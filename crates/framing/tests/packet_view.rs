@@ -3,7 +3,9 @@
 //! several work quanta. Every scenario reaches the packet engine with published
 //! outputs and a physical rejection; a short AVC update is a receiver rejection;
 //! an unsupported HEVC decoder array is an initialization rejection; teardown
-//! releases every pool charge.
+//! releases every pool charge. Each scenario's complete event stream (every step
+//! with its remaining work and pool charge, every published or refused fact) is
+//! pinned per quantum to a digest recorded before the forms were merged.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::compat::nal::*;
@@ -17,14 +19,25 @@ const LIMITS: NalPacketLimits = NalPacketLimits {
     maximum_segments: 128,
 };
 
-#[derive(Default, Debug)]
+/// Every step result with its remaining work and pool charge, and every
+/// published or refused fact, in order.
+#[derive(Default)]
 struct Run {
-    outputs: usize,
-    rejections: usize,
-    /// Reference receive result (with `reference-trace`) and raw update bytes.
-    update_rejections: Vec<(Option<i32>, Vec<u8>)>,
-    /// Raw record and declared array type.
-    init_rejection: Option<(Vec<u8>, u8)>,
+    events: Vec<String>,
+}
+impl Run {
+    fn count(&self, prefix: &str) -> usize {
+        self.events.iter().filter(|e| e.starts_with(prefix)).count()
+    }
+    /// FNV-1a over the events, one per line.
+    fn digest(&self) -> u64 {
+        self.events
+            .iter()
+            .flat_map(|e| e.bytes().chain(*b"\n"))
+            .fold(0xcbf2_9ce4_8422_2325, |h, b| {
+                (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+            })
+    }
 }
 
 struct Packet {
@@ -122,6 +135,48 @@ fn framed(width: usize, nals: &[&[u8]]) -> Vec<u8> {
     out
 }
 
+fn step<T>(
+    run: &mut Run,
+    pool: &Budget,
+    label: &str,
+    work: &WorkBudget,
+    r: &Result<BuildStep<T>, triergon_core::Error>,
+) {
+    let kind = match r {
+        Ok(BuildStep::Yield) => "yield".to_string(),
+        Ok(BuildStep::Ready(_)) => "ready".to_string(),
+        Ok(BuildStep::Complete) => "complete".to_string(),
+        Err(e) => format!("error {e:?}"),
+    };
+    run.events.push(format!(
+        "{label} {kind} {} {}",
+        work.remaining(),
+        pool.used()
+    ));
+}
+
+fn output(run: &mut Run, out: &NalPacketOutput) {
+    run.events.push(format!(
+        "out {:?} cfg {:?} id {:?} crefuse {:?} prefuse {:?} epoch {} fwd {}",
+        out.bytes().as_ref(),
+        out.configuration_bytes().as_ref(),
+        out.configuration_source_identity(),
+        out.configuration_source_refusal(),
+        out.packet_source_refusal(),
+        out.receiver_epoch(),
+        out.forward_new_extradata(),
+    ));
+    for (i, s) in out.segments().iter().enumerate() {
+        run.events.push(format!(
+            "seg {i} {:?} {} {} {:?}",
+            s.origin(),
+            s.prefix_bytes(),
+            s.output_offset(),
+            out.segment_bytes(i)
+        ));
+    }
+}
+
 fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
     let pool = Budget::new(1 << 20).unwrap();
     let base = pool.used();
@@ -132,10 +187,13 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
             let mut p =
                 ReceiverAvcConfigParser::new(&pool, avc_source(20), raw, avc_limits()).unwrap();
             loop {
-                match p.step(&mut WorkBudget::new(q), &NO).unwrap() {
-                    BuildStep::Ready(v) => break NalPacketConfiguration::ReceiverAvc(v),
-                    BuildStep::Yield => (),
-                    BuildStep::Complete => panic!("missing AVC configuration"),
+                let mut w = WorkBudget::new(q);
+                let r = p.step(&mut w, &NO);
+                step(&mut run, &pool, "avc", &w, &r);
+                match r {
+                    Ok(BuildStep::Ready(v)) => break NalPacketConfiguration::ReceiverAvc(v),
+                    Ok(BuildStep::Yield) => (),
+                    _ => return run,
                 }
             }
         }
@@ -143,10 +201,13 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
             let mut p =
                 ReceiverHevcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
             loop {
-                match p.step(&mut WorkBudget::new(q), &NO).unwrap() {
-                    BuildStep::Ready(v) => break NalPacketConfiguration::ReceiverHevc(v),
-                    BuildStep::Yield => (),
-                    BuildStep::Complete => panic!("missing HEVC configuration"),
+                let mut w = WorkBudget::new(q);
+                let r = p.step(&mut w, &NO);
+                step(&mut run, &pool, "hevc", &w, &r);
+                match r {
+                    Ok(BuildStep::Ready(v)) => break NalPacketConfiguration::ReceiverHevc(v),
+                    Ok(BuildStep::Yield) => (),
+                    _ => return run,
                 }
             }
         }
@@ -156,13 +217,26 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
         let mut writer =
             NalPacketConfigWriter::new(&pool, session.configuration(), 1 << 20).unwrap();
         loop {
-            match writer.step(&mut WorkBudget::new(q), &NO) {
-                Ok(BuildStep::Ready(_)) => break,
+            let mut w = WorkBudget::new(q);
+            let r = writer.step(&mut w, &NO);
+            step(&mut run, &pool, "init", &w, &r);
+            match r {
+                Ok(BuildStep::Ready(v)) => {
+                    run.events.push(format!(
+                        "init {:?} src {:?} refuse {:?}",
+                        v.bytes().as_ref(),
+                        v.source_bytes().as_ref(),
+                        v.strict_source_refusal()
+                    ));
+                    break;
+                }
                 Ok(BuildStep::Yield) => (),
                 _ => {
-                    run.init_rejection = writer
-                        .take_receiver_rejection()
-                        .map(|r| (r.source_bytes().to_vec(), r.declared_array_type()));
+                    let r = writer.take_receiver_rejection();
+                    run.events.push(format!(
+                        "init-rejection {:?}",
+                        r.map(|r| (r.source_bytes().to_vec(), r.declared_array_type()))
+                    ));
                     drop(writer);
                     drop(session);
                     assert_eq!(pool.used(), base, "teardown releases every charge");
@@ -187,18 +261,22 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
                 )
                 .unwrap();
                 let parsed = loop {
-                    match p.step(&mut WorkBudget::new(q), &NO) {
+                    let mut w = WorkBudget::new(q);
+                    let r = p.step(&mut w, &NO);
+                    step(&mut run, &pool, "update", &w, &r);
+                    match r {
                         Ok(BuildStep::Ready(v)) => break Some(v),
                         Ok(BuildStep::Yield) => (),
                         _ => {
-                            if let Some(r) = p.take_update_rejection() {
-                                #[cfg(feature = "reference-trace")]
-                                let native = Some(r.native_receive_result());
-                                #[cfg(not(feature = "reference-trace"))]
-                                let native = None;
-                                run.update_rejections
-                                    .push((native, r.source_bytes().to_vec()));
+                            let r = p.take_update_rejection();
+                            #[cfg(feature = "reference-trace")]
+                            if let Some(r) = &r {
+                                assert_eq!(r.native_receive_result(), -1_094_995_529);
                             }
+                            run.events.push(format!(
+                                "update-rejection {:?}",
+                                r.map(|r| (r.source_bytes().to_vec(), r.source_error()))
+                            ));
                             break None;
                         }
                     }
@@ -227,62 +305,96 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
             },
             new_extradata: extra,
         };
-        let Ok(mut job) = session.receiver_packet(source, update) else {
-            continue;
+        let mut job = match session.receiver_packet(source, update) {
+            Ok(job) => job,
+            Err(e) => {
+                run.events.push(format!("begin {e:?}"));
+                continue;
+            }
         };
         loop {
-            match job.step(&mut WorkBudget::new(q), &NO) {
+            let mut w = WorkBudget::new(q);
+            let r = job.step(&mut w, &NO);
+            step(&mut run, &pool, "packet", &w, &r);
+            match r {
                 Ok(BuildStep::Ready(v)) => {
-                    run.outputs += 1;
+                    output(&mut run, &v);
                     kept.push(v);
                     break;
                 }
                 Ok(BuildStep::Yield) => (),
                 Ok(BuildStep::Complete) => break,
                 Err(_) => {
-                    if job.take_receiver_rejection().is_some() {
-                        run.rejections += 1;
-                    }
+                    let r = job.take_receiver_rejection();
+                    run.events.push(format!(
+                        "rejection {:?}",
+                        r.map(|r| (
+                            r.kind(),
+                            r.source_error(),
+                            r.configuration_bytes().to_vec(),
+                            r.configuration_source_identity(),
+                            r.configuration_source_refusal(),
+                            r.packet_source_refusal(),
+                            r.receiver_epoch(),
+                        ))
+                    ));
                     break;
                 }
             }
         }
+        run.events
+            .push(format!("epoch {}", session.receiver_epoch()));
     }
     drop(session);
+    // Outputs keep every fact after the session closes.
+    for out in &kept {
+        output(&mut run, out);
+    }
     drop(kept);
     assert_eq!(pool.used(), base, "teardown releases every charge");
     run
 }
 
+const QUANTA: [u64; 7] = [1, 2, 3, 5, 7, 16, 4096];
+/// Recorded at QUANTA from the compact receiver on `main` at `0f154393`.
+#[rustfmt::skip]
+const DIGESTS: &[(&str, [u64; 7])] = &[
+    ("avc w1 ppsfalse", [1947442219789186057, 1185511715728659596, 8307867964941644497, 16897372378937639698, 17866696144606131561, 5629152097004961167, 18136709142933314019]),
+    ("avc w1 ppstrue", [13884842486497754742, 7760196371067881174, 8533287113242588717, 3299030819101980589, 28164783380591304, 15532338594060495250, 2993719951551840672]),
+    ("avc w2 ppsfalse", [18239225528200379728, 13696431517684817629, 1177911623385127194, 14722527547198414937, 9852954414541737502, 8247547752360730507, 5065442223320622584]),
+    ("avc w2 ppstrue", [3186796332870143657, 9787146178842508965, 6758172136960999258, 2013678162438990773, 7693912216902509816, 16660758004324448607, 875409473685783686]),
+    ("avc w3", [16842999140837986091, 13141484540749877097, 13752474366022095176, 11986371681674494830, 1314298917957113964, 10689175764475304426, 12754415927343330207]),
+    ("avc w4 ppsfalse", [6881063878196693147, 16788212410440608559, 8861556221903114139, 14865897147439908912, 14004740400971062279, 418115431769904358, 17699106426060566749]),
+    ("avc w4 ppstrue", [13984787769768039516, 4966072882948194836, 12326267232434518053, 1703232038220652748, 131814776833187396, 3399827663089223451, 13214804148910948561]),
+    ("hevc duplicate w1", [3124786859819776625, 1630484269661242907, 10996132396304132206, 3848208352051949208, 8615005597859952558, 9479307566767738734, 1429814736607856650]),
+    ("hevc duplicate w2", [7620262315426779902, 9082895688902331519, 2414145230931230328, 14051324404230534766, 6556259138145128636, 12964702671778931216, 12653359729152742345]),
+    ("hevc duplicate w4", [12166421534325376975, 14338866888887521327, 3786663991869377886, 1887436272715170888, 14218994063198536257, 10316036579912284558, 5144817311338313907]),
+    ("hevc empty-arrays w1", [4472031776549822959, 389195086017800842, 512248974393640783, 5196724354034341913, 7642291549320038400, 5678538463194126218, 4270409721997365512]),
+    ("hevc empty-arrays w2", [12093839843655496258, 14297394989122481366, 7641131992357581990, 5921002143566267030, 10139872864010920011, 15879448962327190946, 16856545013193957969]),
+    ("hevc empty-arrays w4", [4544666759356073468, 16069129778441921885, 1445292836986433385, 9501364019316999730, 10720420832453371739, 5133658117174576628, 3768710688477938181]),
+    ("hevc plain w1", [1151220572727913936, 17146245933546370549, 5503377946578327264, 2327234607465535447, 9713478295318565475, 3763506753170346512, 12884181674464957107]),
+    ("hevc plain w2", [18347078724543440790, 10955919909891640212, 11516865353179713685, 11464422390447011651, 3832210858104039010, 11884959605875041875, 13851452055297469670]),
+    ("hevc plain w4", [4918472576543061793, 11332669951336139187, 40232216270817173, 15544172345539372930, 733418252062103648, 14728754430991790955, 247588522761713046]),
+    ("hevc unsupported-array w1", [13228462911118913844, 5816232290387083747, 12526470776149356078, 3858220857909355972, 439654780368376682, 16238039268892528066, 2153331595941929985]),
+    ("hevc unsupported-array w2", [5103550455282199555, 12793933050465456660, 15257397603592746829, 1252985044042593747, 1305757942712506281, 4252329059126782593, 14139041805707675458]),
+    ("hevc unsupported-array w4", [9276415840149683133, 6722290642593121470, 10083458655981451603, 6426923991653888973, 15108859086384853719, 16137964412663070607, 17233005384820849888]),
+];
+
+/// Each scenario's event stream at every quantum, as recorded from the receiver
+/// before its configuration forms were merged.
 fn assert_receives(codec: Codec, record: &[u8], packets: &[Packet], label: &str) {
-    for q in [1, 2, 3, 5, 7, 16, 4096] {
+    let Some(&(_, expected)) = DIGESTS.iter().find(|(l, _)| *l == label) else {
+        panic!("no digests for {label}");
+    };
+    for (q, expected) in QUANTA.into_iter().zip(expected) {
         let run = receive(codec, record, packets, q);
-        if label.contains("unsupported") {
-            assert_eq!(
-                run.init_rejection,
-                Some((record.to_vec(), 55)),
-                "{label} quantum {q}"
-            );
-            continue;
-        }
-        // Every scenario must reach the packet engine, so the run covers
-        // published outputs rather than only an early configuration refusal.
+        // Every scenario reaches the packet engine or the decoder-array refusal.
         assert!(
-            run.outputs >= 4 && run.rejections >= 1,
-            "{label} quantum {q}: {run:?}"
+            run.count("init-rejection Some") == 1
+                || (run.count("out ") >= 8 && run.count("rejection Some") >= 1),
+            "{label} quantum {q}"
         );
-        if codec == Codec::Avc {
-            // The two-byte version-one update is shorter than a complete record.
-            #[cfg(feature = "reference-trace")]
-            let native = Some(-1_094_995_529);
-            #[cfg(not(feature = "reference-trace"))]
-            let native = None;
-            assert_eq!(
-                run.update_rejections,
-                [(native, vec![1, 100])],
-                "{label} quantum {q}"
-            );
-        }
+        assert_eq!(run.digest(), expected, "{label} quantum {q}");
     }
 }
 

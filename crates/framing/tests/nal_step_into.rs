@@ -673,3 +673,125 @@ fn physical_rejection_retains_verified_update_and_original_source_with_no_partia
     drop(rejection);
     assert_eq!(pool.used(), baseline);
 }
+
+fn hvcc() -> Vec<u8> {
+    let mut raw = vec![
+        1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 120, 240, 0, 252, 253, 248, 248, 0, 0, 15, 3,
+    ];
+    for kind in [32, 33, 34] {
+        raw.extend_from_slice(&[128 | kind, 0, 1, 0, 3, kind << 1, 1, 128]);
+    }
+    raw
+}
+
+/// Strict hvcC session whose configuration is a hidden-parent slice.
+fn hevc_session(pool: &Budget) -> NalPacketSession {
+    let mut parser = HvcConfigParser::new(
+        pool,
+        HvcConfigSource {
+            source: SourceId(11),
+            generation: 29,
+            offset: 17,
+        },
+        hidden(pool, &hvcc()),
+        HvcConfigLimits {
+            maximum_record_bytes: 4096,
+            maximum_arrays: 255,
+            maximum_nals: 64,
+            maximum_nal_bytes: 4096,
+        },
+    )
+    .unwrap();
+    let config = loop {
+        match parser
+            .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+            .unwrap()
+        {
+            BuildStep::Ready(value) => break value,
+            BuildStep::Yield => (),
+            BuildStep::Complete => panic!("missing HEVC configuration"),
+        }
+    };
+    NalPacketSession::new(pool, NalPacketConfiguration::Hevc(config), limits()).unwrap()
+}
+
+/// Every published fact of an output, segment payloads included.
+fn facts(out: &NalPacketOutput) -> String {
+    let segments: Vec<_> = out
+        .segments()
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            (
+                out.segment_bytes(i),
+                s.origin(),
+                s.prefix_bytes(),
+                s.output_offset(),
+            )
+        })
+        .collect();
+    format!(
+        "{:?} {:?} {:?} {:?} {:?} {} {:?} {:?} {:?} {:?} {} {} {:?}",
+        out.bytes().as_ref(),
+        out.source().bytes.as_ref(),
+        out.configuration_bytes().as_ref(),
+        out.source().fields,
+        out.source().location,
+        out.source().generation,
+        out.source()
+            .new_extradata
+            .as_ref()
+            .map(|b| b.as_ref().to_vec()),
+        out.configuration_source_identity(),
+        out.configuration_source_refusal(),
+        out.packet_source_refusal(),
+        out.receiver_epoch(),
+        out.forward_new_extradata(),
+        segments,
+    )
+}
+
+#[test]
+fn strict_packets_keep_every_poll_and_fact_across_work_plans() {
+    // Recorded on `main` at `0f154393` from the strict compact path, per plan.
+    const DIGESTS: [u64; 4] = [
+        13_338_352_700_024_966_442,
+        8_938_238_107_557_535_556,
+        928_101_546_738_566_266,
+        6_227_540_478_076_583_636,
+    ];
+    let packets: [(Codec, &[u8]); 8] = [
+        (Codec::Avc, &[0, 0, 0, 3, 0x65, 0xb8, 128]),
+        (Codec::Avc, &[0, 0, 0, 1, 0x41]),
+        (Codec::Avc, &[0, 0]),
+        (Codec::Avc, &[0, 0, 0, 2, 0x41]),
+        (Codec::Avc, &[0, 0, 0, 1, 0x81]),
+        (Codec::Hevc, &[0, 0, 0, 3, 38, 1, 128]),
+        (Codec::Hevc, &[0, 0, 0, 0]),
+        (Codec::Hevc, &[0, 0, 0, 1, 38]),
+    ];
+    let plans: [&[u64]; 4] = [&[0, 1], &[1], &[7], &[4096]];
+    for (plan, expected) in plans.into_iter().zip(DIGESTS) {
+        let mut log = String::new();
+        for (codec, raw) in packets {
+            let pool = Budget::new(16_384).unwrap();
+            let baseline = pool.used();
+            let mut session = match codec {
+                Codec::Avc => avc_session(&pool),
+                Codec::Hevc => hevc_session(&pool),
+            };
+            let cancel = AtomicBool::new(false);
+            let mut job = session.packet(input(hidden(&pool, raw)), None).unwrap();
+            let (polls, ready) = drive(plan, |w, out| job.step_into(w, &cancel, out));
+            drop(job);
+            drop(session);
+            log += &format!("{polls:?} {:?}\n", ready.as_ref().map(facts));
+            drop(ready);
+            assert_eq!(pool.used(), baseline);
+        }
+        let digest = log.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+            (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+        });
+        assert_eq!(digest, expected, "plan {plan:?}\n{log}");
+    }
+}

@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 //! AVC/hvcC configuration storage, work accounting and receiver acceptance.
-//! Literal record arithmetic and pool accounting are the oracles; no native or
-//! encoder output.
+//! Literal record arithmetic and pool accounting are the oracles; step traces
+//! and outcomes are pinned to digests recorded before the eager and compact
+//! forms were merged. No native or encoder output.
 use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
@@ -42,6 +43,34 @@ drive!(
 );
 
 static NO: AtomicBool = AtomicBool::new(false);
+const QUANTA: [u64; 7] = [1, 2, 3, 5, 7, 16, 4096];
+
+/// FNV-1a digest of each value's `Debug` text, compared with a value recorded
+/// from the compact parsers on `main` before their two forms were merged.
+fn pinned<T: std::fmt::Debug>(label: &str, values: impl IntoIterator<Item = T>) {
+    let digest = values
+        .into_iter()
+        .flat_map(|v| format!("{v:?}\n").into_bytes())
+        .fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+            (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+        });
+    let expected = PINNED
+        .iter()
+        .find(|(l, _)| *l == label)
+        .unwrap_or_else(|| panic!("nothing pinned for {label}"))
+        .1;
+    assert_eq!(digest, expected, "{label}");
+}
+/// Recorded on `main` at `0f154393`.
+#[rustfmt::skip]
+const PINNED: &[(&str, u64)] = &[
+    ("avc cancellation", 9066978457836606541),
+    ("avc failure traces", 14901974243396209317),
+    ("avc quanta", 15985694055837125293),
+    ("hevc cancellation", 10290735226527857491),
+    ("hevc quanta", 9182612859336961706),
+    ("limit outcomes", 13244593592555061840),
+];
 
 /// Every step's result kind and remaining work, then the terminal outcome.
 fn run<P: Drive>(parser: &mut P, quantum: u64) -> (Trace, Outcome<P::Out>) {
@@ -417,7 +446,7 @@ fn hvc_corpus() -> Vec<(&'static str, Vec<u8>)> {
 // ================================================================== groups
 
 #[test]
-fn g01_every_record_and_quantum_holds_exact_storage_and_record_extents() {
+fn every_record_and_quantum_holds_exact_storage_and_record_extents() {
     let mut ok = 0;
     let mut total = 0;
     for (_, raw) in avc_fixture_records() {
@@ -480,7 +509,7 @@ fn g01_every_record_and_quantum_holds_exact_storage_and_record_extents() {
 }
 
 #[test]
-fn g01_truncations_refuse_physically_and_mutations_keep_exact_storage() {
+fn truncations_refuse_physically_and_mutations_keep_exact_storage() {
     let rich = avc_rich();
     // Everything before the two trailing bytes is structure.
     let understood = rich.len() - 2;
@@ -547,7 +576,7 @@ fn g01_truncations_refuse_physically_and_mutations_keep_exact_storage() {
 }
 
 #[test]
-fn g01_literal_hvcc_record_arithmetic() {
+fn literal_hvcc_record_arithmetic() {
     // hvcC example: 23-byte prefix, four arrays (one empty, one mismatched).
     let pool = Budget::new(65_536).unwrap();
     let raw = hvc_example(&[0xde, 0xad, 0xbe]);
@@ -602,7 +631,7 @@ fn g01_literal_hvcc_record_arithmetic() {
     assert_eq!(config.syntax_issues(), 1 << 7);
 }
 #[test]
-fn g02_single_exports_outlive_parser_and_configuration_with_one_full_owner() {
+fn single_exports_outlive_parser_and_configuration_with_one_full_owner() {
     let pool = Budget::new(1 << 20).unwrap();
     let baseline = pool.used();
     let raw = bytes(&pool, &hvc_example(&[0xde, 0xad]));
@@ -639,7 +668,7 @@ fn g02_single_exports_outlive_parser_and_configuration_with_one_full_owner() {
 }
 
 #[test]
-fn g04_hidden_parent_offsets_are_record_relative_and_fully_charged() {
+fn hidden_parent_offsets_are_record_relative_and_fully_charged() {
     for (codec, record) in [("avc", avc_rich()), ("hevc", hvc_example(&[9]))] {
         let pool = Budget::new(1 << 20).unwrap();
         let baseline = pool.used();
@@ -674,7 +703,7 @@ fn g04_hidden_parent_offsets_are_record_relative_and_fully_charged() {
 }
 
 #[test]
-fn g05_hvcc_full_width_offsets_and_absolute_extent() {
+fn hvcc_full_width_offsets_and_absolute_extent() {
     // A 65535-byte payload puts the later spans far above u16.
     let pool = Budget::new(1 << 20).unwrap();
     let mut hvc = hvc_prefix(4, 2);
@@ -707,7 +736,7 @@ fn g05_hvcc_full_width_offsets_and_absolute_extent() {
 }
 
 #[test]
-fn g06_empty_arrays_extensions_reserved_bits_mismatch_and_suffix() {
+fn empty_arrays_extensions_reserved_bits_mismatch_and_suffix() {
     // AVC: empty SPS and PPS groups, extension with no SPS-ext, suffix, and
     // a non-all-ones length-reserved pattern retained without repair.
     let raw = vec![1, 100, 0, 40, 0x7c, 0xe0, 0, 0xfc, 0xf8, 0xf8, 0, 1, 2];
@@ -761,9 +790,18 @@ fn g06_empty_arrays_extensions_reserved_bits_mismatch_and_suffix() {
 }
 
 #[test]
-fn g07_cancellation_and_complete_ordering() {
+fn cancellation_quanta_and_complete_ordering() {
     let rich = avc_rich();
     let hvc = hvc_example(&[1]);
+    // Every step and outcome at each quantum.
+    pinned(
+        "avc quanta",
+        QUANTA.map(|q| avc_check(&rich, avc_limits(), q)),
+    );
+    pinned(
+        "hevc quanta",
+        QUANTA.map(|q| hvc_check(&hvc, hvc_limits(), q)),
+    );
     let pool = Budget::new(1 << 20).unwrap();
     let baseline = pool.used();
     let avc =
@@ -829,17 +867,22 @@ fn g07_cancellation_and_complete_ordering() {
     let avc_steps = cancelled(avc(), usize::MAX).len();
     let hvc_steps = cancelled(hvc(), usize::MAX).len();
     assert!(avc_steps > 10 && hvc_steps > 10);
+    let (mut avc_traces, mut hvc_traces) = (Vec::new(), Vec::new());
     for at in 0..40 {
         let trace = cancelled(avc(), at);
         assert_eq!(trace.last() == Some(&201), at < avc_steps, "avc cancel{at}");
+        avc_traces.push(trace);
         let trace = cancelled(hvc(), at);
         assert_eq!(
             trace.last() == Some(&201),
             at < hvc_steps,
             "hevc cancel{at}"
         );
+        hvc_traces.push(trace);
         assert_eq!(pool.used(), baseline);
     }
+    pinned("avc cancellation", avc_traces);
+    pinned("hevc cancellation", hvc_traces);
 }
 
 #[test]
@@ -873,7 +916,7 @@ fn avc_cached_fill_boundary_matches_fallback_output_and_work() {
 }
 
 #[test]
-fn g08_permanent_failures_and_limits_latch_and_release() {
+fn permanent_failures_and_limits_latch_and_release() {
     let rich = avc_rich();
     // Late physical truncation, zero NAL length and a bad fixed NAL header.
     let mut zero = rich.clone();
@@ -885,11 +928,21 @@ fn g08_permanent_failures_and_limits_latch_and_release() {
         ("zero-length", zero),
         ("forbidden-bit", forbidden),
     ];
-    for (label, raw) in &cases {
-        for quantum in [1, 7, 4096] {
-            assert!(avc_check(raw, avc_limits(), quantum).1.is_err(), "{label}");
+    let errors = [
+        Error::Truncated,
+        Error::Invalid("zero AVC record NAL length"),
+        Error::Invalid("NAL forbidden_zero_bit"),
+    ];
+    let mut traces = Vec::new();
+    for ((label, raw), error) in cases.iter().zip(errors) {
+        for quantum in QUANTA {
+            let (trace, out) = avc_check(raw, avc_limits(), quantum);
+            assert_eq!(out.err(), Some(error), "{label} quantum {quantum}");
+            traces.push(trace);
         }
     }
+    pinned("avc failure traces", traces);
+    let mut outcomes = Vec::new();
     // Record, NAL-count and NAL-size limits: five NALs, the largest four bytes.
     for maximum_nals in 0..=6 {
         for maximum_nal_bytes in [1, 2, 3, 4, 65_535] {
@@ -899,6 +952,7 @@ fn g08_permanent_failures_and_limits_latch_and_release() {
                 ..avc_limits()
             };
             let out = avc_check(&rich, limits, 1).1;
+            outcomes.push(format!("{limits:?} {out:?}"));
             if maximum_nals >= 5 && maximum_nal_bytes >= 4 {
                 assert!(out.is_ok(), "{limits:?}");
             } else {
@@ -912,6 +966,7 @@ fn g08_permanent_failures_and_limits_latch_and_release() {
             ..avc_limits()
         };
         let out = avc_check(&rich, limits, 4096).1;
+        outcomes.push(format!("{limits:?} {out:?}"));
         assert_eq!(out.is_ok(), maximum_record_bytes == rich.len());
     }
     // Four arrays and four six-byte NALs.
@@ -926,6 +981,7 @@ fn g08_permanent_failures_and_limits_latch_and_release() {
                     ..hvc_limits()
                 };
                 let out = hvc_check(&hvc, limits, 1).1;
+                outcomes.push(format!("{limits:?} {out:?}"));
                 if maximum_arrays >= 4 && maximum_nals >= 4 && maximum_nal_bytes >= 6 {
                     assert!(out.is_ok(), "{limits:?}");
                 } else {
@@ -940,8 +996,10 @@ fn g08_permanent_failures_and_limits_latch_and_release() {
             ..hvc_limits()
         };
         let out = hvc_check(&hvc, limits, 4096).1;
+        outcomes.push(format!("{limits:?} {out:?}"));
         assert_eq!(out.is_ok(), maximum_record_bytes == hvc.len());
     }
+    pinned("limit outcomes", outcomes);
     // A latched failure released its raw handle: only the caller's remains.
     let pool = Budget::new(1 << 16).unwrap();
     let baseline = pool.used();
@@ -982,7 +1040,7 @@ fn minimum_limit(codec: &str, record: &[u8]) -> usize {
 }
 
 #[test]
-fn g09_actual_capacity_minimum_budget_and_resumable_pressure() {
+fn actual_capacity_minimum_budget_and_resumable_pressure() {
     let rich = avc_rich();
     let hvc = hvc_example(&[]);
     for (codec, record) in [("avc", &rich), ("hevc", &hvc)] {
@@ -1060,7 +1118,7 @@ fn g09_actual_capacity_minimum_budget_and_resumable_pressure() {
 }
 
 #[test]
-fn g11_strict_and_observed_configurations_keep_distinct_typed_refusals() {
+fn strict_and_observed_configurations_keep_distinct_typed_refusals() {
     let mut avc3 = avc_rich();
     avc3[4] = 0xfe;
     let mut hvc3 = hvc_example(&[]);
