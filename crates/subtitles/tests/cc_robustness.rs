@@ -58,7 +58,10 @@ fn the_receiver_takes_any_bytes() {
                 pts,
                 duration_ms: random.next() as u32,
             };
-            decoder.decode(&data, clock, &mut subtitle).expect("decode");
+            let mut work = WorkBudget::new(Decoder::packet_work(data.len()));
+            decoder
+                .decode(&data, clock, &mut subtitle, &mut work)
+                .expect("decode");
             for line in subtitle.lines() {
                 assert!(!line.is_empty());
             }

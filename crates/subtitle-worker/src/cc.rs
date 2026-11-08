@@ -291,7 +291,8 @@ impl Prepared for Captions {
                     .and_then(|pts| container::microseconds(pts, base)),
                 duration_ms: packet.duration.map_or(0, |d| milliseconds(d, base)),
             };
-            if decoder.decode(&packet.data, clock, &mut subtitle)? {
+            let mut work = WorkBudget::new(Decoder::packet_work(packet.data.len()));
+            if decoder.decode(&packet.data, clock, &mut subtitle, &mut work)? {
                 emit(sink, index, &subtitle)?;
             }
         }

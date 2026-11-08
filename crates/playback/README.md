@@ -184,7 +184,9 @@ Teletext pages and closed captions become opaque ASS `TextSource`s, which
 teletext page is a clear. A teletext decode needs the decoder's whole packet
 work in one budget. `CaptionBridge` takes H.264 or HEVC access units or MPEG-2
 PES payloads in decode order and decodes the caption frames FFmpeg's
-extraction settles, in its order.
+extraction settles, in its order. It charges one unit per packet byte and,
+per frame, the receiver's packet work for its size, each paid over as many
+polls as needed.
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
 The feed consumes validated PES continuations directly and preserves source

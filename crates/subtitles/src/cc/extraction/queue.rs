@@ -80,6 +80,16 @@ impl FrameQueue {
         &self.data.as_bytes()[entry.start..entry.end]
     }
 
+    /// The front frame, left in the queue.
+    pub(super) fn front(&self) -> Option<CaptionFrame<'_>> {
+        let entry = self.entries().first()?;
+        Some(CaptionFrame {
+            pts: entry.pts,
+            duration: entry.duration,
+            data: self.bytes(entry),
+        })
+    }
+
     /// Takes the front frame; it stays readable until the queue next changes.
     pub(super) fn pop_front(&mut self) -> Result<Option<CaptionFrame<'_>>> {
         self.compact()?;

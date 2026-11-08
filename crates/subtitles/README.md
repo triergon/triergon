@@ -70,7 +70,12 @@ return the subtitle FFmpeg's decoder returns for it, if any:
 `compat::teletext::Decoder::decode`. The DVB and DVD receivers charge their work
 before doing it and return `Status::Yield` when the budget runs out; the caller
 decodes the same packet again, and the work already granted counts towards it,
-so a packet completes after enough calls. A DVB receiver rectangle carries its
+so a packet completes after enough calls. A teletext call needs
+`Decoder::MAX_PACKET_WORK` units available and a caption call
+`Decoder::packet_work(len)`, enough for every construct to report a caption
+(one unit per `cc_data` construct, 512 per caption). With less, either refuses
+with `Error::Backpressure` and changes nothing; otherwise it spends what it
+did. A DVB receiver rectangle carries its
 region depth's `palette`, as FFmpeg reports it, and `colours`, the colour of
 every pixel value: a region recomposed at a smaller depth without a fill keeps
 larger pixel values, which read as zero, or under the automatic palette as the

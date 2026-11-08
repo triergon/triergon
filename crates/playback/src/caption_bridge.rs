@@ -69,6 +69,16 @@ struct Pending {
     paid: u64,
 }
 
+/// What decoding the next settled frame came to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Decoding {
+    Decoded,
+    /// Its work is not paid yet.
+    Unpaid,
+    /// No frame is settled.
+    Idle,
+}
+
 /// Where the stream's end stands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum End {
@@ -96,6 +106,8 @@ pub struct CaptionBridge {
     subtitle: Subtitle,
     delivered: Option<usize>,
     pending: Option<Pending>,
+    /// Work paid towards decoding the next settled frame.
+    decode_paid: u64,
     sequence: u64,
     end: End,
 }
@@ -128,6 +140,7 @@ impl CaptionBridge {
             subtitle: Subtitle::new(pool),
             delivered: None,
             pending: None,
+            decode_paid: 0,
             sequence: 0,
             end: End::Open,
         })
@@ -163,7 +176,9 @@ impl CaptionBridge {
     }
 
     /// Read the provided packet and deliver what it settles. Reading charges
-    /// one unit per byte, paid over as many polls as `work` needs.
+    /// one unit per byte and decoding a settled frame the receiver's
+    /// [`Decoder::packet_work`] for its size, each paid over as many polls as
+    /// `work` needs.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CaptionStep> {
         if cancel.load(Ordering::Relaxed) {
             self.pending = None;
@@ -195,8 +210,10 @@ impl CaptionBridge {
                 self.extractor.push(packet, &mut WorkBudget::new(size))?;
                 continue;
             }
-            if self.decode_next()? {
-                continue;
+            match self.decode_next(work)? {
+                Decoding::Decoded => continue,
+                Decoding::Unpaid => return Ok(CaptionStep::Yield),
+                Decoding::Idle => {}
             }
             match self.end {
                 End::Open => return Ok(CaptionStep::NeedUnit),
@@ -215,10 +232,19 @@ impl CaptionBridge {
         }
     }
 
-    /// Decode the next settled frame; `false` when none is.
-    fn decode_next(&mut self) -> Result<bool> {
+    /// Pay towards decoding the next settled frame and decode it once paid.
+    fn decode_next(&mut self, work: &mut WorkBudget) -> Result<Decoding> {
+        let Some(frame) = self.extractor.peek() else {
+            return Ok(Decoding::Idle);
+        };
+        let needed = Decoder::packet_work(frame.data.len());
+        self.decode_paid += work.take(needed - self.decode_paid);
+        if self.decode_paid < needed {
+            return Ok(Decoding::Unpaid);
+        }
+        self.decode_paid = 0;
         let Some(frame) = self.extractor.pop()? else {
-            return Ok(false);
+            return Ok(Decoding::Idle);
         };
         let rescale = |ticks: i64, to: u64| {
             self.frame_clock
@@ -234,10 +260,14 @@ impl CaptionBridge {
                 .and_then(|ms| u32::try_from(ms).ok())
                 .unwrap_or(0),
         };
-        if self.decoder.decode(frame.data, clock, &mut self.subtitle)? {
+        let mut paid = WorkBudget::new(needed);
+        if self
+            .decoder
+            .decode(frame.data, clock, &mut self.subtitle, &mut paid)?
+        {
             self.delivered = Some(0);
         }
-        Ok(true)
+        Ok(Decoding::Decoded)
     }
 
     /// The next undelivered line of the last decoded event.

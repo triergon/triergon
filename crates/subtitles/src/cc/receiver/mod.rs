@@ -15,6 +15,10 @@
 //! **Real-time mode** reports the screen as it changes, with an unknown end:
 //! every erase and end of caption, and at most once per latency interval the
 //! screen as written by paint-on, roll-up and text characters.
+//!
+//! **Work.** A packet is decoded in one call that needs
+//! [`Decoder::packet_work`] units available and spends one per construct and
+//! 512 per caption it reports.
 
 mod memory;
 mod render;
@@ -24,7 +28,11 @@ use crate::cc::cc_data::{CcType, triplets};
 use crate::cc::line21::odd_parity;
 use crate::cc::text::Text;
 use memory::{Effect, Memory};
-use triergon_core::{Budget, BudgetVec, Result};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+
+/// Work spent per `cc_data` construct and per caption laid out and written.
+const CONSTRUCT_WORK: u64 = 1;
+const CAPTION_WORK: u64 = 512;
 
 /// The receiver's ASS script header.
 pub const ASS_HEADER: &str = "[Script Info]\n\
@@ -232,13 +240,46 @@ impl Decoder {
         ASS_HEADER
     }
 
-    /// Decodes one packet of `cc_data` constructs into `out`. Returns whether
-    /// `out` holds events.
+    /// The work [`decode`](Self::decode) needs available for a packet of
+    /// `len` bytes: every construct reporting a caption, and one more.
+    #[must_use]
+    pub const fn packet_work(len: usize) -> u64 {
+        let constructs = (len / 3) as u64;
+        constructs
+            .saturating_mul(CONSTRUCT_WORK + CAPTION_WORK)
+            .saturating_add(CAPTION_WORK)
+    }
+
+    /// Decodes one packet of `cc_data` constructs into `out`, spending from
+    /// `work` what it did. Returns whether `out` holds events.
     ///
     /// # Errors
     ///
-    /// Only when the budget cannot hold the text.
-    pub fn decode(&mut self, packet: &[u8], clock: Clock, out: &mut Subtitle) -> Result<bool> {
+    /// [`Error::Backpressure`] when `work` has less than
+    /// [`packet_work`](Self::packet_work) left, before anything changes; else
+    /// only when the budget cannot hold the text.
+    pub fn decode(
+        &mut self,
+        packet: &[u8],
+        clock: Clock,
+        out: &mut Subtitle,
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
+        let needed = Self::packet_work(packet.len());
+        if work.remaining() < needed {
+            return Err(Error::Backpressure {
+                requested: usize::try_from(needed).unwrap_or(usize::MAX),
+                available: usize::try_from(work.remaining()).unwrap_or(usize::MAX),
+            });
+        }
+        let reported = self.receive(packet, clock, out)?;
+        let constructs = (packet.len() / 3) as u64;
+        let captions = out.ends.len() as u64;
+        work.take(constructs * CONSTRUCT_WORK + captions * CAPTION_WORK);
+        Ok(reported)
+    }
+
+    fn receive(&mut self, packet: &[u8], clock: Clock, out: &mut Subtitle) -> Result<bool> {
         out.clear(clock.pts);
         let now = clock.pts.unwrap_or(i64::MIN);
         for triplet in triplets(packet) {

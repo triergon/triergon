@@ -185,6 +185,12 @@ impl CaptionExtractor {
         }
     }
 
+    /// The next settled frame, left for [`pop`](Self::pop) to take.
+    #[must_use]
+    pub fn peek(&self) -> Option<CaptionFrame<'_>> {
+        self.output.front()
+    }
+
     /// The next settled frame, in output order; it stays readable until the
     /// extractor is next used. Frames without caption bytes are not output.
     ///

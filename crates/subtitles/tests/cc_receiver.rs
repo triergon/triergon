@@ -8,7 +8,7 @@
 
 use std::fs;
 use std::path::PathBuf;
-use triergon_core::{Budget, WorkBudget};
+use triergon_core::{Budget, Error, WorkBudget};
 use triergon_subtitles::compat::cc::{
     ASS_HEADER, Clock, DataField, Decoder, Options, SccPackets, Subtitle,
 };
@@ -52,6 +52,12 @@ fn recorded(name: &str) -> Vec<Event> {
 }
 
 fn decode(scc: &str, options: Options) -> Vec<Event> {
+    decode_refusing(scc, options, false)
+}
+
+/// The events of `scc`; with `refuse`, each packet is first offered one
+/// work unit short, which must be refused.
+fn decode_refusing(scc: &str, options: Options, refuse: bool) -> Vec<Event> {
     let pool = Budget::new(1 << 24).expect("pool");
     let text = fs::read(fixture(scc)).expect("scc");
     let packets = SccPackets::read(&text, &pool, &mut WorkBudget::new(1 << 20)).expect("packets");
@@ -75,10 +81,24 @@ fn decode(scc: &str, options: Options) -> Vec<Event> {
             pts: Some(packet.pts * 1000),
             duration_ms: packet.duration as u32,
         };
-        if decoder
-            .decode(packet.data, clock, &mut subtitle)
-            .expect("decode")
-        {
+        let needed = Decoder::packet_work(packet.data.len());
+        if refuse {
+            let mut short = WorkBudget::new(needed - 1);
+            let refused = decoder.decode(packet.data, clock, &mut subtitle, &mut short);
+            assert!(matches!(refused, Err(Error::Backpressure { .. })));
+            assert_eq!(short.spent(), 0);
+        }
+        let mut work = WorkBudget::new(needed);
+        let reported = decoder
+            .decode(packet.data, clock, &mut subtitle, &mut work)
+            .expect("decode");
+        // One unit per construct and 512 per caption.
+        let constructs = (packet.data.len() / 3) as u64;
+        assert_eq!(
+            work.spent(),
+            constructs + 512 * subtitle.lines().len() as u64
+        );
+        if reported {
             take(index, &subtitle);
         }
     }
@@ -121,6 +141,21 @@ fn real_time_reports_match_the_reference() {
 }
 
 #[test]
+fn a_packet_without_enough_work_changes_nothing() {
+    for options in [
+        Options::default(),
+        Options {
+            real_time: true,
+            ..Options::default()
+        },
+    ] {
+        for scc in ["scc-popon.scc", "scc-rollup.scc"] {
+            assert_eq!(decode_refusing(scc, options, true), decode(scc, options));
+        }
+    }
+}
+
+#[test]
 fn the_other_field_is_silent() {
     let options = Options {
         data_field: DataField::Second,
@@ -136,7 +171,10 @@ fn packet(decoder: &mut Decoder, subtitle: &mut Subtitle, ms: i64, pairs: &[[u8;
         pts: Some(ms * 1000),
         duration_ms: 0,
     };
-    decoder.decode(&data, clock, subtitle).expect("decode")
+    let mut work = WorkBudget::new(Decoder::packet_work(data.len()));
+    decoder
+        .decode(&data, clock, subtitle, &mut work)
+        .expect("decode")
 }
 
 #[test]
