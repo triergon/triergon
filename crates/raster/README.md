@@ -19,8 +19,8 @@ frame.
 use triergon_core::{Budget, WorkBudget};
 use triergon_font::{OutlinePoint, Point, PointKind};
 use triergon_raster::{
-    BorderRequest, Effects, Filter, FilterFlags, FrameScale, GlyphRef, GlyphRequest, Limits,
-    Outline, Placement, Raster, Run, Shape, Vector,
+    Border, Effects, FrameScale, GlyphRequest, Limits, Outline, Placement, Raster, Run, RunBorder,
+    Shadow, Shape, Vector,
 };
 
 let budget = Budget::new(64 << 20)?;
@@ -51,32 +51,31 @@ let request = GlyphRequest {
     shape: &shape,
     placement,
     frame,
-    border: BorderRequest::Outline { size: [2.0, 2.0] },
+    border: Border::Outline { size: [2.0, 2.0] },
     karaoke: false,
 };
 let mut run = Run::default();
-let bitmaps = raster.render(&request, &mut run, &mut work)?;
+let glyph = raster.render(&request, &mut run, &mut work)?.ok_or("nothing drawn")?;
 
 // The run's fill, border and shadow, blurred with \blur1.
-let flags = FilterFlags { border: true, shadow: true, ..FilterFlags::default() };
-let effects = Effects { flags, be: 0, blur: 1.0, shadow: [2.0, 2.0] };
-let glyph = GlyphRef {
-    glyph: bitmaps.glyph.as_ref(),
-    border: bitmaps.border_bitmap(),
-    position: Vector::new(0, 0),
-    border_position: Vector::new(
-        bitmaps.border_position.x - bitmaps.position.x,
-        bitmaps.border_position.y - bitmaps.position.y,
-    ),
+let effects = Effects {
+    border: RunBorder::Outline { keeps_fill: false },
+    shadow: Shadow { offset: [2.0, 2.0], keeps_fill: true },
+    blur: 1.0,
+    be: 0,
 };
-let composite = raster.compose(&Filter::new(&effects, &frame), &[glyph], &mut work)?;
+let composite = raster.compose(&effects, &frame, [&glyph], &mut work)?;
+assert_eq!(composite.origin, glyph.origin());
 assert!(composite.fill.is_some() && composite.border.is_some() && composite.shadow.is_some());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 A bitmap's `position` is its first pixel relative to the origin it is placed
-against; `GlyphBitmaps::position` and `GlyphRef::position` are those origins,
-for a glyph in the frame and for a run's glyphs relative to the run.
+against: a glyph's fill and border count from `GlyphBitmaps::origin`, the
+glyph's place in the frame, and a run's composite from `Composite::origin`,
+the least origin of its glyphs. A renderer keys its caches with
+`GlyphBitmaps::key` and `Effects::key`, opaque values that are equal when
+libass's cache keys are.
 
 ## What it matches
 
@@ -85,9 +84,9 @@ for a glyph in the frame and for a run's glyphs relative to the run.
 | Outlines | `ass_outline.c`: conversion from font outlines, rectangles, rotation by 90°, affine and perspective transforms, the karaoke leftmost x, control boxes | `Outline`, `Matrix`, `Projection` |
 | Borders | `ass_outline_stroke`, and the stroking scale `get_bitmap_glyph` chooses | `Raster::stroke`, `Pen` |
 | Rasteriser | `ass_rasterizer.c` with 16×16 tiles (the default build, without large tiles) | `Raster::rasterize`, `Shape` |
-| Glyph bitmaps | `calc_transform_matrix`, `quantize_transform`, `restore_transform`, `get_bitmap_glyph` with its border and the opaque box of `\bord` style 3 | `Raster::render`, `GlyphRequest`, `Placement`, `FrameScale`, `Run` |
+| Glyph bitmaps | `calc_transform_matrix`, `quantize_transform`, `restore_transform`, `get_bitmap_glyph` with its border and the opaque box of `\bord` style 3 | `Raster::render`, `GlyphRequest`, `Placement`, `FrameScale`, `Border`, `Run`, `GlyphBitmaps` |
 | Blur | `ass_blur.c` (the cascade Gaussian and its coefficient solver), the `\be` box blur, `ass_synth_blur` | `Raster::blur` |
-| Composition | `quantize_blur`, `restore_blur`, `ass_composite_construct`, `ass_fix_outline`, `ass_shift_bitmap`, the additive blend | `Raster::compose`, `Effects`, `Filter`, `Bitmap` |
+| Composition | the filter flags `render_and_combine_glyphs` derives, `quantize_blur`, `restore_blur`, `ass_composite_construct`, `ass_fix_outline`, `ass_shift_bitmap`, the additive blend | `Raster::compose`, `Effects`, `RunBorder`, `Shadow`, `Composite`, `Bitmap` |
 | Clipping | `render_glyph`: `\clip` and `\iclip` rectangles and the `\kf` split; the multiply blends of vector clips | `Clip`, `ClipFrame`, `Bitmap::multiply`, `Bitmap::multiply_inverse` |
 
 The arithmetic is libass's own: 26.6 integer subdivision with its rounding, the

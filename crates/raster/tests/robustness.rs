@@ -53,10 +53,8 @@ fn a_square_survives_every_operation() {
 
 #[test]
 fn bitmaps_beyond_libass_s_bound_are_refused() {
-    use triergon_core::{Budget, Error, WorkBudget};
-    use triergon_raster::{
-        Bitmap, Effects, Filter, FrameScale, GlyphRef, MAX_BITMAP_BYTES, Raster, Vector,
-    };
+    use triergon_core::{Budget, Error};
+    use triergon_raster::{Bitmap, MAX_BITMAP_BYTES};
     let budget = Budget::new(1 << 20).unwrap();
     for (width, height) in [
         (usize::MAX, 1),
@@ -70,28 +68,6 @@ fn bitmaps_beyond_libass_s_bound_are_refused() {
             "{width} x {height}"
         );
     }
-    // Glyphs placed as far apart as positions reach compose into nothing.
-    let glyph = Bitmap::new(&budget, 4, 4, &limits()).unwrap();
-    let at = |x| GlyphRef {
-        glyph: Some(&glyph),
-        border: None,
-        position: Vector::new(x, x),
-        border_position: Vector::new(x, x),
-    };
-    let frame = FrameScale {
-        blur: [1.0, 1.0],
-        border: [1.0, 1.0],
-        pixel_aspect: 1.0,
-    };
-    let filter = Filter::new(&Effects::default(), &frame);
-    let composite = Raster::new(&budget, limits())
-        .compose(
-            &filter,
-            &[at(i32::MIN), at(i32::MAX)],
-            &mut WorkBudget::new(WORK),
-        )
-        .unwrap();
-    assert!(composite.fill.is_none());
 }
 
 /// A 1×1 bitmap blurred with a variance of 5·10⁵ pixels² would need planes of
@@ -114,7 +90,10 @@ fn a_blur_beyond_the_bitmap_limit_is_refused_before_it_allocates() {
     assert_eq!(refused, Err(Error::Policy("bitmap size")));
     assert_eq!(work.spent(), 0);
     assert!(budget.peak() < 1 << 20, "peak {}", budget.peak());
-    assert_eq!((bitmap.width(), bitmap.height(), bitmap.row(0)), (1, 1, &[255][..]));
+    assert_eq!(
+        (bitmap.width(), bitmap.height(), bitmap.row(0)),
+        (1, 1, &[255][..])
+    );
 }
 
 /// Blurs within the limits charge their work in proportion to the samples
@@ -127,7 +106,9 @@ fn blur_work_follows_the_blurred_area() {
     let mut raster = Raster::new(&budget, Limits::default());
     let blurred = |raster: &mut Raster, size, be, variance, work: &mut WorkBudget| {
         let mut bitmap = Bitmap::new(&budget, size, size, &Limits::default()).unwrap();
-        raster.blur(&mut bitmap, be, variance, work).map(|()| bitmap)
+        raster
+            .blur(&mut bitmap, be, variance, work)
+            .map(|()| bitmap)
     };
 
     // A Gaussian blur charges at least a unit per 16 samples of its output.

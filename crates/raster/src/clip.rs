@@ -2,26 +2,14 @@
 //! (`render_glyph`), with the `\kf` karaoke split into a left and a right colour.
 
 use crate::bitmap::Bitmap;
-use crate::geometry::Vector;
-
-/// A rectangle in whole frame pixels, `right` and `bottom` exclusive.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct PixelRect {
-    /// The first column inside.
-    pub left: i32,
-    /// The first row inside.
-    pub top: i32,
-    /// The first column past the right edge.
-    pub right: i32,
-    /// The first row past the bottom edge.
-    pub bottom: i32,
-}
+use crate::geometry::{Rect, Vector};
 
 /// A `\clip` (or, `inverse`, `\iclip`) rectangle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Clip {
-    /// The clip rectangle in frame pixels (libass's `clip_x0` to `clip_y1`).
-    pub rect: PixelRect,
+    /// The clip rectangle in frame pixels (libass's `clip_x0` to `clip_y1`):
+    /// columns `x_min..x_max` and rows `y_min..y_max`.
+    pub rect: Rect,
     /// The bitmap is visible outside `rect` rather than inside it.
     pub inverse: bool,
 }
@@ -34,9 +22,9 @@ pub struct ClipFrame {
     pub width: i32,
     /// The frame height in pixels; a normal clip is clamped to `0..=height`.
     pub height: i32,
-    /// The script's play area in frame pixels, which bounds the parts of an
-    /// inverse clip.
-    pub content: PixelRect,
+    /// The script's play area in frame pixels, columns `x_min..x_max` and
+    /// rows `y_min..y_max`, which bounds the parts of an inverse clip.
+    pub content: Rect,
 }
 
 /// Which colour of a karaoke split a part is drawn in.
@@ -148,11 +136,11 @@ impl Clip {
         frame: &ClipFrame,
         spans: &mut [Span; 4],
     ) -> usize {
-        let PixelRect {
-            left,
-            top,
-            right,
-            bottom,
+        let Rect {
+            x_min: left,
+            y_min: top,
+            x_max: right,
+            y_max: bottom,
         } = self.rect;
         let (fw, fh) = (i64::from(frame.width), i64::from(frame.height));
         let clamp = |v: i32, extent: i64| i64::from(v).max(0).min(extent);
@@ -181,10 +169,10 @@ impl Clip {
         frame: &ClipFrame,
         spans: &mut [Span; 4],
     ) -> usize {
-        let cx0 = i64::from(self.rect.left) - dst_x;
-        let cy0 = i64::from(self.rect.top) - dst_y;
-        let cx1 = i64::from(self.rect.right) - dst_x;
-        let cy1 = i64::from(self.rect.bottom) - dst_y;
+        let cx0 = i64::from(self.rect.x_min) - dst_x;
+        let cy0 = i64::from(self.rect.y_min) - dst_y;
+        let cx1 = i64::from(self.rect.x_max) - dst_x;
+        let cy1 = i64::from(self.rect.y_max) - dst_y;
         let bands = [
             Span {
                 x0: 0,
@@ -212,8 +200,8 @@ impl Clip {
             },
         ];
         let area = frame.content;
-        let (zx, zy) = (i64::from(area.left), i64::from(area.top));
-        let (sx, sy) = (i64::from(area.right), i64::from(area.bottom));
+        let (zx, zy) = (i64::from(area.x_min), i64::from(area.y_min));
+        let (sx, sy) = (i64::from(area.x_max), i64::from(area.y_max));
         let mut count = 0;
         for band in bands.into_iter().filter(|s| !s.is_empty()) {
             spans[count] = Span {

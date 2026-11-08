@@ -4,9 +4,8 @@
 use triergon_core::{Budget, WorkBudget};
 use triergon_font::{OutlinePoint, Point, PointKind};
 use triergon_raster::{
-    Bitmap, BorderRequest, Clip, ClipFrame, Effects, Filter, FilterFlags, FrameScale, GlyphRef,
-    GlyphRequest, Limits, Matrix, Outline, Pen, PixelRect, Placement, Projection, Raster, Run,
-    Shape, Vector,
+    Bitmap, Border, Clip, ClipFrame, Effects, FrameScale, GlyphRequest, Limits, Matrix, Outline,
+    Pen, Placement, Projection, Raster, Rect, Run, RunBorder, Shadow, Shape, Vector,
 };
 
 /// xorshift64.
@@ -166,7 +165,7 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
         ));
     }
 
-    let bitmap = raster.rasterize(&stroked, &mut work).ok().flatten();
+    let _ = raster.rasterize(&stroked, &mut work);
 
     let shape = Shape::from_outlines(outline, Outline::new(&budget));
     let placement = Placement {
@@ -187,9 +186,9 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
     };
     let size = [rng.scale() * 4.0, rng.scale() * 4.0];
     let border = match rng.below(3) {
-        0 => BorderRequest::None,
-        1 => BorderRequest::Outline { size },
-        _ => BorderRequest::OpaqueBox {
+        0 => Border::None,
+        1 => Border::Outline { size },
+        _ => Border::OpaqueBox {
             size,
             spacing: rng.signed(256) as i32,
             advance: rng.signed(1 << 12) as i32,
@@ -204,31 +203,40 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
         karaoke: rng.below(2) == 0,
     };
     let mut run = Run::default();
-    let Ok(rendered) = raster.render(&request, &mut run, &mut work) else {
-        return;
-    };
+    let mut rendered = Vec::new();
+    for _ in 0..2 {
+        match raster.render(&request, &mut run, &mut work) {
+            Ok(Some(bitmaps)) => rendered.push(bitmaps),
+            Ok(None) => {}
+            Err(_) => return,
+        }
+    }
+    if let Some(bitmaps) = rendered.first() {
+        let _ = (bitmaps.key(), bitmaps.origin());
+        if let Some(border) = bitmaps.border() {
+            assert!(border.width() > 0 && border.height() > 0);
+        }
+    }
 
-    let flags = FilterFlags {
-        opaque_box: rng.below(2) == 0,
-        border: rng.below(2) == 0,
-        shadow: rng.below(2) == 0,
-        fill_in_shadow: rng.below(2) == 0,
-        fill_in_border: rng.below(2) == 0,
-    };
     let effects = Effects {
-        flags,
+        border: match rng.below(3) {
+            0 => RunBorder::None,
+            1 => RunBorder::Outline {
+                keeps_fill: rng.below(2) == 0,
+            },
+            _ => RunBorder::OpaqueBox {
+                shown: rng.below(2) == 0,
+            },
+        },
+        shadow: Shadow {
+            offset: [rng.real(), rng.real()],
+            keeps_fill: rng.below(2) == 0,
+        },
         be: rng.below(12) as u32,
         blur: rng.scale() * 3.0,
-        shadow: [rng.real(), rng.real()],
     };
-    let filter = Filter::new(&effects, &frame);
-    let glyph_ref = GlyphRef {
-        glyph: rendered.glyph.as_ref(),
-        border: rendered.border_bitmap().or(bitmap.as_ref()),
-        position: Vector::new(rng.signed(64) as i32, rng.signed(64) as i32),
-        border_position: Vector::new(rng.signed(64) as i32, rng.signed(64) as i32),
-    };
-    let composite = raster.compose(&filter, &[glyph_ref, glyph_ref], &mut work);
+    let _ = effects.key(&frame);
+    let composite = raster.compose(&effects, &frame, &rendered, &mut work);
 
     if let Ok(mut plain) = Bitmap::new(
         &budget,
@@ -251,23 +259,18 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
             plain.multiply_inverse(&other, rng.signed(100) as i32, rng.signed(100) as i32);
         }
         let clip = Clip {
-            rect: PixelRect {
-                left: rng.signed(1 << 31) as i32,
-                top: rng.signed(400) as i32,
-                right: rng.signed(400) as i32,
-                bottom: rng.signed(1 << 31) as i32,
-            },
+            rect: Rect::new(
+                rng.signed(1 << 31) as i32,
+                rng.signed(400) as i32,
+                rng.signed(400) as i32,
+                rng.signed(1 << 31) as i32,
+            ),
             inverse: rng.below(2) == 0,
         };
         let frame = ClipFrame {
             width: rng.signed(400) as i32,
             height: rng.signed(400) as i32,
-            content: PixelRect {
-                left: 0,
-                top: 0,
-                right: 400,
-                bottom: 400,
-            },
+            content: Rect::new(0, 0, 400, 400),
         };
         let origin = Vector::new(rng.signed(1 << 31) as i32, rng.signed(400) as i32);
         let parts = clip.parts(&plain, origin, rng.signed(400) as i32, &frame);

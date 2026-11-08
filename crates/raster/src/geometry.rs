@@ -27,17 +27,20 @@ impl Vector {
     }
 }
 
-/// An inclusive bounding rectangle. [`Rect::EMPTY`] is the identity of
-/// [`Rect::include`] and reports [`Rect::is_empty`].
+/// The closed rectangle `x_min ≤ x ≤ x_max`, `y_min ≤ y ≤ y_max`. It bounds
+/// points (an outline's control box in 26.6, both corners included) or whole
+/// pixels (an area in frame pixels: columns `x_min..x_max` and rows
+/// `y_min..y_max`, whose squares it covers). [`Rect::EMPTY`] is the identity
+/// of [`Rect::include`] and reports [`Rect::is_empty`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Rect {
-    /// The leftmost covered coordinate.
+    /// The left edge.
     pub x_min: i32,
-    /// The topmost covered coordinate.
+    /// The top edge.
     pub y_min: i32,
-    /// The rightmost covered coordinate, inclusive.
+    /// The right edge, included.
     pub x_max: i32,
-    /// The bottommost covered coordinate, inclusive.
+    /// The bottom edge, included.
     pub y_max: i32,
 }
 
