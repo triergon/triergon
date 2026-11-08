@@ -1,4 +1,5 @@
 use std::fmt;
+use triergon_core::Error as StorageError;
 use triergon_pixel::Geometry;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -14,6 +15,14 @@ pub enum Error {
         expected: Geometry,
         actual: Geometry,
     },
+    /// Storage the encoder needs does not fit its budget.
+    Budget(StorageError),
+}
+
+impl From<StorageError> for Error {
+    fn from(error: StorageError) -> Self {
+        Error::Budget(error)
+    }
 }
 
 impl fmt::Display for Error {
@@ -29,6 +38,7 @@ impl fmt::Display for Error {
                 expected.width(),
                 expected.height()
             ),
+            Error::Budget(error) => write!(f, "storage budget: {error}"),
         }
     }
 }

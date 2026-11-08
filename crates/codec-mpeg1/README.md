@@ -1,9 +1,10 @@
 # triergon-codec-mpeg1
 
 MPEG-1 video encoder (ISO/IEC 11172-2) producing I and P pictures under a VBV
-constraint. It is a codec-layer crate whose only dependency is
+constraint. It is a codec-layer crate whose dependencies are
 [triergon-pixel](../pixel/README.md), which supplies the input `Picture` and its
-`Geometry`. Each call encodes one picture and returns its complete bytes, with no
+`Geometry`, and [triergon-core](../core/README.md), which supplies the storage
+`Budget`. Each call encodes one picture and returns its complete bytes, with no
 reordering delay. It does not convert RGBA (see triergon-pixel), multiplex (see
 [`triergon_mpegts::mux`](../mpegts/README.md#writing-ts)) or pace frames.
 
@@ -27,12 +28,14 @@ let mut es = Vec::new();
 let picture = encoder.encode(&input, &mut es)?;
 // es: this picture's bytes; picture.key, .index, .bits, .qscale_mean
 assert!(picture.key && es.starts_with(&[0, 0, 1, 0xb3])); // sequence header first
-let recon = encoder.reconstruction();             // what a decoder reconstructs
+let recon = encoder.reconstruction();             // PictureView of what a decoder reconstructs
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 `Encoder::config` returns the configuration and `vbv_underflow_bits` the total VBV
-underflow the rate controller observed.
+underflow the rate controller observed. `Encoder::with_limits(config, limits)` gives
+the encoder a pool of `limits.live_storage_bytes`, and `Encoder::new_in(config, &budget)`
+charges a caller's `Budget`.
 
 ## Supported
 
@@ -54,6 +57,15 @@ underflow the rate controller observed.
   `Geometry::new`.
 - `encode` refuses a picture whose geometry differs from the configuration
   (`Error::PictureGeometry`) before changing any state. `out` is cleared first.
+- Storage sized from the configuration is charged to the encoder's budget before it
+  is allocated: the reference and reconstructed pictures, the previous source luma,
+  the macroblock and motion arrays and the coarse planes, the bit writer and the
+  caller's `out` at the bound of one picture (the VBV buffer plus one full and
+  16 bytes per further macroblock; the bit writer never grows), and the first I
+  picture's trial pass (one row). The default `Limits::live_storage_bytes` is
+  96 MiB; the largest geometry (4094x4094) at the largest signalled VBV buffer
+  (1023 × 16 kbit) needs about 74 MiB. A refused charge is `Error::Budget`, from the
+  constructor or before the picture changes any state.
 - The input must have its coded padding filled (`Picture::pad_edges`; the pixel
   `Converter` does this).
 - Every call encodes and advances the picture index, also for an unchanged source
