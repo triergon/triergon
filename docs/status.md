@@ -123,7 +123,7 @@ final carrier after completed nonempty finite packets. Confirmed Timeline
 ordinals fence later input, and terminal proofs require the core input identity
 bound before carrier admission. A separate live macOS
 (`aarch64-apple-darwin`) comparison at
-`e7e1102c0afd466af24e9e8b969e823d5772a230` matches 90 of 97 operations against
+`f939fb92a6e1309fdafcd84b0bc037130ed35ee3` matches 90 of 97 operations against
 the pinned FFmpeg formats worker and unchanged recorded folds, retaining all
 272 requests. Four malformed empty-reference operations and three operations
 across media entities remain failures. No timing or memory was collected for
@@ -205,6 +205,7 @@ the default font file during 12 cases' operations; those mappings count toward i
 | Subtitles: DVB | `0d70bebfc0799f65df14f170ed97e68c5a35daa7` | `06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077` |
 | MPEG-TS | `5634f47d33ca2a9ba671c82e805398ce4eafd83e` | `1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2` |
 | MPEG-TS finite fault recovery, host | `f3f439b803e079208c9ab422270a77feb6281207` | `69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f` |
+| MPEG-TS source boundaries, macOS AArch64 | `f939fb92a6e1309fdafcd84b0bc037130ed35ee3` | `8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656` |
 | MPEG-TS, earlier measurement | `090c856df65f9247d24ea9f1c927e35cf5d528e8` | `6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1` |
 | MPEG-TS control-only completion (macOS) | `65eeada0888bcd112d4cbd90e68795fea93fd864` | `d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b` |
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
