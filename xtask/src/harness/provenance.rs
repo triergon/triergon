@@ -546,7 +546,7 @@ mod tests {
                 "missing source binding: {name}"
             );
         }
-        for feature in crate::fonts::FEATURES {
+        for feature in crate::lanes::LANES.iter().flat_map(|lane| lane.features) {
             for file in ["contract", "pins"] {
                 let name = format!("harness/features/{}/{file}.json", feature.id);
                 assert!(
