@@ -6,54 +6,6 @@ use triergon_harness_protocol::{
 };
 use triergon_matroska::{metadata::Document, typed::BlockingReader as Demuxer};
 
-fn unsigned(id: u64) -> bool {
-    matches!(
-        id,
-        0x2ad7b1
-            | 0x46ae
-            | 0x73c4
-            | 0x45bc
-            | 0x45bd
-            | 0x45db
-            | 0x45dd
-            | 0x91
-            | 0x92
-            | 0x98
-            | 0x4598
-            | 0x6ebc
-            | 0x63c3
-            | 0x89
-            | 0x6955
-            | 0x6922
-            | 0x68ca
-            | 0x63c5
-            | 0x63c9
-            | 0x63c4
-            | 0x63c6
-            | 0x4484
-    )
-}
-fn textual(id: u64) -> bool {
-    matches!(
-        id,
-        0x7ba9
-            | 0x4d80
-            | 0x5741
-            | 0x467e
-            | 0x466e
-            | 0x5654
-            | 0x85
-            | 0x45a3
-            | 0x4487
-            | 0x4660
-            | 0x437c
-            | 0x437d
-            | 0x437e
-            | 0x63ca
-            | 0x447a
-            | 0x447b
-    )
-}
 fn document(out: &mut String, d: &Document) -> Result<(), Box<dyn std::error::Error>> {
     write!(
         out,
@@ -76,12 +28,12 @@ fn document(out: &mut String, d: &Document) -> Result<(), Box<dyn std::error::Er
             e.parent()
                 .map_or("null".into(), |v| v.ordinal().to_string()),
             e.subtree_end(),
-            if unsigned(e.id()) {
+            if e.is_unsigned() {
                 e.uint()?.to_string()
             } else {
                 "null".into()
             },
-            if textual(e.id()) {
+            if e.is_text() {
                 quoted(e.text()?)
             } else {
                 "null".into()

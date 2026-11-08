@@ -14,8 +14,10 @@ mod evidence;
 mod fate;
 mod fetch;
 mod fonts;
+mod framing_bench;
 mod fuzz;
 mod harness;
+mod isobmff_bench;
 mod json;
 mod numpy;
 mod prepare;
@@ -72,6 +74,8 @@ commands:
                  prefix: its release candidate and a dev build of it, with --reference also
                  its reference; the bound on input size is raised to the largest case
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
+  isobmff-bench   compare all 1020 open/index traces; optionally measure 972 labels or --subset52
+  framing        [fixtures] compare all 125 whole-packet framing cases; use --help for options
   grade          TIMING MEMORY --contract F --manifest F --output DIR
                  [--additional-report F] [--require-slice-acceptance|--require-acceptance]
                  join complete reports, recompute runtime and memory bounds, then apply gates
@@ -86,7 +90,7 @@ commands:
                  workers and the independent oracles (tests whose name contains FILTER)
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
                  [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
-                 [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N]
+                 [--benchmark] [--memory] [--pairs N] [--memory-pairs N] [--iterations N] [--seed N]
                  [--baseline-worker W]
                  correctness, paired runtime and memory report of the built workers for one contract;
                  with a baseline worker of another build, timing and memory pair against it
@@ -152,11 +156,17 @@ fn main() -> ExitCode {
             _ => Err("usage: cargo xtask screen REPORTS".into()),
         },
         Some("report") => return report(&root, &args[1..]),
+        Some("framing") => {
+            return failing(framing_bench::main(&root, &args[1..]), framing_bench::USAGE);
+        }
         Some("grade") => {
             return failing(
                 harness::grade::main(&root, &args[1..]),
                 harness::grade::USAGE,
             );
+        }
+        Some("isobmff-bench") => {
+            return failing(isobmff_bench::main(&root, &args[1..]), isobmff_bench::USAGE);
         }
         Some("external-vector") => return external_vector(&root, &args[1..]),
         Some("fate-run") => return fate_run(&root, &args[1..]),

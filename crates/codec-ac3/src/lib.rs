@@ -35,7 +35,9 @@ pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 use quant::GroupTables;
 use substream::{BlockSink, LFE, NCH, PlaneMap, Substream, acmod_channels};
 use triergon_bitstream::BitReader;
-use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels, SurroundEncoding};
+use triergon_codec::{
+    AudioDecoder, Budget, Charged, DecodeFailure, DownmixLevels, Reservation, SurroundEncoding,
+};
 
 /// Bytes of zero padding kept after a frame in the decode buffer.
 pub(crate) const PAD: usize = 16;
@@ -60,6 +62,23 @@ pub struct DecoderOptions {
     pub crc: CrcPolicy,
     pub noise: NoiseMode,
     pub compat: Compat,
+}
+
+/// Storage limits of one decoder.
+#[derive(Clone, Copy, Debug)]
+pub struct Limits {
+    /// Live storage that depends on the stream: dependent substream state and the
+    /// output frame the decoder fills. The default holds eight dependent substreams
+    /// and a 16-channel frame many times over.
+    pub live_storage_bytes: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            live_storage_bytes: 4 * 1024 * 1024,
+        }
+    }
 }
 
 /// Output conventions the decoder reproduces where A/52 leaves a choice or the
@@ -249,7 +268,12 @@ pub struct Decoder {
     groups: Box<GroupTables>,
     rng: noise::Rng,
     indep: Box<Substream>,
-    deps: Vec<Option<Box<Substream>>>,
+    /// Dependent substreams, created and charged when a stream first names them.
+    deps: Vec<Option<Dependent>>,
+    /// Pool of the stream-dependent storage.
+    budget: Budget,
+    /// Charge of the output frame the last access unit sized.
+    output_charge: Reservation,
     last_block: Box<[[f32; 256]; MAX_CHANNELS]>,
     /// Layout and dual-mono flag of the last decoded block, for concealment.
     last_layout: Option<(ChannelLayout, bool)>,
@@ -266,11 +290,21 @@ impl Default for Decoder {
 }
 
 impl Decoder {
+    /// A decoder with the default options and a pool of the default limit.
     pub fn new() -> Self {
-        Self::with_options(DecoderOptions::default())
+        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
-    pub fn with_options(opts: DecoderOptions) -> Self {
+    /// A decoder with its own pool of `limits.live_storage_bytes`. Fails only for a
+    /// limit below a pool's own charge.
+    pub fn with_limits(limits: Limits) -> Result<Self, DecodeError> {
+        Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
+    }
+
+    /// A decoder charging the caller's pool.
+    pub fn new_in(budget: &Budget) -> Self {
+        let opts = DecoderOptions::default();
         let mut deps = Vec::with_capacity(8);
         deps.resize_with(8, || None);
         Decoder {
@@ -281,8 +315,10 @@ impl Decoder {
             rng: noise::Rng::new(
                 opts.compat == Compat::Reference && opts.noise == NoiseMode::Normal,
             ),
-            indep: Substream::new(),
+            indep: Box::new(Substream::new()),
             deps,
+            budget: budget.clone(),
+            output_charge: Reservation::empty(budget),
             last_block: Box::new([[0.0; 256]; MAX_CHANNELS]),
             last_layout: None,
             scratch: Box::new([0.0; 256]),
@@ -290,6 +326,16 @@ impl Decoder {
             quirk_armed: opts.compat == Compat::Reference,
             last_downmix: None,
         }
+    }
+
+    /// The decoder with behaviour options `opts`, from its initial state.
+    #[must_use]
+    pub fn with_options(mut self, opts: DecoderOptions) -> Self {
+        self.opts = opts;
+        self.rng =
+            noise::Rng::new(opts.compat == Compat::Reference && opts.noise == NoiseMode::Normal);
+        self.quirk_armed = opts.compat == Compat::Reference;
+        self
     }
 
     /// Drop overlap/delay history and restart the compatible noise stream.
@@ -304,6 +350,21 @@ impl Decoder {
         }
         self.last_layout = None;
         self.quirk_armed = self.opts.compat == Compat::Reference;
+    }
+
+    /// Size `out` for `len` samples per channel of `layout`, charging it first.
+    fn prepare_output(
+        &mut self,
+        out: &mut AudioFrame,
+        layout: &ChannelLayout,
+        rate: u32,
+        len: usize,
+    ) -> Result<(), DecodeError> {
+        out.try_resize(layout.channels(), len, &mut self.output_charge)?;
+        out.layout = *layout;
+        out.sample_rate = rate;
+        out.samples_per_channel = len;
+        Ok(())
     }
 
     #[doc(hidden)]
@@ -518,7 +579,7 @@ impl Decoder {
                 });
             }
             // AC-3: repeat the last decoded block (FFmpeg-compatible concealment).
-            prepare_output(out, &layout, out_rate, base + samples);
+            self.prepare_output(out, &layout, out_rate, base + samples)?;
             let same = self.last_layout == Some((layout, dual_mono));
             for p in 0..layout.channels() {
                 for blk in 0..first.num_blocks {
@@ -573,7 +634,7 @@ impl Decoder {
             }
         }
 
-        prepare_output(out, &layout, out_rate, base + samples);
+        self.prepare_output(out, &layout, out_rate, base + samples)?;
         self.trace.frames.clear();
         let mut concealed = None;
         let mut info_dialnorm = 0;
@@ -590,8 +651,7 @@ impl Decoder {
             let sub: &mut Substream = if i == 0 {
                 &mut self.indep
             } else {
-                let id = h.substream_id as usize;
-                self.deps[id].get_or_insert_with(Substream::new)
+                dependent(&mut self.deps, &self.budget, h.substream_id as usize)?
             };
             sub.reference_compat = self.opts.compat == Compat::Reference;
             let mut sink = BlockSink {
@@ -677,6 +737,21 @@ impl Decoder {
     }
 }
 
+/// A dependent substream's state, charged to the decoder's pool.
+type Dependent = Charged<Box<Substream>>;
+
+/// Dependent substream `id`, created and charged the first time a stream names it.
+fn dependent<'a>(
+    deps: &'a mut [Option<Dependent>],
+    budget: &Budget,
+    id: usize,
+) -> Result<&'a mut Substream, DecodeError> {
+    Ok(match &mut deps[id] {
+        Some(sub) => sub,
+        slot => slot.insert(Charged::boxed(budget, Substream::new())?),
+    })
+}
+
 impl AudioDecoder for Decoder {
     fn decode(
         &mut self,
@@ -690,16 +765,6 @@ impl AudioDecoder for Decoder {
     fn reset(&mut self) {
         Decoder::reset(self);
     }
-}
-
-fn prepare_output(out: &mut AudioFrame, layout: &ChannelLayout, rate: u32, len: usize) {
-    out.layout = *layout;
-    out.sample_rate = rate;
-    out.planes.resize_with(layout.channels(), Vec::new);
-    for p in &mut out.planes {
-        p.resize(len, 0.0);
-    }
-    out.samples_per_channel = len;
 }
 
 /// Returns (crc1 ok, crc2 ok). E-AC-3 has a single CRC; it is reported in both.
@@ -749,15 +814,54 @@ fn peek_chanmap(frame: &[u8]) -> Option<u16> {
 }
 
 #[cfg(test)]
+mod budget_tests {
+    use super::*;
+    use triergon_codec::StorageError;
+
+    #[test]
+    fn a_refused_dependent_substream_leaves_its_slot_empty() {
+        let budget = Budget::new(64 * 1024).unwrap();
+        let mut deps: Vec<Option<Dependent>> = (0..8).map(|_| None).collect();
+        assert!(matches!(
+            dependent(&mut deps, &budget, 3),
+            Err(DecodeError::Budget(StorageError::Limit { .. }))
+        ));
+        assert!(deps[3].is_none());
+        let budget = Budget::new(1 << 20).unwrap();
+        dependent(&mut deps, &budget, 3).unwrap();
+        let used = budget.used();
+        dependent(&mut deps, &budget, 3).unwrap();
+        assert_eq!(
+            budget.used(),
+            used,
+            "an existing substream is not charged again"
+        );
+    }
+
+    #[test]
+    fn the_default_limit_holds_eight_dependents_and_a_full_frame() {
+        let budget = Budget::new(Limits::default().live_storage_bytes).unwrap();
+        let mut deps: Vec<Option<Dependent>> = (0..8).map(|_| None).collect();
+        for id in 0..8 {
+            dependent(&mut deps, &budget, id).unwrap();
+        }
+        let mut charge = Reservation::empty(&budget);
+        AudioFrame::default()
+            .try_resize(MAX_CHANNELS, 1536, &mut charge)
+            .unwrap();
+        assert!(budget.used() * 2 < budget.limit(), "{}", budget.used());
+    }
+}
+
+#[cfg(test)]
 mod size_tests {
     #[test]
     fn decoder_state_is_bounded() {
         let sub = size_of::<crate::substream::Substream>();
-        let aht = size_of::<[[[f32; 256]; 6]; crate::substream::NCH]>();
         eprintln!(
-            "Substream {sub} bytes (+{aht} AHT heap), Decoder {} bytes",
+            "Substream {sub} bytes, Decoder {} bytes",
             size_of::<crate::Decoder>()
         );
-        assert!(sub + aht < 128 * 1024);
+        assert!(sub < 128 * 1024);
     }
 }

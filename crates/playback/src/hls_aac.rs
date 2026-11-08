@@ -1,6 +1,9 @@
 //! Access units for explicitly selected TS AAC ADTS carriage (PMT stream type
 //! 0x0f). PES boundaries are transport boundaries, even inside an ADTS header.
-use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
+use crate::{
+    TrackKey, TsNativeCarriage, TsNativeConfiguration,
+    hls_avc::{clock_describes, lane_track, pes_time},
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
 use triergon_framing::{AacAdtsHeader, inspect_aac_adts_header};
@@ -105,12 +108,7 @@ impl HlsAac {
         let Some(packet) = mailbox.as_ref() else {
             return Ok(false);
         };
-        if self.config.track
-            != (TrackKey::Ts {
-                program: packet.program,
-                pid: packet.pid,
-            })
-            || packet.source_epochs.configuration != self.config.configuration_epoch
+        if !lane_track(self.config.track, self.config.configuration_epoch, packet)
             || packet.stream_id != 0xc0
             || packet.source_header.stream_id != packet.stream_id
         {
@@ -136,21 +134,15 @@ impl HlsAac {
         let anchor = packet.time_header();
         let raw_pts = anchor.and_then(|header| header.pts_raw33);
         let raw_dts = anchor.and_then(|header| header.dts_raw33);
-        if clock.program != packet.program
-            || clock.pid != packet.pid
-            || clock.profile != packet.profile
-            || clock.source_epochs != packet.source_epochs
-            || clock.source_pts_raw33 != raw_pts
-            || clock.source_dts_raw33 != raw_dts
-        {
+        if !clock_describes(&clock, packet, raw_pts, raw_dts) {
             return Err(Error::Invalid("HLS AAC clock does not describe this PES"));
         }
         if anchor.is_some() {
             // A newer applicable PES supersedes an unused anchor. An
             // applicable header with no timestamp carries explicit absence.
             self.next_clock = Clock {
-                pts: authoritative_time(raw_pts, clock.pts90)?,
-                dts: authoritative_time(raw_dts, clock.dts90)?,
+                pts: pes_time(raw_pts, clock.pts90, TIMESTAMP)?,
+                dts: pes_time(raw_dts, clock.dts90, TIMESTAMP)?,
             };
         } else if changed_epoch {
             self.next_clock = Clock::default();
@@ -331,17 +323,7 @@ impl HlsAac {
     }
 }
 
-fn authoritative_time(raw: Option<u64>, ticks: Option<i128>) -> Result<Option<Time>> {
-    let Some(raw) = raw else {
-        // The native clock may mirror a PTS-only header into DTS. Keep actual
-        // DTS absence on the feed view.
-        return Ok(None);
-    };
-    let ticks = ticks
-        .filter(|value| value.rem_euclid(1 << 33) == i128::from(raw))
-        .ok_or(Error::Invalid("HLS AAC PES timestamp representative"))?;
-    Ok(Some(Time::new(ticks, 90_000)?))
-}
+const TIMESTAMP: &str = "HLS AAC PES timestamp representative";
 
 #[cfg(test)]
 mod tests {

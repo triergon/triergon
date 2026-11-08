@@ -21,15 +21,8 @@ impl<R: Read> BlockingReader<R> {
         Self::open_in(source, limits, &pool)
     }
     pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
-        Self::construct(
-            source,
-            limits,
-            pool,
-            false,
-            None,
-            None,
-            crate::storage::PayloadOwnership::OwnedExact,
-        )
+        let policy = crate::storage::PayloadOwnership::OwnedExact;
+        Self::open_in_with_payload_ownership(source, limits, pool, policy)
     }
     pub fn open_with_payload_ownership(
         source: R,
@@ -45,36 +38,24 @@ impl<R: Read> BlockingReader<R> {
         pool: &Budget,
         policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
-        Self::construct(source, limits, pool, false, None, None, policy)
+        let reader = Reader::new(pool, SourceId(1), capabilities(false), limits, 8192)?;
+        Self::construct(reader, InputFeeder::new(source, 8192)?, None, policy)
     }
     pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
         self.reader.payload_ownership()
     }
     fn construct(
-        source: R,
-        limits: Limits,
-        pool: &Budget,
-        random_access: bool,
-        reposition: Option<Reposition<R>>,
-        position: Option<Position<R>>,
+        mut reader: Reader,
+        input: InputFeeder<R>,
+        seek: Option<(Reposition<R>, Position<R>)>,
         policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
-        let mut reader = Reader::new(
-            pool,
-            SourceId(1),
-            SourceCapabilities {
-                length: None,
-                random_access,
-            },
-            limits,
-            8192,
-        )?;
         reader.envelope.set_payload_ownership(policy);
         Self::initialize(Self {
             reader,
-            input: InputFeeder::new(source, 8192)?,
-            reposition,
-            position,
+            input,
+            reposition: seek.map(|(reposition, _)| reposition),
+            position: seek.map(|(_, position)| position),
         })
     }
     fn initialize(mut result: Self) -> Result<Self> {
@@ -333,9 +314,17 @@ impl<R: Read> BlockingReader<R> {
     }
 }
 impl<R: Read + Seek> BlockingReader<R> {
+    const SEEK: (Reposition<R>, Position<R>) = (
+        |reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset)),
+        |feed, cursor, request, cancel| feed.synchronize_seekable_position(cursor, request, cancel),
+    );
     pub fn open_seekable(source: R, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_seekable_in(source, limits, &pool)
+    }
+    pub fn open_seekable_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+        let policy = crate::storage::PayloadOwnership::OwnedExact;
+        Self::open_seekable_in_with_payload_ownership(source, limits, pool, policy)
     }
     pub fn open_seekable_with_payload_ownership(
         source: R,
@@ -351,30 +340,20 @@ impl<R: Read + Seek> BlockingReader<R> {
         pool: &Budget,
         policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
+        let reader = Reader::new(pool, SourceId(1), capabilities(true), limits, 8192)?;
         Self::construct(
-            source,
-            limits,
-            pool,
-            true,
-            Some(|reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset))),
-            Some(|feed, cursor, request, cancel| {
-                feed.synchronize_seekable_position(cursor, request, cancel)
-            }),
+            reader,
+            InputFeeder::new(source, 8192)?,
+            Some(Self::SEEK),
             policy,
         )
     }
-    pub fn open_seekable_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
-        Self::construct(
-            source,
-            limits,
-            pool,
-            true,
-            Some(|reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset))),
-            Some(|feed, cursor, request, cancel| {
-                feed.synchronize_seekable_position(cursor, request, cancel)
-            }),
-            crate::storage::PayloadOwnership::OwnedExact,
-        )
+}
+
+fn capabilities(random_access: bool) -> SourceCapabilities {
+    SourceCapabilities {
+        length: None,
+        random_access,
     }
 }
 
@@ -402,24 +381,13 @@ impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
         if !source.as_bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
-        let capabilities = SourceCapabilities {
-            length: None,
-            random_access: true,
-        };
-        let mut reader = if webm_vp9_t35 {
-            new_reader(pool, SourceId(1), capabilities, limits, 8192)?
+        let reader = if webm_vp9_t35 {
+            new_reader(pool, SourceId(1), capabilities(true), limits, 8192)?
         } else {
-            Reader::new(pool, SourceId(1), capabilities, limits, 8192)?
+            Reader::new(pool, SourceId(1), capabilities(true), limits, 8192)?
         };
-        reader.envelope.set_payload_ownership(policy);
-        Self::initialize(Self {
-            reader,
-            input: InputFeeder::from_owned(std::io::Cursor::new(source), 8192)?,
-            reposition: Some(|reader, offset| reader.seek(std::io::SeekFrom::Start(offset))),
-            position: Some(|feed, cursor, request, cancel| {
-                feed.synchronize_seekable_position(cursor, request, cancel)
-            }),
-        })
+        let input = InputFeeder::from_owned(std::io::Cursor::new(source), 8192)?;
+        Self::construct(reader, input, Some(Self::SEEK), policy)
     }
 }
 

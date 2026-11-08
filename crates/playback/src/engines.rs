@@ -360,61 +360,15 @@ impl Engine {
         limits: triergon_matroska::Limits,
         window: usize,
     ) -> Result<Self> {
-        Self::matroska_with_payload_ownership(
-            pool,
-            id,
-            caps,
-            limits,
-            window,
-            triergon_matroska::typed::PayloadOwnership::OwnedExact,
-        )
+        let reader = Reader::new(pool, id, caps, limits, window)?;
+        Ok(Self::matroska_reader(reader, id))
     }
 
-    /// Select the existing bounded block-storage policy for the player reader.
-    /// Shared blocks retain the complete source allocation and its pool charge.
-    pub fn matroska_with_payload_ownership(
-        pool: &Budget,
-        id: SourceId,
-        caps: SourceCapabilities,
-        limits: triergon_matroska::Limits,
-        window: usize,
-        ownership: triergon_matroska::typed::PayloadOwnership,
-    ) -> Result<Self> {
-        Ok(Self::Matroska(MkvEngine {
-            reader: Reader::new_with_payload_ownership(pool, id, caps, limits, window, ownership)?,
-            source: id,
-        }))
-    }
-
-    /// Reuse validated keyframe positions when seeking in these immutable bytes.
-    /// Use a ByteSource backed by views of the same allocation.
-    pub fn matroska_with_immutable_seek_index(
-        pool: &Budget,
-        id: SourceId,
-        bytes: triergon_core::Bytes,
-        limits: triergon_matroska::Limits,
-        window: usize,
-    ) -> Result<Self> {
-        Ok(Self::Matroska(MkvEngine {
-            reader: Reader::new_with_immutable_seek_index(pool, id, bytes, limits, window)?,
-            source: id,
-        }))
-    }
-
-    /// Enable the observed implicit VP9 T.35 carriage on WebM sources.
-    pub fn matroska_webm_vp9_t35_v1(
-        pool: &Budget,
-        id: SourceId,
-        caps: SourceCapabilities,
-        limits: triergon_matroska::Limits,
-        window: usize,
-    ) -> Result<Self> {
-        Ok(Self::Matroska(MkvEngine {
-            reader: triergon_matroska::compat::block_additions::new_reader(
-                pool, id, caps, limits, window,
-            )?,
-            source: id,
-        }))
+    /// Play a Matroska reader configured by the caller, for example with
+    /// `Reader::new_with_payload_ownership`, `Reader::new_with_immutable_seek_index`
+    /// or `compat::block_additions::new_reader`. `id` is the reader's source.
+    pub fn matroska_reader(reader: Reader, id: SourceId) -> Self {
+        Self::Matroska(MkvEngine { reader, source: id })
     }
     pub fn mp4(input: InputCursor, plan: PreparedMp4, maximum_packet: usize) -> Result<Self> {
         let engine = Self::mp4_unattached(input, plan, maximum_packet)?;
@@ -491,12 +445,7 @@ impl Engine {
                 "native front plan needs explicit native attachment",
             ));
         }
-        let state = crate::progressive::ProgressiveState::new(&plan, limits)?;
-        let mut engine = Self::mp4_unattached(input, plan, maximum_packet)?;
-        if let Self::Mp4(e) = &mut engine {
-            e.progressive = Some(state);
-        }
-        Ok(engine)
+        Self::mp4_with_progressive(input, plan, maximum_packet, limits)
     }
     /// Complete one actual front-metadata source using the explicit nonseekable
     /// native view. A terminal MDAT finishes only on a matching Source End.
@@ -509,6 +458,14 @@ impl Engine {
         if !plan.native_front || input.capabilities().random_access {
             return Err(Error::Invalid("native front attachment context"));
         }
+        Self::mp4_with_progressive(input, plan, maximum_packet, limits)
+    }
+    fn mp4_with_progressive(
+        input: InputCursor,
+        plan: PreparedMp4,
+        maximum_packet: usize,
+        limits: crate::progressive::ProgressiveLimits,
+    ) -> Result<Self> {
         let state = crate::progressive::ProgressiveState::new(&plan, limits)?;
         let mut engine = Self::mp4_unattached(input, plan, maximum_packet)?;
         if let Self::Mp4(e) = &mut engine {

@@ -39,7 +39,6 @@ mod slice;
 mod slicedec;
 mod tables;
 mod tables_cabac_init;
-#[allow(dead_code)]
 mod tables_vlc;
 
 use dpb::{PicNums, PocState};
@@ -52,7 +51,9 @@ use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
 use std::collections::VecDeque;
 use tables::*;
 use triergon_bitstream::BitReader;
-use triergon_codec::{Colour, DecodeFailure, PictureView, VideoDecoder};
+use triergon_codec::{
+    Budget, BudgetVec, Colour, DecodeFailure, PictureView, StorageError, VideoDecoder,
+};
 
 pub use nal::NalIter as AnnexBNalIter;
 
@@ -65,6 +66,31 @@ pub enum DecodeError {
     InvalidData(&'static str),
     /// A resource cap (dimensions, DPB size) refused the stream.
     ResourceLimit(&'static str),
+    /// Storage the stream needs does not fit the decoder's budget.
+    Budget(StorageError),
+}
+
+impl From<StorageError> for DecodeError {
+    fn from(error: StorageError) -> Self {
+        DecodeError::Budget(error)
+    }
+}
+
+/// Error of the slice data path, which charges no storage. Without a `Budget` case it keeps
+/// every macroblock-level `Result` as small as before the budget existed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SliceError {
+    Unsupported(&'static str),
+    InvalidData(&'static str),
+}
+
+impl From<SliceError> for DecodeError {
+    fn from(error: SliceError) -> Self {
+        match error {
+            SliceError::Unsupported(s) => DecodeError::Unsupported(s),
+            SliceError::InvalidData(s) => DecodeError::InvalidData(s),
+        }
+    }
 }
 
 impl std::fmt::Display for DecodeError {
@@ -73,11 +99,30 @@ impl std::fmt::Display for DecodeError {
             DecodeError::Unsupported(s) => write!(f, "unsupported: {s}"),
             DecodeError::InvalidData(s) => write!(f, "invalid data: {s}"),
             DecodeError::ResourceLimit(s) => write!(f, "resource limit: {s}"),
+            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }
     }
 }
 
 impl std::error::Error for DecodeError {}
+
+/// Storage limits of one decoder.
+#[derive(Clone, Copy, Debug)]
+pub struct Limits {
+    /// Live storage that depends on the stream: frame sample buffers (also while output
+    /// pictures share them), motion and macroblock arrays, deblocking state, RBSP and slice
+    /// storage. The default holds a level 5.2 decoded picture buffer plus five more frames
+    /// of the largest level 5.2 picture and the scratch of one picture, with margin.
+    pub live_storage_bytes: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            live_storage_bytes: 320 * 1024 * 1024,
+        }
+    }
+}
 
 /// Colour description from the VUI (Annex E); defaults are "unspecified" (2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -198,13 +243,20 @@ pub struct Decoder {
     max_lt_idx: Option<u32>,
     uid: u32,
     decode_count: u64,
-    rbsp: Vec<u8>,
+    rbsp: BudgetVec<u8>,
     /// DPB index of the last decoded first field still waiting for its second field.
     pending_field: Option<(usize, u8, u32)>,
     /// Dimensions of the active SPS (to flush on change).
     cur_dims: Option<(u32, u32)>,
     pending_pts: Option<i64>,
-    mbs_scratch: Vec<MbInfo>,
+    /// Macroblock, slice and deblocking arrays of the last picture, reused by the next.
+    pic_scratch: Option<(BudgetVec<MbInfo>, BudgetVec<SliceDbk>, deblock::Progress)>,
+    /// The pool every buffer sized from the stream is charged to.
+    budget: Budget,
+    /// Samples of no picture, for references whose store has none.
+    no_samples: FrameBuf,
+    /// Prediction scratch of one macroblock (a second field predicting from its first).
+    mb_samples: inter::MbSamples,
     /// Sample buffers given up by frame stores while an output picture still shared them;
     /// reused once the caller has dropped that picture (avoids reallocating frames).
     spare_bufs: Vec<std::sync::Arc<FrameBuf>>,
@@ -217,15 +269,20 @@ pub struct Decoder {
 const MAX_SPARE: usize = 1;
 
 /// A sample buffer of the given size: a spare one no output picture shares any more, or a new one.
-fn recycle_buf(spare: &mut Vec<std::sync::Arc<FrameBuf>>, w: usize, h: usize) -> FrameBuf {
+fn recycle_buf(
+    spare: &mut Vec<std::sync::Arc<FrameBuf>>,
+    w: usize,
+    h: usize,
+    budget: &Budget,
+) -> Result<FrameBuf, StorageError> {
     if let Some(i) = spare
         .iter()
         .position(|b| std::sync::Arc::strong_count(b) == 1 && b.width == w && b.height == h)
         && let Ok(b) = std::sync::Arc::try_unwrap(spare.swap_remove(i))
     {
-        return b;
+        return Ok(b);
     }
-    FrameBuf::new(w, h, true)
+    FrameBuf::new(w, h, budget)
 }
 
 /// Keep `b` (still shared by an output picture) as a future spare.
@@ -268,7 +325,20 @@ fn max_dpb_mbs(level: u8, constraint_set3: bool, profile: u8) -> u32 {
 }
 
 impl Decoder {
+    /// A decoder with its own pool of the default limit.
     pub fn new() -> Self {
+        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        Self::with_limits(Limits::default()).expect("default storage budget")
+    }
+
+    /// A decoder with its own pool of `limits.live_storage_bytes`; fails only for a limit
+    /// below the pool's own charge.
+    pub fn with_limits(limits: Limits) -> Result<Self, DecodeError> {
+        Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
+    }
+
+    /// A decoder charging the caller's pool.
+    pub fn new_in(budget: &Budget) -> Self {
         Decoder {
             spss: vec![None; 32],
             ppss: vec![None; 256],
@@ -280,11 +350,14 @@ impl Decoder {
             max_lt_idx: None,
             uid: 0,
             decode_count: 0,
-            rbsp: Vec::new(),
+            rbsp: BudgetVec::new(budget),
             pending_field: None,
             cur_dims: None,
             pending_pts: None,
-            mbs_scratch: Vec::new(),
+            pic_scratch: None,
+            budget: budget.clone(),
+            no_samples: FrameBuf::empty(budget),
+            mb_samples: inter::MbSamples::new(),
             spare_bufs: Vec::new(),
             spare_motion: Vec::new(),
             errors: 0,
@@ -370,7 +443,7 @@ impl Decoder {
             )),
             7 => {
                 self.finish_picture();
-                let len = unescape(&nal[1..], &mut self.rbsp);
+                let len = unescape(&nal[1..], &mut self.rbsp)?;
                 let mut r = BitReader::with_end(&self.rbsp, len * 8);
                 let sps = ps::parse_sps(&mut r)?;
                 let id = sps.id as usize;
@@ -379,7 +452,7 @@ impl Decoder {
             }
             8 => {
                 self.finish_picture();
-                let len = unescape(&nal[1..], &mut self.rbsp);
+                let len = unescape(&nal[1..], &mut self.rbsp)?;
                 let mut r = BitReader::with_end(&self.rbsp, len * 8);
                 let pps = ps::parse_pps(&mut r, &self.spss)?;
                 let id = pps.id as usize;
@@ -425,20 +498,8 @@ impl Decoder {
     }
 
     fn decode_slice_nal(&mut self, nal: &[u8], h: nal::NalHeader) -> Result<(), DecodeError> {
-        let mut rbsp = std::mem::take(&mut self.rbsp);
-        let len = unescape(&nal[1..], &mut rbsp);
-        let res = self.decode_slice_rbsp(&rbsp, len, h);
-        self.rbsp = rbsp;
-        res
-    }
-
-    fn decode_slice_rbsp(
-        &mut self,
-        rbsp: &[u8],
-        len: usize,
-        h: nal::NalHeader,
-    ) -> Result<(), DecodeError> {
-        let mut r = BitReader::with_end(rbsp, len * 8);
+        let len = unescape(&nal[1..], &mut self.rbsp)?;
+        let mut r = BitReader::with_end(&self.rbsp, len * 8);
         let (_, _, pps_id) = slice::peek_pps_id(&mut r.clone())?;
         let pps = self.ppss[pps_id as usize]
             .as_deref()
@@ -477,7 +538,7 @@ impl Decoder {
             self.finish_picture();
             self.start_picture(&sps, &pps, &sh)?;
         }
-        self.decode_slice_data(&sps, &pps, sh, rbsp, len)
+        self.decode_slice_data(&sps, &pps, sh, len)
     }
 
     /// Begin decoding a new picture: frame_num gap handling, POC, frame store allocation.
@@ -530,7 +591,52 @@ impl Decoder {
             Some(i) => i,
             None => self.alloc_store(sps)?,
         };
+        // Everything this picture needs is charged before the store changes, so a refused
+        // second field leaves its first field as it was.
+        let h = if structure == 0 { fh } else { fh / 2 };
+        let (mut mbs, mut slices, mut dbk) = self.pic_scratch.take().unwrap_or_else(|| {
+            let budget = &self.budget;
+            (
+                BudgetVec::new(budget),
+                BudgetVec::new(budget),
+                deblock::Progress::new(budget),
+            )
+        });
+        mbs.clear();
+        mbs.try_resize(w * h, MbInfo::default())?;
+        slices.clear();
+        dbk.reset(w, h, sh.mbaff)?;
         let fs = &mut self.dpb[store_idx];
+        // Motion arrays of the picture being decoded: a spare set, resized if it must be.
+        let mut motion = self
+            .spare_motion
+            .pop()
+            .unwrap_or_else(|| Motion::empty(&self.budget));
+        motion.alloc(w * h)?;
+        let mut buf = match fs.buf.take().map(std::sync::Arc::try_unwrap) {
+            Some(Ok(b)) => b,
+            // Still held by an output picture: the second field needs the first field's samples.
+            Some(Err(a)) if second_field => match a.try_clone() {
+                Ok(b) => b,
+                Err(error) => {
+                    fs.buf = Some(a);
+                    return Err(error.into());
+                }
+            },
+            Some(Err(a)) => {
+                match recycle_buf(&mut self.spare_bufs, a.width, a.height, &self.budget) {
+                    Ok(b) => {
+                        keep_spare(&mut self.spare_bufs, a);
+                        b
+                    }
+                    Err(error) => {
+                        fs.buf = Some(a);
+                        return Err(error.into());
+                    }
+                }
+            }
+            None => recycle_buf(&mut self.spare_bufs, w * 16, fh * 16, &self.budget)?,
+        };
         if !second_field {
             fs.in_use = true;
             fs.fields = 0;
@@ -565,35 +671,10 @@ impl Decoder {
         } else {
             fs.poc[(structure - 1) as usize] = poc[(structure - 1) as usize];
         }
-        let shared = std::mem::take(&mut fs.buf);
-        let mut buf = match std::sync::Arc::try_unwrap(shared) {
-            Ok(b) => b,
-            // Still held by an output picture: the second field needs the first field's samples.
-            Err(a) if second_field => (*a).clone(),
-            Err(a) => {
-                let (bw, bh) = (a.width, a.height);
-                let b = recycle_buf(&mut self.spare_bufs, bw, bh);
-                keep_spare(&mut self.spare_bufs, a);
-                b
-            }
-        };
         if sps.chroma_format_idc == 0 && !second_field {
             buf.cb.fill(128);
             buf.cr.fill(128);
         }
-        let slot = if structure == 2 { 1 } else { 0 };
-        // Motion arrays of the picture being decoded: a full-size spare, else the store's own
-        // (a corner-compacted store keeps its arrays for its next reference picture).
-        let mut motion = match self.spare_motion.pop() {
-            Some(m) => m,
-            None if !fs.motion[slot].corners => std::mem::take(&mut fs.motion[slot]),
-            None => Motion::default(),
-        };
-        let h = if structure == 0 { fh } else { fh / 2 };
-        motion.alloc(w * h);
-        let mut mbs = std::mem::take(&mut self.mbs_scratch);
-        mbs.clear();
-        mbs.resize(w * h, MbInfo::default());
         let pic = CurPic {
             store: store_idx,
             buf,
@@ -604,10 +685,10 @@ impl Decoder {
             structure,
             mbaff: sh.mbaff,
             poc,
-            slices: Vec::new(),
+            slices,
             decoded_mbs: 0,
             chroma: sps.chroma_format_idc != 0,
-            dbk: deblock::Progress::new(w, h, sh.mbaff),
+            dbk,
         };
         self.active = Some(ActivePic {
             pic,
@@ -652,16 +733,24 @@ impl Decoder {
         loop {
             if let Some(i) = self.dpb.iter().position(|f| !f.in_use) {
                 let fs = &mut self.dpb[i];
-                if fs.buf.width != w || fs.buf.height != h || fs.buf.y.is_empty() {
-                    fs.buf = std::sync::Arc::new(recycle_buf(&mut self.spare_bufs, w, h));
-                    fs.motion = [Motion::default(), Motion::default()];
+                if fs
+                    .buf
+                    .as_ref()
+                    .is_none_or(|b| b.width != w || b.height != h)
+                {
+                    // The old storage is released before the new buffer is charged.
+                    fs.buf = None;
+                    fs.motion = [Motion::empty(&self.budget), Motion::empty(&self.budget)];
+                    let buf = recycle_buf(&mut self.spare_bufs, w, h, &self.budget)?;
+                    fs.buf = Some(std::sync::Arc::new(buf));
                 }
                 self.uid = self.uid.wrapping_add(1);
                 fs.uid = self.uid & 0x1FFF_FFFF;
                 return Ok(i);
             }
+            // At most 19 stores (dpb_size is at most 16); their storage is charged above.
             if self.dpb.len() < max_frames + 1 {
-                self.dpb.push(FrameStore::default());
+                self.dpb.push(FrameStore::new(&self.budget));
                 continue;
             }
             if !self.bump() {
@@ -713,6 +802,8 @@ impl Decoder {
         while unused != sh.frame_num && guard < max {
             guard += 1;
             let idx = self.alloc_store(sps)?;
+            let mbs = sps.pic_width_in_mbs as usize * sps.frame_height_in_mbs() as usize;
+            self.dpb[idx].motion[0].alloc(mbs)?;
             let nums = PicNums {
                 frame_num: unused,
                 max_frame_num: max,
@@ -749,9 +840,7 @@ impl Decoder {
             fs.needed_for_output = false;
             fs.non_existing = true;
             fs.pts = None;
-            let mbs = sps.pic_width_in_mbs as usize * sps.frame_height_in_mbs() as usize;
-            fs.motion[0].alloc(mbs);
-            for f in &mut fs.motion[0].mb_flags {
+            for f in fs.motion[0].mb_flags.iter_mut() {
                 *f = MBF_INTRA;
             }
             self.poc_state.prev_frame_num_offset = fno;
@@ -775,7 +864,6 @@ impl Decoder {
         sps: &Sps,
         pps: &Pps,
         sh: SliceHeader,
-        rbsp: &[u8],
         len: usize,
     ) -> Result<(), DecodeError> {
         let Some(active) = self.active.as_mut() else {
@@ -879,11 +967,13 @@ impl Decoder {
         if slice_num >= 0xFFFE {
             return Err(DecodeError::ResourceLimit("too many slices"));
         }
-        pic.slices.push(SliceDbk {
-            disable_idc: sh.disable_deblocking_filter_idc,
-            alpha_off: sh.slice_alpha_c0_offset,
-            beta_off: sh.slice_beta_offset,
-        });
+        pic.slices
+            .try_push(SliceDbk {
+                disable_idc: sh.disable_deblocking_filter_idc,
+                alpha_off: sh.slice_alpha_c0_offset,
+                beta_off: sh.slice_beta_offset,
+            })
+            .map_err(|e| e.error)?;
         let ctx = SliceCtx {
             sh,
             slice_num,
@@ -904,13 +994,16 @@ impl Decoder {
             log_wd,
             col,
         };
-        let refs = Refs { dpb: &self.dpb };
-        let mut dec = SliceDecoder::new(&ctx, pic, refs, rbsp, len);
-        let res = dec.run();
-        if let Err(e) = &res {
+        let refs = Refs {
+            dpb: &self.dpb,
+            no_samples: &self.no_samples,
+        };
+        let mut dec = SliceDecoder::new(&ctx, pic, refs, &self.rbsp, len, &mut self.mb_samples);
+        dec.run().map_err(|e| {
+            let e = DecodeError::from(e);
             active.max_slice_err = Some(e.clone());
-        }
-        res
+            e
+        })
     }
 
     /// Finish the active picture: deblock, marking, DPB storage and output.
@@ -925,28 +1018,35 @@ impl Decoder {
         let slot = if structure == 2 { 1 } else { 0 };
         {
             let fs = &mut self.dpb[store];
-            fs.buf = std::sync::Arc::new(std::mem::take(&mut a.pic.buf));
+            fs.buf = Some(std::sync::Arc::new(a.pic.buf));
             if a.nal_ref_idc != 0 {
-                if a.sps.frame_mbs_only && a.sps.direct_8x8_inference {
-                    // Later pictures only read corner blocks of it (8.4.1.2.1 with
-                    // direct_8x8_inference_flag, frame / frame co-location).
-                    fs.motion[slot].compact_from(&a.pic.motion);
+                // Later pictures only read corner blocks of it (8.4.1.2.1 with
+                // direct_8x8_inference_flag, frame / frame co-location). Where the compact
+                // copy does not fit, the store keeps the full arrays, which read the same
+                // and are charged already.
+                if a.sps.frame_mbs_only
+                    && a.sps.direct_8x8_inference
+                    && fs.motion[slot].compact_from(&a.pic.motion).is_ok()
+                {
                     if self.spare_motion.len() < MAX_SPARE {
-                        self.spare_motion.push(std::mem::take(&mut a.pic.motion));
+                        self.spare_motion.push(a.pic.motion);
                     }
                 } else {
-                    fs.motion[slot] = std::mem::take(&mut a.pic.motion);
+                    let old = std::mem::replace(&mut fs.motion[slot], a.pic.motion);
+                    if self.spare_motion.len() < MAX_SPARE {
+                        self.spare_motion.push(old);
+                    }
                 }
             } else if self.spare_motion.len() < MAX_SPARE {
                 // A non-reference picture is never co-located (RefPicList1[0] is a reference).
-                self.spare_motion.push(std::mem::take(&mut a.pic.motion));
+                self.spare_motion.push(a.pic.motion);
             }
             fs.fields |= if structure == 0 { 3 } else { structure };
             if a.second_field {
                 fs.fields = 3;
             }
         }
-        self.mbs_scratch = std::mem::take(&mut a.pic.mbs);
+        self.pic_scratch = Some((a.pic.mbs, a.pic.slices, a.pic.dbk));
         let sps = &a.sps;
         let sh = &a.sh_first;
         let nums = PicNums {
@@ -1161,7 +1261,9 @@ impl Decoder {
         }
         let (cx, cy, cw, ch) = fs.info.crop;
         let (cx, cy, cw, ch) = (cx as usize, cy as usize, cw as usize, ch as usize);
-        let b = &fs.buf;
+        let Some(b) = &fs.buf else {
+            return;
+        };
         let (ccw, cch) = (cw / 2, ch / 2);
         let mk = |comp: u8| -> Plane {
             if comp == 0 {

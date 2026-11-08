@@ -234,7 +234,7 @@ pub(crate) struct Substream {
     dba: [Dba; NCH],
 
     /// AHT: dequantized and inverse-DCT'd mantissas [ch][blk][bin] (before exponents).
-    aht_coef: Box<[[[f32; 256]; 6]; NCH]>,
+    aht_coef: [[[f32; 256]; 6]; NCH],
     /// Current block transform coefficients as Q23 integers after the exponent shift.
     icoef: [[i32; 256]; NCH],
     /// Current block transform coefficients (float, dynamic range applied).
@@ -275,8 +275,9 @@ pub(crate) fn acmod_channels(acmod: u8) -> &'static [crate::Speaker] {
 pub(crate) const NFCHANS: [usize; 8] = [2, 1, 2, 3, 3, 4, 4, 5];
 
 impl Substream {
-    pub(crate) fn new() -> Box<Self> {
-        Box::new(Substream {
+    #[allow(clippy::large_stack_arrays)] // Built once per substream, then boxed.
+    pub(crate) fn new() -> Self {
+        Substream {
             eac3: false,
             strmtyp: 0,
             acmod: 0,
@@ -356,14 +357,13 @@ impl Substream {
             cplfleak: 0,
             cplsleak: 0,
             dba: [Dba::default(); NCH],
-            #[allow(clippy::large_stack_arrays)] // Built once per decoder.
-            aht_coef: Box::new([[[0.0; 256]; 6]; NCH]),
+            aht_coef: [[[0.0; 256]; 6]; NCH],
             icoef: [[0; 256]; NCH],
             coef: [[0.0; 256]; NCH],
             delay: [[0.0; 256]; NCH],
             features: FrameFeatures::default(),
             reference_compat: true,
-        })
+        }
     }
 
     pub(crate) fn reset(&mut self) {

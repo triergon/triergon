@@ -156,7 +156,21 @@ impl Reservation {
     pub fn bytes(&self) -> usize {
         self.bytes
     }
-    pub(crate) fn empty(budget: &Budget) -> Self {
+    /// Charges exactly `bytes`, for an owner that keeps its storage in plain
+    /// containers. Growth claims the difference with the pool's limit and
+    /// pressure checks and leaves the charge unchanged on failure; shrinking
+    /// returns the difference to the pool.
+    pub fn resize_to(&mut self, bytes: usize) -> Result<()> {
+        if bytes < self.bytes {
+            self.shrink_by(self.bytes - bytes);
+            Ok(())
+        } else {
+            self.grow_to(bytes)
+        }
+    }
+    /// A zero-byte charge on `budget`, for an owner that sizes it later with
+    /// [`resize_to`](Self::resize_to).
+    pub fn empty(budget: &Budget) -> Self {
         Self {
             budget: budget.clone(),
             bytes: 0,
@@ -186,6 +200,50 @@ impl Reservation {
             self.bytes = bytes;
         }
         Ok(())
+    }
+}
+
+/// A value whose storage stays charged for as long as it lives: state a stream
+/// creates per element, such as a substream, channel element or extension decoder.
+#[derive(Debug)]
+pub struct Charged<T> {
+    value: T,
+    charge: Reservation,
+}
+
+impl<T> Charged<T> {
+    /// Charges `bytes` to `budget`, then builds the value.
+    pub fn try_new(budget: &Budget, bytes: usize, make: impl FnOnce() -> T) -> Result<Self> {
+        let charge = budget.reserve(bytes)?;
+        Ok(Self {
+            value: make(),
+            charge,
+        })
+    }
+    /// `value` in a box charged for its size: state of fixed size that a stream
+    /// creates. Storage the value owns elsewhere charges itself (`BudgetVec`).
+    pub fn boxed(budget: &Budget, value: T) -> Result<Charged<Box<T>>> {
+        Charged::try_new(budget, size_of::<T>(), || Box::new(value))
+    }
+    /// The bytes charged for this value.
+    pub fn charged_bytes(&self) -> usize {
+        self.charge.bytes()
+    }
+}
+
+impl<T> std::ops::Deref for Charged<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T> std::ops::DerefMut for Charged<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.value
     }
 }
 

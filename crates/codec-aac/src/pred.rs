@@ -4,6 +4,7 @@
 
 use crate::ics::{ChannelData, CoreCfg, EIGHT_SHORT, NOISE_HCB};
 use crate::tables::PRED_SFB_MAX;
+use triergon_codec::{Budget, BudgetVec, StorageError};
 
 const ALPHA: f32 = 0.90625;
 const A: f32 = 0.953125;
@@ -29,14 +30,18 @@ const RESET: P = P {
 
 #[derive(Debug)]
 pub(crate) struct PredState {
-    s: Vec<P>,
+    s: BudgetVec<P>,
 }
 
 impl PredState {
-    pub(crate) fn new() -> PredState {
-        PredState {
-            s: vec![RESET; 1024],
-        }
+    pub(crate) fn new(budget: &Budget) -> Result<PredState, StorageError> {
+        Ok(PredState {
+            s: BudgetVec::try_filled(budget, RESET, 1024)?,
+        })
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.s.fill(RESET);
     }
 }
 

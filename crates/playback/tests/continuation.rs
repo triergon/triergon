@@ -1,5 +1,5 @@
 mod common;
-use common::{collect, off, packets, run_open};
+use common::{annex_b, annex_b_session, collect, off, packets, ready, run_open};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -775,8 +775,7 @@ fn native_m2ts_seek_requires_new_context_and_keeps_old_output_scope() {
 }
 
 #[test]
-fn real_hevc_mp4_bridge_preserves_packet_clock_config_and_source_bytes() {
-    use triergon_framing::{BuildStep, HvcConfigLimits, NalPacketLimits};
+fn real_hevc_mp4_packets_frame_as_annex_b_from_their_source_bytes() {
     let (mut p, b, _, _) = player(
         include_bytes!("fixtures/mp4/encoded-hevc-aac-front.mp4"),
         false,
@@ -786,47 +785,15 @@ fn real_hevc_mp4_bridge_preserves_packet_clock_config_and_source_bytes() {
     let packets: Vec<_> = packets(&out)
         .into_iter()
         .filter(|p| matches!(&p.configuration.description.format, b"hvc1" | b"hev1"))
-        .cloned()
         .collect();
     assert!(!packets.is_empty());
-    let mut setup = hevc_bridge::HevcBridgeSetup::new(
-        &b,
-        ID,
-        packets[0].configuration.clone(),
-        HvcConfigLimits {
-            maximum_record_bytes: 1 << 20,
-            maximum_arrays: 256,
-            maximum_nals: 256,
-            maximum_nal_bytes: 1 << 20,
-        },
-        NalPacketLimits {
-            maximum_packet_bytes: 1 << 20,
-            maximum_output_bytes: 2 << 20,
-            maximum_nals: 1024,
-            maximum_segments: 2048,
-        },
-    )
-    .unwrap();
-    let mut bridge = loop {
-        if let Some(b) = setup.poll(&mut WorkBudget::new(1), &off()).unwrap() {
-            break b;
-        }
-    };
+    let mut session = annex_b_session(&b, packets[0]);
     for packet in packets {
-        let sample = packet.source.sample.clone();
-        let payload = packet.source.payload.clone();
-        let config = packet.configuration.revision;
-        let mut job = bridge.packet(packet).unwrap();
-        let result = loop {
-            match job.step(&mut WorkBudget::new(1), &off()).unwrap() {
-                BuildStep::Ready(o) => break o,
-                BuildStep::Yield => {}
-                BuildStep::Complete => panic!(),
-            }
-        };
-        assert_eq!(result.source().fields.source.sample, sample);
-        assert_eq!(result.source().bytes.as_ref(), payload.as_ref());
-        assert_eq!(result.source().fields.configuration.revision, config);
+        let result = annex_b(&mut session, packet);
+        assert_eq!(
+            result.source().bytes.as_ref(),
+            packet.source.payload.as_ref()
+        );
         assert!(
             result.bytes().starts_with(&[0, 0, 0, 1]) || result.bytes().starts_with(&[0, 0, 1])
         );
@@ -1008,9 +975,7 @@ fn aac_bridge_refuses_configuration_change_before_packet_conversion() {
 #[test]
 fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
     use triergon_core::Rounding;
-    use triergon_framing::{
-        AacAscParser, AacConfigLimits, AacSource, AvcConfigLimits, BuildStep, NalPacketLimits,
-    };
+    use triergon_framing::{AacAscParser, AacConfigLimits, AacSource};
     use triergon_session::{
         AudioCodec, AudioSession, PcmBlock, QueueLimits, SessionState, StreamSelection, VideoCodec,
         VideoSession,
@@ -1027,52 +992,21 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
     selection.load(&mut video, &mut audio);
     let mut reference = None;
 
-    fn finish<T>(mut step: impl FnMut(&mut WorkBudget) -> BuildStep<T>) -> T {
-        for _ in 0..8192 {
-            match step(&mut WorkBudget::new(16)) {
-                BuildStep::Ready(result) => return result,
-                BuildStep::Yield => {}
-                BuildStep::Complete => panic!("fixture operation completed without output"),
-            }
-        }
-        panic!("fixture operation exceeded its work limit")
-    }
-
     for iteration in 0..2 {
         let outputs = collect(&mut player, 1).unwrap();
         let packets = packets(&outputs);
         assert_eq!(packets.len(), 4);
-        let avc = &packets
+        let avc = packets
             .iter()
             .find(|p| p.configuration.description.format == *b"avc1")
-            .unwrap()
-            .configuration;
+            .unwrap();
         let aac = &packets
             .iter()
             .find(|p| p.configuration.description.format == *b"mp4a")
             .unwrap()
             .configuration;
-        let video_track = TrackKey::Mp4(avc.track.track_id);
-        let mut avc_setup = nal_bridge::AvcBridgeSetup::new(
-            &pool,
-            ID,
-            avc.clone(),
-            AvcConfigLimits {
-                maximum_record_bytes: 4096,
-                maximum_nals: 64,
-                maximum_nal_bytes: 4096,
-            },
-            NalPacketLimits {
-                maximum_packet_bytes: 8192,
-                maximum_output_bytes: 16384,
-                maximum_nals: 64,
-                maximum_segments: 128,
-            },
-        )
-        .unwrap();
-        let mut avc_bridge = (0..4096)
-            .find_map(|_| avc_setup.poll(&mut WorkBudget::new(16), &cancel).unwrap())
-            .expect("bounded AVC setup");
+        let video_track = TrackKey::Mp4(avc.configuration.track.track_id);
+        let mut avc = annex_b_session(&pool, avc);
         let mut aac_setup = AacAscParser::new(
             &pool,
             AacSource {
@@ -1088,7 +1022,7 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
             },
         )
         .unwrap();
-        let asc_record = finish(|work| aac_setup.step(work, &cancel).unwrap());
+        let asc_record = ready(|work| aac_setup.step(work, &cancel).unwrap());
         let aac_bridge = aac_bridge::AacBridge::new(
             &pool,
             ID,
@@ -1109,13 +1043,12 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
                 .map(|t| t.to_nanoseconds(Rounding::NearestAway).unwrap());
             match &packet.configuration.description.format {
                 b"avc1" => {
-                    let mut job = avc_bridge.packet(packet.clone()).unwrap();
-                    let unit = finish(|work| job.step(work, &cancel).unwrap());
+                    let unit = annex_b(&mut avc, packet);
                     video.feed(unit.bytes().as_ref(), pts).unwrap();
                 }
                 b"mp4a" => {
                     let mut job = aac_bridge.packet(packet.clone()).unwrap();
-                    let unit = finish(|work| job.step(work, &cancel).unwrap());
+                    let unit = ready(|work| job.step(work, &cancel).unwrap());
                     audio.feed(unit.adts.bytes().as_ref(), pts).unwrap();
                 }
                 codec => panic!("unexpected fixture codec {codec:?}"),

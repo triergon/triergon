@@ -37,6 +37,6 @@ mod state;
 mod tables;
 mod transform;
 
-pub use decoder::{ChromaFormat, ColourDescription, Decoder, Picture, Plane, Row};
+pub use decoder::{ChromaFormat, ColourDescription, Decoder, Limits, Picture, Plane, Row};
 pub use error::DecodeError;
 pub use nal::AccessUnitSplitter;

@@ -8143,7 +8143,7 @@
   {
    "name": "codecs-gate-build-linux-arm64",
    "retention": "retained",
-   "reason": "Codecs and decode sessions runtime: 17 workloads, two passes on the gate build",
+   "reason": "Codecs and decode sessions runtime at ceb5076: 17 workloads, two passes on the gate build",
    "key": "evidence/codecs-gate-build-linux-arm64/12940dd90cf511dc37b8311946ccc43626f9e5e7a79cd3e7dfbeed68f48c77ed.tar.gz",
    "sha256": "12940dd90cf511dc37b8311946ccc43626f9e5e7a79cd3e7dfbeed68f48c77ed",
    "bytes": 1322107,
@@ -9470,6 +9470,563 @@
    "sha256": "03819b5fb765876520d644dabb0acf86f2ab482e2801912f75ca450a11871af7",
    "bytes": 347179404,
    "source_revision": "6ea304754e31df0d11fb3e4b1b3cba4cfabb5aca"
+  },
+  {
+   "name": "container-framing-playback-comparison",
+   "retention": "90 days",
+   "key": "qualification/repository/container-framing-playback-comparison/2740fe84cb35b36452e6c2c28ecbd6e131db03bd010c737edf4ef3a93ca476c7.tar.gz",
+   "sha256": "2740fe84cb35b36452e6c2c28ecbd6e131db03bd010c737edf4ef3a93ca476c7"
+  },
+  {
+   "name": "container-framing-host-checks",
+   "retention": "90 days",
+   "key": "qualification/repository/container-framing-host-checks/d4d0ed5dd8c225c14c764882e6884cbba220ee74c17115c1cf04f87449000bf9.tar.gz",
+   "sha256": "d4d0ed5dd8c225c14c764882e6884cbba220ee74c17115c1cf04f87449000bf9"
+  },
+  {
+   "name": "tooling-worktree-checks",
+   "retention": "90 days",
+   "key": "qualification/repository/tooling-worktree-checks/0923544b7a20e0ad5de7753d39ede56de688db20865b281a3c4d05d3915fa202.tar.gz",
+   "sha256": "0923544b7a20e0ad5de7753d39ede56de688db20865b281a3c4d05d3915fa202"
+  },
+  {
+   "name": "container-framing-runner-host-checks",
+   "retention": "90 days",
+   "key": "qualification/repository/container-framing-runner-host-checks/e1a947e44c8af18d1e33fef624cf741099b161e3f5719e7f3e235b5c63fc39c4.tar.gz",
+   "sha256": "e1a947e44c8af18d1e33fef624cf741099b161e3f5719e7f3e235b5c63fc39c4"
+  },
+  {
+   "name": "packet-framing-config-gate-build",
+   "path": "packet-framing-config-gate-build",
+   "retention": "retained",
+   "reason": "Cited packet-framing results preserve all 125 runtime and memory measurements, runtime and RSS failures, exact sources and workers, and the earlier invalid-memory collection.",
+   "key": "evidence/packet-framing-config-gate-build/677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b.tar.gz",
+   "sha256": "677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b",
+   "bytes": 135466609,
+   "source_revision": "04512a07fbb7efdf0d6d7173db08ec1267f2fae3",
+   "collection_status": "failed-runtime-and-rss",
+   "files": [
+    {
+     "path": "packet-framing-config-gate-build/HISTORY.json",
+     "sha256": "3f69a8cf7ffe495ca82a6437d20b22decb90a1fa730fe8fe5eaf9210997fc51d"
+    },
+    {
+     "path": "packet-framing-config-gate-build/INPUTS.json",
+     "sha256": "cc572970dfd3d668c879d103604d475a0fbc789e45f95a46c02a88732100ec16"
+    },
+    {
+     "path": "packet-framing-config-gate-build/NATIVE-INVENTORY.json",
+     "sha256": "e3ccb3878e13cdd55f582e5df8ceabbdab139c3ef3a0b3717479bf2745442ff3"
+    },
+    {
+     "path": "packet-framing-config-gate-build/PER-CASE.csv",
+     "sha256": "2114aafce979483e667f9e5c85c27375b7045284f34403a5dabc753dabc08fa3"
+    },
+    {
+     "path": "packet-framing-config-gate-build/PER-CASE.json",
+     "sha256": "566fbb12a21f5aa15f8c8a53125333ae6c83e22c4ff5583665bc016c5665db3f"
+    },
+    {
+     "path": "packet-framing-config-gate-build/REPORT-METADATA.json",
+     "sha256": "b97cfb9dee0d332d9380ad6b409080a3e87d782e0c43096483d7ca0797950b08"
+    },
+    {
+     "path": "packet-framing-config-gate-build/SELECTED-EXPORTS.json",
+     "sha256": "0c99320a7c4d24a2127b3b5fda7c7fbcf63a4848e930e4b4dd118d274c9ddc9c"
+    },
+    {
+     "path": "packet-framing-config-gate-build/SOURCE-BUNDLE-VERIFY.log",
+     "sha256": "cb6cd12aefb788aa2ab94cf818953c5a754cfdd86ea782c750e7fa9b1f361b3a"
+    },
+    {
+     "path": "packet-framing-config-gate-build/SOURCE-CONTEXT.json",
+     "sha256": "ebae1065b3daa48fd327e9d778380595db211800a16d768cd4a195f4c15b9c81"
+    },
+    {
+     "path": "packet-framing-config-gate-build/SOURCE.bundle",
+     "sha256": "3e6407a746d9b5029cc2013d98f90a6a77925726c0d73a8d3a9929113dc82ef8"
+    },
+    {
+     "path": "packet-framing-config-gate-build/SUMMARY.json",
+     "sha256": "fa3381350b3689eefe05273fd413ccc2592f63044b661b9ff17061a6f035e96b"
+    },
+    {
+     "path": "packet-framing-config-gate-build/TESTS.json",
+     "sha256": "5a76e661d757a48365ae7912d798009ae431df5a9622d9e27b479391fa700f65"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/ARCHIVED-COMPARISON.json",
+     "sha256": "50c844c8ffc9a066ab571fe1df65c108834d70d9a6593b259e48152674dd4b06"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/ARCHIVED-DIGEST.json",
+     "sha256": "5ba8378dcdaba5a3462ddcb60f66a167d967ef9eeaf11a32eae3416811f5bcdd"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/ARCHIVED-PRIOR.json",
+     "sha256": "2bdc890544f6e2183242b27e1b3720396cf7f9f12003c8055319e4137bddacf9"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/BUNDLE-HEADS.txt",
+     "sha256": "87e7231de036f4e5ce57708e8f6358e6acd2bd671114c071ee90a01cc53eb87e"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/BUNDLE-VERIFY.log",
+     "sha256": "00464c28ce0d3bf7fc2435c4f3b9f50d869d641d95a42f6dbc0b636e9ee02f4a"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/CONTROLLER.log",
+     "sha256": "25e88392dc434d638dd6a39e180d6f0ce3683650ee69d6eab810130d46215ad7"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/GUEST-PREFLIGHT.log",
+     "sha256": "3cf495125ec70705a7e9dd9bb6440ad8fa6d72d95e4b63511c3440f95be8d0f0"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/NATIVE-EXIT.txt",
+     "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/NATIVE-MEMBERS.txt",
+     "sha256": "ace6f32c3c58531ab332752387503be39ecd6d7c76523a4e90d74e5189c4f4be"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/NATIVE-RESULTS.sha256",
+     "sha256": "fb136ff4f9e1169c18d628abaa321e6220ec30419c805e578058bcddfff96367"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/NATIVE-RESULTS.tar.gz",
+     "sha256": "eac00d6e7186590460f851f3afb384217c9aabf9f86d387a5298f42323002cd3"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/NATIVE.log",
+     "sha256": "a553eae96f180f8104aae4be5c31c82f98d1767ec4ec7188620a0f315a4b7984"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/PREPARATION-BUNDLE-VERIFY.log",
+     "sha256": "00464c28ce0d3bf7fc2435c4f3b9f50d869d641d95a42f6dbc0b636e9ee02f4a"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/PREPARATION-CHECK.json",
+     "sha256": "501b274770c5dbaa27d1a5b1a0d0a99acf6128dfb351317bd3498a75587c031a"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/RUNNER-ADDRESS",
+     "sha256": "79dc3ff759db141ff19814dbaabbac945580e2855f7d191483dd330cc9fdad23"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/SSH-WAIT.log",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/START-INSTANCE.json",
+     "sha256": "f72a9e3a724183d93017f1cbcea71f0d4b8321d9d534912be0741931e4f36660"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/STOP-INSTANCE.json",
+     "sha256": "323daa66c70209032719102e3db2718e12c1b6d653d1cf1ece33dd6e1690642e"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/ARCHIVED-COMPARISON.json",
+     "sha256": "50c844c8ffc9a066ab571fe1df65c108834d70d9a6593b259e48152674dd4b06"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/BASELINE-BUILD.log",
+     "sha256": "ac76afb884a24f1ee8f89bbc083a791d50aa5d8e95210a9d931cc79030056906"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/BASELINE-IDENTITY.json",
+     "sha256": "75a7105718cd7fe8319f02847bf2f0e075cda1c2e86ef0bc9f8bc84eb93c6561"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/BASELINE-SOURCE.txt",
+     "sha256": "8032980906dce8f35260c565c3c3ce4bc842bf52470f2271efe6580cf6572ff0"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/BASELINE-WORKER.sha256",
+     "sha256": "72dcd407ebfdbcf2da6b1101e1e03ea221b1928385b54151f40d35e18749cf13"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/BASELINE-XTASK.log",
+     "sha256": "8096daba01382220a18cabde2118b7ee72a39f6a963e65869f644d254cb1cf1c"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/BOOT.txt",
+     "sha256": "b95777c72136630adf78aa3ff38ea46827761070b12389a69076efc111106410"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/BUILD.log",
+     "sha256": "ed46dbb5498a1655382bafa0abc37e21cd83fc2bfd79dd5bb08e3ef62f8e7ff7"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/CLIPPY.log",
+     "sha256": "c6622019334788eb467237e610aca77291574768b885249670b42d86d4ca99c1"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/COUNT-INPUT.txt",
+     "sha256": "f5ea1f08c11b379fb2ef191c2be74a3492c9210d7e82f35398ea679e2992d035"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/COUNT.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/COUNT.log",
+     "sha256": "829875f82a092c644d5f0af495722ec5a1eeb6ca47575bad0683c9baa89988f7"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/CPU.txt",
+     "sha256": "132d1f769f4e510acca9a5d9863ac16fd532de89b651f9e04170bb8656be7bbb"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/DIAGNOSTICS-CHECK.json",
+     "sha256": "a72b68a0dff86c166a1831154fec831a65be1891d07ac60c77c245eef5647ab2"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/DISK-BEFORE-TIMING.txt",
+     "sha256": "e3998f3dcd8cbcbbce4a66633090b44c1dae9610a517587c7f979aa74df01d53"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/DISK-END.txt",
+     "sha256": "f365581806cbdd8dc369074bf63a4010ab923fb6b5db9a8875cd21e5b7f2a4c0"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/DISK.txt",
+     "sha256": "837c0d901f4480ce018766a3d2678a741531831cec22c3b87b1c3f51f4877ff4"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/FIXTURES.log",
+     "sha256": "d95981a9040d44f121aa52003536ccf3a0882f31000c29528ad53f599edfd0ef"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/FMT.log",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/GATE-RESULT.json",
+     "sha256": "a1b60dfea47046679dbdb4061e08a20f6af5ed0a7dc4173511204b1e12c725cb"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/GRADE.exit",
+     "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/GRADE.log",
+     "sha256": "8055bcb777f078b94be880d5bd38c987a3d4590ad533219bd11f1bcbd4da4a29"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/LIBRARY-TESTS.log",
+     "sha256": "1f7f72e6afd63f738cb85bc3c1ce7fc3242e6d3caad845f840ad06692c00dc04"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/MEMORY-ADMISSION.log",
+     "sha256": "9ed9d14fb7b535fb5cac508168170614973745af7fc118c7abaf8e62e19f03de"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/MEMORY-IDENTITY.json",
+     "sha256": "416b3e9c272b677f4cab3f66808f4d57468a9891f2236851b0fe9576763f2117"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/MEMORY.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/MEMORY.log",
+     "sha256": "f6ca9dcf3c069956e34e2a256ca9f2872f6a4ff387afdc5be4356af5fa434d67"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/PLATFORM.txt",
+     "sha256": "d59dd32d3c0f10fa871108539b327b52374fa45911988fd0efe09916a6434bb3"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/PRESERVED-OUTPUTS.json",
+     "sha256": "c2669ee2d93b4929ed0d33952558d8625b6ccabb9c08d60808ee3bf369e2d290"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/PROOF-BUILD.log",
+     "sha256": "79154f7dd9671f68f19aac184998b9ba9936f0c80d77a3cae8d8bb5fb7a038ec"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/RECLAIM.txt",
+     "sha256": "0bdaeb2aa6a92a0fdfec2d2cc4d0ab71946de5d0654e08c526e4629130ae0f28"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/RSS-DEPLOY.log",
+     "sha256": "b1c48ed56b48ff1064c04bb3680e4122c13f21e822cef89447a01c01b5fa3df5"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/RUST.txt",
+     "sha256": "ba203e33fe4a5b8e05147bb6e57fb1ddace26d9f799f357420b666887dd7e2f1"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/SAME-CODE.exit",
+     "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/SAME-CODE.log",
+     "sha256": "f0c9863f3aa51d6374f05f1150286a1d8505597c51d736af16c035124700e426"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/TEST-CACHE-CLEANUP.log",
+     "sha256": "b231faf7d34e339be89f60c0fb1b535de05955abd4425b425f5fd74bf5de0f4f"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/TIMING-CHECK.json",
+     "sha256": "8c043ae7b9f89c83b669a169c55397ecfa77ab13b7c861200078faf0c27e07fd"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/TIMING-IDENTITY.json",
+     "sha256": "c3aa426354ff383ffe1960d26f09d1d4b362ac3e162556a70b3e82ed1f33db9a"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/TIMING.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/TIMING.log",
+     "sha256": "522a77d1a0ab7a7e13680a60025bb5021a96a1c3ed1271915b7a0f50252c505c"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/WORKERS.sha256",
+     "sha256": "b4b4ad2c861e78d2c23780990541cd86fbfde0a18978f41ae7d7cfd4e2e17dfb"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/XTASK.log",
+     "sha256": "4be6a9eac598bb0e927ddc844da774099942791e33b6603782b9c78a8b83be23"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/baseline-framing-worker",
+     "sha256": "aee57c3f351c40581ba53b773417fe4d4fbc64f6d345bc1d9d0c62714cd2e0c6"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/candidate-SOURCE.txt",
+     "sha256": "fc92c9e410a4f7a227f2a9806f648f26cc7c348dcaa7d5e1d4b668b89a3e781b"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/proof/RSS-PROOF.json",
+     "sha256": "e193fd988ca6361c70ac4565f8937182b2e76652fb5e55c3459c32d72661caf7"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/proof/fresh-armed.stdout",
+     "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/proof/negative-armed.stdout",
+     "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/proof/negative-invalidate.stdout",
+     "sha256": "b94680fe2e682dbdc8f6db81cd6db6b87030ab28094f3c2875fd74a46a28709c"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/proof/positive.stdout",
+     "sha256": "3c00c0a38b0ee47293a1508314b3db53ca353b686592c70ce6a8c341638fe4f4"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/workers/target/harness/ffmpeg-framing-worker",
+     "sha256": "a16abdaa62edeee2ffc0c25246942522bfedbd558cfca0a9a264c66b9b2b71c6"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/exported/workers/target/release/framing-worker",
+     "sha256": "69e7ad13d170d297fe3a6b5eaa78cfef4897baa69e4c5892e0759aad31ac0594"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/guest.sh",
+     "sha256": "5033583c6924afacf233278f52838e83efa49d2ba93667ee05c68bebe3255cb6"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/host.sh",
+     "sha256": "f67721c4eb046b6cf893ba4edb75f81925d8b1bfe8a7c97f422912cff1c1ac2f"
+    },
+    {
+     "path": "packet-framing-config-gate-build/collection/packet-framing-config-gate-khwx82xe.bundle",
+     "sha256": "c398bb2f37ad2a0a5121bb7bb5691c17a45c213e55c6d71f3d63b438d3665f22"
+    },
+    {
+     "path": "packet-framing-config-gate-build/history/prior-framing-failure/ARCHIVE.tar.gz",
+     "sha256": "168d82b8b981e37b3d03f071a8d712b1bee7e05b01db94ca9cf432054bebfaf9"
+    },
+    {
+     "path": "packet-framing-config-gate-build/history/prior-framing-failure/INDEX-ENTRY.json",
+     "sha256": "38e2e56fd9a9b1b96e8ab5f7878fb6068be768972c644f4da617f249c94e3848"
+    },
+    {
+     "path": "packet-framing-config-gate-build/history/prior-framing-failure/NORMAL-FETCH.log",
+     "sha256": "ff6a0ff63a799720ceefe4e75dcef0e24f051674eb88f137b80454e901dd8b32"
+    },
+    {
+     "path": "packet-framing-config-gate-build/history/prior-framing-failure/REPLAY.json",
+     "sha256": "10421d891abe4f9562c3a265bc4f6a7f144d414ab1ef0657e065f05122fd916a"
+    },
+    {
+     "path": "packet-framing-config-gate-build/history/prior-framing-failure/SUMMARY.json",
+     "sha256": "565b5c271423a56b436b02d46b2f9ac5263331484d1b59f855cbae75a5cae937"
+    },
+    {
+     "path": "packet-framing-config-gate-build/history/prior-framing-failure/VERIFIED.json",
+     "sha256": "f9e19db3d9c40f5ba719981562793ba2cc9d0b75b8a9e7da6d02b9609ab6be96"
+    }
+   ]
+  },
+  {
+   "name": "codec-budgets-linux-arm64",
+   "path": "codec-budgets-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited decoder, capture and trace identities, function comparison, instruction counts and a paired codec timing screen of the codec storage budgets against main at cfa65d17",
+   "key": "evidence/codec-budgets-linux-arm64/8d88beeb36031151a6040855beec20cbd58f386942c32450749a7843159e4312.tar.gz",
+   "sha256": "8d88beeb36031151a6040855beec20cbd58f386942c32450749a7843159e4312",
+   "bytes": 11368312,
+   "source_revision": "e99f12ca2c398fa3cba559c2885b6e8845d3fd04"
+  },
+  {
+   "name": "codecs-gate-build-add6b27-linux-arm64",
+   "path": "codecs-gate-build-add6b27-linux-arm64",
+   "retention": "retained",
+   "reason": "Codecs and decode sessions runtime status row: 17 workloads, one unpinned pass on the gate build",
+   "key": "evidence/codecs-gate-build-add6b27-linux-arm64/ab2a174847322658159e93b2cd9bb994cdd9f4f9438926191518897aff28d929.tar.gz",
+   "sha256": "ab2a174847322658159e93b2cd9bb994cdd9f4f9438926191518897aff28d929",
+   "bytes": 11116900,
+   "source_revision": "add6b272cb622bae0d921dc3fbbf0812958c2023",
+   "files": [
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/PLATFORM",
+     "sha256": "e9aa38b4de3dd8af33348253d2767693404884279bc053e7091a982c310e730a"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/REV",
+     "sha256": "d173e810ddf67c62b7f9c768fb8b3efec66b0bedb26cfbb010105af0be3db119"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/RSS-PROOF.json",
+     "sha256": "33c58b37a3e2687e3f175ba7593aa9b6df0e4681672e02b2f78e663fac46552f"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/binaries-memory.sha256",
+     "sha256": "d398c121bd19f366f9bf56a7ba00ab1f8debe7ca50e5ebe34ceb6d11410d6cc6"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/binaries-timing.sha256",
+     "sha256": "d398c121bd19f366f9bf56a7ba00ab1f8debe7ca50e5ebe34ceb6d11410d6cc6"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/build-memory.log",
+     "sha256": "effcb004195b5b02b21b90c52123d64d5e074cc31886490a4c35c8a23de242ac"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs.log",
+     "sha256": "4d0495be88fd148021222afb0037f796cffa0a638f825173988527e3810c7a6b"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/ledger.json",
+     "sha256": "e8742dea8e75388e7430d09282cbcf9f5738a25629fea1352cc0b7dd65bc8cf6"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/aac-lc-5.1.json",
+     "sha256": "4f328007f939e47d7171efbc373a64d3f3f3896bee3633b08819187ec3c998af"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/aac-lc-stereo.json",
+     "sha256": "801ce99066abd9ce3030bd41ea3fd7dbf6e965c60ce3f67e23305d9c08668774"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/ac3-2.0-192.json",
+     "sha256": "4a4d51758379882f011a9cd8cc9e1605dd2201637f82897a2223ed4d7ee8972b"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/ac3-4.0.json",
+     "sha256": "a6d226007614054b0e3a2a30e3039e868ae30777ab5af9cccfb3f5f0f045f042"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/ac3-5.1-448.json",
+     "sha256": "b54ae2d49a243d38472ead03f44a01e194592c50d5359d4423fa8b603e4adfa7"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/dts-core-7.1-master.json",
+     "sha256": "420b8ea2a0780bfbb599ae317d3bdaa9910daeef3dda53a685a24f91c341a388"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/dts-core-es-6.1.json",
+     "sha256": "9763ac93214c1d99bdb299b6849669fc11454ab2cd44c73f071bf01a76a666f3"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/eac3-5.1-1536.json",
+     "sha256": "373c4925cb8bedc9f60d2596d4a468fb1f7104805c7653dad335f9601f679c8f"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/eac3-5.1-spx.json",
+     "sha256": "ec10777bbb6b24ae2aabf7af26d59b5cdb20c1524282886704e688e6c943aece"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/eac3-7.1.json",
+     "sha256": "629d252d17be855b43dd24d2705f0c5c892e15aa4ed04178cfe760e964caa0c6"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/eac3-stereo-spx.json",
+     "sha256": "a9db8b8c671014d7df734ba7489c43bc177ba97ef94fd0940912fa8f63ce7c05"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/h264-high-1080p.json",
+     "sha256": "a050eaf19f5ee4baaa4f02890035584a7e5ddfa9a88eb4e0f8f8e04c041bdbd6"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/h264-high-720p.json",
+     "sha256": "4453c58e174a3ca025a25d5b2c075e1dca829e4c853fe76383b62a483cc799c5"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/h264-main-1920x800.json",
+     "sha256": "04d4d780b1d0a08dea7a8bec54c8272720b96f92941425e8dd689a8bf8e77902"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/hevc-main-1080p.json",
+     "sha256": "e8b5c93188a6011906567718ea70df1b337f6abfd6f375101e05ba1293e39623"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/hevc-main10-1080p.json",
+     "sha256": "ff4d72056f8dca20e98a22ef512ab153fc4d82803c5d62161eeea454d29b5dc4"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/gate/unpinned/codecs/raw/hevc-main10-2160p.json",
+     "sha256": "33efd340874fa721c7a85a6c5c858653c9d0342a3fb3880243b21cbb77ff7ced"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/identity.json",
+     "sha256": "b4dfde57c02e914c498e5d5e035d5f8a6deee6a273934b39f4d7dd29c4d04a02"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/measure.log",
+     "sha256": "6fe53f17312ff5fbfbc4c2fbab823b1a4101e74953b32514b0b30b0821053704"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/measure.sh",
+     "sha256": "e9274eaff1874727185f7aaa4bb3f7cb5b93b9c5c4628047e1de79a55129995c"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/prove.log",
+     "sha256": "f65e8e4016013914ef770220054248dc053084f5033d687ff7ef77053d133367"
+    },
+    {
+     "path": "codecs-gate-build-add6b27-linux-arm64/setup.sh",
+     "sha256": "0132ce2b80c12bcce3bca267a979494a2d50cef50a205710484d86817977f0f1"
+    }
+   ]
+  },
+  {
+   "name": "gate-build-add6b27-linux-arm64",
+   "retention": "90 days",
+   "key": "qualification/gate-build-add6b27-linux-arm64/0cf93ddd1d397cf583716aef95464e8c498d0b928007239ca8a52d233b52ca94.tar.gz",
+   "sha256": "0cf93ddd1d397cf583716aef95464e8c498d0b928007239ca8a52d233b52ca94"
   }
  ]
 }

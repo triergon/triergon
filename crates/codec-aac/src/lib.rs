@@ -37,7 +37,25 @@ pub use error::{DecodeError, Feature};
 pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 
 use triergon_bitstream::CachedBitReader;
-use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels};
+use triergon_codec::{AudioDecoder, Budget, DecodeFailure, DownmixLevels};
+
+/// Storage limits of one decoder.
+#[derive(Clone, Copy, Debug)]
+pub struct Limits {
+    /// Live storage that depends on the stream: element and coupling-channel state
+    /// (overlap, prediction, LTP, spectra, SBR and PS) and the output frame the decoder
+    /// fills. The default holds the largest PCE layout (48 elements, 93 channels) with
+    /// SBR and Main prediction, 16 coupling channels and four raw data blocks of output.
+    pub live_storage_bytes: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            live_storage_bytes: 32 * 1024 * 1024,
+        }
+    }
+}
 
 /// ADTS AAC decoder.
 #[derive(Debug)]
@@ -52,9 +70,21 @@ impl Default for Decoder {
 }
 
 impl Decoder {
+    /// A decoder with a pool of the default limit.
     pub fn new() -> Self {
+        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        Self::with_limits(Limits::default()).expect("default storage budget")
+    }
+
+    /// A decoder with its own pool of `limits.live_storage_bytes`.
+    pub fn with_limits(limits: Limits) -> Result<Self, DecodeError> {
+        Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
+    }
+
+    /// A decoder charging the caller's pool.
+    pub fn new_in(budget: &Budget) -> Self {
         Decoder {
-            core: decoder::Core::new(),
+            core: decoder::Core::new(budget),
         }
     }
 
@@ -95,26 +125,24 @@ impl Decoder {
         #[cfg(feature = "inspect")]
         core.sbr_fil_ranges.clear();
         let mut br = CachedBitReader::new(payload);
-        // planes sized for the current layout; a mid-frame layout change restarts collection
-        let mut planes: Vec<Vec<f32>> = std::mem::take(&mut out.planes);
+        core.reserve_output(out, h.raw_data_blocks as usize)?;
         for _ in 0..h.raw_data_blocks {
             let start = br.position();
             core.decode_block(&mut br, start)?;
-            core.emit_planes(&mut planes);
+            core.emit_planes(out)?;
             if !h.protection_absent && h.raw_data_blocks > 1 {
                 br.skip(16); // adts_raw_data_block_error_check
             }
         }
         if core.skip_samples > 0 {
-            let n = planes.first().map_or(0, |p| p.len());
+            let n = out.planes.first().map_or(0, |p| p.len());
             let k = core.skip_samples.min(n);
-            for p in &mut planes {
+            for p in &mut out.planes {
                 p.drain(..k);
             }
             core.skip_samples -= k;
         }
         core.frames_out += 1;
-        out.planes = planes;
         out.sample_rate = core.output_rate();
         out.layout = core.layout;
         out.samples_per_channel = out.planes.first().map_or(0, |p| p.len());

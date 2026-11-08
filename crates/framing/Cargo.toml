@@ -19,6 +19,10 @@ triergon-harness-protocol = { path = "../harness-protocol" }
 # not shipped behaviour.
 reference-trace = []
 
+[[example]]
+name = "framing_worker"
+required-features = ["reference-trace"]
+
 [[test]]
 name = "dts_operation"
 required-features = ["reference-trace"]

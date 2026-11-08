@@ -150,16 +150,7 @@ impl SeekHeadJob {
                             .identifier
                             .zip(self.position)
                             .required("incomplete Seek entry")?;
-                        if matches!(
-                            id,
-                            0x1549a966
-                                | 0x1654ae6b
-                                | 0x1c53bb6b
-                                | 0x114d9b74
-                                | 0x1941a469
-                                | 0x1043a770
-                                | 0x1254c367
-                        ) {
+                        if crate::metadata::is_level_one(id) {
                             let output = self.output.as_mut().required("missing SeekHead arena")?;
                             if self
                                 .old_count

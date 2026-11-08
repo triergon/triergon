@@ -18,7 +18,7 @@ mod time;
 mod wide;
 mod work;
 
-pub use budget::{Budget, Reservation};
+pub use budget::{Budget, Charged, Reservation};
 pub use bytes::{
     BudgetVec, BudgetVecIntoIter, ByteStorageAddress, Bytes, BytesWriter, FreezeError,
     OwnedInputBytes, PushError, TransferError, nonzero_prefix_len,

@@ -47,7 +47,9 @@ pub struct SliceHeader {
     pub pic_output_flag: bool,
     pub poc_lsb: u32,
     pub st_rps: ShortTermRps,
-    pub long_term: Vec<LongTermEntry>,
+    /// The num_long_term_sps + num_long_term_pics entries (at most 32).
+    pub long_term: [LongTermEntry; 32],
+    pub num_long_term: usize,
     pub num_long_term_sps: u32,
     pub temporal_mvp: bool,
     pub sao_luma: bool,
@@ -59,7 +61,7 @@ pub struct SliceHeader {
     pub cabac_init: bool,
     pub collocated_from_l0: bool,
     pub collocated_ref_idx: u32,
-    pub pwt: Option<Box<PredWeightTable>>,
+    pub pwt: Option<PredWeightTable>,
     pub max_num_merge_cand: u32,
     pub slice_qp: i32,
     pub cb_qp_offset: i32,
@@ -68,7 +70,6 @@ pub struct SliceHeader {
     pub beta_offset_div2: i32,
     pub tc_offset_div2: i32,
     pub loop_filter_across_slices: bool,
-    pub entry_points: Vec<u32>,
     /// Byte offset of slice_segment_data() within the RBSP (header bytes excluded).
     pub data_offset: usize,
     /// SliceAddrRs of the slice containing this segment.
@@ -76,13 +77,16 @@ pub struct SliceHeader {
 }
 
 impl SliceHeader {
+    pub fn long_term(&self) -> &[LongTermEntry] {
+        &self.long_term[..self.num_long_term]
+    }
     pub fn num_pic_total_curr(&self) -> u32 {
         let mut n = 0;
         n += self.st_rps.used[..self.st_rps.num_delta_pocs()]
             .iter()
             .filter(|&&u| u)
             .count() as u32;
-        for lt in &self.long_term {
+        for lt in self.long_term() {
             if lt.used_by_curr {
                 n += 1;
             }
@@ -202,7 +206,6 @@ pub fn parse_slice_header(
         s.no_output_of_prior_pics = no_output_of_prior_pics;
         s.dependent_slice_segment = true;
         s.segment_address = segment_address;
-        s.entry_points.clear();
         s
     } else {
         SliceHeader {
@@ -217,7 +220,8 @@ pub fn parse_slice_header(
             pic_output_flag: true,
             poc_lsb: 0,
             st_rps: ShortTermRps::default(),
-            long_term: Vec::new(),
+            long_term: [LongTermEntry::default(); 32],
+            num_long_term: 0,
             num_long_term_sps: 0,
             temporal_mvp: false,
             sao_luma: false,
@@ -238,7 +242,6 @@ pub fn parse_slice_header(
             beta_offset_div2: pps.beta_offset_div2,
             tc_offset_div2: pps.tc_offset_div2,
             loop_filter_across_slices: pps.loop_filter_across_slices,
-            entry_points: Vec::new(),
             data_offset: 0,
             slice_addr_rs: segment_address,
         }
@@ -254,10 +257,10 @@ pub fn parse_slice_header(
         if !nal::is_idr(nal_unit_type) {
             sh.poc_lsb = r.read(sps.log2_max_poc_lsb)?;
             let st_sps = r.flag()?;
-            let num_st = sps.st_rps.len();
+            let num_st = sps.num_short_term_ref_pic_sets;
             if !st_sps {
                 let mdpb = sps.max_dec_pic_buffering[sps.max_sub_layers_minus1 as usize] - 1;
-                sh.st_rps = parse_st_rps(&mut r, num_st, num_st, &sps.st_rps, mdpb)?;
+                sh.st_rps = parse_st_rps(&mut r, num_st, num_st, &sps.st_rps[..num_st], mdpb)?;
             } else {
                 if num_st == 0 {
                     return Err(DecodeError::InvalidData(
@@ -272,10 +275,10 @@ pub fn parse_slice_header(
                 if idx >= num_st {
                     return Err(DecodeError::InvalidData("short_term_ref_pic_set_idx"));
                 }
-                sh.st_rps = sps.st_rps[idx].clone();
+                sh.st_rps = sps.st_rps[idx];
             }
             if sps.long_term_refs_present {
-                let nsps = sps.lt_ref_pic_poc_lsb.len() as u32;
+                let nsps = sps.num_long_term_ref_pics_sps;
                 let num_lt_sps = if nsps > 0 {
                     r.ue_max(nsps, "num_long_term_sps")?
                 } else {
@@ -307,10 +310,11 @@ pub fn parse_slice_header(
                     if e.msb_present {
                         e.delta_poc_msb_cycle = r.ue()?;
                     }
-                    sh.long_term.push(e);
+                    sh.long_term[sh.num_long_term] = e;
+                    sh.num_long_term += 1;
                 }
                 // DeltaPocMsbCycleLt accumulation (7-52).
-                for i in 0..sh.long_term.len() {
+                for i in 0..sh.num_long_term {
                     if i != 0 && i as u32 != num_lt_sps {
                         let p = sh.long_term[i - 1].delta_poc_msb_cycle;
                         sh.long_term[i].delta_poc_msb_cycle =
@@ -394,7 +398,7 @@ pub fn parse_slice_header(
                 }
             }
             if (pps.weighted_pred && st == SLICE_P) || (pps.weighted_bipred && st == SLICE_B) {
-                sh.pwt = Some(Box::new(parse_pwt(&mut r, &sh)?));
+                sh.pwt = Some(parse_pwt(&mut r, &sh)?);
             }
             let five_minus = r.ue_max(4, "five_minus_max_num_merge_cand")?;
             sh.max_num_merge_cand = 5 - five_minus;
@@ -431,10 +435,9 @@ pub fn parse_slice_header(
         let n = r.ue_max(sps.pic_size_ctb(), "num_entry_point_offsets")?;
         if n > 0 {
             let len = r.ue_max(31, "offset_len_minus1")? + 1;
-            sh.entry_points.reserve(n as usize);
+            // Substreams are decoded serially, so the offsets are read but not kept.
             for _ in 0..n {
-                let v = r.read(len)?;
-                sh.entry_points.push(v.wrapping_add(1));
+                r.read(len)?;
             }
         }
     }

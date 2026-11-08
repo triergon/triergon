@@ -59,7 +59,7 @@ MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 |---|---|
 | Source protocol | `Source`, `SourceReply`, `ByteSource`, `io::SourceOwner` |
 | Probe | `io::PlaybackProbe`: Matroska, MP4, TS188, M2TS192, AVC and HEVC Annex B |
-| Matroska | `Engine::matroska`, `matroska_with_payload_ownership`, `matroska_with_immutable_seek_index`, `matroska_webm_vp9_t35_v1` |
+| Matroska | `Engine::matroska`, `Engine::matroska_reader` (a reader built with `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`) |
 | Matroska feeds | `matroska_feed::MatroskaFeedSetup` (AVC Annex B, AAC ADTS), `MatroskaHevcDolbySetup` (HEVC Annex B, AC-3/E-AC-3), `MatroskaDiscovery`, `MatroskaCompactDiscovery`, `MatroskaVideoSeekGate` |
 | Matroska clocks | feed methods `native_avc_clock`, `native_aac_clock_probe` (`MatroskaTrackFeed`), `native_hevc_clock`, `native_dolby_clock_probe` (`MatroskaHevcDolbyFeed`); `MatroskaBitmapClockProbe` |
 | MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_pinned_mov_recovery`), `Engine::mp4`, `Engine::mp4_progressive`, `Engine::mp4_native_terminal_v1`, `Mp4RangeOpen` / `Mp4RangePlayer` |
@@ -68,7 +68,7 @@ MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 | TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `ts_native_private_audio_v1`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
 | HLS media segments | `hls_segment::HlsSegmentReader` (AVC + AAC), `HlsMediaSegmentReader` (AVC/HEVC + AAC/AC-3/E-AC-3) |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
-| Packet bridges | `nal_bridge::AvcBridge`, `hevc_bridge::HevcBridge`, `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge` |
+| Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge`; MP4 AVC and HEVC samples frame through `triergon_framing::NalPacketSession` |
 | Subtitles | `text_bridge::TextBridge`, `bitmap_bridge::{PgsBridge, DvdJob, DvdReceiver}`, `matroska_feed::MatroskaBitmapTrack`, `dvb_ts::DvbTsBridge` |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 

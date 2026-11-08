@@ -11,9 +11,12 @@
 // Pending: `missing_docs`.
 
 pub mod layout;
+mod window;
 
 pub use layout::{ChannelLayout, Speaker};
+pub use triergon_core::{Budget, BudgetVec, Charged, Error as StorageError, Reservation};
 pub use triergon_pixel::{Colour, PictureView, Plane};
+pub use window::kbd_window;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VideoCodec {
@@ -57,6 +60,66 @@ impl AudioFrame {
             plane.clear();
         }
         self.samples_per_channel = 0;
+    }
+
+    /// Size the frame to `channels` planes of `len` samples each, new samples zero.
+    ///
+    /// The capacity the frame needs is charged to `charge` before any plane grows,
+    /// and the charge then matches the frame's whole capacity, so a decoder's budget
+    /// covers the output it fills. A refused charge leaves `charge` unchanged; the
+    /// frame may have dropped planes beyond `channels`.
+    pub fn try_resize(
+        &mut self,
+        channels: usize,
+        len: usize,
+        charge: &mut Reservation,
+    ) -> Result<(), StorageError> {
+        self.planes.truncate(channels);
+        let planes = |count: usize| {
+            count
+                .checked_mul(size_of::<Vec<f32>>())
+                .ok_or(StorageError::Overflow)
+        };
+        let samples = |count: usize| {
+            count
+                .checked_mul(size_of::<f32>())
+                .ok_or(StorageError::Overflow)
+        };
+        let mut bytes = planes(self.planes.capacity().max(channels))?;
+        for i in 0..channels {
+            let capacity = self.planes.get(i).map_or(0, Vec::capacity).max(len);
+            bytes = bytes
+                .checked_add(samples(capacity)?)
+                .ok_or(StorageError::Overflow)?;
+        }
+        charge.resize_to(bytes)?;
+        let mut grew = false;
+        if channels > self.planes.len() {
+            self.planes
+                .try_reserve_exact(channels - self.planes.len())
+                .map_err(|_| StorageError::Allocation)?;
+            self.planes.resize_with(channels, Vec::new);
+            grew = true;
+        }
+        for plane in &mut self.planes {
+            if len > plane.capacity() {
+                plane
+                    .try_reserve_exact(len - plane.len())
+                    .map_err(|_| StorageError::Allocation)?;
+                grew = true;
+            }
+            plane.resize(len, 0.0);
+        }
+        if grew {
+            let mut bytes = planes(self.planes.capacity())?;
+            for plane in &self.planes {
+                bytes = bytes
+                    .checked_add(samples(plane.capacity())?)
+                    .ok_or(StorageError::Overflow)?;
+            }
+            charge.resize_to(bytes)?;
+        }
+        Ok(())
     }
 }
 

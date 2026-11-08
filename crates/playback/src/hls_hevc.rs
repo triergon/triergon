@@ -4,7 +4,7 @@
 
 use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
-    hls_avc::{AvcRaster, AvcTsClock, AvcTsLimits},
+    hls_avc::{AvcRaster, AvcTsClock, AvcTsLimits, clock_describes, lane_track},
     raw_video::RawVideoConfigTracker,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -248,12 +248,7 @@ impl Active {
         let Some(packet) = mailbox.as_ref() else {
             return Ok(false);
         };
-        if self.config.track
-            != (TrackKey::Ts {
-                program: packet.program,
-                pid: packet.pid,
-            })
-            || packet.source_epochs.configuration != self.config.configuration_epoch
+        if !lane_track(self.config.track, self.config.configuration_epoch, packet)
             || packet.stream_id & 0xf0 != 0xe0
             || packet.source_header.stream_id != packet.stream_id
         {
@@ -289,13 +284,11 @@ impl Active {
                 "HLS HEVC PES continuation without its causal header",
             ));
         }
-        if clock.program != packet.program
-            || clock.pid != packet.pid
-            || clock.profile != packet.profile
-            || clock.source_epochs != packet.source_epochs
-            || clock.source_pts_raw33 != header.and_then(|header| header.pts_raw33)
-            || clock.source_dts_raw33 != header.and_then(|header| header.dts_raw33)
-        {
+        let (pts, dts) = (
+            header.and_then(|h| h.pts_raw33),
+            header.and_then(|h| h.dts_raw33),
+        );
+        if !clock_describes(&clock, packet, pts, dts) {
             return Err(Error::Invalid("HLS HEVC clock does not describe this PES"));
         }
         let end = self

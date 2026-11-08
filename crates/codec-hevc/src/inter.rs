@@ -998,7 +998,7 @@ mod bench {
     fn bench_mc() {
         let mut plane = Plane::<u8>::new(256, 256, 0);
         let mut seed = 5u32;
-        for v in &mut plane.data {
+        for v in plane.data.iter_mut() {
             seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
             *v = (seed >> 16) as u8;
         }
@@ -1099,7 +1099,7 @@ mod bench_big {
         let (pw, ph) = (2560usize, 1600usize);
         let mut plane = Plane::<u8>::new(pw, ph, 0);
         let mut seed = 5u32;
-        for v in &mut plane.data {
+        for v in plane.data.iter_mut() {
             seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
             *v = (seed >> 16) as u8;
         }

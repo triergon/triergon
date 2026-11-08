@@ -14,9 +14,9 @@ for f in es/*; do
   lay=$(ffprobe -v error -show_entries stream=channel_layout -of csv=p=0 $f | head -1)
   ffmpeg -v quiet -y -f $ext -c:a $ext -i $f -f f32le -c:a pcm_f32le ref/$b.f32 || true
   ffmpeg -v quiet -y -f $ext -c:a $ext -cons_noisegen 1 -i $f -f f32le -c:a pcm_f32le ref/$b.cng.f32 || true
-  ./release/examples/decode $f out/$b.f32 2> out/$b.json
+  ./release/examples/decode_ac3 $f out/$b.f32 2> out/$b.json
   ./release/examples/strip_dither $f nd/$b 2>/dev/null
   ffmpeg -v quiet -y -f $ext -c:a $ext -i nd/$b -f f32le -c:a pcm_f32le nd/$b.ref.f32 || true
-  ./release/examples/decode nd/$b nd/$b.out.f32 2>/dev/null
+  ./release/examples/decode_ac3 nd/$b nd/$b.out.f32 2>/dev/null
   ${PYTHON:-python3} -I ../../harness/codecs/ac3/cmp_f32.py "$b" "$lay" $ch out/$b.f32 ref/$b.f32 ref/$b.cng.f32 nd/$b.out.f32 nd/$b.ref.f32 out/$b.json
 done

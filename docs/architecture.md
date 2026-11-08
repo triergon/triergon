@@ -47,7 +47,12 @@ Every allocation that depends on input is charged to a `Budget` before it happen
 using checked arithmetic. Shared buffers (`Bytes`, `BudgetVec`) carry their charge
 through clones and caller retention. Work, decompression ratio, nesting depth, index
 size and scan distance have separate limits. Formats expose their limits as plain
-`Limits` structs with conservative defaults; there is no unlimited mode.
+`Limits` structs with conservative defaults; there is no unlimited mode. Codecs take
+the same kind of `Limits` (`live_storage_bytes`, with a default that holds every
+conformance stream) and charge pictures, reference pools, NAL and slice storage,
+per-channel state and the output frames they fill; a refused charge is the codec's
+`Budget` error. Fixed-size state allocated at construction and short lists the
+specification caps (reference lists, parameter-set slots) are not charged.
 
 Two outcomes are kept apart everywhere: a *limit* violation is permanent for that
 input, while *backpressure* means the caller is holding too much output and the
@@ -116,8 +121,7 @@ performance gates where it touches hot code.
    `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
    in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves
    to it next.
-3. **Codecs.** Codecs allocate through core budgets.
-4. **Composition.** HLS and codec bridges become separate crates. Playback keeps its own
+3. **Composition.** HLS and codec bridges become separate crates. Playback keeps its own
    container engines: it carries source and native clocks, range plans and per-step
    parsing that `ContainerReader` does not.
 5. **Subtitle rendering.** ASS/SSA scripts are to render to positioned alpha bitmaps that

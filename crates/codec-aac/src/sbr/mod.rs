@@ -6,12 +6,15 @@ pub(crate) mod ps;
 mod qmf;
 pub(crate) mod tables;
 
+pub(crate) use qmf::synthesis_dct;
+
 use crate::error::{DecodeError, Result};
-use crate::fft::Cpx;
+use crate::fft::{Cpx, Dct4};
 use crate::huffman::{Vlc, books};
 use freq::FreqTables;
 use tables::NOISE;
 use triergon_bitstream::CachedBitReader;
+use triergon_codec::{Budget, BudgetVec};
 
 const FIXFIX: u8 = 0;
 const FIXVAR: u8 = 1;
@@ -113,9 +116,9 @@ pub(crate) struct Chan {
     analysis: qmf::Analysis,
     synthesis: qmf::Synthesis,
     /// low band history: xl[k][t], t < T_HFGEN valid
-    xl: Vec<[Cpx; XL_LEN]>,
+    xl: BudgetVec<[Cpx; XL_LEN]>,
     /// Y of the previous frame, slots 32..38 (high band contribution reaching into this frame)
-    y_prev: Vec<[Cpx; 64]>,
+    y_prev: BudgetVec<[Cpx; 64]>,
     /// gain / noise smoothing history (4 slots) per subband
     g_hist: [[f32; 64]; 4],
     q_hist: [[f32; 64]; 4],
@@ -124,14 +127,14 @@ pub(crate) struct Chan {
     /// kx / M used for the previous frame's high band
     kx_prev: usize,
     m_prev: usize,
-    xa: Vec<[Cpx; 32]>,
-    xh: Vec<[Cpx; 40]>,
-    y: Vec<[Cpx; 64]>,
+    xa: BudgetVec<[Cpx; 32]>,
+    xh: BudgetVec<[Cpx; 40]>,
+    y: BudgetVec<[Cpx; 64]>,
 }
 
 impl Chan {
-    fn new() -> Chan {
-        Chan {
+    fn new(budget: &Budget) -> Result<Chan> {
+        Ok(Chan {
             frame_class: 0,
             num_env: 0,
             t_env: [0; 6],
@@ -156,31 +159,27 @@ impl Chan {
             prev_num_env: 0,
             prev_t_env_last: NUM_TIME_SLOTS,
             l_a_prev: -1,
-            analysis: qmf::Analysis::new(),
-            synthesis: qmf::Synthesis::new(),
-            xl: vec![[Cpx::default(); XL_LEN]; 32],
-            y_prev: vec![[Cpx::default(); 64]; 8],
+            analysis: qmf::Analysis::new(budget)?,
+            synthesis: qmf::Synthesis::new(budget)?,
+            xl: BudgetVec::try_filled(budget, [Cpx::default(); XL_LEN], 32)?,
+            y_prev: BudgetVec::try_filled(budget, [Cpx::default(); 64], 8)?,
             g_hist: [[0.0; 64]; 4],
             q_hist: [[0.0; 64]; 4],
             index_noise: 0,
             index_sine: 0,
             kx_prev: 32,
             m_prev: 0,
-            xa: vec![[Cpx::default(); 32]; 32],
-            xh: vec![[Cpx::default(); 40]; 64],
-            y: vec![[Cpx::default(); 64]; 40],
-        }
+            xa: BudgetVec::try_filled(budget, [Cpx::default(); 32], 32)?,
+            xh: BudgetVec::try_filled(budget, [Cpx::default(); 40], 64)?,
+            y: BudgetVec::try_filled(budget, [Cpx::default(); 64], 40)?,
+        })
     }
 
     fn reset_signal(&mut self) {
         self.analysis.reset();
         self.synthesis.reset();
-        for r in &mut self.xl {
-            *r = [Cpx::default(); XL_LEN];
-        }
-        for r in &mut self.y_prev {
-            *r = [Cpx::default(); 64];
-        }
+        self.xl.fill([Cpx::default(); XL_LEN]);
+        self.y_prev.fill([Cpx::default(); 64]);
         self.prev_t_env_last = NUM_TIME_SLOTS;
         self.prev_num_env = 0;
         self.l_a_prev = -1;
@@ -205,32 +204,32 @@ pub(crate) struct Sbr {
     reset: bool,
     ft: FreqTables,
     coupling: bool,
-    ch: [Box<Chan>; 2],
+    ch: [Chan; 2],
     /// data of the current frame was parsed successfully
     data_ok: bool,
-    pub(crate) ps: Box<ps::Ps>,
+    pub(crate) ps: ps::Ps,
     ps_seen: bool,
     // scratch
-    x: Vec<[Cpx; 64]>,
-    x_r: Vec<[Cpx; 64]>,
+    x: BudgetVec<[Cpx; 64]>,
+    x_r: BudgetVec<[Cpx; 64]>,
 }
 
 impl Sbr {
-    pub(crate) fn new(core_rate: u32) -> Sbr {
-        Sbr {
+    pub(crate) fn new(core_rate: u32, budget: &Budget) -> Result<Sbr> {
+        Ok(Sbr {
             fs: core_rate * 2,
             hdr: Header::default(),
             have_header: false,
             reset: false,
             ft: FreqTables::default(),
             coupling: false,
-            ch: [Box::new(Chan::new()), Box::new(Chan::new())],
+            ch: [Chan::new(budget)?, Chan::new(budget)?],
             data_ok: false,
-            ps: Box::new(ps::Ps::new()),
+            ps: ps::Ps::new(budget)?,
             ps_seen: false,
-            x: vec![[Cpx::default(); 64]; 38],
-            x_r: vec![[Cpx::default(); 64]; 38],
-        }
+            x: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
+            x_r: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
+        })
     }
 
     pub(crate) fn reset(&mut self) {
@@ -330,7 +329,7 @@ impl Sbr {
                 &self.ft.low,
                 self.ft.kx,
                 &self.ft.patch_num,
-            );
+            )?;
             self.ft.n_lim = self.ft.lim.len() - 1;
         }
         Ok(())
@@ -448,6 +447,7 @@ impl Sbr {
         nch: usize,
         ps: bool,
         _cpe: bool,
+        dct: &mut Dct4,
     ) {
         let ready = self.have_header && self.data_ok;
         let reset = self.reset && ready;
@@ -507,7 +507,7 @@ impl Sbr {
                 }
             }
             // keep state for the next frame
-            for xl in &mut ch.xl {
+            for xl in ch.xl.iter_mut() {
                 xl.copy_within(32..32 + T_HFGEN, 0);
             }
             if ready {
@@ -549,13 +549,13 @@ impl Sbr {
                     let x = self.x[i];
                     self.ch[0]
                         .synthesis
-                        .run(&x, 1.0 / 32768.0, &mut l[i * 64..i * 64 + 64]);
+                        .run(dct, &x, 1.0 / 32768.0, &mut l[i * 64..i * 64 + 64]);
                 }
                 for i in 0..32 {
                     let x = self.x_r[i];
                     self.ch[1]
                         .synthesis
-                        .run(&x, 1.0 / 32768.0, &mut r[i * 64..i * 64 + 64]);
+                        .run(dct, &x, 1.0 / 32768.0, &mut r[i * 64..i * 64 + 64]);
                 }
                 continue;
             }
@@ -564,7 +564,7 @@ impl Sbr {
             for i in 0..32 {
                 let x = self.x[i];
                 chn.synthesis
-                    .run(&x, 1.0 / 32768.0, &mut out[i * 64..i * 64 + 64]);
+                    .run(dct, &x, 1.0 / 32768.0, &mut out[i * 64..i * 64 + 64]);
             }
         }
         if ready {
@@ -855,7 +855,7 @@ fn parse_noise(
 
 /// Envelope / noise dequantisation (4.6.18.3.5) incl. the coupled stereo case, then the
 /// bookkeeping that makes the last envelope / noise floor the "previous" for delta decoding.
-fn dequant(chans: &mut [Box<Chan>], ci: usize, ft: &FreqTables, coupling: bool, nch: usize) {
+fn dequant(chans: &mut [Chan], ci: usize, ft: &FreqTables, coupling: bool, nch: usize) {
     if coupling && nch == 2 {
         if ci == 1 {
             return; // both channels handled together with ci == 0
@@ -1240,10 +1240,10 @@ mod tests {
             ..Header::default()
         };
         let bands = freq::compute(&header, 48_000).unwrap();
-        assert_eq!(bands.lim, [10, 12, 18]);
+        assert_eq!(*bands.lim, [10, 12, 18]);
         assert_eq!(bands.kx + bands.m, 20);
 
-        let mut channel = Chan::new();
+        let mut channel = Chan::new(&Budget::new(1 << 20).unwrap()).unwrap();
         channel.num_env = 1;
         channel.num_noise = 1;
         channel.t_env[1] = NUM_TIME_SLOTS;

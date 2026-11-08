@@ -39,7 +39,7 @@ fn code(
     e.quant.inter(&coefficients, q, &mut expected);
     e.levels.fill([0; 64]);
     let mut bytes = Vec::new();
-    e.writer.take_into(&mut bytes);
+    e.writer.take_into(&mut bytes).unwrap();
     let mut state = SliceState {
         q,
         target_q: q,

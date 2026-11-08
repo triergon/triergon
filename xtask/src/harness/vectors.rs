@@ -129,6 +129,8 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
     let timed = Operation {
         prefix: "catalogue-".into(),
         arguments: vec![],
+        candidate_options: vec![],
+        work_fields: super::comparison::work_fields(&contract)?,
     };
     if s(&result, "status") == Some("pass") {
         let comparison = options.baseline_worker.as_ref().unwrap_or(&reference);
@@ -685,8 +687,13 @@ fn prefix_traces(
                 raw: scratch.join(&feature.id).join(id),
             };
             let expected = case.get("expected").unwrap_or(&Value::Null);
-            let result =
-                parity::feed_parity(&run, &feature.prefix, &case_arguments(case), expected)?;
+            let result = parity::feed_parity(
+                &run,
+                &feature.prefix,
+                &case_arguments(case),
+                expected,
+                &feature.work_fields,
+            )?;
             verdicts.push((
                 format!("{}/{id}", feature.id),
                 result.get("status").cloned().unwrap_or(Value::Null),

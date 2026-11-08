@@ -318,17 +318,35 @@ impl DescriptionRecoveryTable {
                 "v3 direct needs one physical terminal media extent",
             ));
         }
+        self.direct_cursor(
+            header,
+            media,
+            limits,
+            context,
+            "v3 direct composition domain has more than two rows",
+            false,
+        )
+    }
+    /// The direct engine after the caller's media-extent check.
+    fn direct_cursor<'a>(
+        &'a self,
+        header: &crate::RecoveryTrackHeader,
+        media: &'a [Range<u64>],
+        limits: PacketLimits,
+        context: DescriptionContext,
+        composition_error: &'static str,
+        physical_reads: bool,
+    ) -> Result<DescriptionPacketCursor<'a>> {
         if limits.max_tracks == 0 || limits.max_media_extents == 0 {
             return Err(Error::Limit {
                 requested: 1,
                 maximum: limits.max_tracks.min(limits.max_media_extents),
             });
         }
-        bounded(table.sample_count(), limits.max_source_samples)?;
+        let table = &self.base.storage;
+        count(table.sample_count(), limits.max_source_samples)?;
         if table.ctts.as_ref().is_some_and(|t| t.count > 2) {
-            return Err(Error::Unsupported(
-                "v3 direct composition domain has more than two rows",
-            ));
+            return Err(Error::Unsupported(composition_error));
         }
         Ok(DescriptionPacketCursor {
             legacy: None,
@@ -348,7 +366,7 @@ impl DescriptionRecoveryTable {
                 transport: None,
                 #[cfg(feature = "reference-trace")]
                 root_walk_transport_model: None,
-                physical_reads: false,
+                physical_reads,
             }),
             ready: None,
             failed: None,
@@ -394,44 +412,14 @@ impl DescriptionRecoveryTable {
                 "v4 needs one declared media extent inside the physical source",
             ));
         }
-        if limits.max_tracks == 0 || limits.max_media_extents == 0 {
-            return Err(Error::Limit {
-                requested: 1,
-                maximum: limits.max_tracks.min(limits.max_media_extents),
-            });
-        }
-        let table = &self.base.storage;
-        bounded(table.sample_count(), limits.max_source_samples)?;
-        if table.ctts.as_ref().is_some_and(|t| t.count > 2) {
-            return Err(Error::Unsupported(
-                "v4 direct composition domain has more than two rows",
-            ));
-        }
-        Ok(DescriptionPacketCursor {
-            legacy: None,
-            direct: Some(Direct {
-                table: self,
-                source: table.cursor(),
-                state: State::default(),
-                view: crate::PacketProjector::new(
-                    header.demux_projection_base()?,
-                    table.sync_entry_count(),
-                ),
-                source_timescale: header.source().timescale,
-                media: &media[0],
-                context,
-                limits,
-                #[cfg(feature = "reference-trace")]
-                transport: None,
-                #[cfg(feature = "reference-trace")]
-                root_walk_transport_model: None,
-                physical_reads: true,
-            }),
-            ready: None,
-            failed: None,
-            legacy_visited: 0,
-            legacy_distance: 0,
-        })
+        self.direct_cursor(
+            header,
+            media,
+            limits,
+            context,
+            "v4 direct composition domain has more than two rows",
+            true,
+        )
     }
     pub fn physical_index_cursor<'a>(
         &'a self,
@@ -442,20 +430,9 @@ impl DescriptionRecoveryTable {
         context: DescriptionContext,
         profile: crate::PhysicalReadProfile,
     ) -> Result<DescriptionIndexCursor<'a>> {
-        Ok(DescriptionIndexCursor {
-            inner: self.physical_packet_cursor(
-                pool,
-                header,
-                media,
-                limits.packets,
-                context,
-                profile,
-            )?,
-            next: 0,
-            limit: limits.max_entries,
-            ready: None,
-            failed: None,
-        })
+        let inner =
+            self.physical_packet_cursor(pool, header, media, limits.packets, context, profile)?;
+        Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
     #[cfg(feature = "reference-trace")]
     pub fn root_walk_packet_cursor<'a>(
@@ -492,20 +469,9 @@ impl DescriptionRecoveryTable {
         model: &'a crate::RootWalkTransportModel,
         profile: crate::RootWalkTransportProfile,
     ) -> Result<DescriptionIndexCursor<'a>> {
-        Ok(DescriptionIndexCursor {
-            inner: self.root_walk_packet_cursor(
-                pool,
-                header,
-                media,
-                limits.packets,
-                model,
-                profile,
-            )?,
-            next: 0,
-            limit: limits.max_entries,
-            ready: None,
-            failed: None,
-        })
+        let inner =
+            self.root_walk_packet_cursor(pool, header, media, limits.packets, model, profile)?;
+        Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
     #[cfg(feature = "reference-trace")]
     pub fn description_packet_cursor_with_transport<'a>(
@@ -536,20 +502,15 @@ impl DescriptionRecoveryTable {
         model: &'a crate::RawVideoTransportModel,
         profile: DescriptionRecoveryProfile,
     ) -> Result<DescriptionIndexCursor<'a>> {
-        Ok(DescriptionIndexCursor {
-            inner: self.description_packet_cursor_with_transport(
-                pool,
-                header,
-                media,
-                limits.packets,
-                model,
-                profile,
-            )?,
-            next: 0,
-            limit: limits.max_entries,
-            ready: None,
-            failed: None,
-        })
+        let inner = self.description_packet_cursor_with_transport(
+            pool,
+            header,
+            media,
+            limits.packets,
+            model,
+            profile,
+        )?;
+        Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
     pub fn description_index_cursor<'a>(
         &'a self,
@@ -560,32 +521,12 @@ impl DescriptionRecoveryTable {
         context: DescriptionContext,
         profile: DescriptionRecoveryProfile,
     ) -> Result<DescriptionIndexCursor<'a>> {
-        Ok(DescriptionIndexCursor {
-            inner: self.description_packet_cursor(
-                pool,
-                header,
-                media,
-                limits.packets,
-                context,
-                profile,
-            )?,
-            next: 0,
-            limit: limits.max_entries,
-            ready: None,
-            failed: None,
-        })
+        let inner =
+            self.description_packet_cursor(pool, header, media, limits.packets, context, profile)?;
+        Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
 }
 
-fn bounded(value: u64, maximum: u64) -> Result<()> {
-    if value > maximum {
-        return Err(Error::Limit {
-            requested: usize::try_from(value).map_err(|_| Error::Overflow)?,
-            maximum: usize::try_from(maximum).map_err(|_| Error::Overflow)?,
-        });
-    }
-    Ok(())
-}
 #[derive(Debug, Clone, Copy, Default)]
 struct State {
     ordinal: u64,
@@ -654,12 +595,12 @@ impl Direct<'_> {
             }
         }
         let mut source = self.source;
-        let mut declaration = match source.poll(work)? {
+        let declaration = match source.poll(work)? {
             SampleStep::Yield => return Ok(None),
             SampleStep::End => return Ok(None),
             SampleStep::Sample(s) => s,
         };
-        bounded(
+        count(
             self.state.ordinal.checked_add(1).ok_or(Error::Overflow)?,
             self.limits.max_occurrences,
         )?;
@@ -707,13 +648,10 @@ impl Direct<'_> {
                 .read_disposition(projected.source_range.start, self.media.clone())?
         };
         let range_error = read_sample.require_within(self.media.clone()).err();
-        if self.table.base.sync_diagnostic.is_some() {
-            declaration.access = Access::Unknown;
-        }
         let zero_or_sentinel = self.table.invalid != 0 && self.table.special != Some(2);
         let event_source_description = declaration.description_index;
         let event = DescriptionEvent {
-            declaration,
+            declaration: recovery_access(declaration, self.table.base.sync_diagnostic.is_some()),
             packet: (!suppressed).then_some(projected),
             emission: if suppressed {
                 DescriptionEmission::SuppressedMissingCatalogueEntry
@@ -762,23 +700,15 @@ pub struct DescriptionPacketCursor<'a> {
 }
 impl DescriptionPacketCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        if let Some(e) = self.failed {
-            return Err(e);
-        }
-        let result = self.poll_inner(work, cancel);
-        if let Err(e) = result {
-            self.failed = Some(e);
-            self.ready = None;
-        }
-        result
+        poll_latched(
+            self,
+            |c| (&mut c.failed, &mut c.ready),
+            Self::poll_inner,
+            work,
+            cancel,
+        )
     }
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if self.ready.is_some() {
-            return Ok(CursorStatus::Ready);
-        }
         if let Some(legacy) = &mut self.legacy {
             return match legacy.poll(work, cancel)? {
                 CursorStatus::Ready => {
@@ -840,10 +770,7 @@ impl DescriptionPacketCursor<'_> {
         }
     }
     pub fn take_event(&mut self) -> Result<DescriptionEvent> {
-        if let Some(e) = self.failed {
-            return Err(e);
-        }
-        self.ready.take().ok_or(Error::Invalid("v3 no ready event"))
+        take_latched(self.failed, &mut self.ready, "v3 no ready event")
     }
 }
 
@@ -869,25 +796,26 @@ pub struct DescriptionIndexCursor<'a> {
     ready: Option<DescriptionIndexEvent>,
     failed: Option<Error>,
 }
-impl DescriptionIndexCursor<'_> {
+impl<'a> DescriptionIndexCursor<'a> {
+    fn new(inner: DescriptionPacketCursor<'a>, limit: u64) -> Self {
+        Self {
+            inner,
+            next: 0,
+            limit,
+            ready: None,
+            failed: None,
+        }
+    }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        if let Some(e) = self.failed {
-            return Err(e);
-        }
-        let result = self.poll_inner(work, cancel);
-        if let Err(e) = result {
-            self.failed = Some(e);
-            self.ready = None;
-        }
-        result
+        poll_latched(
+            self,
+            |c| (&mut c.failed, &mut c.ready),
+            Self::poll_inner,
+            work,
+            cancel,
+        )
     }
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if self.ready.is_some() {
-            return Ok(CursorStatus::Ready);
-        }
         match self.inner.poll(work, cancel)? {
             CursorStatus::Ready => {
                 if !work.try_charge(1) {
@@ -895,26 +823,14 @@ impl DescriptionIndexCursor<'_> {
                 }
                 let event = self.inner.take_event()?;
                 let demux_entry = if let Some(packet) = &event.packet {
-                    bounded(self.next.checked_add(1).ok_or(Error::Overflow)?, self.limit)?;
-                    let size = packet
-                        .source_range
-                        .end
-                        .checked_sub(packet.source_range.start)
-                        .ok_or(Error::Overflow)?;
-                    bounded(size, 0x1fff_ffff)?;
-                    if packet.flags & !1 != 0 {
-                        return Err(Error::Unsupported("v3 native index flags"));
-                    }
-                    let entry = DescriptionIndexEntry {
-                        ordinal: self.next,
-                        position: i64::try_from(packet.source_range.start)
-                            .map_err(|_| Error::Unsupported("v3 native signed index position"))?,
-                        timestamp: packet.dts_field.signed_ticks(),
-                        flags: i32::from(packet.flags & 1 != 0),
-                        size: u32::try_from(size).map_err(|_| Error::Overflow)?,
-                        min_distance: i32::try_from(event.demux_index_distance)
-                            .map_err(|_| Error::Overflow)?,
-                    };
+                    count(self.next.checked_add(1).ok_or(Error::Overflow)?, self.limit)?;
+                    let entry = native_index_entry(
+                        packet,
+                        self.next,
+                        event.demux_index_distance,
+                        "v3 native index flags",
+                        "v3 native signed index position",
+                    )?;
                     self.next += 1;
                     Some(entry)
                 } else {
@@ -930,11 +846,6 @@ impl DescriptionIndexCursor<'_> {
         }
     }
     pub fn take_event(&mut self) -> Result<DescriptionIndexEvent> {
-        if let Some(e) = self.failed {
-            return Err(e);
-        }
-        self.ready
-            .take()
-            .ok_or(Error::Invalid("v3 no ready index event"))
+        take_latched(self.failed, &mut self.ready, "v3 no ready index event")
     }
 }

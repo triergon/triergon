@@ -118,7 +118,7 @@ impl Work {
 fn run(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
     let cancel = AtomicBool::new(false);
     let id = SourceId(31);
-    let engine = Engine::matroska_with_immutable_seek_index(
+    let reader = triergon::typed::Reader::new_with_immutable_seek_index(
         pool,
         id,
         raw.clone(),
@@ -126,6 +126,7 @@ fn run(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
         QUANTUM,
     )
     .unwrap();
+    let engine = Engine::matroska_reader(reader, id);
     let source = ByteSource::new(id, raw.clone(), QUANTUM).unwrap();
     let mut discovery = MatroskaCompactDiscovery::new(
         engine,

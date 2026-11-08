@@ -1,6 +1,7 @@
 //! Typed decoder errors.
 
 use std::fmt;
+use triergon_codec::StorageError;
 
 /// A named feature the decoder deliberately does not implement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,6 +30,14 @@ pub enum DecodeError {
     ResourceLimit(&'static str),
     /// The access unit is shorter than its header requires.
     Truncated,
+    /// Storage the access unit needs does not fit the decoder's budget.
+    Budget(StorageError),
+}
+
+impl From<StorageError> for DecodeError {
+    fn from(error: StorageError) -> Self {
+        DecodeError::Budget(error)
+    }
 }
 
 impl fmt::Display for DecodeError {
@@ -38,6 +47,7 @@ impl fmt::Display for DecodeError {
             DecodeError::InvalidData(s) => write!(f, "invalid data: {s}"),
             DecodeError::ResourceLimit(s) => write!(f, "resource limit: {s}"),
             DecodeError::Truncated => write!(f, "truncated access unit"),
+            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }
     }
 }
