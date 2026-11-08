@@ -232,34 +232,52 @@ fn children(raw: &BoxView, skip: usize, budget: &Budget) -> Result<BudgetVec<Box
         }
     }
 }
-fn optional(raw: &BoxView, kind: &[u8; 4]) -> Result<Option<BoxView>> {
+/// The child of each kind in `kinds`, found in one walk of `raw`. Each kind's
+/// result is its own: a kind that occurs twice is an error only when taken.
+fn lookup<const N: usize>(
+    raw: &BoxView,
+    kinds: [&[u8; 4]; N],
+) -> Result<[Result<Option<BoxView>>; N]> {
     let mut cursor = raw.children(0, Limits::default())?;
-    let mut found = None;
-    let mut duplicate = false;
+    let mut found = [const { None }; N];
+    let mut duplicate = [false; N];
     loop {
         match cursor.poll(&mut WorkBudget::new(4096))? {
-            BoxStep::Box(child) if child.header().kind == *kind => {
-                duplicate |= found.replace(child).is_some();
+            BoxStep::Box(child) => {
+                if let Some(at) = kinds.iter().position(|&kind| child.header().kind == *kind) {
+                    duplicate[at] |= found[at].replace(child).is_some();
+                }
             }
             BoxStep::End => break,
-            BoxStep::Box(_) | BoxStep::Yield => {}
+            BoxStep::Yield => {}
         }
     }
-    if duplicate {
-        return Err(Error::Invalid("duplicate required child").into());
-    }
-    Ok(found)
+    let mut found = found.into_iter();
+    Ok(duplicate.map(|duplicate| {
+        let child = found.next().flatten();
+        if duplicate {
+            Err(Error::Invalid("duplicate required child").into())
+        } else {
+            Ok(child)
+        }
+    }))
+}
+fn required(child: Result<Option<BoxView>>) -> Result<BoxView> {
+    child?.ok_or(Failure::Core(Error::Invalid("missing required child")))
+}
+fn optional(raw: &BoxView, kind: &[u8; 4]) -> Result<Option<BoxView>> {
+    let [child] = lookup(raw, [kind])?;
+    child
 }
 fn child(raw: &BoxView, kind: &[u8; 4]) -> Result<BoxView> {
-    optional(raw, kind)?.ok_or(Failure::Core(Error::Invalid("missing required child")))
+    required(optional(raw, kind))
 }
 fn track_header(track: &BoxView) -> Result<(TrackHeader, BoxView)> {
-    let mdia = child(track, b"mdia")?;
-    let header = TrackHeader::parse(
-        &child(track, b"tkhd")?,
-        &child(&mdia, b"mdhd")?,
-        &child(&mdia, b"hdlr")?,
-    )?;
+    let [mdia, tkhd] = lookup(track, [b"mdia", b"tkhd"])?;
+    let mdia = required(mdia)?;
+    let tkhd = required(tkhd)?;
+    let [mdhd, hdlr] = lookup(&mdia, [b"mdhd", b"hdlr"])?;
+    let header = TrackHeader::parse(&tkhd, &required(mdhd)?, &required(hdlr)?)?;
     Ok((header, mdia))
 }
 fn self_contained_table(
@@ -366,7 +384,8 @@ fn index_fragments(
             return Err(Error::Invalid("duplicate fragment track ID").into());
         }
         let stbl = child(&child(&media, b"minf")?, b"stbl")?;
-        let descriptions = word(child(&stbl, b"stsd")?.payload(), 4)?;
+        let [stsd, stsz, stz2] = lookup(&stbl, [b"stsd", b"stsz", b"stz2"])?;
+        let descriptions = word(required(stsd)?.payload(), 4)?;
         if descriptions > Limits::default().max_descriptions {
             return Err(Error::Limit {
                 requested: usize::try_from(descriptions).map_err(|_| Error::Overflow)?,
@@ -377,7 +396,7 @@ fn index_fragments(
         }
         // Both selected size layouts carry sample_count at payload offset8.
         // The real SampleTableBuilder below validates their full wire grammar.
-        let sizes = match (optional(&stbl, b"stsz")?, optional(&stbl, b"stz2")?) {
+        let sizes = match (stsz?, stz2?) {
             (Some(_), Some(_)) => return Err(Error::Invalid("both stsz and stz2").into()),
             (Some(raw), None) | (None, Some(raw)) => raw,
             (None, None) => return Err(Error::Invalid("missing sample size table").into()),
@@ -457,8 +476,10 @@ fn index_fragments(
 
 pub trait Transport: Read + Seek {}
 impl<T: Read + Seek> Transport for T {}
-pub struct Driver<'a> {
-    transport: &'a mut dyn Transport,
+/// Drives the readers over one transport. Generic over the transport so that
+/// small input windows read without dynamic dispatch.
+pub struct Driver<'a, T: Transport + ?Sized = dyn Transport + 'a> {
+    transport: &'a mut T,
     pub input: InputCursor,
     pub budget: Budget,
     length: u64,
@@ -501,9 +522,9 @@ pub struct OpenPolicy {
     pub media_data: MediaDataPolicy,
     pub regular_recovery: bool,
 }
-impl<'a> Driver<'a> {
+impl<'a, T: Transport + ?Sized> Driver<'a, T> {
     pub fn new(
-        transport: &'a mut dyn Transport,
+        transport: &'a mut T,
         length: u64,
         window: usize,
         quantum: u64,
@@ -533,6 +554,9 @@ impl<'a> Driver<'a> {
             cancel: AtomicBool::new(false),
         })
     }
+    // Inlined into `next_box`, which calls it once per window: once per byte
+    // for one-byte windows.
+    #[inline(always)]
     fn supply(&mut self, request: InputRequest) -> Result<()> {
         let maximum = request.maximum.min(self.window).min(65536);
         if maximum == 1 {
@@ -602,6 +626,24 @@ impl<'a> Driver<'a> {
         }
         Ok(())
     }
+    /// Polls `reader`, supplying the input it requests, until it reports a box
+    /// event or the end of the source. Small input windows make this loop run
+    /// once per supplied window, so it keeps its own small frame.
+    #[inline(never)]
+    fn next_box(&mut self, reader: &mut BoxReader) -> Result<Option<BoxEvent>> {
+        loop {
+            match reader.poll(
+                &mut self.input,
+                &mut WorkBudget::new(self.quantum),
+                &self.cancel,
+            )? {
+                Step::Ready(event) => return Ok(Some(event)),
+                Step::NeedInput(request) => self.supply(request)?,
+                Step::Yield => {}
+                Step::End(_) => return Ok(None),
+            }
+        }
+    }
     fn scan(
         &mut self,
         media_data: MediaDataPolicy,
@@ -614,16 +656,9 @@ impl<'a> Driver<'a> {
         let mut truncated_media = None;
         let mut moofs = BudgetVec::new(&self.budget);
         let mut indexes = BudgetVec::new(&self.budget);
-        loop {
-            match reader.poll(
-                &mut self.input,
-                &mut WorkBudget::new(self.quantum),
-                &self.cancel,
-            )? {
-                Step::NeedInput(request) => self.supply(request)?,
-                Step::Yield => {}
-                Step::End(_) => break,
-                Step::Ready(BoxEvent::Header(header)) => {
+        while let Some(event) = self.next_box(&mut reader)? {
+            match event {
+                BoxEvent::Header(header) => {
                     if let Some(roots) = roots.as_deref_mut() {
                         if roots.headers.len() == 64 {
                             return Err(Error::Limit {
@@ -650,12 +685,12 @@ impl<'a> Driver<'a> {
                         reader.skip(&mut self.input)?;
                     }
                 }
-                Step::Ready(BoxEvent::Skipped(header)) => {
+                BoxEvent::Skipped(header) => {
                     if header.kind == *b"mdat" {
                         append(&mut media, header.payload_range()?)?;
                     }
                 }
-                Step::Ready(BoxEvent::Metadata(raw)) => match &raw.header().kind {
+                BoxEvent::Metadata(raw) => match &raw.header().kind {
                     b"ftyp" => {
                         if brand.is_some() {
                             return Err(Error::Invalid("duplicate file type box").into());
@@ -1422,7 +1457,7 @@ pub struct SourceRequest {
     pub kind: RecoveryKind,
     pub syntax: RecoverySyntax,
 }
-impl Driver<'_> {
+impl<T: Transport + ?Sized> Driver<'_, T> {
     fn source_row(
         &mut self,
         model: &Model,
