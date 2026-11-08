@@ -1,7 +1,9 @@
 //! The pinned shaping reference: FriBidi 1.0.17 and HarfBuzz 14.6.0, built from
 //! hash-checked release tarballs with recorded flags into `.research/harfbuzz`, as
-//! the FreeType and FFmpeg references are. `cargo xtask build-workers` links the
-//! reference worker (`harness/reference_shape.h`) against the installed libraries.
+//! the FreeType and FFmpeg references are. A prepare whose sources, flags and
+//! compiler match the recorded ones reuses the compiled amalgamation. `cargo
+//! xtask build-workers` links the reference worker (`harness/reference_shape.h`)
+//! against the installed libraries.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -77,6 +79,44 @@ fn configure(source: &Path, argv: &[String], record: &Path) -> Result<Value, Str
     Ok(wanted)
 }
 
+/// The record of the compiled amalgamation, next to the object: the release,
+/// flags and compiler it was compiled from, and the object's hash.
+const OBJECT_RECORD: &str = "harfbuzz-object.json";
+
+/// Compiles HarfBuzz's amalgamation in `harfbuzz` into `cache/harfbuzz.o`,
+/// unless the recorded compilation is of the same release (its unpacked tree
+/// verified unchanged), with the same flags and compiler, and the object is
+/// the one it produced.
+fn compile_harfbuzz(cache: &Path, harfbuzz: &Path) -> Result<PathBuf, String> {
+    let object = cache.join("harfbuzz.o");
+    let record = cache.join(OBJECT_RECORD);
+    verify_xz_tree(&cache.join(HARFBUZZ.file), cache)?;
+    let compiler = output(Command::new("c++").arg("--version"))?;
+    let compiled = |object: &str| {
+        Value::object([
+            ("release_sha256", Value::str(HARFBUZZ.sha256)),
+            ("flags", Value::strings(HARFBUZZ_FLAGS)),
+            ("compiler", Value::str(compiler.clone())),
+            ("object_sha256", Value::str(object)),
+        ])
+    };
+    let recorded = crate::checks::read_json(&record).ok();
+    if let Ok(data) = fs::read(&object)
+        && recorded == Some(compiled(&sha256::hex(&data)))
+    {
+        return Ok(object);
+    }
+    let _ = fs::remove_file(&record);
+    run(Command::new("c++")
+        .args(HARFBUZZ_FLAGS)
+        .arg(harfbuzz.join("src/harfbuzz.cc"))
+        .arg("-o")
+        .arg(&object))?;
+    let data = fs::read(&object).map_err(|e| format!("{}: {e}", object.display()))?;
+    crate::corpus::write_json(&record, &compiled(&sha256::hex(&data)))?;
+    Ok(object)
+}
+
 /// Builds and installs FriBidi and HarfBuzz and records the build in
 /// `.research/harfbuzz/build.json`.
 pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, String> {
@@ -107,12 +147,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
 
     // HarfBuzz from its amalgamation.
     let harfbuzz = unpack_release(&cache, &HARFBUZZ, net)?;
-    let object = cache.join("harfbuzz.o");
-    run(Command::new("c++")
-        .args(HARFBUZZ_FLAGS)
-        .arg(harfbuzz.join("src/harfbuzz.cc"))
-        .arg("-o")
-        .arg(&object))?;
+    let object = compile_harfbuzz(&cache, &harfbuzz)?;
     let archive = lib.join("libharfbuzz.a");
     let _ = fs::remove_file(&archive);
     run(Command::new("ar").arg("rcs").arg(&archive).arg(&object))?;
