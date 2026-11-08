@@ -178,7 +178,7 @@ pub(super) const CACHE_CAPS: [u8; 168] = [
     204, 204, 204, 201, 201, 201, 201, 198, 198, 198, 187, 187, 175, 140, 66, 40,
 ];
 
-/// The rising half of the 120-sample low-overlap window.
+/// The rising half of the 120-sample low-overlap window, as the table RFC 6716 prints it.
 #[allow(clippy::excessive_precision)] // The digits the reference prints.
 pub(super) const WINDOW: [f32; 120] = [
     6.7286966e-05,
