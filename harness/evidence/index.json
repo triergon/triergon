@@ -47,9 +47,12 @@
  "sets": [
   {
    "name": "packet-framing-inline-segment-comparison",
-   "retention": "90 days",
+   "retention": "retained",
    "key": "qualification/repository/packet-framing-inline-segment-comparison/297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600.tar.gz",
-   "sha256": "297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600"
+   "sha256": "297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600",
+   "reason": "Packet framing AArch64 status row: all 125 AVC/HEVC comparisons, paired runtime, heap and total RSS, with the exact source, workers and resource traces",
+   "bytes": 65546655,
+   "source_revision": "fc64e27d2fc6c4a1f6eed253d2e9f00c2ce1c4a4"
   },
   {
    "name": "packet-framing-avc-update-comparison",
