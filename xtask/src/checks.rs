@@ -101,6 +101,7 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
         (_, Err(error)) => return Err(vec![format!("harness/module-gates.json: {error}")]),
     };
     errors.extend(runtime_mentions(root));
+    errors.extend(contract_fields(root));
     // Generated manifests: the case ids and the pins match, in the recorded form.
     for lane in crate::lanes::LANES {
         errors.extend(lane.check(root));
@@ -140,6 +141,27 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     } else {
         Err(errors)
     }
+}
+
+/// The fields every feature contract (`harness/features/<id>/contract.json`) may
+/// declare that the harness reads the same way for all of them: `timeout_seconds`.
+fn contract_fields(root: &Path) -> Vec<String> {
+    let features = root.join("harness/features");
+    walk::files(&features, &|rel| rel.ends_with("contract.json"))
+        .into_iter()
+        .filter_map(|path| {
+            let rel = path
+                .strip_prefix(root)
+                .expect("walked under root")
+                .display();
+            match read_json(&path) {
+                Ok(contract) => crate::harness::worker::contract_timeout(&contract)
+                    .err()
+                    .map(|error| format!("{rel}: {error}")),
+                Err(error) => Some(format!("{rel}: {error}")),
+            }
+        })
+        .collect()
 }
 
 /// `harness/policy.json` is the only definition of the runtime ceiling and target.
@@ -426,6 +448,26 @@ mod tests {
         ] {
             assert!(!has_unsafe_syntax(text), "{text}");
         }
+    }
+
+    #[test]
+    fn design_names_each_contract_with_an_invalid_timeout() {
+        let root = walk::scratch("contract-fields");
+        for (id, contract) in [
+            ("absent", r#"{"id": "absent"}"#),
+            ("long", r#"{"id": "long", "timeout_seconds": 120}"#),
+            ("zero", r#"{"id": "zero", "timeout_seconds": 0}"#),
+            ("text", r#"{"id": "text", "timeout_seconds": "120"}"#),
+        ] {
+            let directory = root.join("harness/features").join(id);
+            fs::create_dir_all(&directory).unwrap();
+            fs::write(directory.join("contract.json"), contract).unwrap();
+        }
+        let errors = contract_fields(&root);
+        assert_eq!(errors.len(), 2, "{errors:?}");
+        assert!(errors[0].starts_with("harness/features/text/contract.json: timeout_seconds"));
+        assert!(errors[1].starts_with("harness/features/zero/contract.json: timeout_seconds"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

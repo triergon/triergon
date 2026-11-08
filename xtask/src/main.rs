@@ -481,7 +481,7 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
         seed: 280,
         maximum_input_bytes: 4 << 20,
         maximum_output_bytes: 8 << 20,
-        timeout_seconds: 3.0,
+        timeout_seconds: None,
     };
     // With --contract, the campaign runs that feature's cases and --manifest names
     // the feature's corpus manifest (by default the one beside the contract).
@@ -512,7 +512,7 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
                 "--maximum-output-bytes" => campaign.maximum_output_bytes = number()? as usize,
                 "--timeout-seconds" => {
                     campaign.timeout_seconds =
-                        value.parse().map_err(|_| format!("{flag}: not a number"))?;
+                        Some(value.parse().map_err(|_| format!("{flag}: not a number"))?);
                 }
                 _ => return Err(USAGE.to_owned()),
             }
@@ -643,6 +643,7 @@ fn compare(root: &Path, args: &[String]) -> Task {
         reference: &reference,
         input: &input,
         raw: path("--output")?,
+        timeout: harness::worker::DEFAULT_TIMEOUT,
     };
     use harness::parity::{catalogue_parity, colour_parity, parity, seek_parity};
     let result = match values.get("--operation").map_or("plain", String::as_str) {
