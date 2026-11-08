@@ -9,12 +9,14 @@
 //!
 //! This packet operation binds one observer. Anything beyond that scope ends
 //! the operation with its cause instead of a fold: a program with more than one
-//! stream or a carriage the observer has no constructor for, a later PMT, a clock or format boundary, a
+//! stream or a carriage the observer has no constructor for, a later PMT, an unconfirmed clock or format boundary, a
 //! quarantined clock, an unsupported transport, PES-time, program or active PSI fault, or a second
 //! media entity. A single-entity program-policy refusal with no emitted packets
 //! can instead complete when `PacketCompletion` proves every physical carrier is
 //! control-only and the source reached actual EOF. The proof runs inside the
 //! operation and never changes source validation.
+//! Selected finite AVC can acknowledge a real source PCR Timeline or exclude one
+//! unusable final carrier after physical EOF and source Finished confirmation.
 //!
 //! Each packet folds its stream index, PID, PTS, DTS, duration, position, flags,
 //! payload and side data, the same fields in the same order as the reference
@@ -272,6 +274,8 @@ fn observer(
         PesFaultPolicy {
             timing_headers: true,
             rejected_clock_fields: true,
+            source_pcr_pid: Some(map.pcr_pid),
+            terminal_transport: true,
         },
     )
     .map_err(|rejected| rejected.error)
@@ -298,9 +302,27 @@ impl Session {
         quarantined: bool,
     ) -> triergon_core::Result<()> {
         let unrouted = || Error::Unsupported(UNROUTED);
+        let boundary_error = |error| match error {
+            Error::Unsupported(_) => unrouted(),
+            error => error,
+        };
         if let Some(observer) = &self.observer {
             let scope = observer.scope();
-            if scope.entity != cause.source || scope.epochs != cause.epochs || quarantined {
+            if scope.entity != cause.source || quarantined {
+                return Err(unrouted());
+            }
+            if matches!(event, TraceEvent::Timeline { .. }) {
+                return self
+                    .observer
+                    .as_mut()
+                    .ok_or_else(unrouted)?
+                    .confirm_source_timeline(event, cause.context()?)
+                    .map_err(boundary_error);
+            }
+            if scope.epochs != cause.epochs
+                || (observer.awaiting_terminal_completion()
+                    && !matches!(event, TraceEvent::Finished))
+            {
                 return Err(unrouted());
             }
         }
@@ -348,6 +370,19 @@ impl Session {
                     .ok_or_else(unrouted)?
                     .push_rejected_fault(fault.clone(), cause.context()?)
                     .map_err(|rejected| rejected.error)?;
+            }
+            TraceEvent::Diagnostic(fault)
+                if fault.kind == FaultKind::Transport
+                    && matches!(
+                        fault.error,
+                        Error::Truncated | Error::Invalid("TS sync byte")
+                    ) =>
+            {
+                self.observer
+                    .as_mut()
+                    .ok_or_else(unrouted)?
+                    .hold_terminal_transport(fault, cause.context()?)
+                    .map_err(boundary_error)?;
             }
             TraceEvent::Diagnostic(fault)
                 if matches!(fault.kind, FaultKind::Transport | FaultKind::Program)
@@ -564,6 +599,23 @@ fn packet_operation(
                         let error = Error::Invalid("source finished without logical EOF");
                         return refused(session, &error, cause, false);
                     };
+                    if let Some(observer) = session.observer.as_mut()
+                        && observer.awaiting_terminal_completion()
+                    {
+                        match observer.confirm_terminal_finished(
+                            &event,
+                            cause.context()?,
+                            &mut input,
+                            &mut WorkBudget::new(WORK),
+                            cancel,
+                        ) {
+                            Ok(true) => {}
+                            Ok(false) => {
+                                return Err("terminal confirmation yielded on fixed grant".into());
+                            }
+                            Err(error) => return refused(session, &error, cause, false),
+                        }
+                    }
                     if let Err(error) = session.logical_end(cancel) {
                         let eligible = matches!(
                             error.downcast_ref::<Error>(),
@@ -606,6 +658,21 @@ fn packet_operation(
                         boundary("entity_end_not_logical_eof"),
                         false,
                     );
+                }
+                if let Some(observer) = session.observer.as_mut()
+                    && observer.awaiting_terminal_completion()
+                {
+                    let end = demux
+                        .media_entity_end(&mut input, &mut WorkBudget::new(WORK), cancel)?
+                        .ok_or("source End yielded on fixed grant")?;
+                    if !observer.seal_terminal_end(
+                        &end,
+                        &mut input,
+                        &mut WorkBudget::new(WORK),
+                        cancel,
+                    )? {
+                        return Err("terminal End yielded on fixed grant".into());
+                    }
                 }
                 logical_eof = Some(boundary("logical_eof"));
                 demux.end_of_source()?;
@@ -799,11 +866,12 @@ pub fn run(args: &[String]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{control_completion, operation, parse};
+    use super::{Request, control_completion, operation, parse};
     use crate::runner::Totals;
     use std::path::Path;
     use std::sync::atomic::AtomicBool;
-    use triergon_core::{Budget, Error};
+    use triergon_core::{Budget, Bytes, Error};
+    use triergon_mpegts::{PacketFormat, psi::DescriptorNamespace};
 
     fn run(file: &str, arguments: &[&str]) -> Totals {
         let pool = Budget::new(64 * 1024 * 1024).unwrap();
@@ -831,6 +899,67 @@ mod tests {
         assert_eq!(
             (totals.packets, totals.bytes, totals.digest),
             (1, 27, 7_910_521_612_812_314_295)
+        );
+    }
+
+    #[test]
+    fn source_confirmed_clock_and_terminal_boundaries_keep_complete_packets() {
+        for (file, packets, bytes, digest) in [
+            (
+                "pcr-timeline-discontinuity.ts",
+                2,
+                30,
+                6_911_604_658_298_429_283,
+            ),
+            (
+                "transport-partial-final-packet.ts",
+                1,
+                27,
+                7_910_521_612_812_314_295,
+            ),
+            ("transport-sync-loss.ts", 1, 27, 7_910_521_612_812_314_295),
+        ] {
+            let totals = run(file, &["188", "1"]);
+            assert!(
+                totals.refusal.is_none(),
+                "{file}: {:?}",
+                totals.refusal.as_ref().map(|refusal| &refusal.reason)
+            );
+            assert_eq!(
+                (totals.packets, totals.bytes, totals.digest),
+                (packets, bytes, digest),
+                "{file}"
+            );
+        }
+    }
+
+    #[test]
+    fn source_clock_quarantine_is_not_a_confirmed_timeline() {
+        let bytes =
+            include_bytes!("../../mpegts/tests/data/selected-faults-v1/pcr-discontinuity-three.ts");
+        let mut data = bytes.to_vec();
+        // Keep the real first Timeline, then a carrier without PCR clears DI.
+        // A second DI/PCR before two new samples makes the source quarantine it.
+        data[752 + 5] = 0;
+        data[752 + 6..752 + 12].fill(0xff);
+        let mut next = bytes[564..752].to_vec();
+        next[3] = (next[3] & 0xf0) | 3;
+        data.extend_from_slice(&next);
+        let pool = Budget::new(1 << 20).unwrap();
+        let request = Request {
+            format: PacketFormat::Ts188,
+            program: 1,
+            namespace: DescriptorNamespace::Unspecified,
+            input: Bytes::copy_from_slice(&pool, &data).unwrap(),
+            more_entities: false,
+        };
+        let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+        assert_eq!(
+            totals
+                .refusal
+                .expect("source quarantine must remain a refusal")
+                .reason,
+            "unsupported: needs a program-level reader"
         );
     }
 
