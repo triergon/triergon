@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use crate::number::lrint;
+use crate::c_long::{lrint, to_int};
 use crate::{Karaoke, KaraokeMark};
 
 /// What karaoke needs of one laid-out glyph.
@@ -140,7 +140,10 @@ impl<'g> Syllables<'g> {
                 dt = 1.0 - dt;
                 swap_colours = true;
             }
-            (i64::from(x_start) + lrint(f64::from(x_end.wrapping_sub(x_start)) * dt)) as i32
+            to_int(
+                core::ffi::c_long::from(x_start)
+                    .wrapping_add(lrint(f64::from(x_end.wrapping_sub(x_start)) * dt)),
+            )
         };
         Some(Syllable {
             glyphs: start..end,

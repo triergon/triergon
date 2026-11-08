@@ -167,8 +167,26 @@ the drawing invalid (`None`). The `\p` level scales by `drawing_scale`.
 Floating-point operations follow libass's C source in order, without fused
 multiply-add, as the libass reference is built. A compiler that contracts
 `a * b + c` into one fused operation (Clang and GCC may, on targets that have it)
-rounds some animated values differently in the last bit. Conversions out of range
-follow the reference platform's saturating `double` to `int` and `lrint`.
+rounds some animated values differently in the last bit.
+
+Where libass's result depends on the target, the crate chooses deliberately, as
+the [reference-compatible behaviour](../../docs/architecture.md#reference-compatible-behaviour)
+convention asks:
+
+- `long`-width behaviour follows each target's libass. libass reads event times
+  (`sscanf`'s `%d`), a Matroska packet's ReadOrder and the parameters of a
+  `Banner` or `Scroll` effect (`atoi`) through `strtol`, `parse_bool` calls
+  `strtol`, and the karaoke split rounds with `lrint`. A value beyond `int`
+  saturates at `long`'s range and is then narrowed to `int`, so it differs
+  between 64-bit and 32-bit `long`; the crate converts these, and only these,
+  through `core::ffi::c_long` in one module.
+- Out-of-range drawing coordinates are rejected as libass does on 32-bit ARM with
+  GCC. A coordinate is rounded to 26.6 as `triergon_raster::pixels_26_6`
+  rounds, saturating, and a coordinate beyond the outline bound, `i32::MIN`
+  included, discards the drawing. libass's own result there is undefined in C
+  and differs by compiler on other targets.
+
+Those cases are compared in `ass-parse-host`, pinned per target.
 
 ## Behaviour and limits
 
@@ -192,7 +210,9 @@ libass reads it, skipping what it skips, and never panics.
   libass reference worker (`harness/reference_ass.h`) on every authored fixture in
   `harness/fixtures/ass` and requires identical work: `ass-parse-scripts` (whole
   scripts), `ass-parse-chunks` (Matroska packet streams) and `ass-parse-events`
-  (every event walked at the fixture's times). `cargo xtask fuzz --contract
+  (every event walked at the fixture's times), and `ass-parse-host` the
+  operations whose libass result differs by target, each against its target's
+  pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
 

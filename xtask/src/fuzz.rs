@@ -528,10 +528,13 @@ pub fn compare(outcomes: &[(String, Value)]) -> R<Value> {
             s(other, "status").unwrap_or_default(),
         );
         if left == "ok" && right == "ok" {
-            let (a, b) = (
-                candidate.get("data").unwrap_or(&Value::Null),
-                other.get("data").unwrap_or(&Value::Null),
-            );
+            // A reference's host-dependence flag describes the reference alone
+            // (the candidate cannot know it); the work is compared.
+            let mut b = other.get("data").cloned().unwrap_or(Value::Null);
+            if let Value::Object(members) = &mut b {
+                members.retain(|(key, _)| key != crate::lanes::HOST_DEPENDENT);
+            }
+            let (a, b) = (candidate.get("data").unwrap_or(&Value::Null), &b);
             if let Err(error) = validate_shape(a).and_then(|()| validate_shape(b)) {
                 comparisons.push(Value::object([
                     ("role", Value::str(role)),
@@ -1480,6 +1483,16 @@ mod tests {
         .unwrap();
         let shown = json::to_python(result.get("findings").unwrap(), None);
         assert!(shown.contains(r#"{"json_decimal": "1.50"}"#), "{shown}");
+        // The reference's host-dependence flag is not work the candidate owes.
+        let result = compare(&[
+            ("candidate".into(), ok(r#"{"v": 1}"#)),
+            (
+                "reference".into(),
+                ok(r#"{"v": 1, "host_dependent": true}"#),
+            ),
+        ])
+        .unwrap();
+        assert_eq!(result.get("findings"), Some(&Value::Array(vec![])));
         let rejected = Value::object([
             ("status", Value::str("rejected")),
             ("returncode", Value::int(2)),

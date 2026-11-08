@@ -209,7 +209,7 @@ impl Script {
         let Some(token) = next_token(&mut rest, false) else {
             return Ok(());
         };
-        let read_order = crate::number::atoi(token);
+        let read_order = crate::c_long::atoi(token);
         if check && self.is_duplicate(read_order, &mut work)? {
             return Ok(());
         }

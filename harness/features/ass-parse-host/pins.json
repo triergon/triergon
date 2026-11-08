@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "reference": "libass-ass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+  "pins": {
+    "drawings-clip-overflow-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 42,
+        "bytes": 120,
+        "digest": 4331674270210290408,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 42,
+        "bytes": 120,
+        "digest": 4331674270210290408,
+        "host_dependent": true
+      }
+    },
+    "drawings-infinite-ass": {
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 6,
+        "bytes": 44,
+        "digest": 7102520413637202956,
+        "host_dependent": true
+      }
+    },
+    "drawings-int-min-ass": {
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 6,
+        "bytes": 44,
+        "digest": 15881649056746129386,
+        "host_dependent": true
+      }
+    },
+    "events-time-overflow-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 5,
+        "bytes": 332,
+        "digest": 16739617371976300571
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 5,
+        "bytes": 332,
+        "digest": 16669471947859856155
+      }
+    },
+    "stream-read-order-overflow-chunks": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 4,
+        "bytes": 97,
+        "digest": 14772156494427005680
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 4,
+        "bytes": 97,
+        "digest": 3116554152817474288
+      }
+    }
+  }
+}

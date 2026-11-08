@@ -1,0 +1,6 @@
+@private
+[Script Info]
+ScriptType: v4.00+
+@end
+@chunk 0 100
+99999999999,0,Default,,0,0,0,,atoi truncates

@@ -517,17 +517,23 @@ pub fn seek_parity(
 
 /// Fold parity: candidate and reference `{prefix}fold` both reach the end of input and
 /// both match the case's independently recorded packet count, byte count and fold.
+///
+/// A reference that flags its fold host-dependent (its result went through a step
+/// C leaves to the target) passes only in a feature pinned per target
+/// (`pinned_per_target`), on a case whose pin for this target carries the same
+/// flag; elsewhere the case fails as `host-dependent-reference`.
 pub fn feed_parity(
     run: &Run<'_>,
     prefix: &str,
     arguments: &[OsString],
     expected: &Value,
     work_fields: &[String],
+    per_target: bool,
 ) -> Result<Value, String> {
     let mode = format!("{prefix}fold");
     let left = run.candidate(&mode, arguments);
     let right = run.exec(run.reference, &mode, arguments);
-    let result = feed_result(&left, &right, expected, work_fields);
+    let result = feed_result(&left, &right, expected, work_fields, per_target);
     run.write(
         &mode,
         &Value::object([("candidate", left), ("reference", right)]),
@@ -535,27 +541,53 @@ pub fn feed_parity(
     Ok(result)
 }
 
-fn feed_result(left: &Value, right: &Value, expected: &Value, work_fields: &[String]) -> Value {
+fn feed_result(
+    left: &Value,
+    right: &Value,
+    expected: &Value,
+    work_fields: &[String],
+    per_target: bool,
+) -> Value {
+    use crate::lanes::{HOST_DEPENDENT, host_dependent as flagged};
     let work = |outcome: &Value| super::comparison::work_summary(data(outcome), work_fields);
     let complete =
         |outcome: &Value| ok(outcome) && data(outcome).get("eof") == Some(&Value::Bool(true));
     let (candidate, reference) = (work(left), work(right));
+    let (reference_flag, pinned_flag) = (flagged(data(right)), flagged(expected));
+    let mut pinned = expected.clone();
+    if let Value::Object(members) = &mut pinned {
+        members.retain(|(key, _)| key != HOST_DEPENDENT);
+    }
     let pass = complete(left)
         && complete(right)
-        && super::comparison::work_summary(expected, work_fields).is_ok()
+        && reference_flag == pinned_flag
+        && super::comparison::work_summary(&pinned, work_fields).is_ok()
         && candidate
             .as_ref()
-            .is_ok_and(|c| super::diff::equal(c, expected))
+            .is_ok_and(|c| super::diff::equal(c, &pinned))
         && reference
             .as_ref()
-            .is_ok_and(|r| super::diff::equal(r, expected));
-    Value::object([
+            .is_ok_and(|r| super::diff::equal(r, &pinned));
+    let mut result = vec![
         ("status", status_of(pass)),
         ("source_timing_status", status_of(pass)),
         ("expected", expected.clone()),
         ("candidate", candidate.unwrap_or(Value::Null)),
         ("reference", reference.unwrap_or(Value::Null)),
-    ])
+    ];
+    if reference_flag && !per_target {
+        let status = Value::str("host-dependent-reference");
+        result[0].1 = status.clone();
+        result[1].1 = status;
+        result.push((
+            "reason",
+            Value::str(
+                "the reference's result went through a step C leaves to the target; \
+                 pin the case per target in a feature whose contract says pinned_per_target",
+            ),
+        ));
+    }
+    Value::object(result)
 }
 
 #[cfg(test)]
@@ -584,7 +616,13 @@ mod feed_tests {
         assert_eq!(rows.len(), 125);
         for row in rows {
             let expected = row.get("expected").unwrap();
-            let result = feed_result(&outcome(expected), &outcome(expected), expected, &fields);
+            let result = feed_result(
+                &outcome(expected),
+                &outcome(expected),
+                expected,
+                &fields,
+                false,
+            );
             assert_eq!(
                 result.get("status"),
                 Some(&Value::str("pass")),
@@ -607,7 +645,7 @@ mod feed_tests {
                     (outcome(&changed), outcome(&changed)),
                 ] {
                     assert_eq!(
-                        feed_result(&a, &b, expected, &fields).get("status"),
+                        feed_result(&a, &b, expected, &fields, false).get("status"),
                         Some(&Value::str("mismatch"))
                     );
                 }
@@ -627,9 +665,48 @@ mod feed_tests {
             unreachable!()
         };
         fields.push(("digest_b".into(), Value::int(4)));
-        let result = feed_result(&outcome(&extra), &outcome(&extra), &expected, &[]);
+        let result = feed_result(&outcome(&extra), &outcome(&extra), &expected, &[], false);
         assert_eq!(result.get("status"), Some(&Value::str("pass")));
         assert_eq!(result.get("candidate"), Some(&expected));
         assert_eq!(result.get("reference"), Some(&expected));
+    }
+
+    #[test]
+    fn a_host_dependent_reference_passes_only_where_declared_and_pinned() {
+        let work = Value::object([
+            ("packets", Value::int(1)),
+            ("bytes", Value::int(2)),
+            ("digest", Value::int(3)),
+        ]);
+        let mut flagged = work.clone();
+        if let Value::Object(members) = &mut flagged {
+            members.push(("host_dependent".into(), Value::Bool(true)));
+        }
+        let status = |reference: &Value, expected: &Value, declared: bool| {
+            feed_result(
+                &outcome(&work),
+                &outcome(reference),
+                expected,
+                &[],
+                declared,
+            )
+            .get("status")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+        };
+        let pass = Some("pass".to_owned());
+        assert_eq!(status(&flagged, &flagged, true), pass);
+        assert_eq!(status(&work, &work, false), pass);
+        assert_eq!(status(&work, &work, true), pass);
+        // A flag the pin does not carry, or the other way round, is a mismatch.
+        assert_eq!(status(&work, &flagged, true), Some("mismatch".into()));
+        assert_eq!(status(&flagged, &work, true), Some("mismatch".into()));
+        // A feature required on every host fails a flagged reference outright.
+        for expected in [&flagged, &work] {
+            assert_eq!(
+                status(&flagged, expected, false),
+                Some("host-dependent-reference".into())
+            );
+        }
     }
 }

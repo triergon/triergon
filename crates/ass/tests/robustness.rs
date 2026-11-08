@@ -64,9 +64,11 @@ fn mutate(data: &mut Vec<u8>, rng: &mut Rng, round: usize) {
 
 #[test]
 fn mutated_scripts_never_panic() {
-    let seeds: [&[u8]; 5] = [
+    let seeds: [&[u8]; 7] = [
         include_bytes!("../../../harness/fixtures/ass/tags-parens.ass"),
         include_bytes!("../../../harness/fixtures/ass/drawings.ass"),
+        include_bytes!("../../../harness/fixtures/ass/drawings-infinite.ass"),
+        include_bytes!("../../../harness/fixtures/ass/drawings-int-min.ass"),
         include_bytes!("../../../harness/fixtures/ass/karaoke.ass"),
         include_bytes!("../../../harness/fixtures/ass/styles-quirks.ass"),
         include_bytes!("../../../harness/fixtures/ass/fonts-extracted.ass"),

@@ -131,9 +131,10 @@ resource limit becomes an explicit, reviewed rule for that case.
 - **libass parsing.** The ASS parsing lane uses the same libass build: `cargo xtask
   ass prepare` is `cargo xtask raster prepare`, and `cargo xtask build-workers`
   also links the ASS parsing reference worker (`harness/reference_ass.h`), which
-  includes `ass_render.c` from the pinned tree for the render context and
-  restates, citing them, the two static functions it needs: the text loop of
-  `parse_events` and `ass_read_styles` from memory. Its features read the authored
+  includes `ass_render.c` from the pinned tree for the render context, and
+  `ass_drawing.c` to see the coordinates its parser converts, and restates, citing them,
+  the two static functions it needs: the text loop of `parse_events` and
+  `ass_read_styles` from memory. Its features read the authored
   fixtures in `harness/fixtures/ass` with libass's parse-level functions: whole
   scripts with `ass_read_memory` (`ass-parse-scripts`), Matroska packet streams
   with `ass_process_codec_private`, `ass_process_chunk` and its ReadOrder
@@ -141,8 +142,13 @@ resource limit becomes an explicit, reviewed rule for that case.
   with style overrides and font extraction where a fixture asks, and every event
   walked at the fixture's times through `ass_parse_tags`, `ass_get_next_char`,
   `ass_drawing_parse` and `ass_process_karaoke_effects` (`ass-parse-events`). All
-  three are required by `cargo xtask check`, and `cargo xtask ass compare`
-  reports them.
+  three are required by `cargo xtask check`. The reference flags a case whose
+  result C leaves to the target: a drawing coordinate whose 26.6 value is out of
+  `int`'s range or NaN (noted at `double_to_d6`, on every host) or lands on
+  `INT_MIN`, whose `abs` its bound check takes. A flagged case fails those three features. It is a fixture
+  of its own in `ass-parse-host`, with the reads of values that go through C
+  `long` beyond `int` (an event time, a ReadOrder); that feature is pinned per
+  target. `cargo xtask ass compare` reports all four.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   parsing features commit no case rows. `cargo xtask fonts manifest`, `cargo
   xtask shape manifest`, `cargo xtask raster manifest` and `cargo xtask ass
@@ -155,17 +161,29 @@ resource limit becomes an explicit, reviewed rule for that case.
   manifest --record`, `cargo xtask raster manifest --record` or `cargo xtask ass
   manifest --record` after `cargo xtask build-workers`, and never edit them by
   hand. `cargo xtask check-design` fails when the generated case ids and the
-  pins differ or a pin file is not in the form the recorder writes. Each feature's contract says when it runs in
-  `gate`: `"required"` (by `cargo xtask check` and `COMMAND compare`),
-  `"on-demand"` (also by `COMMAND compare --all`) or `"diagnostic"` (by `COMMAND
-  compare --diagnostic`); `cargo xtask check-design` fails when it is missing or
-  anything else.
+  pins differ or a pin file is not in the form the recorder writes. Each
+  feature's contract says when it runs in `gate`: `"required"` (by `cargo xtask
+  check` and `COMMAND compare`), `"on-demand"` (also by `COMMAND compare --all`)
+  or `"diagnostic"` (by `COMMAND compare --diagnostic`); `cargo xtask
+  check-design` fails when it is missing or anything else.
   A contract may set `timeout_seconds`, how long one worker run of its cases may
   take: a whole number of seconds from 1 to 3600, 30 when absent. `report` (its
   parity, timing and memory runs), `external-vector`, `trace-identities` and `fuzz
   --contract` (unless `--timeout-seconds` is given) honour it, and `cargo xtask
   check-design` fails on any other value. `raster-sweep` sets 120 for its heaviest
   cases on 32-bit ARMv7.
+  A contract with `"pinned_per_target": true` pins each case per target triple:
+  `pins.json` maps each case to a fold for each of the contract's
+  `required_targets`, except the targets `unpinned_targets` lists for a case
+  with a reason. A report compares a case with its pin for the host's target and
+  runs and reports, without failing, a case that has none there. `COMMAND
+  manifest --record` records the host target's pins, and on a target whose
+  workers `build-workers` cannot record, `--record --target TRIPLE
+  --reference-worker PATH` records that target's pins with the given reference.
+  check-design fails when a case lacks a target's pin or has one it should not,
+  when a case is the same on every target (it belongs in a feature pinned for
+  every target), and when a feature not pinned per target has a pin the
+  reference flags.
   Pins are recorded with the feature's `worker_operation`, the operation
   `report`, `grade` and `fuzz` run. A diagnostic feature that compares another
   reference with these pins names the features in `cases_from` (`raster-simd`
@@ -255,7 +273,7 @@ and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
 and `formats` references, the three font features with `font-worker` and FreeType,
 the six shaping features with `shape-worker` and HarfBuzz and FriBidi, the
-five rasterising features with `raster-worker` and libass, and the three ASS
+five rasterising features with `raster-worker` and libass, and the four ASS
 parsing features with `ass-worker` and libass.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
