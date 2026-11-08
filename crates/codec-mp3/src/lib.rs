@@ -17,8 +17,8 @@ mod subband;
 mod synthesis;
 
 use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, ChannelLayout, DecodeFailure, DownmixLevels, Reservation,
-    Speaker, StorageError,
+    AudioDecoder, AudioFrame, Budget, ChannelLayout, Charged, DecodeFailure, DownmixLevels,
+    Reservation, Speaker, StorageError,
 };
 use triergon_framing::{MpegAudioHeader, MpegLayer};
 
@@ -28,8 +28,9 @@ use synthesis::Synthesis;
 /// Bounds of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Heap bytes the decoder may hold for the output frame it fills: at most 1152
-    /// samples of two channels. The default leaves a wide margin above that.
+    /// Heap bytes the decoder may hold: its signal state, built with the first frame,
+    /// and the output frame it fills (at most 1152 samples of two channels). The default
+    /// leaves a wide margin above both.
     pub live_storage_bytes: usize,
 }
 
@@ -74,11 +75,13 @@ impl std::error::Error for DecodeError {}
 /// header included.
 #[derive(Debug)]
 pub struct Decoder {
+    budget: Budget,
     output_charge: Reservation,
-    state: Box<State>,
+    /// Built and charged with the first frame.
+    state: Option<Charged<Box<State>>>,
 }
 
-/// Signal state, fixed in size and allocated with the decoder.
+/// Signal state, fixed in size.
 #[derive(Debug)]
 struct State {
     synthesis: [Synthesis; 2],
@@ -108,25 +111,10 @@ impl Decoder {
     /// A decoder charging the caller's pool.
     pub fn new_in(budget: &Budget) -> Self {
         Decoder {
+            budget: budget.clone(),
             output_charge: Reservation::empty(budget),
-            state: Box::new(State {
-                synthesis: [Synthesis::default(), Synthesis::default()],
-                layer3: Layer3::new(),
-                mono: ChannelLayout::new([Speaker::FrontCenter]).unwrap_or_default(),
-                stereo: ChannelLayout::new([Speaker::FrontLeft, Speaker::FrontRight])
-                    .unwrap_or_default(),
-            }),
+            state: None,
         }
-    }
-
-    /// A decoder for the canonical configuration `configuration`. MPEG audio has none:
-    /// every frame header describes its frame, so the bytes are ignored.
-    pub fn from_configuration(
-        configuration: &[u8],
-        limits: Limits,
-    ) -> Result<Decoder, DecodeError> {
-        let _ = configuration;
-        Self::with_limits(limits)
     }
 
     /// Decode one frame into `out`. A frame cut short decodes as if the missing bytes
@@ -137,11 +125,26 @@ impl Decoder {
         let length = header
             .frame_bytes()
             .ok_or(DecodeError::Unsupported("free-format frame"))?;
-        let frame = &au[..length.min(au.len())];
+        let decoded = self.decode_body(&header, &au[..length.min(au.len())], out);
+        if decoded.is_err() {
+            out.clear();
+        }
+        decoded
+    }
+
+    fn decode_body(
+        &mut self,
+        header: &MpegAudioHeader,
+        frame: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<(), DecodeError> {
+        let state: &mut State = match &mut self.state {
+            Some(state) => state,
+            slot => slot.insert(Charged::boxed(&self.budget, State::new())?),
+        };
         let channels = usize::from(header.channels());
         let samples = header.samples_per_frame() as usize;
         out.try_resize(channels, samples, &mut self.output_charge)?;
-        let state = &mut *self.state;
         out.sample_rate = header.sample_rate;
         out.layout = if channels == 1 {
             state.mono
@@ -149,18 +152,14 @@ impl Decoder {
             state.stereo
         };
         out.samples_per_channel = samples;
+        let planes = &mut out.planes;
         match header.layer {
-            MpegLayer::I => layer1::decode(&header, frame, &mut state.synthesis, &mut out.planes),
-            MpegLayer::II => layer2::decode(&header, frame, &mut state.synthesis, &mut out.planes),
+            MpegLayer::I => layer1::decode(header, frame, &mut state.synthesis, planes),
+            MpegLayer::II => layer2::decode(header, frame, &mut state.synthesis, planes),
             MpegLayer::III => {
-                let decoded =
-                    state
-                        .layer3
-                        .decode(&header, frame, &mut state.synthesis, &mut out.planes);
-                if decoded.is_err() {
-                    out.clear();
-                }
-                decoded?;
+                state
+                    .layer3
+                    .decode(header, frame, &mut state.synthesis, planes)?;
             }
         }
         Ok(())
@@ -184,10 +183,23 @@ impl AudioDecoder for Decoder {
     }
 
     fn reset(&mut self) {
-        let state = &mut *self.state;
-        for filter in &mut state.synthesis {
-            filter.reset();
+        if let Some(state) = &mut self.state {
+            for filter in &mut state.synthesis {
+                filter.reset();
+            }
+            state.layer3.reset();
         }
-        state.layer3.reset();
+    }
+}
+
+impl State {
+    fn new() -> State {
+        State {
+            synthesis: [Synthesis::default(), Synthesis::default()],
+            layer3: Layer3::new(),
+            mono: ChannelLayout::new([Speaker::FrontCenter]).unwrap_or_default(),
+            stereo: ChannelLayout::new([Speaker::FrontLeft, Speaker::FrontRight])
+                .unwrap_or_default(),
+        }
     }
 }

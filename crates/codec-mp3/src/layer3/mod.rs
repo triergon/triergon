@@ -76,7 +76,7 @@ struct Channel {
     lines: usize,
 }
 
-/// Layer III decoding state (about 30 KiB, kept inside the decoder's boxed state).
+/// Layer III decoding state (about 14 KiB, kept inside the decoder's boxed state).
 #[derive(Debug)]
 pub(crate) struct Layer3 {
     reservoir: Reservoir,
