@@ -203,7 +203,10 @@ fn main() -> ExitCode {
             None => fonts::main(&root, &args[1..]),
         },
         Some("shape") => match shape::reports(&args[1..]) {
-            Some(reports) => return fonts_compare(&root, &reports),
+            Some(reports) => match shape::write_inputs(&root) {
+                Ok(()) => return fonts_compare(&root, &reports),
+                Err(error) => Err(error),
+            },
             None => shape::main(&root, &args[1..]),
         },
         Some("build-workers") => match &args[1..] {
