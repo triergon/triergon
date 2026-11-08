@@ -94,7 +94,7 @@ fn matroska_source(
         ownership,
     )
     .unwrap();
-    let engine = Engine::matroska_reader(reader).unwrap();
+    let engine = Engine::matroska_reader(reader);
     let source =
         ByteSource::new(ID, Bytes::copy_from_slice(&pool, input).unwrap(), quantum).unwrap();
     (engine, SourceOwner::new(source), pool)
@@ -1320,7 +1320,7 @@ fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() 
 }
 
 #[test]
-fn matroska_engine_refuses_a_reader_that_has_read_input() {
+fn player_refuses_a_matroska_reader_that_has_read_input() {
     let pool = Budget::new(2 << 20).unwrap();
     let capabilities = SourceCapabilities {
         length: Some(INPUT.len() as u64),
@@ -1336,7 +1336,20 @@ fn matroska_engine_refuses_a_reader_that_has_read_input() {
         )
         .unwrap()
     };
-    assert!(Engine::matroska_reader(reader(&pool)).is_ok());
+    let source = |pool: &Budget| {
+        SourceOwner::new(
+            ByteSource::new(ID, Bytes::copy_from_slice(pool, INPUT).unwrap(), 4096).unwrap(),
+        )
+    };
+    let player = |engine, pool: &Budget| {
+        Player::new(
+            engine,
+            source(pool),
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+    };
+    assert!(player(Engine::matroska_reader(reader(&pool)), &pool).is_ok());
     let mut started = reader(&pool);
     let cancel = AtomicBool::new(false);
     let Step::NeedInput(request) = started.step(&mut WorkBudget::new(64), &cancel).unwrap() else {
@@ -1351,7 +1364,7 @@ fn matroska_engine_refuses_a_reader_that_has_read_input() {
         Step::Yield
     ) {}
     assert!(matches!(
-        Engine::matroska_reader(started),
+        player(Engine::matroska_reader(started), &pool),
         Err(Error::Invalid("Matroska engine needs an unstarted reader"))
     ));
 }

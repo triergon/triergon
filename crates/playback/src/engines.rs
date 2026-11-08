@@ -456,19 +456,19 @@ impl Engine {
         limits: triergon_matroska::Limits,
         window: usize,
     ) -> Result<Self> {
-        Self::matroska_reader(Reader::new(pool, id, caps, limits, window)?)
+        Ok(Self::matroska_reader(Reader::new(
+            pool, id, caps, limits, window,
+        )?))
     }
 
     /// Play an unstarted Matroska reader configured by the caller, for example
     /// with `Reader::new_with_payload_ownership`,
     /// `Reader::new_with_immutable_seek_index` or
-    /// `compat::block_additions::new_reader`.
-    pub fn matroska_reader(reader: Reader) -> Result<Self> {
-        if !reader.is_unstarted() {
-            return Err(Error::Invalid("Matroska engine needs an unstarted reader"));
-        }
+    /// `compat::block_additions::new_reader`. A player refuses the engine if
+    /// the reader has already read or repositioned its input.
+    pub fn matroska_reader(reader: Reader) -> Self {
         let source = reader.source();
-        Ok(Self::Matroska(MkvEngine { reader, source }))
+        Self::Matroska(MkvEngine { reader, source })
     }
     pub fn mp4(input: InputCursor, plan: PreparedMp4, maximum_packet: usize) -> Result<Self> {
         let engine = Self::mp4_unattached(input, plan, maximum_packet)?;
@@ -844,6 +844,11 @@ impl Engine {
         }
     }
     pub(crate) fn validate_binding(&self) -> Result<()> {
+        if let Self::Matroska(m) = self
+            && !m.reader.is_unstarted()
+        {
+            return Err(Error::Invalid("Matroska engine needs an unstarted reader"));
+        }
         if let Self::Mp4(r) = self {
             if !r.input.budget().same_pool(&r.plan.pool) {
                 return Err(Error::ForeignPool);
