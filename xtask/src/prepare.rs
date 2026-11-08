@@ -237,7 +237,7 @@ pub fn verify_tree(archive: &[u8], cache: &Path) -> Result<usize, String> {
     let files = crate::archive::tar_files(&tar)?;
     for file in &files {
         let path = cache.join(&file.path);
-        let same = fs::read(&path).is_ok_and(|data| sha256::hex(&data) == sha256::hex(file.data));
+        let same = fs::read(&path).is_ok_and(|data| sha256::hex(&data) == sha256::hex(&file.data));
         if !same {
             return Err(format!("Pinned source was changed: {}", file.path));
         }

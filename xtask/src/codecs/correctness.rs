@@ -119,18 +119,7 @@ fn unknown(lane: &str) -> String {
 
 /// SHA-256 of a file.
 pub fn file_sha(path: &Path) -> Result<String, String> {
-    let mut file = fs::File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let mut hasher = sha256::Sha256::default();
-    let mut buffer = vec![0; 1 << 20];
-    loop {
-        let n = std::io::Read::read(&mut file, &mut buffer)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
-        if n == 0 {
-            break;
-        }
-        hasher.update(&buffer[..n]);
-    }
-    Ok(hasher.finish().iter().map(|b| format!("{b:02x}")).collect())
+    sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Every path below `dir` as `Path.rglob('*')` lists it, sorted: symbolic

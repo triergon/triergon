@@ -48,6 +48,11 @@ impl Sha256 {
         }
     }
 
+    /// The digest as lower-case hex.
+    pub fn finish_hex(self) -> String {
+        self.finish().iter().map(|b| format!("{b:02x}")).collect()
+    }
+
     pub fn finish(mut self) -> [u8; 32] {
         let bits = self.length * 8;
         self.update(&[0x80]);
@@ -99,7 +104,23 @@ impl Sha256 {
 pub fn hex(data: &[u8]) -> String {
     let mut hasher = Sha256::default();
     hasher.update(data);
-    hasher.finish().iter().map(|b| format!("{b:02x}")).collect()
+    hasher.finish_hex()
+}
+
+/// Lower-case hex SHA-256 of the file at `path`, read in pieces.
+pub fn file_hex(path: &std::path::Path) -> std::io::Result<String> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::default();
+    let mut buffer = vec![0u8; 1 << 20];
+    loop {
+        match file.read(&mut buffer) {
+            Ok(0) => return Ok(hasher.finish_hex()),
+            Ok(n) => hasher.update(&buffer[..n]),
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(e),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -124,7 +145,7 @@ mod tests {
         for chunk in vec![b'a'; 1_000_000].chunks(997) {
             split.update(chunk);
         }
-        let digest: String = split.finish().iter().map(|b| format!("{b:02x}")).collect();
+        let digest = split.finish_hex();
         assert_eq!(
             digest,
             "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
