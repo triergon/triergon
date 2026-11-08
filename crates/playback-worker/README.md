@@ -1,7 +1,7 @@
 # playback-worker
 
 Playback measurement worker for the harness. Each mode family runs one operation of
-the [triergon-playback](../playback/README.md) engine on one input; the FFmpeg
+the [triergon-playback](../playback/README.md) engine or a container reader on one input; the FFmpeg
 reference worker in `harness/` performs the same operation through public FFmpeg APIs.
 It is tooling (`publish = false`), not part of the library.
 
@@ -36,6 +36,7 @@ and the input event it is attributed to.
 | `mp4-forward-` | `regular` or `progressive` | `Mp4Open` and `Mp4IndexJob` in the native MOV view; a seekable file through the checked range index and `Engine::mp4`, with encoded plans for edits over composition offsets, or a forward-only front-`moov` file through its native front plan and `Engine::mp4_native_terminal_v1`; every track, times in the track time base | `mp4-forward` |
 | `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE` | explicit PIDs of program 1 through `Engine::ts_native_program_v1`, or one M2TS192 PID through `NativeStartup::new_m2ts_prefix_v2`; native 90 kHz clocks | `ts-program` |
 | `raw-video-` | `avc` or `hevc` | `RawVideoProbe`, `RawVideoSource` and `RawVideoFeed` over forward-only Annex B; no container clock, the duration is the active SPS picture period in 1/1,200,000 s | `raw-annex-b` |
+| `ts-au-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` | the MPEG-TS source reader through `AnyReader`: complete AVC/HEVC, ADTS AAC-LC and DVB-signalled AC-3 units, plus separately reported video-header groups and opt-in incomplete audio at logical EOF; the packet comparison uses original PES anchors through `compat::pes::DemuxClock`, leaving source clocks unchanged; source diagnostics, unsupported carriages and empty observations remain refusals | `mpegts-access-units` |
 | `ts-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` and further media entities (`[--discontinuity] FILE`) | the FFmpeg-compatible packets of one program through the public API: `TransportStream` selects the program, its first active PMT binds a `compat::pes::DemuxObserver` to the one elementary stream, that PID's transport packets feed it and `DemuxClock` places the timestamps; a context the observer alone cannot take (more streams, a later PMT, clock or format boundaries, transport, PES-time and active PSI faults, rejected carriers, a second entity) and an operation without a packet end with their cause; the strict source view and its native clock are not compared | `mpegts-pes` |
 
 A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
@@ -49,6 +50,17 @@ payload byte, with an unknown time folded as `i64::MIN` and an unknown duration 
 zero; `trace` prints one line per packet. The reference side is
 `harness/reference_packet_fold.h`. `ts-` folds stream index, PID, PTS, DTS, duration,
 position, flags, payload and the stream-ID side data, as `harness/reference_ts.h` does.
+The separate `ts-au-` operation enables reference codec parsing with `NOFILLIN`
+and no stream discovery. It preserves the original `ts-` operation and its corpus.
+Derived source sample durations remain available on the packet. The comparison
+keeps zero packet durations for video and AAC; AC-3 duration is confirmed by a
+second frame header, retaining one packet until that lookahead or EOF. This
+context and retention remain inside the measured operation. The bounded input bootstrap
+supplies the comparison's M2TS carrier or sync position. Incomplete audio is
+reported separately from complete units, with its original bytes and refusal
+reason; it never enters the neutral packet stream.
+Its generic refusal context records the last input-window offset; source
+diagnostics carry their exact source location.
 
-The contracts are in `harness/features/<contract>/`. The corpora of those five name
-inputs relative to the repository root, which they record as their `directory`.
+The contracts are in `harness/features/<contract>/`. Packet-fold corpora record
+the repository root as their `directory` and name inputs relative to it.
