@@ -85,6 +85,10 @@ pub struct Reader {
     queued_pes: Option<(usize, SourceEvent, ClockContext)>,
     unsupported_at: Option<usize>,
     tsid: Option<u16>,
+    transport_end: u64,
+    transport_payload_start: u64,
+    boundary_offset: u64,
+    boundary: Option<SourceEvent>,
     end: Option<SourceLocation>,
     finished: bool,
     failure: Option<Error>,
@@ -146,6 +150,10 @@ impl Reader {
             queued_pes: None,
             unsupported_at: None,
             tsid: None,
+            transport_end: 0,
+            transport_payload_start: 0,
+            boundary_offset: 0,
+            boundary: None,
             end: None,
             finished: false,
             failure: None,
@@ -228,6 +236,7 @@ impl Reader {
         self.active = None;
         self.queued_pes = None;
         self.unsupported_at = None;
+        self.boundary = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         self.healthy()?;
@@ -295,6 +304,13 @@ impl Reader {
                         }
                         let source = self.pending.as_ref().expect("pending source");
                         match source.event() {
+                            TraceEvent::Transport(packet) => {
+                                self.transport_payload_start = packet.payload_source_offset;
+                                self.transport_end = packet.source_offset
+                                    .checked_add(u64::try_from(packet.source.len()).map_err(|_| Error::Overflow)?)
+                                    .ok_or(Error::Overflow)?;
+                                self.phase = Phase::Publish;
+                            }
                             TraceEvent::Pat(table) => { self.tsid = Some(table.header.extension); self.phase = Phase::Publish; }
                             TraceEvent::ProgramMap { active: true, configuration_epoch, .. }
                                 if self.map.as_ref().is_none_or(|map| !matches!(map.event(), TraceEvent::ProgramMap { configuration_epoch: old, .. } if old == configuration_epoch)) => {
@@ -303,8 +319,23 @@ impl Reader {
                             TraceEvent::Discontinuity { .. } | TraceEvent::Timeline { .. } => {
                                 self.rebuild = self.map.clone(); self.phase = Phase::DrainAll(0);
                             }
+                            TraceEvent::Continuity { pid, outcome: crate::ContinuityOutcome::SignalledDiscontinuity } => {
+                                self.phase = self.lanes.as_slice().iter()
+                                    .position(|lane| lane.track.stream().pid == *pid)
+                                    .map_or(Phase::Publish, Phase::FaultLane);
+                            }
                             TraceEvent::Finished => { self.rebuild = None; self.phase = Phase::DrainAll(0); }
                             TraceEvent::Pes(pes) => {
+                                if let Some(boundary) = &self.boundary
+                                    && pes.header_source_ranges.as_slice().first().is_some_and(|range| range.offset < self.boundary_offset)
+                                {
+                                    let event = ReaderEvent::InterruptedPes {
+                                        source: source.clone(),
+                                        boundary: boundary.clone(),
+                                    };
+                                    self.phase = Phase::Publish;
+                                    return Ok(Step::Ready(Event::Other(event)));
+                                }
                                 if let Some(index) = self.lanes.as_slice().iter().position(|lane| lane.track.stream().pid == pes.pid) {
                                     let run = (pes.epochs.configuration, pes.epochs.clock, pes.byte_run_epoch);
                                     self.phase = if self.lanes.as_slice()[index].run.is_some_and(|old| old != run) {
@@ -353,6 +384,17 @@ impl Reader {
                                 self.pending.as_ref().expect("pending boundary").event(),
                                 TraceEvent::Finished
                             ) {
+                                // Clock transitions precede the current carrier's
+                                // payload; a PMT is committed after its carrier.
+                                self.boundary_offset = if matches!(
+                                    self.pending.as_ref().expect("pending boundary").event(),
+                                    TraceEvent::Timeline { .. }
+                                ) {
+                                    self.transport_payload_start
+                                } else {
+                                    self.transport_end
+                                };
+                                self.boundary = self.pending.clone();
                                 self.lanes.clear();
                                 self.staged_tracks.clear();
                             }
@@ -375,13 +417,13 @@ impl Reader {
                             self.staged_tracks.try_reserve_exact(
                                 source.map().streams.len() - self.staged_tracks.len(),
                             )?;
-                            let epoch = match source.event() {
-                                TraceEvent::ProgramMap {
-                                    configuration_epoch,
-                                    ..
-                                } => *configuration_epoch,
-                                _ => unreachable!(),
-                            };
+                            let epoch = self
+                                .stream
+                                .as_ref()
+                                .expect("active transport")
+                                .route_epochs(index, source.map().streams.as_slice()[index].pid)
+                                .ok_or(Error::Invalid("MPEG-TS track route missing"))?
+                                .configuration;
                             let track = Track {
                                 source: source.clone(),
                                 index,
