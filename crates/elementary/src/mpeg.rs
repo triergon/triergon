@@ -133,10 +133,8 @@ impl Syntax for MpegAudio {
             };
         };
         let word = u32::from_be_bytes([word[0], word[1], word[2], word[3]]);
-        // FFmpeg accepts the reserved emphasis value 2 (conformance stream hecommon).
-        let emphasis = (word & 3) as u8;
-        match MpegAudioHeader::parse(word & !3) {
-            Some(header) => Probe::Header(MpegAudioHeader { emphasis, ..header }),
+        match MpegAudioHeader::parse(word) {
+            Some(header) => Probe::Header(header),
             None => Probe::Invalid,
         }
     }
