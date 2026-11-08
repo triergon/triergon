@@ -61,7 +61,22 @@ catalogues change atomically with the corresponding source event. A PMT, clock
 or interrupted-byte-run boundary reports unpublished bytes through
 `ReaderEvent::Interrupted`, rather than treating a loss boundary as EOF.
 Logical EOF drains the framers before the original `Finished` event and final
-`Step::End`. Annex-B groups without an admitted primary/base-layer picture
+`Step::End`. Audio defaults to `AudioEofPolicy::RejectIncomplete`: an unfinished
+frame still returns `Truncated`. With `AudioEofPolicy::ReportIncomplete`, only
+logical source EOF can instead produce `ReaderEvent::IncompleteAudio` carrying
+`AccessUnit::IncompleteAudio`. It keeps the exact unfinished audio bytes,
+truncation reason, validated PES ranges and any applicable one-use source anchor.
+It has no complete-frame duration and is never a neutral packet or complete AU.
+Copying is bounded by the audio frame limit, cooperative work and the shared
+storage budget. Retained fragments survive reader reset or closure. Clock,
+program and loss boundaries remain interruptions; transport failures and invalid
+headers are not recovered by this reporting policy.
+All framers finish before EOF fragments are reported. Their publication counts
+the remaining reader tables and distinct backing allocations against the storage
+limit; caller-held output and external reservations can still cause retryable
+backpressure.
+
+Annex-B groups without an admitted primary/base-layer picture
 remain `ReaderEvent::VideoHeaders`,
 outside the AU packet stream. Packets and events remain usable after close or reset.
 
