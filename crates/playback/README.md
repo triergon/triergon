@@ -74,7 +74,7 @@ packet projections before merging the tracks for delivery.
 | HLS media segments | `hls_segment::HlsSegmentReader` (AVC + AAC), `HlsMediaSegmentReader` (AVC/HEVC + AAC/AC-3/E-AC-3) |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
 | Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge`; MP4 AVC and HEVC samples frame through `triergon_framing::NalPacketSession` |
-| Subtitles | `text_bridge::TextBridge`, `bitmap_bridge::{PgsBridge, DvdJob, DvdReceiver}`, `matroska_feed::MatroskaBitmapTrack`, `dvb_ts::DvbTsBridge` |
+| Subtitles | `text_bridge::TextBridge`, `bitmap_bridge::{PgsBridge, DvdReceiver}`, `matroska_feed::MatroskaBitmapTrack`, `mp4_dvd::{Mp4DvdSetup, Mp4DvdTrack}`, `dvb_ts::DvbTsBridge`, `pgs_ts::PgsTsTrack`, `teletext_ts::TeletextTsBridge`, `caption_bridge::CaptionBridge` |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
 ## Behaviour and limits
@@ -122,7 +122,7 @@ media request starts at the command's `start_offset()`.
 For a file with surplus timing entries, `Mp4Open::with_timing_policy` can
 use the timing prefix covered by the sample sizes for forward playback and
 `Mp4RangeOpen`. Each track's table reports the unused timing occurrences. The source playback view
-requires exact coverage.
+requires exact coverage. `subp` tracks are subtitle tracks.
 
 The FFmpeg-compatible packet view opens with `Mp4Open::new_recovery`. When
 the opener read the metadata before any media
@@ -145,7 +145,8 @@ physical end, or as an unsupported layout once the source passes its start.
 
 **MPEG-TS.** `ts_native_program_v1` selects up to 64 PIDs of one program.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
-admission. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
+admission, and a subtitle track when a DVB namespace names DVB subtitling or
+teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
 8 KiB input window. The DVB native PES parser caps a continued segment at
 65,536 bytes. PES outputs reuse their payload storage's budget handle, which
 remains valid while a caller retains an output after closing the player.
@@ -169,6 +170,21 @@ validation, work and retirement boundaries. Independently retained AAC frames
 still keep the full backing allocation charged. Both framers also expose
 `push_compact` for explicit `CompactDemuxPacket` delivery alongside ordinary `push`.
 Both paths share track, configuration-epoch and source-clock admission checks.
+
+**Subtitles.** The TS bridges bind to one PID of one active PMT and take its
+strict private-stream PES; a new generation, PMT epoch or clock epoch needs a
+new bridge. Their times are the PES times on the player's timeline; teletext
+times are bounded by the program clock as FFmpeg's demuxer bounds them, read
+from the transport packets offered to `TeletextTsBridge::observe`.
+`PgsTsTrack` hands each PES to `PgsBridge`. `Mp4DvdSetup` reads the colour
+table of an `mp4s` entry, and its `Mp4DvdTrack` hands each sample to
+`DvdReceiver`; a subpicture without a stop ends with its packet's duration.
+Teletext pages and closed captions become opaque ASS `TextSource`s, which
+`TextBridge` reports as it reports a Matroska ASS track's cues; an empty
+teletext page is a clear. A teletext decode needs the decoder's whole packet
+work in one budget. `CaptionBridge` takes H.264 or HEVC access units or MPEG-2
+PES payloads in decode order and decodes the caption frames FFmpeg's
+extraction settles, in its order.
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
 The feed consumes validated PES continuations directly and preserves source
@@ -214,7 +230,9 @@ native gate-build qualification remains pending.
 - MP4: ISO/IEC 14496-12 and the [QuickTime seek tables](https://developer.apple.com/documentation/quicktime-file-format/seeking_with_a_quicktime_file);
   AV1 per the [AV1-ISOBMFF sample format](https://aomediacodec.github.io/av1-isobmff/v1.3.0.html#av1-sample-format).
 - MPEG-TS: ITU-T H.222.0 (§2.14.1 AVC delimiters); DVB subtitles per
-  [ETSI EN 300 468 §6.2.41](https://www.etsi.org/deliver/etsi_en/300400_300499/300468/01.18.01_60/en_300468v011801p.pdf).
+  [ETSI EN 300 468 §6.2.41](https://www.etsi.org/deliver/etsi_en/300400_300499/300468/01.18.01_60/en_300468v011801p.pdf),
+  teletext per ETSI EN 300 472.
+- Closed captions: ATSC A/53 Part 4 `cc_data()` in ITU-T T.35 SEI messages.
 - AVC/HEVC parameter sets: ITU-T H.264 §7.3 and Annex B, ITU-T H.265.
 
 Integration tests in `tests/` replay authored and FFmpeg-generated fixtures
@@ -232,5 +250,6 @@ Fixture provenance: [AV1](tests/fixtures/av1/README.md),
 [Matroska feeds](tests/fixtures/mkv-feed/README.md),
 [Dolby clocks](tests/fixtures/dolby-clock/README.md),
 [subtitle probes](tests/fixtures/matroska-subtitle-probe/README.md),
+[subtitle bridges](tests/fixtures/subtitles/README.md),
 [terminal-media FFprobe records](tests/fixtures/terminal-matrix/README.md).
 Gates and measurement policy: [docs/quality.md](../../docs/quality.md).

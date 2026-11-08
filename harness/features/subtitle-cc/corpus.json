@@ -1,0 +1,3130 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "fate-closedcaption-rollup",
+      "profile": "fate-closedcaption-rollup",
+      "file": "fate/sub/Closedcaption_rollup.m2v",
+      "sha256": "d03cfbc04957d8672ffb4910de0f3fcee22e2b204d76b848d1473f1ba9ae9afa",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 789,
+        "digest": 13181262219833489151
+      }
+    },
+    {
+      "id": "fate-closedcaption-rollup-realtime",
+      "profile": "fate-closedcaption-rollup",
+      "file": "fate/sub/Closedcaption_rollup.m2v",
+      "sha256": "d03cfbc04957d8672ffb4910de0f3fcee22e2b204d76b848d1473f1ba9ae9afa",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1282,
+        "digest": 9115400784818629736
+      }
+    },
+    {
+      "id": "fate-scte20",
+      "profile": "fate-scte20",
+      "file": "fate/sub/scte20.ts",
+      "sha256": "18ad3b05ae0bffb9c014a2d0ce445d62670be020f42ea76336bebbac374886e6",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 863,
+        "digest": 8200029186303985235
+      }
+    },
+    {
+      "id": "fate-scte20-realtime",
+      "profile": "fate-scte20",
+      "file": "fate/sub/scte20.ts",
+      "sha256": "18ad3b05ae0bffb9c014a2d0ce445d62670be020f42ea76336bebbac374886e6",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 2465,
+        "digest": 11093215347975044587
+      }
+    },
+    {
+      "id": "fate-witch",
+      "profile": "fate-witch",
+      "file": "fate/sub/witch.scc",
+      "sha256": "4f924b6960a1b6ab986a495c1dcb7647ef79c4c8eed0a0ddd8b04cc34fc09758",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite",
+      "arguments": [
+        "cc",
+        "source=packets"
+      ],
+      "expected": {
+        "packets": 103,
+        "bytes": 11149,
+        "digest": 6533744590093559521
+      }
+    },
+    {
+      "id": "fate-witch-realtime",
+      "profile": "fate-witch",
+      "file": "fate/sub/witch.scc",
+      "sha256": "4f924b6960a1b6ab986a495c1dcb7647ef79c4c8eed0a0ddd8b04cc34fc09758",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite",
+      "arguments": [
+        "cc",
+        "source=packets",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 119,
+        "bytes": 13789,
+        "digest": 9554188638795253740
+      }
+    },
+    {
+      "id": "fate-witch-realtime-latency0",
+      "profile": "fate-witch",
+      "file": "fate/sub/witch.scc",
+      "sha256": "4f924b6960a1b6ab986a495c1dcb7647ef79c4c8eed0a0ddd8b04cc34fc09758",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite",
+      "arguments": [
+        "cc",
+        "source=packets",
+        "opt:real_time=1",
+        "opt:real_time_latency_msec=0"
+      ],
+      "expected": {
+        "packets": 119,
+        "bytes": 13789,
+        "digest": 9554188638795253740
+      }
+    },
+    {
+      "id": "mpeg2-a53-m2v",
+      "profile": "mpeg2-a53-m2v",
+      "file": "cc/mpeg2-a53.m2v",
+      "sha256": "f72e921fa1d7c2a02906aaae86dd033e26a18dc38b530cad5ac96fa1bc267cd9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-a53-m2v-realtime",
+      "profile": "mpeg2-a53-m2v",
+      "file": "cc/mpeg2-a53.m2v",
+      "sha256": "f72e921fa1d7c2a02906aaae86dd033e26a18dc38b530cad5ac96fa1bc267cd9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 3967987860773061086
+      }
+    },
+    {
+      "id": "mpeg2-a53-m2v-first",
+      "profile": "mpeg2-a53-m2v",
+      "file": "cc/mpeg2-a53.m2v",
+      "sha256": "f72e921fa1d7c2a02906aaae86dd033e26a18dc38b530cad5ac96fa1bc267cd9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-a53-m2v-second",
+      "profile": "mpeg2-a53-m2v",
+      "file": "cc/mpeg2-a53.m2v",
+      "sha256": "f72e921fa1d7c2a02906aaae86dd033e26a18dc38b530cad5ac96fa1bc267cd9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 12483287260419364831
+      }
+    },
+    {
+      "id": "mpeg2-a53-ts",
+      "profile": "mpeg2-a53-ts",
+      "file": "cc/mpeg2-a53.ts",
+      "sha256": "0b89d12dc0d96e338cbea823a66b5b3b8b35b2debaac365fb5debd729d5699af",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-a53-ts-realtime",
+      "profile": "mpeg2-a53-ts",
+      "file": "cc/mpeg2-a53.ts",
+      "sha256": "0b89d12dc0d96e338cbea823a66b5b3b8b35b2debaac365fb5debd729d5699af",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 2859984639760957918
+      }
+    },
+    {
+      "id": "mpeg2-a53-ts-first",
+      "profile": "mpeg2-a53-ts",
+      "file": "cc/mpeg2-a53.ts",
+      "sha256": "0b89d12dc0d96e338cbea823a66b5b3b8b35b2debaac365fb5debd729d5699af",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-a53-ts-second",
+      "profile": "mpeg2-a53-ts",
+      "file": "cc/mpeg2-a53.ts",
+      "sha256": "0b89d12dc0d96e338cbea823a66b5b3b8b35b2debaac365fb5debd729d5699af",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3321795607689776087
+      }
+    },
+    {
+      "id": "mpeg2-a53-closed-m2v",
+      "profile": "mpeg2-a53-closed-m2v",
+      "file": "cc/mpeg2-a53-closed.m2v",
+      "sha256": "6a4f1769841b7ef12ac312933f5fa4f070b38549a90a501a97cf22c0a5907614",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 3659327023741010195
+      }
+    },
+    {
+      "id": "mpeg2-a53-closed-m2v-realtime",
+      "profile": "mpeg2-a53-closed-m2v",
+      "file": "cc/mpeg2-a53-closed.m2v",
+      "sha256": "6a4f1769841b7ef12ac312933f5fa4f070b38549a90a501a97cf22c0a5907614",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 18242284689993924064
+      }
+    },
+    {
+      "id": "mpeg2-a53-closed-m2v-first",
+      "profile": "mpeg2-a53-closed-m2v",
+      "file": "cc/mpeg2-a53-closed.m2v",
+      "sha256": "6a4f1769841b7ef12ac312933f5fa4f070b38549a90a501a97cf22c0a5907614",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 3659327023741010195
+      }
+    },
+    {
+      "id": "mpeg2-a53-closed-m2v-second",
+      "profile": "mpeg2-a53-closed-m2v",
+      "file": "cc/mpeg2-a53-closed.m2v",
+      "sha256": "6a4f1769841b7ef12ac312933f5fa4f070b38549a90a501a97cf22c0a5907614",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 13159733285128515681
+      }
+    },
+    {
+      "id": "mpeg2-scte20-m2v",
+      "profile": "mpeg2-scte20-m2v",
+      "file": "cc/mpeg2-scte20.m2v",
+      "sha256": "5b1f345f2359f8dd9c452743e50e130ef6710fbb8cbbe8d390eabdb7e6bb5d7e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-scte20-m2v-realtime",
+      "profile": "mpeg2-scte20-m2v",
+      "file": "cc/mpeg2-scte20.m2v",
+      "sha256": "5b1f345f2359f8dd9c452743e50e130ef6710fbb8cbbe8d390eabdb7e6bb5d7e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 3967987860773061086
+      }
+    },
+    {
+      "id": "mpeg2-scte20-m2v-first",
+      "profile": "mpeg2-scte20-m2v",
+      "file": "cc/mpeg2-scte20.m2v",
+      "sha256": "5b1f345f2359f8dd9c452743e50e130ef6710fbb8cbbe8d390eabdb7e6bb5d7e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 12483287260419364831
+      }
+    },
+    {
+      "id": "mpeg2-scte20-m2v-second",
+      "profile": "mpeg2-scte20-m2v",
+      "file": "cc/mpeg2-scte20.m2v",
+      "sha256": "5b1f345f2359f8dd9c452743e50e130ef6710fbb8cbbe8d390eabdb7e6bb5d7e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-scte20-ts",
+      "profile": "mpeg2-scte20-ts",
+      "file": "cc/mpeg2-scte20.ts",
+      "sha256": "8a39b3d6258d2f8eb21d569f4e0f0eb14437a27029c5d8c6ce86d73c85312fdf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-scte20-ts-realtime",
+      "profile": "mpeg2-scte20-ts",
+      "file": "cc/mpeg2-scte20.ts",
+      "sha256": "8a39b3d6258d2f8eb21d569f4e0f0eb14437a27029c5d8c6ce86d73c85312fdf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 2859984639760957918
+      }
+    },
+    {
+      "id": "mpeg2-scte20-ts-first",
+      "profile": "mpeg2-scte20-ts",
+      "file": "cc/mpeg2-scte20.ts",
+      "sha256": "8a39b3d6258d2f8eb21d569f4e0f0eb14437a27029c5d8c6ce86d73c85312fdf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3321795607689776087
+      }
+    },
+    {
+      "id": "mpeg2-scte20-ts-second",
+      "profile": "mpeg2-scte20-ts",
+      "file": "cc/mpeg2-scte20.ts",
+      "sha256": "8a39b3d6258d2f8eb21d569f4e0f0eb14437a27029c5d8c6ce86d73c85312fdf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-scte20-tff-m2v",
+      "profile": "mpeg2-scte20-tff-m2v",
+      "file": "cc/mpeg2-scte20-tff.m2v",
+      "sha256": "1f5de8e41229684ee7fd33c4780022993f84b4eb363e8e5b3f008bc38d9434bd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-scte20-tff-m2v-realtime",
+      "profile": "mpeg2-scte20-tff-m2v",
+      "file": "cc/mpeg2-scte20-tff.m2v",
+      "sha256": "1f5de8e41229684ee7fd33c4780022993f84b4eb363e8e5b3f008bc38d9434bd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 3967987860773061086
+      }
+    },
+    {
+      "id": "mpeg2-scte20-tff-m2v-first",
+      "profile": "mpeg2-scte20-tff-m2v",
+      "file": "cc/mpeg2-scte20-tff.m2v",
+      "sha256": "1f5de8e41229684ee7fd33c4780022993f84b4eb363e8e5b3f008bc38d9434bd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-scte20-tff-m2v-second",
+      "profile": "mpeg2-scte20-tff-m2v",
+      "file": "cc/mpeg2-scte20-tff.m2v",
+      "sha256": "1f5de8e41229684ee7fd33c4780022993f84b4eb363e8e5b3f008bc38d9434bd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1430,
+        "digest": 2344270316793376610
+      }
+    },
+    {
+      "id": "mpeg2-scte20-tff-ts",
+      "profile": "mpeg2-scte20-tff-ts",
+      "file": "cc/mpeg2-scte20-tff.ts",
+      "sha256": "289efb52fb2e94e32975f7a1fb1acb70d046c029a42a89df6e030d3f2763bca8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-scte20-tff-ts-realtime",
+      "profile": "mpeg2-scte20-tff-ts",
+      "file": "cc/mpeg2-scte20-tff.ts",
+      "sha256": "289efb52fb2e94e32975f7a1fb1acb70d046c029a42a89df6e030d3f2763bca8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 2859984639760957918
+      }
+    },
+    {
+      "id": "mpeg2-scte20-tff-ts-first",
+      "profile": "mpeg2-scte20-tff-ts",
+      "file": "cc/mpeg2-scte20-tff.ts",
+      "sha256": "289efb52fb2e94e32975f7a1fb1acb70d046c029a42a89df6e030d3f2763bca8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-scte20-tff-ts-second",
+      "profile": "mpeg2-scte20-tff-ts",
+      "file": "cc/mpeg2-scte20-tff.ts",
+      "sha256": "289efb52fb2e94e32975f7a1fb1acb70d046c029a42a89df6e030d3f2763bca8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1430,
+        "digest": 12352091280136875370
+      }
+    },
+    {
+      "id": "mpeg2-mixed-m2v",
+      "profile": "mpeg2-mixed-m2v",
+      "file": "cc/mpeg2-mixed.m2v",
+      "sha256": "8fc60e99fd7c9fcb3c4f760b110d8a13db15062f38a0ce7dc46659abd221fb54",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1095,
+        "digest": 4726072738896490709
+      }
+    },
+    {
+      "id": "mpeg2-mixed-m2v-realtime",
+      "profile": "mpeg2-mixed-m2v",
+      "file": "cc/mpeg2-mixed.m2v",
+      "sha256": "8fc60e99fd7c9fcb3c4f760b110d8a13db15062f38a0ce7dc46659abd221fb54",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 1340,
+        "digest": 4660323777866130596
+      }
+    },
+    {
+      "id": "mpeg2-mixed-m2v-first",
+      "profile": "mpeg2-mixed-m2v",
+      "file": "cc/mpeg2-mixed.m2v",
+      "sha256": "8fc60e99fd7c9fcb3c4f760b110d8a13db15062f38a0ce7dc46659abd221fb54",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1095,
+        "digest": 4726072738896490709
+      }
+    },
+    {
+      "id": "mpeg2-mixed-m2v-second",
+      "profile": "mpeg2-mixed-m2v",
+      "file": "cc/mpeg2-mixed.m2v",
+      "sha256": "8fc60e99fd7c9fcb3c4f760b110d8a13db15062f38a0ce7dc46659abd221fb54",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1526,
+        "digest": 7049503866686331519
+      }
+    },
+    {
+      "id": "mpeg2-dvd-m2v",
+      "profile": "mpeg2-dvd-m2v",
+      "file": "cc/mpeg2-dvd.m2v",
+      "sha256": "fb0dbfe90dd96b139821b92543261d165f939b3989a0231d90feadec273177e3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-dvd-m2v-realtime",
+      "profile": "mpeg2-dvd-m2v",
+      "file": "cc/mpeg2-dvd.m2v",
+      "sha256": "fb0dbfe90dd96b139821b92543261d165f939b3989a0231d90feadec273177e3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 3967987860773061086
+      }
+    },
+    {
+      "id": "mpeg2-dvd-m2v-first",
+      "profile": "mpeg2-dvd-m2v",
+      "file": "cc/mpeg2-dvd.m2v",
+      "sha256": "fb0dbfe90dd96b139821b92543261d165f939b3989a0231d90feadec273177e3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-dvd-m2v-second",
+      "profile": "mpeg2-dvd-m2v",
+      "file": "cc/mpeg2-dvd.m2v",
+      "sha256": "fb0dbfe90dd96b139821b92543261d165f939b3989a0231d90feadec273177e3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 12483287260419364831
+      }
+    },
+    {
+      "id": "mpeg2-dvd-ts",
+      "profile": "mpeg2-dvd-ts",
+      "file": "cc/mpeg2-dvd.ts",
+      "sha256": "31e86ab53dd648d7d24ab7c9a3f1ac92b28e619fbc64fa20b37f221849a671d9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-dvd-ts-realtime",
+      "profile": "mpeg2-dvd-ts",
+      "file": "cc/mpeg2-dvd.ts",
+      "sha256": "31e86ab53dd648d7d24ab7c9a3f1ac92b28e619fbc64fa20b37f221849a671d9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 2859984639760957918
+      }
+    },
+    {
+      "id": "mpeg2-dvd-ts-first",
+      "profile": "mpeg2-dvd-ts",
+      "file": "cc/mpeg2-dvd.ts",
+      "sha256": "31e86ab53dd648d7d24ab7c9a3f1ac92b28e619fbc64fa20b37f221849a671d9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-dvd-ts-second",
+      "profile": "mpeg2-dvd-ts",
+      "file": "cc/mpeg2-dvd.ts",
+      "sha256": "31e86ab53dd648d7d24ab7c9a3f1ac92b28e619fbc64fa20b37f221849a671d9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3321795607689776087
+      }
+    },
+    {
+      "id": "mpeg2-dish-m2v",
+      "profile": "mpeg2-dish-m2v",
+      "file": "cc/mpeg2-dish.m2v",
+      "sha256": "b8aa8f158fa76010ba9431c71f52b1fbd2bf89ebda44e34aa739eac57c94bbc3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-dish-m2v-realtime",
+      "profile": "mpeg2-dish-m2v",
+      "file": "cc/mpeg2-dish.m2v",
+      "sha256": "b8aa8f158fa76010ba9431c71f52b1fbd2bf89ebda44e34aa739eac57c94bbc3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 3967987860773061086
+      }
+    },
+    {
+      "id": "mpeg2-dish-m2v-first",
+      "profile": "mpeg2-dish-m2v",
+      "file": "cc/mpeg2-dish.m2v",
+      "sha256": "b8aa8f158fa76010ba9431c71f52b1fbd2bf89ebda44e34aa739eac57c94bbc3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 14277871829330450257
+      }
+    },
+    {
+      "id": "mpeg2-dish-m2v-second",
+      "profile": "mpeg2-dish-m2v",
+      "file": "cc/mpeg2-dish.m2v",
+      "sha256": "b8aa8f158fa76010ba9431c71f52b1fbd2bf89ebda44e34aa739eac57c94bbc3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 584,
+        "digest": 9933004713764413311
+      }
+    },
+    {
+      "id": "mpeg2-dish-ts",
+      "profile": "mpeg2-dish-ts",
+      "file": "cc/mpeg2-dish.ts",
+      "sha256": "1bd3e79eb2ab563e7806e7806533679e96669734bd127b5f2a34f2095dec7f28",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-dish-ts-realtime",
+      "profile": "mpeg2-dish-ts",
+      "file": "cc/mpeg2-dish.ts",
+      "sha256": "1bd3e79eb2ab563e7806e7806533679e96669734bd127b5f2a34f2095dec7f28",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 2859984639760957918
+      }
+    },
+    {
+      "id": "mpeg2-dish-ts-first",
+      "profile": "mpeg2-dish-ts",
+      "file": "cc/mpeg2-dish.ts",
+      "sha256": "1bd3e79eb2ab563e7806e7806533679e96669734bd127b5f2a34f2095dec7f28",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5514395023981099665
+      }
+    },
+    {
+      "id": "mpeg2-dish-ts-second",
+      "profile": "mpeg2-dish-ts",
+      "file": "cc/mpeg2-dish.ts",
+      "sha256": "1bd3e79eb2ab563e7806e7806533679e96669734bd127b5f2a34f2095dec7f28",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 584,
+        "digest": 9933004713764413311
+      }
+    },
+    {
+      "id": "mpeg2-dvd-lock-m2v",
+      "profile": "mpeg2-dvd-lock-m2v",
+      "file": "cc/mpeg2-dvd-lock.m2v",
+      "sha256": "3f8bd1733dbb96806511b2a417c4acd567b69e7163d63f7773ada49b8ea834d1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 810,
+        "digest": 2201151281842040533
+      }
+    },
+    {
+      "id": "mpeg2-dvd-lock-m2v-realtime",
+      "profile": "mpeg2-dvd-lock-m2v",
+      "file": "cc/mpeg2-dvd-lock.m2v",
+      "sha256": "3f8bd1733dbb96806511b2a417c4acd567b69e7163d63f7773ada49b8ea834d1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 810,
+        "digest": 5144776837750395726
+      }
+    },
+    {
+      "id": "mpeg2-dvd-lock-m2v-first",
+      "profile": "mpeg2-dvd-lock-m2v",
+      "file": "cc/mpeg2-dvd-lock.m2v",
+      "sha256": "3f8bd1733dbb96806511b2a417c4acd567b69e7163d63f7773ada49b8ea834d1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 810,
+        "digest": 2201151281842040533
+      }
+    },
+    {
+      "id": "mpeg2-dvd-lock-m2v-second",
+      "profile": "mpeg2-dvd-lock-m2v",
+      "file": "cc/mpeg2-dvd-lock.m2v",
+      "sha256": "3f8bd1733dbb96806511b2a417c4acd567b69e7163d63f7773ada49b8ea834d1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1149,
+        "digest": 5289800051935812048
+      }
+    },
+    {
+      "id": "mpeg2-rff-m2v",
+      "profile": "mpeg2-rff-m2v",
+      "file": "cc/mpeg2-rff.m2v",
+      "sha256": "a83f53c5562b5077151ac977d1e8b2c07876d45241e1e9d435f46df6fd352b7f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10714597212237209507
+      }
+    },
+    {
+      "id": "mpeg2-rff-m2v-realtime",
+      "profile": "mpeg2-rff-m2v",
+      "file": "cc/mpeg2-rff.m2v",
+      "sha256": "a83f53c5562b5077151ac977d1e8b2c07876d45241e1e9d435f46df6fd352b7f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 5379570882901789386
+      }
+    },
+    {
+      "id": "mpeg2-rff-m2v-first",
+      "profile": "mpeg2-rff-m2v",
+      "file": "cc/mpeg2-rff.m2v",
+      "sha256": "a83f53c5562b5077151ac977d1e8b2c07876d45241e1e9d435f46df6fd352b7f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10714597212237209507
+      }
+    },
+    {
+      "id": "mpeg2-rff-m2v-second",
+      "profile": "mpeg2-rff-m2v",
+      "file": "cc/mpeg2-rff.m2v",
+      "sha256": "a83f53c5562b5077151ac977d1e8b2c07876d45241e1e9d435f46df6fd352b7f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 14962217704343908468
+      }
+    },
+    {
+      "id": "mpeg2-rff-ts",
+      "profile": "mpeg2-rff-ts",
+      "file": "cc/mpeg2-rff.ts",
+      "sha256": "cc32c3bf064f4eeeb06b77ed75cdbd579151f7283d0dec7dd5175645b6cbbe38",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 1951120406887858915
+      }
+    },
+    {
+      "id": "mpeg2-rff-ts-realtime",
+      "profile": "mpeg2-rff-ts",
+      "file": "cc/mpeg2-rff.ts",
+      "sha256": "cc32c3bf064f4eeeb06b77ed75cdbd579151f7283d0dec7dd5175645b6cbbe38",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 3999302993743460740
+      }
+    },
+    {
+      "id": "mpeg2-rff-ts-first",
+      "profile": "mpeg2-rff-ts",
+      "file": "cc/mpeg2-rff.ts",
+      "sha256": "cc32c3bf064f4eeeb06b77ed75cdbd579151f7283d0dec7dd5175645b6cbbe38",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 1951120406887858915
+      }
+    },
+    {
+      "id": "mpeg2-rff-ts-second",
+      "profile": "mpeg2-rff-ts",
+      "file": "cc/mpeg2-rff.ts",
+      "sha256": "cc32c3bf064f4eeeb06b77ed75cdbd579151f7283d0dec7dd5175645b6cbbe38",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3762895657377254797
+      }
+    },
+    {
+      "id": "mpeg2-rff-progressive-m2v",
+      "profile": "mpeg2-rff-progressive-m2v",
+      "file": "cc/mpeg2-rff-progressive.m2v",
+      "sha256": "72a4bd3f90a1698874add9fc2ebb09e4a51f09d667905e660c65da4d1bac5647",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 2012966102696344888
+      }
+    },
+    {
+      "id": "mpeg2-rff-progressive-m2v-realtime",
+      "profile": "mpeg2-rff-progressive-m2v",
+      "file": "cc/mpeg2-rff-progressive.m2v",
+      "sha256": "72a4bd3f90a1698874add9fc2ebb09e4a51f09d667905e660c65da4d1bac5647",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 18040187776817130906
+      }
+    },
+    {
+      "id": "mpeg2-rff-progressive-m2v-first",
+      "profile": "mpeg2-rff-progressive-m2v",
+      "file": "cc/mpeg2-rff-progressive.m2v",
+      "sha256": "72a4bd3f90a1698874add9fc2ebb09e4a51f09d667905e660c65da4d1bac5647",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 2012966102696344888
+      }
+    },
+    {
+      "id": "mpeg2-rff-progressive-m2v-second",
+      "profile": "mpeg2-rff-progressive-m2v",
+      "file": "cc/mpeg2-rff-progressive.m2v",
+      "sha256": "72a4bd3f90a1698874add9fc2ebb09e4a51f09d667905e660c65da4d1bac5647",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 4163480732986285594
+      }
+    },
+    {
+      "id": "mpeg2-rff-progressive-ts",
+      "profile": "mpeg2-rff-progressive-ts",
+      "file": "cc/mpeg2-rff-progressive.ts",
+      "sha256": "65bad17d8eebc6c196ddc4cb43a3449d26cd5123f8ffd30f459833e26f01495e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 11696233371056545912
+      }
+    },
+    {
+      "id": "mpeg2-rff-progressive-ts-realtime",
+      "profile": "mpeg2-rff-progressive-ts",
+      "file": "cc/mpeg2-rff-progressive.ts",
+      "sha256": "65bad17d8eebc6c196ddc4cb43a3449d26cd5123f8ffd30f459833e26f01495e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 16932184555805027738
+      }
+    },
+    {
+      "id": "mpeg2-rff-progressive-ts-first",
+      "profile": "mpeg2-rff-progressive-ts",
+      "file": "cc/mpeg2-rff-progressive.ts",
+      "sha256": "65bad17d8eebc6c196ddc4cb43a3449d26cd5123f8ffd30f459833e26f01495e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 11696233371056545912
+      }
+    },
+    {
+      "id": "mpeg2-rff-progressive-ts-second",
+      "profile": "mpeg2-rff-progressive-ts",
+      "file": "cc/mpeg2-rff-progressive.ts",
+      "sha256": "65bad17d8eebc6c196ddc4cb43a3449d26cd5123f8ffd30f459833e26f01495e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 13448733153966248466
+      }
+    },
+    {
+      "id": "mpeg2-fields-m2v",
+      "profile": "mpeg2-fields-m2v",
+      "file": "cc/mpeg2-fields.m2v",
+      "sha256": "eea647b2409b4a16022b94fdff88dd449caf49d2cfa43c3c60275d190dce8ef7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1176,
+        "digest": 13410128577348392789
+      }
+    },
+    {
+      "id": "mpeg2-fields-m2v-realtime",
+      "profile": "mpeg2-fields-m2v",
+      "file": "cc/mpeg2-fields.m2v",
+      "sha256": "eea647b2409b4a16022b94fdff88dd449caf49d2cfa43c3c60275d190dce8ef7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 1332,
+        "digest": 4506022178354534237
+      }
+    },
+    {
+      "id": "mpeg2-fields-m2v-first",
+      "profile": "mpeg2-fields-m2v",
+      "file": "cc/mpeg2-fields.m2v",
+      "sha256": "eea647b2409b4a16022b94fdff88dd449caf49d2cfa43c3c60275d190dce8ef7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1176,
+        "digest": 13410128577348392789
+      }
+    },
+    {
+      "id": "mpeg2-fields-m2v-second",
+      "profile": "mpeg2-fields-m2v",
+      "file": "cc/mpeg2-fields.m2v",
+      "sha256": "eea647b2409b4a16022b94fdff88dd449caf49d2cfa43c3c60275d190dce8ef7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1826,
+        "digest": 17515466043220431349
+      }
+    },
+    {
+      "id": "h264-a53-ts",
+      "profile": "h264-a53-ts",
+      "file": "cc/h264-a53.ts",
+      "sha256": "e8add26a57cf74f52642dc86a588d006fb99a5824dbedfdda746741aa0b529e9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 13342594292101211219
+      }
+    },
+    {
+      "id": "h264-a53-ts-realtime",
+      "profile": "h264-a53-ts",
+      "file": "cc/h264-a53.ts",
+      "sha256": "e8add26a57cf74f52642dc86a588d006fb99a5824dbedfdda746741aa0b529e9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 17134281468981820896
+      }
+    },
+    {
+      "id": "h264-a53-ts-first",
+      "profile": "h264-a53-ts",
+      "file": "cc/h264-a53.ts",
+      "sha256": "e8add26a57cf74f52642dc86a588d006fb99a5824dbedfdda746741aa0b529e9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 13342594292101211219
+      }
+    },
+    {
+      "id": "h264-a53-ts-second",
+      "profile": "h264-a53-ts",
+      "file": "cc/h264-a53.ts",
+      "sha256": "e8add26a57cf74f52642dc86a588d006fb99a5824dbedfdda746741aa0b529e9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3998241632398926937
+      }
+    },
+    {
+      "id": "h264-a53-mkv",
+      "profile": "h264-a53-mkv",
+      "file": "cc/h264-a53.mkv",
+      "sha256": "776891416112a122b832d582afd2caaeedfd37974de11968b267621493c9075e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16129581704507474928
+      }
+    },
+    {
+      "id": "h264-a53-mkv-realtime",
+      "profile": "h264-a53-mkv",
+      "file": "cc/h264-a53.mkv",
+      "sha256": "776891416112a122b832d582afd2caaeedfd37974de11968b267621493c9075e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 9798290234563570597
+      }
+    },
+    {
+      "id": "h264-a53-mkv-first",
+      "profile": "h264-a53-mkv",
+      "file": "cc/h264-a53.mkv",
+      "sha256": "776891416112a122b832d582afd2caaeedfd37974de11968b267621493c9075e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16129581704507474928
+      }
+    },
+    {
+      "id": "h264-a53-mkv-second",
+      "profile": "h264-a53-mkv",
+      "file": "cc/h264-a53.mkv",
+      "sha256": "776891416112a122b832d582afd2caaeedfd37974de11968b267621493c9075e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3269057345824328829
+      }
+    },
+    {
+      "id": "h264-a53-mp4",
+      "profile": "h264-a53-mp4",
+      "file": "cc/h264-a53.mp4",
+      "sha256": "27a9f78ad9151fd8b707d2d675de008bd4d94b25fb0b8046ead5558b2a89abf7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "h264-a53-mp4-realtime",
+      "profile": "h264-a53-mp4",
+      "file": "cc/h264-a53.mp4",
+      "sha256": "27a9f78ad9151fd8b707d2d675de008bd4d94b25fb0b8046ead5558b2a89abf7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 15638229727288383231
+      }
+    },
+    {
+      "id": "h264-a53-mp4-first",
+      "profile": "h264-a53-mp4",
+      "file": "cc/h264-a53.mp4",
+      "sha256": "27a9f78ad9151fd8b707d2d675de008bd4d94b25fb0b8046ead5558b2a89abf7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "h264-a53-mp4-second",
+      "profile": "h264-a53-mp4",
+      "file": "cc/h264-a53.mp4",
+      "sha256": "27a9f78ad9151fd8b707d2d675de008bd4d94b25fb0b8046ead5558b2a89abf7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 1372433589025719565
+      }
+    },
+    {
+      "id": "h264-field2-mkv",
+      "profile": "h264-field2-mkv",
+      "file": "cc/h264-field2.mkv",
+      "sha256": "b71c86e28d076e94968e9e208cf78a7fefd48c89f769b918c6eed5509c8ec7a4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3269057345824328829
+      }
+    },
+    {
+      "id": "h264-field2-mkv-realtime",
+      "profile": "h264-field2-mkv",
+      "file": "cc/h264-field2.mkv",
+      "sha256": "b71c86e28d076e94968e9e208cf78a7fefd48c89f769b918c6eed5509c8ec7a4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2172,
+        "digest": 15137392192614598404
+      }
+    },
+    {
+      "id": "h264-field2-mkv-first",
+      "profile": "h264-field2-mkv",
+      "file": "cc/h264-field2.mkv",
+      "sha256": "b71c86e28d076e94968e9e208cf78a7fefd48c89f769b918c6eed5509c8ec7a4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16129581704507474928
+      }
+    },
+    {
+      "id": "h264-field2-mkv-second",
+      "profile": "h264-field2-mkv",
+      "file": "cc/h264-field2.mkv",
+      "sha256": "b71c86e28d076e94968e9e208cf78a7fefd48c89f769b918c6eed5509c8ec7a4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3269057345824328829
+      }
+    },
+    {
+      "id": "h264-split-mp4",
+      "profile": "h264-split-mp4",
+      "file": "cc/h264-split.mp4",
+      "sha256": "62e9926f81418b1c0935d2eb113c0830c81f0e524c575279aea46baacf396c41",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "h264-split-mp4-realtime",
+      "profile": "h264-split-mp4",
+      "file": "cc/h264-split.mp4",
+      "sha256": "62e9926f81418b1c0935d2eb113c0830c81f0e524c575279aea46baacf396c41",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 15638229727288383231
+      }
+    },
+    {
+      "id": "h264-split-mp4-first",
+      "profile": "h264-split-mp4",
+      "file": "cc/h264-split.mp4",
+      "sha256": "62e9926f81418b1c0935d2eb113c0830c81f0e524c575279aea46baacf396c41",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "h264-split-mp4-second",
+      "profile": "h264-split-mp4",
+      "file": "cc/h264-split.mp4",
+      "sha256": "62e9926f81418b1c0935d2eb113c0830c81f0e524c575279aea46baacf396c41",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 1372433589025719565
+      }
+    },
+    {
+      "id": "h264-dtvcc-mkv",
+      "profile": "h264-dtvcc-mkv",
+      "file": "cc/h264-dtvcc.mkv",
+      "sha256": "0d8e95b6c0a8e7910cbca8bdaeea7a48700d5391336416f90389d2fd8748cd64",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 584,
+        "digest": 9933004713764413311
+      }
+    },
+    {
+      "id": "h264-dtvcc-mkv-realtime",
+      "profile": "h264-dtvcc-mkv",
+      "file": "cc/h264-dtvcc.mkv",
+      "sha256": "0d8e95b6c0a8e7910cbca8bdaeea7a48700d5391336416f90389d2fd8748cd64",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 584,
+        "digest": 9933004713764413311
+      }
+    },
+    {
+      "id": "h264-dtvcc-mkv-first",
+      "profile": "h264-dtvcc-mkv",
+      "file": "cc/h264-dtvcc.mkv",
+      "sha256": "0d8e95b6c0a8e7910cbca8bdaeea7a48700d5391336416f90389d2fd8748cd64",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 584,
+        "digest": 9933004713764413311
+      }
+    },
+    {
+      "id": "h264-dtvcc-mkv-second",
+      "profile": "h264-dtvcc-mkv",
+      "file": "cc/h264-dtvcc.mkv",
+      "sha256": "0d8e95b6c0a8e7910cbca8bdaeea7a48700d5391336416f90389d2fd8748cd64",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 584,
+        "digest": 9933004713764413311
+      }
+    },
+    {
+      "id": "h264-gaps-ts",
+      "profile": "h264-gaps-ts",
+      "file": "cc/h264-gaps.ts",
+      "sha256": "66494b1e777b88e3995e665943f9c4c2c6fd341fd3b369893da6cb4d210b5e4b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 762,
+        "digest": 17271829637184367771
+      }
+    },
+    {
+      "id": "h264-gaps-ts-realtime",
+      "profile": "h264-gaps-ts",
+      "file": "cc/h264-gaps.ts",
+      "sha256": "66494b1e777b88e3995e665943f9c4c2c6fd341fd3b369893da6cb4d210b5e4b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 762,
+        "digest": 17273887766490690223
+      }
+    },
+    {
+      "id": "h264-gaps-ts-first",
+      "profile": "h264-gaps-ts",
+      "file": "cc/h264-gaps.ts",
+      "sha256": "66494b1e777b88e3995e665943f9c4c2c6fd341fd3b369893da6cb4d210b5e4b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 762,
+        "digest": 17271829637184367771
+      }
+    },
+    {
+      "id": "h264-gaps-ts-second",
+      "profile": "h264-gaps-ts",
+      "file": "cc/h264-gaps.ts",
+      "sha256": "66494b1e777b88e3995e665943f9c4c2c6fd341fd3b369893da6cb4d210b5e4b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 1163,
+        "digest": 5756846308403037405
+      }
+    },
+    {
+      "id": "h264-novui-ts",
+      "profile": "h264-novui-ts",
+      "file": "cc/h264-novui.ts",
+      "sha256": "dbbdd332fe04210c0e54c8c0f06b5560cd1b804ef4eb92acea93bcf35f87a45d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1041,
+        "digest": 11755983108641464750
+      }
+    },
+    {
+      "id": "h264-novui-ts-realtime",
+      "profile": "h264-novui-ts",
+      "file": "cc/h264-novui.ts",
+      "sha256": "dbbdd332fe04210c0e54c8c0f06b5560cd1b804ef4eb92acea93bcf35f87a45d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1294,
+        "digest": 7457676263454079405
+      }
+    },
+    {
+      "id": "h264-novui-ts-first",
+      "profile": "h264-novui-ts",
+      "file": "cc/h264-novui.ts",
+      "sha256": "dbbdd332fe04210c0e54c8c0f06b5560cd1b804ef4eb92acea93bcf35f87a45d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1041,
+        "digest": 11755983108641464750
+      }
+    },
+    {
+      "id": "h264-novui-ts-second",
+      "profile": "h264-novui-ts",
+      "file": "cc/h264-novui.ts",
+      "sha256": "dbbdd332fe04210c0e54c8c0f06b5560cd1b804ef4eb92acea93bcf35f87a45d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1455,
+        "digest": 1800864690426782311
+      }
+    },
+    {
+      "id": "h264-recovery-ts",
+      "profile": "h264-recovery-ts",
+      "file": "cc/h264-recovery.ts",
+      "sha256": "1133c74648bbb36773168d55f0b55fcdfd4e5cd709caf03b9ec0be5b65f7bcf4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 961,
+        "digest": 18196678399741692687
+      }
+    },
+    {
+      "id": "h264-recovery-ts-realtime",
+      "profile": "h264-recovery-ts",
+      "file": "cc/h264-recovery.ts",
+      "sha256": "1133c74648bbb36773168d55f0b55fcdfd4e5cd709caf03b9ec0be5b65f7bcf4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1559,
+        "digest": 1956997908845993431
+      }
+    },
+    {
+      "id": "h264-recovery-ts-first",
+      "profile": "h264-recovery-ts",
+      "file": "cc/h264-recovery.ts",
+      "sha256": "1133c74648bbb36773168d55f0b55fcdfd4e5cd709caf03b9ec0be5b65f7bcf4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 961,
+        "digest": 18196678399741692687
+      }
+    },
+    {
+      "id": "h264-recovery-ts-second",
+      "profile": "h264-recovery-ts",
+      "file": "cc/h264-recovery.ts",
+      "sha256": "1133c74648bbb36773168d55f0b55fcdfd4e5cd709caf03b9ec0be5b65f7bcf4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1331,
+        "digest": 8293774696058646372
+      }
+    },
+    {
+      "id": "h264-recovery-mkv",
+      "profile": "h264-recovery-mkv",
+      "file": "cc/h264-recovery.mkv",
+      "sha256": "fdc21258dd21318bd66a8ab04c1f6b6751b653fd499332b1d1bd76beead3a6a5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 961,
+        "digest": 17765003031591429364
+      }
+    },
+    {
+      "id": "h264-recovery-mkv-realtime",
+      "profile": "h264-recovery-mkv",
+      "file": "cc/h264-recovery.mkv",
+      "sha256": "fdc21258dd21318bd66a8ab04c1f6b6751b653fd499332b1d1bd76beead3a6a5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1517,
+        "digest": 5141764501741773057
+      }
+    },
+    {
+      "id": "h264-recovery-mkv-first",
+      "profile": "h264-recovery-mkv",
+      "file": "cc/h264-recovery.mkv",
+      "sha256": "fdc21258dd21318bd66a8ab04c1f6b6751b653fd499332b1d1bd76beead3a6a5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 961,
+        "digest": 17765003031591429364
+      }
+    },
+    {
+      "id": "h264-recovery-mkv-second",
+      "profile": "h264-recovery-mkv",
+      "file": "cc/h264-recovery.mkv",
+      "sha256": "fdc21258dd21318bd66a8ab04c1f6b6751b653fd499332b1d1bd76beead3a6a5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1331,
+        "digest": 7351405483504741591
+      }
+    },
+    {
+      "id": "h264-norecovery-ts",
+      "profile": "h264-norecovery-ts",
+      "file": "cc/h264-norecovery.ts",
+      "sha256": "83e1ab5632c53d645a813422dbe3b8ca3de1a4976816e6ca3f5ba10ae9dfc1e6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 961,
+        "digest": 14468214724644518669
+      }
+    },
+    {
+      "id": "h264-norecovery-ts-realtime",
+      "profile": "h264-norecovery-ts",
+      "file": "cc/h264-norecovery.ts",
+      "sha256": "83e1ab5632c53d645a813422dbe3b8ca3de1a4976816e6ca3f5ba10ae9dfc1e6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1559,
+        "digest": 10707056731988885786
+      }
+    },
+    {
+      "id": "h264-norecovery-ts-first",
+      "profile": "h264-norecovery-ts",
+      "file": "cc/h264-norecovery.ts",
+      "sha256": "83e1ab5632c53d645a813422dbe3b8ca3de1a4976816e6ca3f5ba10ae9dfc1e6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 961,
+        "digest": 14468214724644518669
+      }
+    },
+    {
+      "id": "h264-norecovery-ts-second",
+      "profile": "h264-norecovery-ts",
+      "file": "cc/h264-norecovery.ts",
+      "sha256": "83e1ab5632c53d645a813422dbe3b8ca3de1a4976816e6ca3f5ba10ae9dfc1e6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1331,
+        "digest": 8421562074097036577
+      }
+    },
+    {
+      "id": "h264-p-ts",
+      "profile": "h264-p-ts",
+      "file": "cc/h264-p.ts",
+      "sha256": "72c1d7bd36817ee1a4947de36ef84c73349f4f9cba5eed99431cd6b1521561ef",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 898,
+        "digest": 14101851774134892813
+      }
+    },
+    {
+      "id": "h264-p-ts-realtime",
+      "profile": "h264-p-ts",
+      "file": "cc/h264-p.ts",
+      "sha256": "72c1d7bd36817ee1a4947de36ef84c73349f4f9cba5eed99431cd6b1521561ef",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1228,
+        "digest": 17530871422209028621
+      }
+    },
+    {
+      "id": "h264-p-ts-first",
+      "profile": "h264-p-ts",
+      "file": "cc/h264-p.ts",
+      "sha256": "72c1d7bd36817ee1a4947de36ef84c73349f4f9cba5eed99431cd6b1521561ef",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 898,
+        "digest": 14101851774134892813
+      }
+    },
+    {
+      "id": "h264-p-ts-second",
+      "profile": "h264-p-ts",
+      "file": "cc/h264-p.ts",
+      "sha256": "72c1d7bd36817ee1a4947de36ef84c73349f4f9cba5eed99431cd6b1521561ef",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1171,
+        "digest": 8258089760380322419
+      }
+    },
+    {
+      "id": "hevc-a53-ts",
+      "profile": "hevc-a53-ts",
+      "file": "cc/hevc-a53.ts",
+      "sha256": "aac67a9d204851f6712d9da28e9a51f221786e2fd07647606796717278198cd5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 13342594292101211219
+      }
+    },
+    {
+      "id": "hevc-a53-ts-realtime",
+      "profile": "hevc-a53-ts",
+      "file": "cc/hevc-a53.ts",
+      "sha256": "aac67a9d204851f6712d9da28e9a51f221786e2fd07647606796717278198cd5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 17134281468981820896
+      }
+    },
+    {
+      "id": "hevc-a53-ts-first",
+      "profile": "hevc-a53-ts",
+      "file": "cc/hevc-a53.ts",
+      "sha256": "aac67a9d204851f6712d9da28e9a51f221786e2fd07647606796717278198cd5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 13342594292101211219
+      }
+    },
+    {
+      "id": "hevc-a53-ts-second",
+      "profile": "hevc-a53-ts",
+      "file": "cc/hevc-a53.ts",
+      "sha256": "aac67a9d204851f6712d9da28e9a51f221786e2fd07647606796717278198cd5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3998241632398926937
+      }
+    },
+    {
+      "id": "hevc-a53-mkv",
+      "profile": "hevc-a53-mkv",
+      "file": "cc/hevc-a53.mkv",
+      "sha256": "9c81a82f4aad74d66fc542e3ae65e9dc15e9312738c1590529b3209f864aeefa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16129581704507474928
+      }
+    },
+    {
+      "id": "hevc-a53-mkv-realtime",
+      "profile": "hevc-a53-mkv",
+      "file": "cc/hevc-a53.mkv",
+      "sha256": "9c81a82f4aad74d66fc542e3ae65e9dc15e9312738c1590529b3209f864aeefa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 9798290234563570597
+      }
+    },
+    {
+      "id": "hevc-a53-mkv-first",
+      "profile": "hevc-a53-mkv",
+      "file": "cc/hevc-a53.mkv",
+      "sha256": "9c81a82f4aad74d66fc542e3ae65e9dc15e9312738c1590529b3209f864aeefa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16129581704507474928
+      }
+    },
+    {
+      "id": "hevc-a53-mkv-second",
+      "profile": "hevc-a53-mkv",
+      "file": "cc/hevc-a53.mkv",
+      "sha256": "9c81a82f4aad74d66fc542e3ae65e9dc15e9312738c1590529b3209f864aeefa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3269057345824328829
+      }
+    },
+    {
+      "id": "hevc-a53-mp4",
+      "profile": "hevc-a53-mp4",
+      "file": "cc/hevc-a53.mp4",
+      "sha256": "ba75fbede8a4e6dd6db67c05bbe0a8da9935c89a3a7db91961eba5b8e1dfd3db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "hevc-a53-mp4-realtime",
+      "profile": "hevc-a53-mp4",
+      "file": "cc/hevc-a53.mp4",
+      "sha256": "ba75fbede8a4e6dd6db67c05bbe0a8da9935c89a3a7db91961eba5b8e1dfd3db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 15638229727288383231
+      }
+    },
+    {
+      "id": "hevc-a53-mp4-first",
+      "profile": "hevc-a53-mp4",
+      "file": "cc/hevc-a53.mp4",
+      "sha256": "ba75fbede8a4e6dd6db67c05bbe0a8da9935c89a3a7db91961eba5b8e1dfd3db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "hevc-a53-mp4-second",
+      "profile": "hevc-a53-mp4",
+      "file": "cc/hevc-a53.mp4",
+      "sha256": "ba75fbede8a4e6dd6db67c05bbe0a8da9935c89a3a7db91961eba5b8e1dfd3db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 1372433589025719565
+      }
+    },
+    {
+      "id": "hevc-cra-ts",
+      "profile": "hevc-cra-ts",
+      "file": "cc/hevc-cra.ts",
+      "sha256": "b1040885acd23336d8b874e355ea5812b901d1be1d8e94a3ce66121a5e783a76",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 972,
+        "digest": 5568590418042723163
+      }
+    },
+    {
+      "id": "hevc-cra-ts-realtime",
+      "profile": "hevc-cra-ts",
+      "file": "cc/hevc-cra.ts",
+      "sha256": "b1040885acd23336d8b874e355ea5812b901d1be1d8e94a3ce66121a5e783a76",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1614,
+        "digest": 6761147710808532501
+      }
+    },
+    {
+      "id": "hevc-cra-ts-first",
+      "profile": "hevc-cra-ts",
+      "file": "cc/hevc-cra.ts",
+      "sha256": "b1040885acd23336d8b874e355ea5812b901d1be1d8e94a3ce66121a5e783a76",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 972,
+        "digest": 5568590418042723163
+      }
+    },
+    {
+      "id": "hevc-cra-ts-second",
+      "profile": "hevc-cra-ts",
+      "file": "cc/hevc-cra.ts",
+      "sha256": "b1040885acd23336d8b874e355ea5812b901d1be1d8e94a3ce66121a5e783a76",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1401,
+        "digest": 3328821898514293489
+      }
+    },
+    {
+      "id": "hevc-cra-mkv",
+      "profile": "hevc-cra-mkv",
+      "file": "cc/hevc-cra.mkv",
+      "sha256": "ed19eadc39633dbf7fe8326cc10b44609c728ba3a6479092e0fe1887ea0bc41d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 972,
+        "digest": 4956302943486040712
+      }
+    },
+    {
+      "id": "hevc-cra-mkv-realtime",
+      "profile": "hevc-cra-mkv",
+      "file": "cc/hevc-cra.mkv",
+      "sha256": "ed19eadc39633dbf7fe8326cc10b44609c728ba3a6479092e0fe1887ea0bc41d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1572,
+        "digest": 12821192676813019497
+      }
+    },
+    {
+      "id": "hevc-cra-mkv-first",
+      "profile": "hevc-cra-mkv",
+      "file": "cc/hevc-cra.mkv",
+      "sha256": "ed19eadc39633dbf7fe8326cc10b44609c728ba3a6479092e0fe1887ea0bc41d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 972,
+        "digest": 4956302943486040712
+      }
+    },
+    {
+      "id": "hevc-cra-mkv-second",
+      "profile": "hevc-cra-mkv",
+      "file": "cc/hevc-cra.mkv",
+      "sha256": "ed19eadc39633dbf7fe8326cc10b44609c728ba3a6479092e0fe1887ea0bc41d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1401,
+        "digest": 13143620529272657260
+      }
+    },
+    {
+      "id": "hevc-trail-ts",
+      "profile": "hevc-trail-ts",
+      "file": "cc/hevc-trail.ts",
+      "sha256": "8a3d69c3def5e5b15aed5c22a3e71ec84257e7e1dda178d0f1a78780c048858d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 936,
+        "digest": 7766083260582746574
+      }
+    },
+    {
+      "id": "hevc-trail-ts-realtime",
+      "profile": "hevc-trail-ts",
+      "file": "cc/hevc-trail.ts",
+      "sha256": "8a3d69c3def5e5b15aed5c22a3e71ec84257e7e1dda178d0f1a78780c048858d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1353,
+        "digest": 7218481278681106898
+      }
+    },
+    {
+      "id": "hevc-trail-ts-first",
+      "profile": "hevc-trail-ts",
+      "file": "cc/hevc-trail.ts",
+      "sha256": "8a3d69c3def5e5b15aed5c22a3e71ec84257e7e1dda178d0f1a78780c048858d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 936,
+        "digest": 7766083260582746574
+      }
+    },
+    {
+      "id": "hevc-trail-ts-second",
+      "profile": "hevc-trail-ts",
+      "file": "cc/hevc-trail.ts",
+      "sha256": "8a3d69c3def5e5b15aed5c22a3e71ec84257e7e1dda178d0f1a78780c048858d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1377,
+        "digest": 6067764089027863794
+      }
+    },
+    {
+      "id": "hevc-suffix-ts",
+      "profile": "hevc-suffix-ts",
+      "file": "cc/hevc-suffix.ts",
+      "sha256": "f81178ce1069eb01ab86d4df971cdb890bf157d906ca9a5f79d891dfcca16b8e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 13342594292101211219
+      }
+    },
+    {
+      "id": "hevc-suffix-ts-realtime",
+      "profile": "hevc-suffix-ts",
+      "file": "cc/hevc-suffix.ts",
+      "sha256": "f81178ce1069eb01ab86d4df971cdb890bf157d906ca9a5f79d891dfcca16b8e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 17134281468981820896
+      }
+    },
+    {
+      "id": "hevc-suffix-ts-first",
+      "profile": "hevc-suffix-ts",
+      "file": "cc/hevc-suffix.ts",
+      "sha256": "f81178ce1069eb01ab86d4df971cdb890bf157d906ca9a5f79d891dfcca16b8e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 13342594292101211219
+      }
+    },
+    {
+      "id": "hevc-suffix-ts-second",
+      "profile": "hevc-suffix-ts",
+      "file": "cc/hevc-suffix.ts",
+      "sha256": "f81178ce1069eb01ab86d4df971cdb890bf157d906ca9a5f79d891dfcca16b8e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3998241632398926937
+      }
+    },
+    {
+      "id": "hevc-suffix-mp4",
+      "profile": "hevc-suffix-mp4",
+      "file": "cc/hevc-suffix.mp4",
+      "sha256": "41b522c5f605cfcc68bde7434337c5d90b7309e001cc366f166c23c592dde98d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "hevc-suffix-mp4-realtime",
+      "profile": "hevc-suffix-mp4",
+      "file": "cc/hevc-suffix.mp4",
+      "sha256": "41b522c5f605cfcc68bde7434337c5d90b7309e001cc366f166c23c592dde98d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 15638229727288383231
+      }
+    },
+    {
+      "id": "hevc-suffix-mp4-first",
+      "profile": "hevc-suffix-mp4",
+      "file": "cc/hevc-suffix.mp4",
+      "sha256": "41b522c5f605cfcc68bde7434337c5d90b7309e001cc366f166c23c592dde98d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "hevc-suffix-mp4-second",
+      "profile": "hevc-suffix-mp4",
+      "file": "cc/hevc-suffix.mp4",
+      "sha256": "41b522c5f605cfcc68bde7434337c5d90b7309e001cc366f166c23c592dde98d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 1372433589025719565
+      }
+    },
+    {
+      "id": "two-video-mkv-stream0",
+      "profile": "two-video-mkv-stream0",
+      "file": "cc/two-video.mkv",
+      "sha256": "1cfa46d49802a21284a6ffda3c4e252c68e74bb68dd5d7c59042da555c7ef6b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16129581704507474928
+      }
+    },
+    {
+      "id": "two-video-mkv-stream0-realtime",
+      "profile": "two-video-mkv-stream0",
+      "file": "cc/two-video.mkv",
+      "sha256": "1cfa46d49802a21284a6ffda3c4e252c68e74bb68dd5d7c59042da555c7ef6b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=0",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 9798290234563570597
+      }
+    },
+    {
+      "id": "two-video-mkv-stream0-first",
+      "profile": "two-video-mkv-stream0",
+      "file": "cc/two-video.mkv",
+      "sha256": "1cfa46d49802a21284a6ffda3c4e252c68e74bb68dd5d7c59042da555c7ef6b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=0",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16129581704507474928
+      }
+    },
+    {
+      "id": "two-video-mkv-stream0-second",
+      "profile": "two-video-mkv-stream0",
+      "file": "cc/two-video.mkv",
+      "sha256": "1cfa46d49802a21284a6ffda3c4e252c68e74bb68dd5d7c59042da555c7ef6b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=0",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3269057345824328829
+      }
+    },
+    {
+      "id": "two-video-mkv-stream1",
+      "profile": "two-video-mkv-stream1",
+      "file": "cc/two-video.mkv",
+      "sha256": "1cfa46d49802a21284a6ffda3c4e252c68e74bb68dd5d7c59042da555c7ef6b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=1"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3269057345824328829
+      }
+    },
+    {
+      "id": "two-video-mkv-stream1-realtime",
+      "profile": "two-video-mkv-stream1",
+      "file": "cc/two-video.mkv",
+      "sha256": "1cfa46d49802a21284a6ffda3c4e252c68e74bb68dd5d7c59042da555c7ef6b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=1",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2172,
+        "digest": 15137392192614598404
+      }
+    },
+    {
+      "id": "two-video-mkv-stream1-first",
+      "profile": "two-video-mkv-stream1",
+      "file": "cc/two-video.mkv",
+      "sha256": "1cfa46d49802a21284a6ffda3c4e252c68e74bb68dd5d7c59042da555c7ef6b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=1",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16129581704507474928
+      }
+    },
+    {
+      "id": "two-video-mkv-stream1-second",
+      "profile": "two-video-mkv-stream1",
+      "file": "cc/two-video.mkv",
+      "sha256": "1cfa46d49802a21284a6ffda3c4e252c68e74bb68dd5d7c59042da555c7ef6b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=1",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3269057345824328829
+      }
+    },
+    {
+      "id": "two-video-mp4-stream0",
+      "profile": "two-video-mp4-stream0",
+      "file": "cc/two-video.mp4",
+      "sha256": "14363aa828704ad681925264180065b78d15d87b5a4a599ab467460fd505472c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "two-video-mp4-stream0-realtime",
+      "profile": "two-video-mp4-stream0",
+      "file": "cc/two-video.mp4",
+      "sha256": "14363aa828704ad681925264180065b78d15d87b5a4a599ab467460fd505472c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=0",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 15638229727288383231
+      }
+    },
+    {
+      "id": "two-video-mp4-stream0-first",
+      "profile": "two-video-mp4-stream0",
+      "file": "cc/two-video.mp4",
+      "sha256": "14363aa828704ad681925264180065b78d15d87b5a4a599ab467460fd505472c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=0",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "two-video-mp4-stream0-second",
+      "profile": "two-video-mp4-stream0",
+      "file": "cc/two-video.mp4",
+      "sha256": "14363aa828704ad681925264180065b78d15d87b5a4a599ab467460fd505472c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=0",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 1372433589025719565
+      }
+    },
+    {
+      "id": "two-video-mp4-stream1",
+      "profile": "two-video-mp4-stream1",
+      "file": "cc/two-video.mp4",
+      "sha256": "14363aa828704ad681925264180065b78d15d87b5a4a599ab467460fd505472c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=1"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 1372433589025719565
+      }
+    },
+    {
+      "id": "two-video-mp4-stream1-realtime",
+      "profile": "two-video-mp4-stream1",
+      "file": "cc/two-video.mp4",
+      "sha256": "14363aa828704ad681925264180065b78d15d87b5a4a599ab467460fd505472c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=1",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2172,
+        "digest": 10531280360044311953
+      }
+    },
+    {
+      "id": "two-video-mp4-stream1-first",
+      "profile": "two-video-mp4-stream1",
+      "file": "cc/two-video.mp4",
+      "sha256": "14363aa828704ad681925264180065b78d15d87b5a4a599ab467460fd505472c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=1",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 10114410481530176393
+      }
+    },
+    {
+      "id": "two-video-mp4-stream1-second",
+      "profile": "two-video-mp4-stream1",
+      "file": "cc/two-video.mp4",
+      "sha256": "14363aa828704ad681925264180065b78d15d87b5a4a599ab467460fd505472c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "stream=1",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 1372433589025719565
+      }
+    },
+    {
+      "id": "h264-timestamp-scale-mkv",
+      "profile": "h264-timestamp-scale-mkv",
+      "file": "cc/h264-timestamp-scale.mkv",
+      "sha256": "0b2b0580a1085a022effed48a2544b61967579537317fc81172f6f8233a8b30c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 9390334836582771738
+      }
+    },
+    {
+      "id": "h264-timestamp-scale-mkv-realtime",
+      "profile": "h264-timestamp-scale-mkv",
+      "file": "cc/h264-timestamp-scale.mkv",
+      "sha256": "0b2b0580a1085a022effed48a2544b61967579537317fc81172f6f8233a8b30c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 15642078013795609089
+      }
+    },
+    {
+      "id": "h264-timestamp-scale-mkv-first",
+      "profile": "h264-timestamp-scale-mkv",
+      "file": "cc/h264-timestamp-scale.mkv",
+      "sha256": "0b2b0580a1085a022effed48a2544b61967579537317fc81172f6f8233a8b30c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 9390334836582771738
+      }
+    },
+    {
+      "id": "h264-timestamp-scale-mkv-second",
+      "profile": "h264-timestamp-scale-mkv",
+      "file": "cc/h264-timestamp-scale.mkv",
+      "sha256": "0b2b0580a1085a022effed48a2544b61967579537317fc81172f6f8233a8b30c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 9916906360937513475
+      }
+    },
+    {
+      "id": "scc-popon",
+      "profile": "scc-popon",
+      "file": "cc/scc-popon.scc",
+      "sha256": "a14ca433800c3588585c5680240e7e02b6c1ba1173026fae0be35451aa99f1f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "source=packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5764178062059338560
+      }
+    },
+    {
+      "id": "scc-popon-realtime",
+      "profile": "scc-popon",
+      "file": "cc/scc-popon.scc",
+      "sha256": "a14ca433800c3588585c5680240e7e02b6c1ba1173026fae0be35451aa99f1f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "source=packets",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 733514123430445145
+      }
+    },
+    {
+      "id": "scc-popon-realtime-latency0",
+      "profile": "scc-popon",
+      "file": "cc/scc-popon.scc",
+      "sha256": "a14ca433800c3588585c5680240e7e02b6c1ba1173026fae0be35451aa99f1f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "source=packets",
+        "opt:real_time=1",
+        "opt:real_time_latency_msec=0"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 733514123430445145
+      }
+    },
+    {
+      "id": "scc-rollup",
+      "profile": "scc-rollup",
+      "file": "cc/scc-rollup.scc",
+      "sha256": "aab4a401529aa67aaf171041becd9037a576aaa3b376c484879bc6951c1a9a71",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "source=packets"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1477,
+        "digest": 15266628186483595319
+      }
+    },
+    {
+      "id": "scc-rollup-realtime",
+      "profile": "scc-rollup",
+      "file": "cc/scc-rollup.scc",
+      "sha256": "aab4a401529aa67aaf171041becd9037a576aaa3b376c484879bc6951c1a9a71",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "source=packets",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1054,
+        "digest": 10330223456636027407
+      }
+    },
+    {
+      "id": "scc-rollup-realtime-latency0",
+      "profile": "scc-rollup",
+      "file": "cc/scc-rollup.scc",
+      "sha256": "aab4a401529aa67aaf171041becd9037a576aaa3b376c484879bc6951c1a9a71",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "source=packets",
+        "opt:real_time=1",
+        "opt:real_time_latency_msec=0"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1102,
+        "digest": 1277942192116052262
+      }
+    }
+  ]
+}

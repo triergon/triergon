@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{ColourMatrix, RecoveryDecoder};
+use triergon_subtitles::compat::pgs::{ColourMatrix, RecoveryDecoder, Refusal};
 use triergon_subtitles::pgs::{
     DisplayConfig, DisplayDecoder, DisplayLimits, DisplayStatus, Envelope, PacketClock,
     RecoveredPacket, RecoveryStatus,
@@ -473,29 +473,27 @@ fn packet_byte_limits_and_empty_input_reject_without_consuming_the_callers_owner
     assert!(empty.is_some());
 }
 #[test]
-fn one_and_two_byte_physical_headers_are_receiver_errors_not_successful_empty_packets() {
+fn one_and_two_byte_packets_are_refused_and_decoding_continues() {
+    let b = Budget::new(4 * 1024 * 1024).unwrap();
+    let c = AtomicBool::new(false);
+    let mut d =
+        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     for raw in [&[0x16][..], &[0x16, 0][..]] {
-        let b = Budget::new(4 * 1024 * 1024).unwrap();
-        let c = AtomicBool::new(false);
-        let mut d =
-            RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
-        let retained = Bytes::copy_from_slice(&b, raw).unwrap();
-        let mut bytes = Some(retained.clone());
+        let mut bytes = Some(Bytes::copy_from_slice(&b, raw).unwrap());
         d.push(&mut bytes, stamp(), &c).unwrap();
-        let error = loop {
-            match d.poll(&mut WorkBudget::new(4096), &c) {
-                Err(e) => break e,
-                Ok(RecoveryStatus::Yield) => {}
-                other => panic!("short header hidden {other:?}"),
-            }
-        };
-        assert_eq!(error, Error::Truncated);
-        assert_eq!(retained.as_ref(), raw);
-        assert_eq!(
-            b.used(),
-            Budget::control_storage_bytes() + retained.retained_storage_bytes()
-        );
+        let out = ready(&mut d, 1);
+        assert_eq!(out.raw_packet().as_ref(), raw);
+        assert_eq!(out.receiver_refusal(), Some(Refusal::ShortPacket));
+        assert!(out.receiver_output().is_none());
+        assert!(out.source_error().is_some());
     }
+    let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false);
+    let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
+    d.push(&mut bytes, stamp(), &c).unwrap();
+    let out = ready(&mut d, 7);
+    assert_eq!(out.receiver_refusal(), None);
+    let rect = &out.receiver_output().unwrap().rectangles()[0];
+    assert_eq!(rect.pixels().as_ref(), [1, 2]);
 }
 #[test]
 fn retained_source_pixels_raw_palette_and_receiver_output_survive_decoder_teardown() {
@@ -545,7 +543,6 @@ fn explicit_eof_reports_source_truncation_without_fabricating_a_receiver_display
     }
     let eof = d.eof_report().unwrap();
     assert_eq!(eof.source_error, Some(Error::Truncated));
-    assert_eq!(eof.receiver_error, None);
     assert!(d.take_output(&c).is_err());
 }
 #[test]

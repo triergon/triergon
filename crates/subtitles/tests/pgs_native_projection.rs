@@ -1,7 +1,6 @@
 //! Original receiver compatibility guards. Strict source facts remain intact.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{EofBehavior, RecoveryEof};
 use triergon_subtitles::pgs::{
     DisplayConfig, DisplayDecoder, DisplayLimits, DisplaySet, DisplayStatus, Envelope, PacketClock,
     SegmentIter, SegmentStamp,
@@ -401,33 +400,6 @@ fn eof_has_no_delayed_output_but_keeps_strict_missing_end_error() {
         }
     };
     assert_eq!(error, Error::Truncated);
-    let eof = RecoveryEof::from_source_finalization(Some(error));
-    assert_eq!(eof.source_error, Some(Error::Truncated));
-    assert_eq!(eof.receiver_error, None);
-    assert_eq!(eof.behavior, EofBehavior::NoDelayedSubtitle);
-}
-
-#[test]
-fn eof_projection_never_masks_cancellation_limits_or_packet_failures() {
-    for error in [
-        Error::Cancelled,
-        Error::ForeignPool,
-        Error::Overflow,
-        Error::Limit {
-            requested: 2,
-            maximum: 1,
-        },
-        Error::Invalid("source packet failure"),
-    ] {
-        let eof = RecoveryEof::from_source_finalization(Some(error));
-        assert_eq!(eof.source_error, Some(error));
-        assert_eq!(eof.receiver_error, Some(error));
-        assert_eq!(eof.behavior, EofBehavior::UnsupportedSourceFailure);
-    }
-    assert_eq!(
-        RecoveryEof::from_source_finalization(None).source_error,
-        None
-    );
 }
 
 #[test]

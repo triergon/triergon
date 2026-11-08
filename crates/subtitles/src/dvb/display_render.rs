@@ -2,7 +2,6 @@
 use super::colour::{ColourProjection, palette_offset, palette_size};
 use super::display_model::*;
 use super::display_state::{DecodeWork, Object, State};
-use super::receiver_palette::ReceiverPalettePlan;
 use super::{
     FieldParity, FieldSpec, InitialPlane, PaletteFacts, Point, Raster, RasterLimits, RasterSpec,
     SourceFacts, Status,
@@ -25,18 +24,14 @@ pub(crate) struct Renderer {
     offset: usize,
     credit: usize,
     snapshot: usize,
-    overlap_at: usize,
     palette_at: usize,
     palette_entries: Option<BudgetVec<super::colour::PaletteEntry>>,
     palette_rgba: Option<BudgetVec<u8>>,
     palette_unrepaired_rgba: Option<BudgetVec<u8>>,
-    receiver_palette: Option<ReceiverPalettePlan>,
-    all_entries_explicit: bool,
     frozen_rgba: Option<Bytes>,
     frozen_unrepaired_rgba: Option<Bytes>,
     pending_region: Option<DisplayRegion>,
     pub output: BudgetVec<DisplayRegion>,
-    pub omitted: BudgetVec<super::OmittedRegion>,
     rendered: bool,
     cleanup_region: usize,
     cleanup_family: usize,
@@ -60,18 +55,14 @@ impl Renderer {
             offset: 0,
             credit: 0,
             snapshot: 0,
-            overlap_at: 0,
             palette_at: 0,
             palette_entries: None,
             palette_rgba: None,
             palette_unrepaired_rgba: None,
-            receiver_palette: None,
-            all_entries_explicit: true,
             frozen_rgba: None,
             frozen_unrepaired_rgba: None,
             pending_region: None,
             output: BudgetVec::new(budget),
-            omitted: BudgetVec::new(budget),
             rendered: false,
             cleanup_region: 0,
             cleanup_family: 0,
@@ -206,13 +197,12 @@ impl Renderer {
                 non_modifying: false,
                 clip: None,
             };
-            let mut raster = Raster::new_with_receiver_view(
+            let mut raster = Raster::new(
                 &state.budget,
                 spec,
                 RasterLimits::default(),
                 seed,
                 source,
-                state.receiver_view,
                 work.cancel,
             )?;
             if region.refs.len() > 1 {
@@ -290,21 +280,6 @@ impl Renderer {
                         self.lookup += 1;
                         self.credit = 0;
                     }
-                    if self.found.is_none() && state.receiver_view == super::ReceiverView::Receiver
-                    {
-                        // Source controls establish that an unavailable
-                        // ODS is not an instruction to replay old compressed
-                        // data or to reject the native receiver transaction.
-                        // Pay even when the object table is empty, and preserve
-                        // this reference cursor across yield/backpressure.
-                        if !work.pay(&mut self.credit, 1)? {
-                            return Ok(false);
-                        }
-                        self.object_ref += 1;
-                        self.lookup = 0;
-                        self.credit = 0;
-                        continue;
-                    }
                     let object = state
                         .objects
                         .as_slice()
@@ -369,17 +344,6 @@ impl Renderer {
                     self.found = None;
                 }
             }
-            if state.receiver_view == super::ReceiverView::Receiver
-                && state.regions.as_slice()[self.region].plane.is_none()
-                && !self.drew_object
-            {
-                // Native fresh-fill/no-ODS and missing-object controls emit an
-                // empty rectangle list. Retain RCS/PCS/CDS and source packets;
-                // no invented object or valid-looking filled plane is emitted.
-                self.raster = None;
-                self.next_region();
-                continue;
-            }
             let plane = self
                 .raster
                 .as_mut()
@@ -415,11 +379,8 @@ impl Renderer {
                 match self.output.try_push(region) {
                     Ok(()) => {
                         self.snapshot += 1;
-                        self.overlap_at = 0;
                         self.family = None;
                         self.palette_at = 0;
-                        self.all_entries_explicit = true;
-                        self.receiver_palette = None;
                         self.credit = 0;
                     }
                     Err(error) => {
@@ -429,76 +390,17 @@ impl Renderer {
                 }
                 continue;
             }
-            // Actual four default public-API controls establish reverse PCS,
-            // independent of RCS arrival, region IDs or geometry sorting.
-            // Construct in that order; never reorder a completed output.
-            let snapshot_index = match state.receiver_view {
-                super::ReceiverView::Source => self.snapshot,
-                super::ReceiverView::Receiver => state.visible.len() - 1 - self.snapshot,
-            };
-            let visible = state.visible.as_slice()[snapshot_index];
+            let visible = state.visible.as_slice()[self.snapshot];
             let index = state.slots[usize::from(visible.id)]
                 .ok_or(Error::Invalid("DVB missing visible region"))?;
             let region = &state.regions.as_slice()[index];
-            if state.receiver_view == super::ReceiverView::Receiver && region.plane.is_none() {
-                let source_error = Self::region_position(state, visible.address, region.size).err();
-                if let (super::GeometryPolicy::ValidateSource, Some(error)) =
-                    (state.geometry_policy, source_error)
-                {
-                    return Err(error);
-                }
-                if !work.pay(&mut self.credit, 1)? {
-                    return Ok(false);
-                }
-                if state.geometry_policy == super::GeometryPolicy::OmitUnrendered {
-                    // Retain the strict Source failure and original RCS owner.
-                    // No raster, address, clock or packet is repaired or clipped.
-                    self.omitted
-                        .try_push(super::OmittedRegion {
-                            id: region.id,
-                            source_address: visible.address,
-                            source_size: region.size,
-                            original_composition: region.original.clone(),
-                            source_error,
-                        })
-                        .map_err(|error| error.error)?;
-                }
-                self.snapshot += 1;
-                self.overlap_at = 0;
-                self.credit = 0;
-                continue;
-            }
             let clut = region.clut;
             if !self.choose_family(state, clut, work)? {
                 return Ok(false);
             }
             let region = &state.regions.as_slice()[index];
             let position = Self::region_position(state, visible.address, region.size)?;
-            if state.receiver_view == super::ReceiverView::Receiver {
-                // Native source PCS order may be nonascending. Check actual
-                // vertical intersections without assuming emission order. The
-                // cursor pays for each pair once and survives yield/pressure.
-                let lower_edge = position
-                    .y
-                    .checked_add(region.size.height)
-                    .ok_or(Error::Overflow)?;
-                while self.overlap_at < self.output.len() {
-                    if !work.pay(&mut self.credit, 1)? {
-                        return Ok(false);
-                    }
-                    let prior = &self.output.as_slice()[self.overlap_at];
-                    let prior_lower_edge = prior
-                        .position
-                        .y
-                        .checked_add(prior.size.height)
-                        .ok_or(Error::Overflow)?;
-                    if prior.position.y < lower_edge && position.y < prior_lower_edge {
-                        return Err(Error::Invalid("DVB visible regions share scan lines"));
-                    }
-                    self.overlap_at += 1;
-                    self.credit = 0;
-                }
-            } else if self
+            if self
                 .output
                 .as_slice()
                 .last()
@@ -523,47 +425,8 @@ impl Renderer {
                 self.palette_unrepaired_rgba = Some(rgba);
             }
             let family = self.family.ok_or(Error::Invalid("DVB snapshot family"))?;
-            if state.receiver_view == super::ReceiverView::Receiver {
-                let source_family = &state.families.as_slice()[family];
-                if self.receiver_palette.is_none() {
-                    let pixels = region
-                        .plane
-                        .as_ref()
-                        .ok_or(Error::Invalid("DVB native region plane absent"))?
-                        .pixels
-                        .clone();
-                    self.receiver_palette = Some(ReceiverPalettePlan::new(
-                        &state.budget,
-                        region.depth,
-                        source_family.latest.is_none(),
-                        pixels,
-                    )?);
-                }
-                let offset = palette_offset(region.depth);
-                let effective = source_family
-                    .native_entries
-                    .as_ref()
-                    .ok_or(Error::Invalid("DVB native CLUT state absent"))?;
-                if !self
-                    .receiver_palette
-                    .as_mut()
-                    .ok_or(Error::Invalid("DVB native palette plan absent"))?
-                    .prepare(
-                        &source_family.entries.as_slice()[offset..offset + count],
-                        &effective.as_slice()[offset..offset + count],
-                        work,
-                    )?
-                {
-                    return Ok(false);
-                }
-            }
             while self.palette_at < count {
-                let entry_work = if self.receiver_palette.is_some() {
-                    12
-                } else {
-                    8
-                };
-                if !work.pay(&mut self.credit, entry_work)? {
+                if !work.pay(&mut self.credit, 8)? {
                     return Ok(false);
                 }
                 let cell = state.families.as_slice()[family].entries.as_slice()
@@ -571,15 +434,6 @@ impl Renderer {
                     .clone();
                 let rgba = cell.source.rgba_source_nearest()?;
                 let unrepaired = cell.source.rgba(ColourProjection::StudioUnrepaired8)?;
-                if let Some(native) = self.receiver_palette.as_mut() {
-                    let source = state.families.as_slice()[family]
-                        .native_entries
-                        .as_ref()
-                        .ok_or(Error::Invalid("DVB native CLUT state absent"))?
-                        .as_slice()[palette_offset(region.depth) + self.palette_at];
-                    native.push_entry(self.palette_at, source, unrepaired)?;
-                }
-                self.all_entries_explicit &= cell.original_segment.is_some();
                 self.palette_entries
                     .as_mut()
                     .ok_or(Error::Invalid("DVB palette builder"))?
@@ -622,20 +476,7 @@ impl Renderer {
                     }
                 }
             }
-            let receiver = if let Some(native) = self.receiver_palette.as_mut() {
-                Some(
-                    native.try_finish(
-                        self.frozen_unrepaired_rgba
-                            .as_ref()
-                            .ok_or(Error::Invalid("DVB native studio RGBA absent"))?,
-                        self.all_entries_explicit,
-                    )?,
-                )
-            } else {
-                None
-            };
             let palette = PaletteSnapshot {
-                receiver,
                 depth: region.depth,
                 projection: PaletteSnapshot::projection(),
                 rgba: self

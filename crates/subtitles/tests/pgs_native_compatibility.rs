@@ -534,6 +534,9 @@ fn frozen_case(case: &wire::Case, quantum: u64) -> (wire::Sink, bool) {
                 assert_eq!(status, RecoveryStatus::Yield);
             }
             let out = output.ok_or("bounded native output progress")?;
+            if let Some(refusal) = out.refusal() {
+                return Err(format!("receiver refused the packet: {refusal:?}"));
+            }
             if let Some(event) = out.receiver_output() {
                 sink.event(wire::EventHeader {
                     packet: index,

@@ -38,6 +38,8 @@ pub enum MediaKind {
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CodecId<'a> {
+    /// ISO/IEC 13818-2 video, which includes ISO/IEC 11172-2 (MPEG-1) video.
+    Mpeg2Video,
     H264,
     Hevc,
     Av1,

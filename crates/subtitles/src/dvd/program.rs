@@ -35,22 +35,6 @@ pub struct ControlState {
     pub fields: Option<FieldOffsets>,
 }
 
-/// Strict source validation is the default. The explicit receiver profile
-/// retains malformed source evidence while exposing the pinned receiver's outcome.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ControlPolicy {
-    #[default]
-    Strict,
-    Receiver,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TruncatedControl {
-    pub control_offset: u16,
-    pub command_offset: u16,
-    pub opcode: Option<u8>,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpaqueCommandSpan {
     pub opcode: u8,
@@ -76,34 +60,20 @@ pub struct ControlFacts {
     pub local_fields: Option<FieldOffsets>,
     pub state_after: ControlState,
     pub opaque: Option<OpaqueCommandSpan>,
-    /// The raw link remains in next_offset; no repaired source link is invented.
-    pub receiver_stopped_at_link: bool,
 }
 
 #[derive(Debug)]
 pub struct ControlProgram {
     raw: Bytes,
-    first_control: usize,
     controls: BudgetVec<ControlFacts>,
     initial: ControlState,
     after: ControlState,
     last_start: Option<DvdDate>,
     last_stop: Option<DvdDate>,
     forced: bool,
-    policy: ControlPolicy,
-    truncated: Option<TruncatedControl>,
 }
 
 impl ControlProgram {
-    pub(super) fn first_control_offset(&self) -> usize {
-        self.first_control
-    }
-
-    pub(super) fn into_control_storage(mut self) -> BudgetVec<ControlFacts> {
-        self.controls.clear();
-        self.controls
-    }
-
     pub fn raw(&self) -> &Bytes {
         &self.raw
     }
@@ -125,12 +95,6 @@ impl ControlProgram {
     pub fn has_forced_start(&self) -> bool {
         self.forced
     }
-    pub fn policy(&self) -> ControlPolicy {
-        self.policy
-    }
-    pub fn truncated_control(&self) -> Option<TruncatedControl> {
-        self.truncated
-    }
 
     /// Read the validated presentation commands in wire order, including
     /// multiple commands at the same date. Opaque and truncated tails remain
@@ -139,7 +103,6 @@ impl ControlProgram {
         Ok(DisplayControls {
             packet: DvdPacket::parse(&self.raw)?,
             controls: self.controls(),
-            policy: self.policy,
             index: 0,
             command: 0,
             offset: 0,
@@ -205,7 +168,6 @@ pub enum DisplayControlStep {
 pub struct DisplayControls<'a> {
     packet: DvdPacket<'a>,
     controls: &'a [ControlFacts],
-    policy: ControlPolicy,
     index: usize,
     command: usize,
     offset: usize,
@@ -234,12 +196,7 @@ impl DisplayControls<'_> {
                 return Ok(DisplayControlStep::Yield);
             }
             let at = usize::from(fact.raw_start);
-            let control = match self.policy {
-                ControlPolicy::Strict => self.packet.control_at(at, fact.command_count)?,
-                ControlPolicy::Receiver => {
-                    self.packet.receiver_control_at(at, fact.command_count)?
-                }
-            };
+            let control = self.packet.control_at(at, fact.command_count)?;
             let (command, next, _) = control.command_at(self.offset, self.command)?;
             self.offset = next;
             self.command += 1;
@@ -275,8 +232,7 @@ enum Phase {
     Finished,
 }
 
-/// Strict validates links; Receiver records bounded receiver traversal and
-/// termination while retaining the original links. Each command is charged once.
+/// Validates links and charges each command once.
 /// Every original byte remains, including END tails and unsupported operands.
 /// Ordered commands can be reconstructed from raw spans without a command Vec.
 #[derive(Debug)]
@@ -297,8 +253,6 @@ pub struct ProgramJob {
     work: usize,
     phase: Phase,
     failed: Option<Error>,
-    policy: ControlPolicy,
-    truncated: Option<TruncatedControl>,
 }
 
 impl ProgramJob {
@@ -312,28 +266,7 @@ impl ProgramJob {
         limits: ProgramLimits,
         initial: ControlState,
     ) -> Result<Self> {
-        Self::with_policy(raw, budget, limits, initial, ControlPolicy::Strict)
-    }
-
-    pub fn with_policy(
-        raw: Bytes,
-        budget: &Budget,
-        limits: ProgramLimits,
-        initial: ControlState,
-        policy: ControlPolicy,
-    ) -> Result<Self> {
-        Self::with_control_storage(raw, budget, limits, initial, policy, BudgetVec::new(budget))
-    }
-
-    pub(super) fn with_control_storage(
-        raw: Bytes,
-        budget: &Budget,
-        limits: ProgramLimits,
-        initial: ControlState,
-        policy: ControlPolicy,
-        mut records: BudgetVec<ControlFacts>,
-    ) -> Result<Self> {
-        if !raw.belongs_to(budget) || !records.budget().same_pool(budget) {
+        if !raw.belongs_to(budget) {
             return Err(Error::ForeignPool);
         }
         if raw.len() > limits.max_packet_bytes {
@@ -342,10 +275,9 @@ impl ProgramJob {
                 maximum: limits.max_packet_bytes,
             });
         }
-        records.clear();
         Ok(Self {
             raw: Some(raw),
-            records: Some(records),
+            records: Some(BudgetVec::new(budget)),
             limits,
             initial,
             state: initial,
@@ -360,8 +292,6 @@ impl ProgramJob {
             work: 0,
             phase: Phase::Packet,
             failed: None,
-            policy,
-            truncated: None,
         })
     }
 
@@ -415,12 +345,7 @@ impl ProgramJob {
         // Packet validation already established the control offset on this
         // immutable input before entering the first header phase.
         let packet = DvdPacket::with_control_offset(raw, self.first_control);
-        match self.policy {
-            ControlPolicy::Strict => packet.control_at(at, self.limits.max_commands_per_control),
-            ControlPolicy::Receiver => {
-                packet.receiver_control_at(at, self.limits.max_commands_per_control)
-            }
-        }
+        packet.control_at(at, self.limits.max_commands_per_control)
     }
 
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ProgramStatus> {
@@ -488,23 +413,9 @@ impl ProgramJob {
                 });
             }
             let at = commands.position();
-            let command = match commands
+            let command = commands
                 .next()
-                .ok_or(Error::Invalid("DVD command cursor ended"))?
-            {
-                Ok(command) => command,
-                Err(Error::Truncated) if self.policy == ControlPolicy::Receiver => {
-                    let command_offset = start.checked_add(at).ok_or(Error::Overflow)?;
-                    self.truncated = Some(TruncatedControl {
-                        control_offset: fact.raw_start,
-                        command_offset: u16::try_from(command_offset)
-                            .map_err(|_| Error::Overflow)?,
-                        opcode: raw.get(command_offset).copied(),
-                    });
-                    break Ok(true);
-                }
-                Err(error) => return Err(error),
-            };
+                .ok_or(Error::Invalid("DVD command cursor ended"))??;
             fact.command_count = fact.command_count.checked_add(1).ok_or(Error::Overflow)?;
             valid_end = commands.position();
             match command {
@@ -542,6 +453,21 @@ impl ProgramJob {
                         operands_start: (start + valid_end) as u16,
                         operands_end: fact.raw_end,
                     });
+                }
+                // Extended (eight-bit) commands are outside the traditional
+                // program: kept opaque with every byte after the opcode.
+                Command::ExtendedPalette(_)
+                | Command::ExtendedContrast(_)
+                | Command::ExtendedArea(_)
+                | Command::ExtendedFields { .. } => {
+                    fact.opaque = Some(OpaqueCommandSpan {
+                        opcode: raw[start + at],
+                        operands_start: (start + at + 1) as u16,
+                        operands_end: fact.raw_end,
+                    });
+                    valid_end = at + 1;
+                    self.commands += 1;
+                    break Ok(true);
                 }
                 Command::End => (),
             }
@@ -612,7 +538,6 @@ impl ProgramJob {
                         local_fields: None,
                         state_after: self.state,
                         opaque: None,
-                        receiver_stopped_at_link: false,
                     });
                     self.command_at = 0;
                     self.phase = Phase::Command;
@@ -635,22 +560,13 @@ impl ProgramJob {
                         .current
                         .ok_or(Error::Invalid("DVD current control absent"))?;
                     fact.state_after = self.state;
-                    let receiver_stop = self.policy == ControlPolicy::Receiver
-                        && (fact.next_offset < fact.raw_start
-                            || usize::from(fact.next_offset)
-                                .checked_add(5)
-                                .is_none_or(|end| end > self.raw.as_ref().map_or(0, Bytes::len)));
-                    fact.receiver_stopped_at_link = receiver_stop;
                     self.records
                         .as_mut()
                         .ok_or(Error::Invalid("DVD program records absent"))?
                         .try_push(fact)
                         .map_err(|e| e.error)?;
                     self.current = None;
-                    if self.truncated.is_some()
-                        || receiver_stop
-                        || fact.next_offset == fact.raw_start
-                    {
+                    if fact.next_offset == fact.raw_start {
                         self.phase = Phase::Ready;
                     } else {
                         self.next = usize::from(fact.next_offset);
@@ -684,15 +600,12 @@ impl ProgramJob {
         self.phase = Phase::Finished;
         Ok(ControlProgram {
             raw,
-            first_control: self.first_control,
             controls,
             initial: self.initial,
             after: self.state,
             last_start: self.last_start,
             last_stop: self.last_stop,
             forced: self.forced,
-            policy: self.policy,
-            truncated: self.truncated,
         })
     }
 }

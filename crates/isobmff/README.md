@@ -148,7 +148,7 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Seek | `SourceSeekPlanner`, `MovieSourceSeekPlanner`, `SourceCompositionLookup` |
 | Segment/fragment indexes | `SegmentIndex` (`sidx`), `TrackFragmentRandomAccess` (`tfra`), `MovieFragmentRandomAccessTail` (`mfro`) |
 | Recovery groups | `RecoveryDescriptions` (`sgpd`), `RecoveryMappings` (`sbgp`), `RecoveryLookup` |
-| Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `check_dts_core_description`, `QtSoundDescriptionV0` |
+| Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `ObjectTypeScan`, `check_dts_core_description`, `QtSoundDescriptionV0` |
 | Whole movie | `open::MovieOpen` → `open::Movie`, under `open::OpenLimits`; `new_progressive` stops at the first media after a front movie, `new_recovery` admits terminal media declarations |
 | Neutral reader | `Reader`, `ReaderLimits`, `Track`, `Packet`, `ReaderEvent` |
 | FFmpeg-compatible packets | `compat::mov::packets::{PacketCursor, StreamView}`, `compat::mov::edits::EditCursor` |
@@ -219,6 +219,8 @@ description, including the supported QuickTime `wave` layout. It returns
 the source offset and shared bytes under `ConfigurationLimits` and a
 `WorkBudget`. The descriptor identifies MPEG-4 Audio. Callers validate
 the bytes and determine the audio object type separately.
+`ObjectTypeScan` reads any `mp4a` or `mp4s` description's stated object
+type and decoder-specific information the same way.
 
 `BoxReader::with_media_data_policy` can preserve a terminal `mdat`'s
 declared extent when the source length is known and the media ends early.

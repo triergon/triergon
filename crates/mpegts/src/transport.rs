@@ -17,6 +17,19 @@ impl PacketFormat {
     pub fn prefix_bytes(self) -> usize {
         self.bytes() - 188
     }
+    /// The format whose sync bytes (0x47) the start of an input repeats at
+    /// three successive packets, as far as `head` reaches: 188-byte packets
+    /// first, then 192-byte packets after their 4-byte prefix.
+    pub fn detect(head: &[u8]) -> Option<Self> {
+        [Self::Ts188, Self::M2ts192].into_iter().find(|format| {
+            let sync = format.prefix_bytes();
+            head.len() > sync
+                && (0..3).all(|n| {
+                    head.get(sync + n * format.bytes())
+                        .is_none_or(|&b| b == 0x47)
+                })
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -1320,6 +1320,7 @@ fn bitmap_input(b: &Budget, raw: &[u8]) -> bitmap_bridge::BitmapInput<&'static s
             dts: None,
             timebase: triergon_core::TimeBase::new(1, 90_000).unwrap(),
         },
+        duration: None,
         metadata: "original caller packet metadata",
     }
 }
@@ -1647,88 +1648,167 @@ fn bitmap_reset_uses_new_source_fence_and_keeps_retained_display_generation() {
     assert_eq!(next.packet.input().scope.generation, 8);
     assert_eq!(old.display.objects()[0].pixels().as_ref(), &[1, 2]);
 }
-#[test]
-fn dvd_bridge_all_units_and_explicit_first_receiver_keep_identical_full_source_tail() {
-    use bitmap_bridge::*;
-    use triergon_subtitles::dvd;
-    let raw = include_bytes!("fixtures/bitmap/original-dvd-two-units-tail.spu");
-    for mode in [DvdMode::StrictAllUnits, DvdMode::ExplicitNativeFirstUnit] {
-        let b = pool();
-        let mut job = DvdJob::new(
-            &b,
-            bitmap_scope(),
-            bitmap_input(&b, raw),
-            DvdBridgeConfig {
-                mode,
-                ..DvdBridgeConfig::default()
-            },
-        )
-        .unwrap_or_else(|e| panic!("{:?}", e.error));
-        let before = b.used();
-        assert!(!job.poll(&mut WorkBudget::new(0), &off()).unwrap());
-        assert_eq!(b.used(), before);
-        while !job.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
-        let out = job.finish().unwrap();
-        assert_eq!(out.source.raw().as_ref(), raw);
-        assert_eq!(out.source.units().len(), 2);
-        assert_eq!(out.source.units()[1].offset, 30);
-        assert_eq!(out.source.tail_bytes(), &[0xaa, 0xbb]);
-        assert_eq!(out.source.tail().unwrap().offset, 60);
-        assert_eq!(
-            out.pictures.len(),
-            if mode == DvdMode::StrictAllUnits {
-                2
-            } else {
-                1
-            }
-        );
-        assert_eq!(out.packet.input().clock.pts, None);
-        assert!(
-            out.pictures
-                .as_slice()
-                .iter()
-                .all(|p| p.program().initial_state() == dvd::ControlState::default())
-        );
-        drop(out);
-        assert_eq!(b.used(), Budget::control_storage_bytes());
-    }
-}
-#[test]
-fn dvd_bridge_unit_limit_remains_error_with_whole_input_owner_retained() {
-    use bitmap_bridge::*;
-    use triergon_subtitles::dvd;
-    let b = pool();
-    let raw = include_bytes!("fixtures/bitmap/original-dvd-two-units-tail.spu");
-    let mut job = DvdJob::new(
-        &b,
-        bitmap_scope(),
-        bitmap_input(&b, raw),
-        DvdBridgeConfig {
-            packets: dvd::SpuPacketLimits {
-                max_units: 1,
-                ..dvd::SpuPacketLimits::default()
-            },
-            ..DvdBridgeConfig::default()
-        },
-    )
-    .unwrap_or_else(|e| panic!("{:?}", e.error));
-    let mut limit = false;
+/// Step a DVD receiver until it outputs the pending packet.
+fn dvd_next<M>(
+    receiver: &mut bitmap_bridge::DvdReceiver<M>,
+    quantum: u64,
+) -> Result<bitmap_bridge::DvdOutput<M>> {
     for _ in 0..100_000 {
-        match job.poll(&mut WorkBudget::new(1), &off()) {
-            Err(C::Limit {
-                requested: 2,
-                maximum: 1,
-            }) => {
-                limit = true;
-                break;
-            }
-            Ok(_) => {}
-            Err(e) => panic!("wrong resource error {e:?}"),
+        match receiver.step(&mut WorkBudget::new(quantum), &off())? {
+            bitmap_bridge::DvdReceiverStep::Yield => {}
+            bitmap_bridge::DvdReceiverStep::Output(output) => return Ok(output),
+            _ => panic!("DVD receiver left the admitted packet"),
         }
     }
-    assert!(limit);
-    drop(job);
+    panic!("DVD receiver exhausted work limit");
+}
+
+#[test]
+fn dvd_receiver_presents_the_first_unit_of_a_packet_and_discards_the_tail() {
+    use bitmap_bridge::*;
+    let raw = include_bytes!("fixtures/bitmap/original-dvd-two-units-tail.spu");
+    let b = pool();
+    let mut receiver = DvdReceiver::new(&b, bitmap_scope(), DvdBridgeConfig::default()).unwrap();
+    assert!(matches!(
+        receiver.step(&mut WorkBudget::new(0), &off()).unwrap(),
+        DvdReceiverStep::NeedPacket
+    ));
+    receiver
+        .provide(bitmap_input(&b, raw))
+        .unwrap_or_else(|e| panic!("{:?}", e.error));
+    let before = b.used();
+    assert!(matches!(
+        receiver.step(&mut WorkBudget::new(0), &off()).unwrap(),
+        DvdReceiverStep::Yield
+    ));
+    assert_eq!(b.used(), before);
+    let out = dvd_next(&mut receiver, 1).unwrap();
+    assert_eq!(out.packet.input().raw.as_ref(), raw);
+    assert_eq!(out.packet.input().clock.pts, None);
+    let picture = out.picture.as_ref().unwrap();
+    assert_eq!(
+        (picture.x, picture.y, picture.width, picture.height),
+        (0, 0, 1, 2)
+    );
+    assert_eq!((picture.start_ms, picture.end_ms), (193, 0));
+    assert_eq!(
+        picture.palette(),
+        [0xff00_0000, 0xff54_5454, 0xffa9_a9a9, 0xfffe_fefe]
+    );
+    assert_eq!(
+        (picture.row(0), picture.row(1), picture.row(2)),
+        (Some(&[0][..]), Some(&[1][..]), None)
+    );
+    drop((out, receiver));
     assert_eq!(b.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn dvd_receiver_unit_limit_is_an_error_that_drops_the_packet() {
+    use bitmap_bridge::*;
+    use triergon_subtitles::compat::dvd::Limits;
+    let b = pool();
+    let raw = include_bytes!("fixtures/bitmap/original-dvd-two-units-tail.spu");
+    let config = DvdBridgeConfig {
+        limits: Limits {
+            max_unit: raw.len() - 1,
+            ..Limits::default()
+        },
+        ..DvdBridgeConfig::default()
+    };
+    let mut receiver = DvdReceiver::new(&b, bitmap_scope(), config).unwrap();
+    receiver
+        .provide(bitmap_input(&b, raw))
+        .unwrap_or_else(|e| panic!("{:?}", e.error));
+    assert!(matches!(
+        receiver.step(&mut WorkBudget::new(1), &off()),
+        Err(C::Limit {
+            requested: 62,
+            maximum: 61
+        })
+    ));
+    assert!(matches!(
+        receiver.step(&mut WorkBudget::new(1), &off()).unwrap(),
+        DvdReceiverStep::NeedPacket
+    ));
+    drop(receiver);
+    assert_eq!(b.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn dvd_presentation_preserves_precise_pts_and_explicit_clear() {
+    use bitmap_bridge::*;
+    use triergon_core::Time;
+
+    let bytes = include_bytes!("fixtures/bitmap/original-dvd-two-units-tail.spu");
+    for (pts, dts, stop, start_ns) in [
+        (Some(90_001), Some(-42), Some(90_u16), 1_000_011_111),
+        (None, Some(-42), Some(0), -466_667),
+        (Some(i64::MIN), Some(-42), None, -466_667),
+        (None, Some(i64::MIN), None, 0),
+        (Some(0), Some(-42), None, 0),
+        (Some(i64::MAX), None, None, i64::MIN),
+    ] {
+        let b = pool();
+        let mut raw = bytes[..30].to_vec();
+        if let Some(date) = stop {
+            raw[0..2].copy_from_slice(&36_u16.to_be_bytes());
+            raw[8..10].copy_from_slice(&30_u16.to_be_bytes());
+            raw.extend_from_slice(&date.to_be_bytes());
+            raw.extend_from_slice(&[0, 30, 2, 0xff]);
+        }
+        let mut input = bitmap_input(&b, &raw);
+        input.clock.pts = pts;
+        input.clock.dts = dts;
+        let mut receiver =
+            DvdReceiver::new(&b, bitmap_scope(), DvdBridgeConfig::default()).unwrap();
+        receiver
+            .provide(input)
+            .unwrap_or_else(|e| panic!("{:?}", e.error));
+        let out = dvd_next(&mut receiver, 32).unwrap();
+        let presentation = out.presentation().unwrap().unwrap();
+        let at = |ms: u32| {
+            pts.map(|pts| Time::new(i128::from(pts) + i128::from(ms) * 90, 90_000).unwrap())
+        };
+        assert_eq!(
+            presentation.show,
+            DvdDisplayBoundary {
+                milliseconds: 193,
+                at: at(193),
+            }
+        );
+        let end = stop.map_or(0, |date| u32::from(date) * 1024 / 90);
+        assert_eq!(
+            presentation.clear,
+            (end != 0).then(|| DvdDisplayBoundary {
+                milliseconds: end,
+                at: at(end),
+            })
+        );
+        assert!(!presentation.picture.forced);
+        assert_eq!(presentation.picture.row(1).unwrap(), &[1]);
+        let canvas = triergon_subtitles::dvd::Canvas {
+            width: 720,
+            height: 480,
+        };
+        let queued = out.packet_clock_picture(Some(canvas)).unwrap().unwrap();
+        assert_eq!(queued.canvas, Some(canvas));
+        assert_eq!(queued.start_ns, start_ns);
+        assert_eq!(queued.picture.palette(), presentation.picture.palette());
+        let invalid_canvas = triergon_subtitles::dvd::Canvas {
+            width: 159,
+            ..canvas
+        };
+        assert_eq!(
+            out.packet_clock_picture(Some(invalid_canvas))
+                .unwrap()
+                .unwrap()
+                .canvas,
+            None
+        );
+        drop((out, receiver));
+        assert_eq!(b.used(), Budget::control_storage_bytes());
+    }
 }
 #[test]
 fn text_document_foreign_pool_returns_original_source_and_generation_fence() {
@@ -2081,94 +2161,6 @@ fn native_m2ts_prefix_grid_loss_preserves_source_and_refuses_native_tail() {
 }
 
 #[test]
-fn dvd_native_presentation_preserves_precise_pts_and_explicit_clear() {
-    use bitmap_bridge::*;
-    use triergon_core::Time;
-
-    let bytes = include_bytes!("fixtures/bitmap/original-dvd-two-units-tail.spu");
-    for (pts, dts, stop, start_ns) in [
-        (Some(90_001), Some(-42), Some(90_u16), 1_000_011_111),
-        (None, Some(-42), Some(0), -466_667),
-        (Some(i64::MIN), Some(-42), None, -466_667),
-        (None, Some(i64::MIN), None, 0),
-        (Some(0), Some(-42), None, 0),
-        (Some(i64::MAX), None, None, i64::MIN),
-    ] {
-        let b = pool();
-        let mut raw = bytes[..30].to_vec();
-        if let Some(date) = stop {
-            raw[0..2].copy_from_slice(&36_u16.to_be_bytes());
-            raw[8..10].copy_from_slice(&30_u16.to_be_bytes());
-            raw.extend_from_slice(&date.to_be_bytes());
-            raw.extend_from_slice(&[0, 30, 2, 0xff]);
-        }
-        let mut input = bitmap_input(&b, &raw);
-        input.clock.pts = pts;
-        input.clock.dts = dts;
-        let mut job = DvdJob::new(
-            &b,
-            bitmap_scope(),
-            input,
-            DvdBridgeConfig {
-                mode: DvdMode::ExplicitNativeFirstUnit,
-                ..DvdBridgeConfig::default()
-            },
-        )
-        .unwrap_or_else(|e| panic!("{:?}", e.error));
-        while !job.poll(&mut WorkBudget::new(32), &off()).unwrap() {}
-        let out = job.finish().unwrap();
-        let presentation = out.native_presentation().unwrap().unwrap();
-        let at = |ms: u32| {
-            pts.map(|pts| Time::new(i128::from(pts) + i128::from(ms) * 90, 90_000).unwrap())
-        };
-        assert_eq!(
-            presentation.show,
-            DvdDisplayBoundary {
-                milliseconds: 193,
-                at: at(193),
-            }
-        );
-        assert_eq!(
-            presentation.clear,
-            stop.map(|date| {
-                let milliseconds = u32::from(date) * 1024 / 90;
-                DvdDisplayBoundary {
-                    milliseconds,
-                    at: at(milliseconds),
-                }
-            })
-        );
-        assert!(!presentation.forced);
-        assert!(!presentation.menu);
-        assert_eq!(presentation.bitmap.indices_row(0).unwrap(), &[0]);
-        assert_eq!(presentation.bitmap.indices_row(1).unwrap(), &[1]);
-        assert_eq!(out.source.raw().as_ref(), raw);
-        let canvas = triergon_subtitles::dvd::Canvas {
-            width: 720,
-            height: 480,
-        };
-        let queued = out.packet_clock_picture(Some(canvas)).unwrap().unwrap();
-        assert_eq!(queued.canvas, Some(canvas));
-        assert_eq!(queued.start_ns, start_ns);
-        assert_eq!(queued.bitmap.indices_row(1).unwrap(), &[1]);
-        assert_eq!(queued.bitmap.palette(), presentation.bitmap.palette());
-        let invalid_canvas = triergon_subtitles::dvd::Canvas {
-            width: 159,
-            ..canvas
-        };
-        assert_eq!(
-            out.packet_clock_picture(Some(invalid_canvas))
-                .unwrap()
-                .unwrap()
-                .canvas,
-            None
-        );
-        drop(out);
-        assert_eq!(b.used(), Budget::control_storage_bytes());
-    }
-}
-
-#[test]
 fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     use bitmap_bridge::*;
     use matroska_feed::{MatroskaBitmapClockProbe, MatroskaBitmapCodec, MatroskaBitmapTrack};
@@ -2231,7 +2223,8 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     let dvd_frame = &include_bytes!("fixtures/bitmap/original-dvd-two-units-tail.spu")[..30];
     let pes = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.pes-data");
     let dvb_frame = &pes[2..pes.len() - 1];
-    let dvb_clear = [0x0f, 0x10, 0, 1, 0, 2, 2, 0x0b, 0x0f, 0x80, 0, 1, 0, 0];
+    // A new page version without regions: a mode change that clears the page.
+    let dvb_clear = [0x0f, 0x10, 0, 1, 0, 2, 2, 0x1b, 0x0f, 0x80, 0, 1, 0, 0];
     let dvb_private = [0, 1, 0, 2, 0x10];
     let palette = b"size: 720x480\npalette: 112233, 445566, 778899, 000000, 000000, 000000, 000000, 000000, 000000, 000000, 000000, 000000, 000000, 000000, 000000, 000000\n";
     let adler = dvd_frame.iter().fold((1_u32, 0_u32), |(a, b), &byte| {
@@ -2391,10 +2384,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
                         output.packet_clock_action().unwrap()
                     {
                         assert_eq!(picture.start_ns, 0);
-                        assert_eq!(
-                            output.packet.input().metadata.native_duration_ns,
-                            Some(25_000_000)
-                        );
+                        assert_eq!(output.packet.input().duration, Some(25_000_000));
                         assert_eq!(pgs_count, pgs_segments.len());
                         showed = true;
                     }
@@ -2418,21 +2408,17 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         &pool,
         dvd_track.scope(),
         DvdBridgeConfig {
-            mode: DvdMode::ExplicitNativeFirstUnit,
-            palette: config.palette,
+            settings: triergon_subtitles::compat::dvd::Settings {
+                palette: config.palette,
+                forced_only: false,
+            },
             ..DvdBridgeConfig::default()
         },
     )
     .unwrap();
     dvd.provide(dvd_input)
         .unwrap_or_else(|e| panic!("{:?}", e.error));
-    let dvd_output = loop {
-        match dvd.step(&mut WorkBudget::new(1), &off()).unwrap() {
-            DvdReceiverStep::Yield => {}
-            DvdReceiverStep::Output(output) => break output,
-            _ => panic!("lost VobSub packet"),
-        }
-    };
+    let dvd_output = dvd_next(&mut dvd, 1).unwrap();
     let queued = dvd_output
         .packet_clock_picture(config.canvas)
         .unwrap()
@@ -2445,21 +2431,13 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
             height: 480
         })
     );
-    assert_eq!(queued.bitmap.indices_row(1).unwrap(), &[1]);
+    assert_eq!(queued.picture.row(1).unwrap(), &[1]);
 
     let config = dvb_track.dvb_configuration().unwrap();
     assert_eq!(&**config.original(), &dvb_private);
     assert_eq!(config.service().composition_page, 1);
     assert_eq!(config.service().ancillary_page, 2);
-    let mut decoder = dvb::Decoder::new_configured_with_receiver_view(
-        &pool,
-        config,
-        dvb_track.scope().generation,
-        dvb::DisplayLimits::default(),
-        dvb::ReceiverView::Receiver,
-        &off(),
-    )
-    .unwrap();
+    let mut decoder = dvb_track.dvb_decoder().unwrap();
     let mut dvb_clock = MatroskaBitmapClockProbe::new(&dvb_track, &outputs, outputs.len()).unwrap();
     while !dvb_clock.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let mut dvb_actions = Vec::new();
@@ -2470,7 +2448,8 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         let raw = dvb_track.dvb_packet(output, index as u64).unwrap().unwrap();
         assert_eq!(raw.packet.pts, input.packet.pts);
         assert!(raw.packet.source.unwrap().timing().dts.is_none());
-        let timing = input.packet.source.as_ref().unwrap().timing();
+        let source = input.packet.source.as_ref().unwrap();
+        let timing = source.timing();
         assert_eq!(timing.pts, timing.dts);
         let data = input
             .source
@@ -2482,58 +2461,42 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
             .unwrap();
         assert!(input.packet.payload.shares_storage_with(&data));
         assert_eq!(input.packet.envelope, dvb::PacketEnvelope::Segments);
-        decoder.provide(&input.packet).unwrap();
-        loop {
-            let progress = decoder.step(&mut WorkBudget::new(1), &off()).unwrap();
-            match progress.status {
-                dvb::DecodeStatus::Yield => {}
-                dvb::DecodeStatus::Event => {
-                    let event = progress.event.unwrap();
-                    let source = event.source_packets()[0].source.as_ref().unwrap();
-                    if event.action == dvb::DisplayAction::Present {
-                        assert_eq!(event.pts, Some(Time::new(19, 1000).unwrap()));
-                        assert_eq!(source.timing().duration.unwrap().ticks, 42_000_000);
-                        assert_eq!(source.container_position().unwrap().source, ID);
-                        assert_eq!(
-                            event.regions()[0].plane.pixels.as_ref(),
-                            include_bytes!(
-                                "../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices"
-                            )
-                        );
-                        let Some(dvb_ts::DvbQueueAction::Show(picture)) =
-                            input.packet_clock_action(&event).unwrap()
-                        else {
-                            panic!("DVB picture was not queued");
-                        };
-                        assert_eq!(picture.start_ns, 19_000_000);
-                        assert!(std::ptr::eq(
-                            picture.rectangles().next().unwrap(),
-                            &raw const event.regions()[0],
-                        ));
-                        input.source.delivery = Delivery::DecodeOnly {
-                            until: Time::new(20, 1000).unwrap(),
-                        };
-                        assert!(input.packet_clock_action(&event).unwrap().is_none());
-                    } else {
-                        assert_eq!(event.pts, Some(Time::new(94, 1000).unwrap()));
-                        assert!(event.regions().is_empty());
-                        assert!(matches!(
-                            input.packet_clock_action(&event).unwrap(),
-                            Some(dvb_ts::DvbQueueAction::Clear { at_ns: 94_000_000 })
-                        ));
-                    }
-                    assert!(event.receiver_publication.is_some());
-                    dvb_actions.push(event.action);
-                }
-                dvb::DecodeStatus::NeedPacket => break,
-                _ => panic!("unexpected DVB receiver state"),
+        if input.packet.pts == Some(Time::new(19, 1000).unwrap()) {
+            assert_eq!(timing.duration.unwrap().ticks, 42_000_000);
+            assert_eq!(source.container_position().unwrap().source, ID);
+        }
+        let mut work = WorkBudget::new(u64::MAX);
+        match input.decode(&mut decoder, &mut work, &off()).unwrap() {
+            Some(dvb_ts::DvbQueueAction::Show(picture)) => {
+                assert_eq!(picture.start_ns, 19_000_000);
+                assert_eq!(
+                    picture.rectangles().next().unwrap().pixels,
+                    include_bytes!(
+                        "../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices"
+                    )
+                );
+                dvb_actions.push("show");
+                // The same packet as preroll updates the decoder without an action.
+                input.source.delivery = Delivery::DecodeOnly {
+                    until: Time::new(20, 1000).unwrap(),
+                };
+                let mut preroll = dvb_track.dvb_decoder().unwrap();
+                let mut work = WorkBudget::new(u64::MAX);
+                assert!(
+                    input
+                        .decode(&mut preroll, &mut work, &off())
+                        .unwrap()
+                        .is_none()
+                );
             }
+            Some(dvb_ts::DvbQueueAction::Clear { at_ns }) => {
+                assert_eq!(at_ns, 94_000_000);
+                dvb_actions.push("clear");
+            }
+            None => panic!("DVB packet was not queued"),
         }
     }
-    assert_eq!(
-        dvb_actions,
-        [dvb::DisplayAction::Present, dvb::DisplayAction::Clear]
-    );
+    assert_eq!(dvb_actions, ["show", "clear"]);
 
     let select = Selection::Tracks {
         video: Some(TrackKey::Matroska(1)),
@@ -2590,7 +2553,7 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
     use triergon_matroska::typed::Event;
     use triergon_subtitles::pgs;
 
-    type Timing = (Option<i64>, Option<u64>);
+    type Timing = (Option<i64>, Option<i64>);
     let timed = |pts, duration| (Some(pts), Some(duration));
     let cases: [(&[u8], [Timing; 5]); 7] = [
         (
@@ -2663,10 +2626,7 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
         assert_eq!(input.clock.pts, input.clock.dts);
         (
             input.clock.pts.map(|pts| pts / 1_000_000),
-            input
-                .metadata
-                .native_duration_ns
-                .map(|duration| duration / 1_000_000),
+            input.duration.map(|duration| duration / 1_000_000),
         )
     };
 
@@ -3232,53 +3192,29 @@ fn dvd_stop_only_packet_produces_no_packet_clock_picture() {
 
     let b = pool();
     let raw = [0, 10, 0, 4, 0, 0, 0, 4, 2, 0xff];
-    let mut job = DvdJob::new(
-        &b,
-        bitmap_scope(),
-        bitmap_input(&b, &raw),
-        DvdBridgeConfig {
-            mode: DvdMode::ExplicitNativeFirstUnit,
-            ..DvdBridgeConfig::default()
-        },
-    )
-    .unwrap_or_else(|e| panic!("{:?}", e.error));
-    while !job.poll(&mut WorkBudget::new(32), &off()).unwrap() {}
-    let out = job.finish().unwrap();
+    let mut receiver = DvdReceiver::new(&b, bitmap_scope(), DvdBridgeConfig::default()).unwrap();
+    receiver
+        .provide(bitmap_input(&b, &raw))
+        .unwrap_or_else(|e| panic!("{:?}", e.error));
+    let out = dvd_next(&mut receiver, 32).unwrap();
+    assert!(out.picture.is_none());
     assert!(out.packet_clock_picture(None).unwrap().is_none());
 }
 
 #[test]
-fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
+fn dvd_receiver_carries_colours_across_packets_and_fences_reset() {
     use bitmap_bridge::*;
-
-    fn next(receiver: &mut DvdReceiver<&'static str>) -> Result<DvdOutput<&'static str>> {
-        for _ in 0..100_000 {
-            match receiver.step(&mut WorkBudget::new(1), &off())? {
-                DvdReceiverStep::Yield => {}
-                DvdReceiverStep::Output(output) => return Ok(output),
-                _ => panic!("DVD receiver left the admitted packet"),
-            }
-        }
-        panic!("DVD receiver exhausted work limit");
-    }
 
     let b = pool();
     let scope = bitmap_scope();
-    let config = DvdBridgeConfig {
-        mode: DvdMode::ExplicitNativeFirstUnit,
-        ..DvdBridgeConfig::default()
-    };
     let fixture = include_bytes!("fixtures/bitmap/original-dvd-two-units-tail.spu");
     let first = &fixture[..30];
+    // The same unit without its colour and contrast commands.
     let mut inherited = [first[..11].as_ref(), &first[17..]].concat();
     let size = u16::try_from(inherited.len()).unwrap();
     inherited[..2].copy_from_slice(&size.to_be_bytes());
 
-    let mut receiver = DvdReceiver::new(&b, scope, config).unwrap();
-    assert!(matches!(
-        receiver.step(&mut WorkBudget::new(0), &off()).unwrap(),
-        DvdReceiverStep::NeedPacket
-    ));
+    let mut receiver = DvdReceiver::new(&b, scope, DvdBridgeConfig::default()).unwrap();
     receiver
         .provide(bitmap_input(&b, first))
         .unwrap_or_else(|error| panic!("{:?}", error.error));
@@ -3286,17 +3222,15 @@ fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
     assert_eq!(rejected.input.raw.as_ref(), first);
     drop(rejected);
 
+    // Memory pressure keeps the packet pending and the decoder unchanged.
     let pressure = b.reserve(b.available()).unwrap();
-    assert!(matches!(next(&mut receiver), Err(C::Backpressure { .. })));
+    assert!(matches!(
+        dvd_next(&mut receiver, 1),
+        Err(C::Backpressure { .. })
+    ));
     drop(pressure);
-    let first = next(&mut receiver).unwrap();
-    assert_eq!(
-        first.pictures.as_slice()[0]
-            .program()
-            .state_after()
-            .palette_word,
-        Some(0x3210)
-    );
+    let first = dvd_next(&mut receiver, 1).unwrap();
+    let palette = first.picture.as_ref().unwrap().palette().to_vec();
     assert!(receiver.provide(bitmap_input(&b, &inherited)).is_err());
 
     let mut malformed = bitmap_input(&b, &[0, 6, 0, 4, 0xff, 0xff]);
@@ -3304,10 +3238,7 @@ fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
     receiver
         .provide(malformed)
         .unwrap_or_else(|error| panic!("{:?}", error.error));
-    assert!(matches!(
-        next(&mut receiver),
-        Err(C::Invalid("DVD control offset"))
-    ));
+    assert!(dvd_next(&mut receiver, 1).unwrap().picture.is_none());
 
     let mut second = bitmap_input(&b, &inherited);
     second.sequence = 13;
@@ -3316,23 +3247,10 @@ fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
         .provide(second)
         .unwrap_or_else(|error| panic!("{:?}", error.error));
     receiver.finish();
-    let second = next(&mut receiver).unwrap();
+    let second = dvd_next(&mut receiver, 1).unwrap();
+    assert_eq!(second.picture.as_ref().unwrap().palette(), palette);
     assert_eq!(
-        second.pictures.as_slice()[0]
-            .program()
-            .initial_state()
-            .palette_word,
-        Some(0x3210)
-    );
-    assert_eq!(
-        second.pictures.as_slice()[0]
-            .program()
-            .initial_state()
-            .alpha_word,
-        Some(0xffff)
-    );
-    assert_eq!(
-        second.native_presentation().unwrap().unwrap().show.at,
+        second.presentation().unwrap().unwrap().show.at,
         Some(Time::new(1193, 1000).unwrap())
     );
     assert!(matches!(
@@ -3342,9 +3260,10 @@ fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
 
     let mut new_scope = scope;
     new_scope.generation += 1;
+    let config = DvdBridgeConfig::default();
     assert!(
         !receiver
-            .reset(new_scope, config, &mut WorkBudget::new(0), &off())
+            .reset(new_scope, config.clone(), &mut WorkBudget::new(0), &off())
             .unwrap()
     );
     assert!(
@@ -3359,84 +3278,17 @@ fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
     assert!(matches!(stale.error, C::StaleGeneration { .. }));
     assert_eq!(stale.input.raw.as_ref(), inherited);
     drop(stale);
+    // A reset forgets the carried colours: the inherited unit is transparent.
     let mut fresh = bitmap_input(&b, &inherited);
     fresh.scope = new_scope;
     receiver
         .provide(fresh)
         .unwrap_or_else(|error| panic!("{:?}", error.error));
-    let fresh = next(&mut receiver).unwrap();
-    assert_eq!(
-        fresh.pictures.as_slice()[0].program().initial_state(),
-        config.initial
-    );
+    let fresh = dvd_next(&mut receiver, 1).unwrap();
+    assert!(fresh.picture.is_none());
     assert_eq!(first.packet.input().scope, scope);
     assert_eq!(second.packet.input().scope, scope);
     assert_eq!(fresh.packet.input().scope, new_scope);
     drop((first, second, fresh, receiver));
-    assert_eq!(b.used(), Budget::control_storage_bytes());
-}
-
-#[test]
-fn dvd_receiver_recycles_small_tables_and_pixels_after_output_release() {
-    use bitmap_bridge::*;
-
-    let b = pool();
-    let cancel = off();
-    let config = DvdBridgeConfig {
-        mode: DvdMode::ExplicitNativeFirstUnit,
-        ..DvdBridgeConfig::default()
-    };
-    let mut receiver = DvdReceiver::new(&b, bitmap_scope(), config).unwrap();
-    let raw = &include_bytes!("fixtures/bitmap/original-dvd-two-units-tail.spu")[..30];
-    let mut storage = None;
-    let mut packet_address = None;
-    let mut held_packet = None;
-    for sequence in 11..=13 {
-        let mut input = bitmap_input(&b, raw);
-        input.sequence = sequence;
-        receiver
-            .provide(input)
-            .unwrap_or_else(|e| panic!("{:?}", e.error));
-        let output = loop {
-            match receiver.step(&mut WorkBudget::new(4096), &cancel).unwrap() {
-                DvdReceiverStep::Yield => {}
-                DvdReceiverStep::Output(output) => break output,
-                _ => panic!("DVD receiver lost admitted packet"),
-            }
-        };
-        let pictures = output.pictures.as_slice();
-        let controls = pictures[0].program().controls();
-        let addresses = (
-            output.source.units().as_ptr(),
-            controls.as_ptr(),
-            pictures.as_ptr(),
-            pictures[0].bitmap().unwrap().source().pixels().as_ptr(),
-        );
-        let address = std::ptr::from_ref(output.packet.input());
-        match (sequence, packet_address) {
-            (12, Some(previous)) => {
-                assert_eq!(previous, address);
-                held_packet = Some(output.packet.clone());
-            }
-            (13, Some(previous)) => assert_ne!(previous, address),
-            _ => {}
-        }
-        packet_address = Some(address);
-        assert_eq!(output.packet.input().sequence, sequence);
-        assert_eq!(output.source.raw().as_ref(), raw);
-        assert_eq!(controls.len(), 1);
-        assert!(output.native_presentation().unwrap().is_some());
-        if let Some(previous) = storage {
-            assert_eq!(previous, addresses);
-        }
-        storage = Some(addresses);
-        receiver.recycle(output);
-        assert!(b.used() > Budget::control_storage_bytes());
-    }
-    receiver.finish();
-    let held = held_packet.unwrap();
-    assert_eq!(held.input().sequence, 12);
-    assert_eq!(held.input().raw.as_ref(), raw);
-    drop(held);
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }

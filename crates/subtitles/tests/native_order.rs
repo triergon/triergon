@@ -1,12 +1,11 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
+use triergon_core::{Budget, Bytes, Error, WorkBudget};
+use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder};
 use triergon_subtitles::dvb::{
     ClockOrigin, ClockValue, DecodeStatus, Decoder, DisplayEvent, DisplayLimits, PacketIdentity,
-    PacketTiming, ReceiverView, SourceClock, SourceConfiguration,
+    PacketTiming, SourceClock, SourceConfiguration,
 };
-#[cfg(feature = "reference-trace")]
-use triergon_subtitles::reference_trace::dvb::{RECEIVER_VIEW_PROFILE, REFERENCE_REVISION};
 
 struct ExpectedRect {
     source_id: u8,
@@ -34,7 +33,7 @@ struct Observed {
     events: Vec<DisplayEvent>,
     error: Option<Error>,
 }
-fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> Observed {
+fn decode(pool: &Budget, bytes: &[u8], quantum: u64) -> Observed {
     let private = Bytes::copy_from_slice(pool, &[0, 1, 0, 2, 0x14]).unwrap();
     let config = SourceConfiguration::from_matroska_private(
         pool,
@@ -43,15 +42,8 @@ fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> Obse
     )
     .unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = Decoder::new_configured_with_receiver_view(
-        pool,
-        &config,
-        13,
-        DisplayLimits::default(),
-        view,
-        &cancel,
-    )
-    .unwrap();
+    let mut decoder =
+        Decoder::new_configured(pool, &config, 13, DisplayLimits::default(), &cancel).unwrap();
     let raw = Bytes::copy_from_slice(pool, bytes).unwrap();
     let packet = config
         .packet(
@@ -106,67 +98,42 @@ fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> Obse
     }
     panic!("bounded source did not terminate")
 }
+/// The receiver decoder against the recorded output of the reference
+/// decoder: rectangle order and geometry, index planes, palettes and clock.
 fn check_native(index: usize) {
     let case = &cases::CASES[index];
-    for quantum in [1, 7, 4096] {
-        let pool = Budget::new(4 << 20).unwrap();
-        let baseline = pool.used();
-        let result = decode(&pool, case.payload, ReceiverView::Receiver, quantum);
-        assert_eq!(result.error, None, "{} work={quantum}", case.id);
-        assert_eq!(result.events.len(), 1);
-        let event = &result.events[0];
-        assert_eq!(event.receiver_view, ReceiverView::Receiver);
-        assert_eq!(event.pts, Some(Time::new(1, 1).unwrap()));
-        assert_eq!(
-            [event.definition.size.width, event.definition.size.height],
-            [16, 12]
-        );
-        assert_eq!(
-            event.page_composition.as_ref().unwrap().as_ref(),
-            case.original_pcs
-        );
-        assert_eq!(event.source_packets().len(), 1);
-        assert_eq!(event.source_packets()[0].payload.as_ref(), case.payload);
-        let timing = event.source_packets()[0].source.as_ref().unwrap().timing();
-        assert_eq!(timing.pts.unwrap().ticks, 1000);
-        assert_eq!(timing.duration.unwrap().ticks, 2000);
-        let publication = event.receiver_publication.unwrap();
-        #[cfg(feature = "reference-trace")]
-        assert_eq!(publication.reference_revision(), REFERENCE_REVISION);
-        #[cfg(feature = "reference-trace")]
-        assert_eq!(publication.view_profile(), RECEIVER_VIEW_PROFILE);
-        assert_eq!(publication.exact_pts_microseconds, Some(case.pts_raw));
-        assert_eq!(publication.start_display_ms, case.start_ms);
-        assert_eq!(publication.end_display_ms, case.end_ms);
-        assert_eq!(publication.consumed_prefix_bytes, case.payload.len());
-        assert_eq!(event.regions().len(), case.rects.len());
-        for (region, expected) in event.regions().iter().zip(case.rects) {
-            // Region IDs come from the independently authored source PCS;
-            // raw AVSubtitleRect exposes geometry, not a region ID.
-            assert_eq!(
-                region.id, expected.source_id,
-                "literal region order {}",
-                case.id
-            );
-            assert_eq!(
-                [
-                    region.position.x,
-                    region.position.y,
-                    region.size.width,
-                    region.size.height
-                ],
-                expected.geometry
-            );
-            assert_eq!(region.plane.geometry.stride, expected.stride);
-            assert_eq!(region.plane.pixels.as_ref(), expected.indices);
-            let native = region.palette.receiver.as_ref().unwrap();
-            assert!(native.all_entries_explicit);
-            assert_eq!(native.rgba.as_ref(), expected.rgba);
-            assert_eq!(native.words.as_slice(), expected.words);
-            assert_eq!(&region.palette.rgba.as_ref()[..4], &[0, 0, 0, 0]);
-        }
-        drop(result);
-        assert_eq!(pool.used(), baseline);
+    let pool = Budget::new(4 << 20).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut decoder = ReceiverDecoder::new(&pool, &[0, 1, 0, 2, 0x14], Options::default());
+    let mut work = WorkBudget::new(u64::MAX);
+    let subtitle = decoder
+        .decode(case.payload, Some(case.pts_raw), &mut work, &cancel)
+        .unwrap()
+        .expect("presented display set");
+    assert_eq!(subtitle.pts, Some(case.pts_raw));
+    assert_eq!(
+        (subtitle.start_display_ms, subtitle.end_display_ms),
+        (case.start_ms, case.end_ms)
+    );
+    let rects: Vec<_> = subtitle.rects().collect();
+    assert_eq!(rects.len(), case.rects.len(), "{}", case.id);
+    for (rect, expected) in rects.iter().zip(case.rects) {
+        let geometry = [
+            rect.x,
+            rect.y,
+            i32::from(rect.width),
+            i32::from(rect.height),
+        ];
+        assert_eq!(geometry.map(|v| v as u32), expected.geometry, "{}", case.id);
+        assert_eq!(usize::from(rect.width), expected.stride);
+        assert_eq!(rect.pixels, expected.indices);
+        assert_eq!(rect.palette, expected.words);
+        let rgba: Vec<u8> = rect
+            .palette
+            .iter()
+            .flat_map(|w| [(w >> 16) as u8, (w >> 8) as u8, *w as u8, (w >> 24) as u8])
+            .collect();
+        assert_eq!(rgba, expected.rgba);
     }
 }
 fn check_source(index: usize) {
@@ -174,12 +141,11 @@ fn check_source(index: usize) {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
-        let result = decode(&pool, case.payload, ReceiverView::Source, quantum);
+        let result = decode(&pool, case.payload, quantum);
         if case.conforming {
             assert_eq!(result.error, None);
             assert_eq!(result.events.len(), 1);
             let event = &result.events[0];
-            assert!(event.receiver_publication.is_none());
             assert_eq!(
                 event.page_composition.as_ref().unwrap().as_ref(),
                 case.original_pcs
@@ -192,8 +158,14 @@ fn check_source(index: usize) {
                     .collect::<Vec<_>>(),
                 case.source_ids
             );
+            // The receiver presents the same regions in reverse.
+            assert!(
+                case.rects
+                    .iter()
+                    .map(|r| r.source_id)
+                    .eq(case.source_ids.iter().rev().copied())
+            );
             for region in event.regions() {
-                assert!(region.palette.receiver.is_none());
                 assert_eq!(&region.palette.rgba.as_ref()[..4], &[0, 0, 0, 0]);
             }
         } else {
@@ -242,15 +214,14 @@ fn source_nonascending_pcs_remains_rejected() {
 }
 
 #[test]
-fn nonoverlap_validation_is_not_lost_when_native_emission_order_changes() {
-    for view in [ReceiverView::Source, ReceiverView::Receiver] {
+fn source_rejects_regions_sharing_scan_lines() {
+    {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();
             let result = decode(
                 &pool,
                 include_bytes!("native-order-fixtures/input/overlap-invalid.dvb"),
-                view,
                 quantum,
             );
             assert_eq!(
@@ -264,15 +235,14 @@ fn nonoverlap_validation_is_not_lost_when_native_emission_order_changes() {
     }
 }
 #[test]
-fn window_bounds_still_fail_without_partial_event_in_either_order() {
-    for view in [ReceiverView::Source, ReceiverView::Receiver] {
+fn source_window_bounds_fail_without_partial_event() {
+    {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();
             let result = decode(
                 &pool,
                 include_bytes!("native-order-fixtures/input/window-invalid.dvb"),
-                view,
                 quantum,
             );
             assert_eq!(
@@ -287,7 +257,7 @@ fn window_bounds_still_fail_without_partial_event_in_either_order() {
 }
 
 #[test]
-fn empty_native_regions_still_validate_display_bounds() {
+fn source_empty_regions_still_validate_display_bounds() {
     // PCS + a fresh filled 2x2 RCS + EODS, without ODS or a display definition.
     // The default 720x576 canvas applies even when no rectangle is published.
     const EMPTY_REGION: &[u8] = &[
@@ -298,15 +268,15 @@ fn empty_native_regions_still_validate_display_bounds() {
         let mut payload = EMPTY_REGION.to_vec();
         payload[10..12].copy_from_slice(&x.to_be_bytes());
         payload[12..14].copy_from_slice(&y.to_be_bytes());
-        for view in [ReceiverView::Source, ReceiverView::Receiver] {
+        {
             for quantum in [1, 7, 4096] {
                 let pool = Budget::new(4 << 20).unwrap();
                 let baseline = pool.used();
-                let result = decode(&pool, &payload, view, quantum);
+                let result = decode(&pool, &payload, quantum);
                 assert_eq!(
                     result.error,
                     Some(Error::Invalid("DVB region outside display window")),
-                    "view={view:?} work={quantum} position=({x},{y})"
+                    "work={quantum} position=({x},{y})"
                 );
                 assert!(result.events.is_empty());
                 drop(result);

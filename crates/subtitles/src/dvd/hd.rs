@@ -1,6 +1,7 @@
 //! Original extended-SPU wire facts and bounded eight-bit source raster.
 //! Inferred, pinned implementation evidence is not a normative DVD claim.
 //! Header width, field width, pixel mode and source colour are independent.
+use super::receiver::YcbcrRounding;
 use super::{DvdArea, DvdBitmap, DvdDate};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -40,9 +41,6 @@ fn number(raw: &[u8], at: usize, width: usize) -> Result<u32> {
 }
 impl<'a> HdPacket<'a> {
     pub fn parse(raw: &'a [u8]) -> Result<Self> {
-        Self::parse_extent(raw, false)
-    }
-    fn parse_extent(raw: &'a [u8], allow_prefix: bool) -> Result<Self> {
         let wide = number(raw, 0, 2)? == 0;
         let width = if wide { 4 } else { 2 };
         let header = if wide { 10 } else { 4 };
@@ -50,7 +48,7 @@ impl<'a> HdPacket<'a> {
             .map_err(|_| Error::Overflow)?;
         let control =
             usize::try_from(number(raw, header - width, width)?).map_err(|_| Error::Overflow)?;
-        if raw.len() < size && !allow_prefix {
+        if raw.len() < size {
             return Err(Error::Truncated);
         }
         if raw.len() > size {
@@ -92,9 +90,6 @@ impl<'a> HdPacket<'a> {
         }
     }
     fn block(self, at: usize) -> Result<HdControl<'a>> {
-        self.block_with_policy(at, HdPolicy::Strict)
-    }
-    fn block_with_policy(self, at: usize, policy: HdPolicy) -> Result<HdControl<'a>> {
         let width = if self.wide { 4 } else { 2 };
         if at < self.control {
             return Err(Error::Invalid("HD control before control area"));
@@ -103,7 +98,6 @@ impl<'a> HdPacket<'a> {
         let next_offset = number(self.raw, at.checked_add(2).ok_or(Error::Overflow)?, width)?;
         let next = usize::try_from(next_offset).map_err(|_| Error::Overflow)?;
         let start = at.checked_add(2 + width).ok_or(Error::Overflow)?;
-        let mut stopped_at_link = false;
         let end = if next == at {
             self.raw.len()
         } else {
@@ -113,18 +107,11 @@ impl<'a> HdPacket<'a> {
                     .checked_add(3 + width)
                     .is_none_or(|end| end > self.raw.len())
             {
-                if policy != HdPolicy::Receiver {
-                    return Err(Error::Invalid(
-                        "HD backward, overlapping or out-of-range link",
-                    ));
-                }
-                stopped_at_link = true;
+                return Err(Error::Invalid(
+                    "HD backward, overlapping or out-of-range link",
+                ));
             }
-            if stopped_at_link {
-                self.raw.len()
-            } else {
-                next
-            }
+            next
         };
         if start >= end {
             return Err(Error::Truncated);
@@ -137,7 +124,6 @@ impl<'a> HdPacket<'a> {
             commands: HdSpan { start, end },
             raw: self.raw,
             maximum: usize::MAX,
-            receiver_stopped_at_link: stopped_at_link,
         })
     }
 }
@@ -148,7 +134,6 @@ pub struct HdControl<'a> {
     pub offset: usize,
     pub next_offset: u32,
     pub span: HdSpan,
-    pub receiver_stopped_at_link: bool,
     commands: HdSpan,
     raw: &'a [u8],
     maximum: usize,
@@ -330,13 +315,7 @@ pub struct HdFacts {
     pub palette4_wire: Option<HdSpan>,
     pub alpha4_word: Option<u16>,
     pub alpha4_wire: Option<HdSpan>,
-    /// Last opaque prefix retained by the explicit receiver policy. All raw
-    /// control tails remain available through the packet's bounded iterators.
-    pub last_opaque_tail: Option<HdSpan>,
-    pub stopped_at_link: Option<HdSpan>,
     pub selected_control: Option<usize>,
-    /// Receiver prefix ended at the supplied input boundary without a wire End.
-    pub ended_at_input: bool,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum HdPolicy {
@@ -345,8 +324,6 @@ pub enum HdPolicy {
     StrictEightBit,
     /// Strict source decoding with either the four-entry or eight-bit grammar.
     Strict,
-    /// Explicit fresh-context receiver control-prefix behaviour; source stays raw.
-    Receiver,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct HdLimits {
@@ -376,16 +353,11 @@ pub enum HdStatus {
 }
 #[derive(Debug)]
 pub struct HdSubpicture {
-    receiver_forced: bool,
     packet: Bytes,
     bitmap: DvdBitmap,
     facts: HdFacts,
 }
 impl HdSubpicture {
-    /// Pinned rectangle flag projection, distinct from the selected local source flag.
-    pub fn receiver_forced(&self) -> bool {
-        self.receiver_forced
-    }
     pub fn packet(&self) -> &Bytes {
         &self.packet
     }
@@ -424,107 +396,6 @@ impl HdSubpicture {
             }),
         })
     }
-    /// Explicit receiver-reset defaults, never supplied source contrast.
-    pub fn receiver_palette_job(&self) -> Result<HdPaletteJob<'_>> {
-        let mut job = HdPaletteJob {
-            ycrcb: self
-                .ycrcb()
-                .ok_or(Error::Unsupported("HD source YCrCb absent"))?,
-            contrast: self.contrast().unwrap_or(&[]),
-            values: [0; 256],
-            at: 0,
-            failed: None,
-            finished: false,
-            alpha4_override: None,
-        };
-        job.alpha4_override = self.facts.alpha4_word.filter(|_| {
-            match (self.facts.alpha4_wire, self.facts.contrast) {
-                (Some(a), Some(c)) => a.start > c.start,
-                (Some(_), None) => true,
-                _ => false,
-            }
-        });
-        Ok(job)
-    }
-    pub fn receiver_four_palette(&self, source_rgb: Option<&[u32; 16]>) -> Result<HdFourPalette> {
-        if self.facts.eight_bit {
-            return Err(Error::Unsupported("HD four-entry view of eight-bit raster"));
-        }
-        let selectors = std::array::from_fn(|i| {
-            ((self.facts.palette4_word.unwrap_or(0) >> (4 * i)) & 15) as u8
-        });
-        let mut origins = [HdAlphaOrigin::ReceiverReset; 4];
-        let mut alpha = [0_u8; 4];
-        for i in 0..4 {
-            if let Some(raw) = self.contrast() {
-                alpha[i] = 255 - raw[i];
-                origins[i] = HdAlphaOrigin::Contrast {
-                    index: i as u8,
-                    raw: raw[i],
-                };
-            }
-            let packed_after = self
-                .facts
-                .alpha4_wire
-                .is_some_and(|a| self.facts.contrast.is_none_or(|c| a.start > c.start));
-            if packed_after && let Some(word) = self.facts.alpha4_word {
-                alpha[i] = ((word >> (4 * i)) & 15) as u8;
-                origins[i] = HdAlphaOrigin::Packed {
-                    word,
-                    index: i as u8,
-                };
-            }
-        }
-        let mut classes = [u8::MAX; 16];
-        let mut count = 0_u8;
-        for i in 0..4 {
-            if alpha[i] != 0 && classes[selectors[i] as usize] == u8::MAX {
-                classes[selectors[i] as usize] = count;
-                count += 1;
-            }
-        }
-        let argb = std::array::from_fn(|i| {
-            let rgb = if let Some(source) = source_rgb {
-                source[selectors[i] as usize] & 0x00ff_ffff
-            } else if alpha[i] == 0 {
-                0
-            } else {
-                let rank = classes[selectors[i] as usize];
-                let level = if count == 1 {
-                    255
-                } else {
-                    (255 * u16::from(rank) + u16::from(count - 1) / 2) / u16::from(count - 1)
-                };
-                let gray = 255 * u32::from(level) / 256;
-                gray * 0x0001_0101
-            };
-            // The selected native four-entry operation scales effective bytes,
-            // including contrast-derived values beyond15, modulo one ARGB byte.
-            let opacity = (u32::from(alpha[i]) * 17) & 255;
-            (opacity << 24) | rgb
-        });
-        Ok(HdFourPalette {
-            argb,
-            selectors,
-            effective_alpha: alpha,
-            alpha_origins: origins,
-            source_rgb: source_rgb.copied(),
-        })
-    }
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HdAlphaOrigin {
-    ReceiverReset,
-    Contrast { index: u8, raw: u8 },
-    Packed { word: u16, index: u8 },
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HdFourPalette {
-    pub argb: [u32; 4],
-    pub selectors: [u8; 4],
-    pub effective_alpha: [u8; 4],
-    pub alpha_origins: [HdAlphaOrigin; 4],
-    pub source_rgb: Option<[u32; 16]>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -537,7 +408,6 @@ struct ScanBlock {
     local_area: bool,
     local_fields: bool,
     forced: bool,
-    stop_link: bool,
 }
 #[derive(Clone, Copy, Debug)]
 struct Operand {
@@ -555,10 +425,9 @@ enum Phase {
     Ready,
     Finished,
 }
-/// Owned source decoding with explicit strict/fresh-native profiles. `new`
-/// uses the strict eight-bit profile. Strict accepts either pixel grammar;
-/// Receiver validates every eligible multi-row raster in control order and
-/// keeps the last native candidate. Original source bytes and errors survive.
+/// Owned strict source decoding. `new` uses the strict eight-bit profile;
+/// [`HdPolicy::Strict`] accepts either pixel grammar. Original source bytes
+/// and errors survive.
 #[derive(Debug)]
 pub struct HdSpuJob {
     packet: Option<Bytes>,
@@ -595,10 +464,6 @@ pub struct HdSpuJob {
     run_left: u16,
     nibble_word: u16,
     nibbles: u8,
-    native_have_decoded: bool,
-    receiver_forced: bool,
-    allow_prefix: bool,
-    resume_scan: bool,
 }
 impl HdSpuJob {
     pub fn new(packet: Bytes, budget: &Budget, limits: HdLimits) -> Result<Self> {
@@ -610,22 +475,6 @@ impl HdSpuJob {
         limits: HdLimits,
         policy: HdPolicy,
     ) -> Result<Self> {
-        Self::with_extent(packet, budget, limits, policy, false)
-    }
-    pub(crate) fn with_native_prefix(
-        packet: Bytes,
-        budget: &Budget,
-        limits: HdLimits,
-    ) -> Result<Self> {
-        Self::with_extent(packet, budget, limits, HdPolicy::Receiver, true)
-    }
-    fn with_extent(
-        packet: Bytes,
-        budget: &Budget,
-        limits: HdLimits,
-        policy: HdPolicy,
-        allow_prefix: bool,
-    ) -> Result<Self> {
         if !packet.belongs_to(budget) {
             return Err(Error::ForeignPool);
         }
@@ -635,7 +484,7 @@ impl HdSpuJob {
                 maximum: limits.max_packet,
             });
         }
-        let p = HdPacket::parse_extent(&packet, allow_prefix)?;
+        let p = HdPacket::parse(&packet)?;
         let (control, header, wide) = (p.control, p.header, p.wide);
         Ok(Self {
             packet: Some(packet),
@@ -672,10 +521,6 @@ impl HdSpuJob {
             run_left: 0,
             nibble_word: 0,
             nibbles: 0,
-            native_have_decoded: false,
-            receiver_forced: false,
-            allow_prefix,
-            resume_scan: false,
         })
     }
     pub fn work_spent(&self) -> usize {
@@ -690,9 +535,6 @@ impl HdSpuJob {
         } else {
             self.selected.unwrap_or(self.facts)
         }
-    }
-    pub(crate) fn parsed_context_facts(&self) -> HdFacts {
-        self.facts
     }
     fn raw(&self) -> Result<&[u8]> {
         self.packet
@@ -773,37 +615,16 @@ impl HdSpuJob {
             }
             HdCommand::Opaque { .. } => return Err(Error::Unsupported("HD opaque control")),
             HdCommand::End => {
-                if b.stop_link {
-                    self.facts.stopped_at_link = Some(HdSpan {
-                        start: b.offset + 2,
-                        end: b.offset + if self.wide { 6 } else { 4 },
-                    });
-                }
                 if b.local_area && b.local_fields {
-                    if self.selected.is_some() && self.policy != HdPolicy::Receiver {
+                    if self.selected.is_some() {
                         return Err(Error::Unsupported("HD multiple locally eligible rasters"));
                     }
                     let mut facts = self.facts;
                     facts.forced = b.forced;
                     facts.selected_control = Some(b.offset);
-                    if self.policy == HdPolicy::Receiver {
-                        let (_, height) = facts
-                            .area
-                            .ok_or(Error::Invalid("HD source area absent"))?
-                            .dimensions()?;
-                        if height > 1 {
-                            self.resume_scan = true;
-                            self.prepare_raster(facts)?;
-                        } else if !self.native_have_decoded {
-                            // A one-row encoded asset is retained for the source
-                            // fallback; native selection does not replace a prior bitmap.
-                            self.selected = Some(facts);
-                        }
-                    } else {
-                        self.selected = Some(facts);
-                    }
+                    self.selected = Some(facts);
                 }
-                self.next = if b.stop_link || b.next == b.offset {
+                self.next = if b.next == b.offset {
                     None
                 } else {
                     Some(b.next)
@@ -849,7 +670,6 @@ impl HdSpuJob {
             }
             self.bit_at[i] = offset.checked_mul(8).ok_or(Error::Overflow)?;
         }
-        self.receiver_forced |= f.forced;
         self.selected = Some(f);
         self.reset_token();
         self.phase = Phase::Reserve;
@@ -870,19 +690,10 @@ impl HdSpuJob {
                 f.start_date = self.facts.start_date;
                 f.stop_date = self.facts.stop_date;
                 f.forced_date = self.facts.forced_date;
-                f.last_opaque_tail = self.facts.last_opaque_tail;
-                f.stopped_at_link = self.facts.stopped_at_link;
                 f.menu = self.facts.menu;
-                f.ended_at_input = self.facts.ended_at_input;
                 if !f.eight_bit && self.policy == HdPolicy::StrictEightBit {
                     return Err(Error::Unsupported("HD two-bit source raster"));
                 }
-                if self.policy == HdPolicy::Receiver && self.native_have_decoded {
-                    self.selected = Some(f);
-                    self.phase = Phase::Ready;
-                    return Ok(true);
-                }
-                self.resume_scan = false;
                 self.prepare_raster(f)?;
                 return Ok(true);
             };
@@ -897,8 +708,7 @@ impl HdSpuJob {
                     maximum: self.limits.max_controls,
                 });
             }
-            let block = HdPacket::parse_extent(self.raw()?, self.allow_prefix)?
-                .block_with_policy(at, self.policy)?;
+            let block = HdPacket::parse(self.raw()?)?.block(at)?;
             self.block = Some(ScanBlock {
                 offset: at,
                 next: block.next_offset as usize,
@@ -908,7 +718,6 @@ impl HdSpuJob {
                 local_area: false,
                 local_fields: false,
                 forced: false,
-                stop_link: block.receiver_stopped_at_link,
             });
             self.controls += 1;
             self.header_paid = 0;
@@ -938,40 +747,12 @@ impl HdSpuJob {
             .as_mut()
             .ok_or(Error::Invalid("HD command block absent"))?;
         if b.at >= b.end {
-            if self.allow_prefix && b.at == b.end {
-                let at = b.at;
-                self.facts.ended_at_input = true;
-                self.apply(Operand {
-                    opcode: 0xff,
-                    start: at,
-                    end: at,
-                    paid: 0,
-                })?;
-                return Ok(true);
-            }
             return Err(Error::Truncated);
         }
         let at = b.at;
         b.at += 1;
         let opcode = self.raw()?[at];
-        let length = match operand_len(opcode) {
-            Some(length) => length,
-            None if self.policy == HdPolicy::Receiver => {
-                let end = self
-                    .block
-                    .ok_or(Error::Invalid("HD command block absent"))?
-                    .end;
-                self.facts.last_opaque_tail = Some(HdSpan { start: at, end });
-                self.apply(Operand {
-                    opcode: 0xff,
-                    start: at,
-                    end: at,
-                    paid: 0,
-                })?;
-                return Ok(true);
-            }
-            None => return Err(Error::Unsupported("HD opaque control")),
-        };
+        let length = operand_len(opcode).ok_or(Error::Unsupported("HD opaque control"))?;
         let mut b = self
             .block
             .ok_or(Error::Invalid("HD command block absent"))?;
@@ -1035,13 +816,7 @@ impl HdSpuJob {
                     self.column = 0;
                     self.row += 1;
                     if self.row == self.height {
-                        if self.resume_scan {
-                            self.native_have_decoded = true;
-                            self.resume_scan = false;
-                            self.phase = Phase::Scan;
-                        } else {
-                            self.phase = Phase::Ready;
-                        }
+                        self.phase = Phase::Ready;
                     }
                 }
                 self.reset_token();
@@ -1221,7 +996,6 @@ impl HdSpuJob {
             .ok_or(Error::Invalid("HD source absent"))?;
         self.phase = Phase::Finished;
         Ok(HdSubpicture {
-            receiver_forced: self.receiver_forced,
             packet,
             bitmap,
             facts,
@@ -1229,19 +1003,9 @@ impl HdSpuJob {
     }
 }
 
-/// Mathematical pinned-receiver projection of one supplied Y/Cr/Cb triple and
-/// raw contrast byte. It establishes no source RGB/colour-space declaration.
-pub fn hd_argb(ycrcb: [u8; 3], contrast: u8) -> u32 {
-    let luma = (i32::from(ycrcb[0]) - 16) * 1192;
-    let cr = i32::from(ycrcb[1]) - 128;
-    let cb = i32::from(ycrcb[2]) - 128;
-    let values = [
-        luma + 1634 * cr,
-        luma - 401 * cb - 832 * cr,
-        luma + 2066 * cb,
-    ];
-    let rgb = values.map(|v| ((v + 512).div_euclid(1024)).clamp(0, 255) as u32);
-    (u32::from(255 - contrast) << 24) | (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
+/// The ARGB word of one Y/Cr/Cb entry and its contrast byte.
+fn argb(ycrcb: [u8; 3], contrast: u8) -> u32 {
+    u32::from(255 - contrast) << 24 | YcbcrRounding::Nearest.rgb(ycrcb[0], ycrcb[1], ycrcb[2])
 }
 #[derive(Debug)]
 pub struct HdPaletteJob<'a> {
@@ -1283,7 +1047,7 @@ impl HdPaletteJob<'_> {
             {
                 alpha = ((word >> (4 * i)) & 15) as u8;
             }
-            self.values[i] = hd_argb(
+            self.values[i] = argb(
                 [
                     self.ycrcb[3 * i],
                     self.ycrcb[3 * i + 1],

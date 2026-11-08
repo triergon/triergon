@@ -567,9 +567,10 @@ fn receiver_full_events_and_source_failures_are_unchanged_on_negative_grammar() 
     let mut tail = good.clone();
     tail.extend_from_slice(&[0x14, 0, 7, 0, 0, 1]);
     good.extend_from_slice(&[0x80, 0]);
+    let short = vec![0x16, 0];
     let mut complete = 0;
     let mut refusals = 0;
-    for raw in [missing_end, unknown, tail, good] {
+    for raw in [missing_end, unknown, tail, good, short] {
         let budget = Budget::new(4 * 1024 * 1024).unwrap();
         let old = recover_default(&budget, &raw);
         let mut decoder = IndexedRecoveryDecoder::new(
@@ -581,16 +582,13 @@ fn receiver_full_events_and_source_failures_are_unchanged_on_negative_grammar() 
         let new = try_recover_indexed(&mut decoder, &budget, &raw);
         let (new, old) = match (new, old) {
             (Ok(new), Ok(old)) => (new, old),
-            (Err(new), Err(old)) => {
-                assert_eq!(new, old, "literal pre-output refusal differs");
-                refusals += 1;
-                continue;
-            }
             (new, old) => {
                 panic!("whole operation return differs: indexed={new:?} materialized={old:?}")
             }
         };
         complete += 1;
+        assert_eq!(new.receiver_refusal(), old.receiver_refusal());
+        refusals += usize::from(new.receiver_refusal().is_some());
         assert_eq!(new.raw_packet().as_ref(), old.raw_packet().as_ref());
         assert_eq!(new.clock, old.clock);
         assert_eq!(new.source_error(), old.source_error());
@@ -668,15 +666,8 @@ fn receiver_full_events_and_source_failures_are_unchanged_on_negative_grammar() 
             }
         }
     }
-    assert_eq!(
-        complete + refusals,
-        4,
-        "all original malformed transports remain required"
-    );
-    assert!(
-        complete > 0 && refusals > 0,
-        "both full output and literal refusal controls must execute"
-    );
+    assert_eq!(complete, 5, "every malformed packet completes");
+    assert_eq!(refusals, 1, "only the short packet is refused");
 }
 
 #[test]

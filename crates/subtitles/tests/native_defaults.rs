@@ -1,10 +1,10 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
+use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder};
 use triergon_subtitles::dvb::{
     ClockOrigin, ClockValue, ColourProjection, ColourSource, DecodeStatus, Decoder, Depth,
-    DisplayEvent, DisplayLimits, PacketIdentity, PacketTiming, ReceiverView, SourceClock,
-    SourceConfiguration,
+    DisplayEvent, DisplayLimits, PacketIdentity, PacketTiming, SourceClock, SourceConfiguration,
 };
 
 struct Case {
@@ -97,7 +97,7 @@ fn source_palette(case: &Case) -> Vec<u8> {
     result
 }
 
-fn decode(pool: &Budget, case: &Case, view: ReceiverView, quantum: u64) -> Vec<DisplayEvent> {
+fn decode(pool: &Budget, case: &Case, quantum: u64) -> Vec<DisplayEvent> {
     let cancel = AtomicBool::new(false);
     let private = Bytes::copy_from_slice(pool, &[0, 1, 0, 2, 0x10]).unwrap();
     let configuration = SourceConfiguration::from_matroska_private(
@@ -106,15 +106,9 @@ fn decode(pool: &Budget, case: &Case, view: ReceiverView, quantum: u64) -> Vec<D
         SourceClock::new(1, 90000).unwrap(),
     )
     .unwrap();
-    let mut decoder = Decoder::new_configured_with_receiver_view(
-        pool,
-        &configuration,
-        19,
-        DisplayLimits::default(),
-        view,
-        &cancel,
-    )
-    .unwrap();
+    let mut decoder =
+        Decoder::new_configured(pool, &configuration, 19, DisplayLimits::default(), &cancel)
+            .unwrap();
     let payload = Bytes::copy_from_slice(pool, case.payload).unwrap();
     let packet = configuration
         .packet(
@@ -258,48 +252,54 @@ fn whole_source_no_cds_and_partial_cds_keep_every_unredefined_entry() {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();
-            let events = decode(&pool, case, ReceiverView::Source, quantum);
+            let events = decode(&pool, case, quantum);
             assert_eq!(events.len(), 1);
             source_facts(&events[0], case);
-            assert!(events[0].regions()[0].palette.receiver.is_none());
             drop(events);
             assert_eq!(pool.used(), baseline);
         }
     }
 }
 
+/// The receiver decoder against the recorded output of the reference
+/// decoder: the subtitle clock, rectangle, index plane and ARGB words.
 fn native_case(at: usize) {
     let case = &cases::CASES[at];
-    for quantum in [1, 7, 4096] {
-        let pool = Budget::new(4 << 20).unwrap();
-        let baseline = pool.used();
-        let events = decode(&pool, case, ReceiverView::Receiver, quantum);
-        assert_eq!(events.len(), 1);
-        source_facts(&events[0], case);
-        let publication = events[0].receiver_publication.unwrap();
-        assert_eq!(
-            publication.exact_pts_microseconds,
-            Some(case.pts_microseconds)
-        );
-        assert_eq!(publication.start_display_ms, 0);
-        assert_eq!(publication.end_display_ms, 2000);
-        let palette = events[0].regions()[0].palette.receiver.as_ref().unwrap();
-        assert!(!palette.all_entries_explicit);
-        assert_eq!(
-            palette.words.as_slice(),
-            case.receiver_words,
-            "{} entire literal raw native words",
-            case.id
-        );
-        assert_eq!(
-            palette.rgba.as_ref(),
-            case.native_rgba,
-            "{} all entries, including unused/transparent RGB",
-            case.id
-        );
-        drop(events);
-        assert_eq!(pool.used(), baseline);
-    }
+    let pool = Budget::new(4 << 20).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut decoder = ReceiverDecoder::new(&pool, &[0, 1, 0, 2, 0x10], Options::default());
+    let mut work = WorkBudget::new(u64::MAX);
+    let subtitle = decoder
+        .decode(
+            case.payload,
+            Some(case.pts_microseconds),
+            &mut work,
+            &cancel,
+        )
+        .unwrap()
+        .expect("presented display set");
+    assert_eq!(
+        (subtitle.start_display_ms, subtitle.end_display_ms),
+        (0, 2000)
+    );
+    let rects: Vec<_> = subtitle.rects().collect();
+    assert_eq!(rects.len(), 1);
+    let rect = &rects[0];
+    let geometry = [
+        rect.x,
+        rect.y,
+        i32::from(rect.width),
+        i32::from(rect.height),
+    ];
+    assert_eq!(geometry.map(|v| v as u32), case.rect);
+    assert_eq!(rect.pixels, case.indices);
+    assert_eq!(rect.palette, case.receiver_words, "{}", case.id);
+    let rgba: Vec<u8> = rect
+        .palette
+        .iter()
+        .flat_map(|w| [(w >> 16) as u8, (w >> 8) as u8, *w as u8, (w >> 24) as u8])
+        .collect();
+    assert_eq!(rgba, case.native_rgba, "{}", case.id);
 }
 
 #[test]
@@ -322,23 +322,16 @@ fn default_palette_and_original_owners_remain_charged_after_decoder_teardown() {
     for case in &cases::CASES {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
-        let mut events = decode(&pool, case, ReceiverView::Receiver, 1);
+        let mut events = decode(&pool, case, 1);
         let event = events.pop().unwrap();
         drop(events);
         let region = &event.regions()[0];
-        let native = region.palette.receiver.as_ref().unwrap();
-        let expected = native.rgba.as_ref().to_vec();
-        let held = [
-            native.rgba.clone(),
-            region.palette.rgba.clone(),
-            region.plane.pixels.clone(),
-        ];
+        let held = [region.palette.rgba.clone(), region.plane.pixels.clone()];
         let packet = event.source_packets()[0].clone();
         drop(event);
         assert!(pool.used() > baseline);
-        assert_eq!(held[0].as_ref(), expected);
-        assert_eq!(held[1].as_ref(), source_palette(case));
-        assert_eq!(held[2].as_ref(), case.indices);
+        assert_eq!(held[0].as_ref(), source_palette(case));
+        assert_eq!(held[1].as_ref(), case.indices);
         assert_eq!(packet.payload.as_ref(), case.payload);
         drop(held);
         assert!(pool.used() > baseline);

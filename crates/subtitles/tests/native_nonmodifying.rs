@@ -1,12 +1,11 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
+use triergon_core::{Budget, Bytes, Error, WorkBudget};
+use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder};
 use triergon_subtitles::dvb::{
-    ClockOrigin, ClockValue, DecodeStatus, Decoder, Depth, DisplayEvent, DisplayLimits,
-    PacketIdentity, PacketTiming, ReceiverView, SourceClock, SourceConfiguration,
+    ClockOrigin, ClockValue, DecodeStatus, Decoder, DisplayEvent, DisplayLimits, PacketIdentity,
+    PacketTiming, SourceClock, SourceConfiguration,
 };
-#[cfg(feature = "reference-trace")]
-use triergon_subtitles::reference_trace::dvb::{RECEIVER_VIEW_PROFILE, REFERENCE_REVISION};
 
 struct Case {
     id: &'static str,
@@ -26,7 +25,7 @@ struct Observed {
     events: Vec<DisplayEvent>,
     error: Option<Error>,
 }
-fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> Observed {
+fn decode(pool: &Budget, bytes: &[u8], quantum: u64) -> Observed {
     let private = Bytes::copy_from_slice(pool, &[0, 1, 0, 2, 0x14]).unwrap();
     let config = SourceConfiguration::from_matroska_private(
         pool,
@@ -35,15 +34,8 @@ fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> Obse
     )
     .unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = Decoder::new_configured_with_receiver_view(
-        pool,
-        &config,
-        13,
-        DisplayLimits::default(),
-        view,
-        &cancel,
-    )
-    .unwrap();
+    let mut decoder =
+        Decoder::new_configured(pool, &config, 13, DisplayLimits::default(), &cancel).unwrap();
     let raw = Bytes::copy_from_slice(pool, bytes).unwrap();
     let packet = config
         .packet(
@@ -98,78 +90,50 @@ fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> Obse
     }
     panic!("bounded input exceeded poll cap")
 }
+/// The receiver decoder against the recorded output of the reference
+/// decoder: the subtitle clock, rectangle, index plane and palette.
 fn check_native(index: usize) {
     let case = &cases::CASES[index];
-    for quantum in [1, 7, 4096] {
-        let pool = Budget::new(4 << 20).unwrap();
-        let baseline = pool.used();
-        let observed = decode(&pool, case.payload, ReceiverView::Receiver, quantum);
-        assert_eq!(observed.error, None, "{} work={quantum}", case.id);
-        assert_eq!(observed.events.len(), 1);
-        let event = &observed.events[0];
-        assert_eq!(event.receiver_view, ReceiverView::Receiver);
-        assert_eq!(event.pts, Some(Time::new(1, 1).unwrap()));
-        assert_eq!(
-            [event.definition.size.width, event.definition.size.height],
-            [16, 12]
-        );
-        assert_eq!(event.source_packets().len(), 1);
-        assert_eq!(event.source_packets()[0].payload.as_ref(), case.payload);
-        let native = event.receiver_publication.unwrap();
-        #[cfg(feature = "reference-trace")]
-        assert_eq!(native.view_profile(), RECEIVER_VIEW_PROFILE);
-        #[cfg(feature = "reference-trace")]
-        assert_eq!(native.reference_revision(), REFERENCE_REVISION);
-        assert_eq!(native.exact_pts_microseconds, Some(case.pts_raw));
-        assert_eq!(native.start_display_ms, 0);
-        assert_eq!(native.end_display_ms, 2000);
-        assert_eq!(native.consumed_prefix_bytes, case.payload.len());
-        assert_eq!(event.regions().len(), 1);
-        let region = &event.regions()[0];
-        assert_eq!(
-            [
-                region.position.x,
-                region.position.y,
-                region.size.width,
-                region.size.height
-            ],
-            [1, 1, 5, 2]
-        );
-        assert_eq!(region.plane.geometry.stride, 5);
-        assert_eq!(
-            region.plane.depth,
-            match case.depth {
-                2 => Depth::Two,
-                4 => Depth::Four,
-                8 => Depth::Eight,
-                _ => panic!("fixture depth"),
-            }
-        );
-        let palette = region.palette.receiver.as_ref().unwrap();
-        assert!(palette.all_entries_explicit);
-        assert_eq!(
-            palette.rgba.as_ref(),
-            case.native_palette,
-            "entire literal native palette"
-        );
-        assert_eq!(palette.words.as_slice(), case.receiver_words);
-        assert_eq!(palette.words.len(), 1_usize << case.depth);
-        assert_eq!(
-            region.palette.rgba.as_ref(),
-            case.source_palette,
-            "source colour projection unchanged"
-        );
-        assert_eq!(
-            region.plane.pixels.as_ref(),
-            case.native_indices,
-            "{} literal native cursor plane, flag={}",
-            case.id,
-            case.non_modifying
-        );
-        drop(observed);
-        assert_eq!(pool.used(), baseline);
-    }
+    let pool = Budget::new(4 << 20).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut decoder = ReceiverDecoder::new(&pool, &[0, 1, 0, 2, 0x14], Options::default());
+    let mut work = WorkBudget::new(u64::MAX);
+    let subtitle = decoder
+        .decode(case.payload, Some(case.pts_raw), &mut work, &cancel)
+        .unwrap()
+        .expect("presented display set");
+    assert_eq!(subtitle.pts, Some(case.pts_raw));
+    assert_eq!(
+        (subtitle.start_display_ms, subtitle.end_display_ms),
+        (0, 2000)
+    );
+    let rects: Vec<_> = subtitle.rects().collect();
+    assert_eq!(rects.len(), 1);
+    let rect = &rects[0];
+    assert_eq!(
+        [
+            rect.x,
+            rect.y,
+            i32::from(rect.width),
+            i32::from(rect.height)
+        ],
+        [1, 1, 5, 2]
+    );
+    assert_eq!(rect.palette, case.receiver_words, "{}", case.id);
+    assert_eq!(rect.palette.len(), 1 << case.depth);
+    let rgba: Vec<u8> = rect
+        .palette
+        .iter()
+        .flat_map(|w| [(w >> 16) as u8, (w >> 8) as u8, *w as u8, (w >> 24) as u8])
+        .collect();
+    assert_eq!(rgba, case.native_palette, "{}", case.id);
+    assert_eq!(
+        rect.pixels, case.native_indices,
+        "{} flag={}",
+        case.id, case.non_modifying
+    );
 }
+
 include!("native-nonmodifying-support/names.rs");
 
 #[test]
@@ -178,14 +142,12 @@ fn original_twelve_source_planes_and_palettes_are_unchanged() {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();
-            let observed = decode(&pool, case.payload, ReceiverView::Source, quantum);
+            let observed = decode(&pool, case.payload, quantum);
             assert_eq!(observed.error, None);
             assert_eq!(observed.events.len(), 1);
             let event = &observed.events[0];
-            assert!(event.receiver_publication.is_none());
             assert_eq!(event.source_packets()[0].payload.as_ref(), case.payload);
             let region = &event.regions()[0];
-            assert!(region.palette.receiver.is_none());
             assert_eq!(region.plane.pixels.as_ref(), case.source_indices);
             assert_eq!(region.palette.rgba.as_ref(), case.source_palette);
             drop(observed);
@@ -216,7 +178,7 @@ fn source_mapping_rule_and_all_original_map_bytes_are_preserved() {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();
-            let observed = decode(&pool, input, ReceiverView::Source, quantum);
+            let observed = decode(&pool, input, quantum);
             assert_eq!(observed.error, None);
             assert_eq!(observed.events.len(), 1);
             assert_eq!(
@@ -233,15 +195,14 @@ fn source_mapping_rule_and_all_original_map_bytes_are_preserved() {
     }
 }
 #[test]
-fn native_compaction_must_not_hide_logical_source_row_overrun() {
-    for view in [ReceiverView::Source, ReceiverView::Receiver] {
+fn source_rejects_a_logical_row_overrun() {
+    {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();
             let observed = decode(
                 &pool,
                 include_bytes!("native-nonmodifying-fixtures/logical-width-overrun.dvb"),
-                view,
                 quantum,
             );
             assert_eq!(

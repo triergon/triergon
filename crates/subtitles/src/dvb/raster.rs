@@ -1,4 +1,3 @@
-use super::ReceiverView;
 use super::bits::{Bits, Feed, Stop, cancelled, take_work};
 use super::coverage::Coverage;
 use super::model::*;
@@ -35,7 +34,6 @@ struct RasterTarget<'a> {
     decoded_pixels: &'a mut usize,
     bounds: &'a mut Option<ClipRect>,
     coverage: Option<&'a mut Coverage>,
-    receiver_view: ReceiverView,
 }
 
 #[derive(Debug)]
@@ -47,8 +45,6 @@ struct Field {
     maps: MapTables,
     // Logical source position includes every decoded code.
     column: u32,
-    // The receiver view's suppressed codes omit destination advance only.
-    destination_column: u32,
     line: u32,
     line_open: bool,
 }
@@ -62,7 +58,6 @@ impl Field {
             stage: Stage::Tag,
             maps: spec.maps,
             column: 0,
-            destination_column: 0,
             line: spec.parity.line(),
             line_open: false,
         }
@@ -116,7 +111,7 @@ impl Field {
         let x = spec
             .object_origin
             .x
-            .checked_add(self.destination_column)
+            .checked_add(self.column)
             .and_then(|x| x.checked_add(u32::from(run.written)))
             .ok_or(Error::Overflow)?;
         let end = i64::from(x)
@@ -158,7 +153,6 @@ impl Field {
             decoded_pixels,
             bounds,
             mut coverage,
-            receiver_view,
         } = target;
         loop {
             cancelled(input.cancel).map_err(Stop::Error)?;
@@ -198,7 +192,6 @@ impl Field {
                                 )));
                             }
                             self.column = 0;
-                            self.destination_column = 0;
                             self.line = self
                                 .line
                                 .checked_add(2)
@@ -272,14 +265,7 @@ impl Field {
                                 .maps
                                 .map(code.depth, spec.depth, index)
                                 .map_err(Stop::Error)?;
-                            // Source retains its mapped-CLUT1 policy. The
-                            // observed receiver-view tests encoded
-                            // code1, before mapping to the output index.
-                            let non_modifying = spec.non_modifying
-                                && match receiver_view {
-                                    ReceiverView::Source => mapped_index == 1,
-                                    ReceiverView::Receiver => index == 1,
-                                };
+                            let non_modifying = spec.non_modifying && mapped_index == 1;
                             self.stage = Stage::Run {
                                 code,
                                 run: Run {
@@ -351,12 +337,6 @@ impl Field {
                             .column
                             .checked_add(u32::from(run.length))
                             .ok_or(Stop::Error(Error::Overflow))?;
-                        if receiver_view == ReceiverView::Source || !run.non_modifying {
-                            self.destination_column = self
-                                .destination_column
-                                .checked_add(u32::from(run.length))
-                                .ok_or(Stop::Error(Error::Overflow))?;
-                        }
                         Stage::String(code)
                     } else {
                         Stage::Run { code, run }
@@ -419,7 +399,6 @@ pub struct Raster {
     decoded_pixels: usize,
     bounds: Option<ClipRect>,
     coverage: Option<Coverage>,
-    receiver_view: ReceiverView,
 }
 
 fn geometry(spec: RasterSpec, limits: RasterLimits) -> Result<(StoredGeometry, usize)> {
@@ -541,23 +520,7 @@ impl Raster {
             decoded_pixels: 0,
             bounds: None,
             coverage: None,
-            receiver_view: ReceiverView::Source,
         })
-    }
-
-    /// Select the enclosing receiver policy before any initialization or fields.
-    pub(super) fn new_with_receiver_view(
-        budget: &Budget,
-        spec: RasterSpec,
-        limits: RasterLimits,
-        initial: InitialPlane,
-        source: SourceFacts,
-        receiver_view: ReceiverView,
-        cancel: &AtomicBool,
-    ) -> Result<Self> {
-        let mut raster = Self::new(budget, spec, limits, initial, source, cancel)?;
-        raster.receiver_view = receiver_view;
-        Ok(raster)
     }
 
     /// Enable exact overlap validation for this private region's object list.
@@ -793,7 +756,6 @@ impl Raster {
             decoded_pixels: &mut self.decoded_pixels,
             bounds: &mut self.bounds,
             coverage: self.coverage.as_mut(),
-            receiver_view: self.receiver_view,
         };
         let result = field.advance(input, target);
         match result {

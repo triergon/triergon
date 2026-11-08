@@ -1,11 +1,15 @@
 # triergon-subtitles
 
 Subtitle ingestion and decoding for demuxed packets: text cue extraction with
-explicit charset conversion, and bitmap decoding of DVB, PGS and DVD subpictures
-into indexed planes with their palettes. It is a codec-layer crate that depends
-only on [`triergon-core`](../core) for budgets, `Bytes`, work accounting and exact
-time. It does not demux containers, render text glyphs, scale or composite
-bitmaps, or schedule presentation; those belong to the caller.
+explicit charset conversion; bitmap decoding of DVB, PGS and DVD subpictures into
+indexed planes with their palettes; CEA-608/708 closed captions taken from MPEG-2,
+H.264 and HEVC video and decoded to timed text; and DVB teletext pages. It is a
+codec-layer crate that depends only on [`triergon-core`](../core) for budgets,
+`Bytes`, work accounting and exact time, and on
+[`triergon-bitstream`](../bitstream) for RBSP reading. It does not demux
+containers (apart from the VobSub `.idx`/`.sub` pair and DVD program streams,
+which only carry subtitles), render glyphs, scale or composite bitmaps, or
+schedule presentation; those belong to the caller.
 
 ## Usage
 
@@ -58,42 +62,49 @@ assert_eq!(cues[0].decoded_utf8.as_deref(), Some(&b"Hello"[..]));
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Bitmap decoders follow the same shape: `pgs::DisplayDecoder::push(packet, clock,
-Envelope::Packet, &cancel)` then `poll`/`take_output` for each `DisplaySet`;
-`dvb::Decoder::new_configured(..)` then `provide(&DvbPacket)` and `step` for each
-`DisplayEvent`; `dvd::SpuAssembly` then `dvd::TraditionalSpuJob` for each
-`TraditionalSubpicture`.
+The FFmpeg-compatible receivers in `compat` take one codec packet per call and
+return the subtitle FFmpeg's decoder returns for it, if any:
+`compat::dvb::ReceiverDecoder::decode`, `compat::dvd::Decoder`,
+`compat::pgs::ReceiverDecoder`, `compat::cc::Decoder::decode` (fed by
+`compat::cc::CaptionExtractor` from video access units) and
+`compat::teletext::Decoder::decode`. The specification decoders keep the source
+facts: `pgs::DisplayDecoder::push(packet, clock, Envelope::Packet, &cancel)` then
+`poll`/`take_output` for each `DisplaySet`; `dvb::Decoder::new_configured(..)` then
+`provide(&DvbPacket)` and `step` for each `DisplayEvent`; `dvd::SpuAssembly`, then
+`dvd::ProgramJob` and `dvd::DvdRasterJob`; `teletext::Assembler` and
+`teletext::Display`; `cc::line21` and `cc::dtvcc`.
 
 | Module | Entry points |
 | --- | --- |
 | `text` | `Extractor`, `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob` |
 | `dvb` | `Decoder`, `SourceConfiguration`, `Raster` |
 | `pgs` | `DisplayDecoder`, `IndexedDisplayDecoder`, `SegmentIter`, `RasterJob` |
-| `dvd` | `SpuAssembly`, `ConfigJob`, `TraditionalSpuJob`, `ProgramJob`, `DvdRasterJob`, `HdSpuJob`, `HdReceiverJob`, `HdFragmentJob` |
+| `dvd` | `SpuAssembly`, `ConfigJob`, `ProgramJob`, `DvdRasterJob`, `HdSpuJob`; `vobsub` (`.idx` text), `program_stream` (MPEG-2 program streams) |
+| `cc` | `cc_data`, `line21` (CEA-608), `dtvcc` (CEA-708 packets and service blocks), `user_data` (A/53, SCTE 20, DVD captions), `video` (MPEG-2 pictures, H.264/HEVC SEI) |
+| `teletext` | `DataField`, `Packet`, `Assembler`, `Presentation`, `Display`, `charset` |
 | `context` | `Builder`: track header, metadata and attachment bytes handed to a renderer |
-| `compat::dvb` | `PesParser`, `Publication`, `Palette`, `GeometryPolicy` (receiver view of `dvb::Decoder`) |
-| `compat::pgs` | `RecoveryDecoder`, `IndexedRecoveryDecoder`, `ReceiverDecoder`, `ColourMatrix`, `ArgbView` |
-| `compat::dvd` | `CropJob`, `CroppedView`, `resolve_palette`, `Presentation`, `hd_argb` |
+| `compat::dvb` | `ReceiverDecoder`, `Options`, `AutomaticPalette`; `PesParser` (PES data field to codec packets) |
+| `compat::pgs` | `ReceiverDecoder`, `RecoveryDecoder`, `IndexedRecoveryDecoder`, `Refusal`, `ColourMatrix`, `ArgbView` |
+| `compat::dvd` | `Decoder`, `Settings`, `ifo_palette`, `VobSubIndex`, `SubpictureParser`, `mp4_configuration` |
+| `compat::cc` | `Decoder`, `Options`, `CaptionExtractor`, `SccPackets` |
+| `compat::teletext` | `Decoder`, `Options`, `Format`, `PageSelection` |
 | `compat::charset` | `AssPacketJob`, `receiver_charset` |
 | `compat::mov_text` | `Decoder`: tx3g sample to ASS event |
 
 ## Supported
 
-**Source and receiver views.** Each format has a default *source* operation
-that follows the specification strictly and keeps every original byte, clock and
-palette fact. The `compat` modules, and the `Receiver` selectors that enable them
-(`dvb::ReceiverView::Receiver`, `dvd::ControlPolicy::Receiver`,
-`dvd::HdPolicy::Receiver`), reproduce the *receiver*: the output of the pinned
-FFmpeg build (git `d32b387f` on the 9.0 branch), including its tolerances. Fields
-and accessors named `receiver_*` on the source types carry that view beside the
-source facts. The two never share or rewrite each other's output.
+**Source and receiver views.** Each format has a *source* operation that follows
+the specification strictly and keeps every original byte, clock and palette fact.
+One receiver per format in `compat` reproduces the output of the pinned FFmpeg
+build (git `d32b387f` on the 9.0 branch; teletext with libzvbi 0.2.46), including
+its tolerances of malformed input. The two never share or rewrite each other's
+output.
 
 **Comparison-only projections.** The non-default `reference-trace` feature adds
-`reference_trace`: the receiver's profile labels and the reference revision, the
-DVB receiver's packet refusal (`dvb::Decoder::receiver_failure`), the PGS
-`Projector` of strict display sets onto FFmpeg's API rectangles, and the text
-`carriage` session that reproduces FFmpeg's demuxer packets. They exist so tests
-can compare them with recorded FFmpeg output, and are absent from default builds.
+`reference_trace`: the PGS `Projector` of strict display sets onto FFmpeg's API
+rectangles, and the text `carriage` session that reproduces FFmpeg's demuxer
+packets. They exist so tests can compare them with recorded FFmpeg output, and are
+absent from default builds.
 
 ### Text
 
@@ -131,23 +142,31 @@ bytes are errors; nothing is replaced with U+FFFD.
 
 | Format | Decoded | Output |
 | --- | --- | --- |
-| DVB (EN 300 743) | DDS, PCS, RCS, CDS and method-0 (pixel) ODS; 2/4/8-bit interlaced RLE with map tables; default CLUTs; page/region/CLUT/object state per epoch | `DisplayEvent` with present/update/clear action, PTS, timeout-based expiry, indexed region planes, Y/Cr/Cb/T palette facts, and `SOURCE_PROJECTION` / `STUDIO_UNREPAIRED_PROJECTION` RGBA views |
-| PGS (Blu-ray) | PCS, PDS, WDS, ODS, END in packet or SUP framing; fragmented objects; palette updates; object cache; acquisition, epoch and forced flags | `DisplaySet` with index planes, Y/Cr/Cb/alpha palette, crop/window geometry; `IndexedDisplayDecoder` adds on-demand ARGB |
-| DVD SPU / VobSub | SPU reassembly from arbitrary fragments, control program (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit RLE, VobSub `CodecPrivate` (size, palette, custom colours) | Index plane, control facts with 90 kHz dates, native crop and ARGB with a caller-supplied palette |
-| Extended DVD SPU | 8-bit extended subpictures (`Hd*` types), including cross-packet palette context and fragmented physical packets | Index plane and ARGB under the selected policy |
+| DVB (EN 300 743) | DDS, PCS, RCS, CDS and method-0 (pixel) ODS; 2/4/8-bit interlaced RLE with map tables; default CLUTs; page/region/CLUT/object state per epoch | Source: `DisplayEvent` with present/update/clear action, PTS, expiry, indexed region planes and Y/Cr/Cb/T palette facts. Receiver: FFmpeg's subtitles, with its display window, region order, automatic palette and `compute_edt`, `compute_clut`, `dvb_substream` |
+| PGS (Blu-ray) | PCS, PDS, WDS, ODS, END in packet or SUP framing; fragmented objects; palette updates; object cache; acquisition, epoch and forced flags | Source: `DisplaySet` with index planes, Y/Cr/Cb/alpha palette, crop/window geometry. Receiver: every packet FFmpeg decodes, malformed ones included, with its refusals and `forced_subs_only` |
+| DVD SPU / VobSub | SPU reassembly, control program (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | Source: index plane and control facts with 90 kHz dates. Receiver: FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette, and `forced_subs_only` |
+
+### Closed captions and teletext
+
+| Format | Decoded | Output |
+| --- | --- | --- |
+| CEA-608/708 in video | `cc_data` from ATSC A/53 (`GA94`) and DVD caption user data in MPEG-2 pictures, SCTE 20, Dish Network user data, and A/53 SEI in H.264 and HEVC; CEA-608 control codes, PACs, mid-row codes, special and extended characters, XDS; CEA-708 caption channel packets and service blocks | Receiver: the caption data of each frame in FFmpeg's output order and times (`CaptionExtractor`), decoded to the ASS events of its `ccaption` decoder with `real_time` and `data_field`; SCC files read as its `scc` demuxer does. CEA-708 services are surfaced but, as in FFmpeg, not decoded to text |
+| DVB teletext (EN 300 472, EN 300 706) | Data units, Hamming 8/4 and 24/18, parity, headers and rows, parallel and serial magazines, subpages, national option subsets and G0/G1/G2/G3 sets, X/26 enhancements and local objects (active, adaptive, passive), X/28 and M/29 designations and colour tables | Receiver: libzvbi's subtitle pages as FFmpeg's `libzvbi_teletextdec` presents them in its `text` and `ass` formats, with its page selection and options |
 
 ## Behaviour and limits
 
 - **Input.** Text operations take one complete document or demuxed sample per
-  `provide`. Bitmap decoders take complete packets; PES/TS reassembly is upstream
-  (`compat::dvb::PesParser` is an optional FFmpeg-compatible PES-to-segment step).
+  `provide`. Bitmap, caption and teletext decoders take complete packets; PES/TS
+  reassembly is upstream (`triergon-mpegts`; `compat::dvb::PesParser` cuts a DVB
+  PES data field into codec packets as FFmpeg's demuxer does).
   An empty packet is an event, not end of stream; only `finish_input` ends input.
 - **Bounds.** Every operation takes a finite `Limits` struct (input bytes, cues,
   modifiers, planes, objects, palettes). Exceeding one returns `Error::Limit`;
   a valid but oversized input is an explicit failure, never silently truncated.
-- **Errors.** Malformed syntax and resource failures are sticky until `reset`.
-  Cancellation is resumable in the text operations; the bitmap decoders treat it
-  as a failure that needs `reset`. A failed display set publishes nothing.
+- **Errors.** In the source operations malformed syntax and resource failures are
+  sticky until `reset`; a failed display set publishes nothing. The receivers
+  recover as the reference does: a packet it refuses is refused and the next one
+  is decoded. Cancellation is resumable in the text operations and receivers.
 - **Time.** Raw PTS/DTS/duration ticks and their clock are kept next to exact
   rational `Time` values. Unknown time stays `None`; no duration is inferred from
   the next packet and nothing is rounded to microseconds except in named native
@@ -160,11 +179,12 @@ bytes are errors; nothing is replaced with U+FFFD.
   overwritten by them.
 - **DVB objects.** `ObjectRetention::CurrentDisplay` (default) uses ODS from the
   current display set; `EpochExtension` also replays earlier objects in the
-  epoch. The receiver view adds the reference's region ordering, automatic
-  palettes without a CDS, non-modifying-colour handling and EOD tolerance.
+  epoch.
 - **Not handled.** DVB character-coded and progressive objects, depth-reduction
-  modes and disparity; DVD colour-change commands (retained as raw bytes);
-  glyph rendering, ASS styling and font loading; WebVTT browser recovery and CSS.
+  modes and disparity (FFmpeg drops them too, and the receiver does as it does);
+  DVD colour-change commands (retained as raw bytes); teletext's `bitmap` format,
+  which renders libzvbi's own font, and objects from POP and GPOP pages (pages invoking them are presented at Level 1, as the reference presents them); CEA-708 text; glyph rendering, ASS styling and
+  font loading; WebVTT browser recovery and CSS.
 
 The text profile names, default limits and timing rules are in
 [src/text/README.md](src/text/README.md).
@@ -178,14 +198,17 @@ The text profile names, default limits and timing rules are in
 | WebVTT | W3C WebVTT Candidate Recommendation Draft §§2.2, 4.1, 6.1, 6.3 |
 | Matroska carriage | RFC 9559; Matroska codec mapping Internet-Draft §§3.5.11–3.5.12, 5.2–5.4 |
 | Unicode | RFC 3629 (UTF-8), RFC 2781 (UTF-16) |
-| PGS, DVD SPU | No normative specification is available; behaviour follows public documentation and the FFmpeg reference, with no conformance claim |
+| Teletext | ETSI EN 300 472 (data units); ETSI EN 300 706 (packets, pages, presentation) |
+| Closed captions | CEA-608 (line 21 data); CEA-708 (caption channel packets and service blocks); ATSC A/53 Part 4 (`GA94` caption data); SCTE 20 |
+| PGS, DVD SPU, Dish captions | No normative specification is available; behaviour follows public documentation and the FFmpeg reference, with no conformance claim |
 
 The implementation is original safe Rust. Tests use independently authored
 fixtures whose expected index planes, RGBA and cue values were specified from
 the standards, not produced by this code: `tests/text-fixtures/` (with a
 separate Python oracle), `tests/fixtures/`, `tests/state-fixtures/` and the
-DVB regression sets. Receiver views are checked against recorded output of the
-pinned FFmpeg build. Every operation is also exercised at several work quanta,
+DVB regression sets. Receivers are checked against recorded output of the
+pinned FFmpeg build, and case by case against the build itself through the
+subtitle runner (`crates/subtitle-worker`, `harness/features/subtitle-*`). Every operation is also exercised at several work quanta,
 under allocation pressure and with cancellation. Gates and the reference build
 are described in [docs/quality.md](../../docs/quality.md); current results are
 in [docs/status.md](../../docs/status.md).

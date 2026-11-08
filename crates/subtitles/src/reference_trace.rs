@@ -1,19 +1,10 @@
 //! Comparison-only projections, compiled with the `reference-trace` feature.
 //!
-//! These report values in the form FFmpeg's public API exposes them, or label
-//! the receiver view that produced an output, so tests can compare them with
-//! recorded reference output. They are not behaviour a consumer selects outside
-//! a comparison, and they are absent from default builds. With the feature enabled,
-//! [`dvb::Decoder::receiver_failure`](crate::dvb::Decoder::receiver_failure),
-//! the `view_profile()` and `reference_revision()` labels of
-//! [`compat::dvb::Palette`](crate::compat::dvb::Palette) and
-//! [`compat::dvb::Publication`](crate::compat::dvb::Publication) are also available. Their reference revision is the one named on the matching
+//! These report values in the form FFmpeg's public API exposes them, so tests
+//! can compare them with recorded reference output. They are not behaviour a
+//! consumer selects outside a comparison, and they are absent from default
+//! builds. Their reference revision is the one named on the matching
 //! [`compat`](crate::compat) family.
-
-/// DVB receiver labels and the receiver's refusal of a truncated packet.
-pub mod dvb {
-    pub use crate::dvb::receiver::{RECEIVER_VIEW_PROFILE, REFERENCE_REVISION, ReceiverFailure};
-}
 
 /// The PGS receiver projection of strict source display sets.
 ///

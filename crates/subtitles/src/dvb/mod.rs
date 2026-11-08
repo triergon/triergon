@@ -15,9 +15,7 @@ mod model;
 pub(crate) mod pes_parser;
 mod pixel;
 mod raster;
-pub(crate) mod receiver;
-mod receiver_palette;
-mod receiver_palette_buffer;
+pub(crate) mod receiver_decoder;
 
 pub use boundary::{
     ClockOrigin, ClockValue, ConfigurationSource, PacketIdentity, PacketSourceFacts, PacketTiming,
@@ -38,9 +36,3 @@ pub use model::{
     StoredGeometry,
 };
 pub use raster::Raster;
-
-pub(crate) use pes_parser::PesPacket;
-#[cfg(feature = "reference-trace")]
-pub(crate) use receiver::ReceiverFailure;
-pub use receiver::ReceiverView;
-pub(crate) use receiver::{GeometryPolicy, OmittedRegion, Palette, Publication, PublicationReason};

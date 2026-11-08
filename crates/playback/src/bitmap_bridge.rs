@@ -6,7 +6,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, Reservation, Rounding, SourceId, TimeBase, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, Reservation, Rounding, SourceId, Time, TimeBase, WorkBudget,
 };
 use triergon_subtitles::{compat, dvd, pgs};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -21,11 +21,14 @@ pub struct BitmapInput<M> {
     pub sequence: u64,
     pub raw: Bytes,
     pub clock: pgs::PacketClock,
+    /// The packet's duration in ticks of `clock.timebase`, where known.
+    pub duration: Option<i64>,
     pub metadata: M,
 }
 struct Data<M> {
     input: Option<BitmapInput<M>>,
-    charge: Reservation,
+    /// Keeps the owner's allocation charged to the pool while it lives.
+    _charge: Reservation,
 }
 pub struct BitmapOwner<M>(Arc<Data<M>>);
 impl<M> Clone for BitmapOwner<M> {
@@ -36,15 +39,6 @@ impl<M> Clone for BitmapOwner<M> {
 impl<M> BitmapOwner<M> {
     pub fn input(&self) -> &BitmapInput<M> {
         self.0.input.as_ref().expect("published bitmap packet")
-    }
-
-    fn into_storage(mut self, pool: &Budget) -> Option<Arc<Data<M>>> {
-        if self.0.charge.bytes() > 4096 || !self.input().raw.belongs_to(pool) {
-            return None;
-        }
-        let data = Arc::get_mut(&mut self.0)?;
-        data.input = None;
-        Some(self.0)
     }
 }
 pub struct BitmapRejection<M> {
@@ -90,12 +84,9 @@ fn packet_queue_start_ns(clock: pgs::PacketClock) -> Result<i64> {
 fn queue_canvas_dimensions(width: u32, height: u32) -> bool {
     (160..=8192).contains(&width) && (160..=8192).contains(&height)
 }
-#[cfg_attr(
-    target_pointer_width = "64",
-    expect(
-        clippy::result_large_err,
-        reason = "returns exact caller metadata and packet on admission failure"
-    )
+#[expect(
+    clippy::result_large_err,
+    reason = "returns exact caller metadata and packet on admission failure"
 )]
 fn owner<M>(
     pool: &Budget,
@@ -108,12 +99,9 @@ fn owner<M>(
     allocate_owner(pool, input)
 }
 
-#[cfg_attr(
-    target_pointer_width = "64",
-    expect(
-        clippy::result_large_err,
-        reason = "returns exact caller metadata and packet on allocation failure"
-    )
+#[expect(
+    clippy::result_large_err,
+    reason = "returns exact caller metadata and packet on allocation failure"
 )]
 fn allocate_owner<M>(
     pool: &Budget,
@@ -138,7 +126,7 @@ fn allocate_owner<M>(
     };
     Ok(BitmapOwner(Arc::new(Data {
         input: Some(input),
-        charge,
+        _charge: charge,
     })))
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -271,12 +259,9 @@ impl<M> PgsBridge<M> {
             maximum_packet: limits.max_packet_bytes,
         })
     }
-    #[cfg_attr(
-        target_pointer_width = "64",
-        expect(
-            clippy::result_large_err,
-            reason = "returns exact packet owner on refusal"
-        )
+    #[expect(
+        clippy::result_large_err,
+        reason = "returns exact packet owner on refusal"
     )]
     pub fn provide(
         &mut self,
@@ -434,357 +419,139 @@ impl<M> PgsBridge<M> {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DvdMode {
-    StrictAllUnits,
-    ExplicitNativeFirstUnit,
-}
-#[derive(Clone, Copy, Debug)]
+/// The settings and bounds of a [`DvdReceiver`]'s decoder.
+#[derive(Clone, Debug, Default)]
 pub struct DvdBridgeConfig {
-    pub mode: DvdMode,
-    pub initial: dvd::ControlState,
-    pub palette: Option<[u32; 16]>,
-    pub packets: dvd::SpuPacketLimits,
-    pub decoder: dvd::TraditionalLimits,
+    pub settings: compat::dvd::Settings,
+    pub limits: compat::dvd::Limits,
 }
-impl Default for DvdBridgeConfig {
-    fn default() -> Self {
-        Self {
-            mode: DvdMode::StrictAllUnits,
-            initial: dvd::ControlState::default(),
-            palette: None,
-            packets: dvd::SpuPacketLimits::default(),
-            decoder: dvd::TraditionalLimits::default(),
+
+/// One presented DVD subpicture, owned: its display offsets after the packet
+/// clock, its rectangle, colours (4, or 256 for eight-bit pixels) and
+/// `width * height` colour indices, row by row.
+#[derive(Debug)]
+pub struct DvdPicture {
+    pub start_ms: u32,
+    /// The stop offset, else the packet's duration as FFmpeg's decode API
+    /// ends a subtitle without a stop; 0 when neither is known.
+    pub end_ms: u32,
+    pub forced: bool,
+    pub x: u16,
+    pub y: u16,
+    pub width: u16,
+    pub height: u16,
+    palette: BudgetVec<u32>,
+    pub pixels: Bytes,
+}
+
+impl DvdPicture {
+    pub fn palette(&self) -> &[u32] {
+        self.palette.as_slice()
+    }
+
+    /// One row of colour indices.
+    pub fn row(&self, y: u16) -> Option<&[u8]> {
+        let width = usize::from(self.width);
+        (y < self.height).then(|| &self.pixels[usize::from(y) * width..][..width])
+    }
+
+    fn copy(pool: &Budget, subtitle: compat::dvd::Subtitle<'_>) -> Result<Self> {
+        let b = subtitle.bitmap;
+        let (width, height) = (usize::from(b.width), usize::from(b.height));
+        let mut rows = BudgetVec::new(pool);
+        rows.try_reserve_exact(width * height)?;
+        for y in 0..height {
+            rows.try_extend_from_slice(&b.pixels[y * b.stride..][..width])?;
         }
+        let pixels = rows.freeze().map_err(|failure| failure.error)?;
+        let mut palette = BudgetVec::new(pool);
+        palette.try_extend_from_slice(b.palette)?;
+        Ok(Self {
+            start_ms: subtitle.start_ms,
+            end_ms: subtitle.end_ms,
+            forced: subtitle.forced,
+            x: b.x,
+            y: b.y,
+            width: b.width,
+            height: b.height,
+            palette,
+            pixels,
+        })
     }
 }
-pub struct DvdOutput<M> {
-    pub packet: BitmapOwner<M>,
-    pub source: dvd::SpuPacket,
-    pub pictures: BudgetVec<dvd::TraditionalSubpicture>,
-}
-pub use compat::dvd::Presentation as DvdPresentation;
-pub use dvd::DvdDisplayBoundary;
 
-/// A native DVD picture ready for a packet-clock indexed subtitle queue.
+/// A display offset and its position on the packet's timeline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DvdDisplayBoundary {
+    pub milliseconds: u32,
+    pub at: Option<Time>,
+}
+
+/// A picture placed on its packet's timeline.
+#[derive(Clone, Copy, Debug)]
+pub struct DvdPresentation<'a> {
+    pub picture: &'a DvdPicture,
+    pub show: DvdDisplayBoundary,
+    /// `None` for a subpicture without a stop.
+    pub clear: Option<DvdDisplayBoundary>,
+}
+
+/// A DVD picture ready for a packet-clock indexed subtitle queue.
 #[derive(Clone, Copy, Debug)]
 pub struct DvdQueuePicture<'a> {
     pub start_ns: i64,
     pub canvas: Option<dvd::Canvas>,
-    pub bitmap: compat::dvd::CroppedView<'a, 4>,
+    pub picture: &'a DvdPicture,
+}
+
+/// One decoded packet and what it presents.
+pub struct DvdOutput<M> {
+    pub packet: BitmapOwner<M>,
+    pub picture: Option<DvdPicture>,
 }
 
 impl<M> DvdOutput<M> {
-    /// Combine the explicit first-unit receiver view with the packet's PTS.
-    pub fn native_presentation(&self) -> Result<Option<DvdPresentation<'_>>> {
-        let Some(picture) = self.pictures.as_slice().first() else {
+    /// The picture's display boundaries on the packet's PTS. Without a PTS,
+    /// absolute times stay unknown and the offsets remain.
+    pub fn presentation(&self) -> Result<Option<DvdPresentation<'_>>> {
+        let Some(picture) = &self.picture else {
             return Ok(None);
         };
         let clock = self.packet.input().clock;
-        picture.receiver_presentation_from_ticks(clock.pts, clock.timebase)
+        let boundary = |milliseconds: u32| -> Result<DvdDisplayBoundary> {
+            let at = clock
+                .pts
+                .map(|pts| {
+                    Time::from_ticks(i128::from(pts), clock.timebase)?
+                        .checked_add(Time::new(i128::from(milliseconds), 1_000)?)
+                })
+                .transpose()?;
+            Ok(DvdDisplayBoundary { milliseconds, at })
+        };
+        Ok(Some(DvdPresentation {
+            picture,
+            show: boundary(picture.start_ms)?,
+            clear: (picture.end_ms != 0)
+                .then(|| boundary(picture.end_ms))
+                .transpose()?,
+        }))
     }
 
     /// Match the existing bitmap queue: start at packet PTS, fall back to DTS,
     /// then zero. The queue ends a picture when its track is superseded or
-    /// cleared. Use `native_presentation` for DVD's explicit display offsets.
-    /// A packet with no receiver picture produces no queue action.
+    /// cleared. Use `presentation` for DVD's explicit display offsets.
     pub fn packet_clock_picture(
         &self,
         canvas: Option<dvd::Canvas>,
     ) -> Result<Option<DvdQueuePicture<'_>>> {
-        let Some(picture) = self.pictures.as_slice().first() else {
-            return Ok(None);
-        };
-        let Some(presentation) = picture.receiver_presentation(None)? else {
+        let Some(picture) = &self.picture else {
             return Ok(None);
         };
         Ok(Some(DvdQueuePicture {
             start_ns: packet_queue_start_ns(self.packet.input().clock)?,
             canvas: canvas.filter(|c| queue_canvas_dimensions(c.width, c.height)),
-            bitmap: presentation.bitmap,
+            picture,
         }))
-    }
-}
-
-struct DvdStorage<M> {
-    packet: Option<Arc<Data<M>>>,
-    units: Option<BudgetVec<dvd::SpuSpan>>,
-    picture_storage: dvd::TraditionalStorage,
-    pictures: Option<BudgetVec<dvd::TraditionalSubpicture>>,
-}
-
-impl<M> Default for DvdStorage<M> {
-    fn default() -> Self {
-        Self {
-            packet: None,
-            units: None,
-            picture_storage: dvd::TraditionalStorage::default(),
-            pictures: None,
-        }
-    }
-}
-
-// Keep the small tables used by ordinary packets. Larger packets give their
-// allocation back to the shared pool as soon as their output is released.
-fn reusable_dvd_table<T>(table: BudgetVec<T>, pool: &Budget) -> Option<BudgetVec<T>> {
-    (table.capacity() <= 4 && table.budget().same_pool(pool)).then_some(table)
-}
-
-#[allow(clippy::large_enum_variant, reason = "one bounded inline packet stage")]
-enum DvdJobPhase {
-    Framing(dvd::SpuPacketJob),
-    Select,
-    Decode,
-    Store(Option<dvd::TraditionalSubpicture>),
-    Ready,
-}
-
-pub struct DvdJob<M> {
-    pool: Budget,
-    packet: Option<BitmapOwner<M>>,
-    source: Option<dvd::SpuPacket>,
-    pictures: Option<BudgetVec<dvd::TraditionalSubpicture>>,
-    picture_storage: dvd::TraditionalStorage,
-    at: usize,
-    mode: DvdMode,
-    initial: dvd::ControlState,
-    palette: Option<[u32; 16]>,
-    packet_limits: dvd::SpuPacketLimits,
-    limits: dvd::TraditionalLimits,
-    decoder: Option<dvd::TraditionalSpuJob>,
-    phase: DvdJobPhase,
-}
-impl<M> DvdJob<M> {
-    #[cfg_attr(
-        target_pointer_width = "64",
-        expect(
-            clippy::result_large_err,
-            reason = "returns exact source packet on admission failure"
-        )
-    )]
-    pub fn new(
-        pool: &Budget,
-        scope: BitmapScope,
-        input: BitmapInput<M>,
-        config: DvdBridgeConfig,
-    ) -> std::result::Result<Self, BitmapRejection<M>> {
-        if let Err(error) = check(pool, scope, &input) {
-            return Err(BitmapRejection { input, error });
-        }
-        let mut job = Self::vacant(pool, config);
-        job.admit(input, &mut DvdStorage::default())?;
-        Ok(job)
-    }
-
-    fn vacant(pool: &Budget, config: DvdBridgeConfig) -> Self {
-        Self {
-            pool: pool.clone(),
-            packet: None,
-            source: None,
-            pictures: None,
-            picture_storage: dvd::TraditionalStorage::default(),
-            at: 0,
-            mode: config.mode,
-            initial: config.initial,
-            palette: config.palette,
-            packet_limits: config.packets,
-            limits: config.decoder,
-            decoder: None,
-            phase: DvdJobPhase::Ready,
-        }
-    }
-
-    #[cfg_attr(
-        target_pointer_width = "64",
-        expect(
-            clippy::result_large_err,
-            reason = "returns exact source packet on admission failure"
-        )
-    )]
-    fn admit(
-        &mut self,
-        input: BitmapInput<M>,
-        storage: &mut DvdStorage<M>,
-    ) -> std::result::Result<(), BitmapRejection<M>> {
-        debug_assert!(self.packet.is_none());
-        let pool = &self.pool;
-        let units = storage.units.take().unwrap_or_else(|| BudgetVec::new(pool));
-        let source_job = match dvd::SpuPacketJob::with_unit_storage(
-            input.raw.clone(),
-            pool,
-            self.packet_limits,
-            units,
-        ) {
-            Ok(job) => job,
-            Err(error) => return Err(BitmapRejection { input, error }),
-        };
-        let packet = if let Some(mut data) = storage.packet.take() {
-            Arc::get_mut(&mut data)
-                .expect("recycled packet allocation is exclusive")
-                .input = Some(input);
-            BitmapOwner(data)
-        } else {
-            allocate_owner(pool, input)?
-        };
-        self.packet = Some(packet);
-        self.pictures = Some(
-            storage
-                .pictures
-                .take()
-                .unwrap_or_else(|| BudgetVec::new(pool)),
-        );
-        self.picture_storage = std::mem::take(&mut storage.picture_storage);
-        self.at = 0;
-        self.phase = DvdJobPhase::Framing(source_job);
-        Ok(())
-    }
-
-    fn abandon(&mut self) {
-        self.phase = DvdJobPhase::Ready;
-        self.decoder = None;
-        self.packet = None;
-        self.source = None;
-        self.pictures = None;
-        self.picture_storage = dvd::TraditionalStorage::default();
-    }
-
-    pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
-        self.poll_stages::<false>(w, c)
-    }
-
-    fn poll_stages<const CONTINUE: bool>(
-        &mut self,
-        w: &mut WorkBudget,
-        c: &AtomicBool,
-    ) -> Result<bool> {
-        loop {
-            if c.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-            if w.remaining() == 0 {
-                return Ok(false);
-            }
-            match &mut self.phase {
-                DvdJobPhase::Ready => return Ok(true),
-                DvdJobPhase::Framing(job) => {
-                    if job.poll(w, c)? != dvd::SpuPacketStatus::Ready {
-                        return Ok(false);
-                    }
-                    self.source = Some(job.try_finish(c)?);
-                    self.phase = DvdJobPhase::Select;
-                }
-                DvdJobPhase::Store(candidate) => {
-                    w.take(1);
-                    let picture = candidate.take().ok_or(Error::Invalid("DVD candidate"))?;
-                    self.store_picture(picture)?;
-                }
-                DvdJobPhase::Decode => {
-                    let job = self
-                        .decoder
-                        .as_mut()
-                        .ok_or(Error::Invalid("DVD decoder absent"))?;
-                    if job.poll(w, c)? != dvd::TraditionalStatus::Ready {
-                        return Ok(false);
-                    }
-                    let picture = job.try_finish(c)?;
-                    if CONTINUE && w.remaining() != 0 {
-                        if c.load(Ordering::Relaxed) {
-                            return Err(Error::Cancelled);
-                        }
-                        w.take(1);
-                        self.store_picture(picture)?;
-                    } else {
-                        self.phase = DvdJobPhase::Store(Some(picture));
-                    }
-                }
-                DvdJobPhase::Select => {
-                    if !w.try_charge(1) {
-                        return Ok(false);
-                    }
-                    let source = self
-                        .source
-                        .as_ref()
-                        .ok_or(Error::Invalid("DVD source unit list"))?;
-                    let count = if self.mode == DvdMode::ExplicitNativeFirstUnit {
-                        source.units().len().min(1)
-                    } else {
-                        source.units().len()
-                    };
-                    if self.at == count {
-                        self.phase = DvdJobPhase::Ready;
-                        return Ok(true);
-                    }
-                    if source.units()[self.at].encoding != dvd::SpuEncoding::Traditional {
-                        return Err(Error::Unsupported(
-                            "HD DVD receiver requires its separate explicit context",
-                        ));
-                    }
-                    let policy = if self.mode == DvdMode::StrictAllUnits {
-                        dvd::ControlPolicy::Strict
-                    } else {
-                        dvd::ControlPolicy::Receiver
-                    };
-                    let raw = source.unit(self.at)?;
-                    let storage = std::mem::take(&mut self.picture_storage);
-                    if let Some(decoder) = &mut self.decoder {
-                        decoder.start_next(raw, self.initial, policy, storage)?;
-                    } else {
-                        self.decoder = Some(dvd::TraditionalSpuJob::with_storage(
-                            raw,
-                            self.initial,
-                            self.palette,
-                            &self.pool,
-                            self.limits,
-                            policy,
-                            storage,
-                        )?);
-                    }
-                    self.phase = DvdJobPhase::Decode;
-                }
-            }
-            if !CONTINUE {
-                return Ok(false);
-            }
-        }
-    }
-
-    fn store_picture(&mut self, picture: dvd::TraditionalSubpicture) -> Result<()> {
-        let pictures = self
-            .pictures
-            .as_mut()
-            .ok_or(Error::Invalid("DVD pictures absent"))?;
-        if let Err(error) = pictures.try_push(picture) {
-            self.phase = DvdJobPhase::Store(Some(error.value));
-            return Err(error.error);
-        }
-        self.at += 1;
-        self.phase = DvdJobPhase::Select;
-        Ok(())
-    }
-
-    pub fn finish(mut self) -> Result<DvdOutput<M>> {
-        self.take_output()
-    }
-
-    fn take_output(&mut self) -> Result<DvdOutput<M>> {
-        if !matches!(self.phase, DvdJobPhase::Ready) {
-            return Err(Error::Invalid("DVD bridge not ready"));
-        }
-        self.picture_storage = dvd::TraditionalStorage::default();
-        Ok(DvdOutput {
-            packet: self
-                .packet
-                .take()
-                .ok_or(Error::Invalid("DVD packet absent"))?,
-            source: self
-                .source
-                .take()
-                .ok_or(Error::Invalid("DVD source absent"))?,
-            pictures: self
-                .pictures
-                .take()
-                .ok_or(Error::Invalid("DVD pictures absent"))?,
-        })
     }
 }
 
@@ -795,52 +562,43 @@ pub enum DvdReceiverStep<M> {
     Finished,
 }
 
-/// The native first-unit receiver with one pending packet and a control
-/// state scoped to the current source, track and generation.
+/// FFmpeg's DVD receiver ([`compat::dvd::Decoder`]) over one track's packets,
+/// in order, with one pending packet. Units are reassembled across packets
+/// and the colour state carries over between them within the current source,
+/// track and generation.
 pub struct DvdReceiver<M> {
+    pool: Budget,
     scope: BitmapScope,
-    job: DvdJob<M>,
-    storage: DvdStorage<M>,
+    decoder: compat::dvd::Decoder,
+    packet: Option<BitmapOwner<M>>,
     last_sequence: Option<u64>,
     finished: bool,
 }
 
 impl<M> DvdReceiver<M> {
     pub fn new(pool: &Budget, scope: BitmapScope, config: DvdBridgeConfig) -> Result<Self> {
-        Self::validate_config(config)?;
         Ok(Self {
+            pool: pool.clone(),
             scope,
-            job: DvdJob::vacant(pool, config),
-            storage: DvdStorage::default(),
+            decoder: compat::dvd::Decoder::new(pool, config.settings, config.limits),
+            packet: None,
             last_sequence: None,
             finished: false,
         })
     }
 
-    fn validate_config(config: DvdBridgeConfig) -> Result<()> {
-        if config.mode != DvdMode::ExplicitNativeFirstUnit {
-            return Err(Error::Invalid(
-                "DVD receiver requires native first-unit mode",
-            ));
-        }
-        Ok(())
-    }
-
-    #[cfg_attr(
-        target_pointer_width = "64",
-        expect(
-            clippy::result_large_err,
-            reason = "returns exact source packet and metadata on admission failure"
-        )
+    #[expect(
+        clippy::result_large_err,
+        reason = "returns exact source packet and metadata on admission failure"
     )]
     pub fn provide(
         &mut self,
         input: BitmapInput<M>,
     ) -> std::result::Result<(), BitmapRejection<M>> {
-        if let Err(error) = check(&self.job.pool, self.scope, &input) {
+        if let Err(error) = check(&self.pool, self.scope, &input) {
             return Err(BitmapRejection { input, error });
         }
-        if self.job.packet.is_some() || self.finished {
+        if self.packet.is_some() || self.finished {
             return Err(BitmapRejection {
                 input,
                 error: Error::Invalid("DVD receiver packet pending or finished"),
@@ -853,38 +611,16 @@ impl<M> DvdReceiver<M> {
                 error: Error::Invalid("DVD receiver packet sequence"),
             });
         }
-        self.job.admit(input, &mut self.storage)?;
+        self.packet = Some(owner(&self.pool, self.scope, input)?);
         self.last_sequence = Some(sequence);
         Ok(())
     }
 
     pub fn finish(&mut self) {
         self.finished = true;
-        self.storage = DvdStorage::default();
     }
 
-    /// Return a consumed output to reuse its small charged allocations. Borrowed
-    /// pictures must be consumed before calling this method. The decoder's
-    /// committed control state is independent of this optional storage handoff.
-    pub fn recycle(&mut self, output: DvdOutput<M>) {
-        if self.finished || output.packet.input().scope != self.scope {
-            return;
-        }
-        let DvdOutput {
-            packet,
-            source,
-            mut pictures,
-        } = output;
-        self.storage.packet = packet.into_storage(&self.job.pool);
-        self.storage.units = reusable_dvd_table(source.into_unit_storage(), &self.job.pool);
-        if let Some(picture) = pictures.pop() {
-            self.storage.picture_storage = picture.into_storage(&self.job.pool);
-        }
-        pictures.clear();
-        self.storage.pictures = reusable_dvd_table(pictures, &self.job.pool);
-    }
-
-    /// A new playback scope starts with its own control state and palette.
+    /// A new playback scope starts with its own decoder state and settings.
     /// Outputs already handed to the caller keep their original scope.
     pub fn reset(
         &mut self,
@@ -901,61 +637,75 @@ impl<M> DvdReceiver<M> {
                 "DVD receiver reset needs a new bitmap scope",
             ));
         }
-        Self::validate_config(config)?;
         if !work.try_charge(1) {
             return Ok(false);
         }
-        self.job = DvdJob::vacant(&self.job.pool, config);
-        self.storage = DvdStorage::default();
-        self.scope = scope;
-        self.last_sequence = None;
-        self.finished = false;
+        *self = Self::new(&self.pool, scope, config)?;
         Ok(true)
     }
 
+    /// Decode the pending packet. Running out of work or memory keeps it
+    /// pending; any other error drops it.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<DvdReceiverStep<M>> {
         if cancel.load(Ordering::Relaxed) {
-            self.job.abandon();
-            self.storage = DvdStorage::default();
+            self.packet = None;
             self.finished = true;
             return Err(Error::Cancelled);
         }
-        if self.job.packet.is_none() {
+        let Some(packet) = &self.packet else {
             return Ok(if self.finished {
                 DvdReceiverStep::Finished
             } else {
                 DvdReceiverStep::NeedPacket
             });
-        }
-        match self.job.poll_stages::<true>(work, cancel) {
-            Ok(false) => return Ok(DvdReceiverStep::Yield),
-            Ok(true) => {}
+        };
+        let picture = match self.decoder.decode(&packet.input().raw, work) {
+            Ok(compat::dvd::Status::Yield) => return Ok(DvdReceiverStep::Yield),
+            Ok(compat::dvd::Status::Nothing) => None,
+            Ok(compat::dvd::Status::Subtitle(subtitle)) => match DvdPicture::copy(
+                &self.pool,
+                match packet_milliseconds(packet.input()) {
+                    Some(ms) => subtitle.ending_with_packet(ms),
+                    None => subtitle,
+                },
+            ) {
+                Ok(picture) => Some(picture),
+                Err(error) => {
+                    self.decoder.rewind()?;
+                    return Err(error);
+                }
+            },
             Err(error @ Error::Backpressure { .. }) => return Err(error),
             Err(error) => {
-                self.job.abandon();
-                if matches!(error, Error::Cancelled) {
-                    self.finished = true;
-                    self.storage = DvdStorage::default();
-                }
-                return Err(error);
-            }
-        }
-        let output = match self.job.take_output() {
-            Ok(output) => output,
-            Err(error) => {
-                self.job.abandon();
+                self.packet = None;
                 return Err(error);
             }
         };
-        if let Some(picture) = output.pictures.as_slice().first() {
-            self.job.initial = picture.program().state_after();
-        }
-        Ok(DvdReceiverStep::Output(output))
+        let packet = self
+            .packet
+            .take()
+            .ok_or(Error::Invalid("DVD packet absent"))?;
+        Ok(DvdReceiverStep::Output(DvdOutput { packet, picture }))
     }
+}
+
+/// A positive packet duration in milliseconds, rounded as FFmpeg rescales it.
+fn packet_milliseconds<M>(input: &BitmapInput<M>) -> Option<u32> {
+    let duration = input.duration.filter(|&d| d > 0)?;
+    let ms = input
+        .clock
+        .timebase
+        .rescale(
+            duration,
+            TimeBase::new(1, 1_000).ok()?,
+            Rounding::NearestAway,
+        )
+        .ok()?;
+    Some(u32::try_from(ms).unwrap_or(u32::MAX))
 }
 
 #[cfg(test)]
@@ -991,6 +741,7 @@ mod arc_layout_regression {
                 dts: None,
                 timebase: TimeBase::new(1, 90_000).unwrap(),
             },
+            duration: None,
             metadata: AlignedMetadata(17),
         }
     }

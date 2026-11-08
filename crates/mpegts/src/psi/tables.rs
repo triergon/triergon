@@ -157,6 +157,16 @@ impl ElementaryStream {
     pub fn descriptors(&self) -> Descriptors<'_> {
         Descriptors::new(self.descriptor_bytes.as_ref())
     }
+    /// An entry read outside [`PmtReader`], without a descriptor namespace.
+    pub(crate) fn unchecked(stream_type: u8, pid: u16, descriptor_bytes: Bytes) -> Self {
+        Self {
+            stream_type,
+            pid,
+            descriptor_bytes,
+            namespace: super::DescriptorNamespace::Unspecified,
+            dvb: super::dvb::DvbSummary::default(),
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -359,6 +359,7 @@ dependencies = [
 name = "triergon-subtitles"
 version = "0.0.0"
 dependencies = [
+ "triergon-bitstream",
  "triergon-core",
  "triergon-harness-protocol",
 ]

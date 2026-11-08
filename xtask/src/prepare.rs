@@ -363,7 +363,10 @@ pub fn prepare(
             Value::object([
                 ("version", Value::str(ZVBI_VERSION)),
                 ("archive_sha256", Value::str(ZVBI_SHA256)),
-                ("configure_argv", Value::strings(ZVBI_CONFIGURE.iter().map(ToString::to_string))),
+                (
+                    "configure_argv",
+                    Value::strings(ZVBI_CONFIGURE.iter().map(ToString::to_string)),
+                ),
                 ("prefix", Value::str(prefix.display().to_string())),
             ]),
         ));

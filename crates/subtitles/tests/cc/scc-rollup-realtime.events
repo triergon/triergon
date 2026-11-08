@@ -1,0 +1,6 @@
+0	1000000	4294967295	0,0,Default,,0,0,0,,{\an7}{\pos(38,213)}ROLL TWO\N{\an7}{\pos(38,228)}ROLL THREE\N{\an7}{\pos(38,243)}ROLL FOUR
+1	2132000	4294967295	1,0,Default,,0,0,0,,{\an7}{\pos(38,197)}ROLL FOUR\N{\an7}{\pos(38,213)}TWO ROWS{\c&H0000FF&} RED\N{\an7}{\pos(38,228)}FOUR\N{\an7}{\pos(57,243)}ROWS
+2	0	4294967295	2,0,Default,,0,0,0,,
+3	3594000	4294967295	3,0,Default,,0,0,0,,{\an7}{\pos(76,90)}\h\h\h\hPAINT ON\N{\an7}{\pos(76,105)}KEPT
+4	4297000	4294967295	4,0,Default,,0,0,0,,{\an7}{\pos(76,90)}\h\h\h\hPAINT ON\N{\an7}{\pos(76,105)}KEPTTEXT MODE
+5	3132000	4294967295	5,0,Default,,0,0,0,,

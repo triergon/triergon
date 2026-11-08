@@ -3,9 +3,10 @@ use std::io::{Cursor, Read};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, Time, WorkBudget};
+use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder};
 use triergon_subtitles::dvb::{
     ClockOrigin, ClockValue, ColourSource, DecodeStatus, Decoder, Depth, DisplayEvent,
-    DisplayLimits, PacketIdentity, PacketTiming, ReceiverView, SourceClock, SourceConfiguration,
+    DisplayLimits, PacketIdentity, PacketTiming, SourceClock, SourceConfiguration,
 };
 
 struct Frame {
@@ -94,20 +95,13 @@ fn configuration(pool: &Budget) -> SourceConfiguration {
 fn decode(
     pool: &Budget,
     case: &Case,
-    view: ReceiverView,
     quantum: u64,
     pressure: bool,
 ) -> Result<(Vec<DisplayEvent>, u64), Error> {
     let cancel = AtomicBool::new(false);
     let configuration = configuration(pool);
-    let mut decoder = Decoder::new_configured_with_receiver_view(
-        pool,
-        &configuration,
-        17,
-        DisplayLimits::default(),
-        view,
-        &cancel,
-    )?;
+    let mut decoder =
+        Decoder::new_configured(pool, &configuration, 17, DisplayLimits::default(), &cancel)?;
     let mut events = Vec::new();
     let mut spent = 0_u64;
     let clock = |ticks: i64| {
@@ -217,50 +211,28 @@ fn assert_source(events: &[DisplayEvent], case: &Case) {
     }
 }
 
-fn assert_native(events: &[DisplayEvent], case: &Case) {
-    assert_source(events, case);
-    for (event, frame) in events.iter().zip(&case.frames) {
-        let publication = event.receiver_publication.unwrap();
-        assert_eq!(publication.exact_pts_microseconds, Some(frame.pts * 1000));
-        assert_eq!(publication.start_display_ms, 0);
-        assert_eq!(publication.end_display_ms, 2000);
-        let native = event.regions()[0].palette.receiver.as_ref().unwrap();
-        assert!(
-            native.all_entries_explicit,
-            "raw CDS provenance, not an equality certificate"
-        );
-        assert_eq!(native.words.as_slice(), frame.native);
-        let expected: Vec<u8> = frame
-            .native
-            .iter()
-            .flat_map(|word| {
-                [
-                    (word >> 16) as u8,
-                    (word >> 8) as u8,
-                    *word as u8,
-                    (word >> 24) as u8,
-                ]
-            })
-            .collect();
-        assert_eq!(native.rgba.as_ref(), expected);
-    }
-}
-
+/// The receiver decoder against the recorded output of the reference
+/// decoder: its ARGB words, the index plane and the subtitle clock.
 fn native_guard(data: &[u8]) {
     let case = case(data);
-    let mut previous_work = None;
-    for quantum in [1, 7, 4096] {
-        let pool = Budget::new(4 << 20).unwrap();
-        let baseline = pool.used();
-        let (events, work) = decode(&pool, &case, ReceiverView::Receiver, quantum, false).unwrap();
-        assert_native(&events, &case);
-        if let Some(previous) = previous_work {
-            assert_eq!(work, previous);
-        }
-        previous_work = Some(work);
-        assert!(pool.used() > baseline);
-        drop(events);
-        assert_eq!(pool.used(), baseline);
+    let pool = Budget::new(4 << 20).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut decoder = ReceiverDecoder::new(&pool, &[0, 1, 0, 2, 0x10], Options::default());
+    for frame in &case.frames {
+        let mut work = WorkBudget::new(u64::MAX);
+        let subtitle = decoder
+            .decode(&frame.payload, Some(frame.pts * 1000), &mut work, &cancel)
+            .unwrap()
+            .expect("presented display set");
+        assert_eq!(subtitle.pts, Some(frame.pts * 1000));
+        assert_eq!(
+            (subtitle.start_display_ms, subtitle.end_display_ms),
+            (0, 2000)
+        );
+        let rects: Vec<_> = subtitle.rects().collect();
+        assert_eq!(rects.len(), 1);
+        assert_eq!(rects[0].palette, frame.native);
+        assert_eq!(rects[0].pixels, frame.plane);
     }
 }
 
@@ -325,13 +297,8 @@ fn source_views_and_every_original_component_are_unchanged() {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();
-            let (events, _) = decode(&pool, &case, ReceiverView::Source, quantum, false).unwrap();
+            let (events, _) = decode(&pool, &case, quantum, false).unwrap();
             assert_source(&events, &case);
-            assert!(
-                events
-                    .iter()
-                    .all(|e| e.regions()[0].palette.receiver.is_none())
-            );
             drop(events);
             assert_eq!(pool.used(), baseline);
         }
@@ -346,7 +313,7 @@ fn strict_source_rejects_yzero_nonzero_companions() {
         "explicit-clut-fixtures/transparent-companions.case"
     ));
     assert_eq!(
-        decode(&pool, &case, ReceiverView::Source, 1, false).unwrap_err(),
+        decode(&pool, &case, 1, false).unwrap_err(),
         Error::Invalid("DVB transparent source components")
     );
     assert_eq!(pool.used(), baseline);
@@ -358,12 +325,10 @@ fn pressure_preserves_actual_work_output_and_retained_owners() {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
-        let (plain, plain_work) =
-            decode(&pool, &case, ReceiverView::Receiver, quantum, false).unwrap();
-        assert_native(&plain, &case);
-        let (pressured, work) =
-            decode(&pool, &case, ReceiverView::Receiver, quantum, true).unwrap();
-        assert_native(&pressured, &case);
+        let (plain, plain_work) = decode(&pool, &case, quantum, false).unwrap();
+        assert_source(&plain, &case);
+        let (pressured, work) = decode(&pool, &case, quantum, true).unwrap();
+        assert_source(&pressured, &case);
         assert_eq!(plain_work, work);
         drop(plain);
         assert!(pool.used() > baseline);
@@ -373,7 +338,7 @@ fn pressure_preserves_actual_work_output_and_retained_owners() {
 }
 
 #[test]
-fn cancellation_keeps_partial_native_ownership_bounded() {
+fn cancellation_keeps_partial_ownership_bounded() {
     let case = case(include_bytes!("explicit-clut-fixtures/full-rgb.case"));
     let frame = &case.frames[0];
     for steps in [0, 512, 4096, 8192] {
@@ -382,12 +347,11 @@ fn cancellation_keeps_partial_native_ownership_bounded() {
         {
             let cancel = AtomicBool::new(false);
             let configuration = configuration(&pool);
-            let mut decoder = Decoder::new_configured_with_receiver_view(
+            let mut decoder = Decoder::new_configured(
                 &pool,
                 &configuration,
                 17,
                 DisplayLimits::default(),
-                ReceiverView::Receiver,
                 &cancel,
             )
             .unwrap();
@@ -412,9 +376,10 @@ fn cancellation_keeps_partial_native_ownership_bounded() {
                 )
                 .unwrap();
             decoder.provide(&packet).unwrap();
+            let mut outputs = Vec::new();
             for _ in 0..steps {
                 let progress = decoder.step(&mut WorkBudget::new(1), &cancel).unwrap();
-                assert_eq!(progress.status, DecodeStatus::Yield);
+                outputs.extend(progress.event);
             }
             cancel.store(true, Ordering::Relaxed);
             assert_eq!(

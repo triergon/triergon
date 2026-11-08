@@ -1,0 +1,699 @@
+//! The DVD receiver (`compat::dvd::Decoder`) on authored units. Expected values
+//! are the pinned FFmpeg build's `dvdsub` output for the same units.
+#[path = "dvd-support/mod.rs"]
+mod support;
+
+use support::{Cmd, SHOW, field, glyphs, raw_unit, unit};
+use triergon_core::{Budget, Error, WorkBudget};
+use triergon_subtitles::compat::dvd::{
+    Decoder, Limits, Settings, Status, Subtitle, YcbcrRounding, ifo_palette,
+};
+
+const PALETTE: [u32; 16] = [
+    0x000000, 0xf0f0f0, 0xcccccc, 0x999999, 0x3333fa, 0x1111bb, 0xfa3333, 0xbb1111, 0x33fa33,
+    0x11bb11, 0xfafa33, 0xbbbb11, 0xfa33fa, 0xbb11bb, 0x33fafa, 0x11bbbb,
+];
+
+fn settings() -> Settings {
+    Settings {
+        palette: Some(PALETTE),
+        forced_only: false,
+    }
+}
+
+/// What a subtitle shows, owned.
+#[derive(Debug, PartialEq, Eq)]
+struct Shown {
+    start: u32,
+    end: u32,
+    forced: bool,
+    rect: (u16, u16, u16, u16),
+    palette: Vec<u32>,
+    rows: Vec<Vec<u8>>,
+}
+
+impl From<Subtitle<'_>> for Shown {
+    fn from(s: Subtitle<'_>) -> Self {
+        let b = s.bitmap;
+        let rows = (0..usize::from(b.height))
+            .map(|y| b.pixels[y * b.stride..][..usize::from(b.width)].to_vec())
+            .collect();
+        Self {
+            start: s.start_ms,
+            end: s.end_ms,
+            forced: s.forced,
+            rect: (b.x, b.y, b.width, b.height),
+            palette: b.palette.to_vec(),
+            rows,
+        }
+    }
+}
+
+/// Decode each packet; one entry per packet.
+fn decode_all(settings: Settings, packets: &[&[u8]]) -> Vec<Option<Shown>> {
+    let budget = Budget::new(1 << 26).unwrap();
+    let mut decoder = Decoder::new(&budget, settings, Limits::default());
+    packets
+        .iter()
+        .map(
+            |p| match decoder.decode(p, &mut WorkBudget::new(u64::MAX)).unwrap() {
+                Status::Subtitle(s) => Some(s.into()),
+                Status::Nothing => None,
+                Status::Yield => panic!("unbounded work yielded"),
+            },
+        )
+        .collect()
+}
+
+fn decode(settings: Settings, packet: &[u8]) -> Option<Shown> {
+    decode_all(settings, &[packet]).pop().unwrap()
+}
+
+fn shows(packet: &[u8]) -> Option<Shown> {
+    decode(settings(), packet)
+}
+
+fn crop(rows: &[Vec<u8>], x: usize, y: usize, w: usize, h: usize) -> Vec<Vec<u8>> {
+    rows[y..y + h]
+        .iter()
+        .map(|r| r[x..x + w].to_vec())
+        .collect()
+}
+
+#[test]
+fn a_unit_presents_its_bitmap_colours_and_window() {
+    let image = glyphs(16, 6, 1, 0);
+    let shown = shows(&unit(&image, 100, 200, &[(0, &SHOW), (100, &[Cmd::Stop])])).unwrap();
+    assert_eq!(shown.start, 0);
+    assert_eq!(shown.end, 1137);
+    assert!(!shown.forced);
+    assert_eq!(
+        shown.palette,
+        [0x00000000, 0xfff0f0f0, 0xffcccccc, 0xff999999]
+    );
+    assert_eq!(shown.rect, (100, 200, 16, 6));
+    assert_eq!(shown.rows, image);
+}
+
+#[test]
+fn the_window_is_the_last_start_and_stop_in_traversal_order() {
+    let image = glyphs(16, 6, 1, 0);
+    let window = |sequences: &[(u16, &[Cmd])]| {
+        shows(&unit(&image, 0, 0, sequences)).map(|s| (s.start, s.end))
+    };
+    assert_eq!(
+        window(&[(50, &SHOW), (150, &[Cmd::Stop])]),
+        Some((568, 1706))
+    );
+    assert_eq!(window(&[(0, &SHOW)]), Some((0, 0)));
+    assert_eq!(
+        window(&[(100, &SHOW), (50, &[Cmd::Stop])]),
+        Some((1137, 568))
+    );
+    assert_eq!(
+        window(&[
+            (0, &SHOW),
+            (100, &[Cmd::Stop]),
+            (200, &[Cmd::Start]),
+            (300, &[Cmd::Stop])
+        ]),
+        Some((2275, 3413))
+    );
+    assert_eq!(
+        window(&[(0xffff, &SHOW), (0xffff, &[Cmd::Stop])]),
+        Some((745642, 745642))
+    );
+}
+
+#[test]
+fn a_subtitle_without_an_end_ends_with_its_packet() {
+    let image = glyphs(16, 6, 1, 0);
+    let budget = Budget::new(1 << 20).unwrap();
+    let mut decoder = Decoder::new(&budget, settings(), Limits::default());
+    let packet = unit(&image, 0, 0, &[(0, &SHOW)]);
+    let Status::Subtitle(s) = decoder
+        .decode(&packet, &mut WorkBudget::new(u64::MAX))
+        .unwrap()
+    else {
+        panic!("no subtitle");
+    };
+    assert_eq!(s.ending_with_packet(2500).end_ms, 2500);
+    let packet = unit(&image, 0, 0, &[(0, &SHOW), (90, &[Cmd::Stop])]);
+    let Status::Subtitle(s) = decoder
+        .decode(&packet, &mut WorkBudget::new(u64::MAX))
+        .unwrap()
+    else {
+        panic!("no subtitle");
+    };
+    assert_eq!(s.ending_with_packet(4321).end_ms, 1024);
+}
+
+#[test]
+fn transparent_borders_are_removed_unless_the_unit_is_a_menu() {
+    let image = glyphs(16, 6, 1, 1);
+    let shown = shows(&unit(&image, 10, 10, &[(0, &SHOW), (100, &[Cmd::Stop])])).unwrap();
+    assert_eq!(shown.rect.0, 11);
+    assert_eq!(shown.rect.1, 11);
+    let (w, h) = (usize::from(shown.rect.2), usize::from(shown.rect.3));
+    assert_eq!(shown.rows, crop(&image, 1, 1, w, h));
+
+    let menu = [
+        Cmd::Palette([3, 2, 1, 0]),
+        Cmd::Alpha([15, 15, 15, 0]),
+        Cmd::Area,
+        Cmd::Offsets,
+        Cmd::Forced,
+    ];
+    let shown = shows(&unit(&image, 10, 10, &[(0, &menu), (100, &[Cmd::Stop])])).unwrap();
+    assert!(shown.forced);
+    assert_eq!(shown.rect, (10, 10, 16, 6));
+    assert_eq!(shown.rows, image);
+
+    // A forced start after the bitmap keeps the area but not the flag.
+    let shown = shows(&unit(
+        &image,
+        10,
+        10,
+        &[(0, &SHOW), (50, &[Cmd::Forced]), (100, &[Cmd::Stop])],
+    ))
+    .unwrap();
+    assert!(!shown.forced);
+    assert_eq!(shown.rect, (10, 10, 16, 6));
+
+    // A menu is shown even when every colour is transparent.
+    let clear = [Cmd::Alpha([0; 4]), Cmd::Area, Cmd::Offsets, Cmd::Forced];
+    let shown = shows(&unit(&image, 10, 10, &[(0, &clear)])).unwrap();
+    assert_eq!(shown.palette, [0; 4]);
+}
+
+#[test]
+fn a_fully_transparent_bitmap_presents_nothing() {
+    let image = glyphs(16, 6, 1, 1);
+    let clear = [Cmd::Alpha([0; 4]), Cmd::Area, Cmd::Offsets, Cmd::Start];
+    assert_eq!(shows(&unit(&image, 0, 0, &[(0, &clear)])), None);
+    // Without a contrast command every colour is transparent.
+    let bare = [
+        Cmd::Palette([3, 2, 1, 0]),
+        Cmd::Area,
+        Cmd::Offsets,
+        Cmd::Start,
+    ];
+    assert_eq!(shows(&unit(&image, 0, 0, &[(0, &bare)])), None);
+}
+
+#[test]
+fn a_sequence_with_area_and_offsets_redraws_with_the_current_colours() {
+    let image = glyphs(16, 6, 1, 0);
+    let redraw = [Cmd::Palette([5, 6, 7, 8]), Cmd::Area, Cmd::Offsets];
+    let shown = shows(&unit(&image, 0, 0, &[(0, &SHOW), (50, &redraw)])).unwrap();
+    assert_eq!(
+        shown.palette,
+        [0x0033fa33, 0xffbb1111, 0xfffa3333, 0xff1111bb]
+    );
+    // A palette change without both area and offsets leaves the bitmap as drawn.
+    for change in [
+        &[Cmd::Palette([5, 6, 7, 8]), Cmd::Area][..],
+        &[Cmd::Palette([5, 6, 7, 8]), Cmd::Offsets][..],
+    ] {
+        let shown = shows(&unit(&image, 0, 0, &[(0, &SHOW), (50, change)])).unwrap();
+        assert_eq!(shown.palette[1], 0xfff0f0f0);
+    }
+    // Area and offsets must share a sequence.
+    let split = [
+        Cmd::Palette([3, 2, 1, 0]),
+        Cmd::Alpha([15, 15, 15, 0]),
+        Cmd::Area,
+    ];
+    assert_eq!(
+        shows(&unit(&image, 0, 0, &[(0, &split), (10, &[Cmd::Offsets])])),
+        None
+    );
+    // A later area moves the redrawn bitmap; a reversed or one-row area is skipped.
+    let shown = shows(&unit(
+        &image,
+        0,
+        0,
+        &[
+            (0, &SHOW),
+            (50, &[Cmd::AreaAt(20, 35, 30, 35), Cmd::Offsets]),
+        ],
+    ))
+    .unwrap();
+    assert_eq!(shown.rect.0, 20);
+    for skipped in [Cmd::AreaAt(35, 20, 30, 35), Cmd::AreaAt(0, 15, 30, 30)] {
+        let shown = shows(&unit(
+            &image,
+            0,
+            0,
+            &[(0, &SHOW), (50, &[skipped, Cmd::Offsets])],
+        ))
+        .unwrap();
+        assert_eq!(shown.rect, (0, 0, 16, 6));
+    }
+    // A failed redraw drops the unit even after a good one.
+    let narrow = [Cmd::AreaAt(0, 5, 0, 5), Cmd::Offsets];
+    assert_eq!(
+        shows(&unit(&image, 0, 0, &[(0, &SHOW), (50, &narrow)])),
+        None
+    );
+}
+
+#[test]
+fn an_unknown_command_ends_its_sequence_and_truncated_operands_drop_the_unit() {
+    let image = glyphs(16, 6, 1, 0);
+    let colcon: &[Cmd] = &[
+        Cmd::Alpha([15, 15, 15, 0]),
+        Cmd::Area,
+        Cmd::Offsets,
+        Cmd::Raw(&[7, 0, 6, 0x0f, 0xff, 0xff, 0xff]),
+        Cmd::Palette([3, 2, 1, 0]),
+    ];
+    let shown = shows(&unit(&image, 0, 0, &[(0, colcon), (100, &[Cmd::Stop])])).unwrap();
+    assert_eq!(shown.palette, [0, 0xff000000, 0xff000000, 0xff000000]);
+    assert_eq!(shown.end, 1137);
+
+    let mut truncated = unit(&image, 0, 0, &[(0, &SHOW), (100, &[Cmd::Stop])]);
+    let end = truncated.len() - 1;
+    truncated[end] = 3; // a palette command without operands replaces 0xff
+    assert_eq!(shows(&truncated), None);
+}
+
+#[test]
+fn links_are_followed_forward_only() {
+    let image = glyphs(16, 6, 1, 0);
+    let mut packet = unit(
+        &image,
+        0,
+        0,
+        &[(0, &SHOW), (100, &[Cmd::Stop]), (200, &[Cmd::Stop])],
+    );
+    let control = usize::from(u16::from_be_bytes([packet[2], packet[3]]));
+    let second = control + 4 + 3 + 3 + 7 + 5 + 1 + 1;
+    let third = second + 6;
+    let window = |packet: &[u8]| shows(packet).map(|s| s.end);
+    assert_eq!(window(&packet), Some(2275));
+    packet[control + 2..control + 4].copy_from_slice(&(third as u16).to_be_bytes());
+    assert_eq!(window(&packet), Some(2275));
+    packet[control + 2..control + 4].copy_from_slice(&(control as u16).to_be_bytes());
+    assert_eq!(window(&packet), Some(0));
+    packet[control + 2..control + 4].copy_from_slice(&(second as u16).to_be_bytes());
+    packet[second + 2..second + 4].copy_from_slice(&(control as u16).to_be_bytes());
+    assert_eq!(window(&packet), Some(1137));
+}
+
+#[test]
+fn pixels_read_to_the_end_of_the_unit_and_runs_stay_on_their_line() {
+    let full = field(&[&[(16, 1)], &[(16, 1)], &[(16, 1)]]);
+    let body = |top: u16, bottom: u16| {
+        let mut b = vec![3, 0x32, 0x10, 4, 0xff, 0xf0, 5, 0, 0, 0x0f, 0, 0, 5];
+        b.extend([6]);
+        b.extend(top.to_be_bytes());
+        b.extend(bottom.to_be_bytes());
+        b.extend([1, 0xff]);
+        b
+    };
+    let rows = |packet: &[u8]| shows(packet).map(|s| s.rows);
+    // Both fields from one offset.
+    assert_eq!(
+        rows(&raw_unit(&full, [(0, body(4, 4))])),
+        Some(vec![vec![1; 16]; 6])
+    );
+    // A field that runs out reads zero: the transparent rows are cropped away.
+    let two = field(&[&[(16, 1)], &[(16, 1)]]);
+    assert_eq!(
+        rows(&raw_unit(&two, [(0, body(4, 4))])),
+        Some(vec![vec![1; 16]; 4])
+    );
+    // Fill-to-end codes, and runs past the line end.
+    let fill = field(&[&[(4, 2), (0, 1)], &[(0, 3)], &[(0, 3)]]);
+    let shown = rows(&raw_unit(
+        &[fill.clone(), full.clone()].concat(),
+        [(0, body(4, 4 + fill.len() as u16))],
+    ))
+    .unwrap();
+    assert_eq!(shown[0], [vec![2; 4], vec![1; 12]].concat());
+    assert_eq!(shown[2], vec![3; 16]);
+    for bad in [
+        field(&[&[(17, 1)]]),
+        field(&[&[(10, 1), (10, 2)]]),
+        field(&[&[(10, 1)], &[(16, 1)]]),
+    ] {
+        let data = [bad.clone(), full.clone()].concat();
+        assert_eq!(
+            rows(&raw_unit(&data, [(0, body(4, 4 + bad.len() as u16))])),
+            None
+        );
+    }
+    // A field offset within four bytes of the end drops the unit; past the
+    // control table the field reads the zeros that follow it.
+    let length = raw_unit(&full, [(0, body(4, 4))]).len() as u16 + 8;
+    for (offset, visible) in [
+        (length - 8, true),
+        (length - 4, true),
+        (length - 3, false),
+        (0x7000, false),
+    ] {
+        let mut packet = raw_unit(&full, [(0, body(4, offset))]);
+        packet.extend([0; 8]);
+        assert_eq!(rows(&packet).is_some(), visible, "offset {offset}");
+    }
+}
+
+#[test]
+fn units_are_reassembled_as_the_reference_does() {
+    let a = unit(
+        &glyphs(16, 6, 1, 1),
+        10,
+        10,
+        &[(0, &SHOW), (100, &[Cmd::Stop])],
+    );
+    let b = unit(
+        &glyphs(20, 4, 2, 0),
+        50,
+        60,
+        &[(0, &SHOW), (100, &[Cmd::Stop])],
+    );
+    let at = |out: &[Option<Shown>]| -> Vec<usize> {
+        out.iter()
+            .enumerate()
+            .filter_map(|(i, s)| s.as_ref().map(|_| i))
+            .collect()
+    };
+    let x_of = |out: &[Option<Shown>], i: usize| out[i].as_ref().unwrap().rect.0;
+    // Completion, with an empty packet in between.
+    let out = decode_all(settings(), &[&a[..30], &[], &a[30..], &b]);
+    assert_eq!(at(&out), [2, 3]);
+    // Fewer than ten bytes never start a unit (and the rest then starts one).
+    assert_eq!(at(&decode_all(settings(), &[&a[..9], &b])), [1]);
+    assert_eq!(at(&decode_all(settings(), &[&a[..9], &a[9..], &b])), []);
+    // An incomplete start whose control offset lies beyond its size is dropped.
+    let mut bad = a[..10].to_vec();
+    bad[2..4].copy_from_slice(&0xffff_u16.to_be_bytes());
+    let out = decode_all(settings(), &[&bad, &a]);
+    assert_eq!(at(&out), [1]);
+    // A pending unit swallows whatever follows until it completes.
+    let out = decode_all(settings(), &[&a[..30], &b, &b]);
+    assert_eq!(at(&out), [2]);
+    assert_eq!(x_of(&out, 2), 50);
+    // Bytes after a unit are discarded.
+    let out = decode_all(settings(), &[&[&a[..], &b[..]].concat(), &b]);
+    assert_eq!((x_of(&out, 0), x_of(&out, 1)), (11, 50));
+    // A unit is complete once its first control header has arrived.
+    let mut big = a.clone();
+    big[..2].copy_from_slice(&(a.len() as u16 + 20).to_be_bytes());
+    let control = usize::from(u16::from_be_bytes([a[2], a[3]]));
+    assert_eq!(at(&decode_all(settings(), &[&big])), [0]);
+    assert_eq!(at(&decode_all(settings(), &[&big[..control + 4], &b])), [1]);
+    assert_eq!(
+        at(&decode_all(settings(), &[&big[..control + 3], &a, &b])),
+        [2]
+    );
+}
+
+#[test]
+fn the_automatic_palette_ranks_opaque_selectors() {
+    let image = glyphs(16, 6, 1, 0);
+    let automatic = |selectors: [u8; 4], alpha: [u8; 4]| {
+        let cmds = [
+            Cmd::Palette(selectors),
+            Cmd::Alpha(alpha),
+            Cmd::Area,
+            Cmd::Offsets,
+            Cmd::Start,
+        ];
+        decode(Settings::default(), &unit(&image, 0, 0, &[(0, &cmds)])).map(|s| s.palette)
+    };
+    assert_eq!(
+        automatic([3, 2, 1, 0], [15, 8, 15, 15]),
+        Some(vec![0xff000000, 0xff545454, 0x88a9a9a9, 0xfffefefe])
+    );
+    assert_eq!(
+        automatic([3, 2, 3, 1], [15, 8, 15, 0]),
+        Some(vec![0x00000000, 0xff000000, 0x88fefefe, 0xff000000])
+    );
+}
+
+#[test]
+fn forced_only_drops_ordinary_subtitles() {
+    let image = glyphs(16, 6, 1, 0);
+    let only = Settings {
+        forced_only: true,
+        ..settings()
+    };
+    assert_eq!(
+        decode(only.clone(), &unit(&image, 0, 0, &[(0, &SHOW)])),
+        None
+    );
+    let forced = [
+        Cmd::Palette([3, 2, 1, 0]),
+        Cmd::Alpha([15; 4]),
+        Cmd::Forced,
+        Cmd::Area,
+        Cmd::Offsets,
+    ];
+    assert!(
+        decode(only, &unit(&image, 0, 0, &[(0, &forced)]))
+            .unwrap()
+            .forced
+    );
+}
+
+#[test]
+fn configuration_and_options_select_the_palette() {
+    let text = b"size: 720x480\npalette: 111111, 222222\nPalette: 333333\n  palette: 444444\n";
+    let settings = Settings::from_configuration(text);
+    assert_eq!(settings.palette.unwrap()[..3], [0x111111, 0x222222, 0]);
+    let last = Settings::from_configuration(b"palette: 1, 2, 3, 4\r\npalette: 5\n");
+    assert_eq!(last.palette.unwrap()[..2], [5, 0]);
+    assert_eq!(
+        Settings::from_configuration(b"size: 720x480\n").palette,
+        None
+    );
+    assert_eq!(
+        Settings::from_configuration(b"palette:").palette,
+        Some([0; 16])
+    );
+
+    let mut options = Settings::default();
+    options
+        .apply_palette_option(b"112233,445566,778899,aabbcc,0xddeeff,AbCdEf, 102030 ,1122334455");
+    assert_eq!(
+        options.palette.unwrap()[..9],
+        [
+            0x112233, 0x445566, 0x778899, 0xaabbcc, 0xddeeff, 0xabcdef, 0x102030, 0x334455, 0
+        ]
+    );
+    options.apply_palette_option(b"zz,445566");
+    assert_eq!(options.palette, Some([0; 16]));
+
+    options.apply_ifo(None);
+    assert_eq!(options.palette, None);
+}
+
+#[test]
+fn ifo_colour_tables_convert_with_nearest_rounding() {
+    let mut ifo = vec![0; 4096];
+    ifo[..12].copy_from_slice(b"DVDVIDEO-VTS");
+    ifo[0xcc..0xd0].copy_from_slice(&1_u32.to_be_bytes());
+    ifo[0x800..0x802].copy_from_slice(&1_u16.to_be_bytes());
+    ifo[0x80c..0x810].copy_from_slice(&16_u32.to_be_bytes());
+    let entries = [(16 + 12, 128 + 3, 200 - 5), (200, 114, 128), (144, 125, 5)];
+    for (i, (y, cr, cb)) in entries.into_iter().enumerate() {
+        let at = 0x810 + 0xa4 + 4 * i;
+        ifo[at..at + 4].copy_from_slice(&[0, y, cr, cb]);
+    }
+    let palette = ifo_palette(&ifo).unwrap();
+    assert_eq!(palette[1..3], [0xc0e2d6, 0x90c800]);
+    assert_eq!(palette[3], 0x008800);
+    assert_eq!(ifo_palette(&ifo[..0x810 + 0xa4 + 20]), None);
+    ifo[11] = b'G';
+    assert_eq!(ifo_palette(&ifo), None);
+}
+
+#[test]
+fn the_two_ycbcr_conversions_differ_by_their_rounding() {
+    for (y, cr, cb, half_down, nearest) in [
+        (200, 114, 128, 0xbfe1d5, 0xc0e2d6),
+        (144, 125, 5, 0x8fc700, 0x90c800),
+        (64, 128, 6, 0x376700, 0x386800),
+        (190, 128, 128, 0xcacaca, 0xcbcbcb),
+        (128, 128, 166, 0x8172ce, 0x8273cf),
+        (113, 141, 93, 0x857329, 0x86742a),
+        (218, 247, 46, 0xffaa45, 0xffab46),
+        (41, 82, 172, 0x003075, 0x003176),
+        (17, 128, 128, 0x000000, 0x010101),
+    ] {
+        assert_eq!(YcbcrRounding::HalfDown.rgb(y, cr, cb), half_down);
+        assert_eq!(YcbcrRounding::Nearest.rgb(y, cr, cb), nearest);
+    }
+}
+
+#[test]
+fn work_is_charged_and_an_exhausted_budget_consumes_nothing() {
+    let a = unit(
+        &glyphs(16, 6, 1, 1),
+        10,
+        10,
+        &[(0, &SHOW), (100, &[Cmd::Stop])],
+    );
+    let budget = Budget::new(1 << 20).unwrap();
+    let mut decoder = Decoder::new(&budget, settings(), Limits::default());
+    assert_eq!(
+        decoder.decode(&a[..30], &mut WorkBudget::new(0)).unwrap(),
+        Status::Nothing
+    );
+    let need = (a.len() + 16 * 6) as u64;
+    assert_eq!(
+        decoder
+            .decode(&a[30..], &mut WorkBudget::new(need - 1))
+            .unwrap(),
+        Status::Yield
+    );
+    // The work of the attempt that yielded counts towards the next one.
+    let mut work = WorkBudget::new(need);
+    assert!(matches!(
+        decoder.decode(&a[30..], &mut work).unwrap(),
+        Status::Subtitle(_)
+    ));
+    assert_eq!(work.spent(), 1);
+    // Any quantum makes progress.
+    let mut attempts = 0;
+    while decoder.decode(&a, &mut WorkBudget::new(7)).unwrap() == Status::Yield {
+        attempts += 1;
+    }
+    assert_eq!(attempts, need.div_ceil(7) - 1);
+    // A decode can be undone and repeated, colours included.
+    let first = decoder.decode(&a, &mut WorkBudget::new(u64::MAX)).unwrap();
+    assert!(matches!(first, Status::Subtitle(_)));
+    decoder.rewind().unwrap();
+    assert!(matches!(
+        decoder.decode(&a, &mut WorkBudget::new(u64::MAX)).unwrap(),
+        Status::Subtitle(_)
+    ));
+
+    let limits = Limits {
+        max_pixels: 16 * 6 - 1,
+        ..Limits::default()
+    };
+    let mut small = Decoder::new(&budget, settings(), limits);
+    assert!(matches!(
+        small.decode(&a, &mut WorkBudget::new(u64::MAX)),
+        Err(Error::Limit {
+            requested: 96,
+            maximum: 95
+        })
+    ));
+}
+
+#[test]
+fn colour_selectors_and_contrast_carry_over_between_units() {
+    let image = glyphs(16, 6, 1, 0);
+    let first = [
+        Cmd::Palette([7, 6, 5, 4]),
+        Cmd::Alpha([15, 15, 15, 0]),
+        Cmd::Area,
+        Cmd::Offsets,
+        Cmd::Start,
+    ];
+    let bare = [Cmd::Area, Cmd::Offsets, Cmd::Start];
+    let out = decode_all(
+        settings(),
+        &[
+            &unit(&image, 0, 0, &[(0, &first)]),
+            &unit(&image, 0, 0, &[(0, &bare)]),
+        ],
+    );
+    let palettes: Vec<_> = out
+        .iter()
+        .map(|s| s.as_ref().unwrap().palette.clone())
+        .collect();
+    assert_eq!(
+        palettes[0],
+        [0x003333fa, 0xff1111bb, 0xfffa3333, 0xffbb1111]
+    );
+    assert_eq!(palettes[1], palettes[0]);
+    // Changes made by a unit that presents nothing carry over too.
+    let narrow = [
+        Cmd::Palette([3, 2, 1, 0]),
+        Cmd::Alpha([15, 8, 1, 0]),
+        Cmd::AreaAt(0, 5, 0, 5),
+        Cmd::Offsets,
+    ];
+    let out = decode_all(
+        settings(),
+        &[
+            &unit(&image, 0, 0, &[(0, &narrow)]),
+            &unit(&image, 0, 0, &[(0, &bare)]),
+        ],
+    );
+    assert_eq!(out[0], None);
+    assert_eq!(
+        out[1].as_ref().unwrap().palette,
+        [0x00000000, 0x11f0f0f0, 0x88cccccc, 0xff999999]
+    );
+}
+
+/// An extended unit: a zero word, 32-bit size and control offset, then 8-bit
+/// fields and sequences with 32-bit links.
+fn extended(rows: &[Vec<u8>], commands: &[u8]) -> Vec<u8> {
+    let mut top = support::Bits::default();
+    let mut bottom = support::Bits::default();
+    for (y, row) in rows.iter().enumerate() {
+        let w = if y % 2 == 0 { &mut top } else { &mut bottom };
+        for &colour in row {
+            w.put(0b01, 2); // a single pixel with an 8-bit colour
+            w.put(u32::from(colour), 8);
+        }
+        w.align();
+    }
+    let (top, bottom) = (top.bytes, bottom.bytes);
+    let control = 10 + top.len() + bottom.len();
+    let area = [0x85, 1, 0, 31, 1, 0, 15 + rows.len() as u8];
+    let mut out = vec![0, 0];
+    let mut body = commands.to_vec();
+    body.extend(area);
+    body.push(0x86);
+    body.extend(10_u32.to_be_bytes());
+    body.extend((10 + top.len() as u32).to_be_bytes());
+    body.extend([1, 0xff]);
+    out.extend(((control + 6 + body.len()) as u32).to_be_bytes());
+    out.extend((control as u32).to_be_bytes());
+    out.extend(top);
+    out.extend(bottom);
+    out.extend(0_u16.to_be_bytes());
+    out.extend((control as u32).to_be_bytes());
+    out.extend(body);
+    out
+}
+
+#[test]
+fn extended_units_present_eight_bit_pixels_with_their_own_colours() {
+    let rows: Vec<Vec<u8>> = (0..2)
+        .map(|y| (0..16).map(|x| (x * 16 + y) as u8).collect())
+        .collect();
+    let mut palette = vec![0x83];
+    for i in 0..256 {
+        palette.extend([16 + (i % 220) as u8, 128, 128]);
+    }
+    let mut contrast = vec![0x84, 255];
+    contrast.extend([0; 255]);
+    let commands = [palette.clone(), contrast.clone()].concat();
+    let shown = shows(&extended(&rows, &commands)).unwrap();
+    assert_eq!(shown.palette.len(), 256);
+    assert_eq!(shown.palette[0], 0x00000000);
+    assert_eq!(shown.palette[1], 0xff010101);
+    // Pixel value 0 is transparent and cropped away.
+    assert_eq!(shown.rect, (16, 16, 16, 2));
+    assert_eq!((shown.rows[0][0], shown.rows[1][0]), (0, 1));
+    // The colours must be in the unit itself; the contrast carries over.
+    let out = decode_all(
+        settings(),
+        &[
+            &extended(&rows, &commands),
+            &extended(&rows, &contrast),
+            &extended(&rows, &palette),
+        ],
+    );
+    assert!(out[0].is_some() && out[1].is_none());
+    assert_eq!(out[2].as_ref().unwrap().palette[1], 0xff010101);
+}

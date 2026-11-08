@@ -279,7 +279,7 @@ pub(crate) use sample_entry_header::{
 mod encoded_stream;
 pub use encoded_stream::{
     AacConfiguration, AacConfigurationJob, AacConfigurationStep, ConfigurationLimits,
-    check_dts_core_description,
+    ObjectTypeScan, check_dts_core_description,
 };
 pub(crate) use encoded_stream::{EncodedEntryKind, EncodedStream};
 

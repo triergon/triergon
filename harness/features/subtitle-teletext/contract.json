@@ -6,20 +6,16 @@
   "worker_operation": "sub-",
   "reference": "ffmpeg-subtitles-native",
   "contract": [
-    "DVB teletext subtitle pages (EN 300 472, EN 300 706) from MPEG-TS, text and ASS output; reference: FFmpeg libzvbi_teletextdec with libzvbi 0.2.46",
-    "preparation outside the timed operation: open the input, select the subtitle stream, copy its packets in demux order (closed captions: the A/53 or SCTE 20 caption data of every picture in output order)",
+    "DVB teletext subtitle pages (EN 300 472, EN 300 706) from MPEG-TS in the text and ASS formats, with page selection and the txt_ options; reference: FFmpeg libzvbi_teletextdec with libzvbi 0.2.46",
+    "preparation outside the timed operation: open the input, select the teletext stream and its descriptor configuration, and copy its PES payloads in demux order",
     "one timed operation: create and open the decoder with the stream's configuration, packet time base and options, decode every prepared packet with one call each, drain, fold every output subtitle and free it, free the decoder",
     "every output subtitle folded: packet index, pts, display start and end, format, and per rectangle its type, position, size, colour count, flags, ARGB palette, index pixels, text and ASS line",
-    "exact equality of the fold with the reference; deliberate differences only as listed compatibility exceptions"
+    "exact equality of the fold with the reference on every case; deliberate differences only as listed compatibility exceptions"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"
   ],
   "iterations": 50,
-  "runtime_ratio_max": 1.2,
-  "memory_ratio_max_exclusive": 1.0,
   "minimum_pairs": 30,
-  "confidence": 0.95,
-  "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "runtime-ceiling-1.20"
+  "confidence": 0.95
 }

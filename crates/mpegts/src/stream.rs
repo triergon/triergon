@@ -783,7 +783,7 @@ impl TransportStream {
             } else {
                 Some(PesAssembler::new(
                     stream.pid,
-                    matches!(stream.stream_type, 0x1b | 0x24),
+                    is_video_stream_type(stream.stream_type),
                     self.budget.clone(),
                     self.limits,
                     epochs,
@@ -1895,6 +1895,12 @@ impl TransportStream {
             }
         }
     }
+}
+
+/// Video stream types, whose PES packets may leave `PES_packet_length` 0
+/// (ISO/IEC 13818-1 2.4.3.7): MPEG-1 and MPEG-2 video, H.264 and HEVC.
+fn is_video_stream_type(stream_type: u8) -> bool {
+    matches!(stream_type, 0x01 | 0x02 | 0x1b | 0x24)
 }
 
 #[cfg(test)]

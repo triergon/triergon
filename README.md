@@ -5,13 +5,13 @@ dependencies.
 
 Triergon reads Matroska/WebM, MP4/MOV, MPEG-TS, Ogg, native FLAC and raw MPEG audio,
 ADTS and AC-3 streams, frames H.264, HEVC, AV1, VP9, AAC, AC-3 and DTS packets for
-hardware or software decoders, decodes text and bitmap subtitles, reads OpenType and
-TrueType fonts, shapes text, rasterises glyphs and subtitle bitmaps, reads ASS scripts
-and their override tags, and includes software decoders for H.264, HEVC, AAC,
-AC-3/E-AC-3, DTS, FLAC, Opus, Vorbis and MPEG audio Layer I, II and III. It is written
-from the published standards and measured case by case against a pinned reference:
-FFmpeg for media, FreeType for fonts, HarfBuzz and FriBidi for shaping, libass for
-rasterising and ASS parsing.
+hardware or software decoders, decodes text and bitmap subtitles, closed captions and
+teletext, reads OpenType and TrueType fonts, shapes text, rasterises glyphs and subtitle
+bitmaps, reads ASS scripts and their override tags, and includes software decoders for
+H.264, HEVC, AAC, AC-3/E-AC-3, DTS, FLAC, Opus, Vorbis and MPEG audio Layer I, II and
+III. It is written from the published standards and measured case by case against a
+pinned reference: FFmpeg for media, FreeType for fonts, HarfBuzz and FriBidi for shaping,
+libass for rasterising and ASS parsing.
 
 > **Status: experimental.** APIs change without notice and nothing is published to
 > crates.io yet. See [status](docs/status.md) for what is verified today.
@@ -47,7 +47,7 @@ rasterising and ASS parsing.
 | [`triergon-ogg`](crates/ogg) | Ogg with the FLAC, Opus and Vorbis mappings: chained and multiplexed streams, granule timing, trims, seeking |
 | [`triergon-elementary`](crates/elementary) | Native FLAC, MPEG audio (ID3, Xing/Info/VBRI, LAME gapless), ADTS and AC-3 streams |
 | [`triergon-framing`](crates/framing) | Codec configuration and packet conversion for H.264, HEVC, AV1, VP9, AAC, AC-3, DTS |
-| [`triergon-subtitles`](crates/subtitles) | SRT, WebVTT, ASS, mov_text and tx3g; PGS, DVB and DVD bitmap subtitles |
+| [`triergon-subtitles`](crates/subtitles) | SRT, WebVTT, ASS, mov_text and tx3g; PGS, DVB and DVD bitmap subtitles; CEA-608/708 closed captions; DVB teletext |
 | [`triergon-font`](crates/font) | OpenType and TrueType faces and collections: cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | [`triergon-shape`](crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
 | [`triergon-raster`](crates/raster) | Glyph outlines, border stroking, the tile rasteriser, blur, composition and clipping of subtitle bitmaps |

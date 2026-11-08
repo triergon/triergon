@@ -1,4 +1,5 @@
-//! Source-only staged regressions. Literal fixtures/golds are the unchanged414 art.
+//! Decoder resets: stream and configuration resets, after output and after a
+//! fatal error, release the old state and decode like a fresh decoder.
 #![forbid(unsafe_code)]
 
 use std::io::{Cursor, Read};
@@ -6,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
 use triergon_subtitles::dvb::{
     ClockOrigin, ClockValue, DecodeStatus, Decoder, DisplayEvent, DisplayLimits, DvbPacket,
-    ObjectRetention, PacketIdentity, PacketTiming, ReceiverView, SourceClock, SourceConfiguration,
+    ObjectRetention, PacketIdentity, PacketTiming, SourceClock, SourceConfiguration,
 };
 
 const GENERATION: u64 = 61;
@@ -18,7 +19,6 @@ struct Frame {
     body: Vec<u8>,
     source_rgba: Vec<u8>,
     plane: Vec<u8>,
-    receiver_words: Vec<u32>,
 }
 
 fn bytes<const N: usize>(input: &mut Cursor<&[u8]>) -> [u8; N] {
@@ -47,14 +47,10 @@ fn first_frame(data: &[u8]) -> Frame {
     let source_rgba = vector(&mut input, 256 * 4);
     let _studio_rgba = vector(&mut input, 256 * 4);
     let plane = vector(&mut input, 256 * 2);
-    let receiver_words = (0..256)
-        .map(|_| u32::from_be_bytes(bytes(&mut input)))
-        .collect();
     Frame {
         body,
         source_rgba,
         plane,
-        receiver_words,
     }
 }
 
@@ -185,8 +181,7 @@ fn feed(
     panic!("finite reset fixture work ceiling")
 }
 
-fn assert_output(event: &DisplayEvent, input: Input<'_>, view: ReceiverView) {
-    assert_eq!(event.receiver_view, view);
+fn assert_output(event: &DisplayEvent, input: Input<'_>) {
     assert_eq!(event.generation, input.generation);
     assert_eq!(event.pts, Some(Time::new(1, 1).unwrap()));
     assert_eq!(event.source_packets().len(), 1);
@@ -204,27 +199,6 @@ fn assert_output(event: &DisplayEvent, input: Input<'_>, view: ReceiverView) {
     let region = &event.regions()[0];
     assert_eq!(region.plane.pixels.as_ref(), input.frame.plane);
     assert_eq!(region.palette.rgba.as_ref(), input.frame.source_rgba);
-    match view {
-        ReceiverView::Source => {
-            assert!(region.palette.receiver.is_none());
-            assert!(event.receiver_publication.is_none());
-        }
-        ReceiverView::Receiver => {
-            let native = region.palette.receiver.as_ref().unwrap();
-            assert_eq!(native.words.as_slice(), input.frame.receiver_words);
-            let rgba: Vec<u8> = input
-                .frame
-                .receiver_words
-                .iter()
-                .flat_map(|w| [(w >> 16) as u8, (w >> 8) as u8, *w as u8, (w >> 24) as u8])
-                .collect();
-            assert_eq!(native.rgba.as_ref(), rgba);
-            assert_eq!(
-                event.receiver_publication.unwrap().exact_pts_microseconds,
-                Some(1_000_000)
-            );
-        }
-    }
 }
 
 fn poison_decoder(
@@ -254,10 +228,9 @@ fn poison_decoder(
     panic!("fatal sync fixture was not rejected")
 }
 
-fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
+fn transition(kind: ResetKind, fatal_before_reset: bool) {
     let old = first_frame(OLD);
     let fresh = first_frame(FRESH);
-    assert_ne!(old.receiver_words.last(), fresh.receiver_words.last());
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
@@ -266,15 +239,9 @@ fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
         let second = configuration(&pool, &private, 90000);
         let next = kind.next(&first, &second);
         let cancel = AtomicBool::new(false);
-        let mut decoder = Decoder::new_configured_with_receiver_view(
-            &pool,
-            &first,
-            GENERATION,
-            limits(&old, &fresh),
-            ReceiverView::Receiver,
-            &cancel,
-        )
-        .unwrap();
+        let mut decoder =
+            Decoder::new_configured(&pool, &first, GENERATION, limits(&old, &fresh), &cancel)
+                .unwrap();
         let before = Input {
             configuration: &first,
             frame: &old,
@@ -286,7 +253,7 @@ fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
             generation: GENERATION + 1,
         };
         let (retained, _) = feed(&pool, &mut decoder, before, quantum, &cancel);
-        assert_output(&retained, before, ReceiverView::Receiver);
+        assert_output(&retained, before);
         if fatal_before_reset {
             poison_decoder(&pool, &mut decoder, &first, &cancel);
         }
@@ -301,19 +268,13 @@ fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
         );
         drop(stale);
         let (output, work) = feed(&pool, &mut decoder, after, quantum, &cancel);
-        assert_output(&output, after, ReceiverView::Receiver);
-        assert_output(&retained, before, ReceiverView::Receiver);
-        let mut cold = Decoder::new_configured_with_receiver_view(
-            &pool,
-            &next,
-            GENERATION + 1,
-            limits(&old, &fresh),
-            ReceiverView::Receiver,
-            &cancel,
-        )
-        .unwrap();
+        assert_output(&output, after);
+        assert_output(&retained, before);
+        let mut cold =
+            Decoder::new_configured(&pool, &next, GENERATION + 1, limits(&old, &fresh), &cancel)
+                .unwrap();
         let (cold_output, cold_work) = feed(&pool, &mut cold, after, quantum, &cancel);
-        assert_output(&cold_output, after, ReceiverView::Receiver);
+        assert_output(&cold_output, after);
         assert_eq!(
             work, cold_work,
             "reset must not reuse stale effective CLUT work/state"
@@ -325,14 +286,7 @@ fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
         drop(second);
         drop(first);
         drop(private);
-        let alias = retained.regions()[0]
-            .palette
-            .receiver
-            .as_ref()
-            .unwrap()
-            .rgba
-            .clone();
-        assert_eq!(retained.receiver_view, ReceiverView::Receiver);
+        let alias = retained.regions()[0].palette.rgba.clone();
         drop(retained);
         drop(output);
         assert!(pool.used() > baseline);
@@ -343,23 +297,23 @@ fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
 }
 
 #[test]
-fn native_view_survives_reset() {
-    native_transition(ResetKind::Stream, false);
+fn stream_reset() {
+    transition(ResetKind::Stream, false);
 }
 
 #[test]
-fn native_view_survives_reset_with_configuration() {
-    native_transition(ResetKind::Configuration, false);
+fn configuration_reset() {
+    transition(ResetKind::Configuration, false);
 }
 
 #[test]
-fn native_view_survives_fatal_error_then_reset() {
-    native_transition(ResetKind::Stream, true);
+fn stream_reset_after_a_fatal_error() {
+    transition(ResetKind::Stream, true);
 }
 
 #[test]
-fn native_view_survives_fatal_error_then_configuration_reset() {
-    native_transition(ResetKind::Configuration, true);
+fn configuration_reset_after_a_fatal_error() {
+    transition(ResetKind::Configuration, true);
 }
 
 #[test]
@@ -374,15 +328,9 @@ fn reset_methods_release_old_effective_state_before_reacquisition() {
             let first = configuration(&pool, &private, 1000);
             let second = configuration(&pool, &private, 90000);
             let cancel = AtomicBool::new(false);
-            let mut decoder = Decoder::new_configured_with_receiver_view(
-                &pool,
-                &first,
-                GENERATION,
-                limits(&old, &fresh),
-                ReceiverView::Receiver,
-                &cancel,
-            )
-            .unwrap();
+            let mut decoder =
+                Decoder::new_configured(&pool, &first, GENERATION, limits(&old, &fresh), &cancel)
+                    .unwrap();
             let empty = pool.used();
             let (event, _) = feed(
                 &pool,
@@ -447,8 +395,8 @@ fn source_policy_retention_work_and_bounds_are_preserved() {
                     let (retained, _) = feed(&pool, &mut decoder, before, quantum, &cancel);
                     kind.apply(&mut decoder, &second, &cancel);
                     let (output, work) = feed(&pool, &mut decoder, after, quantum, &cancel);
-                    assert_output(&retained, before, ReceiverView::Source);
-                    assert_output(&output, after, ReceiverView::Source);
+                    assert_output(&retained, before);
+                    assert_output(&output, after);
                     assert_eq!(output.object_retention, retention);
                     let mut cold = Decoder::new_configured_with_object_retention(
                         &pool,
@@ -460,7 +408,7 @@ fn source_policy_retention_work_and_bounds_are_preserved() {
                     )
                     .unwrap();
                     let (cold_output, cold_work) = feed(&pool, &mut cold, after, quantum, &cancel);
-                    assert_output(&cold_output, after, ReceiverView::Source);
+                    assert_output(&cold_output, after);
                     assert_eq!(work, cold_work);
                     let mut oversized = old.body.clone();
                     oversized.resize(limits.packet_bytes + 1, 0);
@@ -481,7 +429,7 @@ fn source_policy_retention_work_and_bounds_are_preserved() {
 }
 
 #[test]
-fn rejected_resets_do_not_change_native_policy_or_ownership() {
+fn rejected_resets_do_not_change_state_or_ownership() {
     let old = first_frame(OLD);
     let fresh = first_frame(FRESH);
     let pool = Budget::new(4 << 20).unwrap();
@@ -490,12 +438,11 @@ fn rejected_resets_do_not_change_native_policy_or_ownership() {
         let private = Bytes::copy_from_slice(&pool, &PRIVATE).unwrap();
         let configuration = configuration(&pool, &private, 1000);
         let cancel = AtomicBool::new(false);
-        let mut decoder = Decoder::new_configured_with_receiver_view(
+        let mut decoder = Decoder::new_configured(
             &pool,
             &configuration,
             GENERATION,
             limits(&old, &fresh),
-            ReceiverView::Receiver,
             &cancel,
         )
         .unwrap();
@@ -545,7 +492,7 @@ fn rejected_resets_do_not_change_native_policy_or_ownership() {
             Error::ForeignPool
         );
         assert_eq!(pool.used(), used);
-        assert_output(&retained, before, ReceiverView::Receiver);
+        assert_output(&retained, before);
     }
     assert_eq!(pool.used(), baseline);
 }

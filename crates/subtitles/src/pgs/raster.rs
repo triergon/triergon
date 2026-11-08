@@ -69,7 +69,6 @@ pub struct RasterJob {
     limits: RasterLimits,
     state: State,
     failed: Option<Error>,
-    receiver_tail: bool,
 }
 
 impl RasterJob {
@@ -118,28 +117,12 @@ impl RasterJob {
             limits,
             state: State::Reserve,
             failed: None,
-            receiver_tail: false,
         })
     }
 
-    /// The explicit receiver stops at the completed image, retaining the full
-    /// original encoded owner while leaving trailing source bytes unvalidated.
-    pub(crate) fn native_receiver(
-        encoded: Bytes,
-        width: u16,
-        height: u16,
-        budget: &Budget,
-        limits: RasterLimits,
-    ) -> Result<Self> {
-        let mut job = Self::new(encoded, width, height, budget, limits)?;
-        job.receiver_tail = true;
-        Ok(job)
-    }
-
-    /// Private evidence only: the strict grammar consumed the full encoding
-    /// and completed every row. Receiver-tail acceptance never grants this.
+    /// The strict grammar consumed the full encoding and completed every row.
     pub(crate) fn strict_validated_encoded(&self) -> Option<&Bytes> {
-        if matches!(self.state, State::Ready) && !self.receiver_tail {
+        if matches!(self.state, State::Ready) {
             self.encoded.as_ref()
         } else {
             None
@@ -260,10 +243,6 @@ impl RasterJob {
                         return Err(Error::Truncated);
                     }
                     if self.row == self.height {
-                        if self.receiver_tail {
-                            self.state = State::Ready;
-                            continue;
-                        }
                         return Err(Error::Invalid("PGS trailing object RLE"));
                     }
                     let Some(byte) = self.byte(work)? else {

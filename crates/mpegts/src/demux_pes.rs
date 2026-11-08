@@ -22,9 +22,11 @@ const DEFAULT_PACKET_CAP: usize = 204_800;
 
 mod audio;
 mod compact;
+mod cutter;
 mod dvb;
 pub use audio::{PrivateAudioCarriage, PrivateAudioDescriptors};
 pub use compact::{CompactPayload, DemuxSpanView, DemuxSpanViews, PayloadCursor};
+pub use cutter::{CutPes, PesCutter, pcr_bounded_pts};
 pub use dvb::DvbSubtitlesDescriptors;
 
 /// Explicit single-program/single-PID profile from validated source signalling.

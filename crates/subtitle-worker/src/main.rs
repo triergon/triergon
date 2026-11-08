@@ -103,7 +103,11 @@ impl Args {
     /// Refuse options the candidate does not implement, as the reference refuses
     /// options its decoder does not have.
     pub fn only(&self, known: &[&str]) -> Result<()> {
-        match self.options.iter().find(|(n, _)| !known.contains(&n.as_str())) {
+        match self
+            .options
+            .iter()
+            .find(|(n, _)| !known.contains(&n.as_str()))
+        {
             Some((name, _)) => Err(format!("unsupported decoder option {name}").into()),
             None => Ok(()),
         }

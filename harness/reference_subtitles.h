@@ -33,6 +33,16 @@
 #define SUB_OPERATION "subtitle-decode"
 #define SUB_MAX_DRAIN 64
 
+/* The statically linked libzvbi calls strdup. glibc's strdup allocates
+ * outside the interposed entry points the memory observer covers, so the
+ * worker defines it here with the same work (one malloc of strlen + 1 and a
+ * copy) and the binary imports no allocator the observer cannot see. */
+char *strdup(const char *text) {
+    size_t size = strlen(text) + 1;
+    char *copy = malloc(size);
+    return copy ? memcpy(copy, text, size) : NULL;
+}
+
 typedef struct {
     enum AVCodecID codec;
     AVCodecParameters *par;
