@@ -24,6 +24,9 @@ playback-worker pgs-memory  CAPSULE
 playback-worker subtitle-text-fold   FILE KIND [ENCODING]
 playback-worker subtitle-text-bench  FILE ITERATIONS KIND [ENCODING]
 playback-worker subtitle-text-memory FILE KIND [ENCODING]
+playback-worker ts-fold     FILE SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...
+playback-worker ts-bench    FILE ITERATIONS SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...
+playback-worker ts-memory   FILE SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...
 ```
 
 The `feed-` modes open a Matroska file with a 4 KiB read window, discover the streams,
@@ -99,3 +102,14 @@ repertoire. `srt` and `vtt` read one SubRip or WebVTT document through
 `utf16le`, folding every cue's start, duration, text and WebVTT identifier and
 settings. The capsules are written by `harness/subtitle_corpus.py`; the corpus is
 `harness/features/subtitles-text/`.
+The `ts-fold`, `ts-bench` and `ts-memory` modes produce the packets FFmpeg's MPEG-TS
+demuxer emits for one program of a TS188 or M2TS192 input (`SIZE` 188 or 192) through
+[triergon-mpegts](../mpegts/README.md)' FFmpeg-compatible view: the source view's
+events drive the `compat::pes` observer of the program's one elementary stream, its
+`DemuxClock`, and the `reference-trace` recovery projection for carriers the source
+view rejects. `--dvb` declares the DVB descriptor namespace. Each packet folds its
+stream index, PID, PTS, DTS, duration, position, flags, payload and stream-ID side
+data. A context outside that composition, a further media `ENTITY` (a file next to
+the input) or an operation without packets ends the operation: the JSON line then
+has `"eof":false`, a `refusal` and the source event it is attributed to. The corpus
+is `harness/features/mpegts-pes/`.

@@ -1278,6 +1278,7 @@ mod tests {
             ("raw-annex-b", 6),
             ("subtitles-pgs", 229),
             ("subtitles-text", 275),
+            ("mpegts-pes", 97),
         ] {
             let (manifest, manifest_sha) = super::super::manifest::read(
                 root,

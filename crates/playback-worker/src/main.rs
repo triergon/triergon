@@ -10,6 +10,7 @@ mod progressive;
 mod raw_video;
 mod runner;
 mod subtitle_text;
+mod ts;
 mod ts_program;
 use std::{
     io::{self, Write},
@@ -345,6 +346,9 @@ fn work() -> Result<(), Box<dyn std::error::Error>> {
     }
     if let Some(result) = runner::dispatch(&all) {
         return result;
+    }
+    if all.first().is_some_and(|mode| mode.starts_with("ts-")) {
+        return ts::run(&all);
     }
     let mut args = all.into_iter();
     let usage = "usage: playback-worker feed-bench CAPSULE ITERATIONS | feed-fold CAPSULE | feed-memory CAPSULE";

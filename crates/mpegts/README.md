@@ -241,6 +241,9 @@ Verification:
   the corpus. The FFmpeg-compatible view is compared packet by packet
   (payload bytes, timestamps, flags, positions, stream-ID side data) with the
   FFmpeg reference; nonmatching cases are kept as failures, not normalised.
+  `cargo xtask report` runs that comparison from
+  [`harness/features/mpegts-pes/`](../../harness/features/mpegts-pes/contract.json)
+  through `playback-worker`'s `ts-` modes.
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
