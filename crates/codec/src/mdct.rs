@@ -10,9 +10,12 @@
 //! windowing. It runs as a DCT-IV of size `K` through an `N / 4`-point complex FFT with
 //! pre- and post-twiddles. The FFT is mixed radix, so `N / 4` may be any product of 2, 3
 //! and 5: the power-of-two Vorbis blocks and the 120 · 2^j-sample CELT frames both fit.
-//! Windowing and overlap-add stay with each codec.
+//! Windowing and overlap-add stay with each codec. Every table is charged to the budget
+//! the transform is built in.
 
 use core::f64::consts::PI;
+
+use triergon_core::{Budget, BudgetVec, Error as StorageError};
 
 /// `(a + ib)(c + id)`, in the order every stage uses.
 #[inline(always)]
@@ -24,12 +27,12 @@ fn mul(a: f32, b: f32, c: f32, d: f32) -> (f32, f32) {
 /// transforms of length `radix * span`. The twiddles `e^{-2πi qk / (radix span)}` for
 /// `1 <= q < radix` and `k < span` are stored `q` major in split real and imaginary
 /// parts, so a stage reads them as contiguous runs.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Stage {
     radix: usize,
     span: usize,
-    re: Vec<f32>,
-    im: Vec<f32>,
+    re: BudgetVec<f32>,
+    im: BudgetVec<f32>,
 }
 
 impl Stage {
@@ -48,62 +51,78 @@ impl Stage {
 /// decimation in time over split real and imaginary planes: the input is read in
 /// digit-reversed order ([`Fft::order`]) and the stages run in place, innermost first.
 /// Every loop runs over contiguous runs of one plane, so it vectorises.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Fft {
     len: usize,
     /// Innermost stage first.
-    stages: Vec<Stage>,
+    stages: BudgetVec<Stage>,
     /// The input index each slot of the in-place buffer starts from.
-    order: Vec<u32>,
+    order: BudgetVec<u32>,
+}
+
+/// The radices of a transform of length `len`, outermost first, or `None` unless `len`
+/// is a product of 2, 3 and 5. At most 32 of them, as `len` fits a `u32`.
+fn radices(len: usize) -> Option<([usize; 32], usize)> {
+    if len == 0 || u32::try_from(len).is_err() {
+        return None;
+    }
+    // Outermost factor first. Radix 4 runs innermost and 3 and 5 outermost, so every
+    // stage after the first spans a multiple of four points and its loop vectorises.
+    let mut rest = len;
+    let mut count = |radix: usize| {
+        let mut n = 0;
+        while rest.is_multiple_of(radix) && rest > 1 {
+            rest /= radix;
+            n += 1;
+        }
+        n
+    };
+    let (fours, twos, threes, fives) = (count(4), count(2), count(3), count(5));
+    if rest != 1 {
+        return None;
+    }
+    let mut radices = [0; 32];
+    let mut n = 0;
+    for (radix, times) in [(5, fives), (3, threes), (2, twos), (4, fours)] {
+        radices[n..n + times].fill(radix);
+        n += times;
+    }
+    Some((radices, n))
 }
 
 impl Fft {
-    fn new(len: usize) -> Option<Fft> {
-        if len == 0 || u32::try_from(len).is_err() {
-            return None;
-        }
-        // Outermost factor first. Radix 4 runs innermost and 3 and 5 outermost, so every
-        // stage after the first spans a multiple of four points and its loop vectorises.
-        let mut rest = len;
-        let mut count = |radix: usize| {
-            let mut n = 0;
-            while rest.is_multiple_of(radix) && rest > 1 {
-                rest /= radix;
-                n += 1;
-            }
-            n
+    /// `Ok(None)` unless `len` is a product of 2, 3 and 5.
+    fn new(len: usize, budget: &Budget) -> Result<Option<Fft>, StorageError> {
+        let Some((radices, count)) = radices(len) else {
+            return Ok(None);
         };
-        let (fours, twos, threes, fives) = (count(4), count(2), count(3), count(5));
-        if rest != 1 {
-            return None;
-        }
-        let radices: Vec<usize> = [(5, fives), (3, threes), (2, twos), (4, fours)]
-            .into_iter()
-            .flat_map(|(radix, n)| core::iter::repeat_n(radix, n))
-            .collect();
-        let mut order = Vec::with_capacity(len);
-        digit_reversal(&radices, 0, 1, &mut order);
-        let mut stages = Vec::with_capacity(radices.len());
+        let radices = &radices[..count];
+        let mut order = BudgetVec::try_filled(budget, 0, len)?;
+        let mut next = 0;
+        digit_reversal(radices, 0, 1, &mut order, &mut next);
+        let mut stages = BudgetVec::new(budget);
+        stages.try_reserve_exact(count)?;
         let mut span = 1;
         for &radix in radices.iter().rev() {
             let stride = len / (radix * span);
             let angle =
                 |q: usize, k: usize| -2.0 * PI * ((q * k * stride) % len) as f64 / len as f64;
             let pairs = || (1..radix).flat_map(|q| (0..span).map(move |k| angle(q, k)));
-            stages.push(Stage {
+            let mut re = BudgetVec::try_filled(budget, 0.0, (radix - 1) * span)?;
+            let mut im = BudgetVec::try_filled(budget, 0.0, (radix - 1) * span)?;
+            for ((r, i), a) in re.iter_mut().zip(im.iter_mut()).zip(pairs()) {
+                (*r, *i) = (a.cos() as f32, a.sin() as f32);
+            }
+            let stage = Stage {
                 radix,
                 span,
-                re: pairs().map(|a| a.cos() as f32).collect(),
-                im: pairs().map(|a| a.sin() as f32).collect(),
-            });
+                re,
+                im,
+            };
+            stages.try_push(stage).map_err(|refused| refused.error)?;
             span *= radix;
         }
-        Some(Fft { len, stages, order })
-    }
-
-    /// Bytes the tables of a transform of length `len` hold.
-    fn table_bytes(len: usize) -> usize {
-        len.saturating_mul(size_of::<u32>() + 2 * size_of::<f32>())
+        Ok(Some(Fft { len, stages, order }))
     }
 
     /// The input index each slot of the in-place buffer starts from.
@@ -165,8 +184,6 @@ fn leaf4(x: [(f32, f32); 4]) -> [(f32, f32); 4] {
     ]
 }
 
-impl Fft {}
-
 /// One stage over every block of the planes.
 fn run_stage(re: &mut [f32], im: &mut [f32], stage: &Stage) {
     let block = stage.radix * stage.span;
@@ -184,12 +201,21 @@ fn run_stage(re: &mut [f32], im: &mut [f32], stage: &Stage) {
 
 /// Input index of each leaf of the decomposition `radices` (outermost first), in leaf
 /// order: the mixed-radix digit reversal.
-fn digit_reversal(radices: &[usize], offset: usize, stride: usize, out: &mut Vec<u32>) {
+fn digit_reversal(
+    radices: &[usize],
+    offset: usize,
+    stride: usize,
+    out: &mut [u32],
+    next: &mut usize,
+) {
     match radices.split_first() {
-        None => out.push(offset as u32),
+        None => {
+            out[*next] = offset as u32;
+            *next += 1;
+        }
         Some((&radix, inner)) => {
             for q in 0..radix {
-                digit_reversal(inner, offset + q * stride, stride * radix, out);
+                digit_reversal(inner, offset + q * stride, stride * radix, out, next);
             }
         }
     }
@@ -396,68 +422,76 @@ fn radix5(
 }
 
 /// Inverse MDCT of one block size; see the [module documentation](self).
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Imdct {
-    /// Output length `N`.
+    /// The DCT-IV the transform runs as.
+    dct4: Dct4,
+    /// The DCT-IV of the last [`Imdct::imdct`] input.
+    dct: BudgetVec<f32>,
+}
+
+/// The DCT-IV of size `K = N / 2` through an `N / 4`-point FFT.
+#[derive(Debug)]
+struct Dct4 {
+    /// Output length `N` of the inverse MDCT.
     len: usize,
     fft: Fft,
     /// `e^{-iπ(j + 1/8) / K}` for `j < N / 4`, applied before the FFT, real and
     /// imaginary parts.
-    pre: (Vec<f32>, Vec<f32>),
+    pre: (BudgetVec<f32>, BudgetVec<f32>),
     /// `scale` times the same, applied after it.
-    post: (Vec<f32>, Vec<f32>),
+    post: (BudgetVec<f32>, BudgetVec<f32>),
     /// The FFT's in-place planes.
-    re: Vec<f32>,
-    im: Vec<f32>,
-    /// The DCT-IV of the last [`Imdct::imdct`] input.
-    dct: Vec<f32>,
+    re: BudgetVec<f32>,
+    im: BudgetVec<f32>,
 }
 
 impl Imdct {
-    /// Heap bytes an [`Imdct`] of output length `n` holds, for charging a budget first.
+    /// Whether [`Imdct::new`] builds a transform of output length `n`: a multiple of 4
+    /// whose quarter is a product of 2, 3 and 5.
     #[must_use]
-    pub fn table_bytes(n: usize) -> usize {
-        let q = n / 4;
-        // FFT tables, pre/post twiddles and the work planes; the DCT-IV output; the
-        // stage list.
-        Fft::table_bytes(q)
-            .saturating_add(q.saturating_mul(6 * size_of::<f32>()))
-            .saturating_add((n / 2).saturating_mul(size_of::<f32>()))
-            .saturating_add(16 * size_of::<Stage>())
+    pub fn supports(n: usize) -> bool {
+        n >= 4 && n.is_multiple_of(4) && radices(n / 4).is_some()
     }
 
-    /// The transform producing `n` outputs from `n / 2` coefficients, scaled by `scale`.
-    /// `None` unless `n` is a multiple of 4 and `n / 4` a product of 2, 3 and 5.
-    #[must_use]
-    pub fn new(n: usize, scale: f64) -> Option<Imdct> {
-        if n < 4 || !n.is_multiple_of(4) {
-            return None;
+    /// The transform producing `n` outputs from `n / 2` coefficients, scaled by `scale`,
+    /// with its tables charged to `budget`.
+    ///
+    /// # Errors
+    /// `Invalid` unless [`Imdct::supports`] `n`; a refused charge.
+    pub fn new(n: usize, scale: f64, budget: &Budget) -> Result<Imdct, StorageError> {
+        if !Imdct::supports(n) {
+            return Err(StorageError::Invalid("IMDCT length"));
         }
         let q = n / 4;
         let k = n / 2;
-        let fft = Fft::new(q)?;
-        let twiddles = |s: f64| -> (Vec<f32>, Vec<f32>) {
+        let fft = Fft::new(q, budget)?.ok_or(StorageError::Invalid("IMDCT length"))?;
+        let twiddles = |s: f64| -> Result<(BudgetVec<f32>, BudgetVec<f32>), StorageError> {
             let angle = |j: usize| -PI * (j as f64 + 0.125) / k as f64;
-            (
-                (0..q).map(|j| (s * angle(j).cos()) as f32).collect(),
-                (0..q).map(|j| (s * angle(j).sin()) as f32).collect(),
-            )
+            let mut re = BudgetVec::try_filled(budget, 0.0, q)?;
+            let mut im = BudgetVec::try_filled(budget, 0.0, q)?;
+            for (j, (r, i)) in re.iter_mut().zip(im.iter_mut()).enumerate() {
+                (*r, *i) = ((s * angle(j).cos()) as f32, (s * angle(j).sin()) as f32);
+            }
+            Ok((re, im))
         };
-        Some(Imdct {
-            len: n,
-            fft,
-            pre: twiddles(1.0),
-            post: twiddles(scale),
-            re: vec![0.0; q],
-            im: vec![0.0; q],
-            dct: vec![0.0; k],
+        Ok(Imdct {
+            dct4: Dct4 {
+                len: n,
+                fft,
+                pre: twiddles(1.0)?,
+                post: twiddles(scale)?,
+                re: BudgetVec::try_filled(budget, 0.0, q)?,
+                im: BudgetVec::try_filled(budget, 0.0, q)?,
+            },
+            dct: BudgetVec::try_filled(budget, 0.0, k)?,
         })
     }
 
     /// Output length `N`.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.len
+        self.dct4.len
     }
 
     /// Always false: a transform has at least four outputs.
@@ -472,6 +506,38 @@ impl Imdct {
     /// # Panics
     /// If `x` or `w` is shorter than `K`.
     pub fn dct4(&mut self, x: &[f32], w: &mut [f32]) {
+        self.dct4.run(x, w);
+    }
+
+    /// The full inverse MDCT: `N` outputs `y` from `K = N / 2` coefficients `x`.
+    ///
+    /// # Panics
+    /// If `x` is shorter than `K` or `y` shorter than `N`.
+    pub fn imdct(&mut self, x: &[f32], y: &mut [f32]) {
+        let k = self.dct4.len / 2;
+        let half = k / 2;
+        let dct = &mut self.dct;
+        self.dct4.run(x, dct);
+        let y = &mut y[..self.dct4.len];
+        // y[n] = w[n + K/2] for n < K/2; -w[3K/2 - 1 - n] for K/2 <= n < 3K/2;
+        // -w[n - 3K/2] after.
+        y[..half].copy_from_slice(&dct[half..]);
+        for n in half..3 * half {
+            y[n] = -dct[3 * half - 1 - n];
+        }
+        for n in 3 * half..2 * k {
+            y[n] = -dct[n - 3 * half];
+        }
+    }
+}
+
+impl Dct4 {
+    /// The DCT-IV of size `K = N / 2`:
+    /// `w[m] = scale * sum_k x[k] cos(π/K (m + 1/2)(k + 1/2))`.
+    ///
+    /// # Panics
+    /// If `x` or `w` is shorter than `K`.
+    fn run(&mut self, x: &[f32], w: &mut [f32]) {
         let k = self.len / 2;
         let (x, w) = (&x[..k], &mut w[..k]);
         let (pre_re, pre_im) = (&self.pre.0, &self.pre.1);
@@ -508,33 +574,15 @@ impl Imdct {
             w[k - 1 - 2 * j] = -ui;
         }
     }
-
-    /// The full inverse MDCT: `N` outputs `y` from `K = N / 2` coefficients `x`.
-    ///
-    /// # Panics
-    /// If `x` is shorter than `K` or `y` shorter than `N`.
-    pub fn imdct(&mut self, x: &[f32], y: &mut [f32]) {
-        let k = self.len / 2;
-        let half = k / 2;
-        let mut dct = core::mem::take(&mut self.dct);
-        self.dct4(x, &mut dct);
-        let y = &mut y[..self.len];
-        // y[n] = w[n + K/2] for n < K/2; -w[3K/2 - 1 - n] for K/2 <= n < 3K/2;
-        // -w[n - 3K/2] after.
-        y[..half].copy_from_slice(&dct[half..]);
-        for n in half..3 * half {
-            y[n] = -dct[3 * half - 1 - n];
-        }
-        for n in 3 * half..2 * k {
-            y[n] = -dct[n - 3 * half];
-        }
-        self.dct = dct;
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn budget() -> Budget {
+        Budget::new(1 << 24).unwrap()
+    }
 
     fn lcg(state: &mut u32) -> f32 {
         *state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
@@ -547,7 +595,7 @@ mod tests {
         for len in [
             1, 2, 3, 4, 5, 6, 8, 12, 15, 16, 30, 60, 64, 120, 240, 480, 512,
         ] {
-            let fft = Fft::new(len).unwrap();
+            let fft = Fft::new(len, &budget()).unwrap().unwrap();
             let input: Vec<(f32, f32)> =
                 (0..len).map(|_| (lcg(&mut seed), lcg(&mut seed))).collect();
             let mut re: Vec<f32> = fft.order().iter().map(|&j| input[j as usize].0).collect();
@@ -570,7 +618,7 @@ mod tests {
                 );
             }
         }
-        assert!(Fft::new(7).is_none());
+        assert!(Fft::new(7, &budget()).unwrap().is_none());
     }
 
     #[test]
@@ -579,7 +627,7 @@ mod tests {
         for n in [8, 16, 64, 240, 480, 960, 1920, 256, 2048] {
             let k = n / 2;
             let x: Vec<f32> = (0..k).map(|_| lcg(&mut seed)).collect();
-            let mut imdct = Imdct::new(n, -0.5).unwrap();
+            let mut imdct = Imdct::new(n, -0.5, &budget()).unwrap();
             let mut y = vec![0f32; n];
             imdct.imdct(&x, &mut y);
             for (i, got) in y.iter().enumerate() {
@@ -600,10 +648,26 @@ mod tests {
                 );
             }
         }
-        let mut tiny = Imdct::new(4, 1.0).unwrap();
+        let mut tiny = Imdct::new(4, 1.0, &budget()).unwrap();
         let mut y = [0.0; 4];
         tiny.imdct(&[1.0, 0.0], &mut y);
-        assert!(Imdct::new(28, 1.0).is_none());
-        assert!(Imdct::new(30, 1.0).is_none());
+        assert!(Imdct::new(28, 1.0, &budget()).is_err());
+        assert!(Imdct::new(30, 1.0, &budget()).is_err());
+        assert!(!Imdct::supports(28) && Imdct::supports(1920));
+    }
+
+    #[test]
+    fn tables_are_charged_and_a_small_budget_refuses() {
+        let pool = budget();
+        let idle = pool.used();
+        let imdct = Imdct::new(2048, 1.0, &pool).unwrap();
+        assert!(pool.used() >= idle + 2048 * 2 * size_of::<f32>());
+        drop(imdct);
+        assert_eq!(pool.used(), idle);
+        let small = Budget::new(1024).unwrap();
+        assert!(matches!(
+            Imdct::new(2048, 1.0, &small),
+            Err(StorageError::Limit { .. })
+        ));
     }
 }

@@ -34,6 +34,18 @@ pub fn kbd_window(alpha: f64, out: &mut [f32]) {
     }
 }
 
+/// Fill `out` with the rising slope of the power-complementary window both Vorbis I
+/// (section 4.3.1) and CELT (RFC 6716 section 4.3.7) overlap by:
+/// `sin(π/2 · sin²((i + 1/2) / m · π/2))` for `m = out.len()`, computed in double
+/// precision. The falling slope is the same read backwards.
+pub fn vorbis_window(out: &mut [f32]) {
+    let m = out.len() as f64;
+    for (i, w) in out.iter_mut().enumerate() {
+        let s = ((i as f64 + 0.5) / m * core::f64::consts::FRAC_PI_2).sin();
+        *w = (core::f64::consts::FRAC_PI_2 * s * s).sin() as f32;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::kbd_window;
