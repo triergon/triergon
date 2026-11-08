@@ -325,7 +325,7 @@ mod tests {
         let mut b = [0u8; 34];
         b[..4].copy_from_slice(&[0x10, 0, 0x10, 0]);
         // 44100 Hz, 2 channels, 16 bits, 1000 samples.
-        let packed: u64 = (44100 << 44) | (1 << 41) | (15 << 36) | 1000;
+        let packed: u64 = (44100 << 44) + (1 << 41) + (15 << 36) + 1000;
         b[10..18].copy_from_slice(&packed.to_be_bytes());
         b
     }
