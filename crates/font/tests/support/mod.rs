@@ -500,6 +500,7 @@ fn charstring(parts: &[Part]) -> Vec<u8> {
             Part::N(v) => number(v),
             Part::Op(op) => vec![op],
             Part::Escape(op) => vec![12, op],
+            Part::Byte(byte) => vec![byte],
         })
         .collect()
 }
@@ -510,14 +511,17 @@ enum Part {
     N(i16),
     Op(u8),
     Escape(u8),
+    /// A raw byte, such as a hint mask.
+    Byte(u8),
 }
 
 /// A CFF face exercising `seac`, arithmetic (`div`, `mul`, `add`, `sub`, `neg`,
-/// `abs`, `exch`, `dup`, `index`, `roll`, `put`, `get`, `ifelse`) and subroutines
-/// nested twelve deep, past TN 5177's ten. Glyphs: .notdef, A, acute, D (A with an
-/// acute through `seac`), B (arithmetic), C (nested calls).
+/// `abs`, `exch`, `dup`, `index`, `roll`, `put`, `get`, `ifelse`), subroutines
+/// nested twelve deep, past TN 5177's ten, and the flex, counter-mask, logic and
+/// `sqrt` operators. Glyphs: .notdef, A, acute, D (A with an acute through
+/// `seac`), B (arithmetic), C (nested calls), E (flex and logic).
 fn cff_features_tables() -> Tables {
-    use Part::{Escape as E, N, Op};
+    use Part::{Byte, Escape as E, N, Op};
     let glyphs = vec![
         charstring(&[Op(14)]),
         // A: width 600; a triangle.
@@ -605,6 +609,88 @@ fn cff_features_tables() -> Tables {
         ]),
         // C: twelve nested local subroutines, each drawing a line after its call.
         charstring(&[N(100), N(100), Op(21), N(-107), Op(10), Op(14)]),
+        // E: two stems and a counter mask over both, dotsection, the four flex
+        // forms, then a line whose dx is ((1 and 1) + (0 or 1) + not 0 + (2 eq 2))
+        // * 25 = 100 and whose dy is sqrt 81 = 9.
+        charstring(&[
+            N(0),
+            N(50),
+            N(100),
+            N(50),
+            Op(1),
+            Op(20),
+            Byte(0xc0),
+            E(0),
+            N(100),
+            N(100),
+            Op(21),
+            N(50),
+            N(50),
+            N(20),
+            N(50),
+            N(50),
+            N(50),
+            N(50),
+            E(34),
+            N(30),
+            N(10),
+            N(30),
+            N(10),
+            N(30),
+            N(0),
+            N(30),
+            N(0),
+            N(30),
+            N(-10),
+            N(30),
+            N(-10),
+            N(50),
+            E(35),
+            N(20),
+            N(10),
+            N(20),
+            N(10),
+            N(20),
+            N(20),
+            N(20),
+            N(-10),
+            N(20),
+            E(36),
+            N(10),
+            N(20),
+            N(10),
+            N(20),
+            N(10),
+            N(20),
+            N(10),
+            N(-20),
+            N(10),
+            N(-20),
+            N(10),
+            E(37),
+            N(1),
+            N(1),
+            E(3),
+            N(0),
+            N(1),
+            E(4),
+            E(10),
+            N(0),
+            E(5),
+            E(10),
+            N(2),
+            N(2),
+            E(15),
+            E(10),
+            N(25),
+            E(24),
+            N(81),
+            E(26),
+            Op(5),
+            N(-150),
+            Op(7),
+            Op(14),
+        ]),
     ];
     // Local subroutines 0..12: subr k calls subr k + 1, then draws; the last draws.
     let mut local: Vec<Vec<u8>> = (0..12)
@@ -616,14 +702,14 @@ fn cff_features_tables() -> Tables {
         global: Vec::new(),
         local,
         // A, acute, D, B, C as standard strings.
-        charset: Some(vec![34, 125, 37, 35, 36]),
+        charset: Some(vec![34, 125, 37, 35, 36, 38]),
         matrix: None,
         nominal_width: 500,
     };
     vec![
         (*b"head", head(1000, false, 0)),
-        (*b"hhea", hhea(6)),
-        (*b"maxp", maxp(6)),
+        (*b"hhea", hhea(7)),
+        (*b"maxp", maxp(7)),
         (*b"OS/2", os2(400, 0x40)),
         (
             *b"hmtx",
@@ -634,11 +720,19 @@ fn cff_features_tables() -> Tables {
                 (600, 100),
                 (700, 100),
                 (700, 100),
+                (900, 100),
             ]),
         ),
         (
             *b"cmap",
-            cmap(&[(0x41, 1), (0x42, 4), (0x43, 5), (0x44, 3), (0xb4, 2)]),
+            cmap(&[
+                (0x41, 1),
+                (0x42, 4),
+                (0x43, 5),
+                (0x44, 3),
+                (0x45, 6),
+                (0xb4, 2),
+            ]),
         ),
         (
             *b"name",

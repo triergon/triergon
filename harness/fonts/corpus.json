@@ -329,11 +329,11 @@
       "name": "authored",
       "generator": "authored-fonts",
       "licence": "authored for this repository (MIT OR Apache-2.0)",
-      "origin": "crates/font/tests/support: seac, charstring arithmetic, subroutines nested past ten, a non-default FontMatrix, every supported cmap format",
+      "origin": "crates/font/tests/support: seac, the charstring arithmetic, logic and storage operators, flex, counter masks, subroutines nested past ten, a non-default FontMatrix, every supported cmap format",
       "files": [
         {
           "path": "authored/authored-cff-features.otf",
-          "sha256": "6e92999c49e644ce1887c76f90edc239ba4ffcc2e1f9104f09f5166104097951"
+          "sha256": "16ee723525f06ab9e72afe8799297874d07722b9f51e9514ab7c33d6b7511c39"
         },
         {
           "path": "authored/authored-cff-matrix.otf",

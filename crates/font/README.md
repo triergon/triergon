@@ -87,8 +87,8 @@ range that runs past `glyf` is cut at its end. Instructions are skipped.
 CID-keyed (FDArray, FDSelect formats 0 and 3), and `CFF2` (FDSelect format 4 too)
 at the default instance of a variable font: `blend` applies region scalars at the
 origin, in charstrings and Private DICTs. Supported: all path operators, flex,
-hints and masks (counted and skipped), local and global subroutines (10 nested
-calls in CFF), arithmetic, storage and `random` operators (CFF only, as in
+hints and masks (counted and skipped), local and global subroutines (16 nested
+calls, FreeType's limit; TN 5177 states 10), arithmetic, storage and `random` operators (CFF only, as in
 FreeType), and `seac` accents through StandardEncoding and the ISOAdobe or a
 custom charset, the accent drawn first. Charstrings are evaluated in 16.16 fixed
 point as FreeType's CFF engine evaluates them: sums wrap at 32 bits, `mul`, `div`
@@ -194,7 +194,8 @@ view that allocates nothing.
 `Limits` bounds the work of one parse and of one outline (`work`), nested
 composites and subroutine calls (`depth`) and the points of one outline
 (`points`); exceeding one is `Error::Policy`. Format ceilings (48 or 513 operands,
-96 stems, 32 transient slots, 10 nested calls in CFF, 64 nested composites) are
+96 stems, 32 transient slots, 16 nested subroutine calls in CFF, 64 nested
+composites) are
 `Error::Invalid`, as is malformed data. Unsupported files and features are
 `Error::Unsupported`. No input panics.
 
@@ -218,8 +219,16 @@ composites and subroutine calls (`depth`) and the points of one outline
   plain outlines are compared point by point, elsewhere and for the synthetic
   variants by a 64-bit FNV-1a digest of the same text. A value the crate declares
   unsupported is counted apart, never as agreement.
+- The corpus includes three fonts the crate's test support writes
+  (`examples/authored-fonts.rs`): `seac`, the arithmetic, logic and storage operators,
+  the flex forms, counter masks, subroutines nested twelve deep, a non-default
+  FontMatrix and one cmap subtable of each supported format. With them the
+  comparison exercises every charstring operator except `vsindex` (CFF2 fonts in the
+  corpus do not use it) and `random`, and every supported cmap format;
+  `examples/font-coverage.rs` reports this.
 - `cargo xtask fonts fuzz` runs `examples/fuzz.rs`, which mutates every corpus file
-  and reads the results in the dev profile, so overflow is checked as well.
+  and reads the results in the dev profile, so overflow is checked as well, and fails
+  on an input that runs past its timeout.
 
 The comparison establishes agreement with FreeType on that corpus, not conformance
 with the OpenType specification. Face matching is checked by unit tests only.
