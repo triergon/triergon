@@ -51,169 +51,217 @@ impl Cpx {
     }
 }
 
-/// One stage of the decomposition: `radix` sub-transforms of length `span` are combined.
-#[derive(Clone, Copy, Debug)]
+/// One stage of the decomposition: `radix` transforms of length `span` combine into
+/// transforms of length `radix * span`, with `twiddles` holding `e^{-2πi qk / (radix
+/// span)}` for `k < span` and `1 <= q < radix`, `k` major.
+#[derive(Clone, Debug)]
 struct Stage {
     radix: usize,
     span: usize,
+    twiddles: Vec<Cpx>,
 }
 
-/// Forward complex FFT, `Z[k] = sum_n z[n] e^{-2πi kn/L}`, by mixed-radix decimation in
-/// time.
+/// Forward complex FFT, `Z[k] = sum_n z[n] e^{-2πi kn/L}`, by iterative mixed-radix
+/// decimation in time: the input is read in digit-reversed order ([`Fft::order`]) and
+/// the stages run in place, innermost first.
 #[derive(Clone, Debug)]
 struct Fft {
     len: usize,
+    /// Innermost stage first.
     stages: Vec<Stage>,
-    /// `e^{-2πi j / len}` for `j < len`.
-    twiddle: Vec<Cpx>,
+    /// The input index each slot of the in-place buffer starts from.
+    order: Vec<u32>,
 }
 
 impl Fft {
     fn new(len: usize) -> Option<Fft> {
-        if len == 0 {
+        if len == 0 || u32::try_from(len).is_err() {
             return None;
         }
-        let mut stages = Vec::new();
+        // Outermost factor first: radix 4 while it divides, then 2, 3 and 5.
+        let mut radices = Vec::new();
         let mut rest = len;
         for radix in [4, 2, 3, 5] {
             while rest.is_multiple_of(radix) && rest > 1 {
                 rest /= radix;
-                stages.push(Stage { radix, span: rest });
+                radices.push(radix);
             }
         }
         if rest != 1 {
             return None;
         }
-        let twiddle = (0..len)
-            .map(|j| {
-                let a = -2.0 * PI * j as f64 / len as f64;
-                Cpx::new(a.cos() as f32, a.sin() as f32)
-            })
-            .collect();
-        Some(Fft {
-            len,
-            stages,
-            twiddle,
-        })
+        let mut order = Vec::with_capacity(len);
+        digit_reversal(&radices, 0, 1, &mut order);
+        let mut stages = Vec::with_capacity(radices.len());
+        let mut span = 1;
+        for &radix in radices.iter().rev() {
+            let block = radix * span;
+            let stride = len / block;
+            let twiddles = (0..span)
+                .flat_map(|k| {
+                    (1..radix).map(move |q| {
+                        let a = -2.0 * PI * ((q * k * stride) % len) as f64 / len as f64;
+                        Cpx::new(a.cos() as f32, a.sin() as f32)
+                    })
+                })
+                .collect();
+            stages.push(Stage {
+                radix,
+                span,
+                twiddles,
+            });
+            span = block;
+        }
+        Some(Fft { len, stages, order })
     }
 
-    /// Transform `input` (read with `stride`) into `out`.
+    /// Bytes the tables of a transform of length `len` hold.
+    fn table_bytes(len: usize) -> usize {
+        len.saturating_mul(size_of::<u32>() + size_of::<Cpx>())
+    }
+
+    /// The input index slot `slot` of the in-place buffer starts from.
+    fn order(&self) -> &[u32] {
+        &self.order
+    }
+
+    /// Transform `data`, already filled in [`Fft::order`].
+    fn transform(&self, data: &mut [Cpx]) {
+        let data = &mut data[..self.len];
+        for stage in &self.stages {
+            let block = stage.radix * stage.span;
+            for chunk in data.chunks_exact_mut(block) {
+                match stage.radix {
+                    2 => butterfly2(chunk, stage),
+                    3 => butterfly3(chunk, stage),
+                    4 => butterfly4(chunk, stage),
+                    5 => butterfly5(chunk, stage),
+                    _ => unreachable!("radices are 2, 3, 4 and 5"),
+                }
+            }
+        }
+    }
+
+    /// Transform `input` into `out` (both of the transform's length).
+    #[cfg(test)]
     fn run(&self, input: &[Cpx], out: &mut [Cpx]) {
-        if self.stages.is_empty() {
-            out[0] = input[0];
-            return;
+        for (slot, &from) in out.iter_mut().zip(&self.order) {
+            *slot = input[from as usize];
         }
-        self.work(out, input, 0, 1, 0);
+        self.transform(out);
     }
+}
 
-    fn work(&self, out: &mut [Cpx], input: &[Cpx], offset: usize, stride: usize, stage: usize) {
-        let Stage { radix, span } = self.stages[stage];
-        if span == 1 {
-            for (q, o) in out[..radix].iter_mut().enumerate() {
-                *o = input[offset + q * stride];
-            }
-        } else {
+/// Input index of each leaf of the decomposition `radices` (outermost first), in leaf
+/// order: the mixed-radix digit reversal.
+fn digit_reversal(radices: &[usize], offset: usize, stride: usize, out: &mut Vec<u32>) {
+    match radices.split_first() {
+        None => out.push(offset as u32),
+        Some((&radix, inner)) => {
             for q in 0..radix {
-                self.work(
-                    &mut out[q * span..(q + 1) * span],
-                    input,
-                    offset + q * stride,
-                    stride * radix,
-                    stage + 1,
-                );
+                digit_reversal(inner, offset + q * stride, stride * radix, out);
             }
         }
-        // `stride` steps through the twiddle table for the sub-transform length.
-        let out = &mut out[..radix * span];
-        match radix {
-            2 => self.butterfly2(out, stride, span),
-            3 => self.butterfly3(out, stride, span),
-            4 => self.butterfly4(out, stride, span),
-            5 => self.butterfly5(out, stride, span),
-            _ => unreachable!("radices are 2, 3, 4 and 5"),
-        }
     }
+}
 
-    #[inline(always)]
-    fn tw(&self, index: usize) -> Cpx {
-        self.twiddle[index % self.len]
+fn butterfly2(chunk: &mut [Cpx], stage: &Stage) {
+    let (a, b) = chunk.split_at_mut(stage.span);
+    for ((a, b), &w) in a.iter_mut().zip(b.iter_mut()).zip(&stage.twiddles) {
+        let t = b.mul(w);
+        *b = a.sub(t);
+        *a = a.add(t);
     }
+}
 
-    fn butterfly2(&self, out: &mut [Cpx], stride: usize, m: usize) {
-        let (a, b) = out.split_at_mut(m);
-        for k in 0..m {
-            let t = b[k].mul(self.twiddle[k * stride]);
-            b[k] = a[k].sub(t);
-            a[k] = a[k].add(t);
-        }
+fn butterfly4(chunk: &mut [Cpx], stage: &Stage) {
+    let m = stage.span;
+    let (c0, rest) = chunk.split_at_mut(m);
+    let (c1, rest) = rest.split_at_mut(m);
+    let (c2, c3) = rest.split_at_mut(m);
+    let twiddles = stage.twiddles.chunks_exact(3);
+    for ((((x0, x1), x2), x3), w) in c0.iter_mut().zip(c1).zip(c2).zip(c3).zip(twiddles) {
+        let s0 = *x0;
+        let s1 = x1.mul(w[0]);
+        let s2 = x2.mul(w[1]);
+        let s3 = x3.mul(w[2]);
+        let a0 = s0.add(s2);
+        let a1 = s0.sub(s2);
+        let a2 = s1.add(s3);
+        let a3 = s1.sub(s3).rot_neg();
+        *x0 = a0.add(a2);
+        *x1 = a1.add(a3);
+        *x2 = a0.sub(a2);
+        *x3 = a1.sub(a3);
     }
+}
 
-    fn butterfly4(&self, out: &mut [Cpx], stride: usize, m: usize) {
-        for k in 0..m {
-            let s0 = out[k];
-            let s1 = out[k + m].mul(self.twiddle[k * stride]);
-            let s2 = out[k + 2 * m].mul(self.twiddle[2 * k * stride]);
-            let s3 = out[k + 3 * m].mul(self.twiddle[3 * k * stride]);
-            let a0 = s0.add(s2);
-            let a1 = s0.sub(s2);
-            let a2 = s1.add(s3);
-            let a3 = s1.sub(s3).rot_neg();
-            out[k] = a0.add(a2);
-            out[k + m] = a1.add(a3);
-            out[k + 2 * m] = a0.sub(a2);
-            out[k + 3 * m] = a1.sub(a3);
-        }
+fn butterfly3(chunk: &mut [Cpx], stage: &Stage) {
+    // e^{-2πi/3} = -1/2 - i sqrt(3)/2
+    let s = -(3f32.sqrt() / 2.0);
+    let m = stage.span;
+    let (c0, rest) = chunk.split_at_mut(m);
+    let (c1, c2) = rest.split_at_mut(m);
+    let twiddles = stage.twiddles.chunks_exact(2);
+    for (((x0, x1), x2), w) in c0.iter_mut().zip(c1).zip(c2).zip(twiddles) {
+        let a = *x0;
+        let b = x1.mul(w[0]);
+        let c = x2.mul(w[1]);
+        let sum = b.add(c);
+        let dif = b.sub(c);
+        let mid = a.sub(sum.scale(0.5));
+        // i * s * dif
+        let rot = Cpx::new(-dif.im * s, dif.re * s);
+        *x0 = a.add(sum);
+        *x1 = mid.add(rot);
+        *x2 = mid.sub(rot);
     }
+}
 
-    fn butterfly3(&self, out: &mut [Cpx], stride: usize, m: usize) {
-        // e^{-2πi/3} = -1/2 - i sqrt(3)/2
-        let s = -(3f32.sqrt() / 2.0);
-        for k in 0..m {
-            let x0 = out[k];
-            let x1 = out[k + m].mul(self.twiddle[k * stride]);
-            let x2 = out[k + 2 * m].mul(self.twiddle[2 * k * stride]);
-            let sum = x1.add(x2);
-            let dif = x1.sub(x2);
-            let mid = x0.sub(sum.scale(0.5));
-            // i * s * dif
-            let rot = Cpx::new(-dif.im * s, dif.re * s);
-            out[k] = x0.add(sum);
-            out[k + m] = mid.add(rot);
-            out[k + 2 * m] = mid.sub(rot);
-        }
-    }
-
-    fn butterfly5(&self, out: &mut [Cpx], stride: usize, m: usize) {
-        let w1 = self.tw(self.len / 5);
-        let w2 = self.tw(2 * self.len / 5);
-        for k in 0..m {
-            let x0 = out[k];
-            let x1 = out[k + m].mul(self.twiddle[k * stride]);
-            let x2 = out[k + 2 * m].mul(self.twiddle[2 * k * stride]);
-            let x3 = out[k + 3 * m].mul(self.twiddle[3 * k * stride]);
-            let x4 = out[k + 4 * m].mul(self.twiddle[4 * k * stride]);
-            let s14 = x1.add(x4);
-            let d14 = x1.sub(x4);
-            let s23 = x2.add(x3);
-            let d23 = x2.sub(x3);
-            out[k] = x0.add(s14).add(s23);
-            // Real parts of the fifth roots weight the sums, imaginary parts the differences.
-            let a = x0.add(s14.scale(w1.re)).add(s23.scale(w2.re));
-            let b = x0.add(s14.scale(w2.re)).add(s23.scale(w1.re));
-            // i * (w1.im * d14 + w2.im * d23) and i * (w2.im * d14 - w1.im * d23)
-            let c = Cpx::new(
-                -(d14.im * w1.im + d23.im * w2.im),
-                d14.re * w1.im + d23.re * w2.im,
-            );
-            let d = Cpx::new(
-                -(d14.im * w2.im - d23.im * w1.im),
-                d14.re * w2.im - d23.re * w1.im,
-            );
-            out[k + m] = a.add(c);
-            out[k + 4 * m] = a.sub(c);
-            out[k + 2 * m] = b.add(d);
-            out[k + 3 * m] = b.sub(d);
-        }
+fn butterfly5(chunk: &mut [Cpx], stage: &Stage) {
+    // The fifth roots of unity e^{-2πi/5} and e^{-4πi/5}.
+    let (w1, w2) = {
+        let a = -2.0 * PI / 5.0;
+        (
+            Cpx::new(a.cos() as f32, a.sin() as f32),
+            Cpx::new((2.0 * a).cos() as f32, (2.0 * a).sin() as f32),
+        )
+    };
+    let m = stage.span;
+    let (c0, rest) = chunk.split_at_mut(m);
+    let (c1, rest) = rest.split_at_mut(m);
+    let (c2, rest) = rest.split_at_mut(m);
+    let (c3, c4) = rest.split_at_mut(m);
+    let twiddles = stage.twiddles.chunks_exact(4);
+    for (((((x0, x1), x2), x3), x4), w) in
+        c0.iter_mut().zip(c1).zip(c2).zip(c3).zip(c4).zip(twiddles)
+    {
+        let a = *x0;
+        let b = x1.mul(w[0]);
+        let c = x2.mul(w[1]);
+        let d = x3.mul(w[2]);
+        let e = x4.mul(w[3]);
+        let s14 = b.add(e);
+        let d14 = b.sub(e);
+        let s23 = c.add(d);
+        let d23 = c.sub(d);
+        *x0 = a.add(s14).add(s23);
+        // Real parts of the roots weight the sums, imaginary parts the differences.
+        let p = a.add(s14.scale(w1.re)).add(s23.scale(w2.re));
+        let q = a.add(s14.scale(w2.re)).add(s23.scale(w1.re));
+        // i * (w1.im * d14 + w2.im * d23) and i * (w2.im * d14 - w1.im * d23)
+        let r = Cpx::new(
+            -(d14.im * w1.im + d23.im * w2.im),
+            d14.re * w1.im + d23.re * w2.im,
+        );
+        let t = Cpx::new(
+            -(d14.im * w2.im - d23.im * w1.im),
+            d14.re * w2.im - d23.re * w1.im,
+        );
+        *x1 = p.add(r);
+        *x4 = p.sub(r);
+        *x2 = q.add(t);
+        *x3 = q.sub(t);
     }
 }
 
@@ -227,8 +275,8 @@ pub struct Imdct {
     pre: Vec<Cpx>,
     /// `scale` times the same, applied after it.
     post: Vec<Cpx>,
-    input: Vec<Cpx>,
-    output: Vec<Cpx>,
+    /// The FFT's in-place buffer.
+    work: Vec<Cpx>,
     /// The DCT-IV of the last [`Imdct::imdct`] input.
     dct: Vec<f32>,
 }
@@ -238,11 +286,12 @@ impl Imdct {
     #[must_use]
     pub fn table_bytes(n: usize) -> usize {
         let q = n / 4;
-        // FFT twiddles, pre/post twiddles and two work vectors; the DCT-IV output; the
+        // FFT tables, pre/post twiddles and the work buffer; the DCT-IV output; the
         // stage list.
-        q.saturating_mul(5 * size_of::<Cpx>())
+        Fft::table_bytes(q)
+            .saturating_add(q.saturating_mul(3 * size_of::<Cpx>()))
             .saturating_add((n / 2).saturating_mul(size_of::<f32>()))
-            .saturating_add(32 * size_of::<Stage>())
+            .saturating_add(16 * size_of::<Stage>())
     }
 
     /// The transform producing `n` outputs from `n / 2` coefficients, scaled by `scale`.
@@ -264,8 +313,7 @@ impl Imdct {
             fft,
             pre: (0..q).map(|j| twiddle(j, 1.0)).collect(),
             post: (0..q).map(|j| twiddle(j, scale)).collect(),
-            input: vec![Cpx::default(); q],
-            output: vec![Cpx::default(); q],
+            work: vec![Cpx::default(); q],
             dct: vec![0.0; k],
         })
     }
@@ -289,15 +337,15 @@ impl Imdct {
     /// If `x` or `w` is shorter than `K`.
     pub fn dct4(&mut self, x: &[f32], w: &mut [f32]) {
         let k = self.len / 2;
-        let q = self.len / 4;
         let (x, w) = (&x[..k], &mut w[..k]);
-        for j in 0..q {
-            let z = Cpx::new(x[2 * j], x[k - 1 - 2 * j]);
-            self.input[j] = z.mul(self.pre[j]);
+        // Pre-twiddle straight into the FFT's digit-reversed order.
+        for (slot, &j) in self.work.iter_mut().zip(self.fft.order()) {
+            let j = j as usize;
+            *slot = Cpx::new(x[2 * j], x[k - 1 - 2 * j]).mul(self.pre[j]);
         }
-        self.fft.run(&self.input, &mut self.output);
-        for j in 0..q {
-            let u = self.output[j].mul(self.post[j]);
+        self.fft.transform(&mut self.work);
+        for (j, (u, &post)) in self.work.iter().zip(&self.post).enumerate() {
+            let u = u.mul(post);
             w[2 * j] = u.re;
             w[k - 1 - 2 * j] = -u.im;
         }
