@@ -21,7 +21,7 @@ driven by `cargo xtask codecs` (`manifest`, `grade`, `summarize`, `readers`, `ti
 | `downmix-*.json`, [downmix-integer.md](downmix-integer.md) | Observed stereo downmix (`-ac 2`) rules, for float and for integer decoder output |
 | `rgba-*.json` | Observed letterbox scaling and RGBA conversion rules |
 | `codec-comparison` evidence set | Correctness rows and summaries, timing and memory records, identity hashes; `cargo xtask evidence fetch codec-comparison` unpacks it into `.research/evidence/codec-comparison/` |
-| `audio-review-linux-arm64` evidence set | The file-format lanes' correctness rows, the reader lane, instruction counts, paired timing and paired memory the status rows cite; `audio-readers-mac-arm64` holds the generated Ogg inputs (`inputs/ogg-generated`), and `audio-formats-linux-arm64` the first, superseded run |
+| `audio-review-linux-arm64`, `audio-quick-check-linux-arm64` evidence sets | The file-format lanes' correctness rows, instruction counts, paired timing and paired memory the status rows cite; the reader lane with both Ogg views, the generated Ogg inputs it compares (`inputs/ogg-generated`), and the quick check of the head against main |
 | `aac/`, `ac3/`, `dca/`, `h264/`, `hevc/` | Per-codec tools and derivation notes |
 | `flac/`, `mp3/`, `ogg/` | Generators of the FLAC, MPEG audio and Ogg vectors |
 | `codec-reference-binary`, `codec-reference-reproduction` evidence sets | The reference worker the cited results were measured with, and the proof that `prepare-ffmpeg --profile decode` rebuilds it: byte-identical output on every vector and workload, identical classifications |
@@ -94,7 +94,7 @@ mix, which `codec-worker` reproduces (`flac-integer-device-mix`).
 `cargo xtask codecs readers` compares the packets the container readers emit with the
 decode profile's `ffprobe -show_packets`, the demuxer forced on both sides. Its inputs
 are FATE's `vorbis` and `mp3-conformance` directories, the Ogg files
-`harness/codecs/ogg/make_vectors.sh` generated (archived in `audio-readers-mac-arm64`
+`harness/codecs/ogg/make_vectors.sh` generated (archived in `audio-quick-check-linux-arm64`
 under `inputs/ogg-generated`; copy them to `.research/ogg-generated`), the FLAC test
 files and generated FLAC streams, and the streams in `.research/elementary` (encoded by
 FFmpeg, and crafted damaged ones in `crafted/`). `codec-worker packets FORMAT FILE`

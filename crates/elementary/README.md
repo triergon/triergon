@@ -80,7 +80,9 @@ reviewed rules and dispositions of
 [docs/quality.md](../../docs/quality.md#gates). Over the IETF FLAC decoder testbench, the
 MPEG audio conformance bitstreams, streams FFmpeg writes (FLAC, MP3 with and without
 Xing/Info and LAME tags, MP2, ADTS, AC-3, E-AC-3) and crafted damaged ones, 253/271 pass
-and 2 are refused by both (testbench faulty 06 and 07). The others differ only where FFmpeg:
+and 2 are refused by both (testbench faulty 06 and 07); the frozen differences of the
+others are in [reader-differences.json](../../harness/codecs/reader-differences.json), and
+each lies in the scope of one disposition. They differ only where FFmpeg:
 
 - delivers a FLAC frame's duration rescaled to the first frame's rate when the rate
   changes, no duration at 768 kHz, and the last frame of a stream with varying block

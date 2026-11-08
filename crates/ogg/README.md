@@ -90,22 +90,25 @@ once output is released.
 
 ## Comparison with FFmpeg
 
-`cargo xtask codecs readers` compares every packet as `BlockingReader` delivers it (track,
-pts, dts, duration, trims, size) with the pinned `ffprobe -show_packets` of FFmpeg 9.0.2,
-under the reviewed rules and dispositions of
-[harness/codecs/reader-rules.json](../../harness/codecs/reader-rules.json); gates:
+`cargo xtask codecs readers` compares every packet `BlockingReader` delivers with the
+pinned `ffprobe -show_packets` of FFmpeg 9.0.2 in two views: the reader's own timing
+(track, pts, dts, duration, trims, size) and `compat::clock`, the FFmpeg-compatible view
+of the same packets. The rules, the reviewed dispositions and their frozen difference
+lists are [harness/codecs/reader-rules.json](../../harness/codecs/reader-rules.json) and
+[reader-differences.json](../../harness/codecs/reader-differences.json); gates:
 [docs/quality.md](../../docs/quality.md#gates). On the 21 FATE Vorbis samples and 13
-generated Opus, Vorbis, FLAC, multiplexed, chained, corrupted and truncated files, 7/34
-pass and the other 27 differ only where FFmpeg times packets differently:
+generated Opus, Vorbis, FLAC, multiplexed, chained, corrupted and truncated files:
 
-- the first Vorbis packet, which FFmpeg starts as many samples before zero as it states
-  alone, where this reader times the overlap it primes as no output;
-- a short Vorbis block after a long one, which FFmpeg starts late by the difference of
-  the two quarter blocks;
-- a chained link's start, a last page timed forward from its granule position, pre-skip
-  after a lost first page, and packets after a lost page.
-
-`compat::clock` reproduces FFmpeg's view of each packet for callers that need it.
+- `compat::clock`: 31/34 pass. FFmpeg prints a negative last duration modulo 2^32
+  (`b_vorbis.ogg`, `chain_vorbis.ogg`), and times the first packet after a page that
+  fails its CRC from its own page where `compat::clock` times it from the stream start
+  (`crc_bad.opus`).
+- The reader's own timing: 7/34 pass; 25 differ only where `compat::clock` reproduces
+  FFmpeg, and 2 by the negative last duration. The differences are FFmpeg's: it starts
+  the first Vorbis packet as many samples before zero as it states alone, where this
+  reader times the overlap it primes as no output; it starts a short Vorbis block after
+  a long one late by the difference of their quarter blocks; and it times chained links'
+  starts and packets after a lost page from the page rather than the granule position.
 
 The `read_packets` helper reads every packet of a whole file in memory, headers
 included, for tests and tools.
