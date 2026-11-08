@@ -317,7 +317,33 @@ pub fn open_blocking<S: std::io::Read + std::io::Seek>(
     ))
 }
 
-/// Bytes [`open_blocking`] probes.
+/// A reader for whichever format a sequential `source` holds (a pipe): the first 64 KiB
+/// are probed and replayed, and the reader neither seeks nor knows the source's length,
+/// so it behaves as FFmpeg does on a pipe.
+pub fn open_sequential<S: std::io::Read>(
+    mut source: S,
+    pool: &Budget,
+) -> Result<triergon_core::blocking::Blocking<AnyReader, Replayed<S>>> {
+    let mut prefix = Vec::with_capacity(PROBE_BYTES);
+    std::io::Read::by_ref(&mut source)
+        .take(PROBE_BYTES as u64)
+        .read_to_end(&mut prefix)
+        .map_err(|e| Error::Io(e.kind()))?;
+    let capabilities = SourceCapabilities {
+        length: None,
+        random_access: false,
+    };
+    let reader = AnyReader::open(&prefix, pool, SourceId(1), capabilities)?;
+    let source = std::io::Cursor::new(prefix).chain(source);
+    Ok(triergon_core::blocking::Blocking::sequential(
+        reader, source, pool,
+    ))
+}
+
+/// A sequential source with its probed prefix put back in front.
+pub type Replayed<S> = std::io::Chain<std::io::Cursor<Vec<u8>>, S>;
+
+/// Bytes [`open_blocking`] and [`open_sequential`] probe.
 const PROBE_BYTES: usize = 64 * 1024;
 
 impl PacketInfo for AnyPacket {
