@@ -20,7 +20,7 @@ pub(crate) const CUES: u64 = 0x1c53bb6b;
 pub(crate) const SEEK_HEAD: u64 = 0x114d9b74;
 
 /// The Segment children that carry metadata: every level-one element except Cluster.
-pub(crate) fn is_level_one(id: u64) -> bool {
+pub(crate) fn is_segment_metadata(id: u64) -> bool {
     matches!(
         id,
         INFO | TRACKS | CUES | SEEK_HEAD | ATTACHMENTS | CHAPTERS | TAGS

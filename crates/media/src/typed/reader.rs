@@ -42,7 +42,7 @@ use projection::{
     LegacyEvent, LegacyProjection, PacketProjection, ScanEvent, ScanProjection, TypedProjection,
 };
 
-use crate::metadata::{CLUSTER, CUES, INFO, SEEK_HEAD, SEGMENT, TRACKS, is_level_one};
+use crate::metadata::{CLUSTER, CUES, INFO, SEEK_HEAD, SEGMENT, TRACKS, is_segment_metadata};
 fn document(id: u64) -> bool {
     matches!(
         id,
@@ -302,6 +302,14 @@ impl Reader {
     }
     pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
         self.envelope.payload_ownership()
+    }
+    /// The source this reader was created for.
+    pub fn source(&self) -> SourceId {
+        self.envelope.input().source()
+    }
+    /// True until the reader has read or repositioned its input.
+    pub fn is_unstarted(&self) -> bool {
+        matches!(self.state, State::Envelope) && self.envelope.input().position() == 0
     }
     pub fn budget(&self) -> &Budget {
         &self.pool
@@ -1002,7 +1010,7 @@ impl Reader {
                         // Non-metadata leaves have no lookup or reservation:
                         // the Admit unit and decision apply here directly, and
                         // only an unpaid unit leaves the Admission state behind.
-                        EnvelopeProgress::Header(header) if !is_level_one(header.id) => {
+                        EnvelopeProgress::Header(header) if !is_segment_metadata(header.id) => {
                             if !work.try_charge(1) {
                                 self.state = State::Admission(Admission {
                                     header,
@@ -1088,7 +1096,7 @@ impl Reader {
                 }
                 State::Admission(admission) => match admission.phase {
                     AdmitPhase::Lookup => {
-                        if !is_level_one(admission.header.id) {
+                        if !is_segment_metadata(admission.header.id) {
                             admission.phase = AdmitPhase::Admit;
                             continue;
                         }
