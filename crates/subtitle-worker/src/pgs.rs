@@ -102,7 +102,7 @@ impl Prepared for Pgs {
             }
             decoder.push(&mut Some(payload.clone()), *clock, &cancel)?;
             let out = loop {
-                match decoder.poll(&mut WorkBudget::new(u64::MAX), &cancel)? {
+                match decoder.poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)? {
                     RecoveryStatus::OutputReady => break decoder.take_output(&cancel)?,
                     RecoveryStatus::Yield => {}
                     status => return Err(format!("pgs: unexpected {status:?}").into()),
@@ -133,7 +133,9 @@ impl Prepared for Pgs {
             }
         }
         decoder.finish_input(&cancel)?;
-        while decoder.poll(&mut WorkBudget::new(u64::MAX), &cancel)? != RecoveryStatus::Ended {}
+        while decoder.poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)?
+            != RecoveryStatus::Ended
+        {}
         Ok(())
     }
 

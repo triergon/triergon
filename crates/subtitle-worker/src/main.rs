@@ -42,6 +42,10 @@ use triergon_harness_runner::{Invocation, Mode, Totals, measure};
 /// The words after the file: KIND and its arguments.
 const USAGE: &str = " KIND [ARG...]";
 
+/// Work units a decoder gets per call, so its yield and resume paths run inside
+/// the measurement as a cooperative caller drives them.
+pub const WORK_SLICE: u64 = 1 << 16;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Pgs,
