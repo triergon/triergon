@@ -96,20 +96,32 @@ impl SchedulingClock {
         let Some(ticks) = field.api_ticks() else {
             return Ok(Self::ApiSentinel);
         };
-        if let Some(scaled) = ticks
-            .unsigned_abs()
-            .checked_mul(base.numerator())
-            .and_then(|magnitude| magnitude.checked_mul(1_000_000))
+        // Round to the nearest microsecond, with ties away from zero. Exact
+        // whenever the scaled magnitude fits 128 bits, which it does for every
+        // source timescale; wider products take the exact-time path below.
+        if let Some(scaled) = u128::from(ticks.unsigned_abs())
+            .checked_mul(u128::from(base.numerator()) * 1_000_000)
         {
-            let divisor = base.denominator();
-            let remainder = scaled % divisor;
-            // Round to the nearest microsecond, with ties away from zero.
-            // A nonzero remainder implies a divisor greater than one.
-            let rounded = scaled / divisor + u64::from(remainder >= divisor - remainder);
-            if let Ok(magnitude) = i64::try_from(rounded) {
-                let signed = if ticks < 0 { -magnitude } else { magnitude };
-                return Ok(Self::ExactMicroseconds(signed));
-            }
+            let magnitude = nearest_away(scaled, base.denominator());
+            let exact = if ticks < 0 {
+                0i128.checked_sub_unsigned(magnitude)
+            } else {
+                i128::try_from(magnitude).ok()
+            };
+            let Some(microseconds) = exact else {
+                return Ok(Self::RescaleOverflow {
+                    exact_microseconds: None,
+                });
+            };
+            return match i64::try_from(microseconds) {
+                Ok(i64::MIN) => Err(Error::Unsupported(
+                    "native exact scheduling sentinel collision unreviewed",
+                )),
+                Ok(value) => Ok(Self::ExactMicroseconds(value)),
+                Err(_) => Ok(Self::RescaleOverflow {
+                    exact_microseconds: Some(microseconds),
+                }),
+            };
         }
         let microseconds = TimeBase::new(1, 1_000_000)?;
         match base.rescale(ticks, microseconds, Rounding::NearestAway) {
@@ -133,6 +145,50 @@ impl SchedulingClock {
                 exact_microseconds: None,
             }),
             Err(error) => Err(error),
+        }
+    }
+}
+
+/// `value / divisor` rounded to the nearest integer, ties away from zero.
+///
+/// A divisor below 2^32 divides in 32-bit limbs: each partial remainder is
+/// below the divisor, so it and the next limb fit `u64`. This keeps 128-bit
+/// division, a bit-serial loop on 32-bit targets, off the per-packet path.
+fn nearest_away(value: u128, divisor: u64) -> u128 {
+    let (quotient, remainder) = if let Ok(value) = u64::try_from(value) {
+        (u128::from(value / divisor), value % divisor)
+    } else if divisor <= u64::from(u32::MAX) {
+        [96, 64, 32, 0]
+            .into_iter()
+            .fold((0, 0), |(quotient, remainder): (u128, u64), shift| {
+                let partial = remainder << 32 | u64::from((value >> shift) as u32);
+                (quotient << 32 | u128::from(partial / divisor), partial % divisor)
+            })
+    } else {
+        let divisor = u128::from(divisor);
+        (value / divisor, (value % divisor) as u64)
+    };
+    quotient + u128::from(remainder >= divisor - remainder)
+}
+
+#[test]
+fn nearest_away_matches_wide_division() {
+    let values = [
+        0,
+        1,
+        u128::from(u64::MAX),
+        u128::from(u64::MAX) + 1,
+        u128::from(i64::MAX.unsigned_abs()) * 1_000_000,
+        u128::MAX / 3,
+        u128::MAX,
+    ];
+    let divisors = [1, 2, 3, 1_000, 90_000, u64::from(u32::MAX), 1 << 32, u64::MAX];
+    for value in values {
+        for divisor in divisors {
+            let wide = u128::from(divisor);
+            let remainder = value % wide;
+            let expected = value / wide + u128::from(remainder >= wide - remainder);
+            assert_eq!(nearest_away(value, divisor), expected, "{value} / {divisor}");
         }
     }
 }
