@@ -1,7 +1,12 @@
 //! EN 300 468 6.2.41 regressions. Fixture bodies remain opaque subtitle input.
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::container::{CodecId, MediaKind, TrackId, TrackInfo};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
+};
+use triergon_mpegts::compat::pes::{
+    DemuxObserver, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage,
+    PrivateAudioDescriptors, selected_track_kind,
 };
 use triergon_mpegts::psi::{
     CodecIdentification, Descriptor, DescriptorNamespace, Descriptors, DvbNamespaceEvidence,
@@ -9,7 +14,9 @@ use triergon_mpegts::psi::{
 };
 #[cfg(feature = "reference-trace")]
 use triergon_mpegts::reference_trace::dvb::DvbViewProfile;
-use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, TraceEvent, TransportStream};
+use triergon_mpegts::{
+    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TransportStream,
+};
 
 const DVB: DescriptorNamespace =
     DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
@@ -105,6 +112,306 @@ fn map(program: &[u8], kind: u8, es: &[u8], namespace: DescriptorNamespace) -> P
 }
 
 #[test]
+fn track_classification_keeps_native_tags_and_private_codec_identity() {
+    for stream_type in 0..=u8::MAX {
+        let parsed = map(&[], stream_type, &[], DescriptorNamespace::Unspecified);
+        let stream = &parsed.streams.as_slice()[0];
+        let (kind, codec) = match stream_type {
+            0x01 | 0x02 => (MediaKind::Video, CodecId::Mpeg2Video),
+            0x1b => (MediaKind::Video, CodecId::H264),
+            0x24 => (MediaKind::Video, CodecId::Hevc),
+            0x03 | 0x04 => (MediaKind::Audio, CodecId::MpegAudio),
+            0x0f => (MediaKind::Audio, CodecId::Aac),
+            0x11 => (MediaKind::Audio, CodecId::AacLatm),
+            _ => (MediaKind::Unknown, CodecId::Other(stream.codec_tag())),
+        };
+        assert_eq!(stream.id(), TrackId(256));
+        assert_eq!(stream.kind(), kind, "stream type {stream_type:#x}");
+        assert_eq!(
+            selected_track_kind(stream, None),
+            match stream_type {
+                0x01 => MediaKind::Unknown,
+                0x81 | 0x87 => MediaKind::Audio,
+                0x90 => MediaKind::Subtitle,
+                _ => kind,
+            },
+        );
+        assert_eq!(TrackInfo::codec(stream), codec);
+        if let CodecId::Other(tag) = TrackInfo::codec(stream) {
+            assert!(std::ptr::eq(tag.as_ptr(), stream.codec_tag().as_ptr()));
+        }
+        assert_eq!(stream.codec_tag(), [stream_type]);
+        assert!(std::ptr::eq(
+            stream.codec_tag().as_ptr(),
+            std::ptr::from_ref(&stream.stream_type)
+        ));
+        assert!(stream.configuration().is_empty());
+    }
+}
+
+#[test]
+fn mpeg1_video_source_and_selected_view_keep_the_same_borrowed_tag_and_pid() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let source = section(&[], 0x01, &[], &pool);
+    let mut reader = PmtReader::new(&source, &pool, ParseLimits::default()).unwrap();
+    let parsed = finish(&mut reader).unwrap();
+    let stream = &parsed.streams.as_slice()[0];
+    let retained = pool.used();
+    let pressure = pool.reserve(pool.available()).unwrap();
+    let charged = pool.used();
+
+    assert_eq!(stream.kind(), MediaKind::Video);
+    assert_eq!(selected_track_kind(stream, None), MediaKind::Unknown);
+    assert_eq!(TrackInfo::codec(stream), CodecId::Mpeg2Video);
+    let tag = stream.codec_tag();
+    assert_eq!(tag, [0x01]);
+    assert!(std::ptr::eq(
+        tag.as_ptr(),
+        std::ptr::from_ref(&stream.stream_type)
+    ));
+    assert_eq!(stream.codec_tag(), tag);
+    assert_eq!(stream.stream_type, 0x01);
+    assert_eq!(stream.pid, 256);
+    assert_eq!(stream.id(), TrackId(256));
+    assert_eq!(pool.used(), charged);
+    drop(pressure);
+    assert_eq!(pool.used(), retained);
+}
+
+#[test]
+fn private_audio_admission_does_not_backfill_source_classification() {
+    let budget = Budget::new(1 << 20).unwrap();
+    for (namespace, raw, carriage, source_codec) in [
+        (
+            DVB,
+            &[0x6a, 1, 0][..],
+            PrivateAudioCarriage::DvbAc3Tag,
+            Some(CodecId::Ac3),
+        ),
+        (
+            DVB,
+            &[0x7a, 1, 0][..],
+            PrivateAudioCarriage::DvbEac3Tag,
+            Some(CodecId::Eac3),
+        ),
+        (
+            DescriptorNamespace::Unspecified,
+            &[5, 4, b'A', b'C', b'-', b'3', 0x6a, 1, 0][..],
+            PrivateAudioCarriage::DvbAc3Tag,
+            None,
+        ),
+    ] {
+        let parsed = map(&[], 6, raw, namespace);
+        let stream = &parsed.streams.as_slice()[0];
+        let scope = DemuxScope {
+            program: 1,
+            pid: stream.pid,
+            stream_type: 6,
+            stream_id: 0xbd,
+            entity: SourceId(73),
+            epochs: SourceEpochs::default(),
+        };
+        let descriptors = PrivateAudioDescriptors {
+            program: parsed.program_descriptors.as_ref(),
+            elementary: stream.descriptor_bytes.as_ref(),
+        };
+        let observer = if namespace == DescriptorNamespace::Unspecified {
+            DemuxObserver::new_hls_private_audio(
+                DemuxProfile::PesPackets,
+                scope,
+                carriage,
+                descriptors,
+                budget.clone(),
+                ParseLimits::default(),
+            )
+        } else {
+            DemuxObserver::new_private_audio(
+                DemuxProfile::PesPackets,
+                scope,
+                carriage,
+                descriptors,
+                budget.clone(),
+                ParseLimits::default(),
+            )
+        }
+        .unwrap();
+        assert_eq!(
+            stream.kind(),
+            if source_codec.is_some() {
+                MediaKind::Audio
+            } else {
+                MediaKind::Unknown
+            }
+        );
+        assert_eq!(selected_track_kind(stream, None), MediaKind::Unknown);
+        assert_eq!(
+            selected_track_kind(stream, Some(&observer)),
+            MediaKind::Audio
+        );
+        assert_eq!(
+            TrackInfo::codec(stream),
+            source_codec.unwrap_or(CodecId::Other(&[6]))
+        );
+        assert_eq!(stream.descriptor_namespace(), namespace);
+        assert_eq!(stream.descriptor_bytes.as_ref(), raw);
+
+        let wrong_pid = DemuxObserver::new_private_audio(
+            DemuxProfile::PesPackets,
+            DemuxScope {
+                pid: stream.pid + 1,
+                ..scope
+            },
+            PrivateAudioCarriage::DvbAc3Tag,
+            PrivateAudioDescriptors {
+                program: &[],
+                elementary: &[0x6a, 1, 0],
+            },
+            budget.clone(),
+            ParseLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            selected_track_kind(stream, Some(&wrong_pid)),
+            MediaKind::Unknown
+        );
+    }
+}
+
+#[test]
+fn private_audio_stays_unselected_after_carriage_refusal() {
+    let budget = Budget::new(1 << 20).unwrap();
+    for (program, raw, source_codec) in [
+        (&[][..], &[][..], None),
+        (&[][..], &[0x6a, 1, 0, 0x7a, 1, 0][..], Some(CodecId::Ac3)),
+        (&[0x6a, 1, 0][..], &[][..], None),
+        (
+            &[][..],
+            &[5, 4, b'A', b'C', b'-', b'3', 0x6a, 1, 0][..],
+            Some(CodecId::Ac3),
+        ),
+    ] {
+        let parsed = map(program, 6, raw, DVB);
+        let stream = &parsed.streams.as_slice()[0];
+        let observer = DemuxObserver::new_private_audio(
+            DemuxProfile::PesPackets,
+            DemuxScope {
+                program: 1,
+                pid: stream.pid,
+                stream_type: 6,
+                stream_id: 0xbd,
+                entity: SourceId(73),
+                epochs: SourceEpochs::default(),
+            },
+            PrivateAudioCarriage::DvbAc3Tag,
+            PrivateAudioDescriptors {
+                program,
+                elementary: raw,
+            },
+            budget.clone(),
+            ParseLimits::default(),
+        );
+        assert!(matches!(observer, Err(Error::Unsupported(_))));
+        assert_eq!(
+            selected_track_kind(stream, observer.as_ref().ok()),
+            MediaKind::Unknown
+        );
+        assert_eq!(
+            stream.kind(),
+            if source_codec.is_some() {
+                MediaKind::Audio
+            } else {
+                MediaKind::Unknown
+            }
+        );
+        assert_eq!(
+            TrackInfo::codec(stream),
+            source_codec.unwrap_or(CodecId::Other(&[6]))
+        );
+        assert_eq!(parsed.program_descriptors.as_ref(), program);
+        assert_eq!(stream.descriptor_bytes.as_ref(), raw);
+    }
+}
+
+#[test]
+fn subtitle_signalling_and_selected_pes_admission_remain_distinct() {
+    let budget = Budget::new(1 << 20).unwrap();
+    let duplicate = [SINGLE.as_slice(), SINGLE.as_slice()].concat();
+    for (namespace, raw, admitted) in [
+        (DVB, SINGLE.as_slice(), true),
+        (DescriptorNamespace::Unspecified, SINGLE.as_slice(), false),
+        (DVB, duplicate.as_slice(), false),
+        (DVB, &[0x59, 0][..], false),
+    ] {
+        let parsed = map(&[], 6, raw, namespace);
+        let stream = &parsed.streams.as_slice()[0];
+        let observer = DemuxObserver::new_dvb_subtitles(
+            DemuxProfile::PesPackets,
+            DemuxScope {
+                program: 1,
+                pid: stream.pid,
+                stream_type: 6,
+                stream_id: 0xbd,
+                entity: SourceId(73),
+                epochs: SourceEpochs::default(),
+            },
+            namespace,
+            DvbSubtitlesDescriptors {
+                program: parsed.program_descriptors.as_ref(),
+                elementary: stream.descriptor_bytes.as_ref(),
+            },
+            budget.clone(),
+            ParseLimits::default(),
+        );
+        assert_eq!(observer.is_ok(), admitted);
+        let signalled = namespace == DVB;
+        let kind = if signalled {
+            MediaKind::Subtitle
+        } else {
+            MediaKind::Unknown
+        };
+        assert_eq!(selected_track_kind(stream, None), kind);
+        assert_eq!(selected_track_kind(stream, observer.as_ref().ok()), kind);
+        assert_eq!(
+            stream.kind(),
+            if signalled {
+                MediaKind::Subtitle
+            } else {
+                MediaKind::Unknown
+            }
+        );
+        assert_eq!(
+            TrackInfo::codec(stream),
+            if signalled {
+                CodecId::DvbSubtitle
+            } else {
+                CodecId::Other(&[6])
+            }
+        );
+        assert_eq!(stream.descriptor_namespace(), namespace);
+        assert_eq!(stream.descriptor_bytes.as_ref(), raw);
+    }
+}
+
+#[test]
+fn teletext_track_kind_respects_the_descriptor_namespace() {
+    let descriptor = [0x56, 5, b'e', b'n', b'g', 0x11, 0x00];
+    for (namespace, codec, kind) in [
+        (DVB, CodecId::DvbTeletext, MediaKind::Subtitle),
+        (
+            DescriptorNamespace::Unspecified,
+            CodecId::Other(&[6][..]),
+            MediaKind::Unknown,
+        ),
+    ] {
+        let parsed = map(&[], 6, &descriptor, namespace);
+        let stream = &parsed.streams.as_slice()[0];
+        assert_eq!(TrackInfo::codec(stream), codec);
+        assert_eq!(stream.kind(), kind);
+        assert_eq!(selected_track_kind(stream, None), kind);
+    }
+}
+
+#[test]
 fn subtitling_view_borrows_original_tlv_and_keeps_big_endian_page_ids() {
     let raw = SINGLE;
     let view = descriptor(&raw).dvb_subtitling().unwrap();
@@ -196,6 +503,8 @@ fn unknown_namespace_keeps_even_malformed_private_tag_bodies_opaque() {
     assert_eq!(stream.descriptor_bytes.as_ref(), raw);
     assert_eq!(stream.dvb_subtitling_signalling(), None);
     assert_eq!(stream.codec_identification(), CodecIdentification::Unknown);
+    assert_eq!(stream.kind(), MediaKind::Unknown);
+    assert_eq!(TrackInfo::codec(stream), CodecId::Other(&[6]));
     #[cfg(feature = "reference-trace")]
     assert!(
         stream
@@ -214,6 +523,8 @@ fn only_explicit_dvb_private_pes_es_context_identifies_dvb_subtitles() {
         CodecIdentification::DvbSubtitles
     );
     assert_eq!(stream.dvb_subtitling_signalling().unwrap().services, 1);
+    assert_eq!(stream.kind(), MediaKind::Subtitle);
+    assert_eq!(TrackInfo::codec(stream), CodecId::DvbSubtitle);
     assert_eq!(
         map(&[], 0x1b, &SINGLE, DVB).streams.as_slice()[0].codec_identification(),
         CodecIdentification::Unknown
@@ -237,6 +548,11 @@ fn registration_or_private_specifier_does_not_infer_a_dvb_namespace() {
     assert_eq!(
         unspecified.streams.as_slice()[0].codec_identification(),
         CodecIdentification::Unknown
+    );
+    assert_eq!(unspecified.streams.as_slice()[0].kind(), MediaKind::Unknown);
+    assert_eq!(
+        TrackInfo::codec(&unspecified.streams.as_slice()[0]),
+        CodecId::Other(&[6])
     );
     let scoped = map(&[], 6, &raw, DVB);
     let stream = &scoped.streams.as_slice()[0];
@@ -332,6 +648,9 @@ fn conflicting_dvb_audio_signals_do_not_silently_win_or_disappear() {
             CodecIdentification::ConflictingDvbSignalling
         );
         assert!(stream.dvb_subtitling_signalling().unwrap().audio_conflict);
+        assert_eq!(stream.kind(), MediaKind::Subtitle);
+        assert_eq!(TrackInfo::codec(stream), CodecId::DvbSubtitle);
+        assert_eq!(selected_track_kind(stream, None), MediaKind::Subtitle);
         assert_eq!(stream.descriptor_bytes.as_ref(), raw);
         #[cfg(feature = "reference-trace")]
         assert!(
@@ -391,6 +710,14 @@ fn pmt_dvb_summary_is_work_bounded_cancellable_charged_and_owned() {
     drop(source);
     assert!(pool.used() > baseline);
     let retained = pool.used();
+    let stream = &parsed.streams.as_slice()[0];
+    assert_eq!(stream.kind(), MediaKind::Subtitle);
+    assert_eq!(TrackInfo::codec(stream), CodecId::DvbSubtitle);
+    assert_eq!(selected_track_kind(stream, None), MediaKind::Subtitle);
+    assert!(std::ptr::eq(
+        stream.codec_tag().as_ptr(),
+        std::ptr::from_ref(&stream.stream_type)
+    ));
     #[cfg(feature = "reference-trace")]
     assert_eq!(
         parsed.streams.as_slice()[0]
