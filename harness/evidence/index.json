@@ -14602,6 +14602,14 @@
     }
    ],
    "path": "mp4-buffered-sample-delivery"
+  },
+  {
+   "name": "mp4-range-gate-build",
+   "retention": "retained",
+   "reason": "MP4 range playback gate-build result",
+   "key": "evidence/mp4-range-gate-build/bb59fb61a667c1010a0a8e46604ca9b10d8cab6a3f99e05c2b68170c18d82755.tar.gz",
+   "sha256": "bb59fb61a667c1010a0a8e46604ca9b10d8cab6a3f99e05c2b68170c18d82755",
+   "source_revision": "f58e444b72f94bb3962990dd515f28be1aaaa574"
   }
  ]
 }
