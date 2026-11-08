@@ -466,8 +466,8 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             return None;
         }
         let mv = cm.mv[l];
-        // A missing reference keeps i32::MIN as its POC; the differences wrap (as they do in
-        // every release build) and scaling clips them to the range 8.5.3.2.8 allows.
+        // A conforming stream's POC differences fit 16 bits (8.3.1). A corrupt stream's POCs
+        // can be any i32, so the differences wrap, and scaling clips them to 8.5.3.2.8's range.
         let col_diff = self.refs.col_poc.wrapping_sub(cm.ref_poc[l]);
         let cur_diff = self.poc.wrapping_sub(cur.poc);
         if cur.lt || col_diff == cur_diff {
