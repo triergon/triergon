@@ -263,13 +263,11 @@ Verification:
   with no emitted packets and one entity can complete through a bounded
   control-only replay and a real `NoMediaConfirmation`. Other refusals remain
   failures. The replay runs inside the measured operation.
-  The 272 recorded requests are 97 compat-view operations. A live comparison on
-  macOS (`aarch64-apple-darwin`, Rust 1.99.1) runs all 97 through the candidate
-  and pinned FFmpeg formats worker and checks both against the unchanged recorded
-  expected folds: 81 match, including 15 control-only inputs. This result uses
-  measured code/contract commit `65eeada0`; report `345fd608c847`
-  records the binaries and source graph. Full source and evidence hashes are in
-  [status](../../docs/status.md#measured-revisions).
+  The 272 recorded requests are 97 compat-view operations. The AArch64 Linux
+  gate build at `5634f47d`, with Rust 1.99.1 and default flags, checks all 97
+  against the pinned FFmpeg formats worker and the unchanged recorded expected
+  folds: 81 match, including 15 control-only inputs. Full source and evidence
+  hashes are in [status](../../docs/status.md#measured-revisions).
   The 168 requests for the strict source view, 64
   of them for its native clock, are replayed as the compat-view operation on
   their inputs: the strict source view and its native clock are not compared.
@@ -283,10 +281,12 @@ Verification:
   `pes-optional-header-overrun`, `pes-start-prefix-invalid`,
   `hls-contiguous-pes-carry`, `hls-external-map`, `hls-explicit-discontinuity`,
   `opcr-without-pcr-invalid`. These PES comparisons do not qualify source access
-  units. The last native gate covered 66 matching operations; this completion
-  policy has not been measured there. On those 66, the worst runtime bound is 1.0029 of
-  the reference, peak heap at most 0.073 and total resident RSS at most 0.818 of
-  it.
+  units. All 81 matching operations were measured with 30 paired samples on a
+  c8g.large pinned to CPU 1. Their worst runtime upper bound is 1.0315 of the
+  reference; peak heap is at most 0.073 and total resident RSS at most 0.980 of
+  it. Every measured case passes those numeric gates. The 16 parity failures
+  keep the feature unaccepted.
+
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
