@@ -1,0 +1,35 @@
+;@time 0
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 480
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+Style: X,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fs+5}a{\fs-2}b{\fs0}c{\fs-30}d{\fs+-1}e{\fs 30}f{\fs1e1}g{\fs.5}h{\fs-.5}i{\fsize}j{\fs40px}k
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\be-3}a{\be200}b{\be0.5}c{\be-0.6}d{\blur500}e{\blur-1}f{\bord-5}g{\xbord-1}h{\shad-2}i{\xshad-2}j
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fscx-50}a{\fscy1e3}b{\fsp-4}c{\b2}d{\b100}e{\b-1}f{\b99}g{\i2}h{\i-1}i{\u5}j{\s-1}k
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\an0}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\an10}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\a4}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\a8}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\a12}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\a11}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\an}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\an 9 }a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\q4}a{\q-1}b{\q3}c{\q}d
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\alpha&HFF&}a{\alphaFF}b{\alpha&H}c{\alpha&h80}d{\alpha-1}e{\alpha100000000}f{\alphaH&H7F}g{\alpha&H1FF&}h{\alpha 0x40}i
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\c&HFFFFFFFF&}a{\c&HF&}b{\c255}c{\cHH&&FF}d{\c&H-1&}e{\c&H123456789ABC}f{\c&H 12}g{\c0x00FF00}h
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fn0}a{\fn 0}b{\fn 00}c{\fn  Spaced  Out  }d{\fn@}e{\fn(Paren)}f
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\rNope}a{\r Default}b{\rX}c{\r(X)}d{\rx}e
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\frz-}a{\frz--1}b{\frz1e}c{\frz1e+}d{\frz0x10}e{\frz 12 34}f{\frz1e400}g{\frz-1e400}h{\frz0e400}i
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\b99999999999}a{\b-99999999999}b{\b2147483648}c{\fe99999999999999999999}d{\fe-0x10}e{\an-5}f
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fscx123456789012345678901234567890}a{\fscx0.000000000000000000000000001}b{\fscx4.9e-324}c{\fscx2.2250738585072014e-308}d
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\xyz12\abc\fs22\ \ \  }a{\}b{\\}c{}d{comment}e{\b1 comment\i1}f
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\ fs 24}a{\	bord	3}b{\1c &H00FF00&}c{\K}d{\Fs10}e
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fs20(30)}a{\fs(40)}b{\bord(1,2)}c{\fs()}d{\fs( )}e{\b(1}f

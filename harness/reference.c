@@ -1,6 +1,7 @@
 /* The reference worker. Native tooling only; never linked into Rust.
  * Uses public FFmpeg and FreeType headers, and libass's private ones for the raster
- * reference. No code copied from their implementations.
+ * and ASS references. No code copied from their implementations, apart from the
+ * static libass functions reference_ass.h restates and cites.
  *
  * One source, built once per pinned reference profile; each build compiles only that
  * profile's operations:
@@ -12,6 +13,8 @@
  *                                 FriBidi (reference_shape.h)
  *   -DTRIERGON_RASTER_REFERENCE   outlines, strokes, rasterising, blur and composition
  *                                 with libass's internal stages (reference_raster.h)
+ *   -DTRIERGON_ASS_REFERENCE      ASS scripts, Matroska packets, override tags,
+ *                                 drawings and karaoke with libass (reference_ass.h)
  *   otherwise                     the container operations below, with the feed
  *                                 and Matroska audio clock
  *                                 (TRIERGON_FEED_REFERENCE), HLS segment, MP4
@@ -28,6 +31,8 @@
 #include "reference_shape.h"
 #elif defined(TRIERGON_RASTER_REFERENCE)
 #include "reference_raster.h"
+#elif defined(TRIERGON_ASS_REFERENCE)
+#include "reference_ass.h"
 #else
 #include <libavformat/avformat.h>
 #ifdef TRIERGON_COMBINED_REFERENCE

@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "reference": "libass-ass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+  "pins": {
+    "animation-ass": {
+      "packets": 6413,
+      "bytes": 16562,
+      "digest": 1207536382829561146
+    },
+    "basic-ass": {
+      "packets": 321,
+      "bytes": 1404,
+      "digest": 1688690497385030627
+    },
+    "custom-format-ass": {
+      "packets": 83,
+      "bytes": 246,
+      "digest": 5851223084438414351
+    },
+    "drawings-ass": {
+      "packets": 190,
+      "bytes": 1259,
+      "digest": 15988247565337868559
+    },
+    "effects-ass": {
+      "packets": 1051,
+      "bytes": 2697,
+      "digest": 6394134688125854187
+    },
+    "force-style-ass": {
+      "packets": 9,
+      "bytes": 19,
+      "digest": 1000073232561724462
+    },
+    "karaoke-ass": {
+      "packets": 2271,
+      "bytes": 6000,
+      "digest": 9996975006796536514
+    },
+    "nul-terminated-ass": {
+      "packets": 15,
+      "bytes": 37,
+      "digest": 16438042814143124878
+    },
+    "playres-none-ass": {
+      "packets": 5,
+      "bytes": 12,
+      "digest": 935701804383355834
+    },
+    "playres-x-odd-ass": {
+      "packets": 5,
+      "bytes": 12,
+      "digest": 8898206567204857766
+    },
+    "playres-x-only-ass": {
+      "packets": 5,
+      "bytes": 12,
+      "digest": 13828096802532127021
+    },
+    "playres-y-only-ass": {
+      "packets": 5,
+      "bytes": 12,
+      "digest": 15270050315791295900
+    },
+    "ssa-v4-ssa": {
+      "packets": 65,
+      "bytes": 176,
+      "digest": 1808420196068304687
+    },
+    "stream-basic-chunks": {
+      "packets": 649,
+      "bytes": 1640,
+      "digest": 15046765540909257067
+    },
+    "stream-fonts-chunks": {
+      "packets": 217,
+      "bytes": 1386,
+      "digest": 7462436557014649117
+    },
+    "stream-styles-chunks": {
+      "packets": 115,
+      "bytes": 283,
+      "digest": 287976726804067714
+    },
+    "tags-basic-ass": {
+      "packets": 533,
+      "bytes": 1820,
+      "digest": 17721176542784838371
+    },
+    "tags-edge-ass": {
+      "packets": 261,
+      "bytes": 689,
+      "digest": 11431114866634754856
+    },
+    "tags-parens-ass": {
+      "packets": 2866,
+      "bytes": 7554,
+      "digest": 12476375325316213558
+    },
+    "text-utf8-ass": {
+      "packets": 97,
+      "bytes": 228,
+      "digest": 7207861025810459795
+    },
+    "wrap-style-2-ass": {
+      "packets": 235,
+      "bytes": 595,
+      "digest": 16661204432978474167
+    }
+  }
+}

@@ -1,0 +1,28 @@
+[Script Info]
+ScriptType: v4.00+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.5,0:00:02.500,Default,,0,0,0,,centiseconds
+Dialogue: 0,1:02:03.04,10:00:00.00,Default,,0,0,0,,hours
+Dialogue: 0, 0:00:01.00 , 0:00:00.50,Default,,0,0,0,,negative duration
+Dialogue: 0,-0:00:01.00,0:-1:00.00,Default,,0,0,0,,signs
+Dialogue: 0,0:00:01,0:00:02.00,Default,,0,0,0,,short start
+Dialogue: 0,0:00:01.00,garbage,Default,,0,0,0,,bad end
+Dialogue: 0,0:00:01.00,0: 00:02.00,Default,,0,0,0,,space after colon
+Dialogue: 0,0:00:01.00,0 :00:02.00,Default,,0,0,0,,space before colon
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,   leading kept, trailing cut
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,
+Dialogue: &H10,0:00:00.00,0:00:01.00,Default,  spaced name  ,-1,&H20,4294967297,  effect  ,text
+Dialogue:   7,0:00:00.00,0:00:01.00,Default,,0,0,0,,leading spaces before layer
+Dialogue:7
+Dialogue:
+Comment: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,comment
+dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,lowercase
+Dialogue : 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,space before colon
+	Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,tab indented

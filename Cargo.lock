@@ -3,6 +3,16 @@
 version = 4
 
 [[package]]
+name = "ass-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-ass",
+ "triergon-core",
+ "triergon-harness-protocol",
+ "triergon-raster",
+]
+
+[[package]]
 name = "capture-worker"
 version = "0.0.0"
 dependencies = [
@@ -85,6 +95,14 @@ dependencies = [
  "triergon-mpegts",
  "triergon-ogg",
  "triergon-subtitles",
+]
+
+[[package]]
+name = "triergon-ass"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-raster",
 ]
 
 [[package]]

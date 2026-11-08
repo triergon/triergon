@@ -1,0 +1,247 @@
+{
+  "schema": 1,
+  "reference": "libass-ass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+  "pins": {
+    "animation-ass": {
+      "packets": 26,
+      "bytes": 1489,
+      "digest": 8463131580513492742
+    },
+    "basic-ass": {
+      "packets": 7,
+      "bytes": 411,
+      "digest": 1390068431230197759
+    },
+    "custom-format-sbas-no-ass": {
+      "packets": 5,
+      "bytes": 92,
+      "digest": 17158541424385432183
+    },
+    "custom-format-ass": {
+      "packets": 9,
+      "bytes": 219,
+      "digest": 13230381166904574992
+    },
+    "drawings-clip-overflow-ass": {
+      "packets": 4,
+      "bytes": 131,
+      "digest": 17501278916572564
+    },
+    "drawings-infinite-ass": {
+      "packets": 4,
+      "bytes": 120,
+      "digest": 1962855781250135605
+    },
+    "drawings-int-min-x-ass": {
+      "packets": 4,
+      "bytes": 107,
+      "digest": 5213967198243137327
+    },
+    "drawings-int-min-y-ass": {
+      "packets": 4,
+      "bytes": 107,
+      "digest": 5215918556166151727
+    },
+    "drawings-int-min-ass": {
+      "packets": 4,
+      "bytes": 120,
+      "digest": 9303548372216402199
+    },
+    "drawings-nan-ass": {
+      "packets": 4,
+      "bytes": 103,
+      "digest": 17556025184646351424
+    },
+    "drawings-ass": {
+      "packets": 26,
+      "bytes": 1122,
+      "digest": 7323773244044958012
+    },
+    "effects-banner-delay-overflow-ass": {
+      "packets": 4,
+      "bytes": 98,
+      "digest": 502733696466209034
+    },
+    "effects-scroll-delay-overflow-ass": {
+      "packets": 4,
+      "bytes": 107,
+      "digest": 17695375128129135084
+    },
+    "effects-ass": {
+      "packets": 15,
+      "bytes": 408,
+      "digest": 102959714508162803
+    },
+    "events-no-format-ssa": {
+      "packets": 5,
+      "bytes": 303,
+      "digest": 10213742343294773418
+    },
+    "events-quirks-ass": {
+      "packets": 17,
+      "bytes": 509,
+      "digest": 3065945800291747632
+    },
+    "ffmpeg-legacy-ass": {
+      "packets": 5,
+      "bytes": 333,
+      "digest": 15001744302352683382
+    },
+    "ffmpeg-modified-ass": {
+      "packets": 5,
+      "bytes": 332,
+      "digest": 13307014221631399298
+    },
+    "fonts-extracted-ass": {
+      "packets": 9,
+      "bytes": 100,
+      "digest": 18553112129781957
+    },
+    "fonts-ignored-ass": {
+      "packets": 4,
+      "bytes": 43,
+      "digest": 10714260175860221846
+    },
+    "force-style-ass": {
+      "packets": 7,
+      "bytes": 392,
+      "digest": 14908240350008156717
+    },
+    "format-aliases-ass": {
+      "packets": 5,
+      "bytes": 337,
+      "digest": 17471574774989443152
+    },
+    "headers-duplicates-ass": {
+      "packets": 3,
+      "bytes": 13,
+      "digest": 8175805594990820360
+    },
+    "headers-matrix-empty-ass": {
+      "packets": 3,
+      "bytes": 12,
+      "digest": 11871742619606805581
+    },
+    "headers-quirks-ass": {
+      "packets": 3,
+      "bytes": 14,
+      "digest": 18202856607792132669
+    },
+    "karaoke-ass": {
+      "packets": 15,
+      "bytes": 726,
+      "digest": 1828920109651920868
+    },
+    "lines-bom-crlf-ass": {
+      "packets": 10,
+      "bytes": 145,
+      "digest": 6219350663317818871
+    },
+    "no-script-type-ass": {
+      "packets": 1,
+      "bytes": 0,
+      "digest": 6
+    },
+    "nul-terminated-ass": {
+      "packets": 4,
+      "bytes": 48,
+      "digest": 1231323615163310950
+    },
+    "playres-none-ass": {
+      "packets": 5,
+      "bytes": 353,
+      "digest": 12897333046042246241
+    },
+    "playres-x-odd-ass": {
+      "packets": 4,
+      "bytes": 43,
+      "digest": 11123566496287692995
+    },
+    "playres-x-only-ass": {
+      "packets": 4,
+      "bytes": 59,
+      "digest": 2269242191013951683
+    },
+    "playres-y-only-ass": {
+      "packets": 4,
+      "bytes": 43,
+      "digest": 12865892503375838071
+    },
+    "script-type-short-ass": {
+      "packets": 4,
+      "bytes": 105,
+      "digest": 4501152587821029373
+    },
+    "ssa-style-format-later-ssa": {
+      "packets": 6,
+      "bytes": 163,
+      "digest": 11713758544942522127
+    },
+    "ssa-v4-ssa": {
+      "packets": 9,
+      "bytes": 349,
+      "digest": 4027407007449949760
+    },
+    "styles-no-format-ass": {
+      "packets": 6,
+      "bytes": 335,
+      "digest": 5011000870294329397
+    },
+    "styles-quirks-ass": {
+      "packets": 20,
+      "bytes": 483,
+      "digest": 2340638555720254666
+    },
+    "tags-basic-ass": {
+      "packets": 23,
+      "bytes": 1223,
+      "digest": 11051155132351541906
+    },
+    "tags-clip-animation-overflow-ass": {
+      "packets": 4,
+      "bytes": 132,
+      "digest": 11300080980630957754
+    },
+    "tags-edge-ass": {
+      "packets": 27,
+      "bytes": 1499,
+      "digest": 5834939963088973219
+    },
+    "tags-fade-in-overflow-ass": {
+      "packets": 4,
+      "bytes": 145,
+      "digest": 15782189043142250724
+    },
+    "tags-fade-out-overflow-ass": {
+      "packets": 4,
+      "bytes": 147,
+      "digest": 5286289543614200898
+    },
+    "tags-iclip-animation-overflow-ass": {
+      "packets": 4,
+      "bytes": 133,
+      "digest": 10434525962122584126
+    },
+    "tags-parens-ass": {
+      "packets": 44,
+      "bytes": 1672,
+      "digest": 5944212932081222107
+    },
+    "tags-pbo-overflow-ass": {
+      "packets": 4,
+      "bytes": 107,
+      "digest": 17852906897303731433
+    },
+    "text-utf8-ass": {
+      "packets": 9,
+      "bytes": 118,
+      "digest": 17621947641585143788
+    },
+    "wrap-style-2-ass": {
+      "packets": 8,
+      "bytes": 198,
+      "digest": 1978652189970438210
+    }
+  }
+}

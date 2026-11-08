@@ -758,7 +758,8 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let (memory, memory_sha) = document(&options.memory)?;
     let (contract, contract_sha) = document(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    let open = super::report::open_cases(&contract, &manifest)?;
+    // Open cases scoped to targets are those of the target the reports measured.
+    let open = super::report::open_cases(&contract, &manifest, text(&timed, "target")?)?;
     let binding = Binding {
         contract: &contract,
         manifest: &manifest,
@@ -1474,10 +1475,10 @@ mod tests {
         };
         let manifest = json::parse_strict(r#"{"cases": [{"id": "a"}]}"#).unwrap();
         assert_eq!(
-            super::super::report::open_cases(&contract("a"), &manifest).unwrap(),
+            super::super::report::open_cases(&contract("a"), &manifest, "t").unwrap(),
             ["a"]
         );
-        assert!(super::super::report::open_cases(&contract("gone"), &manifest).is_err());
+        assert!(super::super::report::open_cases(&contract("gone"), &manifest, "t").is_err());
     }
 
     #[test]

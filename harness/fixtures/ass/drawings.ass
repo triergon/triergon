@@ -1,0 +1,31 @@
+;@time 0
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 480
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 l 100 0 100 100 0 100
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p2\pbo10.9}m 0 0 b 10 0 20 10 20 20 l 0 20{\p0}text{\p4}m 0 0 l 1 1
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 s 100 0 100 100 0 100 c
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 s 100 0 100 100 0 100 50 50 p 25 75 10 10 c m 200 200 l 300 300
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 l 10 0 m 20 20 n 30 30 l 40 40 n 50 50 m 60 60
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}l 5 5 b 1 2 3 4 5 6 s 1 1 1 1 1 1 m 0 0 l 1 1
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}n 0 0 m 0 0 l 10 10
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m x n 5 5 l 10 10
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 b 1 1 2 2 l 3 3 b 1 1 2 2 3 3 4 4
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 s 1 1 2 2 l 5 5 p 1 1 c
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 l 1 1 2 2 p 3 3 4 4
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 l 4194303 0 0 4194303
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 l 4194304 0
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0.0078125 0.0234375 l 0.015625 -0.0078125 1.5e1 -2.5e-1 .5 5.
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 l 1 1 x l 2 2 L 3 3 lm 4 4 l5 5,6 6
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 l 10 10 c c s
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}{\b1}m 0 0 l 1 1{\pbo-3}{\p3}m 0 0 l 64 64{ unclosed m 1 1 l 2 2
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p-1}not a drawing{\p0}{\p2147483647}m 0 0 l 1 1{\p33}m 0 0 l 1 1{\p32}m 0 0 l 2 2
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}	m	0	0	l	3	3
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 b 0 0 0 0 0 0 s 3 3 3 3 3 3 p 3 3 3 3 c
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 100000 100000 s -100000 -100000 100000 -100000 -100000 100000 c
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\p1}m 0 0 l 1 1{\p0}x{\p1}{
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\clip(m 0 0 b 10 0 20 10 20 20 s 1 2 3 4 5 6 c)}vector clip

@@ -12,7 +12,7 @@ use super::comparison::{reference_named, reference_record, reference_summary};
 use super::gate_build;
 use super::parity::{self, Run};
 use super::provenance::source_identity_error;
-use super::report::{PrefixFeature, case_arguments, host_target};
+use super::report::{PrefixFeature, case_arguments, expected_for, host_target};
 use super::timing::{Operation, benchmark};
 use crate::checks::read_json;
 use crate::corpus::write_json;
@@ -679,6 +679,7 @@ fn prefix_traces(
     scratch: &Path,
     verdicts: &mut Vec<(String, Value)>,
 ) -> R<()> {
+    let target = host_target();
     for feature in features {
         let reference = reference_named(identity, &feature.reference)?;
         let reference = root.join(s(&reference, "path").unwrap_or_default());
@@ -696,13 +697,14 @@ fn prefix_traces(
                 raw: scratch.join(&feature.id).join(id),
                 timeout: feature.timeout,
             };
-            let expected = case.get("expected").unwrap_or(&Value::Null);
+            let expected = expected_for(case, &target).unwrap_or(&Value::Null);
             let result = parity::feed_parity(
                 &run,
                 &feature.prefix,
                 &case_arguments(case),
                 expected,
                 &feature.work_fields,
+                feature.per_target,
             )?;
             verdicts.push((
                 format!("{}/{id}", feature.id),

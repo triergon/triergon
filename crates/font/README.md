@@ -35,8 +35,9 @@ for segment in outline.segments() {
 let em = f64::from(font.units_per_em());
 let _advance = f64::from(metrics.advance) / em;
 
-// The glyph as libass draws it with hinting off: 256 pixels, then scaled.
-let sized = font.at_size(triergon_font::pixels_26_6(256.0))?;
+// The glyph as libass draws it with hinting off: 256 pixels (16384 in 26.6),
+// then scaled.
+let sized = font.at_size(16_384)?;
 let mut scaled = Outline::new(&pool); // reuse it too
 let glyph_metrics = sized.outline_into(glyph, &mut scaled)?; // 26.6 pixels, y up
 sized.synthesize(&mut scaled, font.synthesis(request.weight(), request.slant()))?;

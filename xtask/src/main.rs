@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 mod archive;
+mod ass;
 mod capture;
 mod checks;
 mod codecs;
@@ -127,7 +128,9 @@ commands:
   shape          prepare|manifest|compare|ucd   triergon-shape against the pinned
                  HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)
   raster         prepare|manifest|compare   triergon-raster against the pinned libass
-                 reference (see `cargo xtask raster --help`)";
+                 reference (see `cargo xtask raster --help`)
+  ass            prepare|manifest|compare   triergon-ass's parsing against the same
+                 libass build (see `cargo xtask ass --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -1091,6 +1094,7 @@ fn check(root: &Path) -> Task {
     shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
     lane_check(root, &shape::LANE)?;
     lane_check(root, &raster::LANE)?;
+    lane_check(root, &ass::LANE)?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;

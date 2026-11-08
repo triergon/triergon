@@ -1,0 +1,24 @@
+;@time 10
+@styles
+Style: Loaded,Arial,25,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,2,9,10,10,10,1
+Format: Name, Fontsize
+Style: Default,50
+[Events]
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,styles section only
+@end
+@private
+[V4 Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, TertiaryColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, AlphaLevel, Encoding
+Style: SSA,Arial,20,&H00FFFFFF,&H0000FFFF,&H000000FF,&H00800000,0,0,1,1,0,4,10,10,10,0,0
+@end
+@chunk 0 100
+0,0,Loaded,,0,0,0,,{\rDefault}uses loaded
+@data
+[Events]
+Format: Layer, Start, End, Style, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,SSA,data line
+[Fonts]
+fontname: x.ttf
+@end
+@chunk 0 100
+1,0,SSA,,0,0,0,,the format changed

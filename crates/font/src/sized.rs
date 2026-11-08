@@ -103,8 +103,8 @@ impl Font {
     /// The face at a pixel size, as libass requests it from FreeType
     /// (`FT_Request_Size`, `FT_SIZE_REQUEST_TYPE_REAL_DIM`): `height` is the
     /// 26.6 pixel height of [`Font::gdi_metrics`]' ascender to descender, and
-    /// x scales as y. libass asks for 256 pixels (16384) unless hinting is on;
-    /// [`pixels_26_6`] rounds pixels as it does.
+    /// x scales as y. libass asks for 256 pixels (16384) unless hinting is
+    /// on, rounding pixels to 26.6 half to even.
     ///
     /// # Errors
     ///
@@ -425,14 +425,9 @@ impl<'f> SizedFont<'f> {
     }
 }
 
-/// libass's `double_to_d6`: pixels to 26.6, rounding half to even.
-pub fn pixels_26_6(pixels: f64) -> i32 {
-    triergon_core::round_ties_even_i32(pixels * 64.0)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{keeps_compatibility, pixels_26_6};
+    use super::keeps_compatibility;
 
     #[test]
     fn instruction_control_needs_a_constant_harmless_selector() {
@@ -445,6 +440,5 @@ mod tests {
         // A computed selector.
         assert!(!keeps_compatibility(&[0xB0, 1, 0x60, 0x8E]));
         assert!(keeps_compatibility(&[0x40, 200]));
-        assert_eq!([pixels_26_6(256.0), pixels_26_6(0.5 / 64.0)], [16384, 0]);
     }
 }

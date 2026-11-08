@@ -261,6 +261,33 @@ fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
     }
 }
 
+/// The work a case must fold on `target`: its `expected` pin, or, for a case
+/// pinned per target, its pin for `target`; `None` when it has none there.
+pub fn expected_for<'a>(case: &'a Value, target: &str) -> Option<&'a Value> {
+    case.get("expected").or_else(|| {
+        case.get(crate::lanes::EXPECTED_BY_TARGET)
+            .and_then(|pins| pins.get(target))
+    })
+}
+
+/// A case without a pin for `target`, run and reported, neither passing nor
+/// failing: `unpinned`, with the contract's reason when it gives one.
+fn unpinned(mut ran: Value, contract: &Value, id: &str, target: &str) -> Value {
+    let reason = crate::lanes::unpinned(contract, id)
+        .into_iter()
+        .find(|(t, _)| *t == target)
+        .map_or_else(
+            || format!("no pin for {target}; reported, not compared"),
+            |(_, why)| format!("not pinned for {target}, reported: {why}"),
+        );
+    if let Value::Object(members) = &mut ran {
+        members.retain(|(key, _)| key != "status" && key != "reason");
+        members.insert(0, ("status".into(), Value::str("unpinned")));
+        members.push(("reason".into(), Value::str(reason)));
+    }
+    ran
+}
+
 /// The arguments a prefix worker takes after a case's input.
 pub fn case_arguments(case: &Value) -> Vec<std::ffi::OsString> {
     case.get("arguments")
@@ -294,6 +321,8 @@ pub struct PrefixFeature {
     pub work_fields: Vec<String>,
     /// How long one worker run may take (the contract's `timeout_seconds`).
     pub timeout: Duration,
+    /// Whether the contract pins its cases per target.
+    pub per_target: bool,
 }
 
 impl PrefixFeature {
@@ -336,6 +365,7 @@ impl PrefixFeature {
             work_fields: super::comparison::work_fields(&document)?,
             timeout: worker::contract_timeout(&document)
                 .map_err(|e| format!("{}: {e}", contract.display()))?,
+            per_target: crate::lanes::pinned_per_target(&document),
             id,
         })
     }
@@ -500,7 +530,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     }
     let contract_sha = digest(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    let open = open_cases(&contract, &manifest)?;
+    let open = open_cases(&contract, &manifest, &host_target())?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
@@ -609,13 +639,21 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     timeout,
                 },
             ));
-            parity::feed_parity(
+            let per_target = crate::lanes::pinned_per_target(&contract);
+            let expected = expected_for(case, &target);
+            let ran = parity::feed_parity(
                 &run,
                 prefix,
                 &arguments,
-                case.get("expected").unwrap_or(&Value::Null),
+                expected.unwrap_or(&Value::Null),
                 &work_fields,
-            )?
+                per_target,
+            )?;
+            if expected.is_some() {
+                ran
+            } else {
+                unpinned(ran, &contract, &id, &target)
+            }
         } else {
             row.push(("input_sha256", Value::str(sha)));
             let seek = case
@@ -674,7 +712,13 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 parity::seek_parity(&run, true, comparison.as_ref(), content)?
             }
         };
-        println!("{id} {}", s(&parity, "status").unwrap_or_default());
+        match s(&parity, "reason") {
+            Some(reason) => println!(
+                "{id} {}: {reason}",
+                s(&parity, "status").unwrap_or_default()
+            ),
+            None => println!("{id} {}", s(&parity, "status").unwrap_or_default()),
+        }
         let passed = s(&parity, "status") == Some("pass");
         row.push(("parity", parity));
         if let (true, Some((reference, input, operation))) = (passed, timed) {
@@ -783,9 +827,15 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     Ok(i32::from(!ratchet(&label, &rows, &open)))
 }
 
-/// A contract's `open_cases`: case ids that fail today, each tied to one of its
-/// `pending_module_requirements`. Every id must be a case of the manifest.
-pub(super) fn open_cases(contract: &Value, manifest: &Value) -> Result<Vec<String>, String> {
+/// A contract's `open_cases` on `target`: case ids that fail today, each tied to
+/// one of its `pending_module_requirements`. An entry with `targets` is open on
+/// those of the contract's `required_targets` only, and must pass elsewhere.
+/// Every id must be a case of the manifest.
+pub(super) fn open_cases(
+    contract: &Value,
+    manifest: &Value,
+    target: &str,
+) -> Result<Vec<String>, String> {
     let list = |value: &Value, key: &str| -> Vec<Value> {
         value
             .get(key)
@@ -806,6 +856,18 @@ pub(super) fn open_cases(contract: &Value, manifest: &Value) -> Result<Vec<Strin
         if !cases.iter().any(|case| s(case, "id") == Some(id)) {
             return Err(format!("open case {id}: not a case of the manifest"));
         }
+        if let Some(scope) = entry.get("targets") {
+            let required = list(contract, "required_targets");
+            let scope = scope.as_array().unwrap_or_default();
+            if scope.is_empty() || scope.iter().any(|t| !required.contains(t)) {
+                return Err(format!(
+                    "open case {id}: its targets must be some of the required targets"
+                ));
+            }
+            if !scope.iter().any(|t| t.as_str() == Some(target)) {
+                continue;
+            }
+        }
         open.push(id.to_owned());
     }
     Ok(open)
@@ -823,7 +885,9 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
             .filter_map(|row| s(row, "id"))
             .collect()
     };
-    let failing = ids(&|row| !passed(row) && !listed(row));
+    let unpinned = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("unpinned");
+    let failing = ids(&|row| !passed(row) && !listed(row) && !unpinned(row));
+    let reported = ids(&unpinned);
     let still_open = ids(&|row| !passed(row) && listed(row));
     let closed = ids(&|row| passed(row) && listed(row));
     println!(
@@ -836,6 +900,13 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
             "{label}: {} open failures, as listed: {}",
             still_open.len(),
             still_open.join(", ")
+        );
+    }
+    if !reported.is_empty() {
+        println!(
+            "{label}: {} cases not pinned for this target, reported only: {}",
+            reported.len(),
+            reported.join(", ")
         );
     }
     if !failing.is_empty() {
@@ -950,13 +1021,39 @@ mod prefix_tests {
             .unwrap()
         };
         let manifest = parse(r#"{"cases": [{"id": "a"}, {"id": "b"}]}"#).unwrap();
-        assert_eq!(open_cases(&contract("x"), &manifest).unwrap(), open);
+        assert_eq!(open_cases(&contract("x"), &manifest, "t").unwrap(), open);
         assert!(
-            open_cases(&contract("y"), &manifest).is_err(),
+            open_cases(&contract("y"), &manifest, "t").is_err(),
             "requirement not pending"
         );
         let other = parse(r#"{"cases": [{"id": "a"}]}"#).unwrap();
-        assert!(open_cases(&contract("x"), &other).is_err(), "unknown case");
+        assert!(
+            open_cases(&contract("x"), &other, "t").is_err(),
+            "unknown case"
+        );
+        // An open case scoped to targets is open there only.
+        let scoped = |targets: &str| {
+            parse(&format!(
+                r#"{{"required_targets": ["t", "u"], "pending_module_requirements": ["x"],
+                    "open_cases": [{{"id": "b", "requirement": "x", "targets": {targets}}}]}}"#
+            ))
+            .unwrap()
+        };
+        assert_eq!(
+            open_cases(&scoped(r#"["t"]"#), &manifest, "t").unwrap(),
+            open
+        );
+        assert!(
+            open_cases(&scoped(r#"["t"]"#), &manifest, "u")
+                .unwrap()
+                .is_empty()
+        );
+        for wrong in ["[]", r#"["v"]"#] {
+            assert!(
+                open_cases(&scoped(wrong), &manifest, "t").is_err(),
+                "{wrong}"
+            );
+        }
     }
 }
 

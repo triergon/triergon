@@ -1,0 +1,8 @@
+[Script Info]
+ScriptType: v4.00
+[V4 Styles]
+Style: NoFormat,Arial,20,&H00FFFFFF,&H0000FFFF,&H000000FF,&H00800000,0,0,1,1,0,9,10,10,10,64,0
+Format: Name, BackColour, OutlineColour, AlphaLevel, Alignment
+Style: Custom,&H00112233,&H00445566,32,8
+[Events]
+Dialogue: 0,0:00:00.00,0:00:01.00,Custom,,0,0,0,,x

@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "ass-parse-chunks",
+  "operation": "ass-parse",
+  "candidate": "ass-worker",
+  "worker_operation": "ass-",
+  "reference": "libass-ass-native",
+  "gate": "required",
+  "contract": [
+    "one authored stream fixture run as libass 0.17.5 runs a Matroska track: ass_new_track, then in order ass_process_codec_private, ass_process_data, ass_read_styles (on memory: the parser state switched to the styles section around ass_process_data), ass_process_chunk with the container's start and duration and ReadOrder deduplication as ass_set_check_readorder sets it, ass_flush_events and ass_prune_events, with the style overrides and font extraction its directives set",
+    "recorded at every @dump command and at the end: the track as ass-parse-scripts records it, with every embedded font extracted so far",
+    "packets count records and bytes the bytes of the strings recorded; a stream the candidate refuses where libass reads it ends its operation with an error, so the case fails",
+    "the file is read and its directives and stream commands parsed before each timed and memory operation, and the reference's library is created and configured once, outside it"
+  ],
+  "required_profiles": [
+    "stream"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

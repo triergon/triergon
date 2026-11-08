@@ -5,6 +5,13 @@
 /// cubic subdivision (`8 · max + 4`) stays within 32 bits.
 pub const OUTLINE_MAX: i32 = (1 << 28) - 1;
 
+/// libass's `double_to_d6`: pixels to 26.6 fixed point, rounding half to
+/// even. Beyond the `i32` range it saturates and NaN is 0, as libass gives
+/// them on 32-bit ARM with GCC.
+pub fn pixels_26_6(pixels: f64) -> i32 {
+    triergon_core::round_ties_even_i32(pixels * 64.0)
+}
+
 /// A point or offset: in 26.6 fixed point for outlines, matrices and offsets of
 /// coverage, in whole pixels for bitmap and clip positions.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -175,4 +182,17 @@ pub(crate) fn split_cubic(pt: &[Vector; 4]) -> [Vector; 7] {
     let x = half(pt[0].x, pt[1].x, pt[2].x, pt[3].x);
     let y = half(pt[0].y, pt[1].y, pt[2].y, pt[3].y);
     std::array::from_fn(|i| Vector::new(x[i], y[i]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pixels_26_6;
+
+    #[test]
+    fn pixels_round_to_26_6_half_to_even() {
+        assert_eq!([pixels_26_6(256.0), pixels_26_6(0.5 / 64.0)], [16384, 0]);
+        assert_eq!(pixels_26_6(1.5 / 64.0), 2);
+        assert_eq!(pixels_26_6(f64::INFINITY), i32::MAX);
+        assert_eq!(pixels_26_6(f64::NAN), 0);
+    }
 }

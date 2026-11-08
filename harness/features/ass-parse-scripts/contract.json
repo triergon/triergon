@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "ass-parse-scripts",
+  "operation": "ass-parse",
+  "candidate": "ass-worker",
+  "worker_operation": "ass-",
+  "reference": "libass-ass-native",
+  "gate": "required",
+  "contract": [
+    "one authored script read from memory as libass 0.17.5's ass_read_memory reads it, without a codepage, after the style overrides (ass_set_style_overrides) and font extraction (ass_set_extract_fonts) its ;@force and ;@extract-fonts directives set",
+    "recorded: every track field (script type, play and layout resolution, timer, wrap style, ScaledBorderAndShadow, kerning, YCbCr matrix, language, the default style), the style and event format lines, every style field (names, size, colours, weight and slant values, decorations, scales, spacing, angle, border style, outline, shadow, alignment, margins, encoding, blur, justification), every event field (times, ReadOrder, layer, style, name, margins, effect, text) and every extracted font's name, size and FNV-1a hash; no track when libass returns none; values libass treats alike are recorded as one (Underline and StrikeOut as 0 or 1, Alignment by its four low bits, WrapStyle and Justify by the values libass names)",
+    "packets count records and bytes the bytes of the strings recorded; a script the candidate refuses where libass reads it ends its operation with an error, so the case fails",
+    "the file is read and its directives and stream commands parsed before each timed and memory operation, and the reference's library is created and configured once, outside it"
+  ],
+  "required_profiles": [
+    "ass",
+    "ssa"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

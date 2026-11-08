@@ -1,0 +1,23 @@
+;@time 0 1000 2500
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 480
+LayoutResX: 1280
+LayoutResY: 960
+WrapStyle: 0
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Banner;5,banner a\nb
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Banner;5;1;7;9;11,banner left to right
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Banner;0;0,banner zero
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Banner;-3,banner negative
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Banner,banner without delay
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,banner;5,lowercase
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Scroll up;10;100;5,scroll up
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Scroll down;200;50;0;1,scroll down reversed band
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Scroll up;1;2,too few
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Scroll up; 7 ;x8; +9 ,spaced
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Karaoke,unknown effect
+Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,Banner;5,{\pos(1,2)\q0}banner positioned

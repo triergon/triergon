@@ -16558,6 +16558,16 @@
    "sha256": "d328061b906a28f523eddd7aeaa778b62d13b7c7750c68347659a457497465d7",
    "bytes": 15433902,
    "source_revision": "a7b6635e20cc2dc9d4592a874ba0eecab24f2870"
+  },
+  {
+   "name": "ass-parsing-21642833-linux-arm",
+   "path": "ass-parsing-21642833-linux-arm",
+   "retention": "retained",
+   "reason": "ASS parsing status row, Linux AArch64 and 32-bit ARMv7: per-target comparisons of ass-parse-scripts, -chunks, -events and -host against each target's libass build, with the per-target pins, dumps, libass build records and platform package lists",
+   "key": "evidence/ass-parsing-21642833-linux-arm/c039ca3e2cb63255140973528ddd22cc7e96b32e5254d22ea4f954011822a35d.tar.gz",
+   "sha256": "c039ca3e2cb63255140973528ddd22cc7e96b32e5254d22ea4f954011822a35d",
+   "bytes": 12480461,
+   "source_revision": "21642833a1c1f4d8e587a5c5bc903910f215428e"
   }
  ]
 }

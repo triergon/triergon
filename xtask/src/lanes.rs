@@ -1,6 +1,7 @@
-//! The lanes whose features commit only their pins: fonts, shaping and
-//! rasterising. Each generates its features' case rows from committed inputs and
-//! seeds (`harness/fonts/corpus.json`, authored texts, seeded random cases), and
+//! The lanes whose features commit only their pins: fonts, shaping, rasterising
+//! and ASS parsing. Each generates its features' case rows from committed inputs
+//! and seeds (`harness/fonts/corpus.json`, authored texts and fixtures, seeded
+//! random cases), and
 //! takes each case's expected work from `harness/features/<id>/pins.json`: the
 //! reference's folds, written only by [`Lane::record`] and never edited by hand. The
 //! harness reads a generated manifest at `harness/features/<id>/corpus.json`; its
@@ -73,10 +74,11 @@ pub struct Lane {
     pub smoke: &'static [(&'static str, &'static [&'static str])],
 }
 
-pub const LANES: [&Lane; 3] = [
+pub const LANES: [&Lane; 4] = [
     &crate::fonts::LANE,
     &crate::shape::LANE,
     &crate::raster::LANE,
+    &crate::ass::LANE,
 ];
 
 /// No generated input files, or nothing more to check.
@@ -197,6 +199,11 @@ impl Lane {
     /// pinned work (see [`Lane::sources`]). The case ids and the pinned ids must
     /// match exactly.
     pub fn manifest(&self, root: &Path, id: &str) -> R<Value> {
+        let expected = if pinned_per_target(&contract(root, id)?) {
+            EXPECTED_BY_TARGET
+        } else {
+            "expected"
+        };
         let (mut rows, mut pinned) = (Vec::new(), Vec::new());
         for source in self.sources(root, id)? {
             rows.extend((self.rows)(root, source)?);
@@ -210,7 +217,7 @@ impl Lane {
             ));
         }
         let mut cases = Vec::new();
-        for (row, (pin, expected)) in rows.into_iter().zip(pinned) {
+        for (row, (pin, work)) in rows.into_iter().zip(pinned) {
             let case = row.get("id").and_then(Value::as_str).unwrap_or_default();
             if case != pin {
                 return Err(format!(
@@ -220,7 +227,7 @@ impl Lane {
             let Value::Object(mut fields) = row else {
                 return Err(format!("{id}: a case row is not an object"));
             };
-            fields.push(("expected".into(), expected));
+            fields.push((expected.into(), work));
             cases.push(Value::Object(fields));
         }
         Ok(Value::object([
@@ -266,6 +273,7 @@ impl Lane {
                 errors.push(error);
                 continue;
             }
+            errors.extend(target_pins(root, feature));
             let path = pins_path(root, feature);
             if self.sources(root, feature).is_ok_and(|s| s != [feature]) {
                 if gate.is_ok_and(|gate| gate != Gate::Diagnostic) {
@@ -296,9 +304,10 @@ impl Lane {
     }
 
     /// Re-records the pins of every feature with its own cases from the built
-    /// reference, running each case's `worker_operation` fold.
+    /// reference, running each case's `worker_operation` fold. A feature pinned
+    /// per target gets this host's entries, if the host's target is one of its
+    /// `required_targets`, and keeps the other targets'.
     pub fn record(&self, root: &Path) -> R<()> {
-        (self.write_inputs)(root)?;
         let identity = crate::checks::read_json(&root.join("target/harness/identity.json"))?;
         let reference = crate::harness::comparison::reference_named(&identity, self.reference)?;
         let worker = root.join(
@@ -316,30 +325,86 @@ impl Lane {
                 self.reference
             ));
         }
+        self.record_with(root, &worker, &crate::harness::report::host_target(), false)
+    }
+
+    /// Records with `worker` as the reference on `target`; with `per_target_only`
+    /// only the features pinned per target, for a target where the workers'
+    /// build identity is not recorded.
+    fn record_with(
+        &self,
+        root: &Path,
+        worker: &Path,
+        target: &str,
+        per_target_only: bool,
+    ) -> R<()> {
+        (self.write_inputs)(root)?;
         for &feature in self.features {
             let sources = self.sources(root, feature)?;
             if sources != [feature] {
                 println!("{feature}: the pins of {}", sources.join(", "));
                 continue;
             }
-            let prefix = contract(root, feature)?
+            let contract = contract(root, feature)?;
+            let per_target = pinned_per_target(&contract);
+            if per_target_only && !per_target {
+                println!("{feature}: pinned for every target; recorded with the build identity");
+                continue;
+            }
+            if per_target && !targets(&contract, "required_targets").contains(&target) {
+                println!("{feature}: pinned per target, and {target} is not one of its targets");
+                continue;
+            }
+            let prefix = contract
                 .get("worker_operation")
                 .and_then(Value::as_str)
                 .map(str::to_owned)
                 .ok_or_else(|| format!("{feature}: no worker_operation"))?;
             let rows = (self.rows)(root, feature)?;
             let directory = root.join((self.directory)(feature));
-            let folds = fold_all(&worker, &format!("{prefix}fold"), &directory, &rows)?;
-            let pins = rows
-                .iter()
-                .zip(folds)
-                .map(|(row, fold)| {
-                    let id = row.get("id").and_then(Value::as_str).unwrap_or_default();
-                    (id.to_owned(), fold)
-                })
-                .collect();
-            crate::corpus::write_json(&pins_path(root, feature), &self.pin_file(pins))?;
-            println!("{feature}: {} pins recorded", rows.len());
+            let folds = fold_all(worker, &format!("{prefix}fold"), &directory, &rows)?;
+            // A feature pinned per target keeps the other targets' pins, so a
+            // pin file it cannot read is an error, not an empty one.
+            let earlier = if per_target && pins_path(root, feature).exists() {
+                pins(root, feature)?
+            } else {
+                Vec::new()
+            };
+            let mut pinned = Vec::new();
+            for (row, fold) in rows.iter().zip(folds) {
+                let id = row.get("id").and_then(Value::as_str).unwrap_or_default();
+                if !per_target {
+                    pinned.push((id.to_owned(), fold));
+                    continue;
+                }
+                let mut by_target: Vec<(String, Value)> =
+                    match earlier.iter().find(|(case, _)| case == id) {
+                        None => Vec::new(),
+                        Some((_, Value::Object(pins)))
+                            if pins
+                                .iter()
+                                .all(|(_, fold)| matches!(fold, Value::Object(_))) =>
+                        {
+                            pins.clone()
+                        }
+                        Some(_) => {
+                            return Err(format!("{feature}: {id} is not pinned per target"));
+                        }
+                    };
+                by_target.retain(|(t, _)| t != target);
+                if !unpinned(&contract, id).iter().any(|(t, _)| *t == target) {
+                    by_target.push((target.to_owned(), fold));
+                }
+                by_target.sort_by(|a, b| a.0.cmp(&b.0));
+                pinned.push((id.to_owned(), Value::Object(by_target)));
+            }
+            crate::corpus::write_json(&pins_path(root, feature), &self.pin_file(pinned))?;
+            let scope = if per_target {
+                format!(" for {target}")
+            } else {
+                String::new()
+            };
+            println!("{feature}: {} pins recorded{scope}", rows.len());
         }
         Ok(())
     }
@@ -361,19 +426,27 @@ impl Lane {
         Ok(())
     }
 
-    /// `COMMAND manifest [--record] [--output DIR]`.
+    /// `COMMAND manifest [--record [--target TARGET --reference-worker PATH]]
+    /// [--output DIR]`. With a target and a worker, only the features pinned per
+    /// target are recorded, on a target where `build-workers` cannot run.
     pub fn manifest_command(&self, root: &Path, args: &[String], usage: &str) -> R<()> {
         let (mut record, mut output) = (false, root.join(self.manifest_directory));
+        let (mut target, mut worker) = (None, None);
         let mut rest = args.iter();
         while let Some(flag) = rest.next() {
             match flag.as_str() {
                 "--record" => record = true,
                 "--output" => output = PathBuf::from(rest.next().ok_or(usage)?),
+                "--target" => target = Some(rest.next().ok_or(usage)?.clone()),
+                "--reference-worker" => worker = Some(PathBuf::from(rest.next().ok_or(usage)?)),
                 _ => return Err(usage.into()),
             }
         }
-        if record {
-            self.record(root)?;
+        match (record, target, worker) {
+            (true, None, None) => self.record(root)?,
+            (true, Some(target), Some(worker)) => self.record_with(root, &worker, &target, true)?,
+            (false, None, None) => {}
+            _ => return Err(usage.into()),
         }
         self.write(root, &output)
     }
@@ -469,9 +542,180 @@ fn fold(worker: &Path, mode: &str, directory: &Path, row: &Value) -> R<Value> {
     }
     let data = crate::json::parse(&String::from_utf8_lossy(&output.stdout))
         .map_err(|e| format!("{id}: {e}"))?;
-    Ok(Value::object(["packets", "bytes", "digest"].map(|key| {
-        (key, data.get(key).cloned().unwrap_or(Value::Null))
-    })))
+    let mut pin: Vec<(&str, Value)> = ["packets", "bytes", "digest"]
+        .map(|key| (key, data.get(key).cloned().unwrap_or(Value::Null)))
+        .into();
+    if host_dependent(&data) {
+        pin.push((HOST_DEPENDENT, Value::Bool(true)));
+    }
+    Ok(Value::object(pin))
+}
+
+/// The flag a reference adds to a fold, and its pin keeps, when the case's
+/// result went through a step C leaves to the host; a contract declares it
+/// when its feature holds such cases.
+pub const HOST_DEPENDENT: &str = "host_dependent";
+
+/// Whether a fold, pin or contract carries [`HOST_DEPENDENT`].
+pub fn host_dependent(value: &Value) -> bool {
+    value.get(HOST_DEPENDENT) == Some(&Value::Bool(true))
+}
+
+/// The manifest field of a case pinned per target: its pins keyed by target.
+pub const EXPECTED_BY_TARGET: &str = "expected_by_target";
+
+/// Whether a contract pins its cases per target (`pinned_per_target`).
+pub fn pinned_per_target(contract: &Value) -> bool {
+    contract.get("pinned_per_target") == Some(&Value::Bool(true))
+}
+
+/// The target triples a contract lists under `key`.
+fn targets<'a>(contract: &'a Value, key: &str) -> Vec<&'a str> {
+    contract
+        .get(key)
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect()
+}
+
+/// The targets case `id` is not pinned for, each with its contract's reason
+/// (`unpinned_targets`).
+pub fn unpinned<'a>(contract: &'a Value, id: &str) -> Vec<(&'a str, &'a str)> {
+    let entries = contract
+        .get("unpinned_targets")
+        .and_then(Value::as_array)
+        .unwrap_or_default();
+    entries
+        .iter()
+        .filter(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
+        .flat_map(|entry| {
+            let reason = entry
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            targets(entry, "targets")
+                .into_iter()
+                .map(move |t| (t, reason))
+        })
+        .collect()
+}
+
+/// A feature pinned per target has, for each case, a pin on each of its
+/// `required_targets` but those `unpinned_targets` names, and holds only cases
+/// whose result differs by target: unpinned somewhere, flagged by the reference
+/// ([`HOST_DEPENDENT`]), or pinned differently. Every other feature has one pin
+/// per case, which no reference flags.
+fn target_pins(root: &Path, feature: &str) -> Vec<String> {
+    let Ok(document) = contract(root, feature) else {
+        return Vec::new();
+    };
+    let per_target = pinned_per_target(&document);
+    let required = targets(&document, "required_targets");
+    let pinned = pins(root, feature).unwrap_or_default();
+    let mut errors = Vec::new();
+    if !per_target && document.get("unpinned_targets").is_some() {
+        errors.push(format!(
+            "{feature}: unpinned_targets needs pinned_per_target"
+        ));
+    }
+    for entry in document
+        .get("unpinned_targets")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let id = entry.get("id").and_then(Value::as_str).unwrap_or_default();
+        let listed = targets(entry, "targets");
+        if !pinned.iter().any(|(case, _)| case == id)
+            || listed.is_empty()
+            || listed.iter().any(|t| !required.contains(t))
+            || entry
+                .get("reason")
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+        {
+            errors.push(format!(
+                "{feature}: unpinned_targets: {id} needs a case, required targets and a reason"
+            ));
+        }
+    }
+    // An open case scoped to targets is compared there: it names some of the
+    // required targets, and in a feature pinned per target, ones it has pins for.
+    for entry in document
+        .get("open_cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let Some(listed) = entry.get("targets") else {
+            continue;
+        };
+        let id = entry.get("id").and_then(Value::as_str).unwrap_or_default();
+        let scope = targets(entry, "targets");
+        let skipped = unpinned(&document, id);
+        let compared = |t: &&str| required.contains(t) && !skipped.iter().any(|(u, _)| u == t);
+        let complete = listed
+            .as_array()
+            .is_some_and(|all| all.len() == scope.len());
+        if scope.is_empty() || !complete || !scope.iter().all(compared) {
+            errors.push(format!(
+                "{feature}: open case {id}: its targets must be required targets it is pinned for"
+            ));
+        }
+    }
+    for (case, pin) in &pinned {
+        if !per_target {
+            if pin.get("packets").is_none() {
+                errors.push(format!(
+                    "{feature}: {case} is pinned per target; its contract is not"
+                ));
+            } else if host_dependent(pin) {
+                errors.push(format!(
+                    "{feature}: the reference flags {case}; pin it per target in a feature \
+                     whose contract says pinned_per_target"
+                ));
+            }
+            continue;
+        }
+        let Value::Object(by_target) = pin else {
+            errors.push(format!("{feature}: {case} is not pinned per target"));
+            continue;
+        };
+        let skipped: Vec<&str> = unpinned(&document, case).iter().map(|(t, _)| *t).collect();
+        let mut wanted: Vec<&str> = required
+            .iter()
+            .copied()
+            .filter(|t| !skipped.contains(t))
+            .collect();
+        wanted.sort_unstable();
+        let have: Vec<&str> = by_target.iter().map(|(t, _)| t.as_str()).collect();
+        if have != wanted {
+            errors.push(format!(
+                "{feature}: {case} is pinned for {} but needs {}; record it on each target",
+                have.join(", "),
+                wanted.join(", ")
+            ));
+        }
+        if by_target
+            .iter()
+            .any(|(_, fold)| fold.get("packets").is_none())
+        {
+            errors.push(format!(
+                "{feature}: {case} has a target pin that is not a fold"
+            ));
+        }
+        let folds: Vec<&Value> = by_target.iter().map(|(_, fold)| fold).collect();
+        let alike = folds
+            .windows(2)
+            .all(|pair| crate::harness::diff::equal(pair[0], pair[1]));
+        if skipped.is_empty() && alike && !folds.iter().any(|fold| host_dependent(fold)) {
+            errors.push(format!(
+                "{feature}: {case} is the same on every target; \
+                 it belongs in a feature pinned for every target"
+            ));
+        }
+    }
+    errors
 }
 
 /// Every generated feature's contract, the pins it takes and the files its rows
@@ -509,7 +753,7 @@ mod tests {
 
     #[test]
     fn compare_selects_features_by_their_contracts_gate() {
-        let [fonts, shape, raster] = LANES;
+        let [fonts, shape, raster, ass] = LANES;
         assert_eq!(compared(fonts, &[]), ["font-outlines", "font-hinting-none"]);
         assert_eq!(compared(fonts, &["--all"]), fonts.features);
         assert_eq!(
@@ -531,6 +775,8 @@ mod tests {
         for flags in [["--all", "--diagnostic"], ["--diagnostic", "--all"]] {
             assert_eq!(compared(raster, &flags), raster.features, "{flags:?}");
         }
+        assert_eq!(compared(ass, &[]), ass.features);
+        assert_eq!(compared(ass, &["--all"]), ass.features);
     }
 
     #[test]
