@@ -822,11 +822,11 @@ mod timed_header_tests {
 
     fn stamp(raw: u64, prefix: u8) -> [u8; 5] {
         [
-            (prefix << 4) | u8::try_from((raw >> 29) & 14).unwrap() | 1,
+            (prefix << 4) | u8::try_from((raw >> 29) & 0x0e).unwrap() | 1,
             ((raw >> 22) & 255).try_into().unwrap(),
-            u8::try_from((raw >> 14) & 254).unwrap() | 1,
+            u8::try_from((raw >> 14) & 0xfe).unwrap() | 1,
             ((raw >> 7) & 255).try_into().unwrap(),
-            u8::try_from((raw << 1) & 254).unwrap() | 1,
+            u8::try_from((raw << 1) & 0xfe).unwrap() | 1,
         ]
     }
 
@@ -901,7 +901,7 @@ mod timed_header_tests {
                     let fast = parse_timed_header(&changed[..used], 1 << 20, &work);
                     match parse_header(&changed, used) {
                         Ok(slow) => {
-                            assert_eq!(format!("{:?}", fast.unwrap().0), format!("{slow:?}"))
+                            assert_eq!(format!("{:?}", fast.unwrap().0), format!("{slow:?}"));
                         }
                         Err(_) => assert!(fast.is_none()),
                     }
