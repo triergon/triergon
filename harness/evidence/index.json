@@ -14506,6 +14506,14 @@
    "key": "evidence/progressive-transport-qualified/0f3a7a6c8de34a87a3c9f900303689b70086e6bf159cba9021729aef9682a880.tar.gz",
    "sha256": "0f3a7a6c8de34a87a3c9f900303689b70086e6bf159cba9021729aef9682a880",
    "source_revision": "de17cfcd2e0b7a81d9e8fac755dba88ee3df7aa1"
+  },
+  {
+   "name": "progressive-current-gate-build",
+   "retention": "retained",
+   "reason": "Selected progressive TS188 and HLS gate results",
+   "key": "evidence/progressive-current-gate-build/fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d.tar.gz",
+   "sha256": "fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d",
+   "source_revision": "5ec7c1f8a7816b1427631f22a8ca77ba74abeeee"
   }
  ]
 }
