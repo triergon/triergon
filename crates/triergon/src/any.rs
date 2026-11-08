@@ -335,14 +335,40 @@ pub fn open_sequential<S: std::io::Read>(
         random_access: false,
     };
     let reader = AnyReader::open(&prefix, pool, SourceId(1), capabilities)?;
-    let source = std::io::Cursor::new(prefix).chain(source);
+    let source = Replayed {
+        prefix,
+        at: 0,
+        rest: source,
+    };
     Ok(triergon_core::blocking::Blocking::sequential(
         reader, source, pool,
     ))
 }
 
-/// A sequential source with its probed prefix put back in front.
-pub type Replayed<S> = std::io::Chain<std::io::Cursor<Vec<u8>>, S>;
+/// A sequential source with its probed prefix put back in front; the prefix is freed
+/// once it has been read.
+#[derive(Debug)]
+pub struct Replayed<S> {
+    prefix: Vec<u8>,
+    at: usize,
+    rest: S,
+}
+
+impl<S: std::io::Read> std::io::Read for Replayed<S> {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        if self.at < self.prefix.len() {
+            let count = out.len().min(self.prefix.len() - self.at);
+            out[..count].copy_from_slice(&self.prefix[self.at..self.at + count]);
+            self.at += count;
+            if self.at == self.prefix.len() {
+                self.prefix = Vec::new();
+                self.at = 0;
+            }
+            return Ok(count);
+        }
+        self.rest.read(out)
+    }
+}
 
 /// Bytes [`open_blocking`] and [`open_sequential`] probe.
 const PROBE_BYTES: usize = 64 * 1024;

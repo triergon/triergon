@@ -12,7 +12,7 @@ use crate::storage::Meter;
 use crate::{DecodeError, ilog};
 
 /// Codeword lengths resolved by a single table lookup.
-const FAST_BITS: u32 = 11;
+const FAST_BITS: u32 = 10;
 
 /// The longest codeword length a codebook can declare.
 const MAX_LENGTH: u32 = 32;
