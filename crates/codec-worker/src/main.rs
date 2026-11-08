@@ -2,8 +2,9 @@
 //! the decode build of `harness/reference.c`, through the session decoders.
 //!
 //! usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
-//! KIND-CODEC-raw FILE OUT, KIND-CODEC one of video-h264, video-hevc, audio-ac3,
-//! audio-eac3, audio-aac, audio-dts, audio-flac, audio-mp3, audio-vorbis, audio-opus. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
+//! KIND-CODEC-raw FILE OUT | packets FORMAT FILE, KIND-CODEC one of video-h264,
+//! video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac, audio-mp3,
+//! audio-vorbis, audio-opus. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest
 //! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
 //! interleaved stereo s16le). File loading and process start are outside the timed
@@ -15,7 +16,10 @@
 //! playback frames access units through `triergon-framing`. FLAC, MPEG audio, Vorbis
 //! and Opus lanes read their file format as a player does, through `AnyReader` and the
 //! session's track decoder, as the reference reads them through its demuxer.
+//! `packets` prints what a container reader emits per packet ([`packets`]).
 #![forbid(unsafe_code)]
+mod packets;
+
 use std::io::Write;
 use std::time::Instant;
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_sequential};
@@ -250,9 +254,18 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
 fn main() {
     // <lane>-<codec>-bench FILE ITERATIONS | <lane>-<codec>-memory FILE | <lane>-<codec>-raw FILE OUT
     let args: Vec<String> = std::env::args().collect();
+    if let [_, command, format, path] = args.as_slice()
+        && command == "packets"
+    {
+        if let Err(error) = packets::run(format, path) {
+            eprintln!("{error}");
+            std::process::exit(2);
+        }
+        return;
+    }
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
-            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT"
+            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | packets FORMAT FILE"
         );
         std::process::exit(2);
     };

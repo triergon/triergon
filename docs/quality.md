@@ -153,8 +153,9 @@ and inflate behaviour against the reference workers and the oracles. The indepen
 oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`),
 as do the numpy table-recovery chains under `harness/codecs/` and the capture input
 generator `harness/capture/generate_inputs.py`, whose numpy PCG64 and float draws the
-cited capture inputs depend on. `cargo xtask codecs` grades, times and records the
-identities of the codec crates against the pinned FFmpeg decoders
+cited capture inputs depend on. `cargo xtask codecs` grades, times, measures the memory
+of and records the identities of the codec crates against the pinned FFmpeg decoders,
+and compares the packets of the audio container readers with its `ffprobe`
 (`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
 pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against

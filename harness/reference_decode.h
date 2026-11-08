@@ -14,8 +14,12 @@
  *        the same protocol as crates/codec-worker.
  * FLAC, MPEG audio, Vorbis and Opus come in a file format (native FLAC, raw MPEG
  * audio, Ogg), so their lanes read it through the demuxer the CLI uses and decode
- * with the decoder it picks for the stream (the float decoders for MPEG audio
- * Layer I and II); packet trims (skip samples, end padding) apply as in the CLI.
+ * with the decoder it picks for the stream, except MPEG audio Layer I and II, which
+ * use the float decoders (rule mpeg-audio-float-decoders in
+ * harness/codecs/numeric-rules.json); packet trims (skip samples, end padding) apply
+ * as in the CLI. The audio chain is the CLI's, so it mixes whatever sample format the
+ * decoder outputs: FLAC of up to 16 bits arrives as s16 and is mixed in integer
+ * (rule flac-integer-device-mix; harness/codecs/downmix-integer.md).
  * The whole operation (parser/decoder/filter setup, decode, convert, teardown)
  * is inside the timed interval; file loading is outside, as in the other workers.
  */
@@ -304,9 +308,10 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
     if (index < 0) die("stream", AVERROR_STREAM_NOT_FOUND);
     AVStream *st = fmt->streams[index];
     const AVCodec *codec = avcodec_find_decoder(st->codecpar->codec_id);
-    /* Layer I and II: FFmpeg's float decoders, like Layer III's default. The defaults
-     * for these layers are the fixed-point decoders, whose 16-bit rounding alone
-     * reaches the float decoder rule (harness/codecs/numeric-rules.json). */
+    /* Layer I and II: FFmpeg's float decoders, like Layer III's default, where the CLI
+     * would pick the fixed-point decoders, whose 16-bit rounding alone reaches the float
+     * decoder rule. So this lane's stereo output for Layer I and II is not the CLI's
+     * (rule mpeg-audio-float-decoders, harness/codecs/numeric-rules.json). */
     if (st->codecpar->codec_id == AV_CODEC_ID_MP1) codec = avcodec_find_decoder_by_name("mp1float");
     if (st->codecpar->codec_id == AV_CODEC_ID_MP2) codec = avcodec_find_decoder_by_name("mp2float");
     if (!codec) die("decoder", AVERROR_DECODER_NOT_FOUND);

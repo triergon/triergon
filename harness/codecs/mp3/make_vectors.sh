@@ -1,25 +1,20 @@
 #!/bin/sh
-# Generate the MPEG audio test vectors and their FFmpeg reference output.
+# Generate the MPEG audio vectors of the mp3, mp2 and mp1 lanes of cargo xtask codecs grade.
 #
-# usage: harness/codecs/mp3/make_vectors.sh [FFMPEG]
+# usage: harness/codecs/mp3/make_vectors.sh FFMPEG OUT_DIR
 #
-# Writes, under .research/mp3/ (git-ignored):
-#   vectors/*.mp3|*.mp2|*.mp1  streams encoded from one synthetic signal by libmp3lame,
-#                              mp2 and mp2fixed, random Layer I/II frames
-#                              (harness/codecs/mp3/random_frames.py) and MPEG-2 intensity stereo
-#                              frames (harness/codecs/mp3/lsf_intensity.py)
-#   ref/NAME.f32 (+ .frames)   FFmpeg's untrimmed float decoder output (harness/codecs/mp3/reference.c)
-#   ref/NAME.default.f32       the same with FFmpeg's default decoder for the codec
-#   ref/NAME.cli.f32           the ffmpeg command line output, trims applied
-# for every vector and for the ISO conformance streams in .research/fate-samples.
+# Writes into OUT_DIR (the manifest's .research/mp3/vectors) streams encoded from one
+# synthetic signal by libmp3lame, mp2 and mp2fixed, random Layer I/II frames
+# (harness/codecs/mp3/random_frames.py) and MPEG-2 intensity stereo frames
+# (harness/codecs/mp3/lsf_intensity.py). FFMPEG must be FFmpeg 9.0.2 with libmp3lame,
+# which the decode profile of cargo xtask prepare-ffmpeg does not build; the vectors
+# are identified by their SHA-256 in harness/codecs/correctness-manifest.json.
 set -eu
-FFMPEG=${1:-/opt/homebrew/bin/ffmpeg}
-ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
-TOOLS="$ROOT/crates/codec-mp3/tools"
-OUT="$ROOT/.research/mp3"
-mkdir -p "$OUT/vectors" "$OUT/ref" "$OUT/bin"
-cc -O1 -o "$OUT/bin/reference" "$TOOLS/reference.c" \
-    $(pkg-config --cflags --libs libavformat libavcodec libavutil)
+[ $# -eq 2 ] || { echo "usage: $0 FFMPEG OUT_DIR" >&2; exit 2; }
+FFMPEG=$1
+OUT=$2
+HERE=$(cd "$(dirname "$0")" && pwd)
+mkdir -p "$OUT"
 
 # Six seconds of chirp, tone bursts with sharp onsets (short blocks), noise and a
 # different right channel (joint stereo).
@@ -28,7 +23,7 @@ SIGNAL="aevalsrc='0.3*sin(2*PI*(200+600*t)*t)+0.5*lt(mod(t,0.37),0.004)*sin(2*PI
 encode() { # NAME FORMAT ARGS...
     name=$1 format=$2
     shift 2
-    "$FFMPEG" -nostdin -v error -y -f lavfi -i "$SIGNAL" "$@" -f "$format" "$OUT/vectors/$name"
+    "$FFMPEG" -nostdin -v error -y -f lavfi -i "$SIGNAL" "$@" -f "$format" "$OUT/$name"
 }
 encode l3_44k_128_joint.mp3 mp3 -ar 44100 -c:a libmp3lame -b:a 128k
 encode l3_48k_vbr2.mp3 mp3 -ar 48000 -c:a libmp3lame -q:a 2
@@ -59,14 +54,5 @@ encode l2_22k_96.mp2 mp2 -ar 22050 -c:a mp2 -b:a 96k
 encode l2_16k_32_mono.mp2 mp2 -ar 16000 -ac 1 -c:a mp2 -b:a 32k
 encode l2fixed_48k_256.mp2 mp2 -ar 48000 -c:a mp2fixed -b:a 256k
 encode l2fixed_44k_64_mono.mp2 mp2 -ar 44100 -ac 1 -c:a mp2fixed -b:a 64k
-python3 -I "$TOOLS/random_frames.py" "$OUT/vectors"
-python3 -I "$TOOLS/lsf_intensity.py" "$OUT/vectors"
-
-for input in "$OUT"/vectors/* "$ROOT"/.research/fate-samples/mp3-conformance/*.bit; do
-    name=$(basename "$input")
-    name=${name%.*}
-    "$OUT/bin/reference" "$input" "$OUT/ref/$name.f32" 2>/dev/null || echo "reference failed: $name"
-    "$OUT/bin/reference" --codec default "$input" "$OUT/ref/$name.default.f32" 2>/dev/null || true
-    "$FFMPEG" -nostdin -v error -y -threads 1 -f mp3 -i "$input" -f f32le -c:a pcm_f32le \
-        "$OUT/ref/$name.cli.f32" 2>/dev/null || echo "ffmpeg cannot read: $name"
-done
+python3 -I "$HERE/random_frames.py" "$OUT"
+python3 -I "$HERE/lsf_intensity.py" "$OUT"

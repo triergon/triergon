@@ -1,0 +1,2140 @@
+{
+ "schema": "triergon.codecs.correctness-manifest.v1",
+ "vectors": [
+  {
+   "lane": "reader-ogg",
+   "name": "1.0-test_small.ogg",
+   "path": ".research/fate-samples/vorbis/1.0-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "9f510e92b976eaf735009b444511f856db601eb13698b54fdfc9c4e078f9f3bc"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "1.0.1-test_small.ogg",
+   "path": ".research/fate-samples/vorbis/1.0.1-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "1eef411505a81a7b4e2e6bcc382844479fa51db88f2d03ed8e638682b0786e4e"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "6.ogg",
+   "path": ".research/fate-samples/vorbis/6.ogg",
+   "bytes": 86033,
+   "sha256": "1dbce194fb1ca74250c156b4aba10b3bf76f90bc5ca8896823cef6c965a2c46a"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "beta3-test_small.ogg",
+   "path": ".research/fate-samples/vorbis/beta3-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "c756dbf9e72680b6b35b9d5547aa15a76298e3d53600b85f17f1a2d19714ec14"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "beta4-test_small.ogg",
+   "path": ".research/fate-samples/vorbis/beta4-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "67517ea51560fac1c6190bd90ab3c18ff1bcdbc30d8e10e3585476ea44aba518"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "chain-test1_small.ogg",
+   "path": ".research/fate-samples/vorbis/chain-test1_small.ogg",
+   "bytes": 100000,
+   "sha256": "f5099bddbe1c7dd80c1b46ba99930cd7f818c63f5120d7c5a5d9d991852cafe0"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "chain-test2_small.ogg",
+   "path": ".research/fate-samples/vorbis/chain-test2_small.ogg",
+   "bytes": 100000,
+   "sha256": "48e5024d95170b064208c469ea75915e98294cf74c7fcec2b73b4e679d0dfd0a"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "highrate-test_small.ogg",
+   "path": ".research/fate-samples/vorbis/highrate-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "9974ea9a70159b6157ff8c157ca6969183037a8e6ccdc4f0d84e4a8aa607e923"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "lsp-test2_small.ogg",
+   "path": ".research/fate-samples/vorbis/lsp-test2_small.ogg",
+   "bytes": 100000,
+   "sha256": "6946aa25a4d27153b38aefeb3c139fa8542689adafc5ae2bdb2ce4aa3af77e54"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "lsp-test3_small.ogg",
+   "path": ".research/fate-samples/vorbis/lsp-test3_small.ogg",
+   "bytes": 100000,
+   "sha256": "3358bacdc7cd33b0b75e4ed84913b1f11847e1d556dbe00ff60fb1e30cf711f5"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "lsp-test4_small.ogg",
+   "path": ".research/fate-samples/vorbis/lsp-test4_small.ogg",
+   "bytes": 100000,
+   "sha256": "5dd55ac71ebffe5db1a351fc5beaeddeab61e415853ce351d268eda547b2264e"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "lsp-test_small.ogg",
+   "path": ".research/fate-samples/vorbis/lsp-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "f908598728585cdec80f47d96ae36eaa9f3afaa2774c01638f52b11a6e4c5727"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "mono_small.ogg",
+   "path": ".research/fate-samples/vorbis/mono_small.ogg",
+   "bytes": 100000,
+   "sha256": "67565c74021eb0a6b68bd20bbef431ff76a0bd7d8c4865702b6d6408860f54cd"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "moog_small.ogg",
+   "path": ".research/fate-samples/vorbis/moog_small.ogg",
+   "bytes": 100000,
+   "sha256": "25778a973824fcf488c751ecbc2fdbc594e8655666802e1f7d319c11c2814461"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "rc1-test_small.ogg",
+   "path": ".research/fate-samples/vorbis/rc1-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "0db535709f6b3f9810c6980370ec72911df2a22d67cf0a32c1445aa5f2b43e99"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "rc2-test2_small.ogg",
+   "path": ".research/fate-samples/vorbis/rc2-test2_small.ogg",
+   "bytes": 100000,
+   "sha256": "db45e1c0ad0c172f2ac32a09984c1a8486963e4be4924bdf3049a4db46880ab7"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "rc2-test_small.ogg",
+   "path": ".research/fate-samples/vorbis/rc2-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "2277d4f8278a0b38894cded850e036db53702f16b6631d69a1407f575bed2e59"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "rc3-test_small.ogg",
+   "path": ".research/fate-samples/vorbis/rc3-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "f6e63631d1e757780ebee1cc82844a3f5e7aa7b49daa0ff7963bd9bcc27659d6"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "sleepzor_small.ogg",
+   "path": ".research/fate-samples/vorbis/sleepzor_small.ogg",
+   "bytes": 100000,
+   "sha256": "dcc01bcbccd9c1ed4cd2304f893a52e3f551573a99a2183635c8db070d18ada2"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "test-short2_small.ogg",
+   "path": ".research/fate-samples/vorbis/test-short2_small.ogg",
+   "bytes": 100000,
+   "sha256": "56900907a3603f842970467a3ea0ed19d4d7426b9c31388333cf45ca2566561c"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "vorbis_chapter_extension_demo.ogg",
+   "path": ".research/fate-samples/vorbis/vorbis_chapter_extension_demo.ogg",
+   "bytes": 106967,
+   "sha256": "b3490672085ff1377f6d23f2d4738129a1b96d3e735711654f535f42228730df"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "a_flac.oga",
+   "path": ".research/ogg-generated/a_flac.oga",
+   "bytes": 19441,
+   "sha256": "8f8c5a846e484931852b466a3e08ef33fb125630cebf921a1a00abcd716ad1da"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "a_opus.opus",
+   "path": ".research/ogg-generated/a_opus.opus",
+   "bytes": 19695,
+   "sha256": "c53015f62682fc2936cc1f29456445087e82b687b853490b89f9abf1b0146ae9"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "a_vorbis.ogg",
+   "path": ".research/ogg-generated/a_vorbis.ogg",
+   "bytes": 8364,
+   "sha256": "ff3157d4b3b1ed595665a314a597a5d357ed5f1570bb22de57b02a1d9c8a3a7c"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "b_opus.opus",
+   "path": ".research/ogg-generated/b_opus.opus",
+   "bytes": 10333,
+   "sha256": "ed1b19e31297aad7db9fa663d4e6631341678b9da8abdcdef730d56e47ba2904"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "b_vorbis.ogg",
+   "path": ".research/ogg-generated/b_vorbis.ogg",
+   "bytes": 5968,
+   "sha256": "f9bd978104bcaf4c02f0232c6102ba51d744370158a51570cc78d1a6dc6ee419"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "chain_opus.opus",
+   "path": ".research/ogg-generated/chain_opus.opus",
+   "bytes": 30028,
+   "sha256": "8c4318d74908867bc5e56e44e6c9aaa609cbcbc5cf0886fb9e0cfabc7c534aab"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "chain_vorbis.ogg",
+   "path": ".research/ogg-generated/chain_vorbis.ogg",
+   "bytes": 14332,
+   "sha256": "19cd38a41bd876db81c5f7a881c7fa9bdfc4821be9b8588f7fe7265202932690"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "crc_bad.opus",
+   "path": ".research/ogg-generated/crc_bad.opus",
+   "bytes": 19695,
+   "sha256": "58955283b54fc60407a235dc3579c6919619ca8d7f8f77ef7f0f41bd9430e614"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "flac_51_24.oga",
+   "path": ".research/ogg-generated/flac_51_24.oga",
+   "bytes": 113468,
+   "sha256": "4353a415af59ce3567aacb3cd040b81bb7afdd6b22475042c8d5db2a2901cdb8"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "lost_page.opus",
+   "path": ".research/ogg-generated/lost_page.opus",
+   "bytes": 18178,
+   "sha256": "553d074916d34d4687b6bea0bcd9d1004aa2e4b3a98713f0c4bc04fc4c819f13"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "mc_opus.opus",
+   "path": ".research/ogg-generated/mc_opus.opus",
+   "bytes": 24096,
+   "sha256": "b814a5ddc354e41a63ac97aaabbf0c87aae5fe40c52e4de972b1ec606f058b8b"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "mux2.opus",
+   "path": ".research/ogg-generated/mux2.opus",
+   "bytes": 14587,
+   "sha256": "504885e07bab8e7d19285f706d4d6437dd3859e8c26d9bec5cae42b3a32b4ec1"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "truncated.opus",
+   "path": ".research/ogg-generated/truncated.opus",
+   "bytes": 19101,
+   "sha256": "ad8c5f58bd770cc5604e55fdd4ea506ea5d5eb56e0aa545e05c961d81f9f2446"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_corrupt.flac",
+   "path": ".research/elementary/crafted/flac_corrupt.flac",
+   "bytes": 165395,
+   "sha256": "a64d636b1cb23938fc5488d7b421c0d884b01c02f5fdc0ab2592a1c95d1df577"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_id3.flac",
+   "path": ".research/elementary/crafted/flac_id3.flac",
+   "bytes": 165569,
+   "sha256": "f1a8e639ad4dd5e9d00cdc723f2c139fb17b7026b04797124fdb54d46db9946f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_mid_junk.flac",
+   "path": ".research/elementary/crafted/flac_mid_junk.flac",
+   "bytes": 166095,
+   "sha256": "e709b8e162689cd7f8c17c7b5857cde30f85c6ec7fcc28925929bf1b6727dfb4"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_truncated.flac",
+   "path": ".research/elementary/crafted/flac_truncated.flac",
+   "bytes": 164395,
+   "sha256": "091e7fe26007843c4f4b949ff3f94986b07d1bd6576d7f6d879f049e542075f7"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_24bit.flac",
+   "path": ".research/elementary/flac_24bit.flac",
+   "bytes": 206246,
+   "sha256": "f6e8155a43ff66a5adc7db968c1aa049da62c7bbf314763e7285c4a9b3dacfd0"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_default.flac",
+   "path": ".research/elementary/flac_default.flac",
+   "bytes": 165395,
+   "sha256": "e87f997ad8e462501f8695668ba6d95b1597499684d643abec62e258d83398c5"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_mono48.flac",
+   "path": ".research/elementary/flac_mono48.flac",
+   "bytes": 54250,
+   "sha256": "b64c7c1a883b3946fb9a411b0863e2a45420a265eee5b9501cd1b610b08f091e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_small_blocks.flac",
+   "path": ".research/elementary/flac_small_blocks.flac",
+   "bytes": 160470,
+   "sha256": "aebccbe21e4263a94ed17a829b83497747d175d491b1c5ab1ff3ef8edb93b2db"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "01 - wrong max blocksize.flac",
+   "path": ".research/flac-test-files/faulty/01 - wrong max blocksize.flac",
+   "bytes": 108081,
+   "sha256": "7abd0c6062b33949cc646bc887b5267d698ec8aff9cd8d8c2f270d40b7b63615"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "02 - wrong maximum framesize.flac",
+   "path": ".research/flac-test-files/faulty/02 - wrong maximum framesize.flac",
+   "bytes": 260998,
+   "sha256": "1e7f0cb5e19b984d549beea65a9f074cc7693ff594e6ae4685bca43b48dc3143"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "03 - wrong bit depth.flac",
+   "path": ".research/flac-test-files/faulty/03 - wrong bit depth.flac",
+   "bytes": 79044,
+   "sha256": "6d3258785ae23fe90958a7bd8eab8443d07d28f456b5d49b908772fa2f803a22"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "04 - wrong number of channels.flac",
+   "path": ".research/flac-test-files/faulty/04 - wrong number of channels.flac",
+   "bytes": 92645,
+   "sha256": "5410a65f762a6c97a2f8c51fb0354bbde564f35d07ef95fee60e8a715d110efc"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "05 - wrong total number of samples.flac",
+   "path": ".research/flac-test-files/faulty/05 - wrong total number of samples.flac",
+   "bytes": 107083,
+   "sha256": "92f98457511f2f9413445f2fb3e236ae92eab86c38e0082dfbe9dd96d01ba92c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "06 - missing streaminfo metadata block.flac",
+   "path": ".research/flac-test-files/faulty/06 - missing streaminfo metadata block.flac",
+   "bytes": 61974,
+   "sha256": "53aed5e7fde7a652b82ba06a8382b2612b02ebbde7b0d2016276644d17cc76cd"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "07 - other metadata blocks preceding streaminfo metadata block.flac",
+   "path": ".research/flac-test-files/faulty/07 - other metadata blocks preceding streaminfo metadata block.flac",
+   "bytes": 105135,
+   "sha256": "6d46725991ba5da477187fde7709ea201c399d00027257c365d7301226d851ea"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "08 - blocksize 65536.flac",
+   "path": ".research/flac-test-files/faulty/08 - blocksize 65536.flac",
+   "bytes": 145006,
+   "sha256": "f6e3b6b72e86f259fcdafc50486b8bf9d4d85b193e18e6e4aa63a6e1ca9e7928"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "09 - blocksize 1.flac",
+   "path": ".research/flac-test-files/faulty/09 - blocksize 1.flac",
+   "bytes": 587401,
+   "sha256": "4a1e703e9ac7dc67ac82dc74087ba1d62a0f13e89d11e020e01e26306a0102af"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "10 - invalid vorbis comment metadata block.flac",
+   "path": ".research/flac-test-files/faulty/10 - invalid vorbis comment metadata block.flac",
+   "bytes": 113105,
+   "sha256": "c79b0514a61634035a5653c5493797bbd1fcc78982116e4d429630e9e462d29b"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "11 - incorrect metadata block length.flac",
+   "path": ".research/flac-test-files/faulty/11 - incorrect metadata block length.flac",
+   "bytes": 53885,
+   "sha256": "3732151ba8c4e66a785165aa75a444aad814c16807ddc97b793811376acacfd6"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "01 - blocksize 4096.flac",
+   "path": ".research/flac-test-files/subset/01 - blocksize 4096.flac",
+   "bytes": 549954,
+   "sha256": "02c7e60ae7788c2cb6898a0a46985d759f1e62482ddd965a374dfd09a2a8390f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "02 - blocksize 4608.flac",
+   "path": ".research/flac-test-files/subset/02 - blocksize 4608.flac",
+   "bytes": 574253,
+   "sha256": "f4e97914fb9a8cd95b9be90c9970f6d553d76ded55a7a443dbd0d5dfa7bd2819"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "03 - blocksize 16.flac",
+   "path": ".research/flac-test-files/subset/03 - blocksize 16.flac",
+   "bytes": 959681,
+   "sha256": "164d0747e8c4855407990182b784fcd7475da228bf20a6cff67e947c683959b3"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "04 - blocksize 192.flac",
+   "path": ".research/flac-test-files/subset/04 - blocksize 192.flac",
+   "bytes": 592513,
+   "sha256": "0f9f7e2fc262e16e8cd92de3e8869d13197a5e9c3ef7239f8ee749cbd2689980"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "05 - blocksize 254.flac",
+   "path": ".research/flac-test-files/subset/05 - blocksize 254.flac",
+   "bytes": 624027,
+   "sha256": "8965c9616f769573d3bf8ef5b92ee5a2827e797c098a9436a5e3366feb9c9ae2"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "06 - blocksize 512.flac",
+   "path": ".research/flac-test-files/subset/06 - blocksize 512.flac",
+   "bytes": 590669,
+   "sha256": "ba705cc365abf5b8bd6b4d4392a2668ae395844f82d04e74be3e19b60cb03260"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "07 - blocksize 725.flac",
+   "path": ".research/flac-test-files/subset/07 - blocksize 725.flac",
+   "bytes": 588018,
+   "sha256": "ffc15a2ead7a6651e2cd36fa886edcffffc32e831077dce852fb7df6f131d2b3"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "08 - blocksize 1000.flac",
+   "path": ".research/flac-test-files/subset/08 - blocksize 1000.flac",
+   "bytes": 573875,
+   "sha256": "fa189c885be140510348f18899fe151a903f0199d502982ecc7863cb85810ba6"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "09 - blocksize 1937.flac",
+   "path": ".research/flac-test-files/subset/09 - blocksize 1937.flac",
+   "bytes": 568691,
+   "sha256": "8786ea66bf5d0083fcf760b874216ac566d0b2688ba58e5711f46525841a0028"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "10 - blocksize 2304.flac",
+   "path": ".research/flac-test-files/subset/10 - blocksize 2304.flac",
+   "bytes": 480104,
+   "sha256": "8ec67465e9041373a67f2440220825ba9d7706789584bffbbb3f109424df25ee"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "11 - partition order 8.flac",
+   "path": ".research/flac-test-files/subset/11 - partition order 8.flac",
+   "bytes": 510583,
+   "sha256": "07596315fc9b297702984deab49041f4695e1482ec3e1d081888d1bf13198e53"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "12 - qlp precision 15 bit.flac",
+   "path": ".research/flac-test-files/subset/12 - qlp precision 15 bit.flac",
+   "bytes": 492334,
+   "sha256": "d33731350269929542c6e0a788c1b9a27eb91dcb3a20f5f960b8569be012c6fa"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "13 - qlp precision 2 bit.flac",
+   "path": ".research/flac-test-files/subset/13 - qlp precision 2 bit.flac",
+   "bytes": 530759,
+   "sha256": "b60e113a6a3b97d7a3c48be90913ced8c85f1ee332c6c5dd5a79b46cdc38108a"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "14 - wasted bits.flac",
+   "path": ".research/flac-test-files/subset/14 - wasted bits.flac",
+   "bytes": 231596,
+   "sha256": "58fa05681bd646168ea2a19bc9a6f4ee9d6de295fd832c1f70da1bdbf32d74cb"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "15 - only verbatim subframes.flac",
+   "path": ".research/flac-test-files/subset/15 - only verbatim subframes.flac",
+   "bytes": 889862,
+   "sha256": "80459f8ad5a9c7edf081a10f9269c55c29136749021e5a55483bc173aaaa82b0"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "16 - partition order 8 containing escaped partitions.flac",
+   "path": ".research/flac-test-files/subset/16 - partition order 8 containing escaped partitions.flac",
+   "bytes": 471502,
+   "sha256": "5562cff546a1b0d93cea31c0c375c5df65658311de1fc3d322d14b8a2c5ac930"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "17 - all fixed orders.flac",
+   "path": ".research/flac-test-files/subset/17 - all fixed orders.flac",
+   "bytes": 589534,
+   "sha256": "d6f082cbbbcb03015f861b8fa30cf16708a62b85520905a126da28db29645feb"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "18 - precision search.flac",
+   "path": ".research/flac-test-files/subset/18 - precision search.flac",
+   "bytes": 479648,
+   "sha256": "562dd053a92a83bf64baf90ae5f9b3d0af58121c5534b3c05353d77b2ff25aaa"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "19 - samplerate 35467Hz.flac",
+   "path": ".research/flac-test-files/subset/19 - samplerate 35467Hz.flac",
+   "bytes": 800858,
+   "sha256": "72ee52c82ee46eea28d659392ce75557e66df1051563fde1936d3e5a8fd8d2c2"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "20 - samplerate 39kHz.flac",
+   "path": ".research/flac-test-files/subset/20 - samplerate 39kHz.flac",
+   "bytes": 426929,
+   "sha256": "9c87394f650fda9d08bc6b4a7c56a4fd56dcac3531913aa536e7d4d576580ee0"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "21 - samplerate 22050Hz.flac",
+   "path": ".research/flac-test-files/subset/21 - samplerate 22050Hz.flac",
+   "bytes": 251199,
+   "sha256": "a808ffa5c3cb99c7bc8268141f2d01fb7ccb4c3ced617fd7909f578fb9363f88"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "22 - 12 bit per sample.flac",
+   "path": ".research/flac-test-files/subset/22 - 12 bit per sample.flac",
+   "bytes": 277942,
+   "sha256": "d9c385129c4253da4c0de34ed5b163b404523aa971773277b8b74ef92f7d4f44"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "23 - 8 bit per sample.flac",
+   "path": ".research/flac-test-files/subset/23 - 8 bit per sample.flac",
+   "bytes": 181470,
+   "sha256": "d72ad54e1d0ebe5d65b1b1addd13ee873d38c58cb3357774a1943ced2d984cf9"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "24 - variable blocksize file created with flake revision 264.flac",
+   "path": ".research/flac-test-files/subset/24 - variable blocksize file created with flake revision 264.flac",
+   "bytes": 2321064,
+   "sha256": "c6664710c935e4d862ab04f146ddd7f6df9e2278b651c17a432934e61488eaf7"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac",
+   "path": ".research/flac-test-files/subset/25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac",
+   "bytes": 2538684,
+   "sha256": "df5658969201d6867a1cc64d69e30a8ec833b53f7239345eda7eefff1a4a2ad8"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "26 - variable blocksize file created with CUETools.Flake 2.1.6.flac",
+   "path": ".research/flac-test-files/subset/26 - variable blocksize file created with CUETools.Flake 2.1.6.flac",
+   "bytes": 2263171,
+   "sha256": "355ddbac0f596623f805c3d3ff8cf4ba25d3a13c9d61e63719a8d02ebb647c19"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "27 - old format variable blocksize file created with Flake 0.11.flac",
+   "path": ".research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac",
+   "bytes": 2215845,
+   "sha256": "21b486a42dbf64c043d57dcd5a038163dc77f5eec398312d994643617ec3c5b6"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "28 - high resolution audio, default settings.flac",
+   "path": ".research/flac-test-files/subset/28 - high resolution audio, default settings.flac",
+   "bytes": 3476937,
+   "sha256": "62322a5c7821081bae99cc1a3f398f177a17cf9312131a5fbcfcc2ee38539346"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "29 - high resolution audio, blocksize 16384.flac",
+   "path": ".research/flac-test-files/subset/29 - high resolution audio, blocksize 16384.flac",
+   "bytes": 3265142,
+   "sha256": "7551605d8a90a7e74e788b31273493ce5e24059d839b1d44dbad89cf9fb132a5"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "30 - high resolution audio, blocksize 13456.flac",
+   "path": ".research/flac-test-files/subset/30 - high resolution audio, blocksize 13456.flac",
+   "bytes": 3242451,
+   "sha256": "d2e6b73cc0888419d709a03c317f59dfb8d48fcdc29e73fb0c099d5de7d512be"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "31 - high resolution audio, using only 32nd order predictors.flac",
+   "path": ".research/flac-test-files/subset/31 - high resolution audio, using only 32nd order predictors.flac",
+   "bytes": 3235301,
+   "sha256": "caf84fbf740a98e3371a58df03422722a7d6058289b11a291f0b39103ea20133"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "32 - high resolution audio, partition order 8 containing escaped partitions.flac",
+   "path": ".research/flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac",
+   "bytes": 3310690,
+   "sha256": "479474ac6a101725976aa9a4e94580040d650779da41db2981be03aa41ef7fdd"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "33 - samplerate 192kHz.flac",
+   "path": ".research/flac-test-files/subset/33 - samplerate 192kHz.flac",
+   "bytes": 6611359,
+   "sha256": "4833aafc6a7d652bac05de6d304d3e63cc419a731df995b146d91294062bbcd0"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "34 - samplerate 192kHz, using only 32nd order predictors.flac",
+   "path": ".research/flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac",
+   "bytes": 6614825,
+   "sha256": "b32a7e21114034610fea4d43610980111dc9c40faa315a3111196102a7bac36e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "35 - samplerate 134560Hz.flac",
+   "path": ".research/flac-test-files/subset/35 - samplerate 134560Hz.flac",
+   "bytes": 4576741,
+   "sha256": "ffe10b26321fdc1a1be31cfd7034a4f98b1c0cb3e32e9c1cc129b7ff4a259177"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "36 - samplerate 384kHz.flac",
+   "path": ".research/flac-test-files/subset/36 - samplerate 384kHz.flac",
+   "bytes": 10687346,
+   "sha256": "63fc6b1ae16fc0285f7053f49ce967087f6a041630ee105d3d67fd8d34e45b7c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "37 - 20 bit per sample.flac",
+   "path": ".research/flac-test-files/subset/37 - 20 bit per sample.flac",
+   "bytes": 2385998,
+   "sha256": "8d8c0526b7823099974a348a6ae80eff9c7eeb4be4e3da270e8e2e9e45d74b3c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "38 - 3 channels (3.0).flac",
+   "path": ".research/flac-test-files/subset/38 - 3 channels (3.0).flac",
+   "bytes": 63893,
+   "sha256": "44d14d0efa374049fd9f56aaee3a068a30045e62a571df574c7b824ae596a3cf"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "39 - 4 channels (4.0).flac",
+   "path": ".research/flac-test-files/subset/39 - 4 channels (4.0).flac",
+   "bytes": 94931,
+   "sha256": "ac670ce52561023dca32f7bd20fbe94c1e1459f06188cd0f870801ea5fb23cee"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "40 - 5 channels (5.0).flac",
+   "path": ".research/flac-test-files/subset/40 - 5 channels (5.0).flac",
+   "bytes": 116017,
+   "sha256": "bf616e933caab9b7a5da64f9527390f83f208134d327c72a16225c0779ba0da0"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "41 - 6 channels (5.1).flac",
+   "path": ".research/flac-test-files/subset/41 - 6 channels (5.1).flac",
+   "bytes": 171527,
+   "sha256": "c12650fda54a384abf017d4b931491de043eaa7a815ae74c7a9b49d4087d6193"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "42 - 7 channels (6.1).flac",
+   "path": ".research/flac-test-files/subset/42 - 7 channels (6.1).flac",
+   "bytes": 212398,
+   "sha256": "07a5d7fc8c4dd74c634b2f0e912a063496f67dd2ba9fbe14f7b5fa37fee8f638"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "43 - 8 channels (7.1).flac",
+   "path": ".research/flac-test-files/subset/43 - 8 channels (7.1).flac",
+   "bytes": 233560,
+   "sha256": "9c39ff436f316b3a8e72200c8f38af2d9ef15418c25be555aa621d0c793a6254"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
+   "path": ".research/flac-test-files/subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
+   "bytes": 42264726,
+   "sha256": "1a0e8c17392ae03b2cb04e8c82fcc1f924580fdc978884101faa3e9cf7ed9197"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "45 - no total number of samples set.flac",
+   "path": ".research/flac-test-files/subset/45 - no total number of samples set.flac",
+   "bytes": 562343,
+   "sha256": "336a18eb7a78f7fc0ab34980348e2895bc3f82db440a2430d9f92e996f889f9a"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "46 - no min-max framesize set.flac",
+   "path": ".research/flac-test-files/subset/46 - no min-max framesize set.flac",
+   "bytes": 424137,
+   "sha256": "9dc39732ce17815832790901b768bb50cd5ff0cd21b28a123c1cabc16ed776cc"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "47 - only STREAMINFO.flac",
+   "path": ".research/flac-test-files/subset/47 - only STREAMINFO.flac",
+   "bytes": 333761,
+   "sha256": "9a62c79f634849e74cb2183f9e3a9bd284f51e2591c553008d3e6449967eef85"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "48 - Extremely large SEEKTABLE.flac",
+   "path": ".research/flac-test-files/subset/48 - Extremely large SEEKTABLE.flac",
+   "bytes": 17171497,
+   "sha256": "4417aca6b5f90971c50c28766d2f32b3acaa7f9f9667bd313336242dae8b2531"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "49 - Extremely large PADDING.flac",
+   "path": ".research/flac-test-files/subset/49 - Extremely large PADDING.flac",
+   "bytes": 17155326,
+   "sha256": "7bc44fa2754536279fde4f8fb31d824f43b8d0b3f93d27d055d209682914f20e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "50 - Extremely large PICTURE.flac",
+   "path": ".research/flac-test-files/subset/50 - Extremely large PICTURE.flac",
+   "bytes": 16317700,
+   "sha256": "1f04f237d74836104993a8072d4223e84a5d3bd76fbc44555c221c7e69a23594"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "51 - Extremely large VORBISCOMMENT.flac",
+   "path": ".research/flac-test-files/subset/51 - Extremely large VORBISCOMMENT.flac",
+   "bytes": 17221398,
+   "sha256": "033160e8124ed287b0b5d615c94ac4139477e47d6e4059b1c19b7141566f5ef9"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "52 - Extremely large APPLICATION.flac",
+   "path": ".research/flac-test-files/subset/52 - Extremely large APPLICATION.flac",
+   "bytes": 17252316,
+   "sha256": "0e45a4f8dbef15cbebdd8dfe690d8ae60e0c6abb596db1270a9161b62a7a3f1c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "53 - CUESHEET with very many indexes.flac",
+   "path": ".research/flac-test-files/subset/53 - CUESHEET with very many indexes.flac",
+   "bytes": 4452249,
+   "sha256": "513fad18578f3225fae5de1bda8f700415be6fd8aa1e7af533b5eb796ed2d461"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "54 - 1000x repeating VORBISCOMMENT.flac",
+   "path": ".research/flac-test-files/subset/54 - 1000x repeating VORBISCOMMENT.flac",
+   "bytes": 1093516,
+   "sha256": "b68dc6644784fac35aa07581be8603a360d1697e07a2265d7eb24001936fd247"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "55 - file 48-53 combined.flac",
+   "path": ".research/flac-test-files/subset/55 - file 48-53 combined.flac",
+   "bytes": 87322787,
+   "sha256": "a756b460df79b7cc492223f80cda570e4511f2024e5fa0c4d505ba51b86191f6"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "56 - JPG PICTURE.flac",
+   "path": ".research/flac-test-files/subset/56 - JPG PICTURE.flac",
+   "bytes": 708441,
+   "sha256": "5cebe7a3710cf8924bd2913854e9ca60b4cd53cfee5a3af0c3c73fddc1888963"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "57 - PNG PICTURE.flac",
+   "path": ".research/flac-test-files/subset/57 - PNG PICTURE.flac",
+   "bytes": 754157,
+   "sha256": "c6abff7f8bb63c2821bd21dd9052c543f10ba0be878e83cb419c248f14f72697"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "58 - GIF PICTURE.flac",
+   "path": ".research/flac-test-files/subset/58 - GIF PICTURE.flac",
+   "bytes": 471482,
+   "sha256": "7c2b1a963a665847167a7275f9924f65baeb85c21726c218f61bf3f803f301c8"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "59 - AVIF PICTURE.flac",
+   "path": ".research/flac-test-files/subset/59 - AVIF PICTURE.flac",
+   "bytes": 339626,
+   "sha256": "7395d02bf8d9533dc554cce02dee9de98c77f8731a45f62d0a243bd0d6f9a45c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "60 - mono audio.flac",
+   "path": ".research/flac-test-files/subset/60 - mono audio.flac",
+   "bytes": 47782,
+   "sha256": "20539fbbd6ae28cea2b2182a4c60c6c70cbb710a136199fc83200c4e5fa00b1c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "61 - predictor overflow check, 16-bit.flac",
+   "path": ".research/flac-test-files/subset/61 - predictor overflow check, 16-bit.flac",
+   "bytes": 117020,
+   "sha256": "9b15791a8b8ca14a6b9a2374ecf7c34be25bc7b9e64fa600eb5f7608194b0b61"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "62 - predictor overflow check, 20-bit.flac",
+   "path": ".research/flac-test-files/subset/62 - predictor overflow check, 20-bit.flac",
+   "bytes": 156871,
+   "sha256": "a6b3904e8bcce7a93ad529f9b07e64d06d6647ea7a775ba91490dbacc3c771b7"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "63 - predictor overflow check, 24-bit.flac",
+   "path": ".research/flac-test-files/subset/63 - predictor overflow check, 24-bit.flac",
+   "bytes": 204107,
+   "sha256": "d5e072373f2d9e80ca2e49b7dd349ebd4340929143d7e5f2c154a97f04755c38"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "64 - rice partitions with escape code zero.flac",
+   "path": ".research/flac-test-files/subset/64 - rice partitions with escape code zero.flac",
+   "bytes": 89138,
+   "sha256": "3ad0bf2e9b9c78cd04deb0a8e133f5d088db051e42cbf3ffb15e1b528f009ca6"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "01 - changing samplerate.flac",
+   "path": ".research/flac-test-files/uncommon/01 - changing samplerate.flac",
+   "bytes": 1086457,
+   "sha256": "9fa8f7c57186be8708f42620885a71d4c4871767ff55cfe063eb1cf3bad8d0a5"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "02 - increasing number of channels.flac",
+   "path": ".research/flac-test-files/uncommon/02 - increasing number of channels.flac",
+   "bytes": 263297,
+   "sha256": "fe70d5e324bea56e9569d4ff9d4b6fa9c33d3f763e7fec5b1f27904e648a0482"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "03 - decreasing number of channels.flac",
+   "path": ".research/flac-test-files/uncommon/03 - decreasing number of channels.flac",
+   "bytes": 359869,
+   "sha256": "8e3c451d835cd9a0ef8914e027cf93c98985bd1bb4d7eea59deb15996b97be3b"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "04 - changing bitdepth.flac",
+   "path": ".research/flac-test-files/uncommon/04 - changing bitdepth.flac",
+   "bytes": 280877,
+   "sha256": "f614382d8bd33b881668f2384dff03478ec2f863cb7069c42120cf8586c145b7"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "05 - 32bps audio.flac",
+   "path": ".research/flac-test-files/uncommon/05 - 32bps audio.flac",
+   "bytes": 2923933,
+   "sha256": "de71cbd81f0be1743fc8264f159a521dfc1d92a5e2056c30a64d66001e055eec"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "06 - samplerate 768kHz.flac",
+   "path": ".research/flac-test-files/uncommon/06 - samplerate 768kHz.flac",
+   "bytes": 6357149,
+   "sha256": "3e773546d57f7aa7d126a225f8db152a34196725b71ffb76bf2fe05bad6fbb9f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "07 - 15 bit per sample.flac",
+   "path": ".research/flac-test-files/uncommon/07 - 15 bit per sample.flac",
+   "bytes": 825693,
+   "sha256": "7defaacc8d1bcd3201081d7054de5df1665d17f79851c35b3c6360401d30aa71"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "08 - blocksize 65535.flac",
+   "path": ".research/flac-test-files/uncommon/08 - blocksize 65535.flac",
+   "bytes": 835115,
+   "sha256": "2c0825fc761db080dbfdc11ea2d2b02ee414c9ed83c6240ffbac62db22d08714"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "09 - Rice partition order 15.flac",
+   "path": ".research/flac-test-files/uncommon/09 - Rice partition order 15.flac",
+   "bytes": 168445,
+   "sha256": "33ee6f02cc9d930dd421e02b716bc2d9d520c3facdf98030eb09c303227f8626"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "10 - file starting at frame header.flac",
+   "path": ".research/flac-test-files/uncommon/10 - file starting at frame header.flac",
+   "bytes": 466375,
+   "sha256": "d95f63e8101320f5ac7ffe249bc429a209eb0e10996a987301eaa63386a8faa1"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "11 - file starting with unparsable data.flac",
+   "path": ".research/flac-test-files/uncommon/11 - file starting with unparsable data.flac",
+   "bytes": 404249,
+   "sha256": "40c58b833fb07f0de41259d83cde78211e3faaf9e5f844aed43fa52c18435d2f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_block16.flac",
+   "path": ".research/flac-generated/ff_s16_block16.flac",
+   "bytes": 254594,
+   "sha256": "548054363fae3e66ad73b3d02909d1f5ca548a40b96d9009ac6f1c782e2f959d"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_block16384.flac",
+   "path": ".research/flac-generated/ff_s16_block16384.flac",
+   "bytes": 156249,
+   "sha256": "fb8acf5a8c172a6c4bf4255492ce2ac9e7a253b2ae8c4b11e7eb4ee7f30ea860"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_block192.flac",
+   "path": ".research/flac-generated/ff_s16_block192.flac",
+   "bytes": 152545,
+   "sha256": "9bd59526cb74e88c358453ca87c01cb5beccf79c445e606f61b7e5892576cdb3"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_block32768.flac",
+   "path": ".research/flac-generated/ff_s16_block32768.flac",
+   "bytes": 151696,
+   "sha256": "e90680b9245ad0dca98423753da3911d37e1ded023e2993cd0a0b362406aeab3"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_block4608.flac",
+   "path": ".research/flac-generated/ff_s16_block4608.flac",
+   "bytes": 147701,
+   "sha256": "94e667f9699121d3f56225c6d60b4d880dfd23c4299fbf25d74f852b2acfbf8e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_block576.flac",
+   "path": ".research/flac-generated/ff_s16_block576.flac",
+   "bytes": 153034,
+   "sha256": "b88d3145b2078ef88519130407733b5a3834c7222a4c31edd8b99f344da1132a"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_ch1.flac",
+   "path": ".research/flac-generated/ff_s16_ch1.flac",
+   "bytes": 88124,
+   "sha256": "e2572bd922f520a88c2743e22da6c84f9746ba2c08342a1e8992fd820e392e5f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_ch2.flac",
+   "path": ".research/flac-generated/ff_s16_ch2.flac",
+   "bytes": 150664,
+   "sha256": "822a5b4df6458efa3b3ca9160bdc6a398d5d859cc6c73c2f4553cdf6abcfb67d"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_ch3.flac",
+   "path": ".research/flac-generated/ff_s16_ch3.flac",
+   "bytes": 234998,
+   "sha256": "8741fea36f842fca66a27dd151e43cf903d4faf0d7bf64ec0fbc8c7162f0dade"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_ch4.flac",
+   "path": ".research/flac-generated/ff_s16_ch4.flac",
+   "bytes": 320464,
+   "sha256": "3df23dae51a03aa7f6b871290977679ea061c0332f50e1826c587f95058b1a8a"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_ch5.flac",
+   "path": ".research/flac-generated/ff_s16_ch5.flac",
+   "bytes": 397104,
+   "sha256": "c4e2ff9a2493c508a4c2f69adaf17bbfb3ca2226bff0e479b09e0636c5cfbc9e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_ch6.flac",
+   "path": ".research/flac-generated/ff_s16_ch6.flac",
+   "bytes": 473549,
+   "sha256": "cff18a774fb64c8423036ad36ff56c522b4be867701a9ad62926749240dbd81a"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_ch7.flac",
+   "path": ".research/flac-generated/ff_s16_ch7.flac",
+   "bytes": 560785,
+   "sha256": "e997e05c739b0104a6efc26dc529a18edd291e144786a0f3def337312ba83f8c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_ch8.flac",
+   "path": ".research/flac-generated/ff_s16_ch8.flac",
+   "bytes": 627166,
+   "sha256": "9edc3f3a43f1c4821ffa5f216666fa305cbf99b261d07b9603ebf61eaeb5b710"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_exact_rice.flac",
+   "path": ".research/flac-generated/ff_s16_exact_rice.flac",
+   "bytes": 150999,
+   "sha256": "1e021859d83a6e221e837b0609d79b6731fba8638a493e83f90686b5a8e3cda4"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_indep.flac",
+   "path": ".research/flac-generated/ff_s16_indep.flac",
+   "bytes": 168351,
+   "sha256": "b3a4216e1717b58be3e75968080e0a98020b3f4d208f76d49dbe9fa4b2ab0424"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_left_side.flac",
+   "path": ".research/flac-generated/ff_s16_left_side.flac",
+   "bytes": 147049,
+   "sha256": "9b51bf7f46170a49d601457cbf212c0ffa1ec98e5fe7214a5bd2c7ded09103ae"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level0.flac",
+   "path": ".research/flac-generated/ff_s16_level0.flac",
+   "bytes": 180726,
+   "sha256": "3f950058f59a5ebd34a3bddd41632a71d5d9fec069fc6feb5b575815faa36307"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level1.flac",
+   "path": ".research/flac-generated/ff_s16_level1.flac",
+   "bytes": 165624,
+   "sha256": "4342de09d616d703d78c51c85d01566300365c4e68745cb31c4311ec9830e778"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level10.flac",
+   "path": ".research/flac-generated/ff_s16_level10.flac",
+   "bytes": 147207,
+   "sha256": "050b3577bfa9886b187e0e16244183fb9290c144b684388bbaec8943425dcc08"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level11.flac",
+   "path": ".research/flac-generated/ff_s16_level11.flac",
+   "bytes": 140196,
+   "sha256": "208f540bd2c16231e594bc8aa7ec7967868bc4cadf4d186d3ef97e0a4bd090c0"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level12.flac",
+   "path": ".research/flac-generated/ff_s16_level12.flac",
+   "bytes": 138118,
+   "sha256": "6def173a90a26b390aaf58ff05ea01ca602f1baf993b6a966d79fe347b2375a7"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level2.flac",
+   "path": ".research/flac-generated/ff_s16_level2.flac",
+   "bytes": 164537,
+   "sha256": "bf4a37c3bdc2562663185e14989491afaf6c2c5ba3a70c28e13e89c320ef4f74"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level3.flac",
+   "path": ".research/flac-generated/ff_s16_level3.flac",
+   "bytes": 153524,
+   "sha256": "ed317d269c8aee3c8f917257526a348930eb175b767c2cee48f17e8307179f84"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level4.flac",
+   "path": ".research/flac-generated/ff_s16_level4.flac",
+   "bytes": 147959,
+   "sha256": "ab21aea393eca66feecc9b2a571a5c723f2ba44265fa79ab10bf6b0ce230545f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level5.flac",
+   "path": ".research/flac-generated/ff_s16_level5.flac",
+   "bytes": 142082,
+   "sha256": "4c55b1f461f2c865fdab156d7185a6419d2fd1319bb16f5bd23a8f32fc5274c1"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level6.flac",
+   "path": ".research/flac-generated/ff_s16_level6.flac",
+   "bytes": 146931,
+   "sha256": "1d810f1ca1a207676c31afc23c1f3483db57068b7683fa842da69ac296465e7a"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level7.flac",
+   "path": ".research/flac-generated/ff_s16_level7.flac",
+   "bytes": 145373,
+   "sha256": "dcf23b025b0c9e62596bbdc84541107b9f00a48ee37611db964b3b553805364c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level8.flac",
+   "path": ".research/flac-generated/ff_s16_level8.flac",
+   "bytes": 141565,
+   "sha256": "b83f9a907078f200c15a968e4b081e32b3ddeb8eacba5a9fce70d44772277bad"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_level9.flac",
+   "path": ".research/flac-generated/ff_s16_level9.flac",
+   "bytes": 148670,
+   "sha256": "dc7b39cf4f145bb6db77a4941fca37b22e0da95554943e28e6e091797091cdd3"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_lpc_cholesky.flac",
+   "path": ".research/flac-generated/ff_s16_lpc_cholesky.flac",
+   "bytes": 162096,
+   "sha256": "6a2e75c52399d2a5c9b7f5f6215800434e5301cb5e33048ef4da81e899d8b263"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_lpc_fixed.flac",
+   "path": ".research/flac-generated/ff_s16_lpc_fixed.flac",
+   "bytes": 187282,
+   "sha256": "4b0d80200ea522bfd0cb9994bd2959bf9b1fc0e32b86005deb02d48c1450de18"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_lpc_levinson.flac",
+   "path": ".research/flac-generated/ff_s16_lpc_levinson.flac",
+   "bytes": 148002,
+   "sha256": "d3e36709f7741cb2e678fdf71def9ab063965f86b0ce35c407cab90c4bc8591a"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_lpc_none.flac",
+   "path": ".research/flac-generated/ff_s16_lpc_none.flac",
+   "bytes": 200437,
+   "sha256": "ae0bcfe9fb938f87024a11b1b48530ef37d4de845b421c767cd975cdcf4288f3"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_mid_side.flac",
+   "path": ".research/flac-generated/ff_s16_mid_side.flac",
+   "bytes": 147486,
+   "sha256": "f844dff967e5a93e1be922b0ab0903426313bcb2e26a1a4e1ebc7d31cfaf3940"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_multi_dim_quant.flac",
+   "path": ".research/flac-generated/ff_s16_multi_dim_quant.flac",
+   "bytes": 150707,
+   "sha256": "d37b2f6012d36366985183d266660148dec71d825ad82881274e88bb6e329eeb"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_order_2level.flac",
+   "path": ".research/flac-generated/ff_s16_order_2level.flac",
+   "bytes": 147803,
+   "sha256": "c277537fbaf18f76e789bcf00953abfa939ad0ad42d6c10c9d0239705f68b55f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_order_estimation.flac",
+   "path": ".research/flac-generated/ff_s16_order_estimation.flac",
+   "bytes": 147588,
+   "sha256": "4cfd751c9b9a28519821fcbbd3395755810a0f21dab36de3fbf1239b371c803c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_order_log.flac",
+   "path": ".research/flac-generated/ff_s16_order_log.flac",
+   "bytes": 146131,
+   "sha256": "b5439e68aa7d2e8d55ae972c2f8ca8b28dcf7292f19ddce2ba6ccb00b3832c00"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_order_search.flac",
+   "path": ".research/flac-generated/ff_s16_order_search.flac",
+   "bytes": 148477,
+   "sha256": "23574ab898a1a1998dc48bb7b1cf9e55a120f2d1ddefe3a8cf41e23cfd2b9305"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_partitions_0_0.flac",
+   "path": ".research/flac-generated/ff_s16_partitions_0_0.flac",
+   "bytes": 157361,
+   "sha256": "eabd68c9a72c3b620859166da9b0b10b71653c83a1cca8e9e1655f92efd935ec"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_partitions_0_8.flac",
+   "path": ".research/flac-generated/ff_s16_partitions_0_8.flac",
+   "bytes": 150384,
+   "sha256": "058fc1a24c6647d0284f10a9131469434dc2454028aad6ec71941a7993fbb643"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_partitions_8_8.flac",
+   "path": ".research/flac-generated/ff_s16_partitions_8_8.flac",
+   "bytes": 150795,
+   "sha256": "40f4670f10480da5d6ff6385a4766438fa1e7eff364b7511bd4c6db556a5f02f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_rate11025.flac",
+   "path": ".research/flac-generated/ff_s16_rate11025.flac",
+   "bytes": 47296,
+   "sha256": "309e9d19fe3b6f33370c6b105d9b8fa2283fa759a2f290e42bfdc06ed1db0164"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_rate176400.flac",
+   "path": ".research/flac-generated/ff_s16_rate176400.flac",
+   "bytes": 519013,
+   "sha256": "9361ce60edff58863639cc6271ff6b40f77a057df4f8813f3adaa6ba47b3b23d"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_rate192000.flac",
+   "path": ".research/flac-generated/ff_s16_rate192000.flac",
+   "bytes": 559623,
+   "sha256": "d36e59816ebc2d22efbbbad0f792046252f6029b1e32ad9909f9a246eb0030d9"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_rate22050.flac",
+   "path": ".research/flac-generated/ff_s16_rate22050.flac",
+   "bytes": 84279,
+   "sha256": "9cd6f31c9a8ba7811e1a173a3cc60953739e853d43ad0cc2accc0717920599d6"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_rate32000.flac",
+   "path": ".research/flac-generated/ff_s16_rate32000.flac",
+   "bytes": 113159,
+   "sha256": "95eaed2637cce53d2e2ac763c9db68e8e57ec147af13d20ba1339779415d76b1"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_rate37800.flac",
+   "path": ".research/flac-generated/ff_s16_rate37800.flac",
+   "bytes": 127662,
+   "sha256": "e0d4eae4f7a6ff283f792356fe6c2500012831f145e7411f10c21011df2bb93d"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_rate8000.flac",
+   "path": ".research/flac-generated/ff_s16_rate8000.flac",
+   "bytes": 34467,
+   "sha256": "ea264945397e3f2e11c60282bcca1d2ebc8a8d0c0fcadc166620c776eebccda9"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_rate88200.flac",
+   "path": ".research/flac-generated/ff_s16_rate88200.flac",
+   "bytes": 278177,
+   "sha256": "b07dad3095f0944219df7a160be6c3bc0ffa4ffeb86d4fac77fa8141aff2c3f1"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_right_side.flac",
+   "path": ".research/flac-generated/ff_s16_right_side.flac",
+   "bytes": 145354,
+   "sha256": "20671462cf0d9d2c999f4ff8b330587075d0e883aeeeb160a62746ec6745ca13"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s16_wasted2.flac",
+   "path": ".research/flac-generated/ff_s16_wasted2.flac",
+   "bytes": 125783,
+   "sha256": "ebc7785dff177f21c91eb1a36440bd172beda390ddd2f4a1615f7bbf5db43866"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_ch1.flac",
+   "path": ".research/flac-generated/ff_s24_ch1.flac",
+   "bytes": 144213,
+   "sha256": "5c704c0facc4fac3d723442b3c3e2f62b250f2b9df1250569e8d12d3c905b014"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_ch6.flac",
+   "path": ".research/flac-generated/ff_s24_ch6.flac",
+   "bytes": 825319,
+   "sha256": "9432219736b7dbbc1f6d15f9e25b76e44e2872bda2b5c127d4a406bea27290b1"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_ch8.flac",
+   "path": ".research/flac-generated/ff_s24_ch8.flac",
+   "bytes": 1099843,
+   "sha256": "3fbb8c4a2c9272b3da67a5ce2fae2101e5674d1d0a92d21ad5417fbbdc8f26ef"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_indep.flac",
+   "path": ".research/flac-generated/ff_s24_indep.flac",
+   "bytes": 553397,
+   "sha256": "3860e4370bbb28506b2e52b47cb8ef6104ef4080be3b4dfab765f8c26a35398b"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_left_side.flac",
+   "path": ".research/flac-generated/ff_s24_left_side.flac",
+   "bytes": 513547,
+   "sha256": "adafa194ae2332569b260f96cfec6da519a0eeeae2b241431f13e786455d22cc"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_mid_side.flac",
+   "path": ".research/flac-generated/ff_s24_mid_side.flac",
+   "bytes": 509453,
+   "sha256": "7283261a9de033f31fbf7c80501cb17c03d112378f43221958bbadf15c317956"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_order1.flac",
+   "path": ".research/flac-generated/ff_s24_order1.flac",
+   "bytes": 569047,
+   "sha256": "67de173e96c651740cabbd91d86d44696f3ee773125117aca190254e2208472e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_order12.flac",
+   "path": ".research/flac-generated/ff_s24_order12.flac",
+   "bytes": 505358,
+   "sha256": "d07c0ed6cec52006cd2d92d464a95745930b60855d92f40fdc22c1ff337c8e80"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_order32.flac",
+   "path": ".research/flac-generated/ff_s24_order32.flac",
+   "bytes": 499792,
+   "sha256": "9924386b6c13f0a4f29d00e88883fd95d85b6c382a6202e20e3562c77586ef98"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_right_side.flac",
+   "path": ".research/flac-generated/ff_s24_right_side.flac",
+   "bytes": 504676,
+   "sha256": "898097ae4729f45a4295564eae364dca37d7c3177c84292cad462befde587fdd"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s24_wasted8.flac",
+   "path": ".research/flac-generated/ff_s24_wasted8.flac",
+   "bytes": 159504,
+   "sha256": "03094ef0dea69375bf779e05e7c09e4d698f9da4a22d54bcf45d3afb392d120d"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s32_ch1.flac",
+   "path": ".research/flac-generated/ff_s32_ch1.flac",
+   "bytes": 202829,
+   "sha256": "32dd1355c8e8ac6be74c6c27f3fd102a275cc7fa78ff9311a4603206fd0abab1"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s32_ch6.flac",
+   "path": ".research/flac-generated/ff_s32_ch6.flac",
+   "bytes": 1182858,
+   "sha256": "01ecc5387291d0e059eabdd02abf19b737d35d2430f57b914c41583e186db031"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s32_ch8.flac",
+   "path": ".research/flac-generated/ff_s32_ch8.flac",
+   "bytes": 1559390,
+   "sha256": "15ac9aee06187a081b9e28a42cee18273ab5feabbb81ce2584bfef25d66b19ad"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s32_indep.flac",
+   "path": ".research/flac-generated/ff_s32_indep.flac",
+   "bytes": 398958,
+   "sha256": "32ff8af7ee7c2b1240271e35be6661b3e17b2d7fbc4426ceb52b9faac797cdb3"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s32_left_side.flac",
+   "path": ".research/flac-generated/ff_s32_left_side.flac",
+   "bytes": 378547,
+   "sha256": "38e02c90dc8b2e6051b1cfb9e38bb333b4b4acc0ecafbfe1117a24b692779ba8"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s32_mid_side.flac",
+   "path": ".research/flac-generated/ff_s32_mid_side.flac",
+   "bytes": 374702,
+   "sha256": "1751955ef7f50f04342dd2d4c59c416fa715d3cab14a58b2e7e588e33f265868"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s32_order32.flac",
+   "path": ".research/flac-generated/ff_s32_order32.flac",
+   "bytes": 365473,
+   "sha256": "811c62f212fb19d931d8ba730f0957f25220ed517cf9e2e83296227386bdc430"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "ff_s32_right_side.flac",
+   "path": ".research/flac-generated/ff_s32_right_side.flac",
+   "bytes": 376238,
+   "sha256": "fc57c6e0e9faa97a1859603d984641a5d4c4f67c650af3b36d006b198cd9916e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_3ch_odd_mask.flac",
+   "path": ".research/flac-generated/flac_3ch_odd_mask.flac",
+   "bytes": 230735,
+   "sha256": "87e97b0c67626ee73d88345e60caa579ad712b4d3cb350b8caa2b1a3dbd5c087"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_5ch_back_mask.flac",
+   "path": ".research/flac-generated/flac_5ch_back_mask.flac",
+   "bytes": 375464,
+   "sha256": "46b58f8553252ac71271500937c2a7f1b6fa62ee42f7acd4d09cbab9b27aa144"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b12_ch7.flac",
+   "path": ".research/flac-generated/flac_b12_ch7.flac",
+   "bytes": 406767,
+   "sha256": "e60b6a181cc50ac131534860cceeda69ed0da3c7e8a5e433b7750bce6d38e512"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b12_stereo.flac",
+   "path": ".research/flac-generated/flac_b12_stereo.flac",
+   "bytes": 88478,
+   "sha256": "404783304e2124a405de7b276d44b828ef8e3f9a40d1fcf5544f4e5198114e14"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b15_stereo.flac",
+   "path": ".research/flac-generated/flac_b15_stereo.flac",
+   "bytes": 132022,
+   "sha256": "a760b0266139626acc5d5758f086079efa1f27524497d67dce7c0dad418f72fa"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b16_stereo.flac",
+   "path": ".research/flac-generated/flac_b16_stereo.flac",
+   "bytes": 146931,
+   "sha256": "7d41e98d4ebafcee67348280ea047d8bb272e52bec06b267747d9e1a0d525f81"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b20_ch7.flac",
+   "path": ".research/flac-generated/flac_b20_ch7.flac",
+   "bytes": 788348,
+   "sha256": "e87d93f2ba06f74efbd3a6d67514cd297e4bbd8cb13c992ba35eb666409461eb"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b20_stereo.flac",
+   "path": ".research/flac-generated/flac_b20_stereo.flac",
+   "bytes": 192387,
+   "sha256": "0a4d1e866cc47239e6df1d15414dd2fe966f53743e33d505a70282a11698ec46"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b24_stereo.flac",
+   "path": ".research/flac-generated/flac_b24_stereo.flac",
+   "bytes": 238251,
+   "sha256": "da357d4634baca5d924a70638b7acf6aab35b6986654969a32024470aed1f287"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b28_stereo.flac",
+   "path": ".research/flac-generated/flac_b28_stereo.flac",
+   "bytes": 294364,
+   "sha256": "c5b8cceb426b01250aa9415694529c0f91f9e00ae94f5443ca67dee8dc5eaec8"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b31_stereo.flac",
+   "path": ".research/flac-generated/flac_b31_stereo.flac",
+   "bytes": 323313,
+   "sha256": "2d34e0f5ad927022d6b28873c4c0cabc23092144541a702f825edbb5e73215d0"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b32_stereo.flac",
+   "path": ".research/flac-generated/flac_b32_stereo.flac",
+   "bytes": 340935,
+   "sha256": "44ead8e11d162c12e35d1d021f5c6587e253d53d9bae6cd5683910426b865652"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b4_stereo.flac",
+   "path": ".research/flac-generated/flac_b4_stereo.flac",
+   "bytes": 34687,
+   "sha256": "8cfc3fee961265c839230c38edd95e0137fd6faf7491ed6add9ae861e5d81f45"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b5_stereo.flac",
+   "path": ".research/flac-generated/flac_b5_stereo.flac",
+   "bytes": 36778,
+   "sha256": "5c3934c2e5a569168583d5e7a74e10f48a967f064dcd2d2ea10ff932e2831294"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b8_ch7.flac",
+   "path": ".research/flac-generated/flac_b8_ch7.flac",
+   "bytes": 224047,
+   "sha256": "b04f63546b56858cec9a33af22f6fa12506c7b648a8b12a05bdbba32b41e460d"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_b8_stereo.flac",
+   "path": ".research/flac-generated/flac_b8_stereo.flac",
+   "bytes": 53984,
+   "sha256": "42469f93bd23c20ba4275fcf01fb5872a30fb9f69a63b11877cefd170ca01e22"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_quad_side_mask.flac",
+   "path": ".research/flac-generated/flac_quad_side_mask.flac",
+   "bytes": 304742,
+   "sha256": "bc4f8a82c4d48cf015cde1e12cd52063f4a2d2d4375730df4fdeea8ee9b53dac"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_adaptive_mid_side.flac",
+   "path": ".research/flac-generated/flac_s16_adaptive_mid_side.flac",
+   "bytes": 141407,
+   "sha256": "3b8e6f786f80db709f56c013cd3b0d44c52cf5d0de4ab13968a34ba2275e9bbc"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_block16.flac",
+   "path": ".research/flac-generated/flac_s16_block16.flac",
+   "bytes": 144022,
+   "sha256": "9693d2722d3c2c0d86b568621584e6230c70961b64043df8e963dc5b4355f78f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_block65535.flac",
+   "path": ".research/flac-generated/flac_s16_block65535.flac",
+   "bytes": 173711,
+   "sha256": "ecc66bf25625890684c64e8042d00d2c63ae75231870ffcfbab773170a66d94e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_ch1.flac",
+   "path": ".research/flac-generated/flac_s16_ch1.flac",
+   "bytes": 81656,
+   "sha256": "631ca35739a1c4cd1922c8e343e344f1b79c0cbb8ba9b0ae296f2c49204eb847"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_ch2.flac",
+   "path": ".research/flac-generated/flac_s16_ch2.flac",
+   "bytes": 140278,
+   "sha256": "b61ba81d31f68d70ce7f8ca80544e364aa66405f8e91a9edb1350d865e943ffb"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_ch3.flac",
+   "path": ".research/flac-generated/flac_s16_ch3.flac",
+   "bytes": 234337,
+   "sha256": "ec57dcf43828fdd4ae09150601a4e23eb98aea815fca63040e062fbfe24ab2e7"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_ch4.flac",
+   "path": ".research/flac-generated/flac_s16_ch4.flac",
+   "bytes": 301947,
+   "sha256": "f1f88c8262da575049e15d9557b25025051cfe435c8bf1226401d16837092927"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_ch5.flac",
+   "path": ".research/flac-generated/flac_s16_ch5.flac",
+   "bytes": 384844,
+   "sha256": "9561b0176da556d0dff463724f77887a36cb58e39ae23098f50e206e3f19ce8e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_ch6.flac",
+   "path": ".research/flac-generated/flac_s16_ch6.flac",
+   "bytes": 458653,
+   "sha256": "d800fa59e65da9aee53a61e878518f52e7cc5173ac8003f106e75e582e6f55b8"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_ch7.flac",
+   "path": ".research/flac-generated/flac_s16_ch7.flac",
+   "bytes": 524969,
+   "sha256": "e9ef7aa20fd6c456baa868e9a7d5d8f16f1150ddeb97d4699273988bdd61652f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_ch8.flac",
+   "path": ".research/flac-generated/flac_s16_ch8.flac",
+   "bytes": 598209,
+   "sha256": "1fffdd88054f0964b839f8c84df54752b42a33d686a2b02044074f174cd50c7f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_exhaustive.flac",
+   "path": ".research/flac-generated/flac_s16_exhaustive.flac",
+   "bytes": 145808,
+   "sha256": "197229d7c0f6641fbb7077f58026aa73836592000c937c57ab00a3f591b3ca79"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_level0.flac",
+   "path": ".research/flac-generated/flac_s16_level0.flac",
+   "bytes": 174996,
+   "sha256": "c120d0b2c6a0b36ac896e0538cc3e79af52463f124051d09c7907da55c47109e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_level3.flac",
+   "path": ".research/flac-generated/flac_s16_level3.flac",
+   "bytes": 173717,
+   "sha256": "16dfa93e3576f7516e1bea12ad86b3e4e76a515d498e510296b2711ed7384d68"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_level5.flac",
+   "path": ".research/flac-generated/flac_s16_level5.flac",
+   "bytes": 147393,
+   "sha256": "beab06952dd5b05bf800974e6fbcc8038a650ef6a1fcd5f9b6d987366f5b884c"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_no_mid_side.flac",
+   "path": ".research/flac-generated/flac_s16_no_mid_side.flac",
+   "bytes": 153749,
+   "sha256": "155898f16330c1dbc878546331a19cd4728ab2b74f1877d7dba1ab95feb3ef2d"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_partition15.flac",
+   "path": ".research/flac-generated/flac_s16_partition15.flac",
+   "bytes": 94229,
+   "sha256": "a4759d7c67560e33c5d3153df5ed51f64b48caf49e735fd740159defa0082dc1"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_precision5.flac",
+   "path": ".research/flac-generated/flac_s16_precision5.flac",
+   "bytes": 141401,
+   "sha256": "449f24301fcf5ad557c6321a6dd0de641504487849b2e9638f19187bd1ae0a2e"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_rate1.flac",
+   "path": ".research/flac-generated/flac_s16_rate1.flac",
+   "bytes": 9799,
+   "sha256": "5a235bd079ae95f6317a9311aef06de4a067235f8fb213be4209be061fafae12"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s16_wasted3.flac",
+   "path": ".research/flac-generated/flac_s16_wasted3.flac",
+   "bytes": 101620,
+   "sha256": "415f469be74378e22775a6e722192982c8b4daa94bd91aa35b34046780311753"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s20_rate768k.flac",
+   "path": ".research/flac-generated/flac_s20_rate768k.flac",
+   "bytes": 2944237,
+   "sha256": "ea3c5aa6fd530bd0b14f893f151904119d6d140d228bbfe67e4a1ac413f4bb0f"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s24_lax_order32.flac",
+   "path": ".research/flac-generated/flac_s24_lax_order32.flac",
+   "bytes": 493161,
+   "sha256": "8149571f13902f4c38f7aa4dedae8cce5cc0ff4cf2d16ec6ebe5915f3cdc442d"
+  },
+  {
+   "lane": "reader-flac",
+   "name": "flac_s32_lax_order32.flac",
+   "path": ".research/flac-generated/flac_s32_lax_order32.flac",
+   "bytes": 365494,
+   "sha256": "cf908410b01401472170878dc3acf772724e8e40f3e50bf2bf2e1b591d0c4e5f"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_ape_footer_only.mp3",
+   "path": ".research/elementary/crafted/mp3_ape_footer_only.mp3",
+   "bytes": 80760,
+   "sha256": "9e6be4796be8d72ad95da9a974e6079fb185219ef25d4d52f60079c6a1a1b676"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_ape_noheader_tail.mp3",
+   "path": ".research/elementary/crafted/mp3_ape_noheader_tail.mp3",
+   "bytes": 80760,
+   "sha256": "856f80784b54c1e1b16fd59929a2867293f957e67319f647de6fb42c94e54a8f"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_cut_frame.mp3",
+   "path": ".research/elementary/crafted/mp3_cut_frame.mp3",
+   "bytes": 80510,
+   "sha256": "cec60c8eeba14bdc8b955f0b66469f0671f830cd43f5c3837359c3c1934e2218"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_foreign_frame.mp3",
+   "path": ".research/elementary/crafted/mp3_foreign_frame.mp3",
+   "bytes": 81337,
+   "sha256": "3ab7165c4c5ae4f7f5e4acadab49656c5341fcd2266f0c5787bb46d74f479ead"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_id3_footer.mp3",
+   "path": ".research/elementary/crafted/mp3_id3_footer.mp3",
+   "bytes": 80722,
+   "sha256": "7253a804bf4d9f99d7d09e2e3dd2be976fdb6481809de9b4d9b7a078d95808ca"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_id3_unsync.mp3",
+   "path": ".research/elementary/crafted/mp3_id3_unsync.mp3",
+   "bytes": 80712,
+   "sha256": "746e8a4d3d928a23b4eb75dffebb399a556832ee0a231233e054e60f5d381cc7"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_info_as_xing.mp3",
+   "path": ".research/elementary/crafted/mp3_info_as_xing.mp3",
+   "bytes": 81127,
+   "sha256": "3fbda129b5c4292fc87a5845696948bf6bcc2afd3f55021a8180597493f9154a"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_info_extended.mp3",
+   "path": ".research/elementary/crafted/mp3_info_extended.mp3",
+   "bytes": 89487,
+   "sha256": "0df7ef0fdd36a1b1b8c201cb12292be04fbc951996e1121dcd770e2c96b1ea8b"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_info_nolame.mp3",
+   "path": ".research/elementary/crafted/mp3_info_nolame.mp3",
+   "bytes": 81127,
+   "sha256": "9c90999b8b4eca85c8ad3e08595ad802197af6ea4f5e713b80954f0c1d89320e"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_info_nolame_name.mp3",
+   "path": ".research/elementary/crafted/mp3_info_nolame_name.mp3",
+   "bytes": 81127,
+   "sha256": "4e7e37b4f0c63b6228f7699cea9f0c8b229e75d674cf29ea4c3c51af059a01a4"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_info_othername.mp3",
+   "path": ".research/elementary/crafted/mp3_info_othername.mp3",
+   "bytes": 81127,
+   "sha256": "a0f5109b9f797370b11196099703e1eb1c95c7f1c5bb3d0ed83ac6b78a042784"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_info_shuffled.mp3",
+   "path": ".research/elementary/crafted/mp3_info_shuffled.mp3",
+   "bytes": 81127,
+   "sha256": "f026d5d52592f5df1263b6526ff4fa22977eebbadd096788964d904c89d5e8d8"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_info_tail_junk.mp3",
+   "path": ".research/elementary/crafted/mp3_info_tail_junk.mp3",
+   "bytes": 81326,
+   "sha256": "54b36a649b9c5b12a88d84b720bc962abcbf2ab1d87db43d465d80416c636f15"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_info_truncated.mp3",
+   "path": ".research/elementary/crafted/mp3_info_truncated.mp3",
+   "bytes": 72767,
+   "sha256": "1108d1c87df111213c78c0b44a8295974a1ef72d540381bbf6e0ef63a5764ab7"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_lead_junk.mp3",
+   "path": ".research/elementary/crafted/mp3_lead_junk.mp3",
+   "bytes": 83666,
+   "sha256": "8d0bcbc7e5dd9ef9a058313e112541596c7bbdfed2f48ca5cb9592c38e96c86e"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_lead_zero.mp3",
+   "path": ".research/elementary/crafted/mp3_lead_zero.mp3",
+   "bytes": 85666,
+   "sha256": "34c54d31beec57acb28cb3e052c9cc841fb15484ba480354e801be2a6b27acf1"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_mid_junk.mp3",
+   "path": ".research/elementary/crafted/mp3_mid_junk.mp3",
+   "bytes": 81210,
+   "sha256": "946e5a67110e4b9a7210e1fa0dd1dccecbbaff7a33a7a808885de1b5723bbb0d"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_mid_junk_falsesync.mp3",
+   "path": ".research/elementary/crafted/mp3_mid_junk_falsesync.mp3",
+   "bytes": 81114,
+   "sha256": "eca2f347d0862c1f87a4ec5531688657844efef96322fde1dc583874674d7240"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_name_abcd.mp3",
+   "path": ".research/elementary/crafted/mp3_name_abcd.mp3",
+   "bytes": 81127,
+   "sha256": "347d66580987f1f1cd3efd6b046b2d0b5727b02bc8758df7c17b8945917e25f8"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_name_gogo.mp3",
+   "path": ".research/elementary/crafted/mp3_name_gogo.mp3",
+   "bytes": 81127,
+   "sha256": "82fb77301c8ae65885b57bb8b705376bc8209257017a14340f603d02f8a53ae2"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_name_lame.mp3",
+   "path": ".research/elementary/crafted/mp3_name_lame.mp3",
+   "bytes": 81127,
+   "sha256": "412910d309db738799e38ec4d12e7c92b1ac8b2f29328bb6774e771e317a0b3f"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_name_lav.mp3",
+   "path": ".research/elementary/crafted/mp3_name_lav.mp3",
+   "bytes": 81127,
+   "sha256": "943625d024fcfe3dc74cb692e68fb72fbc6f248824a3c1f04397890e07610c50"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_name_lavf.mp3",
+   "path": ".research/elementary/crafted/mp3_name_lavf.mp3",
+   "bytes": 81127,
+   "sha256": "e681abd2375707412eb7f7aa61ead61e57e46935523b57e921ae7f4bf1ae0846"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_name_zero4.mp3",
+   "path": ".research/elementary/crafted/mp3_name_zero4.mp3",
+   "bytes": 81127,
+   "sha256": "ecb9bacfd3f67da6b3687b0b674fa6bf623b231a31495f7d753ec3dbf1c7a27c"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_pad_100.mp3",
+   "path": ".research/elementary/crafted/mp3_pad_100.mp3",
+   "bytes": 81127,
+   "sha256": "db5979368869c16c9ebe38c8856a304272a8ff0a0f035100870006c16115b431"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_pad_529.mp3",
+   "path": ".research/elementary/crafted/mp3_pad_529.mp3",
+   "bytes": 81127,
+   "sha256": "bf8ccbe51466a55da86358df6953bbc76a38d16eed90155eeab07fbd3a577839"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_pad_530.mp3",
+   "path": ".research/elementary/crafted/mp3_pad_530.mp3",
+   "bytes": 81127,
+   "sha256": "11f72df96567f7e765272c68560d66f92400d99ec18f6cc2eace5a4bc81d88d5"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_pad_600.mp3",
+   "path": ".research/elementary/crafted/mp3_pad_600.mp3",
+   "bytes": 81127,
+   "sha256": "271247f58ff86b13828800db7103091d2d7f1980621a5879cf93b2be33229dab"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_tags_tail.mp3",
+   "path": ".research/elementary/crafted/mp3_tags_tail.mp3",
+   "bytes": 80920,
+   "sha256": "49cf61d29f59850e0f05f33dfe5cda8e05d5fb48d86c1933cfe6e4364d7e0536"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_tail_junk.mp3",
+   "path": ".research/elementary/crafted/mp3_tail_junk.mp3",
+   "bytes": 80909,
+   "sha256": "e9496af0072a99badc1b6ac137225e72b12acb57e22574c34f71342bb28524d6"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_tail_junk_id3v1.mp3",
+   "path": ".research/elementary/crafted/mp3_tail_junk_id3v1.mp3",
+   "bytes": 81037,
+   "sha256": "338f464d1143467afeaa4ebab7828b09516ac77cfe83f8436006ab75c5dfdcf7"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_truncated.mp3",
+   "path": ".research/elementary/crafted/mp3_truncated.mp3",
+   "bytes": 80410,
+   "sha256": "24dbec1afa4d83f3451c234ace597e1e770fc883ebbf9ee4ab6d504b44fe9cfa"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_two_id3.mp3",
+   "path": ".research/elementary/crafted/mp3_two_id3.mp3",
+   "bytes": 80758,
+   "sha256": "269e7e6a680043d3f367a774d5e443886ff538873f81e1329de269d92fa660d0"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp2_192.mp2",
+   "path": ".research/elementary/mp2_192.mp2",
+   "bytes": 120372,
+   "sha256": "5c10c7dcf26c1959f2ebf565ae74df6cc235ce3159e1c592b5d47af0de89f12f"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp2_mono48.mp2",
+   "path": ".research/elementary/mp2_mono48.mp2",
+   "bytes": 24000,
+   "sha256": "7d3f04083bbaad397cf25aa042fa2a9c614a4405919fd00da463aff616793e84"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_cbr_info.mp3",
+   "path": ".research/elementary/mp3_cbr_info.mp3",
+   "bytes": 81127,
+   "sha256": "db32767a99ec36f1e06291411c162857ffe145184df9a8b5c36d46bc3af07650"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_cbr_noxing.mp3",
+   "path": ".research/elementary/mp3_cbr_noxing.mp3",
+   "bytes": 80710,
+   "sha256": "6c09e5b19e8d6d62d4f0228d14629c5848703fb8d6ccb1d93cd1241438d02fd3"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_id3v1.mp3",
+   "path": ".research/elementary/mp3_id3v1.mp3",
+   "bytes": 81290,
+   "sha256": "309efcb9f4214bcfbdadeb252bc4f073b239440a862ab39a0a68d83771faacf8"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_mpeg25.mp3",
+   "path": ".research/elementary/mp3_mpeg25.mp3",
+   "bytes": 6596,
+   "sha256": "870cb9c7f7abd4050f482baf96d00094a17feebbc425de744dd51ec5718cc74f"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_mpeg2_mono.mp3",
+   "path": ".research/elementary/mp3_mpeg2_mono.mp3",
+   "bytes": 12451,
+   "sha256": "1f08c8ea19d3fdd136eb096f147280d7b3f774d791796e417fee103aa95ab0d9"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_vbr_noxing_noid3.mp3",
+   "path": ".research/elementary/mp3_vbr_noxing_noid3.mp3",
+   "bytes": 32088,
+   "sha256": "587b109ee9d0ec37be89bd290678bff497b937aa1323ed4fc10430a6586db4b2"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "mp3_vbr_xing.mp3",
+   "path": ".research/elementary/mp3_vbr_xing.mp3",
+   "bytes": 32340,
+   "sha256": "d91b48d9f533b994550e0e21ff78a6a4e3dc8f81417695e667804cc3c0e941a3"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "compl.bit",
+   "path": ".research/fate-samples/mp3-conformance/compl.bit",
+   "bytes": 41495,
+   "sha256": "3b93f3675821a5af4826abcff7097fa2e42efcc46154e02c992995f7e31dbc8e"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "he_32khz.bit",
+   "path": ".research/fate-samples/mp3-conformance/he_32khz.bit",
+   "bytes": 95760,
+   "sha256": "965065cdcac3f45a61a9f54b4f94d59d0334f4b5cb74840a5aec7d405e2e050f"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "he_44khz.bit",
+   "path": ".research/fate-samples/mp3-conformance/he_44khz.bit",
+   "bytes": 166661,
+   "sha256": "a64212281a8896d90e00f06c9b21f2c8f21ef9cb7367cae692a92ea421984441"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "he_48khz.bit",
+   "path": ".research/fate-samples/mp3-conformance/he_48khz.bit",
+   "bytes": 63840,
+   "sha256": "dd0383075710570648b8961f3cd0ce692f07a679b265fc4997e50883b3958299"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "he_free.bit",
+   "path": ".research/fate-samples/mp3-conformance/he_free.bit",
+   "bytes": 26645,
+   "sha256": "b55afc2a21492c4b3035d423f36fe87560ef34f65eb997da60af9b01f300362c"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "he_mode.bit",
+   "path": ".research/fate-samples/mp3-conformance/he_mode.bit",
+   "bytes": 53498,
+   "sha256": "fb90396d9bb13311be35284d061e19196830d213d823e05297b18172c88d90ce"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "hecommon.bit",
+   "path": ".research/fate-samples/mp3-conformance/hecommon.bit",
+   "bytes": 12538,
+   "sha256": "21999b77716aeba047c7f55c2c1ce17b54c780b6dc007912f251b7ea189676ef"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "si.bit",
+   "path": ".research/fate-samples/mp3-conformance/si.bit",
+   "bytes": 24659,
+   "sha256": "4f3382de1d9265013d42249ff108023d4a90ecf3c0136489d199243a90a5d0f9"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "si_block.bit",
+   "path": ".research/fate-samples/mp3-conformance/si_block.bit",
+   "bytes": 13374,
+   "sha256": "1d12956840638bf6b81164fc510c3e8269eeb038a51dc4548469e21a71e52b69"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "si_huff.bit",
+   "path": ".research/fate-samples/mp3-conformance/si_huff.bit",
+   "bytes": 15673,
+   "sha256": "fda6d8a7d4e1df3cb17d3560b57013ef98abbf9c60d940455c2e3ebf63eae0ef"
+  },
+  {
+   "lane": "reader-mp3",
+   "name": "sin1k0db.bit",
+   "path": ".research/fate-samples/mp3-conformance/sin1k0db.bit",
+   "bytes": 133120,
+   "sha256": "64775e23c29aa84e27f68777460f88e0717af2ed64e732d287a20c5a92c9fa3e"
+  },
+  {
+   "lane": "reader-aac",
+   "name": "adts_51.aac",
+   "path": ".research/elementary/adts_51.aac",
+   "bytes": 129650,
+   "sha256": "0aafadbf51a54d1469565901477f707a8a1dca4653b070afab6456f098fc765e"
+  },
+  {
+   "lane": "reader-aac",
+   "name": "adts_lc.aac",
+   "path": ".research/elementary/adts_lc.aac",
+   "bytes": 81376,
+   "sha256": "756494f09100b66748cf57bbec30dadba0ccac66fe63832a1f5c75597a672695"
+  },
+  {
+   "lane": "reader-aac",
+   "name": "adts_mid_junk.aac",
+   "path": ".research/elementary/crafted/adts_mid_junk.aac",
+   "bytes": 81709,
+   "sha256": "6490572a4960ed9f90277217dc982d04c5d119e7abcc8ad6d2445c9917e051e9"
+  },
+  {
+   "lane": "reader-aac",
+   "name": "adts_tags.aac",
+   "path": ".research/elementary/crafted/adts_tags.aac",
+   "bytes": 81632,
+   "sha256": "5bce628f9ba02157fda5ce3a6521c7877a1e06fbf657d1622d7357d7fa883468"
+  },
+  {
+   "lane": "reader-aac",
+   "name": "adts_truncated.aac",
+   "path": ".research/elementary/crafted/adts_truncated.aac",
+   "bytes": 81276,
+   "sha256": "6045b6db08d54a13490f18b3b5c18de851342c8e3ac1184b674b9ec87ba72040"
+  },
+  {
+   "lane": "reader-ac3",
+   "name": "ac3_51.ac3",
+   "path": ".research/elementary/ac3_51.ac3",
+   "bytes": 168448,
+   "sha256": "41d6db5aab063d28f14a57b335a5dfb40deca9fb9b0dd5c6799acb9e079f7469"
+  },
+  {
+   "lane": "reader-ac3",
+   "name": "ac3_stereo.ac3",
+   "path": ".research/elementary/ac3_stereo.ac3",
+   "bytes": 120372,
+   "sha256": "ddf1e315305f096a5b5217ea123f69ae9106e7134e5066480090fc05c296f541"
+  },
+  {
+   "lane": "reader-ac3",
+   "name": "ac3_mid_junk.ac3",
+   "path": ".research/elementary/crafted/ac3_mid_junk.ac3",
+   "bytes": 120772,
+   "sha256": "bc6593256a855cf8f38f66e5160ba7c909ea4c887d8115a60a3deed7fce3ab6b"
+  },
+  {
+   "lane": "reader-ac3",
+   "name": "ac3_tags.ac3",
+   "path": ".research/elementary/crafted/ac3_tags.ac3",
+   "bytes": 120546,
+   "sha256": "7dfdd81edc33f2734acb33acd509f7826a08400ef72474946348b138c77de316"
+  },
+  {
+   "lane": "reader-ac3",
+   "name": "ac3_truncated.ac3",
+   "path": ".research/elementary/crafted/ac3_truncated.ac3",
+   "bytes": 120272,
+   "sha256": "94553bba7d4834697904c19456a62952ab35fcebd9b153f4e4e64c45f4023181"
+  },
+  {
+   "lane": "reader-eac3",
+   "name": "eac3_51.eac3",
+   "path": ".research/elementary/eac3_51.eac3",
+   "bytes": 168448,
+   "sha256": "ec9ca4c1ddbd8d42138931936eea6397789c5950a18f7b67e66c22c75aab4344"
+  },
+  {
+   "lane": "reader-eac3",
+   "name": "eac3_stereo.eac3",
+   "path": ".research/elementary/eac3_stereo.eac3",
+   "bytes": 120372,
+   "sha256": "c6bf6e6e5ef80bffd809e6466a297adfdbcbf5aa99e5094eb4cb756cab21a571"
+  }
+ ]
+}
