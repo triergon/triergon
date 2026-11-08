@@ -16568,6 +16568,56 @@
    "sha256": "c039ca3e2cb63255140973528ddd22cc7e96b32e5254d22ea4f954011822a35d",
    "bytes": 12480461,
    "source_revision": "21642833a1c1f4d8e587a5c5bc903910f215428e"
+  },
+  {
+   "name": "isobmff-armv7-runtime-runners-linux-armv7",
+   "path": "isobmff-armv7-runtime-runners-linux-armv7",
+   "retention": "retained",
+   "reason": "ISO BMFF ARMv7 runtime change, 32-bit ARMv7: 30-pair screens of every contract the core change reaches against the base worker on the gate build, the MP4 forward and TS program gates with their profiles, with the CPU, kernel and user-space package list",
+   "key": "evidence/isobmff-armv7-runtime-runners-linux-armv7/fe4098d3c3812710cc17b7b78155f2ee87eba366ce3bbe3d9de9569631bd7106.tar.gz",
+   "sha256": "fe4098d3c3812710cc17b7b78155f2ee87eba366ce3bbe3d9de9569631bd7106",
+   "bytes": 531449971,
+   "source_revision": "4c823f7f74419cbfb9c8220a72b4684931c621f9"
+  },
+  {
+   "name": "isobmff-armv7-runtime-runners-linux-arm64",
+   "path": "isobmff-armv7-runtime-runners-linux-arm64",
+   "retention": "retained",
+   "reason": "ISO BMFF ARMv7 runtime change, AArch64: 30-pair screens of every contract the core change reaches against the base worker on the gate build, with the CPU and kernel",
+   "key": "evidence/isobmff-armv7-runtime-runners-linux-arm64/80ae96afb42abfdae9c7ac54bbc96b9197a3d53ed763d01e4acff1fd325e30c2.tar.gz",
+   "sha256": "80ae96afb42abfdae9c7ac54bbc96b9197a3d53ed763d01e4acff1fd325e30c2",
+   "bytes": 225886565,
+   "source_revision": "4c823f7f74419cbfb9c8220a72b4684931c621f9"
+  },
+  {
+   "name": "isobmff-armv7-runtime-regate-linux-arm64",
+   "path": "isobmff-armv7-runtime-regate-linux-arm64",
+   "retention": "retained",
+   "reason": "ISO BMFF open and index, AArch64: the 30-pair timing collection, the memory collection under the kernel RSS bound with its proof and review, instruction counts and binary sizes against the earlier revision, and a per-output comparison with the earlier gate, with the CPU, kernel and user-space package list",
+   "key": "evidence/isobmff-armv7-runtime-regate-linux-arm64/806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b.tar.gz",
+   "sha256": "806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b",
+   "bytes": 2195600995,
+   "source_revision": "f99d893196908d562c897bccb20c6a972cd25d11"
+  },
+  {
+   "name": "isobmff-armv7-runtime-regate-linux-armv7",
+   "path": "isobmff-armv7-runtime-regate-linux-armv7",
+   "retention": "retained",
+   "reason": "ISO BMFF open and index, 32-bit ARMv7: the 30-pair timing and memory collection on the gate build, instruction counts against the earlier revision, the playback worker's same-code comparison, observed resident peaks recomputed for this and the two earlier runs, with the CPU, kernel and user-space package list",
+   "key": "evidence/isobmff-armv7-runtime-regate-linux-armv7/bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1.tar.gz",
+   "sha256": "bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1",
+   "bytes": 2590598677,
+   "source_revision": "f99d893196908d562c897bccb20c6a972cd25d11"
+  },
+  {
+   "name": "isobmff-armv7-runtime-share-linux-armv7",
+   "path": "isobmff-armv7-runtime-share-linux-armv7",
+   "retention": "retained",
+   "reason": "ISO BMFF ARMv7 runtime change, 32-bit ARMv7: instruction counts on the worst outputs for main, this branch's library with main's worker, this branch with the worker's per-kind child walks, and this branch, with the cross-built workers, their build recipe and their text size by crate",
+   "key": "evidence/isobmff-armv7-runtime-share-linux-armv7/65161697b5c5a79289df268d63ff79ef6e776559db48b36b9e45e1c219cf51e7.tar.gz",
+   "sha256": "65161697b5c5a79289df268d63ff79ef6e776559db48b36b9e45e1c219cf51e7",
+   "bytes": 14049861,
+   "source_revision": "f99d893196908d562c897bccb20c6a972cd25d11"
   }
  ]
 }
