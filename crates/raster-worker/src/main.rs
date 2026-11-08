@@ -25,9 +25,10 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const MAX_INPUT: u64 = 64 << 20;
 /// Glyphs one font case may select.
 const MAX_GLYPHS: usize = 4096;
-const USAGE: &str = "usage: raster-worker raster-fold FILE MODE...
-       | raster-bench FILE ITERATIONS MODE... | raster-memory FILE MODE...
-       | raster-dump FILE MODE...
+const USAGE: &str = "usage: raster-worker OPERATION-fold FILE MODE...
+       | OPERATION-bench FILE ITERATIONS MODE... | OPERATION-memory FILE MODE...
+       | OPERATION-dump FILE MODE...
+  OPERATION: raster or raster-simd (the same work; the reference's engine differs)
   MODE: glyphs HEIGHT COUNT CASE... (FILE a font) or lines (FILE one case per line)";
 
 /// Where a run's cases and glyphs come from.
@@ -155,11 +156,17 @@ enum Action {
 
 fn parse(args: &[String]) -> Result<(Action, &str, Input)> {
     let (mode, rest) = args.split_first().ok_or(USAGE)?;
-    let (action, path, rest) = match (mode.as_str(), rest) {
-        ("raster-bench", [path, count, rest @ ..]) => (Action::Bench(count.parse()?), path, rest),
-        ("raster-fold", [path, rest @ ..]) => (Action::Fold, path, rest),
-        ("raster-memory", [path, rest @ ..]) => (Action::Memory, path, rest),
-        ("raster-dump", [path, rest @ ..]) => (Action::Dump, path, rest),
+    // The crate computes what libass's C engine does; `raster-simd` names the
+    // same work for the feature whose reference runs the host's SIMD engine.
+    let action = mode
+        .strip_prefix("raster-simd-")
+        .or_else(|| mode.strip_prefix("raster-"))
+        .ok_or(USAGE)?;
+    let (action, path, rest) = match (action, rest) {
+        ("bench", [path, count, rest @ ..]) => (Action::Bench(count.parse()?), path, rest),
+        ("fold", [path, rest @ ..]) => (Action::Fold, path, rest),
+        ("memory", [path, rest @ ..]) => (Action::Memory, path, rest),
+        ("dump", [path, rest @ ..]) => (Action::Dump, path, rest),
         _ => return Err(USAGE.into()),
     };
     let input = match rest {

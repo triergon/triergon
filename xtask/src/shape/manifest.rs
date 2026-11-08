@@ -9,7 +9,7 @@ use std::path::Path;
 
 use super::texts::{self, ALPHABETS, Rng, SAMPLES};
 use crate::json::Value;
-use crate::lanes::{Feature, Lane};
+use crate::lanes::{Feature, Gate, Lane};
 
 type R<T> = Result<T, String>;
 
@@ -215,27 +215,27 @@ enum Load {
 pub const FEATURES: [Feature; 6] = [
     Feature {
         id: "shape-text",
-        required: true,
+        gate: Gate::Required,
     },
     Feature {
         id: "shape-libass",
-        required: true,
+        gate: Gate::Required,
     },
     Feature {
         id: "shape-text-all",
-        required: false,
+        gate: Gate::OnDemand,
     },
     Feature {
         id: "shape-bidi",
-        required: true,
+        gate: Gate::Required,
     },
     Feature {
         id: "shape-simple",
-        required: true,
+        gate: Gate::Required,
     },
     Feature {
         id: "shape-unicode",
-        required: true,
+        gate: Gate::Required,
     },
 ];
 

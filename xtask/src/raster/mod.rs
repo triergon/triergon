@@ -15,7 +15,7 @@ use crate::fetch;
 
 pub const USAGE: &str = "usage: cargo xtask raster prepare [--jobs N]
        cargo xtask raster manifest [--record] [--output DIR]
-       cargo xtask raster compare [--all] [REPORT OPTION]...
+       cargo xtask raster compare [--all | --diagnostic] [REPORT OPTION]...
 
   prepare   build the pinned libass release into .research/libass against the
             FreeType, FriBidi and HarfBuzz references (`cargo xtask fonts prepare`,
@@ -29,8 +29,10 @@ pub const USAGE: &str = "usage: cargo xtask raster prepare [--jobs N]
             every pin from the built reference
   compare   `cargo xtask report` on each required rasterising feature
             (raster-glyphs, raster-outlines, raster-bitmaps), with --all also on
-            raster-sweep; further report options pass through, and each report goes
-            to OUTPUT/<feature> (OUTPUT: --output, default .research/raster-report)";
+            raster-sweep; with --diagnostic only on raster-simd, the required cases
+            against the host's SIMD engine, which fails where that engine departs from
+            the gated C engine; further report options pass through, and each report
+            goes to OUTPUT/<feature> (OUTPUT: --output, default .research/raster-report)";
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {
@@ -69,6 +71,8 @@ mod tests {
             "harness/features/raster-glyphs/contract.json"
         );
         assert_eq!(LANE.reports(&args(&["compare", "--all"])).unwrap().len(), 4);
+        let simd = LANE.reports(&args(&["compare", "--diagnostic"])).unwrap();
+        assert_eq!(simd[0][1], "harness/features/raster-simd/contract.json");
         assert!(LANE.reports(&args(&["prepare"])).is_none());
     }
 }
