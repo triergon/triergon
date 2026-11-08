@@ -72,8 +72,9 @@ A bitmap's `position` is its first pixel relative to the origin it is placed
 against: a glyph's fill and border count from `GlyphBitmaps::origin`, the
 glyph's place in the frame, and a run's composite from `Composite::origin`,
 the least origin of its glyphs. A renderer keys its caches with
-`GlyphBitmaps::key` and `Effects::key`, opaque values that are equal when
-libass's cache keys are.
+`GlyphBitmaps::key`, joined with its own identity of the glyph's shape by
+`GlyphKey::with_shape` where the bitmaps depend on the shape, and with
+`Effects::key`: opaque values that are equal when libass's cache keys are.
 
 ## What it matches
 
