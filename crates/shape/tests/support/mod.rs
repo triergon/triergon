@@ -354,7 +354,7 @@ pub fn shape_latin_within(
     let font = Font::new(bytes, 0, &budget, Limits::default()).expect("font");
     let face = Face::new(&font);
     let scale = Scale::units(font.units_per_em());
-    let metrics = OtMetrics::new(&font, scale, &budget);
+    let metrics = OtMetrics::new(&font, scale);
     let language = Language::new("en").expect("language");
     let plan = Plan::new(
         &face,
@@ -389,7 +389,7 @@ pub fn exercise(data: &[u8]) -> usize {
     };
     let face = Face::new(&font);
     let scale = Scale::units(font.units_per_em());
-    let metrics = OtMetrics::new(&font, scale, &budget);
+    let metrics = OtMetrics::new(&font, scale);
     let features = [Feature {
         tag: Tag::new(b"salt"),
         value: 1,

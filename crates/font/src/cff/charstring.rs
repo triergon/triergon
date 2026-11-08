@@ -11,7 +11,7 @@
 
 use super::dict::{CFF_OPERANDS, CFF2_OPERANDS, Stack};
 use super::number::shared_integer;
-use super::path::{Builder, Fixed, Path};
+use super::path::{Builder, Contours, Fixed, Path};
 use super::{Cff, Private, Version};
 use crate::Limits;
 use crate::fixed::{div_fix, mul_fix, sqrt_fixed};
@@ -519,35 +519,26 @@ pub(super) fn operators(
     Ok(run.observer)
 }
 
-/// The bounds of what `glyph`'s program draws, `None` if it draws nothing;
-/// `outline` is scratch storage.
+/// The bounds of what `glyph`'s program draws, `None` if it draws nothing. No
+/// outline is built, so the point limit does not apply.
 pub(super) fn bounds(
     cff: &Cff,
     table: &[u8],
     glyph: u32,
-    outline: &mut Outline,
     limits: &Limits,
     work: &mut WorkBudget,
 ) -> Result<Option<CharstringBounds>> {
-    outline.begin(limits.points);
-    let mut run = Run::new(
-        cff,
-        table,
-        work,
-        limits,
-        Builder::new(outline),
-        Bounds::default(),
-    );
+    let mut run = Run::new(cff, table, work, limits, (), Bounds::default());
     run.top_glyph(glyph)?;
     Ok(run.observer.bounds)
 }
 
-struct Run<'a, 'o, O> {
+struct Run<'a, C, O> {
     cff: &'a Cff,
     table: &'a [u8],
     work: &'a mut WorkBudget,
     depth: u32,
-    builder: Builder<'o>,
+    builder: C,
     observer: O,
 }
 
@@ -587,13 +578,13 @@ struct State<'p, const N: usize> {
     random: u32,
 }
 
-impl<'a, 'o, O: Observe> Run<'a, 'o, O> {
+impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
     fn new(
         cff: &'a Cff,
         table: &'a [u8],
         work: &'a mut WorkBudget,
         limits: &Limits,
-        builder: Builder<'o>,
+        builder: C,
         observer: O,
     ) -> Self {
         let depth = match cff.version {

@@ -14,7 +14,6 @@ use crate::tag::Direction;
 use crate::unicode::{self, GeneralCategory};
 use std::ops::Range;
 use triergon_core::Result;
-use triergon_font::GlyphId;
 
 /// Shapes `text[item]` with `face` as planned, with the characters around the
 /// item as context; clusters are indices into `text`. The glyphs and positions
@@ -26,7 +25,8 @@ use triergon_font::GlyphId;
 /// `Invalid` for an item outside `text`; `Unsupported` for script features this
 /// crate does not implement (the plan reports most at creation); `Policy` when
 /// the work exceeds the buffer's [`Limits`](crate::Limits) or lookups nest
-/// deeper than HarfBuzz's 64 levels; the buffer budget's errors.
+/// deeper than HarfBuzz's 64 levels; the buffer budget's errors; the first error
+/// a [`Metrics`] function returns.
 pub fn shape(
     face: &Face<'_>,
     metrics: &dyn Metrics,
@@ -43,7 +43,9 @@ pub fn shape(
         font: &font,
         direction: plan.direction,
     };
-    run.shape(buffer)
+    let shaped = run.shape(buffer);
+    // A font function's error comes first: the run went on without its answer.
+    font.finish().and(shaped)
 }
 
 struct Run<'a, 'b> {
@@ -272,9 +274,7 @@ impl Run<'_, '_> {
                 self.direction,
             );
             self.face.kern.apply(&mut ctx, plan.kern_mask)?;
-        } else if plan.apply_fallback_kern
-            && let Some(kerning) = self.font.metrics.h_kerning()
-        {
+        } else if plan.apply_fallback_kern && self.font.has_h_kerning() {
             // The font functions' kerning, in visual order and already scaled.
             let backward = self.direction.is_backward();
             if backward {
@@ -288,9 +288,8 @@ impl Run<'_, '_> {
                 self.font,
                 self.direction,
             );
-            let glyph = |g: u32| GlyphId(u16::try_from(g).unwrap_or(0));
             crate::ot::kern::kern_machine(&mut ctx, plan.kern_mask, false, |a, b| {
-                kerning(glyph(a), glyph(b))
+                self.font.h_kerning(a, b)
             })?;
             if backward {
                 buffer.reverse();

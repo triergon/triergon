@@ -124,9 +124,13 @@ follows the Top DICT's, outlines and advances go through it, and a Font DICT who
 matrix implies other units per em scales its glyphs by the ratio. Drawing
 operators read operand counts the format does not allow as FreeType's engine reads
 them, and a glyph whose operator reads past its operands fails; operand types are
-not tracked. `Font::charstring_bounds` gives the box of every point a charstring
-draws, control points included, in unrounded 16.16 before the FontMatrix: what
-HarfBuzz takes CFF glyph extents from.
+not tracked.
+
+**Control boxes.** `Font::control_box` reads a glyph's box without building its
+outline, so no point limit applies: a TrueType glyph's `glyf` header box as
+stored, or the box of every point a charstring draws, control points included,
+in unrounded 16.16 before the FontMatrix (`ControlBox::Empty` when there are no
+points). HarfBuzz takes glyph extents from them.
 
 **At a size.** `Font::at_size` takes a 26.6 pixel height and sets up the face as
 FreeType does when libass requests the size (`ass_face_set_size`:

@@ -30,7 +30,7 @@ let plan = Plan::new(&face, Direction::RightToLeft, Script::from_iso15924(*b"Ara
 
 let text: Vec<char> = "مرحبا بالعالم".chars().collect();
 // HarfBuzz's default scale: font units.
-let metrics = OtMetrics::new(&font, Scale::units(font.units_per_em()), &pool);
+let metrics = OtMetrics::new(&font, Scale::units(font.units_per_em()));
 let mut buffer = Buffer::new(&pool); // reuse it for every run
 triergon_shape::shape(&face, &metrics, &plan, &text, 0..text.len(), &mut buffer)?;
 for (glyph, position) in buffer.glyphs() {

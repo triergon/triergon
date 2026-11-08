@@ -7,7 +7,8 @@
 //! font units truncated toward negative infinity. Zero-length lines are dropped
 //! in device space; contours start at their first segment; closing a contour
 //! drops a final on-curve point equal to its first and a contour left with one
-//! point.
+//! point. A path can also be run into no contours at all, for the interpreter's
+//! observers alone.
 
 use crate::fixed::mul_fix;
 use crate::outline::{Outline, Point, PointKind};
@@ -57,7 +58,7 @@ impl Path {
         self.new_mask = true;
     }
 
-    pub(super) fn move_to(&mut self, b: &mut Builder<'_>, to: (Fixed, Fixed)) -> Result<()> {
+    pub(super) fn move_to(&mut self, b: &mut impl Contours, to: (Fixed, Fixed)) -> Result<()> {
         self.close(b)?;
         self.current = to;
         self.start = to;
@@ -66,11 +67,11 @@ impl Path {
         Ok(())
     }
 
-    pub(super) fn line_to(&mut self, b: &mut Builder<'_>, to: (Fixed, Fixed)) -> Result<()> {
+    pub(super) fn line_to(&mut self, b: &mut impl Contours, to: (Fixed, Fixed)) -> Result<()> {
         self.line(b, to, false)
     }
 
-    fn line(&mut self, b: &mut Builder<'_>, to: (Fixed, Fixed), closing: bool) -> Result<()> {
+    fn line(&mut self, b: &mut impl Contours, to: (Fixed, Fixed), closing: bool) -> Result<()> {
         let new_mask = self.new_mask && !closing;
         if to == self.current && !new_mask {
             return Ok(());
@@ -90,7 +91,7 @@ impl Path {
 
     pub(super) fn curve_to(
         &mut self,
-        b: &mut Builder<'_>,
+        b: &mut impl Contours,
         c1: (Fixed, Fixed),
         c2: (Fixed, Fixed),
         to: (Fixed, Fixed),
@@ -108,7 +109,7 @@ impl Path {
     }
 
     /// The first segment after a move starts the contour.
-    fn begin(&mut self, b: &mut Builder<'_>) -> Result<()> {
+    fn begin(&mut self, b: &mut impl Contours) -> Result<()> {
         if self.move_pending {
             self.move_pending = false;
             self.open = true;
@@ -119,12 +120,41 @@ impl Path {
     }
 
     /// Closes the open subpath with a line back to its start.
-    pub(super) fn close(&mut self, b: &mut Builder<'_>) -> Result<()> {
+    pub(super) fn close(&mut self, b: &mut impl Contours) -> Result<()> {
         if self.open {
             self.line(b, self.start, true)?;
             self.move_pending = true;
             self.open = false;
         }
+        Ok(())
+    }
+}
+
+/// Where a path's segments go, in whole font units: an outline, or nowhere.
+pub(super) trait Contours {
+    /// A move: the next segment starts a contour.
+    fn move_to(&mut self) -> Result<()>;
+    fn line(&mut self, from: (i32, i32), to: (i32, i32)) -> Result<()>;
+    fn curve(&mut self, from: (i32, i32), points: [(i32, i32); 3]) -> Result<()>;
+    /// Closes the last contour.
+    fn close(&mut self) -> Result<()>;
+}
+
+/// No contours: the charstring runs only for what its observer records.
+impl Contours for () {
+    fn move_to(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn line(&mut self, _: (i32, i32), _: (i32, i32)) -> Result<()> {
+        Ok(())
+    }
+
+    fn curve(&mut self, _: (i32, i32), _: [(i32, i32); 3]) -> Result<()> {
+        Ok(())
+    }
+
+    fn close(&mut self) -> Result<()> {
         Ok(())
     }
 }
@@ -152,18 +182,20 @@ impl<'o> Builder<'o> {
         self.outline.push_point(Point::new(x, y), kind)
     }
 
-    fn move_to(&mut self) -> Result<()> {
-        self.close()?;
-        self.begun = false;
-        Ok(())
-    }
-
     fn start(&mut self, at: (i32, i32)) -> Result<()> {
         if !self.begun {
             self.begun = true;
             self.open = true;
             self.push(at, PointKind::On)?;
         }
+        Ok(())
+    }
+}
+
+impl Contours for Builder<'_> {
+    fn move_to(&mut self) -> Result<()> {
+        self.close()?;
+        self.begun = false;
         Ok(())
     }
 
@@ -181,7 +213,7 @@ impl<'o> Builder<'o> {
 
     /// Closes the last contour, as `ps_builder_close_contour` does; closing it
     /// again (two moves in a row) applies the same rules once more.
-    pub(super) fn close(&mut self) -> Result<()> {
+    fn close(&mut self) -> Result<()> {
         let o = &mut *self.outline;
         let ends = o.contour_ends();
         let closed = ends.len();

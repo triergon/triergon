@@ -2,7 +2,7 @@
 
 use crate::buffer::Buffer;
 use crate::metrics::{Extents, Metrics, Scale, Scaled};
-use triergon_core::Budget;
+use triergon_core::{Budget, Result};
 use triergon_font::GlyphId;
 
 /// Maps the listed characters, each to a glyph of its own with the given advance.
@@ -30,15 +30,15 @@ impl Metrics for TestFont {
         None
     }
 
-    fn h_advance(&self, glyph: GlyphId) -> i32 {
-        usize::from(glyph.0)
+    fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
+        Ok(usize::from(glyph.0)
             .checked_sub(1)
             .and_then(|g| self.0.get(g))
-            .map_or(0, |&(_, advance)| advance)
+            .map_or(0, |&(_, advance)| advance))
     }
 
-    fn extents(&self, _glyph: GlyphId) -> Option<Extents> {
-        None
+    fn extents(&self, _glyph: GlyphId) -> Result<Option<Extents>> {
+        Ok(None)
     }
 }
 

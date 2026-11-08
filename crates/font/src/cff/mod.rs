@@ -490,12 +490,11 @@ impl Cff {
         )
     }
 
-    /// The bounds of what `glyph`'s program draws; `outline` is scratch storage.
+    /// The bounds of what `glyph`'s program draws, without building it.
     pub(crate) fn bounds(
         &self,
         data: &[u8],
         glyph: GlyphId,
-        outline: &mut Outline,
         limits: &Limits,
         work: &mut WorkBudget,
     ) -> Result<Option<CharstringBounds>> {
@@ -503,7 +502,6 @@ impl Cff {
             self,
             self.table.bytes(data),
             u32::from(glyph.0),
-            outline,
             limits,
             work,
         )

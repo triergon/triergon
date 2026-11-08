@@ -169,6 +169,18 @@ impl Glyf {
         (start < end).then_some((start, end))
     }
 
+    /// The header of `glyph`, `None` for an empty glyph: its contour count
+    /// (negative for a composite) and its box as stored, `[xMin, yMin, xMax,
+    /// yMax]`.
+    pub(crate) fn header(&self, data: &[u8], glyph: u16) -> Result<Option<(i16, [i16; 4])>> {
+        let Some((start, end)) = self.range(data, glyph) else {
+            return Ok(None);
+        };
+        let mut r = Reader::new(slice(data, self.glyf.offset + start, end - start)?);
+        let contours = r.i16()?;
+        Ok(Some((contours, [r.i16()?, r.i16()?, r.i16()?, r.i16()?])))
+    }
+
     /// Reports whose metrics apply to `glyph` without loading its points, and
     /// passes every glyph program loading it would run to `program`: its own
     /// and those of its components.

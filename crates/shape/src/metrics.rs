@@ -2,9 +2,9 @@
 //! scaling arithmetic.
 
 use crate::ot::data::{Data, bsearch};
-use std::cell::RefCell;
-use triergon_core::Budget;
-use triergon_font::{Charmap, Font, GlyphId, Outline, OutlineFormat, Platform};
+use std::cell::Cell;
+use triergon_core::{Error, Result};
+use triergon_font::{Charmap, ControlBox, Font, GlyphId, Platform};
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
 /// `hb_font_set_ppem` set it. The default is one unit per font unit and no ppem,
@@ -45,6 +45,9 @@ pub struct Extents {
 /// [`OtMetrics`] answers from the font's own tables, as HarfBuzz's built-in
 /// functions do; a renderer can answer from its rasteriser instead, as libass does
 /// with FreeType.
+/// The functions that load a glyph return a `Result`: an error ends the shaping
+/// call with it, while a glyph the font cannot load is an ordinary answer (zero
+/// or `None`), as it is to HarfBuzz.
 pub trait Metrics {
     /// The scale of every value the other functions return.
     fn scale(&self) -> Scale;
@@ -52,23 +55,56 @@ pub trait Metrics {
     fn nominal_glyph(&self, c: char) -> Option<GlyphId>;
     /// The glyph for a character with a variation selector, if the font has one.
     fn variation_glyph(&self, c: char, selector: char) -> Option<GlyphId>;
-    fn h_advance(&self, glyph: GlyphId) -> i32;
-    fn extents(&self, glyph: GlyphId) -> Option<Extents>;
+    /// The horizontal advance of `glyph`; zero for one the font cannot load.
+    ///
+    /// # Errors
+    ///
+    /// What keeps the functions from answering as their font would: a work or
+    /// budget limit, or a value they cannot compute.
+    fn h_advance(&self, glyph: GlyphId) -> Result<i32>;
+    /// The ink box of `glyph`; `None` when the font gives none.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::h_advance`].
+    fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>>;
     /// The position of outline point `point`, for anchors that name one (used
-    /// only with a ppem).
-    fn contour_point(&self, _glyph: GlyphId, _point: u16) -> Option<(i32, i32)> {
-        None
+    /// only with a ppem); `None` when the glyph has no such point.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::h_advance`].
+    fn contour_point(&self, _glyph: GlyphId, _point: u16) -> Result<Option<(i32, i32)>> {
+        Ok(None)
     }
-    /// Pair kerning for the fallback used when a font has neither GPOS kerning
-    /// nor a `kern` table, if the font functions provide it (HarfBuzz's built-in
-    /// ones do not).
-    fn h_kerning(&self) -> Option<&dyn Fn(GlyphId, GlyphId) -> i32> {
-        None
+    /// Whether [`Self::h_kerning`] gives pair kerning, which shaping applies when
+    /// a font has neither GPOS nor a `kern` table. HarfBuzz's built-in functions
+    /// give none.
+    fn has_h_kerning(&self) -> bool {
+        false
+    }
+    /// The kerning of a glyph pair in visual order.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::h_advance`].
+    fn h_kerning(&self, _left: GlyphId, _right: GlyphId) -> Result<i32> {
+        Ok(0)
+    }
+}
+
+/// A glyph the font cannot load (`Invalid`) answers `otherwise`, as it does to
+/// HarfBuzz; other errors stop shaping.
+fn unless_unloadable<T>(result: Result<T>, otherwise: T) -> Result<T> {
+    match result {
+        Err(Error::Invalid(_)) => Ok(otherwise),
+        result => result,
     }
 }
 
 /// The font functions HarfBuzz builds in (`hb-ot`), at a [`Scale`]: the character
-/// map HarfBuzz prefers, `cmap` format 14 variation sequences, `hmtx` advances.
+/// map HarfBuzz prefers, `cmap` format 14 variation sequences, `hmtx` advances,
+/// and extents from the `glyf` header box or the charstring's control box.
 #[derive(Debug)]
 pub struct OtMetrics<'a> {
     font: &'a Font,
@@ -77,19 +113,17 @@ pub struct OtMetrics<'a> {
     symbol: bool,
     /// A Macintosh charmap maps only ASCII.
     ascii_only: bool,
-    variations: Data<'a>,
+    variations: Variations<'a>,
     scale: Scale,
     x_mult: i64,
     x_multf: f32,
     y_multf: f32,
-    /// Reused for CFF glyph bounds.
-    outline: RefCell<Outline>,
 }
 
 impl<'a> OtMetrics<'a> {
-    /// The font functions of `font` at `scale`; glyph outlines read for extents
-    /// are charged to `budget`.
-    pub fn new(font: &'a Font, scale: Scale, budget: &Budget) -> Self {
+    /// The font functions of `font` at `scale`. Each glyph they read is bounded
+    /// by the font's [`Limits`](triergon_font::Limits).
+    pub fn new(font: &'a Font, scale: Scale) -> Self {
         use Platform::{Macintosh, Unicode, Windows};
         let find = |platform: Platform, encoding: Option<u16>| {
             font.charmaps()
@@ -119,29 +153,37 @@ impl<'a> OtMetrics<'a> {
             charmap,
             symbol: is_symbol,
             ascii_only,
-            variations: variation_subtable(font.table(*b"cmap").unwrap_or_default()),
+            variations: Variations::of(font),
             scale,
             x_mult: i64::from(scale.x) * 0x10000 / upem,
             x_multf: scale.x as f32 / f32::from(font.units_per_em()),
             y_multf: scale.y as f32 / f32::from(font.units_per_em()),
-            outline: RefCell::new(Outline::new(budget)),
         }
     }
 
     /// The unscaled ink box (x min, y max, width, height ≤ 0) as hb-ot reads it:
     /// for TrueType the `glyf` header box moved to the `hmtx` side bearing, for
-    /// CFF the charstring's bounds, each side rounded as `roundf` rounds it
+    /// CFF the charstring's control box, each side rounded as `roundf` rounds it
     /// after HarfBuzz narrows its double to a float.
-    fn unscaled_extents(&self, glyph: GlyphId) -> Option<[i32; 4]> {
-        if glyph.0 >= self.font.glyph_count() {
-            return None;
-        }
-        if self.font.outline_format() != OutlineFormat::TrueType {
-            let mut outline = self.outline.try_borrow_mut().ok()?;
-            let bounds = self.font.charstring_bounds(glyph, &mut outline).ok()?;
-            let round = |v: i32| ((f64::from(v) / 65536.0) as f32).round() as i32;
-            let [mut x, mut y, mut w, mut h] = [0; 4];
-            if let Some(b) = bounds {
+    fn unscaled_extents(&self, glyph: GlyphId) -> Result<Option<[i32; 4]>> {
+        let Some(control) = unless_unloadable(self.font.control_box(glyph).map(Some), None)? else {
+            return Ok(None);
+        };
+        Ok(Some(match control {
+            ControlBox::Empty => [0; 4],
+            ControlBox::Glyf(b) => {
+                let [x_min, y_min, x_max, y_max] =
+                    [b.x_min, b.y_min, b.x_max, b.y_max].map(i32::from);
+                [
+                    i32::from(self.font.side_bearing(glyph)?),
+                    y_min.max(y_max),
+                    (x_max - x_min).abs(),
+                    -(y_max - y_min).abs(),
+                ]
+            }
+            ControlBox::Charstring(b) => {
+                let round = |v: i32| ((f64::from(v) / 65536.0) as f32).round() as i32;
+                let [mut x, mut y, mut w, mut h] = [0; 4];
                 if b.x_min < b.x_max {
                     x = round(b.x_min);
                     w = round(b.x_max) - x;
@@ -150,56 +192,9 @@ impl<'a> OtMetrics<'a> {
                     y = round(b.y_max);
                     h = round(b.y_min) - y;
                 }
+                [x, y, w, h]
             }
-            return Some([x, y, w, h]);
-        }
-        let header = self.glyph_header(glyph);
-        let read = |at: usize| i32::from(header.i16(at));
-        if read(0) == 0 {
-            return Some([0; 4]);
-        }
-        let (x_min, y_min, x_max, y_max) = (read(2), read(4), read(6), read(8));
-        let lsb = self.side_bearing(glyph).unwrap_or(x_min.min(x_max));
-        Some([
-            lsb,
-            y_min.max(y_max),
-            (x_max - x_min).abs(),
-            -(y_max - y_min).abs(),
-        ])
-    }
-
-    /// The `glyf` data of `glyph`, empty when `loca` gives none.
-    fn glyph_header(&self, glyph: GlyphId) -> Data<'a> {
-        let (Some(glyf), Some(loca), Some(head)) = (
-            self.font.table(*b"glyf"),
-            self.font.table(*b"loca"),
-            self.font.table(*b"head"),
-        ) else {
-            return Data::EMPTY;
-        };
-        let (loca, g) = (Data(loca), usize::from(glyph.0));
-        let (start, end) = if Data(head).i16(50) == 0 {
-            (
-                2 * usize::from(loca.u16(2 * g)),
-                2 * usize::from(loca.u16(2 * g + 2)),
-            )
-        } else {
-            (loca.u32(4 * g) as usize, loca.u32(4 * g + 4) as usize)
-        };
-        glyf.get(start..end).map_or(Data::EMPTY, Data)
-    }
-
-    /// The `hmtx` left side bearing of `glyph`, if the table has one for it.
-    fn side_bearing(&self, glyph: GlyphId) -> Option<i32> {
-        let hmtx = Data(self.font.table(*b"hmtx")?);
-        let metrics = usize::from(Data(self.font.table(*b"hhea")?).u16(34));
-        let g = usize::from(glyph.0);
-        let at = if g < metrics {
-            4 * g + 2
-        } else {
-            4 * metrics + 2 * (g - metrics)
-        };
-        (at + 2 <= hmtx.0.len()).then(|| i32::from(hmtx.i16(at)))
+        }))
     }
 
     fn lookup(&self, code: u32) -> Option<GlyphId> {
@@ -225,72 +220,104 @@ impl Metrics for OtMetrics<'_> {
     }
 
     fn variation_glyph(&self, base: char, selector: char) -> Option<GlyphId> {
-        let (c, selector) = (u32::from(base), u32::from(selector));
-        let table = self.variations;
-        let records = table.u32(6) as usize;
-        let records = records.min(table.0.len().saturating_sub(10) / 11);
-        let record = bsearch(records, |i| table.u24(10 + 11 * i).cmp(&selector))?;
-        let at = 10 + 11 * record;
-        let defaults = table.at(table.u32(at + 3) as usize);
-        let in_default = {
-            let count = (defaults.u32(0) as usize).min(defaults.0.len().saturating_sub(4) / 4);
-            bsearch(count, |i| {
-                let first = defaults.u24(4 + 4 * i);
-                let last = first + u32::from(defaults.u8(4 + 4 * i + 3));
-                if c < first {
-                    std::cmp::Ordering::Greater
-                } else if c > last {
-                    std::cmp::Ordering::Less
-                } else {
-                    std::cmp::Ordering::Equal
-                }
-            })
-            .is_some()
-        };
-        if in_default {
-            return self.nominal_glyph(base);
+        match self.variations.lookup(u32::from(base), u32::from(selector)) {
+            Variation::Default => self.nominal_glyph(base),
+            Variation::Glyph(glyph) => Some(glyph),
+            Variation::None => None,
         }
-        let mappings = table.at(table.u32(at + 7) as usize);
-        let count = (mappings.u32(0) as usize).min(mappings.0.len().saturating_sub(4) / 5);
-        let i = bsearch(count, |i| mappings.u24(4 + 5 * i).cmp(&c))?;
-        Some(GlyphId(mappings.u16(4 + 5 * i + 3)))
     }
 
-    fn h_advance(&self, glyph: GlyphId) -> i32 {
-        let advance = self.font.advance(glyph).map_or(0, i64::from);
-        ((advance * self.x_mult + 32768) >> 16) as i32
+    fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
+        let advance = unless_unloadable(self.font.advance(glyph), 0)?;
+        Ok(((i64::from(advance) * self.x_mult + 32768) >> 16) as i32)
     }
 
-    fn extents(&self, glyph: GlyphId) -> Option<Extents> {
-        let [x, y, w, h] = self.unscaled_extents(glyph)?;
+    fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>> {
+        let Some([x, y, w, h]) = self.unscaled_extents(glyph)? else {
+            return Ok(None);
+        };
         // Scaled as HarfBuzz scales extents: outwards to whole units.
         let x1 = x as f32 * self.x_multf;
         let y1 = y as f32 * self.y_multf;
         let x2 = x1 + w as f32 * self.x_multf;
         let y2 = y1 + h as f32 * self.y_multf;
         let (x_bearing, y_bearing) = (x1.floor() as i32, y1.floor() as i32);
-        Some(Extents {
+        Ok(Some(Extents {
             x_bearing,
             y_bearing,
             width: x2.ceil() as i32 - x_bearing,
             height: y2.ceil() as i32 - y_bearing,
-        })
+        }))
     }
 }
 
-/// The format 14 subtable of the Unicode variation-sequence encoding (0, 5).
-fn variation_subtable(cmap: &[u8]) -> Data<'_> {
-    let cmap = Data(cmap);
-    let count = cmap.count(2, 4, 8);
-    (0..count)
-        .map(|i| 4 + 8 * i)
-        .find(|&at| cmap.u16(at) == 0 && cmap.u16(at + 2) == 5)
-        .map(|at| cmap.offset32(at + 4))
-        .filter(|table| table.u16(0) == 14)
-        .unwrap_or_default()
+/// How a variation sequence maps.
+enum Variation {
+    /// To the base character's nominal glyph.
+    Default,
+    Glyph(GlyphId),
+    /// Not at all.
+    None,
+}
+
+/// The `cmap` format 14 subtable of the Unicode variation-sequence encoding (0,
+/// 5): the first one, as HarfBuzz and FreeType both take it.
+#[derive(Clone, Copy, Debug)]
+struct Variations<'a>(Data<'a>);
+
+impl<'a> Variations<'a> {
+    fn of(font: &'a Font) -> Self {
+        let cmap = Data(font.table(*b"cmap").unwrap_or_default());
+        let count = cmap.count(2, 4, 8);
+        let table = (0..count)
+            .map(|i| 4 + 8 * i)
+            .find(|&at| cmap.u16(at) == 0 && cmap.u16(at + 2) == 5)
+            .map(|at| cmap.offset32(at + 4))
+            .filter(|table| table.u16(0) == 14);
+        Self(table.unwrap_or_default())
+    }
+
+    /// The selector's default ranges first, then its mappings; a mapping to
+    /// glyph 0 is none.
+    fn lookup(self, c: u32, selector: u32) -> Variation {
+        let table = self.0;
+        let records = table.u32(6) as usize;
+        let records = records.min(table.0.len().saturating_sub(10) / 11);
+        let Some(record) = bsearch(records, |i| table.u24(10 + 11 * i).cmp(&selector)) else {
+            return Variation::None;
+        };
+        let at = 10 + 11 * record;
+        let defaults = table.at(table.u32(at + 3) as usize);
+        let count = (defaults.u32(0) as usize).min(defaults.0.len().saturating_sub(4) / 4);
+        let in_default = bsearch(count, |i| {
+            let first = defaults.u24(4 + 4 * i);
+            let last = first + u32::from(defaults.u8(4 + 4 * i + 3));
+            if c < first {
+                std::cmp::Ordering::Greater
+            } else if c > last {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        });
+        if in_default.is_some() {
+            return Variation::Default;
+        }
+        let mappings = table.at(table.u32(at + 7) as usize);
+        let count = (mappings.u32(0) as usize).min(mappings.0.len().saturating_sub(4) / 5);
+        bsearch(count, |i| mappings.u24(4 + 5 * i).cmp(&c))
+            .map(|i| mappings.u16(4 + 5 * i + 3))
+            .filter(|&glyph| glyph != 0)
+            .map_or(Variation::None, |glyph| Variation::Glyph(GlyphId(glyph)))
+    }
 }
 
 /// The metrics and scale shaping uses, with HarfBuzz's scaling arithmetic.
+///
+/// A font function that fails answers as for a glyph that does not load, so the
+/// pipeline goes on without it, as `std`'s formatting adapters go on after an
+/// I/O error: the first error is kept, no further fallible function is called,
+/// and [`Self::finish`] returns it when the call ends.
 pub(crate) struct Scaled<'a> {
     pub(crate) metrics: &'a dyn Metrics,
     pub(crate) scale: Scale,
@@ -298,6 +325,7 @@ pub(crate) struct Scaled<'a> {
     y_mult: i64,
     x_multf: f32,
     y_multf: f32,
+    error: Cell<Option<Error>>,
 }
 
 impl<'a> Scaled<'a> {
@@ -312,7 +340,24 @@ impl<'a> Scaled<'a> {
             y_mult: i64::from(scale.y) * 0x10000 / upem_int,
             x_multf: scale.x as f32 / upem,
             y_multf: scale.y as f32 / upem,
+            error: Cell::new(None),
         }
+    }
+
+    /// The first error a font function returned, if any.
+    pub(crate) fn finish(&self) -> Result<()> {
+        self.error.get().map_or(Ok(()), Err)
+    }
+
+    /// The answer of a fallible font function, or `otherwise` once one failed.
+    fn ask<T>(&self, otherwise: T, f: impl FnOnce(&dyn Metrics) -> Result<T>) -> T {
+        if self.error.get().is_some() {
+            return otherwise;
+        }
+        f(self.metrics).unwrap_or_else(|error| {
+            self.error.set(Some(error));
+            otherwise
+        })
     }
 
     /// The nominal glyph of the character `c` (a code point the buffer holds).
@@ -328,16 +373,30 @@ impl<'a> Scaled<'a> {
 
     /// The advance of a glyph index the buffer holds; zero for one no face has.
     pub(crate) fn advance(&self, glyph: u32) -> i32 {
-        u16::try_from(glyph).map_or(0, |g| self.metrics.h_advance(GlyphId(g)))
+        u16::try_from(glyph).map_or(0, |g| self.ask(0, |m| m.h_advance(GlyphId(g))))
     }
 
     pub(crate) fn extents(&self, glyph: u32) -> Option<Extents> {
-        self.metrics.extents(GlyphId(u16::try_from(glyph).ok()?))
+        let glyph = GlyphId(u16::try_from(glyph).ok()?);
+        self.ask(None, |m| m.extents(glyph))
     }
 
     pub(crate) fn contour_point(&self, glyph: u32, point: u16) -> Option<(i32, i32)> {
-        self.metrics
-            .contour_point(GlyphId(u16::try_from(glyph).ok()?), point)
+        let glyph = GlyphId(u16::try_from(glyph).ok()?);
+        self.ask(None, |m| m.contour_point(glyph, point))
+    }
+
+    /// Whether the font functions give pair kerning.
+    pub(crate) fn has_h_kerning(&self) -> bool {
+        self.metrics.has_h_kerning()
+    }
+
+    /// The font functions' kerning of two glyph indices the buffer holds.
+    pub(crate) fn h_kerning(&self, left: u32, right: u32) -> i32 {
+        match (u16::try_from(left), u16::try_from(right)) {
+            (Ok(l), Ok(r)) => self.ask(0, |m| m.h_kerning(GlyphId(l), GlyphId(r))),
+            _ => 0,
+        }
     }
 
     /// A font-unit distance in scaled units, rounded as HarfBuzz's `em_mult`.
@@ -363,6 +422,61 @@ impl std::fmt::Debug for Scaled<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Scaled")
             .field("scale", &self.scale)
+            .field("error", &self.error.get())
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Extents, Metrics, Scale, Scaled};
+    use std::cell::Cell;
+    use triergon_core::{Error, Result};
+    use triergon_font::GlyphId;
+
+    /// Advances fail for glyph 2; every call is counted.
+    struct Failing(Cell<u32>);
+
+    impl Metrics for Failing {
+        fn scale(&self) -> Scale {
+            Scale::units(1000)
+        }
+
+        fn nominal_glyph(&self, _c: char) -> Option<GlyphId> {
+            None
+        }
+
+        fn variation_glyph(&self, _c: char, _selector: char) -> Option<GlyphId> {
+            None
+        }
+
+        fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
+            self.0.set(self.0.get() + 1);
+            match glyph.0 {
+                2 => Err(Error::Unsupported("advance")),
+                g => Ok(i32::from(g) * 10),
+            }
+        }
+
+        fn extents(&self, _glyph: GlyphId) -> Result<Option<Extents>> {
+            self.0.set(self.0.get() + 1);
+            Ok(Some(Extents::default()))
+        }
+    }
+
+    #[test]
+    fn the_first_font_function_error_is_kept_and_ends_the_calls() {
+        let metrics = Failing(Cell::new(0));
+        let scaled = Scaled::new(&metrics, 1000);
+        assert_eq!(scaled.advance(1), 10);
+        assert_eq!(scaled.finish(), Ok(()));
+        assert_eq!(scaled.advance(2), 0);
+        assert_eq!(scaled.advance(3), 0);
+        assert_eq!(scaled.extents(1), None);
+        assert_eq!(metrics.0.get(), 2);
+        assert_eq!(scaled.finish(), Err(Error::Unsupported("advance")));
+        // Glyph indices no face has are not asked for.
+        assert_eq!(Scaled::new(&metrics, 1000).advance(0x1_0000), 0);
+        assert_eq!(metrics.0.get(), 2);
     }
 }

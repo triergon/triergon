@@ -223,7 +223,7 @@ fn shape_text(
             .ok()
         });
         let scale = Scale::units(font.units_per_em());
-        let metrics = OtMetrics::new(&font, scale, budget);
+        let metrics = OtMetrics::new(&font, scale);
         for (t, argument) in settings.texts.iter().enumerate() {
             let Some((text, item)) = item(argument) else {
                 sink.record(Record::TextError(t))?;
