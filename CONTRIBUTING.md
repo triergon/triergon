@@ -4,7 +4,8 @@
 
 You need Rust (see `rust-version` in `Cargo.toml`; the full check also installs the
 dated nightly toolchain pinned in xtask for the optional SIMD lane), Python 3, a C compiler,
-`make` (for the FFmpeg and FreeType builds), `pkg-config` and zlib headers (NASM on x86).
+`make` (for the FFmpeg and FreeType builds), `pkg-config` and zlib headers (NASM on x86), and
+`zstd` (for zstd-compressed evidence sets and their test).
 The FFmpeg and FreeType references are only needed for differential and performance work.
 
 ```sh

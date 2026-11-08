@@ -283,5 +283,6 @@ lists every archived set:
 
 The index also records how identifiers were renamed. With `TRIERGON_EVIDENCE_ARCHIVE` set
 to the archive location, `cargo xtask evidence fetch SET` downloads a set, verifies it
-against the index and unpacks it into `.research/evidence/SET/`. `cargo xtask evidence
-pack DIR OUT` writes the deterministic archive a new set is uploaded as.
+against the index and unpacks it into `.research/evidence/SET/`; a `.tar.zst` set is
+decompressed with the system `zstd`. `cargo xtask evidence pack DIR OUT` writes the
+deterministic archive a new set is uploaded as.

@@ -4,6 +4,8 @@
 //!
 //! A pack is a `.tar.gz` whose bytes depend only on the files: entries sorted by
 //! path, zero timestamps and owners, and gzip stored blocks with no name or time.
+//! A set archived whole may instead be a `.tar.zst`, decompressed with the
+//! system `zstd`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -183,16 +185,13 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
         s(set, "key").ok_or("set without key")?,
         s(set, "sha256").ok_or("set without sha256")?,
     );
-    if !key.ends_with(".tar.gz") {
-        return Err(format!(
-            "{name}: {key} is not a pack; download it with the aws CLI and check its SHA-256"
-        ));
-    }
+    let extension =
+        Compression::of(key).ok_or_else(|| format!("{key}: not a .tar.gz or .tar.zst"))?;
     let archive = std::env::var("TRIERGON_EVIDENCE_ARCHIVE")
         .map_err(|_| "set TRIERGON_EVIDENCE_ARCHIVE to the evidence archive location")?;
     let cache = root.join(".research/evidence-cache");
     fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
-    let download = cache.join(format!("{expected}.tar.gz"));
+    let download = cache.join(format!("{expected}{}", extension.suffix()));
     if !download.is_file() {
         let partial = cache.join(format!("{expected}.part"));
         let status = Command::new("aws")
@@ -211,7 +210,7 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
         let _ = fs::remove_file(&download);
         return Err(format!("{key}: SHA-256 differs from the index"));
     }
-    let tar = crate::archive::gunzip(&data, 1 << 32)?;
+    let tar = extension.decompress(&data)?;
     let entries = crate::archive::tar_files(&tar)?;
     // A set packed from repository files lists each file; an archived run copied
     // in whole is verified by its archive hash alone.
@@ -252,6 +251,83 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
     ))
 }
 
+/// How an archived set is compressed, by its key's extension.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Compression {
+    Gzip,
+    Zstd,
+}
+
+/// The largest tar an archived set may decompress to.
+const TAR_LIMIT: usize = 1 << 32;
+
+impl Compression {
+    fn of(key: &str) -> Option<Self> {
+        if key.ends_with(".tar.gz") {
+            Some(Self::Gzip)
+        } else if key.ends_with(".tar.zst") {
+            Some(Self::Zstd)
+        } else {
+            None
+        }
+    }
+
+    fn suffix(self) -> &'static str {
+        match self {
+            Self::Gzip => ".tar.gz",
+            Self::Zstd => ".tar.zst",
+        }
+    }
+
+    fn decompress(self, data: &[u8]) -> Result<Vec<u8>, String> {
+        match self {
+            Self::Gzip => crate::archive::gunzip(data, TAR_LIMIT),
+            Self::Zstd => unzstd(data),
+        }
+    }
+}
+
+/// Decompress a zstd frame with the system `zstd`, refusing more than
+/// [`TAR_LIMIT`] bytes of output.
+fn unzstd(data: &[u8]) -> Result<Vec<u8>, String> {
+    use std::io::{Read, Write};
+    use std::process::Stdio;
+    let mut child = Command::new("zstd")
+        .args(["--decompress", "--stdout", "--quiet"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("zstd: {e}"))?;
+    let mut stdin = child.stdin.take().expect("piped stdin");
+    let mut stdout = child.stdout.take().expect("piped stdout");
+    let input = data.to_vec();
+    let writer = std::thread::spawn(move || stdin.write_all(&input));
+    let mut tar = Vec::new();
+    let limit = u64::try_from(TAR_LIMIT).expect("limit fits u64");
+    stdout
+        .by_ref()
+        .take(limit + 1)
+        .read_to_end(&mut tar)
+        .map_err(|e| format!("zstd: {e}"))?;
+    if tar.len() > TAR_LIMIT {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(format!("zstd: more than {TAR_LIMIT} bytes"));
+    }
+    let written = writer.join().map_err(|_| "zstd: writer panicked")?;
+    let output = child.wait_with_output().map_err(|e| format!("zstd: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "zstd failed: {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    written.map_err(|e| format!("zstd: {e}"))?;
+    Ok(tar)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,6 +357,35 @@ mod tests {
             ]
         );
         assert_eq!(entries[1].data.len(), 200_000);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn zstd_sets_unpack_through_the_system_zstd() {
+        let dir = crate::walk::scratch("evidence-zstd");
+        fs::create_dir_all(dir.join("in/a")).unwrap();
+        fs::write(dir.join("in/a/f.json"), b"{}\n").unwrap();
+        fs::write(dir.join("in/b.bin"), vec![3u8; 70_000]).unwrap();
+        let tar = crate::archive::gunzip(&pack(&dir.join("in")).unwrap(), 1 << 30).unwrap();
+        fs::write(dir.join("set.tar"), &tar).unwrap();
+        let status = Command::new("zstd")
+            .args(["--quiet", "-19"])
+            .arg(dir.join("set.tar"))
+            .arg("-o")
+            .arg(dir.join("set.tar.zst"))
+            .status()
+            .expect("zstd is installed");
+        assert!(status.success());
+        let compressed = fs::read(dir.join("set.tar.zst")).unwrap();
+        assert_eq!(Compression::of("x/abc.tar.zst"), Some(Compression::Zstd));
+        assert_eq!(Compression::of("x/abc.tar.gz"), Some(Compression::Gzip));
+        assert_eq!(Compression::of("x/abc.tar.xz"), None);
+        let unpacked = Compression::Zstd.decompress(&compressed).unwrap();
+        assert_eq!(unpacked, tar);
+        let entries = crate::archive::tar_files(&unpacked).unwrap();
+        let names: Vec<_> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert_eq!(names, ["a/f.json", "b.bin"]);
+        assert!(Compression::Zstd.decompress(b"not zstd").is_err());
         fs::remove_dir_all(dir).unwrap();
     }
 
