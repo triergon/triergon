@@ -6,82 +6,82 @@
     "arimo-regular-ttf-853": {
       "packets": 48,
       "bytes": 99979,
-      "digest": 11145805803576910709
+      "digest": 14307692189760236341
     },
     "arimo-regular-ttf-16384": {
       "packets": 48,
       "bytes": 2936564,
-      "digest": 8934978934420953190
+      "digest": 8754798297230216584
     },
     "notosans-regular-otf-853": {
       "packets": 48,
       "bytes": 78739,
-      "digest": 9496719919700244237
+      "digest": 7709193128361855711
     },
     "notosans-regular-otf-16384": {
       "packets": 48,
       "bytes": 2075566,
-      "digest": 949944859280324800
+      "digest": 8484768816783037078
     },
     "notosansjp-regular-otf-853": {
       "packets": 48,
       "bytes": 135159,
-      "digest": 4145195869193794999
+      "digest": 1653200118979965263
     },
     "notosansjp-regular-otf-16384": {
       "packets": 48,
       "bytes": 5902993,
-      "digest": 13288589853532917895
+      "digest": 5830518002921808979
     },
     "notosansjp-vf-otf-853": {
       "packets": 48,
       "bytes": 127563,
-      "digest": 10662216252700132650
+      "digest": 16093166567658841906
     },
     "notosansjp-vf-otf-16384": {
       "packets": 48,
       "bytes": 2217484,
-      "digest": 1030262611721387854
+      "digest": 7808712457514878592
     },
     "notosanscjk-regular-ttc-853": {
       "packets": 48,
       "bytes": 168983,
-      "digest": 11425812756404556725
+      "digest": 8341415754682834359
     },
     "notosanscjk-regular-ttc-16384": {
       "packets": 48,
       "bytes": 2863650,
-      "digest": 11051684907176186218
+      "digest": 4228068465371966368
     },
     "authored-cff-features-otf-853": {
       "packets": 48,
       "bytes": 44355,
-      "digest": 15344075906987279928
+      "digest": 10509749157179331462
     },
     "authored-cff-features-otf-16384": {
       "packets": 48,
       "bytes": 551696,
-      "digest": 217621141799330445
+      "digest": 2032184180471955719
     },
     "outlines-required-0": {
       "packets": 512,
       "bytes": 2823276,
-      "digest": 17056172538034744040
+      "digest": 7221005039081657782
     },
     "outlines-required-1": {
       "packets": 514,
       "bytes": 3022133,
-      "digest": 15742909526604010798
+      "digest": 8858423918884566922
     },
     "bitmaps-required-0": {
       "packets": 280,
       "bytes": 1830987,
-      "digest": 5748885062910919321
+      "digest": 16018646881908390643
     },
     "bitmaps-required-1": {
       "packets": 280,
       "bytes": 1671281,
-      "digest": 9412013820321088379
+      "digest": 6390816825886779189
     }
   }
 }

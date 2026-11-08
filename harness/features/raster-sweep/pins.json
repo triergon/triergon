@@ -6,1517 +6,1517 @@
     "arimo-bold-ttf-853": {
       "packets": 180,
       "bytes": 367523,
-      "digest": 1563199730251473560
+      "digest": 14579960343964427650
     },
     "arimo-bold-ttf-2400": {
       "packets": 180,
       "bytes": 611299,
-      "digest": 13504114316577226976
+      "digest": 17780654686841062090
     },
     "arimo-bold-ttf-16384": {
       "packets": 180,
       "bytes": 12883842,
-      "digest": 12708078805176334722
+      "digest": 8176336503689753258
     },
     "arimo-bolditalic-ttf-853": {
       "packets": 180,
       "bytes": 443029,
-      "digest": 13443404503927947611
+      "digest": 15678393168146638233
     },
     "arimo-bolditalic-ttf-2400": {
       "packets": 180,
       "bytes": 662101,
-      "digest": 1471725409619828428
+      "digest": 9759076787310651146
     },
     "arimo-bolditalic-ttf-16384": {
       "packets": 180,
       "bytes": 9401157,
-      "digest": 14709536920242959551
+      "digest": 10529659237052035111
     },
     "arimo-italic-ttf-853": {
       "packets": 180,
       "bytes": 469337,
-      "digest": 10603079963765894672
+      "digest": 3809745276003550582
     },
     "arimo-italic-ttf-2400": {
       "packets": 180,
       "bytes": 732721,
-      "digest": 2175796402064145816
+      "digest": 13194888124467524380
     },
     "arimo-italic-ttf-16384": {
       "packets": 180,
       "bytes": 30650538,
-      "digest": 14970456577162447801
+      "digest": 8085743452876073477
     },
     "arimo-regular-ttf-853": {
       "packets": 180,
       "bytes": 324144,
-      "digest": 12997334395277468141
+      "digest": 10889120526459738905
     },
     "arimo-regular-ttf-2400": {
       "packets": 180,
       "bytes": 742219,
-      "digest": 7270558953689211277
+      "digest": 4121833994309899565
     },
     "arimo-regular-ttf-16384": {
       "packets": 180,
       "bytes": 17532092,
-      "digest": 12451477531000274856
+      "digest": 6071078422496662738
     },
     "cousine-bold-ttf-853": {
       "packets": 180,
       "bytes": 1255382,
-      "digest": 9440241681793098849
+      "digest": 16177940131353770737
     },
     "cousine-bold-ttf-2400": {
       "packets": 180,
       "bytes": 566169,
-      "digest": 1146261647682803208
+      "digest": 15010397947775406718
     },
     "cousine-bold-ttf-16384": {
       "packets": 180,
       "bytes": 16333804,
-      "digest": 2100989663968098835
+      "digest": 5681450581481664425
     },
     "cousine-bolditalic-ttf-853": {
       "packets": 180,
       "bytes": 673614,
-      "digest": 15761597767042606565
+      "digest": 18292310001853597853
     },
     "cousine-bolditalic-ttf-2400": {
       "packets": 180,
       "bytes": 527814,
-      "digest": 15426004101408325277
+      "digest": 1042996931163137861
     },
     "cousine-bolditalic-ttf-16384": {
       "packets": 180,
       "bytes": 15959787,
-      "digest": 5740367624492736125
+      "digest": 956777323816499755
     },
     "cousine-italic-ttf-853": {
       "packets": 180,
       "bytes": 764582,
-      "digest": 7694782263108425849
+      "digest": 5634464869200118519
     },
     "cousine-italic-ttf-2400": {
       "packets": 180,
       "bytes": 674365,
-      "digest": 6886190543954336020
+      "digest": 4483315406056867646
     },
     "cousine-italic-ttf-16384": {
       "packets": 180,
       "bytes": 17890807,
-      "digest": 16614994471178543040
+      "digest": 16255222446462675928
     },
     "cousine-regular-ttf-853": {
       "packets": 180,
       "bytes": 2090150,
-      "digest": 10135713986432110638
+      "digest": 12771338159029152702
     },
     "cousine-regular-ttf-2400": {
       "packets": 180,
       "bytes": 1403472,
-      "digest": 3081400278951939079
+      "digest": 15212949335155634273
     },
     "cousine-regular-ttf-16384": {
       "packets": 180,
       "bytes": 10105664,
-      "digest": 12673284792662407368
+      "digest": 3168788204553655044
     },
     "tinos-bold-ttf-853": {
       "packets": 180,
       "bytes": 318926,
-      "digest": 12110436903736677071
+      "digest": 12613466171174740807
     },
     "tinos-bold-ttf-2400": {
       "packets": 180,
       "bytes": 710328,
-      "digest": 9192314443400824084
+      "digest": 5975723805186931268
     },
     "tinos-bold-ttf-16384": {
       "packets": 180,
       "bytes": 17919478,
-      "digest": 12750317768105610492
+      "digest": 12334598367886681114
     },
     "tinos-bolditalic-ttf-853": {
       "packets": 180,
       "bytes": 378648,
-      "digest": 15645174452126623190
+      "digest": 1221328517551425804
     },
     "tinos-bolditalic-ttf-2400": {
       "packets": 180,
       "bytes": 2448172,
-      "digest": 13011468351526103394
+      "digest": 3610748944671741578
     },
     "tinos-bolditalic-ttf-16384": {
       "packets": 180,
       "bytes": 14961615,
-      "digest": 9680036711660835778
+      "digest": 11903362348014812308
     },
     "tinos-italic-ttf-853": {
       "packets": 180,
       "bytes": 357335,
-      "digest": 5617568593093716178
+      "digest": 14851943915505996876
     },
     "tinos-italic-ttf-2400": {
       "packets": 180,
       "bytes": 1891814,
-      "digest": 5232093942223242574
+      "digest": 1160221989754018996
     },
     "tinos-italic-ttf-16384": {
       "packets": 180,
       "bytes": 9558137,
-      "digest": 9884525442747280575
+      "digest": 10289329356312911379
     },
     "tinos-regular-ttf-853": {
       "packets": 180,
       "bytes": 392503,
-      "digest": 7526276678577870870
+      "digest": 46290503265820018
     },
     "tinos-regular-ttf-2400": {
       "packets": 180,
       "bytes": 686323,
-      "digest": 14108571179523227580
+      "digest": 15226337333284771972
     },
     "tinos-regular-ttf-16384": {
       "packets": 180,
       "bytes": 8239211,
-      "digest": 10437940488645882045
+      "digest": 1138780756743534093
     },
     "dejavumathtexgyre-ttf-853": {
       "packets": 180,
       "bytes": 137842,
-      "digest": 17534078866316129076
+      "digest": 13054948476238957588
     },
     "dejavumathtexgyre-ttf-2400": {
       "packets": 180,
       "bytes": 374129,
-      "digest": 18218536153456279968
+      "digest": 7763433952267612964
     },
     "dejavumathtexgyre-ttf-16384": {
       "packets": 180,
       "bytes": 2929344,
-      "digest": 555416725514079701
+      "digest": 17702014757645138459
     },
     "dejavusans-bold-ttf-853": {
       "packets": 180,
       "bytes": 679622,
-      "digest": 3735368300556387584
+      "digest": 208682943956513092
     },
     "dejavusans-bold-ttf-2400": {
       "packets": 180,
       "bytes": 954826,
-      "digest": 12260769091652439585
+      "digest": 15386885362263135985
     },
     "dejavusans-bold-ttf-16384": {
       "packets": 180,
       "bytes": 13612247,
-      "digest": 10631429713001531107
+      "digest": 5773967865964965987
     },
     "dejavusans-boldoblique-ttf-853": {
       "packets": 180,
       "bytes": 513717,
-      "digest": 4803427356021456111
+      "digest": 11337748197688724597
     },
     "dejavusans-boldoblique-ttf-2400": {
       "packets": 180,
       "bytes": 1791673,
-      "digest": 6191806281790257919
+      "digest": 7443138227919780891
     },
     "dejavusans-boldoblique-ttf-16384": {
       "packets": 180,
       "bytes": 11692506,
-      "digest": 10980789205293312416
+      "digest": 8099909880945994382
     },
     "dejavusans-extralight-ttf-853": {
       "packets": 180,
       "bytes": 387484,
-      "digest": 9320363105717187485
+      "digest": 9993277411508211281
     },
     "dejavusans-extralight-ttf-2400": {
       "packets": 180,
       "bytes": 612341,
-      "digest": 5869159661660330815
+      "digest": 12458409021455650241
     },
     "dejavusans-extralight-ttf-16384": {
       "packets": 180,
       "bytes": 9701940,
-      "digest": 2776299303279557372
+      "digest": 5154000697998763624
     },
     "dejavusans-oblique-ttf-853": {
       "packets": 180,
       "bytes": 1541269,
-      "digest": 2280504548262939822
+      "digest": 2755620986865584318
     },
     "dejavusans-oblique-ttf-2400": {
       "packets": 180,
       "bytes": 585475,
-      "digest": 4894045726448549350
+      "digest": 10358683472121662490
     },
     "dejavusans-oblique-ttf-16384": {
       "packets": 180,
       "bytes": 17918895,
-      "digest": 13302283018773287962
+      "digest": 13998206280477407158
     },
     "dejavusans-ttf-853": {
       "packets": 180,
       "bytes": 421529,
-      "digest": 7049607816409310238
+      "digest": 17527886042332069860
     },
     "dejavusans-ttf-2400": {
       "packets": 180,
       "bytes": 829152,
-      "digest": 4774813416378950309
+      "digest": 11394778689533463819
     },
     "dejavusans-ttf-16384": {
       "packets": 180,
       "bytes": 53145908,
-      "digest": 16378570651979413597
+      "digest": 10413809614523167049
     },
     "dejavusanscondensed-bold-ttf-853": {
       "packets": 180,
       "bytes": 454290,
-      "digest": 91088433116638021
+      "digest": 586097622207920631
     },
     "dejavusanscondensed-bold-ttf-2400": {
       "packets": 180,
       "bytes": 1107777,
-      "digest": 17021347860809138131
+      "digest": 12347516099352838061
     },
     "dejavusanscondensed-bold-ttf-16384": {
       "packets": 180,
       "bytes": 14125986,
-      "digest": 13769003887507864097
+      "digest": 8191783498033413087
     },
     "dejavusanscondensed-boldoblique-ttf-853": {
       "packets": 180,
       "bytes": 534290,
-      "digest": 8387332288291028852
+      "digest": 7158422661535399374
     },
     "dejavusanscondensed-boldoblique-ttf-2400": {
       "packets": 180,
       "bytes": 719263,
-      "digest": 15377420690410416235
+      "digest": 11684752563442856535
     },
     "dejavusanscondensed-boldoblique-ttf-16384": {
       "packets": 180,
       "bytes": 15126910,
-      "digest": 4469610802505530521
+      "digest": 8869019276897158941
     },
     "dejavusanscondensed-oblique-ttf-853": {
       "packets": 180,
       "bytes": 414051,
-      "digest": 10627020167091034186
+      "digest": 16527658932150085682
     },
     "dejavusanscondensed-oblique-ttf-2400": {
       "packets": 180,
       "bytes": 897671,
-      "digest": 17247433588105971062
+      "digest": 4957620267217116528
     },
     "dejavusanscondensed-oblique-ttf-16384": {
       "packets": 180,
       "bytes": 13114978,
-      "digest": 9685303181724063282
+      "digest": 7788074737219507566
     },
     "dejavusanscondensed-ttf-853": {
       "packets": 180,
       "bytes": 411801,
-      "digest": 100964813400805652
+      "digest": 10240922379014695680
     },
     "dejavusanscondensed-ttf-2400": {
       "packets": 180,
       "bytes": 671652,
-      "digest": 14875838463642943978
+      "digest": 3960163043105429972
     },
     "dejavusanscondensed-ttf-16384": {
       "packets": 180,
       "bytes": 12185583,
-      "digest": 11017182459673367439
+      "digest": 1830072644820953337
     },
     "dejavusansmono-bold-ttf-853": {
       "packets": 180,
       "bytes": 428861,
-      "digest": 17009371907466301663
+      "digest": 16258438843986737425
     },
     "dejavusansmono-bold-ttf-2400": {
       "packets": 180,
       "bytes": 625044,
-      "digest": 2711877482400018353
+      "digest": 18282435676186417203
     },
     "dejavusansmono-bold-ttf-16384": {
       "packets": 180,
       "bytes": 10283780,
-      "digest": 12590878621580764424
+      "digest": 6888455547858518612
     },
     "dejavusansmono-boldoblique-ttf-853": {
       "packets": 180,
       "bytes": 767020,
-      "digest": 13605148206209638107
+      "digest": 10913091047622863799
     },
     "dejavusansmono-boldoblique-ttf-2400": {
       "packets": 180,
       "bytes": 1286852,
-      "digest": 4105441069692256192
+      "digest": 17378364624295738606
     },
     "dejavusansmono-boldoblique-ttf-16384": {
       "packets": 180,
       "bytes": 9513931,
-      "digest": 16405953178137589736
+      "digest": 6266377979887389380
     },
     "dejavusansmono-oblique-ttf-853": {
       "packets": 180,
       "bytes": 1149478,
-      "digest": 8640280248118391943
+      "digest": 15981849783783229295
     },
     "dejavusansmono-oblique-ttf-2400": {
       "packets": 180,
       "bytes": 966920,
-      "digest": 18416836522431814934
+      "digest": 4679085584453396606
     },
     "dejavusansmono-oblique-ttf-16384": {
       "packets": 180,
       "bytes": 10063870,
-      "digest": 902518980990977104
+      "digest": 11526905742745857690
     },
     "dejavusansmono-ttf-853": {
       "packets": 180,
       "bytes": 317218,
-      "digest": 9299412312640264552
+      "digest": 6493642904194061106
     },
     "dejavusansmono-ttf-2400": {
       "packets": 180,
       "bytes": 662112,
-      "digest": 154959628210941510
+      "digest": 5433054262989101792
     },
     "dejavusansmono-ttf-16384": {
       "packets": 180,
       "bytes": 30856572,
-      "digest": 10217940117502454322
+      "digest": 2786790464454990084
     },
     "dejavuserif-bold-ttf-853": {
       "packets": 180,
       "bytes": 473771,
-      "digest": 17629751576139535916
+      "digest": 5302216231052327870
     },
     "dejavuserif-bold-ttf-2400": {
       "packets": 180,
       "bytes": 740767,
-      "digest": 13025585070048233917
+      "digest": 2543679809779626793
     },
     "dejavuserif-bold-ttf-16384": {
       "packets": 180,
       "bytes": 14935576,
-      "digest": 12004548249758540040
+      "digest": 16116769219081733164
     },
     "dejavuserif-bolditalic-ttf-853": {
       "packets": 180,
       "bytes": 510183,
-      "digest": 14841156054658649173
+      "digest": 3734629266154849833
     },
     "dejavuserif-bolditalic-ttf-2400": {
       "packets": 180,
       "bytes": 4484075,
-      "digest": 15420433401187688221
+      "digest": 6666290149798508109
     },
     "dejavuserif-bolditalic-ttf-16384": {
       "packets": 180,
       "bytes": 13922933,
-      "digest": 9943913961402847219
+      "digest": 5167457154240884959
     },
     "dejavuserif-italic-ttf-853": {
       "packets": 180,
       "bytes": 450348,
-      "digest": 6774348375542862637
+      "digest": 10801992191691095461
     },
     "dejavuserif-italic-ttf-2400": {
       "packets": 180,
       "bytes": 583468,
-      "digest": 10192963386347793712
+      "digest": 13854610997021530926
     },
     "dejavuserif-italic-ttf-16384": {
       "packets": 180,
       "bytes": 30654554,
-      "digest": 982007168943345274
+      "digest": 5812177660084209028
     },
     "dejavuserif-ttf-853": {
       "packets": 180,
       "bytes": 398812,
-      "digest": 4239097434742596989
+      "digest": 10203498283348184409
     },
     "dejavuserif-ttf-2400": {
       "packets": 180,
       "bytes": 805734,
-      "digest": 8090359553632895812
+      "digest": 12932949787933836830
     },
     "dejavuserif-ttf-16384": {
       "packets": 180,
       "bytes": 29593342,
-      "digest": 2502856953786089377
+      "digest": 5588651059569989767
     },
     "dejavuserifcondensed-bold-ttf-853": {
       "packets": 180,
       "bytes": 412810,
-      "digest": 14650622009334652572
+      "digest": 5621892752987886872
     },
     "dejavuserifcondensed-bold-ttf-2400": {
       "packets": 180,
       "bytes": 3034309,
-      "digest": 5672302757633449765
+      "digest": 6348763549680835829
     },
     "dejavuserifcondensed-bold-ttf-16384": {
       "packets": 180,
       "bytes": 21002208,
-      "digest": 6281083752002556577
+      "digest": 15354598616419323597
     },
     "dejavuserifcondensed-bolditalic-ttf-853": {
       "packets": 180,
       "bytes": 559730,
-      "digest": 1633792578427638178
+      "digest": 13431093351616664390
     },
     "dejavuserifcondensed-bolditalic-ttf-2400": {
       "packets": 180,
       "bytes": 988462,
-      "digest": 566237870227308290
+      "digest": 15941135407305088680
     },
     "dejavuserifcondensed-bolditalic-ttf-16384": {
       "packets": 180,
       "bytes": 10890406,
-      "digest": 10752632345428385712
+      "digest": 12747205133154022906
     },
     "dejavuserifcondensed-italic-ttf-853": {
       "packets": 180,
       "bytes": 522316,
-      "digest": 12133892515307558205
+      "digest": 7768843914621470731
     },
     "dejavuserifcondensed-italic-ttf-2400": {
       "packets": 180,
       "bytes": 720914,
-      "digest": 12693691609744172589
+      "digest": 4075852664037874427
     },
     "dejavuserifcondensed-italic-ttf-16384": {
       "packets": 180,
       "bytes": 9785993,
-      "digest": 1681139449013463322
+      "digest": 8685505644615632076
     },
     "dejavuserifcondensed-ttf-853": {
       "packets": 180,
       "bytes": 363560,
-      "digest": 17600122165606022149
+      "digest": 17173231815803833715
     },
     "dejavuserifcondensed-ttf-2400": {
       "packets": 180,
       "bytes": 673419,
-      "digest": 2182770434122779440
+      "digest": 2448991670427963126
     },
     "dejavuserifcondensed-ttf-16384": {
       "packets": 180,
       "bytes": 23662368,
-      "digest": 8895567166692353107
+      "digest": 2914452249861083741
     },
     "notosans-regular-ttf-853": {
       "packets": 180,
       "bytes": 2167284,
-      "digest": 12535623972687420018
+      "digest": 659267035913059782
     },
     "notosans-regular-ttf-2400": {
       "packets": 180,
       "bytes": 583481,
-      "digest": 14311724950539771523
+      "digest": 16193427122816973903
     },
     "notosans-regular-ttf-16384": {
       "packets": 180,
       "bytes": 9118200,
-      "digest": 13693081113279163831
+      "digest": 10758282821072686233
     },
     "notosans-regular-otf-853": {
       "packets": 180,
       "bytes": 460856,
-      "digest": 5148025018923928231
+      "digest": 2342123069802893927
     },
     "notosans-regular-otf-2400": {
       "packets": 180,
       "bytes": 498391,
-      "digest": 14907751465361864884
+      "digest": 10583977630640189240
     },
     "notosans-regular-otf-16384": {
       "packets": 180,
       "bytes": 6079964,
-      "digest": 12675339088447590107
+      "digest": 6456770421788567179
     },
     "notosans-bolditalic-otf-853": {
       "packets": 180,
       "bytes": 247320,
-      "digest": 8395143298697788279
+      "digest": 11880350941923568393
     },
     "notosans-bolditalic-otf-2400": {
       "packets": 180,
       "bytes": 468142,
-      "digest": 5472109570918515401
+      "digest": 14004459515109226431
     },
     "notosans-bolditalic-otf-16384": {
       "packets": 180,
       "bytes": 12580659,
-      "digest": 9788091946264246704
+      "digest": 3964306245925363832
     },
     "notosansjp-regular-otf-853": {
       "packets": 180,
       "bytes": 3985962,
-      "digest": 16239134663944229147
+      "digest": 13177467116732802293
     },
     "notosansjp-regular-otf-2400": {
       "packets": 180,
       "bytes": 935527,
-      "digest": 17773812010416084515
+      "digest": 7320990765062338897
     },
     "notosansjp-regular-otf-16384": {
       "packets": 180,
       "bytes": 24840375,
-      "digest": 7530160861891358762
+      "digest": 553139479379499026
     },
     "notosansjp-vf-otf-853": {
       "packets": 180,
       "bytes": 553569,
-      "digest": 2601766505887208894
+      "digest": 7052325360815398406
     },
     "notosansjp-vf-otf-2400": {
       "packets": 180,
       "bytes": 988511,
-      "digest": 5253002108916785388
+      "digest": 16312309847029377484
     },
     "notosansjp-vf-otf-16384": {
       "packets": 180,
       "bytes": 27680752,
-      "digest": 4256818679600337923
+      "digest": 12198776009668185333
     },
     "notosanscjk-regular-ttc-853": {
       "packets": 180,
       "bytes": 842370,
-      "digest": 18121223677675992952
+      "digest": 13219071190273500510
     },
     "notosanscjk-regular-ttc-2400": {
       "packets": 180,
       "bytes": 3508794,
-      "digest": 12261259512002325185
+      "digest": 18178581556431824635
     },
     "notosanscjk-regular-ttc-16384": {
       "packets": 180,
       "bytes": 583865188,
-      "digest": 17994667841477474656
+      "digest": 13032367658058946678
     },
     "notosansarabic-regular-ttf-853": {
       "packets": 180,
       "bytes": 391887,
-      "digest": 8852269637134206858
+      "digest": 13445204343265228812
     },
     "notosansarabic-regular-ttf-2400": {
       "packets": 180,
       "bytes": 413667,
-      "digest": 13622538126891922789
+      "digest": 9566674589683227341
     },
     "notosansarabic-regular-ttf-16384": {
       "packets": 180,
       "bytes": 19285262,
-      "digest": 16904571819365498101
+      "digest": 11236397328280568961
     },
     "notonaskharabic-regular-ttf-853": {
       "packets": 180,
       "bytes": 220748,
-      "digest": 1722687559258621272
+      "digest": 4050579636892733432
     },
     "notonaskharabic-regular-ttf-2400": {
       "packets": 180,
       "bytes": 633195,
-      "digest": 8677481281121091180
+      "digest": 5364933197810113854
     },
     "notonaskharabic-regular-ttf-16384": {
       "packets": 180,
       "bytes": 5224269,
-      "digest": 14443415722129055193
+      "digest": 5378658827850913453
     },
     "notosanshebrew-regular-ttf-853": {
       "packets": 180,
       "bytes": 1084659,
-      "digest": 13093779166611764472
+      "digest": 7658023287611478496
     },
     "notosanshebrew-regular-ttf-2400": {
       "packets": 180,
       "bytes": 395246,
-      "digest": 1152093318523346063
+      "digest": 9208867435219827477
     },
     "notosanshebrew-regular-ttf-16384": {
       "packets": 180,
       "bytes": 5576973,
-      "digest": 8143062829670070060
+      "digest": 9763827788150374150
     },
     "notosansdevanagari-regular-ttf-853": {
       "packets": 180,
       "bytes": 301661,
-      "digest": 3699047670445153701
+      "digest": 18047773716542669087
     },
     "notosansdevanagari-regular-ttf-2400": {
       "packets": 180,
       "bytes": 374995,
-      "digest": 15436866786549611837
+      "digest": 5475240732836150423
     },
     "notosansdevanagari-regular-ttf-16384": {
       "packets": 180,
       "bytes": 4392621,
-      "digest": 13692294689668392350
+      "digest": 7763976497927007900
     },
     "notosansbengali-regular-ttf-853": {
       "packets": 180,
       "bytes": 415310,
-      "digest": 11379783588478473006
+      "digest": 12212156660139776234
     },
     "notosansbengali-regular-ttf-2400": {
       "packets": 180,
       "bytes": 699246,
-      "digest": 5241414699508250320
+      "digest": 17688057162380185434
     },
     "notosansbengali-regular-ttf-16384": {
       "packets": 180,
       "bytes": 32552666,
-      "digest": 18067590517731230531
+      "digest": 1243774138089135517
     },
     "notosanstamil-regular-ttf-853": {
       "packets": 180,
       "bytes": 637913,
-      "digest": 3329227362540962807
+      "digest": 12527859592710989379
     },
     "notosanstamil-regular-ttf-2400": {
       "packets": 180,
       "bytes": 738749,
-      "digest": 927971228598259859
+      "digest": 8591284630325130405
     },
     "notosanstamil-regular-ttf-16384": {
       "packets": 180,
       "bytes": 9918527,
-      "digest": 8730932473597082121
+      "digest": 9194092483037234701
     },
     "notosansthai-regular-ttf-853": {
       "packets": 180,
       "bytes": 237829,
-      "digest": 12510716832696526256
+      "digest": 8649695681641281560
     },
     "notosansthai-regular-ttf-2400": {
       "packets": 180,
       "bytes": 675246,
-      "digest": 1965591503212034686
+      "digest": 10011825981029671658
     },
     "notosansthai-regular-ttf-16384": {
       "packets": 180,
       "bytes": 9230764,
-      "digest": 7433579890232907226
+      "digest": 9215898009148876690
     },
     "authored-cff-features-otf-853": {
       "packets": 180,
       "bytes": 39984,
-      "digest": 11517845804519356730
+      "digest": 15409439163359176582
     },
     "authored-cff-features-otf-2400": {
       "packets": 180,
       "bytes": 97166,
-      "digest": 13851578908966197315
+      "digest": 15193205725693052403
     },
     "authored-cff-features-otf-16384": {
       "packets": 180,
       "bytes": 4339107,
-      "digest": 2265914360282626826
+      "digest": 14469648770407743344
     },
     "authored-cff-matrix-otf-853": {
       "packets": 180,
       "bytes": 13324,
-      "digest": 8490047189330832804
+      "digest": 16019434006193854822
     },
     "authored-cff-matrix-otf-2400": {
       "packets": 180,
       "bytes": 32436,
-      "digest": 11732329797121189142
+      "digest": 1724597966259588024
     },
     "authored-cff-matrix-otf-16384": {
       "packets": 180,
       "bytes": 241448,
-      "digest": 13170086209507748713
+      "digest": 2018841990891700553
     },
     "authored-cmap-formats-ttf-853": {
       "packets": 180,
       "bytes": 13840,
-      "digest": 15090603376798181975
+      "digest": 16505547724751130429
     },
     "authored-cmap-formats-ttf-2400": {
       "packets": 180,
       "bytes": 68785,
-      "digest": 9571535748834903584
+      "digest": 15199456091629130078
     },
     "authored-cmap-formats-ttf-16384": {
       "packets": 180,
       "bytes": 1272954,
-      "digest": 16554169843422566679
+      "digest": 11982759681931371877
     },
     "authored-cmap-order-ttc-853": {
       "packets": 180,
       "bytes": 19182,
-      "digest": 6035255135906265718
+      "digest": 10591215891810269936
     },
     "authored-cmap-order-ttc-2400": {
       "packets": 180,
       "bytes": 24508,
-      "digest": 10887587598621370333
+      "digest": 5884243189741571741
     },
     "authored-cmap-order-ttc-16384": {
       "packets": 180,
       "bytes": 34086,
-      "digest": 2406089747806139522
+      "digest": 6351351728427498194
     },
     "outlines-0": {
       "packets": 261,
       "bytes": 7843306,
-      "digest": 12920260296326795002
+      "digest": 17289265454123649872
     },
     "outlines-1": {
       "packets": 271,
       "bytes": 25386647,
-      "digest": 1349388676061474851
+      "digest": 13234232190156469883
     },
     "outlines-2": {
       "packets": 261,
       "bytes": 11611345,
-      "digest": 3576549421902819136
+      "digest": 4088138349765066938
     },
     "outlines-3": {
       "packets": 266,
       "bytes": 11542119,
-      "digest": 7506994269182427290
+      "digest": 12516887425762611218
     },
     "outlines-4": {
       "packets": 263,
       "bytes": 3565213,
-      "digest": 16505760807380014695
+      "digest": 3482937708769536729
     },
     "outlines-5": {
       "packets": 270,
       "bytes": 12032847,
-      "digest": 3345851201256694246
+      "digest": 5712972527458583656
     },
     "outlines-6": {
       "packets": 266,
       "bytes": 5781017,
-      "digest": 9491874451878025689
+      "digest": 16982957042205256005
     },
     "outlines-7": {
       "packets": 271,
       "bytes": 14378931,
-      "digest": 583429535213067518
+      "digest": 13362266341607549348
     },
     "outlines-8": {
       "packets": 260,
       "bytes": 3241510,
-      "digest": 9325952310997716801
+      "digest": 1686870933507718841
     },
     "outlines-9": {
       "packets": 270,
       "bytes": 2717487,
-      "digest": 13350605859990187488
+      "digest": 15490573790406618358
     },
     "outlines-10": {
       "packets": 264,
       "bytes": 3573242,
-      "digest": 359784911178863985
+      "digest": 4404606111130681865
     },
     "outlines-11": {
       "packets": 263,
       "bytes": 1733658017,
-      "digest": 5761724346712941613
+      "digest": 14916175652047949187
     },
     "outlines-12": {
       "packets": 268,
       "bytes": 3054255,
-      "digest": 8450657491117893690
+      "digest": 5597621164038109218
     },
     "outlines-13": {
       "packets": 264,
       "bytes": 5407538,
-      "digest": 11685518058049750031
+      "digest": 3002182203266648235
     },
     "outlines-14": {
       "packets": 264,
       "bytes": 7686635,
-      "digest": 691109178309172235
+      "digest": 4735205572908413871
     },
     "outlines-15": {
       "packets": 266,
       "bytes": 3767331,
-      "digest": 72749989475038759
+      "digest": 6290146895781152117
     },
     "outlines-16": {
       "packets": 265,
       "bytes": 975723669,
-      "digest": 10675421359888443488
+      "digest": 11481005533847111542
     },
     "outlines-17": {
       "packets": 268,
       "bytes": 2765151,
-      "digest": 7109589354467261766
+      "digest": 1458805643735539686
     },
     "outlines-18": {
       "packets": 264,
       "bytes": 15184112,
-      "digest": 11896665986407998035
+      "digest": 12114302590741488895
     },
     "outlines-19": {
       "packets": 268,
       "bytes": 6938878,
-      "digest": 9203691535825570287
+      "digest": 3577957079796242429
     },
     "outlines-20": {
       "packets": 265,
       "bytes": 9946464,
-      "digest": 6691253522855593871
+      "digest": 16463840710242717681
     },
     "outlines-21": {
       "packets": 265,
       "bytes": 8549254,
-      "digest": 11133617117318845890
+      "digest": 10488577464017489010
     },
     "outlines-22": {
       "packets": 261,
       "bytes": 3496552,
-      "digest": 1493224057362285503
+      "digest": 15873802248536966773
     },
     "outlines-23": {
       "packets": 269,
       "bytes": 1043301552,
-      "digest": 8580788144437474791
+      "digest": 8560450190312717589
     },
     "outlines-24": {
       "packets": 263,
       "bytes": 6488968,
-      "digest": 6031115966734130756
+      "digest": 15377969866530993628
     },
     "outlines-25": {
       "packets": 265,
       "bytes": 60511111,
-      "digest": 17188309069678917541
+      "digest": 8777272710858301081
     },
     "outlines-26": {
       "packets": 264,
       "bytes": 3131973,
-      "digest": 4912124312302216798
+      "digest": 2417179944799103868
     },
     "outlines-27": {
       "packets": 267,
       "bytes": 15698359,
-      "digest": 12865134386122264368
+      "digest": 16363703378379801208
     },
     "outlines-28": {
       "packets": 272,
       "bytes": 14408053,
-      "digest": 4809057364822734496
+      "digest": 14266361579034205594
     },
     "outlines-29": {
       "packets": 267,
       "bytes": 8613794,
-      "digest": 17514451864758615675
+      "digest": 18070626758469756099
     },
     "outlines-30": {
       "packets": 271,
       "bytes": 7184736,
-      "digest": 16849444106027541431
+      "digest": 9721157138799718503
     },
     "outlines-31": {
       "packets": 264,
       "bytes": 783499337,
-      "digest": 16116786127603251239
+      "digest": 11814594485625914351
     },
     "outlines-32": {
       "packets": 269,
       "bytes": 6727511,
-      "digest": 17597788682524064624
+      "digest": 4400220966394765808
     },
     "outlines-33": {
       "packets": 272,
       "bytes": 8314274,
-      "digest": 12041233807038885216
+      "digest": 17092679404467609636
     },
     "outlines-34": {
       "packets": 261,
       "bytes": 20199471,
-      "digest": 7623970900926513563
+      "digest": 12826840412412732215
     },
     "outlines-35": {
       "packets": 264,
       "bytes": 12341033,
-      "digest": 7696577190858036999
+      "digest": 3447938533929676047
     },
     "outlines-36": {
       "packets": 262,
       "bytes": 3600670721,
-      "digest": 8989568133049828669
+      "digest": 14386280657214500457
     },
     "outlines-37": {
       "packets": 269,
       "bytes": 14677559,
-      "digest": 7281120840854989259
+      "digest": 16958487685473558273
     },
     "outlines-38": {
       "packets": 270,
       "bytes": 54512156,
-      "digest": 12657282346993147688
+      "digest": 819188048175685550
     },
     "outlines-39": {
       "packets": 275,
       "bytes": 15780988,
-      "digest": 175871409503971884
+      "digest": 16454736969107985656
     },
     "outlines-40": {
       "packets": 267,
       "bytes": 8342478,
-      "digest": 8841939145226452229
+      "digest": 387597880260972333
     },
     "outlines-41": {
       "packets": 265,
       "bytes": 14325199,
-      "digest": 18310523330811167024
+      "digest": 9933780746863029438
     },
     "outlines-42": {
       "packets": 262,
       "bytes": 7904378,
-      "digest": 1653219704601447015
+      "digest": 10198151018175236737
     },
     "outlines-43": {
       "packets": 265,
       "bytes": 6100272,
-      "digest": 8123533218929615287
+      "digest": 6104127831254980817
     },
     "outlines-44": {
       "packets": 258,
       "bytes": 7650663,
-      "digest": 6969242112453567792
+      "digest": 9649843499666731248
     },
     "outlines-45": {
       "packets": 264,
       "bytes": 3035385001,
-      "digest": 9417149627199781898
+      "digest": 10979217594037650978
     },
     "outlines-46": {
       "packets": 267,
       "bytes": 9089023,
-      "digest": 15011111077701289960
+      "digest": 5775561853864751742
     },
     "outlines-47": {
       "packets": 263,
       "bytes": 8218215,
-      "digest": 549327348051155112
+      "digest": 17733355846528711194
     },
     "outlines-48": {
       "packets": 264,
       "bytes": 52307569,
-      "digest": 16123951587903603889
+      "digest": 11726536066723301495
     },
     "outlines-49": {
       "packets": 264,
       "bytes": 8227988,
-      "digest": 8759856337415474174
+      "digest": 5186294819538465874
     },
     "outlines-50": {
       "packets": 260,
       "bytes": 10129321,
-      "digest": 846091128559071403
+      "digest": 7659693338381201557
     },
     "outlines-51": {
       "packets": 270,
       "bytes": 13937698,
-      "digest": 11767172584875294589
+      "digest": 5802552954193237665
     },
     "outlines-52": {
       "packets": 268,
       "bytes": 18496908,
-      "digest": 15471810616242987694
+      "digest": 5568593137735402068
     },
     "outlines-53": {
       "packets": 268,
       "bytes": 10909894,
-      "digest": 1523579667481118936
+      "digest": 5712762718672213576
     },
     "outlines-54": {
       "packets": 265,
       "bytes": 5706621,
-      "digest": 15819768973966012862
+      "digest": 18184427689961775346
     },
     "outlines-55": {
       "packets": 268,
       "bytes": 25228045,
-      "digest": 7909452118383884862
+      "digest": 17119908669077763768
     },
     "outlines-56": {
       "packets": 264,
       "bytes": 10654742,
-      "digest": 12486914038565896039
+      "digest": 15009917962585418045
     },
     "outlines-57": {
       "packets": 259,
       "bytes": 5187257,
-      "digest": 3937301454502723240
+      "digest": 17605971001335878218
     },
     "outlines-58": {
       "packets": 264,
       "bytes": 5963794,
-      "digest": 13965800316838747543
+      "digest": 17641919865243759327
     },
     "outlines-59": {
       "packets": 265,
       "bytes": 6066501,
-      "digest": 76942602630409886
+      "digest": 2506076217552470968
     },
     "outlines-60": {
       "packets": 271,
       "bytes": 4194049,
-      "digest": 8574062553795004549
+      "digest": 8047108846251339349
     },
     "outlines-61": {
       "packets": 261,
       "bytes": 10002521,
-      "digest": 3336766680378382777
+      "digest": 17853794963457295725
     },
     "outlines-62": {
       "packets": 260,
       "bytes": 9814126,
-      "digest": 15588076872162814423
+      "digest": 544275102287793733
     },
     "outlines-63": {
       "packets": 266,
       "bytes": 5150483,
-      "digest": 1394657371049497830
+      "digest": 18010669374299617062
     },
     "outlines-64": {
       "packets": 266,
       "bytes": 3628041625,
-      "digest": 5025552855229090474
+      "digest": 13470401081231125648
     },
     "outlines-65": {
       "packets": 276,
       "bytes": 52507461,
-      "digest": 13404090693665097498
+      "digest": 17403535760464294058
     },
     "outlines-66": {
       "packets": 268,
       "bytes": 20893903,
-      "digest": 9360314285242449548
+      "digest": 1260617903489430802
     },
     "outlines-67": {
       "packets": 264,
       "bytes": 12163545,
-      "digest": 2238625437131461283
+      "digest": 7941539858754102805
     },
     "outlines-68": {
       "packets": 261,
       "bytes": 8788472,
-      "digest": 11983955952598648826
+      "digest": 4844181545891562420
     },
     "outlines-69": {
       "packets": 267,
       "bytes": 4701299,
-      "digest": 11120123864064985688
+      "digest": 17979422103793158614
     },
     "outlines-70": {
       "packets": 265,
       "bytes": 10850764,
-      "digest": 3921295710338580607
+      "digest": 11843543537506583115
     },
     "outlines-71": {
       "packets": 265,
       "bytes": 7066224349,
-      "digest": 10844228468999630045
+      "digest": 3242809500918095269
     },
     "outlines-72": {
       "packets": 264,
       "bytes": 14866313,
-      "digest": 12812892318468972144
+      "digest": 14807335893720222512
     },
     "outlines-73": {
       "packets": 262,
       "bytes": 1252249,
-      "digest": 17605742780155856932
+      "digest": 5419713133497963742
     },
     "outlines-74": {
       "packets": 265,
       "bytes": 5480603,
-      "digest": 909117196058867295
+      "digest": 2994110625674748685
     },
     "outlines-75": {
       "packets": 270,
       "bytes": 20172556,
-      "digest": 13520763656346116203
+      "digest": 11220624107588393541
     },
     "outlines-76": {
       "packets": 269,
       "bytes": 8318123,
-      "digest": 11025306971813671090
+      "digest": 16012759781946759396
     },
     "outlines-77": {
       "packets": 267,
       "bytes": 7538437,
-      "digest": 16014851772919256234
+      "digest": 7775644587066734016
     },
     "outlines-78": {
       "packets": 265,
       "bytes": 8607509,
-      "digest": 17173923517742315760
+      "digest": 8866891739926241750
     },
     "outlines-79": {
       "packets": 271,
       "bytes": 28089961,
-      "digest": 4365563740044642706
+      "digest": 7930896543180871134
     },
     "outlines-80": {
       "packets": 267,
       "bytes": 19594933,
-      "digest": 8437105585815859850
+      "digest": 6100217347344894716
     },
     "outlines-81": {
       "packets": 265,
       "bytes": 1287959,
-      "digest": 5542900047612428862
+      "digest": 14046721063833220794
     },
     "outlines-82": {
       "packets": 262,
       "bytes": 3344071,
-      "digest": 3169894661223436882
+      "digest": 17301782888665645250
     },
     "outlines-83": {
       "packets": 267,
       "bytes": 5190300,
-      "digest": 16350968084985742718
+      "digest": 17350924545501403194
     },
     "outlines-84": {
       "packets": 269,
       "bytes": 1784733088,
-      "digest": 15078235327861275456
+      "digest": 3977545666480989642
     },
     "outlines-85": {
       "packets": 267,
       "bytes": 5423495,
-      "digest": 829138179748481983
+      "digest": 14441555746230720065
     },
     "outlines-86": {
       "packets": 267,
       "bytes": 5179670,
-      "digest": 16632467023106747122
+      "digest": 10043726796592165674
     },
     "outlines-87": {
       "packets": 269,
       "bytes": 38626513,
-      "digest": 12301352254625969837
+      "digest": 8719316989189127213
     },
     "outlines-88": {
       "packets": 267,
       "bytes": 10536276,
-      "digest": 396020042678596657
+      "digest": 10423895334677018309
     },
     "outlines-89": {
       "packets": 272,
       "bytes": 19261048,
-      "digest": 16625393867050642029
+      "digest": 4261541790503435245
     },
     "bitmaps-0": {
       "packets": 350,
       "bytes": 1928693,
-      "digest": 12404659332058894148
+      "digest": 7744962767909631588
     },
     "bitmaps-1": {
       "packets": 350,
       "bytes": 2122530,
-      "digest": 12256793232682968765
+      "digest": 13494949731054880341
     },
     "bitmaps-2": {
       "packets": 350,
       "bytes": 1839390,
-      "digest": 6318817860712371632
+      "digest": 733861782240675664
     },
     "bitmaps-3": {
       "packets": 350,
       "bytes": 1794648,
-      "digest": 17647342906352470981
+      "digest": 2273322130387234241
     },
     "bitmaps-4": {
       "packets": 350,
       "bytes": 2142981,
-      "digest": 16964400825926390343
+      "digest": 14920875237881122085
     },
     "bitmaps-5": {
       "packets": 350,
       "bytes": 2099528,
-      "digest": 11144584181291410524
+      "digest": 15352244216811328536
     },
     "bitmaps-6": {
       "packets": 350,
       "bytes": 1747092,
-      "digest": 13904737967235693171
+      "digest": 16323714370515181975
     },
     "bitmaps-7": {
       "packets": 350,
       "bytes": 2042450,
-      "digest": 17242506550808727022
+      "digest": 1934079765204277888
     },
     "bitmaps-8": {
       "packets": 350,
       "bytes": 1776636,
-      "digest": 12051970934975883265
+      "digest": 4426873627243476547
     },
     "bitmaps-9": {
       "packets": 350,
       "bytes": 1926550,
-      "digest": 15286597001798367620
+      "digest": 17254696782432409046
     },
     "bitmaps-10": {
       "packets": 350,
       "bytes": 1636604,
-      "digest": 13696757556893523765
+      "digest": 6162242337811061425
     },
     "bitmaps-11": {
       "packets": 350,
       "bytes": 1786129,
-      "digest": 907156898544065722
+      "digest": 10748638840453046526
     },
     "bitmaps-12": {
       "packets": 350,
       "bytes": 1696669,
-      "digest": 5434979760238614520
+      "digest": 27922175978020472
     },
     "bitmaps-13": {
       "packets": 350,
       "bytes": 1538192,
-      "digest": 12874636271280709016
+      "digest": 8615075706407068366
     },
     "bitmaps-14": {
       "packets": 350,
       "bytes": 1779609,
-      "digest": 1790552948751089170
+      "digest": 2335270837059848540
     },
     "bitmaps-15": {
       "packets": 350,
       "bytes": 1894973,
-      "digest": 5670808420257268228
+      "digest": 17265339975473229888
     },
     "bitmaps-16": {
       "packets": 350,
       "bytes": 2119019,
-      "digest": 6778026933165432963
+      "digest": 2130035632127362935
     },
     "bitmaps-17": {
       "packets": 350,
       "bytes": 1783330,
-      "digest": 1293192719346008987
+      "digest": 15631452091103207491
     },
     "bitmaps-18": {
       "packets": 350,
       "bytes": 2155352,
-      "digest": 13127178918445441359
+      "digest": 10672460801442911253
     },
     "bitmaps-19": {
       "packets": 350,
       "bytes": 1662025,
-      "digest": 16754960295924507299
+      "digest": 2575546296680230271
     },
     "bitmaps-20": {
       "packets": 350,
       "bytes": 2063186,
-      "digest": 17026974833499165715
+      "digest": 2144633917688477723
     },
     "bitmaps-21": {
       "packets": 350,
       "bytes": 1951891,
-      "digest": 5632819060875834046
+      "digest": 3552464999856334062
     },
     "bitmaps-22": {
       "packets": 350,
       "bytes": 2302265,
-      "digest": 1531939141418778158
+      "digest": 10621895852350675866
     },
     "bitmaps-23": {
       "packets": 350,
       "bytes": 1994975,
-      "digest": 14129982443126915764
+      "digest": 13200110446559707298
     },
     "bitmaps-24": {
       "packets": 350,
       "bytes": 1889582,
-      "digest": 10294225431239474265
+      "digest": 4495408006549512839
     },
     "bitmaps-25": {
       "packets": 350,
       "bytes": 1706363,
-      "digest": 5985085068633704697
+      "digest": 2920893561160581061
     },
     "bitmaps-26": {
       "packets": 350,
       "bytes": 1901021,
-      "digest": 5994798456818727053
+      "digest": 8667450362549097727
     },
     "bitmaps-27": {
       "packets": 350,
       "bytes": 1844984,
-      "digest": 8342632850214512792
+      "digest": 15932128094149144834
     },
     "bitmaps-28": {
       "packets": 350,
       "bytes": 2220020,
-      "digest": 3938255869628679741
+      "digest": 4600150860750180339
     },
     "bitmaps-29": {
       "packets": 350,
       "bytes": 1436755,
-      "digest": 11159121401924190248
+      "digest": 18348269336371367560
     },
     "bitmaps-30": {
       "packets": 350,
       "bytes": 1920378,
-      "digest": 15096144851379461302
+      "digest": 17320189555647334708
     },
     "bitmaps-31": {
       "packets": 350,
       "bytes": 1585956,
-      "digest": 16180919290277522980
+      "digest": 10150658889156549750
     },
     "bitmaps-32": {
       "packets": 350,
       "bytes": 1976680,
-      "digest": 16504916260531591401
+      "digest": 3758232261068280169
     },
     "bitmaps-33": {
       "packets": 350,
       "bytes": 1914355,
-      "digest": 18416456663072959544
+      "digest": 9940476319420778634
     },
     "bitmaps-34": {
       "packets": 350,
       "bytes": 2152784,
-      "digest": 2790191414605681825
+      "digest": 5768039213649944287
     },
     "bitmaps-35": {
       "packets": 350,
       "bytes": 2153016,
-      "digest": 11278425294912438276
+      "digest": 16410797248427250664
     },
     "bitmaps-36": {
       "packets": 350,
       "bytes": 1866034,
-      "digest": 4175370684308738019
+      "digest": 14446516911738037499
     },
     "bitmaps-37": {
       "packets": 350,
       "bytes": 1907007,
-      "digest": 14291517992745614267
+      "digest": 16282505653064764659
     },
     "bitmaps-38": {
       "packets": 350,
       "bytes": 2070187,
-      "digest": 14708284134750513097
+      "digest": 11745969496681333057
     },
     "bitmaps-39": {
       "packets": 350,
       "bytes": 2046392,
-      "digest": 5428277542041692901
+      "digest": 17593718960972209767
     },
     "bitmaps-40": {
       "packets": 350,
       "bytes": 1827891,
-      "digest": 8905196984947537852
+      "digest": 2340942582916011438
     },
     "bitmaps-41": {
       "packets": 350,
       "bytes": 1861408,
-      "digest": 14832162045665988594
+      "digest": 13991038196354480876
     },
     "bitmaps-42": {
       "packets": 350,
       "bytes": 1576739,
-      "digest": 17791235799377372427
+      "digest": 13660826646930274103
     },
     "bitmaps-43": {
       "packets": 350,
       "bytes": 1889495,
-      "digest": 7332046684579244414
+      "digest": 2185872688531088602
     },
     "bitmaps-44": {
       "packets": 350,
       "bytes": 2041978,
-      "digest": 372275572886398900
+      "digest": 3740359783082664046
     },
     "bitmaps-45": {
       "packets": 350,
       "bytes": 1557465,
-      "digest": 1122750327645424622
+      "digest": 9301583060495450266
     },
     "bitmaps-46": {
       "packets": 350,
       "bytes": 1931774,
-      "digest": 344242874441823924
+      "digest": 7067698057971898390
     },
     "bitmaps-47": {
       "packets": 350,
       "bytes": 1708002,
-      "digest": 8392803892057411311
+      "digest": 12843555740817382359
     },
     "bitmaps-48": {
       "packets": 350,
       "bytes": 1666927,
-      "digest": 4866213133700684482
+      "digest": 4762730454976682810
     },
     "bitmaps-49": {
       "packets": 350,
       "bytes": 2300204,
-      "digest": 321077190877876850
+      "digest": 13572529324442996592
     },
     "bitmaps-50": {
       "packets": 350,
       "bytes": 1769339,
-      "digest": 10176570994587127577
+      "digest": 13745490105097234003
     },
     "bitmaps-51": {
       "packets": 350,
       "bytes": 1819256,
-      "digest": 13675437369795722335
+      "digest": 12387676439162798945
     },
     "bitmaps-52": {
       "packets": 350,
       "bytes": 2011398,
-      "digest": 1486664601279900743
+      "digest": 17412145623782860301
     },
     "bitmaps-53": {
       "packets": 350,
       "bytes": 1914200,
-      "digest": 2021326357160989625
+      "digest": 16391788566274907759
     },
     "bitmaps-54": {
       "packets": 350,
       "bytes": 1473934,
-      "digest": 8384634137777219352
+      "digest": 15612419212179036934
     },
     "bitmaps-55": {
       "packets": 350,
       "bytes": 1879422,
-      "digest": 13907034157728576448
+      "digest": 18147694346880984744
     },
     "bitmaps-56": {
       "packets": 350,
       "bytes": 2172754,
-      "digest": 7272378307290346328
+      "digest": 16856576875659897908
     },
     "bitmaps-57": {
       "packets": 350,
       "bytes": 1997654,
-      "digest": 14160227947709310935
+      "digest": 5241825569140061143
     },
     "bitmaps-58": {
       "packets": 350,
       "bytes": 2445258,
-      "digest": 9428987484921825706
+      "digest": 2885060813058422206
     },
     "bitmaps-59": {
       "packets": 350,
       "bytes": 2103917,
-      "digest": 8437143852229229731
+      "digest": 3497213794471544539
     }
   }
 }
