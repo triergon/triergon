@@ -558,52 +558,7 @@ impl Engine {
             program,
             namespace,
         )?;
-        Self::ts_from_stream(input, format, limits, policy, namespace, stream)
-    }
-
-    fn ts_from_stream(
-        input: InputCursor,
-        format: ts::PacketFormat,
-        limits: ts::ParseLimits,
-        policy: SourceTimePolicy,
-        namespace: DescriptorNamespace,
-        stream: TransportStream,
-    ) -> Result<Self> {
-        let pool = input.budget().clone();
-        let program = stream.selected_program();
-        let clock = || match program {
-            0 => Ok(None),
-            program => DemuxClock::new(program).map(Some),
-        };
-        Ok(Self::Ts(TsEngine {
-            native_context: None,
-            native_prefix_failed: false,
-            stream,
-            native: clock()?,
-            input,
-            format,
-            program,
-            limits,
-            policy,
-            namespace,
-            tsid: None,
-            pcr_pid: None,
-            facts: BudgetVec::new(&pool),
-            pending: None,
-            ended: false,
-            draining: false,
-            native_tracks: TsNativeTracks::Inline(None),
-            native_active: None,
-            native_map_next: 0,
-            native_pending: None,
-            native_packet_clock: clock()?,
-            event_ordinal: 0,
-            suppressed_events: 0,
-            native_update_at: None,
-            segment_discovery: None,
-            segmented: false,
-            boundary: None,
-        }))
+        TsEngine::from_stream(input, format, limits, policy, namespace, stream).map(Self::Ts)
     }
     pub fn ts_native(
         input: InputCursor,
@@ -775,24 +730,6 @@ impl Engine {
         )
     }
 
-    pub(crate) fn ts_progressive(
-        input: InputCursor,
-        limits: ts::ParseLimits,
-        compact: bool,
-    ) -> Result<Self> {
-        Self::ts_native_segment(
-            input,
-            limits,
-            SourceTimePolicy::Unanchored,
-            DescriptorNamespace::Unspecified,
-            if compact {
-                SegmentDiscovery::CompactProgressive
-            } else {
-                SegmentDiscovery::Progressive
-            },
-        )
-    }
-
     fn ts_native_segment(
         input: InputCursor,
         limits: ts::ParseLimits,
@@ -800,30 +737,7 @@ impl Engine {
         namespace: DescriptorNamespace,
         discovery: SegmentDiscovery,
     ) -> Result<Self> {
-        let budget = input.budget().clone();
-        let stream = match discovery {
-            SegmentDiscovery::Native => {
-                TransportStream::new_single_program_segment(budget, limits, namespace)?
-            }
-            SegmentDiscovery::Progressive | SegmentDiscovery::CompactProgressive => {
-                TransportStream::new_single_program_progressive_feed(budget, limits, namespace)?
-            }
-            SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed => {
-                TransportStream::new_single_program_feed(budget, limits, namespace)?
-            }
-        };
-        let mut engine = Self::ts_from_stream(
-            input,
-            ts::PacketFormat::Ts188,
-            limits,
-            policy,
-            namespace,
-            stream,
-        )?;
-        if let Self::Ts(ts) = &mut engine {
-            ts.segment_discovery = Some(discovery);
-        }
-        Ok(engine)
+        TsEngine::native_segment(input, limits, policy, namespace, discovery).map(Self::Ts)
     }
 
     pub fn ts_segmented(
@@ -926,7 +840,7 @@ impl Engine {
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         match self {
             Self::Mp4(r) => provide(&mut r.input, reply),
-            Self::Ts(r) => provide(&mut r.input, reply),
+            Self::Ts(r) => r.provide(reply),
             Self::Matroska(r) => match reply {
                 SourceReply::Pending => Ok(false),
                 SourceReply::Data(w) => {
@@ -964,26 +878,9 @@ impl Engine {
         }
     }
 
-    pub(crate) fn poll_progressive_payload(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<TsPayloadStep> {
-        let Self::Ts(engine) = self else {
-            return Err(Error::Invalid("compact payload polling requires TS"));
-        };
-        if !matches!(
-            engine.segment_discovery,
-            Some(SegmentDiscovery::Progressive | SegmentDiscovery::CompactProgressive)
-        ) {
-            return Err(Error::Invalid("compact TS payload selection required"));
-        }
-        engine.poll::<TsPayloadStep>(work, cancel)
-    }
-
     pub(crate) fn take_suppressed_events(&mut self) -> u64 {
         match self {
-            Self::Ts(engine) => std::mem::take(&mut engine.suppressed_events),
+            Self::Ts(engine) => engine.take_suppressed_events(),
             _ => 0,
         }
     }
@@ -1620,6 +1517,122 @@ impl Mp4Engine {
     }
 }
 impl TsEngine {
+    fn from_stream(
+        input: InputCursor,
+        format: ts::PacketFormat,
+        limits: ts::ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: DescriptorNamespace,
+        stream: TransportStream,
+    ) -> Result<Self> {
+        let pool = input.budget().clone();
+        let program = stream.selected_program();
+        let clock = || match program {
+            0 => Ok(None),
+            program => DemuxClock::new(program).map(Some),
+        };
+        Ok(Self {
+            native_context: None,
+            native_prefix_failed: false,
+            stream,
+            native: clock()?,
+            input,
+            format,
+            program,
+            limits,
+            policy,
+            namespace,
+            tsid: None,
+            pcr_pid: None,
+            facts: BudgetVec::new(&pool),
+            pending: None,
+            ended: false,
+            draining: false,
+            native_tracks: TsNativeTracks::Inline(None),
+            native_active: None,
+            native_map_next: 0,
+            native_pending: None,
+            native_packet_clock: clock()?,
+            event_ordinal: 0,
+            suppressed_events: 0,
+            native_update_at: None,
+            segment_discovery: None,
+            segmented: false,
+            boundary: None,
+        })
+    }
+
+    fn native_segment(
+        input: InputCursor,
+        limits: ts::ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: DescriptorNamespace,
+        discovery: SegmentDiscovery,
+    ) -> Result<Self> {
+        let budget = input.budget().clone();
+        let stream = match discovery {
+            SegmentDiscovery::Native => {
+                TransportStream::new_single_program_segment(budget, limits, namespace)?
+            }
+            SegmentDiscovery::Progressive | SegmentDiscovery::CompactProgressive => {
+                TransportStream::new_single_program_progressive_feed(budget, limits, namespace)?
+            }
+            SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed => {
+                TransportStream::new_single_program_feed(budget, limits, namespace)?
+            }
+        };
+        let mut engine = Self::from_stream(
+            input,
+            ts::PacketFormat::Ts188,
+            limits,
+            policy,
+            namespace,
+            stream,
+        )?;
+        engine.segment_discovery = Some(discovery);
+        Ok(engine)
+    }
+
+    pub(crate) fn progressive(
+        input: InputCursor,
+        limits: ts::ParseLimits,
+        compact: bool,
+    ) -> Result<Self> {
+        Self::native_segment(
+            input,
+            limits,
+            SourceTimePolicy::Unanchored,
+            DescriptorNamespace::Unspecified,
+            if compact {
+                SegmentDiscovery::CompactProgressive
+            } else {
+                SegmentDiscovery::Progressive
+            },
+        )
+    }
+
+    pub(crate) fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
+        provide(&mut self.input, reply)
+    }
+
+    pub(crate) fn poll_progressive_payload(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<TsPayloadStep> {
+        if !matches!(
+            self.segment_discovery,
+            Some(SegmentDiscovery::Progressive | SegmentDiscovery::CompactProgressive)
+        ) {
+            return Err(Error::Invalid("compact TS payload selection required"));
+        }
+        self.poll::<TsPayloadStep>(work, cancel)
+    }
+
+    pub(crate) fn take_suppressed_events(&mut self) -> u64 {
+        std::mem::take(&mut self.suppressed_events)
+    }
+
     fn discover_tracks(&self, map: &ProgramMap) -> Result<TsNativeTracks> {
         let mut selections = map.streams.as_slice().iter().filter_map(|stream| {
             let carriage = match stream.stream_type {

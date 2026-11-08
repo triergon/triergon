@@ -1,8 +1,8 @@
 //! Sequential TS188 feed for AVC and ADTS AAC.
 
 use crate::{
-    BackendStep, Engine, Error, RawEvent, Result, Source, SourceReply, TrackKey,
-    engines::TsPayloadStep,
+    BackendStep, Error, RawEvent, Result, Source, SourceReply, TrackKey,
+    engines::{TsEngine, TsPayloadStep},
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     io::SourceOwner,
@@ -78,7 +78,7 @@ enum NextAudioTime {
 }
 
 struct Transport<S: Source> {
-    engine: Engine,
+    engine: TsEngine,
     request: Option<InputRequest>,
     pending: Option<TsPayloadStep>,
     source: SourceOwner<S>,
@@ -106,18 +106,15 @@ impl<S: Source> Transport<S> {
         if let SourceReply::Data(window) = reply
             && window.bytes().len() > request.maximum
         {
-            let Engine::Ts(engine) = &self.engine else {
-                return Err(Error::Invalid("progressive TS transport engine"));
-            };
             // Recover the original cursor bound only on the oversize path.
             // Preserve its Limit-before-token-check ordering for all replies.
-            let hard_maximum = engine.input.request().maximum;
+            let hard_maximum = self.engine.input.request().maximum;
             let maximum = if window.bytes().len() > hard_maximum {
                 Some(hard_maximum)
             } else if window.source == request.source
                 && window.token == request.token
                 && window.offset == request.offset
-                && window.bytes().belongs_to(engine.input.budget())
+                && window.bytes().belongs_to(self.engine.input.budget())
             {
                 Some(request.maximum)
             } else {
@@ -242,7 +239,7 @@ impl<S: Source> TsProgressiveReader<S> {
         }
         Ok(Self {
             transport: Some(Transport {
-                engine: Engine::ts_progressive(input, limits.transport, true)?,
+                engine: TsEngine::progressive(input, limits.transport, true)?,
                 request: None,
                 pending: None,
                 source,
@@ -414,7 +411,13 @@ impl<S: Source> TsProgressiveReader<S> {
                 if config.configuration_epoch != tracks.epoch {
                     return Err(Error::Invalid("progressive TS configuration epoch"));
                 }
-                let pool = self.transport.as_ref().ok_or(Error::Closed)?.engine.pool();
+                let pool = self
+                    .transport
+                    .as_ref()
+                    .ok_or(Error::Closed)?
+                    .engine
+                    .input
+                    .budget();
                 if config.track == tracks.video {
                     self.video = Some(AvcTsReader::new_progressive(pool, config, self.limits.avc)?);
                 } else if config.track == tracks.audio {
@@ -711,7 +714,7 @@ mod tests {
             )
             .unwrap();
             Transport {
-                engine: Engine::ts_progressive(input, ParseLimits::default(), true).unwrap(),
+                engine: TsEngine::progressive(input, ParseLimits::default(), true).unwrap(),
                 request: None,
                 pending: None,
                 source: SourceOwner::new(Waiting(seen.clone())),
@@ -871,7 +874,7 @@ mod tests {
             if !compact {
                 let input = InputCursor::new(&pool, id, caps, window).unwrap();
                 reader.transport.as_mut().unwrap().engine =
-                    Engine::ts_progressive(input, limits.transport, false).unwrap();
+                    TsEngine::progressive(input, limits.transport, false).unwrap();
             }
             let cancel = AtomicBool::new(false);
             let mut trace = Vec::new();
