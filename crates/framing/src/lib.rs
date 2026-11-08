@@ -93,7 +93,8 @@ pub use opus_config::{
     OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
 };
 pub use vorbis_config::{
-    VorbisHeaders, VorbisIdentification, vorbis_header_type, xiph_join, xiph_split,
+    VorbisBlock, VorbisHeaders, VorbisIdentification, VorbisModes, vorbis_header_type,
+    vorbis_packet_blocksize, xiph_join, xiph_split,
 };
 pub use dts_inspect::{
     DtsCoreField, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity, DtsInspectionIssues,
