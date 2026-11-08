@@ -351,7 +351,7 @@ impl Rasterizer {
     }
 
     fn add_outline(&mut self, outline: &Outline, work: &mut WorkBudget) -> Result<()> {
-        for (curve, _) in outline.curves() {
+        for curve in outline.curves() {
             match curve {
                 Curve::Line([p0, p1]) => self.push(p0, p1, work)?,
                 Curve::Quadratic(pt) => self.add_quadratic(&pt, work)?,

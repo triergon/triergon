@@ -52,15 +52,6 @@ pub(crate) enum Curve {
     Cubic([Vector; 4]),
 }
 
-impl Curve {
-    /// The first point.
-    pub(crate) const fn start(&self) -> Vector {
-        match self {
-            Self::Line([p, _]) | Self::Quadratic([p, ..]) | Self::Cubic([p, ..]) => *p,
-        }
-    }
-}
-
 /// An outline: points and the segments that own them. Each segment owns as many
 /// points as its order; the last segment of a contour closes it back to the
 /// contour's first point. Coordinates stay within ±[`OUTLINE_MAX`]. Storage is
@@ -110,11 +101,14 @@ impl Outline {
     /// The segments with their points. A trailing contour that is not closed, or
     /// a segment without its points, ends the walk.
     pub(crate) fn curves(&self) -> Curves<'_> {
-        Curves {
+        Curves::new(self.points(), self.segments())
+    }
+
+    /// The contours, each with the curves [`Outline::curves`] walks.
+    pub(crate) fn contours(&self) -> Contours<'_> {
+        Contours {
             points: self.points(),
-            segments: self.segments().iter(),
-            start: 0,
-            next: 0,
+            segments: self.segments(),
         }
     }
 
@@ -488,7 +482,7 @@ fn halfway(a: Vector, b: Vector) -> Vector {
     Vector::new(half(a.x, b.x), half(a.y, b.y))
 }
 
-/// The iterator of [`Outline::curves`].
+/// The iterator of [`Outline::curves`] and [`Contour::curves`].
 #[derive(Clone, Debug)]
 pub(crate) struct Curves<'a> {
     points: &'a [Vector],
@@ -499,15 +493,19 @@ pub(crate) struct Curves<'a> {
     next: usize,
 }
 
-impl Curves<'_> {
-    /// Whether the next segment starts a contour.
-    pub(crate) fn at_contour_start(&self) -> bool {
-        self.start == self.next
+impl<'a> Curves<'a> {
+    fn new(points: &'a [Vector], segments: &'a [Segment]) -> Self {
+        Self {
+            points,
+            segments: segments.iter(),
+            start: 0,
+            next: 0,
+        }
     }
 }
 
 impl Iterator for Curves<'_> {
-    type Item = (Curve, Segment);
+    type Item = Curve;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -523,13 +521,64 @@ impl Iterator for Curves<'_> {
             *self.points.get(after)?
         };
         self.next = after;
-        let curve = match *owned {
-            [a] => Curve::Line([a, end]),
-            [a, b] => Curve::Quadratic([a, b, end]),
-            [a, b, c] => Curve::Cubic([a, b, c, end]),
-            _ => return None,
+        match *owned {
+            [a] => Some(Curve::Line([a, end])),
+            [a, b] => Some(Curve::Quadratic([a, b, end])),
+            [a, b, c] => Some(Curve::Cubic([a, b, c, end])),
+            _ => None,
+        }
+    }
+}
+
+/// One contour of an outline: where it starts, its curves, and whether the
+/// last of them closes it. A contour that is not closed, or whose curves stop
+/// at a segment without its points, is the last.
+#[derive(Clone, Debug)]
+pub(crate) struct Contour<'a> {
+    pub(crate) start: Vector,
+    pub(crate) curves: Curves<'a>,
+    pub(crate) closed: bool,
+}
+
+/// The iterator of [`Outline::contours`].
+#[derive(Clone, Debug)]
+pub(crate) struct Contours<'a> {
+    points: &'a [Vector],
+    segments: &'a [Segment],
+}
+
+impl<'a> Iterator for Contours<'a> {
+    type Item = Contour<'a>;
+
+    fn next(&mut self) -> Option<Contour<'a>> {
+        let (points, segments) = (self.points, self.segments);
+        let start = *points.first()?;
+        let count = segments
+            .iter()
+            .position(|segment| segment.closes_contour)
+            .map_or(segments.len(), |last| last + 1);
+        let (own, rest) = segments.split_at_checked(count)?;
+        let closes = own.last()?.closes_contour;
+        let owned = own.iter().map(|segment| segment.kind.points()).sum();
+        let after = points
+            .split_at_checked(owned)
+            .filter(|_| closes)
+            .map(|(_, after)| after);
+        *self = match after {
+            Some(after) => Self {
+                points: after,
+                segments: rest,
+            },
+            None => Self {
+                points: &[],
+                segments: &[],
+            },
         };
-        Some((curve, segment))
+        Some(Contour {
+            start,
+            curves: Curves::new(points, own),
+            closed: after.is_some(),
+        })
     }
 }
 

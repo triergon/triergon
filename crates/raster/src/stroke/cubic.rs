@@ -2,189 +2,229 @@
 
 use triergon_core::Result;
 
-use super::{Normal, Side, Sides, Stroker, halve, mean, sub};
+use super::Stroker;
+use super::border::{Side, Sides};
+use super::segment::{Normal, Tolerances};
+use super::spline::{Plan, Shortcut, Spline};
 use crate::geometry::{DVector, Vector, split_cubic};
-use crate::limits::charge;
 use crate::outline::SegmentKind;
-use crate::set::{Member, Set};
 
-/// The tests on a cubic's offset curve that decide whether its folded side
-/// must be split: a self-intersection, a zero of the offset derivative at
-/// either end, and a clip at either end.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Test {
-    Intersection,
-    Zero0,
-    Zero1,
-    Clip0,
-    Clip1,
-}
-
-impl Member for Test {
-    fn bit(self) -> u8 {
-        1 << self as u8
-    }
-}
-
-type Tests = Set<Test>;
-
-/// What the cubic estimate checks on the side a curve folds over: the outcome
-/// each test is expected to have, the tests whose outcome decides, and the side.
+/// A cubic spline: its points, the normal-space derivatives of its first
+/// leg, middle and last leg, and its end normals.
 #[derive(Clone, Copy, Debug)]
-struct FoldCheck {
-    expected: Tests,
-    decisive: Tests,
-    side: Side,
+pub(super) struct Cubic {
+    points: [Vector; 4],
+    legs: [DVector; 3],
+    normals: [Normal; 2],
 }
 
-impl FoldCheck {
-    /// Whether `outcome` departs from the expectation in a deciding test.
-    fn fails(&self, outcome: Tests) -> bool {
-        !outcome
-            .symmetric_difference(self.expected)
-            .intersection(self.decisive)
-            .is_empty()
-    }
-
-    /// Sets the expected outcomes and deciding tests of a fold whose offset does
-    /// not intersect itself, from the end normals' dot product `c`, the end
-    /// terms `g` and `f`, `|s|` and the cross products `ds` of the end normals
-    /// with the middle derivative. Returns the badness: above 2, the folded side
-    /// is checked as well.
-    fn classify(&mut self, c: f64, g: [f64; 2], f: [f64; 2], abs_s: f64, ds: [f64; 2]) -> u32 {
-        if ds[0] < 0.0 {
-            self.decisive = self.decisive.toggled(Test::Intersection);
-        }
-        if ds[1] < 0.0 {
-            self.decisive = self.decisive.toggled(Test::Intersection);
-            self.expected = self.expected.toggled(Test::Intersection);
-        }
-        let parallel = self.decisive.contains(Test::Intersection);
-        let mut badness = u32::from(!parallel);
-        let ends = [(Test::Zero0, Test::Clip0), (Test::Zero1, Test::Clip1)];
-        for (end, (zero, clip)) in ends.into_iter().enumerate() {
-            if c + g[end] < 1.0 {
-                if parallel {
-                    self.decisive = self.decisive.toggled(zero);
-                    self.expected = self.expected.toggled(zero);
-                    if c < 0.0 {
-                        self.decisive = self.decisive.toggled(clip);
-                    }
-                    if f[end] > abs_s {
-                        self.expected = self.expected.toggled(zero).toggled(clip);
-                    }
-                }
-                badness += 1;
-            } else {
-                self.decisive = self.decisive.toggled(Test::Intersection);
-                if end == 0 {
-                    self.expected = self.expected.toggled(Test::Intersection);
-                }
-                if !parallel {
-                    self.decisive = self.decisive.toggled(zero);
-                    if c > 0.0 {
-                        self.decisive = self.decisive.toggled(clip);
-                    }
-                }
-            }
-        }
-        badness
-    }
-}
-
-/// A cubic spline being offset: its points, the normal-space derivatives of
-/// its first leg, middle and last leg, and its end normals.
+/// A cubic's end normals against each other (`c` dot, `s` cross) and
+/// against its middle leg (`dc`, `ds`).
 #[derive(Clone, Copy, Debug)]
-struct Cubic {
-    pt: [Vector; 4],
-    deriv: [DVector; 3],
-    normal: [Normal; 2],
-}
-
-/// The products of a cubic's end normals: with each other (`c` dot, `s`
-/// cross) and with the middle derivative (`dc`, `ds`).
-#[derive(Clone, Copy, Debug)]
-struct CubicFrame {
+struct Frame {
     c: f64,
     s: f64,
     dc: [f64; 2],
     ds: [f64; 2],
-    normal: [Normal; 2],
 }
 
-impl CubicFrame {
-    fn new(k: &Cubic) -> Self {
-        let (deriv, normal) = (&k.deriv, &k.normal);
-        Self {
-            c: normal[0].v.dot(normal[1].v),
-            s: normal[0].v.cross(normal[1].v),
-            dc: [normal[0].v.dot(deriv[1]), normal[1].v.dot(deriv[1])],
-            ds: [normal[0].v.cross(deriv[1]), normal[1].v.cross(deriv[1])],
-            normal: *normal,
-        }
-    }
+/// The tests of a fitted offset on the side the spline folds over: whether
+/// it may intersect itself, whether its derivative reaches zero at either
+/// end, and whether it is clipped at either end.
+#[derive(Clone, Copy, Debug)]
+struct Outcome {
+    intersection: bool,
+    zero: [bool; 2],
+    clip: [bool; 2],
 }
 
-impl Stroker<'_> {
-    pub(super) fn add_cubic(
-        &mut self,
-        pt1: Vector,
-        pt2: Vector,
-        pt3: Vector,
-        sides: Sides,
-    ) -> Result<()> {
-        // The points that span the middle derivative: the control points, or
-        // past a tiny end step the end point beyond it.
-        let (mut from, mut to) = (1, 2);
-        let mut d0 = sub(pt1, self.last_point);
-        if self.tolerance.tiny(d0) {
-            d0 = sub(pt2, self.last_point);
-            if self.tolerance.tiny(d0) {
-                return self.add_line(pt3, sides);
-            }
-            from = 0;
+/// The outcomes that let the folded side be fitted: for each test the
+/// outcome required, or `None` when the test does not decide.
+#[derive(Clone, Copy, Debug)]
+struct Expectation {
+    side: Side,
+    intersection: Option<bool>,
+    zero: [Option<bool>; 2],
+    clip: [Option<bool>; 2],
+}
+
+impl Expectation {
+    /// What a fit must show on `side`, the folded side of a spline whose
+    /// offset does not intersect itself; `c` is the end normals' dot product,
+    /// `f` and `g` the end terms against `abs_s` and `ds` the end normals'
+    /// cross products with the middle leg. `None` when that side is split
+    /// without a fit.
+    fn new(
+        side: Side,
+        c: f64,
+        [f0, f1]: [f64; 2],
+        [g0, g1]: [f64; 2],
+        abs_s: f64,
+        ds: [f64; 2],
+    ) -> Option<Self> {
+        // libass's badness: one for a middle leg the end normals do not lie
+        // on opposite sides of, one for each end with c + g < 1. Past two,
+        // the folded side is split rather than fitted.
+        let parallel = (ds[0] < 0.0) != (ds[1] < 0.0);
+        let bad = [c + g0 < 1.0, c + g1 < 1.0];
+        if !parallel && bad[0] && bad[1] {
+            return None;
         }
-        let mut d2 = sub(pt3, pt2);
-        if self.tolerance.tiny(d2) {
-            d2 = sub(pt3, pt1);
-            if self.tolerance.tiny(d2) {
-                return self.add_line(pt3, sides);
-            }
-            to = 3;
-        }
-        if (from, to) == (0, 3) {
-            return self.add_line(pt3, sides);
-        }
-        let pt = [self.last_point, pt1, pt2, pt3];
-        self.last_point = pt3;
-        let d1 = sub(pt[to], pt[from]);
-        let deriv = [d0, d1, d2].map(|d| self.tolerance.derivative(d));
-        let piece = Cubic {
-            pt,
-            deriv,
-            normal: [Normal::of(deriv[0]), Normal::of(deriv[2])],
+        let end = |bad: bool, beyond: bool| match (bad, parallel) {
+            (true, true) => (Some(!beyond), (c < 0.0).then_some(beyond)),
+            (false, false) => (Some(false), (c > 0.0).then_some(false)),
+            _ => (None, None),
         };
-        let first = self.joint.contour_start;
-        self.start_segment(pt[0], piece.normal[0].v, sides)?;
-        self.offset_cubic(&piece, sides, first)
+        let (zero0, clip0) = end(bad[0], f0 > abs_s);
+        let (zero1, clip1) = end(bad[1], f1 > abs_s);
+        // The intersection decides for an odd count of a parallel middle and
+        // good ends; the outcome it requires flips with the inner side, the
+        // last normal turning from the middle and a good first end.
+        let decides = parallel ^ !bad[0] ^ !bad[1];
+        let required = (side == Side::Inner) ^ (ds[1] < 0.0) ^ !bad[0];
+        Some(Self {
+            side,
+            intersection: decides.then_some(required),
+            zero: [zero0, zero1],
+            clip: [clip0, clip1],
+        })
     }
 
-    /// The offset control points of a cubic spline when its error is within
-    /// bounds, with the sides that need no further split.
-    fn estimate_cubic(
+    fn admits(&self, outcome: &Outcome) -> bool {
+        let agrees = |required: Option<bool>, actual: bool| required.is_none_or(|r| r == actual);
+        let both_agree = |required: [Option<bool>; 2], actual: [bool; 2]| {
+            required.into_iter().zip(actual).all(|(r, a)| agrees(r, a))
+        };
+        agrees(self.intersection, outcome.intersection)
+            && both_agree(self.zero, outcome.zero)
+            && both_agree(self.clip, outcome.clip)
+    }
+}
+
+impl Cubic {
+    /// The spline through `points`, or `None` when it has no direction. An
+    /// end leg too short to give one is measured to the next control point
+    /// instead, and the middle leg then reaches to the end point.
+    pub(super) fn new(points: [Vector; 4], tolerances: &Tolerances) -> Option<Self> {
+        let [p0, p1, p2, p3] = points;
+        let (first, last, [from, to]) = match (tolerances.leg(p0, p1), tolerances.leg(p2, p3)) {
+            (Some(first), Some(last)) => (first, last, [p1, p2]),
+            (None, Some(last)) => (tolerances.leg(p0, p2)?, last, [p0, p2]),
+            (Some(first), None) => (first, tolerances.leg(p1, p3)?, [p1, p3]),
+            (None, None) => return None,
+        };
+        Some(Self {
+            points,
+            legs: [first, tolerances.derivative(from, to), last],
+            normals: [Normal::of(first), Normal::of(last)],
+        })
+    }
+
+    /// Whether the offset on the folded side, whose end terms are `f` and
+    /// `g`, intersects itself.
+    fn intersects_itself(&self, frame: &Frame, [f0, f1]: [f64; 2], [g0, g1]: [f64; 2]) -> bool {
+        let [n0, n1] = self.normals;
+        let middle = self.legs[1];
+        let d2 = (f0 + frame.dc[1]) * n1.len + (f1 + frame.dc[0]) * n0.len;
+        let d2 = (d2 + middle.dot(middle)) / 2.0;
+        if !(d2 < g0 && d2 < g1) {
+            return false;
+        }
+        let mut q = (d2 / (2.0 - d2)).sqrt();
+        let h0 = (f0 * q + g0) * n1.len;
+        let h1 = (f1 * q + g1) * n0.len;
+        q *= (4.0 / 3.0) * d2;
+        h0 > q && h1 > q
+    }
+
+    /// The offsets of the inner control points within the error bounds, with
+    /// the sides of `sides` they fit; `expected` checks the folded side.
+    fn fit(
         &self,
-        frame: &CubicFrame,
-        check: &FoldCheck,
+        tolerances: &Tolerances,
+        frame: &Frame,
+        expected: Option<Expectation>,
         mut sides: Sides,
-    ) -> (Sides, [DVector; 2]) {
-        const NONE: (Sides, [DVector; 2]) = (Sides::EMPTY, [DVector::ZERO; 2]);
-        let CubicFrame {
-            c,
-            s,
-            dc,
-            ds,
-            normal,
-        } = *frame;
+    ) -> Option<(Sides, [DVector; 2])> {
+        let shift = Shift::fit(frame, tolerances.err_c)?;
+        if let Some(expected) = expected
+            && !expected.admits(&self.outcome(frame, &shift, expected.side))
+        {
+            sides = sides.without(expected.side);
+            if sides.is_empty() {
+                return None;
+            }
+        }
+        if !self.within_angle(frame, &shift, tolerances.err_a) {
+            return None;
+        }
+        let [n0, n1] = self.normals;
+        let [ro0, ro1] = shift.ro;
+        let along = |n: DVector, ro: f64| DVector::new(n.x + n.y * ro, n.y - n.x * ro);
+        Some((sides, [along(n0.unit, ro0), along(n1.unit, ro1)]))
+    }
+
+    /// The fold tests of `shift` on `side`.
+    fn outcome(&self, frame: &Frame, shift: &Shift, side: Side) -> Outcome {
+        let Frame { c, s, dc, .. } = *frame;
+        let [n0, n1] = self.normals;
+        let [ro0, ro1] = shift.ro;
+        let (s, ro0, ro1) = match side {
+            Side::Outer => (s, ro0, ro1),
+            Side::Inner => (-s, -ro0, -ro1),
+        };
+        Outcome {
+            intersection: 2.0 * s * shift.r < dc[0] + dc[1],
+            zero: [n0.len - ro0 < 0.0, n1.len + ro1 < 0.0],
+            clip: [
+                n0.len + dc[0] + s - ro1 * c < 0.0,
+                n1.len + dc[1] + s + ro0 * c < 0.0,
+            ],
+        }
+    }
+
+    /// Whether the offset with `shift` keeps within the angular error, whose
+    /// tangent is `err_a`, in two stages.
+    fn within_angle(&self, frame: &Frame, shift: &Shift, err_a: f64) -> bool {
+        let Frame { c, s, dc, ds } = *frame;
+        let [n0, n1] = self.normals;
+        let [ro0, ro1] = shift.ro;
+        let d0c = 2.0 * dc[0];
+        let d0s = 2.0 * ds[0];
+        let d1c = 2.0 * dc[1];
+        let d1s = 2.0 * ds[1];
+        let dot0 = d0c + 3.0 * n0.len;
+        let crs0 = d0s + 3.0 * ro0 * n0.len;
+        let dot1 = d1c + 3.0 * n1.len;
+        let crs1 = d1s + 3.0 * ro1 * n1.len;
+        if !(crs0.abs() < err_a * dot0 && crs1.abs() < err_a * dot1) {
+            return false;
+        }
+        let cl0 = c * n0.len;
+        let sl0 = s * n0.len;
+        let cl1 = c * n1.len;
+        let sl1 = -s * n1.len;
+        let dot0 = d0c - ro0 * d0s + cl0 + ro1 * sl0 + cl1 / 3.0;
+        let dot1 = d1c - ro1 * d1s + cl1 + ro0 * sl1 + cl0 / 3.0;
+        let crs0 = d0s + ro0 * d0c - sl0 + ro1 * cl0 - sl1 / 3.0;
+        let crs1 = d1s + ro1 * d1c - sl1 + ro0 * cl1 - sl0 / 3.0;
+        crs0.abs() < err_a * dot0 && crs1.abs() < err_a * dot1
+    }
+}
+
+/// How far the fitted offset's inner control points move along the offset
+/// from the end normals, `ro` each, with `r` the radial term they share.
+#[derive(Clone, Copy, Debug)]
+struct Shift {
+    r: f64,
+    ro: [f64; 2],
+}
+
+impl Shift {
+    /// The best fit for the offset's radius, when its radial error is below
+    /// `err_c`.
+    fn fit(frame: &Frame, err_c: f64) -> Option<Self> {
+        let Frame { c, s, dc, ds } = *frame;
         let t = (ds[0] + ds[1]) / (dc[0] + dc[1]);
         let c1 = 1.0 + c;
         let ss = s * s;
@@ -219,237 +259,141 @@ impl Stroker<'_> {
             aa += a * a;
             ab += a * b;
         }
-        let ro = ab / (aa * inv_ro0 + 1e-9); // best fit
+        let ro = ab / (aa * inv_ro0 + 1e-9);
         let mut err2 = 0.0f64;
         for i in 0..3 {
             let err = f0[i] + ro * (f1[i] + ro * f2[i]);
             err2 += err * err;
         }
-        if !(err2 < self.tolerance.err_c) {
-            return NONE; // radial error
+        if !(err2 < err_c) {
+            return None;
         }
-
         let r = ro * c1 - 1.0;
-        let ro0 = t * r - ro * s;
-        let ro1 = t * r + ro * s;
+        Some(Self {
+            r,
+            ro: [t * r - ro * s, t * r + ro * s],
+        })
+    }
+}
 
-        if sides.contains(check.side) {
-            let (mut test_s, mut test0, mut test1) = (s, ro0, ro1);
-            if check.side == Side::Inner {
-                test_s = -test_s;
-                test0 = -test0;
-                test1 = -test1;
-            }
-            let mut outcome = Tests::EMPTY;
-            outcome.set(Test::Intersection, 2.0 * test_s * r < dc[0] + dc[1]);
-            outcome.set(Test::Zero0, normal[0].len - test0 < 0.0);
-            outcome.set(Test::Zero1, normal[1].len + test1 < 0.0);
-            outcome.set(
-                Test::Clip0,
-                normal[0].len + dc[0] + test_s - test1 * c < 0.0,
-            );
-            outcome.set(
-                Test::Clip1,
-                normal[1].len + dc[1] + test_s + test0 * c < 0.0,
-            );
-            if check.fails(outcome) {
-                sides = sides.without(check.side);
-                if sides.is_empty() {
-                    return NONE;
-                }
-            }
-        }
+impl Spline for Cubic {
+    const KIND: SegmentKind = SegmentKind::Cubic;
 
-        let d0c = 2.0 * dc[0];
-        let d0s = 2.0 * ds[0];
-        let d1c = 2.0 * dc[1];
-        let d1s = 2.0 * ds[1];
-        let dot0 = d0c + 3.0 * normal[0].len;
-        let crs0 = d0s + 3.0 * ro0 * normal[0].len;
-        let dot1 = d1c + 3.0 * normal[1].len;
-        let crs1 = d1s + 3.0 * ro1 * normal[1].len;
-        // Angular error, stage 1.
-        if !(crs0.abs() < self.tolerance.err_a * dot0 && crs1.abs() < self.tolerance.err_a * dot1) {
-            return NONE;
-        }
+    type Controls = [(Vector, DVector); 2];
 
-        let cl0 = c * normal[0].len;
-        let sl0 = s * normal[0].len;
-        let cl1 = c * normal[1].len;
-        let sl1 = -s * normal[1].len;
-        let dot0 = d0c - ro0 * d0s + cl0 + ro1 * sl0 + cl1 / 3.0;
-        let dot1 = d1c - ro1 * d1s + cl1 + ro0 * sl1 + cl0 / 3.0;
-        let crs0 = d0s + ro0 * d0c - sl0 + ro1 * cl0 - sl1 / 3.0;
-        let crs1 = d1s + ro1 * d1c - sl1 + ro0 * cl1 - sl0 / 3.0;
-        // Angular error, stage 2.
-        if !(crs0.abs() < self.tolerance.err_a * dot0 && crs1.abs() < self.tolerance.err_a * dot1) {
-            return NONE;
-        }
-
-        let n0 = normal[0].v;
-        let n1 = normal[1].v;
-        let result = [
-            DVector::new(n0.x + n0.y * ro0, n0.y - n0.x * ro0),
-            DVector::new(n1.x + n1.y * ro1, n1.y - n1.x * ro1),
-        ];
-        (sides, result)
+    fn start(&self) -> Vector {
+        self.points[0]
     }
 
-    fn offset_cubic(&mut self, k: &Cubic, mut sides: Sides, first: bool) -> Result<()> {
-        charge(self.work, 1)?;
-        let frame = CubicFrame::new(k);
-        let Some((rest, check, fold)) = self.fold_cubic(k, &frame, sides, first)? else {
-            self.joint.last_normal = k.normal[1].v;
-            return Ok(());
-        };
-        sides = rest;
-        if !check.is_empty() {
-            let (good, control) = self.estimate_cubic(&frame, &fold, check);
-            if !good.is_empty() {
-                self.emit_first_point(k.pt[0], SegmentKind::Cubic, good)?;
-                self.emit(k.pt[1], control[0], None, good)?;
-                self.emit(k.pt[2], control[1], None, good)?;
-                sides = sides.minus(good);
-                if sides.is_empty() {
-                    self.joint.last_normal = k.normal[1].v;
-                    return Ok(());
-                }
-            }
-        }
-        self.split_cubic(k, sides, first)
+    fn end(&self) -> Vector {
+        self.points[3]
     }
 
-    /// Handles the side a cubic folds over: skips a self-intersecting offset
-    /// there, and decides which sides the error estimate checks and how. Returns
-    /// the sides still to draw, those to check and the fold's tests, or `None`
-    /// when nothing remains to draw.
-    fn fold_cubic(
-        &mut self,
-        k: &Cubic,
-        frame: &CubicFrame,
-        mut sides: Sides,
-        first: bool,
-    ) -> Result<Option<(Sides, Sides, FoldCheck)>> {
-        let (pt, deriv) = (&k.pt, &k.deriv);
-        let CubicFrame {
-            c,
-            s,
-            dc,
-            ds,
-            normal,
-        } = *frame;
-        let f0 = normal[0].len * c + normal[1].len + dc[1];
-        let f1 = normal[1].len * c + normal[0].len + dc[0];
-        let mut g0 = normal[0].len * s - ds[1];
-        let mut g1 = normal[1].len * s + ds[0];
+    fn normals(&self) -> [Normal; 2] {
+        self.normals
+    }
 
-        let mut abs_s = s;
-        let mut check = sides;
-        let mut fold = FoldCheck {
-            expected: Tests::of([Test::Intersection]),
-            decisive: Tests::EMPTY,
-            side: Side::Inner,
+    fn plan(&self, tolerances: &Tolerances, sides: Sides) -> Plan<Self::Controls> {
+        let [n0, n1] = self.normals;
+        let middle = self.legs[1];
+        let frame = Frame {
+            c: n0.unit.dot(n1.unit),
+            s: n0.unit.cross(n1.unit),
+            dc: [n0.unit.dot(middle), n1.unit.dot(middle)],
+            ds: [n0.unit.cross(middle), n1.unit.cross(middle)],
         };
-        if s < 0.0 {
-            abs_s = -s;
-            fold.expected = Tests::EMPTY;
-            fold.side = Side::Outer;
-            g0 = -g0;
-            g1 = -g1;
-        }
-        let side = fold.side;
-        let folded = Sides::of([side]);
+        let Frame { c, s, dc, ds } = frame;
+        let fold = Side::folded(s);
+        let abs_s = s.abs();
+        let f0 = n0.len * c + n1.len + dc[1];
+        let f1 = n1.len * c + n0.len + dc[0];
+        let (g0, g1) = match fold {
+            Side::Inner => (n0.len * s - ds[1], n1.len * s + ds[0]),
+            Side::Outer => (-(n0.len * s - ds[1]), -(n1.len * s + ds[0])),
+        };
 
+        let mut shortcut = None;
+        let mut fitted = sides;
+        let mut expected = None;
         if !(dc[0] + dc[1] > 0.0) {
-            check = Sides::EMPTY;
-        } else if sides.contains(side) {
+            // The middle runs against the ends: only halves can fit.
+            fitted = Sides::EMPTY;
+        } else if sides.contains(fold) {
             if f0 < abs_s && f1 < abs_s {
-                // The offset curve may intersect itself.
-                let d2 = (f0 + dc[1]) * normal[1].len + (f1 + dc[0]) * normal[0].len;
-                let d2 = (d2 + deriv[1].dot(deriv[1])) / 2.0;
-                if d2 < g0 && d2 < g1 {
-                    let mut q = (d2 / (2.0 - d2)).sqrt();
-                    let h0 = (f0 * q + g0) * normal[1].len;
-                    let h1 = (f1 * q + g1) * normal[0].len;
-                    q *= (4.0 / 3.0) * d2;
-                    if h0 > q && h1 > q {
-                        self.prepare_skip(pt[0], folded, first)?;
-                        if f0 < 0.0 || f1 < 0.0 {
-                            self.emit(pt[0], DVector::ZERO, Some(SegmentKind::Line), folded)?;
-                            self.emit(pt[3], DVector::ZERO, Some(SegmentKind::Line), folded)?;
-                        } else {
-                            let offs = normal[0].v.scale(f0 / abs_s);
-                            self.emit(pt[0], offs, Some(SegmentKind::Line), folded)?;
-                        }
-                        sides = sides.without(side);
-                        if sides.is_empty() {
-                            return Ok(None);
-                        }
-                    }
+                // The offset may intersect itself.
+                if self.intersects_itself(&frame, [f0, f1], [g0, g1]) {
+                    shortcut = Some((fold, Shortcut::new([f0, f1], abs_s, n0.unit)));
                 }
-                check = check.toggled(side);
-            } else if fold.classify(c, [g0, g1], [f0, f1], abs_s, ds) > 2 {
-                check = check.toggled(side);
+                fitted = fitted.without(fold);
+            } else {
+                expected = Expectation::new(fold, c, [f0, f1], [g0, g1], abs_s, ds);
+                if expected.is_none() {
+                    fitted = fitted.without(fold);
+                }
             }
         }
-        Ok(Some((sides, check, fold)))
+        let fit = if fitted.is_empty() {
+            None
+        } else {
+            let [_, p1, p2, _] = self.points;
+            self.fit(tolerances, &frame, expected, fitted)
+                .map(|(sides, [o1, o2])| (sides, [(p1, o1), (p2, o2)]))
+        };
+        Plan { shortcut, fit }
     }
 
-    /// Halves a cubic whose estimate failed and offsets both halves, joining
-    /// them with a cap where the middle has no direction.
-    fn split_cubic(&mut self, k: &Cubic, sides: Sides, first: bool) -> Result<()> {
-        let next = split_cubic(&k.pt);
-        let d0 = halve(k.deriv[0]);
-        let centre = halve(k.deriv[1]);
-        let d4 = halve(k.deriv[2]);
-        let d1 = mean(d0, centre);
-        let d3 = mean(centre, d4);
-        let d2 = mean(d1, d3);
-        let low = [next[0], next[1], next[2], next[3]];
-        let high = [next[3], next[4], next[5], next[6]];
-        let min_len = self.tolerance.min_len;
+    fn split(&self, stroker: &mut Stroker<'_>, sides: Sides) -> Result<()> {
+        let [p0, p1, p2, p3, p4, p5, p6] = split_cubic(&self.points);
+        let [n0, n1] = self.normals;
+        let [d0, centre, d4] = self.legs.map(DVector::halved);
+        let d1 = d0.mean(centre);
+        let d3 = centre.mean(d4);
+        let d2 = d1.mean(d3);
+        let min_len = stroker.tolerances.min_len;
 
-        if let Some(middle) = Normal::directed(d2, min_len) {
-            let first_half = Cubic {
-                pt: low,
-                deriv: [d0, d1, d2],
-                normal: [k.normal[0].halved(), middle],
+        if let Some(normal) = Normal::directed(d2, min_len) {
+            let low = Self {
+                points: [p0, p1, p2, p3],
+                legs: [d0, d1, d2],
+                normals: [n0.halved(), normal],
             };
-            let second_half = Cubic {
-                pt: high,
-                deriv: [d2, d3, d4],
-                normal: [middle, k.normal[1].halved()],
+            let high = Self {
+                points: [p3, p4, p5, p6],
+                legs: [d2, d3, d4],
+                normals: [normal, n1.halved()],
             };
-            self.offset_cubic(&first_half, sides, first)?;
-            return self.offset_cubic(&second_half, sides, false);
+            stroker.offset_spline(&low, sides)?;
+            return stroker.offset_spline(&high, sides);
         }
 
-        // Degenerate middle: join the halves with a cap.
-        let d1 = DVector::new(d1.x + d2.x, d1.y + d2.y);
-        let d3 = DVector::new(d3.x + d2.x, d3.y + d2.y);
+        // The middle has no direction: each half's middle leg takes it in,
+        // and the halves meet with a join. A half without a direction is a
+        // line.
+        let d1 = d1 + d2;
+        let d3 = d3 + d2;
         match Normal::directed(d1, min_len) {
-            Some(normal1) => {
-                let first_half = Cubic {
-                    pt: low,
-                    deriv: [d0, d1, DVector::ZERO],
-                    normal: [k.normal[0].halved(), normal1],
+            Some(normal) => {
+                let low = Self {
+                    points: [p0, p1, p2, p3],
+                    legs: [d0, d1, DVector::ZERO],
+                    normals: [n0.halved(), normal],
                 };
-                self.offset_cubic(&first_half, sides, first)?;
+                stroker.offset_spline(&low, sides)?;
             }
-            None => self.emit_first_point(next[0], SegmentKind::Line, sides)?,
+            None => stroker.resume(SegmentKind::Line, p0, sides)?,
         }
-        let normal2 = Normal::directed(d3, min_len);
-        self.start_segment(next[2], normal2.unwrap_or(k.normal[1]).v, sides)?;
-        match normal2 {
-            Some(normal2) => {
-                let second_half = Cubic {
-                    pt: high,
-                    deriv: [DVector::ZERO, d3, d4],
-                    normal: [normal2, k.normal[1].halved()],
+        let second = Normal::directed(d3, min_len);
+        stroker.join(p2, second.map_or(n1.unit, |normal| normal.unit), sides)?;
+        match second {
+            Some(normal) => {
+                let high = Self {
+                    points: [p3, p4, p5, p6],
+                    legs: [DVector::ZERO, d3, d4],
+                    normals: [normal, n1.halved()],
                 };
-                self.offset_cubic(&second_half, sides, false)
+                stroker.offset_spline(&high, sides)
             }
-            None => self.emit_first_point(next[3], SegmentKind::Line, sides),
+            None => stroker.resume(SegmentKind::Line, p3, sides),
         }
     }
 }
