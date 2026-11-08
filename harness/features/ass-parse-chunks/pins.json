@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "reference": "libass-ass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+  "pins": {
+    "stream-basic-chunks": {
+      "packets": 30,
+      "bytes": 1369,
+      "digest": 13378937871811097545
+    },
+    "stream-fonts-chunks": {
+      "packets": 18,
+      "bytes": 925,
+      "digest": 8573572833369919279
+    },
+    "stream-read-order-chunks": {
+      "packets": 22,
+      "bytes": 552,
+      "digest": 12032571391584296880
+    },
+    "stream-styles-chunks": {
+      "packets": 9,
+      "bytes": 315,
+      "digest": 2304825338481282545
+    }
+  }
+}

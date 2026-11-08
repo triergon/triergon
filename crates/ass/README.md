@@ -188,9 +188,16 @@ libass reads it, skipping what it skips, and never panics.
 - `cargo test -p triergon-ass`: unit tests per module and a deterministic mutation
   test (`tests/robustness.rs`) over authored scripts, including work, event and
   budget limits.
+- `cargo xtask ass compare` runs [ass-worker](../ass-worker/README.md) and the
+  libass reference worker (`harness/reference_ass.h`) on every authored fixture in
+  `harness/fixtures/ass` and requires identical work: `ass-parse-scripts` (whole
+  scripts), `ass-parse-chunks` (Matroska packet streams) and `ass-parse-events`
+  (every event walked at the fixture's times). `cargo xtask fuzz --contract
+  harness/features/<feature>/contract.json --reference` mutates the fixtures and
+  compares both workers on every mutation.
 
-The tests establish agreement with libass's behaviour as the fixtures record it,
-not conformance with any specification of the format.
+The comparison establishes agreement with libass on that corpus, not conformance
+with any specification of the format.
 
 ## Not here
 
