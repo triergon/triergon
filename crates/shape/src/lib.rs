@@ -34,7 +34,7 @@ pub use buffer::{Buffer, Glyph, Position};
 #[doc(hidden)]
 pub use dump::{ReferenceProperties, reference_properties};
 pub use face::Face;
-pub use metrics::{Extents, Metrics, OtMetrics, Scale};
+pub use metrics::{Extents, Metrics, OtMetrics, Scale, SizedMetrics};
 pub use plan::{Feature, Plan};
 pub use shape::shape;
 pub use tag::{Direction, Language, Script, Tag};

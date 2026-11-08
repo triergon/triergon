@@ -4,7 +4,7 @@
 use crate::ot::data::{Data, bsearch};
 use std::cell::Cell;
 use triergon_core::{Error, Result};
-use triergon_font::{Charmap, ControlBox, Font, GlyphId, Platform};
+use triergon_font::{CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont};
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
 /// `hb_font_set_ppem` set it. The default is one unit per font unit and no ppem,
@@ -43,8 +43,7 @@ pub struct Extents {
 /// functions and the [`Scale`] they answer in, which positions are produced in.
 ///
 /// [`OtMetrics`] answers from the font's own tables, as HarfBuzz's built-in
-/// functions do; a renderer can answer from its rasteriser instead, as libass does
-/// with FreeType.
+/// functions do; [`SizedMetrics`] as libass's FreeType callbacks do at a size.
 /// The functions that load a glyph return a `Result`: an error ends the shaping
 /// call with it, while a glyph the font cannot load is an ordinary answer (zero
 /// or `None`), as it is to HarfBuzz.
@@ -248,6 +247,145 @@ impl Metrics for OtMetrics<'_> {
             width: x2.ceil() as i32 - x_bearing,
             height: y2.ceil() as i32 - y_bearing,
         }))
+    }
+}
+
+/// The font functions libass 0.17.5 installs on the HarfBuzz font of a face at a
+/// size (`init_font_funcs` and `get_hb_font` in `ass_shaper.c`): the character
+/// map libass selects (`ass_charmap_magic`) looked up as it looks codes up
+/// (`ass_font_index_magic`), FreeType's variation sequences, default-load
+/// advances ([`SizedFont::hinted_advance`]) and `FT_KERNING_DEFAULT` kerning
+/// ([`SizedFont::kerning`]), in 26.6 pixels at the size's
+/// [`SizedFont::harfbuzz_scale`] and pixels per em, so that hinting device
+/// tables apply.
+///
+/// libass reads glyph extents and contour points from FreeType's hinted load,
+/// which this crate does not run: for a glyph of the face both are
+/// `Unsupported`, as is an advance `hinted_advance` cannot give. The vertical
+/// advances libass substitutes in an `@` font are not covered.
+#[derive(Debug)]
+pub struct SizedMetrics<'a> {
+    sized: SizedFont<'a>,
+    charmap: Option<Charmap<'a>>,
+    /// A Windows Symbol charmap, looked up at `0xF000 | c`.
+    symbol: bool,
+    /// A Unicode charmap, which FreeType needs for variation sequences.
+    unicode: bool,
+    variations: Variations<'a>,
+    scale: Scale,
+}
+
+impl<'a> SizedMetrics<'a> {
+    /// libass's font functions over `sized`.
+    ///
+    /// # Errors
+    ///
+    /// `Unsupported` when libass would convert codes for the charmap it selects,
+    /// which this crate does not: Windows Shift-JIS, PRC, Big5, Wansung and Johab
+    /// subtables, and the Symbol subtable of a face declaring a legacy Arabic
+    /// character set (`OS/2.fsSelection` high byte 178 or 179).
+    pub fn new(sized: SizedFont<'a>) -> Result<Self> {
+        let font = sized.font();
+        let windows = |encoding: Option<CharEncoding>| {
+            font.charmaps().find(|c| {
+                c.platform() == Platform::Windows && encoding.is_none_or(|e| c.encoding() == e)
+            })
+        };
+        // A full Unicode subtable anywhere, else the first BMP one, else the
+        // first Windows one, else the one FreeType selects.
+        let charmap = windows(Some(CharEncoding::UnicodeFull))
+            .or_else(|| windows(Some(CharEncoding::Unicode)))
+            .or_else(|| windows(None))
+            .or_else(|| font.text_charmap());
+        let windows = charmap.filter(|c| c.platform() == Platform::Windows);
+        if windows.is_some_and(|c| (2..=6).contains(&c.encoding_id())) {
+            return Err(Error::Unsupported("libass's multibyte charmap conversion"));
+        }
+        let symbol = windows.is_some_and(|c| c.encoding() == CharEncoding::Symbol);
+        let arabic = font
+            .os2()
+            .is_some_and(|os2| matches!(os2.selection.bits() >> 8, 178 | 179));
+        if symbol && arabic {
+            return Err(Error::Unsupported("libass's legacy Arabic charmaps"));
+        }
+        let unicode = charmap.is_some_and(|c| {
+            c.platform() == Platform::Unicode
+                || matches!(
+                    c.encoding(),
+                    CharEncoding::Unicode | CharEncoding::UnicodeFull
+                )
+        });
+        let (x, y) = sized.harfbuzz_scale();
+        let size = sized.metrics();
+        Ok(Self {
+            sized,
+            charmap,
+            symbol,
+            unicode,
+            variations: Variations::of(font),
+            scale: Scale {
+                x,
+                y,
+                x_ppem: u32::from(size.x_ppem),
+                y_ppem: u32::from(size.y_ppem),
+            },
+        })
+    }
+
+    /// The code libass looks `c` up at; it never looks up zero.
+    fn code(&self, c: char) -> Option<u32> {
+        let c = u32::from(c);
+        let code = if self.symbol { c | 0xf000 } else { c };
+        (code != 0).then_some(code)
+    }
+
+    /// `Unsupported` for a glyph of the face, which FreeType would hint; a glyph
+    /// outside it does not load, which libass answers with nothing.
+    fn hinted<T>(&self, glyph: GlyphId, what: &'static str) -> Result<Option<T>> {
+        if glyph.0 < self.sized.font().glyph_count() {
+            Err(Error::Unsupported(what))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl Metrics for SizedMetrics<'_> {
+    fn scale(&self) -> Scale {
+        self.scale
+    }
+
+    fn nominal_glyph(&self, c: char) -> Option<GlyphId> {
+        self.charmap?.glyph(self.code(c)?)
+    }
+
+    fn variation_glyph(&self, c: char, selector: char) -> Option<GlyphId> {
+        let code = self.code(c).filter(|_| self.unicode)?;
+        match self.variations.lookup(code, u32::from(selector)) {
+            Variation::Default => self.charmap?.glyph(code),
+            Variation::Glyph(glyph) => Some(glyph),
+            Variation::None => None,
+        }
+    }
+
+    fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
+        unless_unloadable(self.sized.hinted_advance(glyph), 0)
+    }
+
+    fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>> {
+        self.hinted(glyph, "glyph extents of FreeType's hinted load")
+    }
+
+    fn contour_point(&self, glyph: GlyphId, _point: u16) -> Result<Option<(i32, i32)>> {
+        self.hinted(glyph, "contour points of FreeType's hinted load")
+    }
+
+    fn has_h_kerning(&self) -> bool {
+        true
+    }
+
+    fn h_kerning(&self, left: GlyphId, right: GlyphId) -> Result<i32> {
+        Ok(self.sized.kerning(left, right))
     }
 }
 
