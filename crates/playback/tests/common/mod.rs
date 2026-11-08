@@ -15,6 +15,7 @@ use triergon_isobmff::{BoxStep, EntryLayout, Limits};
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenProgress},
+    mp4_plan::Mp4IndexJob,
     *,
 };
 
@@ -26,17 +27,32 @@ pub fn off() -> AtomicBool {
     AtomicBool::new(false)
 }
 
-/// Advance an opener until it is ready to finish.
-pub fn run_open<S: Source>(open: &mut Mp4Open<S>, units: u64) -> Result<()> {
+/// Repeat `step` until it reports completion, panicking if it does not
+/// finish within the step allowance.
+pub fn bounded(what: &str, mut step: impl FnMut() -> Result<bool>) -> Result<()> {
     for _ in 0..STEPS {
-        if matches!(
-            open.advance(&mut WorkBudget::new(units), &off())?,
-            OpenProgress::Ready
-        ) {
+        if step()? {
             return Ok(());
         }
     }
-    panic!("MP4 open did not make bounded progress");
+    panic!("{what} did not make bounded progress");
+}
+
+/// Advance an opener until it is ready to finish.
+pub fn run_open<S: Source>(open: &mut Mp4Open<S>, units: u64) -> Result<()> {
+    bounded("MP4 open", || {
+        Ok(matches!(
+            open.advance(&mut WorkBudget::new(units), &off())?,
+            OpenProgress::Ready
+        ))
+    })
+}
+
+/// Advance an index job until its plan is ready.
+pub fn run_index(job: &mut Mp4IndexJob<'_>, units: u64) -> Result<()> {
+    bounded("MP4 index", || {
+        job.poll(&mut WorkBudget::new(units), &off())
+    })
 }
 
 /// An MP4 input served from memory, `quantum` bytes at a time.
@@ -61,17 +77,19 @@ pub fn read<S: Source>(player: &mut Player<S>, out: &mut Vec<Output>) -> Result<
     read_units(player, 1, out)
 }
 
-fn read_units<S: Source>(player: &mut Player<S>, units: u64, out: &mut Vec<Output>) -> Result<()> {
-    for _ in 0..STEPS {
+/// Advance a player to its end `units` at a time, appending what it delivers.
+pub fn read_units<S: Source>(
+    player: &mut Player<S>,
+    units: u64,
+    out: &mut Vec<Output>,
+) -> Result<()> {
+    bounded("player", || {
         let progress = player.advance(&mut WorkBudget::new(units), &off())?;
         while let Some(output) = player.pop() {
             out.push(output);
         }
-        if matches!(progress, Progress::Ended) {
-            return Ok(());
-        }
-    }
-    panic!("bounded fixture stalled");
+        Ok(matches!(progress, Progress::Ended))
+    })
 }
 
 /// Advance a player to its end and return what it delivered.

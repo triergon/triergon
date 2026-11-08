@@ -1,34 +1,42 @@
 //! Native MP4 packets against FFprobe over the terminal-media matrix.
 //!
-//! Each case is read through the native packet view once per source geometry:
-//! unknown and known length, three read sizes and two work quanta from a
-//! nonseekable source, and, for the original cases, once from a seekable
-//! source of known length. Every native packet is projected into FFprobe's
-//! packet object and compared field by field with the recorded output.
+//! Each input is read through the native packet view in twelve nonseekable
+//! source geometries (unknown and known length, read sizes 1, 7 and 4096, work
+//! quanta 1 and 4096), and each of the 31 original inputs, the ones whose
+//! record carries a seekable read, once more from a seekable source of known
+//! length. Each run is compared
+//! with FFprobe's record of the same kind of read: every packet the run
+//! delivers is projected into FFprobe's packet object and compared field by
+//! field, and where FFprobe refused the header the run must refuse while
+//! opening, before any packet.
 mod common;
-use common::off;
-use std::collections::BTreeMap;
-use triergon_core::{
-    Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, TimeBase, WorkBudget,
-};
+mod terminal_golds;
+
+use common::{byte_input, read_units, run_index, run_open};
+use terminal_golds::{CASES, Case, Packet, Probe};
+use triergon_core::{Budget, Error, SourceCapabilities, SourceId, TimeBase};
+use triergon_isobmff::compat::mov::packets::PacketOccurrence;
 use triergon_playback::{
-    io::{SelectedInput, SourceOwner},
-    mp4_open::{MetadataReadScope, Mp4Open, OpenLimits, OpenProgress},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits},
+    mp4_open::{MetadataReadScope, Mp4Open, OpenLimits, OpenedMp4},
+    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits, PreparedMp4},
     progressive::ProgressiveLimits,
     *,
 };
-#[allow(dead_code)]
-mod gold {
-    include!("fixtures/native_terminal_matrix_golds.rs");
-}
 
-const STEPS: usize = 2_000_000;
+/// Rows per build profile: twelve nonseekable reads of each of the 39 inputs
+/// and one seekable read of each of the 31 original ones.
+const ROWS: usize = 499;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug)]
 enum Opener {
     Strict,
     Recovery,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mode {
+    Pipe,
+    File,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -36,35 +44,30 @@ struct Geometry {
     known: bool,
     chunk: usize,
     work: u64,
-    file: bool,
+    mode: Mode,
 }
 
-fn geometries(original: bool) -> Vec<Geometry> {
-    let mut all = Vec::new();
-    for known in [false, true] {
-        for chunk in [1, 7, 4096] {
-            for work in [1, 4096] {
-                all.push(Geometry {
-                    known,
-                    chunk,
-                    work,
-                    file: false,
-                });
-            }
-        }
-    }
-    if original {
-        all.push(Geometry {
-            known: true,
-            chunk: 7,
-            work: 4096,
-            file: true,
-        });
-    }
-    all
+fn geometries(seekable: bool) -> impl Iterator<Item = Geometry> {
+    let pipe = [false, true].into_iter().flat_map(|known| {
+        [1, 7, 4096].into_iter().flat_map(move |chunk| {
+            [1, 4096].into_iter().map(move |work| Geometry {
+                known,
+                chunk,
+                work,
+                mode: Mode::Pipe,
+            })
+        })
+    });
+    let file = seekable.then_some(Geometry {
+        known: true,
+        chunk: 7,
+        work: 4096,
+        mode: Mode::File,
+    });
+    pipe.chain(file)
 }
 
-/// One FFprobe packet object, with FFprobe's field spelling.
+/// One FFprobe packet object, owned.
 #[derive(Debug, PartialEq, Eq)]
 struct Object {
     codec_type: &'static str,
@@ -81,8 +84,8 @@ struct Object {
     data: Vec<u8>,
 }
 
-impl From<&gold::Packet> for Object {
-    fn from(p: &gold::Packet) -> Self {
+impl From<&Packet> for Object {
+    fn from(p: &Packet) -> Self {
         Self {
             codec_type: p.codec_type,
             stream_index: p.stream_index,
@@ -110,17 +113,18 @@ fn seconds(ticks: i64, base: TimeBase) -> String {
     format!("{value:.6}")
 }
 
+/// FFprobe's media type of a handler; a handler it does not map is data.
 fn codec_type(handler: [u8; 4]) -> &'static str {
     match &handler {
         b"vide" => "video",
         b"soun" => "audio",
         b"text" | b"sbtl" | b"subt" => "subtitle",
-        _ => "unknown",
+        _ => "data",
     }
 }
 
-#[allow(clippy::too_many_arguments, reason = "one field per FFprobe key")]
-fn object(
+/// The FFprobe fields of one native packet.
+struct Native<'a> {
     handler: [u8; 4],
     stream_index: usize,
     base: TimeBase,
@@ -130,295 +134,402 @@ fn object(
     flags: u32,
     pos: u64,
     size: u64,
-    data: &[u8],
-) -> Object {
-    let flag = |bit: u32, c: char| if flags & bit != 0 { c } else { '_' };
-    Object {
-        codec_type: codec_type(handler),
-        stream_index,
-        pts,
-        pts_time: pts.map(|t| seconds(t, base)),
-        dts,
-        dts_time: dts.map(|t| seconds(t, base)),
-        duration: (duration != 0).then_some(duration),
-        duration_time: (duration != 0).then(|| seconds(duration, base)),
-        size: size.to_string(),
-        pos: Some(pos.to_string()),
-        flags: [flag(1, 'K'), flag(4, 'D'), flag(2, 'C')].iter().collect(),
-        data: data.to_vec(),
+    data: &'a [u8],
+}
+
+impl<'a> Native<'a> {
+    fn occurrence(
+        handler: [u8; 4],
+        stream_index: usize,
+        n: &PacketOccurrence,
+        size: u64,
+        data: &'a [u8],
+    ) -> Self {
+        Self {
+            handler,
+            stream_index,
+            base: n.media_clock.demux_base,
+            pts: n.demux.pts,
+            dts: n.demux.dts,
+            duration: n.demux.duration,
+            flags: n.demux.flags,
+            pos: n.demux.source_range.start,
+            size,
+            data,
+        }
+    }
+
+    fn object(&self) -> Object {
+        let flag = |bit: u32, c: char| if self.flags & bit != 0 { c } else { '_' };
+        let time = |ticks: i64| seconds(ticks, self.base);
+        Object {
+            codec_type: codec_type(self.handler),
+            stream_index: self.stream_index,
+            pts: self.pts,
+            pts_time: self.pts.map(time),
+            dts: self.dts,
+            dts_time: self.dts.map(time),
+            duration: (self.duration != 0).then_some(self.duration),
+            duration_time: (self.duration != 0).then(|| time(self.duration)),
+            size: self.size.to_string(),
+            pos: Some(self.pos.to_string()),
+            flags: [flag(1, 'K'), flag(4, 'D'), flag(2, 'C')].iter().collect(),
+            data: self.data.to_vec(),
+        }
     }
 }
 
-/// Project one delivered event into FFprobe's packet object, if the native
-/// view emits a packet for it.
-fn project(event: &RawEvent, tracks: &[u32]) -> Option<Object> {
+/// Project delivered outputs into FFprobe packet objects. Every event is
+/// accounted for: native packets, short packets and empty packets project;
+/// configurations and top-level boxes carry no FFprobe packet; source packets
+/// without a native occurrence may only follow the end of the native view.
+fn project(outputs: &[Output], tracks: &[u32]) -> Vec<Object> {
     let index = |id: u32| tracks.iter().position(|t| *t == id).expect("planned track");
-    match event {
-        RawEvent::Mp4(Mp4Event::Packet(p)) => {
-            let n = p.native.as_ref()?;
-            let range = &n.demux.source_range;
-            Some(object(
-                p.configuration.track.handler,
-                index(n.track_id),
-                n.media_clock.demux_base,
-                n.demux.pts,
-                n.demux.dts,
-                n.demux.duration,
-                n.demux.flags,
-                range.start,
-                range.end - range.start,
-                p.source.payload.as_ref(),
-            ))
-        }
-        RawEvent::Mp4(Mp4Event::NativeShortPacket(p)) => {
-            let n = &p.native;
-            Some(object(
-                p.configuration.track.handler,
-                index(n.track_id),
-                n.media_clock.demux_base,
-                n.demux.pts,
-                n.demux.dts,
-                n.demux.duration,
-                n.demux.flags,
-                n.demux.source_range.start,
-                p.prefix.payload.len() as u64,
-                p.prefix.payload.as_ref(),
-            ))
-        }
-        RawEvent::Mp4(Mp4Event::NativeEmptyPacket(e)) => Some(object(
-            e.handler,
-            index(e.boundary.track_id),
-            e.time_base,
-            Some(e.pts),
-            Some(e.dts),
-            e.duration,
-            e.flags,
-            e.position,
-            0,
-            &[],
-        )),
-        _ => None,
-    }
-}
-
-struct Run {
-    objects: Vec<Object>,
-    /// The phase and error of a run that did not reach the end.
-    failure: Option<(&'static str, Error)>,
-}
-
-fn run(raw: &[u8], g: Geometry, opener: Opener) -> Run {
+    let mut ended = false;
     let mut objects = Vec::new();
-    let mut phase = "open";
-    let failure = (|| -> Result<()> {
-        let pool = Budget::new(128 << 20)?;
-        let id = SourceId(9001);
-        let source = ByteSource::new(id, Bytes::copy_from_slice(&pool, raw)?, g.chunk)?;
-        let capabilities = SourceCapabilities {
-            length: g.known.then_some(raw.len() as u64),
-            random_access: g.file,
+    for output in outputs {
+        let event = match output.event() {
+            RawEvent::Mp4(event) => event,
+            RawEvent::Mp4Root(_) => continue,
+            other => panic!("unexpected event {other:?}"),
         };
-        let selected = SelectedInput {
-            input: InputCursor::new(&pool, id, capabilities, 4096)?,
-            source: SourceOwner::new(source),
-            format: Format::Mp4,
-        };
-        let mut open = match opener {
-            Opener::Strict => Mp4Open::new(selected, OpenLimits::default())?,
-            Opener::Recovery => Mp4Open::new_recovery(selected, OpenLimits::default())?,
-        };
-        let mut ready = false;
-        for _ in 0..STEPS {
-            if matches!(
-                open.advance(&mut WorkBudget::new(g.work), &off())?,
-                OpenProgress::Ready
-            ) {
-                ready = true;
-                break;
+        match event {
+            Mp4Event::Packet(p) => {
+                let Some(n) = &p.native else {
+                    assert!(
+                        ended,
+                        "source packet without a native occurrence in the native view"
+                    );
+                    continue;
+                };
+                assert!(!ended, "native packet after the end of the native view");
+                let range = &n.demux.source_range;
+                let size = range.end - range.start;
+                let (handler, data) = (p.configuration.track.handler, p.source.payload.as_ref());
+                let native = Native::occurrence(handler, index(n.track_id), n, size, data);
+                objects.push(native.object());
+                ended = p.native_front_read_boundary_v1.is_some();
             }
+            Mp4Event::NativeShortPacket(p) => {
+                assert!(!ended, "short packet after the end of the native view");
+                let n = &p.native;
+                let (handler, data) = (p.configuration.track.handler, p.prefix.payload.as_ref());
+                let native =
+                    Native::occurrence(handler, index(n.track_id), n, data.len() as u64, data);
+                objects.push(native.object());
+                ended = true;
+            }
+            Mp4Event::NativeEmptyPacket(e) => {
+                let empty = Native {
+                    handler: e.handler,
+                    stream_index: index(e.boundary.track_id),
+                    base: e.time_base,
+                    pts: Some(e.pts),
+                    dts: Some(e.dts),
+                    duration: e.duration,
+                    flags: e.flags,
+                    pos: e.position,
+                    size: 0,
+                    data: &[],
+                };
+                objects.push(empty.object());
+                ended = true;
+            }
+            Mp4Event::NativeMissingSample(_) => ended = true,
+            Mp4Event::Configuration(_) => {}
         }
-        assert!(ready, "bounded open");
-        let opened = open.finish()?;
-        phase = "index";
-        let front = matches!(
-            opened.movie.read_scope(),
-            MetadataReadScope::FrontMetadataBeforeMdat(_)
-        );
-        let mut job = if front {
-            Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default())?
-        } else {
-            Mp4IndexJob::new(
-                &opened.movie,
-                Mp4View::PinnedMov9NoParseNoFillin,
-                PlanLimits::default(),
-            )?
-        };
-        let mut ready = false;
-        for _ in 0..STEPS {
-            if job.poll(&mut WorkBudget::new(g.work), &off())? {
-                ready = true;
-                break;
-            }
-        }
-        assert!(ready, "bounded index");
-        let plan = job.finish()?;
-        let tracks: Vec<_> = plan.tracks().iter().map(|t| t.snapshot.track_id).collect();
-        phase = "attach";
-        let engine = if front {
-            Engine::mp4_native_terminal_v1(
-                opened.input,
-                plan,
-                1 << 20,
-                ProgressiveLimits::default(),
-            )?
-        } else {
-            Engine::mp4(opened.input, plan, 1 << 20)?
-        };
-        let mut player = Player::new(
-            engine,
-            opened.source,
-            Selection::All,
-            PlayerPolicy::default(),
-        )?;
-        phase = "read";
-        for _ in 0..STEPS {
-            let step = player.advance(&mut WorkBudget::new(g.work), &off());
-            while let Some(output) = player.pop() {
-                objects.extend(project(output.event(), &tracks));
-            }
-            if matches!(step?, Progress::Ended) {
-                return Ok(());
-            }
-        }
-        panic!("bounded read");
-    })()
-    .err()
-    .map(|error| (phase, error));
-    Run { objects, failure }
+    }
+    objects
 }
 
-/// The outcome class of one matrix row.
-fn verdict(case: &gold::Case, g: Geometry, opener: Opener) -> String {
-    let probe = match (&case.file, g.file) {
-        (Some(gold::File::Own(probe)), true) => probe,
-        (Some(gold::File::SameAsPipe), true) | (_, false) => &case.pipe,
-        (None, true) => panic!("file record"),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Stage {
+    Open,
+    Index,
+    Attach,
+    Read,
+}
+
+fn open(pool: &Budget, raw: &[u8], g: Geometry, opener: Opener) -> Result<OpenedMp4<ByteSource>> {
+    let capabilities = SourceCapabilities {
+        length: g.known.then_some(raw.len() as u64),
+        random_access: g.mode == Mode::File,
     };
-    let run = run(case.raw, g, opener);
-    let expected: Vec<Object> = probe.packets.iter().map(Object::from).collect();
-    match (&run.failure, probe.rc) {
-        (None, 0) if run.objects == expected => "match".into(),
-        (None, 0) => {
-            let at = run
-                .objects
-                .iter()
-                .zip(&expected)
-                .position(|(a, b)| a != b)
-                .unwrap_or(run.objects.len().min(expected.len()));
-            format!(
-                "packet difference at {at} ({} of {} packets)",
-                run.objects.len(),
-                expected.len()
-            )
+    let selected = byte_input(pool, SourceId(9001), raw, g.chunk, capabilities, 4096)?;
+    let mut open = match opener {
+        Opener::Strict => Mp4Open::new(selected, OpenLimits::default())?,
+        Opener::Recovery => Mp4Open::new_recovery(selected, OpenLimits::default())?,
+    };
+    run_open(&mut open, g.work)?;
+    open.finish()
+}
+
+/// Whether the opener read the metadata before any media, which only a
+/// nonseekable source with a front `moov` gives.
+fn front(opened: &OpenedMp4<ByteSource>) -> bool {
+    matches!(
+        opened.movie.read_scope(),
+        MetadataReadScope::FrontMetadataBeforeMdat(_)
+    )
+}
+
+fn index(opened: &OpenedMp4<ByteSource>, g: Geometry) -> Result<PreparedMp4> {
+    let mut job = if front(opened) {
+        Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default())?
+    } else {
+        let view = Mp4View::PinnedMov9NoParseNoFillin;
+        Mp4IndexJob::new(&opened.movie, view, PlanLimits::default())?
+    };
+    run_index(&mut job, g.work)?;
+    job.finish()
+}
+
+fn attach(opened: OpenedMp4<ByteSource>, plan: PreparedMp4) -> Result<Player<ByteSource>> {
+    let engine = if front(&opened) {
+        let limits = ProgressiveLimits::default();
+        Engine::mp4_native_terminal_v1(opened.input, plan, 1 << 20, limits)?
+    } else {
+        Engine::mp4(opened.input, plan, 1 << 20)?
+    };
+    let policy = PlayerPolicy::default();
+    Player::new(engine, opened.source, Selection::All, policy)
+}
+
+/// Open, index, attach and read one input, appending the planned tracks and
+/// what the player delivers.
+fn stages(
+    pool: &Budget,
+    raw: &[u8],
+    g: Geometry,
+    opener: Opener,
+    tracks: &mut Vec<u32>,
+    outputs: &mut Vec<Output>,
+) -> std::result::Result<(), (Stage, Error)> {
+    let opened = open(pool, raw, g, opener).map_err(|e| (Stage::Open, e))?;
+    assert!(
+        !front(&opened) || g.mode == Mode::Pipe,
+        "front read of a seekable source"
+    );
+    let plan = index(&opened, g).map_err(|e| (Stage::Index, e))?;
+    tracks.extend(plan.tracks().iter().map(|t| t.snapshot.track_id));
+    let mut player = attach(opened, plan).map_err(|e| (Stage::Attach, e))?;
+    read_units(&mut player, g.work, outputs).map_err(|e| (Stage::Read, e))
+}
+
+/// The objects one run delivered, and the stage and error of a run that did
+/// not reach the end.
+fn run(raw: &[u8], g: Geometry, opener: Opener) -> (Vec<Object>, Option<(Stage, Error)>) {
+    let pool = Budget::new(128 << 20).expect("test pool");
+    let (mut tracks, mut outputs) = (Vec::new(), Vec::new());
+    let failure = stages(&pool, raw, g, opener, &mut tracks, &mut outputs).err();
+    (project(&outputs, &tracks), failure)
+}
+
+/// The outcome of one matrix row.
+#[derive(Debug, PartialEq, Eq)]
+enum Outcome {
+    /// FFprobe printed packets and the run delivered the same objects.
+    Match,
+    /// FFprobe refused the header as invalid data and the run refused while
+    /// opening, with invalid, truncated or overflowing data, before any packet.
+    MatchingRefusal,
+    /// Both completed, and the objects first differ at `at`.
+    Differs {
+        at: usize,
+        delivered: usize,
+        expected: usize,
+    },
+    /// FFprobe printed packets and the run refused.
+    Refused(Stage, Error),
+    /// FFprobe refused the header and the run completed.
+    Completed { delivered: usize },
+    /// FFprobe refused the header and the run refused elsewhere.
+    RefusedElsewhere(Stage, Error),
+}
+
+fn verdict(case: &Case, g: Geometry, opener: Opener) -> Outcome {
+    let probe = match g.mode {
+        Mode::Pipe => &case.pipe,
+        Mode::File => case.seekable().expect("file record"),
+    };
+    let (objects, failure) = run(case.raw, g, opener);
+    match (probe, failure) {
+        (Probe::Packets(expected), None) => {
+            let expected: Vec<Object> = expected.iter().map(Object::from).collect();
+            match objects.iter().zip(&expected).position(|(a, b)| a != b) {
+                None if objects.len() == expected.len() => Outcome::Match,
+                at => Outcome::Differs {
+                    at: at.unwrap_or(objects.len().min(expected.len())),
+                    delivered: objects.len(),
+                    expected: expected.len(),
+                },
+            }
         }
-        (Some((phase, error)), 0) => format!("{phase}: {error:?}"),
-        (None, rc) => format!(
-            "FFprobe rc {rc}; Triergon completed {} packets",
-            run.objects.len()
-        ),
-        (Some((phase, error)), rc) => format!("FFprobe rc {rc}; {phase}: {error:?}"),
+        (Probe::Packets(_), Some((stage, error))) => Outcome::Refused(stage, error),
+        (
+            Probe::InvalidHeader,
+            Some((Stage::Open, Error::Invalid(_) | Error::Truncated | Error::Overflow)),
+        ) if objects.is_empty() => Outcome::MatchingRefusal,
+        (Probe::InvalidHeader, None) => Outcome::Completed {
+            delivered: objects.len(),
+        },
+        (Probe::InvalidHeader, Some((stage, error))) => Outcome::RefusedElsewhere(stage, error),
     }
 }
 
-fn matrix(opener: Opener) -> BTreeMap<(String, &'static str, String), usize> {
-    let mut rows = BTreeMap::new();
-    for (at, case) in gold::CASES.iter().enumerate() {
-        let original = case.file.is_some();
-        assert_eq!(original, at < 31);
-        for g in geometries(original) {
-            let mode = if g.file { "file" } else { "pipe" };
-            *rows
-                .entry((case.name.to_owned(), mode, verdict(case, g, opener)))
-                .or_default() += 1;
+type Row = (&'static str, Mode, usize, Outcome);
+
+/// The rows of the matrix that do not match, by input, mode and outcome in
+/// matrix order, and the number of matching rows.
+fn assert_matrix(opener: Opener, matches: usize, others: &[Row]) {
+    let mut rows: Vec<Row> = Vec::new();
+    for case in CASES {
+        for g in geometries(case.seekable().is_some()) {
+            let outcome = verdict(case, g, opener);
+            match rows
+                .iter_mut()
+                .find(|r| r.0 == case.name && r.1 == g.mode && r.3 == outcome)
+            {
+                Some(row) => row.2 += 1,
+                None => rows.push((case.name, g.mode, 1, outcome)),
+            }
         }
     }
-    rows
+    assert_eq!(rows.iter().map(|r| r.2).sum::<usize>(), ROWS, "matrix rows");
+    let (matched, rest): (Vec<Row>, Vec<Row>) =
+        rows.into_iter().partition(|r| r.3 == Outcome::Match);
+    assert_eq!(rest, others, "{opener:?} rows that do not match");
+    assert_eq!(
+        matched.iter().map(|r| r.2).sum::<usize>(),
+        matches,
+        "{opener:?} matches"
+    );
 }
 
-type Row = (&'static str, &'static str, usize, &'static str);
-
-/// Every row that does not match, by case, mode and outcome, and the number
-/// of matching rows.
-fn assert_matrix(opener: Opener, matches: usize, nonpasses: &[Row]) {
-    let rows = matrix(opener);
-    assert_eq!(rows.values().sum::<usize>(), 499, "matrix rows");
-    let observed: Vec<Row> = rows
-        .iter()
-        .filter(|((_, _, verdict), _)| verdict != "match")
-        .map(|((case, mode, verdict), count)| {
-            let known = nonpasses
-                .iter()
-                .find(|row| row.0 == case && row.1 == *mode && row.3 == verdict);
-            known.map_or_else(
-                || panic!("{opener:?}: {count} {mode} rows of {case}: {verdict}"),
-                |row| (row.0, row.1, *count, row.3),
-            )
-        })
-        .collect();
-    assert_eq!(observed, nonpasses, "{opener:?} nonpasses");
-    let matched: usize = rows
-        .iter()
-        .filter(|((_, _, verdict), _)| verdict == "match")
-        .map(|(_, count)| count)
-        .sum();
-    assert_eq!(matched, matches, "{opener:?} matches");
-}
-
-/// With the MOV recovery opener every row matches FFprobe except the two
-/// seekable reads that FFprobe itself refuses: a zero-size fragment sample
-/// fails its header, and the recovery opener refuses the same header.
+/// With the MOV recovery opener every row matches FFprobe. Two are matching
+/// refusals: from a seekable source FFprobe refuses the header of a file with
+/// a zero-size fragment sample, and the recovery opener refuses it while
+/// opening.
 #[test]
 fn recovery_native_view_matches_ffprobe_on_the_terminal_matrix() {
-    const REFUSAL: &str =
-        "FFprobe rc 1; open: Invalid(\"zero-size fragment sample in native MOV header\")";
     assert_matrix(
         Opener::Recovery,
         497,
         &[
-            ("open-ended--empty-sample-terminal", "file", 1, REFUSAL),
-            ("progressive--pending-empty-endpoint", "file", 1, REFUSAL),
+            (
+                "open-ended--empty-sample-terminal",
+                Mode::File,
+                1,
+                Outcome::MatchingRefusal,
+            ),
+            (
+                "progressive--pending-empty-endpoint",
+                Mode::File,
+                1,
+                Outcome::MatchingRefusal,
+            ),
         ],
     );
 }
 
-/// The strict opener reads the same matrix by the source rules. It refuses
-/// out-of-source chunk offsets, truncated samples and a zero media timescale
-/// instead of recovering them, and it reads the zero-size fragment samples
-/// that FFprobe refuses on a seekable source.
+/// The strict opener reads the same matrix by the source rules and recovers
+/// nothing.
+///
+/// - It reads the zero-size fragment samples that FFprobe refuses from a
+///   seekable source.
+/// - It refuses a zero media timescale while opening.
+/// - It refuses a chunk offset outside the source while indexing. On a source
+///   of unknown length this is a known defect: the first chunk lies beyond the
+///   end of the file and the next one before it, and the index refuses the
+///   decreasing offsets as an unsupported layout before the `mdat` extent that
+///   would show the first chunk outside the source is known, so malformed data
+///   is reported as `Unsupported`.
+/// - It refuses a sample that runs past the end of the source. When the
+///   source declares its length, a final `mdat` of size zero has a known end,
+///   and a sample beyond it is outside the media extent (`Invalid`); when it
+///   does not, the source ends inside the sample (`Truncated`). A final `mdat`
+///   whose declared size runs past a declared length is refused as
+///   `Truncated` while opening, and while reading when the length is unknown.
 #[test]
 fn strict_native_view_refuses_malformed_media_on_the_terminal_matrix() {
-    const OUTSIDE: &str = "index: Invalid(\"sample outside media extent\")";
-    const ORDER: &str =
-        "index: Unsupported(\"physical merge needs nondecreasing per-track source offsets\")";
-    const ZERO_SCALE: &str = "open: Invalid(\"zero media/movie timescale\")";
-    const ZERO_SIZE: &str = "FFprobe rc 1; Triergon completed 9 packets";
-    const SHORT: &str = "read: Invalid(\"sample outside media extent\")";
+    use Mode::{File, Pipe};
+    use Outcome::{Completed, Refused};
+    use Stage::{Index, Open, Read};
+    const OUTSIDE: Error = Error::Invalid("sample outside media extent");
+    const LAYOUT: Error =
+        Error::Unsupported("physical merge needs nondecreasing per-track source offsets");
+    const ZERO_SCALE: Error = Error::Invalid("zero media/movie timescale");
     assert_matrix(
         Opener::Strict,
         446,
         &[
-            ("mp4--bad-chunk-offset-outside-source", "file", 1, OUTSIDE),
-            ("mp4--bad-chunk-offset-outside-source", "pipe", 6, OUTSIDE),
-            ("mp4--bad-chunk-offset-outside-source", "pipe", 6, ORDER),
-            ("mp4--bad-truncate-final-byte", "file", 1, "open: Truncated"),
-            ("mp4--bad-truncate-final-byte", "pipe", 6, "open: Truncated"),
-            ("mp4--bad-truncate-final-byte", "pipe", 6, "read: Truncated"),
-            ("mp4--bad-zero-timescale", "file", 1, ZERO_SCALE),
-            ("mp4--bad-zero-timescale", "pipe", 12, ZERO_SCALE),
-            ("open-ended--empty-sample-terminal", "file", 1, ZERO_SIZE),
-            ("progressive--pending-empty-endpoint", "file", 1, ZERO_SIZE),
-            ("short-before-empty", "pipe", 6, SHORT),
-            ("short-before-empty", "pipe", 6, "read: Truncated"),
+            (
+                "open-ended--empty-sample-terminal",
+                File,
+                1,
+                Completed { delivered: 9 },
+            ),
+            (
+                "progressive--pending-empty-endpoint",
+                File,
+                1,
+                Completed { delivered: 9 },
+            ),
+            (
+                "mp4--bad-chunk-offset-outside-source",
+                Pipe,
+                6,
+                Refused(Index, LAYOUT),
+            ),
+            (
+                "mp4--bad-chunk-offset-outside-source",
+                Pipe,
+                6,
+                Refused(Index, OUTSIDE),
+            ),
+            (
+                "mp4--bad-chunk-offset-outside-source",
+                File,
+                1,
+                Refused(Index, OUTSIDE),
+            ),
+            (
+                "mp4--bad-truncate-final-byte",
+                Pipe,
+                6,
+                Refused(Read, Error::Truncated),
+            ),
+            (
+                "mp4--bad-truncate-final-byte",
+                Pipe,
+                6,
+                Refused(Open, Error::Truncated),
+            ),
+            (
+                "mp4--bad-truncate-final-byte",
+                File,
+                1,
+                Refused(Open, Error::Truncated),
+            ),
+            (
+                "mp4--bad-zero-timescale",
+                Pipe,
+                12,
+                Refused(Open, ZERO_SCALE),
+            ),
+            (
+                "mp4--bad-zero-timescale",
+                File,
+                1,
+                Refused(Open, ZERO_SCALE),
+            ),
+            (
+                "short-before-empty",
+                Pipe,
+                6,
+                Refused(Read, Error::Truncated),
+            ),
+            ("short-before-empty", Pipe, 6, Refused(Read, OUTSIDE)),
         ],
     );
 }

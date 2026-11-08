@@ -20,6 +20,7 @@ mod harness;
 mod isobmff_bench;
 mod json;
 mod numpy;
+mod playback_golds;
 mod prepare;
 mod process;
 mod progressive_bench;
@@ -67,6 +68,10 @@ commands:
   evidence pack DIR OUT       deterministic .tar.gz of DIR; prints its SHA-256
   evidence fetch SET [DIR]    fetch, verify and unpack an archived evidence set
                               (harness/evidence/index.json; TRIERGON_EVIDENCE_ARCHIVE)
+  playback-golds DIR [--check]
+                 convert the FFprobe captures of evidence set playback-terminal-matrix-ffprobe,
+                 unpacked in DIR, into the playback terminal-media records; --check compares
+                 them with the committed records
   fuzz           --manifest F --output DIR [--rounds N] [--seed N] [--maximum-input-bytes N]
                  [--maximum-output-bytes N] [--timeout-seconds S]
                  deterministic, replayable mutation campaign through JSON workers
@@ -184,6 +189,9 @@ fn main() -> ExitCode {
         Some("graph") => graph(&root, &args[1..]),
         Some("fuzz") => return fuzz_campaign(&root, &args[1..]),
         Some("evidence") => evidence(&root, &args[1..]),
+        Some("playback-golds") => {
+            playback_golds::main(&root, &args[1..]).map(|summary| println!("{summary}"))
+        }
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
