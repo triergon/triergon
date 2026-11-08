@@ -1,10 +1,23 @@
 //! Deblocking filter process (clause 8.7), applied to the whole decoded picture after all of
 //! its slices are reconstructed. Supports frames, field pictures and MBAFF frames.
 
-use crate::mbinfo::{Kind, MbInfo};
-use crate::picture::Motion;
+use crate::mbinfo::{Kind, MbInfo, SliceDbk};
+use crate::picture::{FrameBuf, Motion};
 use crate::slicedec::CurPic;
 use crate::tables::{ALPHA, BETA, TC0};
+use triergon_codec::{Budget, BudgetVec, StorageError};
+
+/// What the filter reads of the picture, borrowed beside its sample planes and the
+/// motion summaries it writes.
+struct PicView<'a> {
+    mbs: &'a [MbInfo],
+    slices: &'a [SliceDbk],
+    motion: &'a Motion,
+    w: usize,
+    structure: u8,
+    mbaff: bool,
+    chroma: bool,
+}
 
 /// Plane view used by the deblocking filter (field pictures see one field).
 struct View {
@@ -14,7 +27,7 @@ struct View {
 
 /// p MB address and its local luma row for picture row `r` at MB column `mbx`.
 #[inline]
-fn mb_at_row(pic: &CurPic, mbx: usize, r: usize) -> (usize, usize) {
+fn mb_at_row(pic: &PicView<'_>, mbx: usize, r: usize) -> (usize, usize) {
     if pic.mbaff {
         let py = r / 32;
         let top = 2 * (py * pic.w + mbx);
@@ -31,7 +44,7 @@ fn mb_at_row(pic: &CurPic, mbx: usize, r: usize) -> (usize, usize) {
 
 /// Luma origin row and line step (dy) of an MB in picture coordinates (6.4.1).
 #[inline]
-fn mb_origin(pic: &CurPic, addr: usize) -> (usize, usize, usize, bool) {
+fn mb_origin(pic: &PicView<'_>, addr: usize) -> (usize, usize, usize, bool) {
     if pic.mbaff {
         let pair = addr / 2;
         let mbx = pair % pic.w;
@@ -522,24 +535,35 @@ fn filter_chroma(l: &mut Lanes, pr: &LineParams, _n: usize) {
 #[derive(Debug)]
 pub(crate) struct Progress {
     /// Macroblocks still to be decoded per row.
-    left: Vec<u32>,
+    left: BudgetVec<u32>,
     /// Macroblocks per row.
     unit: usize,
     /// Next row to filter.
     next: usize,
     /// Uniform motion summaries of the macroblocks filtered so far.
-    uni: Vec<Uni>,
+    uni: BudgetVec<Uni>,
 }
 
 impl Progress {
-    pub(crate) fn new(w: usize, h: usize, mbaff: bool) -> Self {
-        let (unit, rows) = if mbaff { (2 * w, h / 2) } else { (w, h) };
+    pub(crate) fn new(budget: &Budget) -> Self {
         Progress {
-            left: vec![unit as u32; rows],
-            unit,
+            left: BudgetVec::new(budget),
+            unit: 0,
             next: 0,
-            uni: vec![NOT_UNI; w * h],
+            uni: BudgetVec::new(budget),
         }
+    }
+
+    /// Restarts for a picture of `w` x `h` macroblocks, reusing the arrays.
+    pub(crate) fn reset(&mut self, w: usize, h: usize, mbaff: bool) -> Result<(), StorageError> {
+        let (unit, rows) = if mbaff { (2 * w, h / 2) } else { (w, h) };
+        self.left.clear();
+        self.left.try_resize(rows, unit as u32)?;
+        self.uni.clear();
+        self.uni.try_resize(w * h, NOT_UNI)?;
+        self.unit = unit;
+        self.next = 0;
+        Ok(())
     }
 }
 
@@ -599,24 +623,30 @@ fn advance(pic: &mut CurPic, all: bool) {
             },
         )
     };
-    let mut y = std::mem::take(&mut pic.buf.y);
-    let mut cb = std::mem::take(&mut pic.buf.cb);
-    let mut cr = std::mem::take(&mut pic.buf.cr);
-    let mut uni = std::mem::take(&mut pic.dbk.uni);
-    let unit = pic.dbk.unit;
+    let CurPic {
+        buf: FrameBuf { y, cb, cr, .. },
+        dbk,
+        ..
+    } = pic;
+    let pic = PicView {
+        mbs: &pic.mbs,
+        slices: &pic.slices,
+        motion: &pic.motion,
+        w: pic.w,
+        structure: pic.structure,
+        mbaff: pic.mbaff,
+        chroma: pic.chroma,
+    };
+    let unit = dbk.unit;
     while start < end {
         for addr in start * unit..(start + 1) * unit {
             if pic.mbs[addr].slice == 0 {
                 continue;
             }
-            deblock_mb(pic, &mut uni, addr, &vy, &vc, &mut y, &mut cb, &mut cr);
+            deblock_mb(&pic, &mut dbk.uni, addr, &vy, &vc, y, cb, cr);
         }
         start += 1;
     }
-    pic.dbk.uni = uni;
-    pic.buf.y = y;
-    pic.buf.cb = cb;
-    pic.buf.cr = cr;
 }
 
 /// bS = 1 / 0 decision from motion data (8.7.2.1, the "different reference pictures or motion
@@ -703,7 +733,7 @@ fn internal_bs(ctx: &BsCtx<'_>, q: usize) -> ([[u8; 4]; 4], [[u8; 4]; 4]) {
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn deblock_mb(
-    pic: &CurPic,
+    pic: &PicView<'_>,
     uni: &mut [Uni],
     addr: usize,
     vy: &View,
@@ -720,11 +750,11 @@ fn deblock_mb(
     let field_pic = pic.structure != 0;
     let q_intra = q.kind.is_intra();
     if !q_intra {
-        uni[addr] = uniform_motion(&pic.motion, addr);
+        uni[addr] = uniform_motion(pic.motion, addr);
     }
     let ctx = BsCtx {
-        mbs: &pic.mbs,
-        motion: &pic.motion,
+        mbs: pic.mbs,
+        motion: pic.motion,
         uni,
         field_pic,
         mbaff: pic.mbaff,

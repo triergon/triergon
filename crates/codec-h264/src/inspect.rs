@@ -6,6 +6,7 @@ use crate::ps::{Pps, Sps, parse_pps, parse_sps};
 use crate::slice::{SliceType, parse_slice_header, peek_pps_id};
 use std::collections::BTreeSet;
 use triergon_bitstream::BitReader;
+use triergon_codec::{Budget, BudgetVec};
 
 #[derive(Debug, Default, Clone)]
 pub struct StreamFeatures {
@@ -48,12 +49,17 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
     let mut f = StreamFeatures::default();
     let mut spss: Vec<Option<Box<Sps>>> = vec![None; 32];
     let mut ppss: Vec<Option<Box<Pps>>> = vec![None; 256];
-    let mut buf = Vec::new();
+    let Ok(pool) = Budget::new(crate::Limits::default().live_storage_bytes) else {
+        return f;
+    };
+    let mut buf = BudgetVec::new(&pool);
     let mut slices_in_pic = 0u32;
     for nal in NalIter::new(data) {
         let Some(h) = parse_header(nal) else { continue };
         f.nal_types.insert(h.nal_unit_type);
-        let len = unescape(&nal[1..], &mut buf);
+        let Ok(len) = unescape(&nal[1..], &mut buf) else {
+            continue;
+        };
         let mut r = BitReader::with_end(&buf, len * 8);
         match h.nal_unit_type {
             7 => match parse_sps(&mut r) {
