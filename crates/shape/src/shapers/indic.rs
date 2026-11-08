@@ -6,7 +6,7 @@
 
 use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Machine, for_each_syllable, syllable_type};
-use crate::buffer::{Buffer, Info};
+use crate::buffer::{Buffer, Info, ShaperProps};
 use crate::face::Face;
 use crate::metrics::Scaled;
 use crate::ot::would_apply::would_substitute;
@@ -260,15 +260,21 @@ static MACHINE: Machine = Machine::new(&[
 ]);
 
 fn category(info: &Info) -> Cat {
-    Cat::from_index(info.shaper[0])
+    match info.shaper {
+        ShaperProps::Indic(category, _) => category,
+        _ => Cat::X,
+    }
 }
 
 fn position(info: &Info) -> Pos {
-    Pos::from_index(info.shaper[1])
+    match info.shaper {
+        ShaperProps::Indic(_, position) => position,
+        _ => Pos::Start,
+    }
 }
 
 fn set_position(info: &mut Info, position: Pos) {
-    info.shaper[1] = position as u8;
+    info.shaper = ShaperProps::Indic(category(info), position);
 }
 
 /// Whether the glyph is of one of `categories` and has not ligated (after
@@ -310,7 +316,7 @@ fn ligated_and_didnt_multiply(info: &Info) -> bool {
 pub(super) fn setup_masks(buffer: &mut Buffer) {
     for info in buffer.infos_mut() {
         let (category, position) = unicode::indic_properties(info.glyph);
-        info.shaper = [category as u8, position as u8];
+        info.shaper = ShaperProps::Indic(category, position);
     }
 }
 
@@ -428,7 +434,7 @@ pub(super) fn pause(
             }
             let circle = DottedCircle {
                 broken: Syllable::Broken as u8,
-                shaper: [Cat::DottedCircle as u8, Pos::End as u8],
+                shaper: ShaperProps::Indic(Cat::DottedCircle, Pos::End),
                 after: Some(Cat::Repha as u8),
             };
             syllabic::insert_dotted_circles(buffer, font, circle)?;
@@ -814,7 +820,7 @@ fn final_reordering(
         // still a halant.
         for info in &mut buffer.infos_mut()[start..end] {
             if info.glyph == virama && info.ligated() && info.multiplied() {
-                info.shaper[0] = Cat::H as u8;
+                info.shaper = ShaperProps::Indic(Cat::H, position(info));
                 info.glyph_props = info.glyph_props.without_ligation();
             }
         }

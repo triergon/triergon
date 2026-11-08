@@ -14,6 +14,9 @@ mod testing;
 mod thai;
 mod universal;
 
+pub(crate) use arabic::Action as ArabicAction;
+pub(crate) use hangul::Jamo;
+
 use crate::buffer::Buffer;
 use crate::face::Face;
 use crate::metrics::Scaled;

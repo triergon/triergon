@@ -3,7 +3,7 @@
 
 use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Expr, Machine, for_each_syllable, syllable_type};
-use crate::buffer::{Buffer, Info};
+use crate::buffer::{Buffer, Info, ShaperProps};
 use crate::metrics::Scaled;
 use crate::plan::{Builder, FeatureFlags};
 use crate::unicode::{IndicCategory as Cat, IndicPosition as Pos};
@@ -154,15 +154,21 @@ static MACHINE: Machine = Machine::new(&[
 ]);
 
 fn category(info: &Info) -> Cat {
-    Cat::from_index(info.shaper[0])
+    match info.shaper {
+        ShaperProps::Indic(category, _) => category,
+        _ => Cat::X,
+    }
 }
 
 fn position(info: &Info) -> Pos {
-    Pos::from_index(info.shaper[1])
+    match info.shaper {
+        ShaperProps::Indic(_, position) => position,
+        _ => Pos::Start,
+    }
 }
 
 fn set_position(info: &mut Info, position: Pos) {
-    info.shaper[1] = position as u8;
+    info.shaper = ShaperProps::Indic(category(info), position);
 }
 
 fn is_consonant(info: &Info) -> bool {
@@ -179,7 +185,7 @@ pub(super) fn pause(step: Step, buffer: &mut Buffer, font: &Scaled<'_>) -> Resul
         Step::Reorder => {
             let circle = DottedCircle {
                 broken: Syllable::Broken as u8,
-                shaper: [Cat::DottedCircle as u8, Pos::Start as u8],
+                shaper: ShaperProps::Indic(Cat::DottedCircle, Pos::Start),
                 after: None,
             };
             syllabic::insert_dotted_circles(buffer, font, circle)?;
@@ -246,7 +252,7 @@ fn reorder_syllable(buffer: &mut Buffer, range: Range<usize>) -> Result<()> {
         set_position(&mut infos[i], new);
     }
 
-    buffer.sort_by_key(start, end, |info| info.shaper[1])?;
+    buffer.sort_by_key(start, end, |info| position(info) as u8)?;
 
     let infos = buffer.infos();
     let mut left = (start..end).filter(|&i| position(&infos[i]) == Pos::PreM);

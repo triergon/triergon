@@ -2,7 +2,7 @@
 //! combining marks.
 
 use super::Pause;
-use crate::buffer::{Buffer, Info};
+use crate::buffer::{Buffer, Info, ShaperProps};
 use crate::face::Face;
 use crate::metrics::Scaled;
 use crate::plan::{Builder, FeatureFlags, Plan};
@@ -17,7 +17,7 @@ const FEATURES: [&[u8; 4]; 7] = [
 /// What a glyph's joining asks for: one of [`FEATURES`], or a `stch` tile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-enum Action {
+pub(crate) enum Action {
     Isol,
     Fina,
     Fin2,
@@ -31,28 +31,20 @@ enum Action {
 }
 
 impl Action {
-    const ALL: [Self; 10] = [
-        Self::Isol,
-        Self::Fina,
-        Self::Fin2,
-        Self::Fin3,
-        Self::Medi,
-        Self::Med2,
-        Self::Init,
-        Self::None,
-        Self::StchFixed,
-        Self::StchRepeating,
-    ];
-
     fn of(info: &Info) -> Self {
-        Self::ALL
-            .get(usize::from(info.shaper[0]))
-            .copied()
-            .unwrap_or(Self::None)
+        match info.shaper {
+            ShaperProps::Arabic(action) => action,
+            _ => Self::None,
+        }
     }
 
     fn set(self, info: &mut Info) {
-        info.shaper[0] = self as u8;
+        info.shaper = ShaperProps::Arabic(self);
+    }
+
+    /// The mask of the form feature the action applies, if any.
+    fn mask(self, masks: &[u32; 7]) -> u32 {
+        masks.get(self as usize).copied().unwrap_or(0)
     }
 
     fn is_stch(self) -> bool {
@@ -230,9 +222,7 @@ pub(super) fn setup_masks(plan: &Plan, buffer: &mut Buffer) {
     }
     let masks = FEATURES.map(|tag| plan.one_mask(tag));
     for info in buffer.infos_mut() {
-        if let Some(&mask) = masks.get(usize::from(info.shaper[0])) {
-            info.mask |= mask;
-        }
+        info.mask |= Action::of(info).mask(&masks);
     }
 }
 
@@ -243,9 +233,9 @@ pub(super) fn copy_to_mongolian_variation_selectors(plan: &Plan, buffer: &mut Bu
     let infos = buffer.infos_mut();
     for i in 1..infos.len() {
         if matches!(infos[i].glyph, 0x180B..=0x180D | 0x180F) {
-            let action = infos[i - 1].shaper[0];
-            infos[i].shaper[0] = action;
-            infos[i].mask |= masks.get(usize::from(action)).copied().unwrap_or(0);
+            let action = Action::of(&infos[i - 1]);
+            action.set(&mut infos[i]);
+            infos[i].mask |= action.mask(&masks);
         }
     }
 }

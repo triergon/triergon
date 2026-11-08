@@ -7,7 +7,7 @@
 use super::Pause;
 use super::arabic;
 use super::syllabic::{self, ANY, DottedCircle, Expr, Machine, for_each_syllable, syllable_type};
-use crate::buffer::{Buffer, Info};
+use crate::buffer::{Buffer, Info, ShaperProps};
 use crate::metrics::Scaled;
 use crate::plan::{Builder, FeatureFlags, Plan};
 use crate::tag::Script;
@@ -252,11 +252,14 @@ static MACHINE: Machine = {
 };
 
 fn category(info: &Info) -> Cat {
-    Cat::from_index(info.shaper[0])
+    match info.shaper {
+        ShaperProps::Use(category) => category,
+        _ => Cat::O,
+    }
 }
 
 fn set_category(info: &mut Info, category: Cat) {
-    info.shaper[0] = category as u8;
+    info.shaper = ShaperProps::Use(category);
 }
 
 /// Scripts whose letters join as Arabic letters do.
@@ -356,7 +359,7 @@ pub(super) fn pause(
         Step::Reorder => {
             let circle = DottedCircle {
                 broken: Syllable::Broken as u8,
-                shaper: [Cat::B as u8, 0],
+                shaper: ShaperProps::Use(Cat::B),
                 after: Some(Cat::R as u8),
             };
             syllabic::insert_dotted_circles(buffer, font, circle)?;

@@ -5,7 +5,7 @@
 //! Hangul fonts are not designed to mix precomposed syllables and jamo, so
 //! normalisation does not compose for this script.
 
-use crate::buffer::{Buffer, Info};
+use crate::buffer::{Buffer, Info, ShaperProps};
 use crate::metrics::Scaled;
 use crate::plan::{Builder, FeatureFlags, Plan};
 use std::ops::Range;
@@ -17,7 +17,7 @@ const FEATURES: [&[u8; 4]; 3] = [b"ljmo", b"vjmo", b"tjmo"];
 /// The jamo feature a glyph gets, kept in the glyph's first shaper byte.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-enum Jamo {
+pub(crate) enum Jamo {
     None,
     Leading,
     Vowel,
@@ -26,16 +26,14 @@ enum Jamo {
 
 impl Jamo {
     fn of(info: &Info) -> Self {
-        match info.shaper[0] {
-            1 => Self::Leading,
-            2 => Self::Vowel,
-            3 => Self::Trailing,
+        match info.shaper {
+            ShaperProps::Hangul(jamo) => jamo,
             _ => Self::None,
         }
     }
 
     fn set(self, info: &mut Info) {
-        info.shaper[0] = self as u8;
+        info.shaper = ShaperProps::Hangul(self);
     }
 
     fn feature(self) -> Option<&'static [u8; 4]> {

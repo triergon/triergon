@@ -3,7 +3,7 @@
 
 use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Machine, for_each_syllable, syllable_type};
-use crate::buffer::{Buffer, Info};
+use crate::buffer::{Buffer, Info, ShaperProps};
 use crate::metrics::Scaled;
 use crate::plan::{Builder, FeatureFlags, Plan};
 use crate::unicode::{self, IndicCategory as Cat, IndicPosition as Pos};
@@ -110,7 +110,10 @@ static MACHINE: Machine = Machine::new(&[
 ]);
 
 fn category(info: &Info) -> Cat {
-    Cat::from_index(info.shaper[0])
+    match info.shaper {
+        ShaperProps::Indic(category, _) => category,
+        _ => Cat::X,
+    }
 }
 
 pub(super) fn pause(
@@ -124,7 +127,7 @@ pub(super) fn pause(
         Step::Reorder => {
             let circle = DottedCircle {
                 broken: Syllable::Broken as u8,
-                shaper: [Cat::DottedCircle as u8, Pos::Start as u8],
+                shaper: ShaperProps::Indic(Cat::DottedCircle, Pos::Start),
                 after: None,
             };
             syllabic::insert_dotted_circles(buffer, font, circle)?;

@@ -11,7 +11,7 @@
 //! scanners do, each syllable is the longest match of any rule, the earliest
 //! rule winning among equally long ones.
 
-use crate::buffer::{Buffer, Info, UnicodeProps};
+use crate::buffer::{Buffer, Info, ShaperProps, UnicodeProps};
 use crate::metrics::Scaled;
 use crate::tag::Script;
 use crate::unicode::vowel_constraints;
@@ -302,7 +302,8 @@ pub(super) fn find_syllables(
     let mut serial = 1;
     while start < len {
         let infos = buffer.infos();
-        let categories = visible(infos, start, &skipped).map(|i| infos[i].shaper[0]);
+        let categories =
+            visible(infos, start, &skipped).map(|i| infos[i].shaper.syllabic_category());
         let (found, read) = machine.longest(categories);
         let (length, kind) = found.unwrap_or((1, 0));
         let end = visible(infos, start, &skipped).nth(length).unwrap_or(len);
@@ -353,8 +354,9 @@ pub(super) struct DottedCircle {
     /// The syllable type of broken syllables.
     pub(super) broken: u8,
     /// The shaper values of the dotted circle.
-    pub(super) shaper: [u8; 2],
-    /// A category the dotted circle goes after, at the start of the syllable.
+    pub(super) shaper: ShaperProps,
+    /// A category (by its discriminant) the dotted circle goes after, at the
+    /// start of the syllable.
     pub(super) after: Option<u8>,
 }
 
@@ -390,7 +392,7 @@ pub(super) fn insert_dotted_circles(
         if let Some(after) = circle.after {
             while buffer.idx < buffer.len()
                 && buffer.cur().syllable == last_syllable
-                && buffer.cur().shaper[0] == after
+                && buffer.cur().shaper.syllabic_category() == after
             {
                 buffer.next_glyph()?;
             }
@@ -448,6 +450,7 @@ pub(super) fn insert_vowel_constraint_circles(script: Script, buffer: &mut Buffe
 mod tests {
     use super::*;
     use crate::shapers::testing::{TestFont, contents, scaled, text_buffer};
+    use crate::unicode::{IndicCategory, IndicPosition};
     use triergon_core::Budget;
 
     const CONSONANT: u8 = 0;
@@ -469,11 +472,21 @@ mod tests {
         (ANY, OTHER),
     ]);
 
+    /// Shaper values whose grammar category is `category`.
+    fn props(category: u8) -> ShaperProps {
+        use IndicCategory::{A, C, M, N, V, X};
+        let indic = [X, C, V, N, M, A]
+            .into_iter()
+            .find(|&c| c as u8 == category)
+            .expect("a category the tests use");
+        ShaperProps::Indic(indic, IndicPosition::Start)
+    }
+
     fn categorised(budget: &Budget, categories: &[u8]) -> Buffer {
         let text: Vec<u32> = (0..categories.len() as u32).map(|i| 0x41 + i).collect();
         let mut buffer = text_buffer(budget, &text);
         for (info, &category) in buffer.infos_mut().iter_mut().zip(categories) {
-            info.shaper[0] = category;
+            info.shaper = props(category);
         }
         buffer
     }
@@ -510,7 +523,10 @@ mod tests {
     fn skipped_glyphs_join_the_syllable_before_them() {
         let budget = Budget::new(1 << 16).unwrap();
         let mut buffer = categorised(&budget, &[9, 1, 9, 2, 9]);
-        find_syllables(&MACHINE, &mut buffer, |infos, i| infos[i].shaper[0] == 9).unwrap();
+        find_syllables(&MACHINE, &mut buffer, |infos, i| {
+            infos[i].shaper.syllabic_category() == 9
+        })
+        .unwrap();
         let syllables: Vec<u8> = buffer.infos().iter().map(|i| i.syllable).collect();
         assert_eq!(syllables, [0, 0x10, 0x10, 0x10, 0x10]);
     }
@@ -538,7 +554,7 @@ mod tests {
         find_syllables(&MACHINE, &mut buffer, |_, _| false).unwrap();
         let circle = DottedCircle {
             broken: BROKEN,
-            shaper: [1, 0],
+            shaper: props(1),
             after: Some(REPHA),
         };
         insert_dotted_circles(&mut buffer, &font, circle).unwrap();
@@ -555,7 +571,7 @@ mod tests {
             ]
         );
         let infos = buffer.infos();
-        assert_eq!(infos[1].shaper, [1, 0]);
+        assert_eq!(infos[1].shaper, props(1));
         assert_eq!(infos[1].syllable, infos[0].syllable);
     }
 

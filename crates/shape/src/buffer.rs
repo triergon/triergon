@@ -7,7 +7,8 @@
 //! vector, and [`Buffer::sync`] makes the output the new content.
 
 use crate::ot::digest::Digest;
-use crate::unicode::GeneralCategory;
+use crate::shapers::{ArabicAction, Jamo};
+use crate::unicode::{GeneralCategory, IndicCategory, IndicPosition, UseCategory};
 use crate::work::{self, Limits};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_font::GlyphId;
@@ -245,6 +246,32 @@ impl LigProps {
     }
 }
 
+/// A complex shaper's values for a glyph.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum ShaperProps {
+    #[default]
+    None,
+    /// The Arabic shaper's joining action, also for the joining scripts of the
+    /// Universal Shaping Engine until their categories are set.
+    Arabic(ArabicAction),
+    Hangul(Jamo),
+    /// The Indic, Khmer and Myanmar shapers' category and position.
+    Indic(IndicCategory, IndicPosition),
+    /// The Universal Shaping Engine's category.
+    Use(UseCategory),
+}
+
+impl ShaperProps {
+    /// The category a syllabic shaper's grammar reads, as its discriminant.
+    pub(crate) const fn syllabic_category(self) -> u8 {
+        match self {
+            Self::Indic(category, _) => category as u8,
+            Self::Use(category) => category as u8,
+            _ => 0,
+        }
+    }
+}
+
 /// The working record of one glyph.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Info {
@@ -258,9 +285,12 @@ pub(crate) struct Info {
     pub(crate) syllable: u8,
     /// The nominal glyph the normaliser found for the character.
     pub(crate) normalized: u32,
-    /// A complex shaper's per-glyph values: category and position, or an action.
-    pub(crate) shaper: [u8; 2],
+    /// A complex shaper's values.
+    pub(crate) shaper: ShaperProps,
 }
+
+// The record stays as compact as HarfBuzz's, whatever the shapers keep in it.
+const _: () = assert!(size_of::<Info>() == 24);
 
 impl Info {
     pub(crate) fn category(&self) -> GeneralCategory {
