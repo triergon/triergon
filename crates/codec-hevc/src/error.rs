@@ -1,6 +1,7 @@
 //! Typed decoder errors.
 
 use core::fmt;
+use triergon_codec::StorageError;
 
 /// Decoder error. Unsupported features are named so callers can tell a gap in the
 /// selected feature set from corrupt input.
@@ -14,6 +15,14 @@ pub enum DecodeError {
     ResourceLimit(&'static str),
     /// A referenced parameter set has not been received.
     MissingParameterSet(&'static str),
+    /// Storage the stream needs does not fit the decoder's budget.
+    Budget(StorageError),
+}
+
+impl From<StorageError> for DecodeError {
+    fn from(error: StorageError) -> Self {
+        DecodeError::Budget(error)
+    }
 }
 
 impl fmt::Display for DecodeError {
@@ -23,6 +32,7 @@ impl fmt::Display for DecodeError {
             DecodeError::InvalidData(s) => write!(f, "invalid HEVC data: {s}"),
             DecodeError::ResourceLimit(s) => write!(f, "HEVC resource limit: {s}"),
             DecodeError::MissingParameterSet(s) => write!(f, "missing HEVC parameter set: {s}"),
+            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }
     }
 }
