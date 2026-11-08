@@ -2,15 +2,24 @@
  * Rasterising reference: the libass build of harness/reference.c (tooling only;
  * never linked into the library). It includes libass's ass_render.c from the
  * pinned source tree to reach the static glyph, quantisation, composition and
- * clipping functions, and links the built libass.a, with its AArch64 assembly,
- * for everything else. It is compiled with the flags libass compiled itself with
- * (libass-internal.pc), so floating-point evaluation matches the library.
+ * clipping functions, and links the built libass.a for everything else. It is
+ * compiled with the flags libass compiled itself with (libass-internal.pc), so
+ * floating-point evaluation matches the library.
  *
  * Usage:
- *   reference raster-fold   FILE MODE...
- *   reference raster-bench  FILE ITERATIONS MODE...
- *   reference raster-memory FILE MODE...
- *   reference raster-dump   FILE MODE...
+ *   reference OPERATION-fold   FILE MODE...
+ *   reference OPERATION-bench  FILE ITERATIONS MODE...
+ *   reference OPERATION-memory FILE MODE...
+ *   reference OPERATION-dump   FILE MODE...
+ *
+ * OPERATION selects libass's bitmap engine:
+ *   raster       the plain C engine (ass_bitmap_engine_init(ASS_CPU_FLAG_NONE)): C
+ *                functions, 16x16 tiles and 16-byte rows, on every host. It is what
+ *                ass_renderer_init gives a 32-bit ARMv7 build, which has no assembly,
+ *                and does not depend on the host, so it is the gated reference.
+ *   raster-simd  the engine ass_renderer_init chooses for the host (NEON on AArch64,
+ *                AVX2, SSSE3 or SSE2 on x86), measured on demand where it departs
+ *                from the C engine.
  *
  * MODE is one of:
  *   glyphs HEIGHT COUNT CASE...  FILE is a font: COUNT glyph ids spread over face 0
@@ -518,7 +527,11 @@ static const CacheDesc raster_source_desc = {
 static Cache *raster_sources;
 static uint64_t raster_source_ids;
 
-static int raster_setup(void) {
+/* The renderer, with the C engine unless `host_engine`. ass_renderer_init picks the
+ * host's SIMD engine (AVX2's 32-byte rows change \be at a bitmap's right edge), so
+ * the C engine replaces it, and the rasteriser state is rebuilt for it. The C
+ * engine must have 16x16 tiles and 16-byte rows, as an ARMv7 build has. */
+static int raster_setup(int host_engine) {
     raster_library = ass_library_init();
     if (!raster_library) return 0;
     ass_set_message_cb(raster_library, raster_quiet, NULL);
@@ -526,6 +539,17 @@ static int raster_setup(void) {
     raster_sources = ass_cache_create(&raster_source_desc);
     raster_track = ass_new_track(raster_library);
     if (!raster_renderer || !raster_sources || !raster_track) return 0;
+    if (!host_engine) {
+        raster_renderer->engine = ass_bitmap_engine_init(ASS_CPU_FLAG_NONE);
+        if (raster_renderer->engine.tile_order != 4 || raster_renderer->engine.align_order != 4) {
+            fprintf(stderr, "the C engine is not 16x16 tiles with 16-byte rows\n");
+            return 0;
+        }
+        RasterizerData *rasterizer = &raster_renderer->state.rasterizer;
+        ass_rasterizer_done(rasterizer);
+        if (!ass_rasterizer_init(&raster_renderer->engine, rasterizer, RASTERIZER_PRECISION))
+            return 0;
+    }
     raster_track->PlayResX = raster_track->PlayResY = 1;
     raster_renderer->track = raster_track;
     return 1;
@@ -1007,12 +1031,16 @@ static void raster_operation(int glyphs, RasterCase *cases, const int *parsed, s
 }
 
 int main(int argc, char **argv) {
-    const char *usage = "usage: reference raster-fold FILE MODE... | raster-bench FILE N MODE...\n"
-                        "       | raster-memory FILE MODE... | raster-dump FILE MODE...\n"
+    const char *usage = "usage: reference OPERATION-fold FILE MODE... | OPERATION-bench FILE N MODE...\n"
+                        "       | OPERATION-memory FILE MODE... | OPERATION-dump FILE MODE...\n"
+                        "  OPERATION: raster (the C engine) or raster-simd (the host's engine)\n"
                         "  MODE: glyphs HEIGHT COUNT CASE... or lines\n";
     const char *mode = argc > 1 ? argv[1] : "";
-    int bench = !strcmp(mode, "raster-bench"), memory = !strcmp(mode, "raster-memory");
-    int dump = !strcmp(mode, "raster-dump"), fold = !strcmp(mode, "raster-fold");
+    int host_engine = !strncmp(mode, "raster-simd-", 12);
+    const char *action = mode + (host_engine ? 12 : 7);
+    if (strncmp(mode, "raster-", 7)) action = "";
+    int bench = !strcmp(action, "bench"), memory = !strcmp(action, "memory");
+    int dump = !strcmp(action, "dump"), fold = !strcmp(action, "fold");
     if (!(bench || memory || dump || fold) || argc < 4 + bench) {
         fputs(usage, stderr);
         return 2;
@@ -1055,7 +1083,7 @@ int main(int argc, char **argv) {
     unsigned char *data = size >= 0 && size <= RASTER_MAX_INPUT ? malloc((size_t)size + 1) : NULL;
     int read_ok = data && fread(data, 1, (size_t)size, file) == (size_t)size;
     fclose(file);
-    if (!read_ok || !raster_setup()) {
+    if (!read_ok || !raster_setup(host_engine)) {
         fprintf(stderr, "%s: unreadable, too large, or no renderer\n", argv[2]);
         return 2;
     }

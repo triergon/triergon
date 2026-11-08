@@ -641,7 +641,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         source: "harness/reference.c",
         define: Some("-DTRIERGON_RASTER_REFERENCE=1"),
         record: "libass-native",
-        kind: "libass 0.17.5, static, against the FreeType, FriBidi and HarfBuzz references, without floating-point contraction; its outline, stroker, rasteriser, blur, composition and clipping stages",
+        kind: "libass 0.17.5, static, against the FreeType, FriBidi and HarfBuzz references, without floating-point contraction; its outline, stroker, rasteriser, blur, composition and clipping stages on the plain C bitmap engine (c: tile order 4, align order 4) on every host, and on the host's own engine for raster-simd- operations",
         libraries: "libass_reference",
         packages: &["libass-internal"],
         link_static: true,

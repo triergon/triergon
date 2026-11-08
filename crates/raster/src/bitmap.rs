@@ -5,14 +5,13 @@ use triergon_core::{Budget, BudgetVec, Error, Result};
 use crate::geometry::Vector;
 use crate::limits::{Limits, MAX_BITMAP_BYTES};
 
-/// Row alignment: strides are multiples of 16 bytes, as libass's SIMD engines
-/// lay bitmaps out.
+/// Row alignment: strides are multiples of 16 bytes, as libass's C engine (and
+/// its NEON and SSE2 engines) lay bitmaps out.
 pub const ALIGNMENT: usize = 16;
 
 /// An 8-bit coverage bitmap placed at (`left`, `top`) whole pixels. Rows are
-/// [`Bitmap::stride`] bytes apart. The bytes past the width start zero; `\be`
-/// passes spread coverage into them and the border subtraction reads them, as
-/// in libass.
+/// [`Bitmap::stride`] bytes apart. The bytes past the width are zero, and every
+/// operation keeps them so, as libass's C engine does.
 #[derive(Debug)]
 pub struct Bitmap {
     /// The column of the first pixel, whole pixels, relative to the origin the

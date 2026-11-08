@@ -78,9 +78,8 @@ impl Blur {
 
     /// Blurs with the kernel [1, 2, 1] × [1, 2, 1] / 16 `times` times in place.
     /// Repeated passes run on coverage scaled to 0..64, as libass (and
-    /// VSFilter) do; the last pass runs at full range. Each pass covers whole
-    /// rows of the stride, as libass's SIMD engines do, so coverage spreads
-    /// into the row padding and later passes read it back.
+    /// VSFilter) do; the last pass runs at full range. Each pass covers the
+    /// bitmap's width, as libass's C engine does, so the row padding stays zero.
     fn box_blur(&mut self, bitmap: &mut Bitmap, times: u32, work: &mut WorkBudget) -> Result<()> {
         if times == 0 || bitmap.width() == 0 || bitmap.height() == 0 {
             return Ok(());
@@ -212,11 +211,10 @@ impl Planes<'_> {
     }
 }
 
-/// One box blur pass in place over whole stride rows; `lines` holds three rows
-/// of horizontal sums.
+/// One box blur pass in place over the bitmap's width, zero beyond its edges, as
+/// libass's C engine runs it; `lines` holds three rows of horizontal sums.
 fn box_pass(bitmap: &mut Bitmap, lines: &mut [u16]) {
-    let (height, stride) = (bitmap.height(), bitmap.stride());
-    let width = stride;
+    let (width, height, stride) = (bitmap.width(), bitmap.height(), bitmap.stride());
     let data = bitmap.data_mut();
     // [1, 2, 1] along the row, zero beyond both ends.
     let horizontal = |row: &[u8], out: &mut [u16]| {
