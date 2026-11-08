@@ -1098,22 +1098,24 @@ fn actual_capacity_minimum_budget_and_resumable_pressure() {
             }
         }
     }
+    // Hold everything the parser has not yet charged, so its first reservation
+    // meets backpressure whatever the storage headers cost on the target.
     let block = |pool: &Budget| {
-        let size = pool.available() - 64 - Bytes::owner_overhead_bytes();
+        let size = pool.available() - Bytes::owner_overhead_bytes();
         bytes(pool, &vec![0; size])
     };
     let expected = avc_check(&rich, avc_limits(), 1).1.unwrap();
     let pool = Budget::new(1 << 16).unwrap();
     let raw = bytes(&pool, &rich);
-    let blocker = block(&pool);
     let parser = AvcConfigParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
+    let blocker = block(&pool);
     assert_eq!(avc_facts(&pressured(parser, blocker)), expected);
 
     let expected = hvc_check(&hvc, hvc_limits(), 1).1.unwrap();
     let pool = Budget::new(1 << 16).unwrap();
     let raw = bytes(&pool, &hvc);
-    let blocker = block(&pool);
     let parser = HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
+    let blocker = block(&pool);
     assert_eq!(hvc_facts(&pressured(parser, blocker)), expected);
 }
 

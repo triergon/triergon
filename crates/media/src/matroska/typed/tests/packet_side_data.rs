@@ -196,11 +196,27 @@ fn retained_external_pressure_keeps_a_real_group_job_pending_and_retries_same_ba
 
 #[test]
 fn group_own_storage_is_a_permanent_limit_not_an_infinite_backpressure_facade() {
-    let pool = Budget::new(512).unwrap();
     let raw = group_raw(&element(0x4fff, b"opaque"));
+    let cancel = AtomicBool::new(false);
+    // The pool's use at the job's peak, measured with room to spare; one byte
+    // less leaves the job short of its own storage on any target.
+    let peak = {
+        let pool = Budget::new(1 << 16).unwrap();
+        let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+        let mut job = GroupJob::new(source, 0, None, crate::Limits::default(), &pool).unwrap();
+        let mut peak = pool.used();
+        loop {
+            match job.step(&mut WorkBudget::new(1), &cancel) {
+                Ok(ParseStep::Yield) => peak = peak.max(pool.used()),
+                // The event is still held here, so its storage counts.
+                Ok(ParseStep::Event(_)) => break peak.max(pool.used()),
+                other => panic!("an unconstrained group parses, got {other:?}"),
+            }
+        }
+    };
+    let pool = Budget::new(peak - 1).unwrap();
     let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
     let mut job = GroupJob::new(source, 0, None, crate::Limits::default(), &pool).unwrap();
-    let cancel = AtomicBool::new(false);
     let mut requested = None;
     for _ in 0..100_000 {
         match job.step(&mut WorkBudget::new(1), &cancel) {
