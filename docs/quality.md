@@ -103,7 +103,8 @@ resource limit becomes an explicit, reviewed rule for that case.
   required by `cargo xtask check`; `raster-sweep`, every corpus file at three
   heights with larger random sets, runs on demand. `raster-simd` runs the
   required cases against the host's own SIMD engine (NEON, AVX2, SSSE3 or
-  SSE2) with the C engine's pins, and records where that engine departs.
+  SSE2) with their pins, the C engine's folds, and records where that engine
+  departs.
   `cargo xtask raster compare` reports the required three, with `--all` also
   the sweep, with `--diagnostic` `raster-simd`, and with both all five.
 - **Generated manifests and pins.** The font, shaping and rasterising features
@@ -122,6 +123,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   `"on-demand"` (also by `COMMAND compare --all`) or `"diagnostic"` (by `COMMAND
   compare --diagnostic`); `cargo xtask check-design` fails when it is missing or
   anything else.
+  Pins are recorded with the feature's `worker_operation`, the operation
+  `report`, `grade` and `fuzz` run. A diagnostic feature that compares another
+  reference with these pins names the features in `cases_from` (`raster-simd`
+  takes the required rasterising features'): its manifest is their rows and
+  pins, in order, and it commits no pin file; check-design fails if such a
+  feature is not diagnostic or has one.
   Every harness command reads such a manifest at `harness/features/<feature>/corpus.json`;
   its identity is the SHA-256 of the generated JSON, the bytes the generator
   writes, so it is deterministic.

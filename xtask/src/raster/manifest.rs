@@ -59,8 +59,6 @@ enum Load {
     Bitmaps { files: usize, sets: usize },
     /// Every corpus file at every height, and many files of both line kinds.
     Sweep,
-    /// The required features' cases, against the host's SIMD engine.
-    Simd,
 }
 
 /// How far generated transforms reach. The required features stay moderate:
@@ -122,7 +120,6 @@ fn load(id: &str) -> R<Load> {
         "raster-outlines" => Ok(REQUIRED_OUTLINES),
         "raster-bitmaps" => Ok(REQUIRED_BITMAPS),
         "raster-sweep" => Ok(Load::Sweep),
-        "raster-simd" => Ok(Load::Simd),
         _ => Err(format!("{id}: not a rasterising feature")),
     }
 }
@@ -708,12 +705,6 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
         Load::Glyphs { all, glyphs } => glyph_rows(root, all, glyphs)?,
         load @ Load::Outlines { .. } => line_rows(load, "-required", "outlines", Reach::Moderate),
         load @ Load::Bitmaps { .. } => line_rows(load, "-required", "bitmaps", Reach::Moderate),
-        Load::Simd => {
-            let mut cases = rows(root, "raster-glyphs")?;
-            cases.extend(rows(root, "raster-outlines")?);
-            cases.extend(rows(root, "raster-bitmaps")?);
-            cases
-        }
         Load::Sweep => {
             let mut rows = glyph_rows(root, true, SWEEP_GLYPHS)?;
             rows.extend(line_rows(SWEEP_OUTLINES, "", "outlines", Reach::Full));
