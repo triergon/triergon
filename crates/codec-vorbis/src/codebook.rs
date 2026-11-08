@@ -7,11 +7,12 @@
 
 use triergon_bitstream::LsbReader;
 
+use crate::bits::BitWindow;
 use crate::storage::Meter;
 use crate::{DecodeError, ilog};
 
 /// Codeword lengths resolved by a single table lookup.
-const FAST_BITS: u32 = 10;
+const FAST_BITS: u32 = 11;
 
 /// The longest codeword length a codebook can declare.
 const MAX_LENGTH: u32 = 32;
@@ -90,9 +91,54 @@ impl Codebook {
     /// lookup table.
     #[inline(always)]
     pub(crate) fn vector(&self, r: &mut LsbReader<'_>) -> Option<&[f32]> {
-        let entry = self.tree.decode(r)? as usize;
-        let start = entry * self.dimensions;
+        let entry = self.tree.decode(r)?;
+        self.vector_of(entry)
+    }
+
+    #[inline(always)]
+    fn vector_of(&self, entry: u32) -> Option<&[f32]> {
+        let start = entry as usize * self.dimensions;
         self.vectors.get(start..start + self.dimensions)
+    }
+
+    /// Calls `f` with the VQ vectors of the next `count` entries, in order; false if a
+    /// codeword does not decode (after the vectors before it).
+    ///
+    /// Equivalent to `count` calls of [`Codebook::vector`], but codewords are cut from
+    /// one 32-bit window of the reader at a time, so the reader is advanced once per
+    /// window instead of once per codeword.
+    #[inline(always)]
+    pub(crate) fn vectors(
+        &self,
+        r: &mut LsbReader<'_>,
+        count: usize,
+        mut f: impl FnMut(&[f32]),
+    ) -> bool {
+        let mut window = BitWindow::new(r);
+        for _ in 0..count {
+            let Some(vector) = self.entry(&mut window).and_then(|e| self.vector_of(e)) else {
+                return false;
+            };
+            f(vector);
+        }
+        true
+    }
+
+    /// The next entry number, cut from `window`; `None` as for [`Codebook::scalar`].
+    #[inline(always)]
+    pub(crate) fn entry(&self, window: &mut BitWindow<'_, '_>) -> Option<u32> {
+        let fast = &self.tree.fast;
+        let mask = fast.len() - 1;
+        let mut packed = fast[window.ahead() as usize & mask];
+        if packed == 0 || !window.holds(packed & 0xff) {
+            window.refill();
+            packed = fast[window.ahead() as usize & mask];
+            if packed == 0 {
+                packed = self.tree.long(window.ahead())?;
+            }
+        }
+        window.consume(packed & 0xff);
+        Some(packed >> 8)
     }
 }
 
@@ -205,25 +251,30 @@ fn read_vectors(
     let unpack = |multiplicand: u32| multiplicand as f32 * delta + minimum;
     match lookup {
         LookupType::Lattice => {
-            let multiplicands: Vec<u32> = {
-                let count = lookup_values as usize;
-                let mut list = meter.with_capacity(count)?;
-                list.extend((0..count).map(|_| r.read(value_bits)));
-                list
-            };
-            let values = multiplicands.len() as u64;
-            for (entry, vector) in vectors.chunks_exact_mut(dimensions).enumerate() {
-                let mut index = entry as u64;
+            // The unpacked lattice values, and entry `e`'s digits in base `count`
+            // (least significant first) stepped like an odometer.
+            let count = lookup_values as usize;
+            let mut values = meter.with_capacity(count)?;
+            values.extend((0..count).map(|_| unpack(r.read(value_bits))));
+            let mut digits = meter.vec(dimensions, 0usize)?;
+            for vector in vectors.chunks_exact_mut(dimensions) {
                 let mut last = 0.0;
-                for value in vector {
-                    *value = unpack(multiplicands[(index % values) as usize]) + last;
-                    index /= values;
+                for (value, &digit) in vector.iter_mut().zip(&digits) {
+                    *value = values[digit] + last;
                     if sequence {
                         last = *value;
                     }
                 }
+                for digit in &mut digits {
+                    *digit += 1;
+                    if *digit < count {
+                        break;
+                    }
+                    *digit = 0;
+                }
             }
-            meter.release::<u32>(multiplicands.len());
+            meter.release::<f32>(values.len());
+            meter.release::<usize>(digits.len());
         }
         _ => {
             for vector in vectors.chunks_exact_mut(dimensions) {
@@ -334,15 +385,20 @@ impl Tree {
 
     #[cold]
     fn decode_long(&self, r: &mut LsbReader<'_>) -> Option<u32> {
-        let bits = r.peek(32).reverse_bits();
+        let packed = self.long(r.peek(32))?;
+        r.skip(packed & 0xff);
+        Some(packed >> 8)
+    }
+
+    /// The `entry << 8 | length` of the codeword longer than the fast table that starts
+    /// `ahead`, the next 32 bits.
+    #[cold]
+    fn long(&self, ahead: u32) -> Option<u32> {
+        let bits = ahead.reverse_bits();
         let at = self.long.partition_point(|&(codeword, _)| codeword <= bits);
         let &(codeword, packed) = self.long.get(at.checked_sub(1)?)?;
         let length = packed & 0xff;
-        if (codeword ^ bits) >> (32 - length) != 0 {
-            return None;
-        }
-        r.skip(length);
-        Some(packed >> 8)
+        ((codeword ^ bits) >> (32 - length) == 0).then_some(packed)
     }
 }
 

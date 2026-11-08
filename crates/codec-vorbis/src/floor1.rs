@@ -2,6 +2,7 @@
 
 use triergon_bitstream::LsbReader;
 
+use crate::bits::BitWindow;
 use crate::codebook::Codebook;
 use crate::tables::INVERSE_DB;
 use crate::{DecodeError, ilog};
@@ -144,6 +145,7 @@ impl Floor1 {
         codebooks: &[Codebook],
         y: &mut Points,
     ) -> Option<()> {
+        let r = &mut BitWindow::new(r);
         let bits = ilog(self.range() as u32 - 1);
         y[0] = r.read(bits) as i32;
         y[1] = r.read(bits) as i32;
@@ -151,13 +153,13 @@ impl Floor1 {
         for &class in &self.partitions {
             let class = &self.classes[usize::from(class)];
             let mut choice = match class.master {
-                Some(master) => codebooks[usize::from(master)].scalar(r)?,
+                Some(master) => codebooks[usize::from(master)].entry(r)?,
                 None => 0,
             };
             let mask = (1 << class.subclass_bits) - 1;
             for point in points.by_ref().take(class.dimensions) {
                 *point = match class.books[(choice & mask) as usize] {
-                    Some(book) => codebooks[usize::from(book)].scalar(r)? as i32,
+                    Some(book) => codebooks[usize::from(book)].entry(r)? as i32,
                     None => 0,
                 };
                 choice >>= class.subclass_bits;
@@ -235,6 +237,11 @@ fn render_point(x0: i32, y0: i32, x1: i32, y1: i32, x: i32) -> i32 {
 
 /// render_line (section 9.2.7) from `(x0, y0)` up to but excluding `x1`, applied as a
 /// gain: each element of `spectrum` it covers is multiplied by the floor value there.
+/// The levels must lie in `0..=255`, as every level between them then does.
+///
+/// The line's level `k` samples on is `y0 + k * base + sign * floor(k * ady / adx)` with
+/// `ady < adx`. A shallow line (`base` 0, long runs of one level) is applied run by run;
+/// any other in interleaved lanes.
 pub(crate) fn render_line((x0, y0): (i32, i32), (x1, y1): (i32, i32), spectrum: &mut [f32]) {
     let end = (x1.max(0) as usize).min(spectrum.len());
     let start = x0.max(0) as usize;
@@ -242,24 +249,117 @@ pub(crate) fn render_line((x0, y0): (i32, i32), (x1, y1): (i32, i32), spectrum: 
         return;
     }
     let dy = y1 - y0;
-    let adx = x1 - x0;
-    let base = dy / adx;
-    let step = if dy < 0 { base - 1 } else { base + 1 };
-    let ady = dy.abs() - base.abs() * adx;
-    let gain = |y: i32| INVERSE_DB[y.clamp(0, 255) as usize];
-    let (first, rest) = spectrum[start..end].split_at_mut(1);
-    first[0] *= gain(y0);
-    let mut y = y0;
-    let mut err = 0;
-    for value in rest {
-        err += ady;
-        if err >= adx {
-            err -= adx;
-            y += step;
-        } else {
-            y += base;
+    let line = Line {
+        y0,
+        adx: x1 - x0,
+        base: dy / (x1 - x0),
+        sign: if dy < 0 { -1 } else { 1 },
+        ady: dy.abs() % (x1 - x0),
+    };
+    let samples = &mut spectrum[start..end];
+    if line.base == 0 && line.ady * MIN_RUN <= line.adx {
+        line.apply_runs(samples);
+    } else {
+        line.apply_lanes(samples);
+    }
+}
+
+/// The average run of one level from which a line is applied run by run.
+const MIN_RUN: i32 = 8;
+
+/// Interleaved lanes [`Line::apply_lanes`] steps at once.
+const LANES: usize = 4;
+
+/// The integer line of render_line, as an offset `k` from its start.
+#[derive(Clone, Copy, Debug)]
+struct Line {
+    y0: i32,
+    adx: i32,
+    base: i32,
+    sign: i32,
+    /// `|dy| mod adx`: the error term's step.
+    ady: i32,
+}
+
+fn gain(y: i32) -> f32 {
+    INVERSE_DB[(y & 0xff) as usize]
+}
+
+impl Line {
+    /// A level changes by `sign` at the `j`-th carry, at `k = ceil(j * adx / ady)`; the
+    /// distance between carries is `adx / ady` or one more, stepped by its own error term.
+    fn apply_runs(self, samples: &mut [f32]) {
+        if self.ady == 0 {
+            let gain = gain(self.y0);
+            for value in samples {
+                *value *= gain;
+            }
+            return;
         }
-        *value *= gain(y);
+        let (step, fraction) = (self.adx / self.ady, self.adx % self.ady);
+        let (mut y, mut rest, mut slack) = (self.y0, samples, 0);
+        while !rest.is_empty() {
+            // `slack` is `ady * ceil(j * fraction / ady) - j * fraction` for the next carry.
+            let mut run = step;
+            slack -= fraction;
+            if slack < 0 {
+                slack += self.ady;
+                run += 1;
+            }
+            let (head, tail) = rest.split_at_mut((run as usize).min(rest.len()));
+            let gain = gain(y);
+            for value in head {
+                *value *= gain;
+            }
+            rest = tail;
+            y += self.sign;
+        }
+    }
+
+    /// Every [`LANES`]-th sample follows a line of its own: the lanes step independently,
+    /// which keeps the error-term recurrence off a single dependency chain.
+    fn apply_lanes(self, samples: &mut [f32]) {
+        let Line {
+            y0,
+            adx,
+            base,
+            sign,
+            ady,
+        } = self;
+        // The specification's recurrence for the first lane of samples.
+        let mut err = [0; LANES];
+        let mut level = [0; LANES];
+        let (mut e, mut y) = (0, y0);
+        for (err, level) in err.iter_mut().zip(&mut level) {
+            e += ady;
+            y += base;
+            if e >= adx {
+                e -= adx;
+                y += sign;
+            }
+            (*err, *level) = (e, y);
+        }
+        let lanes = LANES as i32;
+        // `ady < adx`, so a lane carries at most `LANES` times per step.
+        let carries = (1..=lanes).filter(|&k| lanes * ady >= k * adx).count() as i32;
+        let jump = lanes * base + sign * carries;
+        let remainder = lanes * ady - carries * adx;
+        let (first, rest) = samples.split_at_mut(1);
+        first[0] *= gain(y0);
+        let mut chunks = rest.chunks_exact_mut(LANES);
+        for chunk in &mut chunks {
+            for (value, &y) in chunk.iter_mut().zip(&level) {
+                *value *= gain(y);
+            }
+            for (e, y) in err.iter_mut().zip(&mut level) {
+                let carry = i32::from(*e + remainder >= adx);
+                *e += remainder - carry * adx;
+                *y += jump + carry * sign;
+            }
+        }
+        for (value, &y) in chunks.into_remainder().iter_mut().zip(&level) {
+            *value *= gain(y);
+        }
     }
 }
 
@@ -291,6 +391,42 @@ mod tests {
         assert_eq!(drawn((0, 0), (4, 13), 4), [0, 3, 6, 9]);
         // Clipped at the vector end.
         assert_eq!(drawn((2, 0), (10, 8), 4)[2..], [0, 1]);
+    }
+
+    #[test]
+    fn lanes_follow_the_specification_recurrence() {
+        // Section 9.2.7 one sample at a time.
+        let specified = |(x0, y0): (i32, i32), (x1, y1): (i32, i32)| {
+            let (dy, adx) = (y1 - y0, x1 - x0);
+            let base = dy / adx;
+            let step = if dy < 0 { base - 1 } else { base + 1 };
+            let ady = dy.abs() - base.abs() * adx;
+            let (mut y, mut err) = (y0, 0);
+            let mut out = vec![y0 as usize];
+            for _ in x0 + 1..x1 {
+                err += ady;
+                if err >= adx {
+                    err -= adx;
+                    y += step;
+                } else {
+                    y += base;
+                }
+                out.push(y as usize);
+            }
+            out
+        };
+        for adx in 1..40 {
+            for y1 in (0..256).step_by(7) {
+                for y0 in [0, 3, 100, 255] {
+                    let line = ((5, y0), (5 + adx, y1));
+                    let len = 5 + adx as usize;
+                    assert_eq!(
+                        drawn(line.0, line.1, len)[5..],
+                        specified(line.0, line.1)[..]
+                    );
+                }
+            }
+        }
     }
 
     #[test]

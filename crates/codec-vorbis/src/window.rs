@@ -12,31 +12,48 @@ pub(crate) enum Block {
     Long = 1,
 }
 
-/// The rising window slope of each block size: `sin(π/2 sin²((i + 1/2) / m · π/2))` over
-/// the `m = blocksize / 2` samples two blocks of that size overlap by.
+/// The window slope two blocks of one size overlap by, `m = blocksize / 2` samples of
+/// `sin(π/2 sin²((i + 1/2) / m · π/2))`, rising and (reversed) falling.
 #[derive(Debug)]
-pub(crate) struct Slopes([Vec<f32>; 2]);
+pub(crate) struct Slope {
+    rising: Vec<f32>,
+    falling: Vec<f32>,
+}
+
+impl Slope {
+    fn new(blocksize: usize, meter: &mut Meter) -> Result<Slope, StorageError> {
+        let m = blocksize / 2;
+        let mut rising = meter.with_capacity(m)?;
+        rising.extend((0..m).map(|i| {
+            let s = ((i as f64 + 0.5) / m as f64 * FRAC_PI_2).sin();
+            (FRAC_PI_2 * s * s).sin() as f32
+        }));
+        let mut falling = meter.with_capacity(m)?;
+        falling.extend(rising.iter().rev());
+        Ok(Slope { rising, falling })
+    }
+
+    /// Samples the slope spans.
+    pub(crate) fn len(&self) -> usize {
+        self.rising.len()
+    }
+}
+
+/// The slope of each block size.
+#[derive(Debug)]
+pub(crate) struct Slopes([Slope; 2]);
 
 impl Slopes {
     pub(crate) fn new(blocksizes: [usize; 2], meter: &mut Meter) -> Result<Slopes, StorageError> {
-        let slope = |meter: &mut Meter, blocksize: usize| -> Result<Vec<f32>, StorageError> {
-            let m = blocksize / 2;
-            let mut slope = meter.with_capacity(m)?;
-            slope.extend((0..m).map(|i| {
-                let s = ((i as f64 + 0.5) / m as f64 * FRAC_PI_2).sin();
-                (FRAC_PI_2 * s * s).sin() as f32
-            }));
-            Ok(slope)
-        };
         Ok(Slopes([
-            slope(meter, blocksizes[0])?,
-            slope(meter, blocksizes[1])?,
+            Slope::new(blocksizes[0], meter)?,
+            Slope::new(blocksizes[1], meter)?,
         ]))
     }
 
     /// The slope joining a block of `previous` size to one of `current` size: the
     /// smaller of the two sets the overlap.
-    pub(crate) fn between(&self, previous: Block, current: Block) -> &[f32] {
+    pub(crate) fn between(&self, previous: Block, current: Block) -> &Slope {
         let block = if previous == Block::Short || current == Block::Short {
             Block::Short
         } else {
@@ -46,33 +63,84 @@ impl Slopes {
     }
 }
 
-/// Overlap-adds the right half of the previous block's IMDCT output, `previous`, with
-/// the current block's output `current` over `slope`, writing the finished samples
+/// Overlap-adds two blocks straight from their DCT-IVs, writing the finished samples
 /// from the centre of the previous block to the centre of the current one into `out`
-/// (`previous.len() / 2 + current.len() / 4` samples).
+/// (a quarter of each block size).
 ///
-/// The previous block's quarter point aligns with the current block's quarter point;
-/// outside the overlap each window is one on the side of its centre that is output and
-/// zero beyond.
-pub(crate) fn overlap_add(previous: &[f32], current: &[f32], slope: &[f32], out: &mut [f32]) {
-    let overlap = slope.len();
-    let previous_quarter = previous.len() / 2;
-    let current_quarter = current.len() / 4;
-    // Output position of the overlap's start, and the current block's sample there.
-    let start = previous_quarter - overlap / 2;
-    let from = current_quarter - overlap / 2;
-    let (head, rest) = out.split_at_mut(start);
-    let (lapped, tail) = rest.split_at_mut(overlap);
-    head.copy_from_slice(&previous[..start]);
-    let fading = previous[start..start + overlap]
-        .iter()
-        .zip(slope.iter().rev());
-    let rising = current[from..from + overlap].iter().zip(slope);
-    for (out, ((&p, &down), (&c, &up))) in lapped.iter_mut().zip(fading.zip(rising)) {
-        *out = p * down + c * up;
+/// A block's inverse MDCT is its DCT-IV `w = [a | b]` (a quarter block each) unfolded:
+/// the left half of the output is `b` then `-b` reversed, the right half `-a` reversed
+/// then `-a`. `previous` is the first quarter of the previous block's right half, `-a`
+/// reversed (see [`fold`]), and `current` the whole DCT-IV of the current block; the
+/// unfolding is folded into the windowing, each pair of output samples mirrored about
+/// the overlap's centre taking one value of each block.
+///
+/// The previous block's three-quarter point aligns with the current block's quarter
+/// point; outside the overlap each window is one on the side of its centre that is output
+/// and zero beyond.
+pub(crate) fn overlap_add(previous: &[f32], current: &[f32], slope: &Slope, out: &mut [f32]) {
+    let half = slope.len() / 2;
+    let quarter = current.len() / 2;
+    let from = quarter - half;
+    let b = &current[quarter..];
+    let lap = Lap::new(previous, half, out);
+    let b_lapped = &b[from..from + half];
+    let (w_in, w_out) = (&slope.rising[..half], &slope.falling[..half]);
+    for j in 0..half {
+        let (p, b) = (lap.previous[j], b_lapped[j]);
+        lap.rising[j] = p * w_out[j] + b * w_in[j];
+        lap.falling[half - 1 - j] = p * w_in[j] + -b * w_out[j];
     }
-    let after = from + overlap;
-    tail.copy_from_slice(&current[after..after + tail.len()]);
+    for (out, &b) in lap.tail.iter_mut().zip(b[..from].iter().rev()) {
+        *out = -b;
+    }
+}
+
+/// [`overlap_add`] with a silent current block: the previous block fades out.
+pub(crate) fn fade_out(previous: &[f32], slope: &Slope, out: &mut [f32]) {
+    let half = slope.len() / 2;
+    let lap = Lap::new(previous, half, out);
+    let (w_in, w_out) = (&slope.rising[..half], &slope.falling[..half]);
+    for j in 0..half {
+        let p = lap.previous[j];
+        lap.rising[j] = p * w_out[j] + 0.0;
+        lap.falling[half - 1 - j] = p * w_in[j] + 0.0;
+    }
+    lap.tail.fill(0.0);
+}
+
+/// The regions of one overlap-add's output, with the samples before the overlap, where
+/// only the previous block contributes, already written.
+struct Lap<'a, 'p> {
+    /// The previous block's samples over the overlap.
+    previous: &'p [f32],
+    rising: &'a mut [f32],
+    falling: &'a mut [f32],
+    tail: &'a mut [f32],
+}
+
+impl<'a, 'p> Lap<'a, 'p> {
+    fn new(previous: &'p [f32], half: usize, out: &'a mut [f32]) -> Lap<'a, 'p> {
+        let start = previous.len() - half;
+        let (head, rest) = out.split_at_mut(start);
+        head.copy_from_slice(&previous[..start]);
+        let (lapped, tail) = rest.split_at_mut(2 * half);
+        let (rising, falling) = lapped.split_at_mut(half);
+        Lap {
+            previous: &previous[start..],
+            rising,
+            falling,
+            tail,
+        }
+    }
+}
+
+/// The first quarter of the right half of the inverse MDCT of the DCT-IV `current`:
+/// `-a` reversed, which with its reverse makes the right half the next block laps.
+pub(crate) fn fold(current: &[f32], saved: &mut [f32]) {
+    let quarter = current.len() / 2;
+    for (saved, &a) in saved.iter_mut().zip(current[..quarter].iter().rev()) {
+        *saved = -a;
+    }
 }
 
 #[cfg(test)]
@@ -89,7 +157,7 @@ mod tests {
             slopes.between(Block::Short, Block::Long),
             slopes.between(Block::Long, Block::Long),
         ] {
-            for (up, down) in slope.iter().zip(slope.iter().rev()) {
+            for (up, down) in slope.rising.iter().zip(&slope.falling) {
                 assert!((up * up + down * down - 1.0).abs() < 1e-6);
             }
         }
@@ -97,29 +165,77 @@ mod tests {
         assert_eq!(slopes.between(Block::Long, Block::Long).len(), 128);
     }
 
+    /// The inverse MDCT output of the DCT-IV `w` (as `Imdct::imdct` unfolds it).
+    fn unfold(w: &[f32]) -> Vec<f32> {
+        let (a, b) = w.split_at(w.len() / 2);
+        let neg = |v: &[f32]| v.iter().map(|&x| -x).collect::<Vec<_>>();
+        let mut y = b.to_vec();
+        y.extend(neg(b).iter().rev());
+        y.extend(neg(a).iter().rev());
+        y.extend(neg(a));
+        y
+    }
+
+    /// Overlap-add on the unfolded outputs, window by window.
+    fn reference(previous: &[f32], current: &[f32], slope: &[f32]) -> Vec<f32> {
+        let previous = unfold(previous);
+        let current = unfold(current);
+        let right = &previous[previous.len() / 2..];
+        let ov = slope.len();
+        let start = right.len() / 2 - ov / 2;
+        let from = current.len() / 4 - ov / 2;
+        let len = previous.len() / 4 + current.len() / 4;
+        (0..len)
+            .map(|i| match i {
+                i if i < start => right[i],
+                i if i < start + ov => {
+                    let k = i - start;
+                    right[i] * slope[ov - 1 - k] + current[from + k] * slope[k]
+                }
+                i => current[from + i - start],
+            })
+            .collect()
+    }
+
     #[test]
-    fn mixed_sizes_return_the_span_between_centres() {
-        let slope = [0.125, 0.25, 0.5, 0.75];
-        let lap = |p: f32, c: f32, k: usize| p * slope[3 - k] + c * slope[k];
-        // Long (16) after short (8): 8/4 + 16/4 = 6 samples. The short block's right
-        // half laps samples 2..6 of the long block, whose hybrid slope is zero before.
-        let previous = [1.0, 2.0, 3.0, 4.0];
-        let current: Vec<f32> = (0..16).map(|i| 10.0 + i as f32).collect();
-        let mut out = [0.0; 6];
-        overlap_add(&previous, &current, &slope, &mut out);
-        let want: Vec<f32> = (0..4)
-            .map(|k| lap(previous[k], current[2 + k], k))
-            .chain([16.0, 17.0])
-            .collect();
-        assert_eq!(out[..], want[..]);
-        // Short after long: 16/4 + 8/4 = 6 samples; the long block's flat part first.
-        let previous: Vec<f32> = (0..8).map(|i| i as f32).collect();
-        let current: Vec<f32> = (0..8).map(|i| 10.0 + i as f32).collect();
-        overlap_add(&previous, &current, &slope, &mut out);
-        let want: Vec<f32> = [0.0, 1.0]
-            .into_iter()
-            .chain((0..4).map(|k| lap(previous[2 + k], current[k], k)))
-            .collect();
-        assert_eq!(out[..], want[..]);
+    fn folded_overlap_matches_the_unfolded_windows_bit_for_bit() {
+        let values = |n: usize, seed: f32| -> Vec<f32> {
+            (0..n)
+                .map(|i| ((i as f32 + seed) * 0.37).sin() * 3.0)
+                .collect()
+        };
+        let slope =
+            |m: usize| -> Vec<f32> { (0..m).map(|i| (i as f32 + 0.5) / m as f32).collect() };
+        let (short, long) = (slope(32), slope(128));
+        let bits = |v: &[f32]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+        // Blocks of 64 and 256 samples: DCT-IVs of 32 and 128 values.
+        let lap = |rising: &[f32]| Slope {
+            rising: rising.to_vec(),
+            falling: rising.iter().rev().copied().collect(),
+        };
+        let (short_lap, long_lap) = (lap(&short), lap(&long));
+        for (p, c, slope, lap) in [
+            (32, 32, &short, &short_lap),
+            (128, 128, &long, &long_lap),
+            (32, 128, &short, &short_lap),
+            (128, 32, &short, &short_lap),
+        ] {
+            let previous = values(p, 1.0);
+            let mut saved = vec![0.0; p / 2];
+            fold(&previous, &mut saved);
+            let mut out = vec![0.0; p / 2 + c / 2];
+            let current = values(c, 7.0);
+            overlap_add(&saved, &current, lap, &mut out);
+            assert_eq!(
+                bits(&out),
+                bits(&reference(&previous, &current, slope)),
+                "{p} then {c}"
+            );
+            // A silent block's inverse MDCT is +0.0 throughout.
+            fade_out(&saved, lap, &mut out);
+            let want = reference(&previous, &vec![0.0; c], slope);
+            let lapped: Vec<f32> = want.iter().map(|&v| v + 0.0).collect();
+            assert_eq!(bits(&out), bits(&lapped), "{p} then silence");
+        }
     }
 }
