@@ -1004,21 +1004,25 @@ pub fn evaluate(
         heaps.push((ch, rh));
         totals.push((total_upper, total_lower));
     }
-    let interval = |values: &[(i128, i128)]| -> R<Value> {
+    let interval = |values: &[(i128, i128)], nonnegative: bool| -> R<Value> {
         let pairs: Vec<(f64, f64)> = values.iter().map(|&(a, b)| (a as f64, b as f64)).collect();
-        let i = stats::ratio_interval(&pairs, seed, 4000)?;
+        let i = if nonnegative {
+            stats::nonnegative_ratio_interval(&pairs, seed, 4000)?
+        } else {
+            stats::ratio_interval(&pairs, seed, 4000)?
+        };
         Ok(Value::object([
             ("median", Value::float(i.median)),
             ("lower_95", Value::float(i.lower_95)),
             ("upper_95", Value::float(i.upper_95)),
         ]))
     };
-    let (Ok(heap), Ok(total)) = (interval(&heaps), interval(&totals)) else {
+    let (Ok(heap), Ok(total)) = (interval(&heaps, true), interval(&totals, false)) else {
         return failed("invalid-memory-observation");
     };
     // The page allowance can make a growth bound nonpositive even when
     // both total resident bounds are valid.
-    let growth = interval(&rss).unwrap_or(Value::Null);
+    let growth = interval(&rss, false).unwrap_or(Value::Null);
     let mut fields = vec![
         ("status", Value::str("qualified")),
         (

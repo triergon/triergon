@@ -46,16 +46,39 @@ pub fn ratio_interval(
     {
         return Err("ratios require positive finite paired measurements".into());
     }
+    Ok(bootstrap_ratio_interval(pairs, seed, resamples))
+}
+
+/// The same paired-ratio bootstrap with nonnegative numerators and strictly
+/// positive denominators. Zero numerator measurements are retained as zero ratios.
+pub fn nonnegative_ratio_interval(
+    pairs: &[(f64, f64)],
+    seed: u64,
+    resamples: usize,
+) -> Result<Interval, String> {
+    if pairs.len() < 2
+        || pairs
+            .iter()
+            .any(|&(a, b)| !a.is_finite() || !b.is_finite() || a < 0.0 || b <= 0.0)
+    {
+        return Err(
+            "ratios require nonnegative finite numerators and positive finite denominators".into(),
+        );
+    }
+    Ok(bootstrap_ratio_interval(pairs, seed, resamples))
+}
+
+fn bootstrap_ratio_interval(pairs: &[(f64, f64)], seed: u64, resamples: usize) -> Interval {
     let ratios: Vec<f64> = pairs.iter().map(|&(a, b)| a / b).collect();
     let mut rng = PyRandom::new(seed);
     let estimates: Vec<f64> = (0..resamples)
         .map(|_| median(&rng.choices(&ratios, ratios.len())))
         .collect();
-    Ok(Interval {
+    Interval {
         median: median(&ratios),
         lower_95: percentile(&estimates, 0.025),
         upper_95: percentile(&estimates, 0.975),
-    })
+    }
 }
 
 #[cfg(test)]
@@ -93,6 +116,64 @@ mod tests {
         assert!(ratio_interval(&[(1.0, 1.0)], 0, 10).is_err());
         assert!(ratio_interval(&[(1.0, 0.0), (1.0, 1.0)], 0, 10).is_err());
         assert!(ratio_interval(&[(f64::NAN, 1.0), (1.0, 1.0)], 0, 10).is_err());
+        assert!(ratio_interval(&[(0.0, 1.0), (1.0, 1.0)], 0, 10).is_err());
+    }
+
+    #[test]
+    fn nonnegative_ratios_keep_zero_and_mixed_samples() {
+        assert_eq!(
+            nonnegative_ratio_interval(&[(0.0, 776.0); 30], 280, 4000).unwrap(),
+            Interval {
+                median: 0.0,
+                lower_95: 0.0,
+                upper_95: 0.0
+            }
+        );
+        assert_eq!(
+            nonnegative_ratio_interval(
+                &[(0.0, 2.0), (1.0, 2.0), (2.0, 2.0), (3.0, 2.0)],
+                280,
+                4000
+            )
+            .unwrap(),
+            Interval {
+                median: 0.75,
+                lower_95: 0.0,
+                upper_95: 1.5
+            }
+        );
+        for invalid in [
+            (-1.0, 1.0),
+            (0.0, 0.0),
+            (1.0, -1.0),
+            (f64::NAN, 1.0),
+            (f64::INFINITY, 1.0),
+            (0.0, f64::NAN),
+            (0.0, f64::INFINITY),
+        ] {
+            assert!(nonnegative_ratio_interval(&[invalid, (1.0, 1.0)], 280, 4000).is_err());
+        }
+        assert!(nonnegative_ratio_interval(&[(0.0, 1.0)], 280, 4000).is_err());
+    }
+
+    #[test]
+    fn positive_ratio_results_are_bit_identical_for_both_domains() {
+        let pairs: Vec<_> = (0..30)
+            .map(|i| (f64::from(100 + i * 7 % 13), f64::from(90 + i * 5 % 11)))
+            .collect();
+        for (seed, resamples) in [(0, 50), (280, 4000), ((1 << 40) + 3, 100)] {
+            let original = ratio_interval(&pairs, seed, resamples).unwrap();
+            let nonnegative = nonnegative_ratio_interval(&pairs, seed, resamples).unwrap();
+            assert_eq!(
+                [original.median, original.lower_95, original.upper_95].map(f64::to_bits),
+                [
+                    nonnegative.median,
+                    nonnegative.lower_95,
+                    nonnegative.upper_95
+                ]
+                .map(f64::to_bits)
+            );
+        }
     }
 
     #[test]
