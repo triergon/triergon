@@ -18,7 +18,7 @@ use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use triergon::CodecId;
 use triergon_core::{Budget, WorkBudget};
-use triergon_subtitles::compat::dvb::{AutomaticPalette, Options, ReceiverDecoder};
+use triergon_subtitles::compat::dvb::{AutomaticPalette, Options, ReceiverDecoder, Status};
 
 /// The candidate's pool: room for the decoder's regions and output.
 const POOL_BYTES: usize = 1 << 30;
@@ -89,10 +89,16 @@ impl Prepared for Dvb {
         let count = self.track.packets.len();
         sink.header(count, None)?;
         for (index, (packet, &pts)) in self.track.packets.iter().zip(&self.pts).enumerate() {
-            let mut work = WorkBudget::new(u64::MAX);
-            let subtitle = match decoder.decode(&packet.data, pts, &mut work, &cancel) {
-                Ok(Some(subtitle)) => subtitle,
-                Ok(None) => continue,
+            let status = loop {
+                let mut work = WorkBudget::new(crate::WORK_SLICE);
+                match decoder.decode(&packet.data, pts, &mut work, &cancel) {
+                    Ok(Status::Yield) => {}
+                    status => break status,
+                }
+            };
+            let subtitle = match status {
+                Ok(Status::Subtitle(subtitle)) => subtitle,
+                Ok(Status::Nothing | Status::Yield) => continue,
                 Err(triergon_core::Error::Invalid(_)) => {
                     sink.refused(index, INVALID_DATA)?;
                     continue;

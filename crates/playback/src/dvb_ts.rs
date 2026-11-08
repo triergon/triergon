@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, Rounding, TimeBase, WorkBudget};
 use triergon_mpegts::psi::CodecIdentification;
 use triergon_subtitles::compat::dvb::{
-    Options, PesPacket, PesParser, PesProgress, ReceiverDecoder, Rect, Subtitle,
+    Options, PesPacket, PesParser, PesProgress, ReceiverDecoder, Rect, Status, Subtitle,
 };
 use triergon_subtitles::dvb::{PacketEnvelope, Size, SourceClock, SourceConfiguration};
 
@@ -253,18 +253,25 @@ impl DvbTsBridge {
         }
         let codec = pending
             .codec
-            .take()
+            .as_ref()
             .ok_or(Error::Invalid("DVB codec packet absent"))?;
-        self.pending = None;
         let anchored = self.anchored;
         let pts = codec
             .codec_pts()
             .filter(|_| anchored)
             .map(|ticks| microseconds(ticks, self.configuration.clock()))
             .transpose()?;
-        match self.decoder.decode(codec.codec(), pts, work, cancel) {
-            Ok(Some(subtitle)) => Ok(DvbStep::Action(DvbQueueAction::from_subtitle(subtitle))),
-            Ok(None) | Err(Error::Invalid(_)) => Ok(DvbStep::NeedPacket),
+        let status = self.decoder.decode(codec.codec(), pts, work, cancel);
+        // A packet that yielded is decoded again at the next poll.
+        if !matches!(status, Ok(Status::Yield)) {
+            self.pending = None;
+        }
+        match status {
+            Ok(Status::Subtitle(subtitle)) => {
+                Ok(DvbStep::Action(DvbQueueAction::from_subtitle(subtitle)))
+            }
+            Ok(Status::Yield) => Ok(DvbStep::Yield),
+            Ok(Status::Nothing) | Err(Error::Invalid(_)) => Ok(DvbStep::NeedPacket),
             Err(error) => Err(error),
         }
     }

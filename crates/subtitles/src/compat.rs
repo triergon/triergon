@@ -26,7 +26,7 @@ pub mod dvb {
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::dvb::pes_parser::{PesFraming, PesPacket, PesParser, PesProgress};
     pub use crate::dvb::receiver_decoder::{
-        AutomaticPalette, Options, ReceiverDecoder, Rect, Subtitle,
+        AutomaticPalette, Options, ReceiverDecoder, Rect, Status, Subtitle,
     };
 }
 

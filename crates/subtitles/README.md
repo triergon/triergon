@@ -67,7 +67,14 @@ return the subtitle FFmpeg's decoder returns for it, if any:
 `compat::dvb::ReceiverDecoder::decode`, `compat::dvd::Decoder`,
 `compat::pgs::ReceiverDecoder`, `compat::cc::Decoder::decode` (fed by
 `compat::cc::CaptionExtractor` from video access units) and
-`compat::teletext::Decoder::decode`. The specification decoders keep the source
+`compat::teletext::Decoder::decode`. The DVB and DVD receivers charge their work
+before doing it and return `Status::Yield` when the budget runs out; the caller
+decodes the same packet again, and the work already granted counts towards it,
+so a packet completes after enough calls. A DVB receiver rectangle carries its
+region depth's `palette`, as FFmpeg reports it, and `colours`, the colour of
+every pixel value: a region recomposed at a smaller depth without a fill keeps
+larger pixel values, which read as zero, or under the automatic palette as the
+level it ranks them at. The specification decoders keep the source
 facts: `pgs::DisplayDecoder::push(packet, clock, Envelope::Packet, &cancel)` then
 `poll`/`take_output` for each `DisplaySet`; `dvb::Decoder::new_configured(..)` then
 `provide(&DvbPacket)` and `step` for each `DisplayEvent`; `dvd::SpuAssembly`, then
@@ -83,7 +90,7 @@ facts: `pgs::DisplayDecoder::push(packet, clock, Envelope::Packet, &cancel)` the
 | `cc` | `cc_data`, `line21` (CEA-608), `dtvcc` (CEA-708 packets and service blocks), `user_data` (A/53, SCTE 20, DVD captions), `video` (MPEG-2 pictures, H.264/HEVC SEI) |
 | `teletext` | `DataField`, `Packet`, `Assembler`, `Presentation`, `Display`, `charset` |
 | `context` | `Builder`: track header, metadata and attachment bytes handed to a renderer |
-| `compat::dvb` | `ReceiverDecoder`, `Options`, `AutomaticPalette`; `PesParser` (PES data field to codec packets) |
+| `compat::dvb` | `ReceiverDecoder`, `Status`, `Options`, `AutomaticPalette`; `PesParser` (PES data field to codec packets) |
 | `compat::pgs` | `ReceiverDecoder`, `RecoveryDecoder`, `IndexedRecoveryDecoder`, `Refusal`, `ColourMatrix`, `ArgbView` |
 | `compat::dvd` | `Decoder`, `Settings`, `ifo_palette`, `VobSubIndex`, `SubpictureParser`, `mp4_configuration` |
 | `compat::cc` | `Decoder`, `Options`, `CaptionExtractor`, `SccPackets` |

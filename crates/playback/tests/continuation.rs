@@ -2163,7 +2163,9 @@ fn native_m2ts_prefix_grid_loss_preserves_source_and_refuses_native_tail() {
 #[test]
 fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     use bitmap_bridge::*;
-    use matroska_feed::{MatroskaBitmapClockProbe, MatroskaBitmapCodec, MatroskaBitmapTrack};
+    use matroska_feed::{
+        MatroskaBitmapClockProbe, MatroskaBitmapCodec, MatroskaBitmapTrack, MatroskaDvbStep,
+    };
     use triergon_matroska::typed::Event;
     use triergon_subtitles::{dvb, dvd, pgs};
 
@@ -2467,7 +2469,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         }
         let mut work = WorkBudget::new(u64::MAX);
         match input.decode(&mut decoder, &mut work, &off()).unwrap() {
-            Some(dvb_ts::DvbQueueAction::Show(picture)) => {
+            MatroskaDvbStep::Action(dvb_ts::DvbQueueAction::Show(picture)) => {
                 assert_eq!(picture.start_ns, 19_000_000);
                 assert_eq!(
                     picture.rectangles().next().unwrap().pixels,
@@ -2482,18 +2484,16 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
                 };
                 let mut preroll = dvb_track.dvb_decoder().unwrap();
                 let mut work = WorkBudget::new(u64::MAX);
-                assert!(
-                    input
-                        .decode(&mut preroll, &mut work, &off())
-                        .unwrap()
-                        .is_none()
-                );
+                assert!(matches!(
+                    input.decode(&mut preroll, &mut work, &off()).unwrap(),
+                    MatroskaDvbStep::Decoded
+                ));
             }
-            Some(dvb_ts::DvbQueueAction::Clear { at_ns }) => {
+            MatroskaDvbStep::Action(dvb_ts::DvbQueueAction::Clear { at_ns }) => {
                 assert_eq!(at_ns, 94_000_000);
                 dvb_actions.push("clear");
             }
-            None => panic!("DVB packet was not queued"),
+            step => panic!("DVB packet was not queued: {step:?}"),
         }
     }
     assert_eq!(dvb_actions, ["show", "clear"]);

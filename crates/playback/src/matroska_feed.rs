@@ -11,6 +11,7 @@ mod video_seek;
 use crate::{Delivery, Output, RawEvent, Result};
 pub use bitmap::{
     MatroskaBitmapCodec, MatroskaBitmapSource, MatroskaBitmapTrack, MatroskaDvbPacket,
+    MatroskaDvbStep,
 };
 pub use bitmap_probe::{MatroskaBitmapClockProbe, MatroskaBitmapLiveClock};
 pub use discovery::{

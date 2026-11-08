@@ -75,6 +75,7 @@ fn receiver_presents_an_empty_subtitle_for_an_undrawn_region() {
                 &AtomicBool::new(false),
             )
             .unwrap()
+            .subtitle()
             .expect("presented display set");
         assert_eq!(subtitle.pts, Some(1_000_000));
         assert_eq!(
@@ -94,7 +95,7 @@ fn receiver_presents_nothing_for_a_segment_past_the_packet() {
     source[18..20].copy_from_slice(&u16::MAX.to_be_bytes());
     let mut work = WorkBudget::new(u64::MAX);
     let decoded = decoder.decode(&source, None, &mut work, &AtomicBool::new(false));
-    assert!(decoded.unwrap().is_none());
+    assert!(decoded.unwrap().subtitle().is_none());
 }
 
 #[test]

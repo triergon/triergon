@@ -60,6 +60,11 @@ impl<'a> Segments<'a> {
     pub(super) fn new(packet: &'a [u8]) -> Self {
         Self { rest: packet }
     }
+
+    /// The bytes after the segments read so far.
+    pub(super) fn remaining(&self) -> usize {
+        self.rest.len()
+    }
 }
 
 impl<'a> Iterator for Segments<'a> {

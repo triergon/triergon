@@ -101,6 +101,7 @@ fn check_native(index: usize) {
     let subtitle = decoder
         .decode(case.payload, Some(case.pts_raw), &mut work, &cancel)
         .unwrap()
+        .subtitle()
         .expect("presented display set");
     assert_eq!(subtitle.pts, Some(case.pts_raw));
     assert_eq!(

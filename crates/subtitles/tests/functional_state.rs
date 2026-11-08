@@ -45,6 +45,7 @@ fn run(index: usize) {
         let Some(subtitle) = decoder
             .decode(packet.body, Some(packet.pts * 1000), &mut work, &cancel)
             .unwrap()
+            .subtitle()
         else {
             continue;
         };

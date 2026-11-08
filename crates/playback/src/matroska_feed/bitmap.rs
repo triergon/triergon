@@ -8,7 +8,7 @@ use crate::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceLocation, TimeBase, WorkBudget};
 use triergon_matroska::typed::{Event, Packet};
-use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder};
+use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder, Status};
 use triergon_subtitles::{dvb, dvd, pgs::PacketClock};
 
 const NS_PER_SECOND: u64 = 1_000_000_000;
@@ -40,7 +40,7 @@ impl MatroskaDvbPacket {
         decoder: &'d mut ReceiverDecoder,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<DvbQueueAction<'d>>> {
+    ) -> Result<MatroskaDvbStep<'d>> {
         let facts = self.packet.source.as_ref().ok_or(Error::SourceMismatch)?;
         let pts = facts
             .timing()
@@ -48,18 +48,32 @@ impl MatroskaDvbPacket {
             .map(|value| microseconds(value.ticks, facts.configuration().clock()))
             .transpose()?;
         let subtitle = match decoder.decode(&self.packet.payload, pts, work, cancel) {
-            Ok(Some(subtitle)) => subtitle,
-            Ok(None) | Err(Error::Invalid(_)) => return Ok(None),
+            Ok(Status::Subtitle(subtitle)) => subtitle,
+            Ok(Status::Yield) => return Ok(MatroskaDvbStep::Yield),
+            Ok(Status::Nothing) | Err(Error::Invalid(_)) => return Ok(MatroskaDvbStep::Decoded),
             Err(error) => return Err(error),
         };
         if matches!(
             self.source.delivery,
             Delivery::DecodeOnly { .. } | Delivery::Unselected
         ) {
-            return Ok(None);
+            return Ok(MatroskaDvbStep::Decoded);
         }
-        Ok(Some(DvbQueueAction::from_subtitle(subtitle)))
+        Ok(MatroskaDvbStep::Action(DvbQueueAction::from_subtitle(
+            subtitle,
+        )))
     }
+}
+
+/// What decoding a [`MatroskaDvbPacket`] did.
+#[derive(Clone, Copy, Debug)]
+pub enum MatroskaDvbStep<'a> {
+    /// The packet is decoded and asks this of the bitmap queue.
+    Action(DvbQueueAction<'a>),
+    /// The packet is decoded with no action.
+    Decoded,
+    /// The work budget ran out: decode the same packet again.
+    Yield,
 }
 
 enum Codec {

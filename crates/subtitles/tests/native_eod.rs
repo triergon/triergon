@@ -98,6 +98,7 @@ fn receive(pool: &Budget, bytes: &[u8], check: impl FnOnce(Subtitle<'_>)) {
     let subtitle = decoder
         .decode(bytes, Some(1_000_000), &mut work, &AtomicBool::new(false))
         .unwrap()
+        .subtitle()
         .expect("presented display set");
     check(subtitle);
 }

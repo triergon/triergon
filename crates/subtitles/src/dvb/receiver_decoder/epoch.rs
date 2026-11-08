@@ -5,10 +5,10 @@ use super::pixels::{self, Canvas, Pen};
 use super::segment::{
     ClutDefinition, ObjectCoding, ObjectData, ObjectPlacement, RegionComposition,
 };
-use super::{Flow, charge, push, push_exact};
+use super::{Flow, push, push_exact};
 use crate::dvb::Depth;
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result};
 
 /// The largest region the receiver allocates.
 const MAX_REGION_PIXELS: usize = 1280 * 1024;
@@ -50,6 +50,16 @@ impl Region {
     /// `width * height` palette indices, row by row.
     pub(super) fn pixels(&self) -> &[u8] {
         self.pixels.as_slice()
+    }
+
+    /// The work of presenting the automatic palette: one unit per pixel,
+    /// unless the palette as last computed still holds.
+    pub(super) fn automatic_palette_work(&self) -> u64 {
+        if self.automatic_current {
+            0
+        } else {
+            self.pixels.len() as u64
+        }
     }
 
     /// Give the region a new size: zero pixels, and nothing drawn. A size
@@ -163,11 +173,9 @@ impl Epoch {
         &mut self,
         index: usize,
         census: &mut Census,
-        work: &mut WorkBudget,
     ) -> Result<&[u32; 256]> {
         let region = &mut self.regions.as_mut_slice()[index];
         if !region.automatic_current {
-            charge(work, region.pixels.len());
             let width = usize::from(region.width);
             palette::automatic(
                 region.pixels.as_slice(),
@@ -189,16 +197,28 @@ impl Epoch {
             .map(|c| &c.tables)
     }
 
+    /// The work of [`compose_region`](Self::compose_region): one unit per
+    /// pixel cleared for a new size and per pixel filled.
+    pub(super) fn composition_work(&self, composition: &RegionComposition<'_>) -> u64 {
+        let size = u64::from(composition.width) * u64::from(composition.height);
+        if size == 0 || size > MAX_REGION_PIXELS as u64 {
+            return 0;
+        }
+        let resized = self
+            .regions
+            .as_slice()
+            .iter()
+            .find(|r| r.id == composition.id)
+            .is_none_or(|r| (r.width, r.height) != (composition.width, composition.height));
+        size * (u64::from(resized) + u64::from(composition.fill))
+    }
+
     /// Create or update a region. A new size clears its pixels and makes it
     /// undrawn; the fill flag paints them with the background code. The
     /// object list replaces the previous one. A region without area, or above
     /// the receiver's pixel limit, stops the packet; one that cannot be
     /// allocated is refused and changes nothing.
-    pub(super) fn compose_region(
-        &mut self,
-        composition: &RegionComposition<'_>,
-        work: &mut WorkBudget,
-    ) -> Result<Flow> {
+    pub(super) fn compose_region(&mut self, composition: &RegionComposition<'_>) -> Result<Flow> {
         let size = usize::from(composition.width) * usize::from(composition.height);
         if size == 0 || size > MAX_REGION_PIXELS {
             return Ok(Flow::Stop);
@@ -225,13 +245,11 @@ impl Epoch {
             .objects
             .try_reserve_exact(placements.saturating_sub(region.objects.len()))?;
         if (region.width, region.height) != (composition.width, composition.height) {
-            charge(work, size);
             region.resize(composition.width, composition.height)?;
         }
         region.depth = composition.depth;
         region.clut = composition.clut;
         if composition.fill {
-            charge(work, size);
             region.pixels.as_mut_slice().fill(composition.background);
         }
         region.objects.clear();
@@ -276,13 +294,43 @@ impl Epoch {
         Ok(())
     }
 
+    /// The work of [`draw_object`](Self::draw_object): one unit per region
+    /// placement it visits, and per field byte and pixel a placement may draw.
+    pub(super) fn drawing_work(&self, object: &ObjectData<'_>) -> u64 {
+        let ObjectCoding::Pixels { top, bottom } = object.coding else {
+            return 0;
+        };
+        if !self.objects.contains(object.id) {
+            return 0;
+        }
+        let bottom = if bottom.is_empty() { top } else { bottom };
+        let mut work = 0;
+        for region in self.regions.as_slice() {
+            let (width, height) = (u64::from(region.width), u64::from(region.height));
+            work += region.objects.len() as u64;
+            for placement in region.objects.as_slice() {
+                if placement.object != object.id {
+                    continue;
+                }
+                let (x, y) = (u64::from(placement.x), u64::from(placement.y));
+                if x >= width || y >= height {
+                    return work;
+                }
+                for (field, line) in [(top, 0), (bottom, 1)] {
+                    let lines = height.saturating_sub(y + line).div_ceil(2);
+                    work += field.len() as u64 + lines * (width - x);
+                }
+            }
+        }
+        work
+    }
+
     /// Draw an object into every region placement of it. An object no region
     /// referenced, one not coded as pixels, or a placement outside its region
     /// stops the packet. Cancellation is checked before each placement.
     pub(super) fn draw_object(
         &mut self,
         object: &ObjectData<'_>,
-        work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Flow> {
         if !self.objects.contains(object.id) {
@@ -295,7 +343,6 @@ impl Epoch {
         for region in self.regions.as_mut_slice() {
             let width = usize::from(region.width);
             let height = usize::from(region.height);
-            charge(work, region.objects.len());
             for placement in region.objects.as_slice() {
                 if placement.object != object.id {
                     continue;
@@ -313,8 +360,6 @@ impl Epoch {
                     depth: region.depth,
                 };
                 for (field, line) in [(top, 0), (bottom, 1)] {
-                    let lines = height.saturating_sub(y + line).div_ceil(2);
-                    charge(work, field.len() + lines * (width - x));
                     let pen = Pen {
                         x,
                         y: y + line,

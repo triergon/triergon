@@ -8,7 +8,7 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_harness_protocol::digest::{fold, fold_bytes};
-use triergon_subtitles::compat::dvb::{AutomaticPalette, Options, ReceiverDecoder};
+use triergon_subtitles::compat::dvb::{AutomaticPalette, Options, ReceiverDecoder, Status};
 
 struct Case {
     id: String,
@@ -89,19 +89,25 @@ fn cases() -> Vec<Case> {
     cases
 }
 
-/// Decode a case and fold its output: events, bytes and digest.
-fn run(case: &Case) -> [u64; 3] {
+/// Decode a case, each call with `quantum` units of work, and fold its
+/// output: events, bytes and digest. Also the calls that yielded.
+fn run(case: &Case, quantum: u64) -> ([u64; 3], u64) {
     let pool = Budget::new(1 << 28).unwrap();
     let cancel = AtomicBool::new(false);
     let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
-    let (mut events, mut bytes, mut digest) = (0, 0, 0);
+    let (mut events, mut bytes, mut digest, mut yields) = (0, 0, 0, 0);
     let text = |digest: &mut u64| fold(digest, 0);
     text(&mut digest);
     for (index, (pts, packet)) in case.packets.iter().enumerate() {
-        let mut work = WorkBudget::new(u64::MAX);
-        let subtitle = match decoder.decode(packet, *pts, &mut work, &cancel) {
-            Ok(Some(subtitle)) => subtitle,
-            Ok(None) | Err(Error::Invalid(_)) => continue,
+        let status = loop {
+            match decoder.decode(packet, *pts, &mut WorkBudget::new(quantum), &cancel) {
+                Ok(Status::Yield) => yields += 1,
+                status => break status,
+            }
+        };
+        let subtitle = match status {
+            Ok(Status::Subtitle(subtitle)) => subtitle,
+            Ok(_) | Err(Error::Invalid(_)) => continue,
             Err(error) => panic!("{}: {error:?}", case.id),
         };
         events += 1;
@@ -140,7 +146,7 @@ fn run(case: &Case) -> [u64; 3] {
     }
     let mut total = 0;
     fold(&mut total, digest);
-    [events, bytes, total]
+    ([events, bytes, total], yields)
 }
 
 #[test]
@@ -149,13 +155,29 @@ fn reference_folds() {
     assert!(cases.len() > 200, "{} fixture cases", cases.len());
     let failures: Vec<&str> = cases
         .iter()
-        .filter(|case| run(case) != case.expected)
+        .filter(|case| run(case, u64::MAX).0 != case.expected)
         .map(|case| case.id.as_str())
         .collect();
     assert!(
         failures.is_empty(),
         "differ from the reference: {failures:?}"
     );
+}
+
+/// Decoded a little work at a time, yielding and called again with the same
+/// packet, every case presents what it presents with unlimited work.
+#[test]
+fn small_budgets_yield_to_the_same_output() {
+    let cases = cases();
+    for quantum in [1, 97, 4096] {
+        let mut yields = 0;
+        for case in &cases {
+            let (fold, yielded) = run(case, quantum);
+            assert_eq!(fold, case.expected, "{} at {quantum}", case.id);
+            yields += yielded;
+        }
+        assert!(yields > 0, "nothing yielded at {quantum}");
+    }
 }
 
 /// Every pixel value of a region recomposed at a smaller depth has a colour,
@@ -175,7 +197,8 @@ fn reduced_depth_pixels_have_colours() {
         let mut last = None;
         for (pts, packet) in &case.packets {
             let mut work = WorkBudget::new(u64::MAX);
-            if let Some(subtitle) = decoder.decode(packet, *pts, &mut work, &cancel).unwrap() {
+            let status = decoder.decode(packet, *pts, &mut work, &cancel).unwrap();
+            if let Some(subtitle) = status.subtitle() {
                 let rect = subtitle.rects().next().unwrap();
                 last = Some((rect.palette.to_vec(), *rect.colours, rect.pixels.to_vec()));
             }
@@ -226,25 +249,38 @@ fn charges_work_and_respects_the_pool() {
     let pool = Budget::new(1 << 20).unwrap();
     let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
     let mut work = WorkBudget::new(1 << 20);
-    assert!(
-        decoder
-            .decode(packet, *pts, &mut work, &cancel)
-            .unwrap()
-            .is_some()
-    );
-    assert!(work.spent() >= packet.len() as u64);
-    let mut small = WorkBudget::new(64);
-    let _ = decoder.decode(packet, *pts, &mut small, &cancel);
-    assert_eq!(small.remaining(), 0);
+    let status = decoder.decode(packet, *pts, &mut work, &cancel).unwrap();
+    assert!(status.subtitle().is_some());
+    let whole = work.spent();
+    assert!(whole >= packet.len() as u64);
+    // A small budget yields, spending it all; the calls together spend what
+    // one call with enough work does.
+    let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+    let mut spent = 0;
+    for _ in 0..whole.div_ceil(64) - 1 {
+        let mut small = WorkBudget::new(64);
+        let status = decoder.decode(packet, *pts, &mut small, &cancel).unwrap();
+        assert!(matches!(status, Status::Yield));
+        assert_eq!(small.remaining(), 0);
+        spent += 64;
+    }
+    let mut last = WorkBudget::new(64);
+    let status = decoder.decode(packet, *pts, &mut last, &cancel).unwrap();
+    assert!(status.subtitle().is_some());
+    assert_eq!(spent + last.spent(), whole);
     let pool = Budget::new(256).unwrap();
     let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
     let mut work = WorkBudget::new(u64::MAX);
     assert!(decoder.decode(packet, *pts, &mut work, &cancel).is_err());
-    let cancel = AtomicBool::new(true);
+    // A cancelled packet continues where it stopped.
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
     assert!(matches!(
-        decoder.decode(packet, *pts, &mut work, &cancel),
+        decoder.decode(packet, *pts, &mut work, &AtomicBool::new(true)),
         Err(Error::Cancelled)
     ));
+    let status = decoder.decode(packet, *pts, &mut work, &cancel).unwrap();
+    assert!(status.subtitle().is_some());
 }
 
 /// Every fixture packet with bytes flipped, cut short and extended decodes
@@ -356,7 +392,7 @@ fn work_scales_with_placements() {
         let presented = decoder
             .decode(&packet, None, &mut work, &AtomicBool::new(false))
             .unwrap();
-        assert_eq!(presented.unwrap().rects().len(), 1);
+        assert_eq!(presented.subtitle().unwrap().rects().len(), 1);
         work.spent() as f64
     };
     let (n, k) = (1000, 4);
@@ -386,7 +422,7 @@ fn decode_all(
             decoder
                 .decode(packet, None, &mut work, &cancel)
                 .map(|subtitle| {
-                    subtitle.map_or_else(Vec::new, |subtitle| {
+                    subtitle.subtitle().map_or_else(Vec::new, |subtitle| {
                         subtitle
                             .rects()
                             .map(|r| {

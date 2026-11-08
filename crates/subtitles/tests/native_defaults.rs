@@ -277,6 +277,7 @@ fn native_case(at: usize) {
             &cancel,
         )
         .unwrap()
+        .subtitle()
         .expect("presented display set");
     assert_eq!(
         (subtitle.start_display_ms, subtitle.end_display_ms),

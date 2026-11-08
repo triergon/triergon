@@ -223,6 +223,7 @@ fn native_guard(data: &[u8]) {
         let subtitle = decoder
             .decode(&frame.payload, Some(frame.pts * 1000), &mut work, &cancel)
             .unwrap()
+            .subtitle()
             .expect("presented display set");
         assert_eq!(subtitle.pts, Some(frame.pts * 1000));
         assert_eq!(

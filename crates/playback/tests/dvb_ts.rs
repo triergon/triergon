@@ -88,16 +88,20 @@ enum Seen {
 fn decode(bridge: &mut DvbTsBridge, pes: Output) -> Seen {
     let cancel = AtomicBool::new(false);
     assert!(bridge.push(&mut Some(pes)).unwrap());
-    for _ in 0..100_000 {
+    for polls in 0..100_000 {
         match bridge.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
             DvbStep::Yield => {}
             DvbStep::NeedPacket => return Seen::Nothing,
             DvbStep::Action(DvbQueueAction::Clear { at_ns }) => return Seen::Clear(at_ns),
             DvbStep::Action(DvbQueueAction::Show(picture)) => {
+                let pixels = picture.rectangles().next().unwrap().pixels.to_vec();
+                // The decoder's work, at least a unit per region pixel, was
+                // spread over the polls.
+                assert!(polls >= pixels.len(), "{polls} polls");
                 return Seen::Show {
                     start_ns: picture.start_ns,
                     canvas: picture.canvas,
-                    pixels: picture.rectangles().next().unwrap().pixels.to_vec(),
+                    pixels,
                 };
             }
             DvbStep::Finished => panic!("finished before the pushed PES"),

@@ -21,7 +21,7 @@ mod pixels;
 mod segment;
 
 use crate::dvb::{Depth, Size};
-use epoch::Epoch;
+use epoch::{Epoch, Region};
 use palette::{Census, DEFAULT};
 use segment::{
     ClutDefinition, DisplayDefinition, Kind, ObjectData, PageComposition, Placement,
@@ -57,6 +57,29 @@ pub struct Options {
     /// stream configuration, or of its first service when it has fewer
     /// (`dvb_substream`). `None` decodes every page.
     pub service: Option<usize>,
+}
+
+/// What a [`ReceiverDecoder::decode`] call did.
+#[derive(Clone, Copy, Debug)]
+pub enum Status<'a> {
+    /// The packet is decoded and presented this subtitle.
+    Subtitle(Subtitle<'a>),
+    /// The packet is decoded and presented nothing.
+    Nothing,
+    /// The work budget ran out before the packet's next segment, which is
+    /// not decoded yet. The work counts towards the next attempt: decode the
+    /// same packet again.
+    Yield,
+}
+
+impl<'a> Status<'a> {
+    /// The presented subtitle, if any.
+    pub fn subtitle(self) -> Option<Subtitle<'a>> {
+        match self {
+            Self::Subtitle(subtitle) => Some(subtitle),
+            Self::Nothing | Self::Yield => None,
+        }
+    }
 }
 
 /// One presented subtitle; valid until the next call.
@@ -172,6 +195,60 @@ impl Pages {
     }
 }
 
+/// A packet whose decoding stopped before a segment, to continue there.
+#[derive(Clone, Copy, Debug)]
+struct Resume {
+    length: usize,
+    pts: Option<i64>,
+    /// Where the next segment starts; the packet length once only the
+    /// end-of-packet presentation remains.
+    offset: usize,
+}
+
+/// How far a call decoded its packet.
+#[derive(Clone, Copy, Debug)]
+enum Progress {
+    Done,
+    /// Stopped before the segment at `at`, for want of work or by
+    /// cancellation.
+    Halted {
+        at: usize,
+        cancelled: bool,
+    },
+}
+
+/// A segment of a selected page as the receiver reads it; `None` where it
+/// cannot be read.
+#[derive(Clone, Copy, Debug)]
+enum Parsed<'a> {
+    Page(PageComposition<'a>),
+    Region(Option<RegionComposition<'a>>),
+    Clut(Option<ClutDefinition<'a>>),
+    Object(Option<ObjectData<'a>>),
+    Display(Option<DisplayDefinition>),
+    End,
+    Other,
+}
+
+impl<'a> Parsed<'a> {
+    fn of(segment: &Segment<'a>) -> Self {
+        match segment.kind {
+            Kind::PageComposition => Self::Page(PageComposition::parse(segment)),
+            Kind::RegionComposition => Self::Region(RegionComposition::parse(segment.body)),
+            Kind::ClutDefinition => Self::Clut(ClutDefinition::parse(segment)),
+            Kind::ObjectData => Self::Object(ObjectData::parse(segment.body).ok()),
+            Kind::DisplayDefinition => Self::Display(DisplayDefinition::parse(segment.body)),
+            Kind::EndOfDisplaySet => Self::End,
+            Kind::Other => Self::Other,
+        }
+    }
+
+    /// Whether the segment may change regions a presented subtitle shows.
+    fn changes_epoch(&self) -> bool {
+        matches!(self, Self::Page(_) | Self::Region(_) | Self::Object(_))
+    }
+}
+
 /// Whether a packet's remaining segments are decoded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Flow {
@@ -233,6 +310,10 @@ pub struct ReceiverDecoder {
     /// Output rectangles, reused across calls.
     slots: BudgetVec<Slot>,
     presented: Option<Presented>,
+    /// Where the packet that yielded or was cancelled continues.
+    resume: Option<Resume>,
+    /// Work granted to calls on the current packet and left unspent.
+    credit: u64,
     budget: Budget,
 }
 
@@ -256,6 +337,8 @@ impl ReceiverDecoder {
             census: Census::new(budget),
             slots: BudgetVec::new(budget),
             presented: None,
+            resume: None,
+            credit: 0,
             budget: budget.clone(),
         }
     }
@@ -264,106 +347,197 @@ impl ReceiverDecoder {
     /// A packet of a segment header or less, or one that does not start with
     /// a segment, is refused (`Error::Invalid`) and changes nothing.
     ///
-    /// A packet is decoded whole. Its work, one unit per packet byte, per
-    /// object placement an object segment visits and per pixel its segments
-    /// may draw, copy or present, is charged to `work`, which stops at zero.
-    /// A cooperative caller decodes the next packet while its budget lasts.
-    /// Cancellation is checked before each segment and each object placement;
-    /// a cancelled packet keeps the segments decoded before it.
+    /// Each segment's work, one unit per byte, per object placement it visits
+    /// and per pixel it may draw, copy or present, is charged to `work` before
+    /// the segment is decoded. When the budget cannot pay for the next one,
+    /// the call yields ([`Status::Yield`]) before it. Call again with the same
+    /// packet and time to continue: the work left over counts towards the
+    /// next call, so the packet completes after enough calls. Cancellation is
+    /// checked before each segment and each object placement, and a cancelled
+    /// packet continues the same way. A different packet drops the rest of a
+    /// yielded or cancelled one.
     pub fn decode(
         &mut self,
         packet: &[u8],
         pts: Option<i64>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<Subtitle<'_>>> {
-        self.presented = None;
+    ) -> Result<Status<'_>> {
         if packet.len() <= 6 || packet[0] != 0x0f {
             return Err(Error::Invalid("DVB subtitle packet"));
         }
-        charge(work, packet.len());
-        self.held = Held::default();
-        let mut flow = Flow::Continue;
-        for segment in Segments::new(packet) {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
+        let start = match self.resume.take() {
+            Some(resume) if resume.length == packet.len() && resume.pts == pts => resume.offset,
+            _ => {
+                self.credit = 0;
+                self.presented = None;
+                self.held = Held::default();
+                0
             }
-            flow = match segment {
-                Ok(segment) if !self.pages.admit(segment.page) => Flow::Continue,
-                Ok(segment) => self.segment(&segment, pts, work, cancel)?,
-                Err(_) => Flow::Stop,
+        };
+        let granted = work.remaining();
+        let mut banked = WorkBudget::new(granted.saturating_add(self.credit));
+        let progress = self.run(packet, start, pts, &mut banked, cancel);
+        if let Ok(Progress::Halted { at, cancelled }) = progress {
+            work.take(granted);
+            self.credit = banked.remaining();
+            self.resume = Some(Resume {
+                length: packet.len(),
+                pts,
+                offset: at,
+            });
+            return if cancelled {
+                Err(Error::Cancelled)
+            } else {
+                Ok(Status::Yield)
             };
-            if flow == Flow::Stop {
+        }
+        work.take(banked.spent().saturating_sub(self.credit));
+        self.credit = 0;
+        progress?;
+        Ok(match self.presented {
+            Some(p) => Status::Subtitle(Subtitle {
+                pts: p.pts,
+                start_display_ms: 0,
+                end_display_ms: p.end_display_ms,
+                display_size: self.display_size,
+                slots: &self.slots.as_slice()[..p.rects],
+                epoch: &self.epoch,
+            }),
+            None => Status::Nothing,
+        })
+    }
+
+    /// Decode the segments from `start` on, each once `work` pays for it,
+    /// then present the packet as the receiver does at its end.
+    fn run(
+        &mut self,
+        packet: &[u8],
+        start: usize,
+        pts: Option<i64>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Progress> {
+        let mut segments = Segments::new(&packet[start..]);
+        loop {
+            let at = packet.len() - segments.remaining();
+            let Some(segment) = segments.next() else {
                 break;
+            };
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(Progress::Halted {
+                    at,
+                    cancelled: true,
+                });
+            }
+            let Ok(segment) = segment else {
+                return Ok(Progress::Done);
+            };
+            let parsed = self.pages.admit(segment.page).then(|| Parsed::of(&segment));
+            let bytes = 6 + segment.body.len() as u64;
+            let cost = bytes + parsed.as_ref().map_or(0, |parsed| self.work(parsed));
+            if !work.try_charge(cost) {
+                return Ok(Progress::Halted {
+                    at,
+                    cancelled: false,
+                });
+            }
+            let Some(parsed) = parsed else {
+                continue;
+            };
+            match self.apply(parsed, pts, cancel) {
+                Ok(Flow::Continue) => {}
+                Ok(Flow::Stop) => return Ok(Progress::Done),
+                Err(Error::Cancelled) => {
+                    return Ok(Progress::Halted {
+                        at,
+                        cancelled: true,
+                    });
+                }
+                Err(error) => return Err(error),
             }
         }
-        if flow == Flow::Continue {
-            if self.held.display_set() {
-                self.display_size.get_or_insert(DEFAULT_DISPLAY);
-            }
-            if self.held.display_set() && !self.options.end_from_next {
-                self.present(pts, self.timeout_ms(), work)?;
-            }
-            self.previous_pts = pts;
+        let presents = self.held.display_set() && !self.options.end_from_next;
+        if presents && !work.try_charge(self.present_work().0) {
+            return Ok(Progress::Halted {
+                at: packet.len(),
+                cancelled: false,
+            });
         }
-        Ok(self.presented.map(|p| Subtitle {
-            pts: p.pts,
-            start_display_ms: 0,
-            end_display_ms: p.end_display_ms,
-            display_size: self.display_size,
-            slots: &self.slots.as_slice()[..p.rects],
-            epoch: &self.epoch,
-        }))
+        if self.held.display_set() {
+            self.display_size.get_or_insert(DEFAULT_DISPLAY);
+        }
+        if presents {
+            self.present(pts, self.timeout_ms())?;
+        }
+        self.previous_pts = pts;
+        Ok(Progress::Done)
     }
 
     fn timeout_ms(&self) -> u32 {
         u32::from(self.page.timeout) * 1000
     }
 
-    fn segment(
+    /// The work of [`apply`](Self::apply) to `segment` in the current state.
+    fn work(&self, segment: &Parsed<'_>) -> u64 {
+        let detach = if self.presented.is_some() && segment.changes_epoch() {
+            self.detach_work()
+        } else {
+            0
+        };
+        detach
+            + match segment {
+                Parsed::Page(page)
+                    if self.options.end_from_next && self.page.version != Some(page.version) =>
+                {
+                    let (palettes, pixels) = self.present_work();
+                    palettes + if page.state.starts_epoch() { pixels } else { 0 }
+                }
+                Parsed::Region(Some(region)) => self.epoch.composition_work(region),
+                Parsed::Object(Some(object)) => self.epoch.drawing_work(object),
+                Parsed::End if !self.options.end_from_next => self.present_work().0,
+                _ => 0,
+            }
+    }
+
+    fn apply(
         &mut self,
-        segment: &Segment<'_>,
+        segment: Parsed<'_>,
         pts: Option<i64>,
-        work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Flow> {
-        if self.presented.is_some()
-            && matches!(
-                segment.kind,
-                Kind::PageComposition | Kind::RegionComposition | Kind::ObjectData
-            )
-        {
-            self.detach(work)?;
+        if self.presented.is_some() && segment.changes_epoch() {
+            self.detach()?;
         }
-        match segment.kind {
-            Kind::PageComposition => {
+        match segment {
+            Parsed::Page(page) => {
                 self.held.page = true;
-                self.compose_page(&PageComposition::parse(segment), pts, work)?;
+                self.compose_page(&page, pts)?;
             }
-            Kind::RegionComposition => {
-                let Some(region) = RegionComposition::parse(segment.body) else {
+            Parsed::Region(region) => {
+                let Some(region) = region else {
                     return Ok(Flow::Stop);
                 };
-                if self.epoch.compose_region(&region, work)? == Flow::Stop {
+                if self.epoch.compose_region(&region)? == Flow::Stop {
                     return Ok(Flow::Stop);
                 }
                 self.held.region = true;
             }
-            Kind::ClutDefinition => {
-                if let Some(clut) = ClutDefinition::parse(segment) {
+            Parsed::Clut(clut) => {
+                if let Some(clut) = clut {
                     self.epoch.define_clut(&clut)?;
                 }
             }
-            Kind::ObjectData => {
-                let Ok(object) = ObjectData::parse(segment.body) else {
+            Parsed::Object(object) => {
+                let Some(object) = object else {
                     return Ok(Flow::Stop);
                 };
-                if self.epoch.draw_object(&object, work, cancel)? == Flow::Stop {
+                if self.epoch.draw_object(&object, cancel)? == Flow::Stop {
                     return Ok(Flow::Stop);
                 }
                 self.held.object = true;
             }
-            Kind::DisplayDefinition => match DisplayDefinition::parse(segment.body) {
+            Parsed::Display(display) => match display {
                 // A repeated version changes nothing.
                 Some(display)
                     if self
@@ -376,10 +550,10 @@ impl ReceiverDecoder {
                 }
                 None => return Ok(Flow::Stop),
             },
-            Kind::EndOfDisplaySet if !self.options.end_from_next => {
-                self.present(pts, self.timeout_ms(), work)?;
+            Parsed::End if !self.options.end_from_next => {
+                self.present(pts, self.timeout_ms())?;
             }
-            Kind::EndOfDisplaySet | Kind::Other => {}
+            Parsed::End | Parsed::Other => {}
         }
         Ok(Flow::Continue)
     }
@@ -387,12 +561,7 @@ impl ReceiverDecoder {
     /// A new page version replaces the region list; at an acquisition point
     /// or mode change it also starts a new epoch. A repeated version, or one
     /// that cannot be allocated, changes nothing.
-    fn compose_page(
-        &mut self,
-        page: &PageComposition<'_>,
-        pts: Option<i64>,
-        work: &mut WorkBudget,
-    ) -> Result<()> {
+    fn compose_page(&mut self, page: &PageComposition<'_>, pts: Option<i64>) -> Result<()> {
         if self.page.version == Some(page.version) {
             return Ok(());
         }
@@ -403,11 +572,11 @@ impl ReceiverDecoder {
                 _ => -1,
             };
             // The receiver's display time is 32 bits: a negative end wraps.
-            self.present(previous, end as u32, work)?;
+            self.present(previous, end as u32)?;
         }
         let starts_epoch = page.state.starts_epoch();
         if starts_epoch {
-            self.detach(work)?;
+            self.detach()?;
         }
         let regions = page.regions().count().min(256);
         self.page
@@ -429,14 +598,39 @@ impl ReceiverDecoder {
         Ok(())
     }
 
+    /// Whether `region` is presented with the automatic palette.
+    fn automatic(&self, region: &Region) -> bool {
+        match self.options.automatic_palette {
+            AutomaticPalette::Never => false,
+            AutomaticPalette::WithoutClut => self.epoch.tables(region.clut).is_none(),
+            AutomaticPalette::Always => true,
+        }
+    }
+
+    /// The work of presenting the page now: the automatic palettes to
+    /// compute, and the pixels of its rectangles.
+    fn present_work(&self) -> (u64, u64) {
+        if self.page.version.is_none() || self.presented.is_some() {
+            return (0, 0);
+        }
+        self.page
+            .placements
+            .as_slice()
+            .iter()
+            .filter_map(|placement| self.epoch.drawn_region(placement.region))
+            .fold((0, 0), |(palettes, pixels), (_, region)| {
+                let palette = if self.automatic(region) {
+                    region.automatic_palette_work()
+                } else {
+                    0
+                };
+                (palettes + palette, pixels + region.pixels().len() as u64)
+            })
+    }
+
     /// Present the page as it stands, unless no page was composed yet or this
-    /// call presented already.
-    fn present(
-        &mut self,
-        pts: Option<i64>,
-        end_display_ms: u32,
-        work: &mut WorkBudget,
-    ) -> Result<()> {
+    /// packet presented already.
+    fn present(&mut self, pts: Option<i64>, end_display_ms: u32) -> Result<()> {
         if self.page.version.is_none() || self.presented.is_some() {
             return Ok(());
         }
@@ -462,6 +656,12 @@ impl ReceiverDecoder {
                 };
                 push_exact(&mut self.slots, slot)?;
             }
+            let automatic = self.automatic(region);
+            let table = self
+                .epoch
+                .tables(region.clut)
+                .unwrap_or(&DEFAULT)
+                .get(region.depth);
             let slot = &mut self.slots.as_mut_slice()[count];
             slot.x = i32::from(placement.x) + i32::from(dx);
             slot.y = i32::from(placement.y) + i32::from(dy);
@@ -469,18 +669,9 @@ impl ReceiverDecoder {
             slot.height = region.height;
             slot.depth = region.depth;
             slot.region = Some(index);
-            let tables = self.epoch.tables(region.clut);
-            let automatic = match self.options.automatic_palette {
-                AutomaticPalette::Never => false,
-                AutomaticPalette::WithoutClut => tables.is_none(),
-                AutomaticPalette::Always => true,
-            };
             if automatic {
-                slot.palette = *self
-                    .epoch
-                    .automatic_palette(index, &mut self.census, work)?;
+                slot.palette = *self.epoch.automatic_palette(index, &mut self.census)?;
             } else {
-                let table = tables.unwrap_or(&DEFAULT).get(region.depth);
                 let (defined, rest) = slot.palette.split_at_mut(table.len());
                 defined.copy_from_slice(table);
                 rest.fill(0);
@@ -495,25 +686,29 @@ impl ReceiverDecoder {
         Ok(())
     }
 
+    /// The work of [`detach`](Self::detach): the pixels it copies.
+    fn detach_work(&self) -> u64 {
+        let count = self.presented.map_or(0, |p| p.rects);
+        self.slots.as_slice()[..count]
+            .iter()
+            .filter_map(|slot| slot.region)
+            .map(|index| self.epoch.region_at(index).pixels().len() as u64)
+            .sum()
+    }
+
     /// Copy the presented pixels out of the regions before a segment of the
     /// same packet changes them.
-    fn detach(&mut self, work: &mut WorkBudget) -> Result<()> {
+    fn detach(&mut self) -> Result<()> {
         let count = self.presented.map_or(0, |p| p.rects);
         for slot in &mut self.slots.as_mut_slice()[..count] {
             if let Some(index) = slot.region.take() {
-                let pixels = self.epoch.region_at(index).pixels();
-                charge(work, pixels.len());
                 slot.pixels.clear();
-                slot.pixels.try_extend_from_slice(pixels)?;
+                slot.pixels
+                    .try_extend_from_slice(self.epoch.region_at(index).pixels())?;
             }
         }
         Ok(())
     }
-}
-
-/// Charge work done, down to an empty budget.
-fn charge(work: &mut WorkBudget, units: usize) {
-    work.take(units as u64);
 }
 
 fn push<T>(vec: &mut BudgetVec<T>, value: T) -> Result<()> {
