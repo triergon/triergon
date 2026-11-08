@@ -1,0 +1,34 @@
+;@time -100 0 1 250 499 500 501 999 1000 1333 1500 1999 2000 2500
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+Style: Alt,Arial,10,&H40102030,&H000000FF,&H00000000,&H80000000,0,0,0,0,50,50,0,90,1,0,0,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\fs80\fscx200\fscy50\fsp10\frx90\fry-90\frz360\fax1\fay-1)}geometry
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(500,1500,\c&H00FF00&\2c&HFF00FF&\3c&H0000FF&\4c&HFFFF00&\alpha&H80&\1a&HFF&)}colours
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(0,1000,0.33,\bord10\xbord1\ybord20\shad5\xshad-5\yshad15\be20\blur8)}borders
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(0,1000,3,\clip(100,100,600,400))\clip(0,0,1280,720)}rect clip
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\iclip(0,0,10,10)\t(250,1250,\iclip(500,500,1000,1000))}iclip
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\fs+10)\t(\fs-5)}relative size
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\fs0)\t(\fs-50)\t(\blur200)\t(\be-50)\t(\fscx-10)}clamped
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\fs)\t(\bord)\t(\c)\t(\alpha)\t(\rAlt)\t(\fn Other)\t(\b1\i1)}resets inside t
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(0,1000,\fs80)}a{\t(1000,2000,\fs10)}b{\fs60}c
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(0,1000,1e400,\fs80)\t(0,1000,-1e400,\bord9)\t(0,1000,0,\shad4)\t(0,1000,-2,\be3)}extreme accel
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\move(100,100,1100,620)}move whole
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\move(100.5,100.25,-1100,620,250,1250)}move timed
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\move(0,0,10,10,1000,1000)}move instant
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fad(500,500)}fad
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fade(200,100,50,0,600,1400,2000)}fade
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fade(255,0,255,-1,300,300,-1)}fade minus one
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fade(1000,-1000,2147483647,0,1,2,3)}fade huge alpha
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fad(0,2500)}long fade out
+Dialogue: 0,0:00:00.50,0:00:01.50,Default,,0,0,0,,{\t(\fs10)\move(0,0,100,0)\fad(100,100)}late start
+Dialogue: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,,{\t(\fs10)\move(0,0,100,0)\fad(100,100)}zero duration
+Dialogue: 0,0:00:02.00,0:00:01.00,Default,,0,0,0,,{\t(\fs10)\move(0,0,100,0)\fad(100,100)}negative duration

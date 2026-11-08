@@ -1,0 +1,38 @@
+@private
+[Script Info]
+ScriptType: v4.00+
+@end
+@chunk 0 100
+5,0,Default,,0,0,0,,fallback event format from the codec private
+@chunk 0 100
+-1,0,Default,,0,0,0,,a negative read order drops the bitmap
+@chunk 0 100
+5,0,Default,,0,0,0,,found by scanning the held events
+@chunk 0 100
+7,0,Default
+@chunk 0 100
+7,0,Default,,0,0,0,,7 was rejected above, so no event holds it
+@chunk 0 100
+83886080,0,Default,,0,0,0,,beyond the bitmap
+@chunk 0 100
+83886079,0,Default,,0,0,0,,the last bit
+@dump
+@flush
+@chunk 0 100
+5,0,Default,,0,0,0,,after flush 5 is new
+@chunk 0 100
+6,0,Default
+@chunk 0 100
+6,0,Default,,0,0,0,,the bitmap remembers the rejected 6
+@chunk 0 100
+99999999999,0,Default,,0,0,0,,atoi truncates
+@chunk 100 50
+1000,0,Default,,0,0,0,,ends at 150
+@dump
+@prune 120
+@chunk 0 100
+1000,0,Default,,0,0,0,,1000 was pruned
+@dump
+@prune 9223372036854775807
+@chunk -9223372036854775808 -1
+1,0,Default,,0,0,0,,extreme times

@@ -1,0 +1,9 @@
+[Script Info]
+ScriptType:4.00+
+YCbCr Matrix:
+Language:
+Kerning: YES
+WrapStyle: &H2
+ScaledBorderAndShadow:   1
+PlayResY: 1024
+Timer: -.5e1

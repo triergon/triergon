@@ -88,6 +88,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-ass"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-raster",
+]
+
+[[package]]
 name = "triergon-bitstream"
 version = "0.0.0"
 

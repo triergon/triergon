@@ -1,0 +1,16 @@
+;@time 100
+[Script Info]
+; Custom format lines: SBAS defaults to yes; fields in any order.
+ScriptType: v4.00+
+[V4+ Styles]
+Format: Fontsize, Name, Bold, Name, Alignment, Unknown, scalex , FONTNAME
+Style: 30,First,1,Second,5,ignored,150,Courier
+Style: 31,Third
+[Events]
+Format: Text, Layer
+Dialogue: rest, of, the, line
+Format: Start, End, Style, Actor, Name, Duration, Effect, MarginV, Layer, Text
+Dialogue: 0:00:00.00,0:00:01.00,Second,actor,name,0:00:03.00,Fx,12,3,text, with, commas
+Dialogue: 0:00:00.00,0:00:01.00,Second,actor,name,0:00:03.00
+Dialogue: 0:00:00.00,0:00:01.00,Second,actor,name,0:00:03.00,Fx,12,3,
+Dialogue:0:00:00.00,0:00:01.00,Second,,,,,,,

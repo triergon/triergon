@@ -1,0 +1,35 @@
+;@extract-fonts
+[Script Info]
+ScriptType: v4.00+
+[Fonts]
+data before any fontname is ignored
+fontname: first.ttf
+!!%#!Q1&"A=)#1I,$!U/$R!2%B-5&298'"E;'RQ>(B]A)3)D*#5G*SAJ+CMM,3YP-$%S-T1V.D=Y/4I\
+0$U_0U""1E.%25:(3%F+3UR.4E^156*46&676VB:7FN=86Z@9'&C9W2F:G>I;7JL<'VO<X"R=H.U>8:X
+?(F[?XR^@H_!A9+$B)7'BYC*CIO-D9[0E*'3EZ36FJ?9G:K<H*W?H[#BIK/EJ;;HK+GKK[SNLK_QM<+T
+N,7WN\CZOLO]P<[`Q-(#Q]4&RM@)S=L,T-X/T^$2UN05V><8W.H;W^T>XN`AY?,DZ/8GZ_DJ[OPM\?\P
+]0(S]`4V^P@Y_@L\`0X_`Q!"!A-%"19(#!E+#QQ.$A]1%2)4&"57&RA:'BM=(2Y@)#%C)S1F*C=I+3IL
+,#UO,T!R-D-U.49X/$E[/TQ^0D^!15*$2%6'2UB*3EN-45Z05&&35V266F>976J<8&V?8W"B9G.E:7:H
+;'FK;WRN<G^Q=8*T>(6W>XBZ?HN]@8Z`A)'#AY3&BI?)C9K,D)W/DZ#2EJ/5F:;8G*G;GZS>HJ_AI;+D
+J+7GJ[CJKKOML;[PM,'SM\3VNL?YO<K\P,W_P]$"QM0%R=<(S-H+S]T.TM`1U>,4V.87V^D:WNP=X>\@
+Y/(CY_4FZO@I[?LL\/XO\`$R]P0U^@<X_0H[_`T^`P]!!1)$"!5'"QA*#AM-$1Y0%"%3%R16&B=9'2I<
+("U?(S!B)C-E*39H+#EK+SQN,C]Q-4)T.$5W.TAZ/DM]04Y`1%&#1U2&2E>)35J,4%V/4V"25F.566:8
+7&F;7VR>8F^A97*D:'6G:WBJ;GNM<7ZP=(&S=X2V>H>Y?8J\@(V_@Y#"AI/%B9;(C)G+CYS.DI_1E:+4
+F*77FZC:GJO=H:[@I+'CI[3FJK?IK;KLL+WOL\#RML/UN<;XO,G[O\S^PL`!Q=,$R-8'R]D*SMP-T=\0
+U.(3U^46VN@9W>L<X.X?X_$BYO0EZ?<H[/HK[_TN\O`Q]@,T^08W^`DZ_PP]`@\`
+fontname: second_0.ttf
+97*D:!
+fontname:   spaced name.otf  
+97*D:'5
+fontname: bad.ttf
+ABCDE
+fontname: empty.ttf
+fontname:nospace.ttf
+  indented data is trimmed at the start  
+FontName: wrong case is data
+[Events]
+Format: Layer, Start, End, Style, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,x
+[Fonts]
+fontname: last.ttf
+>'&J<!

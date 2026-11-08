@@ -1,0 +1,32 @@
+;@time 0 1000
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 360
+WrapStyle: 1
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+Style: Sign,DejaVu Sans,30,&H1000FFFF,&H20FF0000,&H30101010,&HA0000000,1,1,1,1,120,80,1.5,10,3,3,4,7,20,30,40,0
+Style: Sign Two,Noto Sans,40,&H00ABCDEF,&H00000000,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,128
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\b1}b{\b0}b{\b700}b{\i1}i{\i0}i{\u1}u{\u0}u{\s1}s{\s0}s
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\bord3.5}a{\xbord1}b{\ybord2.25}c{\shad4}d{\xshad-2}e{\yshad-3.5}f
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\be1}a{\be2.4}b{\blur0.7}c{\blur3}d
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fnDejaVu Sans}a{\fn@Noto Sans CJK}b{\fs33.3}c{\fsp2}d{\fscx150}e{\fscy75}f{\fsc}g
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\frx10}a{\fry-20}b{\frz30}c{\fr45}d{\fax0.25}e{\fay-0.5}f
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\an7}a{\an3}b
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\a6}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\q2}a\nb\Nc{\q1}d\ne
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\pos(100,200.5)}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\org(320,180)}a
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\c&H0000FF&}a{\1c&H00FF00&}b{\2c&HFF0000&}c{\3c&H123456&}d{\4c&H654321&}e
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\alpha&H80&}a{\1a&H10&}b{\2a&H20&}c{\3a&H30&}d{\4a&H40&}e
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\bord9\c&H0000FF&\fs50}a{\r}b{\rSign}c{\rSign Two}d{\r}e
+Dialogue: 0,0:00:00.00,0:00:02.00,Sign,,0,0,0,,{\fe0}a{\fe128}b{\fe}c
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,text\hwith\hhard\Nspaces and\ttab
+Dialogue: 0,0:00:00.00,0:00:02.00,Sign,,0,0,0,,{\b\i\u\s\bord\xbord\ybord\shad\xshad\yshad\be\blur\fn\fs\fsp\fscx\fscy\frx\fry\frz\fax\fay\c\1c\2c\3c\4c\alpha\1a\2a\3a\4a\fe\q}reset to style
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\b1\i1\fs40\bord5\shad6\c&H00FF00&\alpha&H40&}a{\rSign}b{\b}c{\c}d{\alpha}e{\fs}f{\bord}g{\shad}h{\frz}i

@@ -1,0 +1,8 @@
+[Script Info]
+ScriptType: v4.00+
+[V4+ Styles]
+Format:  name , fontname, fontsize, primarycolour, secondarycolour, outlinecolour, backcolour, bold, italic, underline, strikeout, scalex, scaley, spacing, angle, borderstyle, outline, shadow, alignment, marginl, marginr, marginv, encoding ,
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+[Events]
+Format: Layer, Start, End, Style, Actor, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,An Actor,0,0,0,,x
