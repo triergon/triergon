@@ -422,44 +422,30 @@ impl NalPacketSession {
             None => self.configuration.width(),
         };
         let phase = if changes {
-            Phase::Verify
+            PlanPhase::Verify
         } else if codec == Codec::Hevc {
-            Phase::Arrays
+            PlanPhase::Arrays
         } else {
-            Phase::Scan
+            PlanPhase::Scan
         };
         Ok(NalPacketJob {
-            session: self,
-            source: Some(source),
-            update: avc_update,
-            codec,
-            length_width,
-            avc,
-            epoch,
-            phase,
-            verify: 0,
-            update_verified: false,
-            array: 0,
-            offset: 0,
-            length: 0,
-            prefix_read: 0,
-            nals: 0,
-            nal: None,
-            injection: None,
-            injected_irap: false,
-            has_irap: false,
-            look_nals: 0,
-            live_base: None,
-            segment_hint: None,
-            segments: None,
-            output: None,
-            total: 0,
-            copy_segment: 0,
-            copied: 0,
-            failure: None,
-            receiver_failure: None,
-            observed_packet,
-            packet_source_refusal: None,
+            state: PacketState {
+                session: self,
+                source: Some(source),
+                update: avc_update,
+                codec,
+                length_width,
+                avc,
+                epoch,
+                update_verified: false,
+                segments: None,
+                total: 0,
+                failure: None,
+                receiver_failure: None,
+                observed_packet,
+                packet_source_refusal: None,
+            },
+            phase: PacketPhase::Prepare(PacketPlan::new(phase)),
         })
     }
 }
@@ -821,13 +807,17 @@ impl<M> NalPacketOutput<M> {
 }
 
 #[derive(Clone, Copy)]
-enum Phase {
+enum PlanPhase {
     Verify,
     Arrays,
     Lookahead,
     Scan,
     Inject,
     Nal,
+    Reserve,
+}
+#[derive(Clone, Copy)]
+enum EmissionPhase {
     Reserve,
     Copy,
     Freeze,
@@ -839,63 +829,100 @@ enum Injection {
     Sps,
     Pps,
 }
-/// One cooperative packet framing job over the session it borrows.
-pub struct NalPacketJob<'a, M = NalPacketFields> {
+
+// Source, effective update and descriptors coexist through packet copying and
+// publication. Only the preparation scratch can share space with the buffer.
+struct PacketState<'a, M> {
     session: &'a mut NalPacketSession,
     source: Option<NalPacket<M>>,
     update: Option<AvcUpdate>,
-    // Codec and width stay fixed while the job borrows the session. A valid
-    // update changes only the width of this AVC packet and subsequent packets.
     codec: Codec,
     length_width: Option<LengthSize>,
     avc: AvcState,
     epoch: u64,
-    phase: Phase,
-    verify: usize,
     update_verified: bool,
-    array: usize,
-    offset: usize,
-    length: usize,
-    prefix_read: usize,
-    nals: usize,
-    // Pending NAL bounds stay in offset/length until a successful append.
-    nal: Option<u8>,
-    injection: Option<(Injection, usize)>,
-    injected_irap: bool,
-    has_irap: bool,
-    // Lookahead uses the scan cursor, then resets it before scanning.
-    look_nals: usize,
-    /// Job-invariant part of `minimum_live_bytes`: control storage, both
-    /// descriptor lower bounds and the deduplicated raw owners. None of these
-    /// change while segments are appended, so the sum is computed once.
-    live_base: Option<usize>,
-    /// Size a later spill from the inline table. Even an exact HEVC count
-    /// never reserves storage before the fifth descriptor is appended.
-    segment_hint: Option<usize>,
     segments: Option<PacketSegmentStorage>,
-    output: Option<BudgetVec<u8>>,
     total: usize,
-    copy_segment: usize,
-    copied: usize,
     failure: Option<Error>,
     receiver_failure: Option<NalPacketReceiverErrorKind>,
     observed_packet: bool,
     packet_source_refusal: Option<NalHeaderError>,
 }
-impl<M> NalPacketJob<'_, M> {
+struct PacketPlan {
+    phase: PlanPhase,
+    // Verification, array admission, lookahead and scanning run in order.
+    // The cursor is reset before its next role; source offsets stay full width.
+    offset: usize,
+    length: usize,
+    prefix_read: usize,
+    nals: usize,
+    nal: Option<u8>,
+    injection: Option<(Injection, usize)>,
+    injected_irap: bool,
+    has_irap: bool,
+    look_nals: usize,
+    live_base: Option<usize>,
+    // Hints size only a later fifth-descriptor spill, never an early allocation.
+    segment_hint: Option<usize>,
+}
+impl PacketPlan {
+    fn new(phase: PlanPhase) -> Self {
+        Self {
+            phase,
+            offset: 0,
+            length: 0,
+            prefix_read: 0,
+            nals: 0,
+            nal: None,
+            injection: None,
+            injected_irap: false,
+            has_irap: false,
+            look_nals: 0,
+            live_base: None,
+            segment_hint: None,
+        }
+    }
+}
+struct PacketEmission {
+    phase: EmissionPhase,
+    output: Option<BudgetVec<u8>>,
+    copy_segment: usize,
+    copied: usize,
+}
+impl PacketEmission {
+    fn new() -> Self {
+        Self {
+            phase: EmissionPhase::Reserve,
+            output: None,
+            copy_segment: 0,
+            copied: 0,
+        }
+    }
+}
+enum PacketPhase {
+    Prepare(PacketPlan),
+    Emit(PacketEmission),
+}
+
+/// One cooperative packet framing job over the session it borrows.
+pub struct NalPacketJob<'a, M = NalPacketFields> {
+    state: PacketState<'a, M>,
+    phase: PacketPhase,
+}
+impl<M> PacketState<'_, M> {
     fn config(&self) -> ConfigurationRef<'_> {
         match &self.update {
             Some(update) => ConfigurationRef::Update(update),
             None => ConfigurationRef::Current(&self.session.configuration),
         }
     }
-    pub fn source(&self) -> Option<&NalPacket<M>> {
+    fn source(&self) -> Option<&NalPacket<M>> {
         self.source.as_ref()
     }
     /// Move the original failed source into an observed receiver-error view.
     /// Only the physical error sites below can enable this transition.
     /// The job's source error remains sticky after the one-time move.
-    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
+    fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
         let kind = self.receiver_failure?;
         let error = self.failure?;
         let source = self.source.take()?;
@@ -909,27 +936,6 @@ impl<M> NalPacketJob<'_, M> {
             packet_source_refusal: self.packet_source_refusal,
             receiver_epoch: self.session.receiver_epoch,
         })
-    }
-    // Known owner/capacity lower bound, deduplicating raw caller aliases. A
-    // larger allocator replacement peak may still require retryable pressure.
-    // All terms are non-negative, so summing the job-invariant terms first
-    // overflows exactly when the original left-to-right sum overflowed.
-    fn minimum_live_bytes(&mut self, segments: usize, output: usize) -> Result<usize> {
-        let base = match self.live_base {
-            Some(base) => base,
-            None => *self.live_base.insert(self.fixed_live_bytes()?),
-        };
-        let copied_storage = if self.length_width.is_some() {
-            Bytes::owner_overhead_bytes()
-                .checked_add(output)
-                .ok_or(Error::Overflow)?
-        } else {
-            0
-        };
-        PacketSegmentStorage::required_heap_bytes(segments)?
-            .checked_add(copied_storage)
-            .and_then(|n| n.checked_add(base))
-            .ok_or(Error::Overflow)
     }
     fn fixed_live_bytes(&self) -> Result<usize> {
         let packet = self
@@ -964,40 +970,84 @@ impl<M> NalPacketJob<'_, M> {
         }
         Ok(total)
     }
-    fn append(&mut self, segment: NalPacketSegment) -> Result<()> {
-        let parts = self.segments.as_ref().map_or(0, PacketSegmentStorage::len);
-        if parts == self.session.limits.maximum_segments {
+}
+
+impl PacketPlan {
+    // Known owner/capacity lower bound, deduplicating raw caller aliases. A
+    // larger allocator replacement peak may still require retryable pressure.
+    // All terms are non-negative, so summing the job-invariant terms first
+    // overflows exactly when the original left-to-right sum overflowed.
+    fn minimum_live_bytes<M>(
+        &mut self,
+        state: &PacketState<'_, M>,
+        segments: usize,
+        output: usize,
+    ) -> Result<usize> {
+        let base = match self.live_base {
+            Some(base) => base,
+            None => *self.live_base.insert(state.fixed_live_bytes()?),
+        };
+        let copied_storage = if state.length_width.is_some() {
+            Bytes::owner_overhead_bytes()
+                .checked_add(output)
+                .ok_or(Error::Overflow)?
+        } else {
+            0
+        };
+        PacketSegmentStorage::required_heap_bytes(segments)?
+            .checked_add(copied_storage)
+            .and_then(|n| n.checked_add(base))
+            .ok_or(Error::Overflow)
+    }
+    fn append<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        segment: NalPacketSegment,
+    ) -> Result<()> {
+        let parts = state.segments.as_ref().map_or(0, PacketSegmentStorage::len);
+        if parts == state.session.limits.maximum_segments {
             return Err(Error::Limit {
                 requested: parts.saturating_add(1),
-                maximum: self.session.limits.maximum_segments,
+                maximum: state.session.limits.maximum_segments,
             });
         }
         let count = parts.checked_add(1).ok_or(Error::Overflow)?;
-        let total = self
+        let total = state
             .total
             .checked_add(usize::from(segment.prefix_bytes()))
             .and_then(|v| v.checked_add(segment.len()))
             .ok_or(Error::Overflow)?;
-        if total > self.session.limits.maximum_output_bytes {
+        if total > state.session.limits.maximum_output_bytes {
             return Err(Error::Limit {
                 requested: total,
-                maximum: self.session.limits.maximum_output_bytes,
+                maximum: state.session.limits.maximum_output_bytes,
             });
         }
-        let minimum = self.minimum_live_bytes(count, total)?;
-        if minimum > self.session.pool.limit() {
+        let minimum = self.minimum_live_bytes(state, count, total)?;
+        if minimum > state.session.pool.limit() {
             return Err(Error::Limit {
                 requested: minimum,
-                maximum: self.session.pool.limit(),
+                maximum: state.session.pool.limit(),
             });
         }
-        let parts = self.segments.get_or_insert_with(PacketSegmentStorage::new);
-        parts.try_push(&self.session.pool, self.segment_hint, segment)?;
+        let parts = state.segments.get_or_insert_with(PacketSegmentStorage::new);
+        parts.try_push(&state.session.pool, self.segment_hint, segment)?;
         if matches!(parts, PacketSegmentStorage::Heap(_)) {
             self.segment_hint = None;
         }
-        self.total = total;
+        state.total = total;
         Ok(())
+    }
+}
+
+impl<M> NalPacketJob<'_, M> {
+    pub fn source(&self) -> Option<&NalPacket<M>> {
+        self.state.source()
+    }
+    /// Move the original failed source into an observed receiver-error view.
+    /// The source error remains sticky after the one-time move.
+    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
+        self.state.take_receiver_rejection()
     }
     /// The same state engine as `step_into`, returning the output directly.
     pub fn step(
@@ -1027,29 +1077,36 @@ impl<M> NalPacketJob<'_, M> {
         if ready.is_some() {
             return Err(Error::Invalid("packet output sink occupied"));
         }
-        if let Some(e) = self.failure {
+        if let Some(e) = self.state.failure {
             return Err(e);
         }
         let result = self.advance_into(work, cancel, ready);
         if let Err(e) = result
             && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
         {
-            // A valid side-data configuration precedes payload parsing in
-            // the pinned receiver. Its change survives a physical packet
-            // error, while partial in-band availability never commits.
-            if matches!(e, Error::Invalid(_) | Error::Truncated)
-                && self.update_verified
-                && let Some(configuration) = self.update.take()
-            {
-                configuration.install(&mut self.session.configuration);
-                self.session.receiver_epoch = self.epoch;
-                self.session.avc = AvcState::default();
-            }
-            self.failure = Some(e);
-            self.output = None;
-            self.segments = None;
+            self.fail(e);
         }
         result
+    }
+    #[cold]
+    #[inline(never)]
+    fn fail(&mut self, e: Error) {
+        // A valid side-data configuration precedes payload parsing in
+        // the pinned receiver. Its change survives a physical packet
+        // error, while partial in-band availability never commits.
+        if matches!(e, Error::Invalid(_) | Error::Truncated)
+            && self.state.update_verified
+            && let Some(configuration) = self.state.update.take()
+        {
+            configuration.install(&mut self.state.session.configuration);
+            self.state.session.receiver_epoch = self.state.epoch;
+            self.state.session.avc = AvcState::default();
+        }
+        self.state.failure = Some(e);
+        if let PacketPhase::Emit(emission) = &mut self.phase {
+            emission.output = None;
+        }
+        self.state.segments = None;
     }
 }
 

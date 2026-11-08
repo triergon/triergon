@@ -1,9 +1,10 @@
-//! The packet job state machine: one method per [`Phase`], driven by
+//! The packet job state machine: separate preparation and emission scratch, driven by
 //! [`NalPacketJob::advance_into`]. Each method is one step of the original
 //! loop; `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
-    AvcState, Injection, NalPacketJob, NalPacketOutput, NalPacketProgress,
-    NalPacketReceiverErrorKind, NalPacketSegment, PacketSegmentStorage, Phase,
+    AvcState, EmissionPhase, Injection, NalPacketJob, NalPacketOutput, NalPacketProgress,
+    NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketPhase, PacketPlan,
+    PacketSegmentStorage, PacketState, PlanPhase,
 };
 use crate::{AvcConfigArrayKind, Codec, NalHeader};
 use std::ops::ControlFlow;
@@ -37,35 +38,58 @@ impl<M> NalPacketJob<'_, M> {
         cancel: &AtomicBool,
         ready: &mut Option<NalPacketOutput<M>>,
     ) -> Result<NalPacketProgress> {
+        if let PacketPhase::Prepare(plan) = &mut self.phase {
+            if let Some(status) = plan.advance(&mut self.state, work, cancel)? {
+                return Ok(status);
+            }
+            // No owner or allocation lives in the discarded preparation scratch.
+            // The next emission loop performs the original Reserve cancel check.
+            self.phase = PacketPhase::Emit(PacketEmission::new());
+        }
+        match &mut self.phase {
+            PacketPhase::Emit(emission) => emission.advance(&mut self.state, work, cancel, ready),
+            PacketPhase::Prepare(_) => Err(Error::Invalid("packet emission phase missing")),
+        }
+    }
+}
+
+impl PacketPlan {
+    fn advance<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<NalPacketProgress>> {
         loop {
+            if matches!(self.phase, PlanPhase::Reserve) {
+                return Ok(None);
+            }
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if matches!(self.phase, Phase::Complete) {
-                return Ok(NalPacketProgress::Complete);
-            }
             let step = match self.phase {
-                Phase::Verify => self.verify_update(work)?,
-                Phase::Arrays => self.check_arrays(work)?,
-                Phase::Lookahead => self.lookahead(work, cancel)?,
-                Phase::Scan => self.scan_nal(work, cancel)?,
-                Phase::Inject => self.inject_configuration(work)?,
-                Phase::Nal => self.append_nal(work)?,
-                Phase::Reserve => self.reserve_output(work)?,
-                Phase::Copy => self.copy_output(work, cancel)?,
-                Phase::Freeze => self.freeze_output(work, ready)?,
-                Phase::Complete => Step::Break(NalPacketProgress::Complete),
+                PlanPhase::Verify => self.verify_update(state, work)?,
+                PlanPhase::Arrays => self.check_arrays(state, work)?,
+                PlanPhase::Lookahead => self.lookahead(state, work, cancel)?,
+                PlanPhase::Scan => self.scan_nal(state, work, cancel)?,
+                PlanPhase::Inject => self.inject_configuration(state, work)?,
+                PlanPhase::Nal => self.append_nal(state, work)?,
+                PlanPhase::Reserve => return Ok(None),
             };
             if let Step::Break(status) = step {
-                return Ok(status);
+                return Ok(Some(status));
             }
         }
     }
 
     #[inline]
-    fn verify_update(&mut self, work: &mut WorkBudget) -> Result<Step> {
-        if let Some(update) = &self.update {
-            let extra = self
+    fn verify_update<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+    ) -> Result<Step> {
+        if let Some(update) = &state.update {
+            let extra = state
                 .source
                 .as_ref()
                 .and_then(|s| s.new_extradata.as_ref())
@@ -74,8 +98,8 @@ impl<M> NalPacketJob<'_, M> {
             if extra.len() != raw.len() {
                 return Err(Error::Invalid("configuration update bytes differ"));
             }
-            if self.verify < raw.len() {
-                let count = (raw.len() - self.verify)
+            if self.offset < raw.len() {
+                let count = (raw.len() - self.offset)
                     .min(4096)
                     .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX));
                 if count == 0 {
@@ -83,58 +107,70 @@ impl<M> NalPacketJob<'_, M> {
                 }
                 // Parsed side data usually retains the same immutable input span.
                 if !std::ptr::eq(extra.as_ref(), raw.as_ref())
-                    && extra[self.verify..self.verify + count]
-                        != raw[self.verify..self.verify + count]
+                    && extra[self.offset..self.offset + count]
+                        != raw[self.offset..self.offset + count]
                 {
                     return Err(Error::Invalid("configuration update bytes differ"));
                 }
                 work.take(count as u64);
-                self.verify += count;
-                if self.verify < raw.len() {
+                self.offset += count;
+                if self.offset < raw.len() {
                     return Ok(NEXT);
                 }
             }
         }
-        self.update_verified = true;
-        self.phase = Phase::Scan;
+        state.update_verified = true;
+        self.offset = 0;
+        self.phase = PlanPhase::Scan;
         Ok(NEXT)
     }
 
     #[inline]
-    fn check_arrays(&mut self, work: &mut WorkBudget) -> Result<Step> {
-        if let Some(declared) = self.config().hevc_array_type(self.array) {
+    fn check_arrays<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+    ) -> Result<Step> {
+        if let Some(declared) = state.config().hevc_array_type(self.offset) {
             if !work.try_charge(1) {
                 return Ok(YIELD);
             }
             if !matches!(declared, 32 | 33 | 34 | 39 | 40) {
                 return Err(Error::Unsupported("pinned HEVC decoder array type"));
             }
-            self.array += 1;
+            self.offset += 1;
             return Ok(NEXT);
         }
-        self.phase = if self.length_width.is_some() {
-            Phase::Lookahead
+        self.offset = 0;
+        self.phase = if state.length_width.is_some() {
+            PlanPhase::Lookahead
         } else {
-            Phase::Scan
+            PlanPhase::Scan
         };
         Ok(NEXT)
     }
 
     #[inline]
-    fn lookahead(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step> {
-        let source = self
+    fn lookahead<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step> {
+        let source = state
             .source
             .as_ref()
             .ok_or(Error::Invalid("missing packet source"))?;
         let width = usize::from(
-            self.length_width
+            state
+                .length_width
                 .ok_or(Error::Invalid("missing packet width"))?
                 .bytes(),
         );
         if self.offset == source.bytes.len() && self.prefix_read == 0 {
             self.offset = 0;
             self.length = 0;
-            self.phase = Phase::Scan;
+            self.phase = PlanPhase::Scan;
             return Ok(NEXT);
         }
         if self.prefix_read < width {
@@ -147,7 +183,7 @@ impl<M> NalPacketJob<'_, M> {
                 if !work.try_charge(1) {
                     return Ok(YIELD);
                 }
-                self.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
+                state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
                 return Err(Error::Truncated);
             }
             work.take(count as u64);
@@ -166,13 +202,13 @@ impl<M> NalPacketJob<'_, M> {
             return Ok(YIELD);
         }
         if self.length == 0 {
-            self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
+            state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
             return Err(Error::Invalid("pinned HEVC empty NAL"));
         }
-        if self.look_nals == self.session.limits.maximum_nals {
+        if self.look_nals == state.session.limits.maximum_nals {
             return Err(Error::Limit {
                 requested: self.look_nals.saturating_add(1),
-                maximum: self.session.limits.maximum_nals,
+                maximum: state.session.limits.maximum_nals,
             });
         }
         let end = self
@@ -180,13 +216,13 @@ impl<M> NalPacketJob<'_, M> {
             .checked_add(self.length)
             .ok_or(Error::Overflow)?;
         if end > source.bytes.len() {
-            self.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
+            state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
             return Err(Error::Truncated);
         }
         let kind = match NalHeader::parse_compact(Codec::Hevc, &source.bytes[self.offset..end]) {
             Ok(h) => h.nal_unit_type(),
-            Err(e) if self.observed_packet => {
-                self.packet_source_refusal.get_or_insert(e);
+            Err(e) if state.observed_packet => {
+                state.packet_source_refusal.get_or_insert(e);
                 (source.bytes[self.offset] >> 1) & 63
             }
             Err(e) => return Err(e.error()),
@@ -200,27 +236,33 @@ impl<M> NalPacketJob<'_, M> {
     }
 
     #[inline]
-    fn scan_nal(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step> {
-        let source = self
+    fn scan_nal<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step> {
+        let source = state
             .source
             .as_ref()
             .ok_or(Error::Invalid("missing packet source"))?;
-        let Some(width) = self.length_width else {
+        let Some(width) = state.length_width else {
             if !work.try_charge(1) {
                 return Ok(YIELD);
             }
             self.segment_hint = Some(1);
-            self.append(NalPacketSegment::passthrough(source.bytes.len()))?;
-            self.phase = Phase::Reserve;
+            let segment = NalPacketSegment::passthrough(source.bytes.len());
+            self.append(state, segment)?;
+            self.phase = PlanPhase::Reserve;
             return Ok(NEXT);
         };
         let width = usize::from(width.bytes());
-        if self.offset == 0 && source.bytes.is_empty() && self.codec == Codec::Avc {
-            self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyAvcPacket);
+        if self.offset == 0 && source.bytes.is_empty() && state.codec == Codec::Avc {
+            state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyAvcPacket);
             return Err(Error::Invalid("pinned AVC empty packet"));
         }
         if self.offset == source.bytes.len() && self.prefix_read == 0 {
-            self.phase = Phase::Reserve;
+            self.phase = PlanPhase::Reserve;
             return Ok(NEXT);
         }
         if self.prefix_read < width {
@@ -233,7 +275,7 @@ impl<M> NalPacketJob<'_, M> {
                 if !work.try_charge(1) {
                     return Ok(YIELD);
                 }
-                self.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
+                state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
                 return Err(Error::Truncated);
             }
             work.take(count as u64);
@@ -256,24 +298,24 @@ impl<M> NalPacketJob<'_, M> {
             .checked_add(self.length)
             .ok_or(Error::Overflow)?;
         if end > source.bytes.len() {
-            self.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
+            state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
             return Err(Error::Truncated);
         }
         if self.length == 0 {
-            if self.codec == Codec::Hevc {
-                self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
+            if state.codec == Codec::Hevc {
+                state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
                 return Err(Error::Invalid("pinned HEVC empty NAL"));
             }
             self.prefix_read = 0;
             return Ok(NEXT);
         }
-        if self.nals == self.session.limits.maximum_nals {
+        if self.nals == state.session.limits.maximum_nals {
             return Err(Error::Limit {
                 requested: self.nals.saturating_add(1),
-                maximum: self.session.limits.maximum_nals,
+                maximum: state.session.limits.maximum_nals,
             });
         }
-        let codec = self.codec;
+        let codec = state.codec;
         let kind = if codec == Codec::Hevc {
             // Width-framed HEVC reaches Scan only after Lookahead
             // accepted every header or retained the first observed
@@ -282,8 +324,8 @@ impl<M> NalPacketJob<'_, M> {
         } else {
             match NalHeader::parse_compact(codec, &source.bytes[self.offset..end]) {
                 Ok(header) => header.nal_unit_type(),
-                Err(e) if self.observed_packet => {
-                    self.packet_source_refusal.get_or_insert(e);
+                Err(e) if state.observed_packet => {
+                    state.packet_source_refusal.get_or_insert(e);
                     match codec {
                         Codec::Avc => source.bytes[self.offset] & 31,
                         Codec::Hevc => (source.bytes[self.offset] >> 1) & 63,
@@ -300,13 +342,13 @@ impl<M> NalPacketJob<'_, M> {
         } else {
             match kind {
                 7 => {
-                    self.avc.sps = true;
-                    self.avc.new_idr = true;
+                    state.avc.sps = true;
+                    state.avc.new_idr = true;
                 }
                 8 => {
-                    self.avc.pps = true;
-                    self.avc.new_idr = true;
-                    if !self.avc.sps {
+                    state.avc.pps = true;
+                    state.avc.new_idr = true;
+                    if !state.avc.sps {
                         inject = Some(Injection::Sps);
                     }
                 }
@@ -319,19 +361,19 @@ impl<M> NalPacketJob<'_, M> {
                         & 128
                         != 0;
                     if first {
-                        self.avc.new_idr = true;
+                        state.avc.new_idr = true;
                     }
-                    if self.avc.new_idr && !self.avc.pps {
-                        inject = Some(if self.avc.sps {
+                    if state.avc.new_idr && !state.avc.pps {
+                        inject = Some(if state.avc.sps {
                             Injection::Pps
                         } else {
                             Injection::All
                         });
                     }
-                    self.avc.new_idr = false;
+                    state.avc.new_idr = false;
                 }
                 1 => {
-                    self.avc = AvcState::default();
+                    state.avc = AvcState::default();
                 }
                 _ => {}
             }
@@ -340,7 +382,7 @@ impl<M> NalPacketJob<'_, M> {
         self.nals += 1;
         if self.nals == 1 {
             let injected = if inject.is_some() || (codec == Codec::Hevc && self.has_irap) {
-                self.config().config_nal_count()
+                state.config().config_nal_count()
             } else {
                 0
             };
@@ -358,22 +400,26 @@ impl<M> NalPacketJob<'_, M> {
         }
         if let Some(i) = inject {
             self.injection = Some((i, 0));
-            self.phase = Phase::Inject;
+            self.phase = PlanPhase::Inject;
         } else {
-            self.phase = Phase::Nal;
+            self.phase = PlanPhase::Nal;
         }
         Ok(NEXT)
     }
 
     #[inline]
-    fn inject_configuration(&mut self, work: &mut WorkBudget) -> Result<Step> {
+    fn inject_configuration<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+    ) -> Result<Step> {
         let (which, index) = self
             .injection
             .ok_or(Error::Invalid("missing injection plan"))?;
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        if let Some(n) = self.config().config_nal(index) {
+        if let Some(n) = state.config().config_nal(index) {
             let selected = match (n.kind, which) {
                 (None, _) => true,
                 (Some(kind), Injection::All) => kind != AvcConfigArrayKind::SequenceExtension,
@@ -381,27 +427,32 @@ impl<M> NalPacketJob<'_, M> {
                 (Some(kind), Injection::Pps) => kind == AvcConfigArrayKind::Picture,
             };
             if selected {
-                self.append(NalPacketSegment::configuration(index, n.range, self.total))?;
+                let segment = NalPacketSegment::configuration(index, n.range, state.total);
+                self.append(state, segment)?;
             }
             self.injection = Some((which, index + 1));
         } else {
             if matches!(which, Injection::Sps) {
-                self.avc.sps = true;
+                state.avc.sps = true;
             }
             self.injection = None;
             self.injected_irap = true;
-            self.phase = Phase::Nal;
+            self.phase = PlanPhase::Nal;
         }
         Ok(NEXT)
     }
 
     #[inline]
-    fn append_nal(&mut self, work: &mut WorkBudget) -> Result<Step> {
+    fn append_nal<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+    ) -> Result<Step> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
         let kind = self.nal.ok_or(Error::Invalid("missing source NAL"))?;
-        let prefix = if self.codec == Codec::Hevc || matches!(kind, 7 | 8) || self.total == 0 {
+        let prefix = if state.codec == Codec::Hevc || matches!(kind, 7 | 8) || state.total == 0 {
             4
         } else {
             3
@@ -410,51 +461,85 @@ impl<M> NalPacketJob<'_, M> {
             .offset
             .checked_add(self.length)
             .ok_or(Error::Overflow)?;
-        let segment = NalPacketSegment::packet(self.offset..end, prefix, self.total);
-        self.append(segment)?;
+        let segment = NalPacketSegment::packet(self.offset..end, prefix, state.total);
+        self.append(state, segment)?;
         self.offset = end;
         self.length = 0;
         self.prefix_read = 0;
         self.nal = None;
-        self.phase = Phase::Scan;
+        self.phase = PlanPhase::Scan;
         Ok(NEXT)
+    }
+}
+
+impl PacketEmission {
+    fn advance<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<NalPacketOutput<M>>,
+    ) -> Result<NalPacketProgress> {
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            let step = match self.phase {
+                EmissionPhase::Reserve => self.reserve_output(state, work)?,
+                EmissionPhase::Copy => self.copy_output(state, work, cancel)?,
+                EmissionPhase::Freeze => self.freeze_output(state, work, ready)?,
+                EmissionPhase::Complete => return Ok(NalPacketProgress::Complete),
+            };
+            if let Step::Break(status) = step {
+                return Ok(status);
+            }
+        }
     }
 
     #[inline]
-    fn reserve_output(&mut self, work: &mut WorkBudget) -> Result<Step> {
+    fn reserve_output<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+    ) -> Result<Step> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
         // A passthrough packet can share its charged payload.
-        if self.length_width.is_none() {
-            self.phase = Phase::Freeze;
+        if state.length_width.is_none() {
+            self.phase = EmissionPhase::Freeze;
             return Ok(NEXT);
         }
-        let minimum = self
+        let minimum = state
             .total
             .checked_add(Bytes::owner_overhead_bytes())
             .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
             .ok_or(Error::Overflow)?;
-        if minimum > self.session.pool.limit() {
+        if minimum > state.session.pool.limit() {
             return Err(Error::Limit {
                 requested: minimum,
-                maximum: self.session.pool.limit(),
+                maximum: state.session.pool.limit(),
             });
         }
         self.output
-            .get_or_insert_with(|| BudgetVec::new(&self.session.pool))
-            .try_reserve_exact(self.total)?;
-        self.phase = Phase::Copy;
+            .get_or_insert_with(|| BudgetVec::new(&state.session.pool))
+            .try_reserve_exact(state.total)?;
+        self.phase = EmissionPhase::Copy;
         Ok(NEXT)
     }
 
     #[inline]
-    fn copy_output(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step> {
+    fn copy_output<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step> {
         // One unit per pass exactly as the outer loop runs it: the
         // cancellation check precedes every unit after the first, and
         // every yield, charge and error is unchanged. Only the phase
         // dispatch between units is skipped.
-        let parts = self
+        let parts = state
             .segments
             .as_ref()
             .map_or(&[][..], PacketSegmentStorage::as_slice);
@@ -465,7 +550,7 @@ impl<M> NalPacketJob<'_, M> {
             }
             first = false;
             let Some(p) = parts.get(self.copy_segment) else {
-                self.phase = Phase::Freeze;
+                self.phase = EmissionPhase::Freeze;
                 break;
             };
             let prefix = usize::from(p.prefix_bytes());
@@ -496,7 +581,7 @@ impl<M> NalPacketJob<'_, M> {
                 b.try_extend_from_slice(&[0, 0, 0, 1][start..start + count])?;
             } else {
                 let start = self.copied - prefix;
-                let source = &self
+                let source = &state
                     .source
                     .as_ref()
                     .ok_or(Error::Invalid("missing packet source"))?
@@ -506,8 +591,8 @@ impl<M> NalPacketJob<'_, M> {
                     {
                         source
                     } else {
-                        self.update.as_ref().map_or_else(
-                            || self.session.configuration.bytes(),
+                        state.update.as_ref().map_or_else(
+                            || state.session.configuration.bytes(),
                             super::AvcUpdate::bytes,
                         )
                     };
@@ -521,16 +606,18 @@ impl<M> NalPacketJob<'_, M> {
     }
 
     #[inline]
-    fn freeze_output(
+    fn freeze_output<M>(
         &mut self,
+        state: &mut PacketState<'_, M>,
         work: &mut WorkBudget,
         ready: &mut Option<NalPacketOutput<M>>,
     ) -> Result<Step> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let bytes = if self.length_width.is_none() {
-            self.source
+        let bytes = if state.length_width.is_none() {
+            state
+                .source
                 .as_ref()
                 .ok_or(Error::Invalid("missing packet source"))?
                 .bytes
@@ -548,24 +635,24 @@ impl<M> NalPacketJob<'_, M> {
                 }
             }
         };
-        let configuration = self.config().bytes().clone();
-        let configuration_identity = self.config().source_identity();
-        let configuration_source_refusal = self.config().refusal();
-        let forward_new_extradata = self.codec == Codec::Hevc
-            || self
+        let configuration = state.config().bytes().clone();
+        let configuration_identity = state.config().source_identity();
+        let configuration_source_refusal = state.config().refusal();
+        let forward_new_extradata = state.codec == Codec::Hevc
+            || state
                 .source
                 .as_ref()
                 .and_then(|s| s.new_extradata.as_ref())
                 .is_some_and(Bytes::is_empty);
-        if let Some(c) = self.update.take() {
-            c.install(&mut self.session.configuration);
+        if let Some(c) = state.update.take() {
+            c.install(&mut state.session.configuration);
         }
-        self.session.avc = self.avc;
-        self.session.receiver_epoch = self.epoch;
-        self.phase = Phase::Complete;
+        state.session.avc = state.avc;
+        state.session.receiver_epoch = state.epoch;
+        self.phase = EmissionPhase::Complete;
         *ready = Some(NalPacketOutput {
             bytes,
-            source: self
+            source: state
                 .source
                 .take()
                 .ok_or(Error::Invalid("missing packet source"))?,
@@ -579,12 +666,12 @@ impl<M> NalPacketJob<'_, M> {
             )),
             has_configuration_identity: configuration_identity.is_some(),
             configuration_source_refusal,
-            packet_source_refusal: self.packet_source_refusal,
-            segments: self
+            packet_source_refusal: state.packet_source_refusal,
+            segments: state
                 .segments
                 .take()
                 .unwrap_or_else(PacketSegmentStorage::new),
-            receiver_epoch: self.epoch,
+            receiver_epoch: state.epoch,
             forward_new_extradata,
         });
         Ok(Step::Break(NalPacketProgress::Ready))

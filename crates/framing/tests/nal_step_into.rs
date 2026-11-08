@@ -546,6 +546,114 @@ fn successful_pressure_retry_retains_packet_configuration_and_segment_facts() {
 }
 
 #[test]
+fn long_update_and_payload_keep_owners_across_pressure_zero_work_and_cancellation() {
+    for plan in [&[0, 3][..], &[7][..], &[4096][..]] {
+        for cancel_copy in [false, true] {
+            let pool = Budget::new(65_536).unwrap();
+            let baseline = pool.used();
+            let mut policy = limits();
+            policy.maximum_packet_bytes = 16_384;
+            policy.maximum_output_bytes = 32_768;
+            let mut session = NalPacketSession::new(
+                &pool,
+                NalPacketConfiguration::Avc(parse_avc(&pool, hidden(&pool, &avcc(128)))),
+                policy,
+            )
+            .unwrap();
+            let mut updated = avcc(129);
+            updated.resize(4096, 0);
+            let extra = Bytes::copy_from_slice(&pool, &updated).unwrap();
+            let update = parse_avc(&pool, extra.clone());
+            let mut payload = vec![0x55; 8193];
+            payload[..2].copy_from_slice(&[0x65, 0x88]);
+            let mut wire = vec![0, 0, 32, 1];
+            wire.extend_from_slice(&payload);
+            let mut source = input(Bytes::copy_from_slice(&pool, &wire).unwrap());
+            source.new_extradata = Some(extra.clone());
+            let mut job = session.packet(source, Some(update)).unwrap();
+            let hold = pool.reserve(pool.available()).unwrap();
+            let cancel = AtomicBool::new(false);
+            let mut ready = None;
+            for index in 0..100 {
+                let quantum = [0, 1, 13, 4096][index % 4];
+                let before = pool.used();
+                match job.step_into(&mut WorkBudget::new(quantum), &cancel, &mut ready) {
+                    Ok(NalPacketProgress::Yield) => {
+                        if quantum == 0 {
+                            assert_eq!(pool.used(), before);
+                        }
+                    }
+                    Err(Error::Backpressure { .. }) => break,
+                    other => panic!("expected bounded preparation or output pressure: {other:?}"),
+                }
+                assert!(ready.is_none());
+                assert!(index < 99, "output reservation did not reach pressure");
+            }
+            assert!(ready.is_none());
+            assert_eq!(job.source().unwrap().bytes.as_ref(), wire);
+            assert!(
+                job.source()
+                    .unwrap()
+                    .new_extradata
+                    .as_ref()
+                    .unwrap()
+                    .shares_storage_with(&extra)
+            );
+            drop(hold);
+            assert_eq!(
+                job.step_into(&mut WorkBudget::new(31), &cancel, &mut ready),
+                Ok(NalPacketProgress::Yield)
+            );
+            assert!(ready.is_none());
+            let before = pool.used();
+            assert_eq!(
+                job.step_into(&mut WorkBudget::new(0), &cancel, &mut ready),
+                Ok(NalPacketProgress::Yield)
+            );
+            assert_eq!(pool.used(), before);
+            if cancel_copy {
+                cancel.store(true, Ordering::Relaxed);
+                let mut work = WorkBudget::new(7);
+                assert_eq!(
+                    job.step_into(&mut work, &cancel, &mut ready),
+                    Err(Error::Cancelled)
+                );
+                assert_eq!(work.remaining(), 7);
+                assert!(ready.is_none());
+                drop(job);
+                assert_eq!(session.receiver_epoch(), 0);
+                assert_eq!(session.configuration().bytes().as_ref(), avcc(128));
+                drop(session);
+            } else {
+                let (polls, ready) = drive(plan, |work, out| job.step_into(work, &cancel, out));
+                assert_eq!(polls.last().unwrap().1, Ok(NalPacketProgress::Ready));
+                let output = ready.unwrap();
+                drop(job);
+                assert_eq!(session.receiver_epoch(), 1);
+                drop(session);
+                let mut expected = vec![0, 0, 0, 1];
+                expected.extend_from_slice(&updated[8..13]);
+                expected.extend_from_slice(&[0, 0, 0, 1]);
+                expected.extend_from_slice(&updated[16..20]);
+                // AVC uses a three-byte prefix after the injected parameter sets.
+                expected.extend_from_slice(&[0, 0, 1]);
+                expected.extend_from_slice(&payload);
+                assert_eq!(output.bytes().as_ref(), expected);
+                assert_eq!(output.source().bytes.as_ref(), wire);
+                assert_eq!(output.source().fields, fields());
+                assert_eq!(output.source().location.offset, 0x1_0000_0001);
+                assert_eq!(output.configuration_bytes().as_ref(), updated);
+                assert_eq!(output.segments().len(), 3);
+                assert!(!output.forward_new_extradata());
+                drop(output);
+            }
+            drop(extra);
+            assert_eq!(pool.used(), baseline);
+        }
+    }
+}
+
+#[test]
 fn noncopy_metadata_and_old_configuration_survive_update_flush_and_producer_close() {
     struct Metadata(Arc<AtomicUsize>);
     impl Drop for Metadata {
