@@ -3,12 +3,28 @@
 //! STREAMINFO MD5 the encoder recorded, the float output must be the integer output
 //! scaled, and the damaged files of `faulty` must decode or fail without a panic.
 //! Bit-exactness against FFmpeg is graded by `harness/codecs/flac/flac_vectors.py`.
-#[path = "../examples/decode_flac/native.rs"]
-mod native;
-
 use std::path::{Path, PathBuf};
+use triergon::{Budget, ContainerReader, PacketInfo};
 use triergon_codec_flac::{AudioFrame, Decoder, IntegerFrame, Limits};
-use triergon_framing::flac_stream_info;
+use triergon_framing::{canonical_flac_configuration, flac_stream_info};
+
+/// The configuration and frames of a native FLAC file, read by the elementary reader up
+/// to its first error; `None` when it does not open as FLAC.
+fn read(path: &Path) -> Option<(Vec<u8>, Vec<Vec<u8>>)> {
+    let pool = Budget::new(256 << 20).unwrap();
+    let file = std::io::BufReader::new(std::fs::File::open(path).unwrap());
+    let mut source = triergon::open_blocking(file, &pool).ok()?;
+    let mut frames = Vec::new();
+    while let Ok(Some(packet)) = source.next_packet() {
+        frames.push(packet.payload().to_vec());
+    }
+    let mut configuration = Vec::new();
+    let track = source.reader().track(0)?;
+    if canonical_flac_configuration(track.configuration(), &mut configuration).is_err() {
+        configuration.clear();
+    }
+    Some((configuration, frames))
+}
 
 fn research(dir: &str) -> Vec<PathBuf> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -51,17 +67,18 @@ fn check_md5(max_bytes: u64) {
             if std::fs::metadata(&path).map_or(true, |m| m.len() > max_bytes) {
                 continue;
             }
-            let data = std::fs::read(&path).unwrap();
-            let (configuration, frames) = native::split_header(&data);
-            let Ok(info) = flac_stream_info(configuration) else {
+            let Some((configuration, frames)) = read(&path) else {
+                continue;
+            };
+            let Ok(info) = flac_stream_info(&configuration) else {
                 continue;
             };
             let mut decoder =
-                Decoder::from_configuration(configuration, Limits::default()).unwrap();
+                Decoder::from_configuration(&configuration, Limits::default()).unwrap();
             let (mut integer, mut float) = (IntegerFrame::default(), AudioFrame::default());
             let mut md5 = Md5::default();
             let mut uniform = true;
-            for au in native::frames(frames) {
+            for au in &frames {
                 let Ok(frame) = decoder.decode_integer(au, &mut integer) else {
                     uniform = false;
                     continue;
@@ -99,18 +116,21 @@ fn check_md5(max_bytes: u64) {
 #[test]
 fn damaged_files_never_panic() {
     for path in research("flac-test-files/faulty") {
-        let data = std::fs::read(&path).unwrap();
-        let (configuration, frames) = native::split_header(&data);
-        let configuration = if flac_stream_info(configuration).is_ok() {
-            configuration
-        } else {
-            &[]
-        };
-        let Ok(mut decoder) = Decoder::from_configuration(configuration, Limits::default()) else {
+        let mut out = AudioFrame::default();
+        let Some((configuration, frames)) = read(&path) else {
+            // A file the reader refuses still reaches a decoder without a configuration,
+            // in arbitrary pieces.
+            let bytes = std::fs::read(&path).unwrap();
+            let mut decoder = Decoder::from_configuration(&[], Limits::default()).unwrap();
+            for piece in bytes.chunks(4096) {
+                let _ = decoder.decode_float(piece, &mut out);
+            }
             continue;
         };
-        let mut out = AudioFrame::default();
-        for au in native::frames(frames) {
+        let Ok(mut decoder) = Decoder::from_configuration(&configuration, Limits::default()) else {
+            continue;
+        };
+        for au in &frames {
             let _ = decoder.decode_float(au, &mut out);
         }
     }

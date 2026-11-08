@@ -28,8 +28,10 @@ fn decode(configuration: &[u8], packets: &[&[u8]]) -> Result<(), DecodeError> {
 ```
 
 `Decoder::from_headers_in` charges a caller's `Budget` instead of its own pool.
-`examples/decode_vorbis` decodes an Ogg Vorbis file, chained links included, to
-interleaved f32le.
+`examples/decode_vorbis` decodes the first Vorbis track of a file, read through the
+`triergon` facade, to interleaved f32le: the decoder's whole output, without container
+trims. In a chained Ogg file each link's headers either continue the decoder (when they
+repeat) or start a new one.
 
 ## Supported
 

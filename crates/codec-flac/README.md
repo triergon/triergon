@@ -25,8 +25,10 @@ fn decode(configuration: &[u8], frames: &[&[u8]]) -> Result<(), DecodeError> {
 }
 ```
 
-`examples/decode_flac` decodes a native `.flac` file to interleaved f32le; its file
-splitting (`examples/decode_flac/native.rs`) stands in for a reader.
+`examples/decode_flac` decodes the first FLAC track of a file (native FLAC, Ogg,
+Matroska), read through the `triergon` facade, to interleaved f32le: the decoder's whole
+output, without container trims. `--per-frame` prints each frame's format and
+`--reject-crc` rejects frames whose CRC fails.
 
 ## Supported
 

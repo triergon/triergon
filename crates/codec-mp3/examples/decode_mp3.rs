@@ -1,4 +1,7 @@
-//! Decode a raw MPEG audio file to interleaved f32le, each frame with its own channels.
+#![forbid(unsafe_code)]
+//! Decode the first MPEG audio track of a file to interleaved f32le, each frame with its
+//! own channels. The file (a raw MPEG audio stream, or a container) is read through the
+//! `triergon` facade; the decoder's whole output is written, without container trims.
 //!
 //! usage: decode_mp3 INPUT OUTPUT.f32 [--reset-at N]
 //!
@@ -10,6 +13,7 @@
 
 use std::io::Write;
 
+use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo, TrackInfo};
 use triergon_codec::{AudioDecoder, AudioFrame};
 use triergon_codec_mp3::Decoder;
 
@@ -23,20 +27,52 @@ fn main() {
             std::process::exit(2);
         }
     };
-    let data = std::fs::read(&args[1]).expect("read input");
     let mut output =
         std::io::BufWriter::new(std::fs::File::create(&args[2]).expect("create output"));
     let mut decoder = Decoder::new();
+    let mut track = None;
     let mut frame = AudioFrame::default();
-    let (mut frames, mut samples, mut errors) = (0usize, 0usize, 0usize);
+    let (mut index, mut frames, mut samples, mut errors) = (0usize, 0usize, 0usize, 0usize);
     let mut first: Option<(u32, usize)> = None;
     let mut last_error = String::new();
     let mut bytes = Vec::new();
-    for (index, au) in split::frames(&data).enumerate() {
+    // A source the facade does not recognise is reported as an error, with no output.
+    let mut source = std::fs::File::open(&args[1])
+        .map_err(|e| e.to_string())
+        .and_then(|file| {
+            let pool = Budget::new(256 << 20).map_err(|e| e.to_string())?;
+            triergon::open_blocking(std::io::BufReader::new(file), &pool).map_err(|e| e.to_string())
+        })
+        .map_err(|error| {
+            errors += 1;
+            last_error = error;
+        })
+        .ok();
+    while let Some(source) = source.as_mut() {
+        let packet = match source.next_packet() {
+            Ok(Some(packet)) => packet,
+            Ok(None) => break,
+            Err(error) => {
+                errors += 1;
+                last_error = format!("read: {error}");
+                break;
+            }
+        };
+        if track.is_none() {
+            let reader = source.reader();
+            track = (0..reader.track_count())
+                .filter_map(|i| reader.track(i))
+                .find(|t| t.kind() == MediaKind::Audio && t.codec() == CodecId::MpegAudio)
+                .map(TrackInfo::id);
+        }
+        if track != Some(packet.track()) {
+            continue;
+        }
         if Some(index) == reset_at {
             decoder.reset();
         }
-        match decoder.decode(au, &mut frame) {
+        index += 1;
+        match decoder.decode(packet.payload(), &mut frame) {
             Ok(_) => {
                 frames += 1;
                 samples += frame.samples_per_channel;
@@ -66,58 +102,4 @@ fn main() {
         "{{\"sample_rate\":{rate},\"channels\":{channels},\"layout\":\"{layout}\",\"frames\":{frames},\"samples_per_channel\":{samples},\"errors\":{errors},\"last_error\":\"{}\"}}",
         last_error.replace('"', "'")
     );
-}
-
-/// Frame splitting of a raw MPEG audio file, as FFmpeg's mp3 demuxer delivers it: an
-/// ID3v2 tag at the start and an ID3v1 tag at the end are skipped, and a Xing, Info or
-/// VBRI frame at the start is dropped. A reader crate replaces this.
-mod split {
-    use triergon_codec_mp3::frame_header;
-    use triergon_framing::{MpegAudioHeader, mpeg_info_frame};
-
-    /// Bytes of an ID3v2 tag at the start of `data`.
-    fn id3v2_length(data: &[u8]) -> usize {
-        match data {
-            [b'I', b'D', b'3', _, _, flags, size @ ..] if size.len() >= 4 => {
-                let size = size[..4]
-                    .iter()
-                    .fold(0usize, |n, &b| n << 7 | usize::from(b & 0x7f));
-                10 + size + if flags & 0x10 != 0 { 10 } else { 0 }
-            }
-            _ => 0,
-        }
-    }
-
-    /// The access units of `data`. Bytes that do not start a frame of the stream are
-    /// skipped; a free-format frame (whose length the header does not give) or a
-    /// truncated last frame runs to the end of the data.
-    pub(super) fn frames(data: &[u8]) -> impl Iterator<Item = &[u8]> {
-        let mut data = &data[id3v2_length(data).min(data.len())..];
-        if data.len() >= 128 && data[data.len() - 128..].starts_with(b"TAG") {
-            data = &data[..data.len() - 128];
-        }
-        let mut position = 0;
-        let mut stream: Option<MpegAudioHeader> = None;
-        core::iter::from_fn(move || {
-            loop {
-                let rest = data.get(position..).filter(|rest| rest.len() >= 4)?;
-                let Some(header) =
-                    frame_header(rest).filter(|h| stream.is_none_or(|s| s.same_stream(h)))
-                else {
-                    position += 1;
-                    continue;
-                };
-                let length = header.frame_bytes().unwrap_or(rest.len()).min(rest.len());
-                let frame = &rest[..length];
-                position += length;
-                if stream.is_none() {
-                    stream = Some(header);
-                    if mpeg_info_frame(frame, &header).is_some() {
-                        continue;
-                    }
-                }
-                return Some(frame);
-            }
-        })
-    }
 }
