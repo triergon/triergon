@@ -281,7 +281,7 @@ Verification:
   macOS (`aarch64-apple-darwin`, Rust 1.99.1) runs all 97 through the candidate
   and pinned FFmpeg formats worker and checks both against the unchanged recorded
   expected folds: 81 match, including 15 control-only inputs. This result uses
-  measured code commit `1ddf68ee`; report `01a0a258d44b`
+  measured code/contract commit `65eeada0`; report `345fd608c847`
   records the binaries and source graph. Full source and evidence hashes are in
   [status](../../docs/status.md#measured-revisions).
   The 168 requests for the strict source view, 64
