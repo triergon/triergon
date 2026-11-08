@@ -107,9 +107,7 @@ pub(crate) fn parse(
 ) -> Result<BudgetVec<Subtable>> {
     let bytes = slice(data, table.offset, table.len)?;
     let mut r = Reader::new(bytes);
-    if r.u16()? != 0 {
-        return Err(Error::Invalid("cmap version"));
-    }
+    r.u16()?; // version: FreeType ignores it, as the format allows newer subtables
     let count = r.u16()?;
     charge(work, usize::from(count))?;
     let mut subtables = BudgetVec::new(budget);

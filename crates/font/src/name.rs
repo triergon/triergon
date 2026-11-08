@@ -1,7 +1,7 @@
 //! The naming table (OpenType `name`), decoded lazily.
 
 use crate::read::{Reader, slice, u16_at};
-use triergon_core::{Error, Result};
+use triergon_core::Result;
 
 /// A naming-table record's name identifier (OpenType `name`, "Name IDs").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -143,10 +143,8 @@ impl Names {
     pub(crate) fn new(data: &[u8], offset: usize, len: usize) -> Result<Self> {
         let table = slice(data, offset, len)?;
         let mut r = Reader::new(table);
-        let version = r.u16()?;
-        if version > 1 {
-            return Err(Error::Invalid("name table version"));
-        }
+        // FreeType reads any version as format 0, records first.
+        r.u16()?;
         let count = r.u16()?;
         let storage = usize::from(r.u16()?);
         r.skip(usize::from(count) * RECORD)?;

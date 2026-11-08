@@ -183,10 +183,11 @@ impl Font {
         let hhea = metrics::hhea(required(tables.hhea)?.bytes(bytes))?;
         let maxp_glyphs = metrics::glyph_count(required(tables.maxp)?.bytes(bytes))?;
         let os2 = tables.os2.and_then(|t| metrics::os2(t.bytes(bytes)));
-        let names = match tables.name {
-            Some(t) => Names::new(bytes, t.offset, t.len)?,
-            None => Names::default(),
-        };
+        // FreeType treats a broken `name` table as a missing one.
+        let names = tables
+            .name
+            .and_then(|t| Names::new(bytes, t.offset, t.len).ok())
+            .unwrap_or_default();
         // Tables already on core's work budget share it.
         let mut work = WorkBudget::new(limits.work);
         let charmaps = match tables.cmap {
@@ -214,7 +215,7 @@ impl Font {
                 (Outlines::Cff(Box::new(cff)), count)
             }
         };
-        let hmtx = Hmtx::new(required(tables.hmtx)?, hhea.metrics, glyph_count)?;
+        let hmtx = Hmtx::new(required(tables.hmtx)?, hhea.metrics, glyph_count);
         let kern = match tables.kern {
             Some(t) => Kern::parse(bytes, t, budget, &mut work)?,
             None => Kern::new(budget),

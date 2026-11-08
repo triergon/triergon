@@ -146,15 +146,20 @@ pub(crate) fn directory(
         if slot.is_some() || offset > data.len() {
             continue;
         }
+        // As FreeType sanitises the directory: a table past the end of the
+        // file is dropped, except `hmtx`, cut to a multiple of four bytes;
+        // the first table of a tag with a nonzero length counts.
         let available = data.len() - offset;
         let len = if len <= available {
             len
         } else if &tag == b"hmtx" {
-            available
+            available & !3
         } else {
             continue;
         };
-        *slot = Some(Table { offset, len });
+        if len > 0 {
+            *slot = Some(Table { offset, len });
+        }
     }
     let flavor = match signature {
         TRUETYPE | APPLE_TRUE if tables.glyf.is_some() => Flavor::TrueType,
@@ -188,17 +193,19 @@ mod tests {
         let mut data = font(
             b"\0\x01\0\0",
             &[
-                (b"glyf", 76, 4),
-                (b"hmtx", 78, 8),
-                (b"name", 78, 8),
+                (b"glyf", 92, 0),
+                (b"glyf", 92, 4),
+                (b"hmtx", 102, 8),
+                (b"name", 102, 8),
                 (b"zzzz", 0, 1),
             ],
         );
-        data.extend([0; 4]);
+        data.extend([0; 16]);
         let (flavor, tables) = directory(&data, 0, &mut WorkBudget::new(100)).unwrap();
         assert_eq!(flavor, Flavor::TrueType);
+        // The empty first `glyf` does not count; `hmtx` keeps whole records.
         assert_eq!(tables.glyf.unwrap().len, 4);
-        assert_eq!(tables.hmtx.unwrap().len, 2);
+        assert_eq!(tables.hmtx.unwrap().len, 4);
         assert!(tables.name.is_none());
     }
 
