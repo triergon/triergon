@@ -91,3 +91,17 @@ the pre-skip or other container trims.
   at construction (under 200 KiB). Nothing is allocated per packet.
 
 Constant tables are taken from RFC 6716; see [THIRD-PARTY.md](THIRD-PARTY.md).
+
+## Conformance
+
+- Specifications: RFC 6716 with the RFC 8251 updates, and RFC 7845 for the identification
+  header and the channel mappings.
+- `cargo xtask codecs grade` runs the `opus` lane
+  ([harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)), which decodes each file
+  through the container readers with its trims applied and compares the result with FFmpeg
+  9.0.2's native decoder under the [numeric
+  rules](../../harness/codecs/numeric-rules.json).
+- On the gate build 49/49 pass: FATE's `opus` directory (the 12 RFC test vectors and three
+  more files) and 34 generated streams (SILK, CELT and hybrid frames of several sizes and
+  bandwidths, families 1 and 255, a Matroska track). Runtime and memory against the
+  [gates](../../docs/quality.md#gates): [status](../../docs/status.md).

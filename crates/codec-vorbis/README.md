@@ -73,3 +73,14 @@ layout holds) at any sample rate.
   `DecodeError::Budget`. The FATE vectors peak at 0.6 MiB (six channels); 93 channels of
   8192-sample blocks need about 7 MiB of buffers, and the largest setup headers encoders
   write a few MiB of tables. Nothing is allocated per packet.
+
+## Conformance
+
+- Specification: Vorbis I (Xiph.Org, 2020-07-04 revision with the 2015 errata).
+- `cargo xtask codecs grade` runs the `vorbis` lane
+  ([harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)), which decodes each file
+  through the container readers with its trims applied and compares the result with FFmpeg
+  9.0.2's native decoder under the [numeric
+  rules](../../harness/codecs/numeric-rules.json).
+- On the gate build 21/21 pass: FATE's `vorbis` directory. Runtime and memory against the
+  [gates](../../docs/quality.md#gates): [status](../../docs/status.md).
