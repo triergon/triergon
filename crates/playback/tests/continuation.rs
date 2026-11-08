@@ -794,6 +794,7 @@ fn real_hevc_mp4_packets_frame_as_annex_b_from_their_source_bytes() {
             result.source().bytes.as_ref(),
             packet.source.payload.as_ref()
         );
+        assert_eq!(result.source().generation, packet.source.token.generation());
         assert!(
             result.bytes().starts_with(&[0, 0, 0, 1]) || result.bytes().starts_with(&[0, 0, 1])
         );
