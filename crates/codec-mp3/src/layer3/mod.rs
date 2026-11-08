@@ -70,8 +70,10 @@ impl Reservoir {
 struct Channel {
     scalefactors: Scalefactors,
     hybrid: Hybrid,
-    spectrum: [i32; 576],
+    /// The spectrum of the current granule, requantized then transformed in place.
     xr: [f32; 576],
+    /// Lines of `xr` that may be nonzero; the rest are +0.
+    lines: usize,
 }
 
 /// Layer III decoding state (about 30 KiB, kept inside the decoder's boxed state).
@@ -79,7 +81,8 @@ struct Channel {
 pub(crate) struct Layer3 {
     reservoir: Reservoir,
     channels: [Channel; 2],
-    subbands: [[f32; 32]; 18],
+    /// The 18 samples of each subband of the current granule and channel.
+    subbands: [[f32; 18]; 32],
 }
 
 impl Layer3 {
@@ -87,13 +90,13 @@ impl Layer3 {
         let channel = || Channel {
             scalefactors: Scalefactors::default(),
             hybrid: Hybrid::default(),
-            spectrum: [0; 576],
             xr: [0.0; 576],
+            lines: 0,
         };
         Layer3 {
             reservoir: Reservoir::new(),
             channels: [channel(), channel()],
-            subbands: [[0.0; 32]; 18],
+            subbands: [[0.0; 18]; 32],
         }
     }
 
@@ -157,6 +160,7 @@ impl Layer3 {
                 if !supplied {
                     main.position += g.part2_3_length;
                     channel.xr.fill(0.0);
+                    channel.lines = 0;
                     continue;
                 }
                 let intensity_right = ch == 1 && joint.is_some_and(|j| j.intensity.is_some());
@@ -175,6 +179,8 @@ impl Layer3 {
                     &right.scalefactors,
                     bands,
                 );
+                let lines = left.lines.max(right.lines);
+                (left.lines, right.lines) = (lines, lines);
             }
             for (ch, (channel, plane)) in
                 self.channels.iter_mut().zip(planes.iter_mut()).enumerate()
@@ -182,14 +188,16 @@ impl Layer3 {
                 let g = &side.granules[gr][ch];
                 channel.hybrid.run(
                     &mut channel.xr,
+                    channel.lines,
                     g.block_type,
                     g.mixed,
                     bands,
                     &mut self.subbands,
                 );
                 let (slots, _) = plane[plane_part..plane_part + 576].as_chunks_mut::<32>();
-                for (subbands, pcm) in self.subbands.iter().zip(slots) {
-                    synthesis[ch].run(subbands, pcm);
+                for (t, pcm) in slots.iter_mut().enumerate() {
+                    let slot = core::array::from_fn(|sb| self.subbands[sb][t]);
+                    synthesis[ch].run(&slot, pcm);
                 }
             }
         }
@@ -235,15 +243,9 @@ impl MainData<'_> {
             channel.scalefactors.read_mpeg1(&mut reader, g, reuse);
             None
         };
-        let lines = huffman::read_spectrum(&mut reader, end, g, self.bands, &mut channel.spectrum);
-        requantize::requantize(
-            &channel.spectrum,
-            lines,
-            g,
-            &channel.scalefactors,
-            self.bands,
-            &mut channel.xr,
-        );
+        let lines = huffman::read_spectrum(&mut reader, end, g, self.bands, &mut channel.xr);
+        channel.lines = lines;
+        requantize::requantize(&mut channel.xr, lines, g, &channel.scalefactors, self.bands);
         scale
     }
 }

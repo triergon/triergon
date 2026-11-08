@@ -8,37 +8,52 @@ use triergon_bitstream::CachedBitReader;
 
 use super::bands::Bands;
 use super::huffman_tables::*;
+use super::requantize::{MAX_MAGNITUDE, pow_4_3};
 use super::side_info::GranuleChannel;
 
 /// Codeword bits a lookup resolves in its first step.
 const ROOT_BITS: u8 = 8;
 
-/// A decoded codeword: its symbol and its length beyond the start of its step.
+/// One lookup entry in a single word, so the common case is one load: a codeword's
+/// symbol and its whole length, or a link to the subtable that resolves longer codewords.
 #[derive(Clone, Copy, Debug, Default)]
-struct Leaf {
-    symbol: u8,
-    length: u8,
-}
+struct Entry(u32);
 
-/// An entry of the root step.
-#[derive(Clone, Copy, Debug)]
-enum Entry {
-    Leaf(Leaf),
-    /// Codewords longer than the root step continue in the subtable of `leaves` at
-    /// `offset`, indexed by their next `bits` bits.
-    Link {
-        offset: u16,
-        bits: u8,
-    },
+impl Entry {
+    const LINK: u32 = 1 << 31;
+
+    /// A codeword of `length` bits standing for `symbol`.
+    fn leaf(symbol: u8, length: u8) -> Entry {
+        Entry(u32::from(symbol) | u32::from(length) << 8)
+    }
+
+    /// Codewords continuing in the subtable at `offset`, indexed by their next `bits`
+    /// bits.
+    fn link(offset: usize, bits: u8) -> Entry {
+        Entry(Self::LINK | (offset as u32) << 8 | u32::from(bits))
+    }
+
+    fn is_link(self) -> bool {
+        self.0 & Self::LINK != 0
+    }
+
+    /// For a link: the subtable's offset and index width.
+    fn subtable(self) -> (usize, u32) {
+        (((self.0 & !Self::LINK) >> 8) as usize, self.0 & 31)
+    }
+
+    /// For a leaf: the symbol and the codeword length.
+    fn decoded(self) -> (u8, u32) {
+        (self.0 as u8, (self.0 >> 8) & 31)
+    }
 }
 
 /// A two-step lookup decoding one code table.
 #[derive(Debug)]
 struct Lookup {
-    root_bits: u8,
-    root: Box<[Entry]>,
-    /// The subtables of the codewords longer than `root_bits`.
-    leaves: Box<[Leaf]>,
+    root_bits: u32,
+    /// The root table of `1 << root_bits` entries, then the subtables.
+    entries: Box<[Entry]>,
 }
 
 impl Lookup {
@@ -64,57 +79,51 @@ impl Lookup {
             let width = &mut widths[(code >> rest) as usize];
             *width = (*width).max(rest);
         }
-        let mut leaves = Vec::new();
-        let mut root: Vec<Entry> = widths
-            .iter()
-            .map(|&bits| {
-                if bits == 0 {
-                    return Entry::Leaf(Leaf::default());
-                }
-                let offset = leaves.len() as u16;
-                leaves.resize(leaves.len() + (1 << bits), Leaf::default());
-                Entry::Link { offset, bits }
-            })
-            .collect();
+        let mut entries = vec![Entry::default(); 1 << root_bits];
+        for (prefix, &bits) in widths.iter().enumerate() {
+            if bits > 0 {
+                entries[prefix] = Entry::link(entries.len(), bits);
+                entries.resize(entries.len() + (1 << bits), Entry::default());
+            }
+        }
         for &(code, length, symbol) in &codes {
+            let leaf = Entry::leaf(symbol, length);
             if length <= root_bits {
                 let first = (code << (root_bits - length)) as usize;
-                root[first..first + (1 << (root_bits - length))]
-                    .fill(Entry::Leaf(Leaf { symbol, length }));
-            } else if let Entry::Link { offset, bits } =
-                root[(code >> (length - root_bits)) as usize]
-            {
+                entries[first..first + (1 << (root_bits - length))].fill(leaf);
+            } else {
                 let rest = length - root_bits;
+                let (offset, bits) = entries[(code >> rest) as usize].subtable();
                 let first =
-                    usize::from(offset) + (((code & ((1 << rest) - 1)) << (bits - rest)) as usize);
-                leaves[first..first + (1 << (bits - rest))].fill(Leaf {
-                    symbol,
-                    length: rest,
-                });
+                    offset + (((code & ((1 << rest) - 1)) << (bits - u32::from(rest))) as usize);
+                entries[first..first + (1 << (bits - u32::from(rest)))].fill(leaf);
             }
         }
         Lookup {
-            root_bits,
-            root: root.into_boxed_slice(),
-            leaves: leaves.into_boxed_slice(),
+            root_bits: u32::from(root_bits),
+            entries: entries.into_boxed_slice(),
         }
     }
 
-    /// The next symbol: `x << 4 | y` for a pair table, `vwxy` for a quadruple table.
+    /// The symbol of the codeword at the top of `window`, and the codeword's length:
+    /// `x << 4 | y` for a pair table, `vwxy` for a quadruple table.
+    #[inline(always)]
+    fn find(&self, window: u32) -> (u8, u32) {
+        let root = self.root_bits;
+        let mut entry = self.entries[(window >> (32 - root)) as usize];
+        if entry.is_link() {
+            let (offset, bits) = entry.subtable();
+            entry = self.entries[offset + ((window << root) >> (32 - bits)) as usize];
+        }
+        entry.decoded()
+    }
+
+    /// Read the next symbol.
     #[inline(always)]
     fn decode(&self, reader: &mut CachedBitReader<'_>) -> u8 {
-        let window = reader.peek32();
-        let root = u32::from(self.root_bits);
-        let (leaf, step) = match self.root[(window >> (32 - root)) as usize] {
-            Entry::Leaf(leaf) => (leaf, 0),
-            Entry::Link { offset, bits } => {
-                let index =
-                    usize::from(offset) + ((window << root) >> (32 - u32::from(bits))) as usize;
-                (self.leaves[index], self.root_bits)
-            }
-        };
-        reader.skip(usize::from(step + leaf.length));
-        leaf.symbol
+        let (symbol, length) = self.find(reader.peek32());
+        reader.skip(length as usize);
+        symbol
     }
 }
 
@@ -175,41 +184,52 @@ static CODEBOOKS: LazyLock<Codebooks> = LazyLock::new(|| Codebooks {
 });
 
 /// Decode the Huffman-coded spectrum of one granule and channel, which ends at bit
-/// `end`, into `out`. Returns the number of lines that may be nonzero; the rest are 0.
+/// `end`, into `out` as `sign(is) |is|^(4/3)`, the first half of requantization.
+/// Returns the number of lines that may be nonzero; the rest are 0.
 ///
 /// A count1 quadruple that runs past `end` is dropped (ISO/IEC 11172-3 2.4.3.4.4 ends
 /// the region at `part2_3_length`).
 pub(crate) fn read_spectrum(
+    bits: &mut CachedBitReader<'_>,
+    end: usize,
+    g: &GranuleChannel,
+    bands: &Bands,
+    out: &mut [f32; 576],
+) -> usize {
+    // A local copy keeps the reader's state in registers through the loops.
+    let mut reader = *bits;
+    let lines = read_lines(&mut reader, end, g, bands, out);
+    *bits = reader;
+    lines
+}
+
+#[inline(always)]
+fn read_lines(
     reader: &mut CachedBitReader<'_>,
     end: usize,
     g: &GranuleChannel,
     bands: &Bands,
-    out: &mut [i32; 576],
+    out: &mut [f32; 576],
 ) -> usize {
     let books = &*CODEBOOKS;
+    let pow = pow_4_3();
     let mut line = 0;
     for (region_end, &select) in g.region_ends(bands).into_iter().zip(&g.table_select) {
         let region = &mut out[line..region_end.max(line)];
         line += region.len();
-        match SELECTIONS[usize::from(select)] {
-            None => region.fill(0),
-            Some((table, linbits)) => {
-                let lookup = &books.pairs[table];
-                for pair in region.chunks_exact_mut(2) {
-                    let symbol = lookup.decode(reader);
-                    pair[0] = magnitude(reader, symbol >> 4, linbits);
-                    pair[1] = magnitude(reader, symbol & 15, linbits);
-                }
-            }
-        }
+        let Some((table, linbits)) = SELECTIONS[usize::from(select)] else {
+            region.fill(0.0);
+            continue;
+        };
+        read_pairs(reader, &books.pairs[table], linbits, pow, region);
     }
     let quads = &books.quads[usize::from(g.count1_table_b)];
     while line + 4 <= out.len() && reader.position() < end {
         let symbol = quads.decode(reader);
-        let mut values = [0; 4];
+        let mut values = [0.0; 4];
         for (i, value) in values.iter_mut().enumerate() {
             if symbol & (8 >> i) != 0 {
-                *value = if reader.bit() { -1 } else { 1 };
+                *value = if reader.bit() { -1.0 } else { 1.0 };
             }
         }
         if reader.position() > end {
@@ -218,20 +238,60 @@ pub(crate) fn read_spectrum(
         out[line..line + 4].copy_from_slice(&values);
         line += 4;
     }
-    out[line..].fill(0);
+    out[line..].fill(0.0);
     line
 }
 
-/// One value of a pair: `linbits` extend 15, and a sign bit follows a nonzero value.
+/// The pairs of one big-value region, coded with `lookup` and `linbits`. Kept out of
+/// line: as a loop of its own it holds the reader and the tables in registers.
+#[inline(never)]
+fn read_pairs(
+    reader: &mut CachedBitReader<'_>,
+    lookup: &Lookup,
+    linbits: u32,
+    pow: &[f32; MAX_MAGNITUDE + 1],
+    region: &mut [f32],
+) {
+    let mut bits = *reader;
+    for pair in region.as_chunks_mut::<2>().0 {
+        let window = bits.peek32();
+        let (symbol, length) = lookup.find(window);
+        let (x, y) = (symbol >> 4, symbol & 15);
+        if linbits > 0 && (x == 15 || y == 15) {
+            bits.skip(length as usize);
+            *pair = [x, y].map(|value| escaped(&mut bits, value, linbits, pow));
+            continue;
+        }
+        // The codeword and at most two sign bits lie within the 32-bit window.
+        let mut signs = window << length;
+        let mut used = length;
+        *pair = [x, y].map(|value| {
+            let magnitude = pow[usize::from(value)];
+            if value == 0 {
+                return magnitude;
+            }
+            let sign = signs & 0x8000_0000;
+            signs <<= 1;
+            used += 1;
+            f32::from_bits(magnitude.to_bits() | sign)
+        });
+        bits.skip(used as usize);
+    }
+    *reader = bits;
+}
+
+/// One value of a pair of a table with linbits: they extend 15, and a sign bit follows
+/// a nonzero value.
 #[inline(always)]
-fn magnitude(reader: &mut CachedBitReader<'_>, value: u8, linbits: u32) -> i32 {
+fn escaped(reader: &mut CachedBitReader<'_>, value: u8, linbits: u32, pow: &[f32]) -> f32 {
     if value == 0 {
-        return 0;
+        return 0.0;
     }
-    let mut magnitude = i32::from(value);
-    if magnitude == 15 && linbits > 0 {
-        magnitude += reader.read(linbits) as i32;
+    let mut magnitude = usize::from(value);
+    if magnitude == 15 {
+        magnitude += reader.read(linbits) as usize;
     }
+    let magnitude = pow[magnitude];
     if reader.bit() { -magnitude } else { magnitude }
 }
 
@@ -319,11 +379,11 @@ mod tests {
         writer.put(0, 1); // y sign: positive
         let end = writer.bits;
         let mut reader = CachedBitReader::new(&writer.bytes);
-        let mut out = [7; 576];
+        let mut out = [7.0; 576];
         let bands = Bands::for_rate(44_100).unwrap();
         let lines = read_spectrum(&mut reader, end, &g, bands, &mut out);
-        assert_eq!(&out[..3], &[-1, 16, 0]);
+        assert_eq!(&out[..3], &[-1.0, (16f64.powf(4.0 / 3.0)) as f32, 0.0]);
         assert_eq!(lines, 2);
-        assert!(out[2..].iter().all(|&v| v == 0));
+        assert!(out[2..].iter().all(|&v| v == 0.0));
     }
 }
