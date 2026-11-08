@@ -13,7 +13,7 @@ shaping against HarfBuzz 14.6.0 and FriBidi 1.0.17
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
-| Core | Charged storage, exact time, input windows, work budgets, neutral container model with one codec identity | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | 32-bit target runs, fuzzing |
+| Core | Charged storage, exact time, input windows, work budgets, neutral container model with one codec identity | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | fuzzing |
 | Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four host FATE demux comparisons | 1.1590 (116/116 pass) | heap ≤0.627, RSS ≤0.965 | full EBML/Matroska scope |
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1606 (44/44 pass) | heap ≤0.404, total RSS ≤0.849 | — |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10/10 packet folds (`matroska-audio-clocks`) | 1.4510 (6/10 pass) | heap ≤1.822 (8/10 lower), total RSS ≤1.043 (0/10 lower) | audio seek |
@@ -121,5 +121,68 @@ comparison remains archived separately.
 
 ## Platforms
 
-Qualification runs on native AArch64 Linux. 32-bit ARMv7 and x86_64 have no
-performance runs yet.
+Qualification runs on native AArch64 Linux and, where the next section says so, on
+32-bit ARMv7 Linux. x86_64 has no performance runs yet.
+
+### 32-bit ARMv7
+
+The gate build for `armv7-unknown-linux-gnueabihf` (Rust 1.99.1, default flags, so no
+NEON), with every FFmpeg reference built from the same pins in the same user space
+(FFmpeg selects NEON at run time). The Ubuntu 24.04 armhf user space archived as
+`armv7-userland` ([how to repeat it](quality.md#32-bit-armv7)) on an AWS c6g.4xlarge
+(Graviton2, Neoverse N1 r3p1), kernel `7.0.0-1014-aws`, pinned to CPU 1, 30 pairs.
+Memory uses the standard bounds, because the kernel RSS proof has no 32-bit entry
+point: total RSS is the conservative ceiling (the candidate's declared resident ceiling
+over the reference's observed peak), not a proven result, and the observed resident
+peaks are given beside it.
+
+| Area | Verified against the reference | Runtime | Memory |
+|---|---|---|---|
+| Core | 51,235 exact-arithmetic cases; the workspace tests (3,646 in debug, 3,645 in release) and the worker tests pass | via dependents | via dependents |
+| Matroska / WebM | 116/116 (six feature groups and the external HDR vector) | 1.0940 (116/116 pass) | heap ≤0.775; total RSS ceiling ≤1.728, observed peaks ≤1.136 |
+| Matroska startup and seek | 44/44 | 0.9267 (44/44 pass) | heap ≤0.396; total RSS ceiling ≤1.448, observed peaks ≤1.016 |
+| HLS segments | 71/71 | 0.7366 (71/71 pass) | heap ≤0.020; total RSS ceiling ≤1.353, observed peaks ≤0.843 |
+| ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals) | 2.4250 (757/972 pass) | heap ≤0.364 (972/972 lower); total RSS ceiling ≤1.387, observed peaks ≤0.894 |
+| Packet framing | 125/125 AVC/HEVC reference comparisons | 0.9195 (125/125 pass) | heap ≤0.765 (125/125 lower); total RSS ceiling ≤1.962, observed peaks ≤1.112 |
+| Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the six video timing workloads decode to FFmpeg's digests | 1.7785 (8/17 pass) | no repository runner |
+| Capture | 0/15: mux and encoder pass on all 15, conversion fails on all 15 (below) | 3.7355 (2/15 pass) | heap ≤0.564, total RSS ≤0.981 (14/15; `c05-noise-960` has no valid observation) |
+
+Above the ceiling on ARMv7: codecs `h264-high-1080p` 1.5371, `h264-main-1920x800`
+1.3155, `dts-core-es-6.1` 1.7268, `dts-core-7.1-master` 1.7785, `ac3-5.1-448` 1.3602,
+`ac3-2.0-192` 1.5987, `eac3-7.1` 1.2606, `eac3-5.1-spx` 1.2126, `eac3-stereo-spx`
+1.4841; capture `c01-ui-static-960` 3.4321, `c02-ui-scroll-960` 2.3130,
+`c03-ui-transition-960` 3.0576, `c04-motion-960` 2.8436, `c06-ui-scroll-960-bottomup`
+2.2526, `c07-ui-static-480-bottomup` 3.7355, `c08-ui-scroll-480-bottomup` 2.4663,
+`c09-motion-480-bottomup` 2.5628, `c10-ui-transition-480-topdown` 3.3268,
+`c11-motion-960-rate1` 1.6835, `c12-motion-960-1m` 2.7349, `c13-motion-960-6m` 2.7882,
+`c14-motion-960-rate255` 2.6747; ISO BMFF 215 of 972 outputs, worst
+`clock27-u64-minus1-step12-native-index-tiny` 2.4250: 194 read in `tiny` windows from the
+fragmented-file (`f-`, `trun18-`, `flag-`, `origin18-`, `follow-flag-`, `discard22-`,
+`discard24-`, `modern-iso6-`, `order-fragment-header-`), 64-bit clock (`clock27-`,
+`order27-`) and tx3g (`r-subtitle-`) groups, and 21 `clock27-` and `order27-` outputs read
+in `ordinary` windows. The raw samples' `report.json` lists each bound.
+
+Capture conversion must stay within ±1 of FFmpeg's on every sample. On
+`c01-ui-static-960`, Triergon's conversion output is byte-identical on ARMv7 and
+AArch64, while FFmpeg's ARMv7 conversion differs from its AArch64 output. Across the 15
+cases FFmpeg's ARMv7 conversion is up to 36 from Triergon's (on the noise cases), so all
+15 fail the rule on this target; the encoder and mux pass.
+
+Every Matroska, startup and seek and HLS case has a total RSS ceiling above the
+reference. The observed resident peaks are above it in every Matroska feature-group
+case except `colour-many-tracks`, `attachments-large` and `attachments-large-late` (112
+of 115, up to 1.136), and in 3 of the 44 startup and seek cases:
+`seek-hevc-seek-no-default-0-eof` 1.0007, `seek-hevc-seek-no-default-2700-fresh` 1.0095
+and `seek-hevc-seek-no-default-2700-eof` 1.0163. Every packet-framing case has its total
+RSS ceiling and its observed resident peak above the reference (observed up to 1.112);
+every ISO BMFF output has its total RSS ceiling above the reference, and none its observed
+peak.
+
+Matroska, startup and seek, HLS, the external vector, codec timing and capture were
+measured at `78a873dd983c878c861a7b5549639a58d5a599c1` (raw samples
+`gate-build-linux-armv7`, `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116`);
+ISO BMFF, packet framing, codec conformance and the tests at
+`9621f6063a2e517fecc1c28757e6bed50b5228a8` (`isobmff-gate-build-linux-armv7`,
+`ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691`, and
+`framing-codecs-checks-linux-armv7`,
+`9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e`).

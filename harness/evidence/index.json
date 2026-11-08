@@ -16463,6 +16463,46 @@
    "sha256": "907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136",
    "bytes": 2385629442,
    "source_revision": "b3579f729494a37a4dbebe03c475f7b38484046e"
+  },
+  {
+   "name": "gate-build-linux-armv7",
+   "path": "gate-build-linux-armv7",
+   "retention": "retained",
+   "reason": "32-bit ARMv7 status rows: the eight Matroska, startup and seek and HLS contracts, the external HDR vector, codec timing and capture qualification, with the CPU, kernel and user-space package list",
+   "key": "evidence/gate-build-linux-armv7/773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116.tar.gz",
+   "sha256": "773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116",
+   "bytes": 5869517627,
+   "source_revision": "78a873dd983c878c861a7b5549639a58d5a599c1",
+   "files": 2321
+  },
+  {
+   "name": "armv7-userland",
+   "path": "armv7-userland",
+   "retention": "retained",
+   "reason": "The Ubuntu 24.04 armhf user space the 32-bit ARMv7 results are measured in: a root file system image without home directories, toolchains or build output",
+   "key": "evidence/armv7-userland/f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533.tar.gz",
+   "sha256": "f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533",
+   "bytes": 161683579
+  },
+  {
+   "name": "framing-codecs-checks-linux-armv7",
+   "path": "framing-codecs-checks-linux-armv7",
+   "retention": "retained",
+   "reason": "32-bit ARMv7 status rows: packet framing timing and memory for all 125 cases, the H.264 and HEVC conformance grading, the workspace and worker test logs, with the CPU, kernel and user-space package list",
+   "key": "evidence/framing-codecs-checks-linux-armv7/9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e.tar.gz",
+   "sha256": "9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e",
+   "bytes": 467039557,
+   "source_revision": "9621f6063a2e517fecc1c28757e6bed50b5228a8"
+  },
+  {
+   "name": "isobmff-gate-build-linux-armv7",
+   "path": "isobmff-gate-build-linux-armv7",
+   "retention": "retained",
+   "reason": "32-bit ARMv7 ISO BMFF status row: all 1,020 open and index comparisons with timing and memory for the 972 output labels, with the CPU, kernel and user-space package list",
+   "key": "evidence/isobmff-gate-build-linux-armv7/ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691.tar.gz",
+   "sha256": "ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691",
+   "bytes": 2605870759,
+   "source_revision": "9621f6063a2e517fecc1c28757e6bed50b5228a8"
   }
  ]
 }

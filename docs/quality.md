@@ -293,17 +293,31 @@ target of the toolchain that built them, `armv7-unknown-linux-gnueabihf`. That
 toolchain's default target has no NEON, while FFmpeg selects its NEON code at run
 time, so on this target the gate build compares Rust built without NEON with
 FFmpeg's NEON paths. An AWS Graviton2 host (Neoverse N1) runs a 32-bit user space
-on its AArch64 kernel; later Graviton generations cannot. One way to set one up on Ubuntu 24.04:
+on its AArch64 kernel; later Graviton generations cannot.
+
+The results in [status](status.md#32-bit-armv7) come from the Ubuntu 24.04 armhf user
+space archived as evidence set `armv7-userland` (211 packages; the image holds no home
+directory, toolchain or build output). Unpack it on the host and enter it:
 
 ```sh
-sudo debootstrap --arch=armhf --variant=buildd --components=main,universe noble \
-  /srv/armhf http://ports.ubuntu.com/ubuntu-ports
+sudo mkdir -p /srv/armhf
+aws s3 cp "$TRIERGON_EVIDENCE_ARCHIVE/evidence/armv7-userland/f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533.tar.gz" - |
+  sudo tar -xpz --numeric-owner -C /srv/armhf
 for d in proc sys dev dev/pts; do sudo mount --bind /$d /srv/armhf/$d; done
-sudo chroot /srv/armhf setarch linux32 bash -l
+sudo cp /etc/resolv.conf /srv/armhf/etc/resolv.conf
+sudo install -d -o 1000 -g 1000 /srv/armhf/home/ubuntu
+sudo chroot /srv/armhf setarch linux32 sudo -u ubuntu -H bash -l
 ```
 
-Inside, install the tools listed under [setup](../CONTRIBUTING.md#setup) and rustup as on
-any host, and run every command under `setarch linux32`. Memory uses the standard
+The image was made with `debootstrap --arch=armhf --variant=buildd
+--components=main,universe noble` from `http://ports.ubuntu.com/ubuntu-ports`, with
+`noble-updates` and `noble-security` enabled, then `apt-get install build-essential
+pkg-config zlib1g-dev python3 python3-numpy make git zstd curl ca-certificates sudo jq
+time`. It has a user `ubuntu` (uid 1000, passwordless `sudo`); its home directory is not
+part of the image.
+A user space built the same way later can pick up newer packages; compare its
+`dpkg-query -W` list before treating its results as comparable. Inside, install rustup
+as on any host, and run every command under `setarch linux32`. Memory uses the standard
 bounds: the kernel RSS proof module has no 32-bit ioctl entry point. Record the CPU,
 kernel and user-space package list with the results.
 
