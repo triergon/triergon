@@ -145,6 +145,7 @@ pub struct MalformedInputCompletion {
     pmt_pid: Option<u16>,
     scope: Option<DemuxScope>,
     pending: Option<Pending>,
+    after_discard: bool,
     blocked: bool,
     end: Option<MediaEntityEnd>,
     finished: Option<SourceContext>,
@@ -178,6 +179,7 @@ impl MalformedInputCompletion {
             pmt_pid: None,
             scope: None,
             pending: None,
+            after_discard: false,
             blocked: format != PacketFormat::Ts188,
             end: None,
             finished: None,
@@ -204,10 +206,18 @@ impl MalformedInputCompletion {
         if self.source != input.source() {
             return Err(Error::SourceMismatch);
         }
-        if self.token != input.token() {
-            return Err(Error::Invalid(
-                "malformed completion original cursor changed",
-            ));
+        let received = input.token();
+        if self.token.generation() != received.generation() {
+            return Err(Error::StaleGeneration {
+                expected: self.token.generation(),
+                received: received.generation(),
+            });
+        }
+        if self.token.request() != received.request() {
+            return Err(Error::StaleRequest {
+                expected: self.token.request(),
+                received: received.request(),
+            });
         }
         Ok(())
     }
@@ -308,14 +318,20 @@ impl MalformedInputCompletion {
             return Err(Error::Invalid("malformed PES diagnostic missing"));
         }
         let actual = self.inspect(packet, work, cancel)?;
-        self.retire_control();
+        let selected = self.scope.is_some_and(|scope| scope.pid == actual.pid);
+        if selected && self.after_discard && actual.payload.is_some() && !actual.payload_unit_start
+        {
+            return Err(Error::Unsupported(
+                "PES continuation after malformed discard",
+            ));
+        }
         let control = !actual.transport_error
             && actual.scrambling == 0
             && (actual.payload.is_none() || (actual.is_null() && !actual.payload_unit_start));
         let psi = actual.pid == 0 || self.pmt_pid == Some(actual.pid);
         let kind = if !control
             && !psi
-            && self.scope.is_some_and(|scope| scope.pid == actual.pid)
+            && selected
             && !actual.transport_error
             && actual.scrambling == 0
             && actual.payload_unit_start
@@ -328,9 +344,11 @@ impl MalformedInputCompletion {
         {
             actual.payload.as_ref().and_then(|payload| {
                 let raw = payload.as_ref();
-                if raw.len() >= 3 && raw[..3] != [0, 0, 1] {
+                if raw.len() < 6 || raw[3] != 0xe0 {
+                    None
+                } else if raw[..3] != [0, 0, 1] {
                     Some(MalformedInputKind::PesStartCode)
-                } else if raw.len() >= 9 && raw[..3] == [0, 0, 1] && raw[6] & 0xc0 == 0x80 {
+                } else if raw.len() >= 9 && raw[6] & 0xc0 == 0x80 {
                     let size = usize::from(u16::from_be_bytes([raw[4], raw[5]]));
                     (size != 0 && 9 + usize::from(raw[8]) > size + 6)
                         .then_some(MalformedInputKind::PesHeaderLength)
@@ -345,6 +363,7 @@ impl MalformedInputCompletion {
             let inner = self.observer(observer, context)?;
             inner.inner.transport_fault_input(&actual, context, None)?;
             self.coverage(actual.source_offset)?;
+            self.retire_control();
             self.pending = Some(Pending {
                 packet: actual,
                 context,
@@ -353,6 +372,10 @@ impl MalformedInputCompletion {
             return Ok(MalformedSourceDisposition::AwaitDiagnostic);
         }
         self.coverage(actual.source_offset)?;
+        self.retire_control();
+        if selected && actual.payload_unit_start && actual.payload.is_some() {
+            self.after_discard = false;
+        }
         if !control && psi {
             self.control = Some(Control {
                 packet: actual,
@@ -423,6 +446,7 @@ impl MalformedInputCompletion {
                 context.source_event_ordinal,
             );
             self.discarded = self.discarded.checked_add(1).ok_or(Error::Overflow)?;
+            self.after_discard = true;
             return Ok(MalformedSourceDisposition::Reported(MalformedInputFact {
                 kind: pending.kind,
                 carrier: Some(pending.packet),
@@ -440,7 +464,7 @@ impl MalformedInputCompletion {
         {
             match (raw[3] >> 4) & 3 {
                 0 => Some(MalformedInputKind::ReservedAdaptationControl),
-                3 if raw[4] > 182 => Some(MalformedInputKind::AdaptationLengthOverrun),
+                3 if raw[4] > 183 => Some(MalformedInputKind::AdaptationLengthOverrun),
                 _ => None,
             }
         } else {
@@ -475,14 +499,15 @@ impl MalformedInputCompletion {
         }
         let observer = self.observer(observer, context)?;
         observer.inner.rejected_fault_input(rejected, context)?;
-        self.retire_control();
         self.coverage(fault.location.offset)?;
+        self.retire_control();
         observer.inner.note_recovered(
             raw[3] & 15,
             fault.location.offset,
             context.source_event_ordinal,
         );
         self.discarded = self.discarded.checked_add(1).ok_or(Error::Overflow)?;
+        self.after_discard = true;
         Ok(MalformedSourceDisposition::Reported(MalformedInputFact {
             kind,
             carrier: None,
@@ -505,6 +530,12 @@ impl MalformedInputCompletion {
             return Err(Error::Cancelled);
         }
         self.identity(input)?;
+        if let Some(observer) = observer.as_ref() {
+            if !observer.inner.recovery_budget().same_pool(input.budget()) {
+                return Err(Error::ForeignPool);
+            }
+            observer.check_source_input(input)?;
+        }
         // Check sticky I/O failure even when no new bytes are requested.
         input.read_into(&mut [], &mut WorkBudget::new(0), cancel)?;
         if self.confirmed
@@ -520,6 +551,22 @@ impl MalformedInputCompletion {
         }
         if !work.try_charge(self.required_work(event)?) {
             return Ok(None);
+        }
+        let physical = match event {
+            TraceEvent::Transport(packet) => Some((packet.source_offset, packet.source.len())),
+            TraceEvent::Diagnostic(fault) => fault
+                .rejected
+                .as_ref()
+                .map(|rejected| (rejected.source_offset(), rejected.bytes().len())),
+            _ => None,
+        };
+        if let Some((offset, size)) = physical
+            && (self.end.is_some()
+                || offset.checked_add(size as u64).ok_or(Error::Overflow)? > input.position())
+        {
+            return Err(Error::Invalid(
+                "malformed completion carrier outside original input progress",
+            ));
         }
         let result = match event {
             TraceEvent::Transport(packet) => self.carrier(
@@ -675,9 +722,16 @@ impl MalformedInputCompletion {
             ));
         }
         if self.next_offset != 0 {
-            self.observer(observer, finished)?;
+            let observer = self.observer(observer, finished)?;
+            if !observer.inner.recovery_budget().same_pool(input.budget()) {
+                return Err(Error::ForeignPool);
+            }
+            observer.check_source_input(input)?;
         }
-        if input.position() != end.location.offset || end.token != self.token {
+        if input.position() != end.location.offset
+            || end.token != self.token
+            || self.next_offset != end.location.offset
+        {
             return Err(Error::Invalid("malformed completion EOF moved"));
         }
         if !work.try_charge(1) {

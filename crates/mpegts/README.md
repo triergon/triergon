@@ -99,6 +99,27 @@ additional carrier, malformed adaptation/PES, entity transition or I/O failure i
 promoted to success. These boundary checks add fixed state and no allocation,
 payload copy or descriptor table; a rejected carrier shares its existing charge.
 
+`compat::pes::MalformedInputCompletion` can report selected TS188 AVC carriers
+with reserved adaptation control, an adaptation overrun, an invalid PES start
+code or a PES header exceeding its declared length. It requires a real active
+source PMT and drained, input-bound observer. Accepted transport with malformed
+PES waits for its matching source diagnostic; rejected transport retains the
+original rejection. Each `MalformedInputFact` keeps the original charged bytes,
+source fault and event contexts. The source parser still reports the refusal.
+A later valid PES start is forwarded to the observer. Continuations after a
+discard require a new start before their packet disposition can be proved.
+
+The policy binds the original core cursor before the first byte, accounts for
+every physical carrier and admits only verified self-contained control sections
+or typed discards on its zero-packet branch. `NoPacketsConfirmation` requires
+physical End, actual source Finished and a fresh EOF check on that same cursor.
+This receipt can describe zero physical carriers at actual EOF without creating
+a PAT, PMT or PES scope. It is separate from `NoMediaConfirmation`. Unexplained
+payload, incomplete coverage, I/O failure, cancellation and stale identities
+cannot produce a receipt. `required_work` bounds per-event admission; a short
+grant leaves the event unconsumed. The policy uses fixed state and charged
+aliases, with no new input-dependent allocation or payload copy.
+
 ## Usage
 
 ```rust
@@ -327,7 +348,10 @@ Verification:
   program-policy or empty-observation refusal
   with no emitted packets and one entity can complete through a bounded
   control-only replay and a real `NoMediaConfirmation`. Other refusals remain
-  failures. The replay runs inside the measured operation.
+  failures unless the separately reported malformed-input policy proves complete
+  original-cursor coverage and real EOF with `NoPacketsConfirmation`. That
+  proof runs on the original source operation. The control-only replay runs
+  inside the measured operation.
   The 272 recorded requests are 97 compat-view operations. The AArch64 Linux
   gate build at `5634f47d`, with Rust 1.99.1 and default flags, checks all 97
   against the pinned FFmpeg formats worker and the unchanged recorded expected

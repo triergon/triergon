@@ -49,6 +49,7 @@ struct Run {
     chunk: usize,
     end: Option<MediaEntityEnd>,
     finished: bool,
+    omit_carrier: Option<u64>,
 }
 impl Run {
     fn new(raw: &[u8], pool: &Budget, chunk: usize) -> Self {
@@ -85,6 +86,7 @@ impl Run {
             chunk,
             end: None,
             finished: false,
+            omit_carrier: None,
         }
     }
     fn drain(&mut self) {
@@ -94,11 +96,11 @@ impl Run {
         for _ in 0..100_000 {
             match observer.poll(&mut WorkBudget::new(1), &RUN).unwrap() {
                 AssemblyStep::Output(TransportObservation::Accepted(packet)) => {
-                    self.packets.push(packet)
+                    self.packets.push(packet);
                 }
                 AssemblyStep::Yield => (),
                 AssemblyStep::NeedPayload | AssemblyStep::Finished => return,
-                other => panic!("unexpected extraction {other:?}"),
+                other @ AssemblyStep::Output(_) => panic!("unexpected extraction {other:?}"),
             }
         }
         panic!("observer did not drain");
@@ -169,6 +171,12 @@ impl Run {
                         epochs: self.source.source_epochs(),
                         byte_run_epoch: None,
                     };
+                    if let TraceEvent::Transport(packet) = &event
+                        && self.omit_carrier == Some(packet.source_offset)
+                    {
+                        self.ordinal += 1;
+                        return;
+                    }
                     let used = pool.used();
                     assert!(
                         self.completion
@@ -198,6 +206,22 @@ impl Run {
                     );
                     let blocker = pressure.then(|| pool.reserve(pool.available()).unwrap());
                     let work = self.completion.required_work(&event).unwrap();
+                    if pressure && let TraceEvent::Diagnostic(fault) = &event {
+                        let mut wrong = fault.clone();
+                        wrong.location.offset += 1;
+                        assert!(
+                            self.completion
+                                .observe_source(
+                                    &TraceEvent::Diagnostic(wrong),
+                                    context,
+                                    &mut self.input,
+                                    self.observer.as_mut(),
+                                    &mut WorkBudget::new(work),
+                                    &RUN,
+                                )
+                                .is_err()
+                        );
+                    }
                     let disposition = self
                         .completion
                         .observe_source(
@@ -234,18 +258,18 @@ impl Run {
                                     entity: SourceId(1),
                                     epochs: context.epochs,
                                 };
-                                self.observer = Some(
-                                    TransportFaultRecovery::new(
-                                        DemuxObserver::new(
-                                            DemuxProfile::PesPackets,
-                                            scope,
-                                            pool.clone(),
-                                            ParseLimits::default(),
-                                        )
-                                        .unwrap(),
+                                let mut observer = TransportFaultRecovery::new(
+                                    DemuxObserver::new(
+                                        DemuxProfile::PesPackets,
+                                        scope,
+                                        pool.clone(),
+                                        ParseLimits::default(),
                                     )
                                     .unwrap(),
-                                );
+                                )
+                                .unwrap();
+                                observer.bind_source_input(&self.input).unwrap();
+                                self.observer = Some(observer);
                             }
                             TraceEvent::Transport(packet) => {
                                 if let Some(observer) = self.observer.as_mut()
@@ -406,4 +430,34 @@ fn reset_and_failure_after_real_eof_cannot_publish_a_confirmation() {
         }
         assert!(run.confirm().is_err());
     }
+}
+
+#[test]
+fn omitted_physical_carrier_prevents_a_receipt_even_after_actual_eof() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let raw = CASES[3].0;
+    let mut wire = raw[..376].to_vec();
+    let mut null = [0xff; 188];
+    null[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
+    wire.extend_from_slice(&null);
+    wire.extend_from_slice(&raw[376..]);
+    let mut run = Run::new(&wire, &pool, 1);
+    run.omit_carrier = Some(376);
+    run.all(&pool, false);
+    assert_eq!(run.end.as_ref().unwrap().location().offset, 752);
+    assert_eq!(run.facts.len(), 1);
+    assert!(run.packets.is_empty());
+    assert!(run.confirm().is_err());
+}
+
+#[test]
+fn adaptation_that_fits_without_payload_is_not_an_overrun() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut raw = CASES[1].0.to_vec();
+    raw[380] = 183;
+    let mut run = Run::new(&raw, &pool, 4096);
+    run.all(&pool, false);
+    assert_eq!(run.diagnostics, 1);
+    assert!(run.facts.is_empty());
+    assert!(run.confirm().is_err());
 }

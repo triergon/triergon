@@ -718,15 +718,14 @@ fn packet_operation(
                 }
                 if let Some(observer) = session.observer.as_mut()
                     && observer.awaiting_terminal_completion()
-                {
-                    if !observer.seal_terminal_end(
+                    && !observer.seal_terminal_end(
                         &physical_end,
                         &mut input,
                         &mut WorkBudget::new(WORK),
                         cancel,
-                    )? {
-                        return Err("terminal End yielded on fixed grant".into());
-                    }
+                    )?
+                {
+                    return Err("terminal End yielded on fixed grant".into());
                 }
                 logical_eof = Some(boundary("logical_eof"));
                 demux.end_of_source()?;
