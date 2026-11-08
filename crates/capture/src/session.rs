@@ -7,7 +7,7 @@
 use crate::{CaptureError, Result};
 use triergon_codec_mpeg1::{EncodedPicture, Encoder, EncoderConfig};
 use triergon_mpegts::mux::{MuxConfig, Muxer};
-use triergon_pixel::{Converter, Geometry, Orientation, Picture};
+use triergon_pixel::{Converter, Geometry, Orientation, Picture, PictureView};
 
 /// Receives each frame's complete TS bytes. Returning `false` (refused or
 /// partially written) fails the frame.
@@ -131,7 +131,7 @@ impl Session {
     }
 
     /// The encoder's reconstruction of the last frame.
-    pub fn reconstruction(&self) -> &Picture {
+    pub fn reconstruction(&self) -> PictureView<'_> {
         self.encoder.reconstruction()
     }
 

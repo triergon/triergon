@@ -13,6 +13,7 @@ mod block;
 mod dct;
 mod error;
 mod motion;
+mod planes;
 mod rate;
 mod tables;
 
@@ -20,9 +21,12 @@ use bits::BitWriter;
 use block::Quantizer;
 pub use error::{Error, Result};
 use motion::{Bounds, Coarse, Mv, Search};
+use planes::Planes;
 use rate::{Kind, RateControl};
 use tables::*;
-use triergon_pixel::{Geometry, Picture};
+pub use triergon_core::{Budget, Error as StorageError};
+use triergon_core::{BudgetVec, Reservation};
+use triergon_pixel::{Geometry, Picture, PictureView};
 
 /// Encoder parameters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,6 +42,25 @@ pub struct EncoderConfig {
     pub gop: u32,
 }
 
+/// Storage limits of one encoder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    /// Live storage sized from the configuration: the reconstructed and reference
+    /// pictures, the previous source luma, the macroblock and motion arrays, the bit
+    /// writer and the output buffer at the size bound of one picture, and the first
+    /// I picture's trial pass. The default holds the largest geometry (4094x4094) at
+    /// the largest VBV buffer the sequence header signals.
+    pub live_storage_bytes: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            live_storage_bytes: 96 * 1024 * 1024,
+        }
+    }
+}
+
 /// Picture rate 30 Hz: frame_rate_code 5 in Table 2-D.4.
 const FRAME_RATE_CODE: u32 = 5;
 const FPS: f64 = 30.0;
@@ -47,6 +70,18 @@ const MAX_F_CODE: u32 = 4;
 /// A P macroblock is intra coded when its deviation from its own mean beats
 /// the motion-compensated SAD by this margin (intra blocks cost more bits).
 const INTRA_MARGIN: u32 = 512;
+
+/// Bits one macroblock can take: an 11-bit address increment, a 6-bit type, a 5-bit
+/// quantiser, two 14-bit vector components, a 9-bit coded_block_pattern and six
+/// blocks of DC size and differential (8 + 8), 64 escaped 28-bit coefficients and
+/// end_of_block. Address escapes are counted with `GUARDED_MB_BITS`.
+const MB_BITS: usize = 11 + 6 + 5 + 2 * 14 + 9 + 6 * (8 + 8 + 64 * 28 + 2);
+/// Bits one macroblock can take once the VBV guard of `encode_row` holds: DC-only
+/// intra (at most 116) or uncoded inter (at most 42), plus its share of address
+/// escapes (11 bits per 33 macroblocks).
+const GUARDED_MB_BITS: usize = 128;
+/// Sequence, GOP, picture and slice headers with their alignment.
+const HEADER_BITS: usize = 512;
 
 /// Facts about one encoded picture.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,25 +103,31 @@ struct Analysis {
 #[derive(Debug)]
 pub struct Encoder {
     cfg: EncoderConfig,
-    reference: Picture,
-    recon: Picture,
+    reference: Planes,
+    recon: Planes,
     writer: BitWriter,
+    /// Writer of the first I picture's trial pass, dropped once it has run.
+    probe: Option<BitWriter>,
     quant: Box<Quantizer>,
     rc: RateControl,
-    analysis: Vec<Analysis>,
-    row_activity: Vec<f64>,
-    previous_mvs: Vec<Mv>,
-    coarse_cur: Vec<u8>,
-    coarse_ref: Vec<u8>,
+    analysis: BudgetVec<Analysis>,
+    row_activity: BudgetVec<f64>,
+    previous_mvs: BudgetVec<Mv>,
+    coarse_cur: BudgetVec<u8>,
+    coarse_ref: BudgetVec<u8>,
     /// Luma of the previous source picture, for scene-change detection.
-    previous_luma: Vec<u8>,
+    previous_luma: BudgetVec<u8>,
     /// Macroblocks identical to the previous source (scene-score scratch).
-    unchanged: Vec<u32>,
+    unchanged: BudgetVec<u32>,
     /// Per-block quantised levels of the macroblock being coded; entries are
     /// only meaningful where the block's non-zero mask says so.
     levels: [[i32; 64]; 6],
     index: u64,
     gop_start: u64,
+    /// Charge of the caller's output buffer: its capacity, at least `picture_bound`.
+    output_charge: Reservation,
+    /// Most bytes one picture can take.
+    picture_bound: usize,
 }
 
 /// Per-slice state reset at every slice start. Each picture is one slice
@@ -106,36 +147,51 @@ struct SliceState {
 }
 
 impl Encoder {
+    /// An encoder with a pool of the default limit.
     pub fn new(cfg: EncoderConfig) -> Result<Encoder> {
-        if cfg.gop == 0 {
-            return Err(Error::Gop(0));
-        }
-        if cfg.max_rate == 0
-            || cfg.max_rate.div_ceil(400) > 0x3FFFF
-            || cfg.bit_rate == 0
-            || cfg.vbv_bits == 0
-        {
-            return Err(Error::BitRate(cfg.bit_rate as u64));
-        }
+        Encoder::with_limits(cfg, Limits::default())
+    }
+
+    /// An encoder with its own pool of `limits.live_storage_bytes`.
+    pub fn with_limits(cfg: EncoderConfig, limits: Limits) -> Result<Encoder> {
+        validate(&cfg)?;
+        Encoder::new_in(cfg, &Budget::new(limits.live_storage_bytes)?)
+    }
+
+    /// An encoder charging the caller's pool.
+    pub fn new_in(cfg: EncoderConfig, budget: &Budget) -> Result<Encoder> {
+        validate(&cfg)?;
         let g = cfg.geometry;
         let mbs = g.macroblock_width() * g.macroblock_height();
+        let picture_bound = picture_bound(&cfg)?;
         Ok(Encoder {
             cfg,
-            reference: Picture::new(g),
-            recon: Picture::new(g),
-            writer: BitWriter::with_capacity(cfg.vbv_bits as usize / 8 + 4096),
+            reference: Planes::try_new(budget, g)?,
+            recon: Planes::try_new(budget, g)?,
+            writer: BitWriter::try_new(budget, picture_bound)?,
+            // One row of full macroblocks: the bound of the first I picture's trial pass.
+            probe: Some(BitWriter::try_new(
+                budget,
+                (g.macroblock_width() * MB_BITS).div_ceil(8) + 8,
+            )?),
             quant: Quantizer::new(),
             rc: RateControl::new(cfg.bit_rate, cfg.max_rate, cfg.vbv_bits, cfg.gop, FPS),
-            analysis: vec![Analysis::default(); mbs],
-            row_activity: vec![0.0; g.macroblock_height()],
-            previous_mvs: vec![Mv::ZERO; mbs],
-            coarse_cur: Vec::new(),
-            coarse_ref: Vec::new(),
-            previous_luma: vec![0; g.luma_stride() * g.macroblock_height() * 16],
-            unchanged: Vec::with_capacity(mbs),
+            analysis: BudgetVec::try_filled(budget, Analysis::default(), mbs)?,
+            row_activity: BudgetVec::try_filled(budget, 0.0, g.macroblock_height())?,
+            previous_mvs: BudgetVec::try_filled(budget, Mv::ZERO, mbs)?,
+            coarse_cur: BudgetVec::new(budget),
+            coarse_ref: BudgetVec::new(budget),
+            previous_luma: BudgetVec::try_filled(
+                budget,
+                0,
+                g.luma_stride() * g.macroblock_height() * 16,
+            )?,
+            unchanged: BudgetVec::try_filled(budget, 0, mbs)?,
             levels: [[0; 64]; 6],
             index: 0,
             gop_start: 0,
+            output_charge: Reservation::empty(budget),
+            picture_bound,
         })
     }
 
@@ -148,9 +204,9 @@ impl Encoder {
         self.rc.underflow_bits
     }
 
-    /// The reconstruction of the most recently encoded picture.
-    pub fn reconstruction(&self) -> &Picture {
-        &self.reference
+    /// The reconstruction of the most recently encoded picture, over the coded planes.
+    pub fn reconstruction(&self) -> PictureView<'_> {
+        self.reference.view()
     }
 
     /// Encode `input` (same geometry, padded) into `out` (cleared first).
@@ -161,17 +217,27 @@ impl Encoder {
                 actual: input.geometry(),
             });
         }
-        Ok(self.encode_validated(input, out))
+        // The caller's buffer is a plain `Vec`, so its charge is held here: it takes
+        // at most `picture_bound`, and `take_into` grows it to exactly a picture.
+        self.output_charge
+            .resize_to(out.capacity().max(self.picture_bound))?;
+        self.encode_validated(input, out)
     }
-    fn encode_validated(&mut self, input: &Picture, out: &mut Vec<u8>) -> EncodedPicture {
+    fn encode_validated(&mut self, input: &Picture, out: &mut Vec<u8>) -> Result<EncodedPicture> {
         debug_assert_eq!(input.geometry(), self.cfg.geometry);
         // Scheduled I pictures every `gop`; a P picture whose prediction is
         // worse than intra coding across the picture becomes an I picture and
         // restarts the GOP (the reference's default scene-change rule).
         let mut key = self.index == 0 || self.index - self.gop_start >= self.cfg.gop as u64;
-        let same_source_luma = !key && input.y() == self.previous_luma;
+        let same_source_luma = !key && input.y() == &self.previous_luma[..];
         let mut f_code = 0;
         if !key {
+            let g = self.cfg.geometry;
+            let coarse = g.luma_stride() / 4 * (g.macroblock_height() * 4);
+            if self.coarse_cur.len() != coarse {
+                self.coarse_cur.try_resize(coarse, 0)?;
+                self.coarse_ref.try_resize(coarse, 0)?;
+            }
             let (f, scene_change) = self.analyse(input, same_source_luma);
             f_code = f;
             key = scene_change;
@@ -180,8 +246,10 @@ impl Encoder {
         if key {
             self.gop_start = self.index;
             self.intra_analysis(input);
-            if self.rc.needs_intra_probe() {
-                self.probe_intra(input);
+            if self.rc.needs_intra_probe()
+                && let Some(scratch) = self.probe.take()
+            {
+                self.probe_intra(input, scratch)?;
             }
             self.write_sequence_header();
             self.write_gop_header();
@@ -236,7 +304,7 @@ impl Encoder {
             slice = Some(s);
             activity_done += self.row_activity[mb_y];
         }
-        self.writer.take_into(out);
+        self.writer.take_into(out)?;
         // The emitted picture includes the writer's existing byte alignment.
         // Charge those real bits to both the reservoir and the average bank.
         let bits = out.len() * 8;
@@ -252,7 +320,7 @@ impl Encoder {
         }
         std::mem::swap(&mut self.reference, &mut self.recon);
         if !key {
-            for (prev, a) in self.previous_mvs.iter_mut().zip(&self.analysis) {
+            for (prev, a) in self.previous_mvs.iter_mut().zip(self.analysis.iter()) {
                 *prev = if a.intra { Mv::ZERO } else { a.mv };
             }
         } else {
@@ -265,7 +333,7 @@ impl Encoder {
             qscale_mean: mean_q.round() as u32,
         };
         self.index += 1;
-        picture
+        Ok(picture)
     }
 
     fn write_sequence_header(&mut self) {
@@ -330,7 +398,7 @@ impl Encoder {
         let scene_lambda = (85 * lambda * lambda) as f64 / 100.0;
         let scene_floor = (20.0 * scene_lambda).sqrt();
         let mut scene = 0.0f64;
-        self.unchanged.clear();
+        let mut unchanged = 0;
         let (mut lo, mut hi) = (0i32, 0i32);
         let rows = g.macroblock_height() * 16;
         motion::decimate4(input.y(), stride, rows, &mut self.coarse_cur);
@@ -404,7 +472,8 @@ impl Encoder {
                     // −√(20λ); the variance is only needed if that bound leaves
                     // the decision open (below).
                     scene -= scene_floor;
-                    self.unchanged.push(i as u32);
+                    self.unchanged[unchanged] = i as u32;
+                    unchanged += 1;
                 } else {
                     let variance = variance256(block, stride) as f64;
                     scene += (sse as f64).min(variance + 100.0 * scene_lambda).sqrt()
@@ -419,7 +488,7 @@ impl Encoder {
             self.row_activity[mb_y] = row;
         }
         if scene > 0.0 {
-            for &i in &self.unchanged {
+            for &i in &self.unchanged[..unchanged] {
                 let (x, y) = (
                     (i as usize % g.macroblock_width()) * 16,
                     (i as usize / g.macroblock_width()) * 16,
@@ -456,12 +525,14 @@ impl Encoder {
     /// First intra picture of a session: trial-encode every second row at a
     /// fixed quantiser into scratch bits to seed the intra rate model. The
     /// reconstruction it leaves behind is overwritten by the real pass.
-    fn probe_intra(&mut self, input: &Picture) {
+    fn probe_intra(&mut self, input: &Picture, mut scratch: BitWriter) -> Result<()> {
         const PROBE_Q: u32 = 8;
         let g = self.cfg.geometry;
-        let mut scratch = BitWriter::with_capacity(4096);
         std::mem::swap(&mut self.writer, &mut scratch);
         let mut activity = 0.0;
+        // Only the bit count is used: dropping each row's bytes once counted keeps
+        // the scratch to one row.
+        let mut discarded = 0;
         for mb_y in (0..g.macroblock_height()).step_by(2) {
             let mut s = SliceState {
                 q: PROBE_Q,
@@ -483,10 +554,13 @@ impl Encoder {
                 );
             }
             activity += self.row_activity[mb_y];
+            discarded += self.writer.discard_flushed();
         }
-        let bits = self.writer.bit_len() as f64;
+        let bits = (discarded * 8 + self.writer.bit_len()) as f64;
         std::mem::swap(&mut self.writer, &mut scratch);
+        scratch.check_bound()?;
         self.rc.seed_intra(bits, PROBE_Q, activity);
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -774,6 +848,34 @@ impl Encoder {
     }
 }
 
+fn validate(cfg: &EncoderConfig) -> Result<()> {
+    if cfg.gop == 0 {
+        return Err(Error::Gop(0));
+    }
+    if cfg.max_rate == 0
+        || cfg.max_rate.div_ceil(400) > 0x3FFFF
+        || cfg.bit_rate == 0
+        || cfg.vbv_bits == 0
+    {
+        return Err(Error::BitRate(cfg.bit_rate as u64));
+    }
+    Ok(())
+}
+
+/// Most bytes one picture can take. Rate control never plans beyond the VBV
+/// occupancy (at most `vbv_bits`), and once a picture comes within 8192 bits of
+/// it `encode_row` codes only guarded macroblocks, so one full macroblock and
+/// guarded ones are all that can follow.
+fn picture_bound(cfg: &EncoderConfig) -> Result<usize> {
+    let g = cfg.geometry;
+    // Geometry caps the macroblock count at 65 536.
+    let mbs = g.macroblock_width() * g.macroblock_height();
+    let bits = (cfg.vbv_bits as usize)
+        .checked_add(HEADER_BITS + MB_BITS + mbs * GUARDED_MB_BITS)
+        .ok_or(StorageError::Overflow)?;
+    Ok(bits.div_ceil(8))
+}
+
 /// Plane (0 Y, 1 Cb, 2 Cr), stride, sample origin and DC-predictor component of block `b`.
 #[inline]
 fn block_origin(
@@ -856,3 +958,26 @@ fn write_mv_component(w: &mut BitWriter, delta: i32, f_code: u32) {
 
 #[cfg(test)]
 mod zero_residual_controls;
+
+#[cfg(test)]
+mod limits {
+    use super::*;
+
+    /// The largest configuration fits the default with room for what encoding adds:
+    /// the coarse planes (2 MiB), the caller's output at the picture bound (3 MiB)
+    /// and the trial pass.
+    #[test]
+    fn the_default_limit_holds_the_largest_configuration() {
+        let cfg = EncoderConfig {
+            geometry: Geometry::new(4094, 4094).unwrap(),
+            bit_rate: 100_000_000,
+            max_rate: 100_000_000,
+            vbv_bits: 1023 * 16384,
+            gop: 30,
+        };
+        let budget = Budget::new(Limits::default().live_storage_bytes).unwrap();
+        let _encoder = Encoder::new_in(cfg, &budget).unwrap();
+        assert!(budget.available() > 8 << 20, "{}", budget.used());
+        assert!(budget.used() > budget.limit() * 2 / 3, "{}", budget.used());
+    }
+}
