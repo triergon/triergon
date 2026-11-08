@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "matroska-audio-clocks",
+  "operation": "matroska-audio-clock",
+  "candidate": "playback-worker",
+  "worker_operation": "mkv-audio-",
+  "reference": "ffmpeg-video-native",
+  "contract": [
+    "Matroska open and stream discovery through the playback engine from a preloaded seekable source read in 4 KiB windows; the reference discovers streams with the stock parsers",
+    "every selected AAC-LC, AC-3 and E-AC-3 track bound to its feed; AAC packets framed as ADTS before their clock, Dolby packets on the source clock without syncframe admission",
+    "the discovery prefix projected through native_aac_clock_probe or native_dolby_clock_probe before delivery, then the forward clock through a clean end of file",
+    "each selected packet folded in demux order with track index, PTS, DTS and duration in nanoseconds, key flag, size and every payload byte",
+    "the expected fold is recorded per case from the pinned reference worker"
+  ],
+  "required_profiles": [
+    "aac-pair",
+    "audio-mixed",
+    "dolby-pair",
+    "dolby-bad-first",
+    "damaged-lace-before-valid-anchor",
+    "initial-negative-cluster-relative",
+    "laced-fractional-cadence",
+    "laced-unknown-duration",
+    "no-absolute-anchor",
+    "two-laced-before-first-known-pts"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

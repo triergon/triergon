@@ -1,0 +1,156 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "aac-pair",
+      "profile": "aac-pair",
+      "file": "crates/playback/tests/fixtures/mkv-feed/audio-mixed-discovery.mkv",
+      "sha256": "8fa3222350e8b92aab49bfb6918307d5fcb729a2281bf2d4f9a438c306e3594a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1137,
+        "digest": 13332195889420051873
+      }
+    },
+    {
+      "id": "audio-mixed",
+      "profile": "audio-mixed",
+      "file": "crates/playback/tests/fixtures/mkv-feed/audio-mixed-discovery.mkv",
+      "sha256": "8fa3222350e8b92aab49bfb6918307d5fcb729a2281bf2d4f9a438c306e3594a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 7281,
+        "digest": 18368739302135961132
+      }
+    },
+    {
+      "id": "dolby-pair",
+      "profile": "dolby-pair",
+      "file": "crates/playback/tests/fixtures/mkv-feed/audio-mixed-discovery.mkv",
+      "sha256": "8fa3222350e8b92aab49bfb6918307d5fcb729a2281bf2d4f9a438c306e3594a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "dolby"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 6144,
+        "digest": 3621307738388448621
+      }
+    },
+    {
+      "id": "dolby-bad-first",
+      "profile": "dolby-bad-first",
+      "file": "crates/playback/tests/fixtures/mkv-feed/audio-bad-first-discovery.mkv",
+      "sha256": "7105b3686a4361dbb4fe853bd0c3fe58d748903e5747985cefd48e359df9b42a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 6144,
+        "digest": 7852203219391588648
+      }
+    },
+    {
+      "id": "damaged-lace-before-valid-anchor",
+      "profile": "damaged-lace-before-valid-anchor",
+      "file": "crates/playback/tests/fixtures/dolby-clock/damaged-lace-before-valid-anchor.mkv",
+      "sha256": "8ef0120199a33a9fa125e997dfa90acf13c659a735b05406a990995ed3b4d782",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3072,
+        "digest": 15027024093118728631
+      }
+    },
+    {
+      "id": "initial-negative-cluster-relative",
+      "profile": "initial-negative-cluster-relative",
+      "file": "crates/playback/tests/fixtures/dolby-clock/initial-negative-cluster-relative.mkv",
+      "sha256": "f2ca2dd53e8aa9a1b7dbe44b2b893a966462ca3747b5c10f8b156188a6e24685",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2304,
+        "digest": 5824272408970911841
+      }
+    },
+    {
+      "id": "laced-fractional-cadence",
+      "profile": "laced-fractional-cadence",
+      "file": "crates/playback/tests/fixtures/dolby-clock/laced-fractional-cadence.mkv",
+      "sha256": "8e2bb71c4242183037e4842e2ae3788faa1745cbea735ed20215ea1bfdf095c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 3342,
+        "digest": 9736466787568309955
+      }
+    },
+    {
+      "id": "laced-unknown-duration",
+      "profile": "laced-unknown-duration",
+      "file": "crates/playback/tests/fixtures/dolby-clock/laced-unknown-duration.mkv",
+      "sha256": "ec420d6d5d3a41e8f7dda2675b0bb822aaffe7899c6478eab0c6bf1019e8617c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3072,
+        "digest": 1999376642824555384
+      }
+    },
+    {
+      "id": "no-absolute-anchor",
+      "profile": "no-absolute-anchor",
+      "file": "crates/playback/tests/fixtures/dolby-clock/no-absolute-anchor.mkv",
+      "sha256": "5b095e7cadb5581cfaa3f832469fdc43b507049f52b2e8eb7b1d3a68881470c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1536,
+        "digest": 5460683411682874560
+      }
+    },
+    {
+      "id": "two-laced-before-first-known-pts",
+      "profile": "two-laced-before-first-known-pts",
+      "file": "crates/playback/tests/fixtures/dolby-clock/two-laced-before-first-known-pts.mkv",
+      "sha256": "1e30bdb78e6adbb7518144b69ae5ab6bd41f966953af9444cea39adcf939ef80",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3072,
+        "digest": 9893875284257753976
+      }
+    }
+  ]
+}
