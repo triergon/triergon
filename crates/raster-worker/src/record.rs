@@ -95,18 +95,20 @@ pub trait Sink {
         ])
     }
 
-    /// Position, size and the FNV-1a hash of the rows, or absent.
+    /// Position, size, stride and the FNV-1a hash of every row over the whole
+    /// stride, the padding included, or absent.
     fn bitmap(&mut self, bitmap: Option<&Bitmap>) -> io::Result<()> {
         let Some(b) = bitmap else {
             return self.absent();
         };
-        let hash = b.rows().fold(FNV_INIT, fnv);
+        let hash = fnv(FNV_INIT, b.data());
         self.count_bytes(b.width() * b.height());
         self.values(&[
             b.left.into(),
             b.top.into(),
             b.width() as i64,
             b.height() as i64,
+            b.stride() as i64,
             hash as i64,
         ])
     }

@@ -6,12 +6,12 @@
     "outlines-required-0": {
       "packets": 512,
       "bytes": 2823276,
-      "digest": 17056172538034744040
+      "digest": 7221005039081657782
     },
     "outlines-required-1": {
       "packets": 514,
       "bytes": 3022133,
-      "digest": 15742909526604010798
+      "digest": 8858423918884566922
     }
   }
 }

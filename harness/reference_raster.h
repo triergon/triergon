@@ -158,19 +158,20 @@ static void raster_outline(RasterWork *w, const ASS_Outline *o) {
     raster_value(w, (int64_t)h);
 }
 
-/* Position, size and the hash of the rows, or absent. */
+/* Position, size, stride and the hash of every row over the whole stride, the
+ * padding included, or absent. */
 static void raster_bitmap(RasterWork *w, const Bitmap *bm) {
     if (!bm || !bm->buffer) {
         raster_absent(w);
         return;
     }
-    uint64_t h = RASTER_FNV_INIT;
-    for (int32_t y = 0; y < bm->h; y++) h = raster_fnv(h, bm->buffer + y * bm->stride, bm->w);
+    uint64_t h = raster_fnv(RASTER_FNV_INIT, bm->buffer, (size_t)bm->stride * (size_t)bm->h);
     w->bytes += (uint64_t)bm->w * (uint64_t)bm->h;
     raster_value(w, bm->left);
     raster_value(w, bm->top);
     raster_value(w, bm->w);
     raster_value(w, bm->h);
+    raster_value(w, bm->stride);
     raster_value(w, (int64_t)h);
 }
 
@@ -699,24 +700,25 @@ static void raster_bitmap_case(const RasterCase *c, RasterWork *w) {
     RasterRng r = raster_seeded(c->seed);
     const BitmapEngine *e = &raster_renderer->engine;
     const int32_t *v = c->ints;
-    Bitmap a, b;
-    int has_b = 1;
+    Bitmap a = {0}, b = {0};
+    /* The sizes are within the grammar's bounds, so only memory can fail. */
+    int ok = 1;
     switch (c->kind) {
     case RASTER_BLUR:
-        has_b = 0;
-        raster_random_bitmap(&r, &a, v[0], v[1]);
-        ass_synth_blur(e, &a, v[2], c->reals[0], c->reals[1]);
+        if ((ok = raster_random_bitmap(&r, &a, v[0], v[1])))
+            ass_synth_blur(e, &a, v[2], c->reals[0], c->reals[1]);
         break;
     case RASTER_ADD:
-        raster_random_bitmap(&r, &a, v[0], v[1]);
-        raster_random_bitmap(&r, &b, v[2], v[3]);
-        e->add_bitmaps(a.buffer + v[5] * a.stride + v[4], a.stride, b.buffer, b.stride, b.w, b.h);
+        ok = raster_random_bitmap(&r, &a, v[0], v[1]) && raster_random_bitmap(&r, &b, v[2], v[3]);
+        if (ok)
+            e->add_bitmaps(a.buffer + v[5] * a.stride + v[4], a.stride, b.buffer, b.stride, b.w,
+                           b.h);
         break;
     case RASTER_MUL: {
-        raster_random_bitmap(&r, &a, v[0], v[1]);
-        raster_random_bitmap(&r, &b, v[0], v[1]);
-        Bitmap d;
-        ass_alloc_bitmap(e, &d, a.w, a.h, true);
+        Bitmap d = {0};
+        ok = raster_random_bitmap(&r, &a, v[0], v[1]) && raster_random_bitmap(&r, &b, v[0], v[1]) &&
+             ass_alloc_bitmap(e, &d, a.w, a.h, true);
+        if (!ok) break;
         d.left = d.top = 0;
         e->mul_bitmaps(d.buffer, d.stride, a.buffer, a.stride, b.buffer, b.stride, a.w, a.h);
         ass_free_bitmap(&a);
@@ -724,70 +726,86 @@ static void raster_bitmap_case(const RasterCase *c, RasterWork *w) {
         break;
     }
     case RASTER_IMUL:
-        raster_random_bitmap(&r, &a, v[0], v[1]);
-        raster_random_bitmap(&r, &b, v[0], v[1]);
-        e->imul_bitmaps(a.buffer, a.stride, b.buffer, b.stride, a.w, a.h);
+        ok = raster_random_bitmap(&r, &a, v[0], v[1]) && raster_random_bitmap(&r, &b, v[0], v[1]);
+        if (ok) e->imul_bitmaps(a.buffer, a.stride, b.buffer, b.stride, a.w, a.h);
         break;
     case RASTER_FIX:
-        raster_random_bitmap(&r, &b, v[0], v[1]);
+        ok = raster_random_bitmap(&r, &b, v[0], v[1]) && raster_random_bitmap(&r, &a, v[4], v[5]);
+        if (!ok) break;
         b.left = v[2];
         b.top = v[3];
-        raster_random_bitmap(&r, &a, v[4], v[5]);
         a.left = v[6];
         a.top = v[7];
         ass_fix_outline(&b, &a);
         break;
     default: /* RASTER_SHIFT */
-        has_b = 0;
-        raster_random_bitmap(&r, &a, v[0], v[1]);
-        ass_shift_bitmap(&a, v[2], v[3]);
+        if ((ok = raster_random_bitmap(&r, &a, v[0], v[1]))) ass_shift_bitmap(&a, v[2], v[3]);
         break;
     }
-    raster_value(w, RASTER_OK);
-    raster_bitmap(w, &a);
+    if (ok) {
+        raster_value(w, RASTER_OK);
+        raster_bitmap(w, &a);
+    } else {
+        raster_value(w, RASTER_FAILED);
+    }
     ass_free_bitmap(&a);
-    if (has_b) ass_free_bitmap(&b);
+    ass_free_bitmap(&b);
 }
 
+/* The clip state of one case, reset afterwards so no case sees another's. */
+static void raster_set_clip(const int32_t *v) {
+    RenderContext *state = &raster_renderer->state;
+    state->clip_x0 = v ? v[7] : 0;
+    state->clip_y0 = v ? v[8] : 0;
+    state->clip_x1 = v ? v[9] : 0;
+    state->clip_y1 = v ? v[10] : 0;
+    state->clip_mode = v ? v[11] : 0;
+    raster_renderer->width = v ? v[12] : 0;
+    raster_renderer->height = v ? v[13] : 0;
+    raster_renderer->settings.left_margin = v ? v[14] : 0;
+    raster_renderer->settings.top_margin = v ? v[15] : 0;
+    raster_renderer->frame_content_width = v ? v[16] - v[14] : 0;
+    raster_renderer->frame_content_height = v ? v[17] - v[15] : 0;
+}
+
+/* render_glyph over a random bitmap held, as libass holds every bitmap it clips, by
+ * a composite of the composite cache; the images are released with libass's own
+ * routine, which drops their references to it. */
 static void raster_clip(const RasterCase *c, RasterWork *w) {
     const int32_t *v = c->ints;
     RasterRng r = raster_seeded(c->seed);
-    Bitmap bm;
-    raster_random_bitmap(&r, &bm, v[0], v[1]);
-    bm.left = v[2];
-    bm.top = v[3];
-    RenderContext *state = &raster_renderer->state;
-    state->clip_x0 = v[7];
-    state->clip_y0 = v[8];
-    state->clip_x1 = v[9];
-    state->clip_y1 = v[10];
-    state->clip_mode = v[11];
-    raster_renderer->width = v[12];
-    raster_renderer->height = v[13];
-    raster_renderer->settings.left_margin = v[14];
-    raster_renderer->settings.top_margin = v[15];
-    raster_renderer->frame_content_width = v[16] - v[14];
-    raster_renderer->frame_content_height = v[17] - v[15];
+    CompositeHashKey key = {{0}, 0, NULL};
+    CompositeHashValue *source = ass_cache_get(raster_renderer->cache.composite_cache, &key,
+                                               raster_renderer);
+    if (!source || !raster_random_bitmap(&r, &source->bm, v[0], v[1])) {
+        raster_value(w, RASTER_FAILED);
+        ass_cache_empty(raster_renderer->cache.composite_cache);
+        return;
+    }
+    Bitmap *bm = &source->bm;
+    bm->left = v[2];
+    bm->top = v[3];
+    raster_set_clip(v);
     ASS_Image *head = NULL;
     /* render_glyph leaves the last image's next unset and returns where it is;
      * libass terminates the list (ass_render_frame's *tail = NULL). */
-    ASS_Image **tail = render_glyph(state, &bm, v[4], v[5], 1, 2, v[6], &head,
-                                    IMAGE_TYPE_CHARACTER, NULL);
+    ASS_Image **tail = render_glyph(&raster_renderer->state, bm, v[4], v[5], 1, 2, v[6], &head,
+                                    IMAGE_TYPE_CHARACTER, source);
     *tail = NULL;
+    raster_set_clip(NULL);
     int64_t count = 0;
     for (ASS_Image *img = head; img; img = img->next) count++;
     raster_value(w, RASTER_OK);
     raster_value(w, count);
-    while (head) {
-        ASS_Image *img = head;
-        head = img->next;
-        ptrdiff_t offset = img->bitmap - bm.buffer;
-        int64_t values[7] = {img->dst_x, img->dst_y,     offset % bm.stride, offset / bm.stride,
-                             img->w,     img->h,         img->color};
+    for (ASS_Image *img = head; img; img = img->next) {
+        ptrdiff_t offset = img->bitmap - bm->buffer;
+        int64_t values[7] = {img->dst_x, img->dst_y, offset % bm->stride, offset / bm->stride,
+                             img->w,     img->h,     img->color};
         for (int i = 0; i < 7; i++) raster_value(w, values[i]);
-        free(img);
     }
-    ass_free_bitmap(&bm);
+    ass_frame_ref(head);
+    ass_frame_unref(head);
+    ass_cache_empty(raster_renderer->cache.composite_cache);
 }
 
 static void raster_run(const RasterCase *c, RasterWork *w) {
@@ -896,6 +914,10 @@ static void raster_run(const RasterCase *c, RasterWork *w) {
     } else {
         for (int i = 0; i < 3; i++) raster_absent(w);
     }
+    /* ass_cache_get returns values the caller borrows: an item's references are
+     * the cache queue's and those other items' keys hold. Emptying the bitmap
+     * cache first destroys the bitmaps, whose keys release the border and source
+     * outlines, so the later caches free those too and nothing outlives the run. */
     ass_cache_empty(raster_renderer->cache.bitmap_cache);
     ass_cache_empty(raster_renderer->cache.outline_cache);
     ass_cache_empty(raster_sources);
