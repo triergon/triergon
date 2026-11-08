@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
   manifest --out M.json LANE=DIR[,DIR...]...
-                 hash every vector of each lane (h264, hevc, ac3, eac3, aac, dts)
+                 hash every vector of each lane (h264, hevc, ac3, eac3, aac, dts, flac,
+                 mp3, mp2, mp1, vorbis, opus)
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
         --reference R2 --out OUT.jsonl [--scratch DIR] [--only SUBSTR,...]
                  grade every vector by harness/codecs/numeric-rules.json; appends one row each
