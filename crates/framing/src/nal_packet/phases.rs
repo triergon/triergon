@@ -3,7 +3,7 @@
 //! loop; `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
     AvcState, Injection, NalPacketJob, NalPacketOutput, NalPacketProgress,
-    NalPacketReceiverErrorKind, NalPacketSegment, Phase,
+    NalPacketReceiverErrorKind, NalPacketSegment, PacketSegmentStorage, Phase,
 };
 use crate::{AvcConfigArrayKind, Codec, NalHeader};
 use std::ops::ControlFlow;
@@ -450,7 +450,10 @@ impl<M> NalPacketJob<'_, M> {
         // cancellation check precedes every unit after the first, and
         // every yield, charge and error is unchanged. Only the phase
         // dispatch between units is skipped.
-        let parts = self.segments.as_ref().map_or(&[][..], BudgetVec::as_slice);
+        let parts = self
+            .segments
+            .as_ref()
+            .map_or(&[][..], PacketSegmentStorage::as_slice);
         let mut first = true;
         loop {
             if !first && cancel.load(Ordering::Relaxed) {
@@ -570,7 +573,7 @@ impl<M> NalPacketJob<'_, M> {
             segments: self
                 .segments
                 .take()
-                .unwrap_or_else(|| BudgetVec::new(&self.session.pool)),
+                .unwrap_or_else(PacketSegmentStorage::new),
             receiver_epoch: self.epoch,
             forward_new_extradata,
         });

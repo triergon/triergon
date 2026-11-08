@@ -598,6 +598,97 @@ impl NalPacketSegment {
     }
 }
 
+const INLINE_PACKET_SEGMENTS: usize = 4;
+
+// Fixed descriptor metadata travels with the job/output. Only a spilled table
+// allocates; its complete capacity stays charged through output retention.
+enum PacketSegmentStorage {
+    Inline {
+        data: [NalPacketSegment; INLINE_PACKET_SEGMENTS],
+        len: u8,
+    },
+    Heap(BudgetVec<NalPacketSegment>),
+}
+impl PacketSegmentStorage {
+    fn new() -> Self {
+        Self::Inline {
+            data: std::array::from_fn(|_| NalPacketSegment::packet(0..0, 0, 0)),
+            len: 0,
+        }
+    }
+    fn len(&self) -> usize {
+        self.as_slice().len()
+    }
+    fn as_slice(&self) -> &[NalPacketSegment] {
+        match self {
+            Self::Inline { data, len } => &data[..usize::from(*len)],
+            Self::Heap(parts) => parts.as_slice(),
+        }
+    }
+    fn required_heap_bytes(count: usize) -> Result<usize> {
+        if count <= INLINE_PACKET_SEGMENTS {
+            Ok(0)
+        } else {
+            count
+                .checked_mul(size_of::<NalPacketSegment>())
+                .ok_or(Error::Overflow)
+        }
+    }
+    fn try_push(
+        &mut self,
+        pool: &Budget,
+        planned: Option<usize>,
+        segment: NalPacketSegment,
+    ) -> Result<()> {
+        match self {
+            Self::Inline { data, len } if usize::from(*len) < INLINE_PACKET_SEGMENTS => {
+                data[usize::from(*len)] = segment;
+                *len += 1;
+            }
+            Self::Inline { data, .. } => {
+                *self = Self::Heap(Self::spill(pool, planned, data, segment)?);
+            }
+            Self::Heap(parts) => parts.try_push(segment).map_err(|e| e.error)?,
+        }
+        Ok(())
+    }
+    #[cold]
+    #[inline(never)]
+    fn spill(
+        pool: &Budget,
+        planned: Option<usize>,
+        data: &[NalPacketSegment; INLINE_PACKET_SEGMENTS],
+        segment: NalPacketSegment,
+    ) -> Result<BudgetVec<NalPacketSegment>> {
+        let mut parts = BudgetVec::new(pool);
+        if let Some(planned) = planned {
+            // As with the old first allocation, a refused hint falls back to
+            // ordinary growth. The inline entries remain intact on any error.
+            let _ = parts.try_reserve_exact(planned);
+        }
+        let needed = INLINE_PACKET_SEGMENTS + 1;
+        if parts.capacity() < needed {
+            // Match ordinary four-to-eight growth, including an exact-size
+            // retry when the geometric capacity cannot fit the pool.
+            parts
+                .try_reserve_exact(INLINE_PACKET_SEGMENTS * 2)
+                .or_else(|error| {
+                    if matches!(
+                        error,
+                        Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
+                    ) {
+                        parts.try_reserve_exact(needed)
+                    } else {
+                        Err(error)
+                    }
+                })?;
+        }
+        parts.try_extend_with(data.len(), |i| data[i].clone())?;
+        parts.try_push(segment).map_err(|e| e.error)?;
+        Ok(parts)
+    }
+}
+
 /// Complete output. Payload, source, side data and raw effective configuration
 /// remain owned and charged after producer teardown. Borrowed segment bytes
 /// cannot outlive that output:
@@ -618,7 +709,7 @@ pub struct NalPacketOutput<M = NalPacketFields> {
     has_configuration_identity: bool,
     configuration_source_refusal: NalConfigurationRefusal,
     packet_source_refusal: Option<NalHeaderError>,
-    segments: BudgetVec<NalPacketSegment>,
+    segments: PacketSegmentStorage,
     receiver_epoch: u64,
     forward_new_extradata: bool,
 }
@@ -780,9 +871,9 @@ pub struct NalPacketJob<'a, M = NalPacketFields> {
     live_base: Option<usize>,
     /// Segment count known before the first append: width-framed HEVC after its
     /// lookahead, or a packet whose first NAL is also its last. Only sizes the
-    /// first allocation; a refused reservation falls back to ordinary growth.
+    /// first heap allocation; a refused reservation falls back to ordinary growth.
     segment_hint: Option<usize>,
-    segments: Option<BudgetVec<NalPacketSegment>>,
+    segments: Option<PacketSegmentStorage>,
     output: Option<BudgetVec<u8>>,
     total: usize,
     copy_segment: usize,
@@ -836,9 +927,8 @@ impl<M> NalPacketJob<'_, M> {
         } else {
             0
         };
-        segments
-            .checked_mul(size_of::<NalPacketSegment>())
-            .and_then(|p| p.checked_add(copied_storage))
+        PacketSegmentStorage::required_heap_bytes(segments)?
+            .checked_add(copied_storage)
             .and_then(|n| n.checked_add(base))
             .ok_or(Error::Overflow)
     }
@@ -876,7 +966,7 @@ impl<M> NalPacketJob<'_, M> {
         Ok(total)
     }
     fn append(&mut self, segment: NalPacketSegment) -> Result<()> {
-        let parts = self.segments.as_ref().map_or(0, BudgetVec::len);
+        let parts = self.segments.as_ref().map_or(0, PacketSegmentStorage::len);
         if parts == self.session.limits.maximum_segments {
             return Err(Error::Limit {
                 requested: parts.saturating_add(1),
@@ -902,16 +992,11 @@ impl<M> NalPacketJob<'_, M> {
                 maximum: self.session.pool.limit(),
             });
         }
-        let parts = self
-            .segments
-            .get_or_insert_with(|| BudgetVec::new(&self.session.pool));
-        if let Some(planned) = self.segment_hint.take().filter(|_| parts.capacity() == 0) {
-            // Exact first allocation instead of the default four slots. Any
-            // refusal leaves the vector empty and try_push applies its own
-            // growth and errors exactly as before.
-            let _ = parts.try_reserve_exact(planned);
+        let parts = self.segments.get_or_insert_with(PacketSegmentStorage::new);
+        parts.try_push(&self.session.pool, self.segment_hint, segment)?;
+        if matches!(parts, PacketSegmentStorage::Heap(_)) {
+            self.segment_hint = None;
         }
-        parts.try_push(segment).map_err(|e| e.error)?;
         self.total = total;
         Ok(())
     }
@@ -1060,5 +1145,96 @@ mod packed_plan_boundary_guards {
                 )
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod inline_packet_segments {
+    use super::*;
+
+    fn segment(index: usize) -> NalPacketSegment {
+        NalPacketSegment::packet(index..index + 1, 4, index * 5)
+    }
+
+    #[test]
+    fn four_descriptors_are_inline_and_spill_keeps_every_entry() {
+        let pool = Budget::new(4096).unwrap();
+        let base = pool.used();
+        let mut parts = PacketSegmentStorage::new();
+        assert!(parts.as_slice().is_empty());
+        for index in 0..4 {
+            parts.try_push(&pool, None, segment(index)).unwrap();
+            assert_eq!(pool.used(), base);
+            assert_eq!(parts.len(), index + 1);
+        }
+        for index in 4..9 {
+            parts.try_push(&pool, None, segment(index)).unwrap();
+            let PacketSegmentStorage::Heap(heap) = &parts else {
+                panic!("fifth descriptor did not spill");
+            };
+            assert_eq!(
+                pool.used(),
+                base + heap.capacity() * size_of::<NalPacketSegment>()
+            );
+            assert_eq!(parts.len(), index + 1);
+            for (index, part) in parts.as_slice().iter().enumerate() {
+                assert_eq!(*part, segment(index));
+            }
+        }
+        drop(parts);
+        assert_eq!(pool.used(), base);
+    }
+
+    #[test]
+    fn refused_spill_is_transactional_and_can_resume_with_exact_capacity() {
+        let pool = Budget::new(4096).unwrap();
+        let mut parts = PacketSegmentStorage::new();
+        for index in 0..4 {
+            parts.try_push(&pool, None, segment(index)).unwrap();
+        }
+        let before = parts.as_slice().to_vec();
+        let blocker = pool
+            .reserve(pool.available() - 4 * size_of::<NalPacketSegment>())
+            .unwrap();
+        let charge = pool.used();
+        for _ in 0..2 {
+            assert!(matches!(
+                parts.try_push(&pool, Some(9), segment(4)),
+                Err(Error::Backpressure { .. })
+            ));
+            assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
+            assert_eq!(parts.as_slice(), before);
+            assert_eq!(pool.used(), charge);
+        }
+        drop(blocker);
+        let blocker = pool
+            .reserve(pool.available() - 5 * size_of::<NalPacketSegment>())
+            .unwrap();
+        parts.try_push(&pool, Some(9), segment(4)).unwrap();
+        let PacketSegmentStorage::Heap(heap) = &parts else {
+            panic!("retry did not spill");
+        };
+        assert_eq!(heap.capacity(), 5);
+        for (index, part) in parts.as_slice().iter().enumerate() {
+            assert_eq!(*part, segment(index));
+        }
+        drop(blocker);
+        drop(parts);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+
+    #[test]
+    fn lower_bound_excludes_inline_metadata_and_checks_heap_overflow() {
+        for count in 0..=4 {
+            assert_eq!(PacketSegmentStorage::required_heap_bytes(count), Ok(0));
+        }
+        assert_eq!(
+            PacketSegmentStorage::required_heap_bytes(5),
+            Ok(5 * size_of::<NalPacketSegment>())
+        );
+        assert_eq!(
+            PacketSegmentStorage::required_heap_bytes(usize::MAX),
+            Err(Error::Overflow)
+        );
     }
 }

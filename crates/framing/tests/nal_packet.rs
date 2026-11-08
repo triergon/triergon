@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::*;
 
 fn pool() -> Budget {
@@ -615,6 +615,169 @@ fn reserved_pool_pressure_recovers_without_publishing_partial_bytes() {
         }
     };
     assert_eq!(out.bytes().as_ref(), [conf(), framed(3, IDR)].concat());
+}
+
+#[test]
+fn inline_and_spilled_segments_retain_all_bytes_after_session_drop() {
+    for count in [0, 4, 5, 9] {
+        for quantum in [1, 4096] {
+            let p = pool();
+            let mut s = session(&p);
+            let nals = if count == 0 {
+                vec![&[][..]]
+            } else {
+                vec![NON; count]
+            };
+            let source = packet(&p, &nals);
+            let wire = source.bytes.to_vec();
+            let out = run(&mut s, source, None, quantum).unwrap();
+            assert_eq!(out.segments().len(), count);
+            drop(s);
+            assert_eq!(out.source().bytes.as_ref(), wire);
+            assert_eq!(out.source().fields, fields());
+            let expected: Vec<_> = (0..count)
+                .flat_map(|i| framed(if i == 0 { 4 } else { 3 }, NON))
+                .collect();
+            assert_eq!(out.bytes().as_ref(), expected);
+            for index in 0..count {
+                assert_eq!(out.segment_bytes(index), Some(NON));
+            }
+            let descriptor_capacity = match count {
+                0..=4 => 0,
+                5..=8 => 8,
+                _ => 16,
+            };
+            let retained = Budget::control_storage_bytes()
+                + out.source().bytes.retained_storage_bytes()
+                + out.configuration_bytes().retained_storage_bytes()
+                + out.bytes().retained_storage_bytes()
+                + descriptor_capacity * size_of::<NalPacketSegment>();
+            assert_eq!(p.used(), retained);
+            // Heap retention of the complete output charges its inline metadata
+            // as part of the ordinary element size, without an exemption.
+            let mut kept = BudgetVec::new(&p);
+            kept.try_push(out).map_err(|e| e.error).unwrap();
+            assert_eq!(
+                p.used(),
+                retained + kept.capacity() * size_of::<NalPacketOutput>()
+            );
+            assert_eq!(kept.as_slice()[0].bytes().as_ref(), expected);
+            drop(kept);
+            assert_eq!(p.used(), Budget::control_storage_bytes());
+        }
+    }
+}
+
+#[test]
+fn inline_capacity_does_not_relax_logical_segment_or_output_limits() {
+    for maximum_segments in [1, 4] {
+        let p = pool();
+        let mut l = limits();
+        l.maximum_segments = maximum_segments;
+        let mut s =
+            NalPacketSession::new(&p, NalPacketConfiguration::Avc(avc(&p, 128)), l).unwrap();
+        assert_eq!(
+            run(&mut s, packet(&p, &vec![NON; maximum_segments]), None, 1)
+                .unwrap()
+                .segments()
+                .len(),
+            maximum_segments
+        );
+        let source = packet(&p, &vec![NON; maximum_segments + 1]);
+        let blocker = p.reserve(p.available()).unwrap();
+        assert!(matches!(
+            run(&mut s, source, None, 1),
+            Err(Error::Limit { requested, maximum })
+                if requested == maximum_segments + 1 && maximum == maximum_segments
+        ));
+        drop(blocker);
+    }
+    let p = pool();
+    let mut l = limits();
+    l.maximum_output_bytes = 25; // Four three-byte NALs with 4/3/3/3 prefixes.
+    let mut s = NalPacketSession::new(&p, NalPacketConfiguration::Avc(avc(&p, 128)), l).unwrap();
+    let source = packet(&p, &[NON; 5]);
+    let blocker = p.reserve(p.available()).unwrap();
+    assert!(matches!(
+        run(&mut s, source, None, 1),
+        Err(Error::Limit {
+            requested: 31,
+            maximum: 25
+        })
+    ));
+    drop(blocker);
+}
+
+#[test]
+fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
+    for cancel_retry in [false, true] {
+        let p = pool();
+        let mut s = session(&p);
+        let update = avc(&p, 129);
+        let mut source = packet(&p, &[NON; 5]);
+        source.new_extradata = Some(update.source_bytes().clone());
+        let blocker = p
+            .reserve(p.available() - 4 * size_of::<NalPacketSegment>())
+            .unwrap();
+        let charge = p.used();
+        let mut j = s.packet(source, Some(update)).unwrap();
+        loop {
+            match j.step(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
+                Ok(BuildStep::Yield) => (),
+                Err(Error::Backpressure { .. }) => break,
+                _ => panic!("spill must pause without publishing"),
+            }
+        }
+        assert_eq!(p.used(), charge);
+        assert_eq!(j.source().unwrap().fields, fields());
+        assert!(j.take_receiver_rejection().is_none());
+        let mut work = WorkBudget::new(0);
+        assert!(matches!(
+            j.step(&mut work, &AtomicBool::new(false)),
+            Ok(BuildStep::Yield)
+        ));
+        assert_eq!(p.used(), charge);
+        if cancel_retry {
+            let mut work = WorkBudget::new(4096);
+            assert!(matches!(
+                j.step(&mut work, &AtomicBool::new(true)),
+                Err(Error::Cancelled)
+            ));
+            assert_eq!(work.remaining(), 4096);
+            assert!(matches!(
+                j.step(&mut work, &AtomicBool::new(false)),
+                Err(Error::Cancelled)
+            ));
+            drop(j);
+            assert_eq!(s.receiver_epoch(), 0);
+            assert_eq!(s.configuration().bytes().as_ref(), avcc(128));
+            drop(blocker);
+        } else {
+            drop(blocker);
+            let out = loop {
+                match j
+                    .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                    .unwrap()
+                {
+                    BuildStep::Yield => (),
+                    BuildStep::Ready(out) => break out,
+                    BuildStep::Complete => panic!("spill retry lost output"),
+                }
+            };
+            drop(j);
+            assert_eq!(out.receiver_epoch(), 1);
+            assert_eq!(out.segments().len(), 5);
+            assert_eq!(out.configuration_bytes().as_ref(), avcc(129));
+            let expected: Vec<_> = (0..5)
+                .flat_map(|i| framed(if i == 0 { 4 } else { 3 }, NON))
+                .collect();
+            assert_eq!(out.bytes().as_ref(), expected);
+            assert_eq!(s.receiver_epoch(), 1);
+            assert_eq!(s.configuration().bytes().as_ref(), avcc(129));
+        }
+        drop(s);
+        assert_eq!(p.used(), Budget::control_storage_bytes());
+    }
 }
 #[test]
 fn strict_forbidden_header_refusal_does_not_erase_the_raw_packet() {
