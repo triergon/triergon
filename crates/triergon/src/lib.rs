@@ -12,7 +12,9 @@
 
 mod any;
 
-pub use any::{AnyOther, AnyPacket, AnyReader, Probe, open_blocking, probe};
+pub use any::{
+    AnyOther, AnyPacket, AnyReader, Probe, Replayed, open_blocking, open_sequential, probe,
+};
 pub use triergon_core::blocking::Blocking;
 pub use triergon_core::container::{
     CodecId, ColourDescription, ColourRange, ContainerReader, ContentLight, Event,

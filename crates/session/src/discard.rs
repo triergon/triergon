@@ -23,8 +23,10 @@ impl Discard {
         }
     }
 
-    /// Drop the marked samples from `frame`, and at least `delay` samples from its start,
-    /// reducing `delay` by what was dropped there (a decoder's start delay spans packets).
+    /// Drop the marked samples from `frame`, and at least `delay` samples from its start.
+    /// What does not fit in this frame stays in `delay` for the next one: a start delay
+    /// or start trim may span packets (a LAME skip of 1105 samples over 576-sample
+    /// frames, a long Opus pre-skip).
     pub fn apply(self, frame: &mut AudioFrame, delay: &mut usize) {
         let len = frame.samples_per_channel;
         if len == 0 {
@@ -38,14 +40,14 @@ impl Discard {
             .pts
             .filter(|&pts| pts < 0)
             .map_or(0, |pts| samples(-pts));
-        let start = self
+        let pending = self
             .trim
             .start
             .map_or(0, samples)
             .max(before_zero)
-            .max(*delay)
-            .min(len);
-        *delay -= start.min(*delay);
+            .max(*delay);
+        let start = pending.min(len);
+        *delay = pending - start;
         let end = self.trim.end.map_or(0, samples).min(len - start);
         if start == 0 && end == 0 {
             return;
@@ -113,5 +115,16 @@ mod tests {
         let mut delay = 200;
         discard(0, None, None, 48_000).apply(&mut out, &mut delay);
         assert_eq!((out.samples_per_channel, delay), (0, 80));
+        // A start trim longer than its packet carries into the next.
+        let mut out = frame(576);
+        let mut delay = 0;
+        discard(0, Some(1105), None, 48_000).apply(&mut out, &mut delay);
+        assert_eq!((out.samples_per_channel, delay), (0, 529));
+        let mut out = frame(576);
+        discard(576, None, None, 48_000).apply(&mut out, &mut delay);
+        assert_eq!(
+            (out.samples_per_channel, out.planes[0][0], delay),
+            (47, 529.0, 0)
+        );
     }
 }
