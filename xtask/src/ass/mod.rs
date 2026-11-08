@@ -1,9 +1,10 @@
-//! The ASS parsing lane: the parse-level operations of the pinned libass, the
-//! build `cargo xtask raster prepare` makes, and the parsing features'
-//! manifests. `cargo xtask build-workers` builds ass-worker and links the
-//! reference worker (`harness/reference_ass.h`) against that libass; the
-//! features run through `cargo xtask report`, `trace-identities` and
-//! `fuzz --contract` like every other feature.
+//! The ASS lane: the parse-level operations and the frame rendering of the
+//! pinned libass, the build `cargo xtask raster prepare` makes, and the
+//! features' manifests. `cargo xtask build-workers` builds ass-worker and
+//! links the reference worker (`harness/reference_ass.h`, with
+//! `harness/reference_ass_render.h`) against that libass; the features run
+//! through `cargo xtask report`, `trace-identities` and `fuzz --contract`
+//! like every other feature.
 
 mod manifest;
 mod observed;
@@ -24,17 +25,18 @@ pub const USAGE: &str = "usage: cargo xtask ass prepare [--jobs N]
             reference compiles, with each conversion C leaves undefined out of
             range observed, to .research/libass/observed; then `cargo xtask
             build-workers` builds its reference worker
-  manifest  write each ASS parsing feature's generated manifest (one case per
-            fixture of harness/fixtures/ass, with the pins of
+  manifest  write each ASS feature's generated manifest (the parsing cases of
+            harness/fixtures/ass, the rendering cases of
+            harness/fixtures/ass-render, with the pins of
             harness/features/<feature>/pins.json) to DIR/<feature>/corpus.json
             (default .research/ass/manifests); with --record, first re-record
             every pin from the built reference
-  compare   `cargo xtask report` on each ASS parsing feature (ass-parse-scripts,
-            ass-parse-chunks, ass-parse-events, and ass-parse-host, which fails
-            the command only on the targets its contract requires; --all adds
-            none today); further report options pass through, and each report
-            goes to OUTPUT/<feature> (OUTPUT: --output, default
-            .research/ass-report)";
+  compare   `cargo xtask report` on each ASS feature (ass-parse-scripts,
+            ass-parse-chunks, ass-parse-events, ass-parse-host, which fails
+            the command only on the targets its contract requires, and
+            ass-render; --all adds none today); further report options pass
+            through, and each report goes to OUTPUT/<feature> (OUTPUT:
+            --output, default .research/ass-report)";
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {

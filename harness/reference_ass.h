@@ -45,6 +45,9 @@
  * StrikeOut as 0 or 1, Alignment by its four low bits, WrapStyle and Justify by
  * the values libass names (others as 0, which libass treats them as).
  *
+ * `ass-render-*` modes render frames instead (reference_ass_render.h); a
+ * stream's `@frames` command belongs to them and does nothing here.
+ *
  * The file is read and its directives and commands parsed before each timed and
  * memory operation; the library and, for a walk, the track and the renderer are
  * created once, outside it. The renderer has no font provider, so the font
@@ -350,7 +353,17 @@ typedef struct {
     size_t len;
 } AssLine;
 
-enum { ASSC_PRIVATE, ASSC_DATA, ASSC_STYLES, ASSC_CHUNK, ASSC_DUMP, ASSC_FLUSH, ASSC_PRUNE, ASSC_CHECK };
+enum {
+    ASSC_PRIVATE,
+    ASSC_DATA,
+    ASSC_STYLES,
+    ASSC_CHUNK,
+    ASSC_DUMP,
+    ASSC_FLUSH,
+    ASSC_PRUNE,
+    ASSC_CHECK,
+    ASSC_FRAMES
+};
 
 typedef struct {
     int kind;
@@ -359,6 +372,7 @@ typedef struct {
     const char *packet;
     size_t packet_len;
     long long start, duration; /* a chunk's times, the prune deadline, the check */
+    long long end;             /* the last frame of @frames, whose step is duration */
 } AssCommand;
 
 typedef struct {
@@ -480,6 +494,13 @@ static int assr_read_fixture(const char *data, size_t size, int stream, AssFixtu
                 c->packet_len = lines[i].len;
                 f->n_commands++;
             }
+        } else if (assr_starts(l, "@frames ")) {
+            const char *at = l.start + 8, *end = l.start + l.len;
+            if (assr_number(&at, end, &c->start) && assr_number(&at, end, &c->duration) &&
+                assr_number(&at, end, &c->end) && c->duration > 0) {
+                c->kind = ASSC_FRAMES;
+                f->n_commands++;
+            }
         } else if (assr_starts(l, "@dump")) {
             c->kind = ASSC_DUMP;
             f->n_commands++;
@@ -536,6 +557,7 @@ static ASS_Track *assr_stream(AssWork *w, ASS_Library *lib, const AssFixture *f)
         case ASSC_FLUSH: ass_flush_events(track); break;
         case ASSC_PRUNE: ass_prune_events(track, c->start); break;
         case ASSC_CHECK: ass_set_check_readorder(track, (int)c->start); break;
+        case ASSC_FRAMES: break;
         }
     }
     assr_track(w, lib, track);
@@ -808,7 +830,10 @@ static int assr_operation(AssWork *w, int mode, ASS_Library *lib, char *data, si
     return mode == ASSM_SCRIPT || track != NULL;
 }
 
+#include "reference_ass_render.h"
+
 int main(int argc, char **argv) {
+    if (argc > 1 && !strncmp(argv[1], "ass-render-", 11)) return assr_render_main(argc, argv);
     const char *usage = "usage: reference ass-fold FILE MODE | ass-bench FILE N MODE\n"
                         "       | ass-memory FILE MODE | ass-dump FILE MODE\n"
                         "  MODE: script | chunks, either followed by events\n";

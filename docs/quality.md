@@ -156,8 +156,19 @@ resource limit becomes an explicit, reviewed rule for that case.
   reads of values that go through C `long` beyond `int` (an event time, a
   ReadOrder); that feature is pinned per target. `cargo xtask ass compare`
   reports all four.
+- **libass rendering.** The same reference worker renders frames with
+  `ass_render_frame` (`harness/reference_ass_render.h`, public API only), as a
+  player embeds libass: the fonts a fixture attaches given to `ass_add_font`,
+  font extraction on, `ass_set_fonts` with the fixture's default font file
+  and family and no system font provider, no hinting, and a frame larger than
+  the storage size. `ass-render` renders every script and Matroska packet
+  stream of `harness/fixtures/ass-render` at 1920×1080 over 1280×720 storage
+  and at 1280×720 over anamorphic 720×576 storage, at the times the fixture
+  names, and compares every image's type, position, size, colour and alpha
+  bytes in list order. It is required by `cargo xtask check` and reported by
+  `cargo xtask ass compare`.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
-  parsing features commit no case rows. `cargo xtask fonts manifest`, `cargo
+  features commit no case rows. `cargo xtask fonts manifest`, `cargo
   xtask shape manifest`, `cargo xtask raster manifest` and `cargo xtask ass
   manifest` generate them from `harness/fonts/corpus.json`, the shaping texts,
   seeded random cases, the ASS fixtures and each feature's settings
@@ -281,7 +292,7 @@ and grades it. A contract may name its own candidate worker and reference, as
 and `formats` references, the three font features with `font-worker` and FreeType,
 the six shaping features with `shape-worker` and HarfBuzz and FriBidi, the
 five rasterising features with `raster-worker` and libass, and the four ASS
-parsing features with `ass-worker` and libass.
+parsing features and `ass-render` with `ass-worker` and libass.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
@@ -315,7 +326,7 @@ manifest as `manifest.json` for replay. `cargo xtask codecs fuzz --lane L` build
 from a codec lane's FATE vectors instead: release and `checked` builds of `codec-worker`
 (release optimisation with overflow checks and debug assertions) decode each mutation
 whole. `cargo xtask check` runs one round on smoke cases of each required font,
-shaping, rasterising and ASS parsing feature.
+shaping, rasterising and ASS feature.
 
 On native AArch64 or 32-bit ARMv7 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.

@@ -1,0 +1,22 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@attach croscorefonts-1.31.0/Arimo-Bold.ttf
+;@attach croscorefonts-1.31.0/Arimo-Italic.ttf
+;@attach croscorefonts-1.31.0/Arimo-BoldItalic.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 250 2000
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 480
+ScaledBorderAndShadow: no
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,28,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,Script at 640x480, unscaled borders
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\pos(320,100)\bord4\shad3\blur2}positioned in script pixels
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\an7\pos(10,10)\p1}m 0 0 l 100 0 100 50 0 50

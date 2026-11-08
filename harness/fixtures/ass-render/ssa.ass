@@ -1,0 +1,26 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@attach croscorefonts-1.31.0/Arimo-Bold.ttf
+;@attach croscorefonts-1.31.0/Arimo-Italic.ttf
+;@attach croscorefonts-1.31.0/Arimo-BoldItalic.ttf
+;@attach croscorefonts-1.31.0/Tinos-Regular.ttf
+;@attach croscorefonts-1.31.0/Tinos-Bold.ttf
+;@attach croscorefonts-1.31.0/Tinos-Italic.ttf
+;@attach croscorefonts-1.31.0/Tinos-BoldItalic.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 250 2000
+[Script Info]
+ScriptType: v4.00
+PlayResX: 384
+PlayResY: 288
+
+[V4 Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, TertiaryColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, AlphaLevel, Encoding
+Style: Default,Arimo,20,16777215,65535,65535,0,0,0,1,2,1,2,10,10,10,0,1
+Style: Upper,Tinos,18,65535,16777215,0,8421504,-1,0,1,1,1,6,10,10,10,0,1
+
+[Events]
+Format: Marked, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: Marked=0,0:00:00.00,0:00:02.00,Default,,0000,0000,0000,,SSA dialogue line
+Dialogue: Marked=0,0:00:00.00,0:00:02.00,Upper,,0000,0000,0000,,Top centre in SSA alignment
+Dialogue: Marked=0,0:00:00.00,0:00:02.00,Default,,0000,0000,0050,,{\a9}legacy top left
