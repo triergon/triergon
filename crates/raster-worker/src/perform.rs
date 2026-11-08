@@ -5,9 +5,9 @@ use std::io;
 
 use triergon_core::{Budget, Error, Result as CoreResult, WorkBudget};
 use triergon_raster::{
-    Bitmap, BorderRequest, Clip, ClipFrame, Colour, Effects, Filter, FilterFlags, FrameScale,
-    GlyphRef, GlyphRequest, Limits, OUTLINE_MAX, Outline, Pen, PixelRect, Placement, Raster, Run,
-    Shape, Vector,
+    Bitmap, Border, Clip, ClipFrame, Colour, Effects, FrameScale, GlyphBitmaps, GlyphRequest,
+    Limits, OUTLINE_MAX, Outline, Pen, Placement, Raster, Rect, Run, RunBorder, Shadow, Shape,
+    Vector,
 };
 
 use crate::case::{Case, Glyph, Random, RunCase, Source};
@@ -307,12 +307,7 @@ impl<'g> Runner<'g> {
             Err(error) => return sink.value(refused(&error)),
         };
         source.position = Vector::new(v[0], v[1]);
-        let rect = |at: usize| PixelRect {
-            left: v[at],
-            top: v[at + 1],
-            right: v[at + 2],
-            bottom: v[at + 3],
-        };
+        let rect = |at: usize| Rect::new(v[at], v[at + 1], v[at + 2], v[at + 3]);
         let clip = Clip {
             rect: rect(5),
             inverse: v[9] != 0,
@@ -343,17 +338,12 @@ impl<'g> Runner<'g> {
         Ok(())
     }
 
-    /// One run: every glyph's bitmaps and positions, the run's karaoke
-    /// leftmost x, then the composite's fill, border and shadow.
+    /// One run: every glyph's origin and bitmaps, the run's karaoke leftmost
+    /// x, then the composite's fill, border and shadow. The case's flags are
+    /// the style's: an opaque box, a border, a shadow, a shadow and a border
+    /// that keep the fill, and `\kf` karaoke.
     fn run(&mut self, case: &RunCase, sink: &mut impl Sink) -> io::Result<()> {
         let bit = |b: u32| case.flags & b != 0;
-        let flags = FilterFlags {
-            opaque_box: bit(1),
-            border: bit(2),
-            shadow: bit(4),
-            fill_in_shadow: bit(8),
-            fill_in_border: bit(16),
-        };
         let r = &case.reals;
         let frame = FrameScale {
             blur: [r[3], r[4]],
@@ -361,12 +351,26 @@ impl<'g> Runner<'g> {
             pixel_aspect: r[7],
         };
         let effects = Effects {
-            flags,
-            be: case.be,
+            border: if bit(1) {
+                RunBorder::OpaqueBox { shown: bit(2) }
+            } else if bit(2) {
+                RunBorder::Outline {
+                    keeps_fill: bit(16),
+                }
+            } else {
+                RunBorder::None
+            },
+            shadow: Shadow {
+                offset: if bit(4) { [r[1], r[2]] } else { [0.0, 0.0] },
+                keeps_fill: bit(8),
+            },
             blur: r[0],
-            shadow: [r[1], r[2]],
+            be: case.be,
         };
-        let filter = Filter::new(&effects, &frame);
+        // libass draws a glyph's box when the box is shown or casts a shadow,
+        // and a stroked border when the run has one.
+        let [x, y] = effects.shadow.offset;
+        let casts = x != 0.0 || y != 0.0;
         let mut run = Run::default();
         let mut drawn = Vec::new();
         for glyph in &case.glyphs {
@@ -381,15 +385,15 @@ impl<'g> Runner<'g> {
             let shape = Shape::from_outlines(outline, Outline::new(&self.budget));
             let (gr, gi) = (&glyph.reals, &glyph.ints);
             let size = [gr[11], gr[12]];
-            let border = match (flags.opaque_box, flags.border) {
-                (true, _) if flags.border || flags.shadow => BorderRequest::OpaqueBox {
+            let border = match effects.border {
+                RunBorder::OpaqueBox { shown } if shown || casts => Border::OpaqueBox {
                     size,
                     spacing: gi[6],
                     advance: gi[7],
                     scale_fix: gr[13],
                 },
-                (false, true) => BorderRequest::Outline { size },
-                _ => BorderRequest::None,
+                RunBorder::Outline { .. } => Border::Outline { size },
+                _ => Border::None,
             };
             let request = GlyphRequest {
                 shape: &shape,
@@ -413,17 +417,13 @@ impl<'g> Runner<'g> {
                 Err(error) => return sink.value(refused(&error)),
             };
             sink.value(OK)?;
-            for (bitmap, at) in [
-                (bitmaps.glyph.as_ref(), bitmaps.position),
-                (bitmaps.border_bitmap(), bitmaps.border_position),
-            ] {
-                sink.bitmap(bitmap)?;
-                let at = bitmap.map_or(Vector::default(), |_| at);
-                sink.values(&[at.x.into(), at.y.into()])?;
-            }
-            if bitmaps.glyph.is_some() || bitmaps.border_bitmap().is_some() {
-                drawn.push(bitmaps);
-            }
+            let origin = bitmaps
+                .as_ref()
+                .map_or(Vector::default(), GlyphBitmaps::origin);
+            sink.values(&[origin.x.into(), origin.y.into()])?;
+            sink.bitmap(bitmaps.as_ref().and_then(|b| b.glyph()))?;
+            sink.bitmap(bitmaps.as_ref().and_then(|b| b.border()))?;
+            drawn.extend(bitmaps);
         }
         sink.value(run.leftmost_x().into())?;
         if drawn.is_empty() {
@@ -432,19 +432,10 @@ impl<'g> Runner<'g> {
             }
             return Ok(());
         }
-        let min_x = drawn.iter().map(|b| b.position.x).min().unwrap_or(0);
-        let min_y = drawn.iter().map(|b| b.position.y).min().unwrap_or(0);
-        let relative = |p: Vector| Vector::new(p.x - min_x, p.y - min_y);
-        let refs: Vec<GlyphRef<'_>> = drawn
-            .iter()
-            .map(|b| GlyphRef {
-                glyph: b.glyph.as_ref(),
-                border: b.border_bitmap(),
-                position: relative(b.position),
-                border_position: relative(b.border_position),
-            })
-            .collect();
-        let composite = match self.raster.compose(&filter, &refs, &mut self.work) {
+        let composite = match self
+            .raster
+            .compose(&effects, &frame, &drawn, &mut self.work)
+        {
             Ok(composite) => composite,
             Err(error) => return sink.value(refused(&error)),
         };

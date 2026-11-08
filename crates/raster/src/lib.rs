@@ -29,10 +29,10 @@ mod stroke;
 mod transform;
 
 pub use bitmap::Bitmap;
-pub use clip::{Clip, ClipFrame, ClipPart, Colour, PixelRect};
-pub use compose::{Composite, Effects, Filter, FilterFlags, GlyphRef};
+pub use clip::{Clip, ClipFrame, ClipPart, Colour};
+pub use compose::{Composite, Effects, EffectsKey, RunBorder, Shadow};
 pub use geometry::{OUTLINE_MAX, Rect, Vector};
-pub use glyph::{Border, BorderRequest, FrameScale, GlyphBitmaps, GlyphRequest, Placement, Run};
+pub use glyph::{Border, FrameScale, GlyphBitmaps, GlyphKey, GlyphRequest, Placement, Run};
 pub use limits::{Limits, MAX_BITMAP_BYTES};
 pub use outline::{Outline, Segment, SegmentKind};
 pub use raster::Raster;

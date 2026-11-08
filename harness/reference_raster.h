@@ -810,8 +810,21 @@ static void raster_clip(const RasterCase *c, RasterWork *w) {
 
 static void raster_run(const RasterCase *c, RasterWork *w) {
     RenderContext *state = &raster_renderer->state;
-    int flags = c->ints[0] & 31;
-    int karaoke = c->ints[0] & 32;
+    /* The style's flags, turned into filter flags as render_and_combine_glyphs
+     * turns a glyph's: 8 stands for karaoke or a fill that is not fully
+     * transparent, 16 for opaque fill and karaoke colours without a fade. */
+    int style = c->ints[0];
+    int karaoke = style & 32;
+    double shadow_x = style & 4 ? c->reals[1] : 0;
+    double shadow_y = style & 4 ? c->reals[2] : 0;
+    int flags = 0;
+    if (style & 1) flags |= FILTER_BORDER_STYLE_3;
+    if (style & 2) flags |= FILTER_NONZERO_BORDER;
+    if (shadow_x || shadow_y) flags |= FILTER_NONZERO_SHADOW;
+    if (flags & FILTER_NONZERO_SHADOW && (style & 8 || style & 1)) flags |= FILTER_FILL_IN_SHADOW;
+    if (!(flags & FILTER_NONZERO_BORDER) && !(flags & FILTER_FILL_IN_SHADOW))
+        flags &= ~FILTER_NONZERO_SHADOW;
+    if ((flags & FILTER_NONZERO_BORDER && style & 16) || style & 1) flags |= FILTER_FILL_IN_BORDER;
     state->blur_scale_x = c->reals[3];
     state->blur_scale_y = c->reals[4];
     state->border_scale_x = c->reals[5];
@@ -826,8 +839,8 @@ static void raster_run(const RasterCase *c, RasterWork *w) {
     filter.blur_x = quantize_blur(c->reals[0] * blur_scale_x, &mask_x);
     filter.blur_y = quantize_blur(c->reals[0] * blur_scale_y, &mask_y);
     if (flags & FILTER_NONZERO_SHADOW) {
-        int32_t x = double_to_d6(c->reals[1] * state->border_scale_x);
-        int32_t y = double_to_d6(c->reals[2] * state->border_scale_y);
+        int32_t x = double_to_d6(shadow_x * state->border_scale_x);
+        int32_t y = double_to_d6(shadow_y * state->border_scale_y);
         filter.shadow.x = (x + (mask_x >> 1)) & ~mask_x;
         filter.shadow.y = (y + (mask_y >> 1)) & ~mask_y;
     }
@@ -881,14 +894,21 @@ static void raster_run(const RasterCase *c, RasterWork *w) {
 
         ASS_Vector pos = {0, 0}, pos_o = {0, 0};
         get_bitmap_glyph(state, &info, &leftmost, &pos, &pos_o, &offset, !count, gflags);
+        /* The glyph's origin and both bitmaps placed against it: the border's
+         * own origin, pos_o, moved into its left and top. */
+        int drawn = info.bm || info.bm_o;
         raster_value(w, RASTER_OK);
+        raster_value(w, drawn ? pos.x : 0);
+        raster_value(w, drawn ? pos.y : 0);
         raster_bitmap(w, info.bm);
-        raster_value(w, info.bm ? pos.x : 0);
-        raster_value(w, info.bm ? pos.y : 0);
-        raster_bitmap(w, info.bm_o);
-        raster_value(w, info.bm_o ? pos_o.x : 0);
-        raster_value(w, info.bm_o ? pos_o.y : 0);
-        if (!info.bm && !info.bm_o) continue;
+        if (info.bm_o) {
+            Bitmap border = *info.bm_o;
+            border.left += pos_o.x - pos.x;
+            border.top += pos_o.y - pos.y;
+            raster_bitmap(w, &border);
+        } else
+            raster_absent(w);
+        if (!drawn) continue;
         refs[count] = (BitmapRef){info.bm, info.bm_o, pos, pos_o};
         count++;
         min_x = FFMIN(min_x, pos.x);

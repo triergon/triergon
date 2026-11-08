@@ -6,7 +6,7 @@ use triergon_core::{Result, WorkBudget, round_ties_even_i32};
 use crate::bitmap::Bitmap;
 use crate::fp;
 use crate::geometry::Vector;
-use crate::glyph::FrameScale;
+use crate::glyph::{FrameScale, GlyphBitmaps};
 use crate::raster::Raster;
 
 /// Blur error as a fraction of the full range.
@@ -16,38 +16,107 @@ const POSITION_PRECISION: f64 = 8.0;
 /// Quantised blur steps per (64 · radius) unit.
 const BLUR_SCALE: f64 = 64.0 * BLUR_PRECISION / POSITION_PRECISION;
 
-/// What a run's composite needs to do, as libass derives it from the style.
+/// How a run's border bitmaps combine with its fill.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct FilterFlags {
-    /// `\bord` style 3: the border is an opaque box.
-    pub opaque_box: bool,
-    /// The run has a border bitmap (`FILTER_NONZERO_BORDER`).
-    pub border: bool,
-    /// The run has a shadow bitmap (`FILTER_NONZERO_SHADOW`).
-    pub shadow: bool,
-    /// The shadow covers the fill's area too (transparent fill, karaoke).
-    pub fill_in_shadow: bool,
-    /// The border covers the fill's area too (transparent fill and border).
-    pub fill_in_border: bool,
+pub enum RunBorder {
+    /// The run has no border.
+    #[default]
+    None,
+    /// Stroked outlines (`\bord` style 1). With `keeps_fill` the border also
+    /// covers the fill's area, which libass leaves when the fill and karaoke
+    /// colours are opaque and nothing fades; otherwise the fill is taken out of
+    /// it where the fill shows through.
+    Outline {
+        /// The border keeps its coverage under the fill.
+        keeps_fill: bool,
+    },
+    /// Opaque boxes (`\bord` style 3), which cover the fill's area. With
+    /// `shown` (a nonzero `\bord`) the box is the border and the shadow is a
+    /// copy of it; otherwise the box is the shadow alone.
+    OpaqueBox {
+        /// The box is drawn as the border too.
+        shown: bool,
+    },
+}
+
+/// A run's shadow (`\xshad`, `\yshad`), cast when either offset is nonzero.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Shadow {
+    /// The offset in script pixels, before the frame's border scale.
+    pub offset: [f64; 2],
+    /// The shadow also covers the fill's area, which libass leaves for a fill
+    /// that is not fully transparent, `\kf` and `\ko` karaoke and opaque
+    /// boxes; otherwise the fill is taken out of it. Without a border, a
+    /// shadow that does not keep the fill would be empty and is not cast.
+    pub keeps_fill: bool,
 }
 
 /// The effects of a run, as its style and override tags set them.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Effects {
-    /// Which bitmaps the run's composite produces and how they overlap.
-    pub flags: FilterFlags,
+    /// The border, and how it combines with the fill.
+    pub border: RunBorder,
+    /// The shadow.
+    pub shadow: Shadow,
+    /// `\blur` radius in script pixels, before the frame's blur scale.
+    pub blur: f64,
     /// `\be` passes.
     pub be: u32,
-    /// `\blur` radius in pixels.
-    pub blur: f64,
-    /// `\xshad` and `\yshad` in pixels.
-    pub shadow: [f64; 2],
+}
+
+impl Effects {
+    /// What identifies the composite of these effects in a frame scaled by
+    /// `frame`: the blur and the shadow offset quantised as libass quantises
+    /// them. Glyphs with equal [`GlyphKey`](crate::GlyphKey)s and offsets
+    /// compose into equal bitmaps under equal keys.
+    pub fn key(&self, frame: &FrameScale) -> EffectsKey {
+        EffectsKey(Filter::new(self, frame))
+    }
+}
+
+/// What identifies a run's effects in a frame; see [`Effects::key`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct EffectsKey(Filter);
+
+/// libass's filter flags, from a run's effects as its renderer sets them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+struct FilterFlags {
+    /// `\bord` style 3: the border is an opaque box.
+    opaque_box: bool,
+    /// The run has a border bitmap.
+    border: bool,
+    /// The run has a shadow bitmap.
+    shadow: bool,
+    /// The shadow covers the fill's area too.
+    fill_in_shadow: bool,
+    /// The border covers the fill's area too.
+    fill_in_border: bool,
+}
+
+impl FilterFlags {
+    fn new(effects: &Effects) -> Self {
+        let (opaque_box, border, fill_in_border) = match effects.border {
+            RunBorder::None => (false, false, false),
+            RunBorder::Outline { keeps_fill } => (false, true, keeps_fill),
+            RunBorder::OpaqueBox { shown } => (true, shown, true),
+        };
+        let [x, y] = effects.shadow.offset;
+        let cast = x != 0.0 || y != 0.0;
+        let fill_in_shadow = cast && (effects.shadow.keeps_fill || opaque_box);
+        Self {
+            opaque_box,
+            border,
+            shadow: cast && (border || fill_in_shadow),
+            fill_in_shadow,
+            fill_in_border,
+        }
+    }
 }
 
 /// The post-processing of a run with its blur and shadow quantised: what
 /// libass keys its composites by.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Filter {
+struct Filter {
     flags: FilterFlags,
     be: u32,
     /// Quantised Gaussian blur (x and y).
@@ -59,18 +128,19 @@ pub struct Filter {
 impl Filter {
     /// The filter of a run with `effects` in a frame scaled by `frame`: the blur
     /// under its blur scale, the shadow under its border scale.
-    pub fn new(effects: &Effects, frame: &FrameScale) -> Self {
+    fn new(effects: &Effects, frame: &FrameScale) -> Self {
         let radius_scale = 2.0 / 256.0f64.ln().sqrt();
         let radius = effects.blur;
         let (blur_x, mask_x) = quantize_blur(radius * (frame.blur[0] * radius_scale));
         let (blur_y, mask_y) = quantize_blur(radius * (frame.blur[1] * radius_scale));
-        let flags = effects.flags;
+        let flags = FilterFlags::new(effects);
         let shadow = if flags.shadow {
             let snap =
                 |v: f64, mask: i32| (round_ties_even_i32(v * 64.0).wrapping_add(mask >> 1)) & !mask;
+            let [x, y] = effects.shadow.offset;
             Vector::new(
-                snap(effects.shadow[0] * frame.border[0], mask_x),
-                snap(effects.shadow[1] * frame.border[1], mask_y),
+                snap(x * frame.border[0], mask_x),
+                snap(y * frame.border[1], mask_y),
             )
         } else {
             Vector::default()
@@ -125,62 +195,68 @@ fn be_padding(be: u32) -> u32 {
     }
 }
 
-/// One glyph of a run: its bitmaps and their positions relative to the run.
-#[derive(Clone, Copy, Debug)]
-pub struct GlyphRef<'a> {
-    /// The glyph's fill bitmap, if it has one.
-    pub glyph: Option<&'a Bitmap>,
-    /// The glyph's border bitmap, if it has one; it may be the fill bitmap.
-    pub border: Option<&'a Bitmap>,
-    /// Where `glyph`'s [`position`](Bitmap::position) counts from, whole
-    /// pixels relative to the run.
-    pub position: Vector,
-    /// Where `border`'s [`position`](Bitmap::position) counts from, whole
-    /// pixels relative to the run.
-    pub border_position: Vector,
-}
-
-/// A run's composited bitmaps, positioned relative to the run.
+/// A run's composited bitmaps, placed against the run's origin.
 #[derive(Debug, Default)]
 pub struct Composite {
+    /// The whole-pixel frame position the bitmaps'
+    /// [`position`](Bitmap::position)s count from: the least
+    /// [`origin`](GlyphBitmaps::origin) of the run's glyphs.
+    pub origin: Vector,
     /// The summed glyph fills, blurred only without a stroked border.
     pub fill: Option<Bitmap>,
-    /// The summed and blurred borders with the fill subtracted, unless
-    /// `fill_in_border` keeps it; `None` when an opaque box becomes the shadow.
+    /// The summed and blurred borders, the fill taken out unless the border
+    /// keeps it; `None` when an opaque box is the shadow alone.
     pub border: Option<Bitmap>,
-    /// The shadow, shifted by the shadow offset: a copy of the stroked border
-    /// (the fill subtracted unless `fill_in_shadow` keeps it), the opaque box
-    /// itself, or a copy of the fill without a border.
+    /// The shadow, moved by the shadow offset: a copy of the border (the fill
+    /// taken out unless the shadow keeps it), the opaque box, or a copy of the
+    /// fill without a border.
     pub shadow: Option<Bitmap>,
 }
 
 impl Raster {
-    /// Combines the glyphs of a run under `filter`, as libass's composite
-    /// cache builds a run (`ass_composite_construct`): glyphs and borders
-    /// summed (one bitmap without `\be` is copied), blurred, the fill taken out
-    /// of the border where it shows through, and the shadow copied from the
-    /// border or fill and shifted.
+    /// Combines the glyphs of a run, in order as [`Raster::render`] drew
+    /// them, under `effects` in a frame scaled by `frame`, as libass's
+    /// composite cache builds a run (`ass_composite_construct`): fills and
+    /// borders summed (one bitmap without `\be` is copied), blurred, the fill
+    /// taken out of the border where it shows through, and the shadow copied
+    /// from the border or fill and moved. Without glyphs the composite is
+    /// empty.
     ///
     /// # Errors
     ///
     /// `Policy` when `work` or the limits run out, and the budget's errors.
-    pub fn compose(
+    pub fn compose<'g, I>(
         &mut self,
-        filter: &Filter,
-        glyphs: &[GlyphRef<'_>],
+        effects: &Effects,
+        frame: &FrameScale,
+        glyphs: I,
         work: &mut WorkBudget,
-    ) -> Result<Composite> {
+    ) -> Result<Composite>
+    where
+        I: IntoIterator<Item = &'g GlyphBitmaps>,
+        I::IntoIter: Clone,
+    {
+        let glyphs = glyphs.into_iter();
+        let Some(origin) = glyphs
+            .clone()
+            .map(GlyphBitmaps::origin)
+            .reduce(|a, b| Vector::new(a.x.min(b.x), a.y.min(b.y)))
+        else {
+            return Ok(Composite::default());
+        };
+        let filter = Filter::new(effects, frame);
         let pad = be_padding(filter.be);
-        let mut fill = self.combine(
-            glyphs.iter().filter_map(|g| Some((g.glyph?, g.position))),
-            pad,
-        )?;
-        let mut border = self.combine(
-            glyphs
-                .iter()
-                .filter_map(|g| Some((g.border?, g.border_position))),
-            pad,
-        )?;
+        let placed = |bitmap: fn(&GlyphBitmaps) -> Option<&Bitmap>| {
+            glyphs.clone().filter_map(move |g| {
+                let at = Vector::new(
+                    g.origin().x.wrapping_sub(origin.x),
+                    g.origin().y.wrapping_sub(origin.y),
+                );
+                Some((bitmap(g)?, at))
+            })
+        };
+        let mut fill = self.combine(placed(GlyphBitmaps::glyph), pad)?;
+        let mut border = self.combine(placed(GlyphBitmaps::border), pad)?;
         let flags = filter.flags;
         let variance = filter.variances();
         if (!flags.border || flags.opaque_box)
@@ -223,6 +299,7 @@ impl Raster {
             subtract(&mut border, &fill);
         }
         Ok(Composite {
+            origin,
             fill,
             border,
             shadow,
@@ -280,7 +357,33 @@ impl Raster {
 
 #[cfg(test)]
 mod tests {
-    use super::{be_padding, quantize_blur, restore_blur, shadow_mask};
+    use super::{Effects, be_padding, quantize_blur, restore_blur, shadow_mask};
+    use crate::{Bitmap, FrameScale, GlyphBitmaps, Limits, Raster, Vector};
+    use triergon_core::{Budget, WorkBudget};
+
+    #[test]
+    fn glyphs_as_far_apart_as_positions_reach_compose_into_nothing() {
+        let budget = Budget::new(1 << 20).unwrap();
+        let glyph = |at| {
+            let mut bitmap = Bitmap::new(&budget, 4, 4, &Limits::default()).unwrap();
+            bitmap.position = Vector::new(at, at);
+            GlyphBitmaps::of_glyph(bitmap, Vector::default())
+        };
+        let frame = FrameScale {
+            blur: [1.0, 1.0],
+            border: [1.0, 1.0],
+            pixel_aspect: 1.0,
+        };
+        let composite = Raster::new(&budget, Limits::default())
+            .compose(
+                &Effects::default(),
+                &frame,
+                &[glyph(i32::MIN), glyph(i32::MAX)],
+                &mut WorkBudget::new(1 << 20),
+            )
+            .unwrap();
+        assert!(composite.fill.is_none());
+    }
 
     #[test]
     fn blur_quantisation_round_trips_closely() {

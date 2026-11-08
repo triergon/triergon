@@ -58,7 +58,7 @@ pub struct FrameScale {
 
 /// The border a glyph is drawn with.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum BorderRequest {
+pub enum Border {
     /// No border bitmap.
     None,
     /// `\bord` style 1: the outline stroked by `size` (x and y) pixels.
@@ -96,7 +96,7 @@ pub struct GlyphRequest<'a> {
     /// The renderer's frame-wide scales.
     pub frame: FrameScale,
     /// The border to draw alongside the glyph.
-    pub border: BorderRequest,
+    pub border: Border,
     /// The glyph is timed by `\kf` karaoke, so its run tracks the least x of
     /// its transformed outline.
     pub karaoke: bool,
@@ -301,9 +301,9 @@ impl Run {
     }
 }
 
-/// What a border bitmap is.
+/// A glyph's border bitmap.
 #[derive(Debug)]
-pub enum Border {
+enum BorderBitmap {
     /// No border: none was requested, or it could not be drawn.
     None,
     /// The border rounded to nothing: the glyph bitmap stands in for it.
@@ -312,37 +312,88 @@ pub enum Border {
     Own(Bitmap),
 }
 
-/// The bitmaps of one glyph and their whole-pixel positions.
+/// The bitmaps [`Raster::render`] draws for a glyph, placed against one
+/// origin.
 #[derive(Debug)]
 pub struct GlyphBitmaps {
-    /// The glyph's fill, `None` when it has nothing to draw or leaves the
-    /// coordinate range.
-    pub glyph: Option<Bitmap>,
-    /// The border bitmap.
-    pub border: Border,
-    /// The frame position, whole pixels, that the glyph bitmap's
-    /// [`position`](Bitmap::position) counts from; the border's when only the
-    /// border is drawn.
-    pub position: Vector,
-    /// The frame position, whole pixels, that the border bitmap's
-    /// [`position`](Bitmap::position) counts from; `position` unless the
-    /// border has a bitmap of its own.
-    pub border_position: Vector,
+    glyph: Option<Bitmap>,
+    border: BorderBitmap,
+    origin: Vector,
+    key: GlyphKey,
 }
 
 impl GlyphBitmaps {
-    /// The border bitmap, which may be the glyph's.
-    pub fn border_bitmap(&self) -> Option<&Bitmap> {
+    /// The glyph's fill, `None` when it has nothing to draw or leaves the
+    /// coordinate range.
+    pub fn glyph(&self) -> Option<&Bitmap> {
+        self.glyph.as_ref()
+    }
+
+    /// The border: the stroked outline or the opaque box, or the glyph's own
+    /// bitmap when the border rounds to nothing. `None` without a border.
+    pub fn border(&self) -> Option<&Bitmap> {
         match &self.border {
-            Border::None => None,
-            Border::Glyph => self.glyph.as_ref(),
-            Border::Own(bitmap) => Some(bitmap),
+            BorderBitmap::None => None,
+            BorderBitmap::Glyph => self.glyph.as_ref(),
+            BorderBitmap::Own(bitmap) => Some(bitmap),
         }
     }
 
-    fn is_drawn(&self) -> bool {
-        self.glyph.is_some() || self.border_bitmap().is_some()
+    /// The whole-pixel frame position both bitmaps'
+    /// [`position`](Bitmap::position)s count from: the glyph's quantised
+    /// position, or the border's when only the border is drawn.
+    pub fn origin(&self) -> Vector {
+        self.origin
     }
+
+    /// What identifies these bitmaps besides the shape they are drawn from;
+    /// see [`GlyphKey`].
+    pub fn key(&self) -> GlyphKey {
+        self.key
+    }
+}
+
+#[cfg(test)]
+impl GlyphBitmaps {
+    /// A glyph bitmap without a border, at `origin`.
+    pub(crate) fn of_glyph(glyph: Bitmap, origin: Vector) -> Self {
+        Self {
+            glyph: Some(glyph),
+            border: BorderBitmap::None,
+            origin,
+            key: GlyphKey {
+                glyph: None,
+                border: None,
+                border_offset: Vector::default(),
+            },
+        }
+    }
+}
+
+/// What identifies a glyph's bitmaps besides its shape: the quantised
+/// transforms they were drawn with, the border's stroking scale and widths or
+/// opaque box, and where the border sits against the glyph. Bitmaps of the
+/// same shape with equal keys are equal, so a renderer can key its glyph and
+/// run caches with it, as libass keys its bitmap and composite caches.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct GlyphKey {
+    /// The glyph bitmap's transform, if it is drawn.
+    glyph: Option<BitmapTransform>,
+    /// The border bitmap, if it is drawn.
+    border: Option<BorderId>,
+    /// The border bitmap's own origin from the glyph's, in whole pixels.
+    border_offset: Vector,
+}
+
+/// What a border bitmap is drawn from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum BorderId {
+    /// The glyph bitmap stands in for it.
+    Glyph,
+    /// The glyph's first outline stroked under `BorderKey`.
+    Stroke(BorderKey, BitmapTransform),
+    /// The opaque box.
+    Box(BitmapTransform),
 }
 
 impl Raster {
@@ -350,7 +401,8 @@ impl Raster {
     /// the run (the run's first drawn glyph sets the run's sub-pixel origin),
     /// rasterises the glyph, then its border outline or opaque box placed
     /// against the same origin. A glyph or border that leaves the coordinate
-    /// range under its transform is not drawn, as in libass.
+    /// range under its transform is not drawn, as in libass; `None` when
+    /// nothing is drawn, and the glyph is then no part of the run.
     ///
     /// # Errors
     ///
@@ -360,9 +412,9 @@ impl Raster {
         request: &GlyphRequest<'_>,
         run: &mut Run,
         work: &mut WorkBudget,
-    ) -> Result<GlyphBitmaps> {
+    ) -> Result<Option<GlyphBitmaps>> {
         let GlyphRequest {
-            shape: glyph,
+            shape,
             placement,
             frame,
             karaoke,
@@ -371,35 +423,39 @@ impl Raster {
         let transform = GlyphTransform::new(placement, frame);
         if *karaoke {
             run.leftmost_x =
-                glyph.outlines()[0].min_transformed_x(transform.matrix(), run.leftmost_x);
+                shape.outlines()[0].min_transformed_x(transform.matrix(), run.leftmost_x);
         }
-        let mut out = GlyphBitmaps {
-            glyph: None,
-            border: Border::None,
-            position: Vector::default(),
-            border_position: Vector::default(),
-        };
         let starts = run.drawn == 0;
         let continued = (!starts).then_some(run.offset);
         let Some(quantized) =
-            BitmapTransform::quantize(transform.matrix(), glyph.cbox(), continued)
+            BitmapTransform::quantize(transform.matrix(), shape.cbox(), continued)
         else {
-            return Ok(out);
+            return Ok(None);
         };
         if starts {
             run.offset = quantized.remainder;
         }
-        out.position = quantized.position;
-        out.border_position = quantized.position;
-        out.glyph = self.bitmap(glyph, &quantized.key, work)?;
+        let glyph = self.bitmap(shape, &quantized.key, work)?;
+        let mut out = GlyphBitmaps {
+            key: GlyphKey {
+                glyph: glyph.is_some().then_some(quantized.key),
+                border: None,
+                border_offset: Vector::default(),
+            },
+            glyph,
+            border: BorderBitmap::None,
+            origin: quantized.position,
+        };
         self.render_border(request, &transform, &quantized.centred, run, &mut out, work)?;
-        if out.is_drawn() {
-            run.drawn += 1;
+        if out.glyph.is_none() && out.border().is_none() {
+            return Ok(None);
         }
-        Ok(out)
+        run.drawn += 1;
+        Ok(Some(out))
     }
 
-    /// The border part of [`Raster::render`].
+    /// The border part of [`Raster::render`]: the border bitmap, placed
+    /// against the glyph's origin.
     fn render_border(
         &mut self,
         request: &GlyphRequest<'_>,
@@ -410,9 +466,9 @@ impl Raster {
         work: &mut WorkBudget,
     ) -> Result<()> {
         let (placement, frame) = (&request.placement, &request.frame);
-        let (shape, m) = match request.border {
-            BorderRequest::None => return Ok(()),
-            BorderRequest::OpaqueBox {
+        let (shape, m, stroke) = match request.border {
+            Border::None => return Ok(()),
+            Border::OpaqueBox {
                 size,
                 spacing,
                 advance,
@@ -420,9 +476,9 @@ impl Raster {
             } => {
                 let width = spacing.wrapping_add(advance);
                 let m = transform.opaque_box(placement, frame, size, width, scale_fix);
-                (Shape::unit_box(&self.budget)?, m)
+                (Shape::unit_box(&self.budget)?, m, None)
             }
-            BorderRequest::Outline { size } => {
+            Border::Outline { size } => {
                 let glyph = request.shape;
                 let Some((key, m)) = BorderKey::new(
                     centred,
@@ -435,25 +491,37 @@ impl Raster {
                     return Ok(());
                 };
                 if key.size == Vector::default() {
-                    out.border = Border::Glyph;
+                    out.border = BorderBitmap::Glyph;
+                    out.key.border = out.glyph.is_some().then_some(BorderId::Glyph);
                     return Ok(());
                 }
                 let Some(stroked) = self.stroke_border(glyph, &key, work)? else {
                     return Ok(());
                 };
-                (stroked, m)
+                (stroked, m, Some(key))
             }
         };
         let Some(quantized) = BitmapTransform::quantize(&m, shape.cbox(), Some(run.offset)) else {
             return Ok(());
         };
-        if let Some(bitmap) = self.bitmap(&shape, &quantized.key, work)? {
-            out.border_position = quantized.position;
-            if out.glyph.is_none() {
-                out.position = quantized.position;
-            }
-            out.border = Border::Own(bitmap);
+        let Some(mut bitmap) = self.bitmap(&shape, &quantized.key, work)? else {
+            return Ok(());
+        };
+        if out.glyph.is_none() {
+            out.origin = quantized.position;
         }
+        let offset = Vector::new(
+            quantized.position.x.wrapping_sub(out.origin.x),
+            quantized.position.y.wrapping_sub(out.origin.y),
+        );
+        bitmap.position.x = bitmap.position.x.wrapping_add(offset.x);
+        bitmap.position.y = bitmap.position.y.wrapping_add(offset.y);
+        out.border = BorderBitmap::Own(bitmap);
+        out.key.border = Some(match stroke {
+            Some(key) => BorderId::Stroke(key, quantized.key),
+            None => BorderId::Box(quantized.key),
+        });
+        out.key.border_offset = offset;
         Ok(())
     }
 

@@ -22,9 +22,12 @@
 //! clip      SEED W H LEFT TOP DX DY SPLIT X0 Y0 X1 Y1 INVERSE FW FH CX0 CY0 CX1 CY1
 //! ```
 //!
-//! Integers are decimal and fit 32 bits (seeds 64); run FLAGS are libass's
-//! filter flags (1 opaque box, 2 border, 4 shadow, 8 fill in shadow, 16 fill in
-//! border) plus 32 for `\kf` karaoke glyphs. Bitmap sizes are 1 to 4096, `BE`
+//! Integers are decimal and fit 32 bits (seeds 64); run FLAGS are the style's,
+//! from which both sides derive libass's filter flags as its renderer does: 1
+//! `\bord` style 3 (an opaque box), 2 a nonzero border, 4 a shadow (the offsets
+//! apply only with it), 8 a shadow that keeps the fill (a fill that is not
+//! fully transparent, or karaoke), 16 a border that keeps the fill (opaque fill
+//! and karaoke colours without a fade) and 32 `\kf` karaoke glyphs. Bitmap sizes are 1 to 4096, `BE`
 //! 0 to 255, shifts 0 to 63, rotation offsets within ±2³⁰, an added bitmap lies
 //! inside its target, clip values within ±2²⁴. A line outside the grammar is recorded as unparsed.
 
