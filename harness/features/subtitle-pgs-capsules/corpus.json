@@ -1,0 +1,3212 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "pgs-independent89--clock-known-native-sentinel",
+      "profile": "pgs-independent89--clock-known-native-sentinel",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-known-native-sentinel/input.bin",
+      "sha256": "ccb937db9680da412f9823aae2d42a99869d8b74c53af667811f373c6b2c2d39",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 2996705148325641511
+      }
+    },
+    {
+      "id": "pgs-independent89--clock-negative",
+      "profile": "pgs-independent89--clock-negative",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-negative/input.bin",
+      "sha256": "c9e9a276e844bc15cf40b70d086971d0d47e230e28202568cca22a075342f129",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 118181161183523625
+      }
+    },
+    {
+      "id": "pgs-independent89--clock-unknown-nonzero-raw",
+      "profile": "pgs-independent89--clock-unknown-nonzero-raw",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-unknown-nonzero-raw/input.bin",
+      "sha256": "bf61b97bba95d75a45c596bf4aa07d842fcc4e8012c6e25dd19297beb6431f23",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 3728519953917896454
+      }
+    },
+    {
+      "id": "pgs-independent89--clock-unknown-zero",
+      "profile": "pgs-independent89--clock-unknown-zero",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-unknown-zero/input.bin",
+      "sha256": "3445c8fd8cc1bc4530bb00de2e27707a36863c855fb2d29d5a1bf5ba66a03828",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 8713084274399648712
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-early-17x3",
+      "profile": "pgs-independent89--fragment-early-17x3",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-17x3/input.bin",
+      "sha256": "76c6bacb2b6ccbd5ee910e74447704b70dfbe06b97b8810930622f57e4962918",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2934297024338236839
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-early-1x1",
+      "profile": "pgs-independent89--fragment-early-1x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-1x1/input.bin",
+      "sha256": "c8f3aa371a8351507c8a0098a10ada09c732c6ad20f32f3336108f2feb55c5da",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 14866149261847411045
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-early-2x1",
+      "profile": "pgs-independent89--fragment-early-2x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-2x1/input.bin",
+      "sha256": "3a1378bc9e4c95e5d879fb704f1f00236609aada98d4b6ec828d5184d5168ea6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 10611440347539490544
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-early-3x2",
+      "profile": "pgs-independent89--fragment-early-3x2",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-3x2/input.bin",
+      "sha256": "9a862bd88cf8d9e5e8d1b1e5b444135f6fa83ecb51d5135b3976a62d05ad7e14",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 15242156256729129341
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-no-last-17x3",
+      "profile": "pgs-independent89--fragment-no-last-17x3",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-17x3/input.bin",
+      "sha256": "66d58c2aacf861404f836d9a2df3fe9e5608647babd84d17b0731411d2ce3853",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 51,
+        "digest": 10625200732843824077
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-no-last-1x1",
+      "profile": "pgs-independent89--fragment-no-last-1x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-1x1/input.bin",
+      "sha256": "643cf8fff7c93dcbf8d3e2a90e19acc29fdaac91e8c5c6e69aba1655897b16dc",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 12851164301637175651
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-no-last-2x1",
+      "profile": "pgs-independent89--fragment-no-last-2x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-2x1/input.bin",
+      "sha256": "5190fcc8a39fab47ec369926b9a034d2e76481fc093eb8f3b525551425279372",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 192453744309790759
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-no-last-3x2",
+      "profile": "pgs-independent89--fragment-no-last-3x2",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-3x2/input.bin",
+      "sha256": "bd5ff7f4f0b2c78d67c0638cbb3aaa08d353bb0be2a5e8911f8b57849fbc7399",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 6,
+        "digest": 1276826433727390890
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-overshoot-17x3",
+      "profile": "pgs-independent89--fragment-overshoot-17x3",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-17x3/input.bin",
+      "sha256": "6383302da7ce67680c1a278bb8ad1017043ca7b93885da976f493f827064a749",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 9810348504239136366
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-overshoot-1x1",
+      "profile": "pgs-independent89--fragment-overshoot-1x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-1x1/input.bin",
+      "sha256": "ff594b133bcf92565289cc94faea78eaaffd4efc118a223ad0ae8e5a122ec372",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7653886648117570219
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-overshoot-2x1",
+      "profile": "pgs-independent89--fragment-overshoot-2x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-2x1/input.bin",
+      "sha256": "9e527a6e8fa818f279fd637be1e4be571ea76bfdc695208bced03ffc86ffe611",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7570678945683729441
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-overshoot-3x2",
+      "profile": "pgs-independent89--fragment-overshoot-3x2",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-3x2/input.bin",
+      "sha256": "0b9afd14845c3ab374ad28dc06ac86efe7f9186217d501ad716de172c1051863",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 9096548006088891934
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-version-17x3",
+      "profile": "pgs-independent89--fragment-version-17x3",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-17x3/input.bin",
+      "sha256": "bd76d0c6834f8c3d1bdb0211c9ed728c49b407f874f76dd1c554b0c350787d1b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 51,
+        "digest": 5988557128450694520
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-version-1x1",
+      "profile": "pgs-independent89--fragment-version-1x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-1x1/input.bin",
+      "sha256": "87cb84c9369e50a40dd68999d0285e521c6e8375a14ace18269ddb87085be8ae",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 17492054479463323694
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-version-2x1",
+      "profile": "pgs-independent89--fragment-version-2x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-2x1/input.bin",
+      "sha256": "93c02791de9dd466c1495bae1b285c02b7025b3d58816a075b8ee76ebabb6f77",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 13086456077147858792
+      }
+    },
+    {
+      "id": "pgs-independent89--fragment-version-3x2",
+      "profile": "pgs-independent89--fragment-version-3x2",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-3x2/input.bin",
+      "sha256": "aeca12eda481a0aeccb5f98e6362de1ee27779dc17e4c69b01df8e3ab4874fde",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 6,
+        "digest": 10797728037258976267
+      }
+    },
+    {
+      "id": "pgs-independent89--no-final-EOL-17x3",
+      "profile": "pgs-independent89--no-final-EOL-17x3",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-17x3/input.bin",
+      "sha256": "2db7233e36939517f2f78edbc59ac872db0fc446681ada81f44069d74a08cd8d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 51,
+        "digest": 3028435658253989329
+      }
+    },
+    {
+      "id": "pgs-independent89--no-final-EOL-1x1",
+      "profile": "pgs-independent89--no-final-EOL-1x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-1x1/input.bin",
+      "sha256": "c11babd99530dc6bab397c2f4ccffb48215684d8c33fa0f573f01b5d38cf06c5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 5671726323703167143
+      }
+    },
+    {
+      "id": "pgs-independent89--no-final-EOL-2x1",
+      "profile": "pgs-independent89--no-final-EOL-2x1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-2x1/input.bin",
+      "sha256": "0a20c4be8502c65144241fdcd9d5ca27bdacbfa02bd5448cc54920b394b11353",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 16410891013200967335
+      }
+    },
+    {
+      "id": "pgs-independent89--no-final-EOL-3x2",
+      "profile": "pgs-independent89--no-final-EOL-3x2",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-3x2/input.bin",
+      "sha256": "46f89ad0bb8622119a8eceba5b854f2fdb7b4d35d86206f588bb71f2aeaa0688",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 6,
+        "digest": 442037344266998506
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-1-END",
+      "profile": "pgs-independent89--palette-tail-1-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-END/input.bin",
+      "sha256": "8088d7b0511cdf83cee9040a960888b5497f4f4fb778dbcd526bd80854d7fa90",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 619414410493687891
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-1-PDS-before-END",
+      "profile": "pgs-independent89--palette-tail-1-PDS-before-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-PDS-before-END/input.bin",
+      "sha256": "45b8ebc0f89ff4aa36725489e45e92ba4a061137df0ceaf8f28133b47084cc52",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 5619632889200618983
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-1-packet-end",
+      "profile": "pgs-independent89--palette-tail-1-packet-end",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-packet-end/input.bin",
+      "sha256": "f4b41399128e7ae758393ce7a28a8e6577bb9a021bab1349b04d51b45ae134d3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15366072253174865870
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-1-unknown-before-END",
+      "profile": "pgs-independent89--palette-tail-1-unknown-before-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-unknown-before-END/input.bin",
+      "sha256": "e6425b800858f1831583feec47a23c441b59c57d443426675149494e8d465bb9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 1922881043335244761
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-2-END",
+      "profile": "pgs-independent89--palette-tail-2-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-END/input.bin",
+      "sha256": "ed0f310684d866689f35586f3ffe625cf484d33862f1337212167d6ab6dcedaa",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 716676730739323300
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-2-PDS-before-END",
+      "profile": "pgs-independent89--palette-tail-2-PDS-before-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-PDS-before-END/input.bin",
+      "sha256": "876b1401ff4440afcfb5fb987a590cfcbedac91773cbd3aa8dfc3ca155db1fa6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 11167350481996212483
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-2-packet-end",
+      "profile": "pgs-independent89--palette-tail-2-packet-end",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-packet-end/input.bin",
+      "sha256": "76c503dd487f7126ebccaa6d8894b7df63ee729b28047eefcbf11b36d85b5c73",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 18314652524348913015
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-2-unknown-before-END",
+      "profile": "pgs-independent89--palette-tail-2-unknown-before-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-unknown-before-END/input.bin",
+      "sha256": "707d45efae60dbb1a731e275b6470a8bc786f0820c68affbb5ede63d5dd094ce",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 4881342126548064624
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-3-END",
+      "profile": "pgs-independent89--palette-tail-3-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-END/input.bin",
+      "sha256": "7935a9c17630d407af2f7b508521cdf2dffc50661685883a0c07ab88ff1caa42",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 3751432575627640185
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-3-PDS-before-END",
+      "profile": "pgs-independent89--palette-tail-3-PDS-before-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-PDS-before-END/input.bin",
+      "sha256": "c3caa26b83018feef8aab9008bea34b11432bad8f11f06a3515bc0349b15e2e7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 13719080462782028111
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-3-packet-end",
+      "profile": "pgs-independent89--palette-tail-3-packet-end",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-packet-end/input.bin",
+      "sha256": "edda08b8e00c086c3ec01c01e7b546f13ae3e57f22b068fc5bc404f43ae84966",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 856891679945157800
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-3-unknown-before-END",
+      "profile": "pgs-independent89--palette-tail-3-unknown-before-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-unknown-before-END/input.bin",
+      "sha256": "bf4feb58bbda83949119adedf0437b742982069a7ed11386409f375dcb9ff735",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 14077486899769741325
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-4-END",
+      "profile": "pgs-independent89--palette-tail-4-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-END/input.bin",
+      "sha256": "79ceb4b505d980a817eb61e5dbac02efcde4185e9ab271e40f8af7cb60c79d89",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 15894635530065187461
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-4-PDS-before-END",
+      "profile": "pgs-independent89--palette-tail-4-PDS-before-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-PDS-before-END/input.bin",
+      "sha256": "519c75f943ef66dea89d255b8a128f79f61eec4e39fd68961521cafb311db7af",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 5680812469896156653
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-4-packet-end",
+      "profile": "pgs-independent89--palette-tail-4-packet-end",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-packet-end/input.bin",
+      "sha256": "3e218f912113a7ffb1280f95639cc655a6167421bc6aebc240a4f146add3cd9b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 14046566428787576335
+      }
+    },
+    {
+      "id": "pgs-independent89--palette-tail-4-unknown-before-END",
+      "profile": "pgs-independent89--palette-tail-4-unknown-before-END",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-unknown-before-END/input.bin",
+      "sha256": "f0a8f0bf25a8f52c762d29fa3aff535b58abf40ad91ada16948c839d91548ea5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 6268172253653623145
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-19-actual-1",
+      "profile": "pgs-independent89--physical-tail-declared-19-actual-1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-1/input.bin",
+      "sha256": "174b84b48f9c58d8964b923f8c6d827f7f4b6a23c03d7824e8309c08e285b406",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 4814684776100148181
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-19-actual-11",
+      "profile": "pgs-independent89--physical-tail-declared-19-actual-11",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-11/input.bin",
+      "sha256": "545b748cc0220934d3de58afb645e2889ccba050f0c4cfe2d4e96f7590461434",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12819204692273966530
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-19-actual-13",
+      "profile": "pgs-independent89--physical-tail-declared-19-actual-13",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-13/input.bin",
+      "sha256": "9c3f82cde4b80a8935c6a15103d32fc6859068cb89ca404e0ff5fcba29554a62",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 7154109925427296256
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-19-actual-2",
+      "profile": "pgs-independent89--physical-tail-declared-19-actual-2",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-2/input.bin",
+      "sha256": "4de77d895e6c1d29c58b5473b496e0a69f8145d2cc75518b50eed137942fc844",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1681275470315682264
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-19-actual-3",
+      "profile": "pgs-independent89--physical-tail-declared-19-actual-3",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-3/input.bin",
+      "sha256": "bf0efd7eeccd08aa9ebd58c6a0e50e783540be03f555361a39ab76a45b777fb2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15226051459879659572
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-19-actual-4",
+      "profile": "pgs-independent89--physical-tail-declared-19-actual-4",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-4/input.bin",
+      "sha256": "677e3c7b239dbb0f0ebf52100f1d83611f806addd4b243d095f5ea882d306e3b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 10838994266421691073
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-19-actual-7",
+      "profile": "pgs-independent89--physical-tail-declared-19-actual-7",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-7/input.bin",
+      "sha256": "de61a2e7948c1e1fdf0aea69cb000892d58ebf8491a015b044b5678f2c423b44",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12746150187294339189
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-65535-actual-1",
+      "profile": "pgs-independent89--physical-tail-declared-65535-actual-1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-1/input.bin",
+      "sha256": "174b84b48f9c58d8964b923f8c6d827f7f4b6a23c03d7824e8309c08e285b406",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 4814684776100148181
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-65535-actual-11",
+      "profile": "pgs-independent89--physical-tail-declared-65535-actual-11",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-11/input.bin",
+      "sha256": "27b031d947d2727da263b2b5c0993bfad204ab30d1023bdef9b373a44ac18e01",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 13034449656283989141
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-65535-actual-13",
+      "profile": "pgs-independent89--physical-tail-declared-65535-actual-13",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-13/input.bin",
+      "sha256": "a46dc9138d0ef14003394a6dcf02e714a2824faf1c7fbff9be8571a7729d6600",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 11090335528253957651
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-65535-actual-2",
+      "profile": "pgs-independent89--physical-tail-declared-65535-actual-2",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-2/input.bin",
+      "sha256": "e98dfa18eca4f27c4a1302d2065be507faae04a7a265552e596f2ef63b9cb5c8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1681275470315690169
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-65535-actual-3",
+      "profile": "pgs-independent89--physical-tail-declared-65535-actual-3",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-3/input.bin",
+      "sha256": "12a9e231cab509885836c0eedd79d5079b4a29bb9659a84208106c191f0d6e4f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15226051459879911943
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-65535-actual-4",
+      "profile": "pgs-independent89--physical-tail-declared-65535-actual-4",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-4/input.bin",
+      "sha256": "fd043c14e9174d6a7b7b851c7c2e891b7bfb4908572c12743530c260e103a07f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 10838994266429514574
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-65535-actual-7",
+      "profile": "pgs-independent89--physical-tail-declared-65535-actual-7",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-7/input.bin",
+      "sha256": "9c0c747d987933539122097cf8cb5f414328d2d48a382c482a51801271b12bf7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12746150420364257480
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-71-actual-1",
+      "profile": "pgs-independent89--physical-tail-declared-71-actual-1",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-1/input.bin",
+      "sha256": "174b84b48f9c58d8964b923f8c6d827f7f4b6a23c03d7824e8309c08e285b406",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 4814684776100148181
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-71-actual-11",
+      "profile": "pgs-independent89--physical-tail-declared-71-actual-11",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-11/input.bin",
+      "sha256": "216f5c49900deacd890c63ee10b6019c704f439b4a32c94c5935e0aa79c220aa",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12820579552626321422
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-71-actual-13",
+      "profile": "pgs-independent89--physical-tail-declared-71-actual-13",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-13/input.bin",
+      "sha256": "818d6e1b4b6519d8de5bfecd5e2df07999b0c7154d9215d02548976f0c7ccf76",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 8475350724040347468
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-71-actual-2",
+      "profile": "pgs-independent89--physical-tail-declared-71-actual-2",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-2/input.bin",
+      "sha256": "4de77d895e6c1d29c58b5473b496e0a69f8145d2cc75518b50eed137942fc844",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1681275470315682264
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-71-actual-3",
+      "profile": "pgs-independent89--physical-tail-declared-71-actual-3",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-3/input.bin",
+      "sha256": "06fd4822c9fdd5eb452365867ebc1d6054665dc00c6470b57184c6bf146e5184",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15226051459879661184
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-71-actual-4",
+      "profile": "pgs-independent89--physical-tail-declared-71-actual-4",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-4/input.bin",
+      "sha256": "746777df8e6ecf7bcfc2717c22e1d26cfb52ca907a83c674f77790793e8cef5d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 10838994266421741045
+      }
+    },
+    {
+      "id": "pgs-independent89--physical-tail-declared-71-actual-7",
+      "profile": "pgs-independent89--physical-tail-declared-71-actual-7",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-7/input.bin",
+      "sha256": "5fe8e80b6123467f7ff393d4e941feba42b072d0f3dcf03db8abf79203a56aaf",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12746150188783055041
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-17x3-complete",
+      "profile": "pgs-independent89--rle-17x3-complete",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-complete/input.bin",
+      "sha256": "be85e7b4a30a21f5ccd7922e586484e9cc2d94761342e988a283680d2175a65d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 51,
+        "digest": 10669293932745561101
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-17x3-run-crossing",
+      "profile": "pgs-independent89--rle-17x3-run-crossing",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-run-crossing/input.bin",
+      "sha256": "3dba9eee7aeb86c271d92f1d30cc2c683a913fcd79f8204739707bc8f77d5015",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 14715136780952099269
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-17x3-short-line",
+      "profile": "pgs-independent89--rle-17x3-short-line",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-short-line/input.bin",
+      "sha256": "60e3927caa6e352be16c75908e455a9dc6b6e0ac2b9b7f5745dfb43ac6fb176c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 12244695987597465568
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-17x3-tail-after-EOL",
+      "profile": "pgs-independent89--rle-17x3-tail-after-EOL",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-tail-after-EOL/input.bin",
+      "sha256": "ab6c4df45d18ddb050eb126d9aa17a327dced29c465a1eec8259acc4bcd3ba02",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 51,
+        "digest": 12788745303939901683
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-17x3-truncated-control",
+      "profile": "pgs-independent89--rle-17x3-truncated-control",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-truncated-control/input.bin",
+      "sha256": "f6a7090e756af69a4937952a3475e1163bd38203297856e1da0ad66840ea8c0c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 1505396187786587216
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-17x3-truncated-long-colour",
+      "profile": "pgs-independent89--rle-17x3-truncated-long-colour",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-truncated-long-colour/input.bin",
+      "sha256": "cd1a38b5d51846df2018a942faf2bf42f3fb230dbbee1fdedb4fa35e84b59ed6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7800987646126126388
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-17x3-zero-run",
+      "profile": "pgs-independent89--rle-17x3-zero-run",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-zero-run/input.bin",
+      "sha256": "4a47b4234396589b38ef222e692a2a7a72e7f465dd87e91cffcb31055995c771",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 15308912532929044205
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-1x1-complete",
+      "profile": "pgs-independent89--rle-1x1-complete",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-complete/input.bin",
+      "sha256": "01bfe1261780db84ac2d063324237de278aa7eb76a1a6d0201ca4945f39d7a8e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 9061802707497290147
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-1x1-run-crossing",
+      "profile": "pgs-independent89--rle-1x1-run-crossing",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-run-crossing/input.bin",
+      "sha256": "d9f74a289fc0f7a743c8e0d29033a0d057c28caa1854740a8e0368cd5119a0de",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 16418032040834366063
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-1x1-short-line",
+      "profile": "pgs-independent89--rle-1x1-short-line",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-short-line/input.bin",
+      "sha256": "e452e6df89aef631629fff9efa73da0d6efecf2962fe16b9937b2f1de5ff9444",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 4990237897617578594
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-1x1-tail-after-EOL",
+      "profile": "pgs-independent89--rle-1x1-tail-after-EOL",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-tail-after-EOL/input.bin",
+      "sha256": "e51776214fa1191e0db11594d926769e686fdac855aaadf3a6de4b02af784e88",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 7341434660611419827
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-1x1-truncated-control",
+      "profile": "pgs-independent89--rle-1x1-truncated-control",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-truncated-control/input.bin",
+      "sha256": "d512b85d6bcde9f00b5a524c09b710115f2ff545cc24e7ec6425dc82ae7500c0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 1871239148205170698
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-1x1-truncated-long-colour",
+      "profile": "pgs-independent89--rle-1x1-truncated-long-colour",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-truncated-long-colour/input.bin",
+      "sha256": "59e704f4e9d2dea673b751207c47508390cabf852fa2585eeeb47b8a5d896f2e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 9505033507817791982
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-1x1-zero-run",
+      "profile": "pgs-independent89--rle-1x1-zero-run",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-zero-run/input.bin",
+      "sha256": "96ffaed9efff74b1c570c19ab7d117f261318b51b22bf810ceb7791e49dac3c6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 17012958394620709799
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-2x1-complete",
+      "profile": "pgs-independent89--rle-2x1-complete",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-complete/input.bin",
+      "sha256": "a0846f7b32ee860ba82385ec5209c1aa0b4d6eb169e6975aa1fe2f2e60d01641",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 16179587360064731239
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-2x1-run-crossing",
+      "profile": "pgs-independent89--rle-2x1-run-crossing",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-run-crossing/input.bin",
+      "sha256": "124bf648a5f4215e2655d47abd97defcc7a2f3532b4a15813b77748eb2bcd3d2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8223152064225375668
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-2x1-short-line",
+      "profile": "pgs-independent89--rle-2x1-short-line",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-short-line/input.bin",
+      "sha256": "7b8b9295165011b9fdef12be3faa743459140fdd1ecb59e8a067650a7be46adb",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8885396776152444721
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-2x1-tail-after-EOL",
+      "profile": "pgs-independent89--rle-2x1-tail-after-EOL",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-tail-after-EOL/input.bin",
+      "sha256": "9c492d65997abd7621c8b441c97b57e50c92a9579957cc4dc13d1581f785b18f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 1130068399366151065
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-2x1-truncated-control",
+      "profile": "pgs-independent89--rle-2x1-truncated-control",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-truncated-control/input.bin",
+      "sha256": "21717dbe1f9fd6cbbafba908fc3c35cd23c9b7ad87a1f3ff34449bf38909a6bb",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 3427421032176429838
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-2x1-truncated-long-colour",
+      "profile": "pgs-independent89--rle-2x1-truncated-long-colour",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-truncated-long-colour/input.bin",
+      "sha256": "2de323d910d66fb97e6819b03ea634360ae29f84094077b77089f1666c8f82b7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 12839296664664183922
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-2x1-zero-run",
+      "profile": "pgs-independent89--rle-2x1-zero-run",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-zero-run/input.bin",
+      "sha256": "12708b0400c5bfbf0c3ef7559a4ee8bfdb1e88bf5a145a7df153cb4970a69212",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 1900477477757550123
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-3x2-complete",
+      "profile": "pgs-independent89--rle-3x2-complete",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-complete/input.bin",
+      "sha256": "d63d936f14215524bd0a9e7366dee92effa52e4b3c62b7eb32e0ed4431027e43",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 6,
+        "digest": 9270281212396446954
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-3x2-run-crossing",
+      "profile": "pgs-independent89--rle-3x2-run-crossing",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-run-crossing/input.bin",
+      "sha256": "8f31c1c29bd25f20e013f077c3f183d7b2ca83c47ba01829f4e13a553fddafd7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 9395632049418520188
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-3x2-short-line",
+      "profile": "pgs-independent89--rle-3x2-short-line",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-short-line/input.bin",
+      "sha256": "2a81b959c1fd0e6d5d8996ac38fb9f80fcd7a1dfd525dd4e2c0a544d754993c9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 16363590529721192385
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-3x2-tail-after-EOL",
+      "profile": "pgs-independent89--rle-3x2-tail-after-EOL",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-tail-after-EOL/input.bin",
+      "sha256": "3eed645daa342f459cc9a2e4625a69dab9c4ea764a9ffb1cfbe02eb87f0f520f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 6,
+        "digest": 17231347327658262994
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-3x2-truncated-control",
+      "profile": "pgs-independent89--rle-3x2-truncated-control",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-truncated-control/input.bin",
+      "sha256": "981cb5e957a15cc3bde627bd922e2066f07e22485c77e1c977caa53359dd0f43",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 10797970437877875733
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-3x2-truncated-long-colour",
+      "profile": "pgs-independent89--rle-3x2-truncated-long-colour",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-truncated-long-colour/input.bin",
+      "sha256": "29cd43794cadc8ce3bdb796e3f5209d8c4b2995ddbf8a88d73315600a0aafbbc",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7094175709603159161
+      }
+    },
+    {
+      "id": "pgs-independent89--rle-3x2-zero-run",
+      "profile": "pgs-independent89--rle-3x2-zero-run",
+      "group": "pgs-independent89",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-zero-run/input.bin",
+      "sha256": "88976c80deab50581fd0f8e2f3987ca1495fe92e4f3046b61e3d88c8d2180a6f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 14602100596406076978
+      }
+    },
+    {
+      "id": "pgs-original140--cache-edge-complete-unused-object-preload",
+      "profile": "pgs-original140--cache-edge-complete-unused-object-preload",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-complete-unused-object-preload/input.bin",
+      "sha256": "5946b75fb7007fc60cc0835018eff091aa2125d70b78037fda0adf63485ceb77",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 3880131252884195564
+      }
+    },
+    {
+      "id": "pgs-original140--cache-edge-pending-across-clear-END",
+      "profile": "pgs-original140--cache-edge-pending-across-clear-END",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-across-clear-END/input.bin",
+      "sha256": "c765d8726e851b21243dbe40763596977a85dfc904e6bc4346c1d73e563635ef",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 8360351575429292130
+      }
+    },
+    {
+      "id": "pgs-original140--cache-edge-pending-across-two-clear-ENDs",
+      "profile": "pgs-original140--cache-edge-pending-across-two-clear-ENDs",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-across-two-clear-ENDs/input.bin",
+      "sha256": "0dbdb6c3ca3d80d53b471fb950bb68dd9dee0b875253e698ea830fcf15791b3f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 14762497482602365930
+      }
+    },
+    {
+      "id": "pgs-original140--cache-edge-pending-at-explicit-EOF",
+      "profile": "pgs-original140--cache-edge-pending-at-explicit-EOF",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-at-explicit-EOF/input.bin",
+      "sha256": "5643441a94213af1aa571408cd9409111fa8a264c1c833a5ac6fc965d276915e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 4697525147680150166
+      }
+    },
+    {
+      "id": "pgs-original140--cache-edge-pending-discarded-at-epoch",
+      "profile": "pgs-original140--cache-edge-pending-discarded-at-epoch",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-discarded-at-epoch/input.bin",
+      "sha256": "8cd06a7f23ed2c381dcdadad2ec8f3da6702b12ba88f78a08f2434633d80e563",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 248597076900275048
+      }
+    },
+    {
+      "id": "pgs-original140--clock-large-exact",
+      "profile": "pgs-original140--clock-large-exact",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-large-exact/input.bin",
+      "sha256": "0e2d46b843f48b3de904be12e75473a960b0b8474e682507c62054950ab0283d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 9387980860159371318
+      }
+    },
+    {
+      "id": "pgs-original140--clock-native-unrepresentable-overflow",
+      "profile": "pgs-original140--clock-native-unrepresentable-overflow",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-native-unrepresentable-overflow/input.bin",
+      "sha256": "c09f909ce14dce6b834d067fbe6ad583f4b7d298cfc60a074cd06c2c37c2f5af",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 16048218331106481565
+      }
+    },
+    {
+      "id": "pgs-original140--clock-native-unrepresentable-sentinel",
+      "profile": "pgs-original140--clock-native-unrepresentable-sentinel",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-native-unrepresentable-sentinel/input.bin",
+      "sha256": "7142456e7c57f803a800d2c8a64cabb9e0fd4be4ab7f4d2ed05c4156808bf649",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 15775768642881347306
+      }
+    },
+    {
+      "id": "pgs-original140--clock-negative",
+      "profile": "pgs-original140--clock-negative",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-negative/input.bin",
+      "sha256": "5be23348c3775e9579d88a1a5830a0ca65f115174b16e1fcd731b345e6ef45a4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 11558959169365465430
+      }
+    },
+    {
+      "id": "pgs-original140--clock-one-tick",
+      "profile": "pgs-original140--clock-one-tick",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-one-tick/input.bin",
+      "sha256": "682828158fbc0a67c484a32a206b97f176b060b04846fe2c9afa1b109b98fc42",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 10417398879933410629
+      }
+    },
+    {
+      "id": "pgs-original140--clock-prime-base",
+      "profile": "pgs-original140--clock-prime-base",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-prime-base/input.bin",
+      "sha256": "2f0dbcd14e5da261d19e38a2ec014aadb10cc040c158e70e8bf88fd96587e617",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 4856876359050775229
+      }
+    },
+    {
+      "id": "pgs-original140--clock-split-both-unknown",
+      "profile": "pgs-original140--clock-split-both-unknown",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-both-unknown/input.bin",
+      "sha256": "11ca4b2494caf5eca1d934749d7139788609402f80803be69e6fcf1c99fb9b41",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 16546904373037821002
+      }
+    },
+    {
+      "id": "pgs-original140--clock-split-pcs-known-end-different",
+      "profile": "pgs-original140--clock-split-pcs-known-end-different",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-pcs-known-end-different/input.bin",
+      "sha256": "de557240d96415c82be174b5a914aae9f17a689eb9e6abccce6310b4b5269f82",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 9474423505984686518
+      }
+    },
+    {
+      "id": "pgs-original140--clock-split-pcs-known-end-unknown",
+      "profile": "pgs-original140--clock-split-pcs-known-end-unknown",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-pcs-known-end-unknown/input.bin",
+      "sha256": "49517713823f63b0bd7c552a66d9964253ec3bf41119b760f1e3c14c0b606b5e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 3030199793521098262
+      }
+    },
+    {
+      "id": "pgs-original140--clock-split-pcs-unknown-end-known",
+      "profile": "pgs-original140--clock-split-pcs-unknown-end-known",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-pcs-unknown-end-known/input.bin",
+      "sha256": "1a0175c3d653e5117d2eeb52e75b4140ff63d8c866e9662bea236189f2ea1e22",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 8723368502182603824
+      }
+    },
+    {
+      "id": "pgs-original140--clock-unknown",
+      "profile": "pgs-original140--clock-unknown",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-unknown/input.bin",
+      "sha256": "ec116448d8f6de61d77c2048e016d30bfd63fa1edf5d66b2a2ae1f2082c76f18",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 7728106168818649787
+      }
+    },
+    {
+      "id": "pgs-original140--clock-zero",
+      "profile": "pgs-original140--clock-zero",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-zero/input.bin",
+      "sha256": "09c62cef1c69f8be7a46275d4bcb895c157f230bd2019a10c6152a85a0f25a93",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 2874697177976774235
+      }
+    },
+    {
+      "id": "pgs-original140--compat-EOF-PCS-only",
+      "profile": "pgs-original140--compat-EOF-PCS-only",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-PCS-only/input.bin",
+      "sha256": "db39a5c231a637695bed66acfea30f9cff82e54929531480f2646eb742637e8d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12572870628647389242
+      }
+    },
+    {
+      "id": "pgs-original140--compat-EOF-complete-ODS-without-END",
+      "profile": "pgs-original140--compat-EOF-complete-ODS-without-END",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-complete-ODS-without-END/input.bin",
+      "sha256": "04776a8f14e22905d858f9bfc954ced9634168e7f6a47a93e2286d4244d3341d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 10315510686766320007
+      }
+    },
+    {
+      "id": "pgs-original140--compat-EOF-complete-then-empty-first-pending",
+      "profile": "pgs-original140--compat-EOF-complete-then-empty-first-pending",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-complete-then-empty-first-pending/input.bin",
+      "sha256": "f94c5b0ddec900b5488c940ae4436358310d856d6ebd5fcdf83dad6a72257275",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 17652382969068361799
+      }
+    },
+    {
+      "id": "pgs-original140--compat-EOF-palette-update-without-END",
+      "profile": "pgs-original140--compat-EOF-palette-update-without-END",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-palette-update-without-END/input.bin",
+      "sha256": "3d3d90ef5b198643b550dd6e46b01c3de856b53707900f69940347e2463c5766",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 17307931607437189131
+      }
+    },
+    {
+      "id": "pgs-original140--compat-cache-hidden-third-before-rejected-first",
+      "profile": "pgs-original140--compat-cache-hidden-third-before-rejected-first",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-hidden-third-before-rejected-first/input.bin",
+      "sha256": "9773968266607d396c9999ddd3ac579688c571e967a2d5fec5ddf0421bdf813b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 9253148444784791740
+      }
+    },
+    {
+      "id": "pgs-original140--compat-cache-oversized-replacement-keeps-old-native",
+      "profile": "pgs-original140--compat-cache-oversized-replacement-keeps-old-native",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-oversized-replacement-keeps-old-native/input.bin",
+      "sha256": "f980db8f0633da19c55daff68fd6f5d0c1a1372f90db6879f4edaf7ae6f14122",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 2146967376991227276
+      }
+    },
+    {
+      "id": "pgs-original140--compat-cache-rejected-first-then-valid-replacement",
+      "profile": "pgs-original140--compat-cache-rejected-first-then-valid-replacement",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-rejected-first-then-valid-replacement/input.bin",
+      "sha256": "1b02e0b9f6b1ce33a0c459038e2d13ef18681a029207e24ee36210689a75d420",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 1629377067967613914
+      }
+    },
+    {
+      "id": "pgs-original140--compat-cache-unused-complete-before-rejected-first",
+      "profile": "pgs-original140--compat-cache-unused-complete-before-rejected-first",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-unused-complete-before-rejected-first/input.bin",
+      "sha256": "32782d1d4b74ebc83d9a6e881239973bd134f11f9d4705dfd57b181e21e1f29a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 11182661560768104791
+      }
+    },
+    {
+      "id": "pgs-original140--compat-cache-unused-fragments-before-rejected-first",
+      "profile": "pgs-original140--compat-cache-unused-fragments-before-rejected-first",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-unused-fragments-before-rejected-first/input.bin",
+      "sha256": "29a0c19a66cf09a8963e1cf737b87f948269cacbbb2a0b737890408ddc7cb9ee",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 9881099345919823937
+      }
+    },
+    {
+      "id": "pgs-original140--compat-cache-unused-preload-epoch-then-rejected-first",
+      "profile": "pgs-original140--compat-cache-unused-preload-epoch-then-rejected-first",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-unused-preload-epoch-then-rejected-first/input.bin",
+      "sha256": "0208bbde821ab3dc6ce8dee06477d5e17e19cb9671992b9fbc619dc63015041a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 11094382570923479391
+      }
+    },
+    {
+      "id": "pgs-original140--compat-clock-negative-half-microsecond",
+      "profile": "pgs-original140--compat-clock-negative-half-microsecond",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-clock-negative-half-microsecond/input.bin",
+      "sha256": "2294a9f86b6cb04c2415d89c3f972ed37da82da0023400c4d2d43a2daeeede70",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 18057422764128265803
+      }
+    },
+    {
+      "id": "pgs-original140--compat-clock-sentinel-on-END-fallback",
+      "profile": "pgs-original140--compat-clock-sentinel-on-END-fallback",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-clock-sentinel-on-END-fallback/input.bin",
+      "sha256": "bb8c31e0f844714b6f3ed3bd18875bcf37212c182ff900d5a43a122a53615268",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 13884268045958270493
+      }
+    },
+    {
+      "id": "pgs-original140--compat-clock-unknown-PTS-sentinel-DTS",
+      "profile": "pgs-original140--compat-clock-unknown-PTS-sentinel-DTS",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-clock-unknown-PTS-sentinel-DTS/input.bin",
+      "sha256": "2031d80d1d2658a0817adee92733015874f864e6e6fbcb594df2bd43874d57d3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 14338602856061969956
+      }
+    },
+    {
+      "id": "pgs-original140--compat-empty-first-after-hard-reset",
+      "profile": "pgs-original140--compat-empty-first-after-hard-reset",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-after-hard-reset/input.bin",
+      "sha256": "3dc3c4ebe7a1911416b99393273f876293e32ef7b75c5bd44b3313a4059577c7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 16316938320980931076
+      }
+    },
+    {
+      "id": "pgs-original140--compat-empty-first-partial-palette-recolours-old-image",
+      "profile": "pgs-original140--compat-empty-first-partial-palette-recolours-old-image",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-partial-palette-recolours-old-image/input.bin",
+      "sha256": "55748997fae658c3a1bfff98a36fa442af90082dced73627a919f1d95a69e40c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 8884404295620899302
+      }
+    },
+    {
+      "id": "pgs-original140--compat-empty-first-replacement-00",
+      "profile": "pgs-original140--compat-empty-first-replacement-00",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-00/input.bin",
+      "sha256": "eefea57e7dfbc8102e37def98f44cd049d55c448d8bb0549c5257246b50592aa",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 16012250722795269917
+      }
+    },
+    {
+      "id": "pgs-original140--compat-empty-first-replacement-40",
+      "profile": "pgs-original140--compat-empty-first-replacement-40",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-40/input.bin",
+      "sha256": "576bbf18791b5a750940723f1510e7afde7d6eaec18645afb9463f5100eabf1a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 15519906969175566094
+      }
+    },
+    {
+      "id": "pgs-original140--compat-empty-first-replacement-80",
+      "profile": "pgs-original140--compat-empty-first-replacement-80",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-80/input.bin",
+      "sha256": "1c8510674ccb038195a0028524f6c4129bfb35eafff624174377a250e7e1e48d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 16249295000482918094
+      }
+    },
+    {
+      "id": "pgs-original140--compat-empty-first-replacement-c0",
+      "profile": "pgs-original140--compat-empty-first-replacement-c0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-c0/input.bin",
+      "sha256": "d8cc481666c378db4b989f26517a33174bc1815e581c27082ce6094bf647fbec",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 16978683031790270094
+      }
+    },
+    {
+      "id": "pgs-original140--compat-empty-first-replacement-new-shape",
+      "profile": "pgs-original140--compat-empty-first-replacement-new-shape",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-new-shape/input.bin",
+      "sha256": "014643bd6af823fe7d5014bb3285b43ece9c84d4fdac36959435c47db929c30c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 9502240274961403165
+      }
+    },
+    {
+      "id": "pgs-original140--compat-first-clear-then-complete-in-one-packet",
+      "profile": "pgs-original140--compat-first-clear-then-complete-in-one-packet",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-first-clear-then-complete-in-one-packet/input.bin",
+      "sha256": "73dffe91438843869fe9c6c9d7ba4b9cdfece9858324fe8efd6a8e0d5720838d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 393789613822709739
+      }
+    },
+    {
+      "id": "pgs-original140--compat-first-image-then-clear-new-context",
+      "profile": "pgs-original140--compat-first-image-then-clear-new-context",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-first-image-then-clear-new-context/input.bin",
+      "sha256": "9ece888687d9972d122286ea591a40c31fce78224e17c78de8bdd72c7b4d4023",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 15212907717236461647
+      }
+    },
+    {
+      "id": "pgs-original140--compat-oversized-object-first-rejected-by-native",
+      "profile": "pgs-original140--compat-oversized-object-first-rejected-by-native",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-oversized-object-first-rejected-by-native/input.bin",
+      "sha256": "20332e22dd052bea185f4bbb515fbdce48acc758f191b0e882fd8e0ae88302c8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 12858242111958267438
+      }
+    },
+    {
+      "id": "pgs-original140--compat-packet-final-context-from-trailing-PCS",
+      "profile": "pgs-original140--compat-packet-final-context-from-trailing-PCS",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-packet-final-context-from-trailing-PCS/input.bin",
+      "sha256": "54f73f57e912911ca6804a6d9b4850075c0e12bf0f6b48f3468bbf5724059f0e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 14094802765720527281
+      }
+    },
+    {
+      "id": "pgs-original140--compat-three-references-forced-false",
+      "profile": "pgs-original140--compat-three-references-forced-false",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-three-references-forced-false/input.bin",
+      "sha256": "823597ef86310a827fb55e4a39ebe269ef3aec26fdeef9d4a5906abd13a8da4f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 5767801944799350899
+      }
+    },
+    {
+      "id": "pgs-original140--compat-three-references-forced-true",
+      "profile": "pgs-original140--compat-three-references-forced-true",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-three-references-forced-true/input.bin",
+      "sha256": "4399713f967dcc0081b238855efd9897a1278ea2395d76d3300f67bb5330a2e7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 12634964327453589443
+      }
+    },
+    {
+      "id": "pgs-original140--duplicate-object-references",
+      "profile": "pgs-original140--duplicate-object-references",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--duplicate-object-references/input.bin",
+      "sha256": "d0459b367a0d4cdeec862666a92d029caae1671dd17bfe9355fd5c47a2ccf42b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 4,
+        "digest": 3220298297226870629
+      }
+    },
+    {
+      "id": "pgs-original140--empty-palette-version-update",
+      "profile": "pgs-original140--empty-palette-version-update",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--empty-palette-version-update/input.bin",
+      "sha256": "98de04339f58477c7a2a760168395844e2c1cfc9a277f04b055e9926b516be48",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 12079974990631065993
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-00",
+      "profile": "pgs-original140--every-ods-split-00",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-00/input.bin",
+      "sha256": "ad4abf1a60f44b581f1e8992688295156174061d48f7c00180041c18445bbe7b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 13352290436569242220
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-01",
+      "profile": "pgs-original140--every-ods-split-01",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-01/input.bin",
+      "sha256": "0d4013fb2a024ebcf17385120d718c66a46987b4645e01fac756a4fbbf61509a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 16499492743757800552
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-02",
+      "profile": "pgs-original140--every-ods-split-02",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-02/input.bin",
+      "sha256": "07ef6b1210359d2ced522551164363ab8b661255339fbbd649b13354c337dbe2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 9109254341823646248
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-03",
+      "profile": "pgs-original140--every-ods-split-03",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-03/input.bin",
+      "sha256": "cf13c32ac0395b9d72d7df996a289487dc85143baf53a2c00c4e6708a343f277",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 7119254509130761772
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-04",
+      "profile": "pgs-original140--every-ods-split-04",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-04/input.bin",
+      "sha256": "4764a1d082202afbcae461c82ffcadf058a25a33270957623a089ae534dc246f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 6253767617819950308
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-05",
+      "profile": "pgs-original140--every-ods-split-05",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-05/input.bin",
+      "sha256": "035a6a4e3fad44fe610a78e5ff5aa3ad89938e8d564e0821c1a69f4f9ad7397e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 4947666532255934704
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-06",
+      "profile": "pgs-original140--every-ods-split-06",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-06/input.bin",
+      "sha256": "c160048ae72f4d706d225af513de552905c8d536c0e87818efc2423a12f9afa2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 2958501725732899812
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-07",
+      "profile": "pgs-original140--every-ods-split-07",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-07/input.bin",
+      "sha256": "e67a9adc02b879880b0ee4b9b815fd37ca233877fcee3ffdd970e9f31b6bf011",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 13778711349777992696
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-08",
+      "profile": "pgs-original140--every-ods-split-08",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-08/input.bin",
+      "sha256": "b230727a666539f64aaad257868f95bffb0ca4c4ee42a53943070da856247b00",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 823883119404771164
+      }
+    },
+    {
+      "id": "pgs-original140--every-ods-split-09",
+      "profile": "pgs-original140--every-ods-split-09",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-09/input.bin",
+      "sha256": "9125edcc0206a3398dffaefac5a00d1a3756fbe6712130859b1e706638bd1cb3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 2716110318283894506
+      }
+    },
+    {
+      "id": "pgs-original140--explicit-hard-context-reset",
+      "profile": "pgs-original140--explicit-hard-context-reset",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--explicit-hard-context-reset/input.bin",
+      "sha256": "344d8e2c17a569b91c63638899024856b72b2855b609cb91ab5811fcf6e7cb64",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 11870234725900674061
+      }
+    },
+    {
+      "id": "pgs-original140--forced-only-false",
+      "profile": "pgs-original140--forced-only-false",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--forced-only-false/input.bin",
+      "sha256": "4f28796ee93a44a2203c91bc694334da63d0dc256cd836a3bee44195c9f1b7f6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 4,
+        "digest": 9962137143224844251
+      }
+    },
+    {
+      "id": "pgs-original140--forced-only-true",
+      "profile": "pgs-original140--forced-only-true",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--forced-only-true/input.bin",
+      "sha256": "7c59b59f4f013b3e8cca54771d7650172753c583aa41edb0fd038e7798df95be",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 4,
+        "digest": 9493412251529512871
+      }
+    },
+    {
+      "id": "pgs-original140--interleaved-object-fragments",
+      "profile": "pgs-original140--interleaved-object-fragments",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--interleaved-object-fragments/input.bin",
+      "sha256": "0f770d96bd726cd2be8ce4be8835323ab2825fc693cfaf535ad00ef82b796dd9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 10,
+        "digest": 14973280466072007468
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-END-without-PCS",
+      "profile": "pgs-original140--malformed-END-without-PCS",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-END-without-PCS/input.bin",
+      "sha256": "ec07a1e0ab39e597fe9504d3dc1d0d927e50d902fa1b01bd98b12b802886679c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 13418159643277468308
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-crop-outside-object",
+      "profile": "pgs-original140--malformed-crop-outside-object",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-crop-outside-object/input.bin",
+      "sha256": "6def9e55041b565264ed7fc3c3113250807bf1f8c6d82dc58857b99a6ec33302",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 13120453733137755479
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-early-last",
+      "profile": "pgs-original140--malformed-early-last",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-early-last/input.bin",
+      "sha256": "77bd5c8afe6c25528a8dce9283c63c079d54b023e63d0fdb925d0db559c4edcb",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 10581476716599458474
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-missing-END",
+      "profile": "pgs-original140--malformed-missing-END",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-missing-END/input.bin",
+      "sha256": "beda7778345de32904f998593bf571ad16c4b115e41218e892cd5cdedc5c5603",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 5662057350345762017
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-missing-last-marker",
+      "profile": "pgs-original140--malformed-missing-last-marker",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-missing-last-marker/input.bin",
+      "sha256": "b98d22f930413a8329fc6752e0434f506f94737dc743c052f000efdf705c3a83",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 2110166533166964126
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-nonempty-END",
+      "profile": "pgs-original140--malformed-nonempty-END",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-nonempty-END/input.bin",
+      "sha256": "6fc622485b191312433ef59bc6833f776ea3a0d4224e142db3c3ac3bfdb800b4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 5617389998739459445
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-overshoot",
+      "profile": "pgs-original140--malformed-overshoot",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-overshoot/input.bin",
+      "sha256": "edf7ec5e6e719e603fc3f1de2ad675dbe5b3580698cca7a39987383774f39673",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 17272209174875263145
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-palette-entry-truncated",
+      "profile": "pgs-original140--malformed-palette-entry-truncated",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-palette-entry-truncated/input.bin",
+      "sha256": "14babe4400453e7e9499aec937b1640d2a9f3e9c14f434a62f5ebba4ca0b1170",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 16020870580602960663
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-windows-truncated",
+      "profile": "pgs-original140--malformed-windows-truncated",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-windows-truncated/input.bin",
+      "sha256": "68d32b127c7a1f745294586fd14675f8790a0baa765f17e5f59207ba92a5ac68",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 17067280334460712687
+      }
+    },
+    {
+      "id": "pgs-original140--malformed-wrong-fragment-version",
+      "profile": "pgs-original140--malformed-wrong-fragment-version",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-wrong-fragment-version/input.bin",
+      "sha256": "42a39d4c1f7d0450868d3bc9d1fbcf01b0dd51e7d5fe3d72e59c34464fc2063d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 5130684346334075565
+      }
+    },
+    {
+      "id": "pgs-original140--matrix-height-1080",
+      "profile": "pgs-original140--matrix-height-1080",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-1080/input.bin",
+      "sha256": "ea32eb970f42d62e76c3fe6c3d447cf1b5f425d80170e0255f150980b4605dd6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 3731423517977591113
+      }
+    },
+    {
+      "id": "pgs-original140--matrix-height-480",
+      "profile": "pgs-original140--matrix-height-480",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-480/input.bin",
+      "sha256": "db35dbd836900f77462cd38625d23f271c3ec03403daedf70172e146748a1848",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 4969846799532439688
+      }
+    },
+    {
+      "id": "pgs-original140--matrix-height-576",
+      "profile": "pgs-original140--matrix-height-576",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-576/input.bin",
+      "sha256": "5603fb727afcdc45a7d0922146fc088cd70fdcd29e7916df403fe644786262fa",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 17838515879867271173
+      }
+    },
+    {
+      "id": "pgs-original140--matrix-height-577",
+      "profile": "pgs-original140--matrix-height-577",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-577/input.bin",
+      "sha256": "e60e451de0df41fc98c9ad27df845cb06416ccf576ff5c194279ef99671973f7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 6482502922901773162
+      }
+    },
+    {
+      "id": "pgs-original140--matrix-per-entry-at-update-time",
+      "profile": "pgs-original140--matrix-per-entry-at-update-time",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-per-entry-at-update-time/input.bin",
+      "sha256": "78fc400788915b44ec3ba272fcfcc86a1de0c5be537c442bde38e3d16b3344a0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 5284957248730586411
+      }
+    },
+    {
+      "id": "pgs-original140--multiple-displays-one-packet",
+      "profile": "pgs-original140--multiple-displays-one-packet",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--multiple-displays-one-packet/input.bin",
+      "sha256": "d9652677b34145ebf8f2bce40727ee17fee79e2eb4f618feee4e48fc56535561",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 8454669202204162620
+      }
+    },
+    {
+      "id": "pgs-original140--multiple-objects-wire-order",
+      "profile": "pgs-original140--multiple-objects-wire-order",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--multiple-objects-wire-order/input.bin",
+      "sha256": "4f28796ee93a44a2203c91bc694334da63d0dc256cd836a3bee44195c9f1b7f6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 4,
+        "digest": 9962137143224844251
+      }
+    },
+    {
+      "id": "pgs-original140--normal-window-replacement",
+      "profile": "pgs-original140--normal-window-replacement",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--normal-window-replacement/input.bin",
+      "sha256": "8d488370d23459e7e1c430415ea59e1126e43f13060389f3cf940d53c7d997fe",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 16215165683488057687
+      }
+    },
+    {
+      "id": "pgs-original140--object-replacement-version-0",
+      "profile": "pgs-original140--object-replacement-version-0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--object-replacement-version-0/input.bin",
+      "sha256": "89ec11471b618f0eadd093835c96469971cd65256eb471a701bbcfce44f2ed22",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 17805205865258519183
+      }
+    },
+    {
+      "id": "pgs-original140--object-replacement-version-2",
+      "profile": "pgs-original140--object-replacement-version-2",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--object-replacement-version-2/input.bin",
+      "sha256": "db8ad2163ff56e707fa75f2bf73df1a17e153081070aa2eee68cfdb11599f77c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 12822504683872327313
+      }
+    },
+    {
+      "id": "pgs-original140--old34-cropped",
+      "profile": "pgs-original140--old34-cropped",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-cropped/input.bin",
+      "sha256": "b80bf086d26b4c8b57de973353b31478ab88fab08bb4dfbfb09a4dd5e95ee1e0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 4249875096322223290
+      }
+    },
+    {
+      "id": "pgs-original140--old34-forced",
+      "profile": "pgs-original140--old34-forced",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-forced/input.bin",
+      "sha256": "e0ef228702868d7c7a05fbc0bd85057a4194b2c59affd26250023eac3ca6e82b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 6327620556107770694
+      }
+    },
+    {
+      "id": "pgs-original140--old34-forced-and-cropped",
+      "profile": "pgs-original140--old34-forced-and-cropped",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-forced-and-cropped/input.bin",
+      "sha256": "7af8617f04a4111f7315ced2d641c29253458b0277c1f4891485e1049f4e706b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 349250227046546619
+      }
+    },
+    {
+      "id": "pgs-original140--old34-mixed-two-rows",
+      "profile": "pgs-original140--old34-mixed-two-rows",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-mixed-two-rows/input.bin",
+      "sha256": "e3323ff33e3f000df94a04b44ff0d58379c83a5a5bcbce735ea325721e208b28",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 18205140475426990716
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-1-0",
+      "profile": "pgs-original140--old34-run-1-0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-1-0/input.bin",
+      "sha256": "b79f591c9865edb6fc95b4776e5e87398fa7f7aecf4156427609057e3dfd7f53",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 11769076536607549397
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-1-1",
+      "profile": "pgs-original140--old34-run-1-1",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-1-1/input.bin",
+      "sha256": "89852f28565c8df1aab91568e0310dfa79dcf07f79cff127a85c0bbb2efca469",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 1511425927350625738
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-1-255",
+      "profile": "pgs-original140--old34-run-1-255",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-1-255/input.bin",
+      "sha256": "3ab0a90dcbd66b5826707c0dce84d371f7909005458c1357c29c36ae251600ac",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 5174896992553426091
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-16383-0",
+      "profile": "pgs-original140--old34-run-16383-0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-16383-0/input.bin",
+      "sha256": "df50415e174309e2f4df8ae2eba11cc5fc66ef7a77a077c5b785c2b8e6f826d8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 16383,
+        "digest": 12361558251524550903
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-16383-1",
+      "profile": "pgs-original140--old34-run-16383-1",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-16383-1/input.bin",
+      "sha256": "24a6a8010a1d28b318d0c2792bcc51a2a35356a8d86c07ef152a4eae95166a17",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 16383,
+        "digest": 15465153967383593022
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-16383-255",
+      "profile": "pgs-original140--old34-run-16383-255",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-16383-255/input.bin",
+      "sha256": "640caeabf49156616429a9ffa88e4faa344dee6c752c863940299690f321819d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 16383,
+        "digest": 18353200611515041309
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-2-0",
+      "profile": "pgs-original140--old34-run-2-0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-2-0/input.bin",
+      "sha256": "801137687efced0879718751bbbc0c4823d75d0f74dcb18fd3e6ea4e5594a8d9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 15517611612986721516
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-2-1",
+      "profile": "pgs-original140--old34-run-2-1",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-2-1/input.bin",
+      "sha256": "61eeae2e48bc31d526a4d02b16ec05317e8852cd3fa68bd1575a331a58d8bf2e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 1613959689316285175
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-2-255",
+      "profile": "pgs-original140--old34-run-2-255",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-2-255/input.bin",
+      "sha256": "1d4d467c0e36a96cc5a510d5fc305b2a8daf154213c54ece29c469720c4f2eb0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 11526036013757075643
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-255-0",
+      "profile": "pgs-original140--old34-run-255-0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-255-0/input.bin",
+      "sha256": "28a37af528927cc0cdc329384d6cb6b3d68bbae516c11be4d75fe994ec90ab3f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 255,
+        "digest": 14618854511303625203
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-255-1",
+      "profile": "pgs-original140--old34-run-255-1",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-255-1/input.bin",
+      "sha256": "c7065088c44a1525575951b8139a410f8dc01aa0f45ac8a1f2096791a2e3889d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 255,
+        "digest": 14401047918377096918
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-255-255",
+      "profile": "pgs-original140--old34-run-255-255",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-255-255/input.bin",
+      "sha256": "c369964959f3af4f060f16d378361d656b545c754c5a094d360829de95880b03",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 255,
+        "digest": 3556933573295103413
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-256-0",
+      "profile": "pgs-original140--old34-run-256-0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-256-0/input.bin",
+      "sha256": "bf62a10a0ac743a26b1543c536ecc3bd999dcaee65e060890478c2dbedf48e89",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 15313784428955103917
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-256-1",
+      "profile": "pgs-original140--old34-run-256-1",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-256-1/input.bin",
+      "sha256": "ea8a3f0bde81df49e003ea1b6a1e5a6912ecd1e7e4c3c53eff23859a8f8f4e50",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 17221901479240435082
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-256-255",
+      "profile": "pgs-original140--old34-run-256-255",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-256-255/input.bin",
+      "sha256": "8d3a4df6df882de1a5148840f7ced20c94caddffa131482d728712e5c9b7ed3d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 8356662365937665740
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-4096-0",
+      "profile": "pgs-original140--old34-run-4096-0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-4096-0/input.bin",
+      "sha256": "542b1074ac92a2991480c2e3114be3af6914dd203c09ae00b3c367cb0345a878",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 4096,
+        "digest": 8083740794544391465
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-4096-1",
+      "profile": "pgs-original140--old34-run-4096-1",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-4096-1/input.bin",
+      "sha256": "bf9c46aa752a6f294481398683720907abaac79be536f67601198f36061f07e1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 4096,
+        "digest": 345350514357840738
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-4096-255",
+      "profile": "pgs-original140--old34-run-4096-255",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-4096-255/input.bin",
+      "sha256": "77b2f4e713f48f56aecbe617fd39daf49ba7a6771c4c87fea2726d6e81e1ab4f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 4096,
+        "digest": 5501658599779302308
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-63-0",
+      "profile": "pgs-original140--old34-run-63-0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-63-0/input.bin",
+      "sha256": "206e9c5f9722cf69cd20f28b4635393957fd2a2006e6c1e631ce65753b10a381",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 63,
+        "digest": 1468160429034334871
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-63-1",
+      "profile": "pgs-original140--old34-run-63-1",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-63-1/input.bin",
+      "sha256": "4707b0026b384013fc058bb1c54ce74ed5572fe516ba359c9eb1758621b2b266",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 63,
+        "digest": 13527405213808550582
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-63-255",
+      "profile": "pgs-original140--old34-run-63-255",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-63-255/input.bin",
+      "sha256": "2be02febf98586db53a323209b1a9265474d41fac84cf6860181dd2286df69f0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 63,
+        "digest": 1427975955823143125
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-64-0",
+      "profile": "pgs-original140--old34-run-64-0",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-64-0/input.bin",
+      "sha256": "0bfee85352f5a554d8cecd0c9dc9e7d273fb9f50f89e881ab39bad6ca650c0a3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 64,
+        "digest": 5609779817036337328
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-64-1",
+      "profile": "pgs-original140--old34-run-64-1",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-64-1/input.bin",
+      "sha256": "f8c842706eddb2e05c6e62c530dc475b0963f08a4b3ff64f2ded09fc1009473b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 64,
+        "digest": 2605478227463417229
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-64-255",
+      "profile": "pgs-original140--old34-run-64-255",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-64-255/input.bin",
+      "sha256": "0ed7398cdcfda32e354cd9e689432a4216ec28e557b1d8ae22c98da03e2bfd0b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 64,
+        "digest": 10552517892964728335
+      }
+    },
+    {
+      "id": "pgs-original140--old34-run-across-row",
+      "profile": "pgs-original140--old34-run-across-row",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-across-row/input.bin",
+      "sha256": "2e16e4cf4f4a7095ad2e7bad9321e0f78f7dcab55c227a49457b661e0be93b4d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 114403017823743381
+      }
+    },
+    {
+      "id": "pgs-original140--old34-short-line",
+      "profile": "pgs-original140--old34-short-line",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-short-line/input.bin",
+      "sha256": "c18f3eed99544b45bbd9625e0618073b993d2527096a98b8240f620c90c9d9f3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 776647729750812434
+      }
+    },
+    {
+      "id": "pgs-original140--old34-trailing-rle",
+      "profile": "pgs-original140--old34-trailing-rle",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-trailing-rle/input.bin",
+      "sha256": "1373afa9258b031397d01102403c89ba247fd3a44dae41a3879b96dcae08b9a0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 8595880414700610190
+      }
+    },
+    {
+      "id": "pgs-original140--old34-truncated-control",
+      "profile": "pgs-original140--old34-truncated-control",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-truncated-control/input.bin",
+      "sha256": "572f04aec5b6a02b4855f74c05db5ea654596868f4afa7096d8691c3bce005c9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 17107196322015285683
+      }
+    },
+    {
+      "id": "pgs-original140--old34-truncated-long-colour",
+      "profile": "pgs-original140--old34-truncated-long-colour",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-truncated-long-colour/input.bin",
+      "sha256": "144b340704ae0f8ace67916f71eabb6e4ab6d48bf11056477431ae55edb44ee1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 4730547618262551635
+      }
+    },
+    {
+      "id": "pgs-original140--old34-zero-colour-run",
+      "profile": "pgs-original140--old34-zero-colour-run",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-zero-colour-run/input.bin",
+      "sha256": "ea44b2372fc915afc96bfe1dd71ddf5935fb13843dcb3fd26a27adf7e73c4ef8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 12238472505065469452
+      }
+    },
+    {
+      "id": "pgs-original140--one-rle-byte-per-fragment",
+      "profile": "pgs-original140--one-rle-byte-per-fragment",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--one-rle-byte-per-fragment/input.bin",
+      "sha256": "617fd6c3f88ab9d0787a1c77ac28e49ad2b458ab114e6754cc24149105f1b126",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 18323391032672497435
+      }
+    },
+    {
+      "id": "pgs-original140--partial-duplicate-palette",
+      "profile": "pgs-original140--partial-duplicate-palette",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--partial-duplicate-palette/input.bin",
+      "sha256": "c52f4e5f3194ff6c44955558f596b7c274ec52f9253af835a000d95e93d45faa",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 12701407822732388727
+      }
+    },
+    {
+      "id": "pgs-original140--reset-state-40-missing-definitions",
+      "profile": "pgs-original140--reset-state-40-missing-definitions",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-40-missing-definitions/input.bin",
+      "sha256": "ccbfe939b91fc56a7437d77935dd0b1abd8a6eb44b6a111fb77c8f27d6ba8c65",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 3536299021647490454
+      }
+    },
+    {
+      "id": "pgs-original140--reset-state-40-partial-palette",
+      "profile": "pgs-original140--reset-state-40-partial-palette",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-40-partial-palette/input.bin",
+      "sha256": "afa1085703811f41b5bb91281aa8b9a8fc019e1fd9ae9f33ef289c65aa481f96",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 6036531827751375233
+      }
+    },
+    {
+      "id": "pgs-original140--reset-state-80-missing-definitions",
+      "profile": "pgs-original140--reset-state-80-missing-definitions",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-80-missing-definitions/input.bin",
+      "sha256": "a5dd9bdf39aad3ff6512f5fac5bd950479bc89775afc1f12567bdbf7c79c2c87",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 1076688563692879318
+      }
+    },
+    {
+      "id": "pgs-original140--reset-state-80-partial-palette",
+      "profile": "pgs-original140--reset-state-80-partial-palette",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-80-partial-palette/input.bin",
+      "sha256": "07a901e83e9d0fd80e0b65f6ec4c3366d8aa2137bfef0da862152bdd48605278",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 17519729377038305601
+      }
+    },
+    {
+      "id": "pgs-original140--reset-state-c0-missing-definitions",
+      "profile": "pgs-original140--reset-state-c0-missing-definitions",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-c0-missing-definitions/input.bin",
+      "sha256": "e503180466930953e32020e9d04bb486b87faf8a1b4f4e88a3e913da37433d99",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 17063822179447819798
+      }
+    },
+    {
+      "id": "pgs-original140--reset-state-c0-partial-palette",
+      "profile": "pgs-original140--reset-state-c0-partial-palette",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-c0-partial-palette/input.bin",
+      "sha256": "543d00d468baf92fd83e3f1f8b2cfaaf93d6178c2de19abd784e2d5e68a68b3d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 10556182852615684353
+      }
+    },
+    {
+      "id": "pgs-original140--reuse-clear-resume",
+      "profile": "pgs-original140--reuse-clear-resume",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--reuse-clear-resume/input.bin",
+      "sha256": "6cb6b91b6d28b1bcb3340c4dc89c4a9947e4cf70e45e7274796cdb6b7a69d4a1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 6,
+        "digest": 16868179532842324360
+      }
+    },
+    {
+      "id": "pgs-original140--same-palette-version-new-values",
+      "profile": "pgs-original140--same-palette-version-new-values",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--same-palette-version-new-values/input.bin",
+      "sha256": "0c33d443c1ce1cee7758749cab0612acccf97ccfcfa61857b6ee9be8fca01c51",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 5257772456387172995
+      }
+    },
+    {
+      "id": "pgs-original140--source-position-outside-canvas",
+      "profile": "pgs-original140--source-position-outside-canvas",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--source-position-outside-canvas/input.bin",
+      "sha256": "bbc38fe131474fc50b0d2a84335175217878c6d3dd0eeef506c7f8dc95521388",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 6314152511396830734
+      }
+    },
+    {
+      "id": "pgs-original140--three-source-objects-native-two-reference-limit",
+      "profile": "pgs-original140--three-source-objects-native-two-reference-limit",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--three-source-objects-native-two-reference-limit/input.bin",
+      "sha256": "79b47b74ffe483ea96f61faef8e843c2c264ad4b1af1509c6d16f711447d9a7a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 12411805510723594748
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-01",
+      "profile": "pgs-original140--truncated-first-header-01",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-01/input.bin",
+      "sha256": "174b84b48f9c58d8964b923f8c6d827f7f4b6a23c03d7824e8309c08e285b406",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 4814684776100148181
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-02",
+      "profile": "pgs-original140--truncated-first-header-02",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-02/input.bin",
+      "sha256": "4de77d895e6c1d29c58b5473b496e0a69f8145d2cc75518b50eed137942fc844",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1681275470315682264
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-03",
+      "profile": "pgs-original140--truncated-first-header-03",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-03/input.bin",
+      "sha256": "bf0efd7eeccd08aa9ebd58c6a0e50e783540be03f555361a39ab76a45b777fb2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15226051459879659572
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-04",
+      "profile": "pgs-original140--truncated-first-header-04",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-04/input.bin",
+      "sha256": "7c52ec4014ba09124bda7ed2a1e9bacb7f2fad67879c298e69a45bf120e47f37",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 10838994266421691290
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-05",
+      "profile": "pgs-original140--truncated-first-header-05",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-05/input.bin",
+      "sha256": "761f74e25f238a54c536ea4ba94e2f02cb2766446e71d83dc99b9ab6b80cd672",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 3967455371922662841
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-06",
+      "profile": "pgs-original140--truncated-first-header-06",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-06/input.bin",
+      "sha256": "af95ab7352e979f65f955fa5dffb1094cc92033fbd62692a42d1586b5adb0230",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12311471715632216600
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-07",
+      "profile": "pgs-original140--truncated-first-header-07",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-07/input.bin",
+      "sha256": "23a12f9b7a0f4865bea90ed9281f0e90c3ff4085c7ba9c11a91d60458f41f3b7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12746150187304086147
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-08",
+      "profile": "pgs-original140--truncated-first-header-08",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-08/input.bin",
+      "sha256": "c81493f1f08ef5d6b800c573b9800fd82c19fbaebd2882d56a9408400e9a21ef",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 8536693042314634178
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-09",
+      "profile": "pgs-original140--truncated-first-header-09",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-09/input.bin",
+      "sha256": "a9a3633f007ad34cdeb8de1437ad688d9ccf21f65ea7f969ade5fe71c10594ba",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12353869503555425169
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-10",
+      "profile": "pgs-original140--truncated-first-header-10",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-10/input.bin",
+      "sha256": "d5944c721d4ea4a3b973303c8c858d84908b7ae8a75038aa806f6b67fe1b92b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 14662501334731849315
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-11",
+      "profile": "pgs-original140--truncated-first-header-11",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-11/input.bin",
+      "sha256": "74cd39dea99fec3cf32d3ef33e0409519c0fca470e3e83c9f2e85bb19533d132",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 12819213693794365648
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-12",
+      "profile": "pgs-original140--truncated-first-header-12",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-12/input.bin",
+      "sha256": "1fdccf41d999188bd85d1219a65b4c0aac4676acbd7074fa8183cb30ab389e68",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 4229943482530151589
+      }
+    },
+    {
+      "id": "pgs-original140--truncated-first-header-13",
+      "profile": "pgs-original140--truncated-first-header-13",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-13/input.bin",
+      "sha256": "b3df4bf37e6f590168c37ae4784579ffcb2d81d5b7afa2ccd8811fc277b4a51a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 7162760386530848654
+      }
+    },
+    {
+      "id": "pgs-original140--unknown-segment-kept",
+      "profile": "pgs-original140--unknown-segment-kept",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--unknown-segment-kept/input.bin",
+      "sha256": "f2c6d639964890c0a3d47dc054e5041a2cca96072e0f01ed12f31df6cc9c5241",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 14296512439927568772
+      }
+    },
+    {
+      "id": "pgs-original140--window-crop-forced-real-pixels",
+      "profile": "pgs-original140--window-crop-forced-real-pixels",
+      "group": "pgs-original140",
+      "file": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--window-crop-forced-real-pixels/input.bin",
+      "sha256": "e3600b9beb8bfb7ab9e62fb97524dc3aa87e3b59b2ce7116d3401fa772db865f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 12,
+        "digest": 2032055340491504626
+      }
+    }
+  ]
+}

@@ -7,6 +7,7 @@ use triergon_subtitles::text::tx3g_semantics::{
 use triergon_subtitles::text::{Encoding, Format, Input, Timing};
 
 fn source(pool: &Budget, bytes: &[u8], config: Option<&[u8]>) -> Input {
+    record_sample(bytes, config);
     Input {
         format: Format::Tx3g,
         encoding: Encoding::Tx3gInBand,
@@ -29,6 +30,35 @@ fn source(pool: &Budget, bytes: &[u8], config: Option<&[u8]>) -> Input {
         configuration_epoch: 37,
         container_position: None,
     }
+}
+/// With `TRIERGON_TX3G_SAMPLES=DIR`, append every sample and configuration a test
+/// builds to `DIR/<test name>`, each as an optional big-endian length-prefixed
+/// configuration and a length-prefixed sample.
+/// `harness/fixtures/subtitle-text/author.py` turns them into the samples of the
+/// `subtitle-text` runner.
+fn record_sample(bytes: &[u8], config: Option<&[u8]>) {
+    use std::io::Write;
+    let Some(dir) = std::env::var_os("TRIERGON_TX3G_SAMPLES") else {
+        return;
+    };
+    let thread = std::thread::current();
+    let name = thread.name().unwrap_or("main").replace("::", "-");
+    let mut record = Vec::new();
+    if let Some(config) = config {
+        record.push(1);
+        record.extend_from_slice(&u32::try_from(config.len()).unwrap().to_be_bytes());
+        record.extend_from_slice(config);
+    } else {
+        record.push(0);
+    }
+    record.extend_from_slice(&u32::try_from(bytes.len()).unwrap().to_be_bytes());
+    record.extend_from_slice(bytes);
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(std::path::Path::new(&dir).join(name))
+        .and_then(|mut file| file.write_all(&record))
+        .unwrap();
 }
 fn boxed(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
     let mut b = (u32::try_from(body.len() + 8).unwrap())

@@ -264,7 +264,7 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 10] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 11] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -309,6 +309,13 @@ const ADDITIONAL_CANDIDATES: [Candidate; 10] = [
     },
     Candidate {
         name: "subtitle-worker",
+        package: "subtitle-worker",
+        example: None,
+        features: &[],
+    },
+    // A second binary of the subtitle-worker package.
+    Candidate {
+        name: "subtitle-capsule-worker",
         package: "subtitle-worker",
         example: None,
         features: &[],
