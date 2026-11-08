@@ -1,5 +1,6 @@
 //! The naming table (OpenType `name`), decoded lazily.
 
+use crate::cmap::CharEncoding;
 use crate::read::{Reader, slice, u16_at};
 use triergon_core::Result;
 
@@ -179,7 +180,7 @@ impl Names {
         Some(NameRecord {
             platform: Platform::from_id(field(0)?),
             encoding_id: field(1)?,
-            language_id: field(2)?,
+            language: Language(field(2)?),
             name_id: NameId::from_id(field(3)?),
             bytes: data.get(start..end)?,
         })
@@ -200,13 +201,22 @@ impl Names {
         for record in self.records(data).filter(|r| r.name_id == name_id) {
             match record.platform {
                 Platform::Unicode | Platform::Iso => unicode = Some(record),
-                Platform::Macintosh if record.language_id == 0 => mac_english = Some(record),
-                Platform::Macintosh if record.encoding_id == 0 => mac_roman = Some(record),
+                Platform::Macintosh if record.language == Language::MACINTOSH_ENGLISH => {
+                    mac_english = Some(record);
+                }
+                Platform::Macintosh if record.encoding() == CharEncoding::MacRoman => {
+                    mac_roman = Some(record);
+                }
                 Platform::Windows
-                    if (windows.is_none() || record.language_id & 0x3ff == 9)
-                        && matches!(record.encoding_id, 0 | 1 | 10) =>
+                    if (windows.is_none() || record.language.is_windows_english())
+                        && matches!(
+                            record.encoding(),
+                            CharEncoding::Symbol
+                                | CharEncoding::Unicode
+                                | CharEncoding::UnicodeFull
+                        ) =>
                 {
-                    english = record.language_id & 0x3ff == 9;
+                    english = record.language.is_windows_english();
                     windows = Some(record);
                 }
                 _ => {}
@@ -224,16 +234,37 @@ impl Names {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NameRecord<'a> {
     pub platform: Platform,
-    /// The platform-specific encoding number.
+    /// The platform-specific encoding number; [`NameRecord::encoding`] reads it.
     pub encoding_id: u16,
-    /// The platform-specific language number.
-    pub language_id: u16,
+    pub language: Language,
     pub name_id: NameId,
     /// The encoded string.
     pub bytes: &'a [u8],
 }
 
+/// A name record's platform-specific language number: a Windows LCID, or a
+/// Macintosh language code.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Language(pub u16);
+
+impl Language {
+    /// Windows LCID 0x0409, English (United States).
+    pub const WINDOWS_ENGLISH_US: Self = Self(0x0409);
+    /// Macintosh language 0, English.
+    pub const MACINTOSH_ENGLISH: Self = Self(0);
+
+    /// Whether a Windows LCID's primary language (its low ten bits) is English.
+    pub const fn is_windows_english(self) -> bool {
+        self.0 & 0x3ff == 0x09
+    }
+}
+
 impl<'a> NameRecord<'a> {
+    /// What the platform and encoding number mean.
+    pub const fn encoding(&self) -> CharEncoding {
+        CharEncoding::of(self.platform, self.encoding_id)
+    }
+
     /// Whether the record is UTF-16BE: the Unicode, ISO and Windows platforms.
     const fn is_utf16(&self) -> bool {
         matches!(
@@ -245,7 +276,7 @@ impl<'a> NameRecord<'a> {
     /// Whether this crate decodes the record: UTF-16BE platforms, and Macintosh
     /// Roman (encoding 0) as Mac OS Roman.
     pub fn is_decodable(&self) -> bool {
-        self.is_utf16() || (self.platform == Platform::Macintosh && self.encoding_id == 0)
+        self.is_utf16() || self.encoding() == CharEncoding::MacRoman
     }
 
     /// The decoded characters. Unpaired UTF-16 surrogates become U+FFFD; an odd
@@ -332,13 +363,13 @@ fn mac_roman(byte: u8) -> char {
 
 #[cfg(test)]
 mod tests {
-    use super::{NameId, NameRecord, Names, Platform};
+    use super::{Language, NameId, NameRecord, Names, Platform};
 
     fn record(platform: u16, encoding: u16, bytes: &[u8]) -> NameRecord<'_> {
         NameRecord {
             platform: Platform::from_id(platform),
             encoding_id: encoding,
-            language_id: 0,
+            language: Language(0),
             name_id: NameId::Family,
             bytes,
         }

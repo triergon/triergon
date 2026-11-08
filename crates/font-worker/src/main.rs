@@ -134,7 +134,7 @@ fn face(font: &Font, outline: &mut Outline, sink: &mut impl Sink) -> io::Result<
         sink.record(Record::Name {
             platform: name.platform.id(),
             encoding: name.encoding_id,
-            language: name.language_id,
+            language: name.language.0,
             id: name.name_id.id(),
             bytes: name.bytes,
         })?;

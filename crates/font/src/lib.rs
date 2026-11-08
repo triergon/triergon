@@ -28,8 +28,8 @@ mod work;
 pub use cff::{CharstringOperator, OperatorSet};
 pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings};
 pub use matching::{FaceInfo, Request, select};
-pub use metrics::{FsSelection, Os2};
-pub use name::{NameChars, NameId, NameRecord, Platform};
+pub use metrics::{FsSelection, MacStyle, Os2};
+pub use name::{Language, NameChars, NameId, NameRecord, Platform};
 pub use outline::{Coordinate, Outline, OutlinePoint, Point, PointKind, ScaledOutline, Segment};
 pub use sized::{Band, ScaledMetrics, SizeMetrics, SizedFont, pixels_26_6};
 pub use store::{Built, Store, StoreKey};
@@ -274,7 +274,7 @@ impl Font {
         }
     }
 
-    pub const fn mac_style(&self) -> u16 {
+    pub const fn mac_style(&self) -> MacStyle {
         self.head.mac_style
     }
 
@@ -350,8 +350,8 @@ impl Font {
                 italic: os2.selection.italic() || os2.selection.oblique(),
             },
             None => Style {
-                bold: self.head.mac_style & 1 != 0,
-                italic: self.head.mac_style & 2 != 0,
+                bold: self.head.mac_style.bold(),
+                italic: self.head.mac_style.italic(),
             },
         }
     }
@@ -396,20 +396,31 @@ impl Font {
     /// failing that, among Macintosh Roman records the last English one, else the
     /// first. FreeType then keeps only printable ASCII other than `[](){}<>/%`.
     pub fn postscript_name(&self) -> Option<NameRecord<'_>> {
-        let pick = |platform: Platform, encodings: &[u16], language: u16| {
+        let pick = |platform: Platform, encodings: &[CharEncoding], language: Language| {
             let mut found: Option<NameRecord<'_>> = None;
             for r in self.names().filter(|r| {
                 r.name_id == NameId::PostScript
                     && r.platform == platform
-                    && encodings.contains(&r.encoding_id)
+                    && encodings.contains(&r.encoding())
             }) {
-                if found.is_none() || r.language_id == language {
+                if found.is_none() || r.language == language {
                     found = Some(r);
                 }
             }
             found
         };
-        pick(Platform::Windows, &[0, 1], 0x409).or_else(|| pick(Platform::Macintosh, &[0], 0))
+        pick(
+            Platform::Windows,
+            &[CharEncoding::Symbol, CharEncoding::Unicode],
+            Language::WINDOWS_ENGLISH_US,
+        )
+        .or_else(|| {
+            pick(
+                Platform::Macintosh,
+                &[CharEncoding::MacRoman],
+                Language::MACINTOSH_ENGLISH,
+            )
+        })
     }
 
     /// The supported cmap subtables, in directory order.
@@ -446,7 +457,8 @@ impl Font {
         };
         let full = |c: &&cmap::Subtable| c.encoding() == CharEncoding::UnicodeFull;
         let unicode = |c: &&cmap::Subtable| {
-            c.platform() == Platform::Unicode && c.encoding_id() != 5 || windows_unicode(c)
+            c.platform() == Platform::Unicode && c.encoding() != CharEncoding::UnicodeVariations
+                || windows_unicode(c)
         };
         all.iter()
             .find(windows_unicode)

@@ -129,19 +129,36 @@ fn segment_delta_valid(table: &[u8]) -> Option<()> {
     Some(())
 }
 
-/// What a subtable's codes are, from its encoding record.
+/// What a platform and encoding number mean, for cmap subtables and name
+/// records alike.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CharEncoding {
     /// Unicode BMP: Windows encoding 1, or Unicode-platform encodings 0 to 3.
     Unicode,
     /// Full Unicode: Windows encoding 10, or Unicode-platform encodings 4 and 6.
     UnicodeFull,
+    /// Unicode variation sequences (Unicode-platform encoding 5, cmap format 14).
+    UnicodeVariations,
     /// Windows Symbol (encoding 0): codes usually in U+F020..U+F0FF.
     Symbol,
     /// Macintosh Roman (Macintosh encoding 0).
     MacRoman,
     /// Any other platform-specific encoding.
     Other,
+}
+
+impl CharEncoding {
+    /// The encoding `id` names on `platform`.
+    pub const fn of(platform: Platform, id: u16) -> Self {
+        match (platform, id) {
+            (Platform::Windows, 1) | (Platform::Unicode, 0..=3) => Self::Unicode,
+            (Platform::Windows, 10) | (Platform::Unicode, 4 | 6) => Self::UnicodeFull,
+            (Platform::Unicode, 5) => Self::UnicodeVariations,
+            (Platform::Windows, 0) => Self::Symbol,
+            (Platform::Macintosh, 0) => Self::MacRoman,
+            _ => Self::Other,
+        }
+    }
 }
 
 /// One supported subtable of a face; [`Charmap`] is its public view.
@@ -208,13 +225,7 @@ impl Subtable {
     }
 
     pub(crate) const fn encoding(&self) -> CharEncoding {
-        match (self.platform, self.encoding) {
-            (Platform::Windows, 1) | (Platform::Unicode, 0..=3) => CharEncoding::Unicode,
-            (Platform::Windows, 10) | (Platform::Unicode, 4 | 6) => CharEncoding::UnicodeFull,
-            (Platform::Windows, 0) => CharEncoding::Symbol,
-            (Platform::Macintosh, 0) => CharEncoding::MacRoman,
-            _ => CharEncoding::Other,
-        }
+        CharEncoding::of(self.platform, self.encoding)
     }
 
     fn table<'a>(&self, data: &'a [u8]) -> &'a [u8] {

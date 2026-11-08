@@ -11,7 +11,7 @@ pub(crate) struct Head {
     pub(crate) flags: u16,
     pub(crate) units_per_em: u16,
     pub(crate) bounds: [i16; 4],
-    pub(crate) mac_style: u16,
+    pub(crate) mac_style: MacStyle,
     /// `indexToLocFormat` is not 0: 32-bit `loca` offsets.
     pub(crate) long_offsets: bool,
 }
@@ -26,7 +26,7 @@ pub(crate) fn head(data: &[u8]) -> Result<Head> {
     }
     r.skip(16)?; // created, modified
     let bounds = [r.i16()?, r.i16()?, r.i16()?, r.i16()?];
-    let mac_style = r.u16()?;
+    let mac_style = MacStyle(r.u16()?);
     r.skip(4)?; // lowestRecPPEM, fontDirectionHint
     // FreeType reads every format other than 0 as long offsets.
     let long_offsets = r.i16()? != 0;
@@ -92,6 +92,27 @@ pub struct Os2 {
     pub typo_line_gap: i16,
     pub win_ascent: u16,
     pub win_descent: u16,
+}
+
+/// The `head.macStyle` flags.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MacStyle(u16);
+
+impl MacStyle {
+    /// Bit 0.
+    pub const fn bold(self) -> bool {
+        self.0 & 1 != 0
+    }
+
+    /// Bit 1.
+    pub const fn italic(self) -> bool {
+        self.0 & 1 << 1 != 0
+    }
+
+    /// The stored bits, including those without a name here.
+    pub const fn bits(self) -> u16 {
+        self.0
+    }
 }
 
 /// The `OS/2.fsSelection` flags.
