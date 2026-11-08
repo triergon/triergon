@@ -9,6 +9,11 @@ use triergon_core::{BudgetVec, Bytes, Error, PushError, Result, SourceLocation, 
 
 mod boundaries;
 pub use boundaries::TransportTailConfirmation;
+mod malformed;
+pub use malformed::{
+    MalformedInputCompletion, MalformedInputFact, MalformedInputKind, MalformedSourceDisposition,
+    NoPacketsConfirmation,
+};
 
 /// The sole transport fault admitted by this compatibility policy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
