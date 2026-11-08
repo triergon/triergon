@@ -4,7 +4,7 @@
 //! diacritics" mode. Shapers that ask for no normalisation get only the
 //! decomposition of characters the font lacks and the mark order.
 
-use crate::buffer::{Buffer, Info};
+use crate::buffer::{Buffer, CharFlag, Info};
 use crate::metrics::Scaled;
 use crate::plan::Plan;
 use crate::props::set_unicode_props;
@@ -153,8 +153,7 @@ impl Normalizer<'_, '_> {
                 buffer.scratch.variation_selector_fallback = true;
                 let cur = buffer.cur_mut();
                 cur.unicode.set_category(unicode::GeneralCategory::Format);
-                cur.unicode
-                    .set(crate::buffer::UnicodeProps::VARIATION_SELECTOR, true);
+                cur.unicode.set(CharFlag::VariationSelector, true);
                 let mut info = *buffer.cur();
                 self.set_glyph(&mut info);
                 *buffer.cur_mut() = info;
@@ -276,9 +275,7 @@ pub(crate) fn normalize(plan: &Plan, buffer: &mut Buffer, font: &Scaled<'_>) -> 
                 && (infos[i + 1].combining_class() == 0
                     || infos[i - 1].combining_class() <= infos[i + 1].combining_class())
             {
-                infos[i]
-                    .unicode
-                    .set(crate::buffer::UnicodeProps::HIDDEN, false);
+                infos[i].unicode.set(CharFlag::Hidden, false);
             }
         }
     }

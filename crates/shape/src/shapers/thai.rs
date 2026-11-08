@@ -6,7 +6,7 @@
 //! The rules are those of <https://linux.thai.net/~thep/th-otf/shaping.html>, as
 //! HarfBuzz implements them.
 
-use crate::buffer::{Buffer, UnicodeProps};
+use crate::buffer::{Buffer, CharFlag};
 use crate::metrics::Scaled;
 use crate::plan::Plan;
 use crate::unicode::GeneralCategory;
@@ -59,7 +59,7 @@ fn decompose_sara_am(buffer: &mut Buffer) -> Result<()> {
         buffer.output_glyph(am - SARA_AM + NIKHAHIT)?;
         let nikhahit = buffer.out_len - 1;
         let info = buffer.out_info_mut(nikhahit);
-        info.unicode.set(UnicodeProps::CONTINUATION, true);
+        info.unicode.set(CharFlag::Continuation, true);
         info.unicode.set_category(GeneralCategory::NonSpacingMark);
         buffer.scratch.continuations = true;
         buffer.replace_glyph(am - 1)?;

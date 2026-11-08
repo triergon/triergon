@@ -62,20 +62,37 @@ pub(crate) struct Pos {
     pub(crate) attachment: Attachment,
 }
 
-/// Character properties a glyph keeps from its character, as HarfBuzz packs them:
-/// the general category, flags, and the modified combining class of a mark (or
-/// the fallback type of a space) in the high byte.
+/// What a glyph's character is beyond its general category.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u16)]
+pub(crate) enum CharFlag {
+    /// A default ignorable, hidden unless a lookup substitutes it.
+    Ignorable = 0x20,
+    /// An ignorable that is removed rather than shown as a space.
+    Hidden = 0x40,
+    /// A mark or other character that continues the grapheme before it.
+    Continuation = 0x80,
+    /// ZERO WIDTH JOINER.
+    Zwj = 0x100,
+    /// ZERO WIDTH NON-JOINER.
+    Zwnj = 0x200,
+    /// A variation selector the font could not combine with its base.
+    VariationSelector = 0x400,
+}
+
+/// Character properties a glyph keeps from its character, in HarfBuzz's two
+/// bytes: the general category and [`CharFlag`]s, and the modified combining
+/// class of a mark (or the fallback type of a space) in the high byte.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct UnicodeProps(pub(crate) u16);
+pub(crate) struct UnicodeProps(u16);
 
 impl UnicodeProps {
     const CATEGORY: u16 = 0x1f;
-    pub(crate) const IGNORABLE: u16 = 0x20;
-    pub(crate) const HIDDEN: u16 = 0x40;
-    pub(crate) const CONTINUATION: u16 = 0x80;
-    pub(crate) const ZWJ: u16 = 0x100;
-    pub(crate) const ZWNJ: u16 = 0x200;
-    pub(crate) const VARIATION_SELECTOR: u16 = 0x400;
+
+    /// The properties of a character of `category` without flags.
+    pub(crate) const fn new(category: GeneralCategory) -> Self {
+        Self(category as u16)
+    }
 
     pub(crate) fn category(self) -> GeneralCategory {
         GeneralCategory::from_index(u8::try_from(self.0 & Self::CATEGORY).unwrap_or(0))
@@ -85,15 +102,15 @@ impl UnicodeProps {
         self.0 = (self.0 & !Self::CATEGORY) | u16::from(category as u8);
     }
 
-    pub(crate) const fn has(self, flag: u16) -> bool {
-        self.0 & flag != 0
+    pub(crate) const fn has(self, flag: CharFlag) -> bool {
+        self.0 & flag as u16 != 0
     }
 
-    pub(crate) fn set(&mut self, flag: u16, on: bool) {
+    pub(crate) fn set(&mut self, flag: CharFlag, on: bool) {
         if on {
-            self.0 |= flag;
+            self.0 |= flag as u16;
         } else {
-            self.0 &= !flag;
+            self.0 &= !(flag as u16);
         }
     }
 
@@ -323,15 +340,15 @@ impl Info {
     }
 
     pub(crate) fn is_default_ignorable(&self) -> bool {
-        self.unicode.has(UnicodeProps::IGNORABLE) && !self.substituted()
+        self.unicode.has(CharFlag::Ignorable) && !self.substituted()
     }
 
     pub(crate) fn is_hidden(&self) -> bool {
-        self.unicode.has(UnicodeProps::HIDDEN)
+        self.unicode.has(CharFlag::Hidden)
     }
 
     pub(crate) fn is_continuation(&self) -> bool {
-        self.unicode.has(UnicodeProps::CONTINUATION)
+        self.unicode.has(CharFlag::Continuation)
     }
 
     fn is_format(&self) -> bool {
@@ -339,11 +356,11 @@ impl Info {
     }
 
     pub(crate) fn is_zwnj(&self) -> bool {
-        self.is_format() && self.unicode.has(UnicodeProps::ZWNJ)
+        self.is_format() && self.unicode.has(CharFlag::Zwnj)
     }
 
     pub(crate) fn is_zwj(&self) -> bool {
-        self.is_format() && self.unicode.has(UnicodeProps::ZWJ)
+        self.is_format() && self.unicode.has(CharFlag::Zwj)
     }
 
     pub(crate) const fn is_base_glyph(&self) -> bool {

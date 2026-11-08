@@ -1,6 +1,6 @@
 //! The character properties a glyph carries through shaping.
 
-use crate::buffer::{Info, Scratch, UnicodeProps};
+use crate::buffer::{CharFlag, Info, Scratch, UnicodeProps};
 use crate::unicode::{self, GeneralCategory};
 
 /// Whether HarfBuzz treats `c` as default ignorable: invisible unless the font
@@ -75,29 +75,29 @@ pub(crate) fn modified_combining_class(c: u32) -> u8 {
 pub(crate) fn set_unicode_props(info: &mut Info, scratch: &mut Scratch) {
     let c = info.glyph;
     let category = unicode::general_category(c);
-    let mut props = UnicodeProps(u16::from(category as u8));
+    let mut props = UnicodeProps::new(category);
     if c >= 0x80 {
         if is_default_ignorable(c) {
             scratch.default_ignorables = true;
-            props.set(UnicodeProps::IGNORABLE, true);
+            props.set(CharFlag::Ignorable, true);
             match c {
-                0x200C => props.set(UnicodeProps::ZWNJ, true),
-                0x200D => props.set(UnicodeProps::ZWJ, true),
+                0x200C => props.set(CharFlag::Zwnj, true),
+                0x200D => props.set(CharFlag::Zwj, true),
                 // Mongolian free variation selectors and tags are hidden but take
                 // part in shaping.
                 0x180B..=0x180D | 0x180F | 0xE0020..=0xE007F => {
-                    props.set(UnicodeProps::HIDDEN, true);
+                    props.set(CharFlag::Hidden, true);
                 }
                 0x034F => {
                     scratch.cgj = true;
-                    props.set(UnicodeProps::HIDDEN, true);
+                    props.set(CharFlag::Hidden, true);
                 }
                 _ => {}
             }
         }
         if category.is_mark() {
             scratch.continuations = true;
-            props.set(UnicodeProps::CONTINUATION, true);
+            props.set(CharFlag::Continuation, true);
             props.set_high(modified_combining_class(c));
         }
     }
@@ -156,5 +156,5 @@ pub(crate) fn set_all(infos: &mut [Info], scratch: &mut Scratch, global_mask: u3
 
 fn continuation(info: &mut Info, scratch: &mut Scratch) {
     scratch.continuations = true;
-    info.unicode.set(UnicodeProps::CONTINUATION, true);
+    info.unicode.set(CharFlag::Continuation, true);
 }

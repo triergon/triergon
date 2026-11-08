@@ -11,7 +11,7 @@
 //! scanners do, each syllable is the longest match of any rule, the earliest
 //! rule winning among equally long ones.
 
-use crate::buffer::{Buffer, Info, ShaperProps, UnicodeProps};
+use crate::buffer::{Buffer, CharFlag, Info, ShaperProps};
 use crate::metrics::Scaled;
 use crate::tag::Script;
 use crate::unicode::vowel_constraints;
@@ -440,7 +440,7 @@ pub(super) fn insert_vowel_constraint_circles(script: Script, buffer: &mut Buffe
         buffer
             .out_info_mut(out)
             .unicode
-            .set(UnicodeProps::CONTINUATION, false);
+            .set(CharFlag::Continuation, false);
         buffer.next_glyph()?;
     }
     buffer.sync()
