@@ -53,7 +53,8 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   `interlaced`. Each picture keeps the timestamp of the access unit that carried it
   through reordering.
 - Errors are typed: `Unsupported(&str)` names the feature, `InvalidData(&str)`,
-  `ResourceLimit(&str)`. The decoder does not panic on malformed input.
+  `ResourceLimit(&str)`, `Budget(StorageError)`. The decoder does not panic on
+  malformed input.
 - Refused with `Unsupported`: bit depth above 8, 4:2:2 and 4:4:4, lossless transform
   bypass, flexible macroblock ordering (more than one slice group), SP/SI slices, data
   partitioning.
@@ -61,6 +62,16 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   base view decodes. Redundant slices are dropped.
 - Limits: at most 1024 macroblocks per side; DPB size from the level or
   `max_dec_frame_buffering`.
+- Storage: frame buffers (also while output pictures share them), motion and macroblock
+  arrays, deblocking state, RBSP and slice lists are charged to a `Budget` before they are
+  allocated. `Decoder::with_limits(Limits { live_storage_bytes })` gives the decoder its
+  own pool (320 MiB by default) and `Decoder::new_in(&budget)` charges a caller's pool. A
+  refused charge is `DecodeError::Budget`; that picture is not decoded and the decoder
+  stays usable. The default covers a level 5.2 DPB (184320 macroblocks) and five more
+  36864-macroblock frames (three stores beyond the DPB size, a spare buffer and a picture
+  the caller holds) at 640 bytes per stored macroblock (384 of samples, at most 256 of
+  motion), plus about 700 bytes per macroblock of one picture's scratch and RBSP: about
+  250 MiB.
 - A damaged slice returns `InvalidData`; its macroblocks stay undecoded where FFmpeg
   would conceal them. An unpaired field is output as a frame with the other field's lines
   unset.
