@@ -10037,6 +10037,16 @@
    "sha256": "5b2fca5cab8942cbe31335653dd11acfa46e85cc3a83a84b42a4f19539fb445a",
    "bytes": 8915135,
    "source_revision": "b8ceb3c73ac3d832afe5d969398b92e035b4a0d6"
+  },
+  {
+   "name": "audio-readers-mac-arm64",
+   "path": "audio-readers-mac-arm64",
+   "retention": "retained",
+   "reason": "Cited Ogg and audio elementary-stream packet comparisons with ffprobe, the generated Ogg inputs and the commands that made them",
+   "key": "evidence/audio-readers-mac-arm64/81ef9a39a2ede6c7d3fd9e2c01579653e3a048f2c9db4130d47e3ba8119d8c2a.tar.gz",
+   "sha256": "81ef9a39a2ede6c7d3fd9e2c01579653e3a048f2c9db4130d47e3ba8119d8c2a",
+   "bytes": 404533,
+   "source_revision": "369aa35579a2f08768521982a0a1ead73adafa83"
   }
  ]
 }
