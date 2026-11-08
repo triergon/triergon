@@ -51,6 +51,14 @@ impl<'a> Iterator for StartCodes<'a> {
     }
 }
 
+/// The first whole start code at or after `from`: where its prefix begins and
+/// its code byte. Unlike [`start_codes`], this does not look for the next one.
+#[must_use]
+pub fn next_start_code(es: &[u8], from: usize) -> Option<(usize, u8)> {
+    let offset = find_prefix(es, from)?;
+    Some((offset, *es.get(offset + 3)?))
+}
+
 /// The first `00 00 01` at or after `from`.
 fn find_prefix(es: &[u8], from: usize) -> Option<usize> {
     let mut i = from;

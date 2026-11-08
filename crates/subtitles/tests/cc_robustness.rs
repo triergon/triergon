@@ -278,3 +278,78 @@ fn nal_lengths_past_the_access_unit_or_of_no_size_frame_nothing() {
         assert_eq!(extractor.pop().expect("pop"), None);
     }
 }
+
+/// An MPEG-2 picture of `kind` (1 I, 2 P, 3 B) with one A/53 caption pair and
+/// a slice of `slice` bytes.
+fn mpeg2_picture(kind: u8, caption: u8, slice: usize) -> Vec<u8> {
+    let mut picture = vec![0, 0, 1, 0x00, 0, kind << 3, 0xff, 0xf8];
+    picture.extend_from_slice(b"\0\0\x01\xb2GA94\x03\x41\xff\xfc");
+    picture.extend_from_slice(&[caption, caption]);
+    picture.extend_from_slice(&[0, 0, 1, 0x01]);
+    picture.resize(picture.len() + slice, 0x55);
+    picture
+}
+
+/// A 29.97 Hz sequence header.
+const MPEG2_SEQUENCE: [u8; 12] = [
+    0, 0, 1, 0xb3, 0x2d, 0x01, 0xe0, 0x24, 0xff, 0xff, 0xe0, 0x18,
+];
+
+/// Pushes `stream` in transport-sized pieces without popping, then finishes
+/// and pops; the work spent and the frames.
+fn extract_unpopped(stream: &[u8]) -> (u64, usize) {
+    let pool = Budget::new(1 << 26).expect("pool");
+    let mut extractor = CaptionExtractor::new(&pool, VideoCoding::Mpeg2Raw, (1, 90_000));
+    let mut work = WorkBudget::new(u64::MAX);
+    for piece in stream.chunks(184) {
+        let packet = VideoPacket {
+            data: piece,
+            pts: None,
+            dts: None,
+            duration: None,
+        };
+        extractor.push(packet, &mut work).expect("push");
+    }
+    extractor.finish().expect("finish");
+    let mut frames = 0;
+    while extractor.pop().expect("pop").is_some() {
+        frames += 1;
+    }
+    (work.spent(), frames)
+}
+
+#[test]
+fn caption_extraction_work_grows_linearly_with_the_stream() {
+    // Many small captioned pictures waiting in the output, and one picture
+    // whose slices arrive over many pushes.
+    let many = |pictures: usize| {
+        let mut stream = MPEG2_SEQUENCE.to_vec();
+        for n in 0..pictures {
+            stream.extend(mpeg2_picture(
+                if n == 0 { 1 } else { 2 },
+                0x80 | n as u8,
+                64,
+            ));
+        }
+        stream
+    };
+    let open = |slice: usize| {
+        let mut stream = MPEG2_SEQUENCE.to_vec();
+        stream.extend(mpeg2_picture(1, 0x41, slice));
+        stream
+    };
+    let k = 8;
+    for (small, large, frames) in [
+        (many(500), many(500 * k), (500, 500 * k)),
+        (open(1 << 16), open(k << 16), (1, 1)),
+    ] {
+        let (work, n_frames) = extract_unpopped(&small);
+        let (work_k, k_frames) = extract_unpopped(&large);
+        assert_eq!((n_frames, k_frames), frames);
+        let ratio = work_k as f64 / work as f64;
+        assert!(
+            (0.9 * k as f64..=1.1 * k as f64).contains(&ratio),
+            "work {work} for n, {work_k} for {k}n"
+        );
+    }
+}

@@ -56,6 +56,9 @@ pub(super) struct Mpeg2Decode {
     base: usize,
     /// Position in `es` of the next unit.
     cursor: usize,
+    /// Position in `es` from which the end of the unit at `cursor` is still
+    /// to be found; the bytes before it were searched.
+    searched: usize,
     decoding: Decoding,
 }
 
@@ -66,6 +69,7 @@ impl Mpeg2Decode {
             es: Text::new(pool),
             base: 0,
             cursor: 0,
+            searched: 0,
             decoding: Decoding {
                 time_base,
                 stamps: BudgetVec::new(pool),
@@ -112,38 +116,50 @@ impl Mpeg2Decode {
     }
 
     /// Decodes every complete unit from the cursor on (at the end, every unit).
+    /// Each byte is searched for start codes a bounded number of times, however
+    /// the stream is cut into pushes.
     fn process(&mut self, finishing: bool, out: &mut FrameQueue) -> Result<()> {
-        let ends_picture = |code: u8| matches!(code, PICTURE | SEQUENCE_HEADER | GROUP);
         loop {
-            let rest = &self.es.as_bytes()[self.cursor..];
-            let mut codes = mpeg2::start_codes(rest);
-            let Some(unit) = codes.next() else { break };
-            let end = if unit.code == PICTURE {
-                codes.find(|u| ends_picture(u.code)).map(|u| u.offset)
-            } else {
-                codes.next().map(|u| u.offset)
-            };
-            let Some(end) = end.or(finishing.then_some(rest.len())) else {
+            let es = self.es.as_bytes();
+            let Some((start, code)) = mpeg2::next_start_code(es, self.cursor) else {
+                // Bytes before a start code are not decoded; only the last
+                // three can begin one.
+                self.cursor = self.cursor.max(es.len().saturating_sub(3));
                 break;
             };
-            let unit = StartCode {
-                data: &rest[unit.offset + 4..end],
-                ..unit
+            self.cursor = start;
+            // A picture runs to the next picture, GOP or sequence header,
+            // anything else to the next start code.
+            let ends =
+                |next: u8| code != PICTURE || matches!(next, PICTURE | SEQUENCE_HEADER | GROUP);
+            let mut at = self.searched.max(start + 4);
+            let end = loop {
+                match mpeg2::next_start_code(es, at) {
+                    Some((offset, next)) if !ends(next) => at = offset + 4,
+                    found => break found.map(|(offset, _)| offset),
+                }
             };
-            if unit.code == PICTURE {
-                self.decoding.picture(
-                    &rest[unit.offset..end],
-                    self.base + self.cursor + unit.offset,
-                    out,
-                )?;
+            let Some(end) = end.or(finishing.then_some(es.len())) else {
+                self.searched = at.max(es.len().saturating_sub(3));
+                break;
+            };
+            if code == PICTURE {
+                self.decoding
+                    .picture(&es[start..end], self.base + start, out)?;
             } else {
-                self.decoding.header(unit);
+                self.decoding.header(StartCode {
+                    offset: start,
+                    code,
+                    data: &es[start + 4..end],
+                });
             }
-            self.cursor += end;
+            self.cursor = end;
+            self.searched = end;
         }
         if self.cursor > 0 && self.cursor * 2 >= self.es.len() {
-            self.es.drop_front(self.cursor)?;
+            self.es.drop_front(self.cursor);
             self.base += self.cursor;
+            self.searched -= self.cursor.min(self.searched);
             self.cursor = 0;
         }
         Ok(())
@@ -152,14 +168,13 @@ impl Mpeg2Decode {
 
 impl Decoding {
     fn stamp(&mut self, offset: usize, pts: Option<i64>) -> Result<()> {
-        if self.stamp_head >= 64 || self.stamp_head == self.stamps.len() {
-            let len = self.stamps.len();
+        // Taken stamps leave once they are at least half, so each moves once.
+        let len = self.stamps.len();
+        if self.stamp_head > 0 && self.stamp_head * 2 >= len {
             self.stamps
                 .as_mut_slice()
                 .copy_within(self.stamp_head..len, 0);
-            for _ in 0..self.stamp_head {
-                self.stamps.pop();
-            }
+            self.stamps.truncate(len - self.stamp_head);
             self.stamp_head = 0;
         }
         if self.stamps.len() == self.stamps.capacity() {
@@ -267,5 +282,32 @@ impl Decoding {
         let numerator = i64::from(den) * i64::from(rate.denominator) * i64::from(fields);
         let denominator = i64::from(num) * i64::from(rate.numerator) * 2;
         (denominator > 0).then(|| numerator / denominator)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_picture_arriving_in_pieces_is_searched_once() {
+        let pool = Budget::new(1 << 24).expect("pool");
+        let mut decode = Mpeg2Decode::new(&pool, Some((1, 90_000)));
+        let mut out = FrameQueue::new(&pool);
+        let header = [
+            0, 0, 1, 0xb3, 0x2d, 0x01, 0xe0, 0x24, 0, 0, 1, 0, 0, 8, 0, 0, 0, 0, 1, 1,
+        ];
+        decode.push(&header, Some(0), &mut out).expect("push");
+        for n in 0..2000 {
+            decode.push(&[0x55; 184], Some(n), &mut out).expect("push");
+            // Only a start code prefix cut at the end is searched again.
+            assert!(decode.searched + 3 >= decode.es.len());
+        }
+        // The picture ends at the next picture, taking the first stamp.
+        decode
+            .push(&[0, 0, 1, 0, 0, 8], None, &mut out)
+            .expect("push");
+        let decoding = &decode.decoding;
+        assert_eq!(decoding.stamps.len() - decoding.stamp_head, 2001);
     }
 }

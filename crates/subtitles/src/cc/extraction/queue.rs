@@ -21,6 +21,8 @@ pub(super) struct FrameQueue {
     entries: BudgetVec<Entry>,
     /// Entries before `head` have left.
     head: usize,
+    /// The bytes of the live entries.
+    live: usize,
     data: Text,
     spare: Text,
 }
@@ -30,6 +32,7 @@ impl FrameQueue {
         Self {
             entries: BudgetVec::new(pool),
             head: 0,
+            live: 0,
             data: Text::new(pool),
             spare: Text::new(pool),
         }
@@ -62,7 +65,9 @@ impl FrameQueue {
                 start,
                 end: self.data.len(),
             })
-            .map_err(|rejected| rejected.error)
+            .map_err(|rejected| rejected.error)?;
+        self.live += bytes.len();
+        Ok(())
     }
 
     /// The live entries, front first.
@@ -77,6 +82,7 @@ impl FrameQueue {
             return Ok(None);
         };
         self.head += 1;
+        self.live -= entry.end - entry.start;
         Ok(Some(CaptionFrame {
             pts: entry.pts,
             duration: entry.duration,
@@ -96,6 +102,7 @@ impl FrameQueue {
         take(entry, &self.data.as_bytes()[entry.start..entry.end])?;
         self.entries.as_mut_slice()[at..].rotate_left(1);
         self.entries.pop();
+        self.live -= entry.end - entry.start;
         Ok(())
     }
 
@@ -107,8 +114,7 @@ impl FrameQueue {
             self.data.clear();
             return Ok(());
         }
-        let live: usize = self.entries().iter().map(|e| e.end - e.start).sum();
-        if self.data.len() < 4096 || self.data.len() < 2 * live {
+        if self.data.len() < 4096 || self.data.len() < 2 * self.live {
             return Ok(());
         }
         self.spare.clear();
@@ -130,5 +136,37 @@ impl FrameQueue {
         self.head = 0;
         std::mem::swap(&mut self.data, &mut self.spare);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn live(queue: &FrameQueue) -> usize {
+        queue.entries().iter().map(|e| e.end - e.start).sum()
+    }
+
+    #[test]
+    fn the_live_bytes_are_kept_as_frames_come_and_go() {
+        let pool = Budget::new(1 << 24).expect("pool");
+        let mut queue = FrameQueue::new(&pool);
+        for n in 0..5000usize {
+            queue
+                .push(Some(n as i64), None, &vec![n as u8; 1 + n % 7])
+                .expect("push");
+            match n % 5 {
+                0 => {
+                    queue.pop_front().expect("pop");
+                }
+                1 => queue
+                    .remove(queue.len() / 2, |_, _| Ok(()))
+                    .expect("remove"),
+                _ => {}
+            }
+            assert_eq!(queue.live, live(&queue));
+        }
+        while queue.pop_front().expect("pop").is_some() {}
+        assert_eq!(queue.live, 0);
     }
 }

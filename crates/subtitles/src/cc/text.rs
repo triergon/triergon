@@ -40,9 +40,9 @@ impl Text {
 
 impl Text {
     /// Drops the first `count` bytes, keeping the rest.
-    pub(crate) fn drop_front(&mut self, count: usize) -> Result<()> {
+    pub(crate) fn drop_front(&mut self, count: usize) {
         let len = self.0.len();
         self.0.as_mut_slice().copy_within(count.min(len)..len, 0);
-        self.0.try_resize(len - count.min(len), 0)
+        self.0.truncate(len - count.min(len));
     }
 }
