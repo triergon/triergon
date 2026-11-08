@@ -29,7 +29,5 @@
   "iterations": 1,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "gating the sweep over every corpus file at three heights and the larger random sets once its run time fits the check budget"
-  ]
+  "pending_module_requirements": []
 }

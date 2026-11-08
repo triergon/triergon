@@ -44,7 +44,6 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "gating the sweep over every corpus font and script once its run time fits the check budget",
     "CFF glyph extents as HarfBuzz's own charstring interpreter computes them (it lacks the Type 2 arithmetic and storage operators and reads some curve operands differently from FreeType), for fallback mark positioning in CFF fonts without GPOS"
   ],
   "open_cases": [

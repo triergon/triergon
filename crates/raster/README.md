@@ -92,9 +92,11 @@ libass's cache keys are.
 The arithmetic is libass's own: 26.6 integer subdivision with its rounding, the
 16-bit wrapping of the tile and blur engines, `lrint` rounding to even, and the
 C `FFMAX`/`FFMIN` treatment of NaN. Floating-point expressions keep the C
-source's order and grouping; the reference is built without floating-point
-contraction (`-ffp-contract=off`), so neither side fuses multiply-adds and the
-result does not depend on the target. Two further properties are matched:
+source's order and grouping, and the reference is built without
+floating-point contraction (`-ffp-contract=off`), so neither side fuses
+multiply-adds: additions, multiplications, divisions and square roots, which
+IEEE 754 rounds correctly, give the same result on every target. Two further
+properties are matched:
 
 - **libass's C engine.** The gated reference runs libass's plain C bitmap
   engine on every host (`ass_bitmap_engine_init(ASS_CPU_FLAG_NONE)`: 16×16
@@ -103,9 +105,17 @@ result does not depend on the target. Two further properties are matched:
   up to 16), every pass works over the width and the row padding stays zero.
   libass's SIMD engines depart from it, for example by blurring `\be` over
   whole rows into the padding, and AVX2 pads rows to 32 bytes; the
-  `raster-simd` feature records where, on demand.
-- **libm.** Sines, cosines, exponentials and logarithms come from the platform
-  library, as libass's do.
+  diagnostic `raster-simd` feature records where.
+- **libm.** Five functions come from the platform's libm, as libass's do:
+  the sine and cosine of the `\frx`, `\fry` and `\frz` rotations
+  (`Placement::rotation`), `log1p` and `expm1`, which quantise the `\blur`
+  radius and restore its variance (`Effects::blur`), and `exp` in the
+  Gaussian blur's coefficients (`Raster::blur` and `Raster::compose`); `log`
+  only takes the constant `log 256`. Neither Apple's libm nor glibc
+  guarantees correct rounding for these, so a result that depends on them is
+  the one libass computes against the same libm, and platforms whose libms
+  differ can differ there. The comparison covers macOS AArch64 (Apple's
+  libm) so far.
 
 ## Behaviour and limits
 
