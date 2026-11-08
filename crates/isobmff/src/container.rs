@@ -35,8 +35,9 @@ use triergon_core::{
 };
 
 /// The one mapping from a track handler and sample entry code. `raw ` needs the
-/// handler, and `mp4a` needs its stated object type: without one it stays
-/// [`CodecId::Other`].
+/// handler, and `mp4a` needs its stated object type (ISO/IEC 14496-1
+/// objectTypeIndication; 0xDD is the private value FFmpeg reads as Vorbis):
+/// without one it stays [`CodecId::Other`].
 fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>) -> CodecId<'a> {
     match (handler, format) {
         (b"vide", b"avc1" | b"avc3") => CodecId::H264,
@@ -46,13 +47,18 @@ fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>)
         (b"vide", b"raw ") => CodecId::RawVideo,
         (b"soun", b"mp4a") => match object_type {
             Some(0x40) => CodecId::Aac,
+            // MPEG-2 audio (ISO/IEC 13818-3) and MPEG-1 audio (ISO/IEC 11172-3).
+            Some(0x69 | 0x6b) => CodecId::MpegAudio,
             Some(0xa9 | 0xaa) => CodecId::Dts,
+            Some(0xdd) => CodecId::Vorbis,
             _ => CodecId::Other(format),
         },
         (b"soun", b"ac-3") => CodecId::Ac3,
         (b"soun", b"ec-3") => CodecId::Eac3,
         (b"soun", b"dtsc" | b"dtsh" | b"dtsl") => CodecId::Dts,
         (b"soun", b"Opus") => CodecId::Opus,
+        (b"soun", b"fLaC") => CodecId::Flac,
+        (b"soun", b".mp3") => CodecId::MpegAudio,
         (b"soun", b"raw " | b"twos") => CodecId::Pcm,
         (b"sbtl" | b"text" | b"subt", b"tx3g") => CodecId::Tx3g,
         _ => CodecId::Other(format),
@@ -70,6 +76,7 @@ fn configuration_box(codec: CodecId<'_>) -> Option<[u8; 4]> {
         CodecId::Eac3 => *b"dec3",
         CodecId::Dts => *b"ddts",
         CodecId::Opus => *b"dOps",
+        CodecId::Flac => *b"dfLa",
         _ => return None,
     })
 }
@@ -781,7 +788,7 @@ fn entry_scan(
     };
     let children = match codec {
         CodecId::Dts => dts_entry_children(entry, child_limits),
-        CodecId::Ac3 | CodecId::Eac3 | CodecId::Opus => {
+        CodecId::Ac3 | CodecId::Eac3 | CodecId::Opus | CodecId::Flac => {
             entry.extensions(EntryLayout::AudioV0, child_limits)
         }
         _ => entry.extensions(EntryLayout::Visual, child_limits),
@@ -936,6 +943,11 @@ mod tests {
             (b"vide", b"vp09", None, CodecId::Vp9),
             (b"vide", b"raw ", None, CodecId::RawVideo),
             (b"soun", b"mp4a", Some(0x40), CodecId::Aac),
+            (b"soun", b"mp4a", Some(0x69), CodecId::MpegAudio),
+            (b"soun", b"mp4a", Some(0x6b), CodecId::MpegAudio),
+            (b"soun", b"mp4a", Some(0xdd), CodecId::Vorbis),
+            (b"soun", b".mp3", None, CodecId::MpegAudio),
+            (b"soun", b"fLaC", None, CodecId::Flac),
             (b"soun", b"mp4a", Some(0xa9), CodecId::Dts),
             (b"soun", b"mp4a", Some(0xaa), CodecId::Dts),
             (b"soun", b"ac-3", None, CodecId::Ac3),
@@ -959,8 +971,10 @@ mod tests {
         for (handler, format, object_type) in [
             (b"vide", b"xyz1", None),
             (b"soun", b"mp4a", None),
-            (b"soun", b"mp4a", Some(0x6b)),
+            (b"soun", b"mp4a", Some(0x6a)),
             (b"soun", b"mp4a", Some(0xac)),
+            (b"soun", b"flac", None),
+            (b"vide", b"fLaC", None),
             (b"soun", b"dtse", None),
             (b"soun", b"dtsx", None),
             (b"vide", b"Opus", None),
