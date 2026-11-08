@@ -500,7 +500,12 @@ const SHAPE_OPTIONS: &[&str] = &[
 ];
 /// The rasterising reference takes libass's own compiler flags from
 /// `libass-internal.pc`, so its included stages compute as the library does.
-const RASTER_OPTIONS: &[&str] = &["-Wall", "-Wextra", "-Werror"];
+/// Those zero uninitialised locals in the harness's own code too, so a read of
+/// one stays an error there (`-Werror=uninitialized`; GCC's
+/// `-Wmaybe-uninitialized`, which clang does not know, through `-Wall
+/// -Werror`). libass's sources are included from an `-isystem` directory and
+/// compiled without warnings, as system headers are.
+const RASTER_OPTIONS: &[&str] = &["-Wall", "-Wextra", "-Werror", "-Werror=uninitialized"];
 const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
 
 const PROFILE_REFERENCES: [ProfileReference; 10] = [

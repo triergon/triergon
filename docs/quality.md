@@ -99,7 +99,11 @@ resource limit becomes an explicit, reviewed rule for that case.
   it does not depend on the host. Uninitialised automatic variables are zeroed
   for the same reason: the pinned source reads one (the face `uid` in
   `add_face`), and zero is the value both deployment targets' results agree
-  with. Its features run libass's outline, stroker,
+  with. The flag also covers the reference worker's own code
+  (`harness/reference.c` and `harness/reference_raster.h`), which takes the
+  same flags; there a read of an uninitialised variable fails the build
+  (`-Wall -Werror -Werror=uninitialized`). libass's included sources are
+  compiled as system headers, without warnings. Its features run libass's outline, stroker,
   rasteriser, blur, composition and clipping stages on glyphs of the font
   corpus loaded as libass loads them with hinting off (FreeType in the
   reference, `triergon-font` in the candidate; `raster-glyphs`) and on seeded
