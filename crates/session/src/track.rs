@@ -7,11 +7,14 @@ use crate::{AudioCodec, audio_codec, audio_configuration, audio_decoder};
 
 /// The decoder of one container audio track. It chooses the decoder from the track's
 /// codec and configuration, and drops the decoded samples a packet's container marks
-/// for discarding: its [`Trim`](triergon_core::container::Trim), and any samples before
-/// time zero (Matroska CodecDelay, Opus pre-skip).
+/// for discarding: its [`Trim`](triergon_core::container::Trim), any samples before
+/// time zero (Matroska CodecDelay, Opus pre-skip in Ogg), and at least the decoder's own
+/// start delay ([`AudioDecoder::delay`]) at the start of the stream.
 pub struct TrackDecoder {
     codec: AudioCodec,
     decoder: Box<dyn AudioDecoder>,
+    /// Samples of the decoder's start delay not discarded yet.
+    delay: usize,
 }
 
 impl core::fmt::Debug for TrackDecoder {
@@ -31,9 +34,11 @@ impl TrackDecoder {
         let mut configuration = Vec::new();
         audio_configuration(codec, track.configuration(), &mut configuration)
             .map_err(DecodeFailure::from_error)?;
+        let decoder = audio_decoder(codec, &configuration)?;
         Ok(TrackDecoder {
             codec,
-            decoder: audio_decoder(codec, &configuration)?,
+            delay: decoder.delay(),
+            decoder,
         })
     }
 
@@ -55,8 +60,17 @@ impl TrackDecoder {
         }
         let samples = |ticks: i64| to_samples(ticks, packet.time_base(), out.sample_rate);
         let trim = packet.trim();
-        let before_zero = packet.pts().filter(|&pts| pts < 0).map_or(0, |pts| samples(-pts));
-        let start = trim.start.map_or(0, samples).max(before_zero).min(len);
+        let before_zero = packet
+            .pts()
+            .filter(|&pts| pts < 0)
+            .map_or(0, |pts| samples(-pts));
+        let start = trim
+            .start
+            .map_or(0, samples)
+            .max(before_zero)
+            .max(self.delay)
+            .min(len);
+        self.delay -= start.min(self.delay);
         let end = trim.end.map_or(0, samples).min(len - start);
         if start > 0 || end > 0 {
             for plane in &mut out.planes {
@@ -66,6 +80,11 @@ impl TrackDecoder {
             out.samples_per_channel = len - start - end;
         }
         Ok(levels)
+    }
+
+    /// End of stream: replace `out` with the samples the decoder still holds back.
+    pub fn flush(&mut self, out: &mut AudioFrame) -> Result<(), DecodeFailure> {
+        self.decoder.flush(out)
     }
 
     /// Discontinuity: drop the decoder's signal history.

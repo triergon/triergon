@@ -86,6 +86,41 @@ impl Speaker {
         }
     }
 
+    /// The speaker whose `AV_CH_*` mask bit is `bit`.
+    pub fn from_bit(bit: u8) -> Option<Speaker> {
+        const ALL: [Speaker; 28] = [
+            Speaker::FrontLeft,
+            Speaker::FrontRight,
+            Speaker::FrontCenter,
+            Speaker::LowFrequency,
+            Speaker::BackLeft,
+            Speaker::BackRight,
+            Speaker::FrontLeftOfCenter,
+            Speaker::FrontRightOfCenter,
+            Speaker::BackCenter,
+            Speaker::SideLeft,
+            Speaker::SideRight,
+            Speaker::TopCenter,
+            Speaker::TopFrontLeft,
+            Speaker::TopFrontCenter,
+            Speaker::TopFrontRight,
+            Speaker::TopBackLeft,
+            Speaker::TopBackCenter,
+            Speaker::TopBackRight,
+            Speaker::WideLeft,
+            Speaker::WideRight,
+            Speaker::SurroundDirectLeft,
+            Speaker::SurroundDirectRight,
+            Speaker::LowFrequency2,
+            Speaker::TopSideLeft,
+            Speaker::TopSideRight,
+            Speaker::BottomFrontCenter,
+            Speaker::BottomFrontLeft,
+            Speaker::BottomFrontRight,
+        ];
+        ALL.into_iter().find(|speaker| *speaker as u8 == bit)
+    }
+
     /// FFmpeg `AV_CH_*` mask bit.
     pub fn mask(self) -> u64 {
         1u64 << (self as u8)
@@ -123,6 +158,27 @@ impl ChannelLayout {
             layout.len += 1;
         }
         Some(layout)
+    }
+
+    /// `channels` planes without speaker positions, FFmpeg's unspecified order (for
+    /// example an Opus family 255 stream). Its [`mask`](Self::mask) is 0 and its
+    /// [`name`](Self::name) `N channels`; `None` beyond [`Self::CAPACITY`].
+    pub fn unspecified(channels: usize) -> Option<ChannelLayout> {
+        ChannelLayout::new(core::iter::repeat_n(Speaker::FrontCenter, channels))
+    }
+
+    /// FFmpeg's default layout for `channels` channels: the first standard layout with
+    /// that many speakers (`stereo` for 2, `7.1` for 8). Mixing treats an unspecified
+    /// layout as this one, as FFmpeg's resampler does.
+    pub fn default_for(channels: usize) -> Option<ChannelLayout> {
+        let (mask, _) = STANDARD
+            .iter()
+            .find(|(mask, _)| mask.count_ones() as usize == channels)?;
+        ChannelLayout::new(
+            (0..64u8)
+                .filter(|bit| mask & (1 << bit) != 0)
+                .filter_map(Speaker::from_bit),
+        )
     }
 
     /// Speakers in plane order.

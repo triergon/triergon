@@ -110,21 +110,27 @@ pub fn audio_decoder(
         AudioCodec::Aac => Box::new(triergon_codec_aac::Decoder::new()),
         AudioCodec::Dts => Box::new(triergon_codec_dca::Decoder::new()),
         AudioCodec::Flac => Box::new(
-            triergon_codec_flac::Decoder::from_configuration(configuration, Default::default())
-                .map_err(DecodeFailure::from_error)?,
+            triergon_codec_flac::Decoder::from_configuration(
+                configuration,
+                triergon_codec_flac::Limits::default(),
+            )
+            .map_err(DecodeFailure::from_error)?,
         ),
         AudioCodec::Opus => Box::new(
-            triergon_codec_opus::Decoder::from_configuration(configuration, Default::default())
-                .map_err(DecodeFailure::from_error)?,
+            triergon_codec_opus::Decoder::from_configuration(
+                configuration,
+                triergon_codec_opus::Limits::default(),
+            )
+            .map_err(DecodeFailure::from_error)?,
         ),
         AudioCodec::Vorbis => Box::new(
-            triergon_codec_vorbis::Decoder::from_configuration(configuration, Default::default())
-                .map_err(DecodeFailure::from_error)?,
+            triergon_codec_vorbis::Decoder::from_configuration(
+                configuration,
+                triergon_codec_vorbis::Limits::default(),
+            )
+            .map_err(DecodeFailure::from_error)?,
         ),
-        AudioCodec::MpegAudio => Box::new(
-            triergon_codec_mp3::Decoder::from_configuration(configuration, Default::default())
-                .map_err(DecodeFailure::from_error)?,
-        ),
+        AudioCodec::MpegAudio => Box::new(triergon_codec_mp3::Decoder::new()),
     })
 }
 
