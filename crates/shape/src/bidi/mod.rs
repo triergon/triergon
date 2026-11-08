@@ -32,12 +32,58 @@ use std::ops::Range;
 
 pub use arabic::shape_simple;
 pub use class::{BaseDirection, BidiClass, Bracket, Level};
-pub use line::reorder_line;
+pub use line::{reorder_line, reorder_line_with_limits};
 
 use crate::Direction;
 use crate::unicode::fribidi;
 use runs::Run;
-use triergon_core::{Budget, BudgetVec, Error, Result};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+
+/// Limits of resolving one paragraph or reordering one line: its work is
+/// bounded by `work_per_char` units for each character, and at least
+/// `minimum_work` in all.
+///
+/// The work is the runs each rule looks at: once per pass for most rules, and
+/// again for each run whose context lies past runs of deeper isolates (at most
+/// once per enclosing isolate depth, up to 125), for each bracket pair that
+/// encloses a run (up to 63 per isolate depth) and for each level line
+/// reordering reverses at (up to 126). The default, 4096 units per character
+/// and 65536 in all, as for shaping, is 19 times the most any text of the bidi
+/// and shaping corpora needs (216 units per character, for a seeded random
+/// paragraph of every class); it stops only text that nests brackets and
+/// isolates to multiply the work.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    /// Work units per character.
+    pub work_per_char: u64,
+    /// The work units of a paragraph or line of any length.
+    pub minimum_work: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            work_per_char: 4096,
+            minimum_work: 65536,
+        }
+    }
+}
+
+impl Limits {
+    fn budget(self, chars: usize) -> WorkBudget {
+        let chars = u64::try_from(chars).unwrap_or(u64::MAX);
+        WorkBudget::new(
+            chars
+                .saturating_mul(self.work_per_char)
+                .max(self.minimum_work),
+        )
+    }
+}
+
+/// Charges `units` before the work is done; running out is `Error::Policy`.
+fn charge(work: &mut WorkBudget, units: usize) -> Result<()> {
+    crate::work::charge_for(work, units, "bidi work")
+}
 
 /// The Bidi_Mirroring_Glyph of `c`, if it has one, as `fribidi_get_mirror_char`
 /// gives it.
@@ -70,19 +116,36 @@ pub struct Resolver {
     fsi_rtl: BudgetVec<bool>,
     open_isolates: BudgetVec<Option<u32>>,
     brackets: neutral::Brackets,
+    limits: Limits,
+    /// The work of the last paragraph.
+    work: WorkBudget,
 }
 
 impl Resolver {
-    /// A resolver whose storage is charged to `budget`; it allocates nothing
-    /// until the first paragraph.
+    /// A resolver with the default [`Limits`] whose storage is charged to
+    /// `budget`; it allocates nothing until the first paragraph.
     #[must_use]
     pub fn new(budget: &Budget) -> Self {
+        Self::with_limits(budget, Limits::default())
+    }
+
+    /// A resolver whose paragraphs are each bounded by `limits`.
+    #[must_use]
+    pub fn with_limits(budget: &Budget, limits: Limits) -> Self {
         Self {
             runs: BudgetVec::new(budget),
             fsi_rtl: BudgetVec::new(budget),
             open_isolates: BudgetVec::new(budget),
             brackets: neutral::Brackets::new(budget),
+            limits,
+            work: WorkBudget::new(0),
         }
+    }
+
+    /// The work units the last paragraph spent of the [`Limits`].
+    #[must_use]
+    pub fn work_spent(&self) -> u64 {
+        self.work.spent()
     }
 
     /// Resolves the embedding level of every character of one paragraph, as
@@ -97,7 +160,8 @@ impl Resolver {
     /// # Errors
     ///
     /// `Error::Invalid` if the slices differ in length, `Error::Policy` for a
-    /// paragraph of 2³² characters or more, and the budget's errors.
+    /// paragraph of 2³² characters or more or when the work exceeds the
+    /// resolver's [`Limits`], and the budget's errors.
     pub fn resolve(
         &mut self,
         classes: &[BidiClass],
@@ -119,7 +183,11 @@ impl Resolver {
             }
         };
         let base_level = Level::of(direction).0;
+        let work = &mut self.work;
+        *work = self.limits.budget(classes.len());
 
+        // The passes over every character: P2, X5c, X1–X9 and the levels.
+        charge(work, 4 * classes.len())?;
         explicit::first_strong_isolates(classes, &mut self.fsi_rtl, &mut self.open_isolates)?;
         explicit::runs(
             classes,
@@ -128,16 +196,18 @@ impl Resolver {
             self.fsi_rtl.as_slice(),
             &mut self.runs,
         )?;
-        weak::resolve(&mut self.runs, base_level);
+        weak::resolve(&mut self.runs, base_level, work)?;
+        charge(work, self.runs.len())?;
         runs::compact(&mut self.runs, Run::continues_neutrally_with);
         if self.runs.as_slice().iter().any(|r| r.bracket.is_some()) {
-            self.brackets.resolve(self.runs.as_mut_slice())?;
+            self.brackets.resolve(self.runs.as_mut_slice(), work)?;
             for run in self.runs.as_mut_slice() {
                 run.bracket = None;
             }
+            charge(work, self.runs.len())?;
             runs::compact(&mut self.runs, Run::continues_neutrally_with);
         }
-        neutral::resolve(self.runs.as_mut_slice());
+        neutral::resolve(self.runs.as_mut_slice(), work)?;
         levels::write(self.runs.as_slice(), classes, base_level, levels);
         Ok(direction)
     }

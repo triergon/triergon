@@ -52,7 +52,7 @@ The bidi API mirrors libass's `ass_shaper_shape` and `ass_shaper_reorder`:
 `bidi::BidiClass::of` and `bidi::Bracket::of` per character, `bidi::paragraphs`,
 `bidi::Resolver::resolve` per paragraph (base direction left-to-right,
 right-to-left or automatic, with or without bracket pairing), `bidi::reorder_line`
-per line, and `bidi::shape_simple` for libass's simple shaping level (FriBidi's
+per line (both within `bidi::Limits`), and `bidi::shape_simple` for libass's simple shaping level (FriBidi's
 joining, Arabic presentation forms and mirroring).
 
 ## What it covers
@@ -138,11 +138,17 @@ HarfBuzz's 64 levels, is `Error::Policy`. Each lookup carries a digest of the
 glyphs it can apply at, so lookups and glyphs that cannot match are skipped
 without reading the font.
 
-Bidi resolution is linear in the paragraph with constant factors fixed by
-FriBidi's limits: a run is scanned at most once per enclosing isolate depth (at
-most 125) when its context is looked up, and by at most the 63 bracket pairs per
-depth that can enclose it; line reordering makes at most one pass per level.
-Paragraphs are limited to 2³² characters.
+Bidi resolution and line reordering run under `bidi::Limits`: each paragraph a
+`Resolver` resolves and each line `reorder_line` reorders may spend
+`work_per_char` units per character, and at least `minimum_work`, charged for
+every run a rule looks at. Most rules look at a run once; it is looked at again
+for each enclosing isolate depth (at most 125) that a context search passes it
+at, for each bracket pair that encloses it (at most 63 per isolate depth), and
+once per level line reordering reverses at (at most 126). The default, 4096
+units per character and 65536 in all, is 19 times the most a paragraph of the
+bidi and shaping corpora needs (216 per character, a seeded random paragraph of
+every class); running out is `Error::Policy`. Paragraphs are limited to 2³²
+characters.
 
 ## Verification
 

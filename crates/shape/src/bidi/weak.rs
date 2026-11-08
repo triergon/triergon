@@ -17,23 +17,31 @@
 
 use super::class::BidiClass;
 use super::runs::{MAX_ISOLATE_DEPTH, Run, contexts, sequence_after, sequence_before, truncate};
-use triergon_core::BudgetVec;
+use triergon_core::{BudgetVec, Result, WorkBudget};
 
 /// The last strong class seen before a run, per isolate depth.
 type LastStrong = [BidiClass; MAX_ISOLATE_DEPTH as usize + 1];
 
-pub(super) fn resolve(runs: &mut BudgetVec<Run>, base_level: u8) {
+pub(super) fn resolve(
+    runs: &mut BudgetVec<Run>,
+    base_level: u8,
+    work: &mut WorkBudget,
+) -> Result<()> {
     let mut last_strong: LastStrong =
         [BidiClass::of_level(base_level); MAX_ISOLATE_DEPTH as usize + 1];
-    let kept = marks_and_european_numbers(runs.as_mut_slice(), &mut last_strong);
+    let kept = marks_and_european_numbers(runs.as_mut_slice(), &mut last_strong, work)?;
     truncate(runs, kept);
     last_strong[0] = BidiClass::of_level(base_level);
-    separators_and_terminators(runs.as_mut_slice(), &mut last_strong);
+    separators_and_terminators(runs.as_mut_slice(), &mut last_strong, work)
 }
 
 /// W1 and W2, merging runs as W1 resolves marks. Returns how many runs remain
 /// at the start of `runs`.
-fn marks_and_european_numbers(runs: &mut [Run], last_strong: &mut LastStrong) -> usize {
+fn marks_and_european_numbers(
+    runs: &mut [Run],
+    last_strong: &mut LastStrong,
+    work: &mut WorkBudget,
+) -> Result<usize> {
     // `runs[..kept]` are resolved, `runs[next..]` are not; between them lie
     // runs already merged away.
     let (mut kept, mut next) = (0, 0);
@@ -41,8 +49,8 @@ fn marks_and_european_numbers(runs: &mut [Run], last_strong: &mut LastStrong) ->
         let mut run = run;
         let rest = next + 1;
         next = rest;
-        let before = sequence_before(&runs[..kept], run.isolate);
-        let after = sequence_after(runs, rest, run.isolate);
+        let before = sequence_before(&runs[..kept], run.isolate, work)?;
+        let after = sequence_after(runs, rest, run.isolate, work)?;
         let before_class = run.context(before.map(|i| &runs[i]));
         let after_class = run.context(after.map(|i| &runs[i]));
         if before_class.is_strong() {
@@ -85,17 +93,21 @@ fn marks_and_european_numbers(runs: &mut [Run], last_strong: &mut LastStrong) ->
         runs[kept] = run;
         kept += 1;
     }
-    kept
+    Ok(kept)
 }
 
 /// W3–W7.
-fn separators_and_terminators(runs: &mut [Run], last_strong: &mut LastStrong) {
+fn separators_and_terminators(
+    runs: &mut [Run],
+    last_strong: &mut LastStrong,
+    work: &mut WorkBudget,
+) -> Result<()> {
     // Whether W4 may apply, and the class W4 and W5 see before a run.
     let mut w4 = true;
     let mut before_number = BidiClass::On;
     for at in 0..runs.len() {
         let run = runs[at];
-        let (before_class, after_class) = contexts(runs, at);
+        let (before_class, after_class) = contexts(runs, at, work)?;
         let last = &mut last_strong[usize::from(run.isolate)];
         if before_class.is_strong() {
             *last = before_class;
@@ -149,6 +161,7 @@ fn separators_and_terminators(runs: &mut [Run], last_strong: &mut LastStrong) {
             };
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -170,7 +183,7 @@ mod tests {
             };
             runs.try_push(run).map_err(|e| e.error).expect("push");
         }
-        resolve(&mut runs, level);
+        resolve(&mut runs, level, &mut WorkBudget::new(1000)).expect("work");
         runs.as_slice().iter().map(|r| (r.class, r.len)).collect()
     }
 

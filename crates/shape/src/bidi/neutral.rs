@@ -18,9 +18,10 @@
 //!   when the pair is reached, earlier pairs included.
 //! - Marks after a bracket follow it because W1 merged them into its run.
 
+use super::charge;
 use super::class::BidiClass;
 use super::runs::{MAX_ISOLATE_DEPTH, Run, contexts};
-use triergon_core::{Budget, BudgetVec, Error, Result};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 /// The opening brackets one isolate depth keeps unpaired.
 const MAX_OPEN: usize = 63;
@@ -62,17 +63,19 @@ impl Brackets {
     }
 
     /// N0 for every bracket pair of `runs`.
-    pub(super) fn resolve(&mut self, runs: &mut [Run]) -> Result<()> {
-        self.pair(runs)?;
+    pub(super) fn resolve(&mut self, runs: &mut [Run], work: &mut WorkBudget) -> Result<()> {
+        self.pair(runs, work)?;
         let pairs = self.pairs.as_mut_slice();
         // Pairs of one opening bracket, which the shared rows allow, in the order found.
+        charge(work, pairs.len())?;
         pairs.sort_unstable();
-        resolve_pairs(runs, pairs);
-        Ok(())
+        resolve_pairs(runs, pairs, work)
     }
 
-    /// BD16.
-    fn pair(&mut self, runs: &[Run]) -> Result<()> {
+    /// BD16. Each run, and each open bracket a closing one is compared with,
+    /// is charged to `work`.
+    fn pair(&mut self, runs: &[Run], work: &mut WorkBudget) -> Result<()> {
+        charge(work, runs.len())?;
         self.pairs.clear();
         let depths = runs
             .iter()
@@ -104,11 +107,14 @@ impl Brackets {
                 }
                 stack[*len] = at;
                 *len += 1;
-            } else if let Some(found) = stack[..*len].iter().rposition(|&o| {
-                runs.get(o as usize)
-                    .and_then(|r| r.bracket)
-                    .is_some_and(|b| b.pairs_with(bracket))
-            }) {
+            } else if let Some(found) = {
+                charge(work, *len)?;
+                stack[..*len].iter().rposition(|&o| {
+                    runs.get(o as usize)
+                        .and_then(|r| r.bracket)
+                        .is_some_and(|b| b.pairs_with(bracket))
+                })
+            } {
                 self.pairs
                     .try_push((stack[found], at))
                     .map_err(|e| e.error)?;
@@ -125,8 +131,10 @@ fn raised(level: u8, class: BidiClass) -> u8 {
     level + ((level % 2) ^ class.rtl_bit())
 }
 
-/// N0b and N0c for pairs in order of their opening brackets.
-fn resolve_pairs(runs: &mut [Run], pairs: &[(u32, u32)]) {
+/// N0b and N0c for pairs in order of their opening brackets. The runs inside
+/// each pair are charged to `work` as they are looked at, as are the runs swept
+/// before them.
+fn resolve_pairs(runs: &mut [Run], pairs: &[(u32, u32)], work: &mut WorkBudget) -> Result<()> {
     // The level of the strong class last passed per isolate depth, swept forward
     // once as pairs are reached.
     let mut preceding: [Option<u8>; DEPTHS] = [None; DEPTHS];
@@ -141,9 +149,11 @@ fn resolve_pairs(runs: &mut [Run], pairs: &[(u32, u32)]) {
         };
 
         let inside = &runs[open..close];
+        charge(work, inside.len())?;
         let direction = if inside.iter().any(|run| strong(run) == Some(embedding)) {
             Some(embedding)
         } else {
+            charge(work, inside.len() + open.saturating_sub(swept))?;
             for run in &runs[swept.min(open)..open] {
                 if let Some(level) = strong(run) {
                     preceding[usize::from(run.isolate)] = Some(level);
@@ -161,14 +171,16 @@ fn resolve_pairs(runs: &mut [Run], pairs: &[(u32, u32)]) {
             runs[close].class = class;
         }
     }
+    Ok(())
 }
 
 /// N1 and N2: a neutral takes the class on both sides where they agree
 /// (numbers as R), else the embedding direction.
-pub(super) fn resolve(runs: &mut [Run]) {
+pub(super) fn resolve(runs: &mut [Run], work: &mut WorkBudget) -> Result<()> {
     for at in 0..runs.len() {
+        charge(work, 1)?;
         if runs[at].class.is_neutral() {
-            let (before, after) = contexts(runs, at);
+            let (before, after) = contexts(runs, at, work)?;
             let (before, after) = (before.numbers_as_r(), after.numbers_as_r());
             runs[at].class = if before == after {
                 before
@@ -177,6 +189,7 @@ pub(super) fn resolve(runs: &mut [Run]) {
             };
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -184,7 +197,7 @@ mod tests {
     use super::*;
     use crate::bidi::class::Bracket;
     use BidiClass::*;
-    use triergon_core::Budget;
+    use triergon_core::{Budget, WorkBudget};
 
     fn run(class: BidiClass, level: u8, bracket: Option<char>) -> Run {
         Run {
@@ -198,7 +211,10 @@ mod tests {
 
     fn brackets(runs: &mut [Run]) {
         let budget = Budget::new(1 << 20).expect("budget");
-        Brackets::new(&budget).resolve(runs).expect("brackets");
+        let mut work = WorkBudget::new(1000);
+        Brackets::new(&budget)
+            .resolve(runs, &mut work)
+            .expect("brackets");
     }
 
     #[test]
@@ -248,10 +264,10 @@ mod tests {
     #[test]
     fn neutrals_between_agreeing_sides() {
         let mut runs = [run(R, 0, None), run(On, 0, None), run(An, 0, None)];
-        resolve(&mut runs);
+        resolve(&mut runs, &mut WorkBudget::new(100)).expect("work");
         assert_eq!(runs[1].class, R);
         let mut runs = [run(R, 0, None), run(Ws, 0, None), run(L, 0, None)];
-        resolve(&mut runs);
+        resolve(&mut runs, &mut WorkBudget::new(100)).expect("work");
         assert_eq!(runs[1].class, L);
     }
 }

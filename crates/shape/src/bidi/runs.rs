@@ -12,8 +12,9 @@
 //! the runs of one sequence are those of equal depth with no shallower run in
 //! between, as FriBidi links them.
 
+use super::charge;
 use super::class::{BidiClass, Bracket};
-use triergon_core::BudgetVec;
+use triergon_core::{BudgetVec, Result, WorkBudget};
 
 /// The deepest isolate nesting FriBidi tracks: depths stop growing at 124.
 pub(super) const MAX_ISOLATE_DEPTH: u8 = 124;
@@ -64,41 +65,59 @@ impl Run {
 }
 
 /// The index of the last run of `before` in the isolating run sequence at
-/// isolate depth `isolate`, if the sequence continues that far back.
-pub(super) fn sequence_before(before: &[Run], isolate: u8) -> Option<usize> {
+/// isolate depth `isolate`, if the sequence continues that far back. Each run
+/// looked at is charged to `work`.
+pub(super) fn sequence_before(
+    before: &[Run],
+    isolate: u8,
+    work: &mut WorkBudget,
+) -> Result<Option<usize>> {
     for (at, run) in before.iter().enumerate().rev() {
+        charge(work, 1)?;
         if run.isolate < isolate {
-            return None;
+            return Ok(None);
         }
         if run.isolate == isolate {
-            return Some(at);
+            return Ok(Some(at));
         }
     }
-    None
+    Ok(None)
 }
 
 /// The index of the first run from `from` on in the isolating run sequence at
 /// isolate depth `isolate`. Looking forward, FriBidi passes over a closing PDI
-/// to the run after it.
-pub(super) fn sequence_after(runs: &[Run], from: usize, isolate: u8) -> Option<usize> {
-    let rest = runs.get(from..)?;
+/// to the run after it. Each run looked at is charged to `work`.
+pub(super) fn sequence_after(
+    runs: &[Run],
+    from: usize,
+    isolate: u8,
+    work: &mut WorkBudget,
+) -> Result<Option<usize>> {
+    let Some(rest) = runs.get(from..) else {
+        return Ok(None);
+    };
     for (offset, run) in rest.iter().enumerate() {
+        charge(work, 1)?;
         if run.isolate < isolate {
-            return None;
+            return Ok(None);
         }
         if run.isolate == isolate && run.class != BidiClass::Pdi {
-            return Some(from + offset);
+            return Ok(Some(from + offset));
         }
     }
-    None
+    Ok(None)
 }
 
 /// The context classes on both sides of `runs[at]`.
-pub(super) fn contexts(runs: &[Run], at: usize) -> (BidiClass, BidiClass) {
+pub(super) fn contexts(
+    runs: &[Run],
+    at: usize,
+    work: &mut WorkBudget,
+) -> Result<(BidiClass, BidiClass)> {
     let run = &runs[at];
-    let before = sequence_before(&runs[..at], run.isolate).map(|i| &runs[i]);
-    let after = sequence_after(runs, at + 1, run.isolate).map(|i| &runs[i]);
-    (run.context(before), run.context(after))
+    let before = sequence_before(&runs[..at], run.isolate, work)?.map(|i| &runs[i]);
+    let after = sequence_after(runs, at + 1, run.isolate, work)?.map(|i| &runs[i]);
+    Ok((run.context(before), run.context(after)))
 }
 
 /// Merges every run into the one before it while `continues` says so; a merged
@@ -142,6 +161,8 @@ mod tests {
 
     #[test]
     fn sequences_follow_isolate_depth() {
+        let mut work = WorkBudget::new(100);
+        let w = &mut work;
         // a LRI b PDI c, with b inside the isolate.
         let runs = [
             run(L, 0, 0),
@@ -150,16 +171,16 @@ mod tests {
             run(Pdi, 0, 0),
             run(On, 0, 0),
         ];
-        assert_eq!(sequence_before(&runs[..1], 0), Some(0));
+        assert_eq!(sequence_before(&runs[..1], 0, w), Ok(Some(0)));
         assert_eq!(
-            sequence_before(&runs[..3], 0),
-            Some(1),
+            sequence_before(&runs[..3], 0, w),
+            Ok(Some(1)),
             "past the isolate's content"
         );
-        assert_eq!(sequence_before(&runs[..2], 1), None);
+        assert_eq!(sequence_before(&runs[..2], 1, w), Ok(None));
         // Forward, the PDI is passed over.
-        assert_eq!(sequence_after(&runs, 2, 0), Some(4));
-        assert_eq!(sequence_after(&runs, 3, 1), None);
-        assert_eq!(contexts(&runs, 2), (L, L));
+        assert_eq!(sequence_after(&runs, 2, 0, w), Ok(Some(4)));
+        assert_eq!(sequence_after(&runs, 3, 1, w), Ok(None));
+        assert_eq!(contexts(&runs, 2, w), Ok((L, L)));
     }
 }

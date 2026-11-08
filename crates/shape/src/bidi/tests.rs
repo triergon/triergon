@@ -327,3 +327,47 @@ fn arbitrary_input() {
         shape_simple(&mut shaped, &classes, &levels).expect("shape");
     }
 }
+
+/// Brackets nested 63 deep in each of 120 nested isolates: every run is inside
+/// thousands of pairs, so N0 looks at each thousands of times.
+fn nested_brackets_and_isolates() -> Vec<char> {
+    let mut text = Vec::new();
+    for _ in 0..120 {
+        text.push('\u{2067}');
+        text.extend(std::iter::repeat_n('(', 63));
+    }
+    text.push('a');
+    for _ in 0..120 {
+        text.extend(std::iter::repeat_n(')', 63));
+        text.push('\u{2069}');
+    }
+    text
+}
+
+#[test]
+fn work_beyond_the_limits_is_a_policy_error() {
+    let budget = Budget::new(1 << 24).expect("budget");
+    let text = nested_brackets_and_isolates();
+    let classes: Vec<BidiClass> = text.iter().map(|&c| BidiClass::of(c)).collect();
+    let brackets: Vec<Option<Bracket>> = text.iter().map(|&c| Bracket::of(c)).collect();
+    let mut levels = vec![Level::default(); text.len()];
+    let mut resolve =
+        |resolver: &mut Resolver, brackets| resolver.resolve(&classes, brackets, Auto, &mut levels);
+    // Without brackets the isolates alone cost little.
+    let mut resolver = Resolver::new(&budget);
+    assert!(resolve(&mut resolver, None).is_ok());
+    assert!(resolver.work_spent() < 64 * text.len() as u64);
+    // With them, the default limits stop the paragraph.
+    assert_eq!(
+        resolve(&mut resolver, Some(&brackets)),
+        Err(Error::Policy("bidi work"))
+    );
+    let tight = Limits {
+        work_per_char: 1,
+        minimum_work: 0,
+    };
+    assert_eq!(
+        resolve(&mut Resolver::with_limits(&budget, tight), None),
+        Err(Error::Policy("bidi work"))
+    );
+}

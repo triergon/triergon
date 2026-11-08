@@ -2,12 +2,14 @@
 //! flags applies them.
 
 use super::class::{BidiClass, Level};
+use super::{Limits, charge};
 use crate::Direction;
 use triergon_core::{Error, Result};
 
-/// Reorders one line of a paragraph: `classes` and `levels` are the line's part
-/// of the paragraph's classes and resolved levels, and `items` holds one value
-/// per character (character indices, for a visual-to-logical map).
+/// Reorders one line of a paragraph within the default [`Limits`]:
+/// `classes` and `levels` are the line's part of the paragraph's classes and
+/// resolved levels, and `items` holds one value per character (character
+/// indices, for a visual-to-logical map).
 ///
 /// First the whitespace, BN and embedding characters at the end of the line are
 /// set to the paragraph level of `direction` (FriBidi leaves isolate formatting
@@ -18,8 +20,25 @@ use triergon_core::{Error, Result};
 ///
 /// # Errors
 ///
-/// `Error::Invalid` if the three slices differ in length.
+/// `Error::Invalid` if the three slices differ in length; `Error::Policy` when
+/// the work exceeds the limits.
 pub fn reorder_line<T>(
+    classes: &[BidiClass],
+    direction: Direction,
+    levels: &mut [Level],
+    items: &mut [T],
+) -> Result<()> {
+    reorder_line_with_limits(Limits::default(), classes, direction, levels, items)
+}
+
+/// [`reorder_line`] within `limits`: each level's pass over the line is
+/// charged, at most one per level from the highest to the lowest odd one.
+///
+/// # Errors
+///
+/// As [`reorder_line`].
+pub fn reorder_line_with_limits<T>(
+    limits: Limits,
     classes: &[BidiClass],
     direction: Direction,
     levels: &mut [Level],
@@ -28,6 +47,8 @@ pub fn reorder_line<T>(
     if classes.len() != levels.len() || items.len() != levels.len() {
         return Err(Error::Invalid("bidi line lengths differ"));
     }
+    let mut work = limits.budget(levels.len());
+    charge(&mut work, levels.len())?;
     for (class, level) in classes.iter().zip(levels.iter_mut()).rev() {
         if !(class.is_removed() || *class == BidiClass::Ws) {
             break;
@@ -38,13 +59,14 @@ pub fn reorder_line<T>(
     let (Some(&lowest), Some(&highest)) = (levels.iter().min(), levels.iter().max()) else {
         return Ok(());
     };
-    for level in ((lowest.0 | 1)..=highest.0).rev() {
+    for level in ((lowest.get() | 1)..=highest.get()).rev() {
+        charge(&mut work, levels.len())?;
         let mut start = 0;
-        while let Some(offset) = levels[start..].iter().position(|l| l.0 >= level) {
+        while let Some(offset) = levels[start..].iter().position(|l| l.get() >= level) {
             let from = start + offset;
             let len = levels[from..]
                 .iter()
-                .position(|l| l.0 < level)
+                .position(|l| l.get() < level)
                 .unwrap_or(levels.len() - from);
             items[from..from + len].reverse();
             start = from + len;
@@ -85,6 +107,31 @@ mod tests {
         let (levels, map) = reorder(&[R, Ws, Bn, Pdf], Direction::LeftToRight, &[1, 1, 1, 1]);
         assert_eq!(levels, [1, 0, 0, 0]);
         assert_eq!(map, [0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn deep_levels_need_work() {
+        let classes = [L; 4];
+        let mut levels = [Level(125), Level(0), Level(125), Level(0)];
+        let mut map = [0, 1, 2, 3];
+        let tight = Limits {
+            work_per_char: 1,
+            minimum_work: 0,
+        };
+        assert_eq!(
+            reorder_line_with_limits(
+                tight,
+                &classes,
+                Direction::LeftToRight,
+                &mut levels,
+                &mut map
+            ),
+            Err(Error::Policy("bidi work"))
+        );
+        assert_eq!(
+            reorder_line(&classes, Direction::LeftToRight, &mut levels, &mut map),
+            Ok(())
+        );
     }
 
     #[test]

@@ -42,11 +42,16 @@ impl Limits {
 
 /// Charges `units` before the work is done; running out is `Error::Policy`.
 pub(crate) fn charge(work: &mut WorkBudget, units: usize) -> Result<()> {
+    charge_for(work, units, "shaping work")
+}
+
+/// [`charge`], running out being the policy error `what`.
+pub(crate) fn charge_for(work: &mut WorkBudget, units: usize, what: &'static str) -> Result<()> {
     let units = u64::try_from(units).map_err(|_| Error::Overflow)?;
     if work.try_charge(units) {
         Ok(())
     } else {
-        Err(Error::Policy("shaping work"))
+        Err(Error::Policy(what))
     }
 }
 
