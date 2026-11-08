@@ -50,12 +50,16 @@ impl Resampler {
 
     /// Start over for input at the rate of `bandwidth`, with zero history.
     pub(super) fn set_bandwidth(&mut self, bandwidth: Bandwidth) {
-        (self.filter, self.priming) = match bandwidth {
-            Bandwidth::Narrow => (&INTERPOLATION_NB[..], 4),
-            Bandwidth::Medium => (&INTERPOLATION_MB[..], 8),
-            Bandwidth::Wide => (&INTERPOLATION_WB[..], 11),
-        };
+        (self.filter, self.priming) = filter(bandwidth);
         self.reset();
+    }
+
+    /// The outputs the first input after a start at the rate of `bandwidth` comes out
+    /// short by, which [`Resampler::flush`] returns: the input positions the priming
+    /// leaves short of the filter span, one output per phase each.
+    pub(super) fn start_latency(bandwidth: Bandwidth) -> usize {
+        let (filter, priming) = filter(bandwidth);
+        (TAPS - BEFORE - 1).saturating_sub(priming) * filter.len()
     }
 
     /// Start over at the current rate, with zero history.
@@ -129,6 +133,16 @@ impl Resampler {
             self.len -= start;
             self.position = BEFORE;
         }
+    }
+}
+
+/// The interpolation filter from the rate of `bandwidth` and the zero input samples
+/// primed at a start.
+fn filter(bandwidth: Bandwidth) -> (&'static [[f32; TAPS]], usize) {
+    match bandwidth {
+        Bandwidth::Narrow => (&INTERPOLATION_NB, 4),
+        Bandwidth::Medium => (&INTERPOLATION_MB, 8),
+        Bandwidth::Wide => (&INTERPOLATION_WB, 11),
     }
 }
 
@@ -391,6 +405,7 @@ mod tests {
         // A constant comes through at unit gain once the filter has filled.
         assert!(output.iter().all(|&y| (y - 0.5).abs() < 1e-3));
         assert_eq!(resampler.flush(&mut output), 24);
+        assert_eq!(Resampler::start_latency(Bandwidth::Narrow), 24);
     }
 
     #[test]
@@ -401,5 +416,7 @@ mod tests {
         assert_eq!(resampler.process(&input, &mut output), 960);
         assert_eq!(resampler.process(&input, &mut output), 960);
         assert_eq!(resampler.flush(&mut output), 0);
+        assert_eq!(Resampler::start_latency(Bandwidth::Wide), 0);
+        assert_eq!(Resampler::start_latency(Bandwidth::Medium), 0);
     }
 }

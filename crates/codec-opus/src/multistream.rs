@@ -2,8 +2,8 @@
 //! channel takes, the output layout, and the header's output gain.
 
 use crate::DecodeError;
-use triergon_codec::ChannelLayout;
 use triergon_codec::layout::{native_order, vorbis_order};
+use triergon_codec::{BudgetVec, ChannelLayout};
 use triergon_framing::OpusHead;
 
 /// No stream feeds this channel: it is silent.
@@ -31,6 +31,7 @@ fn unordered(channels: usize) -> (ChannelLayout, [u8; ChannelLayout::CAPACITY]) 
 impl Mapping {
     pub(crate) fn new(head: &OpusHead) -> Result<Mapping, DecodeError> {
         let channels = usize::from(head.channels);
+        // The most channels an output layout holds.
         if channels > ChannelLayout::CAPACITY {
             return Err(DecodeError::Unsupported("more than 93 output channels"));
         }
@@ -94,7 +95,7 @@ impl Mapping {
     pub(crate) fn distribute(
         &self,
         stream: usize,
-        pcm: &[Vec<f32>; 2],
+        pcm: &[BudgetVec<f32>; 2],
         samples: usize,
         planes: &mut [Vec<f32>],
     ) {

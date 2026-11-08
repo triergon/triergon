@@ -1,10 +1,12 @@
 //! One Opus stream (RFC 6716 section 4.5): SILK-only, hybrid and CELT-only frames, and
 //! the redundant CELT frames and cross-fades of mode transitions.
 
+use crate::DecodeError;
 use crate::celt::{self, CeltDecoder, FrameLayout, HYBRID_START_BAND};
 use crate::packet::{Mode, Packet, Toc};
 use crate::range::RangeDecoder;
-use crate::silk::{SilkDecoder, SilkError};
+use crate::silk::{SilkConfig, SilkDecoder};
+use triergon_codec::{Budget, BudgetVec, StorageError};
 
 /// Samples per channel of the longest packet (120 ms) plus what the SILK resampler may
 /// release with it.
@@ -22,36 +24,21 @@ const MAX_HELD: usize = 32;
 pub(crate) struct Workspace {
     pub(crate) celt: celt::Workspace,
     /// The decoded packet of the current stream.
-    pub(crate) pcm: [Vec<f32>; 2],
-    silk: [Vec<f32>; 2],
+    pub(crate) pcm: [BudgetVec<f32>; 2],
+    silk: [BudgetVec<f32>; 2],
     redundant: [[f32; REDUNDANT]; 2],
 }
 
 impl Workspace {
-    pub(crate) fn new() -> Workspace {
-        Workspace {
-            celt: celt::Workspace::new(),
-            pcm: [vec![0.0; MAX_PACKET], vec![0.0; MAX_PACKET]],
-            silk: [vec![0.0; MAX_FRAME], vec![0.0; MAX_FRAME]],
+    /// The buffers and the CELT transforms, charging `budget` for what they allocate.
+    pub(crate) fn new(budget: &Budget) -> Result<Workspace, StorageError> {
+        let buffer = |len| BudgetVec::try_filled(budget, 0.0, len);
+        Ok(Workspace {
+            celt: celt::Workspace::new(budget)?,
+            pcm: [buffer(MAX_PACKET)?, buffer(MAX_PACKET)?],
+            silk: [buffer(MAX_FRAME)?, buffer(MAX_FRAME)?],
             redundant: [[0.0; REDUNDANT]; 2],
-        }
-    }
-}
-
-/// Why a stream refused a frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum FrameError {
-    Silk(SilkError),
-    /// The redundancy signalling points past the frame.
-    Redundancy,
-}
-
-impl FrameError {
-    pub(crate) fn message(self) -> &'static str {
-        match self {
-            FrameError::Silk(SilkError::Invalid(what)) => what,
-            FrameError::Redundancy => "redundant frame size",
-        }
+        })
     }
 }
 
@@ -124,19 +111,50 @@ impl StreamDecoder {
         self.pending_fade = PendingFade::default();
     }
 
-    /// Decode every frame of `packet` into `work.pcm[channel][..]` and return the samples
-    /// per channel written: the packet's duration, adjusted by the samples the SILK
-    /// resampler holds back or releases.
-    pub(crate) fn decode(
-        &mut self,
-        packet: &Packet<'_>,
-        work: &mut Workspace,
-    ) -> Result<usize, FrameError> {
+    /// Refuse `packet` if this stream cannot decode it, and otherwise return the samples
+    /// per channel [`StreamDecoder::decode`] writes for it. Reads no state that decoding
+    /// changes, so a decoder can check every stream of a packet before it decodes one.
+    pub(crate) fn check(&self, packet: &Packet<'_>) -> Result<usize, DecodeError> {
+        let toc = packet.toc;
+        // Only a hybrid frame's redundancy signalling, which follows its SILK layer, can
+        // point past the frame.
+        if let Some(silk) = SilkConfig::of(toc).filter(|_| toc.mode == Mode::Hybrid) {
+            for &data in packet.frames() {
+                let mut rc = RangeDecoder::new(data);
+                SilkDecoder::skip(&mut rc, silk);
+                parse_redundancy(&mut rc, toc.mode, data)?;
+            }
+        }
+        Ok(self.output_len(packet))
+    }
+
+    /// The samples per channel decoding `packet` writes: its duration, plus those the
+    /// SILK resampler releases when SILK stops or changes rate, less those it holds back
+    /// when SILK starts. All frames of a packet share the mode and rate, so only the
+    /// first can stop or start SILK.
+    fn output_len(&self, packet: &Packet<'_>) -> usize {
+        let silk = SilkConfig::of(packet.toc);
+        let duration = packet.frames().len() * packet.toc.duration.samples();
+        if silk.map(SilkConfig::rate) == self.silk_rate {
+            duration
+        } else {
+            duration + self.held - silk.map_or(0, SilkConfig::start_latency)
+        }
+    }
+
+    /// The samples [`StreamDecoder::flush`] releases.
+    pub(crate) fn pending(&self) -> usize {
+        self.held
+    }
+
+    /// Decode every frame of a `packet` that [`StreamDecoder::check`] accepted into
+    /// `work.pcm[channel][..]` and return the samples per channel written.
+    pub(crate) fn decode(&mut self, packet: &Packet<'_>, work: &mut Workspace) -> usize {
         let mut at = 0;
         for &frame in packet.frames() {
-            at += self.decode_frame(packet.toc, frame, at, work)?;
+            at += self.decode_frame(packet.toc, frame, at, work);
         }
-        Ok(at)
+        at
     }
 
     /// Release the samples the SILK resampler still holds into `work.pcm[channel][..]`,
@@ -164,29 +182,26 @@ impl StreamDecoder {
 
     /// Decode one frame into `work.pcm[..][at..]` (`opus_decode_frame`) and return the
     /// samples per channel written.
-    fn decode_frame(
-        &mut self,
-        toc: Toc,
-        data: &[u8],
-        start: usize,
-        work: &mut Workspace,
-    ) -> Result<usize, FrameError> {
+    fn decode_frame(&mut self, toc: Toc, data: &[u8], start: usize, work: &mut Workspace) -> usize {
         let mode = toc.mode;
         let mut rc = RangeDecoder::new(data);
 
         // The SILK resampler releases what it holds back when SILK stops or changes rate.
-        let silk_rate = (mode != Mode::Celt).then(|| toc.bandwidth.silk_rate());
+        let silk = SilkConfig::of(toc);
+        let silk_rate = silk.map(SilkConfig::rate);
         let mut at = start;
         if self.silk_rate.is_some() && self.silk_rate != silk_rate {
             at += self.flush_silk(work, at);
         }
         self.silk_rate = silk_rate;
 
-        let len = match silk_rate {
-            Some(rate) => self.decode_silk(&mut rc, toc, rate, work)?,
+        let len = match silk {
+            Some(silk) => self.decode_silk(&mut rc, silk, work),
             None => toc.duration.samples(),
         };
-        let redundancy = parse_redundancy(&mut rc, mode, data)?;
+        let redundancy = parse_redundancy(&mut rc, mode, data);
+        debug_assert!(redundancy.is_ok(), "refused by `check`");
+        let redundancy = redundancy.unwrap_or(None);
         let mut redundant_range = 0;
         if let Some(Redundancy {
             celt_to_silk: true,
@@ -227,7 +242,7 @@ impl StreamDecoder {
         };
         self.previous = Some(mode);
         self.continues_redundancy = redundancy.is_some_and(|r| !r.celt_to_silk);
-        Ok(at + len - start)
+        at + len - start
     }
 
     /// Decode the SILK layer into `work.silk`, resampled to 48 kHz by the SILK layer, and
@@ -236,22 +251,18 @@ impl StreamDecoder {
     fn decode_silk(
         &mut self,
         rc: &mut RangeDecoder<'_>,
-        toc: Toc,
-        rate: u32,
+        silk: SilkConfig,
         work: &mut Workspace,
-    ) -> Result<usize, FrameError> {
+    ) -> usize {
         if self.previous == Some(Mode::Celt) {
             self.silk.reset();
         }
-        let n = toc.duration.samples();
+        let n = silk.duration_48k();
         let [left, right] = &mut work.silk;
         let mut out = [&mut left[..n], &mut right[..n]];
-        let len = self
-            .silk
-            .decode(rc, rate, n, toc.channels(), &mut out[..self.channels])
-            .map_err(FrameError::Silk)?;
+        let len = self.silk.decode(rc, silk, &mut out[..self.channels]);
         self.held += n - len;
-        Ok(len)
+        len
     }
 
     /// The CELT layer of a CELT-only or hybrid frame into `work.pcm[..][at..]`, or silence
@@ -336,11 +347,13 @@ impl StreamDecoder {
 
 /// The redundant CELT frame signalled after the SILK data of a SILK-only or hybrid
 /// frame (RFC 6716 section 4.5.1), whose bytes end the frame; `rc` then excludes them.
+/// Only a hybrid frame codes the size, which may not fit: a SILK-only frame's redundant
+/// frame takes the bytes after the SILK data.
 fn parse_redundancy<'a>(
     rc: &mut RangeDecoder<'_>,
     mode: Mode,
     data: &'a [u8],
-) -> Result<Option<Redundancy<'a>>, FrameError> {
+) -> Result<Option<Redundancy<'a>>, DecodeError> {
     let hybrid_bits = if mode == Mode::Hybrid { 20 } else { 0 };
     if mode == Mode::Celt || rc.tell() + 17 + hybrid_bits > 8 * data.len() as i32 {
         return Ok(None);
@@ -358,7 +371,7 @@ fn parse_redundancy<'a>(
         .len()
         .checked_sub(bytes)
         .filter(|&kept| kept as i32 * 8 >= rc.tell())
-        .ok_or(FrameError::Redundancy)?;
+        .ok_or(DecodeError::Invalid("redundant frame size"))?;
     rc.shrink(bytes);
     Ok(Some(Redundancy {
         celt_to_silk,

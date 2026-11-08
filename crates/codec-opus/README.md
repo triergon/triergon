@@ -5,19 +5,19 @@ normative where the text defers to it), with the channel mapping of RFC 7845. It
 one Opus packet per access unit to planar `f32` at 48 kHz in FFmpeg's channel order (the
 [triergon-codec](../codec/README.md) `AudioDecoder` contract): SILK-only, hybrid and
 CELT-only frames of 2.5 to 60 ms, packets up to 120 ms, and multistream packets of up to
-255 streams. It depends on [triergon-codec](../codec/README.md) (`AudioFrame`, layouts,
-the shared inverse MDCT), [triergon-core](../core/README.md) (budgets) and
-[triergon-framing](../framing/README.md) (`OpusHead`).
+255 streams into up to 93 output channels. It depends on
+[triergon-codec](../codec/README.md) (`AudioFrame`, layouts, budgets, the shared inverse
+MDCT) and [triergon-framing](../framing/README.md) (`OpusHead`).
 
 ## Usage
 
 ```rust
 use triergon_codec::{AudioDecoder, AudioFrame};
-use triergon_codec_opus::{DecodeError, Decoder, Limits};
+use triergon_codec_opus::{DecodeError, Decoder};
 
 fn decode(opus_head: &[u8], packets: &[&[u8]]) -> Result<(), DecodeError> {
     // The identification header: Ogg's first packet, Matroska's CodecPrivate.
-    let mut decoder = Decoder::from_configuration(opus_head, Limits::default())?;
+    let mut decoder = Decoder::new(opus_head)?;
     let mut frame = AudioFrame::default();
     for packet in packets {
         if decoder.decode(packet, &mut frame).is_ok() {
@@ -30,7 +30,8 @@ fn decode(opus_head: &[u8], packets: &[&[u8]]) -> Result<(), DecodeError> {
 }
 ```
 
-`Decoder::from_configuration_in` charges a caller's `Budget` instead of its own pool.
+`Decoder::with_limits(opus_head, Limits { live_storage_bytes })` sizes the decoder's own
+pool; `Decoder::new_in(opus_head, &budget)` charges a caller's `Budget` instead.
 `examples/decode_opus` decodes the first Opus track of a file read through the `triergon`
 facade (Matroska/WebM, Ogg), or an RFC 6716 `.bit` test vector (whose recorded final
 range it checks per packet), to interleaved f32le: the decoder's whole output, without
@@ -56,7 +57,8 @@ the pre-skip or other container trims.
   mono, stereo, 3.0, quad, 5.0, 5.1, 6.1, 7.1) and 255 (coded order without speaker
   positions, `ChannelLayout::mask() == 0`), coupled and uncoupled streams, stream
   channels used by several outputs, and silent outputs (mapping index 255). Other
-  families are `Unsupported`.
+  families are `Unsupported`, and so are headers of more than 93 output channels (RFC
+  7845 allows 255): 93 is the most a `ChannelLayout` holds.
 
 ## Behaviour and limits
 
@@ -80,15 +82,19 @@ the pre-skip or other container trims.
     (the reference alternates the channels per band; both are within the conformance
     tolerance).
 - No packet loss concealment or forward error correction: every access unit is a packet.
-- Malformed packets return `DecodeFailure` (an `Invalid` error inside) and leave the
-  decoder usable; streams of one multistream packet with different durations are
-  `Invalid`.
-- Memory: the per-stream state (about 46 KiB: CELT history and energies, SILK state)
-  and the output frame are charged to the decoder's budget before they are allocated
-  (`Limits::live_storage_bytes`, 64 MiB by default: 255 streams take about 12 MiB and the
-  largest frame, 255 channels of 120 ms, 6 MiB); a refused charge is
-  `DecodeError::Budget`. The transforms and per-packet scratch are fixed
-  at construction (under 200 KiB). Nothing is allocated per packet.
+- Malformed packets return `DecodeFailure` (an `Invalid` error inside); streams of one
+  multistream packet with different durations are `Invalid`. A packet is checked whole
+  before any stream decodes: the framing of every stream's packet, the redundant frame
+  size of each hybrid frame (which follows its SILK layer, read twice for this), the
+  durations, then the output frame's charge. A refused packet leaves every stream as it
+  was, so the next packet decodes as if it had not been sent.
+- Memory charged to the decoder's budget: at construction the state of each stream
+  (46 KiB: CELT history and energies, SILK state) and the buffers and inverse MDCT
+  tables the streams share (140 KiB), and the output frame before a packet that needs
+  it larger. `Limits::live_storage_bytes` is 64 MiB by default, which holds the largest
+  header with a wide margin: 255 streams (11.4 MiB) and 93 channels of 120 ms (2 MiB).
+  A refused charge is `DecodeError::Budget`; in `decode` it refuses only that packet.
+  Nothing is allocated per packet.
 
 Constant tables are taken from RFC 6716; see [THIRD-PARTY.md](THIRD-PARTY.md).
 

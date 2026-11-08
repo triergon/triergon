@@ -133,47 +133,29 @@ fn decode_stream(packets: &[Vec<u8>]) -> (usize, Vec<f32>, Vec<f32>, usize) {
             continue;
         };
         for frame in frames {
-            let config = usize::from(frame.config);
-            let duration = if config < 12 {
-                [480, 960, 1920, 2880][config % 4]
-            } else if config < 16 {
-                [480, 960][config % 2]
-            } else {
-                [120, 240, 480, 960][config % 4]
-            };
+            let toc = Toc::parse(frame.config << 3 | u8::from(frame.stereo) << 2);
             // Hybrid frames start with a wideband SILK layer; CELT is not decoded here.
-            let frame_rate = match config {
-                0..12 => Some([8000, 12000, 16000][config / 4]),
-                12..16 => Some(16000),
-                _ => None,
-            };
+            let silk = SilkConfig::of(toc);
+            let frame_rate = silk.map(SilkConfig::rate);
             if rate.is_some() && frame_rate != rate {
                 let mut out: Vec<&mut [f32]> = planes.iter_mut().map(|p| &mut p[..]).collect();
                 let flushed = decoder.flush(&mut out);
                 push(&planes, flushed, &mut output);
             }
             rate = frame_rate;
-            let Some(frame_rate) = frame_rate else {
+            let Some(silk) = silk else {
                 skipped += 1;
                 decoder.reset();
                 for plane in &mut planes {
                     plane.fill(0.0);
                 }
-                push(&planes, duration, &mut output);
+                push(&planes, toc.duration.samples(), &mut output);
                 continue;
             };
             let mut rc = RangeDecoder::new(frame.data);
+            let duration = silk.duration_48k();
             let mut out: Vec<&mut [f32]> = planes.iter_mut().map(|p| &mut p[..duration]).collect();
-            let result = decoder.decode(
-                &mut rc,
-                frame_rate,
-                duration,
-                1 + usize::from(frame.stereo),
-                &mut out,
-            );
-            let Ok(produced) = result else {
-                panic!("{result:?}");
-            };
+            let produced = decoder.decode(&mut rc, silk, &mut out);
             push(&planes, produced, &mut output);
             // Internal-rate output, always as two channels.
             for i in 0..decoder.internal_len {
@@ -211,6 +193,13 @@ fn decode_ogg_file() {
     );
 }
 
+/// The SILK configuration of round `round`: every bandwidth, duration and channel count.
+fn config_of_round(round: usize) -> SilkConfig {
+    let config = (round % 3) * 4 + (round / 3) % 4;
+    let stereo = (round / 12) % 2;
+    SilkConfig::of(Toc::parse((config << 3 | stereo << 2) as u8)).unwrap()
+}
+
 #[test]
 fn malformed_frames_never_panic() {
     let mut decoder = SilkDecoder::new();
@@ -225,13 +214,11 @@ fn malformed_frames_never_panic() {
                 (state >> 24) as u8
             })
             .collect();
-        let rate = [8000, 12000, 16000][round % 3];
-        let duration = [480, 960, 1920, 2880][(round / 3) % 4];
-        let channels = 1 + (round / 12) % 2;
+        let silk = config_of_round(round);
+        let duration = silk.duration_48k();
         let mut rc = RangeDecoder::new(&data);
         let mut out: [&mut [f32]; 2] = [&mut left[..duration], &mut right[..duration]];
-        let result = decoder.decode(&mut rc, rate, duration, channels, &mut out[..1 + round % 2]);
-        assert!(result.is_ok());
+        decoder.decode(&mut rc, silk, &mut out[..1 + round % 2]);
         // The interpolation filters have a worst-case gain below 1.91 for clamped input.
         let worst = left[..duration].iter().fold(0.0f32, |m, s| m.max(s.abs()));
         assert!(worst.is_finite() && worst <= 1.91, "{worst}");
@@ -239,15 +226,43 @@ fn malformed_frames_never_panic() {
 }
 
 #[test]
-fn invalid_parameters_are_refused() {
+fn skipping_reads_what_decoding_reads() {
     let mut decoder = SilkDecoder::new();
-    let mut plane = [0.0f32; 960];
-    let mut rc = RangeDecoder::new(&[0; 8]);
-    let mut out: [&mut [f32]; 1] = [&mut plane];
-    assert!(decoder.decode(&mut rc, 24000, 960, 1, &mut out).is_err());
-    assert!(decoder.decode(&mut rc, 16000, 240, 1, &mut out).is_err());
-    assert!(decoder.decode(&mut rc, 16000, 960, 3, &mut out).is_err());
-    assert!(decoder.decode(&mut rc, 16000, 480, 1, &mut out).is_err());
+    let mut state = 0x0bad_cafeu32;
+    let mut left = [0.0f32; 2880];
+    let mut right = [0.0f32; 2880];
+    for round in 0..3000 {
+        let len = (round * 13) % 200;
+        let data: Vec<u8> = (0..len)
+            .map(|_| {
+                state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+                (state >> 24) as u8
+            })
+            .collect();
+        let silk = config_of_round(round);
+        let duration = silk.duration_48k();
+        let mut decoded = RangeDecoder::new(&data);
+        let mut skipped = decoded.clone();
+        let mut out: [&mut [f32]; 2] = [&mut left[..duration], &mut right[..duration]];
+        decoder.decode(&mut decoded, silk, &mut out[..1 + (round / 12) % 2]);
+        SilkDecoder::skip(&mut skipped, silk);
+        assert_eq!(
+            (skipped.tell_frac(), skipped.range()),
+            (decoded.tell_frac(), decoded.range()),
+            "round {round}"
+        );
+    }
+}
+
+#[test]
+fn tocs_name_the_silk_layer() {
+    let rate_and_duration =
+        |toc: u8| SilkConfig::of(Toc::parse(toc)).map(|c| (c.rate(), c.duration_48k()));
+    assert_eq!(rate_and_duration(3 << 3), Some((8000, 2880)));
+    assert_eq!(rate_and_duration(5 << 3 | 4), Some((12000, 960)));
+    assert_eq!(rate_and_duration(12 << 3), Some((16000, 480)));
+    assert_eq!(rate_and_duration(15 << 3), Some((16000, 960)));
+    assert_eq!(rate_and_duration(31 << 3), None);
 }
 
 #[test]
