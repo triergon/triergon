@@ -379,15 +379,20 @@ fn run_case(rng: &mut Rng, glyphs: &[&str], em: f64, reach: Reach) -> String {
             flags |= bit;
         }
     }
-    let be = match rng.below(10) {
-        0..=5 => 0,
-        6..=8 => rng.range(1, 4),
+    // One run in twenty goes beyond libass's `\be` clamp of 127 passes, with
+    // moderate transforms only, whose bitmaps stay small enough for that many.
+    let be = match rng.below(20) {
+        0..=11 => 0,
+        12..=17 => rng.range(1, 4),
+        19 if reach == Reach::Moderate => rng.range(128, 255),
         _ => rng.range(5, 20),
     };
-    let blur = match rng.below(10) {
-        0..=4 => 0.0,
-        5..=7 => rng.real(0.05, 2.0),
-        _ => rng.real(2.0, 12.0),
+    // One in twenty goes beyond its `\blur` clamp of 100 pixels.
+    let blur = match rng.below(20) {
+        0..=9 => 0.0,
+        10..=15 => rng.real(0.05, 2.0),
+        16..=18 => rng.real(2.0, 12.0),
+        _ => rng.real(100.0, 200.0),
     };
     let scale = |rng: &mut Rng| {
         if rng.chance(0.7) {
@@ -477,7 +482,7 @@ fn run_case(rng: &mut Rng, glyphs: &[&str], em: f64, reach: Reach) -> String {
 
 /// One set of bitmap cases: a blur, an addition, both multiplications, a
 /// subtraction, a shift and a clip.
-fn bitmap_cases(rng: &mut Rng) -> Vec<String> {
+fn bitmap_cases(rng: &mut Rng, reach: Reach) -> Vec<String> {
     let mut cases = Vec::new();
     let seed = rng.range(0, i64::MAX >> 1);
     let (w, h) = (rng.range(2, 160), rng.range(2, 160));
@@ -488,11 +493,23 @@ fn bitmap_cases(rng: &mut Rng) -> Vec<String> {
             rng.real(0.0, 1.0).powi(2) * 30.0
         }
     };
-    // One blur in ten reaches beyond libass's `\blur` clamp, so far that the
-    // blurred bitmap would pass libass's bound of 2^29 samples and stays
-    // unblurred.
+    // One blur in ten reaches beyond libass's `\blur` clamp of 100 pixels: 40%
+    // of them to radii it still blurs (up to 250 pixels, or 1000 with the full
+    // reach, short of planes of gigabytes), 45% so far that the blurred bitmap
+    // would pass libass's bound of 2^29 samples and stays unblurred, and 15% to
+    // variances beyond 4·10^16 pixels², whose blurred size no longer fits
+    // libass's `int` offset.
     let (rx, ry) = if rng.chance(0.1) {
-        let r = rng.real(2e4, 1e6);
+        let u = rng.unit();
+        let log_between = |lo: f64, hi: f64, t: f64| lo * (hi / lo).powf(t);
+        let widest = if reach == Reach::Full { 1000.0 } else { 250.0 };
+        let r = if u < 0.4 {
+            log_between(100.0, widest, u / 0.4)
+        } else if u < 0.85 {
+            log_between(2e4, 1e6, (u - 0.4) / 0.45)
+        } else {
+            log_between(2.1e8, 1e9, (u - 0.85) / 0.15)
+        };
         (r, r * rng.real(1.0, 2.0))
     } else {
         let rx = radius(rng);
@@ -582,10 +599,10 @@ fn outline_file(name: &str, outlines: usize, reach: Reach) -> String {
 }
 
 /// A file of random bitmap cases.
-fn bitmap_file(name: &str, sets: usize) -> String {
+fn bitmap_file(name: &str, sets: usize, reach: Reach) -> String {
     let mut rng = Rng::named(name);
     (0..sets)
-        .flat_map(|_| bitmap_cases(&mut rng))
+        .flat_map(|_| bitmap_cases(&mut rng, reach))
         .map(|l| format!("{l}\n"))
         .collect()
 }
@@ -603,7 +620,7 @@ fn line_files(load: Load, prefix: &str, reach: Reach) -> Vec<(String, String)> {
         Load::Bitmaps { files, sets } => (0..files)
             .map(|i| {
                 let name = format!("bitmaps{prefix}-{i}");
-                let text = bitmap_file(&name, sets);
+                let text = bitmap_file(&name, sets, reach);
                 (name, text)
             })
             .collect(),
@@ -748,7 +765,7 @@ mod tests {
             ["convert", "raster", "rotate", "run", "stroke", "transform"]
         );
         assert_eq!(
-            kinds(&bitmap_file("bitmaps-required-0", 5)),
+            kinds(&bitmap_file("bitmaps-required-0", 5, Reach::Moderate)),
             ["add", "blur", "clip", "fix", "imul", "mul", "shift"]
         );
     }
