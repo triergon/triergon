@@ -20,7 +20,7 @@ use triergon_playback::{
     matroska_feed::{
         MatroskaCompactDiscovery, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
         MatroskaDolbyLimits, MatroskaFeedLimits, MatroskaFeedSetup, MatroskaHevcDolbyLimits,
-        MatroskaHevcDolbySetup, MatroskaVideoSeekGate, MatroskaVideoTiming,
+        MatroskaHevcDolbySetup, MatroskaPacketTiming, MatroskaVideoSeekGate,
     },
 };
 
@@ -89,7 +89,7 @@ impl Work {
         fold(&mut self.digest, word);
     }
 
-    fn packet(&mut self, timing: MatroskaVideoTiming, data: &[u8]) {
+    fn packet(&mut self, timing: MatroskaPacketTiming, data: &[u8]) {
         self.packets += 1;
         self.bytes += data.len() as u64;
         self.fold(signed(timing.pts_ns.unwrap_or(i64::MIN)));

@@ -3,9 +3,6 @@
 mod clock;
 mod dolby_clock;
 pub use clock::MatroskaHevcClock;
-pub use dolby_clock::{
-    MatroskaDolbyClock, MatroskaDolbyClockPrefix, MatroskaDolbyClockProbe, MatroskaDolbyTiming,
-};
 
 use super::{Association, check_limit, probe_clock::syncframe_duration_ns};
 use crate::{Output, Result};

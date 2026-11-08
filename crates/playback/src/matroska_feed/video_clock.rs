@@ -1,16 +1,12 @@
 //! Packet clock projection shared by the selected AVC and HEVC feeds.
-use super::{Association, FeedCodec, MatroskaFeedPacket, MatroskaFeedPayload, MatroskaTrackFeed};
+use super::{
+    Association, FeedCodec, MatroskaFeedPacket, MatroskaFeedPayload, MatroskaPacketTiming,
+    MatroskaTrackFeed,
+};
 use crate::{Result, hls_avc::syntax as avc, raw_video::hevc_syntax as hevc};
 use triergon_core::Error;
 use triergon_framing::{AvcAnnexBConfig, Codec, NalHeader};
 use triergon_matroska::typed::Packet;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct MatroskaVideoTiming {
-    pub pts_ns: Option<i64>,
-    pub dts_ns: Option<i64>,
-    pub duration_ns: Option<u64>,
-}
 
 /// One timing projection for an ordered progressive AVC feed, beginning at
 /// an admitted IDR. Observe each checked sample once.
@@ -39,7 +35,7 @@ impl MatroskaTrackFeed {
 impl MatroskaAvcClock<'_> {
     /// Project the packet's native presentation and decode clocks. Source
     /// timing remains available on the supplied packet.
-    pub fn observe(&mut self, packet: &MatroskaFeedPacket<'_>) -> Result<MatroskaVideoTiming> {
+    pub fn observe(&mut self, packet: &MatroskaFeedPacket<'_>) -> Result<MatroskaPacketTiming> {
         let MatroskaFeedPayload::Avc(unit) = &packet.payload else {
             return Err(Error::Invalid("native AVC clock packet codec"));
         };
@@ -79,7 +75,7 @@ impl DecodeClock {
         source: &Packet,
         nals: impl Iterator<Item = &'a [u8]>,
         fallback_duration: impl FnOnce(u64) -> Option<u64>,
-    ) -> Result<MatroskaVideoTiming> {
+    ) -> Result<MatroskaPacketTiming> {
         if !self.valid {
             return Err(Error::Invalid("native video clock continuity"));
         }
@@ -103,7 +99,7 @@ impl DecodeClock {
         };
         self.started = true;
         let dts_ns = pts_ns.and_then(|pts| self.push_pts(pts));
-        Ok(MatroskaVideoTiming {
+        Ok(MatroskaPacketTiming {
             pts_ns,
             dts_ns,
             duration_ns,

@@ -1,7 +1,120 @@
 //! Shared native initial-packet timing over a bounded probe prefix.
 use crate::Result;
-use triergon_core::Error;
+use triergon_core::{Budget, BudgetVec, Error};
 use triergon_matroska::typed::Packet;
+
+const MAX_PREFIX_PACKETS: usize = 4096;
+
+/// One packet's native clock in nanoseconds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MatroskaPacketTiming {
+    pub pts_ns: Option<i64>,
+    pub dts_ns: Option<i64>,
+    pub duration_ns: Option<u64>,
+}
+
+impl From<NativePacketTiming> for MatroskaPacketTiming {
+    fn from(timing: NativePacketTiming) -> Self {
+        Self {
+            pts_ns: timing.pts,
+            dts_ns: timing.dts,
+            duration_ns: timing.duration_ns,
+        }
+    }
+}
+
+/// Retain scalar timing rows for the caller's selected packets of one feed
+/// during discovery. The feed's `push` observes a packet.
+pub struct MatroskaClockProbe<'feed, F> {
+    feed: &'feed F,
+    maximum_packets: usize,
+    rows: BudgetVec<PacketClock>,
+    timeline: ProbeTimeline,
+}
+
+impl<'feed, F> MatroskaClockProbe<'feed, F> {
+    pub(super) fn new(feed: &'feed F, budget: &Budget, maximum_packets: usize) -> Result<Self> {
+        super::check_limit(maximum_packets, MAX_PREFIX_PACKETS)?;
+        Ok(Self {
+            feed,
+            maximum_packets,
+            rows: BudgetVec::new(budget),
+            timeline: ProbeTimeline::default(),
+        })
+    }
+
+    /// Observe one checked packet and return its ordinal within this prefix.
+    /// Allocation pressure leaves both the ordinal and the clock unchanged.
+    pub(super) fn push_timing(
+        &mut self,
+        project: impl FnOnce(&F) -> Result<NativePacketTiming>,
+    ) -> Result<usize> {
+        let ordinal = self.rows.len();
+        super::check_limit(
+            ordinal.checked_add(1).ok_or(Error::Overflow)?,
+            self.maximum_packets,
+        )?;
+        let timing = project(self.feed)?;
+        let mut next = self.timeline;
+        let row = next.push(ordinal, timing)?;
+        self.rows.try_push(row).map_err(|failure| failure.error)?;
+        self.timeline = next;
+        Ok(ordinal)
+    }
+
+    /// Freeze the observed prefix before delivering any of its clock rows.
+    pub fn finish(self) -> MatroskaClockPrefix<'feed, F> {
+        MatroskaClockPrefix(self)
+    }
+}
+
+/// Replays the probe's timestamp projection without retaining packet payloads.
+pub struct MatroskaClockPrefix<'feed, F>(MatroskaClockProbe<'feed, F>);
+
+impl<'feed, F> MatroskaClockPrefix<'feed, F> {
+    pub(super) fn resolve(
+        &self,
+        ordinal: usize,
+        missing: &'static str,
+    ) -> Result<MatroskaPacketTiming> {
+        let row = self
+            .0
+            .rows
+            .as_slice()
+            .get(ordinal)
+            .ok_or(Error::Invalid(missing))?;
+        Ok(self.0.timeline.resolve(ordinal, *row)?.into())
+    }
+
+    /// Continue the same clock after the caller replays the prefix.
+    pub fn into_live(self) -> MatroskaClock<'feed, F> {
+        MatroskaClock {
+            feed: self.0.feed,
+            timeline: self.0.timeline.into_live(),
+        }
+    }
+}
+
+/// Forward clock for one feed binding. Rebuild it on a new seek generation.
+/// The feed's `observe` advances it by one packet.
+pub struct MatroskaClock<'feed, F> {
+    feed: &'feed F,
+    timeline: Timeline,
+}
+
+impl<F> MatroskaClock<'_, F> {
+    pub(super) fn advance(
+        &mut self,
+        project: impl FnOnce(&F) -> Result<NativePacketTiming>,
+    ) -> Result<MatroskaPacketTiming> {
+        let timing = project(self.feed)?;
+        let mut next = self.timeline;
+        let row = next.push(timing)?;
+        let result = next.resolve(row)?;
+        self.timeline = next;
+        Ok(result.into())
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(super) struct NativePacketTiming {
