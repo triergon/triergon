@@ -117,7 +117,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   tied to one of its `pending_module_requirements`. `cargo xtask report` still runs
   them and prints them as open failures with their count, and passes only when every
   other case passes and every listed case still fails; a listed case that starts
-  to match must leave the list. The module stays unaccepted while any is listed.
+  to match must leave the list. A module stays unaccepted while any case of one of
+  its gating features is listed. Features that a module's documentation names as
+  additional coverage, such as `shape-text` and `shape-text-all` for the shaper,
+  keep their open cases listed without blocking it.
 - **Input rights.** A case is measured only when its `rights` are
   `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
   reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
