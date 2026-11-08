@@ -120,9 +120,24 @@ fn operation(
     o: Options,
     op: DemuxOperation,
     policy: OpenPolicy,
+    trace: Option<&mut String>,
+) -> Result<Stats> {
+    match input {
+        Input::Memory(cursor) => {
+            let length = cursor.get_ref().len() as u64;
+            demux(cursor, length, o, op, policy, trace)
+        }
+        Input::File(file, length) => demux(file, *length, o, op, policy, trace),
+    }
+}
+fn demux<T: Transport>(
+    transport: &mut T,
+    length: u64,
+    o: Options,
+    op: DemuxOperation,
+    policy: OpenPolicy,
     mut trace: Option<&mut String>,
 ) -> Result<Stats> {
-    let (transport, length) = input.transport();
     let mut stats = Stats::default();
     stats.start(o.retain, o.window, o.file)?;
     let mut driver = Driver::new(transport, length, o.window, o.quantum)?;
