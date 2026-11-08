@@ -818,10 +818,23 @@ mod tests {
             }),
             Ok(true)
         );
-        assert!(matches!(
-            current.poll(&mut WorkBudget::new(65536), &cancel, 64 * 1024),
-            Err(Error::Truncated)
-        ));
+        let mut truncated = false;
+        for _ in 0..128 {
+            match current
+                .poll(&mut WorkBudget::new(65536), &cancel, 64 * 1024)
+                .unwrap()
+            {
+                TsPayloadStep::Step(BackendStep::Yield) => {}
+                TsPayloadStep::Step(BackendStep::Event(RawEvent::Ts(event))) => {
+                    assert!(matches!(event.source, TraceEvent::Diagnostic(fault)
+                        if fault.kind == FaultKind::Transport && fault.error == Error::Truncated));
+                    truncated = true;
+                    break;
+                }
+                _ => panic!("expected the truncated carrier diagnostic"),
+            }
+        }
+        assert!(truncated);
     }
 
     #[test]
