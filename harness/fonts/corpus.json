@@ -74,6 +74,10 @@
     {
       "name": "dejavu-fonts-ttf-2.37.tar.bz2",
       "url": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2",
+      "github_asset": {
+        "repo": "dejavu-fonts/dejavu-fonts",
+        "id": 2070169
+      },
       "licence": "Bitstream Vera and Arev font licences (dejavu-fonts-ttf-2.37/LICENSE)",
       "origin": "DejaVu fonts 2.37",
       "files": [

@@ -14,15 +14,43 @@ jobs:
     timeout-minutes: 40
     env:
       CARGO_INCREMENTAL: '0'
+      # Pinned downloads, kept under their SHA-256 so an upstream outage does not
+      # stop the checks. Every entry is verified against its pin before use.
+      TRIERGON_DOWNLOAD_CACHE: /home/runner/.cache/triergon-downloads
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore pinned downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: /home/runner/.cache/triergon-downloads
+          key: pinned-downloads
+          restore-keys: pinned-downloads-
       - name: Install check dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config zlib1g-dev nasm rsync zstd
           rustup show active-toolchain || rustup toolchain install
           rustc -vV
+          mkdir -p "$TRIERGON_DOWNLOAD_CACHE"
+          touch "$RUNNER_TEMP/downloads-start"
       - name: Prepare pinned reference and fixtures
         run: cargo xtask prepare-check || cargo xtask prepare-check
       - name: Verify workspace
         run: cargo xtask check
+      - name: Keep only the downloads this run used
+        id: downloads
+        if: always()
+        run: |
+          # A run that stopped early may not have reached every download, so only
+          # a complete run drops the entries it did not use.
+          if [ "${{ job.status }}" = success ]; then
+            find "$TRIERGON_DOWNLOAD_CACHE" -type f ! -newer "$RUNNER_TEMP/downloads-start" -delete
+          fi
+          key=$(ls "$TRIERGON_DOWNLOAD_CACHE" | sort | sha256sum | cut -c1-16)
+          echo "key=pinned-downloads-$key" >> "$GITHUB_OUTPUT"
+      - name: Save pinned downloads
+        if: always() && steps.downloads.outputs.key != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: /home/runner/.cache/triergon-downloads
+          key: ${{ steps.downloads.outputs.key }}

@@ -30,6 +30,11 @@ resource limit becomes an explicit, reviewed rule for that case.
 
 ## Reference and corpus
 
+- **Pinned downloads.** Reference sources and corpus files are fixed by their SHA-256.
+  Each may list mirrors, tried in order, and any bytes that don't match the pin are
+  refused. With `TRIERGON_DOWNLOAD_CACHE` set, verified downloads are also kept in that
+  directory under their hash and reused before any network access. CI keeps this
+  cache between runs.
 - **FFmpeg pins.** `cargo xtask prepare-ffmpeg --profile P` builds FFmpeg from a pinned,
   hash-checked source with recorded configure flags, compiler and binary hashes, and
   `cargo xtask build-workers` builds the reference worker of every prepared profile

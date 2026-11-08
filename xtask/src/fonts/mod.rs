@@ -161,13 +161,22 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
     fs::create_dir_all(&cache).map_err(|e| format!("{}: {e}", cache.display()))?;
     let archive_path = cache.join(format!("freetype-{VERSION}.tar.xz"));
     if !archive_path.exists() {
-        let url = format!(
-            "https://download.savannah.gnu.org/releases/freetype/freetype-{VERSION}.tar.xz"
-        );
-        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
-        if data.len() > ARCHIVE_LIMIT {
-            return Err("FreeType archive size limit".into());
-        }
+        let name = format!("freetype-{VERSION}.tar.xz");
+        let sources = [
+            format!("https://download.savannah.gnu.org/releases/freetype/{name}"),
+            format!("https://download-mirror.savannah.gnu.org/releases/freetype/{name}"),
+            format!(
+                "https://downloads.sourceforge.net/project/freetype/freetype2/{VERSION}/{name}"
+            ),
+        ];
+        let sources = sources.each_ref().map(|url| fetch::Source::Url(url));
+        let data = fetch::pinned(
+            net,
+            &sources,
+            ARCHIVE_SHA256,
+            ARCHIVE_LIMIT,
+            "triergon-reference-builder",
+        )?;
         fetch::publish(&archive_path, &data)?;
     }
     let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
@@ -321,10 +330,24 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
         }
         let archive = downloads.join(name);
         if !archive.exists() {
-            let data = net.https(url, "triergon-font-corpus", FONT_LIMIT)?;
-            if data.len() > FONT_LIMIT {
-                return Err(format!("{name} exceeds the download bound"));
-            }
+            // A GitHub release asset may also be fetched through the API, which
+            // stays up when release downloads fail.
+            let asset = source.get("github_asset").map(|asset| {
+                let repo = asset.get("repo").and_then(Value::as_str);
+                let id = match asset.get("id") {
+                    Some(Value::Number(id)) if id.is_integer() => {
+                        id.as_i128().and_then(|id| u64::try_from(id).ok())
+                    }
+                    _ => None,
+                };
+                repo.zip(id)
+                    .map(|(repo, id)| fetch::Source::GitHubAsset { repo, id })
+                    .ok_or(format!("{name}: github_asset needs repo and id"))
+            });
+            let mut sources = vec![fetch::Source::Url(url)];
+            sources.extend(asset.transpose()?);
+            let data = fetch::pinned(net, &sources, expected, FONT_LIMIT, "triergon-font-corpus")
+                .map_err(|e| format!("{name}: {e}"))?;
             fetch::publish(&archive, &data)?;
         }
         let data = fetch::read_bounded(&archive, FONT_LIMIT)?;

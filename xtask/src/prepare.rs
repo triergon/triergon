@@ -367,10 +367,13 @@ fn revision_source(
     };
     if !archive_path.exists() {
         let url = format!("https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/{REVISION}");
-        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
-        if data.len() > ARCHIVE_LIMIT {
-            return Err("source archive size limit".into());
-        }
+        let data = fetch::pinned(
+            net,
+            &[fetch::Source::Url(&url)],
+            ARCHIVE_SHA256,
+            ARCHIVE_LIMIT,
+            "triergon-reference-builder",
+        )?;
         fetch::publish(&archive_path, &data)?;
     }
     let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
@@ -404,10 +407,13 @@ fn release_source(
         .join(format!("ffmpeg-{RELEASE}.tar.xz"));
     if !archive_path.exists() {
         let url = format!("https://ffmpeg.org/releases/ffmpeg-{RELEASE}.tar.xz");
-        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
-        if data.len() > ARCHIVE_LIMIT {
-            return Err("release archive size limit".into());
-        }
+        let data = fetch::pinned(
+            net,
+            &[fetch::Source::Url(&url)],
+            RELEASE_SHA256,
+            ARCHIVE_LIMIT,
+            "triergon-reference-builder",
+        )?;
         let parent = archive_path.parent().expect("archive has a parent");
         fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
         fetch::publish(&archive_path, &data)?;
