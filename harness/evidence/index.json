@@ -46,6 +46,12 @@
  },
  "sets": [
   {
+   "name": "packet-framing-cycle-profiles",
+   "retention": "90 days",
+   "key": "qualification/packet-framing-cycle-profiles/7783e7f734e2f5dc254ae31ac4253f2ceacc7d463e9d881b12df80a836fd2c7e.tar.gz",
+   "sha256": "7783e7f734e2f5dc254ae31ac4253f2ceacc7d463e9d881b12df80a836fd2c7e"
+  },
+  {
    "name": "packet-framing-inline-segment-comparison",
    "retention": "retained",
    "key": "evidence/repository/packet-framing-inline-segment-comparison/297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600.tar.gz",
