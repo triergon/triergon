@@ -1,5 +1,6 @@
 //! Bounded access-unit queue. A full queue refuses the access unit and the
 //! feeder keeps it (backpressure).
+use crate::Discard;
 use std::collections::VecDeque;
 
 /// Capacity of one lane's pending input.
@@ -40,6 +41,7 @@ pub enum FeedError {
 pub(crate) struct Unit {
     pub data: Vec<u8>,
     pub pts: Option<i64>,
+    pub discard: Discard,
 }
 
 #[derive(Debug)]
@@ -58,6 +60,14 @@ impl UnitQueue {
         }
     }
     pub fn push(&mut self, data: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
+        self.push_discarding(data, pts, Discard::default())
+    }
+    pub fn push_discarding(
+        &mut self,
+        data: &[u8],
+        pts: Option<i64>,
+        discard: Discard,
+    ) -> Result<(), FeedError> {
         if data.is_empty() || data.len() > self.limits.unit_bytes {
             return Err(FeedError::Invalid);
         }
@@ -68,6 +78,7 @@ impl UnitQueue {
         self.units.push_back(Unit {
             data: data.to_vec(),
             pts,
+            discard,
         });
         Ok(())
     }
