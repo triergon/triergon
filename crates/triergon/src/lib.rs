@@ -23,6 +23,8 @@ pub use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, Time, TimeBase, WorkBudget,
 };
 
+#[cfg(feature = "elementary")]
+pub use triergon_elementary as elementary;
 #[cfg(feature = "framing")]
 pub use triergon_framing as framing;
 #[cfg(feature = "isobmff")]
