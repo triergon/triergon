@@ -1311,7 +1311,7 @@ mod tests {
             ("mpegts-pes", 97),
             ("subtitle-pgs", 317),
             ("subtitle-dvb", 219),
-            ("subtitle-dvd", 222),
+            ("subtitle-dvd", 223),
             ("subtitle-cc", 185),
             ("subtitle-teletext", 70),
         ] {

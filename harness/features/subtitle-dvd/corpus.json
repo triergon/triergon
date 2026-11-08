@@ -749,6 +749,28 @@
       }
     },
     {
+      "id": "vobsub-reassembly-control-offset-zero",
+      "profile": "vobsub-reassembly-control-offset-zero",
+      "file": "dvd/reassembly-control-offset-zero.idx",
+      "sha256": "a3a86b7bd1a3c4e4e8865363054aec74edbb0b6ed6df8c0231e2f97546abfb07",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/reassembly-control-offset-zero.sub",
+          "sha256": "ccc577d7b6290555356d913e7ff95e258f9c41e0b726c73d1fbaa3f95c2d47f8"
+        }
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 216,
+        "digest": 14025692882750471780
+      }
+    },
+    {
       "id": "vobsub-reassembly-control-header-complete",
       "profile": "vobsub-reassembly-control-header-complete",
       "file": "dvd/reassembly-control-header-complete.idx",

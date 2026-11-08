@@ -302,6 +302,32 @@ fn links_are_followed_forward_only() {
 }
 
 #[test]
+fn a_control_offset_of_zero_runs_no_sequence() {
+    let image = glyphs(16, 6, 1, 1);
+    let a = unit(&image, 10, 10, &[(0, &SHOW), (100, &[Cmd::Stop])]);
+    let bare = unit(
+        &image,
+        30,
+        30,
+        &[
+            (0, &[Cmd::Area, Cmd::Offsets, Cmd::Start]),
+            (100, &[Cmd::Stop]),
+        ],
+    );
+    // Colour commands right after the header, where a sequence at offset 0
+    // would read them.
+    let narrow = [0, 15, 0, 0, 3, 0x76, 0x54, 4, 0xf8, 0x40, 0xff, 0, 0, 0, 0];
+    let wide = [
+        0, 0, 0, 0, 0, 21, 0, 0, 0, 0, 3, 0x12, 0x34, 4, 0xff, 0x80, 0xff, 0, 0, 0, 0,
+    ];
+    let out = decode_all(settings(), &[&a, &narrow, &bare, &wide, &bare]);
+    let palette = &out[0].as_ref().unwrap().palette;
+    assert_eq!((&out[1], &out[3]), (&None, &None));
+    assert_eq!(&out[2].as_ref().unwrap().palette, palette);
+    assert_eq!(&out[4].as_ref().unwrap().palette, palette);
+}
+
+#[test]
 fn pixels_read_to_the_end_of_the_unit_and_runs_stay_on_their_line() {
     let full = field(&[&[(16, 1)], &[(16, 1)], &[(16, 1)]]);
     let body = |top: u16, bottom: u16| {

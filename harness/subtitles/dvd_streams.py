@@ -1065,6 +1065,13 @@ def generate(out):
     c = spu(glyphs(12, 8, 3), 30, 40)
     control = struct.unpack(">H", a[2:4])[0]
     big = struct.pack(">H", len(a) + 20) + a[2:]
+    # Units with a control offset of 0, whose colour commands follow the
+    # header, then units that show the colours carried over.
+    bare = spu(glyphs(16, 6, 1, border=1), 30, 30, [(0, [None, None, cmd_start()]), (100, [cmd_stop()])])
+    narrow_zero = cmd_palette(7, 6, 5, 4) + cmd_alpha(15, 8, 4, 0) + cmd_end()
+    narrow_zero = struct.pack(">HH", 4 + len(narrow_zero) + 4, 0) + narrow_zero + b"\0" * 4
+    wide_zero = cmd_palette(1, 2, 3, 4) + cmd_alpha(15, 15, 8, 0) + cmd_end()
+    wide_zero = struct.pack(">HII", 0, 10 + len(wide_zero) + 4, 0) + wide_zero + b"\0" * 4
     scenarios = [
         ("split", [a[:30], a[30:], b, a[:10], a[10:], c, a[:20], a[20:21], a[21:25], a[25:]]),
         ("short-start", [a[:1], b, a[:9], a[9:], c]),
@@ -1079,6 +1086,7 @@ def generate(out):
         ("declared-size", [struct.pack(">H", len(a) - 5) + a[2:], b"\0\3" + a[2:], b"\0\0" + a[2:], b]),
         ("control-offset", [a[:2] + struct.pack(">H", len(a) + 10) + a[4:],
                             a[:2] + struct.pack(">H", 2) + a[4:], c]),
+        ("control-offset-zero", [a, narrow_zero, bare, wide_zero, bare]),
         ("control-header-complete", [big, big[:control + 4], b, big[:control + 3], a, b,
                                      big[:20], big[20:], b"\0" * 20, c]),
         ("long-tail", [a[:20], a[20:] + b"\0" * 3000, b]),

@@ -210,13 +210,14 @@ pub enum Status<'a> {
 ///   packet, are dropped; later packets are appended until the unit completes,
 ///   and bytes after it are discarded. Every structure is read from all of the
 ///   unit's bytes, regardless of the declared size.
-/// * **Control.** Sequences are followed while the link moves forward. A
-///   sequence ends at `0xff`, at an unknown command (including `CHG_COLCON`)
-///   or at the end of the unit; truncated operands drop the unit. Every
-///   sequence with both a display area and field offsets (and at least two
-///   rows) redraws the bitmap with the colours set so far; a failed redraw
-///   drops the unit after the rest of it has run. The last start and stop
-///   dates give the display window.
+/// * **Control.** Sequences are followed from the control offset while the
+///   link moves forward; a control offset of 0 runs none. A sequence ends at
+///   `0xff`, at an unknown command (including `CHG_COLCON`) or at the end of
+///   the unit; truncated operands drop the unit. Every sequence with both a
+///   display area and field offsets (and at least two rows) redraws the
+///   bitmap with the colours set so far; a failed redraw drops the unit after
+///   the rest of it has run. The last start and stop dates give the display
+///   window.
 /// * **Colours.** The colour selectors and the contrast of each colour carry
 ///   over from unit to unit, even from units that present nothing. `0x04`
 ///   sets the first four contrasts to its raw nibbles and `0x84` all 256 to
@@ -545,6 +546,10 @@ impl Pass<'_, '_> {
     fn run(&mut self, unit: &[u8], header: Header) -> std::result::Result<Shown, Halt> {
         if !self.work.try_charge(unit.len() as u64) {
             return Err(Halt::Yield);
+        }
+        // Offset 0 holds the unit's own header, never a sequence.
+        if header.control == 0 {
+            return Err(Halt::Malformed);
         }
         let mut state = UnitState::default();
         let mut drawn = None;
