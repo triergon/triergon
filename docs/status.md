@@ -113,6 +113,9 @@ rejected-clock recovery on macOS (`aarch64-apple-darwin`) at
 the pinned FFmpeg formats worker and unchanged recorded folds. All 272 requests
 are retained; 10 operations remain open. That source has no native timing or
 memory qualification; the native figures above apply to `5634f47d`.
+The complete host observations and exact source are retained as
+`mpegts-finite-recovery`, SHA-256
+`69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f`.
 
 The earlier macOS parity comparison at
 `65eeada0888bcd112d4cbd90e68795fea93fd864` also matches 81 of 97 operations.
@@ -185,6 +188,7 @@ the default font file during 12 cases' operations; those mappings count toward i
 | Subtitles: DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
 | Subtitles: DVB | `0d70bebfc0799f65df14f170ed97e68c5a35daa7` | `06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077` |
 | MPEG-TS | `5634f47d33ca2a9ba671c82e805398ce4eafd83e` | `1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2` |
+| MPEG-TS finite fault recovery, host | `f3f439b803e079208c9ab422270a77feb6281207` | `69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f` |
 | MPEG-TS, earlier measurement | `090c856df65f9247d24ea9f1c927e35cf5d528e8` | `6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1` |
 | MPEG-TS control-only completion (macOS) | `65eeada0888bcd112d4cbd90e68795fea93fd864` | `d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b` |
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |

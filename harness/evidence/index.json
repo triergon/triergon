@@ -16773,6 +16773,15 @@
    "key": "evidence/ass-rendering-58a5c202-linux-arm64-memory-libass/799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3.tar.gz",
    "sha256": "799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3",
    "bytes": 210930417
+  },
+  {
+   "name": "mpegts-finite-recovery",
+   "path": "mpegts-finite-recovery",
+   "retention": "retained",
+   "reason": "finite PES fault-recovery host comparisons cited by docs/status.md",
+   "key": "evidence/mpegts-finite-recovery/69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f.tar.gz",
+   "sha256": "69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f",
+   "bytes": 39685608
   }
  ]
 }
