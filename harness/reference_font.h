@@ -3,10 +3,10 @@
  * linked into the library). Public FreeType API only.
  *
  * Usage:
- *   reference OPERATION-fold   FILE [HEIGHT]
- *   reference OPERATION-bench  FILE ITERATIONS [HEIGHT]
- *   reference OPERATION-memory FILE [HEIGHT]
- *   reference OPERATION-dump   FILE [HEIGHT]
+ *   reference OPERATION-fold   FILE [MODE HEIGHT]
+ *   reference OPERATION-bench  FILE ITERATIONS [MODE HEIGHT]
+ *   reference OPERATION-memory FILE [MODE HEIGHT]
+ *   reference OPERATION-dump   FILE [MODE HEIGHT]
  *
  * OPERATION is one of:
  *   font         per face: the face metrics and style flags; the family, style and
@@ -14,18 +14,19 @@
  *                subtable of formats 0, 4, 6, 10, 12 and 13 with all of its
  *                mappings; the text charmap libass selects; the unscaled kerning of
  *                every pair the `kern` table lists; and for every glyph its hmtx
- *                advance, its loaded advance and its unhinted outline at 1/64 font
- *                unit (loaded at one pixel per font unit).
- *   font-scaled  per face, as libass loads it at the 26.6 pixel HEIGHT: libass's GDI
- *                face metrics (`set_font_metrics`), the size request libass makes
- *                (`ass_face_set_size`: REAL_DIM), the size metrics, libass's ascent
- *                and descent, HarfBuzz scale, emboldening strength, PostScript flag
- *                and decoration bands; the kerning at the size of every pair the
- *                `kern` table lists (FT_KERNING_DEFAULT); and for every glyph the
- *                unhinted outline and advance libass draws, then that outline
- *                emboldened, slanted, and both (libass's order).
- *   font-hinted  per face at HEIGHT as above: every glyph's default-load (hinted)
- *                advance, which libass's HarfBuzz callbacks report.
+ *                advance, its loaded advance and its outline in font units
+ *                (FT_LOAD_NO_SCALE).
+ *   font-sized   per face, as libass loads it at the 26.6 pixel HEIGHT: libass's GDI
+ *                face metrics (`set_font_metrics`) and the size request libass makes
+ *                (`ass_face_set_size`: REAL_DIM); then by MODE
+ *     outlines   the size metrics, libass's ascent and descent, HarfBuzz scale,
+ *                emboldening strength, PostScript flag and decoration bands; the
+ *                kerning at the size of every pair the `kern` table lists
+ *                (FT_KERNING_DEFAULT); and for every glyph the unhinted outline and
+ *                advance libass draws (FT_LOAD_NO_HINTING), then that outline
+ *                emboldened, slanted, and both (libass's order);
+ *     advances   every glyph's default-load (FT_LOAD_DEFAULT) advance, which
+ *                libass's HarfBuzz callbacks report.
  *
  * Each group of values starts with a tag and folds as crates/font-worker/src/
  * record.rs folds it; `packets` counts outlines (or hinted advances) and `bytes`
@@ -78,7 +79,8 @@ enum {
 
 typedef enum { FONT_FACES, FONT_SCALED, FONT_HINTED_ADVANCES } FontOperation;
 
-static const char *const font_operation_names[] = {"font-outlines", "font-scaled", "font-hinted"};
+static const char *const font_operation_names[] = {"font-outlines", "font-sized-outlines",
+                                                   "font-sized-advances"};
 
 typedef struct {
     uint64_t packets, bytes, digest;
@@ -561,19 +563,18 @@ static int font_read(FT_Library library, const FT_Byte *data, FT_Long size, Font
 }
 
 int main(int argc, char **argv) {
-    const char *usage = "usage: reference OPERATION-fold FILE [HEIGHT] | OPERATION-bench FILE N [HEIGHT]\n"
-                        "       | OPERATION-memory FILE [HEIGHT] | OPERATION-dump FILE [HEIGHT]\n"
-                        "  OPERATION: font, font-scaled HEIGHT, font-hinted HEIGHT\n";
+    const char *usage = "usage: reference OPERATION-fold FILE [MODE HEIGHT]\n"
+                        "       | OPERATION-bench FILE N [MODE HEIGHT]\n"
+                        "       | OPERATION-memory FILE [MODE HEIGHT] | OPERATION-dump FILE [MODE HEIGHT]\n"
+                        "  OPERATION: font, or font-sized with MODE outlines or advances\n";
     const char *mode = argc > 1 ? argv[1] : "";
     const char *action = strrchr(mode, '-');
     size_t prefix = action ? (size_t)(action - mode) : 0;
-    FontOperation operation;
+    int sized;
     if (prefix == 4 && !strncmp(mode, "font", 4))
-        operation = FONT_FACES;
-    else if (prefix == 11 && !strncmp(mode, "font-scaled", 11))
-        operation = FONT_SCALED;
-    else if (prefix == 11 && !strncmp(mode, "font-hinted", 11))
-        operation = FONT_HINTED_ADVANCES;
+        sized = 0;
+    else if (prefix == 10 && !strncmp(mode, "font-sized", 10))
+        sized = 1;
     else {
         fputs(usage, stderr);
         return 2;
@@ -581,14 +582,22 @@ int main(int argc, char **argv) {
     action = action + 1;
     int bench = !strcmp(action, "bench"), memory = !strcmp(action, "memory");
     int dump = !strcmp(action, "dump"), fold = !strcmp(action, "fold");
-    int sized = operation != FONT_FACES;
-    if (!(bench || memory || dump || fold) || argc != 3 + bench + sized) {
+    if (!(bench || memory || dump || fold) || argc != 3 + bench + 2 * sized) {
+        fputs(usage, stderr);
+        return 2;
+    }
+    FontOperation operation = FONT_FACES;
+    if (sized && !strcmp(argv[3 + bench], "outlines"))
+        operation = FONT_SCALED;
+    else if (sized && !strcmp(argv[3 + bench], "advances"))
+        operation = FONT_HINTED_ADVANCES;
+    else if (sized) {
         fputs(usage, stderr);
         return 2;
     }
     char *end = NULL, *height_end = NULL;
     unsigned long iterations = bench ? strtoul(argv[3], &end, 10) : 1;
-    long height = sized ? strtol(argv[3 + bench], &height_end, 10) : 0;
+    long height = sized ? strtol(argv[4 + bench], &height_end, 10) : 0;
     if ((end && *end) || (height_end && *height_end) || iterations < 1 || iterations > 1000000) {
         fputs(usage, stderr);
         return 2;

@@ -52,10 +52,28 @@ resource limit becomes an explicit, reviewed rule for that case.
   fetches the font corpus listed with sources, licences and hashes in
   `harness/fonts/corpus.json` and writes its authored fonts with the font crate's
   `authored-fonts` example. Its files are the cases of three features run like
-  every other feature: `font-outlines` (face data and unscaled outlines),
-  `font-scaled` (what libass loads at ten sizes) and `font-hinted` (default-load
-  advances at those sizes). `cargo xtask fonts compare` reports all three;
-  `cargo xtask fonts fuzz` runs the crate's mutation smoke test over the corpus.
+  every other feature: `font-outlines` (face data and unscaled outlines) and
+  `font-hinting-none` (libass's default configuration: unhinted outlines and
+  default-load advances at 256 pixels), which `cargo xtask check` requires, and
+  `font-hinting-modes` (the nine other heights libass requests when hinting is on),
+  run on demand and not gated yet. `cargo xtask fonts compare` reports the
+  required two, with `--all` all three.
+- **Generated manifests and pins.** The font features commit no case rows.
+  `cargo xtask fonts manifest` generates them from `harness/fonts/corpus.json` and
+  each feature's load settings (`xtask/src/fonts/manifest.rs`), and takes each
+  case's expected work from `harness/features/<feature>/pins.json`. Pins are the
+  FreeType reference's folds: re-record them with
+  `cargo xtask fonts manifest --record` after `cargo xtask build-workers`, and never
+  edit them by hand. `cargo xtask check-design` fails when the generated case ids
+  and the pins differ or a pin file is not in the form the recorder writes. Every
+  harness command reads such a manifest at `harness/features/<feature>/corpus.json`;
+  its identity is the SHA-256 of the generated JSON, the bytes
+  `fonts manifest` writes, so it is deterministic.
+- **Open cases.** A contract may list `open_cases`: case ids that fail today, each
+  tied to one of its `pending_module_requirements`. `cargo xtask report` still runs
+  them and prints them as open failures with their count, and passes only when every
+  other case passes and every listed case still fails; a listed case that starts
+  to match must leave the list. The module stays unaccepted while any is listed.
 - **Input rights.** A case is measured only when its `rights` are
   `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
   reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
@@ -129,8 +147,10 @@ pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest, with a timeout per
 input. With `--contract` it builds that manifest from a prefix feature's cases: the
-release candidate and its dev build, plus the reference with `--reference`; the
-campaign keeps it as `manifest.json` for replay.
+release candidate and its dev build, plus the reference with `--reference`; listed
+open cases are expected to be rejected by both builds, and the campaign keeps the
+manifest as `manifest.json` for replay. `cargo xtask check` runs one round on each
+required font feature.
 
 On native AArch64 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.

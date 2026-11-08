@@ -1,0 +1,4507 @@
+{
+  "schema": 1,
+  "reference": "freetype-native",
+  "note": "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+  "pins": {
+    "arimo-bold-ttf-outlines-4800": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 13142464949372616347
+    },
+    "arimo-bold-ttf-advances-4800": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 8895928763003219326
+    },
+    "arimo-bold-ttf-outlines-5280": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 14089284986076044769
+    },
+    "arimo-bold-ttf-advances-5280": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 4275523382035699006
+    },
+    "arimo-bold-ttf-outlines-3200": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 15094519711499075984
+    },
+    "arimo-bold-ttf-advances-3200": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 14399926647818680254
+    },
+    "arimo-bold-ttf-outlines-3072": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 4200388742576791856
+    },
+    "arimo-bold-ttf-advances-3072": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 4528696315447996606
+    },
+    "arimo-bold-ttf-outlines-2400": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 2544327965404774894
+    },
+    "arimo-bold-ttf-advances-2400": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 16533226273499329918
+    },
+    "arimo-bold-ttf-outlines-2160": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 17281659879217868698
+    },
+    "arimo-bold-ttf-advances-2160": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 13102700876702743742
+    },
+    "arimo-bold-ttf-outlines-853": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 3606247140717864238
+    },
+    "arimo-bold-ttf-advances-853": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 5252443900927434238
+    },
+    "arimo-bold-ttf-outlines-1568": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 8142801682970951048
+    },
+    "arimo-bold-ttf-advances-1568": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 13282601500316716734
+    },
+    "arimo-bold-ttf-outlines-538": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 4793669025165223622
+    },
+    "arimo-bold-ttf-advances-538": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 12699462186956745022
+    },
+    "arimo-bolditalic-ttf-outlines-4800": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 5658922533026184245
+    },
+    "arimo-bolditalic-ttf-advances-4800": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 7637386448966986622
+    },
+    "arimo-bolditalic-ttf-outlines-5280": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 9336193214724998612
+    },
+    "arimo-bolditalic-ttf-advances-5280": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 2094614075922918654
+    },
+    "arimo-bolditalic-ttf-outlines-3200": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 11761631668094897278
+    },
+    "arimo-bolditalic-ttf-advances-3200": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 17272127435898956926
+    },
+    "arimo-bolditalic-ttf-outlines-3072": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 7543873035501927358
+    },
+    "arimo-bolditalic-ttf-advances-3072": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 2138194310967357502
+    },
+    "arimo-bolditalic-ttf-outlines-2400": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 13197890615447593979
+    },
+    "arimo-bolditalic-ttf-advances-2400": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 15088338642102818302
+    },
+    "arimo-bolditalic-ttf-outlines-2160": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 4398591421340210943
+    },
+    "arimo-bolditalic-ttf-advances-2160": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 14149941691370123646
+    },
+    "arimo-bolditalic-ttf-outlines-853": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 6683415411199183199
+    },
+    "arimo-bolditalic-ttf-advances-853": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 13453192937413172094
+    },
+    "arimo-bolditalic-ttf-outlines-1568": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 3976909848852605602
+    },
+    "arimo-bolditalic-ttf-advances-1568": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 6359451486516863038
+    },
+    "arimo-bolditalic-ttf-outlines-538": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 4358187433537011588
+    },
+    "arimo-bolditalic-ttf-advances-538": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 18343332142885150718
+    },
+    "arimo-italic-ttf-outlines-4800": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 6127129871035895644
+    },
+    "arimo-italic-ttf-advances-4800": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 4371214467772903294
+    },
+    "arimo-italic-ttf-outlines-5280": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 2248045728910547266
+    },
+    "arimo-italic-ttf-advances-5280": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 13026644083265550078
+    },
+    "arimo-italic-ttf-outlines-3200": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 10072474907019722216
+    },
+    "arimo-italic-ttf-advances-3200": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 11205786306883136190
+    },
+    "arimo-italic-ttf-outlines-3072": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 5918663600055855324
+    },
+    "arimo-italic-ttf-advances-3072": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 14358681440925147198
+    },
+    "arimo-italic-ttf-outlines-2400": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 1686824147649471592
+    },
+    "arimo-italic-ttf-advances-2400": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 12886071524691871358
+    },
+    "arimo-italic-ttf-outlines-2160": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 7687194470262320186
+    },
+    "arimo-italic-ttf-advances-2160": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 7184959555778875774
+    },
+    "arimo-italic-ttf-outlines-853": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 1572205080061100118
+    },
+    "arimo-italic-ttf-advances-853": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 6183797411757131262
+    },
+    "arimo-italic-ttf-outlines-1568": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 2266929869731416672
+    },
+    "arimo-italic-ttf-advances-1568": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 8974384075986011326
+    },
+    "arimo-italic-ttf-outlines-538": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 5283037342286795296
+    },
+    "arimo-italic-ttf-advances-538": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 5327707123931298110
+    },
+    "arimo-regular-ttf-outlines-4800": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 2399549403241298833
+    },
+    "arimo-regular-ttf-advances-4800": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 7271607985820009278
+    },
+    "arimo-regular-ttf-outlines-5280": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 16710903963999907235
+    },
+    "arimo-regular-ttf-advances-5280": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 7288261448327130686
+    },
+    "arimo-regular-ttf-outlines-3200": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 14232204828971817663
+    },
+    "arimo-regular-ttf-advances-3200": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 1231394920815194430
+    },
+    "arimo-regular-ttf-outlines-3072": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 6380246287325528969
+    },
+    "arimo-regular-ttf-advances-3072": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 6209151640220813886
+    },
+    "arimo-regular-ttf-outlines-2400": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 7351655631299110816
+    },
+    "arimo-regular-ttf-advances-2400": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 16493773229986633854
+    },
+    "arimo-regular-ttf-outlines-2160": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 18343506076942939195
+    },
+    "arimo-regular-ttf-advances-2160": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 10401705374334940734
+    },
+    "arimo-regular-ttf-outlines-853": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 18244608194433598165
+    },
+    "arimo-regular-ttf-advances-853": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 8125886588213648766
+    },
+    "arimo-regular-ttf-outlines-1568": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 12670413003970639886
+    },
+    "arimo-regular-ttf-advances-1568": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 7602594227548341310
+    },
+    "arimo-regular-ttf-outlines-538": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 12988668508691660028
+    },
+    "arimo-regular-ttf-advances-538": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 13183684817691105726
+    },
+    "cousine-bold-ttf-outlines-4800": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 7388326591218388411
+    },
+    "cousine-bold-ttf-advances-4800": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 9017007595079084613
+    },
+    "cousine-bold-ttf-outlines-5280": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 7527801460650089979
+    },
+    "cousine-bold-ttf-advances-5280": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 4392565590375803973
+    },
+    "cousine-bold-ttf-outlines-3200": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 6438735375444560564
+    },
+    "cousine-bold-ttf-advances-3200": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 15979182574685791045
+    },
+    "cousine-bold-ttf-outlines-3072": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 15734906854733196884
+    },
+    "cousine-bold-ttf-advances-3072": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 12523607057434223301
+    },
+    "cousine-bold-ttf-outlines-2400": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 12202895592757718332
+    },
+    "cousine-bold-ttf-advances-2400": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 13692473544885936197
+    },
+    "cousine-bold-ttf-outlines-2160": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 17596736232412420669
+    },
+    "cousine-bold-ttf-advances-2160": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 6781322510382800709
+    },
+    "cousine-bold-ttf-outlines-853": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 7198080587358996994
+    },
+    "cousine-bold-ttf-advances-853": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 5663479968034658757
+    },
+    "cousine-bold-ttf-outlines-1568": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 2781246558933984955
+    },
+    "cousine-bold-ttf-advances-1568": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 7950188997834513605
+    },
+    "cousine-bold-ttf-outlines-538": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 17810627943483968782
+    },
+    "cousine-bold-ttf-advances-538": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 13743497489989507141
+    },
+    "cousine-bolditalic-ttf-outlines-4800": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 16407231137945807881
+    },
+    "cousine-bolditalic-ttf-advances-4800": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 9017007595079084613
+    },
+    "cousine-bolditalic-ttf-outlines-5280": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 17195340792562901959
+    },
+    "cousine-bolditalic-ttf-advances-5280": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 4392565590375803973
+    },
+    "cousine-bolditalic-ttf-outlines-3200": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 2591768888730219837
+    },
+    "cousine-bolditalic-ttf-advances-3200": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 15979182574685791045
+    },
+    "cousine-bolditalic-ttf-outlines-3072": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 14759784241396370692
+    },
+    "cousine-bolditalic-ttf-advances-3072": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 12523607057434223301
+    },
+    "cousine-bolditalic-ttf-outlines-2400": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 6165594718780137421
+    },
+    "cousine-bolditalic-ttf-advances-2400": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 13692473544885936197
+    },
+    "cousine-bolditalic-ttf-outlines-2160": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 7554872259562937981
+    },
+    "cousine-bolditalic-ttf-advances-2160": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 6781322510382800709
+    },
+    "cousine-bolditalic-ttf-outlines-853": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 5657331854889594911
+    },
+    "cousine-bolditalic-ttf-advances-853": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 5663479968034658757
+    },
+    "cousine-bolditalic-ttf-outlines-1568": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 15227940843781887654
+    },
+    "cousine-bolditalic-ttf-advances-1568": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 7950188997834513605
+    },
+    "cousine-bolditalic-ttf-outlines-538": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 17970335019705607084
+    },
+    "cousine-bolditalic-ttf-advances-538": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 13743497489989507141
+    },
+    "cousine-italic-ttf-outlines-4800": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 1899736054498470831
+    },
+    "cousine-italic-ttf-advances-4800": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 9017007595079084613
+    },
+    "cousine-italic-ttf-outlines-5280": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 2380903302169603648
+    },
+    "cousine-italic-ttf-advances-5280": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 4392565590375803973
+    },
+    "cousine-italic-ttf-outlines-3200": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 3133659882145781938
+    },
+    "cousine-italic-ttf-advances-3200": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 15979182574685791045
+    },
+    "cousine-italic-ttf-outlines-3072": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 13174690742235537167
+    },
+    "cousine-italic-ttf-advances-3072": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 12523607057434223301
+    },
+    "cousine-italic-ttf-outlines-2400": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 8707128262201484643
+    },
+    "cousine-italic-ttf-advances-2400": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 13692473544885936197
+    },
+    "cousine-italic-ttf-outlines-2160": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 12805310794137150968
+    },
+    "cousine-italic-ttf-advances-2160": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 6781322510382800709
+    },
+    "cousine-italic-ttf-outlines-853": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 6904285027869890734
+    },
+    "cousine-italic-ttf-advances-853": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 5663479968034658757
+    },
+    "cousine-italic-ttf-outlines-1568": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 2322366162341616510
+    },
+    "cousine-italic-ttf-advances-1568": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 7950188997834513605
+    },
+    "cousine-italic-ttf-outlines-538": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 16404438816589193865
+    },
+    "cousine-italic-ttf-advances-538": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 13743497489989507141
+    },
+    "cousine-regular-ttf-outlines-4800": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 14540067978534116682
+    },
+    "cousine-regular-ttf-advances-4800": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 9017007595079084613
+    },
+    "cousine-regular-ttf-outlines-5280": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 14737730621185809654
+    },
+    "cousine-regular-ttf-advances-5280": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 4392565590375803973
+    },
+    "cousine-regular-ttf-outlines-3200": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 10790282699833670979
+    },
+    "cousine-regular-ttf-advances-3200": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 15979182574685791045
+    },
+    "cousine-regular-ttf-outlines-3072": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 16272715990159410730
+    },
+    "cousine-regular-ttf-advances-3072": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 12523607057434223301
+    },
+    "cousine-regular-ttf-outlines-2400": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 13331619319814249978
+    },
+    "cousine-regular-ttf-advances-2400": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 13692473544885936197
+    },
+    "cousine-regular-ttf-outlines-2160": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 18418076543021432316
+    },
+    "cousine-regular-ttf-advances-2160": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 6781322510382800709
+    },
+    "cousine-regular-ttf-outlines-853": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 6575176530776146431
+    },
+    "cousine-regular-ttf-advances-853": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 5663479968034658757
+    },
+    "cousine-regular-ttf-outlines-1568": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 7769622990850855998
+    },
+    "cousine-regular-ttf-advances-1568": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 7950188997834513605
+    },
+    "cousine-regular-ttf-outlines-538": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 4146646243634282461
+    },
+    "cousine-regular-ttf-advances-538": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 13743497489989507141
+    },
+    "tinos-bold-ttf-outlines-4800": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 1394378462261145791
+    },
+    "tinos-bold-ttf-advances-4800": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 10292097291842733222
+    },
+    "tinos-bold-ttf-outlines-5280": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 7062622993767452683
+    },
+    "tinos-bold-ttf-advances-5280": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 6642215411041116006
+    },
+    "tinos-bold-ttf-outlines-3200": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 1040265988659360475
+    },
+    "tinos-bold-ttf-advances-3200": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 10984498325461359910
+    },
+    "tinos-bold-ttf-outlines-3072": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 14801662826211780402
+    },
+    "tinos-bold-ttf-advances-3072": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 17105104461305216230
+    },
+    "tinos-bold-ttf-outlines-2400": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 9980947135516007894
+    },
+    "tinos-bold-ttf-advances-2400": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 17075464795894346086
+    },
+    "tinos-bold-ttf-outlines-2160": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 14322361763089703332
+    },
+    "tinos-bold-ttf-advances-2160": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 9362826909100670950
+    },
+    "tinos-bold-ttf-outlines-853": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 2450575535479103478
+    },
+    "tinos-bold-ttf-advances-853": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 4297357694068441830
+    },
+    "tinos-bold-ttf-outlines-1568": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 4724338851878241412
+    },
+    "tinos-bold-ttf-advances-1568": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 7519368262480579046
+    },
+    "tinos-bold-ttf-outlines-538": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 4640580047244552946
+    },
+    "tinos-bold-ttf-advances-538": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 18192568715713054054
+    },
+    "tinos-bolditalic-ttf-outlines-4800": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 5218123949918934209
+    },
+    "tinos-bolditalic-ttf-advances-4800": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 8662410954000975142
+    },
+    "tinos-bolditalic-ttf-outlines-5280": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 12083420928659278140
+    },
+    "tinos-bolditalic-ttf-advances-5280": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 8371668218644752486
+    },
+    "tinos-bolditalic-ttf-outlines-3200": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 576269881432443574
+    },
+    "tinos-bolditalic-ttf-advances-3200": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 17655882130345832870
+    },
+    "tinos-bolditalic-ttf-outlines-3072": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 4324190081417806183
+    },
+    "tinos-bolditalic-ttf-advances-3072": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 325219612537230822
+    },
+    "tinos-bolditalic-ttf-outlines-2400": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 5080031326452904804
+    },
+    "tinos-bolditalic-ttf-advances-2400": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 2871085373413725798
+    },
+    "tinos-bolditalic-ttf-outlines-2160": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 563576151124293652
+    },
+    "tinos-bolditalic-ttf-advances-2160": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 10496199676599454566
+    },
+    "tinos-bolditalic-ttf-outlines-853": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 4216496722915647336
+    },
+    "tinos-bolditalic-ttf-advances-853": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 15624714832652911590
+    },
+    "tinos-bolditalic-ttf-outlines-1568": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 4507290870014983976
+    },
+    "tinos-bolditalic-ttf-advances-1568": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 9605411280864261542
+    },
+    "tinos-bolditalic-ttf-outlines-538": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 9740315399224616385
+    },
+    "tinos-bolditalic-ttf-advances-538": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 9796792117157166566
+    },
+    "tinos-italic-ttf-outlines-4800": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 14556244554433555283
+    },
+    "tinos-italic-ttf-advances-4800": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 4612041781314425638
+    },
+    "tinos-italic-ttf-outlines-5280": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 10590718000229806550
+    },
+    "tinos-italic-ttf-advances-5280": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 12281647865610383078
+    },
+    "tinos-italic-ttf-outlines-3200": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 8867646633122435844
+    },
+    "tinos-italic-ttf-advances-3200": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 14730766963828086374
+    },
+    "tinos-italic-ttf-outlines-3072": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 14500867391164532798
+    },
+    "tinos-italic-ttf-advances-3072": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 7820510223267543078
+    },
+    "tinos-italic-ttf-outlines-2400": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 12502205282501860702
+    },
+    "tinos-italic-ttf-advances-2400": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 12718441110043065318
+    },
+    "tinos-italic-ttf-outlines-2160": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 9461001322235870215
+    },
+    "tinos-italic-ttf-advances-2160": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 15802791249695901030
+    },
+    "tinos-italic-ttf-outlines-853": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 8374743336448301931
+    },
+    "tinos-italic-ttf-advances-853": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 388163978843645606
+    },
+    "tinos-italic-ttf-outlines-1568": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 5203511560482694739
+    },
+    "tinos-italic-ttf-advances-1568": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 12475062968363414886
+    },
+    "tinos-italic-ttf-outlines-538": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 16339925644418839054
+    },
+    "tinos-italic-ttf-advances-538": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 13305498768819739750
+    },
+    "tinos-regular-ttf-outlines-4800": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 16825829581829983673
+    },
+    "tinos-regular-ttf-advances-4800": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 13460005328925557030
+    },
+    "tinos-regular-ttf-outlines-5280": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 7594017744571164276
+    },
+    "tinos-regular-ttf-advances-5280": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 7732355110998571686
+    },
+    "tinos-regular-ttf-outlines-3200": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 15567718862145767519
+    },
+    "tinos-regular-ttf-advances-3200": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 16865221431847003302
+    },
+    "tinos-regular-ttf-outlines-3072": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 12804913144874348990
+    },
+    "tinos-regular-ttf-advances-3072": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 8695361557897113190
+    },
+    "tinos-regular-ttf-outlines-2400": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 17633036850903724736
+    },
+    "tinos-regular-ttf-advances-2400": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 3449106433082480294
+    },
+    "tinos-regular-ttf-outlines-2160": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 14242703175203993610
+    },
+    "tinos-regular-ttf-advances-2160": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 16404416211903678630
+    },
+    "tinos-regular-ttf-outlines-853": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 6107327048153149769
+    },
+    "tinos-regular-ttf-advances-853": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 12424581811329898854
+    },
+    "tinos-regular-ttf-outlines-1568": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 2746645352542033655
+    },
+    "tinos-regular-ttf-advances-1568": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 8460038397369327462
+    },
+    "tinos-regular-ttf-outlines-538": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 1277109236415158575
+    },
+    "tinos-regular-ttf-advances-538": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 8496343125867851686
+    },
+    "dejavumathtexgyre-ttf-outlines-4800": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 1899264386339592373
+    },
+    "dejavumathtexgyre-ttf-advances-4800": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 759944086323691983
+    },
+    "dejavumathtexgyre-ttf-outlines-5280": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 17424478202656368378
+    },
+    "dejavumathtexgyre-ttf-advances-5280": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 17934958897897823375
+    },
+    "dejavumathtexgyre-ttf-outlines-3200": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 12256357763049868876
+    },
+    "dejavumathtexgyre-ttf-advances-3200": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 14613156472077381583
+    },
+    "dejavumathtexgyre-ttf-outlines-3072": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 2528335039464288037
+    },
+    "dejavumathtexgyre-ttf-advances-3072": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 13677492596053242127
+    },
+    "dejavumathtexgyre-ttf-outlines-2400": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 15102851938830036126
+    },
+    "dejavumathtexgyre-ttf-advances-2400": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 426173577692007183
+    },
+    "dejavumathtexgyre-ttf-outlines-2160": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 6569374774340305671
+    },
+    "dejavumathtexgyre-ttf-advances-2160": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 1923222109267529103
+    },
+    "dejavumathtexgyre-ttf-outlines-853": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 1862763444911799057
+    },
+    "dejavumathtexgyre-ttf-advances-853": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 9277501749791616847
+    },
+    "dejavumathtexgyre-ttf-outlines-1568": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 2345115268436430136
+    },
+    "dejavumathtexgyre-ttf-advances-1568": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 9119248506565621903
+    },
+    "dejavumathtexgyre-ttf-outlines-538": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 17371001141142646734
+    },
+    "dejavumathtexgyre-ttf-advances-538": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 14296216187808034383
+    },
+    "dejavusans-bold-ttf-outlines-4800": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 4886532134097713917
+    },
+    "dejavusans-bold-ttf-advances-4800": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 12358230771494891730
+    },
+    "dejavusans-bold-ttf-outlines-5280": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 3378943656100556050
+    },
+    "dejavusans-bold-ttf-advances-5280": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 4626089844409388178
+    },
+    "dejavusans-bold-ttf-outlines-3200": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 534106518074164772
+    },
+    "dejavusans-bold-ttf-advances-3200": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 8470804143507030930
+    },
+    "dejavusans-bold-ttf-outlines-3072": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 10909079812387527266
+    },
+    "dejavusans-bold-ttf-advances-3072": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 12416653633420535698
+    },
+    "dejavusans-bold-ttf-outlines-2400": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 10830010705803364952
+    },
+    "dejavusans-bold-ttf-advances-2400": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 15256122411133097682
+    },
+    "dejavusans-bold-ttf-outlines-2160": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 5976681681636609974
+    },
+    "dejavusans-bold-ttf-advances-2160": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 17019958865052064274
+    },
+    "dejavusans-bold-ttf-outlines-853": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 16844743422377422972
+    },
+    "dejavusans-bold-ttf-advances-853": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 13106646939772998802
+    },
+    "dejavusans-bold-ttf-outlines-1568": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 16177665103235462959
+    },
+    "dejavusans-bold-ttf-advances-1568": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 13251571223442302802
+    },
+    "dejavusans-bold-ttf-outlines-538": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 16898148302996657654
+    },
+    "dejavusans-bold-ttf-advances-538": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 13888837335654624338
+    },
+    "dejavusans-boldoblique-ttf-outlines-4800": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 6210722729625294743
+    },
+    "dejavusans-boldoblique-ttf-advances-4800": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 4425031723674554331
+    },
+    "dejavusans-boldoblique-ttf-outlines-5280": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 2629351420515025882
+    },
+    "dejavusans-boldoblique-ttf-advances-5280": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 11917435261888274523
+    },
+    "dejavusans-boldoblique-ttf-outlines-3200": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 4335023703787803380
+    },
+    "dejavusans-boldoblique-ttf-advances-3200": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 4599559910883219931
+    },
+    "dejavusans-boldoblique-ttf-outlines-3072": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 3396258526631537261
+    },
+    "dejavusans-boldoblique-ttf-advances-3072": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 1026108424340670363
+    },
+    "dejavusans-boldoblique-ttf-outlines-2400": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 1549439273403481234
+    },
+    "dejavusans-boldoblique-ttf-advances-2400": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 6207534021201097755
+    },
+    "dejavusans-boldoblique-ttf-outlines-2160": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 5274451905203524720
+    },
+    "dejavusans-boldoblique-ttf-advances-2160": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 4849362221508916059
+    },
+    "dejavusans-boldoblique-ttf-outlines-853": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 11992564629818565150
+    },
+    "dejavusans-boldoblique-ttf-advances-853": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 17248363454948299291
+    },
+    "dejavusans-boldoblique-ttf-outlines-1568": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 8296993542565317400
+    },
+    "dejavusans-boldoblique-ttf-advances-1568": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 14059697942446142619
+    },
+    "dejavusans-boldoblique-ttf-outlines-538": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 10953490901027323326
+    },
+    "dejavusans-boldoblique-ttf-advances-538": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 2630105446276359771
+    },
+    "dejavusans-extralight-ttf-outlines-4800": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 12865310768602781947
+    },
+    "dejavusans-extralight-ttf-advances-4800": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 10452848104260860980
+    },
+    "dejavusans-extralight-ttf-outlines-5280": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 4703495535015097714
+    },
+    "dejavusans-extralight-ttf-advances-5280": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 18348240144928926516
+    },
+    "dejavusans-extralight-ttf-outlines-3200": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 6327926005949406169
+    },
+    "dejavusans-extralight-ttf-advances-3200": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 4326039759597076852
+    },
+    "dejavusans-extralight-ttf-outlines-3072": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 2390247160555064931
+    },
+    "dejavusans-extralight-ttf-advances-3072": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 3529347636027812724
+    },
+    "dejavusans-extralight-ttf-outlines-2400": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 13477689373610826858
+    },
+    "dejavusans-extralight-ttf-advances-2400": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 15364980508422692532
+    },
+    "dejavusans-extralight-ttf-outlines-2160": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 12900506208956812106
+    },
+    "dejavusans-extralight-ttf-advances-2160": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 4994549899383662068
+    },
+    "dejavusans-extralight-ttf-outlines-853": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 14107038982015224457
+    },
+    "dejavusans-extralight-ttf-advances-853": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 2113774709234693364
+    },
+    "dejavusans-extralight-ttf-outlines-1568": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 15123547665328968058
+    },
+    "dejavusans-extralight-ttf-advances-1568": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 16958214777686598964
+    },
+    "dejavusans-extralight-ttf-outlines-538": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 2061653641063729995
+    },
+    "dejavusans-extralight-ttf-advances-538": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 1595013636760169972
+    },
+    "dejavusans-oblique-ttf-outlines-4800": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 10760121709837357329
+    },
+    "dejavusans-oblique-ttf-advances-4800": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 5578526324513953112
+    },
+    "dejavusans-oblique-ttf-outlines-5280": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 12838606020910424078
+    },
+    "dejavusans-oblique-ttf-advances-5280": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 1705165948784546072
+    },
+    "dejavusans-oblique-ttf-outlines-3200": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 11843341561418765897
+    },
+    "dejavusans-oblique-ttf-advances-3200": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 7409788322528464984
+    },
+    "dejavusans-oblique-ttf-outlines-3072": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 11744227482139620788
+    },
+    "dejavusans-oblique-ttf-advances-3072": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 676611682539001752
+    },
+    "dejavusans-oblique-ttf-outlines-2400": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 5188267723294997753
+    },
+    "dejavusans-oblique-ttf-advances-2400": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 11447829250484164056
+    },
+    "dejavusans-oblique-ttf-outlines-2160": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 15030248564329782806
+    },
+    "dejavusans-oblique-ttf-advances-2160": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 16490049695345272920
+    },
+    "dejavusans-oblique-ttf-outlines-853": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 17950586134101682720
+    },
+    "dejavusans-oblique-ttf-advances-853": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 6687464158165795800
+    },
+    "dejavusans-oblique-ttf-outlines-1568": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 14832687309244041676
+    },
+    "dejavusans-oblique-ttf-advances-1568": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 12323463911330469336
+    },
+    "dejavusans-oblique-ttf-outlines-538": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 12671135598522631259
+    },
+    "dejavusans-oblique-ttf-advances-538": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 3483982333065077784
+    },
+    "dejavusans-ttf-outlines-4800": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 15843312490384570524
+    },
+    "dejavusans-ttf-advances-4800": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 8841431057900881911
+    },
+    "dejavusans-ttf-outlines-5280": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 9200491616611111446
+    },
+    "dejavusans-ttf-advances-5280": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 3654969413803589687
+    },
+    "dejavusans-ttf-outlines-3200": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 6747032306696682696
+    },
+    "dejavusans-ttf-advances-3200": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 2317392711823324983
+    },
+    "dejavusans-ttf-outlines-3072": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 5300086100972933738
+    },
+    "dejavusans-ttf-advances-3072": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 1213659217169956983
+    },
+    "dejavusans-ttf-outlines-2400": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 7818600897178329537
+    },
+    "dejavusans-ttf-advances-2400": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 9762792261706069047
+    },
+    "dejavusans-ttf-outlines-2160": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 6173057863505863302
+    },
+    "dejavusans-ttf-advances-2160": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 16437904146777903095
+    },
+    "dejavusans-ttf-outlines-853": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 10419453536441892618
+    },
+    "dejavusans-ttf-advances-853": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 3642142549403249079
+    },
+    "dejavusans-ttf-outlines-1568": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 14780750720826215485
+    },
+    "dejavusans-ttf-advances-1568": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 5885902284830954359
+    },
+    "dejavusans-ttf-outlines-538": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 13363588075145702309
+    },
+    "dejavusans-ttf-advances-538": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 16474852036852006519
+    },
+    "dejavusanscondensed-bold-ttf-outlines-4800": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 5679407946279552562
+    },
+    "dejavusanscondensed-bold-ttf-advances-4800": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 8437027719724991058
+    },
+    "dejavusanscondensed-bold-ttf-outlines-5280": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 13356019006584593389
+    },
+    "dejavusanscondensed-bold-ttf-advances-5280": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 6874832609461892306
+    },
+    "dejavusanscondensed-bold-ttf-outlines-3200": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 15320916253161812765
+    },
+    "dejavusanscondensed-bold-ttf-advances-3200": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 7301822822191897810
+    },
+    "dejavusanscondensed-bold-ttf-outlines-3072": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 15431442506229144441
+    },
+    "dejavusanscondensed-bold-ttf-advances-3072": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 2398054305163199250
+    },
+    "dejavusanscondensed-bold-ttf-outlines-2400": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 9892009648491539538
+    },
+    "dejavusanscondensed-bold-ttf-advances-2400": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 7765392635739337234
+    },
+    "dejavusanscondensed-bold-ttf-outlines-2160": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 16516782133774510938
+    },
+    "dejavusanscondensed-bold-ttf-advances-2160": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 3955611596102400402
+    },
+    "dejavusanscondensed-bold-ttf-outlines-853": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 8398005413401090438
+    },
+    "dejavusanscondensed-bold-ttf-advances-853": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 16531157777254074642
+    },
+    "dejavusanscondensed-bold-ttf-outlines-1568": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 740664096785133640
+    },
+    "dejavusanscondensed-bold-ttf-advances-1568": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 2593412266397459986
+    },
+    "dejavusanscondensed-bold-ttf-outlines-538": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 11228031239406196249
+    },
+    "dejavusanscondensed-bold-ttf-advances-538": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 3968597911312018578
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-4800": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 17704840467187492275
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-4800": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 8606036502817798619
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-5280": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 1621908540572646246
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-5280": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 18009874625591181019
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-3200": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 5486930501869325117
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-3200": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 12086294653113397275
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-3072": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 2965621193321611197
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-3072": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 7686202138782570651
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-2400": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 13986206080579490061
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-2400": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 2530839927729967451
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-2160": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 8922812567391942982
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-2160": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 2688655850677544795
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-853": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 10792539474392176328
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-853": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 17840247354175068891
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-1568": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 15727544866939895393
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-1568": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 16651378514169435291
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-538": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 16133202670814822976
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-538": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 11701977514597258523
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-4800": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 1924009885845278313
+    },
+    "dejavusanscondensed-oblique-ttf-advances-4800": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 16907331812950899928
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-5280": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 15858280588084497045
+    },
+    "dejavusanscondensed-oblique-ttf-advances-5280": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 8579016873133203672
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-3200": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 1138748002328491198
+    },
+    "dejavusanscondensed-oblique-ttf-advances-3200": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 15121853839642093848
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-3072": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 12942694525659820176
+    },
+    "dejavusanscondensed-oblique-ttf-advances-3072": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 12447395451418688536
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-2400": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 9190774052639090248
+    },
+    "dejavusanscondensed-oblique-ttf-advances-2400": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 4499415832900041368
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-2160": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 6839246296471785677
+    },
+    "dejavusanscondensed-oblique-ttf-advances-2160": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 10227266861209398680
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-853": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 9577390046969991901
+    },
+    "dejavusanscondensed-oblique-ttf-advances-853": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 10771569854524383064
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-1568": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 18272963647077717357
+    },
+    "dejavusanscondensed-oblique-ttf-advances-1568": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 16031932033329360536
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-538": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 14746734162528815489
+    },
+    "dejavusanscondensed-oblique-ttf-advances-538": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 4410805341605375512
+    },
+    "dejavusanscondensed-ttf-outlines-4800": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 15056215578238995416
+    },
+    "dejavusanscondensed-ttf-advances-4800": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 4666777581021567607
+    },
+    "dejavusanscondensed-ttf-outlines-5280": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 14703636737044330755
+    },
+    "dejavusanscondensed-ttf-advances-5280": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 16197334112553103799
+    },
+    "dejavusanscondensed-ttf-outlines-3200": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 14730097957970744305
+    },
+    "dejavusanscondensed-ttf-advances-3200": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 13359714985017429815
+    },
+    "dejavusanscondensed-ttf-outlines-3072": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 17010583557313287657
+    },
+    "dejavusanscondensed-ttf-advances-3072": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 13861149155588095031
+    },
+    "dejavusanscondensed-ttf-outlines-2400": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 15153012356595530039
+    },
+    "dejavusanscondensed-ttf-advances-2400": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 526738743007878647
+    },
+    "dejavusanscondensed-ttf-outlines-2160": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 16342219432208352066
+    },
+    "dejavusanscondensed-ttf-advances-2160": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 15461330867075765175
+    },
+    "dejavusanscondensed-ttf-outlines-853": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 159180447277908896
+    },
+    "dejavusanscondensed-ttf-advances-853": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 6344153936837232567
+    },
+    "dejavusanscondensed-ttf-outlines-1568": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 17913347195437182529
+    },
+    "dejavusanscondensed-ttf-advances-1568": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 4511125417930310647
+    },
+    "dejavusanscondensed-ttf-outlines-538": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 17390968627900459413
+    },
+    "dejavusanscondensed-ttf-advances-538": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 17674569513891889143
+    },
+    "dejavusansmono-bold-ttf-outlines-4800": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 3586726019207015690
+    },
+    "dejavusansmono-bold-ttf-advances-4800": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 8357157955115162418
+    },
+    "dejavusansmono-bold-ttf-outlines-5280": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 15618383299232538236
+    },
+    "dejavusansmono-bold-ttf-advances-5280": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 11237828170147469874
+    },
+    "dejavusansmono-bold-ttf-outlines-3200": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 6228348540062340288
+    },
+    "dejavusansmono-bold-ttf-advances-3200": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 8218351793114938994
+    },
+    "dejavusansmono-bold-ttf-outlines-3072": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 7100513349506262425
+    },
+    "dejavusansmono-bold-ttf-advances-3072": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 16721556276211637938
+    },
+    "dejavusansmono-bold-ttf-outlines-2400": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 10539038884534052130
+    },
+    "dejavusansmono-bold-ttf-advances-2400": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 12400550953663176754
+    },
+    "dejavusansmono-bold-ttf-outlines-2160": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 9284781741070637178
+    },
+    "dejavusansmono-bold-ttf-advances-2160": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 10960215846147023026
+    },
+    "dejavusansmono-bold-ttf-outlines-853": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 17026939172741299874
+    },
+    "dejavusansmono-bold-ttf-advances-853": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 3758540308566254386
+    },
+    "dejavusansmono-bold-ttf-outlines-1568": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 15367250236888190338
+    },
+    "dejavusansmono-bold-ttf-advances-1568": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 8079545631114715570
+    },
+    "dejavusansmono-bold-ttf-outlines-538": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 5945576255265834934
+    },
+    "dejavusansmono-bold-ttf-advances-538": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 10821409684146799602
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-4800": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 4175572098411080542
+    },
+    "dejavusansmono-boldoblique-ttf-advances-4800": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 15413353276181090114
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-5280": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 9717185899041206872
+    },
+    "dejavusansmono-boldoblique-ttf-advances-5280": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 4024044842055668034
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-3200": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 3802791725089353417
+    },
+    "dejavusansmono-boldoblique-ttf-advances-3200": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 10923431521242220738
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-3072": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 949510609164424109
+    },
+    "dejavusansmono-boldoblique-ttf-advances-3072": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 9159072611346188354
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-2400": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 15554799973686132903
+    },
+    "dejavusansmono-boldoblique-ttf-advances-2400": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 17019663225679545666
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-2160": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 16735230425736671415
+    },
+    "dejavusansmono-boldoblique-ttf-advances-2160": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 13490945405887480898
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-853": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 7459526371339582261
+    },
+    "dejavusansmono-boldoblique-ttf-advances-853": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 14294100380636708674
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-1568": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 4394827217877495878
+    },
+    "dejavusansmono-boldoblique-ttf-advances-1568": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 6433509766303351362
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-538": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 14546864067426824066
+    },
+    "dejavusansmono-boldoblique-ttf-advances-538": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 9001023650948611522
+    },
+    "dejavusansmono-oblique-ttf-outlines-4800": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 6714585138162360385
+    },
+    "dejavusansmono-oblique-ttf-advances-4800": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 2773937768434133217
+    },
+    "dejavusansmono-oblique-ttf-outlines-5280": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 6899532708975548950
+    },
+    "dejavusansmono-oblique-ttf-advances-5280": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 15593581284719200225
+    },
+    "dejavusansmono-oblique-ttf-outlines-3200": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 1688794363671657069
+    },
+    "dejavusansmono-oblique-ttf-advances-3200": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 2615270506354156577
+    },
+    "dejavusansmono-oblique-ttf-outlines-3072": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 10041764148720118942
+    },
+    "dejavusansmono-oblique-ttf-advances-3072": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 4022045645710277729
+    },
+    "dejavusansmono-oblique-ttf-outlines-2400": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 14158380931769253351
+    },
+    "dejavusansmono-oblique-ttf-advances-2400": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 12462696481847004641
+    },
+    "dejavusansmono-oblique-ttf-outlines-2160": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 15745287864063754904
+    },
+    "dejavusansmono-oblique-ttf-advances-2160": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 15276246760559246945
+    },
+    "dejavusansmono-oblique-ttf-outlines-853": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 10803701877663265777
+    },
+    "dejavusansmono-oblique-ttf-advances-853": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 10897254080410906849
+    },
+    "dejavusansmono-oblique-ttf-outlines-1568": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 3507980606047283307
+    },
+    "dejavusansmono-oblique-ttf-advances-1568": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 2456603244274179937
+    },
+    "dejavusansmono-oblique-ttf-outlines-538": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 6184734695607210937
+    },
+    "dejavusansmono-oblique-ttf-advances-538": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 15117579498479270305
+    },
+    "dejavusansmono-ttf-outlines-4800": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 14648116872964998782
+    },
+    "dejavusansmono-ttf-advances-4800": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 1190466508566903253
+    },
+    "dejavusansmono-ttf-outlines-5280": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 12204441639201210746
+    },
+    "dejavusansmono-ttf-advances-5280": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 17189781068120497109
+    },
+    "dejavusansmono-ttf-outlines-3200": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 7233336445929810247
+    },
+    "dejavusansmono-ttf-advances-3200": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 9144612429573765973
+    },
+    "dejavusansmono-ttf-outlines-3072": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 17725159677108882242
+    },
+    "dejavusansmono-ttf-advances-3072": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 9756469808112755413
+    },
+    "dejavusansmono-ttf-outlines-2400": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 17567655518793727115
+    },
+    "dejavusansmono-ttf-advances-2400": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 13427614079346692053
+    },
+    "dejavusansmono-ttf-outlines-2160": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 2208177053519784679
+    },
+    "dejavusansmono-ttf-advances-2160": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 14651328836424670933
+    },
+    "dejavusansmono-ttf-outlines-853": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 16899315334867510582
+    },
+    "dejavusansmono-ttf-advances-853": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 2323158548105013717
+    },
+    "dejavusansmono-ttf-outlines-1568": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 14397204571370449866
+    },
+    "dejavusansmono-ttf-advances-1568": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 17098758350580628693
+    },
+    "dejavusansmono-ttf-outlines-538": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 17418420232865753156
+    },
+    "dejavusansmono-ttf-advances-538": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 4158730683721982037
+    },
+    "dejavuserif-bold-ttf-outlines-4800": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 5782633509244003144
+    },
+    "dejavuserif-bold-ttf-advances-4800": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 11862150662567539027
+    },
+    "dejavuserif-bold-ttf-outlines-5280": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 2534845680731683473
+    },
+    "dejavuserif-bold-ttf-advances-5280": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 12296414257595740307
+    },
+    "dejavuserif-bold-ttf-outlines-3200": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 13132572409442046280
+    },
+    "dejavuserif-bold-ttf-advances-3200": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 17253155056431586963
+    },
+    "dejavuserif-bold-ttf-outlines-3072": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 13592919284080820364
+    },
+    "dejavuserif-bold-ttf-advances-3072": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 13879441773306685075
+    },
+    "dejavuserif-bold-ttf-outlines-2400": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 5392021177156213363
+    },
+    "dejavuserif-bold-ttf-advances-2400": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 13288297111699058963
+    },
+    "dejavuserif-bold-ttf-outlines-2160": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 3086147695203676597
+    },
+    "dejavuserif-bold-ttf-advances-2160": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 13708984940387367379
+    },
+    "dejavuserif-bold-ttf-outlines-853": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 8041068324667424154
+    },
+    "dejavuserif-bold-ttf-advances-853": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 16478550280769458963
+    },
+    "dejavuserif-bold-ttf-outlines-1568": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 6018350827817700741
+    },
+    "dejavuserif-bold-ttf-advances-1568": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 12987402716726501523
+    },
+    "dejavuserif-bold-ttf-outlines-538": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 2181394362584302033
+    },
+    "dejavuserif-bold-ttf-advances-538": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 11107708977286553811
+    },
+    "dejavuserif-bolditalic-ttf-outlines-4800": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 18231657589603216305
+    },
+    "dejavuserif-bolditalic-ttf-advances-4800": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 12449865493284693715
+    },
+    "dejavuserif-bolditalic-ttf-outlines-5280": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 5772380449287388334
+    },
+    "dejavuserif-bolditalic-ttf-advances-5280": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 13201005397152387283
+    },
+    "dejavuserif-bolditalic-ttf-outlines-3200": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 16486296791393552263
+    },
+    "dejavuserif-bolditalic-ttf-advances-3200": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 16553082228142336403
+    },
+    "dejavuserif-bolditalic-ttf-outlines-3072": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 151968162846676122
+    },
+    "dejavuserif-bolditalic-ttf-advances-3072": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 5315050197582819539
+    },
+    "dejavuserif-bolditalic-ttf-outlines-2400": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 193831711979001487
+    },
+    "dejavuserif-bolditalic-ttf-advances-2400": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 6280400817321985875
+    },
+    "dejavuserif-bolditalic-ttf-outlines-2160": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 9210698290475302851
+    },
+    "dejavuserif-bolditalic-ttf-advances-2160": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 9176802156675093331
+    },
+    "dejavuserif-bolditalic-ttf-outlines-853": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 10726564282310606479
+    },
+    "dejavuserif-bolditalic-ttf-advances-853": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 16795844314423189203
+    },
+    "dejavuserif-bolditalic-ttf-outlines-1568": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 1240841407562937274
+    },
+    "dejavuserif-bolditalic-ttf-advances-1568": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 9694894491506227219
+    },
+    "dejavuserif-bolditalic-ttf-outlines-538": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 15090719472220610918
+    },
+    "dejavuserif-bolditalic-ttf-advances-538": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 10742428347822990931
+    },
+    "dejavuserif-italic-ttf-outlines-4800": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 14256126244333448784
+    },
+    "dejavuserif-italic-ttf-advances-4800": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 16022646345365532532
+    },
+    "dejavuserif-italic-ttf-outlines-5280": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 8707893851158573040
+    },
+    "dejavuserif-italic-ttf-advances-5280": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 1007290903152308468
+    },
+    "dejavuserif-italic-ttf-outlines-3200": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 14305479426250675283
+    },
+    "dejavuserif-italic-ttf-advances-3200": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 14650761769689268340
+    },
+    "dejavuserif-italic-ttf-outlines-3072": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 5539305609028247980
+    },
+    "dejavuserif-italic-ttf-advances-3072": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 10612892169503447668
+    },
+    "dejavuserif-italic-ttf-outlines-2400": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 16657433454235044501
+    },
+    "dejavuserif-italic-ttf-advances-2400": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 16217503328093192436
+    },
+    "dejavuserif-italic-ttf-outlines-2160": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 17586173430047393455
+    },
+    "dejavuserif-italic-ttf-advances-2160": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 928935279584352820
+    },
+    "dejavuserif-italic-ttf-outlines-853": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 2104611705770505913
+    },
+    "dejavuserif-italic-ttf-advances-853": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 7470453430564849396
+    },
+    "dejavuserif-italic-ttf-outlines-1568": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 11313982920423321360
+    },
+    "dejavuserif-italic-ttf-advances-1568": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 12922246707822022260
+    },
+    "dejavuserif-italic-ttf-outlines-538": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 7980688348354485320
+    },
+    "dejavuserif-italic-ttf-advances-538": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 13666346470588823540
+    },
+    "dejavuserif-ttf-outlines-4800": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 3578241655168214579
+    },
+    "dejavuserif-ttf-advances-4800": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 14760310504676387976
+    },
+    "dejavuserif-ttf-outlines-5280": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 10072883277831517655
+    },
+    "dejavuserif-ttf-advances-5280": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 345626881222984904
+    },
+    "dejavuserif-ttf-outlines-3200": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 7260411061970721509
+    },
+    "dejavuserif-ttf-advances-3200": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 7947242372755503368
+    },
+    "dejavuserif-ttf-outlines-3072": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 13068258384123973175
+    },
+    "dejavuserif-ttf-advances-3072": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 16129593345662519496
+    },
+    "dejavuserif-ttf-outlines-2400": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 2481535298526300647
+    },
+    "dejavuserif-ttf-advances-2400": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 16378049872560741320
+    },
+    "dejavuserif-ttf-outlines-2160": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 7818004464225750024
+    },
+    "dejavuserif-ttf-advances-2160": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 13219909238407718728
+    },
+    "dejavuserif-ttf-outlines-853": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 15588755898936582654
+    },
+    "dejavuserif-ttf-advances-853": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 350054619654769544
+    },
+    "dejavuserif-ttf-outlines-1568": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 15660564437988370591
+    },
+    "dejavuserif-ttf-advances-1568": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 3981127084545556360
+    },
+    "dejavuserif-ttf-outlines-538": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 18068101414117039518
+    },
+    "dejavuserif-ttf-advances-538": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 2915193478600301448
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-4800": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 15103362613080506360
+    },
+    "dejavuserifcondensed-bold-ttf-advances-4800": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 15896103422663554067
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-5280": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 9205713548593787396
+    },
+    "dejavuserifcondensed-bold-ttf-advances-5280": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 12377047236906633683
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-3200": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 14339580113884280219
+    },
+    "dejavuserifcondensed-bold-ttf-advances-3200": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 8852966818969631379
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-3072": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 16626330912985132050
+    },
+    "dejavuserifcondensed-bold-ttf-advances-3072": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 16627824288833035475
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-2400": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 11534449559347723637
+    },
+    "dejavuserifcondensed-bold-ttf-advances-2400": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 10697709305160188563
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-2160": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 5470461788617607630
+    },
+    "dejavuserifcondensed-bold-ttf-advances-2160": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 212852689570906707
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-853": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 4812779047234089651
+    },
+    "dejavuserifcondensed-bold-ttf-advances-853": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 1823847298149898131
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-1568": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 2514537784470226912
+    },
+    "dejavuserifcondensed-bold-ttf-advances-1568": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 7363889828245774291
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-538": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 8483199556349342280
+    },
+    "dejavuserifcondensed-bold-ttf-advances-538": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 9531949895633556947
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-4800": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 10512432121032843004
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-4800": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 15956346834379386899
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-5280": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 7385244949402966635
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-5280": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 8714637899880112275
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-3200": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 7194341148718442632
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-3200": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 15404988059015646611
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-3072": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 18168682574706559760
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-3072": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 5237429132797378707
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-2400": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 16743350900820238689
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-2400": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 15521322869061007507
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-2160": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 7816284447382415000
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-2160": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 4384033079827310355
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-853": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 13128190472342625630
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-853": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 12994744231387413587
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-1568": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 14315199403592076949
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-1568": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 4680662938841490003
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-538": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 10564806542895878523
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-538": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 5859323265044091283
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-4800": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 9011037943218634129
+    },
+    "dejavuserifcondensed-italic-ttf-advances-4800": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 10642571235429720756
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-5280": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 9839538418955494403
+    },
+    "dejavuserifcondensed-italic-ttf-advances-5280": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 7617611628334614004
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-3200": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 15989183496201355803
+    },
+    "dejavuserifcondensed-italic-ttf-advances-3200": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 12672134698891400116
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-3072": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 12450767043609890323
+    },
+    "dejavuserifcondensed-italic-ttf-advances-3072": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 2424735053978329332
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-2400": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 5979864869027709490
+    },
+    "dejavuserifcondensed-italic-ttf-advances-2400": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 16828719912874931892
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-2160": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 16800773138101269455
+    },
+    "dejavuserifcondensed-italic-ttf-advances-2160": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 8285322699904732532
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-853": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 13120444878037821821
+    },
+    "dejavuserifcondensed-italic-ttf-advances-853": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 5240536588756930868
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-1568": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 571775784121991327
+    },
+    "dejavuserifcondensed-italic-ttf-advances-1568": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 3711275844634686516
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-538": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 67580339229272675
+    },
+    "dejavuserifcondensed-italic-ttf-advances-538": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 2452205320043690484
+    },
+    "dejavuserifcondensed-ttf-outlines-4800": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 13050893058836791623
+    },
+    "dejavuserifcondensed-ttf-advances-4800": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 3769482796578656136
+    },
+    "dejavuserifcondensed-ttf-outlines-5280": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 15433191473590748244
+    },
+    "dejavuserifcondensed-ttf-advances-5280": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 6164072284879107976
+    },
+    "dejavuserifcondensed-ttf-outlines-3200": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 10374198365952028810
+    },
+    "dejavuserifcondensed-ttf-advances-3200": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 17783793068976486280
+    },
+    "dejavuserifcondensed-ttf-outlines-3072": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 1969004643438546544
+    },
+    "dejavuserifcondensed-ttf-advances-3072": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 8018678087418610248
+    },
+    "dejavuserifcondensed-ttf-outlines-2400": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 8030073861289190356
+    },
+    "dejavuserifcondensed-ttf-advances-2400": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 2029542270671428488
+    },
+    "dejavuserifcondensed-ttf-outlines-2160": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 3602888775108130539
+    },
+    "dejavuserifcondensed-ttf-advances-2160": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 15668895639330511816
+    },
+    "dejavuserifcondensed-ttf-outlines-853": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 8249591436010334724
+    },
+    "dejavuserifcondensed-ttf-advances-853": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 1128637203131564168
+    },
+    "dejavuserifcondensed-ttf-outlines-1568": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 12762799562360260647
+    },
+    "dejavuserifcondensed-ttf-advances-1568": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 6114024832377901320
+    },
+    "dejavuserifcondensed-ttf-outlines-538": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 11602774779874254765
+    },
+    "dejavuserifcondensed-ttf-advances-538": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 723613154141949640
+    },
+    "notosans-regular-ttf-outlines-4800": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 14833104802834454590
+    },
+    "notosans-regular-ttf-advances-4800": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 4554449272796930902
+    },
+    "notosans-regular-ttf-outlines-5280": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 18412552214268467771
+    },
+    "notosans-regular-ttf-advances-5280": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 8774480071194613334
+    },
+    "notosans-regular-ttf-outlines-3200": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 7925433955128746394
+    },
+    "notosans-regular-ttf-advances-3200": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 1676665733397265174
+    },
+    "notosans-regular-ttf-outlines-3072": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 12089912736391856798
+    },
+    "notosans-regular-ttf-advances-3072": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 14077532111461230166
+    },
+    "notosans-regular-ttf-outlines-2400": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 10221179065379642387
+    },
+    "notosans-regular-ttf-advances-2400": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 1164217253674265878
+    },
+    "notosans-regular-ttf-outlines-2160": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 17027681972429185751
+    },
+    "notosans-regular-ttf-advances-2160": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 3434047440274856534
+    },
+    "notosans-regular-ttf-outlines-853": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 8817936497762342344
+    },
+    "notosans-regular-ttf-advances-853": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 11323684167180321110
+    },
+    "notosans-regular-ttf-outlines-1568": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 5910093601074752602
+    },
+    "notosans-regular-ttf-advances-1568": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 13173287882653513110
+    },
+    "notosans-regular-ttf-outlines-538": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 13874636858852709321
+    },
+    "notosans-regular-ttf-advances-538": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 13452666593472187990
+    },
+    "notosans-regular-otf-outlines-4800": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 16229784875147083033
+    },
+    "notosans-regular-otf-advances-4800": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 4554449272796930902
+    },
+    "notosans-regular-otf-outlines-5280": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 4458121113461936401
+    },
+    "notosans-regular-otf-advances-5280": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 8774480071194613334
+    },
+    "notosans-regular-otf-outlines-3200": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 13361236432756633839
+    },
+    "notosans-regular-otf-advances-3200": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 1676665733397265174
+    },
+    "notosans-regular-otf-outlines-3072": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 7191905438276342108
+    },
+    "notosans-regular-otf-advances-3072": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 14077532111461230166
+    },
+    "notosans-regular-otf-outlines-2400": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 3327623073494939296
+    },
+    "notosans-regular-otf-advances-2400": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 1164217253674265878
+    },
+    "notosans-regular-otf-outlines-2160": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 12702239419000898428
+    },
+    "notosans-regular-otf-advances-2160": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 3434047440274856534
+    },
+    "notosans-regular-otf-outlines-853": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 2614449123132971940
+    },
+    "notosans-regular-otf-advances-853": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 11323684167180321110
+    },
+    "notosans-regular-otf-outlines-1568": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 11698403542645408691
+    },
+    "notosans-regular-otf-advances-1568": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 13173287882653513110
+    },
+    "notosans-regular-otf-outlines-538": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 4548501768729853609
+    },
+    "notosans-regular-otf-advances-538": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 13452666593472187990
+    },
+    "notosans-bolditalic-otf-outlines-4800": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 11566870563132067447
+    },
+    "notosans-bolditalic-otf-advances-4800": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 5306578494230329202
+    },
+    "notosans-bolditalic-otf-outlines-5280": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 12962097655481785517
+    },
+    "notosans-bolditalic-otf-advances-5280": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 13893168451920521650
+    },
+    "notosans-bolditalic-otf-outlines-3200": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 7216996132488697308
+    },
+    "notosans-bolditalic-otf-advances-3200": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 6043996501588838130
+    },
+    "notosans-bolditalic-otf-outlines-3072": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 14556695420093694882
+    },
+    "notosans-bolditalic-otf-advances-3072": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 18007426057422635378
+    },
+    "notosans-bolditalic-otf-outlines-2400": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 15961859062367036366
+    },
+    "notosans-bolditalic-otf-advances-2400": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 12678666336339286386
+    },
+    "notosans-bolditalic-otf-outlines-2160": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 10231418094015890884
+    },
+    "notosans-bolditalic-otf-advances-2160": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 11045768508289139442
+    },
+    "notosans-bolditalic-otf-outlines-853": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 1010247667528560273
+    },
+    "notosans-bolditalic-otf-advances-853": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 7300896321187971314
+    },
+    "notosans-bolditalic-otf-outlines-1568": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 1068804102299559047
+    },
+    "notosans-bolditalic-otf-advances-1568": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 9173266027108957938
+    },
+    "notosans-bolditalic-otf-outlines-538": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 9984830477499556672
+    },
+    "notosans-bolditalic-otf-advances-538": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 4204098296249603506
+    },
+    "notosansjp-regular-otf-outlines-4800": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 14147160176880742333
+    },
+    "notosansjp-regular-otf-advances-4800": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 8704030852105241892
+    },
+    "notosansjp-regular-otf-outlines-5280": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 9993397532429084440
+    },
+    "notosansjp-regular-otf-advances-5280": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 9555763532684443492
+    },
+    "notosansjp-regular-otf-outlines-3200": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 2763002680248226779
+    },
+    "notosansjp-regular-otf-advances-3200": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 1294951920872657316
+    },
+    "notosansjp-regular-otf-outlines-3072": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 378398990034653383
+    },
+    "notosansjp-regular-otf-advances-3072": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 201943304550960228
+    },
+    "notosansjp-regular-otf-outlines-2400": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 17265035114121832300
+    },
+    "notosansjp-regular-otf-advances-2400": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 8068188978344521188
+    },
+    "notosansjp-regular-otf-outlines-2160": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 13864745084709422786
+    },
+    "notosansjp-regular-otf-advances-2160": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 18025635865192077924
+    },
+    "notosansjp-regular-otf-outlines-853": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 2666555433972262120
+    },
+    "notosansjp-regular-otf-advances-853": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 17535132038458390180
+    },
+    "notosansjp-regular-otf-outlines-1568": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 1264018397554396223
+    },
+    "notosansjp-regular-otf-advances-1568": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 12269656401785619108
+    },
+    "notosansjp-regular-otf-outlines-538": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 12828194684095486179
+    },
+    "notosansjp-regular-otf-advances-538": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 4531721693273658340
+    },
+    "notosansjp-vf-otf-outlines-4800": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 5230554710926492864
+    },
+    "notosansjp-vf-otf-advances-4800": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 347612651912120548
+    },
+    "notosansjp-vf-otf-outlines-5280": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 11115497992135964058
+    },
+    "notosansjp-vf-otf-advances-5280": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 14433157211960729380
+    },
+    "notosansjp-vf-otf-outlines-3200": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 5848046950530967434
+    },
+    "notosansjp-vf-otf-advances-3200": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 17781957848689983652
+    },
+    "notosansjp-vf-otf-outlines-3072": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 2881181298474809401
+    },
+    "notosansjp-vf-otf-advances-3072": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 14819629157132296484
+    },
+    "notosansjp-vf-otf-outlines-2400": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 17245692919592960888
+    },
+    "notosansjp-vf-otf-advances-2400": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 18244572879033652068
+    },
+    "notosansjp-vf-otf-outlines-2160": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 18044995218783073047
+    },
+    "notosansjp-vf-otf-advances-2160": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 6934412356023483108
+    },
+    "notosansjp-vf-otf-outlines-853": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 8402206983723045125
+    },
+    "notosansjp-vf-otf-advances-853": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 1219526261756191012
+    },
+    "notosansjp-vf-otf-outlines-1568": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 4518127887382229271
+    },
+    "notosansjp-vf-otf-advances-1568": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 3906705201208023780
+    },
+    "notosansjp-vf-otf-outlines-538": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 13055593097929987967
+    },
+    "notosansjp-vf-otf-advances-538": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 512680707000217124
+    },
+    "notosanscjk-regular-ttc-outlines-4800": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 1440034842581731719
+    },
+    "notosanscjk-regular-ttc-advances-4800": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 11861998372926747995
+    },
+    "notosanscjk-regular-ttc-outlines-5280": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 4771733009793800881
+    },
+    "notosanscjk-regular-ttc-advances-5280": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 7939303821881906523
+    },
+    "notosanscjk-regular-ttc-outlines-3200": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 10788179956692013415
+    },
+    "notosanscjk-regular-ttc-advances-3200": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 11880381755033013595
+    },
+    "notosanscjk-regular-ttc-outlines-3072": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 15999855751071617055
+    },
+    "notosanscjk-regular-ttc-advances-3072": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 11588049162006560091
+    },
+    "notosanscjk-regular-ttc-outlines-2400": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 10970209824865352947
+    },
+    "notosanscjk-regular-ttc-advances-2400": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 9603723419803487579
+    },
+    "notosanscjk-regular-ttc-outlines-2160": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 14140848127711415175
+    },
+    "notosanscjk-regular-ttc-advances-2160": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 5186260086666386779
+    },
+    "notosanscjk-regular-ttc-outlines-853": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 17585875343618324131
+    },
+    "notosanscjk-regular-ttc-advances-853": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 3873943548119776603
+    },
+    "notosanscjk-regular-ttc-outlines-1568": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 10432111262473938727
+    },
+    "notosanscjk-regular-ttc-advances-1568": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 13478546225931656539
+    },
+    "notosanscjk-regular-ttc-outlines-538": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 17607231474009634251
+    },
+    "notosanscjk-regular-ttc-advances-538": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 15728178481921418587
+    },
+    "notosansarabic-regular-ttf-outlines-4800": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 10452852557659443215
+    },
+    "notosansarabic-regular-ttf-advances-4800": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 16629839452401718226
+    },
+    "notosansarabic-regular-ttf-outlines-5280": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 9132482741787755135
+    },
+    "notosansarabic-regular-ttf-advances-5280": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 16865993324828738642
+    },
+    "notosansarabic-regular-ttf-outlines-3200": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 6408552280550874630
+    },
+    "notosansarabic-regular-ttf-advances-3200": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 18095704125919534226
+    },
+    "notosansarabic-regular-ttf-outlines-3072": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 6861994320972023423
+    },
+    "notosansarabic-regular-ttf-advances-3072": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 2289155790807716434
+    },
+    "notosansarabic-regular-ttf-outlines-2400": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 25144904141487194
+    },
+    "notosansarabic-regular-ttf-advances-2400": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 5601974987349434450
+    },
+    "notosansarabic-regular-ttf-outlines-2160": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 12563759212083021907
+    },
+    "notosansarabic-regular-ttf-advances-2160": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 4717865587859319634
+    },
+    "notosansarabic-regular-ttf-outlines-853": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 1618297769266924407
+    },
+    "notosansarabic-regular-ttf-advances-853": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 10297144415350740114
+    },
+    "notosansarabic-regular-ttf-outlines-1568": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 14697717051636973324
+    },
+    "notosansarabic-regular-ttf-advances-1568": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 7117908847994964946
+    },
+    "notosansarabic-regular-ttf-outlines-538": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 5663845370710081051
+    },
+    "notosansarabic-regular-ttf-advances-538": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 1609699364723464594
+    },
+    "notonaskharabic-regular-ttf-outlines-4800": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 10315248642620407830
+    },
+    "notonaskharabic-regular-ttf-advances-4800": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 18174218081698564618
+    },
+    "notonaskharabic-regular-ttf-outlines-5280": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 6795286877401884550
+    },
+    "notonaskharabic-regular-ttf-advances-5280": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 101225654089266890
+    },
+    "notonaskharabic-regular-ttf-outlines-3200": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 6268811441311723590
+    },
+    "notonaskharabic-regular-ttf-advances-3200": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 6286374726858493770
+    },
+    "notonaskharabic-regular-ttf-outlines-3072": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 13632970230956694218
+    },
+    "notonaskharabic-regular-ttf-advances-3072": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 5356174554825843850
+    },
+    "notonaskharabic-regular-ttf-outlines-2400": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 7318788228340998710
+    },
+    "notonaskharabic-regular-ttf-advances-2400": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 3755552254138108042
+    },
+    "notonaskharabic-regular-ttf-outlines-2160": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 3628996837428506525
+    },
+    "notonaskharabic-regular-ttf-advances-2160": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 3733320010471945418
+    },
+    "notonaskharabic-regular-ttf-outlines-853": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 4073208297929438804
+    },
+    "notonaskharabic-regular-ttf-advances-853": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 5500458100712831434
+    },
+    "notonaskharabic-regular-ttf-outlines-1568": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 12306424432067950543
+    },
+    "notonaskharabic-regular-ttf-advances-1568": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 3253764751197274442
+    },
+    "notonaskharabic-regular-ttf-outlines-538": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 16824977902332057364
+    },
+    "notonaskharabic-regular-ttf-advances-538": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 320564272538854154
+    },
+    "notosanshebrew-regular-ttf-outlines-4800": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 16393502648354597210
+    },
+    "notosanshebrew-regular-ttf-advances-4800": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 11044698590751294914
+    },
+    "notosanshebrew-regular-ttf-outlines-5280": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 4614581417673652403
+    },
+    "notosanshebrew-regular-ttf-advances-5280": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 9842556437729050690
+    },
+    "notosanshebrew-regular-ttf-outlines-3200": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 11055991168553647086
+    },
+    "notosanshebrew-regular-ttf-advances-3200": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 17102662849390287810
+    },
+    "notosanshebrew-regular-ttf-outlines-3072": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 3694895519898916770
+    },
+    "notosanshebrew-regular-ttf-advances-3072": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 3315184076071219970
+    },
+    "notosanshebrew-regular-ttf-outlines-2400": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 13227080476507854653
+    },
+    "notosanshebrew-regular-ttf-advances-2400": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 16311215943338282690
+    },
+    "notosanshebrew-regular-ttf-outlines-2160": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 1380778012267745945
+    },
+    "notosanshebrew-regular-ttf-advances-2160": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 11666328825751604738
+    },
+    "notosanshebrew-regular-ttf-outlines-853": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 4842118084452572106
+    },
+    "notosanshebrew-regular-ttf-advances-853": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 10762220458773608130
+    },
+    "notosanshebrew-regular-ttf-outlines-1568": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 11201352422858862439
+    },
+    "notosanshebrew-regular-ttf-advances-1568": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 9133043893486756354
+    },
+    "notosanshebrew-regular-ttf-outlines-538": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 9006239718346810059
+    },
+    "notosanshebrew-regular-ttf-advances-538": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 15397622831610903618
+    },
+    "notosansdevanagari-regular-ttf-outlines-4800": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 16019525782062064419
+    },
+    "notosansdevanagari-regular-ttf-advances-4800": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 9175598654291396295
+    },
+    "notosansdevanagari-regular-ttf-outlines-5280": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 15648113246148989233
+    },
+    "notosansdevanagari-regular-ttf-advances-5280": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 8373750642821307079
+    },
+    "notosansdevanagari-regular-ttf-outlines-3200": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 12603395301601449709
+    },
+    "notosansdevanagari-regular-ttf-advances-3200": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 1067610733502997575
+    },
+    "notosansdevanagari-regular-ttf-outlines-3072": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 15224677775263645182
+    },
+    "notosansdevanagari-regular-ttf-advances-3072": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 7350505510044224903
+    },
+    "notosansdevanagari-regular-ttf-outlines-2400": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 4304535416659343599
+    },
+    "notosansdevanagari-regular-ttf-advances-2400": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 16321722157019511495
+    },
+    "notosansdevanagari-regular-ttf-outlines-2160": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 17358819660491748106
+    },
+    "notosansdevanagari-regular-ttf-advances-2160": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 9500661624003945799
+    },
+    "notosansdevanagari-regular-ttf-outlines-853": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 16640314696252516708
+    },
+    "notosansdevanagari-regular-ttf-advances-853": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 5442032348951799751
+    },
+    "notosansdevanagari-regular-ttf-outlines-1568": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 3698089937665334896
+    },
+    "notosansdevanagari-regular-ttf-advances-1568": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 14279794090084319687
+    },
+    "notosansdevanagari-regular-ttf-outlines-538": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 6326573717937305195
+    },
+    "notosansdevanagari-regular-ttf-advances-538": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 16722492048581323591
+    },
+    "notosansbengali-regular-ttf-outlines-4800": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 5772930811273729709
+    },
+    "notosansbengali-regular-ttf-advances-4800": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 5938970043532525211
+    },
+    "notosansbengali-regular-ttf-outlines-5280": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 16146584870196913734
+    },
+    "notosansbengali-regular-ttf-advances-5280": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 3481886893689389467
+    },
+    "notosansbengali-regular-ttf-outlines-3200": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 407126120985420613
+    },
+    "notosansbengali-regular-ttf-advances-3200": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 17270254813464943643
+    },
+    "notosansbengali-regular-ttf-outlines-3072": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 9151741619837368323
+    },
+    "notosansbengali-regular-ttf-advances-3072": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 11048284268696738843
+    },
+    "notosansbengali-regular-ttf-outlines-2400": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 39443688581565408
+    },
+    "notosansbengali-regular-ttf-advances-2400": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 9591330551916761947
+    },
+    "notosansbengali-regular-ttf-outlines-2160": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 14570122181429110287
+    },
+    "notosansbengali-regular-ttf-advances-2160": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 6660826740768772955
+    },
+    "notosansbengali-regular-ttf-outlines-853": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 7948113109708093093
+    },
+    "notosansbengali-regular-ttf-advances-853": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 6399852142973950299
+    },
+    "notosansbengali-regular-ttf-outlines-1568": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 15635844720276685404
+    },
+    "notosansbengali-regular-ttf-advances-1568": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 1904655951169405467
+    },
+    "notosansbengali-regular-ttf-outlines-538": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 16001591763206664277
+    },
+    "notosansbengali-regular-ttf-advances-538": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 483994068777683611
+    },
+    "notosanstamil-regular-ttf-outlines-4800": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 12846467690125847949
+    },
+    "notosanstamil-regular-ttf-advances-4800": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 14437444863796152562
+    },
+    "notosanstamil-regular-ttf-outlines-5280": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 15584715890435985954
+    },
+    "notosanstamil-regular-ttf-advances-5280": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 8422203414109098674
+    },
+    "notosanstamil-regular-ttf-outlines-3200": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 9833051178816229326
+    },
+    "notosanstamil-regular-ttf-advances-3200": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 3432999004908440882
+    },
+    "notosanstamil-regular-ttf-outlines-3072": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 16270916885028661502
+    },
+    "notosanstamil-regular-ttf-advances-3072": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 5421821910745211954
+    },
+    "notosanstamil-regular-ttf-outlines-2400": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 17499559642719540056
+    },
+    "notosanstamil-regular-ttf-advances-2400": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 2397234575622451634
+    },
+    "notosanstamil-regular-ttf-outlines-2160": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 3473274983208630510
+    },
+    "notosanstamil-regular-ttf-advances-2160": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 11997797466793562418
+    },
+    "notosanstamil-regular-ttf-outlines-853": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 4572387263753390939
+    },
+    "notosanstamil-regular-ttf-advances-853": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 13628901685647812082
+    },
+    "notosanstamil-regular-ttf-outlines-1568": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 7905060388149929088
+    },
+    "notosanstamil-regular-ttf-advances-1568": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 13618337897229465650
+    },
+    "notosanstamil-regular-ttf-outlines-538": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 12228800914874630539
+    },
+    "notosanstamil-regular-ttf-advances-538": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 3148745430352020530
+    },
+    "notosansthai-regular-ttf-outlines-4800": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 11890428106366139654
+    },
+    "notosansthai-regular-ttf-advances-4800": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 4890927208228007398
+    },
+    "notosansthai-regular-ttf-outlines-5280": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 13766660068757932510
+    },
+    "notosansthai-regular-ttf-advances-5280": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 11692070574813375526
+    },
+    "notosansthai-regular-ttf-outlines-3200": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 16117466167501470613
+    },
+    "notosansthai-regular-ttf-advances-3200": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 328680738413636198
+    },
+    "notosansthai-regular-ttf-outlines-3072": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 13825637239087485064
+    },
+    "notosansthai-regular-ttf-advances-3072": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 8919825710526875622
+    },
+    "notosansthai-regular-ttf-outlines-2400": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 18228266937352309003
+    },
+    "notosansthai-regular-ttf-advances-2400": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 902184756796697574
+    },
+    "notosansthai-regular-ttf-outlines-2160": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 14530557398026484039
+    },
+    "notosansthai-regular-ttf-advances-2160": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 13795866522105142182
+    },
+    "notosansthai-regular-ttf-outlines-853": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 4886590531025532298
+    },
+    "notosansthai-regular-ttf-advances-853": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 3587922876137293286
+    },
+    "notosansthai-regular-ttf-outlines-1568": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 17528272181503196239
+    },
+    "notosansthai-regular-ttf-advances-1568": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 16440411128234483110
+    },
+    "notosansthai-regular-ttf-outlines-538": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 3491065856424636012
+    },
+    "notosansthai-regular-ttf-advances-538": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 18396952550721879846
+    },
+    "authored-cff-features-otf-outlines-4800": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 5810821120118263149
+    },
+    "authored-cff-features-otf-advances-4800": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 16200589686561450728
+    },
+    "authored-cff-features-otf-outlines-5280": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 10194159374786535971
+    },
+    "authored-cff-features-otf-advances-5280": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 6419347935794996008
+    },
+    "authored-cff-features-otf-outlines-3200": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 17677630311766957531
+    },
+    "authored-cff-features-otf-advances-3200": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 8647442406198954728
+    },
+    "authored-cff-features-otf-outlines-3072": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 1427756411299621040
+    },
+    "authored-cff-features-otf-advances-3072": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 3068276434166676392
+    },
+    "authored-cff-features-otf-outlines-2400": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 9960124922983679170
+    },
+    "authored-cff-features-otf-advances-2400": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 9288774159341057000
+    },
+    "authored-cff-features-otf-outlines-2160": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 13941749602314701415
+    },
+    "authored-cff-features-otf-advances-2160": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 2165593915546016744
+    },
+    "authored-cff-features-otf-outlines-853": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 1070545283655506549
+    },
+    "authored-cff-features-otf-advances-853": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 14604897173278166056
+    },
+    "authored-cff-features-otf-outlines-1568": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 11120641991069501612
+    },
+    "authored-cff-features-otf-advances-1568": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 13963565420134157160
+    },
+    "authored-cff-features-otf-outlines-538": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 4747731171750535605
+    },
+    "authored-cff-features-otf-advances-538": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 7483409122099737704
+    },
+    "authored-cff-matrix-otf-outlines-4800": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 8953443894899042568
+    },
+    "authored-cff-matrix-otf-advances-4800": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 551118664363
+    },
+    "authored-cff-matrix-otf-outlines-5280": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 7008229677630018089
+    },
+    "authored-cff-matrix-otf-advances-5280": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 551133917931
+    },
+    "authored-cff-matrix-otf-outlines-3200": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 8941591646171067322
+    },
+    "authored-cff-matrix-otf-advances-3200": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 551069090155
+    },
+    "authored-cff-matrix-otf-outlines-3072": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 1572264658243954448
+    },
+    "authored-cff-matrix-otf-advances-3072": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 551063370091
+    },
+    "authored-cff-matrix-otf-outlines-2400": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 15242863941166112419
+    },
+    "authored-cff-matrix-otf-advances-2400": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 551042396395
+    },
+    "authored-cff-matrix-otf-outlines-2160": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 6191865198641769331
+    },
+    "authored-cff-matrix-otf-advances-2160": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 551034769579
+    },
+    "authored-cff-matrix-otf-outlines-853": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 10788302820427328112
+    },
+    "authored-cff-matrix-otf-advances-853": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 550994728875
+    },
+    "authored-cff-matrix-otf-outlines-1568": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 8281615110371794091
+    },
+    "authored-cff-matrix-otf-advances-1568": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 551017609259
+    },
+    "authored-cff-matrix-otf-outlines-538": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 2472425790887922737
+    },
+    "authored-cff-matrix-otf-advances-538": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 550985195371
+    },
+    "authored-cmap-formats-ttf-outlines-4800": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 6841794933071450276
+    },
+    "authored-cmap-formats-ttf-advances-4800": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9419886607338960426
+    },
+    "authored-cmap-formats-ttf-outlines-5280": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 1997099876294236292
+    },
+    "authored-cmap-formats-ttf-advances-5280": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9424963128396187114
+    },
+    "authored-cmap-formats-ttf-outlines-3200": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 4028025059043888358
+    },
+    "authored-cmap-formats-ttf-advances-3200": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9404656930561089066
+    },
+    "authored-cmap-formats-ttf-outlines-3072": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 16760406996473792934
+    },
+    "authored-cmap-formats-ttf-advances-3072": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9402964737940663914
+    },
+    "authored-cmap-formats-ttf-outlines-2400": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 4299139128417111368
+    },
+    "authored-cmap-formats-ttf-advances-2400": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9396195967462776426
+    },
+    "authored-cmap-formats-ttf-outlines-2160": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 212112194180200024
+    },
+    "authored-cmap-formats-ttf-advances-2160": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9392811639024068266
+    },
+    "authored-cmap-formats-ttf-outlines-853": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 3735643052835132343
+    },
+    "authored-cmap-formats-ttf-advances-853": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9379274268467093354
+    },
+    "authored-cmap-formats-ttf-outlines-1568": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 13258330807330146331
+    },
+    "authored-cmap-formats-ttf-advances-1568": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9387735117964934890
+    },
+    "authored-cmap-formats-ttf-outlines-538": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 11908060737437001295
+    },
+    "authored-cmap-formats-ttf-advances-538": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9375889883228149610
+    }
+  }
+}

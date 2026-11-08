@@ -1,12 +1,16 @@
 //! The FreeType reference and the font corpus: build the pinned FreeType release,
-//! fetch the corpus, and run the font features. `cargo xtask build-workers` links
-//! the reference worker (`harness/reference_font.h`) against the installed
-//! library; the features `font-outlines`, `font-scaled` and `font-hinted` run
-//! through `cargo xtask report`, `trace-identities` and `fuzz --contract` like
-//! every other feature, and `fonts compare` reports all three.
+//! fetch the corpus, generate the font features' manifests and run the features.
+//! `cargo xtask build-workers` links the reference worker
+//! (`harness/reference_font.h`) against the installed library; the features run
+//! through `cargo xtask report`, `trace-identities` and `fuzz --contract` like every
+//! other feature.
 //!
 //! FreeType is built from its hash-checked release tarball with recorded configure
 //! flags, as the FFmpeg references are.
+
+mod manifest;
+
+pub use manifest::{FEATURES, ROW_SOURCES, SMOKE_CASES, check, manifest};
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,20 +23,23 @@ use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
        cargo xtask fonts fetch
-       cargo xtask fonts compare [REPORT OPTION]...
-       cargo xtask fonts fuzz [--iters N] [--timeout SECONDS]
+       cargo xtask fonts manifest [--record] [--output DIR]
+       cargo xtask fonts compare [--all] [REPORT OPTION]...
 
-  prepare  build the pinned FreeType release into .research/freetype; then
-           `cargo xtask build-workers` builds its reference worker
-  fetch    fetch and verify the font corpus (harness/fonts/corpus.json) into
-           .research/fonts, writing the authored fonts with the crate's
-           authored-fonts example
-  compare  `cargo xtask report` on each font feature (font-outlines, font-scaled,
-           font-hinted), with any further report options; each report goes to
-           OUTPUT/<feature> (OUTPUT: --output, default .research/font-report)
-  fuzz     run the crate's mutation smoke test (examples/fuzz.rs, dev profile, so
-           overflow is checked; an input past the timeout is a hang) over every
-           corpus file, N mutations each (default 40)";
+  prepare   build the pinned FreeType release into .research/freetype; then
+            `cargo xtask build-workers` builds its reference worker
+  fetch     fetch and verify the font corpus (harness/fonts/corpus.json) into
+            .research/fonts, writing the authored fonts with the crate's
+            authored-fonts example
+  manifest  write each font feature's generated manifest (its cases from the
+            corpus and the feature's load settings, with the pins of
+            harness/features/<feature>/pins.json) to DIR/<feature>/corpus.json
+            (default .research/fonts/manifests); with --record, first re-record
+            every pin from the built FreeType reference
+  compare   `cargo xtask report` on each required font feature (font-outlines,
+            font-hinting-none), with --all also on font-hinting-modes; further
+            report options pass through, and each report goes to OUTPUT/<feature>
+            (OUTPUT: --output, default .research/font-report)";
 
 pub const VERSION: &str = "2.15.0";
 pub const ARCHIVE_SHA256: &str = "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5";
@@ -41,22 +48,21 @@ const FONT_LIMIT: usize = 64 * 1024 * 1024;
 const CACHE: &str = ".research/freetype";
 const FONTS: &str = ".research/fonts";
 const CORPUS: &str = "harness/fonts/corpus.json";
-/// The font features: face data and unscaled outlines, what libass loads at a
-/// size, and default-load (hinted) advances.
-pub const FEATURES: [&str; 3] = ["font-outlines", "font-scaled", "font-hinted"];
 
 /// The `cargo xtask report` arguments `fonts compare ARGS` stands for, one list
-/// per feature; `None` for the other commands.
-pub fn reports(args: &[String]) -> Option<Vec<(&'static str, Vec<String>)>> {
+/// per feature: the required features, or with `--all` every font feature; `None`
+/// for the other commands.
+pub fn reports(args: &[String]) -> Option<Vec<Vec<String>>> {
     let (command, rest) = args.split_first()?;
     if command != "compare" {
         return None;
     }
-    let mut output = PathBuf::from(".research/font-report");
+    let (mut output, mut all) = (PathBuf::from(".research/font-report"), false);
     let mut options = Vec::new();
     let mut rest = rest.iter();
     while let Some(arg) = rest.next() {
         match (arg.as_str(), rest.clone().next()) {
+            ("--all", _) => all = true,
             ("--output", Some(value)) => {
                 output = PathBuf::from(value);
                 rest.next();
@@ -67,7 +73,9 @@ pub fn reports(args: &[String]) -> Option<Vec<(&'static str, Vec<String>)>> {
     Some(
         FEATURES
             .iter()
-            .map(|&feature| {
+            .filter(|feature| all || feature.required)
+            .map(|feature| {
+                let feature = feature.id;
                 let path = |file: &str| format!("harness/features/{feature}/{file}.json");
                 let mut list = vec![
                     "--contract".to_owned(),
@@ -78,7 +86,7 @@ pub fn reports(args: &[String]) -> Option<Vec<(&'static str, Vec<String>)>> {
                     output.join(feature).display().to_string(),
                 ];
                 list.extend(options.iter().cloned());
-                (feature, list)
+                list
             })
             .collect(),
     )
@@ -108,60 +116,23 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
-        [command, rest @ ..] if command == "fuzz" => {
-            let (mut iterations, mut timeout) = (40, 10);
+        [command, rest @ ..] if command == "manifest" => {
+            let (mut record, mut output) = (false, root.join(".research/fonts/manifests"));
             let mut rest = rest.iter();
             while let Some(flag) = rest.next() {
-                let value: u32 = rest
-                    .next()
-                    .and_then(|v| v.parse().ok())
-                    .ok_or_else(|| format!("{flag} needs a number"))?;
                 match flag.as_str() {
-                    "--iters" => iterations = value,
-                    "--timeout" => timeout = value,
+                    "--record" => record = true,
+                    "--output" => output = PathBuf::from(rest.next().ok_or(USAGE)?),
                     _ => return Err(USAGE.into()),
                 }
             }
-            fuzz(root, iterations, timeout)
+            if record {
+                manifest::record(root)?;
+            }
+            manifest::write(root, &output)
         }
         _ => Err(USAGE.into()),
     }
-}
-
-/// The crate's fuzz example over every corpus file.
-fn fuzz(root: &Path, iterations: u32, timeout: u32) -> Result<(), String> {
-    run(Command::new("cargo")
-        .args([
-            "build",
-            "--locked",
-            "-p",
-            "triergon-font",
-            "--example",
-            "fuzz",
-        ])
-        .env("CARGO_INCREMENTAL", "0")
-        .current_dir(root))?;
-    let files = root.join(FONTS).join("files");
-    let paths: Vec<PathBuf> = corpus(root)?
-        .into_iter()
-        .flat_map(|(_, list)| list)
-        .map(|file| files.join(file.path))
-        .collect();
-    if let Some(missing) = paths.iter().find(|p| !p.exists()) {
-        return Err(format!(
-            "{}: missing (run `cargo xtask fonts fetch`)",
-            missing.display()
-        ));
-    }
-    run(Command::new(root.join("target/debug/examples/fuzz"))
-        .args([
-            "--iters",
-            &iterations.to_string(),
-            "--timeout",
-            &timeout.to_string(),
-        ])
-        .args(&paths)
-        .current_dir(root.join(FONTS)))
 }
 
 pub fn configure_argv(prefix: &Path) -> Vec<String> {
@@ -256,10 +227,12 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
     Ok(path)
 }
 
-/// One corpus file: its path under `.research/fonts/files` and its SHA-256.
+/// One corpus file: its path under `.research/fonts/files`, its SHA-256 and its
+/// outline format (`truetype`, `cff`, `cff-cid`, `cff2` or `collection`).
 struct CorpusFile {
     path: String,
     sha256: String,
+    format: String,
 }
 
 fn corpus(root: &Path) -> Result<Vec<(Value, Vec<CorpusFile>)>, String> {
@@ -278,8 +251,10 @@ fn corpus(root: &Path) -> Result<Vec<(Value, Vec<CorpusFile>)>, String> {
         let mut list = Vec::new();
         for file in files {
             let field = |key| file.get(key).and_then(Value::as_str).map(str::to_owned);
-            let (Some(path), Some(sha256)) = (field("path"), field("sha256")) else {
-                return Err("corpus file without path or hash".into());
+            let (Some(path), Some(sha256), Some(format)) =
+                (field("path"), field("sha256"), field("format"))
+            else {
+                return Err("corpus file without path, hash or format".into());
             };
             if path
                 .split('/')
@@ -287,7 +262,11 @@ fn corpus(root: &Path) -> Result<Vec<(Value, Vec<CorpusFile>)>, String> {
             {
                 return Err(format!("invalid corpus path {path}"));
             }
-            list.push(CorpusFile { path, sha256 });
+            list.push(CorpusFile {
+                path,
+                sha256,
+                format,
+            });
         }
         result.push((source.clone(), list));
     }
@@ -379,25 +358,27 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn compare_reports_every_font_feature() {
+    fn compare_reports_the_required_features_or_all() {
         let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let found = reports(&args(&["compare", "--output", "out", "--memory"])).unwrap();
-        assert_eq!(found.len(), FEATURES.len());
-        let (feature, scaled) = &found[1];
-        assert_eq!(*feature, "font-scaled");
+        let required = reports(&args(&["compare", "--output", "out", "--memory"])).unwrap();
         assert_eq!(
-            *scaled,
+            required[1],
             args(&[
                 "--contract",
-                "harness/features/font-scaled/contract.json",
+                "harness/features/font-hinting-none/contract.json",
                 "--manifest",
-                "harness/features/font-scaled/corpus.json",
+                "harness/features/font-hinting-none/corpus.json",
                 "--output",
-                "out/font-scaled",
+                "out/font-hinting-none",
                 "--memory",
             ])
         );
-        assert!(reports(&args(&["fuzz"])).is_none());
+        assert_eq!(required.len(), 2);
+        assert_eq!(
+            reports(&args(&["compare", "--all"])).unwrap().len(),
+            FEATURES.len()
+        );
+        assert!(reports(&args(&["prepare"])).is_none());
     }
 
     #[test]

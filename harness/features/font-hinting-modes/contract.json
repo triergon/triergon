@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "font-hinting-modes",
+  "operation": "font-sized",
+  "candidate": "font-worker",
+  "worker_operation": "font-sized-",
+  "reference": "freetype-native",
+  "contract": [
+    "the sizes libass requests when hinting is on (ASS_HINTING_NATIVE, LIGHT and NORMAL): every face of one font file read from memory and loaded at each of nine 26.6 pixel heights, after libass's GDI face metrics, with a REAL_DIM size request",
+    "outlines cases: the size metrics, libass's ascent and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline and strikeout bands; the kerning at the size (FT_KERNING_DEFAULT) of every pair the kern table lists, nonzero values only; every glyph's FT_LOAD_NO_HINTING outline and advance, then that outline emboldened, slanted, and both",
+    "advances cases: every glyph's FT_LOAD_DEFAULT advance at that size; an advance the candidate cannot give ends its operation with an error, so the case fails",
+    "the file is read before each timed and memory operation; the reference library is created once, outside it"
+  ],
+  "required_profiles": [
+    "truetype",
+    "cff",
+    "cff-cid",
+    "cff2",
+    "collection"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "gating the hinting modes: run by cargo xtask check once their policy is decided",
+    "FreeType auto-hinter for FT_LOAD_DEFAULT advances",
+    "hinted outlines and extents for NATIVE, LIGHT and NORMAL hinting"
+  ]
+}

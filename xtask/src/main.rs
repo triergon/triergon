@@ -66,7 +66,7 @@ commands:
   fuzz           --manifest F --output DIR [--rounds N] [--seed N] [--maximum-input-bytes N]
                  [--maximum-output-bytes N] [--timeout-seconds S]
                  deterministic, replayable mutation campaign through JSON workers
-  fuzz           --contract F [--manifest F] [--corpus DIR] [--case TEXT] [--reference]
+  fuzz           --contract F [--manifest F] [--corpus DIR] [--case TEXT]... [--reference]
                  --output DIR [--rounds N] ...
                  the same campaign over the cases of a feature with a worker operation
                  prefix: its release candidate and a dev build of it, with --reference also
@@ -107,10 +107,9 @@ commands:
                  pinned FFmpeg decoders (see `cargo xtask codecs --help`)
   capture        compare|qualify|summarize|equivalence   capture pipeline against the
                  FFmpeg capture reference (see `cargo xtask capture --help`)
-  fonts          prepare|fetch|compare|fuzz   the pinned FreeType reference and the font
-                 corpus; compare reports the three font features, fuzz runs the
-                 crate's mutation test
-                 (see `cargo xtask fonts --help`)";
+  fonts          prepare|fetch|manifest|compare   the pinned FreeType reference, the font
+                 corpus and the font features' manifests; compare reports the required
+                 font features, --all every one (see `cargo xtask fonts --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -455,7 +454,7 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
     // With --contract, the campaign runs that feature's cases and --manifest names
     // the feature's corpus manifest (by default the one beside the contract).
     let (mut contract, mut manifest, mut corpus, mut cases, mut reference) =
-        (None, None, None, None, false);
+        (None, None, None, Vec::new(), false);
     let mut rest = args.iter();
     let parsed = (|| -> Task {
         while let Some(flag) = rest.next() {
@@ -473,7 +472,7 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
                 "--contract" => contract = Some(PathBuf::from(value)),
                 "--manifest" => manifest = Some(PathBuf::from(value)),
                 "--corpus" => corpus = Some(PathBuf::from(value)),
-                "--case" => cases = Some(value.clone()),
+                "--case" => cases.push(value.clone()),
                 "--output" => campaign.output = PathBuf::from(value),
                 "--rounds" => campaign.rounds = number()? as usize,
                 "--seed" => campaign.seed = number()?,
@@ -499,7 +498,7 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
             };
             fuzz::feature_campaign(root, &feature, &campaign)
         }
-        None if corpus.is_none() && cases.is_none() && !reference => {
+        None if corpus.is_none() && cases.is_empty() && !reference => {
             campaign.manifest = manifest.unwrap_or_default();
             fuzz::campaign(root, &campaign)
         }
@@ -562,9 +561,9 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
         // Without --corpus, a manifest that records its directory names it.
         options.corpus = match corpus {
             Some(corpus) => corpus,
-            None => checks::read_json(&options.manifest)
+            None => harness::manifest::read(root, &options.manifest)
                 .ok()
-                .and_then(|manifest| harness::report::recorded_corpus(root, &manifest))
+                .and_then(|(manifest, _)| harness::report::recorded_corpus(root, &manifest))
                 .unwrap_or_else(|| std::mem::take(&mut options.corpus)),
         };
         Ok(())
@@ -879,70 +878,54 @@ const REFERENCE_TRACE_CRATES: [&str; 5] = [
     "triergon-subtitles",
 ];
 
-/// `fonts compare`: the report of every font feature, then each feature's passing
-/// cases and failures. Exits with the first failing report's code.
-fn fonts_compare(root: &Path, reports: &[(&str, Vec<String>)]) -> ExitCode {
+/// The reports `fonts compare` stands for; exits with the first failing one's code.
+fn fonts_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
     let mut result = ExitCode::SUCCESS;
-    let mut summary = Vec::new();
-    for (feature, args) in reports {
+    for args in reports {
         println!("$ cargo xtask report {}", args.join(" "));
         let code = report(root, args);
-        if code != ExitCode::SUCCESS && result == ExitCode::SUCCESS {
+        if result == ExitCode::SUCCESS {
             result = code;
         }
-        let output = args
-            .iter()
-            .position(|a| a == "--output")
-            .map(|at| root.join(&args[at + 1]).join("report.json"));
-        let cases = output
-            .and_then(|path| checks::read_json(&path).ok())
-            .and_then(|r| {
-                r.get("cases")
-                    .and_then(json::Value::as_array)
-                    .map(<[_]>::to_vec)
-            })
-            .unwrap_or_default();
-        let status = |case: &json::Value| {
-            case.get("parity")
-                .and_then(|p| p.get("status"))
-                .and_then(json::Value::as_str)
-                .unwrap_or("missing")
-                .to_owned()
-        };
-        let failed: Vec<String> = cases
-            .iter()
-            .filter(|c| status(c) != "pass")
-            .map(|c| {
-                let id = c.get("id").and_then(json::Value::as_str).unwrap_or("?");
-                format!("{id} ({})", status(c))
-            })
-            .collect();
-        summary.push(format!(
-            "{feature}: {} of {} cases pass{}",
-            cases.len() - failed.len(),
-            cases.len(),
-            if failed.is_empty() {
-                String::new()
-            } else {
-                format!("; failing: {}", failed.join(", "))
-            }
-        ));
-    }
-    for line in summary {
-        println!("{line}");
     }
     result
 }
 
-/// `fonts compare`, then `fonts fuzz` (the crate's mutation smoke test).
+/// `fonts compare` on the required font features, then one round of mutations of
+/// each feature's smoke cases through the release and dev builds of the font
+/// worker; a campaign that finds nothing is removed.
 fn fonts_check(root: &Path) -> Task {
-    println!("$ cargo xtask fonts compare");
     let reports = fonts::reports(&["compare".to_owned()]).expect("compare is a report");
     if fonts_compare(root, &reports) != ExitCode::SUCCESS {
         return Err("cargo xtask fonts compare failed".into());
     }
-    println!("$ cargo xtask fonts fuzz");
-    fonts::main(root, &["fuzz".to_owned()])
+    for feature in fonts::FEATURES.iter().filter(|f| f.required) {
+        let contract = format!("harness/features/{}/contract.json", feature.id);
+        let output = format!(".research/check-fuzz-{}-{}", feature.id, std::process::id());
+        let mut args = vec![
+            "--contract",
+            &contract,
+            "--output",
+            &output,
+            "--rounds",
+            "1",
+            "--timeout-seconds",
+            "60",
+        ];
+        for case in fonts::SMOKE_CASES {
+            args.extend(["--case", case]);
+        }
+        println!("$ cargo xtask fuzz {}", args.join(" "));
+        let args: Vec<String> = args.iter().map(ToString::to_string).collect();
+        if fuzz_campaign(root, &args) != ExitCode::SUCCESS {
+            return Err(format!(
+                "the {} campaign found problems: {output}",
+                feature.id
+            ));
+        }
+        std::fs::remove_dir_all(root.join(&output)).map_err(|e| format!("{output}: {e}"))?;
+    }
+    Ok(())
 }
 
 fn check(root: &Path) -> Task {

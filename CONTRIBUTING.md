@@ -56,9 +56,11 @@ benchmarks assume it.
 4. Run `cargo xtask report --fate-cache .research/fate-samples`, and the same with
    `--benchmark --memory --require-acceptance` on an isolated AArch64 Linux machine when
    the change touches parsing or decoding hot paths; for `triergon-font`,
-   `cargo xtask fonts compare` with the same options and
-   `cargo xtask fonts fuzz`. Put the per-case results in the pull
-   request and update [docs/status.md](docs/status.md).
+   `cargo xtask fonts compare --all` with the same options and
+   `cargo xtask fuzz --contract harness/features/<feature>/contract.json --output DIR`.
+   When the FreeType reference changes, re-record the font pins with
+   `cargo xtask fonts manifest --record`; pins are never edited by hand. Put the
+   per-case results in the pull request and update [docs/status.md](docs/status.md).
 
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
 [docs/architecture.md](docs/architecture.md) for where code belongs.

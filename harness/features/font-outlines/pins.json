@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "reference": "freetype-native",
+  "note": "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+  "pins": {
+    "arimo-bold-ttf": {
+      "packets": 3292,
+      "bytes": 92025,
+      "digest": 16844695504457541666
+    },
+    "arimo-bolditalic-ttf": {
+      "packets": 3292,
+      "bytes": 97497,
+      "digest": 11793110876577963835
+    },
+    "arimo-italic-ttf": {
+      "packets": 3292,
+      "bytes": 97313,
+      "digest": 2600487454799489059
+    },
+    "arimo-regular-ttf": {
+      "packets": 3292,
+      "bytes": 92895,
+      "digest": 1872395311417801371
+    },
+    "cousine-bold-ttf": {
+      "packets": 2385,
+      "bytes": 68182,
+      "digest": 8658520424905831709
+    },
+    "cousine-bolditalic-ttf": {
+      "packets": 2385,
+      "bytes": 72926,
+      "digest": 7441428927053000720
+    },
+    "cousine-italic-ttf": {
+      "packets": 2385,
+      "bytes": 72956,
+      "digest": 12727514228109774844
+    },
+    "cousine-regular-ttf": {
+      "packets": 2385,
+      "bytes": 68064,
+      "digest": 2775765950377749171
+    },
+    "tinos-bold-ttf": {
+      "packets": 3279,
+      "bytes": 112864,
+      "digest": 952996555155112172
+    },
+    "tinos-bolditalic-ttf": {
+      "packets": 3279,
+      "bytes": 114917,
+      "digest": 747889384184381742
+    },
+    "tinos-italic-ttf": {
+      "packets": 3279,
+      "bytes": 115789,
+      "digest": 360563104150945546
+    },
+    "tinos-regular-ttf": {
+      "packets": 3279,
+      "bytes": 112861,
+      "digest": 2765752870138154125
+    },
+    "dejavumathtexgyre-ttf": {
+      "packets": 4282,
+      "bytes": 138687,
+      "digest": 2892947330609938288
+    },
+    "dejavusans-bold-ttf": {
+      "packets": 6196,
+      "bytes": 200419,
+      "digest": 6261014786870747219
+    },
+    "dejavusans-boldoblique-ttf": {
+      "packets": 5413,
+      "bytes": 176983,
+      "digest": 17638877003817106562
+    },
+    "dejavusans-extralight-ttf": {
+      "packets": 2032,
+      "bytes": 59075,
+      "digest": 11971051558385247362
+    },
+    "dejavusans-oblique-ttf": {
+      "packets": 5355,
+      "bytes": 179651,
+      "digest": 5783174530882501333
+    },
+    "dejavusans-ttf": {
+      "packets": 6253,
+      "bytes": 203306,
+      "digest": 17103635714912045519
+    },
+    "dejavusanscondensed-bold-ttf": {
+      "packets": 6196,
+      "bytes": 200383,
+      "digest": 2319390691872673283
+    },
+    "dejavusanscondensed-boldoblique-ttf": {
+      "packets": 5413,
+      "bytes": 176983,
+      "digest": 14588666243297585396
+    },
+    "dejavusanscondensed-oblique-ttf": {
+      "packets": 5355,
+      "bytes": 179649,
+      "digest": 1243031651050896413
+    },
+    "dejavusanscondensed-ttf": {
+      "packets": 6253,
+      "bytes": 203306,
+      "digest": 2779859975410877834
+    },
+    "dejavusansmono-bold-ttf": {
+      "packets": 3316,
+      "bytes": 101584,
+      "digest": 2410026994598804115
+    },
+    "dejavusansmono-boldoblique-ttf": {
+      "packets": 2711,
+      "bytes": 75266,
+      "digest": 5991958708926248138
+    },
+    "dejavusansmono-oblique-ttf": {
+      "packets": 2710,
+      "bytes": 75934,
+      "digest": 10471416195930446321
+    },
+    "dejavusansmono-ttf": {
+      "packets": 3377,
+      "bytes": 103203,
+      "digest": 9769825901078445974
+    },
+    "dejavuserif-bold-ttf": {
+      "packets": 3506,
+      "bytes": 115333,
+      "digest": 9103799179613363073
+    },
+    "dejavuserif-bolditalic-ttf": {
+      "packets": 3506,
+      "bytes": 119739,
+      "digest": 1798193799746522940
+    },
+    "dejavuserif-italic-ttf": {
+      "packets": 3507,
+      "bytes": 126056,
+      "digest": 9955504979124747622
+    },
+    "dejavuserif-ttf": {
+      "packets": 3528,
+      "bytes": 121309,
+      "digest": 10228417030115808145
+    },
+    "dejavuserifcondensed-bold-ttf": {
+      "packets": 3506,
+      "bytes": 115333,
+      "digest": 7669434808076010395
+    },
+    "dejavuserifcondensed-bolditalic-ttf": {
+      "packets": 3506,
+      "bytes": 119739,
+      "digest": 7572254149715863736
+    },
+    "dejavuserifcondensed-italic-ttf": {
+      "packets": 3507,
+      "bytes": 126056,
+      "digest": 4246984277962491826
+    },
+    "dejavuserifcondensed-ttf": {
+      "packets": 3528,
+      "bytes": 121309,
+      "digest": 733519143408331419
+    },
+    "notosans-regular-ttf": {
+      "packets": 3884,
+      "bytes": 125881,
+      "digest": 4554330730983994021
+    },
+    "notosans-regular-otf": {
+      "packets": 3884,
+      "bytes": 123175,
+      "digest": 17817116569709896274
+    },
+    "notosans-bolditalic-otf": {
+      "packets": 3895,
+      "bytes": 129034,
+      "digest": 14909407415198777975
+    },
+    "notosansjp-regular-otf": {
+      "packets": 17936,
+      "bytes": 1644836,
+      "digest": 5702418080575360087
+    },
+    "notosansjp-vf-otf": {
+      "packets": 17936,
+      "bytes": 1531597,
+      "digest": 11745742285997239261
+    },
+    "notosanscjk-regular-ttc": {
+      "packets": 655350,
+      "bytes": 61565700,
+      "digest": 6734885075735437716
+    },
+    "notosansarabic-regular-ttf": {
+      "packets": 1399,
+      "bytes": 103505,
+      "digest": 3951235597813985239
+    },
+    "notonaskharabic-regular-ttf": {
+      "packets": 1415,
+      "bytes": 122228,
+      "digest": 7725456768296282139
+    },
+    "notosanshebrew-regular-ttf": {
+      "packets": 151,
+      "bytes": 3211,
+      "digest": 6504754710583037528
+    },
+    "notosansdevanagari-regular-ttf": {
+      "packets": 845,
+      "bytes": 37100,
+      "digest": 12607995756469081273
+    },
+    "notosansbengali-regular-ttf": {
+      "packets": 418,
+      "bytes": 17548,
+      "digest": 11895807627323811758
+    },
+    "notosanstamil-regular-ttf": {
+      "packets": 244,
+      "bytes": 14616,
+      "digest": 8166563080527147111
+    },
+    "notosansthai-regular-ttf": {
+      "packets": 140,
+      "bytes": 4597,
+      "digest": 11125366403979896317
+    },
+    "authored-cff-features-otf": {
+      "packets": 8,
+      "bytes": 83,
+      "digest": 13306317305592165626
+    },
+    "authored-cff-matrix-otf": {
+      "packets": 2,
+      "bytes": 4,
+      "digest": 7798923689045368348
+    },
+    "authored-cmap-formats-ttf": {
+      "packets": 4,
+      "bytes": 14,
+      "digest": 4582947697869803770
+    }
+  }
+}

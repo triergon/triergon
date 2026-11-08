@@ -1,5 +1,5 @@
 //! The differential harness: run the same operation through a Triergon worker
-//! and an FFmpeg reference worker, compare canonical output, and grade the
+//! and a reference worker (FFmpeg or FreeType), compare canonical output, and grade the
 //! results against the feature contract. Failures are recorded, never dropped.
 
 pub mod acceptance;
@@ -11,6 +11,7 @@ pub mod grade;
 pub mod linux;
 #[cfg(test)]
 mod linux_tests;
+pub mod manifest;
 pub mod memory;
 pub mod oracle;
 pub mod parity;

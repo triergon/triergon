@@ -228,31 +228,36 @@ composites) are
 
 - `cargo test -p triergon-font`: unit tests per table, faces built in memory
   (TrueType, CFF and a collection) and a deterministic mutation test over them.
-- `cargo xtask fonts compare` runs three harness features
-  (`harness/features/font-*`) on every file of the corpus in
-  `harness/fonts/corpus.json` through [`font-worker`](../font-worker/README.md) and
-  the FreeType 2.15.0 reference worker (`harness/reference_font.h`), and requires
+- Three harness features (`harness/features/font-*`) run every file of the corpus
+  in `harness/fonts/corpus.json` through [`font-worker`](../font-worker/README.md)
+  and the FreeType 2.15.0 reference worker (`harness/reference_font.h`), and require
   both to fold exactly what FreeType folds:
   - `font-outlines`, per face: metrics, style, family, style and PostScript names,
     every name record, every cmap mapping, the text charmap, the kerning of every
     pair the `kern` table lists, and for every glyph its `hmtx` and loaded advances
     and its unscaled outline in font units (`FT_LOAD_NO_SCALE`).
-  - `font-scaled`, per face at each of ten 26.6 heights, after libass's GDI face
-    metrics: 256 pixels (libass with hinting off) and 75, 82.5, 50, 48, 37.5,
-    33.75, 13.33, 24.5 and 8.4 (common ASS sizes on 1080- and 720-line frames,
-    below 25 pixels per em, and small). Each size folds the size metrics, ascent
-    and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline
-    and strikeout bands and the kerning of every listed pair; every glyph its
-    unhinted outline and advance, and that outline emboldened, slanted and both,
-    every point.
-  - `font-hinted`, at the same heights: every glyph's default-load advance. An
-    advance `hinted_advance` declares `Unsupported` ends the candidate's operation
-    with an error, so the case fails; it never counts as agreement.
+  - `font-hinting-none`, libass 0.17.5's default (ASS_HINTING_NONE) at 256 pixels
+    (16384 in 26.6), after libass's GDI face metrics, as two cases per file. The
+    outlines case folds the size metrics, ascent and descent, HarfBuzz scale,
+    emboldening strength, PostScript flag, underline and strikeout bands and the
+    kerning of every listed pair, and every glyph's unhinted outline and advance,
+    plain, emboldened, slanted and both, every point. The advances case folds every
+    glyph's default-load advance; one `hinted_advance` declares `Unsupported` ends
+    the candidate's operation with an error, so the case fails.
+  - `font-hinting-modes`, the same two cases at the nine other heights libass
+    requests with hinting on: 75, 82.5, 50, 48, 37.5, 33.75, 13.33, 24.5 and 8.4
+    pixels (common ASS sizes on 1080- and 720-line frames, below 25 pixels per em,
+    and small).
 
-  `cargo xtask report` runs each feature on its own and with `--benchmark` and
-  `--memory` measures runtime and memory against FreeType. `font-dump`,
-  `font-scaled-dump` and `font-hinted-dump` print the folded values as lines in
-  both workers, for diffing a failing case.
+  `cargo xtask check` requires `font-outlines` and `font-hinting-none`
+  (`cargo xtask fonts compare`); `font-hinting-modes` runs on demand
+  (`cargo xtask fonts compare --all`) and is not gated yet. `font-hinting-none`
+  lists its open cases, which `check` still runs and reports. The case rows are
+  generated (`cargo xtask fonts manifest`) and each case's expected work is pinned
+  from FreeType's output in `pins.json`. `cargo xtask report` runs each feature on
+  its own and with `--benchmark` and `--memory` measures runtime and memory
+  against FreeType. `font-dump` and `font-sized-dump` print the folded values as
+  lines in both workers, for diffing a failing case.
 - The corpus includes three fonts the crate's test support writes
   (`examples/authored-fonts.rs`): `seac`, the arithmetic, logic and storage operators,
   the flex forms, counter masks, subroutines nested twelve deep, curve operators with
@@ -261,12 +266,11 @@ composites) are
   comparison exercises every charstring operator except `vsindex` (CFF2 fonts in the
   corpus do not use it) and `random`, and every supported cmap format;
   `examples/font-coverage.rs` reports this.
-- `cargo xtask fonts fuzz` runs `examples/fuzz.rs`, which mutates every corpus file
-  with the mutator the mutation test uses and reads the results in the dev profile,
-  so overflow is checked as well, and fails on an input that runs past its timeout.
-  `cargo xtask fuzz --contract harness/features/font-outlines/contract.json` runs a
-  replayable campaign through the release and dev builds of the worker, with
-  `--reference` comparing each result with FreeType's.
+- `cargo xtask fuzz --contract harness/features/<feature>/contract.json` mutates
+  every case's file through the release and dev builds of the worker (the dev build
+  checks overflow), with a timeout per input, and with `--reference` compares each
+  result with FreeType's. `cargo xtask check` runs one round of it on a few cases
+  of each required feature.
 
 The comparison establishes agreement with FreeType on that corpus, not conformance
 with the OpenType specification. Face matching is checked by unit tests only.

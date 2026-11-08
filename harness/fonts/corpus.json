@@ -10,51 +10,63 @@
       "files": [
         {
           "path": "croscorefonts-1.31.0/Arimo-Bold.ttf",
-          "sha256": "3251104cea71aee741bb5ce63370b1e84b5f4326ecf4259db8889935eb01219b"
+          "sha256": "3251104cea71aee741bb5ce63370b1e84b5f4326ecf4259db8889935eb01219b",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Arimo-BoldItalic.ttf",
-          "sha256": "e78a9c639a5e4210d799acae0757ed8e8e6479ba1464682476a9873f71463244"
+          "sha256": "e78a9c639a5e4210d799acae0757ed8e8e6479ba1464682476a9873f71463244",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Arimo-Italic.ttf",
-          "sha256": "eb8498900d06aa4fbde30e1a539d1a04334fe9d380765f1dba01d5670d3cb2b0"
+          "sha256": "eb8498900d06aa4fbde30e1a539d1a04334fe9d380765f1dba01d5670d3cb2b0",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Arimo-Regular.ttf",
-          "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36"
+          "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Cousine-Bold.ttf",
-          "sha256": "d2a3e25eca9ffc368d8e86fbcf9986bf00bee3f8d7aeb86233fb1a9fde7a9b58"
+          "sha256": "d2a3e25eca9ffc368d8e86fbcf9986bf00bee3f8d7aeb86233fb1a9fde7a9b58",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Cousine-BoldItalic.ttf",
-          "sha256": "d2803caf15358e14144aa95ca9b364669cd6c6a9b4d5447926e7cd4b6be5d5b4"
+          "sha256": "d2803caf15358e14144aa95ca9b364669cd6c6a9b4d5447926e7cd4b6be5d5b4",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Cousine-Italic.ttf",
-          "sha256": "4338d67dc364f6655ae530294efc7e9a93adcec3a2f9524b219adb199c7c2f47"
+          "sha256": "4338d67dc364f6655ae530294efc7e9a93adcec3a2f9524b219adb199c7c2f47",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Cousine-Regular.ttf",
-          "sha256": "42184656557104572298db92c12f31ed5055304facd9af229125219f2f3e65ac"
+          "sha256": "42184656557104572298db92c12f31ed5055304facd9af229125219f2f3e65ac",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Tinos-Bold.ttf",
-          "sha256": "f28af65ead96dfa99af139e0d4932fde6c602154116c49dd4db9057e4cf1f1f0"
+          "sha256": "f28af65ead96dfa99af139e0d4932fde6c602154116c49dd4db9057e4cf1f1f0",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Tinos-BoldItalic.ttf",
-          "sha256": "c7ddcea49e5b84fb50df15b512a6422a4868bed5724312b3421749188cecdc2b"
+          "sha256": "c7ddcea49e5b84fb50df15b512a6422a4868bed5724312b3421749188cecdc2b",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Tinos-Italic.ttf",
-          "sha256": "e6a5bc3aa15fdcc9b8111be15f67d04e9834f415898fc1a85ef489a39eb75d03"
+          "sha256": "e6a5bc3aa15fdcc9b8111be15f67d04e9834f415898fc1a85ef489a39eb75d03",
+          "format": "truetype"
         },
         {
           "path": "croscorefonts-1.31.0/Tinos-Regular.ttf",
-          "sha256": "57c72d7e8aacdbbbb47a49e8005760cf1bdc82f6f5500c4c3fc72fdae67c7591"
+          "sha256": "57c72d7e8aacdbbbb47a49e8005760cf1bdc82f6f5500c4c3fc72fdae67c7591",
+          "format": "truetype"
         }
       ],
       "sha256": "672c3487883ec1ef83d9254240d4327b014212abc823d06d15816095867315e1"
@@ -67,91 +79,113 @@
       "files": [
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuMathTeXGyre.ttf",
-          "sha256": "40da67c0b6b03076504fbda4bf3e7b4f20b35999c98063019a3392fe9b1294fe"
+          "sha256": "40da67c0b6b03076504fbda4bf3e7b4f20b35999c98063019a3392fe9b1294fe",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSans-Bold.ttf",
-          "sha256": "e6476c1b80502924294eed40894c5b18e06c181444ca953e5334262df9c27724"
+          "sha256": "e6476c1b80502924294eed40894c5b18e06c181444ca953e5334262df9c27724",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSans-BoldOblique.ttf",
-          "sha256": "eb436dca0c2594b73d8b603b892e374fdfd8d885d25ffb4f18df4c4c0b49e50f"
+          "sha256": "eb436dca0c2594b73d8b603b892e374fdfd8d885d25ffb4f18df4c4c0b49e50f",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSans-ExtraLight.ttf",
-          "sha256": "6cb0746a1f68d176bebe83752cee35ebdf726cb1a1e88a01fc038ddf76de9ea8"
+          "sha256": "6cb0746a1f68d176bebe83752cee35ebdf726cb1a1e88a01fc038ddf76de9ea8",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSans-Oblique.ttf",
-          "sha256": "4af75fa16ee6d3ad43e1ecec41862c24954af26a55c6bb1ebb27bd486a50f5f4"
+          "sha256": "4af75fa16ee6d3ad43e1ecec41862c24954af26a55c6bb1ebb27bd486a50f5f4",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf",
-          "sha256": "7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954"
+          "sha256": "7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSansCondensed-Bold.ttf",
-          "sha256": "38098d0b8edd8430a0f53fb2831b5d36037563a998a620d3c87a4d7591766d20"
+          "sha256": "38098d0b8edd8430a0f53fb2831b5d36037563a998a620d3c87a4d7591766d20",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSansCondensed-BoldOblique.ttf",
-          "sha256": "43f9fd6b77edf174553cf94857c77c63de7ddb0c6751fd1390e73223518e128f"
+          "sha256": "43f9fd6b77edf174553cf94857c77c63de7ddb0c6751fd1390e73223518e128f",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSansCondensed-Oblique.ttf",
-          "sha256": "dc3526fa25fae4278c4e34b47d4c049b6923421c70921032a0db11bfe9c1b0cf"
+          "sha256": "dc3526fa25fae4278c4e34b47d4c049b6923421c70921032a0db11bfe9c1b0cf",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSansCondensed.ttf",
-          "sha256": "8550cd5ca1acb65a8fc7877c46939cd0b4d909f8e7bc1e24716873d918c5e549"
+          "sha256": "8550cd5ca1acb65a8fc7877c46939cd0b4d909f8e7bc1e24716873d918c5e549",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSansMono-Bold.ttf",
-          "sha256": "bce60f1b4421acd9ea51ba6623d7024ecbe6817a953e3654df62a5e6bdf8f769"
+          "sha256": "bce60f1b4421acd9ea51ba6623d7024ecbe6817a953e3654df62a5e6bdf8f769",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSansMono-BoldOblique.ttf",
-          "sha256": "91713a71d550bba22c2a6b2bb2a9ad8f9a159e12e4e9f0a5b2677998ba21213e"
+          "sha256": "91713a71d550bba22c2a6b2bb2a9ad8f9a159e12e4e9f0a5b2677998ba21213e",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSansMono-Oblique.ttf",
-          "sha256": "742097840c541870e8d6dc5c9b37bb1ceeea6c0dedd1d475faf903ef9df734b0"
+          "sha256": "742097840c541870e8d6dc5c9b37bb1ceeea6c0dedd1d475faf903ef9df734b0",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSansMono.ttf",
-          "sha256": "b4a6c3e4faab8773f4ff761d56451646409f29abedd68f05d38c2df667d3c582"
+          "sha256": "b4a6c3e4faab8773f4ff761d56451646409f29abedd68f05d38c2df667d3c582",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSerif-Bold.ttf",
-          "sha256": "c47b5527bcdc8dcf9ea8c77054454c5a884beaca2f44851a2a823ee639cbf07f"
+          "sha256": "c47b5527bcdc8dcf9ea8c77054454c5a884beaca2f44851a2a823ee639cbf07f",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSerif-BoldItalic.ttf",
-          "sha256": "8d3dd3d31350309042ed226af82b34539bd773518e6107cb352712853ba80308"
+          "sha256": "8d3dd3d31350309042ed226af82b34539bd773518e6107cb352712853ba80308",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSerif-Italic.ttf",
-          "sha256": "2e39b1d50f90b933b00c7bb54a96afd3f86419b3d717c7cf202e36f2d4973e47"
+          "sha256": "2e39b1d50f90b933b00c7bb54a96afd3f86419b3d717c7cf202e36f2d4973e47",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSerif.ttf",
-          "sha256": "42d1edeb7952f31b1f96d767ed7030b08a39e0c372b0071641518864e2bffb51"
+          "sha256": "42d1edeb7952f31b1f96d767ed7030b08a39e0c372b0071641518864e2bffb51",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSerifCondensed-Bold.ttf",
-          "sha256": "e09aa87c60c3e8de7f4e6c7bfeec8fd9489b6cd975e3033259bca3d6009aed18"
+          "sha256": "e09aa87c60c3e8de7f4e6c7bfeec8fd9489b6cd975e3033259bca3d6009aed18",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSerifCondensed-BoldItalic.ttf",
-          "sha256": "4cfc5a3700c72413f51c4bb54f09617401a0a63eccb9ff577713e20afa047fa5"
+          "sha256": "4cfc5a3700c72413f51c4bb54f09617401a0a63eccb9ff577713e20afa047fa5",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSerifCondensed-Italic.ttf",
-          "sha256": "dfe5bf5336d62ca71de419cccf7fd18ab19a57245dc392891ee76347129807e1"
+          "sha256": "dfe5bf5336d62ca71de419cccf7fd18ab19a57245dc392891ee76347129807e1",
+          "format": "truetype"
         },
         {
           "path": "dejavu-fonts-ttf-2.37/ttf/DejaVuSerifCondensed.ttf",
-          "sha256": "685dcdfb8daf32a453d3426a4eb8d881c72146ddd999229354fb757511357995"
+          "sha256": "685dcdfb8daf32a453d3426a4eb8d881c72146ddd999229354fb757511357995",
+          "format": "truetype"
         }
       ],
       "sha256": "fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e846e17d7"
@@ -164,7 +198,8 @@
       "files": [
         {
           "path": "NotoSans-Regular.ttf",
-          "sha256": "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823"
+          "sha256": "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823",
+          "format": "truetype"
         }
       ],
       "sha256": "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823"
@@ -177,7 +212,8 @@
       "files": [
         {
           "path": "NotoSans-Regular.otf",
-          "sha256": "bfb44de2c2031c391ff856943fe8f105ebb5d725cb9a04d493d211d5bbd5c21b"
+          "sha256": "bfb44de2c2031c391ff856943fe8f105ebb5d725cb9a04d493d211d5bbd5c21b",
+          "format": "cff"
         }
       ],
       "sha256": "bfb44de2c2031c391ff856943fe8f105ebb5d725cb9a04d493d211d5bbd5c21b"
@@ -190,7 +226,8 @@
       "files": [
         {
           "path": "NotoSans-BoldItalic.otf",
-          "sha256": "858515544374e4ac6ddc8fe80aa7dcf6cce9d0ca3c7c45fd3ac9e250a9d815d4"
+          "sha256": "858515544374e4ac6ddc8fe80aa7dcf6cce9d0ca3c7c45fd3ac9e250a9d815d4",
+          "format": "cff"
         }
       ],
       "sha256": "858515544374e4ac6ddc8fe80aa7dcf6cce9d0ca3c7c45fd3ac9e250a9d815d4"
@@ -203,7 +240,8 @@
       "files": [
         {
           "path": "NotoSansJP-Regular.otf",
-          "sha256": "dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073"
+          "sha256": "dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073",
+          "format": "cff-cid"
         }
       ],
       "sha256": "dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073"
@@ -216,7 +254,8 @@
       "files": [
         {
           "path": "NotoSansJP-VF.otf",
-          "sha256": "85e5ef353081175fb9f764f037c550dd4b5ad913cb030c0de98a5d4d4018014b"
+          "sha256": "85e5ef353081175fb9f764f037c550dd4b5ad913cb030c0de98a5d4d4018014b",
+          "format": "cff2"
         }
       ],
       "sha256": "85e5ef353081175fb9f764f037c550dd4b5ad913cb030c0de98a5d4d4018014b"
@@ -229,7 +268,8 @@
       "files": [
         {
           "path": "NotoSansCJK-Regular.ttc",
-          "sha256": "b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a"
+          "sha256": "b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a",
+          "format": "collection"
         }
       ],
       "sha256": "b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a"
@@ -242,7 +282,8 @@
       "files": [
         {
           "path": "NotoSansArabic-Regular.ttf",
-          "sha256": "bdff3e5659d67e67def05b33f749683b9376ae819d65d3dd62ac4640b3aaef48"
+          "sha256": "bdff3e5659d67e67def05b33f749683b9376ae819d65d3dd62ac4640b3aaef48",
+          "format": "truetype"
         }
       ],
       "sha256": "bdff3e5659d67e67def05b33f749683b9376ae819d65d3dd62ac4640b3aaef48"
@@ -255,7 +296,8 @@
       "files": [
         {
           "path": "NotoNaskhArabic-Regular.ttf",
-          "sha256": "6f0a92031367b2f5a2078fe9d24f3433122b61a0bad57c423aad8f3c39aa2e6e"
+          "sha256": "6f0a92031367b2f5a2078fe9d24f3433122b61a0bad57c423aad8f3c39aa2e6e",
+          "format": "truetype"
         }
       ],
       "sha256": "6f0a92031367b2f5a2078fe9d24f3433122b61a0bad57c423aad8f3c39aa2e6e"
@@ -268,7 +310,8 @@
       "files": [
         {
           "path": "NotoSansHebrew-Regular.ttf",
-          "sha256": "cdefaf8efd47045f6820928eba84db5bed7557539328952b5f828315485e02ee"
+          "sha256": "cdefaf8efd47045f6820928eba84db5bed7557539328952b5f828315485e02ee",
+          "format": "truetype"
         }
       ],
       "sha256": "cdefaf8efd47045f6820928eba84db5bed7557539328952b5f828315485e02ee"
@@ -281,7 +324,8 @@
       "files": [
         {
           "path": "NotoSansDevanagari-Regular.ttf",
-          "sha256": "4e3c66638958c3e2ab5d37f47a8deb89fffeb7be9985c665a519bbc7ba762313"
+          "sha256": "4e3c66638958c3e2ab5d37f47a8deb89fffeb7be9985c665a519bbc7ba762313",
+          "format": "truetype"
         }
       ],
       "sha256": "4e3c66638958c3e2ab5d37f47a8deb89fffeb7be9985c665a519bbc7ba762313"
@@ -294,7 +338,8 @@
       "files": [
         {
           "path": "NotoSansBengali-Regular.ttf",
-          "sha256": "b55c62ee531e3214da6c0701daecea89a52ba42db7d8206b92e6b51f397a3193"
+          "sha256": "b55c62ee531e3214da6c0701daecea89a52ba42db7d8206b92e6b51f397a3193",
+          "format": "truetype"
         }
       ],
       "sha256": "b55c62ee531e3214da6c0701daecea89a52ba42db7d8206b92e6b51f397a3193"
@@ -307,7 +352,8 @@
       "files": [
         {
           "path": "NotoSansTamil-Regular.ttf",
-          "sha256": "3c0a186feb3c63c7f6d63e1511dcdc144e745ae09b98e217c83f3e317974f6f9"
+          "sha256": "3c0a186feb3c63c7f6d63e1511dcdc144e745ae09b98e217c83f3e317974f6f9",
+          "format": "truetype"
         }
       ],
       "sha256": "3c0a186feb3c63c7f6d63e1511dcdc144e745ae09b98e217c83f3e317974f6f9"
@@ -320,7 +366,8 @@
       "files": [
         {
           "path": "NotoSansThai-Regular.ttf",
-          "sha256": "61cf814eec46b294d6ea4401ac295d0cecd5207bd2331dcc5a15e7301d30ee44"
+          "sha256": "61cf814eec46b294d6ea4401ac295d0cecd5207bd2331dcc5a15e7301d30ee44",
+          "format": "truetype"
         }
       ],
       "sha256": "61cf814eec46b294d6ea4401ac295d0cecd5207bd2331dcc5a15e7301d30ee44"
@@ -333,15 +380,18 @@
       "files": [
         {
           "path": "authored/authored-cff-features.otf",
-          "sha256": "41e3eb12412361b03872524031ae3f7a704b74d9e913e8c5e5ef0c39a163cb9a"
+          "sha256": "41e3eb12412361b03872524031ae3f7a704b74d9e913e8c5e5ef0c39a163cb9a",
+          "format": "cff"
         },
         {
           "path": "authored/authored-cff-matrix.otf",
-          "sha256": "5c85f989188339917965276d808a371ded5dc1808e530864ccddd0655b8297b8"
+          "sha256": "5c85f989188339917965276d808a371ded5dc1808e530864ccddd0655b8297b8",
+          "format": "cff"
         },
         {
           "path": "authored/authored-cmap-formats.ttf",
-          "sha256": "2dd8238413923c033680f98577fa797658f17f2e00908bdd8070647a3cb9486c"
+          "sha256": "2dd8238413923c033680f98577fa797658f17f2e00908bdd8070647a3cb9486c",
+          "format": "truetype"
         }
       ]
     }

@@ -288,7 +288,7 @@ impl PrefixFeature {
                 .ok_or_else(|| format!("{}: no {key}", contract.display()))
         };
         let id = text("id")?;
-        let listing = read_json(manifest)?;
+        let (listing, _) = super::manifest::read(root, manifest)?;
         let corpus = match corpus {
             Some(corpus) => corpus.to_path_buf(),
             None => recorded_corpus(root, &listing).ok_or_else(|| {
@@ -420,6 +420,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         return Err("qualification iterations do not match the contract".into());
     }
     let contract_sha = digest(&options.contract)?;
+    let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
+    let open = open_cases(&contract, &manifest)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
@@ -450,10 +452,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             "contract_id",
             contract.get("id").cloned().unwrap_or(Value::Null),
         ),
-        (
-            "corpus_manifest_sha256",
-            Value::str(digest(&options.manifest)?),
-        ),
+        ("corpus_manifest_sha256", Value::str(&manifest_sha)),
         (
             "environment",
             Value::object([
@@ -471,7 +470,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         .map_err(|e| format!("{}: {e}", options.corpus.display()))?;
     let reviewed = reviewed_inputs(root)?;
     let mut rows: Vec<Value> = Vec::new();
-    for case in read_json(&options.manifest)?
+    for case in manifest
         .get("cases")
         .and_then(Value::as_array)
         .unwrap_or_default()
@@ -693,16 +692,81 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     if (options.require_slice_acceptance && !slice) || (options.require_acceptance && !accepted) {
         return Ok(2);
     }
-    let all_pass = !rows.is_empty()
-        && rows
-            .iter()
-            .all(|r| r.get("parity").and_then(|p| s(p, "status")) == Some("pass"));
-    Ok(i32::from(!all_pass))
+    Ok(i32::from(!ratchet(&label, &rows, &open)))
+}
+
+/// A contract's `open_cases`: case ids that fail today, each tied to one of its
+/// `pending_module_requirements`. Every id must be a case of the manifest.
+fn open_cases(contract: &Value, manifest: &Value) -> Result<Vec<String>, String> {
+    let list = |value: &Value, key: &str| -> Vec<Value> {
+        value
+            .get(key)
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+            .to_vec()
+    };
+    let pending = list(contract, "pending_module_requirements");
+    let cases = list(manifest, "cases");
+    let mut open = Vec::new();
+    for entry in list(contract, "open_cases") {
+        let (Some(id), Some(requirement)) = (s(&entry, "id"), entry.get("requirement")) else {
+            return Err("an open case needs an id and a requirement".into());
+        };
+        if !pending.contains(requirement) {
+            return Err(format!("open case {id}: its requirement is not pending"));
+        }
+        if !cases.iter().any(|case| s(case, "id") == Some(id)) {
+            return Err(format!("open case {id}: not a case of the manifest"));
+        }
+        open.push(id.to_owned());
+    }
+    Ok(open)
+}
+
+/// Prints how many cases pass and which listed open cases still fail. Holds when
+/// every other case passes and every open case still fails: a listed case that
+/// starts to pass must leave the list, so the list only shrinks.
+fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
+    let passed = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("pass");
+    let listed = |row: &Value| open.iter().any(|id| s(row, "id") == Some(id));
+    let ids = |keep: &dyn Fn(&Value) -> bool| -> Vec<&str> {
+        rows.iter()
+            .filter(|row| keep(row))
+            .filter_map(|row| s(row, "id"))
+            .collect()
+    };
+    let failing = ids(&|row| !passed(row) && !listed(row));
+    let still_open = ids(&|row| !passed(row) && listed(row));
+    let closed = ids(&|row| passed(row) && listed(row));
+    println!(
+        "{label}: {} of {} cases pass",
+        rows.iter().filter(|row| passed(row)).count(),
+        rows.len()
+    );
+    if !still_open.is_empty() {
+        println!(
+            "{label}: {} open failures, as listed: {}",
+            still_open.len(),
+            still_open.join(", ")
+        );
+    }
+    if !failing.is_empty() {
+        println!("{label}: failing: {}", failing.join(", "));
+    }
+    if !closed.is_empty() {
+        println!(
+            "{label}: listed open cases now pass; remove them from open_cases: {}",
+            closed.join(", ")
+        );
+    }
+    !rows.is_empty() && failing.is_empty() && closed.is_empty()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{PrefixFeature, recorded_corpus, reviewed_inputs, rights_reviewed};
+    use super::{
+        PrefixFeature, open_cases, ratchet, recorded_corpus, reviewed_inputs, rights_reviewed,
+    };
     use crate::json::{Value, parse};
     use std::path::Path;
 
@@ -744,9 +808,9 @@ mod tests {
         assert_eq!(
             found,
             [
-                ("font-hinted", "font-hinted-", 500),
+                ("font-hinting-modes", "font-sized-", 900),
+                ("font-hinting-none", "font-sized-", 100),
                 ("font-outlines", "font-", 50),
-                ("font-scaled", "font-scaled-", 500),
             ]
         );
         let reviewed = reviewed_inputs(root).unwrap();
@@ -765,5 +829,45 @@ mod tests {
                 .is_err()
         );
         assert_eq!(recorded_corpus(root, &Value::Object(vec![])), None);
+    }
+
+    #[test]
+    fn open_cases_only_shrink() {
+        let rows = |pass: &[(&str, bool)]| -> Vec<Value> {
+            pass.iter()
+                .map(|(id, ok)| {
+                    let status = if *ok { "pass" } else { "mismatch" };
+                    parse(&format!(
+                        r#"{{"id": "{id}", "parity": {{"status": "{status}"}}}}"#
+                    ))
+                    .unwrap()
+                })
+                .collect()
+        };
+        let open = vec!["b".to_owned()];
+        assert!(ratchet("f", &rows(&[("a", true), ("b", false)]), &open));
+        assert!(
+            !ratchet("f", &rows(&[("a", false), ("b", false)]), &open),
+            "unlisted failure"
+        );
+        assert!(
+            !ratchet("f", &rows(&[("a", true), ("b", true)]), &open),
+            "listed case passes"
+        );
+        assert!(ratchet("f", &rows(&[("a", true)]), &[]));
+        let contract = |requirement: &str| {
+            parse(&format!(
+                r#"{{"pending_module_requirements": ["x"], "open_cases": [{{"id": "b", "requirement": "{requirement}"}}]}}"#
+            ))
+            .unwrap()
+        };
+        let manifest = parse(r#"{"cases": [{"id": "a"}, {"id": "b"}]}"#).unwrap();
+        assert_eq!(open_cases(&contract("x"), &manifest).unwrap(), open);
+        assert!(
+            open_cases(&contract("y"), &manifest).is_err(),
+            "requirement not pending"
+        );
+        let other = parse(r#"{"cases": [{"id": "a"}]}"#).unwrap();
+        assert!(open_cases(&contract("x"), &other).is_err(), "unknown case");
     }
 }

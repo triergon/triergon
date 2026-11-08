@@ -16,10 +16,11 @@ use triergon_font::{Font, GlyphId, Limits, NameRecord, Outline, SizedFont, Synth
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 const MAX_INPUT: u64 = 64 << 20;
-const USAGE: &str =
-    "usage: font-worker OPERATION-fold FILE [HEIGHT] | OPERATION-bench FILE ITERATIONS [HEIGHT]
-       | OPERATION-memory FILE [HEIGHT] | OPERATION-dump FILE [HEIGHT]
-  OPERATION is font (no HEIGHT), font-scaled or font-hinted (HEIGHT in 26.6 pixels)";
+const USAGE: &str = "usage: font-worker OPERATION-fold FILE [MODE HEIGHT]
+       | OPERATION-bench FILE ITERATIONS [MODE HEIGHT]
+       | OPERATION-memory FILE [MODE HEIGHT] | OPERATION-dump FILE [MODE HEIGHT]
+  OPERATION is font (no MODE or HEIGHT) or font-sized, with MODE outlines or advances
+  and HEIGHT in 26.6 pixels";
 
 /// What one operation reads from every face.
 #[derive(Clone, Copy)]
@@ -37,8 +38,8 @@ impl Operation {
     const fn name(self) -> &'static str {
         match self {
             Self::Faces => "font-outlines",
-            Self::Scaled(_) => "font-scaled",
-            Self::Hinted(_) => "font-hinted",
+            Self::Scaled(_) => "font-sized-outlines",
+            Self::Hinted(_) => "font-sized-advances",
         }
     }
 }
@@ -267,8 +268,8 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
     let (path, arguments) = rest;
     let operation = match (operation, arguments) {
         ("font", []) => Operation::Faces,
-        ("font-scaled", [height]) => Operation::Scaled(height.parse()?),
-        ("font-hinted", [height]) => Operation::Hinted(height.parse()?),
+        ("font-sized", [mode, height]) if mode == "outlines" => Operation::Scaled(height.parse()?),
+        ("font-sized", [mode, height]) if mode == "advances" => Operation::Hinted(height.parse()?),
         _ => return Err(USAGE.into()),
     };
     Ok((action, operation, path))

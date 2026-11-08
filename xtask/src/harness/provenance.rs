@@ -65,14 +65,18 @@ pub fn matroska_inputs() -> Vec<String> {
         "matroska-segment-metadata",
         "matroska-startup-seek",
         "hls-segments",
-        "font-outlines",
-        "font-scaled",
-        "font-hinted",
     ] {
         for file in ["contract", "corpus"] {
             names.push(format!("harness/features/{feature}/{file}.json"));
         }
     }
+    // Features whose manifests are generated from their pins and the font corpus.
+    for feature in crate::fonts::FEATURES {
+        for file in ["contract", "pins"] {
+            names.push(format!("harness/features/{}/{file}.json", feature.id));
+        }
+    }
+    names.extend(crate::fonts::ROW_SOURCES.map(String::from));
     names
 }
 

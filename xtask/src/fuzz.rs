@@ -619,8 +619,8 @@ pub struct Feature {
     pub manifest: PathBuf,
     /// The corpus directory, when the manifest records none or another is wanted.
     pub corpus: Option<PathBuf>,
-    /// Only the cases whose id contains this text.
-    pub cases: Option<String>,
+    /// Only the cases whose id contains one of these texts; every case when empty.
+    pub cases: Vec<String>,
     /// Also run the feature's reference, for differential observations.
     pub reference: bool,
 }
@@ -677,17 +677,35 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
             Value::object(roles.iter().map(|(role, _)| (*role, argv.clone()))),
         ),
     ]);
-    let ok = Value::object([(
-        "fold",
-        Value::object(roles.iter().map(|(role, _)| (*role, Value::str("ok")))),
-    )]);
+    // A listed open case is one the candidate fails today: its builds reject it.
+    let open: Vec<String> = crate::checks::read_json(&feature.contract)?
+        .get("open_cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|entry| s(entry, "id").map(str::to_owned))
+        .collect();
+    let baseline = |id: &str| {
+        let outcome = |role: &str| {
+            if role != "reference" && open.iter().any(|o| o == id) {
+                "rejected"
+            } else {
+                "ok"
+            }
+        };
+        Value::object([(
+            "fold",
+            Value::object(
+                roles
+                    .iter()
+                    .map(|(role, _)| (*role, Value::str(outcome(role)))),
+            ),
+        )])
+    };
     let (mut seeds, mut largest) = (Vec::new(), 0);
     for case in &lane.cases {
         let id = s(case, "id").unwrap_or_default();
-        if feature
-            .cases
-            .as_deref()
-            .is_some_and(|text| !id.contains(text))
+        if !feature.cases.is_empty() && !feature.cases.iter().any(|text| id.contains(text.as_str()))
         {
             continue;
         }
@@ -710,15 +728,17 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
                         .map(|a| a.to_string_lossy().into_owned()),
                 ),
             ),
-            ("baseline_statuses", ok.clone()),
+            ("baseline_statuses", baseline(id)),
         ]));
     }
     if seeds.is_empty() {
         return Err(format!("{}: no case selected", lane.id));
     }
-    let sources = [&lane.contract, &lane.manifest]
+    let mut files = vec![lane.contract.clone()];
+    files.extend(crate::harness::manifest::sources(root, &lane.manifest));
+    let sources = files
+        .iter()
         .map(|path| Ok((relative(path), Value::str(sha(path)?))))
-        .into_iter()
         .collect::<R<Vec<_>>>()?;
     let manifest = Value::object([
         ("schema", Value::int(1)),

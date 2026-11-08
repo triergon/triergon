@@ -992,7 +992,7 @@ impl Rng {
 }
 
 /// One of four edits, chosen by `round`: bit flips, a truncation, an overwritten
-/// burst, or a removed range. The fuzz example and the mutation test share it.
+/// burst, or a removed range, for the mutation test.
 pub fn mutate(data: &mut Vec<u8>, rng: &mut Rng, round: usize) {
     if data.is_empty() {
         return;
