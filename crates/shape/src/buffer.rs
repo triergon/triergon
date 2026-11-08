@@ -1098,3 +1098,29 @@ fn reserve<T>(vec: &mut BudgetVec<T>, len: usize) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Buffer, Limits};
+    use triergon_core::{Budget, Error};
+
+    #[test]
+    fn the_buffer_holds_at_most_its_limit_of_glyphs() {
+        let budget = Budget::new(1 << 20).expect("budget");
+        let limits = Limits {
+            glyphs_per_char: 2,
+            minimum_glyphs: 0,
+            ..Limits::default()
+        };
+        let mut buffer = Buffer::with_limits(&budget, limits);
+        buffer.load(&['a', 'b'], 0..2).expect("load");
+        buffer.clear_output();
+        for glyph in 0..4 {
+            buffer.output_glyph(glyph).expect("within the limit");
+        }
+        assert_eq!(
+            buffer.output_glyph(4),
+            Err(Error::Policy("glyphs in the buffer"))
+        );
+    }
+}
