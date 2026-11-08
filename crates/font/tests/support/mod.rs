@@ -305,93 +305,498 @@ fn n(value: i16) -> u8 {
     (value + 139) as u8
 }
 
+/// A CFF number written as a real (TN 5176 Table 5), from its decimal text.
+fn real(text: &str) -> Vec<u8> {
+    let mut nibbles: Vec<u8> = Vec::new();
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        nibbles.push(match c {
+            '0'..='9' => c as u8 - b'0',
+            '.' => 0xa,
+            'E' if chars.peek() == Some(&'-') => {
+                chars.next();
+                0xc
+            }
+            'E' => 0xb,
+            '-' => 0xe,
+            _ => panic!("not a real: {text}"),
+        });
+    }
+    nibbles.push(0xf);
+    if nibbles.len() % 2 == 1 {
+        nibbles.push(0xf);
+    }
+    let mut out = vec![30];
+    out.extend(nibbles.chunks(2).map(|pair| pair[0] << 4 | pair[1]));
+    out
+}
+
+/// The parts of a name-keyed CFF table.
+pub struct CffProgram {
+    pub glyphs: Vec<Vec<u8>>,
+    pub global: Vec<Vec<u8>>,
+    pub local: Vec<Vec<u8>>,
+    /// The SID of each glyph after .notdef, as a format 0 charset; the ISOAdobe
+    /// charset when absent.
+    pub charset: Option<Vec<u16>>,
+    /// FontMatrix entries as decimal text.
+    pub matrix: Option<[&'static str; 6]>,
+    pub nominal_width: i32,
+}
+
+impl CffProgram {
+    /// The CFF table. Offsets use the five-byte integer form, so the layout is
+    /// computed once with placeholders and once for real.
+    pub fn build(&self) -> Vec<u8> {
+        let private = |subrs: i32| {
+            let mut p = long(self.nominal_width);
+            p.push(21); // nominalWidthX
+            if !self.local.is_empty() {
+                p.extend(long(subrs));
+                p.push(19); // Subrs, relative to the Private DICT
+            }
+            p
+        };
+        let private_len = private(0).len();
+        let top = |charstrings: i32, charset: i32, private_offset: i32| {
+            let mut t = long(charstrings);
+            t.push(17);
+            if self.charset.is_some() {
+                t.extend(long(charset));
+                t.push(15);
+            }
+            if let Some(matrix) = self.matrix {
+                for value in matrix {
+                    t.extend(real(value));
+                }
+                t.extend([12, 7]);
+            }
+            t.extend(long(private_len as i32));
+            t.extend(long(private_offset));
+            t.push(18);
+            t
+        };
+        let charset = self.charset.as_ref().map(|sids| {
+            let mut c = vec![0];
+            c.extend(u16s(sids));
+            c
+        });
+        let header = vec![1, 0, 4, 4];
+        let names = index(&[b"Test".to_vec()]);
+        let top_len = index(&[top(0, 0, 0)]).len();
+        let strings = index(&[]);
+        let global = index(&self.global);
+        let charstrings_at = header.len() + names.len() + top_len + strings.len() + global.len();
+        let charstrings = index(&self.glyphs);
+        let charset_at = charstrings_at + charstrings.len();
+        let private_at = charset_at + charset.as_ref().map_or(0, Vec::len);
+        let mut out = header;
+        out.extend(names);
+        out.extend(index(&[top(
+            charstrings_at as i32,
+            charset_at as i32,
+            private_at as i32,
+        )]));
+        out.extend(strings);
+        out.extend(global);
+        out.extend(charstrings);
+        out.extend(charset.unwrap_or_default());
+        out.extend(private(private_len as i32));
+        if !self.local.is_empty() {
+            out.extend(index(&self.local));
+        }
+        out
+    }
+}
+
 /// A CFF table: glyph 1 a square drawn with a width, hints, a hintmask and a local
 /// subroutine; glyph 2 a curve through a global subroutine and a flex.
 pub fn cff_table() -> Vec<u8> {
-    // Local subr 0 (biased -107): vlineto 100; return.
-    let local = vec![vec![n(100), 7, 11]];
-    // Global subr 0: rrcurveto 10 20 30 0 20 -20; return.
-    let global = vec![vec![n(10), n(20), n(30), n(0), n(20), n(-20), 8, 11]];
+    CffProgram {
+        // Local subr 0 (biased -107): vlineto 100; return.
+        local: vec![vec![n(100), 7, 11]],
+        // Global subr 0: rrcurveto 10 20 30 0 20 -20; return.
+        global: vec![vec![n(10), n(20), n(30), n(0), n(20), n(-20), 8, 11]],
+        glyphs: vec![
+            vec![14],
+            // width 10 (nominal 400), hstem 0 20, vstem 0 20, hintmask, rmoveto 50 0,
+            // hlineto 100, callsubr -107, hlineto -100, endchar.
+            vec![
+                n(10),
+                n(0),
+                n(20),
+                1,
+                n(0),
+                n(20),
+                3,
+                19,
+                0xc0,
+                n(50),
+                n(0),
+                21,
+                n(100),
+                6,
+                n(-107),
+                10,
+                n(-100),
+                6,
+                14,
+            ],
+            // rmoveto 0 0, callgsubr -107, rlineto 0 0 (dropped), hflex, endchar.
+            vec![
+                n(0),
+                n(0),
+                21,
+                n(-107),
+                29,
+                n(0),
+                n(0),
+                5,
+                n(10),
+                n(5),
+                n(5),
+                n(10),
+                n(10),
+                n(5),
+                n(10),
+                12,
+                34,
+                14,
+            ],
+        ],
+        charset: None,
+        matrix: None,
+        nominal_width: 400,
+    }
+    .build()
+}
+
+/// A two-byte charstring number (108..=1131 or -1131..=-108), or one byte inside
+/// -107..=107.
+pub fn number(value: i16) -> Vec<u8> {
+    match value {
+        -107..=107 => vec![n(value)],
+        108..=1131 => {
+            let v = value - 108;
+            vec![(v / 256 + 247) as u8, (v % 256) as u8]
+        }
+        -1131..=-108 => {
+            let v = -value - 108;
+            vec![(v / 256 + 251) as u8, (v % 256) as u8]
+        }
+        _ => {
+            let mut b = vec![28];
+            b.extend(value.to_be_bytes());
+            b
+        }
+    }
+}
+
+/// A charstring from numbers and operator bytes.
+fn charstring(parts: &[Part]) -> Vec<u8> {
+    parts
+        .iter()
+        .flat_map(|part| match *part {
+            Part::N(v) => number(v),
+            Part::Op(op) => vec![op],
+            Part::Escape(op) => vec![12, op],
+        })
+        .collect()
+}
+
+/// One element of an authored charstring.
+#[derive(Clone, Copy)]
+enum Part {
+    N(i16),
+    Op(u8),
+    Escape(u8),
+}
+
+/// A CFF face exercising `seac`, arithmetic (`div`, `mul`, `add`, `sub`, `neg`,
+/// `abs`, `exch`, `dup`, `index`, `roll`, `put`, `get`, `ifelse`) and subroutines
+/// nested twelve deep, past TN 5177's ten. Glyphs: .notdef, A, acute, D (A with an
+/// acute through `seac`), B (arithmetic), C (nested calls).
+fn cff_features_tables() -> Tables {
+    use Part::{Escape as E, N, Op};
     let glyphs = vec![
-        vec![14],
-        // width 10 (nominal 400), hstem 0 20, vstem 0 20, hintmask, rmoveto 50 0,
-        // hlineto 100, callsubr -107, hlineto -100, endchar.
-        vec![
-            n(10),
-            n(0),
-            n(20),
-            1,
-            n(0),
-            n(20),
-            3,
-            19,
-            0xc0,
-            n(50),
-            n(0),
-            21,
-            n(100),
-            6,
-            n(-107),
-            10,
-            n(-100),
-            6,
-            14,
-        ],
-        // rmoveto 0 0, callgsubr -107, rlineto 0 0 (dropped), hflex, endchar.
-        vec![
-            n(0),
-            n(0),
-            21,
-            n(-107),
-            29,
-            n(0),
-            n(0),
-            5,
-            n(10),
-            n(5),
-            n(5),
-            n(10),
-            n(10),
-            n(5),
-            n(10),
-            12,
-            34,
-            14,
-        ],
+        charstring(&[Op(14)]),
+        // A: width 600; a triangle.
+        charstring(&[
+            N(100),
+            N(100),
+            N(0),
+            Op(21),
+            N(200),
+            N(600),
+            N(200),
+            N(-600),
+            Op(5),
+            Op(14),
+        ]),
+        // acute: a quadrilateral above.
+        charstring(&[
+            N(250),
+            N(650),
+            Op(21),
+            N(100),
+            N(100),
+            N(-150),
+            N(0),
+            Op(5),
+            Op(14),
+        ]),
+        // D: seac with the acute offset by (50, 20): adx ady bchar achar.
+        charstring(&[N(50), N(20), N(65), N(194), Op(14)]),
+        // B: coordinates from arithmetic.
+        charstring(&[
+            N(100),
+            N(100),
+            Op(21),
+            N(600),
+            N(4),
+            E(12),
+            N(0),
+            Op(5), // 600/4 = 150
+            N(100),
+            N(3),
+            E(12),
+            N(50),
+            Op(5), // 33.33.., 50
+            N(7),
+            N(-9),
+            E(24),
+            E(9),
+            N(5),
+            E(14),
+            E(10),
+            N(0),
+            E(28),
+            Op(5), // |7*-9| + -5, exch
+            N(10),
+            E(27),
+            E(10),
+            N(-20),
+            Op(5), // dup add: 20, -20
+            N(3),
+            N(0),
+            E(20),
+            N(0),
+            E(21),
+            N(2),
+            N(1),
+            N(4),
+            N(3),
+            E(22),
+            N(9),
+            E(11),
+            Op(5), // put/get/ifelse/sub
+            N(11),
+            N(22),
+            N(33),
+            N(3),
+            N(1),
+            E(30),
+            N(1),
+            E(29),
+            E(18),
+            E(18),
+            Op(5), // roll, index, drop
+            Op(14),
+        ]),
+        // C: twelve nested local subroutines, each drawing a line after its call.
+        charstring(&[N(100), N(100), Op(21), N(-107), Op(10), Op(14)]),
     ];
-    let private = |subrs: i32| {
-        let mut p = long(400);
-        p.push(21); // nominalWidthX
-        p.extend(long(subrs));
-        p.push(19);
-        p
+    // Local subroutines 0..12: subr k calls subr k + 1, then draws; the last draws.
+    let mut local: Vec<Vec<u8>> = (0..12)
+        .map(|k| charstring(&[N(k + 1 - 107), Op(10), N(10), N(20), Op(5), Op(11)]))
+        .collect();
+    local.push(charstring(&[N(50), N(0), Op(5), Op(11)]));
+    let program = CffProgram {
+        glyphs,
+        global: Vec::new(),
+        local,
+        // A, acute, D, B, C as standard strings.
+        charset: Some(vec![34, 125, 37, 35, 36]),
+        matrix: None,
+        nominal_width: 500,
     };
-    let private_len = private(0).len();
-    let top = |charstrings: i32, private_offset: i32| {
-        let mut t = long(charstrings);
-        t.push(17);
-        t.extend(long(private_len as i32));
-        t.extend(long(private_offset));
-        t.push(18);
+    vec![
+        (*b"head", head(1000, false, 0)),
+        (*b"hhea", hhea(6)),
+        (*b"maxp", maxp(6)),
+        (*b"OS/2", os2(400, 0x40)),
+        (
+            *b"hmtx",
+            hmtx(&[
+                (500, 0),
+                (600, 100),
+                (500, 250),
+                (600, 100),
+                (700, 100),
+                (700, 100),
+            ]),
+        ),
+        (
+            *b"cmap",
+            cmap(&[(0x41, 1), (0x42, 4), (0x43, 5), (0x44, 3), (0xb4, 2)]),
+        ),
+        (
+            *b"name",
+            name(&[
+                (1, "Authored CFF"),
+                (2, "Regular"),
+                (4, "Authored CFF Regular"),
+                (6, "AuthoredCFF-Regular"),
+            ]),
+        ),
+        (*b"CFF ", program.build()),
+    ]
+}
+
+/// A CFF face whose FontMatrix slants and halves its glyphs (2000 units per em).
+fn cff_matrix_tables() -> Tables {
+    use Part::{N, Op};
+    let square = charstring(&[
+        N(100),
+        N(100),
+        Op(21),
+        N(500),
+        Op(6),
+        N(500),
+        Op(7),
+        N(-500),
+        Op(6),
+        Op(14),
+    ]);
+    let program = CffProgram {
+        glyphs: vec![charstring(&[Op(14)]), square],
+        global: Vec::new(),
+        local: Vec::new(),
+        charset: None,
+        matrix: Some(["0.0005", "0", "0.0001", "0.0005", "0", "0"]),
+        nominal_width: 0,
+    };
+    vec![
+        (*b"head", head(2000, false, 0)),
+        (*b"hhea", hhea(2)),
+        (*b"maxp", maxp(2)),
+        (*b"hmtx", hmtx(&[(1000, 0), (1200, 100)])),
+        (*b"cmap", cmap(&[(0x41, 1)])),
+        (*b"name", name(&[(1, "Authored Matrix"), (2, "Regular")])),
+        (*b"CFF ", program.build()),
+    ]
+}
+
+/// A cmap subtable of format 0: 256 glyph bytes.
+pub fn cmap_format0(map: &[(u8, u8)]) -> Vec<u8> {
+    let mut glyphs = [0_u8; 256];
+    for &(code, glyph) in map {
+        glyphs[usize::from(code)] = glyph;
+    }
+    let mut t = u16s(&[0, 262, 0]);
+    t.extend(glyphs);
+    t
+}
+
+/// Format 6 (16-bit) or 10 (32-bit): consecutive codes from `first`.
+pub fn cmap_trimmed(format: u16, first: u32, glyphs: &[u16]) -> Vec<u8> {
+    if format == 6 {
+        let mut t = u16s(&[
+            6,
+            (10 + 2 * glyphs.len()) as u16,
+            0,
+            first as u16,
+            glyphs.len() as u16,
+        ]);
+        t.extend(u16s(glyphs));
         t
+    } else {
+        let mut t = u16s(&[10, 0]);
+        for v in [20 + 2 * glyphs.len() as u32, 0, first, glyphs.len() as u32] {
+            t.extend(v.to_be_bytes());
+        }
+        t.extend(u16s(glyphs));
+        t
+    }
+}
+
+/// Format 12 or 13 from (first, last, glyph) groups.
+pub fn cmap_groups(format: u16, groups: &[(u32, u32, u32)]) -> Vec<u8> {
+    let mut t = u16s(&[format, 0]);
+    for v in [16 + 12 * groups.len() as u32, 0, groups.len() as u32] {
+        t.extend(v.to_be_bytes());
+    }
+    for &(a, b, g) in groups {
+        for v in [a, b, g] {
+            t.extend(v.to_be_bytes());
+        }
+    }
+    t
+}
+
+/// A cmap table from (platform, encoding, subtable) records.
+pub fn cmap_records(records: &[(u16, u16, Vec<u8>)]) -> Vec<u8> {
+    let mut t = u16s(&[0, records.len() as u16]);
+    let mut offset = 4 + 8 * records.len();
+    for (platform, encoding, subtable) in records {
+        t.extend(u16s(&[*platform, *encoding]));
+        t.extend((offset as u32).to_be_bytes());
+        offset += subtable.len();
+    }
+    for (_, _, subtable) in records {
+        t.extend(subtable);
+    }
+    t
+}
+
+/// A TrueType face with one subtable of each supported cmap format.
+fn cmap_formats_tables() -> Tables {
+    let mut tables = truetype_tables(400, 0x40, "Authored Cmap", "Regular");
+    let format4 = {
+        let full = cmap(&[(0x41, 1), (0x42, 2), (0x43, 3)]);
+        full[12..].to_vec()
     };
-    let header = vec![1, 0, 4, 4];
-    let names = index(&[b"Test".to_vec()]);
-    let top_len = index(&[top(0, 0)]).len();
-    let strings = index(&[]);
-    let global = index(&global);
-    let charstrings_at = header.len() + names.len() + top_len + strings.len() + global.len();
-    let charstrings = index(&glyphs);
-    let private_at = charstrings_at + charstrings.len();
-    let mut out = header;
-    out.extend(names);
-    out.extend(index(&[top(charstrings_at as i32, private_at as i32)]));
-    out.extend(strings);
-    out.extend(global);
-    out.extend(charstrings);
-    out.extend(private(private_len as i32));
-    out.extend(index(&local));
-    out
+    let records = vec![
+        (0, 3, cmap_trimmed(6, 0x61, &[1, 2, 3])),
+        (0, 4, cmap_trimmed(10, 0x1_0400, &[3, 2])),
+        (
+            0,
+            6,
+            cmap_groups(13, &[(0x2000, 0x200f, 1), (0x1_f600, 0x1_f64f, 2)]),
+        ),
+        (1, 0, cmap_format0(&[(0x41, 1), (0x8e, 2)])),
+        (3, 1, format4),
+        (
+            3,
+            10,
+            cmap_groups(12, &[(0x41, 0x43, 1), (0x1_d400, 0x1_d402, 1)]),
+        ),
+    ];
+    for table in &mut tables {
+        if &table.0 == b"cmap" {
+            table.1 = cmap_records(&records);
+        }
+    }
+    tables
+}
+
+/// Authored fonts for the FreeType comparison: features the freely licensed
+/// corpus does not exercise. Named by their file in the corpus.
+pub fn authored_fonts() -> Vec<(&'static str, Vec<u8>)> {
+    vec![
+        (
+            "authored-cff-features.otf",
+            font(b"OTTO", &cff_features_tables()),
+        ),
+        (
+            "authored-cff-matrix.otf",
+            font(b"OTTO", &cff_matrix_tables()),
+        ),
+        (
+            "authored-cmap-formats.ttf",
+            font(b"\0\x01\0\0", &cmap_formats_tables()),
+        ),
+    ]
 }
 
 pub fn cff_tables() -> Tables {
@@ -410,6 +815,55 @@ pub fn bytes(data: &[u8]) -> (Budget, Bytes) {
     let budget = Budget::new(data.len() + (1 << 24)).unwrap();
     let bytes = Bytes::copy_from_slice(&budget, data).unwrap();
     (budget, bytes)
+}
+
+/// A deterministic xorshift generator for mutations.
+pub struct Rng(pub u64);
+
+impl Rng {
+    pub fn next(&mut self) -> u64 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 7;
+        self.0 ^= self.0 << 17;
+        self.0
+    }
+
+    pub fn below(&mut self, n: usize) -> usize {
+        (self.next() % n.max(1) as u64) as usize
+    }
+}
+
+/// One of four edits, chosen by `round`: bit flips, a truncation, an overwritten
+/// burst, or a removed range. The fuzz example and the mutation test share it.
+pub fn mutate(data: &mut Vec<u8>, rng: &mut Rng, round: usize) {
+    if data.is_empty() {
+        return;
+    }
+    match round % 4 {
+        0 => {
+            for _ in 0..1 + rng.below(16) {
+                let at = rng.below(data.len());
+                data[at] ^= 1 << rng.below(8);
+            }
+        }
+        1 => {
+            let len = rng.below(data.len());
+            data.truncate(len);
+        }
+        2 => {
+            let at = rng.below(data.len());
+            for k in 0..rng.below(64) {
+                if let Some(byte) = data.get_mut(at + k) {
+                    *byte = rng.next() as u8;
+                }
+            }
+        }
+        _ => {
+            let a = rng.below(data.len());
+            let b = (a + rng.below(4096)).min(data.len());
+            data.drain(a..b);
+        }
+    }
 }
 
 /// Every public read on every face of `data`; errors are fine, panics are not.

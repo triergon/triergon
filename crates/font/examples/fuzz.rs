@@ -1,75 +1,96 @@
-//! Robustness smoke test: parse and read bit-flipped, truncated, overwritten and
-//! spliced copies of the given font files, and report any panic (the reader must
-//! return errors, never panic). Build it in the dev profile so arithmetic overflow
-//! is checked too.
+//! Robustness smoke test: parse and read mutated copies of the given font files
+//! (the mutator of `tests/support`) and report any panic or hang; the reader must
+//! return errors within its work limits. Build it in the dev profile so
+//! arithmetic overflow is checked too. A failing input is saved next to the
+//! working directory as `fuzz_crash_*` or `fuzz_hang_*`.
 //!
-//! Usage: fuzz [--iters N] FILE...
+//! Usage: fuzz [--iters N] [--timeout SECONDS] FILE...
 
 #[path = "../tests/support/mod.rs"]
 mod support;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use support::{Rng, exercise, mutate};
 use triergon_font::Limits;
+
+/// The input under test and when it started, for the watchdog.
+struct Current {
+    name: String,
+    data: Vec<u8>,
+}
 
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
-    let mut iters = 20usize;
-    if args.len() > 1 && args[0] == "--iters" {
-        iters = args[1].parse().expect("iteration count");
+    let (mut iters, mut timeout) = (20usize, 10u64);
+    while args.len() > 1 && args[0].starts_with("--") {
+        let value = args[1].parse().expect("a number");
+        match args[0].as_str() {
+            "--iters" => iters = value as usize,
+            "--timeout" => timeout = value,
+            flag => panic!("unknown flag {flag}"),
+        }
         args.drain(..2);
     }
-    let mut seed = 0x9E37_79B9_7F4A_7C15u64;
-    let mut rnd = move || {
-        seed ^= seed << 13;
-        seed ^= seed >> 7;
-        seed ^= seed << 17;
-        seed
-    };
     std::panic::set_hook(Box::new(|_| {}));
     let limits = Limits {
         work: 1 << 20,
         ..Limits::default()
     };
+    // A watchdog: an input that runs past the timeout is a hang.
+    let started = Arc::new(AtomicU64::new(0));
+    let current = Arc::new(Mutex::new(Current {
+        name: String::new(),
+        data: Vec::new(),
+    }));
+    let epoch = Instant::now();
+    {
+        let (started, current) = (Arc::clone(&started), Arc::clone(&current));
+        std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(Duration::from_millis(200));
+                let since = started.load(Ordering::Relaxed);
+                if since != 0 && epoch.elapsed().as_secs() > since / 1000 + timeout {
+                    let current = current
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    let out = format!("fuzz_hang_{}", current.name);
+                    std::fs::write(&out, &current.data).expect("hang file");
+                    eprintln!("HANG {} -> saved {out}", current.name);
+                    std::process::exit(1);
+                }
+            }
+        });
+    }
+    let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
     let mut panics = 0;
     for path in &args {
         let original = std::fs::read(path).expect("font file");
-        if catch_unwind(AssertUnwindSafe(|| support::exercise(&original, limits))).is_err() {
-            panics += 1;
-            eprintln!("PANIC {path} unmodified");
-        }
-        for it in 0..iters {
-            let mut d = original.clone();
-            match it % 4 {
-                0 => {
-                    // Bit flips anywhere: directories and headers are small targets.
-                    for _ in 0..1 + rnd() % 16 {
-                        let p = (rnd() as usize) % d.len();
-                        d[p] ^= 1 << (rnd() % 8);
-                    }
-                }
-                1 => {
-                    let l = (rnd() as usize) % d.len();
-                    d.truncate(l);
-                }
-                2 => {
-                    let p = (rnd() as usize) % d.len();
-                    for k in 0..(rnd() % 64) as usize {
-                        if p + k < d.len() {
-                            d[p + k] = rnd() as u8;
-                        }
-                    }
-                }
-                _ => {
-                    let a = (rnd() as usize) % d.len();
-                    let b = (a + (rnd() as usize) % 4096).min(d.len());
-                    d.drain(a..b);
-                }
+        let base = std::path::Path::new(path)
+            .file_name()
+            .expect("file name")
+            .to_string_lossy()
+            .into_owned();
+        for it in 0..=iters {
+            let mut data = original.clone();
+            if it > 0 {
+                mutate(&mut data, &mut rng, it);
             }
-            if catch_unwind(AssertUnwindSafe(|| support::exercise(&d, limits))).is_err() {
+            *current
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = Current {
+                name: format!("{base}_{it}"),
+                data: data.clone(),
+            };
+            started.store(epoch.elapsed().as_millis() as u64 + 1, Ordering::Relaxed);
+            let result = catch_unwind(AssertUnwindSafe(|| exercise(&data, limits)));
+            started.store(0, Ordering::Relaxed);
+            if result.is_err() {
                 panics += 1;
-                let name = std::path::Path::new(path).file_name().expect("file name");
-                let out = format!("fuzz_crash_{}_{it}", name.to_string_lossy());
-                std::fs::write(&out, &d).expect("crash file");
+                let out = format!("fuzz_crash_{base}_{it}");
+                std::fs::write(&out, &data).expect("crash file");
                 eprintln!("PANIC {path} iter {it} -> saved {out}");
             }
         }

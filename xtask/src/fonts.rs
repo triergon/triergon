@@ -283,6 +283,34 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
     fs::create_dir_all(&files).map_err(|e| format!("{}: {e}", files.display()))?;
     let mut verified = 0;
     for (source, list) in corpus(root)? {
+        if source.get("generator").and_then(Value::as_str) == Some("authored-fonts") {
+            // Written by the font crate's own builder, then checked like any file.
+            run(Command::new("cargo")
+                .args([
+                    "run",
+                    "--quiet",
+                    "--locked",
+                    "-p",
+                    "triergon-font",
+                    "--example",
+                    "authored-fonts",
+                    "--",
+                ])
+                .arg(files.join("authored"))
+                .env("CARGO_INCREMENTAL", "0")
+                .current_dir(root))?;
+            for file in &list {
+                let data = fetch::read_bounded(&files.join(&file.path), FONT_LIMIT)?;
+                if sha256::hex(&data) != file.sha256 {
+                    return Err(format!(
+                        "{}: authored font changed; update its hash",
+                        file.path
+                    ));
+                }
+                verified += 1;
+            }
+            continue;
+        }
         let text = |key| {
             source
                 .get(key)
