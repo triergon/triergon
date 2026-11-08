@@ -219,6 +219,19 @@ fn demux_field(time: Option<Time>, base: TimeBase) -> Result<ClockField> {
         .to_ticks(base, Rounding::NearestAway)?;
     ClockField::from_exact_ticks(ticks)
 }
+/// The demux clock a packet projection reads.
+#[derive(Clone, Copy)]
+enum Clock {
+    /// The sample's own clocks, mapped through an edit when there is one.
+    Source(Option<ProjectedEdit>),
+    /// The sample's own clocks, mapped through an edit from the demux's decode start.
+    DemuxEdit(ProjectedEdit, Time),
+    /// A regular track's demux DTS shift.
+    Regular { shift: i64 },
+    /// A fragment's demux DTS, with the whole track's negative composition minimum.
+    Fragment { dts: i128, minimum: i64 },
+}
+
 impl PacketProjector {
     pub fn new(media_base: TimeBase, sync_entries: Option<u32>) -> Self {
         Self {
@@ -231,7 +244,7 @@ impl PacketProjector {
     /// This stateless method has no whole-ctts context; the complete regular
     /// compatibility operation uses PacketCursor's bounded wire-run scan.
     pub fn project(&self, source: &Sample, edit: Option<ProjectedEdit>) -> Result<PacketView> {
-        self.project_inner(source, edit, None, None, None)
+        self.project_inner(source, Clock::Source(edit))
     }
     pub(crate) fn project_demux_edit(
         &self,
@@ -242,7 +255,7 @@ impl PacketProjector {
         if edit.entry.rate_integer != 1 || edit.entry.rate_fraction != 0 {
             return Err(Error::Unsupported("native non-unit edit point projection"));
         }
-        self.project_inner(source, Some(edit), None, None, Some(decode_start))
+        self.project_inner(source, Clock::DemuxEdit(edit, decode_start))
     }
     /// Regular-only reference observation, after a bounded whole-wire-run scan.
     /// A raw32 signed demux interpretation is deliberately distinct from source
@@ -251,7 +264,7 @@ impl PacketProjector {
         if source.fragment_flags.is_some() {
             return Err(Error::Invalid("regular native clock applied to fragment"));
         }
-        self.project_inner(source, None, Some(shift), None, None)
+        self.project_inner(source, Clock::Regular { shift })
     }
     /// Reference fragment-only clock view, independently of source knownness.
     /// Demux controls support raw32 signed CTO in either wire version and
@@ -265,102 +278,105 @@ impl PacketProjector {
         if source.fragment_flags.is_none() || minimum > 0 {
             return Err(Error::Invalid("fragment native clock context"));
         }
-        self.project_inner(source, None, None, Some((demux_dts, minimum)), None)
+        self.project_inner(
+            source,
+            Clock::Fragment {
+                dts: demux_dts,
+                minimum,
+            },
+        )
     }
-    fn project_inner(
-        &self,
-        source: &Sample,
-        edit: Option<ProjectedEdit>,
-        regular_shift: Option<i64>,
-        fragment_clock: Option<(i128, i64)>,
-        demux_edit_start: Option<Time>,
-    ) -> Result<PacketView> {
+    fn project_inner(&self, source: &Sample, clock: Clock) -> Result<PacketView> {
         if source.partial_sync || source.dependency.is_some() || source.access == Access::Unknown {
             return Err(Error::Unsupported(
                 "native dependency/recovery flag profile not frozen",
             ));
         }
-        let times = source.source_times(self.media_base)?;
-        let mut pts = times.cts;
-        let mut dts = times.dts;
-        if let Some((ticks, minimum)) = fragment_clock {
-            let offset = source.composition_offset.map_or(0, |value| {
-                i32::from_be_bytes(value.raw_bits().to_be_bytes())
-            });
-            let composition = ticks
-                .checked_add(i128::from(offset))
-                .and_then(|value| value.checked_sub(i128::from(minimum)))
-                .ok_or(Error::Overflow)?;
-            pts = Some(Time::from_ticks(composition, self.media_base)?);
-            dts = Some(Time::from_ticks(ticks, self.media_base)?);
-        } else if let Some(shift) = regular_shift {
-            let ticks = source
-                .dts_ticks
-                .ok_or(Error::Unsupported("native DTS unknown"))?;
-            let offset = source.composition_offset.map_or(0, |value| {
-                i32::from_be_bytes(value.raw_bits().to_be_bytes())
-            });
-            pts = Some(Time::from_ticks(
-                ticks
-                    .checked_add(i128::from(offset))
-                    .ok_or(Error::Overflow)?,
-                self.media_base,
-            )?);
-            dts = Some(Time::from_ticks(
-                ticks
-                    .checked_add(i128::from(shift))
-                    .ok_or(Error::Overflow)?,
-                self.media_base,
-            )?);
-        }
-        if dts.is_none() || pts.is_none() {
-            return Err(Error::Unsupported("native clock origin unresolved"));
-        }
+        // Packet clocks stay in media-base ticks. Only an edit mapping needs
+        // exact time; converting ticks to exact time and back in the same base
+        // is the identity, and costs a gcd and wide divisions per packet.
+        // The demux reads the composition offset as raw32 signed in either version.
+        let raw_offset = || {
+            source
+                .composition_offset
+                .map_or(0, |value| i128::from(value.raw_bits().cast_signed()))
+        };
+        let (pts, dts) = match clock {
+            Clock::Fragment { dts, minimum } => {
+                let composition = dts
+                    .checked_add(raw_offset())
+                    .and_then(|value| value.checked_sub(i128::from(minimum)))
+                    .ok_or(Error::Overflow)?;
+                (composition, dts)
+            }
+            Clock::Regular { shift } => {
+                let ticks = source
+                    .dts_ticks
+                    .ok_or(Error::Unsupported("native DTS unknown"))?;
+                (
+                    ticks.checked_add(raw_offset()).ok_or(Error::Overflow)?,
+                    ticks
+                        .checked_add(i128::from(shift))
+                        .ok_or(Error::Overflow)?,
+                )
+            }
+            Clock::Source(_) | Clock::DemuxEdit(..) => source
+                .cts_ticks
+                .zip(source.dts_ticks)
+                .ok_or(Error::Unsupported("native clock origin unresolved"))?,
+        };
+        let (edit, demux_edit_start) = match clock {
+            Clock::Source(edit) => (edit, None),
+            Clock::DemuxEdit(edit, start) => (Some(edit), Some(start)),
+            Clock::Regular { .. } | Clock::Fragment { .. } => (None, None),
+        };
         let mut flags = u32::from(source.is_container_sync());
         // Observed on the reference worker: explicit empty stss still makes its
         // first packet key. This does not grant source random-access/recovery proof.
         if self.sync_entries == Some(0) && source.ordinal == 1 {
             flags |= 1;
         }
-        if let Some(mapping) = edit {
-            if mapping.entry.is_empty() {
-                return Err(Error::Invalid("empty edit has no packet occurrence"));
-            }
-            if self.sync_entries == Some(0) || source.composition_offset.is_some() {
-                return Err(Error::Unsupported(
-                    "native edited/reordered or empty-sync profile not frozen",
-                ));
-            }
-            let map = |time: Option<Time>| -> Result<Option<Time>> {
-                time.map(|t| {
+        let (pts_field, dts_field) = match edit {
+            None => (
+                ClockField::from_exact_ticks(pts)?,
+                ClockField::from_exact_ticks(dts)?,
+            ),
+            Some(mapping) => {
+                if mapping.entry.is_empty() {
+                    return Err(Error::Invalid("empty edit has no packet occurrence"));
+                }
+                if self.sync_entries == Some(0) || source.composition_offset.is_some() {
+                    return Err(Error::Unsupported(
+                        "native edited/reordered or empty-sync profile not frozen",
+                    ));
+                }
+                let pts = Time::from_ticks(pts, self.media_base)?;
+                let dts = Time::from_ticks(dts, self.media_base)?;
+                let map = |time: Time| -> Result<Option<Time>> {
                     if let Some(start) = demux_edit_start {
                         Ok(Some(
-                            t.checked_sub(start)?.checked_add(mapping.movie_start)?,
+                            time.checked_sub(start)?.checked_add(mapping.movie_start)?,
                         ))
                     } else {
                         mapping
                             .entry
-                            .map_rate_one(t, mapping.movie_start, self.media_base)
+                            .map_rate_one(time, mapping.movie_start, self.media_base)
                     }
-                })
-                .transpose()
-                .map(Option::flatten)
-            };
-            pts = map(pts)?;
-            dts = map(dts)?;
-            let source_start =
-                Time::from_ticks(i128::from(mapping.entry.media_time), self.media_base)?;
-            let source_end =
-                source_start.checked_add(mapping.entry.duration(mapping.movie_base)?)?;
-            if times
-                .cts
-                .is_some_and(|cts| cts < source_start || cts >= source_end)
-            {
-                flags |= 4;
+                };
+                let (mapped_pts, mapped_dts) = (map(pts)?, map(dts)?);
+                let source_start =
+                    Time::from_ticks(i128::from(mapping.entry.media_time), self.media_base)?;
+                let source_end =
+                    source_start.checked_add(mapping.entry.duration(mapping.movie_base)?)?;
+                if pts < source_start || pts >= source_end {
+                    flags |= 4;
+                }
+                (
+                    demux_field(mapped_pts, self.media_base)?,
+                    demux_field(mapped_dts, self.media_base)?,
+                )
             }
-        }
-        let pts_field = demux_field(pts, self.media_base)?;
-        let dts_field = demux_field(dts, self.media_base)?;
+        };
         Ok(PacketView {
             source_ordinal: source.ordinal,
             source_description: source.description_index,
@@ -369,9 +385,7 @@ impl PacketProjector {
             dts: dts_field.api_ticks(),
             pts_field,
             dts_field,
-            duration: times
-                .decode_delta
-                .to_i64_ticks(self.media_base, Rounding::NearestAway)?,
+            duration: i64::from(source.duration_ticks),
             flags,
         })
     }
