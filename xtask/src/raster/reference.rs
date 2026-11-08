@@ -46,6 +46,13 @@ const DEPENDENCIES: [(&str, &str, &[&str]); 2] = [
     ),
 ];
 
+/// The compiler flags libass is built with: like every reference library, without
+/// floating-point contraction, and with uninitialised automatic variables zeroed.
+/// `add_face` (`ass_font.c`) compares and stores a face `uid` that
+/// `ass_font_select` leaves unwritten for the default font file; zero matches no
+/// face, which is what the builds for both deployment targets compute.
+const CFLAGS: &str = "-O2 -ffp-contract=off -ftrivial-auto-var-init=zero";
+
 pub fn configure_argv(prefix: &Path) -> Vec<String> {
     vec![
         "./configure".into(),
@@ -57,9 +64,31 @@ pub fn configure_argv(prefix: &Path) -> Vec<String> {
         "--disable-directwrite".into(),
         "--disable-libunibreak".into(),
         "--disable-require-system-font-provider".into(),
-        // Like every reference library, without floating-point contraction.
-        "CFLAGS=-O2 -ffp-contract=off".into(),
+        format!("CFLAGS={CFLAGS}"),
     ]
+}
+
+/// Fails unless `build`, a recorded `build.json`, was configured as [`prepare`]
+/// configures libass now. `prepare` rebuilds a tree configured otherwise; this keeps
+/// a worker from linking one that was never rebuilt.
+pub fn check_prepared(build: &Value) -> Result<(), String> {
+    let recorded = build
+        .get("configure_argv")
+        .and_then(Value::as_array)
+        .unwrap_or_default();
+    let wanted = configure_argv(Path::new(""));
+    let same = recorded.len() == wanted.len()
+        && recorded
+            .iter()
+            .zip(&wanted)
+            .all(|(r, w)| w.starts_with("--prefix=") || r.as_str() == Some(w));
+    if same {
+        Ok(())
+    } else {
+        Err(format!(
+            "{CACHE} is configured otherwise than this tree builds it; run `cargo xtask raster prepare`"
+        ))
+    }
 }
 
 /// Unpacks libass and configures it with `argv` unless the recorded arguments
@@ -141,6 +170,13 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
 
     // The private headers and flags of the internal stages the worker calls.
     let cflags = library_cflags(&source)?;
+    // The worker compiles libass's stages with these, so they must carry the build's.
+    if let Some(flag) = CFLAGS
+        .split_whitespace()
+        .find(|flag| !cflags.iter().any(|c| c == flag))
+    {
+        return Err(format!("libass Makefile compiles without {flag}"));
+    }
     let tree = source.display();
     fs::write(
         pkgconfig.join("libass-internal.pc"),
@@ -190,13 +226,17 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
 
 #[cfg(test)]
 mod tests {
-    use super::configure_argv;
+    use super::{check_prepared, configure_argv};
+    use crate::json::Value;
     use std::path::Path;
 
     #[test]
-    fn libass_builds_without_a_system_font_provider_or_contraction() {
+    fn libass_builds_without_a_system_font_provider_contraction_or_uninitialised_locals() {
         let argv = configure_argv(Path::new("/p"));
-        assert!(argv.iter().any(|a| a.contains("-ffp-contract=off")));
+        let cflags = argv.iter().find_map(|a| a.strip_prefix("CFLAGS=")).unwrap();
+        for flag in ["-ffp-contract=off", "-ftrivial-auto-var-init=zero"] {
+            assert!(cflags.split_whitespace().any(|f| f == flag), "{flag}");
+        }
         for flag in [
             "fontconfig",
             "coretext",
@@ -206,5 +246,15 @@ mod tests {
         ] {
             assert!(argv.contains(&format!("--disable-{flag}")), "{flag}");
         }
+    }
+
+    #[test]
+    fn a_build_configured_otherwise_is_not_linked() {
+        let record = |argv: Vec<String>| Value::object([("configure_argv", Value::strings(argv))]);
+        assert!(check_prepared(&record(configure_argv(Path::new("/elsewhere")))).is_ok());
+        let mut unzeroed = configure_argv(Path::new("/p"));
+        *unzeroed.last_mut().unwrap() = "CFLAGS=-O2 -ffp-contract=off".into();
+        assert!(check_prepared(&record(unzeroed)).is_err());
+        assert!(check_prepared(&Value::Object(Vec::new())).is_err());
     }
 }

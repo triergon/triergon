@@ -480,6 +480,9 @@ struct ProfileReference {
     /// decode, capture and font builds record their configuration in the profile's
     /// `build.json` instead).
     identity: bool,
+    /// Fails when the profile's `build.json` is not the build its prepare command
+    /// makes now.
+    prepared: Option<fn(&Value) -> R<()>>,
 }
 
 const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
@@ -514,6 +517,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         link_static: true,
         options: CONTAINER_OPTIONS,
         identity: true,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -528,6 +532,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         link_static: true,
         options: CONTAINER_OPTIONS,
         identity: true,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-decode",
@@ -549,6 +554,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         link_static: true,
         options: RELEASE_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-capture-static",
@@ -563,6 +569,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         link_static: true,
         options: RELEASE_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-capture-small-static",
@@ -577,6 +584,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         link_static: true,
         options: RELEASE_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -591,6 +599,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         link_static: true,
         options: CONTAINER_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -605,6 +614,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         link_static: true,
         options: CONTAINER_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/freetype",
@@ -619,6 +629,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         link_static: true,
         options: RELEASE_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/harfbuzz",
@@ -633,6 +644,7 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         link_static: true,
         options: SHAPE_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/libass",
@@ -641,12 +653,13 @@ const PROFILE_REFERENCES: [ProfileReference; 10] = [
         source: "harness/reference.c",
         define: Some("-DTRIERGON_RASTER_REFERENCE=1"),
         record: "libass-native",
-        kind: "libass 0.17.5, static, against the FreeType, FriBidi and HarfBuzz references, without floating-point contraction; its outline, stroker, rasteriser, blur, composition and clipping stages on the plain C bitmap engine (c: tile order 4, align order 4) on every host, and on the host's own engine for raster-simd- operations",
+        kind: "libass 0.17.5, static, against the FreeType, FriBidi and HarfBuzz references, without floating-point contraction, with uninitialised automatic variables zeroed; its outline, stroker, rasteriser, blur, composition and clipping stages on the plain C bitmap engine (c: tile order 4, align order 4) on every host, and on the host's own engine for raster-simd- operations",
         libraries: "libass_reference",
         packages: &["libass-internal"],
         link_static: true,
         options: RASTER_OPTIONS,
         identity: false,
+        prepared: Some(crate::raster::check_prepared),
     },
 ];
 
@@ -736,6 +749,9 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         if !profiles().all(|profile| root.join(profile).join("build.json").exists()) {
             let _ = fs::remove_file(&path);
             continue;
+        }
+        if let Some(prepared) = reference.prepared {
+            prepared(&read_json(&build)?)?;
         }
         let pkgconfig = std::env::join_paths(
             profiles().map(|profile| root.join(profile).join("install/lib/pkgconfig")),
