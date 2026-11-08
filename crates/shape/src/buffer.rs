@@ -16,6 +16,7 @@ use triergon_font::GlyphId;
 /// One shaped glyph.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Glyph {
+    /// The glyph's index in the face.
     pub id: GlyphId,
     /// The index in the text of the first character the glyph belongs to.
     pub cluster: u32,
@@ -24,9 +25,14 @@ pub struct Glyph {
 /// Where a glyph goes, in the units of the face's scale (font units by default).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Position {
+    /// How far the pen moves horizontally after the glyph.
     pub x_advance: i32,
+    /// How far the pen moves vertically after the glyph (zero in horizontal
+    /// text).
     pub y_advance: i32,
+    /// How far the glyph is drawn to the right of the pen.
     pub x_offset: i32,
+    /// How far the glyph is drawn above the pen.
     pub y_offset: i32,
 }
 
@@ -452,6 +458,7 @@ impl Buffer {
         Self::with_limits(budget, Limits::default())
     }
 
+    /// A buffer whose shaping calls are each bounded by `limits`.
     pub fn with_limits(budget: &Budget, limits: Limits) -> Self {
         Self {
             info: BudgetVec::new(budget),
@@ -482,6 +489,7 @@ impl Buffer {
         self.info.len()
     }
 
+    /// Whether the buffer holds no glyphs.
     pub fn is_empty(&self) -> bool {
         self.info.is_empty()
     }

@@ -163,15 +163,20 @@ impl fmt::Debug for Script {
 /// The direction a run is shaped in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Direction {
+    /// Left to right, as Latin is written.
     LeftToRight,
+    /// Right to left, as Arabic and Hebrew are written.
     RightToLeft,
 }
 
 impl Direction {
+    /// Whether glyphs come in the reverse of logical order: right to left.
+    #[must_use]
     pub const fn is_backward(self) -> bool {
         matches!(self, Self::RightToLeft)
     }
 
+    /// The other direction.
     #[must_use]
     pub const fn reverse(self) -> Self {
         match self {

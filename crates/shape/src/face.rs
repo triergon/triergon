@@ -16,6 +16,9 @@ pub struct Face<'a> {
 }
 
 impl<'a> Face<'a> {
+    /// The layout tables of `font`. Nothing is read beyond their headers until
+    /// a plan or a shaping call asks.
+    #[must_use]
     pub fn new(font: &'a Font) -> Self {
         let gsub = font.table(*b"GSUB");
         let gpos = font.table(*b"GPOS");
@@ -29,6 +32,8 @@ impl<'a> Face<'a> {
         }
     }
 
+    /// The font the face reads.
+    #[must_use]
     pub fn font(&self) -> &'a Font {
         self.font
     }

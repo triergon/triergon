@@ -1,19 +1,24 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
     clippy::unwrap_used
 )]
-// Pending: `missing_docs`, `clippy::expect_used`.
+// Pending: `clippy::expect_used`.
 
 pub mod bidi;
 mod buffer;
 mod dump;
 mod face;
 mod fallback;
+#[allow(
+    missing_docs,
+    reason = "pending: the fields of Scale and Extents, Metrics::h_advance and Metrics::extents"
+)]
 mod metrics;
 mod normalize;
 mod ot;

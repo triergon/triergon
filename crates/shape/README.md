@@ -57,8 +57,10 @@ joining, Arabic presentation forms and mirroring).
 
 ## What it covers
 
-**Pipeline.** Everything `hb_shape` does for a horizontal run with default buffer
-flags: Unicode properties and grapheme clusters (emoji modifiers, regional
+**Pipeline.** The glyph ids, clusters and positions `hb_shape` gives for a
+horizontal run with default buffer flags, but not the glyph flags it also sets
+(`HB_GLYPH_FLAG_UNSAFE_TO_BREAK` and the others `hb_glyph_info_get_glyph_flags`
+reports), by the same steps: Unicode properties and grapheme clusters (emoji modifiers, regional
 indicators, ZWJ sequences), shaping in the script's native direction, mirroring
 or `rtlm`, normalisation against the font (decomposition, mark reordering with
 HarfBuzz's modified combining classes, recomposition, variation selectors, space

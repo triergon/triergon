@@ -13,7 +13,10 @@ use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 /// A feature the caller sets for the whole item, such as `kern=0`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Feature {
+    /// The feature's tag, such as `kern`.
     pub tag: Tag,
+    /// Its value: zero turns it off, one on, and a larger value picks an
+    /// alternate.
     pub value: u32,
 }
 
