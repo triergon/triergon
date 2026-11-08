@@ -5,7 +5,8 @@
 //! A pack is a `.tar.gz` whose bytes depend only on the files: entries sorted by
 //! path, zero timestamps and owners, and gzip stored blocks with no name or time.
 
-use std::fs;
+use std::fs::{self, File};
+use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -71,15 +72,15 @@ fn header(name: &[u8], prefix: &[u8], size: u64, executable: bool, kind: u8) -> 
     h
 }
 
-fn pad(out: &mut Vec<u8>) {
-    out.resize(out.len().div_ceil(512) * 512, 0);
+/// Zeros that pad `len` bytes to the next 512-byte record.
+fn padding(len: u64) -> &'static [u8] {
+    &[0; 512][..(len.next_multiple_of(512) - len) as usize]
 }
 
-/// A ustar archive of `files`; paths that do not fit a ustar name and prefix use
-/// a pax `path` record.
-pub fn tar(files: &[(String, Vec<u8>, bool)]) -> Vec<u8> {
-    let mut out = Vec::new();
-    for (path, data, executable) in files {
+/// Writes a ustar archive of `files` (relative path, source file) to `out`, one file
+/// at a time; paths that do not fit a ustar name and prefix use a pax `path` record.
+fn write_tar(out: &mut impl Write, files: &[(String, PathBuf)]) -> io::Result<()> {
+    for (path, source) in files {
         let bytes = path.as_bytes();
         let split = (bytes.len() > 100)
             .then(|| {
@@ -101,66 +102,139 @@ pub fn tar(files: &[(String, Vec<u8>, bool)]) -> Vec<u8> {
                     length = format!("{length}{record}").len();
                 }
                 record = format!("{length}{record}");
-                out.extend(header(b"pax", b"", record.len() as u64, false, b'x'));
-                out.extend(record.as_bytes());
-                pad(&mut out);
+                let size = record.len() as u64;
+                out.write_all(&header(b"pax", b"", size, false, b'x'))?;
+                out.write_all(record.as_bytes())?;
+                out.write_all(padding(size))?;
                 (&bytes[bytes.len().saturating_sub(100)..], b"")
             }
         };
-        out.extend(header(name, prefix, data.len() as u64, *executable, b'0'));
-        out.extend(data);
-        pad(&mut out);
-    }
-    out.extend([0u8; 1024]);
-    out
-}
-
-/// gzip of `data` in stored deflate blocks, with no name and a zero timestamp.
-pub fn gzip_stored(data: &[u8]) -> Vec<u8> {
-    let mut out = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255];
-    let mut chunks = data.chunks(65_535).peekable();
-    if chunks.peek().is_none() {
-        out.extend([1, 0, 0, 0xff, 0xff]);
-    }
-    while let Some(chunk) = chunks.next() {
-        let len = chunk.len() as u16;
-        out.push(u8::from(chunks.peek().is_none()));
-        out.extend(len.to_le_bytes());
-        out.extend((!len).to_le_bytes());
-        out.extend(chunk);
-    }
-    out.extend(crate::zlib::crc32(data).to_le_bytes());
-    out.extend((data.len() as u32).to_le_bytes());
-    out
-}
-
-/// The deterministic pack of every file under `dir`.
-pub fn pack(dir: &Path) -> Result<Vec<u8>, String> {
-    let mut entries = Vec::new();
-    for (relative, path) in files(dir)? {
-        let data = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let file = File::open(source)?;
+        let metadata = file.metadata()?;
         #[cfg(unix)]
         let executable = {
             use std::os::unix::fs::PermissionsExt;
-            fs::metadata(&path)
-                .map_err(|e| e.to_string())?
-                .permissions()
-                .mode()
-                & 0o111
-                != 0
+            metadata.permissions().mode() & 0o111 != 0
         };
         #[cfg(not(unix))]
         let executable = false;
-        entries.push((relative, data, executable));
+        let size = metadata.len();
+        out.write_all(&header(name, prefix, size, executable, b'0'))?;
+        if io::copy(&mut file.take(size), out)? != size {
+            return Err(io::Error::other(format!(
+                "{}: shrank while packing",
+                source.display()
+            )));
+        }
+        out.write_all(padding(size))?;
     }
-    Ok(gzip_stored(&tar(&entries)))
+    out.write_all(&[0; 1024])
+}
+
+const STORED_BLOCK: usize = 65_535;
+
+/// A gzip member of stored deflate blocks, with no name and a zero timestamp, written
+/// as the data arrives. A full block waits for more data so the last one can be
+/// marked final.
+struct GzipStored<W: Write> {
+    out: W,
+    block: Vec<u8>,
+    crc: u32,
+    len: u64,
+}
+
+impl<W: Write> GzipStored<W> {
+    fn new(mut out: W) -> io::Result<Self> {
+        out.write_all(&[0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255])?;
+        Ok(Self {
+            out,
+            block: Vec::with_capacity(STORED_BLOCK),
+            crc: 0,
+            len: 0,
+        })
+    }
+
+    fn emit(&mut self, last: bool) -> io::Result<()> {
+        let len = self.block.len() as u16;
+        self.out.write_all(&[u8::from(last)])?;
+        self.out.write_all(&len.to_le_bytes())?;
+        self.out.write_all(&(!len).to_le_bytes())?;
+        self.out.write_all(&self.block)?;
+        self.block.clear();
+        Ok(())
+    }
+
+    fn finish(mut self) -> io::Result<W> {
+        self.emit(true)?;
+        self.out.write_all(&self.crc.to_le_bytes())?;
+        // ISIZE is the length modulo 2^32.
+        self.out.write_all(&(self.len as u32).to_le_bytes())?;
+        Ok(self.out)
+    }
+}
+
+impl<W: Write> Write for GzipStored<W> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        if self.block.len() == STORED_BLOCK && !data.is_empty() {
+            self.emit(false)?;
+        }
+        let taken = &data[..data.len().min(STORED_BLOCK - self.block.len())];
+        self.block.extend_from_slice(taken);
+        self.crc = crate::zlib::crc32_extend(self.crc, taken);
+        self.len += taken.len() as u64;
+        Ok(taken.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()
+    }
+}
+
+/// Passes writes through to `out` and hashes them.
+struct Hashed<W> {
+    out: W,
+    hash: sha256::Sha256,
+}
+
+impl<W: Write> Write for Hashed<W> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        let written = self.out.write(data)?;
+        self.hash.update(&data[..written]);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()
+    }
+}
+
+/// Writes the deterministic pack of every file under `dir` to `out`, streaming each
+/// file, and returns `out`.
+pub fn pack<W: Write>(dir: &Path, out: W) -> Result<W, String> {
+    let files = files(dir)?;
+    let write = || {
+        let mut gzip = GzipStored::new(out)?;
+        write_tar(&mut gzip, &files)?;
+        gzip.finish()
+    };
+    write().map_err(|e| format!("{}: {e}", dir.display()))
 }
 
 /// `cargo xtask evidence pack DIR OUT`: write the pack and print its SHA-256.
 pub fn pack_command(dir: &Path, out: &Path) -> Result<String, String> {
-    let data = pack(dir)?;
-    fs::write(out, &data).map_err(|e| format!("{}: {e}", out.display()))?;
-    Ok(sha256::hex(&data))
+    let file = File::create(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    let hashed = Hashed {
+        out: BufWriter::new(file),
+        hash: sha256::Sha256::default(),
+    };
+    let Hashed {
+        out: mut written,
+        hash,
+    } = pack(dir, hashed)?;
+    written
+        .flush()
+        .map_err(|e| format!("{}: {e}", out.display()))?;
+    Ok(hash.finish().iter().map(|b| format!("{b:02x}")).collect())
 }
 
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -261,8 +335,8 @@ mod tests {
         fs::write(dir.join("b.txt"), vec![7u8; 200_000]).unwrap();
         fs::write(dir.join(&long).join(format!("{long}.json")), b"long").unwrap();
         fs::write(dir.join("empty"), b"").unwrap();
-        let first = pack(&dir).unwrap();
-        assert_eq!(first, pack(&dir).unwrap());
+        let first = pack(&dir, Vec::new()).unwrap();
+        assert_eq!(first, pack(&dir, Vec::new()).unwrap());
         let tar = crate::archive::gunzip(&first, 1 << 30).unwrap();
         let entries = crate::archive::tar_files(&tar).unwrap();
         let names: Vec<_> = entries.iter().map(|e| e.path.clone()).collect();
@@ -277,6 +351,34 @@ mod tests {
         );
         assert_eq!(entries[1].data.len(), 200_000);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn stored_gzip_blocks_split_at_the_block_size_whatever_the_writes() {
+        for len in [0, 1, STORED_BLOCK, STORED_BLOCK + 1, 2 * STORED_BLOCK] {
+            let data: Vec<u8> = (0..len).map(|i| (i * 7 % 251) as u8).collect();
+            let mut expected = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255];
+            let blocks: Vec<&[u8]> = data.chunks(STORED_BLOCK).collect();
+            for (at, block) in blocks.iter().enumerate() {
+                let n = block.len() as u16;
+                expected.push(u8::from(at + 1 == blocks.len()));
+                expected.extend(n.to_le_bytes());
+                expected.extend((!n).to_le_bytes());
+                expected.extend(*block);
+            }
+            if blocks.is_empty() {
+                expected.extend([1, 0, 0, 0xff, 0xff]);
+            }
+            expected.extend(crate::zlib::crc32(&data).to_le_bytes());
+            expected.extend((len as u32).to_le_bytes());
+            let mut gzip = GzipStored::new(Vec::new()).unwrap();
+            for piece in data.chunks(4_099) {
+                gzip.write_all(piece).unwrap();
+            }
+            let streamed = gzip.finish().unwrap();
+            assert_eq!(streamed, expected, "{len} bytes");
+            assert_eq!(crate::archive::gunzip(&streamed, 1 << 20).unwrap(), data);
+        }
     }
 
     #[test]
