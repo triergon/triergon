@@ -82,6 +82,58 @@ static ProgressiveRatio progressive_ratio(int64_t n, int64_t d) {
     return (ProgressiveRatio){n / (int64_t)a, d / (int64_t)a};
 }
 
+/* Exact sums of products of two int64_t values. 32-bit targets have no 128-bit
+ * integer type, so there the values are kept as two words. */
+#ifdef __SIZEOF_INT128__
+typedef __int128 ProgressiveWide;
+
+static ProgressiveWide progressive_mul(int64_t a, int64_t b) { return (__int128)a * b; }
+static ProgressiveWide progressive_add(ProgressiveWide a, ProgressiveWide b) { return a + b; }
+static int progressive_less(ProgressiveWide a, ProgressiveWide b) { return a < b; }
+static int progressive_below_min(ProgressiveWide a) { return a < INT64_MIN; }
+static int progressive_above_max(ProgressiveWide a) { return a > INT64_MAX; }
+static int64_t progressive_narrow(ProgressiveWide a) { return (int64_t)a; }
+#else
+typedef struct {
+    int64_t hi;
+    uint64_t lo;
+} ProgressiveWide;
+
+static ProgressiveWide progressive_mul(int64_t a, int64_t b) {
+    uint64_t x = a < 0 ? 0 - (uint64_t)a : (uint64_t)a;
+    uint64_t y = b < 0 ? 0 - (uint64_t)b : (uint64_t)b;
+    uint64_t x0 = (uint32_t)x, x1 = x >> 32, y0 = (uint32_t)y, y1 = y >> 32;
+    uint64_t p00 = x0 * y0, p01 = x0 * y1, p10 = x1 * y0, p11 = x1 * y1;
+    uint64_t middle = (p00 >> 32) + (uint32_t)p01 + (uint32_t)p10;
+    uint64_t lo = (middle << 32) | (uint32_t)p00;
+    uint64_t hi = p11 + (p01 >> 32) + (p10 >> 32) + (middle >> 32);
+    if ((a < 0) != (b < 0)) {
+        lo = 0 - lo;
+        hi = ~hi + (lo == 0);
+    }
+    return (ProgressiveWide){(int64_t)hi, lo};
+}
+
+static ProgressiveWide progressive_add(ProgressiveWide a, ProgressiveWide b) {
+    uint64_t lo = a.lo + b.lo;
+    return (ProgressiveWide){(int64_t)((uint64_t)a.hi + (uint64_t)b.hi + (lo < a.lo)), lo};
+}
+
+static int progressive_less(ProgressiveWide a, ProgressiveWide b) {
+    return a.hi != b.hi ? a.hi < b.hi : a.lo < b.lo;
+}
+
+static int progressive_below_min(ProgressiveWide a) {
+    return a.hi < -1 || (a.hi == -1 && a.lo < (uint64_t)INT64_MIN);
+}
+
+static int progressive_above_max(ProgressiveWide a) {
+    return a.hi > 0 || (a.hi == 0 && a.lo > (uint64_t)INT64_MAX);
+}
+
+static int64_t progressive_narrow(ProgressiveWide a) { return (int64_t)a.lo; }
+#endif
+
 static int progressive_audio_fields(const AVPacket *p, ProgressiveRatio *previous,
                                     ProgressiveRatio *next, int64_t fields[12]) {
     static const unsigned rates[] = {
@@ -107,14 +159,16 @@ static int progressive_audio_fields(const AVPacket *p, ProgressiveRatio *previou
     ProgressiveRatio duration = progressive_ratio(1024, rates[index]);
     ProgressiveRatio present = pts.d ? pts : *next;
     if (!present.d ||
-        (previous->d && (__int128)present.n * previous->d < (__int128)previous->n * present.d))
+        (previous->d && progressive_less(progressive_mul(present.n, previous->d),
+                                         progressive_mul(previous->n, present.d))))
         return AVERROR_INVALIDDATA;
-    __int128 n = (__int128)present.n * duration.d + (__int128)duration.n * present.d;
-    __int128 d = (__int128)present.d * duration.d;
-    if (n < INT64_MIN || n > INT64_MAX || d > INT64_MAX)
+    ProgressiveWide n = progressive_add(progressive_mul(present.n, duration.d),
+                                        progressive_mul(duration.n, present.d));
+    ProgressiveWide d = progressive_mul(present.d, duration.d);
+    if (progressive_below_min(n) || progressive_above_max(n) || progressive_above_max(d))
         return AVERROR(ERANGE);
     *previous = present;
-    *next = progressive_ratio((int64_t)n, (int64_t)d);
+    *next = progressive_ratio(progressive_narrow(n), progressive_narrow(d));
     const int64_t values[] = {
         rates[index], channels[config], 1024,       pts.n,      pts.d,  0, 0,
         present.n,    present.d,        duration.n, duration.d, length,
