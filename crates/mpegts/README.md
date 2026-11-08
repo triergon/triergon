@@ -95,6 +95,9 @@ range and event ordinal. Runs reserve checked span capacity before advancing
 input; ordinary carrier polling handles PES completion.
 Feed dispatch reuses the selected PES route after checking its PID against the
 current program table. Other PIDs use the ordinary route lookup.
+Idle PSI jobs do not enter the table poller. Complete timestamp-only PES headers
+use the shared timestamp validator directly; other headers retain incremental
+validation. Both paths preserve work charges and cancellation boundaries.
 Runs record the complete final carrier for duplicate detection before transferring
 the shared backing storage. Every retained view keeps the full allocation charged.
 A fresh, inactive `DemuxObserver` can select `enable_compact_payloads` before input and then use

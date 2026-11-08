@@ -667,7 +667,10 @@ pub(crate) fn parse_timed_header(
     work: &WorkBudget,
 ) -> Option<(PesHeader, Option<usize>)> {
     let prefix = bytes.first_chunk::<9>()?;
-    if prefix[..3] != [0, 0, 1] || !matches!((prefix[7], prefix[8]), (0x80, 5) | (0xc0, 10)) {
+    if prefix[..3] != [0, 0, 1]
+        || prefix[6] & 0xf0 != 0x80
+        || !matches!((prefix[7], prefix[8]), (0x80, 5) | (0xc0, 10))
+    {
         return None;
     }
     let used = 9 + usize::from(prefix[8]);
@@ -679,11 +682,29 @@ pub(crate) fn parse_timed_header(
     if declared.is_some_and(|total| total < used || total > maximum) {
         return None;
     }
+    let bytes = bytes.get(..used)?;
+    let timing = prefix[7] >> 6;
+    let pts_raw33 = Some(timestamp(&bytes[9..14], timing).ok()?);
+    let dts_raw33 = if timing == 3 {
+        Some(timestamp(&bytes[14..19], 1).ok()?)
+    } else {
+        None
+    };
     let mut raw = [0; HEADER_MAX];
-    raw[..used].copy_from_slice(bytes.get(..used)?);
-    parse_header(&raw, used)
-        .ok()
-        .map(|header| (header, declared))
+    raw[..used].copy_from_slice(bytes);
+    Some((
+        PesHeader {
+            stream_id: prefix[3],
+            declared_packet_length: u16::from_be_bytes([prefix[4], prefix[5]]),
+            pts_raw33,
+            dts_raw33,
+            data_alignment_indicator: prefix[6] & 4 != 0,
+            priority: prefix[6] & 8 != 0,
+            raw,
+            used,
+        },
+        declared,
+    ))
 }
 
 pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHeader> {
@@ -793,4 +814,112 @@ pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHea
         raw: *raw,
         used,
     })
+}
+
+#[cfg(test)]
+mod timed_header_tests {
+    use super::*;
+
+    fn stamp(raw: u64, prefix: u8) -> [u8; 5] {
+        [
+            (prefix << 4) | u8::try_from((raw >> 29) & 14).unwrap() | 1,
+            ((raw >> 22) & 255).try_into().unwrap(),
+            u8::try_from((raw >> 14) & 254).unwrap() | 1,
+            ((raw >> 7) & 255).try_into().unwrap(),
+            u8::try_from((raw << 1) & 254).unwrap() | 1,
+        ]
+    }
+
+    fn header(pts: u64, dts: Option<u64>, control: u8) -> ([u8; HEADER_MAX], usize) {
+        let mut raw = [0; HEADER_MAX];
+        let (timing, used) = if dts.is_some() { (3, 19) } else { (2, 14) };
+        raw[..9].copy_from_slice(&[
+            0,
+            0,
+            1,
+            0xe0,
+            0,
+            0,
+            control,
+            timing << 6,
+            u8::try_from(used - 9).unwrap(),
+        ]);
+        raw[9..14].copy_from_slice(&stamp(pts, timing));
+        if let Some(dts) = dts {
+            raw[14..19].copy_from_slice(&stamp(dts, 1));
+        }
+        (raw, used)
+    }
+
+    #[test]
+    fn complete_timestamps_match_general_headers_and_keep_admission_bounds() {
+        for pts in [0, 1, 0x0001_0000_0011, (1 << 33) - 1] {
+            for dts in [None, Some(0), Some((1 << 33) - 1)] {
+                for control in 0x80..=0x8f {
+                    let (mut raw, used) = header(pts, dts, control);
+                    for length in [0, u16::try_from(used - 6).unwrap(), u16::MAX] {
+                        raw[4..6].copy_from_slice(&length.to_be_bytes());
+                        let work = WorkBudget::new(used as u64 + 3);
+                        let (fast, total) =
+                            parse_timed_header(&raw[..used], 1 << 20, &work).unwrap();
+                        let slow = parse_header(&raw, used).unwrap();
+                        assert_eq!(format!("{fast:?}"), format!("{slow:?}"));
+                        assert_eq!(fast.pts_raw33, Some(pts));
+                        assert_eq!(fast.dts_raw33, dts);
+                        assert_eq!(total, (length != 0).then_some(usize::from(length) + 6));
+                        assert_eq!(work.spent(), 0);
+                        let too_small = if length == 0 {
+                            used - 1
+                        } else {
+                            usize::from(length) + 5
+                        };
+                        assert!(parse_timed_header(&raw[..used], too_small, &work).is_none());
+                        for units in [0, used as u64 + 2] {
+                            assert!(
+                                parse_timed_header(&raw[..used], 1 << 20, &WorkBudget::new(units))
+                                    .is_none()
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn invalid_and_incomplete_timestamps_fall_back_to_the_general_parser() {
+        for dts in [None, Some((1 << 33) - 1)] {
+            let (raw, used) = header(0x0001_0000_0011, dts, 0x84);
+            let work = WorkBudget::new(4096);
+            for length in 0..used {
+                assert!(parse_timed_header(&raw[..length], 1 << 20, &work).is_none());
+            }
+            for at in std::iter::once(6).chain(9..used) {
+                for bit in 0..8 {
+                    let mut changed = raw;
+                    changed[at] ^= 1 << bit;
+                    let fast = parse_timed_header(&changed[..used], 1 << 20, &work);
+                    match parse_header(&changed, used) {
+                        Ok(slow) => {
+                            assert_eq!(format!("{:?}", fast.unwrap().0), format!("{slow:?}"))
+                        }
+                        Err(_) => assert!(fast.is_none()),
+                    }
+                }
+            }
+            for at in [0, 1, 2, 7, 8] {
+                let mut changed = raw;
+                changed[at] ^= 1;
+                assert!(parse_timed_header(&changed[..used], 1 << 20, &work).is_none());
+            }
+            let mut short = raw;
+            short[4..6].copy_from_slice(&u16::try_from(used - 7).unwrap().to_be_bytes());
+            assert!(parse_timed_header(&short[..used], 1 << 20, &work).is_none());
+        }
+        let (mut raw, used) = header(17, None, 0x84);
+        raw[8] += 1;
+        raw[used] = 0xff;
+        assert!(parse_header(&raw, used + 1).is_ok());
+        assert!(parse_timed_header(&raw[..used + 1], 1 << 20, &WorkBudget::new(4096)).is_none());
+    }
 }

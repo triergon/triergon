@@ -34,6 +34,55 @@ fn provide(input: &mut InputCursor, bytes: &[u8]) {
 }
 
 #[test]
+fn idle_psi_preserves_cancellation_and_zero_work_fault_delivery() {
+    let pool = Budget::new(8192).unwrap();
+    let mut input = InputCursor::new(
+        &pool,
+        SOURCE,
+        SourceCapabilities {
+            length: None,
+            random_access: false,
+        },
+        WINDOW,
+    )
+    .unwrap();
+    let mut stream =
+        TransportStream::new(pool, PacketFormat::Ts188, ParseLimits::default(), 1).unwrap();
+    assert!(!stream.collector.has_pending());
+    let cancel = AtomicBool::new(true);
+    let mut work = WorkBudget::new(0);
+    assert!(matches!(
+        stream.poll(&mut input, &mut work, &cancel),
+        Err(Error::Cancelled)
+    ));
+    cancel.store(false, Ordering::Relaxed);
+    assert!(matches!(
+        stream.poll(&mut input, &mut work, &cancel),
+        Ok(Step::Yield)
+    ));
+    stream.fault = Some(TraceFault {
+        kind: FaultKind::Transport,
+        pid: Some(PID),
+        location: SourceLocation {
+            source: SOURCE,
+            offset: 188,
+        },
+        error: Error::Truncated,
+        rejected: None,
+    });
+    assert!(matches!(
+        stream.poll(&mut input, &mut work, &cancel),
+        Ok(Step::Ready(TraceEvent::Diagnostic(TraceFault {
+            pid: Some(PID),
+            error: Error::Truncated,
+            ..
+        })))
+    ));
+    assert_eq!(work.spent(), 0);
+    assert_eq!(input.position(), 0);
+}
+
+#[test]
 fn output_modes_preserve_null_carriers_faults_and_cancelled_partial_input() {
     fn collect(compact: bool, quantum: u64, window: usize) -> (Vec<(u64, u16, u8)>, usize, u64) {
         let pool = Budget::new(64 * 1024).unwrap();

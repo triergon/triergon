@@ -1690,11 +1690,21 @@ impl TransportStream {
                     epochs: self.source_epochs(),
                 }));
             }
-            if let Some(event) = self.poll_jobs(work, cancel)? {
-                return Ok(ready(event));
-            }
-            if self.job.is_some() || self.section.is_some() || self.map_build.is_some() {
-                return Ok(Step::Yield);
+            if self.fault.is_some()
+                || self.map_build.is_some()
+                || self.section.is_some()
+                || self.job.is_some()
+                || self.collector.has_pending()
+            {
+                if let Some(event) = self.poll_jobs(work, cancel)? {
+                    return Ok(ready(event));
+                }
+                if self.job.is_some() || self.section.is_some() || self.map_build.is_some() {
+                    return Ok(Step::Yield);
+                }
+            } else if cancel.load(Ordering::Relaxed) {
+                // An idle collector still checks cancellation before returning Done.
+                return Err(Error::Cancelled);
             }
             if work.remaining() == 0 {
                 return Ok(Step::Yield);
