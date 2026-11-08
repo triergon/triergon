@@ -244,3 +244,86 @@ fn mutated_packets() {
         }
     }
 }
+
+/// Authored segments of page 1.
+mod segments {
+    fn segment(kind: u8, body: &[u8]) -> Vec<u8> {
+        let mut bytes = vec![0x0f, kind, 0, 1];
+        bytes.extend_from_slice(&u16::try_from(body.len()).unwrap().to_be_bytes());
+        bytes.extend_from_slice(body);
+        bytes
+    }
+
+    /// A page composition placing `regions` as (id, x, y).
+    pub fn page(version: u8, acquisition: bool, regions: &[(u8, u16, u16)]) -> Vec<u8> {
+        let mut body = vec![5, version << 4 | u8::from(acquisition) << 2];
+        for &(id, x, y) in regions {
+            body.extend([id, 0]);
+            body.extend(x.to_be_bytes());
+            body.extend(y.to_be_bytes());
+        }
+        segment(0x10, &body)
+    }
+
+    /// A 2-bit region composition without fill, placing `objects` as (id, x, y).
+    pub fn region(id: u8, width: u16, height: u16, objects: &[(u16, u16, u16)]) -> Vec<u8> {
+        let mut body = vec![id, 0];
+        body.extend(width.to_be_bytes());
+        body.extend(height.to_be_bytes());
+        body.extend([1 << 5 | 1 << 2, 0, 0, 0]);
+        for &(object, x, y) in objects {
+            body.extend(object.to_be_bytes());
+            body.extend(x.to_be_bytes());
+            body.extend(y.to_be_bytes());
+        }
+        segment(0x11, &body)
+    }
+
+    /// Object `id`: pixels 1, 2, 3, 1 on each line of both fields.
+    pub fn object(id: u16) -> Vec<u8> {
+        let field = [0x10, 0x6d, 0x00, 0xf0];
+        let mut body = id.to_be_bytes().to_vec();
+        body.push(0);
+        body.extend(4_u16.to_be_bytes());
+        body.extend(0_u16.to_be_bytes());
+        body.extend(field);
+        segment(0x13, &body)
+    }
+
+    pub fn end() -> Vec<u8> {
+        segment(0x80, &[])
+    }
+}
+
+fn packet(segments: &[Vec<u8>]) -> Vec<u8> {
+    segments.concat()
+}
+
+/// The work of drawing one object at `placements` places in a region grows
+/// with the placements, not faster.
+#[test]
+fn work_scales_with_placements() {
+    let spent = |placements: usize| {
+        let objects = vec![(1, 0, 0); placements];
+        let packet = packet(&[
+            segments::page(0, false, &[(0, 0, 0)]),
+            segments::region(0, 128, 64, &objects),
+            segments::object(1),
+            segments::end(),
+        ]);
+        let pool = Budget::new(1 << 22).unwrap();
+        let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+        let mut work = WorkBudget::new(u64::MAX);
+        let presented = decoder
+            .decode(&packet, None, &mut work, &AtomicBool::new(false))
+            .unwrap();
+        assert_eq!(presented.unwrap().rects().len(), 1);
+        work.spent() as f64
+    };
+    let (n, k) = (1000, 4);
+    let ratio = spent(k * n) / spent(n);
+    assert!(
+        (0.95 * k as f64..=1.05 * k as f64).contains(&ratio),
+        "work ratio {ratio} for {k} times the placements"
+    );
+}

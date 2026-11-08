@@ -7,7 +7,8 @@ use super::segment::{
 };
 use super::{Flow, charge, push, push_exact};
 use crate::dvb::Depth;
-use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 /// The largest region the receiver allocates.
 const MAX_REGION_PIXELS: usize = 1280 * 1024;
@@ -44,12 +45,54 @@ struct Clut {
     tables: Tables,
 }
 
+/// A set of object ids, one bit each, allocated on first use.
+#[derive(Debug)]
+struct ObjectSet {
+    words: BudgetVec<u64>,
+}
+
+impl ObjectSet {
+    const WORDS: usize = (u16::MAX as usize + 1) / 64;
+
+    fn new(budget: &Budget) -> Self {
+        Self {
+            words: BudgetVec::new(budget),
+        }
+    }
+
+    fn contains(&self, id: u16) -> bool {
+        self.words
+            .as_slice()
+            .get(usize::from(id / 64))
+            .is_some_and(|word| word >> (id % 64) & 1 == 1)
+    }
+
+    /// Allocate the set, so that [`insert`](Self::insert) cannot fail.
+    fn reserve(&mut self) -> Result<()> {
+        if self.words.is_empty() {
+            self.words.try_resize(Self::WORDS, 0)?;
+        }
+        Ok(())
+    }
+
+    /// Insert `id` into a [reserved](Self::reserve) set.
+    fn insert(&mut self, id: u16) {
+        if let Some(word) = self.words.as_mut_slice().get_mut(usize::from(id / 64)) {
+            *word |= 1 << (id % 64);
+        }
+    }
+
+    fn clear(&mut self) {
+        self.words.as_mut_slice().fill(0);
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct Epoch {
     regions: BudgetVec<Region>,
     cluts: BudgetVec<Clut>,
     /// Objects a region composition has referenced.
-    objects: BudgetVec<u16>,
+    objects: ObjectSet,
     budget: Budget,
 }
 
@@ -58,7 +101,7 @@ impl Epoch {
         Self {
             regions: BudgetVec::new(budget),
             cluts: BudgetVec::new(budget),
-            objects: BudgetVec::new(budget),
+            objects: ObjectSet::new(budget),
             budget: budget.clone(),
         }
     }
@@ -168,11 +211,12 @@ impl Epoch {
             region.pixels.as_mut_slice().fill(composition.background);
         }
         region.objects.clear();
+        if composition.objects().next().is_some() {
+            self.objects.reserve()?;
+        }
         for placement in composition.objects() {
             push(&mut region.objects, placement)?;
-            if !self.objects.as_slice().contains(&placement.object) {
-                push(&mut self.objects, placement.object)?;
-            }
+            self.objects.insert(placement.object);
         }
         Ok(Flow::Continue)
     }
@@ -210,13 +254,14 @@ impl Epoch {
 
     /// Draw an object into every region placement of it. An object no region
     /// referenced, one not coded as pixels, or a placement outside its region
-    /// stops the packet.
+    /// stops the packet. Cancellation is checked before each placement.
     pub(super) fn draw_object(
         &mut self,
         object: &ObjectData<'_>,
         work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<Flow> {
-        if !self.objects.as_slice().contains(&object.id) {
+        if !self.objects.contains(object.id) {
             return Ok(Flow::Stop);
         }
         let ObjectCoding::Pixels { top, bottom } = object.coding else {
@@ -226,9 +271,13 @@ impl Epoch {
         for region in self.regions.as_mut_slice() {
             let width = usize::from(region.width);
             let height = usize::from(region.height);
+            charge(work, region.objects.len());
             for placement in region.objects.as_slice() {
                 if placement.object != object.id {
                     continue;
+                }
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(Error::Cancelled);
                 }
                 let (x, y) = (usize::from(placement.x), usize::from(placement.y));
                 if x >= width || y >= height {

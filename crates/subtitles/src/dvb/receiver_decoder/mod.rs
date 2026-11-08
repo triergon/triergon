@@ -257,10 +257,12 @@ impl ReceiverDecoder {
     /// A packet of a segment header or less, or one that does not start with
     /// a segment, is refused (`Error::Invalid`) and changes nothing.
     ///
-    /// A packet is decoded whole. Its work, one unit per packet byte and per
-    /// pixel its segments may draw or present, is bounded by the packet and
-    /// the region sizes; it is charged to `work`, which stops at zero. A
-    /// cooperative caller decodes the next packet while its budget lasts.
+    /// A packet is decoded whole. Its work, one unit per packet byte, per
+    /// object placement an object segment visits and per pixel its segments
+    /// may draw, copy or present, is charged to `work`, which stops at zero.
+    /// A cooperative caller decodes the next packet while its budget lasts.
+    /// Cancellation is checked before each segment and each object placement;
+    /// a cancelled packet keeps the segments decoded before it.
     pub fn decode(
         &mut self,
         packet: &[u8],
@@ -281,7 +283,7 @@ impl ReceiverDecoder {
             }
             flow = match segment {
                 Ok(segment) if !self.pages.admit(segment.page) => Flow::Continue,
-                Ok(segment) => self.segment(&segment, pts, work)?,
+                Ok(segment) => self.segment(&segment, pts, work, cancel)?,
                 Err(_) => Flow::Stop,
             };
             if flow == Flow::Stop {
@@ -316,6 +318,7 @@ impl ReceiverDecoder {
         segment: &Segment<'_>,
         pts: Option<i64>,
         work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<Flow> {
         if self.presented.is_some()
             && matches!(
@@ -323,7 +326,7 @@ impl ReceiverDecoder {
                 Kind::PageComposition | Kind::RegionComposition | Kind::ObjectData
             )
         {
-            self.detach()?;
+            self.detach(work)?;
         }
         match segment.kind {
             Kind::PageComposition => {
@@ -348,7 +351,7 @@ impl ReceiverDecoder {
                 let Ok(object) = ObjectData::parse(segment.body) else {
                     return Ok(Flow::Stop);
                 };
-                if self.epoch.draw_object(&object, work)? == Flow::Stop {
+                if self.epoch.draw_object(&object, work, cancel)? == Flow::Stop {
                     return Ok(Flow::Stop);
                 }
                 self.held.object = true;
@@ -398,19 +401,14 @@ impl ReceiverDecoder {
         self.page.version = Some(page.version);
         self.page.timeout = page.timeout;
         if page.state.starts_epoch() {
-            self.detach()?;
+            self.detach(work)?;
             self.epoch.clear();
         }
         self.page.placements.clear();
+        // A region listed again keeps its first place.
+        let mut listed = [false; 256];
         for placement in page.regions() {
-            // A region listed again keeps its first place.
-            if !self
-                .page
-                .placements
-                .as_slice()
-                .iter()
-                .any(|p| p.region == placement.region)
-            {
+            if !std::mem::replace(&mut listed[usize::from(placement.region)], true) {
                 push(&mut self.page.placements, placement)?;
             }
         }
@@ -485,13 +483,14 @@ impl ReceiverDecoder {
 
     /// Copy the presented pixels out of the regions before a segment of the
     /// same packet changes them.
-    fn detach(&mut self) -> Result<()> {
+    fn detach(&mut self, work: &mut WorkBudget) -> Result<()> {
         let count = self.presented.map_or(0, |p| p.rects);
         for slot in &mut self.slots.as_mut_slice()[..count] {
             if let Some(index) = slot.region.take() {
+                let pixels = self.epoch.region_at(index).pixels();
+                charge(work, pixels.len());
                 slot.pixels.clear();
-                slot.pixels
-                    .try_extend_from_slice(self.epoch.region_at(index).pixels())?;
+                slot.pixels.try_extend_from_slice(pixels)?;
             }
         }
         Ok(())
