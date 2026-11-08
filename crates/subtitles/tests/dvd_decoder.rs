@@ -4,7 +4,7 @@
 mod support;
 
 use support::{Cmd, SHOW, field, glyphs, raw_unit, unit};
-use triergon_core::{Budget, Error, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, WorkBudget};
 use triergon_subtitles::compat::dvd::{
     Decoder, Limits, Settings, Status, Subtitle, YcbcrRounding, ifo_palette,
 };
@@ -698,4 +698,212 @@ fn extended_units_present_eight_bit_pixels_with_their_own_colours() {
     );
     assert!(out[0].is_some() && out[1].is_none());
     assert_eq!(out[2].as_ref().unwrap().palette[1], 0xff010101);
+}
+
+/// A pool of `size` bytes, `held` of them taken by something else.
+#[derive(Clone, Copy)]
+struct Pool {
+    size: usize,
+    held: usize,
+}
+
+const ROOMY: Pool = Pool {
+    size: 1 << 20,
+    held: 0,
+};
+
+/// Decode `before`, then `refused`, which must fail, then `after`; and the
+/// same without `refused`, each with and without a rewind just before
+/// `after`. What `after` presents must agree every time. Returns the refusal
+/// and what `after` presents without one.
+fn refusal_changes_nothing(
+    pool: Pool,
+    limits: Limits,
+    before: &[&[u8]],
+    refused: &[u8],
+    after: &[&[u8]],
+) -> (Error, Vec<Option<Shown>>) {
+    let run = |send_refused: bool, rewind: bool| {
+        let budget = Budget::new(pool.size).unwrap();
+        let _held = BudgetVec::try_filled(&budget, 0_u8, pool.held).unwrap();
+        let mut decoder = Decoder::new(&budget, settings(), limits);
+        let mut decode = |packet: &[u8]| {
+            decoder
+                .decode(packet, &mut WorkBudget::new(u64::MAX))
+                .map(|status| match status {
+                    Status::Subtitle(s) => Some(Shown::from(s)),
+                    Status::Nothing => None,
+                    Status::Yield => panic!("unbounded work yielded"),
+                })
+        };
+        for packet in before {
+            decode(packet).unwrap();
+        }
+        let refusal = send_refused.then(|| decode(refused).unwrap_err());
+        drop(decode);
+        if rewind {
+            decoder.rewind().unwrap();
+        }
+        let shown: Vec<_> = after
+            .iter()
+            .map(
+                |packet| match decoder.decode(packet, &mut WorkBudget::new(u64::MAX)) {
+                    Ok(Status::Subtitle(s)) => Some(Shown::from(s)),
+                    Ok(Status::Nothing) => None,
+                    other => panic!("{other:?}"),
+                },
+            )
+            .collect();
+        (refusal, shown)
+    };
+    let (_, presented) = run(false, false);
+    let mut refusal = None;
+    for rewind in [false, true] {
+        let (_, expected) = run(false, rewind);
+        let (error, shown) = run(true, rewind);
+        assert_eq!(shown, expected, "rewind: {rewind}");
+        refusal = error;
+    }
+    (refusal.unwrap(), presented)
+}
+
+/// A unit that sets these colours, then draws `area` from the image at the
+/// origin.
+fn recoloured(rows: &[Vec<u8>], selectors: [u8; 4], area: Cmd) -> Vec<u8> {
+    unit(
+        rows,
+        0,
+        0,
+        &[
+            (0, &[Cmd::Palette(selectors), Cmd::Alpha([15, 15, 15, 15])]),
+            (50, &[area, Cmd::Offsets, Cmd::Start]),
+        ],
+    )
+}
+
+#[test]
+fn a_unit_over_its_size_limit_changes_nothing() {
+    let a = unit(
+        &glyphs(16, 6, 1, 1),
+        10,
+        10,
+        &[(0, &SHOW), (100, &[Cmd::Stop])],
+    );
+    let b = unit(&glyphs(20, 4, 2, 0), 50, 60, &[(0, &SHOW)]);
+    let limits = Limits {
+        max_unit: 4096,
+        ..Limits::default()
+    };
+    let huge = vec![0x10; 4097];
+    // While a unit is buffered: it still completes with its own bytes.
+    let (refusal, presented) =
+        refusal_changes_nothing(ROOMY, limits, &[&a[..30]], &huge[1..], &[&a[30..], &b]);
+    assert_eq!(
+        refusal,
+        Error::Limit {
+            requested: 30 + 4096,
+            maximum: 4096
+        }
+    );
+    assert!(presented.iter().all(Option::is_some));
+    // After a unit completed: a rewind still gives it back.
+    let (refusal, _) =
+        refusal_changes_nothing(ROOMY, limits, &[&a[..30], &a[30..]], &huge, &[&a[30..]]);
+    assert_eq!(
+        refusal,
+        Error::Limit {
+            requested: 4097,
+            maximum: 4096
+        }
+    );
+}
+
+#[test]
+fn an_area_over_its_pixel_limit_keeps_the_colours_and_the_buffered_unit() {
+    let image = glyphs(16, 6, 1, 1);
+    let a = unit(&image, 10, 10, &[(0, &SHOW)]);
+    let bare = unit(&image, 0, 0, &[(0, &[Cmd::Area, Cmd::Offsets, Cmd::Start])]);
+    let limits = Limits {
+        max_pixels: 16 * 6,
+        ..Limits::default()
+    };
+    let over = Error::Limit {
+        requested: 100 * 100,
+        maximum: 16 * 6,
+    };
+    let wide = Cmd::AreaAt(0, 99, 0, 99);
+    // The refused unit's colours, set before its area, do not carry over.
+    let (refusal, presented) = refusal_changes_nothing(
+        ROOMY,
+        limits,
+        &[&a],
+        &recoloured(&image, [7, 6, 5, 4], wide),
+        &[&bare],
+    );
+    assert_eq!(refusal, over);
+    assert_eq!(
+        presented[0].as_ref().unwrap().palette,
+        shows(&a).unwrap().palette
+    );
+    // A refused continuation leaves the start it continued buffered.
+    let bad = recoloured(&image, [7, 6, 5, 4], wide);
+    let good = recoloured(&image, [3, 2, 1, 0], Cmd::Area);
+    assert_eq!(bad[..30], good[..30]);
+    let (refusal, presented) = refusal_changes_nothing(
+        ROOMY,
+        limits,
+        &[&bad[..30]],
+        &bad[30..],
+        &[&good[30..], &bare],
+    );
+    assert_eq!(refusal, over);
+    assert_eq!(presented[0], shows(&good));
+    assert_eq!(
+        presented[1].as_ref().unwrap().palette,
+        presented[0].as_ref().unwrap().palette
+    );
+}
+
+#[test]
+fn memory_the_budget_refuses_changes_nothing() {
+    let image = glyphs(16, 6, 1, 1);
+    let a = unit(&image, 10, 10, &[(0, &SHOW)]);
+    let bare = unit(&image, 0, 0, &[(0, &[Cmd::Area, Cmd::Offsets, Cmd::Start])]);
+    // Its plane needs (100 + 16) * 100 bytes.
+    let wide = recoloured(&image, [7, 6, 5, 4], Cmd::AreaAt(0, 99, 0, 99));
+    let small = Pool {
+        size: 8192,
+        held: 0,
+    };
+    let crowded = Pool {
+        size: 1 << 16,
+        held: (1 << 16) - 8192,
+    };
+    for pool in [small, crowded] {
+        let (refusal, presented) =
+            refusal_changes_nothing(pool, Limits::default(), &[&a], &wide, &[&bare]);
+        assert!(
+            matches!(
+                refusal,
+                Error::Limit {
+                    requested: 11600,
+                    ..
+                } | Error::Backpressure {
+                    requested: 11600,
+                    ..
+                }
+            ),
+            "{refusal:?}"
+        );
+        assert!(presented[0].is_some());
+        // The buffer a continuation needs.
+        let huge = vec![0x10; 9000];
+        let (refusal, presented) =
+            refusal_changes_nothing(pool, Limits::default(), &[&a[..30]], &huge, &[&a[30..]]);
+        assert!(
+            matches!(refusal, Error::Limit { .. } | Error::Backpressure { .. }),
+            "{refusal:?}"
+        );
+        assert_eq!(presented[0], shows(&a));
+    }
 }

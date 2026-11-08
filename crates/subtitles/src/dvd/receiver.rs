@@ -232,6 +232,11 @@ pub enum Status<'a> {
 /// * **Presentation.** A forced start anywhere in the unit keeps the whole
 ///   area (a menu); otherwise rows and columns of fully transparent pixels are
 ///   removed, and a fully transparent bitmap presents nothing.
+/// * **Refusal.** A decode that yields or fails changes nothing the decoder
+///   carries to later packets: a unit over [`Limits::max_unit`], an area over
+///   [`Limits::max_pixels`] or memory the budget refuses leaves the buffered
+///   bytes, the colours and what [`rewind`](Self::rewind) undoes as they
+///   were, so the decoder continues as if the packet had never been sent.
 #[derive(Debug)]
 pub struct Decoder {
     settings: Settings,
@@ -240,7 +245,7 @@ pub struct Decoder {
     plane: BudgetVec<u8>,
     colours: Colours,
     palette: [u32; 256],
-    /// How to undo the last decode until the next one starts.
+    /// How to undo the last decode that neither yielded nor failed.
     last: Option<Undo>,
     /// Work granted to attempts at the current packet that yielded.
     credit: u64,
@@ -288,12 +293,13 @@ impl Decoder {
         }
     }
 
-    /// Undo the last [`decode`](Self::decode), so that the same packet can be
-    /// decoded again: for a consumer that could not store its subtitle.
+    /// Undo the last [`decode`](Self::decode) that neither yielded nor
+    /// failed, so that the same packet can be decoded again: for a consumer
+    /// that could not store its subtitle.
     pub fn rewind(&mut self) -> Result<()> {
         if let Some(undo) = self.last.take() {
             self.colours = undo.colours;
-            self.pending.try_resize(undo.pending, 0)?;
+            self.pending.truncate(undo.pending);
         }
         Ok(())
     }
@@ -304,65 +310,84 @@ impl Decoder {
 
     /// Decode one packet. An empty packet presents nothing.
     pub fn decode(&mut self, packet: &[u8], work: &mut WorkBudget) -> Result<Status<'_>> {
-        if self.last.take().is_some_and(|undo| undo.completed) {
-            self.pending.clear();
-        }
-        let resumed = self.pending.len();
-        let length = resumed + packet.len();
+        // A unit the last decode completed is discarded by this one.
+        let resumed = match self.last {
+            Some(Undo {
+                completed: true, ..
+            }) => 0,
+            _ => self.pending.len(),
+        };
+        // The packet continues the buffered unit rather than starting one.
+        let continues = resumed != 0;
+        let length = resumed.saturating_add(packet.len());
         if length > self.limits.max_unit {
             return Err(Error::Limit {
                 requested: length,
                 maximum: self.limits.max_unit,
             });
         }
-        let before = Undo {
+        let undo = Undo {
             colours: self.colours,
             pending: resumed,
-            completed: resumed != 0,
-        };
-        self.last = Some(Undo {
             completed: false,
-            ..before
-        });
-        let (unit, header) = if resumed == 0 {
-            let Some(header) = Header::read(packet) else {
-                return Ok(Status::Nothing);
-            };
-            if !header.complete(packet.len()) {
-                if header.control <= header.size {
-                    self.pending.try_extend_from_slice(packet)?;
-                }
-                return Ok(Status::Nothing);
-            }
-            (packet, header)
-        } else {
-            self.pending.try_extend_from_slice(packet)?;
-            match Header::read(self.pending.as_slice()) {
-                Some(header) if header.complete(length) => (self.pending.as_slice(), header),
-                _ => return Ok(Status::Nothing),
-            }
         };
-        self.last = Some(before);
+        let header = if continues {
+            self.pending.try_extend_from_slice(packet)?;
+            Header::read(&self.pending)
+        } else {
+            Header::read(packet)
+        };
+        let Some(header) = header.filter(|header| header.complete(length)) else {
+            if !continues {
+                // An incomplete start is kept unless its control offset lies
+                // beyond its size.
+                let start = header.filter(|header| header.control <= header.size);
+                self.restart_pending(start.map_or(&[], |_| packet))?;
+            }
+            self.last = Some(undo);
+            self.credit = 0;
+            return Ok(Status::Nothing);
+        };
+        let unit = if continues {
+            self.pending.as_slice()
+        } else {
+            packet
+        };
+        let mut colours = self.colours;
         let granted = work.remaining();
         let mut banked = WorkBudget::new(granted.saturating_add(self.credit));
-        let mut pass = Pass {
+        let outcome = Pass {
             settings: &self.settings,
             limits: self.limits,
-            colours: &mut self.colours,
+            colours: &mut colours,
             palette: &mut self.palette,
             plane: &mut self.plane,
             work: &mut banked,
-        };
-        let outcome = pass.run(unit, header);
-        if matches!(outcome, Err(Halt::Yield)) {
+        }
+        .run(unit, header);
+        if let Err(Halt::Yield) = outcome {
             work.take(granted);
             self.credit = self.credit.saturating_add(granted);
         } else {
             work.take(banked.spent().saturating_sub(self.credit));
             self.credit = 0;
         }
-        if let Err(Halt::Yield | Halt::Failed(Error::Backpressure { .. })) = outcome {
-            self.rewind()?;
+        match outcome {
+            Ok(_) | Err(Halt::Malformed) => {
+                self.colours = colours;
+                if !continues {
+                    self.pending.clear();
+                }
+                self.last = Some(Undo {
+                    completed: continues,
+                    ..undo
+                });
+            }
+            Err(Halt::Yield | Halt::Failed(_)) => {
+                if continues {
+                    self.pending.truncate(resumed);
+                }
+            }
         }
         match outcome {
             Ok(shown) => Ok(Status::Subtitle(
@@ -372,6 +397,15 @@ impl Decoder {
             Err(Halt::Yield) => Ok(Status::Yield),
             Err(Halt::Failed(error)) => Err(error),
         }
+    }
+
+    /// Replace the buffered bytes with `start`, or change nothing when the
+    /// memory is refused.
+    fn restart_pending(&mut self, start: &[u8]) -> Result<()> {
+        self.pending
+            .try_reserve_exact(start.len().saturating_sub(self.pending.len()))?;
+        self.pending.clear();
+        self.pending.try_extend_from_slice(start)
     }
 }
 
