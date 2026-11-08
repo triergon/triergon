@@ -55,7 +55,10 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
   `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.
 - Storage that depends on the stream is charged to the decoder's budget before it is
   allocated: each channel element, its SBR/PS state and each coupling channel when the
-  stream first needs it, and the output frame before an access unit is decoded.
+  stream first needs it, and the output frame for the configured layout before an access
+  unit's first raw data block. A PCE, a CPE in a mono stream or the start of SBR or PS
+  inside an access unit reconfigures the decoder in band: its state and the larger frame
+  are charged when it appears, and a refusal there drops the rest of the access unit.
   `Decoder::with_limits(Limits { live_storage_bytes })` sets the pool, `Decoder::new_in`
   charges a caller's `Budget`; a refused charge is `DecodeError::Budget` and the decoder
   stays usable. The 32 MiB default holds the largest layout a PCE can declare: 48 elements

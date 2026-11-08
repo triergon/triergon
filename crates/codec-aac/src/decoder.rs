@@ -739,9 +739,10 @@ impl Core {
         }
     }
 
-    /// Charge the output of `blocks` raw data blocks in the current layout before any is
-    /// decoded, so that a refusal leaves the decoder unchanged. `emit_planes` grows the frame
-    /// again only when the layout or SBR switches inside the access unit.
+    /// Charge the output of `blocks` raw data blocks in the configured layout before any is
+    /// decoded. `emit_planes` grows the frame again only when the access unit reconfigures
+    /// the decoder in band (a PCE, a CPE in a mono stream, the start of SBR or PS), which
+    /// creates state when it appears.
     pub(crate) fn reserve_output(&mut self, out: &mut AudioFrame, blocks: usize) -> Result<()> {
         let (channels, len) = (self.layout.channels(), blocks * self.frame_len());
         if out.planes.len() < channels || out.planes[..channels].iter().any(|p| p.capacity() < len)
