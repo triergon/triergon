@@ -227,10 +227,13 @@ selective style overrides), in the frame and storage size and margins of its
   composited with its blur, `\be` and shadow by `Raster::compose`; then each run's shadow,
   border and fill as images, clipped by the clip rectangle (with `\kf`'s
   split), multiplied by a vector clip, and the box of `BorderStyle` 4.
-- **The frame.** Events are taken in layer and read order; within a layer,
-  events placed by their margins move clear of each other and keep their
-  place on later frames (the record lives with the event in the `Script`);
-  fully transparent images are dropped.
+- **The frame.** Events are taken in layer and read order, and in the
+  script's order where both are equal (libass's `qsort` leaves that order
+  unspecified; a whole script's events differ in ReadOrder, a stream's need
+  not); within a layer, events placed by their margins move clear of each
+  other and keep their place on later frames (the record lives with the event
+  in the `Script`, and a refused frame changes none); fully transparent
+  images are dropped.
 - **Change detection.** `Frame::change` is what libass's `ass_detect_change`
   reports: `Change::Content` when the image count differs or an image's size,
   stride, colour or bitmap does, `Change::Positions` when only places do,

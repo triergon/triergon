@@ -153,7 +153,9 @@ fn fit(s: Rect, fixed: &mut BudgetVec<Rect>, up: bool) -> Result<i32> {
 
 /// `fix_collisions` over the events of one layer and their records: those
 /// placed before keep their place unless it changed height or now overlaps,
-/// the others move clear of them. `used` is scratch storage.
+/// the others move clear of them. `used` is scratch storage, reserved for
+/// every event before any record changes, so a refused reservation leaves
+/// the records as they were.
 pub(super) fn fix(
     events: &mut [EventBox],
     placed: &mut [Placed],
@@ -163,6 +165,8 @@ pub(super) fn fix(
     frame_height: i32,
 ) -> Result<()> {
     used.clear();
+    // Each event joins the boxes at most once.
+    used.try_reserve_exact(events.len())?;
     for (event, record) in events.iter_mut().zip(placed.iter_mut()) {
         if !event.takes_part() {
             continue;

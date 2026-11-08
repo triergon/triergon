@@ -268,6 +268,60 @@ fn a_frame_is_bounded_by_its_work_setting_and_charged_linearly() {
     }
 }
 
+/// A frame refused past its work bound keeps no collision record: the next
+/// frame places events as if it had not been asked for.
+#[test]
+fn a_refused_frame_leaves_collision_records_unchanged() {
+    let budget = Budget::new(256 << 20).unwrap();
+    // B arrives on A at 1 s and moves up; once A ends, B keeps the place it
+    // was given. Layer 1 collides too, so its collision handling is the last
+    // work of the frame, after layer 0's records are made.
+    let events = "Dialogue: 0,0:00:00.00,0:00:02.00,Default,AB\n\
+                  Dialogue: 0,0:00:01.00,0:00:09.00,Default,BC\n\
+                  Dialogue: 1,0:00:00.00,0:00:09.00,Default,CA\n\
+                  Dialogue: 1,0:00:00.00,0:00:09.00,Default,AC\n";
+    let run = |work: u64, times: &[i64]| {
+        let mut settings = Settings::new(Size::new(1280, 720));
+        settings.storage = Some(Size::new(640, 360));
+        settings.work = work;
+        let fonts = Fonts {
+            attached: vec![test_sans(&budget)],
+            ..Fonts::default()
+        };
+        let mut renderer = Renderer::new(&budget, &settings, &fonts).unwrap();
+        let mut script = script(&budget, events);
+        let mut frames = Vec::new();
+        for &now in times {
+            frames.push(renderer.render(&mut script, now).map(|frame| {
+                frame
+                    .images
+                    .iter()
+                    .map(|i| (i.kind, i.x, i.y))
+                    .collect::<Vec<_>>()
+            }));
+        }
+        frames
+    };
+    // The least bound under which the frame at 1 s is made after the one at 0.
+    let (mut refused, mut made) = (0, Settings::DEFAULT_WORK);
+    while made - refused > 1 {
+        let mid = refused + (made - refused) / 2;
+        if run(mid, &[0, 1000])[1].is_ok() {
+            made = mid;
+        } else {
+            refused = mid;
+        }
+    }
+    let frames = run(made - 1, &[0, 1000, 3000]);
+    assert!(frames[0].is_ok());
+    assert!(matches!(frames[1], Err(Error::Policy(_))));
+    let skipped = run(made - 1, &[0, 3000]);
+    assert_eq!(frames[2], skipped[1]);
+    // Had the frame at 1 s been made, B would have kept its raised place.
+    let kept = run(made, &[0, 1000, 3000]);
+    assert_ne!(kept[2], skipped[1]);
+}
+
 struct Rng(u64);
 
 impl Rng {

@@ -172,40 +172,40 @@ impl Renderer {
                 boxes.try_push(event).map_err(|e| e.error)?;
             }
         }
-        // libass sorts by layer and read order, which are unique in a track.
+        // libass sorts by layer and read order with qsort, which leaves the
+        // order of equal keys unspecified, and a ReadOrder repeats (0 for
+        // every event of a whole script): equal keys keep the script's order.
+        // Boxes are collected in that order, so the event index completes the
+        // key and the sort needs no scratch.
         boxes
             .as_mut_slice()
-            .sort_unstable_by_key(|b| (b.layer, b.read_order));
-        let mut start = 0;
-        while start < boxes.len() {
-            let layer = boxes.as_slice()[start].layer;
-            let end = boxes.as_slice()[start..]
-                .iter()
-                .position(|b| b.layer != layer)
-                .map_or(boxes.len(), |n| start + n);
-            let group = &mut boxes.as_mut_slice()[start..end];
+            .sort_unstable_by_key(|b| (b.layer, b.read_order, b.event));
+        // Collision records are worked on in scratch and kept with the
+        // events only once the whole frame has been made: a refused frame
+        // leaves them as they were.
+        let placed = &mut self.scratch.placed;
+        placed.clear();
+        placed.try_reserve_exact(boxes.len())?;
+        for b in boxes.as_slice() {
+            placed
+                .try_push(script.events()[b.event].placed)
+                .map_err(|e| e.error)?;
+        }
+        let mut records = placed.as_mut_slice();
+        for layer in boxes.as_mut_slice().chunk_by_mut(|a, b| a.layer == b.layer) {
+            let (group, rest) = records.split_at_mut(layer.len());
+            records = rest;
             // Each event that takes part is fitted against those before it.
-            let taking_part = group.iter().filter(|b| b.takes_part()).count();
+            let taking_part = layer.iter().filter(|b| b.takes_part()).count();
             charge(&mut work, taking_part.saturating_mul(taking_part))?;
-            let placed = &mut self.scratch.placed;
-            placed.clear();
-            for b in group.iter() {
-                placed
-                    .try_push(script.events()[b.event].placed)
-                    .map_err(|e| e.error)?;
-            }
             collisions::fix(
+                layer,
                 group,
-                placed.as_mut_slice(),
                 self.scratch.images.as_mut_slice(),
                 &mut self.scratch.used,
                 self.id,
                 self.frame.height,
             )?;
-            for (b, record) in group.iter().zip(placed.as_slice()) {
-                script.events_mut()[b.event].placed = *record;
-            }
-            start = end;
         }
         let images = self.scratch.images.as_slice();
         let next = &mut self.scratch.frame;
@@ -214,6 +214,9 @@ impl Renderer {
             for image in &images[b.images.clone()] {
                 next.try_push(image.clone()).map_err(|e| e.error)?;
             }
+        }
+        for (b, record) in boxes.as_slice().iter().zip(self.scratch.placed.as_slice()) {
+            script.events_mut()[b.event].placed = *record;
         }
         self.scratch.boxes = boxes;
         images::drop_transparent(next);
