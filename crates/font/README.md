@@ -37,7 +37,7 @@ let _advance = f64::from(metrics.advance) / em;
 
 // The glyph as libass draws it with hinting off: 256 pixels, then scaled.
 let sized = font.at_size(triergon_font::pixels_26_6(256.0))?;
-let mut scaled = triergon_font::ScaledOutline::new(&pool); // reuse it too
+let mut scaled = Outline::new(&pool); // reuse it too
 let glyph_metrics = sized.outline_into(glyph, &mut scaled)?; // 26.6 pixels, y up
 sized.synthesize(&mut scaled, font.synthesis(request.weight(), request.slant()))?;
 let _shaping_advance = sized.hinted_advance(glyph)?; // what HarfBuzz receives
@@ -95,9 +95,10 @@ as FreeType sizes it (at most 65536 entries; one too short for `maxp` is read on
 into the bytes before the next table when they hold every entry, else the glyph
 count drops to the glyphs it covers), and broken `loca` data is repaired: a glyph starting, or (except the last) ending, past `glyf` is
 empty, the last glyph is cut at the table's end, and one ending before it starts
-runs to the end. Instructions are skipped. In font units, component matrices
-apply in `f64`; at a size they apply as FreeType's `FT_MulFix`, so the two can
-differ by 1/64 unit where a 2×2 matrix meets very large coordinates.
+runs to the end. Instructions are skipped. Outlines are whole font units, as
+FreeType loads them with `FT_LOAD_NO_SCALE`: component matrices apply as
+`FT_Outline_Transform` and offsets with `FT_MulFix`, the same fixed-point
+arithmetic as at a size with a scale of one.
 
 **CFF and CFF2 outlines.** `CFF ` version 1 with Type 2 charstrings, name-keyed or
 CID-keyed (FDArray, FDSelect formats 0 and 3), and `CFF2` (FDSelect format 4 too)
@@ -131,8 +132,8 @@ FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A
 `SizedFont` then gives:
 
 - `outline_into`: the outline libass draws with hinting off
-  (`FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP`), in a `ScaledOutline` of 26.6 `i32`
-  points, y up, and its unhinted advance (`advance.x`, `pp2 - pp1`). TrueType
+  (`FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP`), in an `Outline` of 26.6 points,
+  y up, and its unhinted advance (`advance.x`, `pp2 - pp1`). TrueType
   points, component offsets (scaled with FreeType's CORDIC `FT_Hypot` under
   SCALED_COMPONENT_OFFSET) and the `xMin - lsb` origin are scaled with
   `FT_MulFix`; component matrices apply as `FT_Outline_Transform`. CFF outlines
@@ -142,7 +143,7 @@ FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A
   `Font::weight`: the oblique shear (0x2d24 for CFF faces, 0x5700 for others, as
   `FT_Outline_Transform` applies it), then `FT_Outline_EmboldenXY` with libass's
   strength (`embolden_strength`, the em in 26.6 pixels over 64), including
-  `FT_Vector_NormLen` and the orientation test. `ScaledOutline::transform`,
+  `FT_Vector_NormLen` and the orientation test. `Outline::transform`,
   `embolden` and `orientation` are public.
 - `hinted_advance`: the advance of FreeType's default load, which libass's
   HarfBuzz callbacks report: the unhinted advance at the hinting scale (TrueType
@@ -211,7 +212,7 @@ lookup depends on; glyph programs, cmap entries, names and kerning pairs are rea
 from the font bytes when asked for. A face retains the shared `Bytes` plus small
 tables charged to the `Budget` it was created with: the supported cmap records, one
 Private DICT per CFF FDArray entry, variation region scalars and kern subtable
-records. An `Outline` or `ScaledOutline` charges its points and contour ends to its
+records. An `Outline` charges its points and contour ends to its
 own budget and keeps its capacity across glyphs; a `SizedFont` is a small copyable
 view that allocates nothing.
 
@@ -235,7 +236,7 @@ composites) are
   - `font-outlines`, per face: metrics, style, family, style and PostScript names,
     every name record, every cmap mapping, the text charmap, the kerning of every
     pair the `kern` table lists, and for every glyph its `hmtx` and loaded advances
-    and its outline at 1/64 font unit.
+    and its unscaled outline in font units (`FT_LOAD_NO_SCALE`).
   - `font-scaled`, per face at each of ten 26.6 heights, after libass's GDI face
     metrics: 256 pixels (libass with hinting off) and 75, 82.5, 50, 48, 37.5,
     33.75, 13.33, 24.5 and 8.4 (common ASS sizes on 1080- and 720-line frames,

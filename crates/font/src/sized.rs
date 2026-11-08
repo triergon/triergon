@@ -2,12 +2,12 @@
 //! the size: scales, size metrics, scaled unhinted outlines and advances, the
 //! hinted advances HarfBuzz receives, kerning and decoration lines.
 
-use crate::cff::Scale;
+use crate::fixed::Scale;
 use crate::fixed::{div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_round};
-use crate::glyf::{self, Scaled};
-use crate::outline::ScaledOutline;
+use crate::glyf;
+use crate::outline::Outline;
 use crate::synthesis::Synthesis;
-use crate::{Font, GlyphId, Outlines, VerticalMetrics};
+use crate::{Font, GlyphId, GlyphMetrics, Outlines, VerticalMetrics};
 use triergon_core::{Error, Result, WorkBudget};
 
 /// libass's largest outline coordinate, `OUTLINE_MAX`.
@@ -28,13 +28,6 @@ pub struct SizeMetrics {
     pub descender: i64,
     pub height: i64,
     pub max_advance: i64,
-}
-
-/// What loading a glyph at a size reports besides its outline.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ScaledMetrics {
-    /// The unhinted advance in 26.6 pixels (`advance.x` of the glyph slot).
-    pub advance: i32,
 }
 
 /// A horizontal band in 26.6 pixels, y up: an underline or strikeout as libass
@@ -303,7 +296,8 @@ impl<'f> SizedFont<'f> {
     /// Loads `glyph` into `outline` as libass loads it with hinting off
     /// (`FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP`): unhinted, scaled to 26.6
     /// pixels, y up, the origin at the glyph's left side bearing as FreeType
-    /// places it.
+    /// places it, with the unhinted advance in 26.6 pixels (`advance.x` of the
+    /// glyph slot).
     ///
     /// TrueType points scale with `FT_MulFix` by the size's scales (unhinted
     /// loading ignores `head`'s integer-ppem flag); composites transform and
@@ -314,43 +308,8 @@ impl<'f> SizedFont<'f> {
     ///
     /// Those of [`Font::outline_into`]; `Overflow` for coordinates beyond
     /// `i32`.
-    pub fn outline_into(
-        &self,
-        glyph: GlyphId,
-        outline: &mut ScaledOutline,
-    ) -> Result<ScaledMetrics> {
-        let font = self.font;
-        let index = font.check(glyph)?;
-        let data = font.data.as_ref();
-        let mut work = WorkBudget::new(font.limits.work);
-        match &font.outlines {
-            Outlines::Glyf(table) => {
-                outline.begin(font.limits.points);
-                let units = Scaled {
-                    x: self.metrics.x_scale,
-                    y: self.metrics.y_scale,
-                };
-                let m = table.outline(&font.glyf_context(), glyph, units, outline, &mut work)?;
-                // FreeType's phantom points: the origin and the advance.
-                let origin = i64::from(m.x_min) - i64::from(font.side_bearing(m.glyph));
-                let advance = i64::from(font.hmtx.advance(data, m.glyph));
-                let pp1 = mul_fix(origin, units.x);
-                let pp2 = mul_fix(origin + advance, units.x);
-                if pp1 != 0 {
-                    glyf::Units::translate(units, outline.points_mut(), (-pp1, 0))?;
-                }
-                Ok(ScaledMetrics {
-                    advance: glyf::narrow(pp2 - pp1)?,
-                })
-            }
-            Outlines::Cff(cff) => {
-                cff.load(data, glyph, self.scale(), outline, &font.limits, &mut work)?;
-                let advance = font.hmtx.advance(data, index);
-                Ok(ScaledMetrics {
-                    advance: glyf::narrow(cff.advance(data, glyph, advance, self.scale())?)?,
-                })
-            }
-        }
+    pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
+        self.font.load(glyph, self.scale(), outline)
     }
 
     const fn scale(&self) -> Scale {
@@ -367,7 +326,7 @@ impl<'f> SizedFont<'f> {
     /// # Errors
     ///
     /// `Overflow` for coordinates beyond `i32`.
-    pub fn synthesize(&self, outline: &mut ScaledOutline, synthesis: Synthesis) -> Result<()> {
+    pub fn synthesize(&self, outline: &mut Outline, synthesis: Synthesis) -> Result<()> {
         if synthesis.oblique {
             outline.transform([0x1_0000, Synthesis::shear(self.font), 0, 0x1_0000])?;
         }

@@ -1,8 +1,8 @@
-//! TrueType outlines (OpenType `glyf` and `loca`), unhinted, in font units or
-//! scaled as FreeType scales them.
+//! TrueType outlines (OpenType `glyf` and `loca`), unhinted, at a 16.16 scale
+//! (one for font units) in FreeType's fixed-point arithmetic.
 
-use crate::fixed::{hypot, mul_fix};
-use crate::outline::{Coordinate, Outline, OutlinePoint, Point, PointKind};
+use crate::fixed::{Scale, hypot, mul_fix};
+use crate::outline::{Outline, OutlinePoint, Point, PointKind};
 use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
 use crate::work::charge;
@@ -36,140 +36,53 @@ const MAX_COMPONENT_DEPTH: u32 = 64;
 /// `x' = xx x + xy y` and `y' = yx x + yy y`.
 type Matrix = [i16; 4];
 
-/// How stored font units become outline coordinates, and how composites move
-/// their components in those coordinates.
-pub(crate) trait Units: Copy {
-    type Coord: Coordinate;
-    /// An offset between two points, wide enough for any difference.
-    type Offset: Copy + Default + PartialEq;
-
-    fn point(self, x: i64, y: i64) -> Result<Point<Self::Coord>>;
-
-    fn transform(self, points: &mut [OutlinePoint<Self::Coord>], m: Matrix) -> Result<()>;
-
-    /// A component offset given in font units; `scaled` carries the matrix when
-    /// the component asks for its offset to scale (`SCALED_COMPONENT_OFFSET`).
-    fn offset(self, x: i32, y: i32, scaled: Option<Matrix>) -> Self::Offset;
-
-    /// `to - from`.
-    fn between(self, to: Point<Self::Coord>, from: Point<Self::Coord>) -> Self::Offset;
-
-    fn translate(self, points: &mut [OutlinePoint<Self::Coord>], by: Self::Offset) -> Result<()>;
-}
-
-/// Font units as `f32`, transformed in `f64`.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct FontUnits;
-
-impl Units for FontUnits {
-    type Coord = f32;
-    type Offset = (f64, f64);
-
-    fn point(self, x: i64, y: i64) -> Result<Point<f32>> {
-        Ok(Point::new(x as f32, y as f32))
-    }
-
-    fn transform(self, points: &mut [OutlinePoint<f32>], m: Matrix) -> Result<()> {
-        let m = m.map(|v| f64::from(v) / 16384.0);
-        for p in points {
-            let (x, y) = (f64::from(p.point.x), f64::from(p.point.y));
-            p.point.x = (m[0] * x + m[2] * y) as f32;
-            p.point.y = (m[1] * x + m[3] * y) as f32;
-        }
-        Ok(())
-    }
-
-    fn offset(self, x: i32, y: i32, scaled: Option<Matrix>) -> (f64, f64) {
-        // A scaled offset is whole font units, as FreeType computes it.
-        let (x, y) = scaled_offset(x, y, scaled);
-        (x as f64, y as f64)
-    }
-
-    fn between(self, to: Point<f32>, from: Point<f32>) -> (f64, f64) {
-        (
-            f64::from(to.x) - f64::from(from.x),
-            f64::from(to.y) - f64::from(from.y),
-        )
-    }
-
-    fn translate(self, points: &mut [OutlinePoint<f32>], (dx, dy): (f64, f64)) -> Result<()> {
-        for p in points {
-            p.point.x = (f64::from(p.point.x) + dx) as f32;
-            p.point.y = (f64::from(p.point.y) + dy) as f32;
-        }
-        Ok(())
-    }
-}
-
-/// A component offset in font units, scaled when the component asks for it
-/// by the length of each matrix row (FreeType's reading of Apple's rule) and
-/// rounded to whole units with `FT_MulFix`.
-fn scaled_offset(x: i32, y: i32, scaled: Option<Matrix>) -> (i64, i64) {
-    let (x, y) = (i64::from(x), i64::from(y));
-    match scaled {
-        // FreeType widens F2Dot14 to 16.16 by multiplying with 4.
-        Some(m) => {
-            let [xx, yx, xy, yy] = m.map(|v| i64::from(v) * 4);
-            (mul_fix(x, hypot(xx, xy)), mul_fix(y, hypot(yy, yx)))
-        }
-        None => (x, y),
-    }
-}
-
-/// 26.6 pixels: font units times 16.16 scales with `FT_MulFix`, component
-/// matrices applied as `FT_Outline_Transform` applies them.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Scaled {
-    pub(crate) x: i64,
-    pub(crate) y: i64,
-}
-
 /// A 26.6 value that fits the outline's `i32` coordinates.
 pub(crate) fn narrow(v: i64) -> Result<i32> {
     i32::try_from(v).map_err(|_| Error::Overflow)
 }
 
-impl Units for Scaled {
-    type Coord = i32;
-    type Offset = (i64, i64);
+/// A stored point at `scale`.
+fn point(scale: Scale, x: i64, y: i64) -> Result<Point> {
+    Ok(Point::new(
+        narrow(mul_fix(x, scale.x))?,
+        narrow(mul_fix(y, scale.y))?,
+    ))
+}
 
-    fn point(self, x: i64, y: i64) -> Result<Point<i32>> {
-        Ok(Point::new(
-            narrow(mul_fix(x, self.x))?,
-            narrow(mul_fix(y, self.y))?,
-        ))
+/// Applies a component matrix as `FT_Outline_Transform` does, after FreeType
+/// widens F2Dot14 to 16.16 by multiplying with 4.
+fn transform(points: &mut [OutlinePoint], m: Matrix) -> Result<()> {
+    let [xx, yx, xy, yy] = m.map(|v| i64::from(v) * 4);
+    for p in points {
+        let (x, y) = (i64::from(p.point.x), i64::from(p.point.y));
+        p.point.x = narrow(mul_fix(x, xx) + mul_fix(y, xy))?;
+        p.point.y = narrow(mul_fix(x, yx) + mul_fix(y, yy))?;
     }
+    Ok(())
+}
 
-    fn transform(self, points: &mut [OutlinePoint<i32>], m: Matrix) -> Result<()> {
-        // FreeType widens F2Dot14 to 16.16 by multiplying with 4.
-        let [xx, yx, xy, yy] = m.map(|v| i64::from(v) * 4);
-        for p in points {
-            let (x, y) = (i64::from(p.point.x), i64::from(p.point.y));
-            p.point.x = narrow(mul_fix(x, xx) + mul_fix(y, xy))?;
-            p.point.y = narrow(mul_fix(x, yx) + mul_fix(y, yy))?;
+/// A component offset at `scale`: in whole font units first, scaled when the
+/// component asks for it by the length of each matrix row (FreeType's reading
+/// of Apple's rule), each product rounded with `FT_MulFix`.
+fn offset(scale: Scale, x: i32, y: i32, scaled: Option<Matrix>) -> (i64, i64) {
+    let (x, y) = (i64::from(x), i64::from(y));
+    let (x, y) = match scaled {
+        Some(m) => {
+            let [xx, yx, xy, yy] = m.map(|v| i64::from(v) * 4);
+            (mul_fix(x, hypot(xx, xy)), mul_fix(y, hypot(yy, yx)))
         }
-        Ok(())
-    }
+        None => (x, y),
+    };
+    (mul_fix(x, scale.x), mul_fix(y, scale.y))
+}
 
-    fn offset(self, x: i32, y: i32, scaled: Option<Matrix>) -> (i64, i64) {
-        let (x, y) = scaled_offset(x, y, scaled);
-        (mul_fix(x, self.x), mul_fix(y, self.y))
+/// Moves points by `(dx, dy)`.
+pub(crate) fn translate(points: &mut [OutlinePoint], (dx, dy): (i64, i64)) -> Result<()> {
+    for p in points {
+        p.point.x = narrow(i64::from(p.point.x) + dx)?;
+        p.point.y = narrow(i64::from(p.point.y) + dy)?;
     }
-
-    fn between(self, to: Point<i32>, from: Point<i32>) -> (i64, i64) {
-        (
-            i64::from(to.x) - i64::from(from.x),
-            i64::from(to.y) - i64::from(from.y),
-        )
-    }
-
-    fn translate(self, points: &mut [OutlinePoint<i32>], (dx, dy): (i64, i64)) -> Result<()> {
-        for p in points {
-            p.point.x = narrow(i64::from(p.point.x) + dx)?;
-            p.point.y = narrow(i64::from(p.point.y) + dy)?;
-        }
-        Ok(())
-    }
+    Ok(())
 }
 
 /// The `glyf` table and its `loca` index.
@@ -320,23 +233,23 @@ impl Glyf {
     }
 
     /// Loads `glyph` into `outline` and reports whose metrics apply.
-    pub(crate) fn outline<U: Units>(
+    pub(crate) fn outline(
         &self,
         cx: &Context<'_>,
         glyph: GlyphId,
-        units: U,
-        outline: &mut Outline<U::Coord>,
+        scale: Scale,
+        outline: &mut Outline,
         work: &mut WorkBudget,
     ) -> Result<Metrics> {
-        self.load(cx, glyph.0, units, outline, work, 0)
+        self.load(cx, glyph.0, scale, outline, work, 0)
     }
 
-    fn load<U: Units>(
+    fn load(
         &self,
         cx: &Context<'_>,
         glyph: u16,
-        units: U,
-        outline: &mut Outline<U::Coord>,
+        scale: Scale,
+        outline: &mut Outline,
         work: &mut WorkBudget,
         depth: u32,
     ) -> Result<Metrics> {
@@ -358,7 +271,7 @@ impl Glyf {
         }
         let mut metrics = Metrics { glyph, x_min };
         if contours > 0 {
-            simple(&mut r, contours.unsigned_abs(), units, outline, work)?;
+            simple(&mut r, contours.unsigned_abs(), scale, outline, work)?;
         } else {
             // FreeType reads every negative count as a composite.
             if depth >= MAX_COMPONENT_DEPTH {
@@ -367,7 +280,7 @@ impl Glyf {
             if depth >= cx.limits.depth {
                 return Err(Error::Policy("glyph nesting depth"));
             }
-            if let Some(own) = self.composite(cx, &mut r, units, outline, work, depth)? {
+            if let Some(own) = self.composite(cx, &mut r, scale, outline, work, depth)? {
                 metrics = own;
             }
         }
@@ -376,12 +289,12 @@ impl Glyf {
 
     /// Appends the components; returns the metrics of the last `USE_MY_METRICS`
     /// component.
-    fn composite<U: Units>(
+    fn composite(
         &self,
         cx: &Context<'_>,
         r: &mut Reader<'_>,
-        units: U,
-        outline: &mut Outline<U::Coord>,
+        scale: Scale,
+        outline: &mut Outline,
         work: &mut WorkBudget,
         depth: u32,
     ) -> Result<Option<Metrics>> {
@@ -391,13 +304,13 @@ impl Glyf {
             charge(work, 1)?;
             let c = component(r)?;
             let base = outline.len();
-            let component = self.load(cx, c.glyph, units, outline, work, depth + 1)?;
+            let component = self.load(cx, c.glyph, scale, outline, work, depth + 1)?;
             if c.flags & USE_MY_METRICS != 0 {
                 metrics = Some(component);
             }
             // FreeType places only components that add points.
             if outline.len() > base {
-                place(&c, units, outline, first, base)?;
+                place(&c, scale, outline, first, base)?;
             }
             if c.flags & MORE_COMPONENTS == 0 {
                 break;
@@ -409,20 +322,20 @@ impl Glyf {
 
 /// Transforms and moves the component points from `base` on: by its offset,
 /// or so that its point matches a point of the composite starting at `first`.
-fn place<U: Units>(
+fn place(
     c: &Component,
-    units: U,
-    outline: &mut Outline<U::Coord>,
+    scale: Scale,
+    outline: &mut Outline,
     first: usize,
     base: usize,
 ) -> Result<()> {
     let (a, b) = c.args;
     if let Some(m) = c.matrix {
-        units.transform(&mut outline.points_mut()[base..], m)?;
+        transform(&mut outline.points_mut()[base..], m)?;
     }
     let offset = if c.flags & ARGS_ARE_XY_VALUES != 0 {
         let scaled = c.matrix.filter(|_| c.flags & SCALED_COMPONENT_OFFSET != 0);
-        units.offset(a, b, scaled)
+        offset(scale, a, b, scaled)
     } else {
         let parent = usize::try_from(a)
             .ok()
@@ -431,12 +344,15 @@ fn place<U: Units>(
         let child = usize::try_from(b).ok().map(|i| base + i);
         let all = outline.points();
         match (parent.map(|i| all[i].point), child.and_then(|i| all.get(i))) {
-            (Some(p), Some(c)) => units.between(p, c.point),
+            (Some(p), Some(c)) => (
+                i64::from(p.x) - i64::from(c.point.x),
+                i64::from(p.y) - i64::from(c.point.y),
+            ),
             _ => return Err(Error::Invalid("component attachment point")),
         }
     };
-    if offset != U::Offset::default() {
-        units.translate(&mut outline.points_mut()[base..], offset)?;
+    if offset != (0, 0) {
+        translate(&mut outline.points_mut()[base..], offset)?;
     }
     Ok(())
 }
@@ -479,11 +395,11 @@ fn component(r: &mut Reader<'_>) -> Result<Component> {
 }
 
 /// Appends a simple glyph's contours.
-fn simple<U: Units>(
+fn simple(
     r: &mut Reader<'_>,
     contours: u16,
-    units: U,
-    outline: &mut Outline<U::Coord>,
+    scale: Scale,
+    outline: &mut Outline,
     work: &mut WorkBudget,
 ) -> Result<()> {
     let ends = r.take(2 * usize::from(contours))?;
@@ -521,7 +437,7 @@ fn simple<U: Units>(
         } else {
             PointKind::Quadratic
         };
-        outline.push_point(units.point(x, y)?, kind)?;
+        outline.push_point(point(scale, x, y)?, kind)?;
     }
     let ends = ends
         .chunks_exact(2)
@@ -592,7 +508,8 @@ fn delta(r: &mut Reader<'_>, flag: u8, short: u8, same: u8) -> Result<i64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FontUnits, Glyf, Scaled, Units};
+    use super::{Glyf, offset, point, transform};
+    use crate::fixed::Scale;
     use crate::outline::{OutlinePoint, Point, PointKind};
     use crate::sfnt::Table;
 
@@ -613,24 +530,23 @@ mod tests {
 
     #[test]
     fn scaled_components_round_each_product() {
-        let units = Scaled {
+        let scale = Scale {
             x: 0x10_624D,
             y: 0x10_624D,
         };
-        assert_eq!(units.point(1000, -3), Ok(Point::new(16384, -49)));
+        assert_eq!(point(scale, 1000, -3), Ok(Point::new(16384, -49)));
         let mut points = [OutlinePoint {
             point: Point::new(100, 3),
             kind: PointKind::On,
         }];
         // Half scale: 0x2000 in F2Dot14.
-        units
-            .transform(&mut points, [0x2000, 0, 0, 0x2000])
-            .unwrap();
+        transform(&mut points, [0x2000, 0, 0, 0x2000]).unwrap();
         assert_eq!(points[0].point, Point::new(50, 2));
-        assert_eq!(units.offset(10, 0, None), (164, 0));
+        assert_eq!(offset(scale, 10, 0, None), (164, 0));
+        // Scaled offsets are whole font units before the scale.
         assert_eq!(
-            FontUnits.offset(10, 4, Some([0x2000, 0, 0, 0x4000])),
-            (5.0, 4.0)
+            offset(Scale::UNITS, 10, 5, Some([0x2000, 0, 0, 0x6000])),
+            (5, 8)
         );
     }
 }

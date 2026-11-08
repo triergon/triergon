@@ -10,7 +10,7 @@
     "per face: metrics and style flags; family, style and PostScript names; OS/2 weight; every name record",
     "every cmap subtable of formats 0, 4, 6, 10, 12 and 13 with every mapping, and the text charmap libass selects",
     "the kerning of every pair the kern table lists, sorted and unique, nonzero values only",
-    "for every glyph its hmtx advance, its loaded advance and its unhinted outline at 1/64 font unit; packets count glyph outlines and bytes their points",
+    "for every glyph its hmtx advance, its loaded advance and its unscaled outline in font units (FT_LOAD_NO_SCALE); packets count glyph outlines and bytes their points",
     "the file is read before each timed and memory operation; the reference library is created once, outside it"
   ],
   "required_profiles": [

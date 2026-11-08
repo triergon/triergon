@@ -15,7 +15,7 @@ use super::path::{Builder, Fixed, Path};
 use super::{Cff, Private, Version};
 use crate::Limits;
 use crate::fixed::{div_fix, mul_fix, sqrt_fixed};
-use crate::outline::{Coordinate, Outline};
+use crate::outline::Outline;
 use crate::read::Reader;
 use crate::work::charge;
 use triergon_core::{Error, Result, WorkBudget};
@@ -425,11 +425,11 @@ fn token(r: &mut Reader<'_>, version: Version) -> Result<Token> {
 }
 
 /// Loads `glyph`'s charstring into `outline`, in whole font units.
-pub(super) fn outline<C: Coordinate>(
+pub(super) fn outline(
     cff: &Cff,
     table: &[u8],
     glyph: u32,
-    outline: &mut Outline<C>,
+    outline: &mut Outline,
     limits: &Limits,
     work: &mut WorkBudget,
 ) -> Result<()> {
@@ -441,11 +441,11 @@ pub(super) fn outline<C: Coordinate>(
 
 /// The operators `glyph`'s program executes, including subroutines and `seac`
 /// components, into an outline that is then discarded.
-pub(super) fn operators<C: Coordinate>(
+pub(super) fn operators(
     cff: &Cff,
     table: &[u8],
     glyph: u32,
-    outline: &mut Outline<C>,
+    outline: &mut Outline,
     limits: &Limits,
     work: &mut WorkBudget,
 ) -> Result<OperatorSet> {
@@ -462,12 +462,12 @@ pub(super) fn operators<C: Coordinate>(
     Ok(run.observer)
 }
 
-struct Run<'a, 'o, C, O> {
+struct Run<'a, 'o, O> {
     cff: &'a Cff,
     table: &'a [u8],
     work: &'a mut WorkBudget,
     depth: u32,
-    builder: Builder<'o, C>,
+    builder: Builder<'o>,
     observer: O,
 }
 
@@ -507,13 +507,13 @@ struct State<'p, const N: usize> {
     random: u32,
 }
 
-impl<'a, 'o, C: Coordinate, O: Observe> Run<'a, 'o, C, O> {
+impl<'a, 'o, O: Observe> Run<'a, 'o, O> {
     fn new(
         cff: &'a Cff,
         table: &'a [u8],
         work: &'a mut WorkBudget,
         limits: &Limits,
-        builder: Builder<'o, C>,
+        builder: Builder<'o>,
         observer: O,
     ) -> Self {
         let depth = match cff.version {

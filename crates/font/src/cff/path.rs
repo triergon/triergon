@@ -10,7 +10,7 @@
 //! point.
 
 use crate::fixed::mul_fix;
-use crate::outline::{Coordinate, Outline, Point, PointKind};
+use crate::outline::{Outline, Point, PointKind};
 use triergon_core::Result;
 
 /// A 16.16 charstring number (`CF2_Fixed`); sums wrap at 32 bits.
@@ -57,11 +57,7 @@ impl Path {
         self.new_mask = true;
     }
 
-    pub(super) fn move_to<C: Coordinate>(
-        &mut self,
-        b: &mut Builder<'_, C>,
-        to: (Fixed, Fixed),
-    ) -> Result<()> {
+    pub(super) fn move_to(&mut self, b: &mut Builder<'_>, to: (Fixed, Fixed)) -> Result<()> {
         self.close(b)?;
         self.current = to;
         self.start = to;
@@ -70,20 +66,11 @@ impl Path {
         Ok(())
     }
 
-    pub(super) fn line_to<C: Coordinate>(
-        &mut self,
-        b: &mut Builder<'_, C>,
-        to: (Fixed, Fixed),
-    ) -> Result<()> {
+    pub(super) fn line_to(&mut self, b: &mut Builder<'_>, to: (Fixed, Fixed)) -> Result<()> {
         self.line(b, to, false)
     }
 
-    fn line<C: Coordinate>(
-        &mut self,
-        b: &mut Builder<'_, C>,
-        to: (Fixed, Fixed),
-        closing: bool,
-    ) -> Result<()> {
+    fn line(&mut self, b: &mut Builder<'_>, to: (Fixed, Fixed), closing: bool) -> Result<()> {
         let new_mask = self.new_mask && !closing;
         if to == self.current && !new_mask {
             return Ok(());
@@ -101,9 +88,9 @@ impl Path {
         Ok(())
     }
 
-    pub(super) fn curve_to<C: Coordinate>(
+    pub(super) fn curve_to(
         &mut self,
-        b: &mut Builder<'_, C>,
+        b: &mut Builder<'_>,
         c1: (Fixed, Fixed),
         c2: (Fixed, Fixed),
         to: (Fixed, Fixed),
@@ -121,7 +108,7 @@ impl Path {
     }
 
     /// The first segment after a move starts the contour.
-    fn begin<C: Coordinate>(&mut self, b: &mut Builder<'_, C>) -> Result<()> {
+    fn begin(&mut self, b: &mut Builder<'_>) -> Result<()> {
         if self.move_pending {
             self.move_pending = false;
             self.open = true;
@@ -132,7 +119,7 @@ impl Path {
     }
 
     /// Closes the open subpath with a line back to its start.
-    pub(super) fn close<C: Coordinate>(&mut self, b: &mut Builder<'_, C>) -> Result<()> {
+    pub(super) fn close(&mut self, b: &mut Builder<'_>) -> Result<()> {
         if self.open {
             self.line(b, self.start, true)?;
             self.move_pending = true;
@@ -144,16 +131,16 @@ impl Path {
 
 /// FreeType's outline builder over an [`Outline`]: whole font units.
 #[derive(Debug)]
-pub(super) struct Builder<'o, C> {
-    outline: &'o mut Outline<C>,
+pub(super) struct Builder<'o> {
+    outline: &'o mut Outline,
     /// A segment was drawn since the last move.
     begun: bool,
     /// The contour being drawn is not in the outline's contour ends yet.
     open: bool,
 }
 
-impl<'o, C: Coordinate> Builder<'o, C> {
-    pub(super) const fn new(outline: &'o mut Outline<C>) -> Self {
+impl<'o> Builder<'o> {
+    pub(super) const fn new(outline: &'o mut Outline) -> Self {
         Self {
             outline,
             begun: false,
@@ -162,8 +149,7 @@ impl<'o, C: Coordinate> Builder<'o, C> {
     }
 
     fn push(&mut self, (x, y): (i32, i32), kind: PointKind) -> Result<()> {
-        self.outline
-            .push_point(Point::new(C::from_units(x), C::from_units(y)), kind)
+        self.outline.push_point(Point::new(x, y), kind)
     }
 
     fn move_to(&mut self) -> Result<()> {

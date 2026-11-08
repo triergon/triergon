@@ -18,7 +18,7 @@ One operation parses every face of the file from memory and reads, per face:
 
 | OPERATION | HEIGHT | Read |
 |---|---|---|
-| `font` | none | the metrics and style flags, the family, style and PostScript names in FreeType's ASCII forms, the `OS/2` weight, every name record, every supported cmap subtable with all of its mappings, the text charmap, the kerning of every pair the `kern` subtables list (sorted, unique, nonzero values only), and for every glyph its `hmtx` advance, its loaded advance and its outline at 1/64 font unit |
+| `font` | none | the metrics and style flags, the family, style and PostScript names in FreeType's ASCII forms, the `OS/2` weight, every name record, every supported cmap subtable with all of its mappings, the text charmap, the kerning of every pair the `kern` subtables list (sorted, unique, nonzero values only), and for every glyph its `hmtx` advance, its loaded advance and its unscaled outline in font units (`FT_LOAD_NO_SCALE`) |
 | `font-scaled` | 26.6 pixels | the face at that size as libass loads it: the size metrics, ascent and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline and strikeout bands and the kerning of every listed pair; for every glyph its unhinted outline and advance, then that outline emboldened, slanted and both |
 | `font-hinted` | 26.6 pixels | every glyph's default-load (hinted) advance at that size |
 

@@ -3,8 +3,8 @@ mod support;
 use support::{bytes, cff_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error};
 use triergon_font::{
-    Built, CharEncoding, CmapFormat, FaceInfo, Font, GlyphId, Limits, Orientation, OutlineFormat,
-    Platform, Point, PointKind, Request, ScaledOutline, Segment, Store, StoreKey, Style,
+    Built, CharEncoding, CmapFormat, FaceInfo, Font, GlyphId, Limits, Orientation, Outline,
+    OutlineFormat, Platform, Point, PointKind, Request, Segment, Store, StoreKey, Style,
     pixels_26_6, select,
 };
 
@@ -13,7 +13,7 @@ fn parse(data: &[u8]) -> Font {
     Font::new(bytes, 0, &budget, Limits::default()).unwrap()
 }
 
-fn points(font: &Font, glyph: u16) -> (Vec<(f32, f32, PointKind)>, Vec<u32>, i32) {
+fn points(font: &Font, glyph: u16) -> (Vec<(i32, i32, PointKind)>, Vec<u32>, i32) {
     let budget = Budget::new(1 << 20).unwrap();
     let (outline, metrics) = font.outline(GlyphId(glyph), &budget).unwrap();
     let points = outline
@@ -81,18 +81,13 @@ fn truetype_outlines_shift_to_the_side_bearing_and_compose() {
     let on = PointKind::On;
     assert_eq!(
         square,
-        [
-            (50.0, 0.0, on),
-            (50.0, 200.0, on),
-            (250.0, 200.0, on),
-            (250.0, 0.0, on)
-        ]
+        [(50, 0, on), (50, 200, on), (250, 200, on), (250, 0, on)]
     );
     assert_eq!((ends, advance), (vec![4], 400));
     let (composite, ends, advance) = points(&font, 3);
     // Glyph 1 unshifted at half size plus (10, 20), then glyph 2, whose metrics apply.
-    assert_eq!(&composite[..2], [(60.0, 20.0, on), (60.0, 120.0, on)]);
-    assert_eq!(composite[5], (50.0, 100.0, PointKind::Quadratic));
+    assert_eq!(&composite[..2], [(60, 20, on), (60, 120, on)]);
+    assert_eq!(composite[5], (50, 100, PointKind::Quadratic));
     assert_eq!((ends, advance), (vec![4, 7], 300));
     let budget = Budget::new(1 << 20).unwrap();
     let (outline, _) = font.outline(GlyphId(2), &budget).unwrap();
@@ -101,8 +96,8 @@ fn truetype_outlines_shift_to_the_side_bearing_and_compose() {
     assert_eq!(
         segments,
         [
-            Segment::MoveTo(p(0.0, 0.0)),
-            Segment::QuadTo(p(50.0, 100.0), p(100.0, 0.0)),
+            Segment::MoveTo(p(0, 0)),
+            Segment::QuadTo(p(50, 100), p(100, 0)),
             Segment::Close
         ]
     );
@@ -135,7 +130,7 @@ fn sizes_scale_as_freetype_does_for_libass() {
         Err(Error::Unsupported(_))
     ));
     let budget = Budget::new(1 << 20).unwrap();
-    let mut outline = ScaledOutline::new(&budget);
+    let mut outline = Outline::new(&budget);
     let metrics = sized.outline_into(GlyphId(1), &mut outline).unwrap();
     let corners: Vec<_> = outline.points().iter().map(|p| p.point).collect();
     // xMin 100 scales to 1280; the origin (xMin - lsb) to 640.
@@ -183,19 +178,14 @@ fn cff_charstrings_with_subroutines_hints_and_flex() {
     let on = PointKind::On;
     assert_eq!(
         square,
-        [
-            (50.0, 0.0, on),
-            (150.0, 0.0, on),
-            (150.0, 100.0, on),
-            (50.0, 100.0, on)
-        ]
+        [(50, 0, on), (150, 0, on), (150, 100, on), (50, 100, on)]
     );
     assert_eq!((ends, advance), (vec![4], 410));
     let (curve, ends, _) = points(&font, 2);
     // The zero-length line is dropped; the flex adds two curves.
     assert_eq!(ends, [10]);
-    assert_eq!(curve[3], (60.0, 0.0, on));
-    assert_eq!(curve[9], (110.0, 0.0, on));
+    assert_eq!(curve[3], (60, 0, on));
+    assert_eq!(curve[9], (110, 0, on));
     assert_eq!(curve[4].2, PointKind::Cubic);
 }
 

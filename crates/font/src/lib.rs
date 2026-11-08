@@ -30,13 +30,14 @@ pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings};
 pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
-pub use outline::{Coordinate, Outline, OutlinePoint, Point, PointKind, ScaledOutline, Segment};
-pub use sized::{Band, ScaledMetrics, SizeMetrics, SizedFont, pixels_26_6};
+pub use outline::{Outline, OutlinePoint, Point, PointKind, Segment};
+pub use sized::{Band, SizeMetrics, SizedFont, pixels_26_6};
 pub use store::{Built, Store, StoreKey};
 pub use synthesis::{Orientation, Synthesis};
 
-use cff::{Cff, Scale, Version};
-use glyf::{FontUnits, Glyf};
+use cff::{Cff, Version};
+use fixed::{Scale, mul_fix};
+use glyf::Glyf;
 use kern::Kern;
 use metrics::{Head, Hhea, Hmtx};
 use name::Names;
@@ -522,32 +523,42 @@ impl Font {
     /// [`Limits`] and the outline budget's errors. On error the outline holds
     /// whatever was loaded before the failure.
     pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
+        self.load(glyph, Scale::UNITS, outline)
+    }
+
+    /// Loads `glyph` as FreeType does without hinting, at the 16.16 `scale` (one
+    /// for font units), and returns its advance at that scale.
+    pub(crate) fn load(
+        &self,
+        glyph: GlyphId,
+        scale: Scale,
+        outline: &mut Outline,
+    ) -> Result<GlyphMetrics> {
         let index = self.check(glyph)?;
         let data = self.data.as_ref();
         let mut work = WorkBudget::new(self.limits.work);
-        match &self.outlines {
-            Outlines::Glyf(glyf) => {
+        let advance = match &self.outlines {
+            Outlines::Glyf(table) => {
                 outline.begin(self.limits.points);
-                let cx = self.glyf_context();
-                let metrics = glyf.outline(&cx, glyph, FontUnits, outline, &mut work)?;
-                let shift = self.side_bearing(metrics.glyph) - i32::from(metrics.x_min);
-                if shift != 0 {
-                    for p in outline.points_mut() {
-                        p.point.x = (f64::from(p.point.x) + f64::from(shift)) as f32;
-                    }
+                let m = table.outline(&self.glyf_context(), glyph, scale, outline, &mut work)?;
+                // FreeType's phantom points: the origin and the advance.
+                let origin = i64::from(m.x_min) - i64::from(self.side_bearing(m.glyph));
+                let advance = i64::from(self.hmtx.advance(data, m.glyph));
+                let pp1 = mul_fix(origin, scale.x);
+                let pp2 = mul_fix(origin + advance, scale.x);
+                if pp1 != 0 {
+                    glyf::translate(outline.points_mut(), (-pp1, 0))?;
                 }
-                Ok(GlyphMetrics {
-                    advance: i32::from(self.hmtx.advance(data, metrics.glyph)),
-                })
+                pp2 - pp1
             }
             Outlines::Cff(cff) => {
-                cff.load(data, glyph, Scale::UNITS, outline, &self.limits, &mut work)?;
-                let advance = self.hmtx.advance(data, index);
-                Ok(GlyphMetrics {
-                    advance: glyf::narrow(cff.advance(data, glyph, advance, Scale::UNITS)?)?,
-                })
+                cff.load(data, glyph, scale, outline, &self.limits, &mut work)?;
+                cff.advance(data, glyph, self.hmtx.advance(data, index), scale)?
             }
-        }
+        };
+        Ok(GlyphMetrics {
+            advance: glyf::narrow(advance)?,
+        })
     }
 
     /// The charstring operators `glyph`'s program executes, with its subroutines

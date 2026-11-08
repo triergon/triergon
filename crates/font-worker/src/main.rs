@@ -11,9 +11,7 @@ use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use std::time::Instant;
 use triergon_core::{Budget, Bytes};
-use triergon_font::{
-    Font, GlyphId, Limits, NameRecord, Outline, ScaledOutline, SizedFont, Synthesis,
-};
+use triergon_font::{Font, GlyphId, Limits, NameRecord, Outline, SizedFont, Synthesis};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -200,7 +198,7 @@ fn scaled(
             })?;
         }
     }
-    let (mut outline, mut styled) = (ScaledOutline::new(budget), ScaledOutline::new(budget));
+    let (mut outline, mut styled) = (Outline::new(budget), Outline::new(budget));
     for glyph in font.glyphs() {
         let Ok(metrics) = sized.outline_into(glyph, &mut outline) else {
             sink.record(Record::GlyphError(glyph.0))?;

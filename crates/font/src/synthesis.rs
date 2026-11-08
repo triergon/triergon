@@ -5,7 +5,7 @@
 use crate::Font;
 use crate::fixed::{mul_div, mul_fix, norm_len};
 use crate::glyf::narrow;
-use crate::outline::{Point, ScaledOutline};
+use crate::outline::{Outline, Point};
 use triergon_core::Result;
 
 /// The fill rule direction of an outline's contours, from the signed area of
@@ -59,7 +59,7 @@ impl Font {
     }
 }
 
-impl ScaledOutline {
+impl Outline {
     /// The orientation of the contours, by the shoelace sum over every point.
     pub fn orientation(&self) -> Orientation {
         if self.is_empty() {
@@ -133,13 +133,13 @@ impl ScaledOutline {
 
 /// One contour of `FT_Outline_EmboldenXY` with equal strengths.
 fn embolden_contour(
-    points: &mut [crate::outline::OutlinePoint<i32>],
+    points: &mut [crate::outline::OutlinePoint],
     strength: i64,
     truetype: bool,
 ) -> Result<()> {
     let last = points.len() - 1;
     let next = |j: usize| if j < last { j + 1 } else { 0 };
-    let at = |points: &[crate::outline::OutlinePoint<i32>], i: usize| {
+    let at = |points: &[crate::outline::OutlinePoint], i: usize| {
         (i64::from(points[i].point.x), i64::from(points[i].point.y))
     };
     let (mut incoming, mut l_in) = ((0, 0), 0);
@@ -211,11 +211,11 @@ fn embolden_contour(
 #[cfg(test)]
 mod tests {
     use super::Orientation;
-    use crate::outline::{Point, PointKind, ScaledOutline};
+    use crate::outline::{Outline, Point, PointKind};
     use triergon_core::Budget;
 
-    fn square(budget: &Budget, clockwise: bool) -> ScaledOutline {
-        let mut o = ScaledOutline::new(budget);
+    fn square(budget: &Budget, clockwise: bool) -> Outline {
+        let mut o = Outline::new(budget);
         o.begin(usize::MAX);
         let mut corners = [(0, 0), (0, 640), (640, 640), (640, 0)];
         if !clockwise {
@@ -249,9 +249,6 @@ mod tests {
         let mut sheared = square(&budget, true);
         sheared.transform([0x1_0000, 0x5700, 0, 0x1_0000]).unwrap();
         assert_eq!(sheared.points()[1].point, Point::new(218, 640));
-        assert_eq!(
-            ScaledOutline::new(&budget).orientation(),
-            Orientation::TrueType
-        );
+        assert_eq!(Outline::new(&budget).orientation(), Orientation::TrueType);
     }
 }

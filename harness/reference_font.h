@@ -321,17 +321,13 @@ static void font_face(FT_Face face, long index, FontWork *w) {
 
     font_kerning(face, FT_KERNING_UNSCALED, w);
 
-    /* Unhinted outlines at one pixel per font unit, so 26.6 values are 1/64 units. */
-    int sized = !FT_Set_Char_Size(face, 0, (FT_F26Dot6)face->units_per_EM * 64, 72, 72);
-    const FT_Int32 outline_flags =
-        FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP | FT_LOAD_NO_AUTOHINT | FT_LOAD_NO_SVG;
+    /* Unscaled, unhinted outlines in whole font units, with their advances. */
     for (long g = 0; g < face->num_glyphs; g++) {
         FT_Fixed advance = 0;
         if (FT_Get_Advance(face, (FT_UInt)g, FT_LOAD_NO_SCALE, &advance)) advance = -1;
         FT_Error error =
             FT_Load_Glyph(face, (FT_UInt)g, FT_LOAD_NO_SCALE | FT_LOAD_NO_BITMAP | FT_LOAD_NO_SVG);
         long loaded = error ? -1 : face->glyph->metrics.horiAdvance;
-        if (!error) error = !sized || FT_Load_Glyph(face, (FT_UInt)g, outline_flags);
         if (error) {
             font_error(w, FONT_GLYPH_ERROR, "glyph", g);
             continue;

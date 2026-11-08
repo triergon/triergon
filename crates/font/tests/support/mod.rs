@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 
 use triergon_core::{Budget, Bytes};
-use triergon_font::{FaceInfo, Font, GlyphId, Limits, Outline, Request, ScaledOutline, select};
+use triergon_font::{FaceInfo, Font, GlyphId, Limits, Outline, Request, select};
 
 pub fn u16s(values: &[u16]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_be_bytes()).collect()
@@ -1037,7 +1037,7 @@ pub fn exercise(data: &[u8], limits: Limits) {
         }
     }
     let mut outline = Outline::new(&budget);
-    let mut scaled = ScaledOutline::new(&budget);
+    let mut scaled = Outline::new(&budget);
     for font in &fonts {
         let _ = (
             font.vertical_metrics(),

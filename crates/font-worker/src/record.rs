@@ -2,9 +2,7 @@
 //! ordered work digest of the harness protocol and the readable line format.
 
 use std::io::{self, Write};
-use triergon_font::{
-    Band, Charmap, Coordinate, Outline, PointKind, ScaledOutline, SizeMetrics, SizedFont,
-};
+use triergon_font::{Band, Charmap, Outline, PointKind, SizeMetrics, SizedFont};
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
 
 /// What one size reports besides its glyphs.
@@ -117,13 +115,13 @@ pub enum Record<'a> {
         index: u16,
         /// The unhinted advance in 26.6.
         advance: i32,
-        outline: &'a ScaledOutline,
+        outline: &'a Outline,
     },
     /// A synthetic style of the last scaled glyph; `None` when it cannot be applied.
     Styled {
         style: Style,
         index: u16,
-        outline: Option<&'a ScaledOutline>,
+        outline: Option<&'a Outline>,
     },
     /// The default-load advance in 26.6; `None` when the glyph cannot be loaded.
     Hinted {
@@ -159,12 +157,6 @@ const SCALED_GLYPH: u64 = 23;
 const STYLED: u64 = 24;
 const HINTED: u64 = 25;
 const ABSENT: u64 = u64::MAX;
-
-/// Unscaled coordinates at 1/64 font unit, as FreeType's 26.6 values at a size of
-/// one pixel per font unit.
-fn units_64(value: f32) -> i64 {
-    (f64::from(value) * 64.0).round() as i64
-}
 
 const fn point_tag(kind: PointKind) -> u8 {
     match kind {
@@ -218,7 +210,7 @@ impl Work {
     }
 
     /// Contours, points, contour ends, then x, y and tag of every point.
-    fn outline<C: Coordinate>(&mut self, outline: &Outline<C>, value: impl Fn(C) -> i64) {
+    fn outline(&mut self, outline: &Outline) {
         let (ends, points) = (outline.contour_ends(), outline.points());
         self.words(&[ends.len() as u64, points.len() as u64]);
         for &end in ends {
@@ -226,8 +218,8 @@ impl Work {
         }
         for p in points {
             self.words(&[
-                signed(value(p.point.x)),
-                signed(value(p.point.y)),
+                signed(p.point.x.into()),
+                signed(p.point.y.into()),
                 point_tag(p.kind).into(),
             ]);
         }
@@ -304,7 +296,7 @@ impl Sink for Work {
                 outline,
             } => {
                 self.words(&[GLYPH, index.into(), signed(advance), signed(loaded.into())]);
-                self.outline(outline, units_64);
+                self.outline(outline);
             }
             Record::GlyphError(index) => self.words(&[GLYPH_ERROR, index.into()]),
             Record::SizedFace(index) => self.words(&[SIZED_FACE, index.into()]),
@@ -338,7 +330,7 @@ impl Sink for Work {
                 outline,
             } => {
                 self.words(&[SCALED_GLYPH, index.into(), signed(advance.into())]);
-                self.outline(outline, i64::from);
+                self.outline(outline);
             }
             Record::Styled {
                 style,
@@ -347,7 +339,7 @@ impl Sink for Work {
             } => {
                 self.words(&[STYLED, style as u64, index.into()]);
                 match outline {
-                    Some(outline) => self.outline(outline, i64::from),
+                    Some(outline) => self.outline(outline),
                     None => fold(&mut self.digest, ABSENT),
                 }
             }
@@ -365,11 +357,7 @@ impl Sink for Work {
 pub struct Dump<W>(pub W);
 
 impl<W: Write> Dump<W> {
-    fn outline<C: Coordinate>(
-        &mut self,
-        outline: &Outline<C>,
-        value: impl Fn(C) -> i64,
-    ) -> io::Result<()> {
+    fn outline(&mut self, outline: &Outline) -> io::Result<()> {
         let out = &mut self.0;
         let ends = outline.contour_ends();
         write!(out, "{} |", ends.len())?;
@@ -378,7 +366,7 @@ impl<W: Write> Dump<W> {
         }
         write!(out, " |")?;
         for p in outline.points() {
-            let (x, y, tag) = (value(p.point.x), value(p.point.y), point_tag(p.kind));
+            let (x, y, tag) = (p.point.x, p.point.y, point_tag(p.kind));
             write!(out, " {x} {y} {tag}")?;
         }
         writeln!(out)
@@ -453,7 +441,7 @@ impl<W: Write> Sink for Dump<W> {
                 outline,
             } => {
                 write!(self.0, "glyph {index} {advance} {loaded} ")?;
-                self.outline(outline, units_64)
+                self.outline(outline)
             }
             Record::GlyphError(index) => writeln!(self.0, "glyph {index} error"),
             Record::SizedFace(index) => writeln!(self.0, "face {index}"),
@@ -489,7 +477,7 @@ impl<W: Write> Sink for Dump<W> {
                 outline,
             } => {
                 write!(self.0, "glyph {index} {advance} ")?;
-                self.outline(outline, i64::from)
+                self.outline(outline)
             }
             Record::Styled {
                 style,
@@ -498,7 +486,7 @@ impl<W: Write> Sink for Dump<W> {
             } => match outline {
                 Some(outline) => {
                     write!(self.0, "{} {index} ", style.name())?;
-                    self.outline(outline, i64::from)
+                    self.outline(outline)
                 }
                 None => writeln!(self.0, "{} {index} error", style.name()),
             },

@@ -9,9 +9,9 @@ mod matrix;
 mod number;
 mod path;
 
-use crate::fixed::{ONE, mul_div, mul_fix};
+use crate::fixed::{Scale, mul_div, mul_fix};
 use crate::glyf::narrow;
-use crate::outline::{Coordinate, Outline, Point};
+use crate::outline::{Outline, Point};
 use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
 use crate::work::charge;
@@ -493,12 +493,12 @@ impl Cff {
     /// Loads `glyph` into `outline` as FreeType's CFF loader does without
     /// hinting: built in whole font units, through its Font DICT's FontMatrix,
     /// then multiplied by the 16.16 `scale` ([`Scale::UNITS`] for font units).
-    pub(crate) fn load<C: Coordinate>(
+    pub(crate) fn load(
         &self,
         data: &[u8],
         glyph: GlyphId,
         scale: Scale,
-        outline: &mut Outline<C>,
+        outline: &mut Outline,
         limits: &Limits,
         work: &mut WorkBudget,
     ) -> Result<()> {
@@ -507,11 +507,8 @@ impl Cff {
         let (matrix, scale) = self.placement(table, glyph, scale)?;
         if !matrix.is_identity() || scale != Scale::UNITS {
             for p in outline.points_mut() {
-                let (x, y) = matrix.point((p.point.x.whole_units(), p.point.y.whole_units()));
-                p.point = Point::new(
-                    C::from_units(narrow(mul_fix(x, scale.x))?),
-                    C::from_units(narrow(mul_fix(y, scale.y))?),
-                );
+                let (x, y) = matrix.point((i64::from(p.point.x), i64::from(p.point.y)));
+                p.point = Point::new(narrow(mul_fix(x, scale.x))?, narrow(mul_fix(y, scale.y))?);
             }
         }
         Ok(())
@@ -545,18 +542,6 @@ impl Cff {
         };
         Ok((dict.matrix, scale))
     }
-}
-
-/// 16.16 horizontal and vertical scales.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Scale {
-    pub(crate) x: i64,
-    pub(crate) y: i64,
-}
-
-impl Scale {
-    /// Font units.
-    pub(crate) const UNITS: Self = Self { x: ONE, y: ONE };
 }
 
 /// The Top DICT entries this reader uses.

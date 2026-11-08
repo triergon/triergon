@@ -8,6 +8,18 @@
 /// One in 16.16.
 pub(crate) const ONE: i64 = 0x1_0000;
 
+/// 16.16 horizontal and vertical scales from font units to outline coordinates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Scale {
+    pub(crate) x: i64,
+    pub(crate) y: i64,
+}
+
+impl Scale {
+    /// Font units, unscaled.
+    pub(crate) const UNITS: Self = Self { x: ONE, y: ONE };
+}
+
 /// `FT_MulFix`: `a × b / 65536`, rounded half away from zero.
 pub(crate) const fn mul_fix(a: i64, b: i64) -> i64 {
     let ab = a.wrapping_mul(b);
