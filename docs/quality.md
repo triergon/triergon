@@ -105,7 +105,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   required cases against the host's own SIMD engine (NEON, AVX2, SSSE3 or
   SSE2) with the C engine's pins, and records where that engine departs.
   `cargo xtask raster compare` reports the required three, with `--all` also
-  the sweep, with `--diagnostic` `raster-simd`.
+  the sweep, with `--diagnostic` `raster-simd`, and with both all five.
 - **Generated manifests and pins.** The font, shaping and rasterising features
   commit no case rows. `cargo xtask fonts manifest`, `cargo xtask shape manifest`
   and `cargo xtask raster manifest` generate them from `harness/fonts/corpus.json`,
