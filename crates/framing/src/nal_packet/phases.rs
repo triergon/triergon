@@ -17,6 +17,19 @@ type Step = ControlFlow<NalPacketProgress>;
 const NEXT: Step = Step::Continue(());
 const YIELD: Step = Step::Break(NalPacketProgress::Yield);
 
+#[inline]
+fn extend_length(mut value: usize, bytes: &[u8]) -> usize {
+    // Length fields have at most four bytes. A four-byte chunk therefore
+    // starts a fresh field; partial chunks retain the accumulated prefix.
+    if let [a, b, c, d] = bytes {
+        return u32::from_be_bytes([*a, *b, *c, *d]) as usize;
+    }
+    for &byte in bytes {
+        value = (value << 8) | usize::from(byte);
+    }
+    value
+}
+
 impl<M> NalPacketJob<'_, M> {
     pub(super) fn advance_into(
         &mut self,
@@ -171,13 +184,8 @@ impl<M> NalPacketJob<'_, M> {
                 return Err(Error::Truncated);
             }
             work.take(count as u64);
-            // Width is at most four. Every reachable accumulated
-            // prefix fits usize on the supported32/64-bit targets.
-            for &byte in &source.bytes[self.offset..self.offset + count] {
-                // A prefix is at most four bytes, so each partial value
-                // fits usize on supported32/64-bit targets.
-                self.length = (self.length << 8) | usize::from(byte);
-            }
+            self.length =
+                extend_length(self.length, &source.bytes[self.offset..self.offset + count]);
             self.offset += count;
             self.prefix_read += count;
             if self.prefix_read < width {
@@ -262,13 +270,8 @@ impl<M> NalPacketJob<'_, M> {
                 return Err(Error::Truncated);
             }
             work.take(count as u64);
-            // Width is at most four. Every reachable accumulated
-            // prefix fits usize on the supported32/64-bit targets.
-            for &byte in &source.bytes[self.offset..self.offset + count] {
-                // A prefix is at most four bytes, so each partial value
-                // fits usize on supported32/64-bit targets.
-                self.length = (self.length << 8) | usize::from(byte);
-            }
+            self.length =
+                extend_length(self.length, &source.bytes[self.offset..self.offset + count]);
             self.offset += count;
             self.prefix_read += count;
             if self.prefix_read < width {
