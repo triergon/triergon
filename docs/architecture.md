@@ -12,8 +12,8 @@ Crates depend only on layers below them. Core never depends on a format.
 | Layer | Crates | Role |
 |---|---|---|
 | Foundation | [`triergon-core`](../crates/core), [`triergon-bitstream`](../crates/bitstream) | Budgets, shared byte storage, exact time, input windows, resumable steps, errors, the neutral container model (`ContainerReader`); bit reading, RBSP, CABAC and CRCs |
-| Formats | [`triergon-matroska`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts), [`triergon-ogg`](../crates/ogg), [`triergon-elementary`](../crates/elementary) (native FLAC, MPEG audio, ADTS, AC-3) | Container readers: tracks, packets, metadata, seeking |
 | Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, ADTS, AC-3, DTS core, AV1, VP9; FLAC, Opus, Vorbis and MPEG audio headers and their canonical configurations) |
+| Formats | [`triergon-matroska`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts), [`triergon-ogg`](../crates/ogg), [`triergon-elementary`](../crates/elementary) (native FLAC, MPEG audio, ADTS, AC-3) | Container readers: tracks, packets, metadata, seeking; MPEG-TS and elementary readers compose existing framers |
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
 | Fonts | [`triergon-font`](../crates/font) | OpenType and TrueType faces: tables, collections, cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | Shaping | [`triergon-shape`](../crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
@@ -119,8 +119,10 @@ limit violation).
 Open structural work. Each step keeps worker traces byte-identical and re-runs the
 performance gates where it touches hot code.
 
-1. **Formats.** MPEG-TS needs a `ContainerReader` with full access-unit demux and
-   an `AnyReader` variant. Playback uses format-owned track classification.
+1. **Formats.** Extend MPEG-TS access-unit carriages beyond AVC/HEVC, ADTS AAC-LC
+   and DVB-signalled AC-3, and add seeking. Its source AU reader implements
+   `ContainerReader` and is available through `AnyReader`; playback uses
+   format-owned track classification and keeps its specialized native/feed engines.
 2. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
    `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
    in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves

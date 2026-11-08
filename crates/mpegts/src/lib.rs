@@ -28,6 +28,7 @@ pub mod mux;
 mod packet_completion;
 pub mod pes;
 pub mod psi;
+mod reader;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;
 mod stream;
@@ -39,6 +40,10 @@ pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
 pub use media_entity::MediaEntityEnd;
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
+pub use reader::{
+    AccessUnit, Packet, PacketClock, PayloadSource, Reader, ReaderEvent, ReaderLimits, SourceEvent,
+    Track,
+};
 pub use stream::{
     CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun,
     TraceEvent, TraceFault, TransportStream,
