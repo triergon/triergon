@@ -15258,703 +15258,867 @@
    "name": "codec-followups-linux-arm64",
    "path": "codec-followups-linux-arm64",
    "retention": "retained",
-   "reason": "Cited decoder, capture and trace identities, function comparison, instruction counts, a paired codec timing screen and codec fuzz campaigns of the CABAC offset, HEVC slice, AAC reconfiguration and H.264 mvd changes against main at 7a4e7c90",
-   "key": "evidence/codec-followups-linux-arm64/61d54fdcb477e16b1df2dadd5516e966b63fe32b0ed1317ca2a43eb15ad909e7.tar.gz",
-   "sha256": "61d54fdcb477e16b1df2dadd5516e966b63fe32b0ed1317ca2a43eb15ad909e7",
-   "bytes": 16839959,
-   "source_revision": "103c393eee0439d42171f85c3abc3b311dd2e8af",
+   "reason": "Cited decoder, capture and trace identities, function comparison, instruction counts, a paired codec timing screen and codec fuzz campaigns of the CABAC offset, HEVC slice, AAC reconfiguration and H.264 mvd changes against main at 58f54482",
+   "key": "evidence/codec-followups-linux-arm64/dcacfc85c7921a1680e75844f11e668029b6827ef2f4f81d2baf251ca560a9e4.tar.gz",
+   "sha256": "dcacfc85c7921a1680e75844f11e668029b6827ef2f4f81d2baf251ca560a9e4",
+   "bytes": 17711453,
+   "source_revision": "55f72939df6462d9a4c6a5c91e562fdf28a79672",
    "files": [
     {
      "path": "codec-followups-linux-arm64/README.txt",
+     "sha256": "6de6127233b0777b72f36c68a02018f29fd61248b24760196a3b52261f00eee9"
+    },
+    {
+     "path": "codec-followups-linux-arm64/earlier/README-earlier.txt",
      "sha256": "2022940ecc9d010ea08556cafd5cf4e844c8237839bc9e5ed9b654351eae4217"
     },
     {
-     "path": "codec-followups-linux-arm64/cand-rev.txt",
+     "path": "codec-followups-linux-arm64/earlier/cand-rev.txt",
      "sha256": "0c5be548f28684b2073bbd4df36bf9b9d7dd9b273fdabe7deb53ddaf8f792902"
     },
     {
-     "path": "codec-followups-linux-arm64/cap-cand.json",
+     "path": "codec-followups-linux-arm64/earlier/cap-cand.json",
      "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
     },
     {
-     "path": "codec-followups-linux-arm64/cap-main.json",
+     "path": "codec-followups-linux-arm64/earlier/cap-main.json",
      "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
     },
     {
-     "path": "codec-followups-linux-arm64/chain2.sh",
+     "path": "codec-followups-linux-arm64/earlier/chain2.sh",
      "sha256": "edd6f803e86773c25228c41c9758cfff0f54c9f15c195e1f9485001135ed3025"
     },
     {
-     "path": "codec-followups-linux-arm64/count17.txt",
+     "path": "codec-followups-linux-arm64/earlier/count17.txt",
      "sha256": "ec6005dc360af3e684acb176db3b91a85737f3c61a3936e3d233f48443d3d679"
     },
     {
-     "path": "codec-followups-linux-arm64/eq-cand.json",
+     "path": "codec-followups-linux-arm64/earlier/eq-cand.json",
      "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
     },
     {
-     "path": "codec-followups-linux-arm64/eq-main.json",
+     "path": "codec-followups-linux-arm64/earlier/eq-main.json",
      "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
     },
     {
-     "path": "codec-followups-linux-arm64/final-rev.txt",
+     "path": "codec-followups-linux-arm64/earlier/final-rev.txt",
      "sha256": "b7981edddeb4291c355734c7b7250c937bf77482e0da94fd4dfbba039989c439"
     },
     {
-     "path": "codec-followups-linux-arm64/final.sh",
+     "path": "codec-followups-linux-arm64/earlier/final.sh",
      "sha256": "40d30b1965827a8c94b1a7be1e22ab8ca5237567efffe702d74a5c6c38124598"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-280.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-280.log",
      "sha256": "3f13b339cc0aba501bd74b87ba442fdfa5c8b6e130d92d84d929798eed58a4a3"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-280/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-280/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-280/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-280/identity.json",
      "sha256": "6fcbdca8b3a4f97322fa281fdafebff13269743be9d727d931017c37b2bfe69b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-280/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-280/manifest.json",
      "sha256": "f90f867673f61ca20a335ba062676424df4c830535ac8b6ffb71e4a84efe9fc6"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-280/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-280/progress.json",
      "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-280/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-280/report.json",
      "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-283.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-283.log",
      "sha256": "70e6ceccff1973a49593209ffe940c8334e910bf13c414cf8a235289d7a26d50"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-283/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-283/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-283/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-283/identity.json",
      "sha256": "26227d6e91df3225ffcb39755b778b04218b194a845287df234c35666d29e592"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-283/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-283/manifest.json",
      "sha256": "f90f867673f61ca20a335ba062676424df4c830535ac8b6ffb71e4a84efe9fc6"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-283/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-283/progress.json",
      "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-283/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-283/report.json",
      "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284.log",
      "sha256": "99cd32575fbe2233d0294423ea6eda4b9d4fc759edddc379fc454a9b265b7436"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000577/decode/candidate.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000577/decode/candidate.stderr",
      "sha256": "1251ac1f80ca377f75fc86169040e0181bb63c8ef0aac6b67cb8f7b80c32e439"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000577/decode/candidate.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000577/decode/candidate.stdout",
      "sha256": "7f9d8cfa8fbc650c7c2126d88b521b9aa95ba2077938d2f85c5921e86abf05a6"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000577/decode/debug.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000577/decode/debug.stderr",
      "sha256": "72252659cc3e2d92b03abc033a0b2890e0a405e3eaa25ba95a17a0b1c62980d2"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000577/decode/debug.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000577/decode/debug.stdout",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000577/initial-input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000577/initial-input.bin",
      "sha256": "4d1c110f26bd243c9726c14605344fb153002568171973e407904265ea8a1b65"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000577/input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000577/input.bin",
      "sha256": "4d1c110f26bd243c9726c14605344fb153002568171973e407904265ea8a1b65"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000577/observation.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000577/observation.json",
      "sha256": "5c4e70f26f8661a3ddae9cc3c53af83aff6fbcebd60a75428f30ef90b26e6ea8"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000839/decode/candidate.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000839/decode/candidate.stderr",
      "sha256": "32cdbb44e35814b75ddb5563f6f5899155f5c2492c2b6398b12c1c9a8751b1a2"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000839/decode/candidate.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000839/decode/candidate.stdout",
      "sha256": "2da404324989a62861968b2d304191e19bac859a262ec444734300bc8da91e46"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000839/decode/debug.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000839/decode/debug.stderr",
      "sha256": "7441b6da539a8575e8bdc05c79f3388cce7c08a49c03746c76b90ace50412869"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000839/decode/debug.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000839/decode/debug.stdout",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000839/initial-input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000839/initial-input.bin",
      "sha256": "18702903a865d276566e90a2feba2665e5e995a52ae200268a247460900d9a41"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000839/input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000839/input.bin",
      "sha256": "18702903a865d276566e90a2feba2665e5e995a52ae200268a247460900d9a41"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/case-000839/observation.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/case-000839/observation.json",
      "sha256": "753c9b314bbe1ef5c075005aab3dfb9614c8a1b4f58050ce3041db86a8a9803f"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/findings.jsonl",
      "sha256": "0fadaee0e0657646d54bc4d2cffbea8af586b15978acd791c8d56a02c3fae247"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/identity.json",
      "sha256": "8c85fc8c8607043f18c3dc9ad20da488688d876f87dd0bdc065c08c6c5e612a3"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/manifest.json",
      "sha256": "f90f867673f61ca20a335ba062676424df4c830535ac8b6ffb71e4a84efe9fc6"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/progress.json",
      "sha256": "115d30733882345533cfa5982fd18d85750174e46395e92265680e944822b51a"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-284/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-284/report.json",
      "sha256": "84f882165296166fdd8866a7678a6f9df4f0752aea93ec70fc3689cf445b3013"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285.log",
      "sha256": "36fe08bc01368502aef13cc91b7ecb037b11cc10a5623eea8e7dd9b350d4f1dc"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/case-000404/decode/candidate.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/case-000404/decode/candidate.stderr",
      "sha256": "0e7f52eaef8cc1e8c4192255ba29acf16357514454426683aaf0b9de855173cb"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/case-000404/decode/candidate.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/case-000404/decode/candidate.stdout",
      "sha256": "bc6172cf228e471be5044aa9096418e5124c8b44eb5aa467a8d85a5ebe923d96"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/case-000404/decode/debug.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/case-000404/decode/debug.stderr",
      "sha256": "3be960d2a5fffb0e23b8db014bffffc791fc40571a6823a49b694814b1ef05b3"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/case-000404/decode/debug.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/case-000404/decode/debug.stdout",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/case-000404/initial-input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/case-000404/initial-input.bin",
      "sha256": "8a50a7507a3db78eabaf7efad2eb438dfc3c7f4f430cb82bb151c4707738ccdd"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/case-000404/input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/case-000404/input.bin",
      "sha256": "8a50a7507a3db78eabaf7efad2eb438dfc3c7f4f430cb82bb151c4707738ccdd"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/case-000404/observation.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/case-000404/observation.json",
      "sha256": "f5bb2aa2f6f9a8d51837dcbcbbb9ce8dc601b9b197e95dfee0f8791018c6dddd"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/findings.jsonl",
      "sha256": "68b2ab60256409739e9ac0d44350ca478b3ee44920b6f5aff024684a908f3b7f"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/identity.json",
      "sha256": "875be0cf33c0d03fa66c7329a388acf6bcf649d1c488e0dbe334fa70db2b030b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/manifest.json",
      "sha256": "f90f867673f61ca20a335ba062676424df4c830535ac8b6ffb71e4a84efe9fc6"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/progress.json",
      "sha256": "7ec86d511997b590899977303637ee014f355f60e7c2950edee965e89bf31177"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-final-h264-285/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-final-h264-285/report.json",
      "sha256": "64c4490123ebb7fdd2fb7f379193c9902388f4d5499e2f2b41480944d807bb9b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280.log",
      "sha256": "d0d89a1946ba6a4b4a55e00c76037c5741bd0dffdae3ec00f26f5279d3c5131a"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/case-000877/decode/candidate.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/case-000877/decode/candidate.stderr",
      "sha256": "a1023f7479b2b5009c347a9665d4b62a17894646014a9a346bb066927ee27bc7"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/case-000877/decode/candidate.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/case-000877/decode/candidate.stdout",
      "sha256": "d4bb729044f2559fc8c17fdc00e87c64918d5e203b9231c39897824e7e56fca3"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/case-000877/decode/debug.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/case-000877/decode/debug.stderr",
      "sha256": "d4a3fd2009bb3763d7895be3f3229a5594366f4d4483ccb437ec206a0f51d2e3"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/case-000877/decode/debug.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/case-000877/decode/debug.stdout",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/case-000877/initial-input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/case-000877/initial-input.bin",
      "sha256": "be30cd2679149ed79e14a8a32678200b21c4f110778b548840274aaee349c668"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/case-000877/input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/case-000877/input.bin",
      "sha256": "be30cd2679149ed79e14a8a32678200b21c4f110778b548840274aaee349c668"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/case-000877/observation.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/case-000877/observation.json",
      "sha256": "da8dabc6aa0e1dd87b807dd717e561dd731450507e26e47030de92dfdf7a8916"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/findings.jsonl",
      "sha256": "3c99de732e483f6b4ce53772fdef8f37b31402b4c876d990f8cd360403e1cd58"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/identity.json",
      "sha256": "545a31e1de5ccd6dbab8e877ba0b2cc8d4d2beaeab6153477acccc2f638f799e"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/manifest.json",
      "sha256": "4ae629c4623092a150ed2f8850fe809a7b1c5b14c1bff847da19706d3069828c"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/progress.json",
      "sha256": "7ec86d511997b590899977303637ee014f355f60e7c2950edee965e89bf31177"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-280/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-280/report.json",
      "sha256": "9ec1b51def5e199947f4816748230b6663ebd975d85d15ccba916c710f863bce"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-281.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-281.log",
      "sha256": "8b3ea1b8fae51fa536754b1301e8578b79082f3792dfb41d182d92e536434111"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-281/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-281/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-281/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-281/identity.json",
      "sha256": "03e8524e1102a83cbefac554f3a8d6b0c2493986137086e1de41d90eb150108a"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-281/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-281/manifest.json",
      "sha256": "4ae629c4623092a150ed2f8850fe809a7b1c5b14c1bff847da19706d3069828c"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-281/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-281/progress.json",
      "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-281/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-281/report.json",
      "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-282.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-282.log",
      "sha256": "ba0230036efc1f00dc8b6151556cef8d205ad9775aef0a1b2921db608201aa37"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-282/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-282/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-282/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-282/identity.json",
      "sha256": "906b33d3da641ce54984b4cdc8e68015b75e47069ca4693263338e8fc7694c77"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-282/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-282/manifest.json",
      "sha256": "4ae629c4623092a150ed2f8850fe809a7b1c5b14c1bff847da19706d3069828c"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-282/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-282/progress.json",
      "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-282/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-282/report.json",
      "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283.log",
      "sha256": "83a90923851c241d6b5da0e078586e691522e29778bfc19ec1b8675a8ddeddfe"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/case-000761/decode/candidate.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/case-000761/decode/candidate.stderr",
      "sha256": "6ddeda156855d5b0f006cae2f4e21f036d36b629c72483d0d366dbd7f2ee969c"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/case-000761/decode/candidate.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/case-000761/decode/candidate.stdout",
      "sha256": "4a34d3270e218a064e1fd1217f01af1ba68fa91ecfd17e166d4e109b374a750d"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/case-000761/decode/debug.stderr",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/case-000761/decode/debug.stderr",
      "sha256": "38062f029580809b8f9a66de6930d25f062e4ac191e288931bbc157c8adaadc9"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/case-000761/decode/debug.stdout",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/case-000761/decode/debug.stdout",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/case-000761/initial-input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/case-000761/initial-input.bin",
      "sha256": "7eafbee460908d656ccc23b5c5f2ad4aafdd4bf3e23f7524e55f614f289700bc"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/case-000761/input.bin",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/case-000761/input.bin",
      "sha256": "7eafbee460908d656ccc23b5c5f2ad4aafdd4bf3e23f7524e55f614f289700bc"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/case-000761/observation.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/case-000761/observation.json",
      "sha256": "83a569672fc9a1144018e0e92d5d803de4229eafb6ee0ac78ebdc8c4ac634674"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/findings.jsonl",
      "sha256": "3707b5e4b1c2f73266920bea80b4e6fe40b0bb8d5d89382c965771a82d1ece3c"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/identity.json",
      "sha256": "585af124b251f0bb98e63c45186201bf40bb0fe082ea628fb153fb198221cc31"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/manifest.json",
      "sha256": "4ae629c4623092a150ed2f8850fe809a7b1c5b14c1bff847da19706d3069828c"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/progress.json",
      "sha256": "7ec86d511997b590899977303637ee014f355f60e7c2950edee965e89bf31177"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-h264-283/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-h264-283/report.json",
      "sha256": "b2d5516a6a150de971e290a018915276415607bcf45559b79d9467a67bae948e"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-290.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-290.log",
      "sha256": "63cc16559aee36cc13bad672008903d56da1aef6a7b04af5e8206d131bbc7b40"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-290/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-290/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-290/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-290/identity.json",
      "sha256": "789fcccd5e2dd87a6fe6891da1a9a0fcdff1d7b3b50122248d751c4ed3e11d37"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-290/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-290/manifest.json",
      "sha256": "0038e84ecb6eefc1afe35c120fde516daa6165fc36428a8ad1454f8f870525f7"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-290/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-290/progress.json",
      "sha256": "e6ff1766abb14cc52a1ee2ed594655059e4f2fba731ed78b117798f72382856b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-290/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-290/report.json",
      "sha256": "c38b8f4c62fd5bce365de9bc29c53809801bcbf2c317fb0fade82767f2d23b31"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-291.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-291.log",
      "sha256": "f2e535bf80b1bf0f7546ab41eccb78ca1308a295f50415e855ba9fac3d8bf697"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-291/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-291/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-291/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-291/identity.json",
      "sha256": "bfd949b133849b6986affa74c5008e8264ab28d5fe6773dbaf11ca1c668f5c0b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-291/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-291/manifest.json",
      "sha256": "0038e84ecb6eefc1afe35c120fde516daa6165fc36428a8ad1454f8f870525f7"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-291/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-291/progress.json",
      "sha256": "e6ff1766abb14cc52a1ee2ed594655059e4f2fba731ed78b117798f72382856b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-291/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-291/report.json",
      "sha256": "c38b8f4c62fd5bce365de9bc29c53809801bcbf2c317fb0fade82767f2d23b31"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-292.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-292.log",
      "sha256": "28432283243f3d87721abf37593d135e0a5b1f3e297c556487f9fec30e7f6e93"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-292/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-292/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-292/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-292/identity.json",
      "sha256": "74f64e85767f48e47943d4e4cfe92f80bb2a8b4990e430ea637b36897025eac2"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-292/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-292/manifest.json",
      "sha256": "0038e84ecb6eefc1afe35c120fde516daa6165fc36428a8ad1454f8f870525f7"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-292/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-292/progress.json",
      "sha256": "e6ff1766abb14cc52a1ee2ed594655059e4f2fba731ed78b117798f72382856b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-292/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-292/report.json",
      "sha256": "c38b8f4c62fd5bce365de9bc29c53809801bcbf2c317fb0fade82767f2d23b31"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-293.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-293.log",
      "sha256": "8739ff70a65a1b1fe83a57b0f0c99834de2e3473d5b8b6d9255d3a23f81e6a20"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-293/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-293/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-293/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-293/identity.json",
      "sha256": "af00163cc9a444d9ffdfa210f82fd458a5ba505a03fe95e777b08c4672e3fbfe"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-293/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-293/manifest.json",
      "sha256": "0038e84ecb6eefc1afe35c120fde516daa6165fc36428a8ad1454f8f870525f7"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-293/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-293/progress.json",
      "sha256": "e6ff1766abb14cc52a1ee2ed594655059e4f2fba731ed78b117798f72382856b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-hevc-293/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-hevc-293/report.json",
      "sha256": "c38b8f4c62fd5bce365de9bc29c53809801bcbf2c317fb0fade82767f2d23b31"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-280/campaign.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-280/campaign.log",
      "sha256": "4b6ffe2458e3ed5955ee3937742825b4bdb2358951f5538317134d6d77332305"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-280/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-280/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-280/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-280/identity.json",
      "sha256": "0834a11b667d3b10c579289ae762266167a8124af47921ba94bb4db5862fd0e1"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-280/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-280/manifest.json",
      "sha256": "61e3191da647261773d67308d9ab65cdc5dd07a5954476a12f91edc192317470"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-280/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-280/progress.json",
      "sha256": "e6ff1766abb14cc52a1ee2ed594655059e4f2fba731ed78b117798f72382856b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-280/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-280/report.json",
      "sha256": "c38b8f4c62fd5bce365de9bc29c53809801bcbf2c317fb0fade82767f2d23b31"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-281/campaign.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-281/campaign.log",
      "sha256": "e8931560898e63663f95a55c7babf1f1dc69407a608ec06aeb68a6c375552c73"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-281/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-281/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-281/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-281/identity.json",
      "sha256": "c9b4f5c903bce0ede2a21b7629f368d5ffe0294798b9c9178a01894a9d142a15"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-281/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-281/manifest.json",
      "sha256": "61e3191da647261773d67308d9ab65cdc5dd07a5954476a12f91edc192317470"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-281/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-281/progress.json",
      "sha256": "e6ff1766abb14cc52a1ee2ed594655059e4f2fba731ed78b117798f72382856b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-281/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-281/report.json",
      "sha256": "c38b8f4c62fd5bce365de9bc29c53809801bcbf2c317fb0fade82767f2d23b31"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-282/campaign.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-282/campaign.log",
      "sha256": "c535574ca5da115ba8b0f8319dfbc5b71e1fa4259d4975e74cb30d32c9308790"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-282/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-282/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-282/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-282/identity.json",
      "sha256": "3f834ae5c9bb608383f05bfdc3b241891f0c65b190fe0d5e36235fe6be2519f6"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-282/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-282/manifest.json",
      "sha256": "61e3191da647261773d67308d9ab65cdc5dd07a5954476a12f91edc192317470"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-282/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-282/progress.json",
      "sha256": "e6ff1766abb14cc52a1ee2ed594655059e4f2fba731ed78b117798f72382856b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-282/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-282/report.json",
      "sha256": "c38b8f4c62fd5bce365de9bc29c53809801bcbf2c317fb0fade82767f2d23b31"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-283/campaign.log",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-283/campaign.log",
      "sha256": "500844f8003d221a7506f621694670703eb88664a691cdd757e24a25297142be"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-283/findings.jsonl",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-283/findings.jsonl",
      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-283/identity.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-283/identity.json",
      "sha256": "bbc3dc3a35815d434cdf26fed521c2e2f0eb23c700cab3dc90be4bab38ed429f"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-283/manifest.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-283/manifest.json",
      "sha256": "61e3191da647261773d67308d9ab65cdc5dd07a5954476a12f91edc192317470"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-283/progress.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-283/progress.json",
      "sha256": "e6ff1766abb14cc52a1ee2ed594655059e4f2fba731ed78b117798f72382856b"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz-macos-hevc-283/report.json",
+     "path": "codec-followups-linux-arm64/earlier/fuzz-macos-hevc-283/report.json",
      "sha256": "c38b8f4c62fd5bce365de9bc29c53809801bcbf2c317fb0fade82767f2d23b31"
     },
     {
-     "path": "codec-followups-linux-arm64/fuzz.sh",
+     "path": "codec-followups-linux-arm64/earlier/fuzz.sh",
      "sha256": "978f1df15e90a6def31aaaf7d458a57ce56cf947f74ebd32e689a85a9e552f5f"
     },
     {
-     "path": "codec-followups-linux-arm64/replay.txt",
+     "path": "codec-followups-linux-arm64/earlier/replay.txt",
      "sha256": "a5af4f1b2440593295191bde03300724d4e112055e7081a7f880129fef70e696"
     },
     {
-     "path": "codec-followups-linux-arm64/run.log",
+     "path": "codec-followups-linux-arm64/earlier/run.log",
      "sha256": "034bf21e2c0c430985f3f558914b5d4ba489df5c096a55b35cf6a530ad24b4b7"
     },
     {
-     "path": "codec-followups-linux-arm64/run.sh",
+     "path": "codec-followups-linux-arm64/earlier/run.sh",
      "sha256": "8e4e28341a0d01ecca8dcad7f8dcae7b404e67e7fbb5fdb65ab94364fea51944"
     },
     {
-     "path": "codec-followups-linux-arm64/sc-capture-worker.txt",
+     "path": "codec-followups-linux-arm64/earlier/sc-capture-worker.txt",
      "sha256": "f492e2294f42bca6940ccee399413b3d626ddce201590b856f4803c824985df6"
     },
     {
-     "path": "codec-followups-linux-arm64/sc-codec-worker.txt",
+     "path": "codec-followups-linux-arm64/earlier/sc-codec-worker.txt",
      "sha256": "8d9583e6e246b869d285a7bff4913be3b5729c3286d0cdf9bd01e28db4cff893"
     },
     {
-     "path": "codec-followups-linux-arm64/sc-final-vs-8572.txt",
+     "path": "codec-followups-linux-arm64/earlier/sc-final-vs-8572.txt",
      "sha256": "0ab36d85afee551c1549c1e5a83f3c4e20e222e5a450da5f6cb3eec23f470cfc"
     },
     {
-     "path": "codec-followups-linux-arm64/sc-media-worker.txt",
+     "path": "codec-followups-linux-arm64/earlier/sc-media-worker.txt",
      "sha256": "8cf1a9cf0bd7e3362bda276a0921db1cb8148cac82ce39fea6d2b558249163f0"
     },
     {
-     "path": "codec-followups-linux-arm64/sc-playback-worker.txt",
+     "path": "codec-followups-linux-arm64/earlier/sc-playback-worker.txt",
      "sha256": "48de7d428eb7cf3a8464e07cb97b5133d3898190f0f656e655a8f8dc244588bb"
     },
     {
-     "path": "codec-followups-linux-arm64/setup.sh",
+     "path": "codec-followups-linux-arm64/earlier/setup.sh",
      "sha256": "8ba9bf40474384fc5eb406365293815c6875c592af3a7d4263d5b2b5f3b94e5d"
     },
     {
-     "path": "codec-followups-linux-arm64/timing.log",
+     "path": "codec-followups-linux-arm64/earlier/timing.log",
      "sha256": "f7a0245a325d575161763e2d1d6cbdaa44f6fdcd4ba00c5542370fc406e548a6"
     },
     {
-     "path": "codec-followups-linux-arm64/timing.sh",
+     "path": "codec-followups-linux-arm64/earlier/timing.sh",
      "sha256": "47ba2e606ee6fd567c8e55112325b45db6d2b9dc71f68b9ae1dff034dcb9e649"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/ledger.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/ledger.json",
      "sha256": "5a75224f4e0dd19b2e3975ef149587f3f85126a432e3f1e42cd4c1ff51452383"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/aac-lc-5.1.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/aac-lc-5.1.json",
      "sha256": "1c2bc16bfe6826b0b58be3507ac56d17d3dfa4c59ba2925abb3971c7e3c552e5"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/aac-lc-stereo.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/aac-lc-stereo.json",
      "sha256": "a48426c8a64e89ce1c1e6b5f916b026c66fb0464fd5f628812199d9a082fac1e"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/ac3-2.0-192.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/ac3-2.0-192.json",
      "sha256": "49313ad40f90cd101d51f2271f1aee0f96b73289f6f32e13afc3caf9d6b9b319"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/ac3-4.0.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/ac3-4.0.json",
      "sha256": "c696922a5b077e45c99e2baecb5732897ac376d5309228960bec55ebd3a08b90"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/ac3-5.1-448.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/ac3-5.1-448.json",
      "sha256": "68c03beff9b07fe46565a4ec8b71ab30bcdff628f8da3a09fef5e387e46b080c"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/dts-core-7.1-master.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/dts-core-7.1-master.json",
      "sha256": "5c1dbb52ae5231d61da0a7d7d9dc0104234d08b1adf45cfdea31d4acbeb50b2b"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/dts-core-es-6.1.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/dts-core-es-6.1.json",
      "sha256": "22b17004854578a247a56ad9efb540a70ca71ccfd1863b8b639eb6ee430c0ec4"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/eac3-5.1-1536.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/eac3-5.1-1536.json",
      "sha256": "b4d3b57e5fea8439cb0bc064cc0bc7cc618541258551d9f7525c9266a30099a1"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/eac3-5.1-spx.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/eac3-5.1-spx.json",
      "sha256": "80b0f044776d902b33c05c9657fe06fefc43004e16c486ef6717a4ddd287f421"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/eac3-7.1.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/eac3-7.1.json",
      "sha256": "5a25e64b339ea056add5a489ebdafcf199bea6254c08c3c967c738912f2b67cc"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/eac3-stereo-spx.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/eac3-stereo-spx.json",
      "sha256": "472687d3c7638f380bd57415d043adc3ac1abe08806f7d8284f560388768d13a"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/h264-high-1080p.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/h264-high-1080p.json",
      "sha256": "596af83a8d97a0776529362298ad4e661cfdc1cf1b28eb0905b70e1778db2aa3"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/h264-high-720p.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/h264-high-720p.json",
      "sha256": "7119621363e6dfc0c4f31b32b75ffbc0b17a2f8ac01756906f6d8e3d75701a9e"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/h264-main-1920x800.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/h264-main-1920x800.json",
      "sha256": "afd6a415df20947c72335b5ab2c58535c88e8d95a1a1d3ae6bb2e1c49f7c0022"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/hevc-main-1080p.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/hevc-main-1080p.json",
      "sha256": "4a9e10a0ac4d1af137e7cf85b2e138e2ec6e2e637accc11914610e84ed7297c9"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/hevc-main10-1080p.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/hevc-main10-1080p.json",
      "sha256": "4eae4f826a5bcf6f8132efe8815e4e09a529f1b2ef83e4d121988bb47f93b089"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/out/hevc-main10-2160p.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/out/hevc-main10-2160p.json",
      "sha256": "30fd29003806d262b4a7bf3c84d929edfbd3e5a946f1828c8a755afcd23c9d57"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/reports/codecs/report.json",
+     "path": "codec-followups-linux-arm64/earlier/timing/reports/codecs/report.json",
      "sha256": "dc14c0ebd9f08e0e7c49ac961fcda8032a6b7980ccc652ba47cc0e44989c2074"
     },
     {
-     "path": "codec-followups-linux-arm64/timing/screen.txt",
+     "path": "codec-followups-linux-arm64/earlier/timing/screen.txt",
      "sha256": "0f626280530d20d0aa34c4b2c5ec0f43c7c2dca4b87d34f58ca30e3761a7723a"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/cand-rev.txt",
+     "sha256": "736f6a12eeb27d3cf9452a362e58078e0341ea434392bed1dfcc5472d5deae43"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/cap-cand.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/cap-main.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/chain4.sh",
+     "sha256": "c3d5dce64bccb1af4c2ee5471300a148f2839dfd74e85756c1d20f2f41af7cfb"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/count17.txt",
+     "sha256": "3f2c129140d2325ad7511053559ddf1d5f1d1fe04558fb5b1a9c15600b45181b"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/eq-cand.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/eq-main.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/main-rev.txt",
+     "sha256": "7ea4be47acc9ee73e01b07c9cb0aec36c5c04c8998d5b518eb6b95a4bda58d92"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/run.log",
+     "sha256": "cd71dbb42c70b3296029ae210e749fb4f742ca617d2acad36f883be8f4acdea4"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/run.sh",
+     "sha256": "8e4e28341a0d01ecca8dcad7f8dcae7b404e67e7fbb5fdb65ab94364fea51944"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/sc-capture-worker.txt",
+     "sha256": "f492e2294f42bca6940ccee399413b3d626ddce201590b856f4803c824985df6"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/sc-codec-worker.txt",
+     "sha256": "b6e4a6f0be06b85591cd228c40b4f21233dbff9d9c36a54b7dcf78157c41648b"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/sc-media-worker.txt",
+     "sha256": "8cf1a9cf0bd7e3362bda276a0921db1cb8148cac82ce39fea6d2b558249163f0"
+    },
+    {
+     "path": "codec-followups-linux-arm64/final/sc-playback-worker.txt",
+     "sha256": "48de7d428eb7cf3a8464e07cb97b5133d3898190f0f656e655a8f8dc244588bb"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/cap-cand.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/cap-main.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/chain3.sh",
+     "sha256": "d48cc163fc9e2df923bf7479d624833c741d4fb42a29500483b90c3e01f98e73"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/count17.txt",
+     "sha256": "47059904310407b21e5f078adea4bb3e437536601d17d6d510d9918fac1855be"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/eq-cand.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/eq-main.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-280.log",
+     "sha256": "d701b4838cdf9e2f7333943cd4943af1a7bee8590c088954b35e1d82dfef8302"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-280/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-280/identity.json",
+     "sha256": "6c3ad2234061b245c40df0fffc2fbf95f2f3e0f9725889d4ff9b8613b7668eb8"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-280/manifest.json",
+     "sha256": "d958252020b37c60a10db2005bdee2edc21e5ba3681119cd94c60b75703b00fa"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-280/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-280/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-283.log",
+     "sha256": "f034319fc5b38c8d9fd19740609f32105c2c0d65f3e87e388e462ff5ba7d9310"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-283/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-283/identity.json",
+     "sha256": "d7192fdcb8b0fbf31295d961564d1fe75a035687e497d8e89f22739b5181bb30"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-283/manifest.json",
+     "sha256": "d958252020b37c60a10db2005bdee2edc21e5ba3681119cd94c60b75703b00fa"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-283/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz-h264-283/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/fuzz2.sh",
+     "sha256": "32c41989401c9336754a7ef2c256e5fbeec5273bb0025059dbd095a036c43dea"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/replay-0d0d36e6.txt",
+     "sha256": "a49de2ac985e4112cfa3911d7134e509689eea47ee3e4993eb4cad022b9c0ea0"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/replay.txt",
+     "sha256": "a49de2ac985e4112cfa3911d7134e509689eea47ee3e4993eb4cad022b9c0ea0"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/run.log",
+     "sha256": "7545a7523411043f0f064f75356ffe7281667468a82f6e921de2da72561a78fd"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/sc-capture-worker.txt",
+     "sha256": "f492e2294f42bca6940ccee399413b3d626ddce201590b856f4803c824985df6"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/sc-codec-worker.txt",
+     "sha256": "be72b5a72bbac5b71c2eca03def569b9838679363ef55f6ff9b6084829867f55"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/sc-media-worker.txt",
+     "sha256": "8cf1a9cf0bd7e3362bda276a0921db1cb8148cac82ce39fea6d2b558249163f0"
+    },
+    {
+     "path": "codec-followups-linux-arm64/round-0d0d36e6/sc-playback-worker.txt",
+     "sha256": "48de7d428eb7cf3a8464e07cb97b5133d3898190f0f656e655a8f8dc244588bb"
     }
    ]
   }
