@@ -11,9 +11,12 @@ use triergon_elementary::{
     TagKind,
 };
 
-/// The same packets whatever the window size, step work and length knowledge.
+/// The same packets whatever the window size and step work, for a known and for an
+/// unknown source length (which may differ: FFmpeg withholds an MPEG audio end trim it
+/// cannot check). Returns the known-length reading.
 fn invariant<F: Format>(file: &[u8]) -> Reading {
-    let reference = read_file::<F>(file, 1 << 30, usize::MAX, true).unwrap();
+    let known_length = read_file::<F>(file, 1 << 30, usize::MAX, true).unwrap();
+    let unknown_length = read_file::<F>(file, 1 << 30, usize::MAX, false).unwrap();
     for (work, most, known) in [
         (1 << 30, 1, true),
         (64, 3, false),
@@ -22,6 +25,11 @@ fn invariant<F: Format>(file: &[u8]) -> Reading {
         (100, 65536, true),
     ] {
         let reading = read_file::<F>(file, work, most, known).unwrap();
+        let reference = if known {
+            &known_length
+        } else {
+            &unknown_length
+        };
         let first = reading
             .packets
             .iter()
@@ -37,7 +45,7 @@ fn invariant<F: Format>(file: &[u8]) -> Reading {
         );
         assert_eq!(reading.opened, 1);
     }
-    reference
+    known_length
 }
 
 fn mp3_stream(frames: u32) -> Vec<u8> {
@@ -125,7 +133,12 @@ fn a_lame_info_frame_is_not_audio_and_trims_like_ffmpeg() {
     let info = reader.format().info_frame().unwrap();
     assert!(info.consistent);
 
-    // A source far longer than the frame states keeps the start trim only.
+    // A source of unknown length, such as a pipe, keeps the start trim only.
+    let piped = read_file::<MpegAudio>(&file, 1 << 30, 4096, false).unwrap();
+    assert_eq!(piped.packets[0].start_trim, Some(1105));
+    assert!(piped.packets.iter().all(|p| p.end_trim.is_none()));
+
+    // So does a source far longer than the frame states.
     let mut longer = file.clone();
     longer.extend(noise(5, audio.len()).into_iter().map(|b| b & 0x7f));
     let reading = read_file::<MpegAudio>(&longer, 1 << 30, 4096, true).unwrap();

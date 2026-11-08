@@ -18,7 +18,7 @@
 #![forbid(unsafe_code)]
 use std::io::Write;
 use std::time::Instant;
-use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_blocking};
+use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_sequential};
 use triergon_codec::{AudioCodec, AudioFrame, VideoCodec};
 use triergon_harness_protocol::interleaved::InterleavedDigest;
 use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
@@ -179,10 +179,11 @@ fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
 }
 
 /// A file-format lane: the first audio track of the file, decoded with its trims and
-/// mixed to stereo s16 like the elementary lanes.
+/// mixed to stereo s16 like the elementary lanes. The file is read sequentially, as the
+/// reference reads its piped input.
 fn file_audio(data: &[u8], out: &mut Output) {
     let pool = Budget::new(256 << 20).expect("pool");
-    let mut source = open_blocking(std::io::Cursor::new(data), &pool).expect("open");
+    let mut source = open_sequential(data, &pool).expect("open");
     let mut decoder: Option<(triergon::TrackId, TrackDecoder)> = None;
     let mut frame = AudioFrame::default();
     let mut downmix = Downmix::default();

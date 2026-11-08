@@ -12,9 +12,9 @@
 //! `Lavf` or `Lavc`) trims the stream as FFmpeg 9.0 does: the first packet drops
 //! `encoder delay + 529` samples (the decoder delay of 528 plus one), and the packet
 //! with frame index `frames - 1` drops `encoder padding - 529` samples when that is
-//! positive. The end trim is withheld, as FFmpeg withholds it, when the source holds
-//! more than a sixteenth more bytes after the information frame's header than the
-//! frame states.
+//! positive. The end trim is withheld, as FFmpeg withholds it, when the source's length
+//! is unknown (a pipe) or it holds more than a sixteenth more bytes after the
+//! information frame's header than the frame states.
 use crate::stream::Limits;
 use crate::syntax::{Gap, Length, Plan, Probe, SeekBasis, SeekContext, Syntax, TrackFacts};
 use triergon_core::container::{CodecId, Trim};
@@ -213,7 +213,7 @@ impl Syntax for MpegAudio {
             let padding = u32::from(tag.encoder_padding).saturating_sub(DECODER_DELAY);
             let end = description
                 .frames
-                .filter(|&frames| consistent && padding > 0 && frames > 0)
+                .filter(|&frames| consistent && source_len.is_some() && padding > 0 && frames > 0)
                 .map(|frames| (u64::from(frames) - 1, padding));
             self.gapless = Some(Gapless {
                 start: u32::from(tag.encoder_delay) + DECODER_DELAY,
