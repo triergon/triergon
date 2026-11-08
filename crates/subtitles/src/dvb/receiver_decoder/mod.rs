@@ -409,10 +409,10 @@ impl ReceiverDecoder {
         if starts_epoch {
             self.detach(work)?;
         }
-        let listed = page.regions().count();
+        let regions = page.regions().count().min(256);
         self.page
             .placements
-            .try_reserve_exact(listed.saturating_sub(self.page.placements.len()))?;
+            .try_reserve_exact(regions.saturating_sub(self.page.placements.len()))?;
         self.page.version = Some(page.version);
         self.page.timeout = page.timeout;
         if starts_epoch {
