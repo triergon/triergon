@@ -287,17 +287,18 @@ impl Lane {
     }
 
     /// The `cargo xtask report` arguments `COMMAND compare ARGS` stands for, one
-    /// list per feature: the required features, with `--all` also those run on
-    /// demand, with `--diagnostic` the diagnostic ones only. Each feature's gate
-    /// is read from its contract.
+    /// list per feature selected by its contract's gate: the required features,
+    /// with `--all` also those run on demand, with `--diagnostic` the diagnostic
+    /// ones only, and with both every feature, in either order.
     pub fn reports(&self, root: &Path, args: &[String]) -> R<Vec<Vec<String>>> {
-        let (mut output, mut gates) = (PathBuf::from(self.report_directory), vec![Gate::Required]);
+        let (mut all, mut diagnostic) = (false, false);
+        let mut output = PathBuf::from(self.report_directory);
         let mut options = Vec::new();
         let mut rest = args.iter();
         while let Some(arg) = rest.next() {
             match (arg.as_str(), rest.clone().next()) {
-                ("--all", _) => gates.push(Gate::OnDemand),
-                ("--diagnostic", _) => gates = vec![Gate::Diagnostic],
+                ("--all", _) => all = true,
+                ("--diagnostic", _) => diagnostic = true,
                 ("--output", Some(value)) => {
                     output = PathBuf::from(value);
                     rest.next();
@@ -305,9 +306,14 @@ impl Lane {
                 _ => options.push(arg.clone()),
             }
         }
+        let selected = |gate| match gate {
+            Gate::Required => all || !diagnostic,
+            Gate::OnDemand => all,
+            Gate::Diagnostic => diagnostic,
+        };
         let mut reports = Vec::new();
         for &feature in self.features {
-            if !gates.contains(&gate(root, feature)?) {
+            if !selected(gate(root, feature)?) {
                 continue;
             }
             let path = |file: &str| format!("harness/features/{feature}/{file}.json");
@@ -431,6 +437,9 @@ mod tests {
         assert_eq!(compared(raster, &[]), required);
         assert_eq!(compared(raster, &["--all"]), &raster.features[..4]);
         assert_eq!(compared(raster, &["--diagnostic"]), ["raster-simd"]);
+        for flags in [["--all", "--diagnostic"], ["--diagnostic", "--all"]] {
+            assert_eq!(compared(raster, &flags), raster.features, "{flags:?}");
+        }
     }
 
     #[test]
