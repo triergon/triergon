@@ -84,6 +84,19 @@ struct Transport<S: Source> {
     source: SourceOwner<S>,
 }
 
+// Prefer an end on the TS188 grid without changing cursor identity or its
+// hard window limit. Arbitrarily short replies still use the normal carry path.
+#[inline]
+fn carrier_aligned_request(mut request: InputRequest) -> InputRequest {
+    let stride = triergon_mpegts::PacketFormat::Ts188.bytes();
+    // Both remainders are below one carrier, including on 32-bit targets.
+    let residual = ((request.offset % stride as u64) as usize + request.maximum % stride) % stride;
+    if request.maximum > residual {
+        request.maximum -= residual;
+    }
+    request
+}
+
 impl<S: Source> Transport<S> {
     fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         let request = self
@@ -93,10 +106,29 @@ impl<S: Source> Transport<S> {
         if let SourceReply::Data(window) = reply
             && window.bytes().len() > request.maximum
         {
-            return Err(Error::Limit {
-                requested: window.bytes().len(),
-                maximum: request.maximum,
-            });
+            let Engine::Ts(engine) = &self.engine else {
+                return Err(Error::Invalid("progressive TS transport engine"));
+            };
+            // Recover the original cursor bound only on the oversize path.
+            // Preserve its Limit-before-token-check ordering for all replies.
+            let hard_maximum = engine.input.request().maximum;
+            let maximum = if window.bytes().len() > hard_maximum {
+                Some(hard_maximum)
+            } else if window.source == request.source
+                && window.token == request.token
+                && window.offset == request.offset
+                && window.bytes().belongs_to(engine.input.budget())
+            {
+                Some(request.maximum)
+            } else {
+                None
+            };
+            if let Some(maximum) = maximum {
+                return Err(Error::Limit {
+                    requested: window.bytes().len(),
+                    maximum,
+                });
+            }
         }
         let accepted = self.engine.provide(reply)?;
         if accepted {
@@ -153,6 +185,7 @@ impl<S: Source> Transport<S> {
                     self.pending = Some(event);
                 }
                 TsPayloadStep::Step(BackendStep::NeedInput(request)) => {
+                    let request = carrier_aligned_request(request);
                     self.request = Some(request.clone());
                     if work.remaining() == 0 {
                         return Ok(BackendStep::NeedInput(request).into());
@@ -586,6 +619,210 @@ fn select_track(map: &ProgramMap, stream_type: u8) -> Result<TrackKey> {
 mod tests {
     use super::*;
     use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId};
+
+    #[test]
+    fn aligned_requests_keep_identity_and_never_round_positive_limits_to_zero() {
+        let pool = Budget::new(64 * 1024).unwrap();
+        let input = InputCursor::new(
+            &pool,
+            SourceId(71),
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            4096,
+        )
+        .unwrap();
+        for offset in [0, 1, 187, 188, u64::MAX - 187, u64::MAX] {
+            for maximum in [0, 1, 17, 187, 188, 189, 4096, usize::MAX] {
+                let mut original = input.request();
+                original.offset = offset;
+                original.maximum = maximum;
+                let request = carrier_aligned_request(original.clone());
+                assert_eq!(request.source, original.source);
+                assert_eq!(request.token, original.token);
+                assert_eq!(request.offset, original.offset);
+                assert!(request.maximum <= maximum);
+                assert_eq!(request.maximum == 0, maximum == 0);
+                // Search all possible trims independently of the production formula.
+                let expected = (0..maximum.min(188))
+                    .find_map(|trim| {
+                        let count = maximum - trim;
+                        ((offset % 188 + (count % 188) as u64) % 188 == 0).then_some(count)
+                    })
+                    .unwrap_or(maximum);
+                assert_eq!(
+                    request.maximum, expected,
+                    "offset {offset}, maximum {maximum}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn capped_requests_preserve_short_replies_and_stale_token_errors() {
+        use std::{cell::Cell, rc::Rc};
+        use triergon_core::InputWindow;
+
+        struct Waiting(Rc<Cell<usize>>);
+        impl Source for Waiting {
+            fn poll(
+                &mut self,
+                request: &InputRequest,
+                _: &mut WorkBudget,
+                _: &AtomicBool,
+            ) -> triergon_core::Result<SourceReply> {
+                self.0.set(request.maximum);
+                Ok(SourceReply::Pending)
+            }
+            fn invalidate(&mut self) {
+                panic!("no random access");
+            }
+            fn abort(&mut self) {}
+            fn close(&mut self) {}
+        }
+        fn request(transport: &mut Transport<Waiting>, cancel: &AtomicBool) -> InputRequest {
+            for _ in 0..128 {
+                match transport
+                    .poll(&mut WorkBudget::new(65536), cancel, 64 * 1024)
+                    .unwrap()
+                {
+                    TsPayloadStep::Step(BackendStep::NeedInput(request)) => return request,
+                    TsPayloadStep::Step(BackendStep::Yield) => {}
+                    _ => panic!("expected an input request"),
+                }
+            }
+            panic!("request stalled");
+        }
+
+        let pool = Budget::new(256 * 1024).unwrap();
+        let seen = Rc::new(Cell::new(0));
+        let open = || {
+            let input = InputCursor::new(
+                &pool,
+                SourceId(72),
+                SourceCapabilities {
+                    length: None,
+                    random_access: false,
+                },
+                4096,
+            )
+            .unwrap();
+            Transport {
+                engine: Engine::ts_progressive(input, ParseLimits::default(), true).unwrap(),
+                request: None,
+                pending: None,
+                source: SourceOwner::new(Waiting(seen.clone())),
+            }
+        };
+        let cancel = AtomicBool::new(false);
+        let mut old = open();
+        let stale = request(&mut old, &cancel);
+        let mut current = open();
+        let first = request(&mut current, &cancel);
+        assert_eq!(first.offset, 0);
+        assert_eq!(first.maximum, 3948);
+        assert_eq!(seen.get(), first.maximum);
+
+        let beyond_hard = Bytes::copy_from_slice(&pool, &[0x47; 5000]).unwrap();
+        for token in [stale.token.clone(), first.token.clone()] {
+            let reply = SourceReply::Data(
+                InputWindow::new(first.source, token, 0, beyond_hard.clone()).unwrap(),
+            );
+            assert_eq!(
+                current.provide(&reply),
+                Err(Error::Limit {
+                    requested: 5000,
+                    maximum: 4096
+                })
+            );
+            assert_eq!(current.request.as_ref().unwrap().token, first.token);
+        }
+        let bytes = Bytes::copy_from_slice(&pool, &[0x47; 4096]).unwrap();
+        let stale = SourceReply::Data(
+            InputWindow::new(stale.source, stale.token, 0, bytes.clone()).unwrap(),
+        );
+        assert!(matches!(
+            current.provide(&stale),
+            Err(Error::StaleGeneration { .. })
+        ));
+        assert_eq!(current.request.as_ref().unwrap().token, first.token);
+        let foreign = Budget::new(16 * 1024).unwrap();
+        let foreign = SourceReply::Data(
+            InputWindow::new(
+                first.source,
+                first.token.clone(),
+                first.offset,
+                Bytes::copy_from_slice(&foreign, &[0x47; 4096]).unwrap(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(current.provide(&foreign), Err(Error::ForeignPool));
+        assert_eq!(current.request.as_ref().unwrap().token, first.token);
+        let wrong_source = SourceReply::Data(
+            InputWindow::new(
+                SourceId(73),
+                first.token.clone(),
+                first.offset,
+                bytes.clone(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(current.provide(&wrong_source), Err(Error::SourceMismatch));
+        let wrong_offset = SourceReply::Data(
+            InputWindow::new(
+                first.source,
+                first.token.clone(),
+                first.offset + 1,
+                bytes.clone(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            current.provide(&wrong_offset),
+            Err(Error::Invalid("input window is not currently requested"))
+        );
+        assert_eq!(current.request.as_ref().unwrap().token, first.token);
+        let oversized = SourceReply::Data(
+            InputWindow::new(first.source, first.token.clone(), first.offset, bytes).unwrap(),
+        );
+        assert_eq!(
+            current.provide(&oversized),
+            Err(Error::Limit {
+                requested: 4096,
+                maximum: 3948
+            })
+        );
+        assert_eq!(current.request.as_ref().unwrap().token, first.token);
+
+        let short = SourceReply::Data(
+            InputWindow::new(
+                first.source,
+                first.token.clone(),
+                first.offset,
+                Bytes::copy_from_slice(&pool, &[0x47]).unwrap(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(current.provide(&short), Ok(true));
+        let next = request(&mut current, &cancel);
+        assert_eq!(next.source, first.source);
+        assert_eq!(next.token, first.token);
+        assert_eq!(next.offset, 1);
+        assert_eq!(next.maximum, 3947);
+        assert_eq!(seen.get(), next.maximum);
+        assert_eq!(
+            current.provide(&SourceReply::End {
+                source: next.source,
+                token: next.token
+            }),
+            Ok(true)
+        );
+        assert!(matches!(
+            current.poll(&mut WorkBudget::new(65536), &cancel, 64 * 1024),
+            Err(Error::Truncated)
+        ));
+    }
 
     #[test]
     fn compact_payloads_preserve_every_output_work_boundary_and_retained_charge() {
