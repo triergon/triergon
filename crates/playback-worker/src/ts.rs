@@ -29,8 +29,9 @@ use triergon_core::{
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors,
-    NoMediaConfirmation, PacketCompletion, PrivateAudioCarriage, PrivateAudioDescriptors,
-    RegisteredCarriage, SourceContext, TransportFaultRecovery, TransportObservation,
+    NoMediaConfirmation, PacketCompletion, PesFaultPolicy, PrivateAudioCarriage,
+    PrivateAudioDescriptors, RegisteredCarriage, SourceContext, TransportFaultRecovery,
+    TransportObservation,
 };
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, DvbNamespaceEvidence, ProgramMap};
 use triergon_mpegts::{
@@ -266,7 +267,14 @@ fn observer(
     } else {
         Err(unrouted)
     }?;
-    TransportFaultRecovery::new(observer).map_err(|rejected| rejected.error)
+    TransportFaultRecovery::with_policy(
+        observer,
+        PesFaultPolicy {
+            timing_headers: true,
+            rejected_clock_fields: true,
+        },
+    )
+    .map_err(|rejected| rejected.error)
 }
 
 /// The observer, its clock and the folded packets of one operation.
@@ -329,6 +337,19 @@ impl Session {
                     .confirm_source_fault(fault, cause.context()?)?;
             }
             TraceEvent::Diagnostic(fault)
+                if fault.rejected.is_some()
+                    && matches!(
+                        fault.error,
+                        Error::Invalid("PCR reserved bits/extension" | "OPCR without PCR")
+                    ) =>
+            {
+                self.observer
+                    .as_mut()
+                    .ok_or_else(unrouted)?
+                    .push_rejected_fault(fault.clone(), cause.context()?)
+                    .map_err(|rejected| rejected.error)?;
+            }
+            TraceEvent::Diagnostic(fault)
                 if matches!(fault.kind, FaultKind::Transport | FaultKind::Program)
                     || (fault.kind == FaultKind::Pes
                         && matches!(
@@ -383,6 +404,27 @@ impl Session {
                             u64::from(packet.pid),
                             signed(i64::try_from(time.pts90)?),
                             signed(i64::try_from(time.dts90)?),
+                            signed(packet.duration90_raw),
+                            signed(packet.position),
+                            u64::from(packet.flags),
+                            packet.payload_len as u64,
+                        ],
+                        packet.stream_id,
+                        packet.payload(),
+                    )?;
+                }
+                AssemblyStep::Output(TransportObservation::PesFault(packet)) => {
+                    let time = self
+                        .clock
+                        .project_pes_fault(&packet, &mut WorkBudget::new(1), cancel)?
+                        .ok_or("clock yielded on a fixed grant")?;
+                    fold_payload(
+                        &mut self.totals,
+                        [
+                            0,
+                            u64::from(packet.pid),
+                            signed(time64(time.pts90)?.unwrap_or(NO_TIME)),
+                            signed(time64(time.dts90)?.unwrap_or(NO_TIME)),
                             signed(packet.duration90_raw),
                             signed(packet.position),
                             u64::from(packet.flags),
