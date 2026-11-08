@@ -59,32 +59,7 @@ impl BidiClass {
     /// The class of `c`, as `fribidi_get_bidi_type` gives it.
     #[must_use]
     pub fn of(c: char) -> Self {
-        use fribidi::BidiClass as F;
-        match fribidi::bidi_class(u32::from(c)) {
-            F::L => Self::L,
-            F::R => Self::R,
-            F::Al => Self::Al,
-            F::En => Self::En,
-            F::Es => Self::Es,
-            F::Et => Self::Et,
-            F::An => Self::An,
-            F::Cs => Self::Cs,
-            F::Nsm => Self::Nsm,
-            F::Bn => Self::Bn,
-            F::B => Self::B,
-            F::S => Self::S,
-            F::Ws => Self::Ws,
-            F::On => Self::On,
-            F::Lre => Self::Lre,
-            F::Lro => Self::Lro,
-            F::Rle => Self::Rle,
-            F::Rlo => Self::Rlo,
-            F::Pdf => Self::Pdf,
-            F::Lri => Self::Lri,
-            F::Rli => Self::Rli,
-            F::Fsi => Self::Fsi,
-            F::Pdi => Self::Pdi,
-        }
+        fribidi::bidi_class(u32::from(c))
     }
 
     /// The strong class of a direction: L for even levels, R for odd ones.
@@ -167,19 +142,20 @@ impl BidiClass {
 /// compatibility folding): which brackets pair with it and whether it opens.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Bracket {
+    /// The identity both brackets of a pair share (see [`fribidi::bracket`]).
     pair: u32,
     opens: bool,
 }
 
 impl Bracket {
+    pub(crate) const fn new(pair: u32, opens: bool) -> Self {
+        Self { pair, opens }
+    }
+
     /// The bracket `c` is, if any, as `fribidi_get_bracket` gives it.
     #[must_use]
     pub fn of(c: char) -> Option<Self> {
-        let bracket = fribidi::bracket(u32::from(c))?;
-        Some(Self {
-            pair: bracket.pair,
-            opens: bracket.kind == fribidi::BracketKind::Open,
-        })
+        fribidi::bracket(u32::from(c))
     }
 
     /// Whether this is an opening bracket.
@@ -192,6 +168,12 @@ impl Bracket {
     #[must_use]
     pub const fn pairs_with(self, other: Self) -> bool {
         self.pair == other.pair
+    }
+
+    /// The identity both brackets of a pair share: the opening bracket, after
+    /// FriBidi's folding.
+    pub(crate) const fn pair(self) -> u32 {
+        self.pair
     }
 }
 

@@ -7,56 +7,7 @@ mod tables;
 
 use super::ArabicForm;
 
-/// A Bidi_Class (UAX #9), as FriBidi assigns them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum BidiClass {
-    /// Left-to-right.
-    L,
-    /// Right-to-left.
-    R,
-    /// Arabic letter.
-    Al,
-    /// European number.
-    En,
-    /// European separator.
-    Es,
-    /// European terminator.
-    Et,
-    /// Arabic number.
-    An,
-    /// Common separator.
-    Cs,
-    /// Nonspacing mark.
-    Nsm,
-    /// Boundary neutral.
-    Bn,
-    /// Paragraph separator.
-    B,
-    /// Segment separator.
-    S,
-    /// Whitespace.
-    Ws,
-    /// Other neutral.
-    On,
-    /// Left-to-right embedding.
-    Lre,
-    /// Left-to-right override.
-    Lro,
-    /// Right-to-left embedding.
-    Rle,
-    /// Right-to-left override.
-    Rlo,
-    /// Pop directional format.
-    Pdf,
-    /// Left-to-right isolate.
-    Lri,
-    /// Right-to-left isolate.
-    Rli,
-    /// First strong isolate.
-    Fsi,
-    /// Pop directional isolate.
-    Pdi,
-}
+pub(crate) use crate::bidi::{BidiClass, Bracket};
 
 /// `fribidi_get_bidi_type`. Code points UnicodeData.txt does not list, including
 /// those inside its ranges, have FriBidi's defaults: R or AL in the blocks
@@ -67,33 +18,25 @@ pub(crate) fn bidi_class(cp: u32) -> BidiClass {
     tables::BIDI_CLASSES[usize::from(tables::BIDI_CLASS.get(cp))]
 }
 
-/// Whether a paired bracket opens or closes.
+/// Whether a paired bracket opens or closes, as the tables record it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum BracketKind {
     Open,
     Close,
 }
 
-/// A paired bracket (BidiBrackets.txt).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct Bracket {
-    /// The identity the two brackets of a pair share: the opening bracket, or the
-    /// first character of its decomposition, canonical or compatibility (U+2329
-    /// and U+232A pair as U+3008, like U+3008 and U+3009; U+FF08 and U+FF09 as
-    /// U+0028, as FriBidi 1.0.17's tables have them).
-    pub(crate) pair: u32,
-    pub(crate) kind: BracketKind,
-}
-
-/// `fribidi_get_bracket`: the bracket `cp` is, if any (FriBidi's value is the
-/// identity, with the open bit for an opening bracket, or 0).
+/// `fribidi_get_bracket`: the bracket `cp` is, if any. The identity the two
+/// brackets of a pair share is the opening bracket, or the first character of
+/// its decomposition, canonical or compatibility (U+2329 and U+232A pair as
+/// U+3008, like U+3008 and U+3009; U+FF08 and U+FF09 as U+0028, as FriBidi
+/// 1.0.17's tables have them).
 #[inline]
 pub(crate) fn bracket(cp: u32) -> Option<Bracket> {
     let (offset, kind) = tables::BRACKETS[usize::from(tables::BRACKET.get(cp))]?;
-    Some(Bracket {
-        pair: cp.wrapping_add_signed(offset),
-        kind,
-    })
+    Some(Bracket::new(
+        cp.wrapping_add_signed(offset),
+        kind == BracketKind::Open,
+    ))
 }
 
 /// `fribidi_get_mirror_char`: the Bidi_Mirroring_Glyph of `cp`, if it has one.
@@ -189,7 +132,7 @@ mod tests {
     #[test]
     fn brackets_and_mirrors() {
         use BracketKind::*;
-        let bracket_at = |pair, kind| Some(Bracket { pair, kind });
+        let bracket_at = |pair, kind| Some(Bracket::new(pair, kind == Open));
         assert_eq!(bracket(0x0028), bracket_at(0x0028, Open));
         assert_eq!(bracket(0x0029), bracket_at(0x0028, Close));
         assert_eq!(bracket(0x005D), bracket_at(0x005B, Close));

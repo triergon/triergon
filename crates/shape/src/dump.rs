@@ -27,7 +27,7 @@ pub struct ReferenceProperties {
 /// The properties of `cp`.
 #[doc(hidden)]
 pub fn reference_properties(cp: u32) -> ReferenceProperties {
-    use fribidi::{BidiClass, BracketKind, JoiningType};
+    use fribidi::{BidiClass, JoiningType};
     let bidi_type = match fribidi::bidi_class(cp) {
         BidiClass::L => 0x110,
         BidiClass::R => 0x111,
@@ -62,9 +62,12 @@ pub fn reference_properties(cp: u32) -> ReferenceProperties {
         JoiningType::LeftJoining => 0x6,
         JoiningType::Ignored => 0x10,
     };
-    let bracket = fribidi::bracket(cp).map_or(0, |b| match b.kind {
-        BracketKind::Open => b.pair | 0x8000_0000,
-        BracketKind::Close => b.pair,
+    let bracket = fribidi::bracket(cp).map_or(0, |b| {
+        if b.opens() {
+            b.pair() | 0x8000_0000
+        } else {
+            b.pair()
+        }
     });
     ReferenceProperties {
         general_category: unicode::general_category(cp) as u8,
