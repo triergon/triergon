@@ -16,7 +16,7 @@ use std::process::ExitCode;
 
 use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo};
 use triergon_codec::{AudioDecoder, AudioFrame};
-use triergon_codec_opus::{Decoder, Limits};
+use triergon_codec_opus::Decoder;
 
 /// The packets and final ranges of an RFC 6716 test vector.
 fn read_vector(path: &str) -> std::io::Result<Vec<(u32, Vec<u8>)>> {
@@ -176,8 +176,7 @@ fn decode_vector(path: &str, channels: u8, out: &mut Output) -> Result<Decoder, 
     let mut head = b"OpusHead\x01".to_vec();
     head.push(channels);
     head.extend_from_slice(&[0, 0, 0x80, 0xbb, 0, 0, 0, 0, 0]);
-    let mut decoder = Decoder::from_configuration(&head, Limits::default())
-        .map_err(|e| format!("configuration: {e}"))?;
+    let mut decoder = Decoder::new(&head).map_err(|e| format!("configuration: {e}"))?;
     let mut frame = AudioFrame::default();
     for (range, packet) in &packets {
         out.decode(&mut decoder, &mut frame, packet, Some(*range))
@@ -215,8 +214,7 @@ fn decode_container(path: &str, out: &mut Output) -> Result<Decoder, String> {
             let mut head = Vec::new();
             triergon_framing::canonical_opus_configuration(track.configuration(), &mut head)
                 .map_err(|e| format!("configuration: {e}"))?;
-            let built = Decoder::from_configuration(&head, Limits::default())
-                .map_err(|e| format!("configuration: {e}"))?;
+            let built = Decoder::new(&head).map_err(|e| format!("configuration: {e}"))?;
             decoder = Some((track.id(), built));
         }
         let Some((track, decoder)) = decoder.as_mut() else {

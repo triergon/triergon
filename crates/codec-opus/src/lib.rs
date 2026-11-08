@@ -21,10 +21,9 @@ use multistream::Mapping;
 use packet::Packet;
 use stream::{StreamDecoder, Workspace};
 use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, ChannelLayout, DecodeFailure, DownmixLevels, Reservation,
-    StorageError,
+    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, Charged, DecodeFailure,
+    DownmixLevels, Reservation, StorageError,
 };
-use triergon_core::BudgetVec;
 use triergon_framing::{OPUS_RATE, OpusHead};
 
 /// Bounds of one decoder.
@@ -35,8 +34,8 @@ pub struct Limits {
 }
 
 impl Default for Limits {
-    /// 64 MiB: 255 streams of state (about 30 KiB each) and the largest output frame
-    /// (255 channels of 120 ms) fit with a wide margin.
+    /// 64 MiB: the state of 255 streams and the largest output frame (93 channels of
+    /// 120 ms) fit with a wide margin.
     fn default() -> Self {
         Limits {
             live_storage_bytes: 64 << 20,
@@ -84,26 +83,24 @@ pub struct Decoder {
     mapping: Mapping,
     pre_skip: u16,
     streams: BudgetVec<StreamDecoder>,
-    work: Box<Workspace>,
+    work: Charged<Box<Workspace>>,
     output_charge: Reservation,
 }
 
 impl Decoder {
     /// A decoder for an `OpusHead` identification header (RFC 7845 section 5.1), the
-    /// canonical configuration of every container.
-    pub fn from_configuration(
-        configuration: &[u8],
-        limits: Limits,
-    ) -> Result<Decoder, DecodeError> {
-        let budget = Budget::new(limits.live_storage_bytes)?;
-        Decoder::from_configuration_in(configuration, &budget)
+    /// canonical configuration of every container, with a pool of the default limit.
+    pub fn new(configuration: &[u8]) -> Result<Decoder, DecodeError> {
+        Decoder::with_limits(configuration, Limits::default())
     }
 
-    /// As [`Decoder::from_configuration`], charging the caller's pool.
-    pub fn from_configuration_in(
-        configuration: &[u8],
-        budget: &Budget,
-    ) -> Result<Decoder, DecodeError> {
+    /// As [`Decoder::new`], with its own pool of `limits.live_storage_bytes`.
+    pub fn with_limits(configuration: &[u8], limits: Limits) -> Result<Decoder, DecodeError> {
+        Decoder::new_in(configuration, &Budget::new(limits.live_storage_bytes)?)
+    }
+
+    /// As [`Decoder::new`], charging the caller's pool.
+    pub fn new_in(configuration: &[u8], budget: &Budget) -> Result<Decoder, DecodeError> {
         let head = OpusHead::parse(configuration)
             .map_err(|_| DecodeError::Invalid("Opus identification header"))?;
         let mapping = Mapping::new(&head)?;
@@ -118,7 +115,7 @@ impl Decoder {
             mapping,
             pre_skip: head.pre_skip,
             streams,
-            work: Box::new(Workspace::new()),
+            work: Charged::boxed(budget, Workspace::new(budget)?)?,
             output_charge: Reservation::empty(budget),
         })
     }
@@ -142,51 +139,55 @@ impl Decoder {
     /// them when SILK stops, changes rate, or here. `out` is replaced (possibly empty).
     pub fn flush(&mut self, out: &mut AudioFrame) -> Result<(), DecodeError> {
         out.samples_per_channel = 0;
-        let mut samples = 0;
-        for index in 0..self.streams.len() {
-            let produced = self.streams[index].flush(&mut self.work);
-            self.collect(index, produced, &mut samples, out)?;
-        }
-        self.finish(samples, out);
-        Ok(())
-    }
-
-    fn decode_packet(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        out.samples_per_channel = 0;
-        let mut rest = au;
-        let mut samples = 0;
-        let last = self.streams.len() - 1;
-        for index in 0..self.streams.len() {
-            let packet = Packet::parse(rest, index != last)
-                .map_err(|e| DecodeError::Invalid(e.message()))?;
-            rest = &rest[packet.len..];
-            let produced = self.streams[index]
-                .decode(&packet, &mut self.work)
-                .map_err(|e| DecodeError::Invalid(e.message()))?;
-            self.collect(index, produced, &mut samples, out)?;
-        }
-        self.finish(samples, out);
-        Ok(())
-    }
-
-    /// Move stream `index`'s `produced` samples to their planes; every stream must
-    /// produce as many as the first.
-    fn collect(
-        &mut self,
-        index: usize,
-        produced: usize,
-        samples: &mut usize,
-        out: &mut AudioFrame,
-    ) -> Result<(), DecodeError> {
-        if index == 0 {
-            *samples = produced;
-            out.try_resize(self.mapping.channels(), produced, &mut self.output_charge)?;
-        } else if produced != *samples {
+        let samples = self.streams.first().map_or(0, StreamDecoder::pending);
+        if self
+            .streams
+            .iter()
+            .any(|stream| stream.pending() != samples)
+        {
             return Err(DecodeError::Invalid("streams of unequal duration"));
         }
-        self.mapping
-            .distribute(index, &self.work.pcm, produced, &mut out.planes);
+        out.try_resize(self.mapping.channels(), samples, &mut self.output_charge)?;
+        for (index, stream) in self.streams.iter_mut().enumerate() {
+            let produced = stream.flush(&mut self.work);
+            debug_assert_eq!(produced, samples);
+            self.mapping
+                .distribute(index, &self.work.pcm, samples, &mut out.planes);
+        }
+        self.finish(samples, out);
         Ok(())
+    }
+
+    /// Decode one (multistream) packet. Everything that can refuse it, from the framing
+    /// of each sub-packet to the output frame's charge, comes before the first stream
+    /// decodes, so a refused packet leaves every stream as it was.
+    fn decode_packet(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        out.samples_per_channel = 0;
+        let samples = self.check(au)?;
+        out.try_resize(self.mapping.channels(), samples, &mut self.output_charge)?;
+        // `check` parsed every sub-packet.
+        let packets = sub_packets(au, self.streams.len()).map_while(Result::ok);
+        for (index, (stream, packet)) in self.streams.iter_mut().zip(packets).enumerate() {
+            let produced = stream.decode(&packet, &mut self.work);
+            debug_assert_eq!(produced, samples);
+            self.mapping
+                .distribute(index, &self.work.pcm, samples, &mut out.planes);
+        }
+        self.finish(samples, out);
+        Ok(())
+    }
+
+    /// Check every sub-packet of `au` against its stream and return the samples per
+    /// channel they decode to, which must agree.
+    fn check(&self, au: &[u8]) -> Result<usize, DecodeError> {
+        let mut samples = None;
+        for (stream, packet) in self.streams.iter().zip(sub_packets(au, self.streams.len())) {
+            let len = stream.check(&packet?)?;
+            if *samples.get_or_insert(len) != len {
+                return Err(DecodeError::Invalid("streams of unequal duration"));
+            }
+        }
+        Ok(samples.unwrap_or(0))
     }
 
     fn finish(&self, samples: usize, out: &mut AudioFrame) {
@@ -195,6 +196,18 @@ impl Decoder {
         out.layout = self.mapping.layout();
         out.samples_per_channel = samples;
     }
+}
+
+/// The sub-packets of the `streams` streams of a packet: all but the last are
+/// self-delimited (RFC 6716 Appendix B), and the last takes the rest.
+fn sub_packets(au: &[u8], streams: usize) -> impl Iterator<Item = Result<Packet<'_>, DecodeError>> {
+    let mut rest = au;
+    (0..streams).map(move |index| {
+        let packet = Packet::parse(rest, index + 1 < streams)
+            .map_err(|error| DecodeError::Invalid(error.message()))?;
+        rest = &rest[packet.len..];
+        Ok(packet)
+    })
 }
 
 impl AudioDecoder for Decoder {

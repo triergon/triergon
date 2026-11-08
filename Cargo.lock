@@ -166,7 +166,6 @@ dependencies = [
  "triergon",
  "triergon-bitstream",
  "triergon-codec",
- "triergon-core",
  "triergon-framing",
 ]
 
