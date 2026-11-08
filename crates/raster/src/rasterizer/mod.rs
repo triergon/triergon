@@ -17,51 +17,35 @@ use crate::bitmap::Bitmap;
 use crate::geometry::{Rect, Vector, split_cubic, split_quadratic};
 use crate::limits::{Limits, charge};
 use crate::outline::{Curve, Outline};
+use crate::set::{Member, Set};
 use crate::shape::Shape;
 use tile::{TILE, TILE_ORDER, TileMut};
 
 /// Spline flattening tolerance in 1/64 pixel.
 const OUTLINE_ERROR: i64 = 16;
 
-/// Edge and orientation flags of a polyline segment.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct LineFlags(u8);
-
-impl LineFlags {
+/// What a polyline segment's flags state about it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LineFlag {
     /// The segment runs downwards.
-    pub(crate) const DN: Self = Self(1);
+    Down,
     /// The segment runs from upper left to lower right (or the reverse).
-    pub(crate) const UL_DR: Self = Self(2);
-    /// The bounding box edges that the segment really touches.
-    pub(crate) const EXACT_LEFT: Self = Self(4);
-    pub(crate) const EXACT_RIGHT: Self = Self(8);
-    pub(crate) const EXACT_TOP: Self = Self(16);
-    pub(crate) const EXACT_BOTTOM: Self = Self(32);
+    UpLeftDownRight,
+    /// The bounding box edges the segment really touches.
+    ExactLeft,
+    ExactRight,
+    ExactTop,
+    ExactBottom,
+}
 
+impl Member for LineFlag {
     #[inline(always)]
-    pub(crate) const fn contains(self, other: Self) -> bool {
-        self.0 & other.0 == other.0
-    }
-
-    #[inline(always)]
-    fn insert(&mut self, other: Self) {
-        self.0 |= other.0;
-    }
-
-    #[inline(always)]
-    fn remove(&mut self, other: Self) {
-        self.0 &= !other.0;
-    }
-
-    #[inline(always)]
-    fn toggle(&mut self, other: Self) {
-        self.0 ^= other.0;
-    }
-
-    const fn union(self, other: Self) -> Self {
-        Self(self.0 | other.0)
+    fn bit(self) -> u8 {
+        1 << self as u8
     }
 }
+
+pub(crate) type LineFlags = Set<LineFlag>;
 
 /// A polyline segment as the half-plane `a·x + b·y < c` within its bounding
 /// box, coefficients normalised so `max(|a|, |b|) · scale = 2⁶¹`.
@@ -92,15 +76,19 @@ impl Line {
         if x == 0 && y == 0 {
             return None;
         }
-        let mut flags = LineFlags::EXACT_LEFT
-            .union(LineFlags::EXACT_RIGHT)
-            .union(LineFlags::EXACT_TOP)
-            .union(LineFlags::EXACT_BOTTOM);
+        let mut flags = LineFlags::of([
+            LineFlag::ExactLeft,
+            LineFlag::ExactRight,
+            LineFlag::ExactTop,
+            LineFlag::ExactBottom,
+        ]);
         if x < 0 {
-            flags.toggle(LineFlags::UL_DR);
+            flags = flags.toggled(LineFlag::UpLeftDownRight);
         }
         if y >= 0 {
-            flags.toggle(LineFlags::DN.union(LineFlags::UL_DR));
+            flags = flags
+                .toggled(LineFlag::Down)
+                .toggled(LineFlag::UpLeftDownRight);
         }
         // Normalise the half-plane so the larger coefficient fills 31 bits and
         // `scale` is 2⁶¹ / max_ab, from libass's polynomial approximation.
@@ -166,7 +154,7 @@ impl Line {
         if !below && self.flags.contains(lo) {
             return min >= at;
         }
-        let ul_dr = self.flags.contains(LineFlags::UL_DR);
+        let ul_dr = self.flags.contains(LineFlag::UpLeftDownRight);
         let corner = if ul_dr == below { other_max } else { other_min };
         let mut cc =
             self.c - i64::from(coef) * i64::from(at) - i64::from(other) * i64::from(corner);
@@ -185,8 +173,8 @@ impl Line {
         self.c -= i64::from(coef) * i64::from(at);
         let (lo, _) = exact_edges(axis);
         let (other_lo, _) = exact_edges(axis.other());
-        if min == 0 && self.flags.contains(lo.union(LineFlags::UL_DR)) {
-            self.flags.remove(other_lo);
+        if min == 0 && self.flags.contains(lo) && self.flags.contains(LineFlag::UpLeftDownRight) {
+            self.flags = self.flags.without(other_lo);
         }
     }
 
@@ -202,13 +190,13 @@ impl Line {
         self.set_extent(axis, min, at);
         let (lo, hi) = exact_edges(axis);
         let (other_lo, other_hi) = exact_edges(axis.other());
-        self.flags.remove(other_lo);
-        next.flags.remove(other_hi);
-        if self.flags.contains(LineFlags::UL_DR) {
+        self.flags = self.flags.without(other_lo);
+        next.flags = next.flags.without(other_hi);
+        if self.flags.contains(LineFlag::UpLeftDownRight) {
             std::mem::swap(&mut self.flags, &mut next.flags);
         }
-        self.flags.insert(hi);
-        next.flags.insert(lo);
+        self.flags = self.flags.with(hi);
+        next.flags = next.flags.with(lo);
         next
     }
 }
@@ -224,10 +212,10 @@ impl Axis {
 
 /// The flags of the low and high box edges along `axis`.
 #[inline(always)]
-const fn exact_edges(axis: Axis) -> (LineFlags, LineFlags) {
+const fn exact_edges(axis: Axis) -> (LineFlag, LineFlag) {
     match axis {
-        Axis::X => (LineFlags::EXACT_LEFT, LineFlags::EXACT_RIGHT),
-        Axis::Y => (LineFlags::EXACT_TOP, LineFlags::EXACT_BOTTOM),
+        Axis::X => (LineFlag::ExactLeft, LineFlag::ExactRight),
+        Axis::Y => (LineFlag::ExactTop, LineFlag::ExactBottom),
     }
 }
 
@@ -249,9 +237,11 @@ impl Fill {
             [] if winding != 0 => Self::Solid,
             [] => Self::Empty,
             [line] => {
-                let test = LineFlags::UL_DR.union(LineFlags::EXACT_LEFT);
+                let flags = line.flags;
+                let test = flags.contains(LineFlag::UpLeftDownRight)
+                    && flags.contains(LineFlag::ExactLeft);
                 let mut winding = winding;
-                if line.flags.contains(test) == line.flags.contains(LineFlags::DN) {
+                if test == flags.contains(LineFlag::Down) {
                     winding += 1;
                 }
                 match winding {
@@ -291,53 +281,43 @@ impl Canvas<'_> {
 
 /// Reusable rasteriser state: two segment buffers and a scratch tile.
 #[derive(Debug)]
-pub struct Rasterizer {
+pub(crate) struct Rasterizer {
     lines: [BudgetVec<Line>; 2],
     /// Segments of the first outline; the rest belong to the second.
     first: usize,
     bbox: Rect,
     tile: [u8; TILE * TILE],
-    limits: Limits,
 }
 
 impl Rasterizer {
-    /// A rasteriser whose segment storage and bitmaps are charged to `budget`,
-    /// each operation bounded by `limits`.
-    pub fn new(budget: &Budget, limits: Limits) -> Self {
+    pub(crate) fn new(budget: &Budget) -> Self {
         Self {
             lines: [BudgetVec::new(budget), BudgetVec::new(budget)],
             first: 0,
             bbox: Rect::EMPTY,
             tile: [0; TILE * TILE],
-            limits,
         }
     }
 
-    /// Bytes of segment storage currently charged.
-    pub fn retained_bytes(&self) -> usize {
+    pub(crate) fn retained_bytes(&self) -> usize {
         (self.lines[0].capacity() + self.lines[1].capacity()) * size_of::<Line>()
     }
 
-    /// Rasterises `shape`, the union of its outlines each filled with the
-    /// nonzero rule, into a bitmap of whole tiles placed at its pixel origin.
-    /// The bitmap covers the polyline's bounds widened by 1/64 pixel on the
-    /// top-left and a pixel on the bottom-right. Returns `None` when there is
-    /// nothing to draw, or the bitmap would exceed
-    /// [`MAX_BITMAP_BYTES`](crate::MAX_BITMAP_BYTES), as libass draws nothing
-    /// then.
-    ///
-    /// # Errors
-    ///
-    /// `Policy` when the limits run out, and the budget's errors.
-    pub fn rasterize(&mut self, shape: &Shape) -> Result<Option<Bitmap>> {
-        let mut work = self.limits.work();
+    /// libass's `ass_outline_to_bitmap`; see
+    /// [`Raster::rasterize`](crate::Raster::rasterize).
+    pub(crate) fn rasterize(
+        &mut self,
+        shape: &Shape,
+        limits: &Limits,
+        work: &mut WorkBudget,
+    ) -> Result<Option<Bitmap>> {
         self.lines[0].clear();
         self.lines[1].clear();
         self.bbox = Rect::EMPTY;
         let [first, second] = shape.outlines();
-        self.add_outline(first, &mut work)?;
+        self.add_outline(first, work)?;
         self.first = self.lines[0].len();
-        self.add_outline(second, &mut work)?;
+        self.add_outline(second, work)?;
         for line in self.lines[0].as_slice() {
             self.bbox.include(line.bounds());
         }
@@ -353,13 +333,12 @@ impl Rasterizer {
         let tile_w = ((x_max - x_min + mask) & !mask) as usize;
         let tile_h = ((y_max - y_min + mask) & !mask) as usize;
         let budget = self.lines[0].budget().clone();
-        let Some(mut bitmap) = Bitmap::drawable(&budget, tile_w, tile_h, &self.limits)? else {
+        let Some(mut bitmap) = Bitmap::drawable(&budget, tile_w, tile_h, limits)? else {
             return Ok(None);
         };
-        bitmap.left = x_min;
-        bitmap.top = y_min;
+        bitmap.position = Vector::new(x_min, y_min);
         let stride = bitmap.stride();
-        self.fill(bitmap.data_mut(), stride, x_min, y_min, &mut work)?;
+        self.fill(bitmap.data_mut(), stride, x_min, y_min, work)?;
         Ok(Some(bitmap))
     }
 
@@ -709,7 +688,7 @@ impl Cut {
                 emit(part, Keep::High, group, lines, &mut kept)?;
                 continue;
             }
-            if line.flags.contains(LineFlags::UL_DR) {
+            if line.flags.contains(LineFlag::UpLeftDownRight) {
                 winding[group] += delta;
             }
             let mut part = line;

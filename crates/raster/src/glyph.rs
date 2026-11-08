@@ -2,15 +2,14 @@
 //! its quantisation against the glyph's run, the border or opaque box, and their
 //! rasterisation, as libass's `get_bitmap_glyph` draws them.
 
-use triergon_core::{Budget, Error, Result};
+use triergon_core::{Error, Result, WorkBudget, round_ties_even_i32};
 
 use crate::bitmap::Bitmap;
 use crate::fp;
 use crate::geometry::{OUTLINE_MAX, Rect, Vector};
-use crate::limits::Limits;
-use crate::rasterizer::Rasterizer;
+use crate::raster::Raster;
 use crate::shape::Shape;
-use crate::stroke::Pen;
+use crate::stroke::{Pen, stroke};
 use crate::transform::{BitmapTransform, MAX_PERSP_SCALE, Matrix, RunOffset};
 
 /// Stroker tolerance in outline units; outlines are scaled so it suffices.
@@ -86,7 +85,7 @@ pub enum BorderRequest {
     },
 }
 
-/// What [`GlyphRaster::render`] draws: a glyph or drawing shape, where and how.
+/// What [`Raster::render`] draws: a glyph or drawing shape, where and how.
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphRequest<'a> {
     /// The glyph or drawing in outline units, y down; its first outline is
@@ -261,8 +260,8 @@ impl BorderKey {
         let key = Self {
             scale_order: [order_x, order_y],
             size: Vector::new(
-                fp::lrint32(bord_x / f64::from(STROKER_PRECISION)),
-                fp::lrint32(bord_y / f64::from(STROKER_PRECISION)),
+                round_ties_even_i32(bord_x / f64::from(STROKER_PRECISION)),
+                round_ties_even_i32(bord_y / f64::from(STROKER_PRECISION)),
             ),
         };
         let matrix = Matrix(
@@ -321,11 +320,13 @@ pub struct GlyphBitmaps {
     pub glyph: Option<Bitmap>,
     /// The border bitmap.
     pub border: Border,
-    /// The frame position, whole pixels, that the glyph bitmap's `left` and
-    /// `top` count from; the border's when only the border is drawn.
+    /// The frame position, whole pixels, that the glyph bitmap's
+    /// [`position`](Bitmap::position) counts from; the border's when only the
+    /// border is drawn.
     pub position: Vector,
-    /// The frame position, whole pixels, that the border bitmap's `left` and
-    /// `top` count from; `position` unless the border has a bitmap of its own.
+    /// The frame position, whole pixels, that the border bitmap's
+    /// [`position`](Bitmap::position) counts from; `position` unless the
+    /// border has a bitmap of its own.
     pub border_position: Vector,
 }
 
@@ -344,33 +345,7 @@ impl GlyphBitmaps {
     }
 }
 
-/// Rasterises glyphs, borders and boxes; owns the scratch shapes and the
-/// rasteriser.
-#[derive(Debug)]
-pub struct GlyphRaster {
-    rasterizer: Rasterizer,
-    transformed: Shape,
-    budget: Budget,
-    limits: Limits,
-}
-
-impl GlyphRaster {
-    /// A glyph rasteriser whose scratch is charged to `budget`, each operation
-    /// bounded by `limits`.
-    pub fn new(budget: &Budget, limits: Limits) -> Self {
-        Self {
-            rasterizer: Rasterizer::new(budget, limits),
-            transformed: Shape::new(budget),
-            budget: budget.clone(),
-            limits,
-        }
-    }
-
-    /// Bytes of scratch storage currently charged.
-    pub fn retained_bytes(&self) -> usize {
-        self.rasterizer.retained_bytes() + self.transformed.retained_bytes()
-    }
-
+impl Raster {
     /// Draws one glyph of `run` as libass does: quantises its transform against
     /// the run (the run's first drawn glyph sets the run's sub-pixel origin),
     /// rasterises the glyph, then its border outline or opaque box placed
@@ -379,8 +354,13 @@ impl GlyphRaster {
     ///
     /// # Errors
     ///
-    /// `Policy` when the limits run out, and the budget's errors.
-    pub fn render(&mut self, request: &GlyphRequest<'_>, run: &mut Run) -> Result<GlyphBitmaps> {
+    /// `Policy` when `work` or the limits run out, and the budget's errors.
+    pub fn render(
+        &mut self,
+        request: &GlyphRequest<'_>,
+        run: &mut Run,
+        work: &mut WorkBudget,
+    ) -> Result<GlyphBitmaps> {
         let GlyphRequest {
             shape: glyph,
             placement,
@@ -411,15 +391,15 @@ impl GlyphRaster {
         }
         out.position = quantized.position;
         out.border_position = quantized.position;
-        out.glyph = self.bitmap(glyph, &quantized.key)?;
-        self.render_border(request, &transform, &quantized.centred, run, &mut out)?;
+        out.glyph = self.bitmap(glyph, &quantized.key, work)?;
+        self.render_border(request, &transform, &quantized.centred, run, &mut out, work)?;
         if out.is_drawn() {
             run.drawn += 1;
         }
         Ok(out)
     }
 
-    /// The border part of [`GlyphRaster::render`].
+    /// The border part of [`Raster::render`].
     fn render_border(
         &mut self,
         request: &GlyphRequest<'_>,
@@ -427,6 +407,7 @@ impl GlyphRaster {
         centred: &Matrix,
         run: &Run,
         out: &mut GlyphBitmaps,
+        work: &mut WorkBudget,
     ) -> Result<()> {
         let (placement, frame) = (&request.placement, &request.frame);
         let (shape, m) = match request.border {
@@ -457,7 +438,7 @@ impl GlyphRaster {
                     out.border = Border::Glyph;
                     return Ok(());
                 }
-                let Some(stroked) = self.stroke(glyph, &key)? else {
+                let Some(stroked) = self.stroke_border(glyph, &key, work)? else {
                     return Ok(());
                 };
                 (stroked, m)
@@ -466,7 +447,7 @@ impl GlyphRaster {
         let Some(quantized) = BitmapTransform::quantize(&m, shape.cbox(), Some(run.offset)) else {
             return Ok(());
         };
-        if let Some(bitmap) = self.bitmap(&shape, &quantized.key)? {
+        if let Some(bitmap) = self.bitmap(&shape, &quantized.key, work)? {
             out.border_position = quantized.position;
             if out.glyph.is_none() {
                 out.position = quantized.position;
@@ -479,7 +460,12 @@ impl GlyphRaster {
     /// The bitmap of `shape` under the quantised transform `key`. An outline
     /// that leaves the coordinate range under the transform is dropped, as
     /// libass drops it.
-    fn bitmap(&mut self, shape: &Shape, key: &BitmapTransform) -> Result<Option<Bitmap>> {
+    fn bitmap(
+        &mut self,
+        shape: &Shape,
+        key: &BitmapTransform,
+        work: &mut WorkBudget,
+    ) -> Result<Option<Bitmap>> {
         let m = key.restore(shape.cbox());
         let projection = key.projection();
         self.transformed.rebuild(|outputs| {
@@ -491,12 +477,18 @@ impl GlyphRaster {
             }
             Ok(())
         })?;
-        self.rasterizer.rasterize(&self.transformed)
+        self.rasterizer
+            .rasterize(&self.transformed, &self.limits, work)
     }
 
     /// The border of `glyph` for `key`: its first outline scaled and stroked.
     /// `None` when it cannot be stroked within the coordinate range.
-    fn stroke(&mut self, glyph: &Shape, key: &BorderKey) -> Result<Option<Shape>> {
+    fn stroke_border(
+        &mut self,
+        glyph: &Shape,
+        key: &BorderKey,
+        work: &mut WorkBudget,
+    ) -> Result<Option<Shape>> {
         let source = &glyph.outlines()[0];
         let mut border = Shape::new(&self.budget);
         if (key.size.x == 0 && key.size.y == 0) || source.is_empty() {
@@ -510,9 +502,10 @@ impl GlyphRaster {
             tolerance: STROKER_PRECISION,
         };
         let scaled = &mut self.transformed;
+        let points = self.limits.outline_points;
         let stroked = scaled
             .rebuild(|[first, _]| source.scale_pow2_into(first, key.scale_order))
-            .and_then(|()| scaled.outlines()[0].stroke_into(&pen, &self.limits, &mut border));
+            .and_then(|()| stroke(&scaled.outlines()[0], &pen, points, &mut border, work));
         match stroked {
             Ok(()) => Ok(Some(border)),
             Err(Error::Invalid(_)) => Ok(None),

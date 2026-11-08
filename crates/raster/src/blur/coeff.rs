@@ -34,7 +34,7 @@ impl Method {
             level = exponent.max(0) as u32;
             let mul = fp::ldexp(1.0, -2 * exponent); // 0.25^level
             let shrink = (10.1525 + 0.8335 * mul) * (1.0 - frac);
-            // Converted as AArch64 converts: saturating, NaN to 0.
+            // Converted as ARM converts: saturating, NaN to 0.
             radius = 8i32.wrapping_sub(shrink as i32).clamp(4, 8) as usize;
             calc_coeff(&mut mu, radius, r2, mul);
         }

@@ -28,7 +28,8 @@
 //! 0 to 255, shifts 0 to 63, rotation offsets within ±2³⁰, an added bitmap lies
 //! inside its target, clip values within ±2²⁴. A line outside the grammar is recorded as unparsed.
 
-use triergon_raster::{Matrix, PointKind, Projection, SourcePoint, Vector};
+use triergon_font::{OutlinePoint, Point, PointKind};
+use triergon_raster::{Matrix, Projection, Vector};
 
 /// Bounds on one case, so no input can demand unbounded work or reach the
 /// reference's unchecked arithmetic.
@@ -50,7 +51,7 @@ pub enum Source {
 /// Tagged points and exclusive contour ends, as a font outline gives them.
 #[derive(Clone, Debug, Default)]
 pub struct Glyph {
-    pub points: Vec<SourcePoint>,
+    pub points: Vec<OutlinePoint>,
     pub ends: Vec<u32>,
 }
 
@@ -206,7 +207,10 @@ impl Tokens<'_> {
                             1 => PointKind::On,
                             _ => PointKind::Cubic,
                         };
-                        Some(SourcePoint { x, y, kind })
+                        Some(OutlinePoint {
+                            point: Point::new(x, y),
+                            kind,
+                        })
                     })
                     .collect::<Option<_>>()?;
                 Some(Source::Inline(Glyph { points, ends }))

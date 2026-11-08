@@ -1,11 +1,12 @@
 //! Random inputs for every operation: outlines with valid and broken structure
 //! and extreme coordinates, transforms, borders, blurs, filters and clips.
 
-use triergon_core::Budget;
+use triergon_core::{Budget, WorkBudget};
+use triergon_font::{OutlinePoint, Point, PointKind};
 use triergon_raster::{
-    Bitmap, Blur, BorderRequest, Clip, ClipFrame, Compositor, Effects, Filter, FilterFlags,
-    FrameScale, GlyphRaster, GlyphRef, GlyphRequest, GlyphSource, Limits, Matrix, Outline, Pen,
-    PixelRect, Placement, PointKind, Projection, Rasterizer, Run, Shape, SourcePoint, Vector,
+    Bitmap, BorderRequest, Clip, ClipFrame, Effects, Filter, FilterFlags, FrameScale, GlyphRef,
+    GlyphRequest, Limits, Matrix, Outline, Pen, PixelRect, Placement, Projection, Raster, Run,
+    Shape, Vector,
 };
 
 /// xorshift64.
@@ -50,7 +51,7 @@ impl Rng {
 
 /// A glyph source: points and contour ends, valid or not.
 pub struct Source {
-    pub points: Vec<SourcePoint>,
+    pub points: Vec<OutlinePoint>,
     pub ends: Vec<u32>,
 }
 
@@ -65,9 +66,8 @@ impl Source {
             PointKind::Cubic,
         ];
         let points = (0..n)
-            .map(|_| SourcePoint {
-                x: rng.signed(magnitude) as i32,
-                y: rng.signed(magnitude) as i32,
+            .map(|_| OutlinePoint {
+                point: Point::new(rng.signed(magnitude) as i32, rng.signed(magnitude) as i32),
                 kind: kinds[rng.below(4) as usize],
             })
             .collect();
@@ -95,8 +95,9 @@ impl Source {
             }
             1 if n > 0 => {
                 let at = rng.below(n as u64) as usize;
-                self.points[at].x ^= 1 << rng.below(31);
-                self.points[at].y = self.points[at].y.wrapping_neg();
+                let point = &mut self.points[at].point;
+                point.x ^= 1 << rng.below(31);
+                point.y = point.y.wrapping_neg();
             }
             2 if !self.ends.is_empty() => {
                 let at = rng.below(self.ends.len() as u64) as usize;
@@ -114,11 +115,7 @@ impl Source {
 
     pub fn outline(&self, budget: &Budget) -> Outline {
         let mut outline = Outline::new(budget);
-        let glyph = GlyphSource {
-            points: &self.points,
-            contour_ends: &self.ends,
-        };
-        if outline.push_glyph(&glyph).is_err() {
+        if outline.push_glyph(&self.points, &self.ends).is_err() {
             assert!(
                 outline.is_empty(),
                 "a rejected glyph leaves the outline unchanged"
@@ -141,11 +138,13 @@ fn matrix(rng: &mut Rng) -> Matrix {
 }
 
 /// Runs every operation on `source` with parameters drawn from `rng`. Errors
-/// are fine; panics and runaway work are not.
-pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits) {
+/// are fine; panics and runaway work are not: every operation shares `work`
+/// units, as the stages of one frame do.
+pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
     let budget = Budget::new(256 << 20).expect("budget");
+    let mut work = WorkBudget::new(work);
+    let mut raster = Raster::new(&budget, limits);
     let outline = source.outline(&budget);
-    let _ = outline.control_box();
     let _ = outline.min_transformed_x(&matrix(rng), 0);
 
     let mut stroked = Shape::new(&budget);
@@ -153,7 +152,7 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits) {
         width: Vector::new(rng.signed(1 << 12) as i32, rng.signed(1 << 12) as i32),
         tolerance: 1 + rng.below(32) as i32,
     };
-    let _ = outline.stroke_into(&pen, &limits, &mut stroked);
+    let _ = raster.stroke(&outline, &pen, &mut stroked, &mut work);
 
     let mut moved = Outline::new(&budget);
     let m = matrix(rng);
@@ -167,10 +166,8 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits) {
         ));
     }
 
-    let mut rasterizer = Rasterizer::new(&budget, limits);
-    let bitmap = rasterizer.rasterize(&stroked).ok().flatten();
+    let bitmap = raster.rasterize(&stroked, &mut work).ok().flatten();
 
-    let mut glyphs = GlyphRaster::new(&budget, limits);
     let shape = Shape::from_outlines(outline, Outline::new(&budget));
     let placement = Placement {
         rotation: [rng.real(), rng.real(), rng.real()],
@@ -207,7 +204,7 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits) {
         karaoke: rng.below(2) == 0,
     };
     let mut run = Run::default();
-    let Ok(rendered) = glyphs.render(&request, &mut run) else {
+    let Ok(rendered) = raster.render(&request, &mut run, &mut work) else {
         return;
     };
 
@@ -231,10 +228,8 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits) {
         position: Vector::new(rng.signed(64) as i32, rng.signed(64) as i32),
         border_position: Vector::new(rng.signed(64) as i32, rng.signed(64) as i32),
     };
-    let mut compositor = Compositor::new(&budget, limits);
-    let composite = compositor.compose(&filter, &[glyph_ref, glyph_ref]);
+    let composite = raster.compose(&filter, &[glyph_ref, glyph_ref], &mut work);
 
-    let mut blur = Blur::new(&budget, limits);
     if let Ok(mut plain) = Bitmap::new(
         &budget,
         rng.below(80) as usize,
@@ -247,7 +242,7 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits) {
             }
         }
         let variance = [rng.scale().abs(), rng.scale().abs()];
-        let _ = blur.apply(&mut plain, rng.below(8) as u32, variance);
+        let _ = raster.blur(&mut plain, rng.below(8) as u32, variance, &mut work);
         plain.shift_by(Vector::new(rng.signed(200) as i32, rng.signed(200) as i32));
         if let Some(other) = composite.ok().and_then(|c| c.fill) {
             plain.subtract_fill(&other);
@@ -276,7 +271,7 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits) {
         };
         let origin = Vector::new(rng.signed(1 << 31) as i32, rng.signed(400) as i32);
         let parts = clip.parts(&plain, origin, rng.signed(400) as i32, &frame);
-        for part in parts.as_slice() {
+        for part in parts {
             assert!(
                 part.source_x + part.width <= plain.width()
                     && part.source_y + part.height <= plain.height()

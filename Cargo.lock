@@ -293,6 +293,7 @@ name = "triergon-raster"
 version = "0.0.0"
 dependencies = [
  "triergon-core",
+ "triergon-font",
 ]
 
 [[package]]

@@ -3,65 +3,88 @@
 
 use std::io;
 
-use triergon_core::{Budget, Result as CoreResult};
+use triergon_core::{Budget, Error, Result as CoreResult, WorkBudget};
 use triergon_raster::{
-    Bitmap, Blur, BorderRequest, Clip, ClipFrame, Colour, Compositor, Effects, Filter, FilterFlags,
-    FrameScale, GlyphRaster, GlyphRef, GlyphRequest, GlyphSource, Limits, OUTLINE_MAX, Outline,
-    Pen, PixelRect, Placement, Rasterizer, Run, Shape, Vector,
+    Bitmap, BorderRequest, Clip, ClipFrame, Colour, Effects, Filter, FilterFlags, FrameScale,
+    GlyphRef, GlyphRequest, Limits, OUTLINE_MAX, Outline, Pen, PixelRect, Placement, Raster, Run,
+    Shape, Vector,
 };
 
 use crate::case::{Case, Glyph, Random, RunCase, Source};
 use crate::record::{Kind, Sink};
 
-/// Status values of a record: the source or parameters are invalid, the
-/// operation succeeded, or it failed.
+/// Status values of a record. The first three are the reference's: the source
+/// or parameters are invalid, the operation succeeded, or it failed as libass
+/// fails it (`Error::Invalid`). The reference never records the last two, so a
+/// case that reaches them fails: the crate refused under a policy limit (the
+/// case's work or [`Limits`]), or under its storage budget.
 const INVALID: i64 = 0;
 const OK: i64 = 1;
 const FAILED: i64 = 2;
+const POLICY: i64 = 3;
+const BUDGET: i64 = 4;
+
+/// The work one case may do: the work of a frame, which a case stands for.
+const CASE_WORK: u64 = 1 << 32;
+
+/// The status of an operation that failed with `error`.
+fn refused(error: &Error) -> i64 {
+    match error {
+        Error::Invalid(_) => FAILED,
+        Error::Policy(_) => POLICY,
+        _ => BUDGET,
+    }
+}
+
+/// The status of a source that does not convert: invalid as libass rejects it,
+/// or refused.
+fn unconverted(error: &Error) -> i64 {
+    match error {
+        Error::Invalid(_) => INVALID,
+        error => refused(error),
+    }
+}
 
 /// The raster state reused across cases, and the glyphs of a font case.
 #[derive(Debug)]
 pub struct Runner<'g> {
     budget: Budget,
-    limits: Limits,
-    rasterizer: Rasterizer,
-    glyphs: GlyphRaster,
-    compositor: Compositor,
-    blur: Blur,
+    raster: Raster,
+    /// The work of the case being performed.
+    work: WorkBudget,
     /// The selected glyph ids and outlines of a font case.
     font_glyphs: &'g [(u16, Option<Glyph>)],
 }
 
 impl<'g> Runner<'g> {
     pub fn new(budget: &Budget, font_glyphs: &'g [(u16, Option<Glyph>)]) -> Self {
-        let limits = Limits::default();
         Self {
             budget: budget.clone(),
-            limits,
-            rasterizer: Rasterizer::new(budget, limits),
-            glyphs: GlyphRaster::new(budget, limits),
-            compositor: Compositor::new(budget, limits),
-            blur: Blur::new(budget, limits),
+            raster: Raster::new(budget, Limits::default()),
+            work: WorkBudget::new(CASE_WORK),
             font_glyphs,
         }
     }
 
-    /// The converted outline of `source`, or `None` when it is invalid or names
-    /// no loaded glyph.
-    fn convert(&self, source: &Source) -> Option<Outline> {
+    /// The converted outline of `source`: `Invalid` when libass rejects it or
+    /// it names no loaded glyph.
+    fn convert(&self, source: &Source) -> CoreResult<Outline> {
+        const MISSING: Error = Error::Invalid("no such glyph");
         let glyph = match source {
-            Source::Glyph(index) => self.font_glyphs.get(*index)?.1.as_ref()?,
+            Source::Glyph(index) => self
+                .font_glyphs
+                .get(*index)
+                .and_then(|(_, glyph)| glyph.as_ref())
+                .ok_or(MISSING)?,
             Source::Inline(glyph) => glyph,
         };
         let mut outline = Outline::new(&self.budget);
-        let source = GlyphSource {
-            points: &glyph.points,
-            contour_ends: &glyph.ends,
-        };
-        outline.push_glyph(&source).ok().map(|()| outline)
+        outline.push_glyph(&glyph.points, &glyph.ends)?;
+        Ok(outline)
     }
 
     pub fn perform(&mut self, case: Option<&Case>, sink: &mut impl Sink) -> io::Result<()> {
+        self.work = WorkBudget::new(CASE_WORK);
         let Some(case) = case else {
             sink.begin(Kind::Unparsed)?;
             return sink.end();
@@ -70,23 +93,23 @@ impl<'g> Runner<'g> {
             Case::Convert(source) => {
                 sink.begin(Kind::Convert)?;
                 match self.convert(source) {
-                    Some(outline) => {
+                    Ok(outline) => {
                         sink.value(OK)?;
                         sink.outline(&outline)?;
                     }
-                    None => sink.value(INVALID)?,
+                    Err(error) => sink.value(unconverted(&error))?,
                 }
             }
             Case::Rotate(offset, source) => {
                 sink.begin(Kind::Rotate)?;
                 match self.convert(source) {
-                    None => sink.value(INVALID)?,
-                    Some(mut outline) => match outline.rotate_90(*offset) {
+                    Err(error) => sink.value(unconverted(&error))?,
+                    Ok(mut outline) => match outline.rotate_90(*offset) {
                         Ok(()) => {
                             sink.value(OK)?;
                             sink.outline(&outline)?;
                         }
-                        Err(_) => sink.value(FAILED)?,
+                        Err(error) => sink.value(refused(&error))?,
                     },
                 }
             }
@@ -96,9 +119,12 @@ impl<'g> Runner<'g> {
             }
             Case::Transform(projection, m, source) => {
                 sink.begin(Kind::Transform)?;
-                let Some(outline) = self.convert(source) else {
-                    sink.value(INVALID)?;
-                    return sink.end();
+                let outline = match self.convert(source) {
+                    Ok(outline) => outline,
+                    Err(error) => {
+                        sink.value(unconverted(&error))?;
+                        return sink.end();
+                    }
                 };
                 let mut out = Outline::new(&self.budget);
                 match outline.transform_into(m, *projection, &mut out) {
@@ -106,26 +132,38 @@ impl<'g> Runner<'g> {
                         sink.value(OK)?;
                         sink.outline(&out)?;
                     }
-                    Err(_) => sink.value(FAILED)?,
+                    Err(error) => sink.value(refused(&error))?,
                 }
             }
             Case::Raster(projection, m, sources) => {
                 sink.begin(Kind::Raster)?;
                 let mut outlines = Vec::with_capacity(2);
                 for source in sources {
-                    let Some(outline) = self.convert(source) else {
-                        sink.value(INVALID)?;
-                        return sink.end();
+                    let outline = match self.convert(source) {
+                        Ok(outline) => outline,
+                        Err(error) => {
+                            sink.value(unconverted(&error))?;
+                            return sink.end();
+                        }
                     };
                     let mut out = Outline::new(&self.budget);
-                    // A transform out of range leaves the outline empty.
-                    let _ = outline.transform_into(m, *projection, &mut out);
+                    // A transform out of range leaves the outline empty; a
+                    // refusal for storage is recorded.
+                    match outline.transform_into(m, *projection, &mut out) {
+                        Ok(()) | Err(Error::Invalid(_)) => {}
+                        Err(error) => {
+                            sink.value(refused(&error))?;
+                            return sink.end();
+                        }
+                    }
                     outlines.push(out);
                 }
                 let second = outlines.pop().unwrap_or_else(|| Outline::new(&self.budget));
                 let first = outlines.pop().unwrap_or_else(|| Outline::new(&self.budget));
                 let shape = Shape::from_outlines(first, second);
-                self.result(sink, |runner| runner.rasterizer.rasterize(&shape))?;
+                self.result(sink, |runner| {
+                    runner.raster.rasterize(&shape, &mut runner.work)
+                })?;
             }
             Case::Run(run) => {
                 sink.begin(Kind::Run)?;
@@ -139,7 +177,9 @@ impl<'g> Runner<'g> {
                 sink.begin(Kind::Blur)?;
                 self.result(sink, |runner| {
                     let mut out = runner.random(*bitmap)?;
-                    runner.blur.apply(&mut out, *be, *variance)?;
+                    runner
+                        .raster
+                        .blur(&mut out, *be, *variance, &mut runner.work)?;
                     Ok(Some(out))
                 })?;
             }
@@ -183,7 +223,7 @@ impl<'g> Runner<'g> {
                     let mut rng = Rng::seeded(*seed);
                     let mut placed = |(size, [left, top]): ([usize; 2], [i32; 2])| {
                         let mut bitmap = rng.bitmap(&runner.budget, size)?;
-                        (bitmap.left, bitmap.top) = (left, top);
+                        bitmap.position = Vector::new(left, top);
                         CoreResult::Ok(bitmap)
                     };
                     let fill = placed(*fill)?;
@@ -208,8 +248,8 @@ impl<'g> Runner<'g> {
         sink.end()
     }
 
-    /// A bitmap result: `OK` and the bitmap, or `FAILED` when the crate refuses
-    /// what libass does.
+    /// A bitmap result: `OK` and the bitmap, or the status of the crate's
+    /// refusal; libass draws every one.
     fn result(
         &mut self,
         sink: &mut impl Sink,
@@ -220,7 +260,7 @@ impl<'g> Runner<'g> {
                 sink.value(OK)?;
                 sink.bitmap(bitmap.as_ref())
             }
-            Err(_) => sink.value(FAILED),
+            Err(error) => sink.value(refused(&error)),
         }
     }
 
@@ -236,30 +276,35 @@ impl<'g> Runner<'g> {
         sink: &mut impl Sink,
     ) -> io::Result<()> {
         let radius = width.x.max(width.y);
-        let outline = self
-            .convert(source)
-            .filter(|_| tolerance >= 1 && radius >= tolerance && radius <= OUTLINE_MAX);
-        let Some(outline) = outline else {
-            return sink.value(INVALID);
+        let outline = match self.convert(source) {
+            Ok(outline) => outline,
+            Err(error) => return sink.value(unconverted(&error)),
         };
+        if !(tolerance >= 1 && radius >= tolerance && radius <= OUTLINE_MAX) {
+            return sink.value(INVALID);
+        }
         let pen = Pen { width, tolerance };
         let mut border = Shape::new(&self.budget);
-        match outline.stroke_into(&pen, &self.limits, &mut border) {
+        match self
+            .raster
+            .stroke(&outline, &pen, &mut border, &mut self.work)
+        {
             Ok(()) => {
                 sink.value(OK)?;
                 let [outer, inner] = border.outlines();
                 sink.outline(outer)?;
                 sink.outline(inner)
             }
-            Err(_) => sink.value(FAILED),
+            Err(error) => sink.value(refused(&error)),
         }
     }
 
     fn clip(&self, bitmap: Random, v: &[i32; 16], sink: &mut impl Sink) -> io::Result<()> {
-        let Ok(mut source) = self.random(bitmap) else {
-            return sink.value(FAILED);
+        let mut source = match self.random(bitmap) {
+            Ok(source) => source,
+            Err(error) => return sink.value(refused(&error)),
         };
-        (source.left, source.top) = (v[0], v[1]);
+        source.position = Vector::new(v[0], v[1]);
         let rect = |at: usize| PixelRect {
             left: v[at],
             top: v[at + 1],
@@ -277,8 +322,8 @@ impl<'g> Runner<'g> {
         };
         let parts = clip.parts(&source, Vector::new(v[2], v[3]), v[4], &frame);
         sink.value(OK)?;
-        sink.value(parts.as_slice().len() as i64)?;
-        for part in parts.as_slice() {
+        sink.value(parts.len() as i64)?;
+        for part in parts {
             let colour = match part.colour {
                 Colour::First => 1,
                 Colour::Second => 2,
@@ -323,9 +368,13 @@ impl<'g> Runner<'g> {
         let mut run = Run::default();
         let mut drawn = Vec::new();
         for glyph in &case.glyphs {
-            let Some(outline) = self.convert(&glyph.source) else {
-                sink.value(INVALID)?;
-                continue;
+            let outline = match self.convert(&glyph.source) {
+                Ok(outline) => outline,
+                Err(Error::Invalid(_)) => {
+                    sink.value(INVALID)?;
+                    continue;
+                }
+                Err(error) => return sink.value(refused(&error)),
             };
             let shape = Shape::from_outlines(outline, Outline::new(&self.budget));
             let (gr, gi) = (&glyph.reals, &glyph.ints);
@@ -357,8 +406,9 @@ impl<'g> Runner<'g> {
                 border,
                 karaoke: bit(32),
             };
-            let Ok(bitmaps) = self.glyphs.render(&request, &mut run) else {
-                return sink.value(FAILED);
+            let bitmaps = match self.raster.render(&request, &mut run, &mut self.work) {
+                Ok(bitmaps) => bitmaps,
+                Err(error) => return sink.value(refused(&error)),
             };
             sink.value(OK)?;
             for (bitmap, at) in [
@@ -392,8 +442,9 @@ impl<'g> Runner<'g> {
                 border_position: relative(b.border_position),
             })
             .collect();
-        let Ok(composite) = self.compositor.compose(&filter, &refs) else {
-            return sink.value(FAILED);
+        let composite = match self.raster.compose(&filter, &refs, &mut self.work) {
+            Ok(composite) => composite,
+            Err(error) => return sink.value(refused(&error)),
         };
         for bitmap in [&composite.fill, &composite.border, &composite.shadow] {
             sink.bitmap(bitmap.as_ref())?;

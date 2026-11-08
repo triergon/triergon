@@ -48,7 +48,7 @@ impl Shape {
 
     /// The control box of both outlines, as libass keeps it: all zero when they
     /// are empty.
-    pub fn cbox(&self) -> &Rect {
+    pub(crate) fn cbox(&self) -> &Rect {
         &self.cbox
     }
 
