@@ -5,63 +5,63 @@
   "pins": {
     "arimo-regular-ttf-853": {
       "packets": 48,
-      "bytes": 99979,
-      "digest": 2045299508532698856
+      "bytes": 119807,
+      "digest": 9944271903982486744
     },
     "arimo-regular-ttf-16384": {
       "packets": 48,
-      "bytes": 2711108,
-      "digest": 12097006395257449427
+      "bytes": 78171229,
+      "digest": 11503633738340801275
     },
     "notosans-regular-otf-853": {
       "packets": 48,
-      "bytes": 76435,
-      "digest": 6661069354941050917
+      "bytes": 54905,
+      "digest": 16794276899384754780
     },
     "notosans-regular-otf-16384": {
       "packets": 48,
-      "bytes": 2075566,
-      "digest": 5450978902885829413
+      "bytes": 7172210,
+      "digest": 9714635748040376871
     },
     "notosansjp-regular-otf-853": {
       "packets": 48,
-      "bytes": 135159,
-      "digest": 7845930139621949482
+      "bytes": 156792,
+      "digest": 700471380863694830
     },
     "notosansjp-regular-otf-16384": {
       "packets": 48,
-      "bytes": 5902993,
-      "digest": 12912742843517012609
+      "bytes": 13995903,
+      "digest": 6325701183138036997
     },
     "notosansjp-vf-otf-853": {
       "packets": 48,
-      "bytes": 127563,
-      "digest": 14580052891498411037
+      "bytes": 130857,
+      "digest": 6323163064372305807
     },
     "notosansjp-vf-otf-16384": {
       "packets": 48,
-      "bytes": 2059000,
-      "digest": 4283498408211220266
+      "bytes": 1812437,
+      "digest": 11374559777815552980
     },
     "notosanscjk-regular-ttc-853": {
       "packets": 48,
-      "bytes": 155959,
-      "digest": 1438237677762230307
+      "bytes": 144401,
+      "digest": 13600920902299982875
     },
     "notosanscjk-regular-ttc-16384": {
       "packets": 48,
-      "bytes": 2628506,
-      "digest": 4028528045658337569
+      "bytes": 2670752,
+      "digest": 4132523919802118990
     },
     "authored-cff-features-otf-853": {
       "packets": 48,
-      "bytes": 44355,
-      "digest": 4209405048477044382
+      "bytes": 34135,
+      "digest": 10309762595279257093
     },
     "authored-cff-features-otf-16384": {
       "packets": 48,
-      "bytes": 550672,
-      "digest": 17859704777970133899
+      "bytes": 809960,
+      "digest": 2386119485020872017
     }
   }
 }

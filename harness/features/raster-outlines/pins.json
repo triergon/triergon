@@ -4,14 +4,14 @@
   "note": "libass 0.17.5's folds, recorded by `cargo xtask raster manifest --record`; never edited by hand.",
   "pins": {
     "outlines-required-0": {
-      "packets": 512,
-      "bytes": 2823276,
-      "digest": 3355235385387119634
+      "packets": 511,
+      "bytes": 2465744,
+      "digest": 4686760013204290077
     },
     "outlines-required-1": {
-      "packets": 514,
-      "bytes": 3022133,
-      "digest": 7037105573800673278
+      "packets": 508,
+      "bytes": 2726842,
+      "digest": 7044977423289111800
     }
   }
 }

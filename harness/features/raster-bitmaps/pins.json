@@ -5,13 +5,13 @@
   "pins": {
     "bitmaps-required-0": {
       "packets": 280,
-      "bytes": 1621599,
-      "digest": 15607243300809175070
+      "bytes": 5904295,
+      "digest": 17026255702179323931
     },
     "bitmaps-required-1": {
       "packets": 280,
-      "bytes": 1631941,
-      "digest": 17123793532238808561
+      "bytes": 14527237,
+      "digest": 880646678962253778
     }
   }
 }
