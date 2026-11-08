@@ -129,6 +129,88 @@ impl SilkConfig {
     pub(crate) fn start_latency(self) -> usize {
         Resampler::start_latency(self.bandwidth)
     }
+
+    /// The pulses [`SilkLayer::parse`] stores for one Opus frame: whole shell blocks of
+    /// every coded channel of every SILK frame.
+    pub(crate) fn pulses_len(self) -> usize {
+        self.layout.frames * self.coded_channels * self.padded_len()
+    }
+
+    /// Samples per channel of one SILK frame at the internal rate.
+    fn frame_len(self) -> usize {
+        self.bandwidth.subframe_len() * self.layout.subframes
+    }
+
+    /// The pulses of one channel of one SILK frame, in whole shell blocks.
+    fn padded_len(self) -> usize {
+        self.frame_len().next_multiple_of(excitation::BLOCK)
+    }
+
+    /// Where the pulses of `channel` of SILK frame `frame` lie in an Opus frame's pulses.
+    fn pulses_at(self, frame: usize, channel: usize) -> core::ops::Range<usize> {
+        let start = (frame * self.coded_channels + channel) * self.padded_len();
+        start..start + self.padded_len()
+    }
+}
+
+/// Most pulses [`SilkLayer::parse`] stores for one packet: 120 ms of two channels at
+/// 16 kHz, in whole shell blocks (a 10 ms medium-band frame pads 120 samples to 128).
+pub(crate) const MAX_PACKET_PULSES: usize = 2 * 120 * 16;
+
+/// The symbols of one SILK frame, read ahead of its synthesis.
+#[derive(Clone, Copy, Debug, Default)]
+struct FrameSymbols {
+    weights: Weights,
+    mid_only: bool,
+    /// Side information of each coded channel; none for an uncoded side channel.
+    info: [Option<SideInfo>; 2],
+}
+
+/// The SILK layer of one Opus frame as read from its range coder, apart from the pulses,
+/// which go to a buffer of [`SilkConfig::pulses_len`]: everything synthesis needs. The
+/// reading depends on no decoder state, so every frame of a packet can be read before
+/// the first is synthesized.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct SilkLayer {
+    frames: [FrameSymbols; 3],
+}
+
+impl SilkLayer {
+    /// Read the SILK layer of one Opus frame from `rc`, leaving `rc` after it.
+    pub(crate) fn parse(rc: &mut RangeDecoder<'_>, config: SilkConfig, pulses: &mut [i32]) -> Self {
+        let SilkConfig {
+            bandwidth,
+            layout,
+            coded_channels,
+        } = config;
+        let header = Header::parse(rc, coded_channels, layout.frames);
+        // The first pulses serve as scratch for the discarded LBRR frames.
+        skip_lbrr(rc, &header, config, &mut pulses[config.pulses_at(0, 0)]);
+        let mut layer = SilkLayer::default();
+        let mut prev_lag = [None; 2];
+        let mut prev_mid_only = false;
+        for (frame, symbols) in layer.frames[..layout.frames].iter_mut().enumerate() {
+            if coded_channels == 2 {
+                (symbols.weights, symbols.mid_only) = read_stereo(rc, &header, frame);
+            }
+            for channel in 0..coded_channels {
+                if channel == 1 && symbols.mid_only {
+                    continue;
+                }
+                symbols.info[channel] = Some(read_channel(
+                    rc,
+                    bandwidth,
+                    layout,
+                    header.vad[channel][frame],
+                    coding(frame, channel, prev_mid_only),
+                    &mut prev_lag[channel],
+                    &mut pulses[config.pulses_at(frame, channel)],
+                ));
+            }
+            prev_mid_only = symbols.mid_only;
+        }
+        layer
+    }
 }
 
 /// SILK decoder state of one Opus stream (at most one coded stereo pair).
@@ -145,8 +227,7 @@ pub(crate) struct SilkDecoder {
     /// a stereo to mono switch, so its history stays continuous.
     right_follows_mono: bool,
     resamplers: [Resampler; 2],
-    /// Scratch: excitation pulses and reconstructed excitation of one SILK frame.
-    pulses: [i32; MAX_FRAME],
+    /// Scratch: reconstructed excitation of one SILK frame.
     excitation: [f32; MAX_FRAME],
     /// Scratch: decoded mid and side signal of one SILK frame.
     decoded: [[f32; MAX_FRAME]; 2],
@@ -167,7 +248,6 @@ impl SilkDecoder {
             prev_mid_only: false,
             right_follows_mono: false,
             resamplers: [Resampler::new(), Resampler::new()],
-            pulses: [0; MAX_FRAME],
             excitation: [0.0; MAX_FRAME],
             decoded: [[0.0; MAX_FRAME]; 2],
             internal: [[0.0; MAX_PACKET]; 2],
@@ -191,36 +271,23 @@ impl SilkDecoder {
         }
     }
 
-    /// Decode the SILK layer of one Opus frame. `out` has one slice per output channel
-    /// (1 or 2), each [`SilkConfig::duration_48k`] samples, filled at 48 kHz with full
-    /// scale 1.0 from the front. Returns the samples written per channel: the duration,
-    /// except [`SilkConfig::start_latency`] fewer for the first frame after a start
-    /// (FFmpeg's resampler latency; see [`SilkDecoder::flush`]).
+    /// Synthesize the SILK layer `layer` of one Opus frame, with its `pulses`, as
+    /// [`SilkLayer::parse`] read them with `config`. `out` has one slice per output
+    /// channel (1 or 2), each [`SilkConfig::duration_48k`] samples, filled at 48 kHz with
+    /// full scale 1.0 from the front. Returns the samples written per channel: the
+    /// duration, except [`SilkConfig::start_latency`] fewer for the first frame after a
+    /// start (FFmpeg's resampler latency; see [`SilkDecoder::flush`]).
     pub(crate) fn decode(
         &mut self,
-        rc: &mut RangeDecoder<'_>,
         config: SilkConfig,
+        layer: &SilkLayer,
+        pulses: &[i32],
         out: &mut [&mut [f32]],
     ) -> usize {
-        let SilkConfig {
-            bandwidth,
-            layout,
-            coded_channels,
-        } = config;
         debug_assert!(matches!(out.len(), 1 | 2));
         debug_assert!(out.iter().all(|plane| plane.len() == config.duration_48k()));
-        self.configure(bandwidth, coded_channels);
-
-        let header = Header::parse(rc, coded_channels, layout.frames);
-        skip_lbrr(
-            rc,
-            &header,
-            bandwidth,
-            layout,
-            coded_channels,
-            &mut self.pulses,
-        );
-        let len = self.decode_frames(rc, &header, bandwidth, layout, out.len());
+        self.configure(config.bandwidth, config.coded_channels);
+        let len = self.decode_frames(config, layer, pulses, out.len());
         self.internal_len = len;
 
         let [left, right] = &self.internal;
@@ -229,7 +296,7 @@ impl SilkDecoder {
         let out_left = &mut *first[0];
         let produced = r0.process(&left[..len], out_left);
         if let Some(out_right) = rest.first_mut() {
-            if coded_channels == 2 {
+            if config.coded_channels == 2 {
                 r1.process(&right[..len], out_right);
             } else if self.right_follows_mono {
                 r1.process(&left[..len], out_right);
@@ -239,40 +306,6 @@ impl SilkDecoder {
         }
         self.right_follows_mono = false;
         produced
-    }
-
-    /// Read the SILK layer of one Opus frame from `rc` as [`SilkDecoder::decode`] does,
-    /// without decoding it or reading any decoder state: `rc` ends where `decode` would
-    /// leave it.
-    pub(crate) fn skip(rc: &mut RangeDecoder<'_>, config: SilkConfig) {
-        let SilkConfig {
-            bandwidth,
-            layout,
-            coded_channels,
-        } = config;
-        let header = Header::parse(rc, coded_channels, layout.frames);
-        let mut pulses = [0; MAX_FRAME];
-        skip_lbrr(rc, &header, bandwidth, layout, coded_channels, &mut pulses);
-        let mut prev_lag = [None; 2];
-        let mut prev_mid_only = false;
-        for frame in 0..layout.frames {
-            let mid_only = coded_channels == 2 && read_stereo(rc, &header, frame).1;
-            for channel in 0..coded_channels {
-                if channel == 1 && mid_only {
-                    continue;
-                }
-                read_channel(
-                    rc,
-                    bandwidth,
-                    layout,
-                    header.vad[channel][frame],
-                    coding(frame, channel, prev_mid_only),
-                    &mut prev_lag[channel],
-                    &mut pulses,
-                );
-            }
-            prev_mid_only = mid_only;
-        }
     }
 
     /// Emit the 48 kHz samples the resampler still holds back (only after narrowband
@@ -317,49 +350,38 @@ impl SilkDecoder {
         self.coded_channels = coded_channels;
     }
 
-    /// Decode the regular SILK frames into `self.internal`; returns the samples per channel.
+    /// Synthesize the regular SILK frames into `self.internal`; returns the samples per
+    /// channel.
     fn decode_frames(
         &mut self,
-        rc: &mut RangeDecoder<'_>,
-        header: &Header,
-        bandwidth: Bandwidth,
-        layout: Layout,
+        config: SilkConfig,
+        layer: &SilkLayer,
+        pulses: &[i32],
         out_channels: usize,
     ) -> usize {
-        let len = bandwidth.subframe_len() * layout.subframes;
-        let stereo = self.coded_channels == 2;
-        let mut prev_lag = [None; 2];
-        for frame in 0..layout.frames {
-            let (weights, mid_only) = if stereo {
-                read_stereo(rc, header, frame)
-            } else {
-                (Weights::default(), false)
-            };
-            if stereo && !mid_only && self.prev_mid_only {
+        let SilkConfig {
+            bandwidth, layout, ..
+        } = config;
+        let len = config.frame_len();
+        let stereo = config.coded_channels == 2;
+        for (frame, symbols) in layer.frames[..layout.frames].iter().enumerate() {
+            if stereo && !symbols.mid_only && self.prev_mid_only {
                 // The side channel resumes after uncoded frames from a known, silent state.
                 self.channels[1].reset();
             }
-            for channel in 0..self.coded_channels {
-                if channel == 1 && mid_only {
+            for (channel, info) in symbols.info.iter().enumerate() {
+                let Some(info) = info else {
                     continue;
-                }
-                let info = read_channel(
-                    rc,
-                    bandwidth,
-                    layout,
-                    header.vad[channel][frame],
-                    coding(frame, channel, self.prev_mid_only),
-                    &mut prev_lag[channel],
-                    &mut self.pulses,
-                );
+                };
+                let pulses = &pulses[config.pulses_at(frame, channel)];
                 excitation::reconstruct(
-                    &self.pulses[..len],
+                    &pulses[..len],
                     info.frame_type,
                     info.seed,
                     &mut self.excitation[..len],
                 );
                 self.channels[channel].decode(
-                    &info,
+                    info,
                     &self.excitation[..len],
                     bandwidth,
                     layout.subframes,
@@ -370,9 +392,9 @@ impl SilkDecoder {
             let [left, right] = &mut self.internal;
             let [mid, side] = &self.decoded;
             if stereo && out_channels == 2 {
-                let side = (!mid_only).then(|| &side[..len]);
+                let side = (!symbols.mid_only).then(|| &side[..len]);
                 self.stereo.unmix(
-                    weights,
+                    symbols.weights,
                     bandwidth,
                     &mid[..len],
                     side,
@@ -382,7 +404,7 @@ impl SilkDecoder {
             } else {
                 self.stereo.mono(&mid[..len], &mut left[range]);
             }
-            self.prev_mid_only = mid_only;
+            self.prev_mid_only = symbols.mid_only;
         }
         layout.frames * len
     }
@@ -416,7 +438,7 @@ fn read_channel(
     active: bool,
     coding: Coding,
     prev_lag: &mut Option<i32>,
-    pulses: &mut [i32; MAX_FRAME],
+    pulses: &mut [i32],
 ) -> SideInfo {
     let info = SideInfo::parse(rc, bandwidth, layout.subframes, active, coding, *prev_lag);
     *prev_lag = info.pitch_lag();
@@ -428,14 +450,12 @@ fn read_channel(
 /// Parse the LBRR frames (RFC 6716 section 4.2.5). Their redundant copy of the previous
 /// packet is only needed for loss recovery, so they are parsed and discarded; they do not
 /// touch the decoder state.
-fn skip_lbrr(
-    rc: &mut RangeDecoder<'_>,
-    header: &Header,
-    bandwidth: Bandwidth,
-    layout: Layout,
-    coded_channels: usize,
-    pulses: &mut [i32; MAX_FRAME],
-) {
+fn skip_lbrr(rc: &mut RangeDecoder<'_>, header: &Header, config: SilkConfig, pulses: &mut [i32]) {
+    let SilkConfig {
+        bandwidth,
+        layout,
+        coded_channels,
+    } = config;
     let mut prev_lag = [None; 2];
     for frame in 0..layout.frames {
         for channel in 0..coded_channels {

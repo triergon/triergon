@@ -19,7 +19,7 @@ mod stream;
 
 use multistream::Mapping;
 use packet::Packet;
-use stream::{StreamDecoder, Workspace};
+use stream::{Staging, StreamDecoder, Workspace};
 use triergon_codec::{
     AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, Charged, DecodeFailure,
     DownmixLevels, Reservation, StorageError,
@@ -83,6 +83,8 @@ pub struct Decoder {
     mapping: Mapping,
     pre_skip: u16,
     streams: BudgetVec<StreamDecoder>,
+    /// What checking a packet reads of every stream, for decoding it.
+    staging: Staging,
     work: Charged<Box<Workspace>>,
     output_charge: Reservation,
 }
@@ -114,6 +116,7 @@ impl Decoder {
         Ok(Decoder {
             mapping,
             pre_skip: head.pre_skip,
+            staging: Staging::new(streams.len(), budget)?,
             streams,
             work: Charged::boxed(budget, Workspace::new(budget)?)?,
             output_charge: Reservation::empty(budget),
@@ -168,7 +171,7 @@ impl Decoder {
         // `check` parsed every sub-packet.
         let packets = sub_packets(au, self.streams.len()).map_while(Result::ok);
         for (index, (stream, packet)) in self.streams.iter_mut().zip(packets).enumerate() {
-            let produced = stream.decode(&packet, &mut self.work);
+            let produced = stream.decode(&packet, self.staging.stream(index), &mut self.work);
             debug_assert_eq!(produced, samples);
             self.mapping
                 .distribute(index, &self.work.pcm, samples, &mut out.planes);
@@ -177,12 +180,14 @@ impl Decoder {
         Ok(())
     }
 
-    /// Check every sub-packet of `au` against its stream and return the samples per
-    /// channel they decode to, which must agree.
-    fn check(&self, au: &[u8]) -> Result<usize, DecodeError> {
+    /// Check every sub-packet of `au` against its stream, staging what decoding them
+    /// continues from, and return the samples per channel they decode to, which must
+    /// agree.
+    fn check(&mut self, au: &[u8]) -> Result<usize, DecodeError> {
         let mut samples = None;
-        for (stream, packet) in self.streams.iter().zip(sub_packets(au, self.streams.len())) {
-            let len = stream.check(&packet?)?;
+        let packets = sub_packets(au, self.streams.len());
+        for (index, (stream, packet)) in self.streams.iter().zip(packets).enumerate() {
+            let len = stream.check(&packet?, self.staging.stream_mut(index))?;
             if *samples.get_or_insert(len) != len {
                 return Err(DecodeError::Invalid("streams of unequal duration"));
             }
