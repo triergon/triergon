@@ -2,6 +2,7 @@
 //! the size: scales, size metrics, scaled unhinted outlines and advances, the
 //! hinted advances HarfBuzz receives, kerning and decoration lines.
 
+use crate::cff::Scale;
 use crate::fixed::{div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_round};
 use crate::glyf::{self, Scaled};
 use crate::outline::ScaledOutline;
@@ -307,12 +308,12 @@ impl<'f> SizedFont<'f> {
     /// TrueType points scale with `FT_MulFix` by the size's scales (unhinted
     /// loading ignores `head`'s integer-ppem flag); composites transform and
     /// move components in pixels. CFF outlines are built in whole font units by
-    /// FreeType's CFF engine and then scaled.
+    /// FreeType's CFF engine, put through the FontMatrix, and then scaled.
     ///
     /// # Errors
     ///
-    /// Those of [`Font::outline_into`]; `Unsupported` for CFF with a FontMatrix
-    /// other than 1/unitsPerEm; `Overflow` for coordinates beyond `i32`.
+    /// Those of [`Font::outline_into`]; `Overflow` for coordinates beyond
+    /// `i32`.
     pub fn outline_into(
         &self,
         glyph: GlyphId,
@@ -343,20 +344,19 @@ impl<'f> SizedFont<'f> {
                 })
             }
             Outlines::Cff(cff) => {
-                if cff.has_matrix() {
-                    return Err(Error::Unsupported("scaled CFF with a FontMatrix"));
-                }
-                cff.outline_units(data, glyph, outline, &font.limits, &mut work)?;
-                let (x, y) = (self.metrics.x_scale, self.metrics.y_scale);
-                for p in outline.points_mut() {
-                    p.point.x = glyf::narrow(mul_fix(i64::from(p.point.x), x))?;
-                    p.point.y = glyf::narrow(mul_fix(i64::from(p.point.y), y))?;
-                }
-                let advance = i64::from(font.hmtx.advance(data, index));
+                cff.load(data, glyph, self.scale(), outline, &font.limits, &mut work)?;
+                let advance = font.hmtx.advance(data, index);
                 Ok(ScaledMetrics {
-                    advance: glyf::narrow(mul_fix(advance, x))?,
+                    advance: glyf::narrow(cff.advance(data, glyph, advance, self.scale())?)?,
                 })
             }
+        }
+    }
+
+    const fn scale(&self) -> Scale {
+        Scale {
+            x: self.metrics.x_scale,
+            y: self.metrics.y_scale,
         }
     }
 
@@ -415,13 +415,7 @@ impl<'f> SizedFont<'f> {
                 mul_fix(origin + advance, x) - mul_fix(origin, x)
             }
             Outlines::Cff(cff) => {
-                if cff.has_matrix() {
-                    return Err(Error::Unsupported("scaled CFF with a FontMatrix"));
-                }
-                mul_fix(
-                    i64::from(font.hmtx.advance(data, index)),
-                    self.metrics.x_scale,
-                )
+                cff.advance(data, glyph, font.hmtx.advance(data, index), self.scale())?
             }
         };
         glyf::narrow(pix_round(advance))

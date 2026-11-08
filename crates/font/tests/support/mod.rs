@@ -767,7 +767,7 @@ fn cff_matrix_tables() -> Tables {
         global: Vec::new(),
         local: Vec::new(),
         charset: None,
-        matrix: Some(["0.0005", "0", "0.0001", "0.0005", "0", "0"]),
+        matrix: Some(["0.0005", "0", "0.0001", "0.0005", "0.025", "-0.0125"]),
         nominal_width: 0,
     };
     vec![

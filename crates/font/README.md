@@ -32,8 +32,8 @@ let metrics = font.outline_into(glyph, &mut outline)?;
 for segment in outline.segments() {
     if let Segment::QuadTo(_control, _end) = segment { /* font units, y up */ }
 }
-let em = f32::from(font.units_per_em());
-let _advance = f32::from(metrics.advance) / em;
+let em = f64::from(font.units_per_em());
+let _advance = f64::from(metrics.advance) / em;
 
 // The glyph as libass draws it with hinting off: 256 pixels, then scaled.
 let sized = font.at_size(triergon_font::pixels_26_6(256.0))?;

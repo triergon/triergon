@@ -29,6 +29,8 @@ mod private {
     pub trait Sealed {
         /// A whole number of units, exactly.
         fn from_units(v: i32) -> Self;
+        /// A value [`Sealed::from_units`] made, back.
+        fn whole_units(self) -> i64;
     }
 
     impl Sealed for f32 {
@@ -36,11 +38,19 @@ mod private {
             // Every caller passes values within ±2^24, which f32 holds exactly.
             v as Self
         }
+
+        fn whole_units(self) -> i64 {
+            self as i64
+        }
     }
 
     impl Sealed for i32 {
         fn from_units(v: i32) -> Self {
             v
+        }
+
+        fn whole_units(self) -> i64 {
+            i64::from(self)
         }
     }
 }

@@ -116,19 +116,30 @@ impl<const N: usize> Stack<f64, N> {
     }
 }
 
-/// Calls `apply` for each operator with its operands. In a CFF2 Private DICT,
-/// `blend` is applied in place using `scalars(vsindex)`.
+/// One DICT entry: an operator and its operands, as values and as encoded.
+pub(crate) struct Entry<'a> {
+    pub(crate) operator: u16,
+    pub(crate) operands: &'a [f64],
+    /// The operand bytes, for values read with more care than `f64` (the
+    /// FontMatrix); blends make them differ from `operands`.
+    pub(crate) encoded: &'a [u8],
+}
+
+/// Calls `apply` for each entry. In a CFF2 Private DICT, `blend` is applied in
+/// place using `scalars(vsindex)`.
 pub(crate) fn parse<'s, const N: usize>(
     bytes: &[u8],
     work: &mut WorkBudget,
     scalars: &dyn Fn(usize) -> Result<&'s [f64]>,
-    mut apply: impl FnMut(u16, &[f64]) -> Result<()>,
+    mut apply: impl FnMut(Entry<'_>) -> Result<()>,
 ) -> Result<()> {
     let mut r = Reader::new(bytes);
     let mut stack = Stack::<f64, N>::new();
     let mut vsindex = 0;
+    let mut start = 0;
     while !r.at_end() {
         charge(work, 1)?;
+        let end = r.offset();
         let byte = r.u8()?;
         let operator = match byte {
             12 => 0x0c00 | u16::from(r.u8()?),
@@ -148,9 +159,14 @@ pub(crate) fn parse<'s, const N: usize>(
                 stack.blend_scalars(count, scalars(vsindex)?)?;
                 continue;
             }
-            _ => apply(operator, stack.as_slice())?,
+            _ => apply(Entry {
+                operator,
+                operands: stack.as_slice(),
+                encoded: &bytes[start..end],
+            })?,
         }
         stack.clear();
+        start = r.offset();
     }
     Ok(())
 }
@@ -227,8 +243,8 @@ mod tests {
             bytes,
             &mut WorkBudget::new(1000),
             &|_| Ok(scalars),
-            |operator, operands| {
-                out.push((operator, operands.to_vec()));
+            |entry| {
+                out.push((entry.operator, entry.operands.to_vec()));
                 Ok(())
             },
         )?;

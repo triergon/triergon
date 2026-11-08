@@ -35,7 +35,7 @@ pub use sized::{Band, ScaledMetrics, SizeMetrics, SizedFont, pixels_26_6};
 pub use store::{Built, Store, StoreKey};
 pub use synthesis::{Orientation, Synthesis};
 
-use cff::{Cff, Version};
+use cff::{Cff, Scale, Version};
 use glyf::{FontUnits, Glyf};
 use kern::Kern;
 use metrics::{Head, Hhea, Hmtx};
@@ -105,8 +105,8 @@ pub struct VerticalMetrics {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GlyphMetrics {
     /// The advance. A TrueType composite takes the advance of its last
-    /// `USE_MY_METRICS` component.
-    pub advance: u16,
+    /// `USE_MY_METRICS` component; a CFF FontMatrix scales and offsets it.
+    pub advance: i32,
 }
 
 /// The `head` bounding box of all glyphs, in font units.
@@ -491,8 +491,9 @@ impl Font {
     /// A TrueType outline is shifted horizontally so that its left side bearing is
     /// the `hmtx` value, by `lsb - xMin` of the glyph whose metrics apply, as
     /// FreeType places it. CFF outlines are unshifted and, as FreeType's CFF
-    /// engine builds them, in whole font units (rounded down) before the
-    /// FontMatrix. [`Font::at_size`] loads outlines scaled to pixels.
+    /// engine builds them, in whole font units (rounded down), then through the
+    /// FontMatrix in fixed point. [`Font::at_size`] loads outlines scaled to
+    /// pixels.
     ///
     /// # Errors
     ///
@@ -515,13 +516,14 @@ impl Font {
                     }
                 }
                 Ok(GlyphMetrics {
-                    advance: self.hmtx.advance(data, metrics.glyph),
+                    advance: i32::from(self.hmtx.advance(data, metrics.glyph)),
                 })
             }
             Outlines::Cff(cff) => {
-                cff.outline(data, glyph, outline, &self.limits, &mut work)?;
+                cff.load(data, glyph, Scale::UNITS, outline, &self.limits, &mut work)?;
+                let advance = self.hmtx.advance(data, index);
                 Ok(GlyphMetrics {
-                    advance: self.hmtx.advance(data, index),
+                    advance: glyf::narrow(cff.advance(data, glyph, advance, Scale::UNITS)?)?,
                 })
             }
         }
