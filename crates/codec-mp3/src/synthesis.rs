@@ -75,41 +75,54 @@ static LEE: LazyLock<LeeFactors> = LazyLock::new(|| {
     }
 });
 
-/// A DCT-II `X[m] = sum_k x[k] cos(π m (2k + 1) / 2N)` of size `$n`, from two of size
-/// `$n / 2`: the even outputs transform `x[k] + x[N-1-k]`, the odd ones the differences
-/// scaled by `$factors`, summed pairwise.
-macro_rules! lee_dct {
-    ($name:ident, $half:ident, $n:literal, $factors:ident) => {
-        #[inline(always)]
-        fn $name(x: &[f32; $n], lee: &LeeFactors) -> [f32; $n] {
-            const H: usize = $n / 2;
-            let sums: [f32; H] = core::array::from_fn(|k| x[k] + x[$n - 1 - k]);
-            let differences: [f32; H] =
-                core::array::from_fn(|k| (x[k] - x[$n - 1 - k]) * lee.$factors[k]);
-            let even = $half(&sums, lee);
-            let odd = $half(&differences, lee);
-            core::array::from_fn(|m| {
-                let h = m / 2;
-                if m % 2 == 0 {
-                    even[h]
-                } else if h + 1 < H {
-                    odd[h] + odd[h + 1]
-                } else {
-                    odd[h]
-                }
-            })
-        }
-    };
+/// The 32-point DCT-II `X[m] = sum_k x[k] cos(π m (2k + 1) / 64)` by Lee's
+/// factorisation, a level at a time so each level's butterflies run as vector code:
+/// a transform of size `N` splits into one of the sums `x[k] + x[N-1-k]` (giving the
+/// even outputs) and one of the differences scaled by `1 / (2 cos(π (2k + 1) / 2N))`
+/// (whose neighbouring outputs sum to the odd outputs).
+fn dct32(x: &[f32; 32], lee: &LeeFactors) -> [f32; 32] {
+    let mut v = *x;
+    split::<32, 16>(&mut v, &lee.n32);
+    split::<16, 8>(&mut v, &lee.n16);
+    split::<8, 4>(&mut v, &lee.n8);
+    split::<4, 2>(&mut v, &lee.n4);
+    split::<2, 1>(&mut v, &[FRAC_1_SQRT_2]);
+    merge::<4>(&mut v);
+    merge::<8>(&mut v);
+    merge::<16>(&mut v);
+    merge::<32>(&mut v);
+    v
 }
 
-lee_dct!(dct32, dct16, 32, n32);
-lee_dct!(dct16, dct8, 16, n16);
-lee_dct!(dct8, dct4, 8, n8);
-lee_dct!(dct4, dct2, 4, n4);
-
+/// Split every block of `N = 2H` values into its sums (first half) and scaled
+/// differences (second half).
 #[inline(always)]
-fn dct2(x: &[f32; 2], _: &LeeFactors) -> [f32; 2] {
-    [x[0] + x[1], (x[0] - x[1]) * FRAC_1_SQRT_2]
+fn split<const N: usize, const H: usize>(v: &mut [f32; 32], factors: &[f32; H]) {
+    const { assert!(N == 2 * H) };
+    for block in v.as_chunks_mut::<N>().0 {
+        let x = *block;
+        for k in 0..H {
+            block[k] = x[k] + x[N - 1 - k];
+            block[H + k] = (x[k] - x[N - 1 - k]) * factors[k];
+        }
+    }
+}
+
+/// Merge every block of `N` transformed halves: the even outputs are the first half,
+/// the odd ones sums of neighbours of the second.
+#[inline(always)]
+fn merge<const N: usize>(v: &mut [f32; 32]) {
+    for block in v.as_chunks_mut::<N>().0 {
+        let x = *block;
+        let half = N / 2;
+        for h in 0..half {
+            block[2 * h] = x[h];
+        }
+        for h in 0..half - 1 {
+            block[2 * h + 1] = x[half + h] + x[half + h + 1];
+        }
+        block[N - 1] = x[N - 1];
+    }
 }
 
 /// The filterbank state of one channel: the last 16 vectors `V`.
@@ -147,21 +160,24 @@ impl Synthesis {
         for i in 48..64 {
             v[i] = -c[i - 48];
         }
-        *pcm = [0.0; 32];
-        let (window, []) = WINDOW.as_chunks::<32>() else {
-            unreachable!("the window is 16 rows of 32");
+        // Rows of the window in pairs: an even age reads the first half of its vector,
+        // an odd age the second. The sum runs over the ages in order.
+        let (rows, []) = WINDOW.as_chunks::<64>() else {
+            unreachable!("the window is 8 pairs of rows of 32");
         };
-        for (age, d) in window.iter().enumerate() {
-            let vector = &self.history[(self.newest + age) % 16];
-            let half = if age % 2 == 0 {
-                &vector[..32]
-            } else {
-                &vector[32..]
-            };
-            for ((out, &d), &v) in pcm.iter_mut().zip(d).zip(half) {
-                *out += d * v;
+        let mut sum = [0.0f32; 32];
+        for (pair, row) in rows.iter().enumerate() {
+            let even = &self.history[(self.newest + 2 * pair) % 16][..32];
+            let odd = &self.history[(self.newest + 2 * pair + 1) % 16][32..];
+            let (d_even, d_odd) = row.split_at(32);
+            for (j, out) in sum.iter_mut().enumerate() {
+                *out += d_even[j] * even[j];
+            }
+            for (j, out) in sum.iter_mut().enumerate() {
+                *out += d_odd[j] * odd[j];
             }
         }
+        *pcm = sum;
     }
 }
 

@@ -16,12 +16,12 @@ const ALIAS_C: [f64; 8] = [
 ];
 
 struct Tables {
-    /// `cos(π/72 (2m + 1)(2k + 1))`: the 18-point DCT-IV behind the 36-point IMDCT
-    /// (symmetric in `m` and `k`).
-    dct18: [[f32; 18]; 18],
-    /// `cos(π/24 (2m + 1)(2k + 1))`: the 6-point DCT-IV behind the 12-point IMDCT
-    /// (symmetric too).
-    dct6: [[f32; 6]; 6],
+    /// Column `k` of the 18-point DCT-IV behind the 36-point IMDCT,
+    /// `cos(π/72 (2m + 1)(2k + 1))` for `m < 18`, padded with zeros to whole vectors.
+    dct18: [[f32; 20]; 18],
+    /// Column `k` of the 6-point DCT-IV behind the 12-point IMDCT,
+    /// `cos(π/24 (2m + 1)(2k + 1))` for `m < 6`, padded likewise.
+    dct6: [[f32; 8]; 6],
     /// Long windows of block types 0 (normal), 1 (start) and 3 (stop).
     normal: [f32; 36],
     start: [f32; 36],
@@ -30,6 +30,16 @@ struct Tables {
     short: [f32; 12],
     /// `(cs_i, ca_i)` of the alias-reduction butterflies.
     alias: [(f32, f32); 8],
+}
+
+/// Columns of the `n`-point DCT-IV, `cos(π/4n (2m + 1)(2k + 1))`, padded to `L` lanes.
+fn dct_iv_columns<const N: usize, const L: usize>(n: usize) -> [[f32; L]; N] {
+    core::array::from_fn(|k| {
+        core::array::from_fn(|m| {
+            let angle = core::f64::consts::PI / (4 * n) as f64 * ((2 * m + 1) * (2 * k + 1)) as f64;
+            if m < n { angle.cos() as f32 } else { 0.0 }
+        })
+    })
 }
 
 static TABLES: LazyLock<Tables> = LazyLock::new(|| {
@@ -49,12 +59,8 @@ static TABLES: LazyLock<Tables> = LazyLock::new(|| {
         _ => sine(36, i),
     });
     Tables {
-        dct18: core::array::from_fn(|m| {
-            core::array::from_fn(|k| (PI / 72.0 * ((2 * m + 1) * (2 * k + 1)) as f64).cos() as f32)
-        }),
-        dct6: core::array::from_fn(|m| {
-            core::array::from_fn(|k| (PI / 24.0 * ((2 * m + 1) * (2 * k + 1)) as f64).cos() as f32)
-        }),
+        dct18: dct_iv_columns(18),
+        dct6: dct_iv_columns(6),
         normal,
         start,
         stop,
@@ -85,15 +91,17 @@ impl Hybrid {
         *self = Hybrid::default();
     }
 
-    /// Transform the requantized, stereo-processed spectrum `xr` of one granule into 18
-    /// time slots of 32 subband samples. `xr` is used as scratch.
+    /// Transform the requantized, stereo-processed spectrum `xr` of one granule, whose
+    /// lines from `lines` on are +0, into the 18 time samples of each of the 32
+    /// subbands. `xr` is used as scratch.
     pub(crate) fn run(
         &mut self,
         xr: &mut [f32; 576],
+        lines: usize,
         block: BlockType,
         mixed: bool,
         bands: &Bands,
-        out: &mut [[f32; 32]; SUBBAND],
+        out: &mut [[f32; SUBBAND]; 32],
     ) {
         let tables = &*TABLES;
         let (long_subbands, aliased) = match (block, mixed) {
@@ -107,7 +115,13 @@ impl Hybrid {
         let (subbands, []) = xr.as_chunks_mut::<SUBBAND>() else {
             unreachable!("a granule is 32 subbands");
         };
-        let mut active = subbands
+        // Short-block reordering moves lines between subbands; long blocks keep them.
+        let searched = if long_subbands < 32 {
+            32
+        } else {
+            lines.div_ceil(SUBBAND).min(32)
+        };
+        let mut active = subbands[..searched]
             .iter()
             .rposition(|subband| subband.iter().any(|&v| v != 0.0))
             .map_or(0, |last| last + 1);
@@ -126,10 +140,10 @@ impl Hybrid {
         if !boundaries.is_empty() {
             active = active.max(boundaries.end);
         }
-        for (sb, (coefficients, overlap)) in subbands.iter().zip(&mut self.overlap).enumerate() {
-            let mut samples = [0.0; SUBBAND];
+        let pairs = subbands.iter().zip(&mut self.overlap).zip(out.iter_mut());
+        for (sb, ((coefficients, overlap), samples)) in pairs.enumerate() {
             if sb >= active {
-                samples = *overlap;
+                *samples = *overlap;
                 *overlap = [0.0; SUBBAND];
             } else if sb < long_subbands {
                 let window = match block {
@@ -138,13 +152,15 @@ impl Hybrid {
                     BlockType::Stop => &tables.stop,
                     _ => &tables.normal,
                 };
-                long_imdct(tables, coefficients, window, overlap, &mut samples);
+                long_imdct(tables, coefficients, window, overlap, samples);
             } else {
-                short_imdct(tables, coefficients, overlap, &mut samples);
+                short_imdct(tables, coefficients, overlap, samples);
             }
-            for (t, sample) in samples.into_iter().enumerate() {
+            if sb % 2 == 1 {
                 // Frequency inversion: odd time samples of odd subbands change sign.
-                out[t][sb] = if sb & t & 1 == 1 { -sample } else { sample };
+                for sample in samples.iter_mut().skip(1).step_by(2) {
+                    *sample = -*sample;
+                }
             }
         }
     }
@@ -182,13 +198,17 @@ fn long_imdct(
 ) {
     let w = dct_iv(&tables.dct18, x);
     // y[n] = w[n + 9] for n < 9, -w[26 - n] for n < 27, -w[n - 27] after.
-    for n in 0..SUBBAND {
-        let y = if n < 9 { w[n + 9] } else { -w[26 - n] };
-        out[n] = overlap[n] + y * window[n];
+    for n in 0..9 {
+        out[n] = overlap[n] + w[n + 9] * window[n];
     }
-    for n in SUBBAND..36 {
-        let y = if n < 27 { -w[26 - n] } else { -w[n - 27] };
-        overlap[n - SUBBAND] = y * window[n];
+    for n in 9..18 {
+        out[n] = overlap[n] + -w[26 - n] * window[n];
+    }
+    for n in 18..27 {
+        overlap[n - 18] = -w[26 - n] * window[n];
+    }
+    for n in 27..36 {
+        overlap[n - 18] = -w[n - 27] * window[n];
     }
 }
 
@@ -219,12 +239,15 @@ fn short_imdct(
     }
 }
 
-/// `w[m] = sum_k x[k] matrix[k][m]` for a symmetric `matrix`, accumulated a column at a
-/// time so the sum over `m` vectorizes.
-#[inline(always)]
-fn dct_iv<const N: usize>(matrix: &[[f32; N]; N], x: &[f32; N]) -> [f32; N] {
-    let mut w = [0.0; N];
-    for (column, &value) in matrix.iter().zip(x) {
+/// `w[m] = sum_k x[k] columns[k][m]`, accumulated a column at a time so the sum over
+/// the `L` lanes (`m`, padded to whole vectors) vectorizes. Trailing zero coefficients
+/// are skipped: adding a zero product to a sum that starts at +0 never changes it.
+/// Kept out of line, so the use of its outputs does not reshape the vector loop.
+#[inline(never)]
+fn dct_iv<const N: usize, const L: usize>(columns: &[[f32; L]; N], x: &[f32; N]) -> [f32; L] {
+    let used = x.iter().rposition(|&v| v != 0.0).map_or(0, |last| last + 1);
+    let mut w = [0.0; L];
+    for (column, &value) in columns[..used].iter().zip(x) {
         for (out, &c) in w.iter_mut().zip(column) {
             *out += c * value;
         }
