@@ -46,6 +46,7 @@ enum Tail {
 }
 #[derive(Debug, Default)]
 pub(super) struct Boundaries {
+    source_input: Option<InputToken>,
     last_carrier: Option<(u64, SourceContext, bool)>,
     finite_output: bool,
     timeline: Option<SourceContext>,
@@ -69,6 +70,62 @@ impl Boundaries {
     }
 }
 impl TransportFaultRecovery {
+    /// Bind the original sequential core input before admitting any carrier.
+    /// Terminal recovery requires this identity; reset, seek, entity continuation
+    /// and a replacement cursor cannot supply this operation's EOF proof.
+    /// Binding retains a fixed-size token, with no byte or `Budget` handle clone.
+    pub fn bind_source_input(&mut self, input: &InputCursor) -> Result<()> {
+        if let Some(error) = self.fault {
+            return Err(error);
+        }
+        if !self.inner.recovery_budget().same_pool(input.budget()) {
+            return Err(Error::ForeignPool);
+        }
+        if input.source() != self.scope().entity {
+            return Err(Error::SourceMismatch);
+        }
+        if self.boundaries.source_input.is_some()
+            || self.pending.is_some()
+            || self.boundaries.input_error().is_some()
+            || self.boundaries.last_carrier.is_some()
+            || !self.inner.recovery_pristine()
+        {
+            return Err(Error::Invalid(
+                "source input binding must precede admitted carriers",
+            ));
+        }
+        self.boundaries.source_input = Some(input.token());
+        Ok(())
+    }
+
+    // Both callers check the pool first, preserving foreign-pool precedence.
+    fn check_source_input(&self, input: &InputCursor) -> Result<()> {
+        let expected = self
+            .boundaries
+            .source_input
+            .as_ref()
+            .ok_or(Error::Unsupported(
+                "terminal transport source input not bound",
+            ))?;
+        let received = input.token();
+        if expected.generation() != received.generation() {
+            return Err(Error::StaleGeneration {
+                expected: expected.generation(),
+                received: received.generation(),
+            });
+        }
+        if expected.request() != received.request() {
+            return Err(Error::StaleRequest {
+                expected: expected.request(),
+                received: received.request(),
+            });
+        }
+        if input.source() != self.scope().entity {
+            return Err(Error::SourceMismatch);
+        }
+        Ok(())
+    }
+
     #[allow(
         clippy::result_large_err,
         reason = "return the original charged carrier inline"
@@ -145,7 +202,7 @@ impl TransportFaultRecovery {
         {
             return Err(Error::Unsupported("source Timeline context unobserved"));
         }
-        self.inner.commit_clock_epoch(context.epochs);
+        self.inner.commit_clock_epoch(context);
         self.boundaries.timeline = None;
         Ok(())
     }
@@ -160,6 +217,11 @@ impl TransportFaultRecovery {
     ) -> Result<()> {
         if let Some(error) = self.fault {
             return Err(error);
+        }
+        if self.boundaries.source_input.is_none() {
+            return Err(Error::Unsupported(
+                "terminal transport source input not bound",
+            ));
         }
         let scope = self.scope();
         let last = self.boundaries.last_carrier;
@@ -237,6 +299,7 @@ impl TransportFaultRecovery {
         {
             return Err(Error::ForeignPool);
         }
+        self.check_source_input(input)?;
         let Some(Tail::Pending(tail)) = self.boundaries.tail.as_mut() else {
             return Err(Error::Invalid("no terminal transport awaiting End"));
         };
@@ -294,6 +357,7 @@ impl TransportFaultRecovery {
         if !self.inner.recovery_budget().same_pool(input.budget()) {
             return Err(Error::ForeignPool);
         }
+        self.check_source_input(input)?;
         let Some(Tail::Pending(tail)) = self.boundaries.tail.as_ref() else {
             return Err(Error::Invalid("no terminal transport awaiting Finished"));
         };
