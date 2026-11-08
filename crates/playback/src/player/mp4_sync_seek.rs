@@ -3,7 +3,7 @@
 use super::{ClockChoice, Player, SeekIntent, Selection, TrackKey};
 use crate::{
     Engine, Result,
-    catalogue::{CatalogueCommit, Mp4Catalogue, ProgressiveSeek, RetiredCatalogue},
+    catalogue::{CatalogueCommit, Mp4Catalogue, RangeSeek, RetiredCatalogue},
     engines::{Mp4RangeLanding, Mp4SyncLanding},
     input::Source,
     mp4_plan::{Mp4View, PreparedMp4, SourceRow},
@@ -73,12 +73,19 @@ impl Mp4SyncSeekCommand {
         self.sync_ordinal
     }
 
-    pub(crate) fn intent(&self) -> SeekIntent {
-        SeekIntent {
-            track: TrackKey::Mp4(self.request.video),
-            target: self.request.source_time,
-            clock: ClockChoice::SourceExact,
-            replay_from_start: false,
+    pub(crate) fn seek(&self) -> RangeSeek<'_> {
+        RangeSeek {
+            pool: &self.pool,
+            active_generation: self.progressive_generation,
+            candidate_generation: self.generation,
+            selection: self.selection,
+            intent: SeekIntent {
+                track: TrackKey::Mp4(self.request.video),
+                target: self.request.source_time,
+                clock: ClockChoice::SourceExact,
+                replay_from_start: false,
+            },
+            landing: Mp4RangeLanding::Source(self.landing),
         }
     }
 }
@@ -119,31 +126,9 @@ impl<S: Source> Player<S> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<RetiredCatalogue>> {
-        self.prepare_mp4_progressive_sync_commit(next, command, work, cancel)?
+        self.prepare_progressive_commit(next, command.seek(), work, cancel)?
             .map(CatalogueCommit::commit)
             .transpose()
-    }
-
-    pub(crate) fn prepare_mp4_progressive_sync_commit<'a>(
-        &'a mut self,
-        next: &'a mut Option<Mp4Catalogue<S>>,
-        command: &'a Mp4SyncSeekCommand,
-        work: &mut WorkBudget,
-        cancel: &'a AtomicBool,
-    ) -> Result<Option<CatalogueCommit<'a, S>>> {
-        self.prepare_progressive_commit(
-            next,
-            ProgressiveSeek {
-                pool: &command.pool,
-                active_generation: command.progressive_generation,
-                candidate_generation: command.generation,
-                selection: command.selection,
-                intent: command.intent(),
-                landing: Mp4RangeLanding::Source(command.landing),
-            },
-            work,
-            cancel,
-        )
     }
 
     fn check_sync_seek_clock(&self) -> Result<()> {
@@ -161,28 +146,7 @@ impl<S: Source> Player<S> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
-        if command.progressive_generation.is_some() {
-            return Err(Error::Invalid(
-                "progressive seek needs its candidate catalogue",
-            ));
-        }
-        if !self.pool.same_pool(&command.pool) {
-            return Err(Error::ForeignPool);
-        }
-        if self.generation != command.generation {
-            return Err(Error::StaleGeneration {
-                expected: self.generation,
-                received: command.generation,
-            });
-        }
-        self.apply_seek(
-            TrackKey::Mp4(command.request.video),
-            command.request.source_time,
-            command.selection,
-            Some(Mp4RangeLanding::Source(command.landing)),
-            work,
-            cancel,
-        )
+        self.apply_range_seek(command.seek(), work, cancel)
     }
 }
 
