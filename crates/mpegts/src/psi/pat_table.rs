@@ -67,6 +67,9 @@ impl PatCollector {
         };
         Some(&section.source)
     }
+    pub(crate) fn has_pending(&self) -> bool {
+        self.input.is_some() || self.building.is_some()
+    }
     /// Rejection returns the original charged source and metadata allocations.
     /// Allocating a box on this failure path would need a new budget reservation.
     #[allow(

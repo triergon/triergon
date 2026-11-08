@@ -215,6 +215,33 @@ impl PesAssembler {
         &self.raw_header[..self.header_used]
     }
 
+    fn validating_body(&self) -> bool {
+        self.payload.is_none()
+            && !self.ended
+            && self.fault.is_none()
+            && self.active
+            && self.header.is_some()
+    }
+
+    /// Capacity before a finite PES completes and needs ordinary publication.
+    pub(crate) fn body_run_capacity(&self, carrier_payload: usize) -> usize {
+        if !self.validating_body() {
+            return 0;
+        }
+        let limit = self.total.map_or(self.limits.pes_bytes, |end| end - 1);
+        (limit.saturating_sub(self.seen) / carrier_payload)
+            .min(self.limits.source_spans - self.validated_spans)
+            .min(usize::try_from(u64::MAX - self.next_chunk).unwrap_or(usize::MAX))
+    }
+
+    pub(crate) fn record_body_carriers(&mut self, carriers: usize, payload: usize) {
+        self.next_chunk += carriers as u64;
+        self.validated_chunk = Some(self.next_chunk - 1);
+        self.validated_spans += carriers;
+        self.payload_len += payload;
+        self.seen += payload;
+    }
+
     /// Validate one ordinary body carrier. A successful result records whether
     /// this finishes the finite PES. Other cases use the incremental parser.
     pub(crate) fn validate_body_carrier(
@@ -222,11 +249,7 @@ impl PesAssembler {
         count: usize,
         work: &mut WorkBudget,
     ) -> Result<Option<bool>> {
-        if self.payload.is_some()
-            || self.ended
-            || self.fault.is_some()
-            || !self.active
-            || self.header.is_none()
+        if !self.validating_body()
             || self.next_chunk == u64::MAX
             || self.validated_spans == self.limits.source_spans
             || count > self.total.unwrap_or(self.limits.pes_bytes) - self.seen
@@ -234,11 +257,7 @@ impl PesAssembler {
         {
             return Ok(None);
         }
-        self.validated_chunk = Some(self.next_chunk);
-        self.next_chunk += 1;
-        self.validated_spans += 1;
-        self.payload_len += count;
-        self.seen += count;
+        self.record_body_carriers(1, count);
         let completed = self.total == Some(self.seen);
         if completed {
             self.emit::<false>()?;
@@ -337,6 +356,52 @@ impl PesAssembler {
         self.payload_len = 0;
         Ok(AssemblyStep::Output(result))
     }
+    fn complete_timed_header(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        let pending = self
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("PES payload missing"))?;
+        let bytes = &pending.bytes.as_ref()[pending.position..];
+        let Some((header, total)) = parse_timed_header(bytes, self.limits.pes_bytes, work) else {
+            return Ok(false);
+        };
+        let id = header.stream_id;
+        if !(id == 0xbd || (0xc0..=0xef).contains(&id))
+            || (total.is_none() && !(self.video && (0xe0..=0xef).contains(&id)))
+        {
+            return Ok(false);
+        }
+        let used = header.as_bytes().len();
+        let extent = SourceRange {
+            entity: pending.entity,
+            offset: pending
+                .offset
+                .checked_add(pending.position as u64)
+                .ok_or(Error::Overflow)?,
+            bytes: used,
+        };
+        let merge = prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        commit_range(&mut self.header_ranges, extent, merge)?;
+        work.take(used as u64 + 3);
+        self.header_used = used;
+        self.header_target = used;
+        self.seen = used;
+        self.total = total;
+        self.header = Some(header);
+        self.payload
+            .as_mut()
+            .ok_or(Error::Invalid("PES payload missing"))?
+            .position += used;
+        Ok(true)
+    }
+
     fn poll_inner<const RETAIN: bool>(
         &mut self,
         work: &mut WorkBudget,
@@ -454,6 +519,13 @@ impl PesAssembler {
                 continue;
             }
             if self.header.is_none() {
+                if !RETAIN && self.header_used == 0 && self.complete_timed_header(work, cancel)? {
+                    continue;
+                }
+                let pending = self
+                    .payload
+                    .as_ref()
+                    .ok_or(Error::Invalid("PES payload missing"))?;
                 if !work.try_charge(1) {
                     return Ok(AssemblyStep::Yield);
                 }
@@ -587,6 +659,54 @@ fn timestamp(bytes: &[u8], prefix: u8) -> Result<u64> {
         | u64::from(bytes[4] >> 1))
 }
 
+/// Parse a complete timestamp-only header without stepping its three stages.
+/// Refusal leaves the caller free to use the ordinary parser and diagnostics.
+pub(crate) fn parse_timed_header(
+    bytes: &[u8],
+    maximum: usize,
+    work: &WorkBudget,
+) -> Option<(PesHeader, Option<usize>)> {
+    let prefix = bytes.first_chunk::<9>()?;
+    if prefix[..3] != [0, 0, 1]
+        || prefix[6] & 0xf0 != 0x80
+        || !matches!((prefix[7], prefix[8]), (0x80, 5) | (0xc0, 10))
+    {
+        return None;
+    }
+    let used = 9 + usize::from(prefix[8]);
+    if used > maximum || work.remaining() < used as u64 + 3 {
+        return None;
+    }
+    let length = usize::from(u16::from_be_bytes([prefix[4], prefix[5]]));
+    let declared = (length != 0).then_some(length + 6);
+    if declared.is_some_and(|total| total < used || total > maximum) {
+        return None;
+    }
+    let bytes = bytes.get(..used)?;
+    let timing = prefix[7] >> 6;
+    let pts_raw33 = Some(timestamp(&bytes[9..14], timing).ok()?);
+    let dts_raw33 = if timing == 3 {
+        Some(timestamp(&bytes[14..19], 1).ok()?)
+    } else {
+        None
+    };
+    let mut raw = [0; HEADER_MAX];
+    raw[..used].copy_from_slice(bytes);
+    Some((
+        PesHeader {
+            stream_id: prefix[3],
+            declared_packet_length: u16::from_be_bytes([prefix[4], prefix[5]]),
+            pts_raw33,
+            dts_raw33,
+            data_alignment_indicator: prefix[6] & 4 != 0,
+            priority: prefix[6] & 8 != 0,
+            raw,
+            used,
+        },
+        declared,
+    ))
+}
+
 pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHeader> {
     let bytes = &raw[..used];
     if used < 9 || bytes[6] & 0xc0 != 0x80 || used != 9 + usize::from(bytes[8]) {
@@ -694,4 +814,112 @@ pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHea
         raw: *raw,
         used,
     })
+}
+
+#[cfg(test)]
+mod timed_header_tests {
+    use super::*;
+
+    fn stamp(raw: u64, prefix: u8) -> [u8; 5] {
+        [
+            (prefix << 4) | u8::try_from((raw >> 29) & 0x0e).unwrap() | 1,
+            ((raw >> 22) & 255).try_into().unwrap(),
+            u8::try_from((raw >> 14) & 0xfe).unwrap() | 1,
+            ((raw >> 7) & 255).try_into().unwrap(),
+            u8::try_from((raw << 1) & 0xfe).unwrap() | 1,
+        ]
+    }
+
+    fn header(pts: u64, dts: Option<u64>, control: u8) -> ([u8; HEADER_MAX], usize) {
+        let mut raw = [0; HEADER_MAX];
+        let (timing, used) = if dts.is_some() { (3, 19) } else { (2, 14) };
+        raw[..9].copy_from_slice(&[
+            0,
+            0,
+            1,
+            0xe0,
+            0,
+            0,
+            control,
+            timing << 6,
+            u8::try_from(used - 9).unwrap(),
+        ]);
+        raw[9..14].copy_from_slice(&stamp(pts, timing));
+        if let Some(dts) = dts {
+            raw[14..19].copy_from_slice(&stamp(dts, 1));
+        }
+        (raw, used)
+    }
+
+    #[test]
+    fn complete_timestamps_match_general_headers_and_keep_admission_bounds() {
+        for pts in [0, 1, 0x0001_0000_0011, (1 << 33) - 1] {
+            for dts in [None, Some(0), Some((1 << 33) - 1)] {
+                for control in 0x80..=0x8f {
+                    let (mut raw, used) = header(pts, dts, control);
+                    for length in [0, u16::try_from(used - 6).unwrap(), u16::MAX] {
+                        raw[4..6].copy_from_slice(&length.to_be_bytes());
+                        let work = WorkBudget::new(used as u64 + 3);
+                        let (fast, total) =
+                            parse_timed_header(&raw[..used], 1 << 20, &work).unwrap();
+                        let slow = parse_header(&raw, used).unwrap();
+                        assert_eq!(format!("{fast:?}"), format!("{slow:?}"));
+                        assert_eq!(fast.pts_raw33, Some(pts));
+                        assert_eq!(fast.dts_raw33, dts);
+                        assert_eq!(total, (length != 0).then_some(usize::from(length) + 6));
+                        assert_eq!(work.spent(), 0);
+                        let too_small = if length == 0 {
+                            used - 1
+                        } else {
+                            usize::from(length) + 5
+                        };
+                        assert!(parse_timed_header(&raw[..used], too_small, &work).is_none());
+                        for units in [0, used as u64 + 2] {
+                            assert!(
+                                parse_timed_header(&raw[..used], 1 << 20, &WorkBudget::new(units))
+                                    .is_none()
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn invalid_and_incomplete_timestamps_fall_back_to_the_general_parser() {
+        for dts in [None, Some((1 << 33) - 1)] {
+            let (raw, used) = header(0x0001_0000_0011, dts, 0x84);
+            let work = WorkBudget::new(4096);
+            for length in 0..used {
+                assert!(parse_timed_header(&raw[..length], 1 << 20, &work).is_none());
+            }
+            for at in std::iter::once(6).chain(9..used) {
+                for bit in 0..8 {
+                    let mut changed = raw;
+                    changed[at] ^= 1 << bit;
+                    let fast = parse_timed_header(&changed[..used], 1 << 20, &work);
+                    match parse_header(&changed, used) {
+                        Ok(slow) => {
+                            assert_eq!(format!("{:?}", fast.unwrap().0), format!("{slow:?}"));
+                        }
+                        Err(_) => assert!(fast.is_none()),
+                    }
+                }
+            }
+            for at in [0, 1, 2, 7, 8] {
+                let mut changed = raw;
+                changed[at] ^= 1;
+                assert!(parse_timed_header(&changed[..used], 1 << 20, &work).is_none());
+            }
+            let mut short = raw;
+            short[4..6].copy_from_slice(&u16::try_from(used - 7).unwrap().to_be_bytes());
+            assert!(parse_timed_header(&short[..used], 1 << 20, &work).is_none());
+        }
+        let (mut raw, used) = header(17, None, 0x84);
+        raw[8] += 1;
+        raw[used] = 0xff;
+        assert!(parse_header(&raw, used + 1).is_ok());
+        assert!(parse_timed_header(&raw[..used + 1], 1 << 20, &WorkBudget::new(4096)).is_none());
+    }
 }

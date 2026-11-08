@@ -137,6 +137,20 @@ fn expanded_case(report: &Value, path: &Path, row: &Value) -> R<Value> {
     }
 }
 
+fn control_proofs(
+    root: &Path,
+    contract: &Value,
+    manifest: &Value,
+    timed: (&Path, &Value),
+    memory: (&Path, &Value),
+) -> R<()> {
+    for (role, (path, report)) in [("timing", timed), ("memory", memory)] {
+        crate::progressive_bench::validate_report_controls(root, path, report, contract, manifest)
+            .map_err(|error| format!("{role} functional controls: {error}"))?;
+    }
+    Ok(())
+}
+
 /// Only the kernel proof pin may be added after timing. All other build fields,
 /// including source graphs, compiler settings and every worker hash, stay equal.
 fn identities(timed: &Value, memory: &Value) -> R<()> {
@@ -728,6 +742,13 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     };
     binding.registered(root)?;
     let kind = binding.headers(&timed, &memory)?;
+    control_proofs(
+        root,
+        &contract,
+        &manifest,
+        (&options.timing, &timed),
+        (&options.memory, &memory),
+    )?;
     let identity = field(&memory, "identity")?;
     let target = text(&memory, "target")?;
     let pinned = gate_build::pinned_release(root)?;
@@ -868,6 +889,49 @@ mod tests {
     use super::*;
     use crate::harness::comparison::reference_record;
     use crate::harness::timing;
+
+    #[test]
+    fn ordinary_contracts_do_not_require_functional_control_reports() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let mut ordinary = 0;
+        for feature in fs::read_dir(root.join("harness/features")).unwrap() {
+            let contract = feature.unwrap().path().join("contract.json");
+            if !contract.is_file() {
+                continue;
+            }
+            let contract = read_json(&contract).unwrap();
+            if contract.get("functional_controls").is_some() {
+                continue;
+            }
+            control_proofs(
+                Path::new("unused"),
+                &contract,
+                &Value::Null,
+                (Path::new("timing"), &Value::Null),
+                (Path::new("memory"), &Value::Null),
+            )
+            .unwrap();
+            ordinary += 1;
+        }
+        assert!(ordinary >= 8);
+    }
+
+    #[test]
+    fn progressive_grading_requires_functional_proof_before_numeric_gates() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let feature = root.join("harness/features/progressive-ts188");
+        let contract = read_json(&feature.join("contract.json")).unwrap();
+        let manifest = read_json(&feature.join("corpus.json")).unwrap();
+        let error = control_proofs(
+            root,
+            &contract,
+            &manifest,
+            (Path::new("timing"), &Value::Null),
+            (Path::new("memory"), &Value::Null),
+        )
+        .unwrap_err();
+        assert!(error.contains("timing functional controls: missing functional controls"));
+    }
 
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()

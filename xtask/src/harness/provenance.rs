@@ -56,6 +56,15 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/reference_feed.h",
         "harness/reference_hls.h",
         "harness/reference_font.h",
+        "harness/reference_progressive.h",
+        "xtask/src/progressive_bench.rs",
+        "harness/features/progressive-ts188/provenance.json",
+        "harness/features/progressive-ts188/controls.json",
+        "harness/features/progressive-ts188/inputs/continuous-44100.ts",
+        "harness/features/progressive-ts188/inputs/reordered-48000.ts",
+        "harness/features/progressive-ts188/inputs/later-entry-48000.ts",
+        "harness/features/progressive-ts188/inputs/duplicate-control-44100.ts",
+        "harness/features/progressive-ts188/inputs/legal-duplicate-44100.ts",
     ]
     .map(String::from)
     .to_vec();
@@ -68,6 +77,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "matroska-segment-metadata",
         "matroska-startup-seek",
         "hls-segments",
+        "progressive-ts188",
     ] {
         for file in ["contract", "corpus"] {
             names.push(format!("harness/features/{feature}/{file}.json"));
@@ -506,6 +516,36 @@ mod tests {
                 && shared.get("xtask/src/harness/grade.rs").is_some()
                 && shared.get("xtask/src/harness/validation.rs").is_some()
         );
+        for name in [
+            "harness/reference_font.h",
+            "harness/reference_progressive.h",
+            "xtask/src/progressive_bench.rs",
+            "harness/features/progressive-ts188/controls.json",
+        ] {
+            assert!(shared.get(name).is_some(), "missing source binding: {name}");
+        }
+        for input in [
+            "continuous-44100",
+            "reordered-48000",
+            "later-entry-48000",
+            "duplicate-control-44100",
+            "legal-duplicate-44100",
+        ] {
+            let name = format!("harness/features/progressive-ts188/inputs/{input}.ts");
+            assert!(
+                shared.get(&name).is_some(),
+                "missing source binding: {name}"
+            );
+        }
+        for feature in crate::fonts::FEATURES {
+            for file in ["contract", "pins"] {
+                let name = format!("harness/features/{}/{file}.json", feature.id);
+                assert!(
+                    shared.get(&name).is_some(),
+                    "missing source binding: {name}"
+                );
+            }
+        }
         assert_eq!(
             graph.get("sha256").and_then(Value::as_str).map(str::len),
             Some(64)

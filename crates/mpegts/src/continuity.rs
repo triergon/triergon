@@ -58,6 +58,16 @@ impl Continuity {
         self.record_packet(packet, packet.ts_bytes(), true);
     }
 
+    pub(crate) fn record_plain_continuation(&mut self, ts: &[u8], counter: u8) {
+        debug_assert!(self.expects_payload_counter(counter));
+        self.record(ts, None, counter, true);
+    }
+
+    pub(crate) fn record_payload_run(&mut self, first_counter: u8, last: &[u8]) {
+        debug_assert!(self.expects_payload_counter(first_counter));
+        self.record(last, None, last[3] & 15, true);
+    }
+
     /// A bounded 188-byte operation. The caller charges one packet work unit before
     /// calling and checks cancellation at that boundary; no heap allocation occurs.
     /// PCR observations on Duplicate remain usable; do not re-assemble its payload.
@@ -119,11 +129,26 @@ impl Continuity {
     }
 
     fn record_packet(&mut self, packet: &TransportPacket, ts: &[u8], has_payload: bool) {
+        self.record(
+            ts,
+            packet.pcr_range.clone(),
+            packet.continuity_counter,
+            has_payload,
+        );
+    }
+
+    fn record(
+        &mut self,
+        ts: &[u8],
+        pcr_range: Option<std::ops::Range<usize>>,
+        counter: u8,
+        has_payload: bool,
+    ) {
         self.previous.copy_from_slice(ts);
-        if let Some(pcr) = packet.pcr_range.as_ref() {
-            self.previous[pcr.clone()].fill(0);
+        if let Some(pcr) = pcr_range {
+            self.previous[pcr].fill(0);
         }
-        self.counter = Some(packet.continuity_counter);
+        self.counter = Some(counter);
         self.payload = has_payload;
         self.duplicated = false;
     }

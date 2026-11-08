@@ -20,7 +20,7 @@ mod work;
 
 pub use budget::{Budget, Charged, Reservation};
 pub use bytes::{
-    BudgetVec, BudgetVecIntoIter, ByteStorageAddress, Bytes, BytesWriter, FreezeError,
+    BudgetVec, BudgetVecIntoIter, ByteStorageAddress, Bytes, BytesView, BytesWriter, FreezeError,
     OwnedInputBytes, PushError, TransferError, nonzero_prefix_len,
 };
 pub use error::{Error, Result};

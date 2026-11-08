@@ -9,7 +9,23 @@ use triergon_core::{
 };
 
 const STUFFING: [u8; 182] = [0xff; 182];
+pub(crate) const TS188_BYTES: usize = 188;
+pub(crate) const TS_PAYLOAD_START: usize = 4;
+pub(crate) const PLAIN_PAYLOAD_BYTES: usize = TS188_BYTES - TS_PAYLOAD_START;
 
+/// Header of a clear, payload-only continuation in a complete TS188 carrier.
+pub(crate) fn payload_only_continuation(ts: &[u8]) -> Option<(u16, u8)> {
+    let [0x47, high, low, control, ..] = ts else {
+        return None;
+    };
+    if high & 0xc0 != 0 || control & 0xf0 != 0x10 {
+        return None;
+    }
+    let pid = (u16::from(high & 31) << 8) | u16::from(*low);
+    Some((pid, control & 15))
+}
+
+#[derive(Debug)]
 struct CarrierHeader {
     pid: u16,
     pusi: bool,
@@ -37,32 +53,48 @@ impl CarrierHeader {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct PlainCarrier {
     header: CarrierHeader,
     payload_start: usize,
     flags: Option<u8>,
+    pcr: Option<Pcr>,
 }
 
 impl PlainCarrier {
-    /// Validate payload-only carriers and adaptations containing only flags
-    /// and stuffing. Charge the same fields and bytes as the incremental path.
-    pub(crate) fn inspect_ts188(source: &Bytes, work: &mut WorkBudget) -> Option<Self> {
+    /// Validate payload-only carriers and adaptations containing flags, an
+    /// optional PCR and stuffing. Charge the incremental path's fields/bytes.
+    pub(crate) fn inspect_ts188(
+        source: &Bytes,
+        source_offset: u64,
+        work: &mut WorkBudget,
+    ) -> Option<Self> {
         let data = source.as_ref();
-        if data.len() != 188 {
+        if data.len() != TS188_BYTES || source_offset.checked_add(TS188_BYTES as u64).is_none() {
             return None;
         }
         let header = CarrierHeader::parse(data).ok()?;
-        let (payload_start, flags, charge) = match header.afc {
-            1 => (4, None, 2),
-            3 if data[4] == 0 => (5, Some(0), 4),
-            3 if data[4] <= 182 && data[5] & 31 == 0 => {
+        let (payload_start, flags, pcr, charge) = match header.afc {
+            1 => (4, None, None, 2),
+            3 if data[4] == 0 => (5, Some(0), None, 4),
+            3 if data[4] <= 182 && data[5] & 15 == 0 => {
                 let end = 5 + usize::from(data[4]);
-                let stuffing = end - 6;
+                let has_pcr = data[5] & 0x10 != 0;
+                let stuffing_start = if has_pcr { 12 } else { 6 };
+                let stuffing = end.checked_sub(stuffing_start)?;
                 let charge = 10 + stuffing as u64;
-                if work.remaining() < charge || data[6..end] != STUFFING[..stuffing] {
+                if work.remaining() < charge {
                     return None;
                 }
-                (end, Some(data[5]), charge)
+                let pcr = if has_pcr {
+                    Some(crate::transport::pcr(&data[6..12]).ok()?)
+                } else {
+                    None
+                };
+                if data[stuffing_start..end] != STUFFING[..stuffing] {
+                    return None;
+                }
+                (end, Some(data[5]), pcr, charge)
             }
             _ => return None,
         };
@@ -70,7 +102,16 @@ impl PlainCarrier {
             header,
             payload_start,
             flags,
+            pcr,
         })
+    }
+
+    pub(crate) fn is_plain_continuation(&self) -> bool {
+        !self.header.pusi
+            && !self.header.tei
+            && self.header.scrambling == 0
+            && self.flags.unwrap_or(0) & 0x80 == 0
+            && self.pcr.is_none()
     }
 
     pub(crate) fn into_packet(
@@ -86,7 +127,7 @@ impl PlainCarrier {
                 discontinuity: flags & 128 != 0,
                 random_access_indicator: flags & 64 != 0,
                 elementary_priority: flags & 32 != 0,
-                pcr: None,
+                pcr: self.pcr,
                 opcr: None,
                 splice_countdown: None,
                 private_data: None,
@@ -112,8 +153,40 @@ impl PlainCarrier {
                 .checked_add(self.payload_start as u64)
                 .ok_or(Error::Overflow)?,
             sync: 0,
-            pcr_range: None,
+            pcr_range: self.pcr.map(|_| 6..12),
         })
+    }
+}
+
+/// A complete plain TS188 continuation with its charged backing storage.
+#[derive(Debug)]
+pub(crate) struct PlainContinuation {
+    pub(crate) layout: PlainCarrier,
+    pub(crate) source: Option<Bytes>,
+    pub(crate) offset: u64,
+    pub(crate) entity: Option<SourceId>,
+}
+
+impl PlainContinuation {
+    pub(crate) fn pid(&self) -> u16 {
+        self.layout.header.pid
+    }
+
+    pub(crate) fn counter(&self) -> u8 {
+        self.layout.header.cc
+    }
+
+    pub(crate) fn payload_start(&self) -> usize {
+        self.layout.payload_start
+    }
+
+    pub(crate) fn into_packet(self) -> Result<TransportPacket> {
+        self.layout.into_packet(
+            self.source
+                .ok_or(Error::Invalid("missing continuation source"))?,
+            self.offset,
+            self.entity,
+        )
     }
 }
 
@@ -578,6 +651,259 @@ impl TransportInspector {
 mod tests {
     use super::*;
 
+    fn pcr_carrier(base: u64, extension: u16, stuffing: usize, flags: u8) -> [u8; 188] {
+        let mut wire = [0x42; 188];
+        wire[..6].copy_from_slice(&[
+            0x47,
+            1,
+            7,
+            0x37,
+            (7 + stuffing).try_into().unwrap(),
+            flags | 0x10,
+        ]);
+        wire[6..12].copy_from_slice(&[
+            (base >> 25).try_into().unwrap(),
+            ((base >> 17) & 255).try_into().unwrap(),
+            ((base >> 9) & 255).try_into().unwrap(),
+            ((base >> 1) & 255).try_into().unwrap(),
+            0x7e | u8::try_from((base & 1) << 7).unwrap() | u8::try_from(extension >> 8).unwrap(),
+            (extension & 255).try_into().unwrap(),
+        ]);
+        wire[12..12 + stuffing].fill(0xff);
+        wire
+    }
+
+    fn incremental(bytes: Bytes, offset: u64, quantum: u64) -> (TransportInspection, u64) {
+        let mut inspector =
+            TransportInspector::detached(bytes, PacketFormat::Ts188, offset, Some(SourceId(7)))
+                .unwrap();
+        let mut spent = 0;
+        loop {
+            let mut work = WorkBudget::new(quantum);
+            let step = inspector.poll(&mut work, &AtomicBool::new(false)).unwrap();
+            spent += work.spent();
+            match step {
+                AssemblyStep::Output(result) => return (result, spent),
+                AssemblyStep::Yield => {}
+                _ => panic!("inspection did not produce a carrier"),
+            }
+        }
+    }
+
+    fn assert_same_packet(fast: &TransportPacket, slow: &TransportPacket) {
+        assert_eq!(
+            (
+                fast.source_offset,
+                fast.source_id,
+                fast.pid,
+                fast.payload_unit_start,
+                fast.transport_priority,
+                fast.transport_error,
+                fast.scrambling,
+                fast.continuity_counter
+            ),
+            (
+                slow.source_offset,
+                slow.source_id,
+                slow.pid,
+                slow.payload_unit_start,
+                slow.transport_priority,
+                slow.transport_error,
+                slow.scrambling,
+                slow.continuity_counter
+            )
+        );
+        assert_eq!(
+            (fast.sync, &fast.pcr_range, fast.payload_source_offset),
+            (slow.sync, &slow.pcr_range, slow.payload_source_offset)
+        );
+        assert_eq!(fast.source.as_ref(), slow.source.as_ref());
+        for (a, b) in [(&fast.prefix, &slow.prefix), (&fast.payload, &slow.payload)] {
+            assert_eq!(a.as_ref().map(AsRef::as_ref), b.as_ref().map(AsRef::as_ref));
+        }
+        let (Some(a), Some(b)) = (&fast.adaptation, &slow.adaptation) else {
+            panic!("expected adaptation on both carriers");
+        };
+        assert_eq!(
+            (
+                a.discontinuity,
+                a.random_access_indicator,
+                a.elementary_priority,
+                a.pcr,
+                a.opcr,
+                a.splice_countdown
+            ),
+            (
+                b.discontinuity,
+                b.random_access_indicator,
+                b.elementary_priority,
+                b.pcr,
+                b.opcr,
+                b.splice_countdown
+            )
+        );
+        assert_eq!(a.source.as_ref(), b.source.as_ref());
+        for (a, b) in [
+            (&a.private_data, &b.private_data),
+            (&a.extension, &b.extension),
+        ] {
+            assert_eq!(a.as_ref().map(AsRef::as_ref), b.as_ref().map(AsRef::as_ref));
+        }
+    }
+
+    fn assert_fallback(bytes: &Bytes, offset: u64) {
+        for units in [0, 1, 9, 4096] {
+            let mut work = WorkBudget::new(units);
+            assert!(PlainCarrier::inspect_ts188(bytes, offset, &mut work).is_none());
+            assert_eq!(work.spent(), 0);
+        }
+    }
+
+    #[test]
+    fn pcr_adaptation_matches_incremental_fields_ranges_bytes_and_work() {
+        let pool = Budget::new(8192).unwrap();
+        for (base, extension) in [
+            (0, 0),
+            (0, 299),
+            (1, 1),
+            (0x123456789, 257),
+            ((1 << 33) - 1, 299),
+        ] {
+            for stuffing in [0, 1, 63, 64, 65, 175] {
+                for flags in (0..=0xe0).step_by(0x20) {
+                    for header in [0, 0x40, 0xa0] {
+                        let mut wire = pcr_carrier(base, extension, stuffing, flags);
+                        wire[1] |= header;
+                        if header == 0xa0 {
+                            wire[3] |= 0x80;
+                        }
+                        let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
+                        for offset in [0, 188, u64::MAX - 188] {
+                            let charge = 10 + stuffing as u64;
+                            for units in [0, 1, charge - 1, charge, charge + 1] {
+                                let mut work = WorkBudget::new(units);
+                                let result = PlainCarrier::inspect_ts188(&bytes, offset, &mut work);
+                                assert_eq!(result.is_some(), units >= charge);
+                                assert_eq!(work.spent(), if units >= charge { charge } else { 0 });
+                            }
+                            let mut work = WorkBudget::new(charge);
+                            let plain =
+                                PlainCarrier::inspect_ts188(&bytes, offset, &mut work).unwrap();
+                            assert!(!plain.is_plain_continuation());
+                            let fast = plain
+                                .into_packet(bytes.clone(), offset, Some(SourceId(7)))
+                                .unwrap();
+                            assert_eq!(
+                                fast.adaptation.as_ref().unwrap().pcr,
+                                Some(Pcr { base, extension })
+                            );
+                            assert_eq!(fast.pcr_range, Some(6..12));
+                            for quantum in [1, 4, 9, 64, 4096] {
+                                let (TransportInspection::Accepted(slow), spent) =
+                                    incremental(bytes.clone(), offset, quantum)
+                                else {
+                                    panic!("expected valid PCR carrier");
+                                };
+                                assert_eq!(work.spent(), spent);
+                                assert_same_packet(&fast, &slow);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn complex_adaptations_and_invalid_pcr_keep_the_incremental_fallback() {
+        let pool = Budget::new(8192).unwrap();
+        for extra in [1, 2, 4, 8] {
+            let mut wire = pcr_carrier(17, 299, 6, extra);
+            match extra {
+                1 | 2 => wire[12..15].copy_from_slice(&[2, 0x44, 0x55]),
+                4 => wire[12] = 0xfe,
+                8 => wire.copy_within(6..12, 12),
+                _ => unreachable!(),
+            }
+            let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
+            assert_fallback(&bytes, 188);
+            assert!(matches!(
+                incremental(bytes, 188, 1).0,
+                TransportInspection::Accepted(_)
+            ));
+        }
+        for length in 1..7 {
+            let mut wire = pcr_carrier(17, 299, 0, 0);
+            wire[4] = length;
+            let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
+            assert_fallback(&bytes, 0);
+            let (TransportInspection::Rejected(rejected), _) = incremental(bytes, 0, 1) else {
+                panic!("short declared PCR accepted");
+            };
+            assert_eq!(rejected.error(), Error::Invalid("adaptation field length"));
+        }
+        for (bad_clock, bad_stuffing) in [(true, false), (false, true), (true, true)] {
+            for at in [12, 76, 186] {
+                let mut wire = pcr_carrier(17, 299, 175, 0x40);
+                if bad_clock {
+                    wire[10] ^= 2;
+                }
+                if bad_stuffing {
+                    wire[at] = 0;
+                }
+                let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
+                assert_fallback(&bytes, 188);
+                let (TransportInspection::Rejected(rejected), _) = incremental(bytes, 188, 1)
+                else {
+                    panic!("malformed PCR carrier accepted");
+                };
+                assert_eq!(
+                    rejected.error(),
+                    Error::Invalid(if bad_clock {
+                        "PCR reserved bits/extension"
+                    } else {
+                        "adaptation stuffing"
+                    })
+                );
+                assert_eq!(
+                    rejected.secondary,
+                    (bad_clock && bad_stuffing).then_some(Error::Invalid("adaptation stuffing"))
+                );
+                assert_eq!(rejected.bytes().as_ref(), wire);
+            }
+        }
+        let mut wire = pcr_carrier(17, 299, 0, 0);
+        wire[11] = 0xff; // Extension 511, outside the 27 MHz sub-tick range.
+        let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
+        assert_fallback(&bytes, 0);
+        assert!(matches!(
+            incremental(bytes, 0, 1).0,
+            TransportInspection::Rejected(_)
+        ));
+
+        let wire = pcr_carrier(17, 299, 0, 0);
+        for length in 0..188 {
+            let bytes = Bytes::copy_from_slice(&pool, &wire[..length]).unwrap();
+            assert_fallback(&bytes, 0);
+            assert_eq!(
+                TransportInspector::detached(bytes, PacketFormat::Ts188, 0, None)
+                    .unwrap_err()
+                    .error,
+                Error::Invalid("transport packet size")
+            );
+        }
+        let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
+        for offset in [u64::MAX - 187, u64::MAX] {
+            assert_fallback(&bytes, offset);
+            assert_eq!(
+                TransportInspector::detached(bytes.clone(), PacketFormat::Ts188, offset, None)
+                    .unwrap_err()
+                    .error,
+                Error::Overflow
+            );
+        }
+    }
+
     #[test]
     fn plain_adaptation_matches_incremental_work_fields_and_payload() {
         let pool = Budget::new(8192).unwrap();
@@ -587,7 +913,7 @@ mod tests {
         let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
         let source = Some(SourceId(7));
         let mut fast_work = WorkBudget::new(4096);
-        let plain = PlainCarrier::inspect_ts188(&bytes, &mut fast_work).unwrap();
+        let plain = PlainCarrier::inspect_ts188(&bytes, 188, &mut fast_work).unwrap();
         let fast = plain.into_packet(bytes.clone(), 188, source).unwrap();
         let mut slow_work = WorkBudget::new(4096);
         let mut inspector =
@@ -618,7 +944,7 @@ mod tests {
         wire[104] = 0;
         let malformed = Bytes::copy_from_slice(&pool, &wire).unwrap();
         let mut work = WorkBudget::new(4096);
-        assert!(PlainCarrier::inspect_ts188(&malformed, &mut work).is_none());
+        assert!(PlainCarrier::inspect_ts188(&malformed, 0, &mut work).is_none());
         assert_eq!(work.spent(), 0);
     }
 }

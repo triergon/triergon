@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "archive_sha256": "f39de6e867932328750624733a85c8aa30a3204a2e39dd194c90f7a1e9d30e24",
+  "archive_member": "progressive-ts188/on-demand-spans.tar.gz",
+  "archive_member_sha256": "d7da488eda6923e979593cf5a1399556427590f9fb131cfe9ed9444dc61ad43f",
+  "historical_revision": "1a9a5770d90cd3b50329a4f89d129644685a9710",
+  "historical_build": "stable 1.99.1 with target-cpu override; not a current gate build",
+  "manifest_sha256": "59d5e19f0eb365a6429593bc799b7ac8cdd7f813737177e4bb47663892228c65",
+  "oracle_sha256": "918296ef17c985b8e38a4882cd19511ae98ab828167a5c57f7f95b430b1754c7",
+  "workloads_sha256": "4fd9c8ba4d68e3fd86d9cfc0ec80673f7e6e4299fa05495e969f3ae9856162d9",
+  "historical_worker_sha256": "18742a8c96ce4d2c17d6cdac3595341792f17e4d487f661660feb1cc25bc0232",
+  "historical_reference_sha256": "c4116cc26659315be7dd1f0b6b2164eb31d762583b48b4e5628048870aaa8d9d",
+  "original_timed_cases": 3,
+  "functional_controls": 5,
+  "controls_sha256": "540ee2d4b786f54c42f683c65836eba925748f644da7333115060a6ce34df127",
+  "timing_corpus_sha256": "3ac94befb9929fc9012f1e9c0ca30f718ce5165fb687a74d67d317e0ea568335"
+}

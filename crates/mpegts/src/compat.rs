@@ -32,9 +32,10 @@ pub mod pes {
         ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, TimestampOrigin,
     };
     pub use crate::demux_pes::{
-        DemuxBoundary, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope, DemuxSpan,
-        DvbSubtitlesDescriptors, PrivateAudioCarriage, PrivateAudioDescriptors, ReadyContinuation,
-        RegisteredCarriage, SourceContext,
+        CompactDemuxPacket, CompactPayload, DemuxBoundary, DemuxObserver, DemuxPacket,
+        DemuxPayloadKind, DemuxScope, DemuxSpan, DemuxSpanView, DemuxSpanViews,
+        DvbSubtitlesDescriptors, PayloadCursor, PrivateAudioCarriage, PrivateAudioDescriptors,
+        ReadyContinuation, RegisteredCarriage, SourceContext,
     };
 }
 

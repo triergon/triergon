@@ -17,6 +17,83 @@ pub struct Bytes {
     range: Range<usize>,
 }
 
+/// A checked borrowed range. Copies borrow the original handle rather than
+/// incrementing its shared-storage count. Call `into_bytes` for independent retention.
+#[derive(Clone, Copy)]
+pub struct BytesView<'a> {
+    backing: &'a Bytes,
+    data: &'a [u8],
+}
+
+impl<'a> BytesView<'a> {
+    /// Number of bytes in this borrowed range.
+    pub fn len(self) -> usize {
+        self.data.len()
+    }
+    /// Whether the checked range contains no bytes.
+    pub fn is_empty(self) -> bool {
+        self.data.is_empty()
+    }
+    /// Borrow the original handle, including its full retained allocation.
+    pub fn backing_bytes(self) -> &'a Bytes {
+        self.backing
+    }
+    /// Capacity of the backing allocation, including bytes outside this range.
+    pub fn retained_capacity(self) -> usize {
+        self.backing.retained_capacity()
+    }
+    /// Whether the backing allocation is charged to this budget pool.
+    pub fn belongs_to(self, budget: &Budget) -> bool {
+        self.backing.belongs_to(budget)
+    }
+    /// Borrow a relative subrange, rejecting reversed or out-of-range bounds.
+    pub fn slice(self, range: Range<usize>) -> Result<Self> {
+        let data = self
+            .data
+            .get(range)
+            .ok_or(Error::Invalid("byte span range"))?;
+        Ok(Self {
+            backing: self.backing,
+            data,
+        })
+    }
+    /// Retain this exact range independently, adding one shared handle.
+    pub fn into_bytes(self) -> Result<Bytes> {
+        let start = self.offset()?;
+        let end = start.checked_add(self.len()).ok_or(Error::Overflow)?;
+        self.backing.slice(start..end)
+    }
+
+    fn offset(self) -> Result<usize> {
+        // Construction and subslicing keep both slices in the same allocation.
+        self.data
+            .as_ptr()
+            .addr()
+            .checked_sub(self.backing.as_ref().as_ptr().addr())
+            .ok_or(Error::Invalid("byte span range"))
+    }
+}
+
+impl std::fmt::Debug for BytesView<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let start = self.offset().map_err(|_| std::fmt::Error)?;
+        let end = start.checked_add(self.len()).ok_or(std::fmt::Error)?;
+        formatter
+            .debug_struct("BytesView")
+            .field("backing", &self.backing)
+            .field("start", &start)
+            .field("end", &end)
+            .finish()
+    }
+}
+
+impl AsRef<[u8]> for BytesView<'_> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.data
+    }
+}
+
 /// A shared allocation's address. It can be reused after the last owner drops.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ByteStorageAddress(usize);
@@ -68,6 +145,14 @@ impl Bytes {
             range,
         })
     }
+    /// Borrow a checked range without allocating or cloning shared storage.
+    pub fn view(&self, range: Range<usize>) -> Result<BytesView<'_>> {
+        let range = self.subrange(range)?;
+        Ok(BytesView {
+            backing: self,
+            data: &self.storage.data[range],
+        })
+    }
     /// Consumes this handle and selects a checked subspan without cloning or
     /// allocating a new shared owner. The complete backing capacity and header
     /// remain charged, including for an empty successful view. Bounds are
@@ -115,6 +200,10 @@ impl Bytes {
     }
     pub fn shares_storage_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.storage, &other.storage)
+    }
+    /// Whether another live view retains this allocation.
+    pub fn has_shared_storage(&self) -> bool {
+        Arc::strong_count(&self.storage) != 1
     }
     /// Compare backing allocations without extending their lifetimes.
     pub fn storage_address(&self) -> ByteStorageAddress {
@@ -389,33 +478,34 @@ impl<T> BudgetVec<T> {
         self.charge.shrink_by(old);
         Ok(())
     }
+    #[inline]
     pub fn try_push(&mut self, value: T) -> std::result::Result<(), PushError<T>> {
-        if self.len() == self.capacity() {
-            let Some(needed) = self.len().checked_add(1) else {
-                return Err(PushError {
-                    error: Error::Overflow,
-                    value,
-                });
-            };
-            let target = needed.max(self.capacity().saturating_mul(2).max(4));
-            let result = self.grow_to(target).or_else(|error| {
-                if target != needed
-                    && matches!(
-                        error,
-                        Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
-                    )
-                {
-                    self.grow_to(needed)
-                } else {
-                    Err(error)
-                }
-            });
-            if let Err(error) = result {
-                return Err(PushError { error, value });
-            }
+        if self.len() == self.capacity()
+            && let Err(error) = self.grow_for_push()
+        {
+            return Err(PushError { error, value });
         }
         self.data.push(value);
         Ok(())
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn grow_for_push(&mut self) -> Result<()> {
+        let needed = self.len().checked_add(1).ok_or(Error::Overflow)?;
+        let target = needed.max(self.capacity().saturating_mul(2).max(4));
+        self.grow_to(target).or_else(|error| {
+            if target != needed
+                && matches!(
+                    error,
+                    Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
+                )
+            {
+                self.grow_to(needed)
+            } else {
+                Err(error)
+            }
+        })
     }
     #[inline]
     pub fn try_extend_from_slice(&mut self, values: &[T]) -> Result<()>
@@ -430,6 +520,20 @@ impl<T> BudgetVec<T> {
         self.data.extend_from_slice(values);
         Ok(())
     }
+    /// Reserve space for all new elements before constructing any of them.
+    pub fn try_extend_with(&mut self, count: usize, make: impl FnMut(usize) -> T) -> Result<()> {
+        self.try_reserve_exact(count)?;
+        self.data.extend((0..count).map(make));
+        Ok(())
+    }
+    /// Move elements after reserving destination capacity. Both buffers stay
+    /// charged to their existing pools. A failed reserve leaves both intact.
+    pub fn try_append(&mut self, other: &mut Self) -> Result<()> {
+        self.try_reserve_exact(other.len())?;
+        self.data.append(&mut other.data);
+        Ok(())
+    }
+
     /// Initializes new elements only after reserving their complete capacity.
     /// Shrinking retains the allocation and its existing charge.
     pub fn try_resize(&mut self, new_len: usize, value: T) -> Result<()>
@@ -464,6 +568,13 @@ impl<T> std::ops::DerefMut for BudgetVec<T> {
 pub struct BudgetVecIntoIter<T> {
     iter: std::vec::IntoIter<T>,
     _charge: Reservation,
+}
+
+impl<T> BudgetVecIntoIter<T> {
+    /// Borrow the remaining elements in traversal order without advancing.
+    pub fn as_slice(&self) -> &[T] {
+        self.iter.as_slice()
+    }
 }
 
 impl<T> Iterator for BudgetVecIntoIter<T> {
@@ -565,7 +676,65 @@ pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::nonzero_prefix_len;
+    use super::{Bytes, BytesView, nonzero_prefix_len};
+    use crate::Budget;
+
+    #[test]
+    fn borrowed_ranges_do_not_clone_storage_and_owned_ranges_keep_the_full_charge() {
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<BytesView<'static>>();
+        let pool = Budget::new(8192).unwrap();
+        let bytes = Bytes::copy_from_slice(&pool, b"0123456789").unwrap();
+        let charge = bytes.retained_storage_bytes();
+        let nested = bytes.slice(2..9).unwrap();
+        drop(bytes);
+        let view = nested.view(1..5).unwrap();
+        let copied = view;
+        assert_eq!(copied.as_ref(), b"3456");
+        assert_eq!(view.slice(1..3).unwrap().as_ref(), b"45");
+        assert!(!nested.has_shared_storage());
+        assert_eq!(pool.used(), Budget::control_storage_bytes() + charge);
+        for (start, end) in [(5, 4), (0, 8), (usize::MAX, usize::MAX)] {
+            assert!(view.slice(start..end).is_err());
+        }
+        let retained = view.into_bytes().unwrap();
+        assert!(nested.has_shared_storage());
+        drop(nested);
+        assert_eq!(retained.as_ref(), b"3456");
+        assert_eq!(pool.used(), Budget::control_storage_bytes() + charge);
+        drop(retained);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+
+    #[test]
+    fn borrowed_subranges_preserve_empty_and_nested_storage_windows() {
+        let pool = Budget::new(8192).unwrap();
+        for input in [b"".as_slice(), b"abcdef".as_slice()] {
+            let bytes = Bytes::copy_from_slice(&pool, input).unwrap();
+            let charge = pool.used();
+            for outer_start in 0..=input.len() {
+                for outer_end in outer_start..=input.len() {
+                    let backing = bytes.slice(outer_start..outer_end).unwrap();
+                    let view = backing.view(0..backing.len()).unwrap();
+                    for start in 0..=view.len() {
+                        for end in start..=view.len() {
+                            let borrowed = view.slice(start..end).unwrap();
+                            let retained = borrowed.into_bytes().unwrap();
+                            assert_eq!(
+                                retained.as_ref(),
+                                &input[outer_start + start..outer_start + end]
+                            );
+                            assert_eq!(retained.as_ref().as_ptr(), borrowed.as_ref().as_ptr());
+                            assert!(retained.shares_storage_with(&bytes));
+                            assert_eq!(pool.used(), charge);
+                        }
+                    }
+                }
+            }
+            drop(bytes);
+            assert_eq!(pool.used(), Budget::control_storage_bytes());
+        }
+    }
 
     #[test]
     fn nonzero_prefix_stops_at_the_first_zero_in_groups_and_tails() {

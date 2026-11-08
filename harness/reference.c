@@ -204,6 +204,7 @@ static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t)
 #endif
 #ifdef TRIERGON_HLS_REFERENCE
 #include "reference_hls.h"
+#include "reference_progressive.h"
 #endif
 int main(int argc,char **argv){
     av_log_set_level(AV_LOG_ERROR);
@@ -215,6 +216,9 @@ int main(int argc,char **argv){
         printf(",\"adapter\":\"native-ffmpeg-packets\"");
 #endif
         printf("}\n");return 0;}
+#ifdef TRIERGON_HLS_REFERENCE
+    if(!strncmp(argv[1],"progressive-",12))return progressive_main(argc,argv);
+#endif
     FILE *file=fopen(argv[2],"rb");if(!file)return 2;
     if(fseek(file,0,SEEK_END)||ftell(file)<0){fclose(file);return 2;}
     long size=ftell(file);rewind(file);if(size>64*1024*1024){fclose(file);return 2;}

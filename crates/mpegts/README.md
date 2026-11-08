@@ -74,6 +74,7 @@ file.
 | --- | --- |
 | Whole stream, one program | `TransportStream::{new, new_with_namespace}` |
 | One HLS segment (TS188, in-band PAT/PMT) | `TransportStream::new_single_program_segment`, `new_single_program_feed` |
+| Sequential TS188 playback input | `TransportStream::new_single_program_progressive_feed` |
 | Packets only | `parse_transport`, `TransportFramer`, `carrier::TransportInspector` |
 | Continuity | `Continuity::observe` → `ContinuityOutcome` |
 | PSI | `SectionAssembler`, `psi::{PatReader, PmtReader, PatCollector}` |
@@ -84,9 +85,41 @@ file.
 | FFmpeg-compatible clock | `compat::pes::DemuxClock` |
 | FFmpeg-compatible start position | `compat::input::InputBootstrap` |
 
+The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
-to a consumer in segment feed mode. `take_feed_omissions` counts the skipped
-events so consumers can retain positions in the source trace.
+in both feed modes. `poll_feed_carriers` lets a progressive feed move a
+plain continuation's charged payload storage into `compat::pes::DemuxObserver`.
+`poll_feed_with_payload_runs` can offer several payload-only continuations
+on one PID from an already shared window. Each carrier keeps its source
+range and event ordinal. Runs reserve checked span capacity before advancing
+input; ordinary carrier polling handles PES completion.
+Feed dispatch reuses the selected PES route after checking its PID against the
+current program table. Other PIDs use the ordinary route lookup.
+Idle PSI jobs do not enter the table poller. Complete timestamp-only PES headers
+use the shared timestamp validator directly; other headers retain incremental
+validation. Both paths preserve work charges and cancellation boundaries.
+Runs record the complete final carrier for duplicate detection before transferring
+the shared backing storage. Every retained view keeps the full allocation charged.
+A fresh, inactive `DemuxObserver` can select `enable_compact_payloads` before input and then use
+`poll_compact_payload` (or its input-bound counterpart). `CompactDemuxPacket`
+retains one backing handle per admitted run on 64-bit targets; `CompactPayload::spans` and its
+consuming `PayloadCursor` expose every logical carrier's payload range, source
+range, transport extent and context. Span capacity remains charged for the full
+logical count. Retiring the last range of a run releases its backing handle.
+On 32-bit targets the same cursor uses ordinary span storage, keeping the
+observer's charged size and constant-time counters unchanged.
+Ordinary constructors and polling keep the owned `DemuxPacket.spans` API.
+Mixing polling representations returns a typed error before changing state or
+spending work. `CompactPayload::from_spans` always adopts ordinary spans and
+never interprets public metadata as a run marker.
+`PayloadCursor::current_bytes` and `next_bytes` expose just the borrowed byte
+range with the same admission and retirement rules. Full carrier facts remain
+available through `current` and `next_span`.
+Sequential playback can share up to four tight input windows of at most 4 KiB
+each. A full set, oversized backing storage or low budget headroom uses
+carrier-sized storage. Fallback uses the original transport event.
+`take_feed_omissions` counts
+skipped events so consumers can retain positions in the source trace.
 
 `TransportStream::poll_compact` coalesces runs of null packets into one
 `CompactTraceEvent::NullRun`.

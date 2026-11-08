@@ -66,6 +66,7 @@ MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_native_seek` / `apply_mp4_native_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
 | TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `ts_native_private_audio_v1`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
+| Progressive TS188 | `ts_progressive::TsProgressiveReader` (AVC + ADTS AAC) |
 | HLS media segments | `hls_segment::HlsSegmentReader` (AVC + AAC), `HlsMediaSegmentReader` (AVC/HEVC + AAC/AC-3/E-AC-3) |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
 | Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge`; MP4 AVC and HEVC samples frame through `triergon_framing::NalPacketSession` |
@@ -128,6 +129,24 @@ remains valid while a caller retains an output after closing the player.
 Delivery without a seek uses the presence of the projected presentation
 timestamp directly.
 
+**Progressive TS188.** One sequential input with a stable PAT, PMT and clock,
+one AVC track and one ADTS AAC track. AVC starts on a timed IDR with an
+access-unit delimiter. AAC needs an initial PES timestamp, then advances
+by the exact ADTS duration when an anchor is absent. Source timestamps stay
+available alongside the playback clocks. Completed units can be delivered
+before the end of input. Each advance can process several internal steps within
+the caller's work budget. A source that spends its remaining work before a
+reply is ready leaves the request pending for the next advance. Start a new
+reader to begin at another offset.
+Input requests prefer a TS188 boundary within the cursor's window limit. Short
+replies continue through the ordinary packet carry path.
+On 64-bit targets, progressive PES payloads retain one shared backing handle per
+admitted carrier run. The AVC and AAC cursors borrow each logical carrier range, preserving its
+validation, work and retirement boundaries. Independently retained AAC frames
+still keep the full backing allocation charged. Both framers also expose
+`push_compact` for explicit `CompactDemuxPacket` delivery alongside ordinary `push`.
+Both paths share track, configuration-epoch and source-clock admission checks.
+
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
 The feed consumes validated PES continuations directly and preserves source
 event positions. AVC fixed-width fields consume buffered RBSP bits in byte-sized
@@ -136,14 +155,35 @@ groups while retaining emulation-prevention validation. The segment reader uses 
 feed, including any inserted parameter sets. Its spans remain valid while the
 video unit is retained.
 AVC delimiter lookbehind uses compact indices into four retained PES clocks.
+Repeated AVC parameter sets reuse their parsed values when their bytes exactly
+match the last stored set. Different bytes follow normal parsing and ID lookup.
 Units are released only after EOF and both the video and audio assemblers drain. Defaults: 64 MiB
 source, 64 MiB feed, 8,192 access units. A failed reader releases its source;
 retry with a new reader.
+
+**ADTS AAC.** Complete frames contained in one source span can share its charged
+backing storage when its capacity fits the configured maximum frame size. After
+header validation, a fragmented frame can use one copy of the remaining PES tail
+when that tail fits the frame size limit (at most 8,191 bytes) and the work budget
+covers validation, copying, allocation and span retirement. Every remaining span
+must use the same pool and their lengths must exactly match the declared extent.
+Frames then share the joined storage and keep its full capacity charged while
+retained. Insufficient work, invalid tail metadata or allocation pressure keeps
+ordered span assembly, so a later invalid span still follows earlier valid frames.
 
 **Sinks.** `pump::Sink` owns accepted `Feed` envelopes until their callbacks
 retire; `Submission::Blocked` returns the same envelope. Threading and
 platform decoder configuration are the sink's responsibility; no `Send` bound
 is imposed.
+
+`cargo xtask progressive` checks three comparable AVC/AAC TS188 packet folds and
+all five authored functional controls through the bounded sequential reader.
+All ten literal worker outcomes are required, including positive Rust output and
+the recorded reference refusal on the legal duplicate control. The
+[contract](../../harness/features/progressive-ts188/contract.json) preserves complete
+packet fields and payloads with two retained units per stream. `--benchmark --memory`
+uses the standard paired harness for the three original comparable cases only;
+native gate-build qualification remains pending.
 
 ## Conformance
 
