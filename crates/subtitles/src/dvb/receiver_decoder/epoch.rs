@@ -1,6 +1,6 @@
 //! Regions, CLUTs and objects of the current epoch, and how the region,
 //! CLUT and object segments change them.
-use super::palette::{self, DEFAULT, Tables};
+use super::palette::{self, Census, DEFAULT, Tables};
 use super::pixels::{self, Canvas, Pen};
 use super::segment::{
     ClutDefinition, ObjectCoding, ObjectData, ObjectPlacement, RegionComposition,
@@ -23,6 +23,11 @@ pub(super) struct Region {
     drawn: bool,
     objects: BudgetVec<ObjectPlacement>,
     pixels: BudgetVec<u8>,
+    /// The automatic palette as last computed. The receiver recomputes it only
+    /// after an object is drawn into the region, and a recomputation rewrites
+    /// only the colours it ranks; the rest keep earlier values.
+    automatic: [u32; 256],
+    automatic_current: bool,
 }
 
 impl Region {
@@ -78,6 +83,30 @@ impl Epoch {
         &self.regions.as_slice()[index]
     }
 
+    /// Region `index`'s automatic palette at its depth, recomputed when an
+    /// object was drawn into the region since the last computation.
+    pub(super) fn automatic_palette(
+        &mut self,
+        index: usize,
+        census: &mut Census,
+        work: &mut WorkBudget,
+    ) -> Result<&[u32]> {
+        let region = &mut self.regions.as_mut_slice()[index];
+        let colours = 1 << region.depth.bits();
+        if !region.automatic_current {
+            charge(work, region.pixels.len());
+            let width = usize::from(region.width);
+            palette::automatic(
+                region.pixels.as_slice(),
+                width,
+                census,
+                &mut region.automatic[..colours],
+            )?;
+            region.automatic_current = true;
+        }
+        Ok(&region.automatic[..colours])
+    }
+
     /// The CLUT `id`, if one was defined in this epoch.
     pub(super) fn tables(&self, id: u8) -> Option<&Tables> {
         self.cluts
@@ -117,6 +146,8 @@ impl Epoch {
                 drawn: false,
                 objects: BudgetVec::new(&self.budget),
                 pixels: BudgetVec::new(&self.budget),
+                automatic: [0; 256],
+                automatic_current: false,
             };
             push_exact(&mut self.regions, region)?;
             self.regions.len() - 1
@@ -216,7 +247,10 @@ impl Epoch {
                         y: y + line,
                         non_modifying: object.non_modifying,
                     };
-                    pixels::draw_field(&mut canvas, field, pen);
+                    // A field the receiver abandons leaves the palette as computed.
+                    if pixels::draw_field(&mut canvas, field, pen) {
+                        region.automatic_current = false;
+                    }
                 }
                 region.drawn = true;
             }

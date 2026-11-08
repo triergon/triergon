@@ -18,15 +18,6 @@ struct Case {
     expected: [u64; 3],
 }
 
-/// Cases whose reference output depends on memory it never initialised: the
-/// reference leaves the automatic palette's unranked entries unwritten, and
-/// they show whatever its allocator handed back (here an earlier subtitle's
-/// palette). The receiver decoder writes zero.
-const UNINITIALISED_PALETTE: &[&str] = &[
-    "region-resize-partial--compute_clut-1",
-    "versions-repeated--compute_clut-1",
-];
-
 struct Reader<'a>(&'a [u8]);
 
 impl Reader<'_> {
@@ -156,14 +147,15 @@ fn run(case: &Case) -> [u64; 3] {
 fn reference_folds() {
     let cases = cases();
     assert!(cases.len() > 200, "{} fixture cases", cases.len());
-    let mut failures = Vec::new();
-    for case in &cases {
-        let matches = run(case) == case.expected;
-        if matches == UNINITIALISED_PALETTE.contains(&case.id.as_str()) {
-            failures.push(case.id.as_str());
-        }
-    }
-    assert!(failures.is_empty(), "unexpected results: {failures:?}");
+    let failures: Vec<&str> = cases
+        .iter()
+        .filter(|case| run(case) != case.expected)
+        .map(|case| case.id.as_str())
+        .collect();
+    assert!(
+        failures.is_empty(),
+        "differ from the reference: {failures:?}"
+    );
 }
 
 #[test]

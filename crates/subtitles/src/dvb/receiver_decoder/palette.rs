@@ -160,7 +160,7 @@ impl Census {
 /// inwards. Starting from the edge, the colour that most of its outline
 /// shares with the edge and the colours ranked so far comes next; ranked
 /// colours take evenly spaced levels from transparent to opaque, and the rest
-/// stay zero. `pixels` holds rows of `width` indices below `out.len()`.
+/// keep their values. `pixels` holds rows of `width` indices below `out.len()`.
 pub(super) fn automatic(
     pixels: &[u8],
     width: usize,
@@ -221,7 +221,6 @@ pub(super) fn automatic(
             *r += t;
         }
     }
-    out.fill(0);
     let steps = ranked.saturating_sub(1).max(1);
     for (rank, &c) in order[..ranked].iter().enumerate() {
         let v = (rank * 255 / steps) as u8;

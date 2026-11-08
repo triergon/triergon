@@ -185,15 +185,16 @@ fn paint(run: &mut [u8], index: u8) {
 
 /// Draw one field: lines at `pen.y`, `pen.y + 2`, ... The field stops at
 /// a sub-block other than an end of line past the right edge, at any below
-/// the bottom, and at a pixel string deeper than the region.
-pub(super) fn draw_field(canvas: &mut Canvas<'_>, block: &[u8], pen: Pen) {
+/// the bottom, and at a pixel string deeper than the region; it returns
+/// whether it reached the end of `block` instead.
+pub(super) fn draw_field(canvas: &mut Canvas<'_>, block: &[u8], pen: Pen) -> bool {
     let mut maps = Maps::default();
     let (mut x, mut y) = (pen.x, pen.y);
     let height = canvas.pixels.len() / canvas.width.max(1);
     let mut at = 0;
     while let Some(&kind) = block.get(at) {
         if (kind != 0xf0 && x >= canvas.width) || y >= height {
-            break;
+            return false;
         }
         at += 1;
         let rest = &block[at..];
@@ -201,7 +202,7 @@ pub(super) fn draw_field(canvas: &mut Canvas<'_>, block: &[u8], pen: Pen) {
             0x10..=0x12 => {
                 let bits = [2, 4, 8][usize::from(kind - 0x10)];
                 if bits > canvas.depth.bits() {
-                    break;
+                    return false;
                 }
                 let map: &[u8] = match (bits, canvas.depth) {
                     (2, Depth::Four) => &maps.two_to_four,
@@ -245,6 +246,7 @@ pub(super) fn draw_field(canvas: &mut Canvas<'_>, block: &[u8], pen: Pen) {
             _ => {}
         }
     }
+    true
 }
 
 /// Decode one pixel-code string into `line`; returns the bytes it used.

@@ -465,9 +465,11 @@ impl ReceiverDecoder {
             };
             let palette = &mut slot.palette[..1 << region.depth.bits()];
             if automatic {
-                charge(work, region.pixels().len());
-                let width = usize::from(region.width);
-                palette::automatic(region.pixels(), width, &mut self.census, palette)?;
+                palette.copy_from_slice(self.epoch.automatic_palette(
+                    index,
+                    &mut self.census,
+                    work,
+                )?);
             } else {
                 palette.copy_from_slice(tables.unwrap_or(&DEFAULT).get(region.depth));
             }
