@@ -12,7 +12,7 @@ pub(crate) struct Head {
     pub(crate) units_per_em: u16,
     pub(crate) bounds: [i16; 4],
     pub(crate) mac_style: u16,
-    /// `indexToLocFormat` is 1: 32-bit `loca` offsets.
+    /// `indexToLocFormat` is not 0: 32-bit `loca` offsets.
     pub(crate) long_offsets: bool,
 }
 
@@ -21,18 +21,15 @@ pub(crate) fn head(data: &[u8]) -> Result<Head> {
     r.skip(16)?; // version .. magicNumber
     let flags = r.u16()?;
     let units_per_em = r.u16()?;
-    if !(1..=16384).contains(&units_per_em) {
-        return Err(Error::Invalid("unitsPerEm outside 1..16384"));
+    if !(16..=16384).contains(&units_per_em) {
+        return Err(Error::Invalid("unitsPerEm outside 16..16384"));
     }
     r.skip(16)?; // created, modified
     let bounds = [r.i16()?, r.i16()?, r.i16()?, r.i16()?];
     let mac_style = r.u16()?;
     r.skip(4)?; // lowestRecPPEM, fontDirectionHint
-    let long_offsets = match r.i16()? {
-        0 => false,
-        1 => true,
-        _ => return Err(Error::Invalid("indexToLocFormat")),
-    };
+    // FreeType reads every format other than 0 as long offsets.
+    let long_offsets = r.i16()? != 0;
     Ok(Head {
         flags,
         units_per_em,
@@ -70,13 +67,10 @@ pub(crate) fn hhea(data: &[u8]) -> Result<Hhea> {
     })
 }
 
-/// `maxp.numGlyphs`, in either table version.
+/// `maxp.numGlyphs`; FreeType does not check the table version.
 pub(crate) fn glyph_count(data: &[u8]) -> Result<u16> {
     let mut r = Reader::new(data);
-    match r.u32()? {
-        0x0000_5000 | 0x0001_0000 => {}
-        _ => return Err(Error::Invalid("maxp version")),
-    }
+    r.u32()?; // version
     match r.u16()? {
         0 => Err(Error::Invalid("face has no glyphs")),
         count => Ok(count),
@@ -184,29 +178,39 @@ pub(crate) struct Hmtx {
 }
 
 impl Hmtx {
-    /// Checks that every stored advance is present. A table cut short after the
-    /// last advance (side bearings missing) is still usable.
-    pub(crate) fn new(table: Table, metrics: u16, glyphs: u16) -> Result<Self> {
-        let metrics = metrics.min(glyphs);
-        if metrics == 0 {
-            return Err(Error::Invalid("numberOfHMetrics is zero"));
+    /// Records beyond the glyph count are ignored. Reads past the table give
+    /// zero, as FreeType reads a short table.
+    pub(crate) fn new(table: Table, metrics: u16, glyphs: u16) -> Self {
+        Self {
+            table,
+            metrics: metrics.min(glyphs),
         }
-        if table.len < usize::from(metrics) * 4 - 2 {
-            return Err(Error::Invalid("hmtx shorter than its advances"));
-        }
-        Ok(Self { table, metrics })
     }
 
-    /// The advance of `glyph`, which must be below the glyph count.
+    /// The advance of `glyph`, which must be below the glyph count: zero when
+    /// its long record (or, past the records, the last record's advance) is
+    /// cut off or there are no records.
     pub(crate) fn advance(self, data: &[u8], glyph: u16) -> u16 {
-        let record = glyph.min(self.metrics - 1);
-        u16_at(self.table.bytes(data), 4 * usize::from(record)).unwrap_or(0)
+        let Some(last) = self.metrics.checked_sub(1) else {
+            return 0;
+        };
+        let (record, needed) = if glyph <= last { (glyph, 4) } else { (last, 2) };
+        let at = 4 * usize::from(record);
+        let bytes = self.table.bytes(data);
+        if bytes.len() < at + needed {
+            return 0;
+        }
+        u16_at(bytes, at).unwrap_or(0)
     }
 
     /// The left side bearing of `glyph`: from its long record, else from the
-    /// side-bearing array after the records; zero where the table lacks it.
+    /// side-bearing array after the records; zero where the table lacks it or
+    /// there are no records, as FreeType reads them.
     pub(crate) fn side_bearing(self, data: &[u8], glyph: u16) -> i16 {
         let (glyph, metrics) = (usize::from(glyph), usize::from(self.metrics));
+        if metrics == 0 {
+            return 0;
+        }
         let at = if glyph < metrics {
             4 * glyph + 2
         } else {
@@ -220,7 +224,6 @@ impl Hmtx {
 mod tests {
     use super::{Hmtx, glyph_count, head, os2};
     use crate::sfnt::Table;
-    use triergon_core::Error;
 
     #[test]
     fn head_checks_units_and_location_format() {
@@ -230,8 +233,8 @@ mod tests {
         let parsed = head(&data).unwrap();
         assert_eq!((parsed.units_per_em, parsed.long_offsets), (1000, true));
         data[50] = 2;
-        assert_eq!(head(&data), Err(Error::Invalid("indexToLocFormat")));
-        data[18..20].copy_from_slice(&[0, 0]);
+        assert!(head(&data).unwrap().long_offsets);
+        data[18..20].copy_from_slice(&15_u16.to_be_bytes());
         assert!(head(&data).is_err());
         assert!(head(&data[..53]).is_err());
     }
@@ -241,21 +244,27 @@ mod tests {
         // Two records (100, 200) and one side bearing.
         let data = [0, 100, 0, 0, 0, 200, 0, 0, 0, 5];
         let table = Table { offset: 0, len: 10 };
-        let hmtx = Hmtx::new(table, 2, 3).unwrap();
+        let hmtx = Hmtx::new(table, 2, 3);
         assert_eq!([0, 1, 2].map(|g| hmtx.advance(&data, g)), [100, 200, 200]);
         assert_eq!(
             [0, 1, 2, 3].map(|g| hmtx.side_bearing(&data, g)),
             [0, 0, 5, 0]
         );
-        assert!(Hmtx::new(Table { offset: 0, len: 5 }, 2, 3).is_err());
-        assert!(Hmtx::new(table, 0, 3).is_err());
+        // A record cut off reads as zero; so does a table without records.
+        let short = Hmtx::new(Table { offset: 0, len: 7 }, 2, 3);
+        assert_eq!([0, 1, 2].map(|g| short.advance(&data, g)), [100, 0, 200]);
+        let empty = Hmtx::new(table, 0, 3);
+        assert_eq!(
+            (empty.advance(&data, 1), empty.side_bearing(&data, 1)),
+            (0, 0)
+        );
     }
 
     #[test]
-    fn maxp_and_os2_versions() {
+    fn maxp_versions_are_not_checked_and_os2_versions_are() {
         assert_eq!(glyph_count(&[0, 0, 0x50, 0, 0, 7]), Ok(7));
         assert!(glyph_count(&[0, 0, 0x50, 0, 0, 0]).is_err());
-        assert!(glyph_count(&[0, 2, 0, 0, 0, 7]).is_err());
+        assert_eq!(glyph_count(&[0, 2, 0, 0, 0, 7]), Ok(7));
         let mut table = [0_u8; 78];
         table[4..6].copy_from_slice(&700_u16.to_be_bytes());
         table[74..76].copy_from_slice(&900_u16.to_be_bytes());

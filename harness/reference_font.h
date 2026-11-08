@@ -253,7 +253,7 @@ static void font_face(FT_Face face, long index, FontWork *w) {
             font_signed(face->ascender),
             font_signed(face->descender),
             font_signed(face->height),
-            (uint64_t)face->max_advance_width,
+            font_signed(face->max_advance_width), /* FT_Short */
             !!(face->style_flags & FT_STYLE_FLAG_BOLD),
             !!(face->style_flags & FT_STYLE_FLAG_ITALIC),
         };

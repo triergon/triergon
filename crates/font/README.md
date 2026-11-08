@@ -50,26 +50,35 @@ let _drawn_advance = glyph_metrics.advance;
 **Container.** Single fonts with sfnt version `0x00010000`, `true` or `OTTO`, and
 TrueType/OpenType collections (`ttcf`, any version), face by index. A table that
 starts beyond the file is absent; one that ends beyond it is absent too, except
-`hmtx`, which keeps its bytes. Only the first record of a repeated tag is used.
+`hmtx`, which keeps its whole four-byte records. The first record of a tag with a
+nonzero length is used, as FreeType sanitises the directory.
 
-**Face tables.** `head` (unitsPerEm 1 to 16384, bounding box, macStyle, loca
-format), `hhea`, `maxp` (version 0.5 or 1.0), `hmtx` and `OS/2` (version 0 and
-later, at least 78 bytes; shorter is treated as absent). `head`, `hhea`, `maxp` and
-`hmtx` are required.
+**Face tables.** `head` (unitsPerEm 16 to 16384, bounding box, macStyle, loca
+format: any value but 0 means long offsets), `hhea`, `maxp` (any version),
+`hmtx` (an advance or bearing cut off by the table's end reads as zero, as do all
+advances without records) and `OS/2` (version 0 and later, at least 78 bytes;
+shorter is treated as absent). `head`, `hhea`, `maxp` and `hmtx` are required.
+As in FreeType, a `name` table that cannot be read counts as absent and the `cmap`
+version is not checked.
 
 **Metrics and style.** `vertical_metrics` and `style` follow FreeType's choices:
 typographic metrics when `fsSelection` sets USE_TYPO_METRICS, else `hhea`, else
-(both zero) typographic and then Windows metrics; bold from `fsSelection` bit 5,
+(both zero) typographic and then Windows metrics, kept to 16 bits with a
+negative height made positive, as FreeType stores them; bold from `fsSelection` bit 5,
 italic from bits 0 or 9, or `macStyle` without `OS/2`.
 
-**Names.** Format 0 and 1 naming tables. Records decode lazily as `char`s:
+**Names.** Naming tables of any version, read as format 0 (format 1 language
+tags are not read). Records decode lazily as `char`s:
 platforms 0 and 3 as UTF-16BE (unpaired surrogates become U+FFFD), Macintosh Roman
 as Mac OS Roman; other encodings yield nothing. Empty records and records outside
 the string storage are skipped. `family_name`, `style_name` and `postscript_name`
 select the record FreeType reports.
 
 **Character mapping.** `cmap` formats 0, 4, 6, 10, 12 and 13 on any platform, in
-directory order; other formats (2, 8, 14) are not listed. Lookups are bounded by the
+directory order; other formats (2, 8, 14) are not listed. Records stop at the
+table's end, and a subtable is listed only when FreeType's default validation
+accepts it (lengths that fit, ascending non-overlapping groups for formats 12
+and 13, ordered segments and in-table glyph arrays for format 4). Lookups are bounded by the
 end of the `cmap` table rather than the declared subtable length. A glyph at or
 above the glyph count is unmapped. `text_charmap` is libass's selection: the first
 Windows Unicode subtable, else the first Windows subtable, else FreeType's default
@@ -78,10 +87,17 @@ Unicode subtable; `glyph_index` looks a Windows Symbol charmap up at `0xF000 | c
 **TrueType outlines.** `glyf` with short or long `loca`: simple glyphs and
 composites with offsets, point matching, one scale, x and y scales or a 2×2
 matrix, nested to the depth limit. Offsets scale only with
-SCALED_COMPONENT_OFFSET, by the length of each matrix column. A composite takes the
-advance of its last USE_MY_METRICS component. As FreeType does, the outline is
-shifted horizontally by `lsb - xMin` of the glyph whose metrics apply, and a glyph
-range that runs past `glyf` is cut at its end. Instructions are skipped.
+SCALED_COMPONENT_OFFSET, by the length of each matrix row, rounded to whole units.
+A composite takes the advance of its last USE_MY_METRICS component; a component
+that adds no points is not placed. As FreeType does, the outline is shifted
+horizontally by `lsb - xMin` of the glyph whose metrics apply. `loca` is read
+as FreeType sizes it (at most 65536 entries; one too short for `maxp` is read on
+into the bytes before the next table when they hold every entry, else the glyph
+count drops to the glyphs it covers), and broken `loca` data is repaired: a glyph starting, or (except the last) ending, past `glyf` is
+empty, the last glyph is cut at the table's end, and one ending before it starts
+runs to the end. Instructions are skipped. In font units, component matrices
+apply in `f64`; at a size they apply as FreeType's `FT_MulFix`, so the two can
+differ by 1/64 unit where a 2×2 matrix meets very large coordinates.
 
 **CFF and CFF2 outlines.** `CFF ` version 1 with Type 2 charstrings, name-keyed or
 CID-keyed (FDArray, FDSelect formats 0 and 3), and `CFF2` (FDSelect format 4 too)
@@ -96,9 +112,13 @@ and `sqrt` round as FreeType's do, integer operands round. Outlines are built as
 that engine builds unhinted ones: points are whole font units (the 16.16 value at
 1/64 scale, rounded, then shifted down), a contour starts at its first segment,
 lines of zero length are dropped, and closing a contour drops a final on-curve
-point equal to its first and a contour left with one point. A top FontMatrix other
-than 1/unitsPerEm is applied to the font-unit outline. Drawing operators ignore a
-malformed remainder of operands; operand types are not tracked.
+point equal to its first and a contour left with one point. The FontMatrix is
+read, normalised and applied in fixed point as FreeType does: a Font DICT's matrix
+follows the Top DICT's, outlines and advances go through it, and a Font DICT whose
+matrix implies other units per em scales its glyphs by the ratio. Drawing
+operators read operand counts the format does not allow as FreeType's engine reads
+them, and a glyph whose operator reads past its operands fails; operand types are
+not tracked.
 
 **At a size.** `Font::at_size` takes a 26.6 pixel height and sets up the face as
 FreeType does when libass requests the size (`ass_face_set_size`:
@@ -138,7 +158,8 @@ FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A
   and `OS/2`, rounded as it rounds them).
 
 **Kerning.** Microsoft `kern` version 0: horizontal, non-minimum format 0
-subtables, at most 32, summed, with the override bit replacing the sum.
+subtables, at most 32, summed, with the override bit replacing the sum. As in
+FreeType the version is not checked; Apple's version 1 reads as no subtables.
 `kerning_pairs` lists the pairs those subtables contain.
 
 **Face matching.** `FaceInfo` and `select` score faces as libass 0.17.5 does for
@@ -164,8 +185,10 @@ the least recently used values that only the store holds are dropped.
 underline, hinting (`cvt ` is not read, `fpgm`, `prep` and glyph programs are
 only scanned for `INSTCTRL`, CFF hints are skipped), Apple `kern` version 1 and
 kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Type
-1 charstrings (CharstringType 1), synthetic fonts, Expert charsets for `seac`, and
-FontMatrix entries of CID Font DICTs.
+1 charstrings (CharstringType 1), synthetic fonts and Expert charsets for `seac`.
+A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
+opens it and fails each glyph. A format 4 subtable whose segments overlap or are out
+of order is searched in order rather than with FreeType's overlap handling.
 
 At a size, what needs hinting or vertical layout is not reproduced: hinted
 outlines, hence the glyph extents and contour points libass's HarfBuzz callbacks
@@ -174,7 +197,7 @@ report (they load glyphs hinted), and vertical advances and origins for `@` font
 `fpgm` and a `prep` of at most 7 bytes; the autohinter moves advances), tricky
 fonts known by family name, and programs that may leave backward compatibility;
 fonts FreeType finds tricky only by their table checksums are not recognised.
-Scaled CFF with a FontMatrix other than 1/unitsPerEm is `Unsupported`. Sizes whose
+Sizes whose
 pixels per em round to 0 or exceed 65535 are refused (FreeType loads the former
 unscaled). Coordinates are `i32`; a scaled coordinate beyond it is
 `Error::Overflow`, where FreeType's 64-bit `FT_Pos` goes on (libass rejects
@@ -231,8 +254,9 @@ composites) are
   both workers, for diffing a failing case.
 - The corpus includes three fonts the crate's test support writes
   (`examples/authored-fonts.rs`): `seac`, the arithmetic, logic and storage operators,
-  the flex forms, counter masks, subroutines nested twelve deep, a non-default
-  FontMatrix and one cmap subtable of each supported format. With them the
+  the flex forms, counter masks, subroutines nested twelve deep, curve operators with
+  operand counts the format does not allow, a skewing FontMatrix with an offset and
+  one cmap subtable of each supported format. With them the
   comparison exercises every charstring operator except `vsindex` (CFF2 fonts in the
   corpus do not use it) and `random`, and every supported cmap format;
   `examples/font-coverage.rs` reports this.

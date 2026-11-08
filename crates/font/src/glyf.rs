@@ -197,15 +197,37 @@ pub(crate) struct Context<'a> {
 }
 
 impl Glyf {
-    /// Checks that `loca` holds the offset of every glyph. The final offset, which
-    /// ends the last glyph, may be missing, as FreeType accepts; the last glyph then
-    /// runs to the end of `glyf`.
-    pub(crate) fn new(glyf: Table, loca: Table, long: bool, glyph_count: u16) -> Result<Self> {
+    /// Sizes `loca` as FreeType does: at most 65536 entries are read, and one
+    /// too short for the glyph count is read on into `room` (the bytes before the
+    /// next table) when that holds every entry, else the glyph count drops to the
+    /// glyphs it covers. Returns the table and that glyph count.
+    pub(crate) fn new(
+        glyf: Table,
+        loca: Table,
+        long: bool,
+        glyph_count: u16,
+        room: usize,
+    ) -> Result<(Self, u16)> {
         let entry = if long { 4 } else { 2 };
-        if loca.len < usize::from(glyph_count) * entry {
-            return Err(Error::Invalid("loca shorter than the glyph count"));
+        let len = loca.len.min(0x1_0000 * entry);
+        let entries = len / entry;
+        let needed = (usize::from(glyph_count) + 1) * entry;
+        let (len, glyph_count) = if entries > usize::from(glyph_count) {
+            (len, glyph_count)
+        } else if needed <= room {
+            (needed, glyph_count)
+        } else {
+            let covered = entries.saturating_sub(1);
+            (len, u16::try_from(covered).map_err(|_| Error::Overflow)?)
+        };
+        if glyph_count == 0 {
+            return Err(Error::Invalid("loca without glyphs"));
         }
-        Ok(Self { glyf, loca, long })
+        let loca = Table {
+            offset: loca.offset,
+            len,
+        };
+        Ok((Self { glyf, loca, long }, glyph_count))
     }
 
     /// The byte range of `glyph` in `glyf`, or `None` for an empty glyph, with
@@ -570,8 +592,24 @@ fn delta(r: &mut Reader<'_>, flag: u8, short: u8, same: u8) -> Result<i64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FontUnits, Scaled, Units};
+    use super::{FontUnits, Glyf, Scaled, Units};
     use crate::outline::{OutlinePoint, Point, PointKind};
+    use crate::sfnt::Table;
+
+    #[test]
+    fn a_short_loca_reads_on_or_lowers_the_glyph_count() {
+        let table = |len| Table { offset: 100, len };
+        let glyf = table(40);
+        let sized = |len, glyphs, room| {
+            Glyf::new(glyf, table(len), false, glyphs, room).map(|(g, n)| (g.loca.len, n))
+        };
+        // Four glyphs need five short entries.
+        assert_eq!(sized(10, 4, 10), Ok((10, 4)));
+        assert_eq!(sized(8, 4, 12), Ok((10, 4)));
+        assert_eq!(sized(8, 4, 8), Ok((8, 3)));
+        assert_eq!(sized(14, 4, 14), Ok((14, 4)));
+        assert!(sized(2, 4, 2).is_err());
+    }
 
     #[test]
     fn scaled_components_round_each_product() {

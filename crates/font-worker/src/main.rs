@@ -120,7 +120,7 @@ fn face(font: &Font, outline: &mut Outline, sink: &mut impl Sink) -> io::Result<
         ascender: metrics.ascender,
         descender: metrics.descender,
         height: metrics.height,
-        max_advance: font.horizontal_header().advance_max,
+        max_advance: font.horizontal_header().advance_max.cast_signed(),
         bold: style.bold,
         italic: style.italic,
     })?;

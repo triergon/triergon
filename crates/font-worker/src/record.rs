@@ -66,7 +66,8 @@ pub enum Record<'a> {
         ascender: i32,
         descender: i32,
         height: i32,
-        max_advance: u16,
+        /// `advanceWidthMax` as FreeType exposes it, an `FT_Short`.
+        max_advance: i16,
         bold: bool,
         italic: bool,
     },
@@ -264,7 +265,7 @@ impl Sink for Work {
                 signed(ascender.into()),
                 signed(descender.into()),
                 signed(height.into()),
-                max_advance.into(),
+                signed(max_advance.into()),
                 bold.into(),
                 italic.into(),
             ]),

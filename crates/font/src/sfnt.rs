@@ -54,6 +54,9 @@ pub(crate) struct Tables {
     pub(crate) post: Option<Table>,
     pub(crate) fpgm: Option<Table>,
     pub(crate) prep: Option<Table>,
+    /// The bytes from `loca` to the next table that starts after it, or to the
+    /// end of the file: FreeType reads a short `loca` that far.
+    pub(crate) loca_room: usize,
 }
 
 impl Tables {
@@ -146,15 +149,35 @@ pub(crate) fn directory(
         if slot.is_some() || offset > data.len() {
             continue;
         }
+        // As FreeType sanitises the directory: a table past the end of the
+        // file is dropped, except `hmtx`, cut to a multiple of four bytes;
+        // the first table of a tag with a nonzero length counts.
         let available = data.len() - offset;
         let len = if len <= available {
             len
         } else if &tag == b"hmtx" {
-            available
+            available & !3
         } else {
             continue;
         };
-        *slot = Some(Table { offset, len });
+        if len > 0 {
+            *slot = Some(Table { offset, len });
+        }
+    }
+    if let Some(loca) = tables.loca {
+        let starts = records.chunks_exact(TABLE_RECORD).filter_map(|record| {
+            let tag: [u8; 4] = record[..4].try_into().ok()?;
+            let offset = usize::try_from(u32_be(record, 8)?).ok()?;
+            let len = usize::try_from(u32_be(record, 12)?).ok()?;
+            let kept = offset <= data.len()
+                && (len <= data.len() - offset
+                    || matches!(&tag, b"hmtx" | b"HMTX" | b"vmtx" | b"VMTX"));
+            kept.then_some(offset)
+        });
+        tables.loca_room = starts
+            .filter_map(|start| start.checked_sub(loca.offset).filter(|&gap| gap > 0))
+            .min()
+            .unwrap_or(data.len() - loca.offset);
     }
     let flavor = match signature {
         TRUETYPE | APPLE_TRUE if tables.glyf.is_some() => Flavor::TrueType,
@@ -188,17 +211,19 @@ mod tests {
         let mut data = font(
             b"\0\x01\0\0",
             &[
-                (b"glyf", 76, 4),
-                (b"hmtx", 78, 8),
-                (b"name", 78, 8),
+                (b"glyf", 92, 0),
+                (b"glyf", 92, 4),
+                (b"hmtx", 102, 8),
+                (b"name", 102, 8),
                 (b"zzzz", 0, 1),
             ],
         );
-        data.extend([0; 4]);
+        data.extend([0; 16]);
         let (flavor, tables) = directory(&data, 0, &mut WorkBudget::new(100)).unwrap();
         assert_eq!(flavor, Flavor::TrueType);
+        // The empty first `glyf` does not count; `hmtx` keeps whole records.
         assert_eq!(tables.glyf.unwrap().len, 4);
-        assert_eq!(tables.hmtx.unwrap().len, 2);
+        assert_eq!(tables.hmtx.unwrap().len, 4);
         assert!(tables.name.is_none());
     }
 

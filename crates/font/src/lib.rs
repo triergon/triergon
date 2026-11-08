@@ -93,6 +93,7 @@ pub struct Style {
 /// Face-wide vertical metrics in font units, chosen as FreeType chooses them:
 /// typographic metrics when `OS/2` sets USE_TYPO_METRICS, else `hhea`, else when
 /// both `hhea` values are zero the typographic and then the Windows metrics.
+/// Values are 16-bit, as FreeType stores them, and the height is positive.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VerticalMetrics {
     pub ascender: i32,
@@ -183,10 +184,11 @@ impl Font {
         let hhea = metrics::hhea(required(tables.hhea)?.bytes(bytes))?;
         let maxp_glyphs = metrics::glyph_count(required(tables.maxp)?.bytes(bytes))?;
         let os2 = tables.os2.and_then(|t| metrics::os2(t.bytes(bytes)));
-        let names = match tables.name {
-            Some(t) => Names::new(bytes, t.offset, t.len)?,
-            None => Names::default(),
-        };
+        // FreeType treats a broken `name` table as a missing one.
+        let names = tables
+            .name
+            .and_then(|t| Names::new(bytes, t.offset, t.len).ok())
+            .unwrap_or_default();
         // Tables already on core's work budget share it.
         let mut work = WorkBudget::new(limits.work);
         let charmaps = match tables.cmap {
@@ -195,13 +197,14 @@ impl Font {
         };
         let (outlines, glyph_count) = match flavor {
             Flavor::TrueType => {
-                let glyf = Glyf::new(
+                let (glyf, count) = Glyf::new(
                     required(tables.glyf)?,
                     required(tables.loca)?,
                     head.long_offsets,
                     maxp_glyphs,
+                    tables.loca_room,
                 )?;
-                (Outlines::Glyf(glyf), maxp_glyphs)
+                (Outlines::Glyf(glyf), count)
             }
             Flavor::Cff => {
                 let (table, version) = match (tables.cff, tables.cff2) {
@@ -214,7 +217,7 @@ impl Font {
                 (Outlines::Cff(Box::new(cff)), count)
             }
         };
-        let hmtx = Hmtx::new(required(tables.hmtx)?, hhea.metrics, glyph_count)?;
+        let hmtx = Hmtx::new(required(tables.hmtx)?, hhea.metrics, glyph_count);
         let kern = match tables.kern {
             Some(t) => Kern::parse(bytes, t, budget, &mut work)?,
             None => Kern::new(budget),
@@ -304,11 +307,23 @@ impl Font {
             line_gap: g,
             ..
         } = self.horizontal_header();
-        let typo = |o: &Os2| VerticalMetrics {
-            ascender: i32::from(o.typo_ascender),
-            descender: i32::from(o.typo_descender),
-            height: i32::from(o.typo_ascender) - i32::from(o.typo_descender)
-                + i32::from(o.typo_line_gap),
+        let short = |v: i32| i32::from(v as i16);
+        let metrics = |ascender: i32, descender: i32, gap: i32| {
+            let (ascender, descender) = (short(ascender), short(descender));
+            // FT_Open_Face makes a negative height positive.
+            let height = short(ascender - descender + gap);
+            VerticalMetrics {
+                ascender,
+                descender,
+                height: if height < 0 { short(-height) } else { height },
+            }
+        };
+        let typo = |o: &Os2| {
+            metrics(
+                i32::from(o.typo_ascender),
+                i32::from(o.typo_descender),
+                i32::from(o.typo_line_gap),
+            )
         };
         match self.os2 {
             Some(os2) if os2.selection.use_typo_metrics() => typo(&os2),
@@ -317,20 +332,14 @@ impl Font {
                     typo(&os2)
                 } else {
                     // FreeType reads the unsigned Windows values as 16-bit signed.
-                    let ascender = i32::from(os2.win_ascent.cast_signed());
-                    let descender = -i32::from(os2.win_descent.cast_signed());
-                    VerticalMetrics {
-                        ascender,
-                        descender,
-                        height: ascender - descender,
-                    }
+                    metrics(
+                        i32::from(os2.win_ascent.cast_signed()),
+                        -i32::from(os2.win_descent.cast_signed()),
+                        0,
+                    )
                 }
             }
-            _ => VerticalMetrics {
-                ascender: i32::from(a),
-                descender: i32::from(d),
-                height: i32::from(a) - i32::from(d) + i32::from(g),
-            },
+            _ => metrics(i32::from(a), i32::from(d), i32::from(g)),
         }
     }
 
