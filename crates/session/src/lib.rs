@@ -6,10 +6,14 @@
 pub mod audio;
 pub mod mix;
 pub mod queue;
+#[cfg(feature = "codecs")]
+mod track;
 pub mod video;
 
 pub use audio::{AudioSession, PcmBlock};
 pub use queue::{FeedError, QueueLimits};
+#[cfg(feature = "codecs")]
+pub use track::TrackDecoder;
 pub use triergon_codec::{AudioCodec, AudioDecoder, DecodeFailure, VideoCodec, VideoDecoder};
 pub use video::{Published, VideoSession};
 

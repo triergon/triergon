@@ -13,6 +13,7 @@ dependencies = [
 name = "codec-worker"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-codec",
  "triergon-codec-aac",
  "triergon-codec-ac3",
@@ -56,6 +57,7 @@ version = "0.0.0"
 dependencies = [
  "triergon",
  "triergon-core",
+ "triergon-elementary",
  "triergon-framing",
  "triergon-isobmff",
  "triergon-matroska",
@@ -269,6 +271,7 @@ dependencies = [
 name = "triergon-session"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-codec",
  "triergon-codec-aac",
  "triergon-codec-ac3",

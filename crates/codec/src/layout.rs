@@ -147,11 +147,69 @@ impl ChannelLayout {
         mask
     }
 
+    /// FFmpeg's name for the layout, as `ffprobe` reports `channel_layout`: a standard
+    /// layout's name (`stereo`, `5.1(side)`, ...), else the speaker names joined by `+`,
+    /// or `N channels` when a speaker repeats.
+    pub fn name(&self) -> String {
+        let mask = self.mask();
+        if mask == 0 {
+            return format!("{} channels", self.channels());
+        }
+        if let Some((_, name)) = STANDARD.iter().find(|(m, _)| *m == mask) {
+            return (*name).to_owned();
+        }
+        let names: Vec<&str> = self.speakers().iter().map(|s| s.name()).collect();
+        names.join("+")
+    }
+
     /// Plane index of `speaker`, if present.
     pub fn position(&self, speaker: Speaker) -> Option<usize> {
         self.speakers().iter().position(|&s| s == speaker)
     }
 }
+
+/// FFmpeg's standard layouts by mask (`ffmpeg -layouts`), in its order: the first match
+/// names a mask.
+const STANDARD: &[(u64, &str)] = &[
+    (0x4, "mono"),
+    (0x3, "stereo"),
+    (0xb, "2.1"),
+    (0x7, "3.0"),
+    (0x103, "3.0(back)"),
+    (0x107, "4.0"),
+    (0x33, "quad"),
+    (0x603, "quad(side)"),
+    (0xf, "3.1"),
+    (0x37, "5.0"),
+    (0x607, "5.0(side)"),
+    (0x10f, "4.1"),
+    (0x3f, "5.1"),
+    (0x60f, "5.1(side)"),
+    (0x707, "6.0"),
+    (0x6c3, "6.0(front)"),
+    (0x500f, "3.1.2"),
+    (0x137, "hexagonal"),
+    (0x70f, "6.1"),
+    (0x13f, "6.1(back)"),
+    (0x6cb, "6.1(front)"),
+    (0x637, "7.0"),
+    (0x6c7, "7.0(front)"),
+    (0x63f, "7.1"),
+    (0xff, "7.1(wide)"),
+    (0x6cf, "7.1(wide-side)"),
+    (0x560f, "5.1.2"),
+    (0x503f, "5.1.2(back)"),
+    (0x737, "octagonal"),
+    (0x2d033, "cube"),
+    (0x2d60f, "5.1.4"),
+    (0x563f, "7.1.2"),
+    (0x2d63f, "7.1.4"),
+    (0x80001563f, "7.2.3"),
+    (0x2d6ff, "9.1.4"),
+    (0x300002d6ff, "9.1.6"),
+    (0x18003f737, "hexadecagonal"),
+    (0x1f80003ffff, "22.2"),
+];
 
 impl Default for ChannelLayout {
     fn default() -> Self {
@@ -196,7 +254,14 @@ pub fn vorbis_order(channels: usize) -> Option<&'static [Speaker]> {
         3 => &[FrontLeft, FrontCenter, FrontRight],
         4 => &[FrontLeft, FrontRight, BackLeft, BackRight],
         5 => &[FrontLeft, FrontCenter, FrontRight, BackLeft, BackRight],
-        6 => &[FrontLeft, FrontCenter, FrontRight, BackLeft, BackRight, LowFrequency],
+        6 => &[
+            FrontLeft,
+            FrontCenter,
+            FrontRight,
+            BackLeft,
+            BackRight,
+            LowFrequency,
+        ],
         7 => &[
             FrontLeft,
             FrontCenter,
@@ -234,7 +299,14 @@ pub fn flac_order(channels: usize) -> Option<&'static [Speaker]> {
         3 => &[FrontLeft, FrontRight, FrontCenter],
         4 => &[FrontLeft, FrontRight, BackLeft, BackRight],
         5 => &[FrontLeft, FrontRight, FrontCenter, BackLeft, BackRight],
-        6 => &[FrontLeft, FrontRight, FrontCenter, LowFrequency, BackLeft, BackRight],
+        6 => &[
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            LowFrequency,
+            BackLeft,
+            BackRight,
+        ],
         7 => &[
             FrontLeft,
             FrontRight,
@@ -311,13 +383,36 @@ mod tests {
         assert_eq!(&plane[..8], &[0, 2, 1, 6, 7, 4, 5, 3]);
         assert_eq!(
             native_order(vorbis_order(7).unwrap()).unwrap().0.speakers(),
-            &[FrontLeft, FrontRight, FrontCenter, LowFrequency, BackCenter, SideLeft, SideRight]
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                BackCenter,
+                SideLeft,
+                SideRight
+            ]
         );
         for channels in 1..=8 {
             let (_, plane) = native_order(flac_order(channels).unwrap()).unwrap();
-            assert!(plane[..channels].iter().enumerate().all(|(i, &p)| usize::from(p) == i));
+            assert!(
+                plane[..channels]
+                    .iter()
+                    .enumerate()
+                    .all(|(i, &p)| usize::from(p) == i)
+            );
         }
         assert!(vorbis_order(9).is_none());
+        let name = |coded: &[Speaker]| native_order(coded).unwrap().0.name();
+        assert_eq!(name(vorbis_order(2).unwrap()), "stereo");
+        assert_eq!(name(vorbis_order(6).unwrap()), "5.1");
+        assert_eq!(name(vorbis_order(7).unwrap()), "6.1");
+        assert_eq!(name(vorbis_order(8).unwrap()), "7.1");
+        assert_eq!(name(&[FrontLeft, LowFrequency]), "FL+LFE");
+        assert_eq!(
+            ChannelLayout::new([FrontCenter; 3]).unwrap().name(),
+            "3 channels"
+        );
         assert!(native_order(&[FrontLeft, FrontLeft]).is_none());
     }
 }

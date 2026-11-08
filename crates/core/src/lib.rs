@@ -9,6 +9,7 @@
 )]
 // Pending: `missing_docs`, `clippy::expect_used`.
 
+pub mod blocking;
 mod budget;
 mod bytes;
 pub mod container;

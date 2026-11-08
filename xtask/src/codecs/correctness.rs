@@ -44,7 +44,9 @@ fn audio_suffixes(lane: &str) -> Option<&'static [&'static str]> {
         "aac" => Some(&[".adts"]),
         "dts" => Some(&[".core.dts"]),
         "flac" => Some(&[".flac"]),
-        "mp3" => Some(&[".bit", ".mp3", ".mp2", ".mp1"]),
+        "mp3" => Some(&[".bit", ".mp3"]),
+        "mp2" => Some(&[".mp2"]),
+        "mp1" => Some(&[".mp1"]),
         "vorbis" => Some(&[".ogg"]),
         "opus" => Some(&[".opus", ".mka"]),
         _ => None,
@@ -60,10 +62,25 @@ fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
         "aac" => Some("aac"),
         "dts" => Some("dts"),
         "flac" => Some("flac"),
-        "mp3" => Some("mp3"),
+        "mp3" | "mp2" | "mp1" => Some("mp3"),
         "vorbis" => Some("ogg"),
         "opus" => None,
         _ => return Err(unknown(lane)),
+    })
+}
+
+/// The FFmpeg decoder a lane is compared with, where the stream alone does not decide
+/// it: the native decoders, and the float decoders for MPEG audio, whose Layer I and II
+/// defaults are fixed point with 16-bit output.
+fn reference_decoder(lane: &str) -> Option<&'static str> {
+    Some(match lane {
+        "flac" => "flac",
+        "mp3" => "mp3float",
+        "mp2" => "mp2float",
+        "mp1" => "mp1float",
+        "vorbis" => "vorbis",
+        "opus" => "opus",
+        _ => return None,
     })
 }
 
@@ -74,10 +91,8 @@ fn example(lane: &str) -> Option<&'static str> {
         "ac3" | "eac3" => "codec-ac3-decode",
         "aac" => "codec-aac-decode",
         "dts" => "codec-dca-decode",
-        "flac" => "codec-flac-decode",
-        "mp3" => "codec-mp3-decode",
-        "vorbis" => "codec-vorbis-decode",
-        "opus" => "codec-opus-decode",
+        // File-format lanes decode through a container reader, as a player does.
+        "flac" | "mp3" | "mp2" | "mp1" | "vorbis" | "opus" => "audio-decode",
         _ => return None,
     })
 }
@@ -91,7 +106,7 @@ fn operation(lane: &str) -> Option<&'static str> {
         "aac" => "audio-aac",
         "dts" => "audio-dts",
         "flac" => "audio-flac",
-        "mp3" => "audio-mp3",
+        "mp3" | "mp2" | "mp1" => "audio-mp3",
         "vorbis" => "audio-vorbis",
         "opus" => "audio-opus",
         _ => return None,
@@ -563,6 +578,9 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
         .to_vec();
     if let Some(format) = format {
         reference_argv.extend(["-f".to_owned(), format.to_owned()]);
+    }
+    if let Some(decoder) = reference_decoder(lane) {
+        reference_argv.extend(["-c:a".to_owned(), decoder.to_owned()]);
     }
     reference_argv.extend(
         [
