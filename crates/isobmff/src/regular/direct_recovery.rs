@@ -184,39 +184,31 @@ impl<T> Default for Latched<T> {
     }
 }
 impl<T> Latched<T> {
+    /// What a poll returns without advancing the cursor: the latched failure,
+    /// a cancellation, or the item still waiting to be taken.
+    pub(super) fn early(&self, cancel: &AtomicBool) -> Option<Result<CursorStatus>> {
+        if let Some(e) = self.failed {
+            return Some(Err(e));
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Some(Err(Error::Cancelled));
+        }
+        self.ready.is_some().then_some(Ok(CursorStatus::Ready))
+    }
+    /// Any error, cancellation included, latches and drops the ready item.
+    pub(super) fn settle(&mut self, result: Result<CursorStatus>) -> Result<CursorStatus> {
+        if let Err(e) = result {
+            self.failed = Some(e);
+            self.ready = None;
+        }
+        result
+    }
     /// The ready item unless a failure is latched.
     pub(super) fn take(&mut self, missing: &'static str) -> Result<T> {
         if let Some(e) = self.failed {
             return Err(e);
         }
         self.ready.take().ok_or(Error::Invalid(missing))
-    }
-}
-/// A cursor that advances only while no failure is latched, the caller has not
-/// cancelled and no item is ready.
-pub(super) trait LatchedCursor {
-    type Item;
-    fn latch(&mut self) -> &mut Latched<Self::Item>;
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus>;
-    /// Any error, cancellation included, latches and drops the ready item.
-    fn poll_latched(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        let latch = self.latch();
-        if let Some(e) = latch.failed {
-            return Err(e);
-        }
-        let result = if cancel.load(Ordering::Relaxed) {
-            Err(Error::Cancelled)
-        } else if latch.ready.is_some() {
-            Ok(CursorStatus::Ready)
-        } else {
-            self.advance(work, cancel)
-        };
-        if let Err(e) = result {
-            let latch = self.latch();
-            latch.failed = Some(e);
-            latch.ready = None;
-        }
-        result
     }
 }
 /// Native index fields of a demux packet; the error texts name the profile.
@@ -371,18 +363,13 @@ impl<'a> From<RecoveryPacketCursor<'a>> for DirectPacketCursor<'a> {
 }
 impl DirectPacketCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        self.poll_latched(work, cancel)
+        let result = match self.latch.early(cancel) {
+            Some(early) => early,
+            None => self.poll_inner(work, cancel),
+        };
+        self.latch.settle(result)
     }
-    pub fn take_occurrence(&mut self) -> Result<DirectOccurrence> {
-        self.latch.take("no ready v2 observation")
-    }
-}
-impl LatchedCursor for DirectPacketCursor<'_> {
-    type Item = DirectOccurrence;
-    fn latch(&mut self) -> &mut Latched<DirectOccurrence> {
-        &mut self.latch
-    }
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(c) = &mut self.legacy {
             return match c.poll(work, cancel)? {
                 CursorStatus::Ready => {
@@ -422,6 +409,9 @@ impl LatchedCursor for DirectPacketCursor<'_> {
             None => Ok(CursorStatus::End),
         }
     }
+    pub fn take_occurrence(&mut self) -> Result<DirectOccurrence> {
+        self.latch.take("no ready v2 observation")
+    }
 }
 #[derive(Clone, Debug)]
 pub struct DirectIndexEntry {
@@ -456,18 +446,13 @@ impl<'a> From<RecoveryIndexCursor<'a>> for DirectIndexCursor<'a> {
 }
 impl DirectIndexCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        self.poll_latched(work, cancel)
+        let result = match self.latch.early(cancel) {
+            Some(early) => early,
+            None => self.poll_inner(work, cancel),
+        };
+        self.latch.settle(result)
     }
-    pub fn take_entry(&mut self) -> Result<DirectIndexEntry> {
-        self.latch.take("no ready v2 index")
-    }
-}
-impl LatchedCursor for DirectIndexCursor<'_> {
-    type Item = DirectIndexEntry;
-    fn latch(&mut self) -> &mut Latched<DirectIndexEntry> {
-        &mut self.latch
-    }
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         match &mut self.engine {
             IndexEngine::Legacy(c) => match c.poll(work, cancel)? {
                 CursorStatus::Ready => {
@@ -522,5 +507,8 @@ impl LatchedCursor for DirectIndexCursor<'_> {
                 other => Ok(other),
             },
         }
+    }
+    pub fn take_entry(&mut self) -> Result<DirectIndexEntry> {
+        self.latch.take("no ready v2 index")
     }
 }

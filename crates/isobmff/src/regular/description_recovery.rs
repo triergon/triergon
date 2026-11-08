@@ -697,18 +697,16 @@ pub struct DescriptionPacketCursor<'a> {
 }
 impl DescriptionPacketCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        self.poll_latched(work, cancel)
+        let result = match self.latch.early(cancel) {
+            Some(early) => early,
+            None => self.poll_inner(work, cancel),
+        };
+        self.latch.settle(result)
     }
     pub fn take_event(&mut self) -> Result<DescriptionEvent> {
         self.latch.take("v3 no ready event")
     }
-}
-impl LatchedCursor for DescriptionPacketCursor<'_> {
-    type Item = DescriptionEvent;
-    fn latch(&mut self) -> &mut Latched<DescriptionEvent> {
-        &mut self.latch
-    }
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(legacy) = &mut self.legacy {
             return match legacy.poll(work, cancel)? {
                 CursorStatus::Ready => {
@@ -802,18 +800,16 @@ impl<'a> DescriptionIndexCursor<'a> {
         }
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        self.poll_latched(work, cancel)
+        let result = match self.latch.early(cancel) {
+            Some(early) => early,
+            None => self.poll_inner(work, cancel),
+        };
+        self.latch.settle(result)
     }
     pub fn take_event(&mut self) -> Result<DescriptionIndexEvent> {
         self.latch.take("v3 no ready index event")
     }
-}
-impl LatchedCursor for DescriptionIndexCursor<'_> {
-    type Item = DescriptionIndexEvent;
-    fn latch(&mut self) -> &mut Latched<DescriptionIndexEvent> {
-        &mut self.latch
-    }
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         match self.inner.poll(work, cancel)? {
             CursorStatus::Ready => {
                 if !work.try_charge(1) {
