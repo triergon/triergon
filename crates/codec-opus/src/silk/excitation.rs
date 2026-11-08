@@ -8,7 +8,7 @@ use super::tables::*;
 use crate::range::RangeDecoder;
 
 /// Samples per shell block.
-const BLOCK: usize = 16;
+pub(super) const BLOCK: usize = 16;
 const MAX_BLOCKS: usize = MAX_FRAME / BLOCK;
 /// The pulse count symbol that announces another LSB level.
 const ESCAPE: usize = 17;
@@ -19,7 +19,7 @@ pub(super) fn parse_pulses(
     rc: &mut RangeDecoder<'_>,
     frame_type: FrameType,
     len: usize,
-    pulses: &mut [i32; MAX_FRAME],
+    pulses: &mut [i32],
 ) {
     let blocks = len.div_ceil(BLOCK);
     let rate_level = rc.icdf(&RATE_LEVEL[frame_type.voicing()], 8);

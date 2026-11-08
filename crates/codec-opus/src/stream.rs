@@ -4,8 +4,8 @@
 use crate::DecodeError;
 use crate::celt::{self, CeltDecoder, FrameLayout, HYBRID_START_BAND};
 use crate::packet::{Mode, Packet, Toc};
-use crate::range::RangeDecoder;
-use crate::silk::{SilkConfig, SilkDecoder};
+use crate::range::{Position, RangeDecoder};
+use crate::silk::{MAX_PACKET_PULSES, SilkConfig, SilkDecoder, SilkLayer};
 use triergon_codec::{Budget, BudgetVec, StorageError};
 
 /// Samples per channel of the longest packet (120 ms) plus what the SILK resampler may
@@ -18,6 +18,8 @@ const REDUNDANT: usize = 240;
 const FADE: usize = 120;
 /// Most samples the SILK resampler holds back.
 const MAX_HELD: usize = 32;
+/// Most frames with a SILK layer in one packet: 120 ms of 10 ms frames.
+const MAX_SILK_FRAMES: usize = 12;
 
 /// Buffers of one packet, shared by all streams of a decoder.
 #[derive(Debug)]
@@ -42,12 +44,62 @@ impl Workspace {
     }
 }
 
+/// What [`StreamDecoder::check`] reads of a frame with a SILK layer, for
+/// [`StreamDecoder::decode`] to continue from: the SILK symbols, the redundant frame
+/// and where the CELT layer starts.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct StagedFrame {
+    silk: SilkLayer,
+    redundancy: Option<Redundancy>,
+    celt: Position,
+}
+
+/// The frames [`StreamDecoder::check`] reads of one packet in every stream of a
+/// decoder, until [`StreamDecoder::decode`] synthesizes them. Every stream has room for
+/// a packet of 120 ms.
+#[derive(Debug)]
+pub(crate) struct Staging {
+    frames: BudgetVec<StagedFrame>,
+    pulses: BudgetVec<i32>,
+}
+
+impl Staging {
+    pub(crate) fn new(streams: usize, budget: &Budget) -> Result<Staging, StorageError> {
+        let room = |per_stream: usize| {
+            streams
+                .checked_mul(per_stream)
+                .ok_or(StorageError::Overflow)
+        };
+        Ok(Staging {
+            frames: BudgetVec::try_filled(budget, StagedFrame::default(), room(MAX_SILK_FRAMES)?)?,
+            pulses: BudgetVec::try_filled(budget, 0, room(MAX_PACKET_PULSES)?)?,
+        })
+    }
+
+    /// The room of stream `stream`.
+    pub(crate) fn stream(&self, stream: usize) -> (&[StagedFrame], &[i32]) {
+        (
+            &self.frames[stream * MAX_SILK_FRAMES..][..MAX_SILK_FRAMES],
+            &self.pulses[stream * MAX_PACKET_PULSES..][..MAX_PACKET_PULSES],
+        )
+    }
+
+    /// As [`Staging::stream`], to fill.
+    pub(crate) fn stream_mut(&mut self, stream: usize) -> (&mut [StagedFrame], &mut [i32]) {
+        (
+            &mut self.frames[stream * MAX_SILK_FRAMES..][..MAX_SILK_FRAMES],
+            &mut self.pulses[stream * MAX_PACKET_PULSES..][..MAX_PACKET_PULSES],
+        )
+    }
+}
+
 /// A redundant CELT frame in a SILK or hybrid frame (RFC 6716 section 4.5.1).
 #[derive(Clone, Copy, Debug)]
-struct Redundancy<'a> {
+struct Redundancy {
     /// The frame starts a CELT-to-SILK transition (else it ends a SILK-to-CELT one).
     celt_to_silk: bool,
-    data: &'a [u8],
+    /// Where it starts in the frame, which it ends.
+    start: usize,
 }
 
 /// Decoder state of one elementary Opus stream of one or two channels.
@@ -112,17 +164,28 @@ impl StreamDecoder {
     }
 
     /// Refuse `packet` if this stream cannot decode it, and otherwise return the samples
-    /// per channel [`StreamDecoder::decode`] writes for it. Reads no state that decoding
-    /// changes, so a decoder can check every stream of a packet before it decodes one.
-    pub(crate) fn check(&self, packet: &Packet<'_>) -> Result<usize, DecodeError> {
+    /// per channel [`StreamDecoder::decode`] writes for it. Each frame's SILK layer and
+    /// redundancy signalling (whose size a hybrid frame codes and may not fit) are read
+    /// into `stage` for `decode`. Reads no state that decoding changes, so a decoder can
+    /// check every stream of a packet before it decodes one.
+    pub(crate) fn check(
+        &self,
+        packet: &Packet<'_>,
+        (staged, pulses): (&mut [StagedFrame], &mut [i32]),
+    ) -> Result<usize, DecodeError> {
         let toc = packet.toc;
-        // Only a hybrid frame's redundancy signalling, which follows its SILK layer, can
-        // point past the frame.
-        if let Some(silk) = SilkConfig::of(toc).filter(|_| toc.mode == Mode::Hybrid) {
-            for &data in packet.frames() {
+        if let Some(silk) = SilkConfig::of(toc) {
+            debug_assert!(packet.frames().len() * silk.pulses_len() <= pulses.len());
+            let frames = packet.frames().iter().zip(staged);
+            for ((&data, staged), pulses) in frames.zip(pulses.chunks_exact_mut(silk.pulses_len()))
+            {
                 let mut rc = RangeDecoder::new(data);
-                SilkDecoder::skip(&mut rc, silk);
-                parse_redundancy(&mut rc, toc.mode, data)?;
+                let layer = SilkLayer::parse(&mut rc, silk, pulses);
+                *staged = StagedFrame {
+                    silk: layer,
+                    redundancy: parse_redundancy(&mut rc, toc.mode, data)?,
+                    celt: rc.position(),
+                };
             }
         }
         Ok(self.output_len(packet))
@@ -147,12 +210,30 @@ impl StreamDecoder {
         self.held
     }
 
-    /// Decode every frame of a `packet` that [`StreamDecoder::check`] accepted into
-    /// `work.pcm[channel][..]` and return the samples per channel written.
-    pub(crate) fn decode(&mut self, packet: &Packet<'_>, work: &mut Workspace) -> usize {
+    /// Decode every frame of a `packet` that [`StreamDecoder::check`] accepted, with
+    /// what it staged, into `work.pcm[channel][..]` and return the samples per channel
+    /// written.
+    pub(crate) fn decode(
+        &mut self,
+        packet: &Packet<'_>,
+        (staged, pulses): (&[StagedFrame], &[i32]),
+        work: &mut Workspace,
+    ) -> usize {
+        let toc = packet.toc;
         let mut at = 0;
-        for &frame in packet.frames() {
-            at += self.decode_frame(packet.toc, frame, at, work);
+        match SilkConfig::of(toc) {
+            Some(silk) => {
+                let frames = packet.frames().iter().zip(staged);
+                for ((&data, staged), pulses) in frames.zip(pulses.chunks_exact(silk.pulses_len()))
+                {
+                    at += self.decode_frame(toc, data, Some((silk, staged, pulses)), at, work);
+                }
+            }
+            None => {
+                for &data in packet.frames() {
+                    at += self.decode_frame(toc, data, None, at, work);
+                }
+            }
         }
         at
     }
@@ -181,14 +262,24 @@ impl StreamDecoder {
     }
 
     /// Decode one frame into `work.pcm[..][at..]` (`opus_decode_frame`) and return the
-    /// samples per channel written.
-    fn decode_frame(&mut self, toc: Toc, data: &[u8], start: usize, work: &mut Workspace) -> usize {
+    /// samples per channel written. A frame with a SILK layer comes with what `check`
+    /// staged of it and its pulses.
+    fn decode_frame(
+        &mut self,
+        toc: Toc,
+        data: &[u8],
+        silk: Option<(SilkConfig, &StagedFrame, &[i32])>,
+        start: usize,
+        work: &mut Workspace,
+    ) -> usize {
         let mode = toc.mode;
-        let mut rc = RangeDecoder::new(data);
+        let (mut rc, redundancy) = match silk {
+            Some((_, staged, _)) => (RangeDecoder::resume(data, staged.celt), staged.redundancy),
+            None => (RangeDecoder::new(data), None),
+        };
 
         // The SILK resampler releases what it holds back when SILK stops or changes rate.
-        let silk = SilkConfig::of(toc);
-        let silk_rate = silk.map(SilkConfig::rate);
+        let silk_rate = silk.map(|(config, ..)| config.rate());
         let mut at = start;
         if self.silk_rate.is_some() && self.silk_rate != silk_rate {
             at += self.flush_silk(work, at);
@@ -196,20 +287,17 @@ impl StreamDecoder {
         self.silk_rate = silk_rate;
 
         let len = match silk {
-            Some(silk) => self.decode_silk(&mut rc, silk, work),
+            Some((config, staged, pulses)) => self.decode_silk(config, &staged.silk, pulses, work),
             None => toc.duration.samples(),
         };
-        let redundancy = parse_redundancy(&mut rc, mode, data);
-        debug_assert!(redundancy.is_ok(), "refused by `check`");
-        let redundancy = redundancy.unwrap_or(None);
         let mut redundant_range = 0;
         if let Some(Redundancy {
             celt_to_silk: true,
-            data,
+            start,
         }) = redundancy
         {
             // The CELT-to-SILK frame continues the CELT signal before the SILK one starts.
-            redundant_range = self.decode_redundant(data, toc, work);
+            redundant_range = self.decode_redundant(&data[start..], toc, work);
         }
         self.decode_celt(&mut rc, toc, at, work);
         if mode != Mode::Celt {
@@ -222,11 +310,11 @@ impl StreamDecoder {
         match redundancy {
             Some(Redundancy {
                 celt_to_silk: false,
-                data,
+                start,
             }) => {
                 // The SILK-to-CELT frame starts the CELT signal the next frame continues.
                 self.celt.reset();
-                redundant_range = self.decode_redundant(data, toc, work);
+                redundant_range = self.decode_redundant(&data[start..], toc, work);
                 self.fade_out_into_redundant(work, at + len);
             }
             Some(Redundancy {
@@ -250,8 +338,9 @@ impl StreamDecoder {
     /// short.
     fn decode_silk(
         &mut self,
-        rc: &mut RangeDecoder<'_>,
         silk: SilkConfig,
+        layer: &SilkLayer,
+        pulses: &[i32],
         work: &mut Workspace,
     ) -> usize {
         if self.previous == Some(Mode::Celt) {
@@ -260,7 +349,9 @@ impl StreamDecoder {
         let n = silk.duration_48k();
         let [left, right] = &mut work.silk;
         let mut out = [&mut left[..n], &mut right[..n]];
-        let len = self.silk.decode(rc, silk, &mut out[..self.channels]);
+        let len = self
+            .silk
+            .decode(silk, layer, pulses, &mut out[..self.channels]);
         self.held += n - len;
         len
     }
@@ -349,11 +440,11 @@ impl StreamDecoder {
 /// frame (RFC 6716 section 4.5.1), whose bytes end the frame; `rc` then excludes them.
 /// Only a hybrid frame codes the size, which may not fit: a SILK-only frame's redundant
 /// frame takes the bytes after the SILK data.
-fn parse_redundancy<'a>(
+fn parse_redundancy(
     rc: &mut RangeDecoder<'_>,
     mode: Mode,
-    data: &'a [u8],
-) -> Result<Option<Redundancy<'a>>, DecodeError> {
+    data: &[u8],
+) -> Result<Option<Redundancy>, DecodeError> {
     let hybrid_bits = if mode == Mode::Hybrid { 20 } else { 0 };
     if mode == Mode::Celt || rc.tell() + 17 + hybrid_bits > 8 * data.len() as i32 {
         return Ok(None);
@@ -375,7 +466,7 @@ fn parse_redundancy<'a>(
     rc.shrink(bytes);
     Ok(Some(Redundancy {
         celt_to_silk,
-        data: &data[kept..],
+        start: kept,
     }))
 }
 

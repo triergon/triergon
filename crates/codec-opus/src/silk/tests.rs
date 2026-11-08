@@ -155,7 +155,9 @@ fn decode_stream(packets: &[Vec<u8>]) -> (usize, Vec<f32>, Vec<f32>, usize) {
             let mut rc = RangeDecoder::new(frame.data);
             let duration = silk.duration_48k();
             let mut out: Vec<&mut [f32]> = planes.iter_mut().map(|p| &mut p[..duration]).collect();
-            let produced = decoder.decode(&mut rc, silk, &mut out);
+            let mut pulses = vec![0; silk.pulses_len()];
+            let layer = SilkLayer::parse(&mut rc, silk, &mut pulses);
+            let produced = decoder.decode(silk, &layer, &pulses, &mut out);
             push(&planes, produced, &mut output);
             // Internal-rate output, always as two channels.
             for i in 0..decoder.internal_len {
@@ -218,39 +220,12 @@ fn malformed_frames_never_panic() {
         let duration = silk.duration_48k();
         let mut rc = RangeDecoder::new(&data);
         let mut out: [&mut [f32]; 2] = [&mut left[..duration], &mut right[..duration]];
-        decoder.decode(&mut rc, silk, &mut out[..1 + round % 2]);
+        let mut pulses = [0; MAX_PACKET_PULSES];
+        let layer = SilkLayer::parse(&mut rc, silk, &mut pulses);
+        decoder.decode(silk, &layer, &pulses, &mut out[..1 + round % 2]);
         // The interpolation filters have a worst-case gain below 1.91 for clamped input.
         let worst = left[..duration].iter().fold(0.0f32, |m, s| m.max(s.abs()));
         assert!(worst.is_finite() && worst <= 1.91, "{worst}");
-    }
-}
-
-#[test]
-fn skipping_reads_what_decoding_reads() {
-    let mut decoder = SilkDecoder::new();
-    let mut state = 0x0bad_cafeu32;
-    let mut left = [0.0f32; 2880];
-    let mut right = [0.0f32; 2880];
-    for round in 0..3000 {
-        let len = (round * 13) % 200;
-        let data: Vec<u8> = (0..len)
-            .map(|_| {
-                state = state.wrapping_mul(1664525).wrapping_add(1013904223);
-                (state >> 24) as u8
-            })
-            .collect();
-        let silk = config_of_round(round);
-        let duration = silk.duration_48k();
-        let mut decoded = RangeDecoder::new(&data);
-        let mut skipped = decoded.clone();
-        let mut out: [&mut [f32]; 2] = [&mut left[..duration], &mut right[..duration]];
-        decoder.decode(&mut decoded, silk, &mut out[..1 + (round / 12) % 2]);
-        SilkDecoder::skip(&mut skipped, silk);
-        assert_eq!(
-            (skipped.tell_frac(), skipped.range()),
-            (decoded.tell_frac(), decoded.range()),
-            "round {round}"
-        );
     }
 }
 

@@ -85,14 +85,17 @@ the pre-skip or other container trims.
 - Malformed packets return `DecodeFailure` (an `Invalid` error inside); streams of one
   multistream packet with different durations are `Invalid`. A packet is checked whole
   before any stream decodes: the framing of every stream's packet, the redundant frame
-  size of each hybrid frame (which follows its SILK layer, read twice for this), the
-  durations, then the output frame's charge. A refused packet leaves every stream as it
-  was, so the next packet decodes as if it had not been sent.
+  size of each hybrid frame, the durations, then the output frame's charge. The redundant
+  frame size follows the SILK layer, so checking reads the SILK symbols and redundancy
+  fields of every frame into a staging area, from which decoding synthesizes SILK and
+  continues with CELT; nothing is read twice. A refused packet leaves every stream as
+  it was, so the next packet decodes as if it had not been sent.
 - Memory charged to the decoder's budget: at construction the state of each stream
-  (46 KiB: CELT history and energies, SILK state) and the buffers and inverse MDCT
-  tables the streams share (140 KiB), and the output frame before a packet that needs
-  it larger. `Limits::live_storage_bytes` is 64 MiB by default, which holds the largest
-  header with a wide margin: 255 streams (11.4 MiB) and 93 channels of 120 ms (2 MiB).
+  (45 KiB: CELT history and energies, SILK state) with room to stage one packet of it
+  (20 KiB), the buffers and inverse MDCT tables the streams share (140 KiB), and the
+  output frame before a packet that needs it larger. `Limits::live_storage_bytes` is 64
+  MiB by default, which holds the largest header with a wide margin: 255 streams (16
+  MiB) and 93 channels of 120 ms (2 MiB).
   A refused charge is `DecodeError::Budget`; in `decode` it refuses only that packet.
   Nothing is allocated per packet.
 
