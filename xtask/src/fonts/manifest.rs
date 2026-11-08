@@ -7,7 +7,7 @@ use std::path::Path;
 
 use super::{CORPUS, corpus};
 use crate::json::Value;
-use crate::lanes::{self, Feature, Lane};
+use crate::lanes::{self, Feature, Gate, Lane};
 
 type R<T> = Result<T, String>;
 
@@ -55,15 +55,15 @@ enum Load {
 pub const FEATURES: [Feature; 3] = [
     Feature {
         id: "font-outlines",
-        required: true,
+        gate: Gate::Required,
     },
     Feature {
         id: "font-hinting-none",
-        required: true,
+        gate: Gate::Required,
     },
     Feature {
         id: "font-hinting-modes",
-        required: false,
+        gate: Gate::OnDemand,
     },
 ];
 

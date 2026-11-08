@@ -16,11 +16,23 @@ use crate::json::Value;
 
 type R<T> = Result<T, String>;
 
-/// One feature of a lane, and whether `cargo xtask check` requires it.
+/// When a feature runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Gate {
+    /// `cargo xtask check` requires it.
+    Required,
+    /// Run on demand by `COMMAND compare --all`.
+    OnDemand,
+    /// Records where another reference departs from the gated one; run by
+    /// `COMMAND compare --diagnostic`.
+    Diagnostic,
+}
+
+/// One feature of a lane, and when it runs.
 #[derive(Clone, Copy, Debug)]
 pub struct Feature {
     pub id: &'static str,
-    pub required: bool,
+    pub gate: Gate,
 }
 
 /// A lane of generated-manifest features.
@@ -191,8 +203,11 @@ impl Lane {
                 .join(feature.id)
                 .join("contract.json");
             let contract = crate::checks::read_json(&contract)?;
+            // A diagnostic feature's pins are the gated reference's folds
+            // (`pin_operation`), so its report shows where its own reference departs.
             let prefix = contract
-                .get("worker_operation")
+                .get("pin_operation")
+                .or_else(|| contract.get("worker_operation"))
                 .and_then(Value::as_str)
                 .ok_or_else(|| format!("{}: no worker_operation", feature.id))?;
             let rows = (self.rows)(root, feature.id)?;
@@ -247,19 +262,21 @@ impl Lane {
     }
 
     /// The `cargo xtask report` arguments `COMMAND compare ARGS` stands for, one
-    /// list per feature: the required features, or with `--all` every feature;
-    /// `None` for the other commands.
+    /// list per feature: the required features, with `--all` also those run on
+    /// demand, with `--diagnostic` the diagnostic ones only; `None` for the other
+    /// commands.
     pub fn reports(&self, args: &[String]) -> Option<Vec<Vec<String>>> {
         let (command, rest) = args.split_first()?;
         if command != "compare" {
             return None;
         }
-        let (mut output, mut all) = (PathBuf::from(self.report_directory), false);
+        let (mut output, mut gates) = (PathBuf::from(self.report_directory), vec![Gate::Required]);
         let mut options = Vec::new();
         let mut rest = rest.iter();
         while let Some(arg) = rest.next() {
             match (arg.as_str(), rest.clone().next()) {
-                ("--all", _) => all = true,
+                ("--all", _) => gates.push(Gate::OnDemand),
+                ("--diagnostic", _) => gates = vec![Gate::Diagnostic],
                 ("--output", Some(value)) => {
                     output = PathBuf::from(value);
                     rest.next();
@@ -270,7 +287,7 @@ impl Lane {
         Some(
             self.features
                 .iter()
-                .filter(|feature| all || feature.required)
+                .filter(|feature| gates.contains(&feature.gate))
                 .map(|feature| {
                     let feature = feature.id;
                     let path = |file: &str| format!("harness/features/{feature}/{file}.json");

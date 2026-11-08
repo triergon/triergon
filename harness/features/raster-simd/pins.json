@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "reference": "libass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask raster manifest --record`; never edited by hand.",
+  "pins": {
+    "arimo-regular-ttf-853": {
+      "packets": 48,
+      "bytes": 99979,
+      "digest": 11145805803576910709
+    },
+    "arimo-regular-ttf-16384": {
+      "packets": 48,
+      "bytes": 2936564,
+      "digest": 8934978934420953190
+    },
+    "notosans-regular-otf-853": {
+      "packets": 48,
+      "bytes": 78739,
+      "digest": 9496719919700244237
+    },
+    "notosans-regular-otf-16384": {
+      "packets": 48,
+      "bytes": 2075566,
+      "digest": 949944859280324800
+    },
+    "notosansjp-regular-otf-853": {
+      "packets": 48,
+      "bytes": 135159,
+      "digest": 4145195869193794999
+    },
+    "notosansjp-regular-otf-16384": {
+      "packets": 48,
+      "bytes": 5902993,
+      "digest": 13288589853532917895
+    },
+    "notosansjp-vf-otf-853": {
+      "packets": 48,
+      "bytes": 127563,
+      "digest": 10662216252700132650
+    },
+    "notosansjp-vf-otf-16384": {
+      "packets": 48,
+      "bytes": 2217484,
+      "digest": 1030262611721387854
+    },
+    "notosanscjk-regular-ttc-853": {
+      "packets": 48,
+      "bytes": 168983,
+      "digest": 11425812756404556725
+    },
+    "notosanscjk-regular-ttc-16384": {
+      "packets": 48,
+      "bytes": 2863650,
+      "digest": 11051684907176186218
+    },
+    "authored-cff-features-otf-853": {
+      "packets": 48,
+      "bytes": 44355,
+      "digest": 15344075906987279928
+    },
+    "authored-cff-features-otf-16384": {
+      "packets": 48,
+      "bytes": 551696,
+      "digest": 217621141799330445
+    },
+    "outlines-required-0": {
+      "packets": 512,
+      "bytes": 2823276,
+      "digest": 17056172538034744040
+    },
+    "outlines-required-1": {
+      "packets": 514,
+      "bytes": 3022133,
+      "digest": 15742909526604010798
+    },
+    "bitmaps-required-0": {
+      "packets": 280,
+      "bytes": 1830987,
+      "digest": 5748885062910919321
+    },
+    "bitmaps-required-1": {
+      "packets": 280,
+      "bytes": 1671281,
+      "digest": 9412013820321088379
+    }
+  }
+}

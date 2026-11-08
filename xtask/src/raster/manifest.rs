@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use crate::json::Value;
-use crate::lanes::{Feature, Lane};
+use crate::lanes::{Feature, Gate, Lane};
 
 type R<T> = Result<T, String>;
 
@@ -59,6 +59,8 @@ enum Load {
     Bitmaps { files: usize, sets: usize },
     /// Every corpus file at every height, and many files of both line kinds.
     Sweep,
+    /// The required features' cases, against the host's SIMD engine.
+    Simd,
 }
 
 /// How far generated transforms reach. The required features stay moderate:
@@ -87,22 +89,26 @@ const REQUIRED_OUTLINES: Load = Load::Outlines {
 };
 const REQUIRED_BITMAPS: Load = Load::Bitmaps { files: 2, sets: 40 };
 
-pub const FEATURES: [Feature; 4] = [
+pub const FEATURES: [Feature; 5] = [
     Feature {
         id: "raster-glyphs",
-        required: true,
+        gate: Gate::Required,
     },
     Feature {
         id: "raster-outlines",
-        required: true,
+        gate: Gate::Required,
     },
     Feature {
         id: "raster-bitmaps",
-        required: true,
+        gate: Gate::Required,
     },
     Feature {
         id: "raster-sweep",
-        required: false,
+        gate: Gate::OnDemand,
+    },
+    Feature {
+        id: "raster-simd",
+        gate: Gate::Diagnostic,
     },
 ];
 
@@ -131,6 +137,7 @@ fn load(id: &str) -> R<Load> {
         "raster-outlines" => Ok(REQUIRED_OUTLINES),
         "raster-bitmaps" => Ok(REQUIRED_BITMAPS),
         "raster-sweep" => Ok(Load::Sweep),
+        "raster-simd" => Ok(Load::Simd),
         _ => Err(format!("{id}: not a rasterising feature")),
     }
 }
@@ -145,6 +152,9 @@ fn note(id: &str) -> &'static str {
         }
         "raster-bitmaps" => {
             "Two files of 40 sets each of seeded random bitmaps blurred, added, multiplied, subtracted, shifted and clipped."
+        }
+        "raster-simd" => {
+            "The cases of raster-glyphs, raster-outlines and raster-bitmaps, with the reference on the host's SIMD engine and the pins of libass's C engine."
         }
         _ => {
             "Every corpus file at 13.33, 37.5 and 256 pixels with 30 glyphs each, 90 files of 50 random outlines and 60 files of 50 random bitmap sets, with transforms as far as libass draws them."
@@ -703,6 +713,12 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
         Load::Glyphs { all, glyphs } => glyph_rows(root, all, glyphs)?,
         load @ Load::Outlines { .. } => line_rows(load, "-required", "outlines", Reach::Moderate),
         load @ Load::Bitmaps { .. } => line_rows(load, "-required", "bitmaps", Reach::Moderate),
+        Load::Simd => {
+            let mut cases = rows(root, "raster-glyphs")?;
+            cases.extend(rows(root, "raster-outlines")?);
+            cases.extend(rows(root, "raster-bitmaps")?);
+            cases
+        }
         Load::Sweep => {
             let mut rows = glyph_rows(root, true, SWEEP_GLYPHS)?;
             rows.extend(line_rows(SWEEP_OUTLINES, "", "outlines", Reach::Full));
