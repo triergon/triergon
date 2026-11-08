@@ -161,13 +161,22 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
     fs::create_dir_all(&cache).map_err(|e| format!("{}: {e}", cache.display()))?;
     let archive_path = cache.join(format!("freetype-{VERSION}.tar.xz"));
     if !archive_path.exists() {
-        let url = format!(
-            "https://download.savannah.gnu.org/releases/freetype/freetype-{VERSION}.tar.xz"
-        );
-        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
-        if data.len() > ARCHIVE_LIMIT {
-            return Err("FreeType archive size limit".into());
-        }
+        let name = format!("freetype-{VERSION}.tar.xz");
+        let sources = [
+            format!("https://download.savannah.gnu.org/releases/freetype/{name}"),
+            format!("https://download-mirror.savannah.gnu.org/releases/freetype/{name}"),
+            format!(
+                "https://downloads.sourceforge.net/project/freetype/freetype2/{VERSION}/{name}"
+            ),
+        ];
+        let sources = sources.each_ref().map(String::as_str);
+        let data = fetch::pinned(
+            net,
+            &sources,
+            ARCHIVE_SHA256,
+            ARCHIVE_LIMIT,
+            "triergon-reference-builder",
+        )?;
         fetch::publish(&archive_path, &data)?;
     }
     let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
@@ -321,10 +330,8 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
         }
         let archive = downloads.join(name);
         if !archive.exists() {
-            let data = net.https(url, "triergon-font-corpus", FONT_LIMIT)?;
-            if data.len() > FONT_LIMIT {
-                return Err(format!("{name} exceeds the download bound"));
-            }
+            let data = fetch::pinned(net, &[url], expected, FONT_LIMIT, "triergon-font-corpus")
+                .map_err(|e| format!("{name}: {e}"))?;
             fetch::publish(&archive, &data)?;
         }
         let data = fetch::read_bounded(&archive, FONT_LIMIT)?;

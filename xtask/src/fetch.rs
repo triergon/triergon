@@ -116,6 +116,93 @@ pub fn publish(path: &Path, data: &[u8]) -> Result<(), String> {
     })
 }
 
+/// The directory named by `TRIERGON_DOWNLOAD_CACHE`, if any: pinned downloads are
+/// kept there under their SHA-256, so a later run needs no network for them.
+fn download_cache() -> Option<PathBuf> {
+    std::env::var_os("TRIERGON_DOWNLOAD_CACHE")
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from)
+}
+
+/// The bytes whose SHA-256 is `sha256`, at most `limit` of them: from the download
+/// cache if it holds them, otherwise from the first of `sources` that serves them.
+/// Every candidate is verified, so a stale cache entry or a mirror serving other
+/// bytes is passed over, never used.
+pub fn pinned(
+    net: &dyn Transport,
+    sources: &[&str],
+    sha256: &str,
+    limit: usize,
+    agent: &str,
+) -> Result<Vec<u8>, String> {
+    pinned_in(
+        net,
+        download_cache().as_deref(),
+        sources,
+        sha256,
+        limit,
+        agent,
+    )
+}
+
+fn pinned_in(
+    net: &dyn Transport,
+    cache: Option<&Path>,
+    sources: &[&str],
+    sha256: &str,
+    limit: usize,
+    agent: &str,
+) -> Result<Vec<u8>, String> {
+    let matches = |data: &[u8]| data.len() <= limit && sha256::hex(data) == sha256;
+    if let Some(data) = cache.and_then(|dir| cached(dir, sha256, limit, matches)) {
+        return Ok(data);
+    }
+    let mut failures = Vec::new();
+    for url in sources {
+        match net.https(url, agent, limit) {
+            Ok(data) if matches(&data) => {
+                if let Some(dir) = cache {
+                    let stored = fs::create_dir_all(dir)
+                        .map_err(|e| format!("{}: {e}", dir.display()))
+                        .and_then(|()| publish(&dir.join(sha256), &data));
+                    if let Err(error) = stored {
+                        eprintln!("download cache not updated: {error}");
+                    }
+                }
+                return Ok(data);
+            }
+            Ok(data) if data.len() > limit => failures.push(format!("{url}: over {limit} bytes")),
+            Ok(_) => failures.push(format!("{url}: not the pinned SHA-256 {sha256}")),
+            Err(error) => failures.push(error),
+        }
+    }
+    Err(format!(
+        "no source served the pinned download {sha256}: {}",
+        failures.join("; ")
+    ))
+}
+
+/// A verified cache entry, marked as used by this run so a pruned cache keeps it.
+/// An entry that fails verification is removed and the caller downloads afresh.
+fn cached(
+    dir: &Path,
+    sha256: &str,
+    limit: usize,
+    matches: impl Fn(&[u8]) -> bool,
+) -> Option<Vec<u8>> {
+    let path = dir.join(sha256);
+    let data = read_bounded(&path, limit).ok()?;
+    if !matches(&data) {
+        let _ = fs::remove_file(&path);
+        return None;
+    }
+    let _ = fs::File::options()
+        .append(true)
+        .open(&path)
+        .and_then(|file| file.set_modified(std::time::SystemTime::now()));
+    Some(data)
+}
+
 // ---------------------------------------------------------------------------
 // Specification texts.
 
@@ -575,5 +662,95 @@ mod tests {
     fn formats_dates() {
         assert_eq!(today().len(), 10);
         assert!(today().as_str() >= "2026-01-01");
+    }
+
+    /// A transport that answers each URL from a table and records what was asked.
+    struct Sources {
+        answers: Vec<(&'static str, Result<&'static [u8], &'static str>)>,
+        calls: RefCell<Vec<String>>,
+    }
+
+    impl Sources {
+        fn new(answers: Vec<(&'static str, Result<&'static [u8], &'static str>)>) -> Self {
+            Self {
+                answers,
+                calls: RefCell::default(),
+            }
+        }
+    }
+
+    impl Transport for Sources {
+        fn https(&self, url: &str, _: &str, _: usize) -> Result<Vec<u8>, String> {
+            self.calls.borrow_mut().push(url.to_owned());
+            let (_, answer) = self.answers.iter().find(|(u, _)| *u == url).unwrap();
+            answer.map(<[u8]>::to_vec).map_err(str::to_owned)
+        }
+
+        fn rsync(&self, _: &str, _: &Path, _: usize) -> Result<(), String> {
+            unreachable!("pinned downloads are HTTPS")
+        }
+    }
+
+    const PINNED: &[u8] = b"pinned archive";
+
+    #[test]
+    fn pinned_falls_back_past_failing_and_wrong_sources_and_fills_the_cache() {
+        let cache = crate::walk::scratch("download-cache");
+        let pin = sha256::hex(PINNED);
+        let net = Sources::new(vec![
+            ("https://down", Err("curl https://down: exit status: 22")),
+            ("https://other-bytes", Ok(b"another archive")),
+            ("https://mirror", Ok(PINNED)),
+        ]);
+        let sources = ["https://down", "https://other-bytes", "https://mirror"];
+        let data = pinned_in(&net, Some(&cache), &sources, &pin, 64, "test").unwrap();
+        assert_eq!(data, PINNED);
+        assert_eq!(fs::read(cache.join(&pin)).unwrap(), PINNED);
+        assert_eq!(net.calls.borrow().len(), 3);
+        fs::remove_dir_all(cache).unwrap();
+    }
+
+    #[test]
+    fn pinned_uses_a_verified_cache_entry_without_network() {
+        let cache = crate::walk::scratch("download-cache");
+        let pin = sha256::hex(PINNED);
+        fs::write(cache.join(&pin), PINNED).unwrap();
+        let net = Sources::new(vec![]);
+        let data = pinned_in(&net, Some(&cache), &["https://x"], &pin, 64, "test").unwrap();
+        assert_eq!(data, PINNED);
+        assert!(net.calls.borrow().is_empty());
+        fs::remove_dir_all(cache).unwrap();
+    }
+
+    #[test]
+    fn pinned_replaces_a_damaged_cache_entry() {
+        let cache = crate::walk::scratch("download-cache");
+        let pin = sha256::hex(PINNED);
+        fs::write(cache.join(&pin), b"damaged").unwrap();
+        let net = Sources::new(vec![("https://x", Ok(PINNED))]);
+        let data = pinned_in(&net, Some(&cache), &["https://x"], &pin, 64, "test").unwrap();
+        assert_eq!(data, PINNED);
+        assert_eq!(fs::read(cache.join(&pin)).unwrap(), PINNED);
+        fs::remove_dir_all(cache).unwrap();
+    }
+
+    #[test]
+    fn pinned_names_every_source_when_none_serves_the_pin() {
+        let pin = sha256::hex(PINNED);
+        let net = Sources::new(vec![
+            ("https://down", Err("curl https://down: exit status: 22")),
+            ("https://large", Ok(b"an archive larger than the bound")),
+        ]);
+        let error = pinned_in(
+            &net,
+            None,
+            &["https://down", "https://large"],
+            &pin,
+            16,
+            "test",
+        )
+        .unwrap_err();
+        assert!(error.contains("https://down: exit status: 22"), "{error}");
+        assert!(error.contains("https://large: over 16 bytes"), "{error}");
     }
 }
