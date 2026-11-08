@@ -29,6 +29,9 @@ pub mod pes {
     //! [`PesFaultPolicy`] separately opts into isolated timing-header faults and
     //! fully checked rejected clock fields. [`PesFaultPacket`] retains the source
     //! refusal; [`DiagnosticTimeView`] reports optional encoded compatibility time.
+    //! A source-signalled PCR/DI transition needs [`TransportFaultRecovery::confirm_source_timeline`].
+    //! Opt-in terminal transport handling needs real core/framer EOF and source
+    //! Finished; [`TransportTailConfirmation`] retains the excluded source fault.
     //!
     //! [`PesCutter`] cuts one PID of any stream type into the packets the demuxer
     //! hands a decoder ([`CutPes`]): each starts at a unit start and ends at its
@@ -56,7 +59,7 @@ pub mod pes {
     pub use crate::demux_transport::{
         PesFaultCarrier, PesFaultHeader, PesFaultKind, PesFaultPacket, PesFaultPolicy,
         TransportFaultHeader, TransportFaultKind, TransportFaultPacket, TransportFaultRecovery,
-        TransportObservation,
+        TransportObservation, TransportTailConfirmation,
     };
     /// Control-only completion from complete physical carrier coverage and
     /// actual source EOF. The confirmation never creates a validated PES scope
