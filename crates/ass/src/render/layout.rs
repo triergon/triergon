@@ -9,10 +9,14 @@ use triergon_raster::{Vector, pixels_26_6};
 
 use super::fonts::Library;
 use super::geometry::Scales;
-use super::math::d6_to_double;
 use super::outlines::{GlyphKey, Outlines};
 use super::text::{Break, Glyphs};
 use crate::{HAlign, Justify, KaraokeGlyph, Limits, Syllables, WrapStyle, charge};
+
+/// `d6_to_double`: 26.6 to pixels.
+pub(super) fn d6_to_double(x: i32) -> f64 {
+    f64::from(x) / 64.0
+}
 
 /// One line's ascent and descent in pixels.
 #[derive(Clone, Copy, Debug, Default)]

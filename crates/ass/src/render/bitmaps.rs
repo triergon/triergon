@@ -11,7 +11,7 @@ use triergon_raster::{
     Raster, Run, Shadow, Shape, ShapedKey, Vector, pixels_26_6,
 };
 
-use super::math::d6_to_double;
+use super::layout::d6_to_double;
 use super::outlines::OutlineValue;
 use super::text::{GlyphInfo, Glyphs};
 use crate::{Karaoke, Rgba};

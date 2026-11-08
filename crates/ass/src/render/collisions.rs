@@ -13,7 +13,7 @@ use super::images::Image;
 /// renderer counts as none.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Placed {
-    renderer: u64,
+    renderer: u32,
     top: i32,
     height: i32,
     left: i32,
@@ -22,7 +22,7 @@ pub(crate) struct Placed {
 
 impl Placed {
     /// The record for `renderer`, reset when another renderer made it.
-    fn for_renderer(&mut self, renderer: u64) -> &mut Self {
+    fn for_renderer(&mut self, renderer: u32) -> &mut Self {
         if self.renderer != renderer {
             *self = Self {
                 renderer,
@@ -161,7 +161,7 @@ pub(super) fn fix(
     placed: &mut [Placed],
     images: &mut [Image],
     used: &mut BudgetVec<Rect>,
-    renderer: u64,
+    renderer: u32,
     frame_height: i32,
 ) -> Result<()> {
     used.clear();

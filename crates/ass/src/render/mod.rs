@@ -8,12 +8,11 @@ mod fonts;
 mod geometry;
 mod images;
 mod layout;
-mod math;
 mod outlines;
 mod shaping;
 mod text;
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::{Clip as ClipRect, ClipFrame, FrameScale, Matrix, Rect, Vector, pixels_26_6};
@@ -47,7 +46,7 @@ pub struct Frame<'r> {
 }
 
 /// Identities of renderers, which collision records are tied to.
-static RENDERERS: AtomicU64 = AtomicU64::new(1);
+static RENDERERS: AtomicU32 = AtomicU32::new(1);
 
 /// Renders frames of scripts as libass's renderer does.
 ///
@@ -71,7 +70,7 @@ static RENDERERS: AtomicU64 = AtomicU64::new(1);
 pub struct Renderer {
     budget: Budget,
     frame: Canvas,
-    id: u64,
+    id: u32,
     library: Library,
     outlines: Outlines,
     shaper: Shaper,
