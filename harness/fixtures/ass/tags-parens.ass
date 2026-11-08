@@ -1,0 +1,49 @@
+;@time 0 750 1500
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 480
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\pos(10,20}unterminated
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\pos(10,20,30)\pos(1)\pos(5 , 6 )}three then two
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\pos( 1.5e1 ,-2 )\pos(3,4)}first wins
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\move(0,0,100,200)}whole event
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\move(0,0,100,200,500,1000)}timed
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\move(0,0,100,200,1000,500)}swapped
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\move(0,0,100,200,-5,0)}nonpositive
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\move(1,2,3,4,5)\move(9,9,9,9)\pos(1,1)}five then four
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\org(1,2)\org(3,4)\org(5)}origin
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fad(200,300)\fad(0,0)}fad
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fade(255,0,128,0,500,1000,1500)}fade
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fade(1,2,3)\fad(1000,500)}fade three
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fade(-1,300,2000,-1,800,700,-1)}event relative fade
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\fad(1500,1500)}overlapping
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\clip(10,20,300,400)}a{\clip(1,2,3)}b{\iclip(5,6,7,8)}c
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\clip(m 0 0 l 100 0 100 100 0 100)\clip(m 1 1 l 2 2)\iclip(5,6,7,8)}vector
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\iclip(3, m 0 0 l 64 0 64 64)}scaled inverse
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\clip(m 0 0 l 1 1}unterminated vector
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\clip(1,2,3,4,5,6,7,8,9,10)\clip()\iclip}excess
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\clip(0x10,1e2,-3.7,99999999999)}int parse
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\fs40)}t0
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(2,\fs40)}t accel
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(500,1500,\fs40)}t times
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(500.7,1500.2,\fs40)}t float times
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(500,1500,0.5,\fs40\bord8)}t times accel
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(1,2,3,4,\fs40)}t too many
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(0,500)}t no tags{\fs30}
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t}t bare{\t()}x
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\fs40)\bord6}t then tag
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\fs40}t unterminated
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\fs40  }t unterminated with spaces
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\clip(10,10,20,20)\fs40)\b1}t nested parens
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\fs10\t(0,500)\fs50)\bord1}t inside t sets power
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\t(0,500,\fs10)\fs50)}t in t
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(0,1000,\fs10\t(1000,2000,\bord9\t(\shad4}deep
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(\pos(1,2)\fad(100,100)\an9\r\move(0,0,1,1))}t with event tags
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(0,0,\fs40)\t(-500,500,\bord4)\t(2000,0,\shad5)}t edge times
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\t(a,b,c,\fs40)\t(,,\bord3)}t garbage times
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,open { brace{\b1}text{ and \} escaped \{ braces {
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\b1}{\i1}{}{\}{\u1\}x
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{\pos(1,2)\fs(}x{\fs30)}y{\(}z{\\fs20}w

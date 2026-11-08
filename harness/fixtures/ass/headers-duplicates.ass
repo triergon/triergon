@@ -1,0 +1,17 @@
+[Script Info]
+ScriptType: v4.00
+PlayResX: 640
+PlayResX: &h-10
+PlayResY: +200x
+ScaledBorderAndShadow: yes
+ScaledBorderAndShadow: no
+Kerning: 0
+Kerning: -3
+YCbCr Matrix: tv.601
+YCbCr Matrix: something long enough to be cut
+Language: e
+Timer: 1e400
+WrapStyle: -1
+ScriptType: v4.00+
+LayoutResX: 1920
+LayoutResY: 1080

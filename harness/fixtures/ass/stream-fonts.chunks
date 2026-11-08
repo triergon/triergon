@@ -1,0 +1,55 @@
+;@extract-fonts
+;@time 800 900 1150
+@private
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Attached Sans,36,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,20,20,20,1
+
+[Fonts]
+fontname: attached-a.ttf
+#T"6?J`%[1YT7(WCR_Q2.FO!J=LP&$F?A[D.]B=]99;LU05;0W3*LN0Y(5*HD,(7_S"&;I_UW@YD3'W3
+N^Q"*ENQF<L@"#F/=ZC^YA=M58;<Q/5+,V2ZHM0I$4*8@+('[R!V7H_ES?Y4/&W#J]TR&DNAB;L0^"E_
+9YCNUP==17;,M.8[(U2JDL09`3*(<*'WWQ!F3G_5O>Y$+%VSF\TB"CN1>:K`Z!EO5XC>QO=--6:\I-8K
+$T2:@K0)\2)X8)'GS`!6/F_%K=Y
+fontname: attached-b.otf
+!WD.-J@]9=9LE06;PS3*\F/Y(9,H4,%7?_"&KA^UW4[D#'X3.ZQ":MMQF@J@R#G/]VC^)I@M5<9<A/6+
+LR2ZXA
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+@end
+@chunk 0 500
+2,0,Default,,0,0,0,,{\fnAttached Sans\k20}at{\k30}tached
+@chunk 0 500
+1,0,Default,,0,0,0,,{\fade(255,0,255,0,100,400,500)}first
+@chunk 100 200
+2,0,Default,,0,0,0,,a duplicate of 2 is dropped
+@chunk 100 50
+3,1,Default,,0,0,0,,{\an8\pos(640,10)}short
+@prune 200
+@chunk 100 50
+3,1,Default,,0,0,0,,3 was pruned, so it is read again
+@check-readorder 0
+@chunk 600 100
+1,0,Default,,0,0,0,,unchecked: 1 again
+@dump
+@check-readorder 1
+@chunk 700 100
+4,0,Default,,0,0,0,,checked again
+@prune 750
+@flush
+@chunk 800 400
+1,0,Default,,0,0,0,,{\kf20}after {\kf30\move(0,0,100,100,0,200)}a seek the bitmap starts over
+@chunk 800 400
+1,0,Default,,0,0,0,,and catches this one
+@data
+[Fonts]
+fontname: late.ttf
+#T"6?J`%[1YT7(WCR_Q2.FO!J=LP&$F?A[D.]B=]
+@end
+@prune 900

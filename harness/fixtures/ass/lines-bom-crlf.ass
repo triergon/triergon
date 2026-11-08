@@ -1,0 +1,19 @@
+﻿[script info]
+ScriptType: v4.00+
+  PlayResX: 320
+	PlayResY: 240
+
+﻿Title: BOM on a later line
+[v4+ styles]
+Format: Name, Fontname, Fontsize
+Style: Default,Arial,20
+[EVENTS]garbage after the header
+Format: Layer, Start, End, Style, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,crlf line
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,cr only lineDialogue: 0,0:00:00.00,0:00:01.00,Default,after cr
+﻿﻿Dialogue: 0,0:00:00.00,0:00:01.00,Default,two boms
+
+[Unknown Section]
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,still events? no
+[Events]
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,back in events

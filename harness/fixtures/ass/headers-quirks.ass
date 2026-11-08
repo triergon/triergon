@@ -1,0 +1,16 @@
+[Script Info]
+; Header values with libass's integer, boolean and matrix quirks.
+ScriptType: v4.00+
+PlayResX:&H280
+PlayResY: 4294967776
+LayoutResX: -5
+LayoutResY:0x10
+Timer: 100.0000
+WrapStyle: 4294967298
+ScaledBorderAndShadow: 2
+Kerning: Yes please
+YCbCr Matrix: 	PC.FCC
+Language:   deutsch
+playresx: 1
+PlayResX : 7
+Unknown: value

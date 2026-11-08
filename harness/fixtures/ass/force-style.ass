@@ -1,0 +1,40 @@
+;@force Default.FontName=  Forced Font
+;@force sign.Bold=5
+;@force ScaleX=1.5
+;@force PlayResX=&H100
+;@force playresy=200
+;@force LayoutResX=300
+;@force LayoutResY=400
+;@force Timer=50.5
+;@force WrapStyle=3
+;@force Kerning=yes
+;@force ScaledBorderAndShadow=no
+;@force YCbCr Matrix=PC.709
+;@force Sign.AlphaLevel=300
+;@force Sign.BackColour=&H00112233
+;@force Default.Alignment=12
+;@force Default.Justify=2
+;@force Blur=2.5
+;@force Name=renamed
+;@force Missing.FontSize=99
+;@force Dotted.Name.FontSize=11
+;@force a=b=MarginL=7
+;@force no equals sign
+;@force Sign.Outline=-4
+;@force Sign.Encoding=x
+;@force Sign.PrimaryColour=0xFF
+;@time 0
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 480
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+Style: Sign,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+Style: Dotted.Name,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Sign,,0,0,0,,{\blur\r}x{\fscx}y{\alpha}z

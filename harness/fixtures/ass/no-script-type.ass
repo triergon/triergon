@@ -1,0 +1,7 @@
+[Script Info]
+; No ScriptType and no styles section: libass returns no track.
+ScriptType: v4.01+
+PlayResX: 640
+[Events]
+Format: Layer, Start, End, Style, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,lost

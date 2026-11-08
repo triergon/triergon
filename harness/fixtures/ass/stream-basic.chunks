@@ -1,0 +1,56 @@
+;@force Default.Fontsize=30
+;@time 0 1500
+@chunk 0 1000
+0,0,Default,,0,0,0,,before the codec private: no event format yet
+@private
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+Style: Top,Arial,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,8,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+@end
+@chunk 1000 2000
+0,0,Default,,0,0,0,,first
+@chunk 1000 2000
+0,5,Top,Speaker,1,2,3,Fx,duplicate read order is dropped
+@chunk 3000 500
+1,&H10,Top,Speaker,1,2,3,Fx,{\pos(10,10)}second, with, commas
+@chunk 3000 500
+2,0,Top
+@chunk 3000 500
+2,0,Top,,0,0,0,,the short packet before marked 2 anyway
+@chunk 4000 100
+ 3 , 2 ,Default,,0,0,0,,spaces around read order
+@chunk 4000 100
+x,0,Default,,0,0,0,,non-numeric read order is 0, a duplicate
+@chunk 4000 100
+
+@chunk 4000 100
+4
+@dump
+@check-readorder 0
+@chunk 5000 100
+0,0,Default,,0,0,0,,no check: read order 0 again
+@check-readorder 2
+@chunk 5000 100
+0,0,Default,,0,0,0,,2 is not 1: still no check
+@check-readorder 1
+@chunk 5000 100
+0,0,Default,,0,0,0,,checked again: dropped
+@dump
+@prune 1500
+@chunk 6000 100
+0,0,Default,,0,0,0,,pruned read order 0 is free again
+@data
+Dialogue: 0,0:00:07.00,0:00:08.00,Default,,0,0,0,,a Dialogue line through process_data
+Style: Late,Arial,10,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+@end
+@chunk 9000 100
+9,0,Late,,0,0,0,,late style found
