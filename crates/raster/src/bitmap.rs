@@ -33,6 +33,21 @@ impl Bitmap {
     /// [`MAX_BITMAP_BYTES`](crate::MAX_BITMAP_BYTES), libass's bound; `Policy`
     /// when it exceeds `limits.bitmap_bytes`; and the budget's errors.
     pub fn new(budget: &Budget, width: usize, height: usize, limits: &Limits) -> Result<Self> {
+        let stride = Self::stride_within(width, height, limits)?;
+        let mut data = BudgetVec::new(budget);
+        data.try_resize(stride * height, 0)?;
+        Ok(Self {
+            position: Vector::new(0, 0),
+            width,
+            height,
+            stride,
+            data,
+        })
+    }
+
+    /// The stride of a `width` × `height` bitmap, with the errors of
+    /// [`Bitmap::new`]: checked before anything that size is allocated.
+    pub(crate) fn stride_within(width: usize, height: usize, limits: &Limits) -> Result<usize> {
         let too_large = Error::Limit {
             requested: width.saturating_mul(height),
             maximum: MAX_BITMAP_BYTES,
@@ -42,19 +57,10 @@ impl Bitmap {
         if stride > MAX_BITMAP_BYTES / height.max(1) {
             return Err(too_large);
         }
-        let bytes = stride * height;
-        if bytes > limits.bitmap_bytes {
+        if stride * height > limits.bitmap_bytes {
             return Err(Error::Policy("bitmap size"));
         }
-        let mut data = BudgetVec::new(budget);
-        data.try_resize(bytes, 0)?;
-        Ok(Self {
-            position: Vector::new(0, 0),
-            width,
-            height,
-            stride,
-            data,
-        })
+        Ok(stride)
     }
 
     /// [`Bitmap::new`], or `None` for a bitmap beyond libass's bound, which

@@ -78,10 +78,9 @@ impl Blur {
         if times == 0 || bitmap.width() == 0 || bitmap.height() == 0 {
             return Ok(());
         }
-        // One unit per row of each pass; a row is bounded by the bitmap's charge.
         charge(
             work,
-            u64::from(times).saturating_mul(bitmap.height() as u64),
+            u64::from(times).saturating_mul(row_work(bitmap.width(), bitmap.height())),
         )?;
         self.lines.clear();
         self.lines.try_resize(3 * bitmap.stride(), 0)?;
@@ -144,9 +143,11 @@ impl Blur {
         if samples > i32::MAX as u64 / 4 {
             return Ok(());
         }
+        // The blurred bitmap must fit the limits before its planes are
+        // allocated; every stage's output is at most its size.
+        Bitmap::stride_within(end_w, end_h, limits)?;
         let stages = u64::from(mx.level + my.level) * 2 + 2;
-        // One unit per output row of each stage, at most `end_h`.
-        charge(work, stages.saturating_mul(end_h as u64))?;
+        charge(work, stages.saturating_mul(row_work(end_w, end_h)))?;
         for plane in &mut self.planes {
             plane.clear();
             plane.try_resize(end_w * end_h, 0)?;
@@ -197,6 +198,12 @@ impl Blur {
         *bitmap = out;
         Ok(())
     }
+}
+
+/// The work of one filter stage over a `width` × `height` image: a unit per 16
+/// samples of each row.
+fn row_work(width: usize, height: usize) -> u64 {
+    (height as u64).saturating_mul(width.div_ceil(16) as u64)
 }
 
 /// The two planes the stages alternate between, and the current image size.

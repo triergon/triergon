@@ -10,7 +10,8 @@ pub const MAX_BITMAP_BYTES: usize = i32::MAX as usize - crate::bitmap::ALIGNMENT
 /// Bounds on the sizes of one operation. Exceeding one is [`Error::Policy`].
 /// Storage is charged separately to the [`Budget`] a value is created with, and
 /// work to the [`WorkBudget`] the caller passes for a frame: one unit per
-/// subdivision step, emitted point, polyline segment, tile and filter row.
+/// subdivision step, emitted point, polyline segment and 16×16 tile filled,
+/// and per 16 pixels of every row a blur stage writes.
 ///
 /// [`Budget`]: triergon_core::Budget
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
