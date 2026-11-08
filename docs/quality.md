@@ -428,9 +428,19 @@ lists every archived set:
 - whether it is kept (cited results) or expires after 90 days;
 - each file it holds, by path and SHA-256.
 
-The index also records how identifiers were renamed. With `TRIERGON_EVIDENCE_ARCHIVE` set
-to the archive location, `cargo xtask evidence fetch SET` downloads a set, verifies it
-against the index and unpacks it into `.research/evidence/SET/`; a `.tar.zst` set is
-decompressed with the system `zstd`. Both stream, hashing and writing each file as it
-leaves the archive, so a set larger than memory unpacks on a 32-bit host. `cargo xtask
-evidence pack DIR OUT` writes the deterministic archive a new set is uploaded as.
+Where a set lives decides how long it is kept: sets under `qualification/` expire 90
+days after upload, and sets under `evidence/` are kept. With `TRIERGON_EVIDENCE_ARCHIVE`
+set to the archive location:
+
+1. `cargo xtask evidence pack DIR OUT` writes the deterministic archive of a run.
+2. `cargo xtask evidence upload SET OUT` uploads it under `qualification/SET/` and
+   prints its index entry. Every new set starts there.
+3. `cargo xtask evidence promote SET` moves an indexed set under `evidence/` and
+   records it as kept. Promote a set in the pull request that first cites it; an
+   uncited upload simply expires.
+4. `cargo xtask evidence fetch SET` downloads a set, verifies it against the index and
+   unpacks it into `.research/evidence/SET/`; a `.tar.zst` set is decompressed with the
+   system `zstd`. Packing and fetching stream, hashing and writing each file as it
+   passes, so a set larger than memory unpacks on a 32-bit host.
+
+The index also records how identifiers were renamed.
