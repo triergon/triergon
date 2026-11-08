@@ -165,6 +165,17 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
         ),
         ("configure_argv", argv),
         ("internal_cflags", Value::strings(cflags)),
+        // The bitmap engine the reference worker selects for the gated features
+        // (`ass_bitmap_engine_init(ASS_CPU_FLAG_NONE)`); `raster-simd-` operations
+        // keep the one `ass_renderer_init` chooses for the host.
+        (
+            "engine",
+            Value::object([
+                ("name", Value::str("c")),
+                ("tile_order", Value::int(4)),
+                ("align_order", Value::int(4)),
+            ]),
+        ),
         ("library_sha256", Value::str(sha256::hex(&library))),
         ("dependencies", Value::object(dependencies)),
         (

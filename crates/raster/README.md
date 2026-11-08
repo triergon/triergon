@@ -87,15 +87,16 @@ The arithmetic is libass's own: 26.6 integer subdivision with its rounding, the
 C `FFMAX`/`FFMIN` treatment of NaN. Floating-point expressions keep the C
 source's order and grouping; the reference is built without floating-point
 contraction (`-ffp-contract=off`), so neither side fuses multiply-adds and the
-result does not depend on the target. Two properties of the reference build
-are matched as well:
+result does not depend on the target. Two further properties are matched:
 
-- **The SIMD engine's row padding.** The AArch64 `\be` kernel blurs whole
-  16-byte rows, so coverage spreads into the row padding and repeated passes
-  read it back, and the fill subtraction spans whole strides. Bitmaps keep
-  libass's stride (the width rounded up to 16) and the same padding contents.
-  libass's AVX2 engine pads to 32 bytes, which changes repeated `\be` passes on
-  coverage that reaches a bitmap's right edge.
+- **libass's C engine.** The gated reference runs libass's plain C bitmap
+  engine on every host (`ass_bitmap_engine_init(ASS_CPU_FLAG_NONE)`: 16×16
+  tiles and rows aligned to 16 bytes), which is what libass runs on 32-bit
+  ARMv7, where it has no assembly. Bitmaps keep its stride (the width rounded
+  up to 16), every pass works over the width and the row padding stays zero.
+  libass's SIMD engines depart from it, for example by blurring `\be` over
+  whole rows into the padding, and AVX2 pads rows to 32 bytes; the
+  `raster-simd` feature records where, on demand.
 - **libm.** Sines, cosines, exponentials and logarithms come from the platform
   library, as libass's do.
 
@@ -127,6 +128,6 @@ which mutates random glyph sources and runs every operation on them. The
 features `raster-glyphs`, `raster-outlines`, `raster-bitmaps` and
 `raster-sweep` (`harness/features/raster-*`, run by
 `cargo xtask raster compare [--all]`) compare
-[raster-worker](../raster-worker/README.md) with the pinned libass build
-exactly: outline points and segments, bitmap positions, sizes and every pixel,
+[raster-worker](../raster-worker/README.md) with the pinned libass build on
+its C engine exactly: outline points and segments, bitmap positions, sizes and every pixel,
 glyph and run positions, and clip parts; see [docs/status.md](../../docs/status.md).
