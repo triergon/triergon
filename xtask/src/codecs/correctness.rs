@@ -238,7 +238,12 @@ impl Rules {
             .get("lossless_audio_decode")
             .and_then(|s| s.get("applies_to"))
             .and_then(Value::as_array)
-            .ok_or_else(|| format!("{}: missing lossless_audio_decode.applies_to", path.display()))?
+            .ok_or_else(|| {
+                format!(
+                    "{}: missing lossless_audio_decode.applies_to",
+                    path.display()
+                )
+            })?
             .iter()
             .map(|lane| lane.as_str().map(str::to_owned))
             .collect::<Option<Vec<_>>>()
@@ -573,9 +578,16 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
     let format = audio_format(lane)?;
     let stream = probe(&a.ffprobe, path, format, true)?;
     let (reference_path, ours_path) = (tmp.join("ref.f32"), tmp.join("ours.f32"));
-    let mut reference_argv: Vec<String> = [a.ffmpeg.as_str(), "-nostdin", "-v", "error", "-threads", "1"]
-        .map(String::from)
-        .to_vec();
+    let mut reference_argv: Vec<String> = [
+        a.ffmpeg.as_str(),
+        "-nostdin",
+        "-v",
+        "error",
+        "-threads",
+        "1",
+    ]
+    .map(String::from)
+    .to_vec();
     if let Some(format) = format {
         reference_argv.extend(["-f".to_owned(), format.to_owned()]);
     }

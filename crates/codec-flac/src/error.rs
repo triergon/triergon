@@ -8,7 +8,7 @@ pub enum DecodeError {
     Unsupported(&'static str),
     /// Malformed data.
     Invalid(&'static str),
-    /// The frame's CRC-16 does not match (only with [`CrcPolicy::Reject`]).
+    /// The frame's CRC-16 does not match (only with [`CrcPolicy::Reject`](crate::CrcPolicy::Reject)).
     CrcMismatch,
     /// The storage budget refused an allocation.
     Budget(StorageError),
