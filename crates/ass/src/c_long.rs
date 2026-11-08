@@ -6,8 +6,12 @@
 //! `parse_bool` calls `strtol` itself, and the karaoke split rounds with
 //! `lrint`. `long` has 64 bits on LP64 targets and 32 on 32-bit ones, so a
 //! value beyond `int` saturates at different bounds before it is narrowed.
-//! These are the only results of the crate that depend on the target, and
-//! every conversion through `long` is here.
+//! These are the only results of the crate that depend on the width of
+//! `long`, and every conversion through `long` is here. One `lrint` is
+//! deliberately not: a drawing coordinate's (`double_to_d6`, `lrint` narrowed
+//! from `long` to `int`) follows libass on 32-bit ARM with GCC on every
+//! target, as do the casts from `double` to `int` C leaves undefined out of
+//! range; see the crate's documentation.
 
 use core::ffi::c_long;
 

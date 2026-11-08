@@ -2,9 +2,9 @@
  * ASS parsing reference: the libass build of harness/reference.c (tooling only;
  * never linked into the library). It includes libass's ass_render.c from the
  * pinned source tree, as reference_raster.h does, to reach the render context
- * and its static init_render_context and free_render_context, and ass_drawing.c,
- * to see the points its parser adds (below), and links the built libass.a for
- * everything else. It is compiled with the flags libass compiled itself with
+ * and its static init_render_context and free_render_context, ass_drawing.c
+ * and a copy of ass_parse.c, to see the conversions they make (below), and links
+ * the built libass.a for everything else. It is compiled with the flags libass compiled itself with
  * (libass-internal.pc).
  *
  * Usage:
@@ -51,22 +51,26 @@
  * lookups libass's tags make find no font. `ass-dump` prints the same records
  * as lines, identical to ass-worker's.
  *
- * A case whose result C leaves to the target is flagged. libass reads a
- * drawing coordinate with double_to_d6, lrint(x * 64) narrowed from long to
- * int, then bounds it with abs(pt.x) > OUTLINE_MAX in ass_outline_add_point.
- * The result is the target's own in two ways:
- *   - a 26.6 value outside int's range or NaN: lrint saturates at long's range
- *     on ARM and gives LONG_MIN on x86-64, and long has 32 or 64 bits, so the
- *     int differs. ass_drawing.c is compiled into this file with its calls of
- *     double_to_d6 going through assr_double_to_d6, which notes such a value
- *     (on every host, whatever its long) and returns libass's result. The
- *     check is explicit: the floating-point invalid exception would also be
- *     raised by results C defines (0 x inf in strtod, inf - inf in \t,
- *     fmod(inf), and dtoi32, which Clang compiles to a conversion before its
- *     range check).
- *   - abs(INT_MIN), for a coordinate that lands on INT_MIN (Clang reads it as
- *     out of bounds, GCC as in bounds): the calls of ass_outline_add_point go
- *     through assr_add_point, which notes such a point and calls libass's.
+ * A case whose result C leaves to the target is flagged, by explicit checks
+ * at each step where it can arise, on every host:
+ *   - a drawing coordinate: double_to_d6 is lrint(x * 64) narrowed from long
+ *     to int, and a 26.6 value outside int's range or NaN converts as the
+ *     target's lrint and long have it (saturating at long's range on ARM,
+ *     LONG_MIN on x86-64; 32 or 64 bits). ass_drawing.c is compiled into this
+ *     file with its calls of double_to_d6 going through assr_double_to_d6.
+ *   - a coordinate landing on INT_MIN, whose abs libass's bound check in
+ *     ass_outline_add_point takes (Clang reads it as out of bounds, GCC as in
+ *     bounds): those calls go through assr_add_point.
+ *   - every other conversion from double to int that C leaves undefined out of
+ *     range or for NaN: an animated \clip or \iclip, \fad and \fade's alpha,
+ *     the delay of a Banner or Scroll effect (in a copy of ass_parse.c that
+ *     xtask writes with each of them wrapped in ASSR_TO_INT, compiled here in
+ *     place of the library's), and \pbo copied into a drawing glyph (in the
+ *     text loop below). assr_to_int notes such a value and converts it as the
+ *     compiler does.
+ * The floating-point invalid exception is not used: C defines results that
+ * raise it too (0 x inf in strtod, inf - inf in \t, fmod(inf), and dtoi32,
+ * which Clang compiles to a conversion before its range check).
  * A flagged fold adds "host_dependent":true and ass-dump says so on stderr;
  * ass-worker cannot know, so the flag comes from the reference alone.
  */
@@ -87,6 +91,15 @@ static bool assr_add_point(ASS_Outline *outline, ASS_Vector pt, char segment);
 #include "ass_drawing.c"
 #undef double_to_d6
 #undef ass_outline_add_point
+
+/* A double converted to int: out of int's range or NaN, C leaves the result to
+ * the target, so the case is noted; the conversion is the compiler's. */
+static int assr_to_int(double x) {
+    if (!(x > INT_MIN - 1.0 && x < INT_MAX + 1.0)) assr_host_dependent = true;
+    return (int)x;
+}
+#define ASSR_TO_INT(x) assr_to_int(x)
+#include "ass_parse_observed.c"
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -671,7 +684,7 @@ static int assr_walk(AssWork *w, ASS_Renderer *r, ASS_Track *t, int index, long 
         if (drawing.str) {
             g->drawing_text = drawing;
             g->drawing_scale = s->drawing_scale;
-            g->drawing_pbo = s->pbo;
+            g->drawing_pbo = assr_to_int(s->pbo);
         }
         g->symbol = code;
         for (int i = 0; i < 4; i++) g->c[i] = s->c[i];

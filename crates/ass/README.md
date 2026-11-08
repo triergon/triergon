@@ -180,17 +180,25 @@ convention asks:
   saturates at `long`'s range and is then narrowed to `int`, so it differs
   between 64-bit and 32-bit `long`; the crate converts these, and only these,
   through `core::ffi::c_long` in one module.
-- Out-of-range drawing coordinates are rejected as libass does on 32-bit ARM with
-  GCC. A coordinate is rounded to 26.6 as `triergon_raster::pixels_26_6`
-  rounds, saturating, and a coordinate beyond the outline bound discards the
-  drawing. libass's own result there is undefined in C and differs by compiler
-  on other targets.
+- Every conversion of a `double` to `int` whose result C leaves to the target
+  out of range follows libass on 32-bit ARM with GCC: it saturates at `int`'s
+  range, and NaN is 0. Those are the casts libass makes for `\pbo` in a
+  drawing glyph, an animated `\clip` or `\iclip`, `\fade`'s alpha and the
+  delay of a `Banner` or `Scroll` effect (undefined out of range), and a
+  drawing coordinate in 26.6: `double_to_d6`'s `lrint`, whose result is
+  unspecified beyond `long`'s range, narrowed from `long` to `int` (rounded as
+  `triergon_raster::pixels_26_6` rounds). So an out-of-range drawing
+  coordinate lies beyond the outline bound and discards the drawing, and a NaN
+  one (such as `0e400`) is 0. libass's own result is the compiler's and the
+  target's.
 - The one exception: libass built with GCC accepts a coordinate landing exactly
   on `INT_MIN` through `abs(INT_MIN)` overflow, and the crate rejects it, so
   the raster stages never see that coordinate.
 
-Those cases are compared in `ass-parse-host`, pinned per target; the exception's
-two cases are listed there as open cases on the GCC targets.
+Those cases are compared in `ass-parse-host`, pinned per target. The exception's
+two cases are open there on the GCC targets, as are, on
+`aarch64-unknown-linux-gnu`, the two drawings whose coordinates libass converts
+with a 64-bit `long` there.
 
 ## Behaviour and limits
 

@@ -25,21 +25,31 @@ pub enum Operation {
     Walk,
 }
 
-/// The operations whose libass result differs by target, each one fixture's:
-/// drawing coordinates out of `int`'s range in 26.6 or landing on `INT_MIN`,
-/// which the reference flags (`harness/reference_ass.h`), and values read
-/// through C `long` beyond `int` (an event time, a ReadOrder). They are
-/// `ass-parse-host`'s cases, pinned per target; `cargo xtask check-design`
-/// fails if one of them is the same on every target, and a flagged case
-/// fails any other feature.
-pub const PER_TARGET: [(&str, Operation); 7] = [
+/// The operations whose libass result differs by target, each one fixture's,
+/// in fixture order: those the reference flags (`harness/reference_ass.h`),
+/// where a conversion from `double` to `int` is out of range or NaN (a drawing
+/// coordinate in 26.6, `\pbo`, an animated `\clip` or `\iclip`, `\fade`'s
+/// alpha, a `Banner` or `Scroll` delay) or a drawing coordinate lands on
+/// `INT_MIN`; and values read through C `long` beyond `int` (an event time, a
+/// ReadOrder). They are `ass-parse-host`'s cases, pinned per target; `cargo
+/// xtask check-design` fails if one of them is the same on every target, and a
+/// flagged case fails any other feature.
+pub const PER_TARGET: [(&str, Operation); 15] = [
     ("drawings-clip-overflow.ass", Operation::Walk),
     ("drawings-infinite.ass", Operation::Walk),
     ("drawings-int-min-x.ass", Operation::Walk),
     ("drawings-int-min-y.ass", Operation::Walk),
     ("drawings-int-min.ass", Operation::Walk),
+    ("drawings-nan.ass", Operation::Walk),
+    ("effects-banner-delay-overflow.ass", Operation::Walk),
+    ("effects-scroll-delay-overflow.ass", Operation::Walk),
     ("events-time-overflow.ass", Operation::Read),
     ("stream-read-order-overflow.chunks", Operation::Read),
+    ("tags-clip-animation-overflow.ass", Operation::Walk),
+    ("tags-fade-in-overflow.ass", Operation::Walk),
+    ("tags-fade-out-overflow.ass", Operation::Walk),
+    ("tags-iclip-animation-overflow.ass", Operation::Walk),
+    ("tags-pbo-overflow.ass", Operation::Walk),
 ];
 
 /// The files case rows are generated from, besides the pins and the fixtures,

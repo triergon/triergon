@@ -48,10 +48,25 @@
       "bytes": 120,
       "digest": 9303548372216402199
     },
+    "drawings-nan-ass": {
+      "packets": 4,
+      "bytes": 103,
+      "digest": 17556025184646351424
+    },
     "drawings-ass": {
       "packets": 26,
       "bytes": 1122,
       "digest": 7323773244044958012
+    },
+    "effects-banner-delay-overflow-ass": {
+      "packets": 4,
+      "bytes": 98,
+      "digest": 502733696466209034
+    },
+    "effects-scroll-delay-overflow-ass": {
+      "packets": 4,
+      "bytes": 107,
+      "digest": 17695375128129135084
     },
     "effects-ass": {
       "packets": 15,
@@ -183,15 +198,40 @@
       "bytes": 1223,
       "digest": 11051155132351541906
     },
+    "tags-clip-animation-overflow-ass": {
+      "packets": 4,
+      "bytes": 132,
+      "digest": 11300080980630957754
+    },
     "tags-edge-ass": {
       "packets": 27,
       "bytes": 1499,
       "digest": 5834939963088973219
     },
+    "tags-fade-in-overflow-ass": {
+      "packets": 4,
+      "bytes": 145,
+      "digest": 15782189043142250724
+    },
+    "tags-fade-out-overflow-ass": {
+      "packets": 4,
+      "bytes": 147,
+      "digest": 5286289543614200898
+    },
+    "tags-iclip-animation-overflow-ass": {
+      "packets": 4,
+      "bytes": 133,
+      "digest": 10434525962122584126
+    },
     "tags-parens-ass": {
       "packets": 44,
       "bytes": 1672,
       "digest": 5944212932081222107
+    },
+    "tags-pbo-overflow-ass": {
+      "packets": 4,
+      "bytes": 107,
+      "digest": 17852906897303731433
     },
     "text-utf8-ass": {
       "packets": 9,

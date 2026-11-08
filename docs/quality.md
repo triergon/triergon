@@ -132,9 +132,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   ass prepare` is `cargo xtask raster prepare`, and `cargo xtask build-workers`
   also links the ASS parsing reference worker (`harness/reference_ass.h`), which
   includes `ass_render.c` from the pinned tree for the render context, and
-  `ass_drawing.c` to see the coordinates its parser converts, and restates, citing them,
-  the two static functions it needs: the text loop of `parse_events` and
-  `ass_read_styles` from memory. Its features read the authored
+  `ass_drawing.c` and a copy of `ass_parse.c` that `cargo xtask ass prepare`
+  and `build-workers` write, to see the conversions they make, and restates,
+  citing them, the two static functions it needs: the text loop of
+  `parse_events` and `ass_read_styles` from memory. Its features read the authored
   fixtures in `harness/fixtures/ass` with libass's parse-level functions: whole
   scripts with `ass_read_memory` (`ass-parse-scripts`), Matroska packet streams
   with `ass_process_codec_private`, `ass_process_chunk` and its ReadOrder
@@ -143,12 +144,18 @@ resource limit becomes an explicit, reviewed rule for that case.
   walked at the fixture's times through `ass_parse_tags`, `ass_get_next_char`,
   `ass_drawing_parse` and `ass_process_karaoke_effects` (`ass-parse-events`). All
   three are required by `cargo xtask check`. The reference flags a case whose
-  result C leaves to the target: a drawing coordinate whose 26.6 value is out of
-  `int`'s range or NaN (noted at `double_to_d6`, on every host) or lands on
-  `INT_MIN`, whose `abs` its bound check takes. A flagged case fails those three features. It is a fixture
-  of its own in `ass-parse-host`, with the reads of values that go through C
-  `long` beyond `int` (an event time, a ReadOrder); that feature is pinned per
-  target. `cargo xtask ass compare` reports all four.
+  result C leaves to the target, by an explicit check where libass makes the
+  step, on every host: a conversion from `double` to `int` out of range or for
+  NaN (a drawing coordinate at `double_to_d6`, `lrint` narrowed from `long`;
+  the casts for `\pbo` in a drawing glyph, an animated `\clip` or `\iclip`,
+  `\fade`'s alpha, a `Banner` or `Scroll` delay; the copy of `ass_parse.c`
+  wraps each of its conversions, and the edit fails if the source does not
+  match), or a drawing coordinate landing
+  on `INT_MIN`, whose `abs` its bound check takes. A flagged case fails those
+  three features. It is a fixture of its own in `ass-parse-host`, with the
+  reads of values that go through C `long` beyond `int` (an event time, a
+  ReadOrder); that feature is pinned per target. `cargo xtask ass compare`
+  reports all four.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   parsing features commit no case rows. `cargo xtask fonts manifest`, `cargo
   xtask shape manifest`, `cargo xtask raster manifest` and `cargo xtask ass

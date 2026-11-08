@@ -18,6 +18,12 @@
       }
     },
     "drawings-infinite-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 44,
+        "digest": 2758801544890065950,
+        "host_dependent": true
+      },
       "armv7-unknown-linux-gnueabihf": {
         "packets": 6,
         "bytes": 44,
@@ -54,10 +60,58 @@
       }
     },
     "drawings-int-min-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 44,
+        "digest": 17791394752719166305,
+        "host_dependent": true
+      },
       "armv7-unknown-linux-gnueabihf": {
         "packets": 6,
         "bytes": 44,
         "digest": 15881649056746129386,
+        "host_dependent": true
+      }
+    },
+    "drawings-nan-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 27,
+        "digest": 8185492603997413489,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 6,
+        "bytes": 27,
+        "digest": 8185492603997413489,
+        "host_dependent": true
+      }
+    },
+    "effects-banner-delay-overflow-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 8544013250187682576,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 8544013250187682576,
+        "host_dependent": true
+      }
+    },
+    "effects-scroll-delay-overflow-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 6236201623175922093,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 6236201623175922093,
         "host_dependent": true
       }
     },
@@ -83,6 +137,76 @@
         "packets": 4,
         "bytes": 97,
         "digest": 3116554152817474288
+      }
+    },
+    "tags-clip-animation-overflow-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 4992240586215293869,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 4992240586215293869,
+        "host_dependent": true
+      }
+    },
+    "tags-fade-in-overflow-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 14901843017533116151,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 14901843017533116151,
+        "host_dependent": true
+      }
+    },
+    "tags-fade-out-overflow-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 14920842132671709493,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 14920842132671709493,
+        "host_dependent": true
+      }
+    },
+    "tags-iclip-animation-overflow-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 1203054323934508907,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 1203054323934508907,
+        "host_dependent": true
+      }
+    },
+    "tags-pbo-overflow-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 23,
+        "digest": 10155893059127458149,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 6,
+        "bytes": 23,
+        "digest": 10155893059127458149,
+        "host_dependent": true
       }
     }
   }
