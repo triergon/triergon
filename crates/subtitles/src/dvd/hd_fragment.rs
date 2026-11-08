@@ -674,8 +674,7 @@ impl HdFragmentJob {
                     } else {
                         usize::from(u16::from_be_bytes([raw[0], raw[1]]))
                     };
-                    if control <= declared
-                        && control.checked_add(header).ok_or(Error::Overflow)? > n
+                    if control <= declared && control.checked_add(header).is_none_or(|end| end > n)
                     {
                         let s = self
                             .state

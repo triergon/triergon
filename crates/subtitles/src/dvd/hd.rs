@@ -57,7 +57,9 @@ impl<'a> HdPacket<'a> {
             return Err(Error::Invalid("HD SPU trailing bytes"));
         }
         if control < header
-            || control.checked_add(3 + width).ok_or(Error::Overflow)? > size.min(raw.len())
+            || control
+                .checked_add(3 + width)
+                .is_none_or(|end| end > size.min(raw.len()))
         {
             return Err(Error::Invalid("HD SPU control extent"));
         }
@@ -105,7 +107,11 @@ impl<'a> HdPacket<'a> {
         let end = if next == at {
             self.raw.len()
         } else {
-            if next <= start || next.checked_add(3 + width).ok_or(Error::Overflow)? > self.raw.len()
+            // An end that does not fit `usize` lies past the packet on every target.
+            if next <= start
+                || next
+                    .checked_add(3 + width)
+                    .is_none_or(|end| end > self.raw.len())
             {
                 if policy != HdPolicy::Receiver {
                     return Err(Error::Invalid(
