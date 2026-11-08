@@ -378,8 +378,8 @@ impl ReceiverDecoder {
     }
 
     /// A new page version replaces the region list; at an acquisition point
-    /// or mode change it also starts a new epoch. A repeated version changes
-    /// nothing.
+    /// or mode change it also starts a new epoch. A repeated version, or one
+    /// that cannot be allocated, changes nothing.
     fn compose_page(
         &mut self,
         page: &PageComposition<'_>,
@@ -398,10 +398,17 @@ impl ReceiverDecoder {
             // The receiver's display time is 32 bits: a negative end wraps.
             self.present(previous, end as u32, work)?;
         }
+        let starts_epoch = page.state.starts_epoch();
+        if starts_epoch {
+            self.detach(work)?;
+        }
+        let listed = page.regions().count();
+        self.page
+            .placements
+            .try_reserve_exact(listed.saturating_sub(self.page.placements.len()))?;
         self.page.version = Some(page.version);
         self.page.timeout = page.timeout;
-        if page.state.starts_epoch() {
-            self.detach(work)?;
+        if starts_epoch {
             self.epoch.clear();
         }
         self.page.placements.clear();

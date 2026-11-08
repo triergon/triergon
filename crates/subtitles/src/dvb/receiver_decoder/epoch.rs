@@ -32,9 +32,40 @@ pub(super) struct Region {
 }
 
 impl Region {
+    fn new(id: u8, budget: &Budget) -> Self {
+        Self {
+            id,
+            width: 0,
+            height: 0,
+            depth: Depth::Two,
+            clut: 0,
+            drawn: false,
+            objects: BudgetVec::new(budget),
+            pixels: BudgetVec::new(budget),
+            automatic: [0; 256],
+            automatic_current: false,
+        }
+    }
+
     /// `width * height` palette indices, row by row.
     pub(super) fn pixels(&self) -> &[u8] {
         self.pixels.as_slice()
+    }
+
+    /// Give the region a new size: zero pixels, and nothing drawn. A size
+    /// that cannot be allocated changes nothing.
+    fn resize(&mut self, width: u16, height: u16) -> Result<()> {
+        let size = usize::from(width) * usize::from(height);
+        if size > self.pixels.capacity() {
+            self.pixels = BudgetVec::try_filled(self.pixels.budget(), 0, size)?;
+        } else {
+            self.pixels.try_resize(size, 0)?;
+            self.pixels.as_mut_slice().fill(0);
+        }
+        self.width = width;
+        self.height = height;
+        self.drawn = false;
+        Ok(())
     }
 }
 
@@ -162,7 +193,8 @@ impl Epoch {
     /// Create or update a region. A new size clears its pixels and makes it
     /// undrawn; the fill flag paints them with the background code. The
     /// object list replaces the previous one. A region without area, or above
-    /// the receiver's pixel limit, stops the packet.
+    /// the receiver's pixel limit, stops the packet; one that cannot be
+    /// allocated is refused and changes nothing.
     pub(super) fn compose_region(
         &mut self,
         composition: &RegionComposition<'_>,
@@ -172,37 +204,30 @@ impl Epoch {
         if size == 0 || size > MAX_REGION_PIXELS {
             return Ok(Flow::Stop);
         }
-        let index = if let Some(index) = self
+        let placements = composition.objects().count();
+        // A composition that cannot be allocated is refused before it changes
+        // anything.
+        if placements != 0 {
+            self.objects.reserve()?;
+        }
+        let mut created = None;
+        let existing = self
             .regions
             .as_slice()
             .iter()
-            .position(|r| r.id == composition.id)
-        {
-            index
+            .position(|r| r.id == composition.id);
+        let region = if let Some(index) = existing {
+            &mut self.regions.as_mut_slice()[index]
         } else {
-            let region = Region {
-                id: composition.id,
-                width: 0,
-                height: 0,
-                depth: composition.depth,
-                clut: 0,
-                drawn: false,
-                objects: BudgetVec::new(&self.budget),
-                pixels: BudgetVec::new(&self.budget),
-                automatic: [0; 256],
-                automatic_current: false,
-            };
-            push_exact(&mut self.regions, region)?;
-            self.regions.len() - 1
+            self.regions.try_reserve_exact(1)?;
+            created.insert(Region::new(composition.id, &self.budget))
         };
-        let region = &mut self.regions.as_mut_slice()[index];
+        region
+            .objects
+            .try_reserve_exact(placements.saturating_sub(region.objects.len()))?;
         if (region.width, region.height) != (composition.width, composition.height) {
             charge(work, size);
-            region.pixels.clear();
-            region.pixels.try_resize(size, 0)?;
-            region.width = composition.width;
-            region.height = composition.height;
-            region.drawn = false;
+            region.resize(composition.width, composition.height)?;
         }
         region.depth = composition.depth;
         region.clut = composition.clut;
@@ -211,12 +236,12 @@ impl Epoch {
             region.pixels.as_mut_slice().fill(composition.background);
         }
         region.objects.clear();
-        if composition.objects().next().is_some() {
-            self.objects.reserve()?;
-        }
         for placement in composition.objects() {
             push(&mut region.objects, placement)?;
             self.objects.insert(placement.object);
+        }
+        if let Some(region) = created {
+            push(&mut self.regions, region)?;
         }
         Ok(Flow::Continue)
     }

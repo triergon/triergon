@@ -327,3 +327,72 @@ fn work_scales_with_placements() {
         "work ratio {ratio} for {k} times the placements"
     );
 }
+
+type Shown = Vec<(i32, i32, u16, u16, Vec<u32>, Vec<u8>)>;
+
+/// Decode `packets` in order with a pool of `limit` bytes: each packet's
+/// rectangles, or its error, and the bytes the decoder then holds.
+fn decode_all(
+    limit: usize,
+    options: Options,
+    packets: &[&[u8]],
+) -> (Vec<Result<Shown, Error>>, usize) {
+    let pool = Budget::new(limit).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+    let outcomes = packets
+        .iter()
+        .map(|packet| {
+            let mut work = WorkBudget::new(u64::MAX);
+            decoder
+                .decode(packet, None, &mut work, &cancel)
+                .map(|subtitle| {
+                    subtitle.map_or_else(Vec::new, |subtitle| {
+                        subtitle
+                            .rects()
+                            .map(|r| {
+                                let palette = r.palette.to_vec();
+                                (r.x, r.y, r.width, r.height, palette, r.pixels.to_vec())
+                            })
+                            .collect()
+                    })
+                })
+        })
+        .collect();
+    (outcomes, pool.used())
+}
+
+/// A packet refused for want of memory changes nothing: the packets after it
+/// decode as if it had never been sent.
+#[test]
+fn refused_packet_changes_nothing() {
+    let drawn = packet(&[
+        segments::page(0, false, &[(0, 10, 10)]),
+        segments::region(0, 640, 64, &[(1, 0, 0)]),
+        segments::object(1),
+        segments::end(),
+    ]);
+    let present = packet(&[segments::end(), vec![0xff]]);
+    let moved = packet(&[segments::page(1, false, &[(0, 50, 60)]), segments::end()]);
+    // A region grown past the pool.
+    let grown = packet(&[segments::region(0, 1280, 1024, &[(1, 0, 0)])]);
+    // A new epoch whose page first presents the previous one, whose pixels
+    // must then be copied out of the regions.
+    let reset = packet(&[segments::page(1, true, &[(0, 10, 10)])]);
+    let next = Options {
+        end_from_next: true,
+        ..Options::default()
+    };
+    for (options, refused, after, room) in [
+        (Options::default(), &grown, &present, 1280 * 1024 / 2),
+        (next, &reset, &moved, 640 * 64 / 2),
+    ] {
+        let (_, used) = decode_all(1 << 24, options, &[&drawn]);
+        let limit = used + room;
+        let (outcomes, _) = decode_all(limit, options, &[&drawn, refused, after]);
+        let (expected, _) = decode_all(limit, options, &[&drawn, after]);
+        assert!(outcomes[0].is_ok() && outcomes[1].is_err(), "{outcomes:?}");
+        assert_eq!(outcomes[2], expected[1]);
+        assert!(!expected[1].as_ref().unwrap().is_empty());
+    }
+}
