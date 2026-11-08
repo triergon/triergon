@@ -18,11 +18,11 @@
 #![forbid(unsafe_code)]
 use std::io::Write;
 use std::time::Instant;
+use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_blocking};
 use triergon_codec::{AudioCodec, AudioFrame, VideoCodec};
 use triergon_harness_protocol::interleaved::InterleavedDigest;
 use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
 use triergon_session::mix::Downmix;
-use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_blocking};
 use triergon_session::{TrackDecoder, audio_decoder, video_decoder};
 
 #[derive(Default)]
