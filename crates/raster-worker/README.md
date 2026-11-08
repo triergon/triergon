@@ -28,12 +28,20 @@ for `raster` and the host's SIMD engine for `raster-simd`.
 The case grammar is in `src/case.rs`: outline conversion, rotation, stroking,
 transforms, rasterisation, runs of glyphs through the glyph pipeline and the
 compositor, blur, the bitmap blends, the border's fill subtraction, shifts and
-clipping. A case outside the grammar is recorded as unparsed, a source or
-parameter libass rejects as invalid, and an operation libass fails as failed.
-An operation the crate refuses where libass draws is recorded with a status of
-its own, so the case fails: one for a limit (`Error::Policy` or `Error::Limit`:
-the case's work, one frame's worth, the crate's `Limits` or a fixed size
-bound) and one for a storage budget that ran out. The fold, bench and memory modes print the
+clipping. A case outside the grammar is recorded as unparsed. Each operation
+records a status:
+
+| Status | Outcome |
+|---|---|
+| 0 | the source or parameters are invalid, as libass rejects them |
+| 1 | the operation succeeded |
+| 2 | the operation failed as libass fails it (`Error::Invalid`) |
+| 3 | the crate refused under a limit (`Error::Policy`, `Error::Limit`): the case's work, one frame's worth, the crate's `Limits` or a fixed size bound |
+| 4 | the storage budget ran out (`Error::Backpressure`, `Error::Allocation`) |
+| 5 | any other error, which the crate does not return for these operations |
+
+The reference records only 0 to 2, so a case where the crate reaches 3, 4 or
+5 fails. The fold, bench and memory modes print the
 harness protocol's one JSON line, whose `digest` folds every record in a fixed
 order (`src/record.rs`); the bench mode adds the elapsed time of the timed loop
 and the memory mode brackets one operation with the allocation-window markers.
