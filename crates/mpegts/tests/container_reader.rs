@@ -8,7 +8,7 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_mpegts::{
-    AccessUnit, Packet, PacketFormat, Reader, ReaderEvent, ReaderLimits, TraceEvent,
+    AccessUnit, AudioEofPolicy, Packet, PacketFormat, Reader, ReaderEvent, ReaderLimits, TraceEvent,
 };
 
 const ID: SourceId = SourceId(77);
@@ -573,6 +573,436 @@ fn a_partial_audio_frame_at_eof_is_an_error_and_is_never_a_packet() {
         }
     }
     assert_eq!(drive.next().unwrap_err(), Error::Truncated);
+}
+
+fn audio_eof_frame(ac3: bool) -> Vec<u8> {
+    if ac3 {
+        let mut frame = vec![0; 192];
+        frame[..8].copy_from_slice(&[0x0b, 0x77, 0, 0, 4, 0x40, 0x40, 0x1f]);
+        frame
+    } else {
+        adts(b"original audio frame")
+    }
+}
+
+fn audio_eof_transport(ac3: bool) -> (Transport, ReaderLimits) {
+    let mut ts = Transport::new();
+    ts.tables(
+        &[(
+            if ac3 { 6 } else { 0x0f },
+            PID,
+            if ac3 { &[0x6a, 1, 0] } else { &[] },
+        )],
+        0,
+    );
+    let limits = ReaderLimits {
+        audio_eof_policy: AudioEofPolicy::ReportIncomplete,
+        descriptor_namespace: if ac3 {
+            audio_eof_namespace()
+        } else {
+            triergon_mpegts::psi::DescriptorNamespace::Unspecified
+        },
+        ..ReaderLimits::default()
+    };
+    (ts, limits)
+}
+
+fn audio_eof_namespace() -> triergon_mpegts::psi::DescriptorNamespace {
+    use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
+    DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile)
+}
+
+#[test]
+fn audio_eof_reports_only_original_fragments_and_keeps_them_after_reset_and_drop() {
+    for ac3 in [false, true] {
+        let frame = audio_eof_frame(ac3);
+        for tail in [&frame[..7], &frame[..frame.len() - 1]] {
+            for complete in [false, true] {
+                let (mut ts, limits) = audio_eof_transport(ac3);
+                let mut body = Vec::new();
+                if complete {
+                    body.extend_from_slice(&frame);
+                }
+                body.extend_from_slice(tail);
+                ts.pes(
+                    PID,
+                    if ac3 { 0xbd } else { 0xc0 },
+                    &body,
+                    Some(90_000),
+                    None,
+                );
+                for (chunk, quantum) in [(1, 1), (4096, 8192)] {
+                    let mut drive = Drive::new(&ts.bytes, limits, chunk, quantum);
+                    let pool = drive.pool.clone();
+                    let mut packets = 0;
+                    let mut fragment = None;
+                    let mut source_bytes = Vec::new();
+                    while let Some(event) = drive.next().unwrap() {
+                        match event {
+                            Event::Packet(packet) => {
+                                assert_eq!(packet.payload(), frame);
+                                assert!(!matches!(
+                                    packet.access_unit(),
+                                    AccessUnit::IncompleteAudio { .. }
+                                ));
+                                packets += 1;
+                            }
+                            Event::Other(ReaderEvent::IncompleteAudio(packet)) => {
+                                assert!(fragment.is_none());
+                                assert_eq!(packet.payload(), tail);
+                                assert_eq!(
+                                    packet.elementary_range(),
+                                    if complete { frame.len() as u64 } else { 0 }
+                                        ..body.len() as u64
+                                );
+                                assert!(
+                                    matches!(packet.access_unit(), AccessUnit::IncompleteAudio { bytes, reason: Error::Truncated, .. } if bytes.as_ref() == tail)
+                                );
+                                assert_eq!(packet.duration(), None);
+                                assert_eq!(packet.sample_duration(), None);
+                                assert_eq!(
+                                    packet.random_access(),
+                                    triergon_core::container::RandomAccess::Unknown
+                                );
+                                assert_eq!(packet.pts(), (!complete).then_some(90_000));
+                                assert_eq!(packet.dts(), None);
+                                let mut recovered = Vec::new();
+                                for origin in packet.sources() {
+                                    let TraceEvent::Pes(pes) = origin.pes.event() else {
+                                        panic!("original PES missing");
+                                    };
+                                    let raw: Vec<u8> = pes.payload().flatten().copied().collect();
+                                    recovered.extend_from_slice(&raw[origin.payload_range.clone()]);
+                                }
+                                assert_eq!(recovered, tail);
+                                fragment = Some(packet);
+                            }
+                            Event::Other(ReaderEvent::Source(source)) => {
+                                if let TraceEvent::Pes(pes) = source.event() {
+                                    source_bytes.extend(pes.payload().flatten().copied());
+                                }
+                            }
+                            Event::Other(
+                                ReaderEvent::Interrupted { .. }
+                                | ReaderEvent::InterruptedPes { .. }
+                                | ReaderEvent::Unsupported { .. },
+                            ) => panic!("unexpected source interruption"),
+                            _ => (),
+                        }
+                    }
+                    assert_eq!(source_bytes, body);
+                    assert_eq!(packets, usize::from(complete));
+                    let fragment = fragment.unwrap();
+                    drive.reader.reset().unwrap();
+                    drive.reader.close();
+                    drop(drive);
+                    assert_eq!(fragment.payload(), tail);
+                    assert_eq!(fragment.track_info().stream().pid, PID);
+                    assert!(pool.used() > Budget::control_storage_bytes());
+                    drop(fragment);
+                    assert_eq!(pool.used(), Budget::control_storage_bytes());
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn audio_eof_copy_spans_every_validated_pes_and_uses_each_anchor_once() {
+    for ac3 in [false, true] {
+        let frame = audio_eof_frame(ac3);
+        let (mut ts, limits) = audio_eof_transport(ac3);
+        let tail = &frame[..frame.len() - 1];
+        let body = [frame.as_slice(), tail].concat();
+        let id = if ac3 { 0xbd } else { 0xc0 };
+        ts.pes(PID, id, &body[..2], Some(90_000), None);
+        ts.pes(PID, id, &body[2..frame.len() + 2], Some(180_000), None);
+        ts.pes(PID, id, &body[frame.len() + 2..], Some(270_000), None);
+        let mut drive = Drive::new(&ts.bytes, limits, 1, 1);
+        let mut source_bytes = Vec::new();
+        let mut fragment = None;
+        let mut completed = 0;
+        while let Some(event) = drive.next().unwrap() {
+            match event {
+                Event::Packet(packet) => {
+                    assert_eq!(packet.pts(), Some(90_000));
+                    completed += 1;
+                }
+                Event::Other(ReaderEvent::IncompleteAudio(packet)) => fragment = Some(packet),
+                Event::Other(ReaderEvent::Source(source)) => {
+                    if let TraceEvent::Pes(pes) = source.event() {
+                        source_bytes.extend(pes.payload().flatten().copied());
+                    }
+                }
+                _ => (),
+            }
+        }
+        assert_eq!(completed, 1);
+        assert_eq!(source_bytes, body);
+        let fragment = fragment.unwrap();
+        assert_eq!(fragment.payload(), tail);
+        assert_eq!(fragment.sources().len(), 2);
+        assert_eq!(fragment.pts(), Some(180_000));
+        assert_eq!(fragment.dts(), None);
+        assert_eq!(
+            fragment.sources()[0].payload_range,
+            frame.len() - 2..frame.len()
+        );
+    }
+}
+
+#[test]
+fn audio_eof_policy_never_reports_a_clock_program_or_loss_boundary_as_eof() {
+    for boundary in 0..3 {
+        let frame = audio_eof_frame(false);
+        let (mut ts, limits) = audio_eof_transport(false);
+        ts.pes(PID, 0xc0, &frame[..7], Some(90_000), None);
+        match boundary {
+            0 => ts.pcr(90_000, true),
+            1 => ts.tables(&[(0x0f, PID, &[])], 1),
+            _ => ts.counters[usize::from(PID)] = (ts.counters[usize::from(PID)] + 2) & 15,
+        }
+        ts.pes(PID, 0xc0, &frame, Some(180_000), None);
+        let mut drive = Drive::new(&ts.bytes, limits, 1, 1);
+        // An unchanged elementary route retains epoch2 across the PMT update.
+        if boundary == 1 {
+            drive.catalogue_epoch_override = Some(2);
+        }
+        let mut interrupted = 0;
+        let mut complete = 0;
+        while let Some(event) = drive.next().unwrap() {
+            match event {
+                Event::Packet(packet) => {
+                    assert_eq!(packet.payload(), frame);
+                    complete += 1;
+                }
+                Event::Other(ReaderEvent::IncompleteAudio(_)) => panic!("boundary treated as EOF"),
+                Event::Other(ReaderEvent::Interrupted { .. }) => interrupted += 1,
+                _ => (),
+            }
+        }
+        assert_eq!(complete, 1);
+        assert!(interrupted > 0);
+    }
+}
+
+#[test]
+fn audio_eof_default_stays_truncated_and_reporting_retries_after_pressure() {
+    for ac3 in [false, true] {
+        let frame = audio_eof_frame(ac3);
+        let (mut ts, limits) = audio_eof_transport(ac3);
+        ts.pes(
+            PID,
+            if ac3 { 0xbd } else { 0xc0 },
+            &frame[..7],
+            Some(90_000),
+            None,
+        );
+        let mut strict = Drive::new(
+            &ts.bytes,
+            ReaderLimits {
+                audio_eof_policy: AudioEofPolicy::RejectIncomplete,
+                ..limits
+            },
+            1,
+            1,
+        );
+        loop {
+            match strict.next() {
+                Err(error) => {
+                    assert_eq!(error, Error::Truncated);
+                    break;
+                }
+                Ok(Some(Event::Other(ReaderEvent::IncompleteAudio(_))) | None) => {
+                    panic!("default accepted a fragment")
+                }
+                Ok(_) => (),
+            }
+        }
+        let mut drive = Drive::new(&ts.bytes, limits, 4096, 1);
+        let mut pressure = None;
+        let mut retried = false;
+        let mut reported = 0;
+        loop {
+            match drive.next() {
+                Ok(Some(Event::Other(ReaderEvent::Source(source))))
+                    if matches!(source.event(), TraceEvent::Pes(_)) =>
+                {
+                    pressure = Some(drive.pool.reserve(drive.pool.available()).unwrap());
+                }
+                Err(Error::Backpressure { .. }) if pressure.is_some() => {
+                    drop(pressure.take());
+                    retried = true;
+                }
+                Ok(Some(Event::Other(ReaderEvent::IncompleteAudio(packet)))) => {
+                    assert_eq!(packet.payload(), &frame[..7]);
+                    reported += 1;
+                }
+                Ok(None) => break,
+                Ok(_) => (),
+                Err(error) => panic!("fragment retry failed: {error:?}"),
+            }
+        }
+        assert!(retried);
+        assert_eq!(reported, 1);
+    }
+}
+
+#[test]
+fn audio_eof_reporting_preserves_frame_and_count_limits() {
+    for ac3 in [false, true] {
+        let frame = audio_eof_frame(ac3);
+        for tail in [&frame[..3], &frame[..7]] {
+            let (mut ts, mut limits) = audio_eof_transport(ac3);
+            limits.maximum_access_units = 1;
+            let body = [frame.as_slice(), tail].concat();
+            ts.pes(PID, if ac3 { 0xbd } else { 0xc0 }, &body, None, None);
+            let mut drive = Drive::new(&ts.bytes, limits, 1, 1);
+            let mut completed = 0;
+            loop {
+                match drive.next() {
+                    Ok(Some(Event::Packet(_))) => completed += 1,
+                    Ok(Some(Event::Other(ReaderEvent::IncompleteAudio(_))) | None) => {
+                        panic!("fragment exceeded the output count limit")
+                    }
+                    Ok(_) => (),
+                    Err(error) => {
+                        assert_eq!(
+                            error,
+                            Error::Limit {
+                                requested: 2,
+                                maximum: 1
+                            }
+                        );
+                        assert_eq!(drive.next().unwrap_err(), error);
+                        break;
+                    }
+                }
+            }
+            assert_eq!(completed, 1);
+        }
+        let (mut ts, mut limits) = audio_eof_transport(ac3);
+        limits.maximum_audio_frame_bytes = frame.len() - 1;
+        ts.pes(PID, if ac3 { 0xbd } else { 0xc0 }, &frame[..7], None, None);
+        let mut drive = Drive::new(&ts.bytes, limits, 1, 1);
+        loop {
+            match drive.next() {
+                Ok(
+                    Some(Event::Packet(_) | Event::Other(ReaderEvent::IncompleteAudio(_))) | None,
+                ) => {
+                    panic!("oversized frame was reported")
+                }
+                Ok(_) => (),
+                Err(error) => {
+                    assert_eq!(
+                        error,
+                        Error::Limit {
+                            requested: frame.len(),
+                            maximum: frame.len() - 1,
+                        }
+                    );
+                    break;
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn audio_eof_reporting_never_converts_source_failure_into_a_fragment() {
+    for failure in [SourceFailure::Transport, SourceFailure::Cancelled] {
+        let frame = audio_eof_frame(false);
+        let (mut ts, limits) = audio_eof_transport(false);
+        ts.pes(PID, 0xc0, &frame[..7], Some(90_000), None);
+        let mut drive = Drive::new(&ts.bytes, limits, 1, 1);
+        let mut failed = false;
+        for _ in 0..2_000_000 {
+            match drive.reader.step(&mut WorkBudget::new(1), &OFF).unwrap() {
+                Step::NeedInput(request) => {
+                    let at = usize::try_from(request.offset).unwrap();
+                    if at == ts.bytes.len() {
+                        drive
+                            .reader
+                            .fail(request.source, request.token, failure)
+                            .unwrap();
+                        failed = true;
+                        break;
+                    }
+                    let bytes = Bytes::copy_from_slice(&drive.pool, &ts.bytes[at..at + 1]).unwrap();
+                    drive
+                        .reader
+                        .provide(
+                            &InputWindow::new(request.source, request.token, request.offset, bytes)
+                                .unwrap(),
+                        )
+                        .unwrap();
+                }
+                Step::Ready(Event::Packet(_) | Event::Other(ReaderEvent::IncompleteAudio(_)))
+                | Step::End(_) => panic!("interrupted source treated as logical EOF"),
+                Step::Yield | Step::Ready(_) => (),
+                Step::Backpressure(pressure) => panic!("unexpected pressure: {pressure:?}"),
+            }
+        }
+        assert!(failed);
+        assert_eq!(
+            drive
+                .reader
+                .step(&mut WorkBudget::new(1), &OFF)
+                .unwrap_err(),
+            match failure {
+                SourceFailure::Transport => Error::Transport,
+                SourceFailure::Cancelled => Error::Cancelled,
+            }
+        );
+    }
+}
+
+#[test]
+fn audio_eof_reports_each_track_before_finished_and_preserves_retained_fragments() {
+    let frame = audio_eof_frame(false);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[]), (0x0f, PID + 1, &[])], 0);
+    ts.pes(PID, 0xc0, &frame[..7], Some(90_000), None);
+    ts.pes(PID + 1, 0xc1, &frame[..7], Some(180_000), None);
+    let mut drive = Drive::new(
+        &ts.bytes,
+        ReaderLimits {
+            audio_eof_policy: AudioEofPolicy::ReportIncomplete,
+            ..ReaderLimits::default()
+        },
+        1,
+        1,
+    );
+    let mut fragments = Vec::new();
+    let mut finished = false;
+    while let Some(event) = drive.next().unwrap() {
+        match event {
+            Event::Other(ReaderEvent::IncompleteAudio(packet)) => {
+                assert!(!finished);
+                assert_eq!(packet.payload(), &frame[..7]);
+                fragments.push(packet);
+            }
+            Event::Other(ReaderEvent::Source(source))
+                if matches!(source.event(), TraceEvent::Finished) =>
+            {
+                assert_eq!(fragments.len(), 2);
+                finished = true;
+            }
+            Event::Packet(_) => panic!("unfinished audio is not an AU"),
+            _ => (),
+        }
+    }
+    assert!(finished);
+    assert_eq!(fragments[0].track_info().stream().pid, PID);
+    assert_eq!(fragments[1].track_info().stream().pid, PID + 1);
+    assert_eq!(fragments[0].pts(), Some(90_000));
+    assert_eq!(fragments[1].pts(), Some(180_000));
+    drive.reader.close();
+    assert!(
+        fragments
+            .iter()
+            .all(|packet| packet.payload() == &frame[..7])
+    );
 }
 
 #[test]
