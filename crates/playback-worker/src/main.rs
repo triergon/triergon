@@ -1,8 +1,8 @@
 //! Playback measurement worker; serialization and startup are outside the timed loop.
 #![forbid(unsafe_code)]
 mod hls;
-mod progressive;
 mod mp4_range;
+mod progressive;
 use std::{
     io::{self, Write},
     process::ExitCode,
