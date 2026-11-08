@@ -549,6 +549,13 @@ impl TransportStream {
     pub fn clock_is_quarantined(&self) -> bool {
         self.clock_quarantined
     }
+    pub(crate) fn route_epochs(&self, index: usize, pid: u16) -> Option<SourceEpochs> {
+        self.routes
+            .as_slice()
+            .get(index)
+            .filter(|route| route.pid == pid)
+            .map(|route| route.epochs)
+    }
     fn location(&self) -> SourceLocation {
         self.packet.as_ref().map_or(
             self.entity_end.unwrap_or(SourceLocation {
