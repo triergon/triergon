@@ -61,7 +61,8 @@ pub struct CacheLimits {
     /// Font descriptions (family, weight, slant, orientation) kept with the
     /// fonts made for them, at most. libass keeps them all; past this many,
     /// those asked for least recently go, never one the last frame asked
-    /// for, and a font asked for again starts over from its first face.
+    /// for, and a font asked for again starts over from its first face. A
+    /// caller that wants libass's behaviour sets it to `usize::MAX`.
     pub fonts: usize,
 }
 

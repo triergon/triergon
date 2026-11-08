@@ -266,7 +266,8 @@ the previous frame's images were drawn from. Requested fonts and the faces
 they gathered are kept up to `CacheLimits::fonts` font descriptions (10,000
 by default), cut at each frame the same way, never one the previous frame
 asked for; libass keeps them all, so a font asked for again after it left
-starts over from its first face. Shaping plans are kept up to 256. All of it
+starts over from its first face. A caller that wants libass's behaviour sets
+`CacheLimits::fonts` to `usize::MAX`. Shaping plans are kept up to 256. All of it
 is charged to the renderer's budget, family names and drawing texts by
 length, and looked up by the names and texts the script holds, without
 copying them. The byte limits bound nothing: there is no bitmap or composite
