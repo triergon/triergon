@@ -105,7 +105,12 @@ pub fn adler32(data: &[u8]) -> u32 {
 }
 
 pub fn crc32(data: &[u8]) -> u32 {
-    let mut crc = !0u32;
+    crc32_extend(0, data)
+}
+
+/// The CRC-32 of the bytes summarised by `crc` (0 for none) followed by `data`.
+pub fn crc32_extend(crc: u32, data: &[u8]) -> u32 {
+    let mut crc = !crc;
     for &byte in data {
         crc ^= u32::from(byte);
         for _ in 0..8 {
