@@ -294,17 +294,7 @@ impl<'a> SizedMetrics<'a> {
     /// character set (`OS/2.fsSelection` high byte 178 or 179).
     pub fn new(sized: SizedFont<'a>) -> Result<Self> {
         let font = sized.font();
-        let windows = |encoding: Option<CharEncoding>| {
-            font.charmaps().find(|c| {
-                c.platform() == Platform::Windows && encoding.is_none_or(|e| c.encoding() == e)
-            })
-        };
-        // A full Unicode subtable anywhere, else the first BMP one, else the
-        // first Windows one, else the one FreeType selects.
-        let charmap = windows(Some(CharEncoding::UnicodeFull))
-            .or_else(|| windows(Some(CharEncoding::Unicode)))
-            .or_else(|| windows(None))
-            .or_else(|| font.text_charmap());
+        let charmap = font.text_charmap();
         let windows = charmap.filter(|c| c.platform() == Platform::Windows);
         if windows.is_some_and(|c| (2..=6).contains(&c.encoding_id())) {
             return Err(Error::Unsupported("libass's multibyte charmap conversion"));

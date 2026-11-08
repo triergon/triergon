@@ -213,7 +213,7 @@ characters.
     advances FreeType's auto-hinter sets, and one CFF font without GPOS whose
     fallback mark positioning reads hinted glyph extents.
   - `shape-text` and `shape-text-all`: the same cases, and every corpus face and
-    script (1,724 cases, 100,351 runs), with HarfBuzz's built-in font functions
+    script (1,746 cases, 101,691 runs), with HarfBuzz's built-in font functions
     at units per em against `OtMetrics`. They cover the font tables' layout
     without FreeType; each lists one open case, the CFF font whose glyphs use
     operators HarfBuzz's charstring interpreter reads differently (above).

@@ -8622,6 +8622,116 @@
       "packets": 846,
       "bytes": 933,
       "digest": 14253010345287551696
+    },
+    "authored-cmap-order-ttc-latn-libass": {
+      "packets": 13704,
+      "bytes": 14466,
+      "digest": 10688852460871267593
+    },
+    "authored-cmap-order-ttc-zyyy-libass": {
+      "packets": 5148,
+      "bytes": 6414,
+      "digest": 2775568545225809261
+    },
+    "authored-cmap-order-ttc-grek-libass": {
+      "packets": 5946,
+      "bytes": 6432,
+      "digest": 6032067451642805341
+    },
+    "authored-cmap-order-ttc-cyrl-libass": {
+      "packets": 6180,
+      "bytes": 6696,
+      "digest": 15929783208946932693
+    },
+    "authored-cmap-order-ttc-hani-libass": {
+      "packets": 3642,
+      "bytes": 5004,
+      "digest": 16611943558446371197
+    },
+    "authored-cmap-order-ttc-hira-libass": {
+      "packets": 5316,
+      "bytes": 5922,
+      "digest": 17189598348446119625
+    },
+    "authored-cmap-order-ttc-kana-libass": {
+      "packets": 4050,
+      "bytes": 4362,
+      "digest": 10538004254303454173
+    },
+    "authored-cmap-order-ttc-hang-libass": {
+      "packets": 4560,
+      "bytes": 5004,
+      "digest": 7276394905567912037
+    },
+    "authored-cmap-order-ttc-hebr-libass": {
+      "packets": 7356,
+      "bytes": 7878,
+      "digest": 13517771291864195745
+    },
+    "authored-cmap-order-ttc-arab-libass": {
+      "packets": 8922,
+      "bytes": 9588,
+      "digest": 18383458982321706717
+    },
+    "authored-cmap-order-ttc-deva-libass": {
+      "packets": 6672,
+      "bytes": 7236,
+      "digest": 17651295149585346161
+    },
+    "authored-cmap-order-ttc-beng-libass": {
+      "packets": 4944,
+      "bytes": 5514,
+      "digest": 18156232032333436777
+    },
+    "authored-cmap-order-ttc-taml-libass": {
+      "packets": 4248,
+      "bytes": 4710,
+      "digest": 16477826978854686875
+    },
+    "authored-cmap-order-ttc-gujr-libass": {
+      "packets": 4824,
+      "bytes": 5394,
+      "digest": 5286154146035736471
+    },
+    "authored-cmap-order-ttc-guru-libass": {
+      "packets": 4248,
+      "bytes": 4680,
+      "digest": 16674160956159844653
+    },
+    "authored-cmap-order-ttc-knda-libass": {
+      "packets": 4608,
+      "bytes": 5160,
+      "digest": 15972479259852315827
+    },
+    "authored-cmap-order-ttc-mlym-libass": {
+      "packets": 4782,
+      "bytes": 5322,
+      "digest": 10968611379670402845
+    },
+    "authored-cmap-order-ttc-telu-libass": {
+      "packets": 4770,
+      "bytes": 5244,
+      "digest": 18077650561486744093
+    },
+    "authored-cmap-order-ttc-sinh-libass": {
+      "packets": 4764,
+      "bytes": 5208,
+      "digest": 14608677267887333297
+    },
+    "authored-cmap-order-ttc-thai-libass": {
+      "packets": 5190,
+      "bytes": 5598,
+      "digest": 18181434569578661533
+    },
+    "authored-cmap-order-ttc-khmr-libass": {
+      "packets": 4776,
+      "bytes": 5352,
+      "digest": 2126257506508581879
+    },
+    "authored-cmap-order-ttc-mymr-libass": {
+      "packets": 5076,
+      "bytes": 5598,
+      "digest": 1676336528551437359
     }
   }
 }
