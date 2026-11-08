@@ -13,7 +13,7 @@ use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
 use crate::bitmap::Bitmap;
 use crate::geometry::Vector;
-use crate::limits::{Limits, charge};
+use crate::limits::{Limits, charge, row_work};
 use coeff::Method;
 
 /// libass's `\blur` and `\be`, with scratch storage reused across bitmaps.
@@ -198,12 +198,6 @@ impl Blur {
         *bitmap = out;
         Ok(())
     }
-}
-
-/// The work of one filter stage over a `width` × `height` image: a unit per 16
-/// samples of each row.
-fn row_work(width: usize, height: usize) -> u64 {
-    (height as u64).saturating_mul(width.div_ceil(16) as u64)
 }
 
 /// The two planes the stages alternate between, and the current image size.

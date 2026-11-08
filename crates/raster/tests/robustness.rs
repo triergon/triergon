@@ -156,3 +156,73 @@ fn rasteriser_work_follows_the_tiles_filled() {
         Some(Error::Policy("raster work"))
     );
 }
+
+/// Composition charges the sum of a run's glyphs, a unit per 16 pixels of its
+/// rows, before allocating it: a frame's work budget refuses glyphs placed far
+/// apart before their sum takes memory.
+#[test]
+fn composition_work_follows_the_summed_area() {
+    use triergon_core::{Budget, Error, WorkBudget};
+    use triergon_raster::{
+        Effects, FrameScale, GlyphRequest, Outline, Placement, Raster, Run, Shape, Vector,
+    };
+    let budget = Budget::new(1 << 30).unwrap();
+    let mut raster = Raster::new(&budget, Limits::default());
+    let mut outline = Outline::new(&budget);
+    outline
+        .push_rect(Vector::new(0, 0), Vector::new(640, 640))
+        .unwrap();
+    let square = Shape::from_outlines(outline, Outline::new(&budget));
+    let frame = FrameScale {
+        blur: [1.0, 1.0],
+        border: [1.0, 1.0],
+        pixel_aspect: 1.0,
+    };
+    let effects = Effects::default();
+    let mut run = Run::default();
+    let mut work = WorkBudget::new(1 << 40);
+    let mut glyphs = Vec::new();
+    for at in [0, 4000 * 64] {
+        let placement = Placement {
+            rotation: [0.0; 3],
+            shear: [0.0; 2],
+            scale: [1.0; 2],
+            shift: Vector::new(0, 0),
+            ascender: 640,
+            descender: 0,
+            position: Vector::new(at, at),
+            advance: 640,
+            scale_fix: 1.0,
+            outline_scale: [1.0; 2],
+            outline_offset: [0.0; 2],
+        };
+        let request = GlyphRequest {
+            shape: &square,
+            placement,
+            frame,
+            effects: &effects,
+            karaoke: false,
+        };
+        glyphs.extend(raster.render(&request, &mut run, &mut work).unwrap());
+    }
+    assert_eq!(glyphs.len(), 2);
+
+    // The fill spans the two glyphs, about 4000 × 4000 pixels: about 10⁶
+    // units of work and 16 MB. Without the work for it, the sum is refused
+    // before it is allocated.
+    let peak = budget.peak();
+    let mut work = WorkBudget::new(1 << 16);
+    let refused = raster.compose(&effects, &frame, &glyphs, &mut work);
+    assert_eq!(refused.err(), Some(Error::Policy("raster work")));
+    assert!(budget.peak() < peak + (1 << 20), "peak {}", budget.peak());
+
+    let mut work = WorkBudget::new(1 << 40);
+    let fill = raster
+        .compose(&effects, &frame, &glyphs, &mut work)
+        .unwrap()
+        .fill
+        .unwrap();
+    let area = (fill.width().div_ceil(16) * fill.height()) as u64;
+    assert!(fill.width() > 4000 && fill.height() > 4000);
+    assert!(work.spent() >= area, "{} < {area}", work.spent());
+}

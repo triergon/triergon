@@ -11,7 +11,8 @@ pub const MAX_BITMAP_BYTES: usize = i32::MAX as usize - crate::bitmap::ALIGNMENT
 /// Storage is charged separately to the [`Budget`] a value is created with, and
 /// work to the [`WorkBudget`] the caller passes for a frame: one unit per
 /// subdivision step, emitted point, polyline segment and 16×16 tile filled,
-/// and per 16 pixels of every row a blur stage writes.
+/// and per 16 pixels of every row a blur stage writes or a run's glyph
+/// bitmaps are summed into.
 ///
 /// [`Budget`]: triergon_core::Budget
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,6 +43,12 @@ pub(crate) fn charge(work: &mut WorkBudget, units: u64) -> Result<()> {
     } else {
         Err(Error::Policy("raster work"))
     }
+}
+
+/// The work of one pass over a `width` × `height` image: a unit per 16 samples
+/// of each row.
+pub(crate) fn row_work(width: usize, height: usize) -> u64 {
+    (height as u64).saturating_mul(width.div_ceil(16) as u64)
 }
 
 #[cfg(test)]

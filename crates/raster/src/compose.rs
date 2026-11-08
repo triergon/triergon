@@ -1,12 +1,13 @@
 //! Combining a run's glyph bitmaps into its fill, border and shadow bitmaps:
 //! blur, `\be`, the border's subtraction of the fill and the sub-pixel shadow.
 
-use triergon_core::{Result, WorkBudget, round_ties_even_i32};
+use triergon_core::{Error, Result, WorkBudget, round_ties_even_i32};
 
 use crate::bitmap::Bitmap;
 use crate::fp;
 use crate::geometry::Vector;
 use crate::glyph::{FrameScale, GlyphBitmaps};
+use crate::limits::{charge, row_work};
 use crate::raster::Raster;
 
 /// Blur error as a fraction of the full range.
@@ -267,8 +268,8 @@ impl Raster {
                 Some((bitmap(g)?, at))
             })
         };
-        let mut fill = self.combine(placed(GlyphBitmaps::glyph), pad)?;
-        let mut border = self.combine(placed(GlyphBitmaps::border), pad)?;
+        let mut fill = self.combine(placed(GlyphBitmaps::glyph), pad, work)?;
+        let mut border = self.combine(placed(GlyphBitmaps::border), pad, work)?;
         let flags = filter.flags;
         let variance = filter.variances();
         if (!flags.border || flags.opaque_box)
@@ -318,16 +319,20 @@ impl Raster {
         })
     }
 
-    /// Sums the placed bitmaps into one, padded by `pad` pixels.
+    /// Sums the placed bitmaps into one, padded by `pad` pixels. The sum's
+    /// rows and those of every bitmap added into it are charged to `work`
+    /// before the sum is allocated; a sum beyond libass's bound is not drawn.
     fn combine<'b>(
         &self,
         parts: impl Iterator<Item = (&'b Bitmap, Vector)> + Clone,
         pad: u32,
+        work: &mut WorkBudget,
     ) -> Result<Option<Bitmap>> {
         // Positions are the run's own, so they fit; 64 bits keep hostile ones
         // from overflowing.
         let (mut x_min, mut y_min, mut x_max, mut y_max) = (i64::MAX, i64::MAX, i64::MIN, i64::MIN);
         let mut count = 0;
+        let mut added = 0u64;
         let mut last = None;
         for (bitmap, pos) in parts.clone() {
             let x = i64::from(pos.x) + i64::from(bitmap.position.x);
@@ -336,12 +341,14 @@ impl Raster {
             x_max = x_max.max(x + bitmap.width() as i64);
             y_max = y_max.max(y + bitmap.height() as i64);
             count += 1;
+            added = added.saturating_add(row_work(bitmap.width(), bitmap.height()));
             last = Some((bitmap, pos));
         }
         let Some((last, last_pos)) = last else {
             return Ok(None);
         };
         if pad == 0 && count == 1 {
+            charge(work, added)?;
             let mut copy = last.try_clone(&self.budget)?;
             copy.position.x = copy.position.x.wrapping_add(last_pos.x);
             copy.position.y = copy.position.y.wrapping_add(last_pos.y);
@@ -354,9 +361,13 @@ impl Raster {
         };
         let width = usize::try_from(x_max - x_min + 2 * pad).unwrap_or(usize::MAX);
         let height = usize::try_from(y_max - y_min + 2 * pad).unwrap_or(usize::MAX);
-        let Some(mut out) = Bitmap::drawable(&self.budget, width, height, &self.limits)? else {
-            return Ok(None);
-        };
+        match Bitmap::stride_within(width, height, &self.limits) {
+            Ok(_) => {}
+            Err(Error::Limit { .. }) => return Ok(None),
+            Err(error) => return Err(error),
+        }
+        charge(work, row_work(width, height).saturating_add(added))?;
+        let mut out = Bitmap::new(&self.budget, width, height, &self.limits)?;
         out.position = Vector::new(left, top);
         for (bitmap, pos) in parts {
             let x = i64::from(pos.x) + i64::from(bitmap.position.x) - i64::from(left);

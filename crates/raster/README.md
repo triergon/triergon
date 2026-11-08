@@ -122,7 +122,8 @@ with: outlines, bitmaps and the rasteriser's and blur's scratch, which a
 `Raster` keeps and reuses. Work is charged to the `WorkBudget` the caller passes
 to each stage, one per frame: subdivision steps, emitted points, polyline
 segments and 16×16 tiles filled, and every 16 pixels of a row a blur stage
-writes, charged before the stage allocates or runs. `Limits` bounds sizes: the points of a stroked
+writes or a run's glyph bitmaps are summed into, charged before the stage
+allocates or runs. `Limits` bounds sizes: the points of a stroked
 outline (`outline_points`) and the bytes of a bitmap (`bitmap_bytes`). Running
 out of work or exceeding a limit is `Error::Policy`. The bitmap default is
 `MAX_BITMAP_BYTES`, libass's own bound just under 2³¹ bytes, so only the budget
