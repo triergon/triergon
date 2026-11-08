@@ -93,8 +93,10 @@ pub fn crc16_a52(mut crc: u16, data: &[u8]) -> u16 {
     crc
 }
 
-static MPEG: [u32; 256] = {
-    let mut table = [0; 256];
+/// Slicing-by-8 tables: entry `k` holds the contribution of a byte followed by `k` zero
+/// bytes; entry 0 is the plain byte table.
+static MPEG: [[u32; 256]; 8] = {
+    let mut tables = [[0; 256]; 8];
     let mut byte = 0;
     while byte < 256 {
         let mut register = (byte as u32) << 24;
@@ -108,10 +110,20 @@ static MPEG: [u32; 256] = {
                 };
             bit += 1;
         }
-        table[byte] = register;
+        tables[0][byte] = register;
         byte += 1;
     }
-    table
+    let mut k = 1;
+    while k < 8 {
+        let mut byte = 0;
+        while byte < 256 {
+            let previous = tables[k - 1][byte];
+            tables[k][byte] = (previous << 8) ^ tables[0][(previous >> 24) as usize];
+            byte += 1;
+        }
+        k += 1;
+    }
+    tables
 };
 
 /// The MPEG-2 section checksum (ITU-T H.222.0 Annex A): MSB first, register preset to all
@@ -132,10 +144,23 @@ impl Crc32Mpeg {
         Self(value)
     }
 
-    /// Shifts `bytes` through the register.
+    /// Shifts `bytes` through the register, eight bytes per step.
     #[inline]
     pub fn update(&mut self, bytes: &[u8]) {
-        for &byte in bytes {
+        let t = &MPEG;
+        let mut chunks = bytes.chunks_exact(8);
+        for c in &mut chunks {
+            let x = self.0 ^ u32::from_be_bytes([c[0], c[1], c[2], c[3]]);
+            self.0 = t[7][(x >> 24) as usize]
+                ^ t[6][(x >> 16) as usize & 0xff]
+                ^ t[5][(x >> 8) as usize & 0xff]
+                ^ t[4][x as usize & 0xff]
+                ^ t[3][usize::from(c[4])]
+                ^ t[2][usize::from(c[5])]
+                ^ t[1][usize::from(c[6])]
+                ^ t[0][usize::from(c[7])];
+        }
+        for &byte in chunks.remainder() {
             self.update_byte(byte);
         }
     }
@@ -144,7 +169,7 @@ impl Crc32Mpeg {
     #[inline]
     pub fn update_byte(&mut self, byte: u8) {
         let index = (self.0 >> 24) as u8 ^ byte;
-        self.0 = (self.0 << 8) ^ MPEG[usize::from(index)];
+        self.0 = (self.0 << 8) ^ MPEG[0][usize::from(index)];
     }
 
     /// The current register value.
@@ -250,6 +275,20 @@ mod tests {
                 }
             }
             assert_eq!(crc16_a52(0, &data), register);
+        }
+    }
+
+    #[test]
+    fn sliced_mpeg_matches_bytewise_updates() {
+        for length in [0, 1, 7, 8, 9, 16, 1001] {
+            let data = message(length);
+            let mut sliced = Crc32Mpeg::from_register(0x1234_5678);
+            sliced.update(&data);
+            let mut bytewise = Crc32Mpeg::from_register(0x1234_5678);
+            for &byte in &data {
+                bytewise.update_byte(byte);
+            }
+            assert_eq!(sliced.remainder(), bytewise.remainder(), "{length}");
         }
     }
 
