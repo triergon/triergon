@@ -13,6 +13,19 @@ pub const INFO: u64 = 0x1549a966;
 pub const ATTACHMENTS: u64 = 0x1941a469;
 pub const CHAPTERS: u64 = 0x1043a770;
 pub const TAGS: u64 = 0x1254c367;
+pub(crate) const SEGMENT: u64 = 0x18538067;
+pub(crate) const CLUSTER: u64 = 0x1f43b675;
+pub(crate) const TRACKS: u64 = 0x1654ae6b;
+pub(crate) const CUES: u64 = 0x1c53bb6b;
+pub(crate) const SEEK_HEAD: u64 = 0x114d9b74;
+
+/// The Segment children that carry metadata: every level-one element except Cluster.
+pub(crate) fn is_level_one(id: u64) -> bool {
+    matches!(
+        id,
+        INFO | TRACKS | CUES | SEEK_HEAD | ATTACHMENTS | CHAPTERS | TAGS
+    )
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Node {
@@ -174,6 +187,14 @@ impl<'a> Element<'a> {
     }
     pub fn string(self, id: u64) -> Result<Option<&'a str>> {
         self.field(id).map(Self::text).transpose()
+    }
+    /// Whether the document reads this field as an unsigned integer.
+    pub fn is_unsigned(self) -> bool {
+        unsigned(self.id())
+    }
+    /// Whether the document reads this field as a UTF-8 or ASCII string.
+    pub fn is_text(self) -> bool {
+        utf8(self.id()) || ascii(self.id())
     }
     pub fn parent(self) -> Option<Self> {
         let p = self.doc.nodes[self.index as usize].parent;

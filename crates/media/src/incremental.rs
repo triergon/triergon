@@ -14,8 +14,9 @@ use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 
-const SEGMENT: u64 = 0x18538067;
-const CLUSTER: u64 = 0x1f43b675;
+use crate::metadata::{
+    ATTACHMENTS, CHAPTERS, CLUSTER, CUES, INFO, SEEK_HEAD, SEGMENT, TAGS, TRACKS, is_level_one,
+};
 const EBML: u64 = 0x1a45dfa3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -406,10 +407,10 @@ impl ElementReader {
             .size
             .ok_or(Error::Invalid("unknown non-master size"))?;
         let (collect, maximum) = match header.id {
-            EBML | 0x1549a966 | 0x1654ae6b | 0x1c53bb6b | 0x114d9b74 | 0x1043a770 | 0x1254c367 => {
+            EBML | INFO | TRACKS | CUES | SEEK_HEAD | CHAPTERS | TAGS => {
                 (true, self.limits.metadata_bytes)
             }
-            0x1941a469 => (
+            ATTACHMENTS => (
                 true,
                 self.limits
                     .metadata_bytes
@@ -932,12 +933,6 @@ fn buffered_header_widths(bytes: &[u8]) -> Option<(usize, usize)> {
     }
     let size_width = size.leading_zeros() as usize + 1;
     (bytes.len() >= id_width + size_width).then_some((id_width, size_width))
-}
-fn is_level_one(id: u64) -> bool {
-    matches!(
-        id,
-        0x1549a966 | 0x1654ae6b | 0x1c53bb6b | 0x114d9b74 | 0x1941a469 | 0x1043a770 | 0x1254c367
-    )
 }
 
 pub(crate) mod typed_bridge;
