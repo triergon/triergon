@@ -105,7 +105,7 @@ the least recently used values that only the store holds are dropped.
 
 ## What it does not read
 
-WOFF and WOFF2, bare CFF, Type 1 and Type 42, bitmap and colour glyphs (`EBDT`,
+`cmap` format 14 (variation selectors, which shaping will need), WOFF and WOFF2, bare CFF, Type 1 and Type 42, bitmap and colour glyphs (`EBDT`,
 `CBDT`, `sbix`, `COLR`, `SVG `), variation instances other than the default (`fvar`,
 `gvar`, `HVAR`, `avar`), vertical metrics (`vhea`, `vmtx`), `post`, hinting
 (`fpgm`, `prep`, `cvt `, CFF hints), Apple `kern` version 1 and kern formats other
