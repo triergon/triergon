@@ -24,8 +24,10 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  classify a grading run against the declared lane selection
   readers --manifest M.json --root R --ffprobe FP --codec-worker W --out OUT.jsonl
           [--only SUBSTR,...]
-                 compare every packet the container readers emit with ffprobe by
-                 harness/codecs/reader-rules.json; appends one row per input
+                 compare every packet the container readers emit, and Ogg's compat view,
+                 with ffprobe by harness/codecs/reader-rules.json and the reviewed
+                 difference lists of reader-differences.json; appends one row per input
+                 and view, and writes the observed lists to OUT.differences.json
   time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
        [--only ID,...] [--recollect-contaminated LABEL]
                  paired timing of the decoder workloads (30 pairs, seed 280)

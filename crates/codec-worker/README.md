@@ -48,5 +48,7 @@ exact converted output: a fingerprint of equal output, not a cryptographic hash.
 Each line holds the track index, `time_base`, `pts`, `dts`, `duration`, `trim_start` and
 `trim_end` as the reader reports them, the payload `size`, the source `position` (Ogg:
 the page that completes the packet; elementary streams: the first byte) and `complete`.
-The last line lists the tracks and how reading ended (`eof`, or `error` with the
+Ogg packets also carry `compat`, the reader's FFmpeg-compatible view
+(`triergon_ogg::compat::clock`), and the reader's `resync` and `lost` events are lines
+of their own. The last line lists the tracks and how reading ended (`eof`, or `error` with the
 reader's message).

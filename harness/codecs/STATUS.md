@@ -14,7 +14,7 @@ driven by `cargo xtask codecs` (`manifest`, `grade`, `summarize`, `readers`, `ti
 |---|---|
 | `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: lossy audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; FLAC bit-exact; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB; and the reviewed rules for the Layer I and II float decoders and the integer stereo mix of 16-bit FLAC |
 | `correctness-manifest.json` | The 775 correctness vectors: 454 of the video and elementary-stream lanes and 321 of the file-format lanes (FLAC 187, MP3 39, MP2 20, MP1 5, Vorbis 21, Opus 49) |
-| `reader-manifest.json`, `reader-rules.json` | The 305 reader comparison inputs, and the fields compared per format, the reviewed comparison rules and the dispositions of FFmpeg behaviours `cargo xtask codecs readers` applies |
+| `reader-manifest.json`, `reader-rules.json`, `reader-differences.json` | The 305 reader comparison inputs; the views and fields compared per format, the reviewed comparison rules and the scoped dispositions of FFmpeg behaviours `cargo xtask codecs readers` applies; and every reviewed difference with its disposition |
 | `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 17 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
 | [measurement-policy.md](measurement-policy.md) | What counts as equivalent work in timing and memory runs |
 | [adapter-contract.md](adapter-contract.md) | Session-layer contract for a host adapter |
@@ -99,13 +99,23 @@ under `inputs/ogg-generated`; copy them to `.research/ogg-generated`), the FLAC 
 files and generated FLAC streams, and the streams in `.research/elementary` (encoded by
 FFmpeg, and crafted damaged ones in `crafted/`). `codec-worker packets FORMAT FILE`
 prints every packet `triergon_ogg::BlockingReader` or the `triergon_elementary` reader
-emits: track, pts, dts, duration, size, position and trims as the reader reports them.
-The rules in `reader-rules.json` project the reader's times into FFmpeg's stream time
-base and pair packets in order per stream; position is compared for elementary
-streams, not for Ogg, where the reader reports the completing page and FFmpeg the
-starting one. Each input is a row: `pass`, `refused-by-both`, `disposition` with the
-reviewed FFmpeg behaviours that explain exactly its differences (pinned by input and
-difference SHA-256), or `fail`.
+emits: track, pts, dts, duration, size, position and trims as the reader reports them,
+for Ogg also its FFmpeg-compatible view (`triergon_ogg::compat::clock::packet_timing`)
+and the reader's resync and lost-page events.
+
+`reader-rules.json` projects the reader's times into FFmpeg's stream time base, aligns
+packets per stream (by position for elementary streams, by size for Ogg, where the
+reader reports the page that completes a packet and FFmpeg the one it starts on) and
+compares every field in each view: `native`, what the reader reports, and for Ogg
+`compat`, its FFmpeg-compatible policy. A native difference the compat view does not
+have is `reproduced-by-compat`. Every other difference must be one of the reviewed
+differences of its case and view in `reader-differences.json`, one per line (stream,
+reader packet, reference packet, field, reader value, FFmpeg value, disposition) under
+the SHA-256 of the list, and fall within the scope (view, fields, packets, value
+relation) of exactly one disposition the case lists. Each view of each input is `pass`,
+`refused-by-both`, `reproduced-by-compat`, `disposition` or `fail`. The run writes its
+unexplained differences, attributed where a scope matches, to `OUT.differences.json`
+for review.
 
 ## Timing and memory
 

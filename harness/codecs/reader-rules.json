@@ -1,80 +1,124 @@
 {
- "schema": "triergon.codecs.reader-rules.v1",
- "frozen_utc": "2026-11-08T07:35:00Z",
+ "schema": "triergon.codecs.reader-rules.v2",
+ "frozen_utc": "2026-11-08T09:51:00Z",
  "reference": "ffprobe of FFmpeg 9.0.2, the decode profile of cargo xtask prepare-ffmpeg (.research/reference-decode/install/bin/ffprobe), -show_packets with the demuxer forced",
- "candidate": "codec-worker packets FORMAT FILE: every packet triergon_ogg::BlockingReader or the triergon_elementary reader of FORMAT emits, as the reader reports it",
+ "candidate": "codec-worker packets FORMAT FILE: every packet triergon_ogg::BlockingReader or the triergon_elementary reader of FORMAT emits, as the reader reports it, and for Ogg also the reader's FFmpeg-compatible view (triergon_ogg::compat::clock::packet_timing)",
+ "views": {
+  "native": "what the reader reports: its own times, durations and trims",
+  "compat": "the reader's FFmpeg-compatible policy of the same packets; a native difference this view does not have is reproduced-by-compat and needs no disposition"
+ },
  "formats": {
   "ogg": {
-   "compare": [
-    "size",
-    "pts",
-    "dts",
-    "duration",
-    "trim_start",
-    "trim_end"
-   ],
    "streams": "position-in-link",
-   "reference_duration_excludes_discard_padding": true
+   "align_by": "size",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ],
+     "reference_duration_excludes_discard_padding": true
+    },
+    "compat": {
+     "compare": [
+      "size",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
   },
   "flac": {
-   "compare": [
-    "size",
-    "position",
-    "pts",
-    "dts",
-    "duration",
-    "trim_start",
-    "trim_end"
-   ],
-   "streams": "first-audio"
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
   },
   "mp3": {
-   "compare": [
-    "size",
-    "position",
-    "pts",
-    "dts",
-    "duration",
-    "trim_start",
-    "trim_end"
-   ],
-   "streams": "first-audio"
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
   },
   "aac": {
-   "compare": [
-    "size",
-    "position",
-    "pts",
-    "dts",
-    "duration",
-    "trim_start",
-    "trim_end"
-   ],
-   "streams": "first-audio"
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
   },
   "ac3": {
-   "compare": [
-    "size",
-    "position",
-    "pts",
-    "dts",
-    "duration",
-    "trim_start",
-    "trim_end"
-   ],
-   "streams": "first-audio"
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
   },
   "eac3": {
-   "compare": [
-    "size",
-    "position",
-    "pts",
-    "dts",
-    "duration",
-    "trim_start",
-    "trim_end"
-   ],
-   "streams": "first-audio"
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
   }
  },
  "rules": [
@@ -85,21 +129,21 @@
    "reason": "the comparison is of one reader against one demuxer; probing could pick a different one on either side"
   },
   {
-   "id": "ordered-pairing",
+   "id": "aligned-pairing",
    "scope": "every case",
-   "rule": "packets are paired in order per stream; packet counts, the set of streams and whether reading ended in an error are compared, and every compared field of every pair",
-   "reason": "a reader emits packets in file order; nothing is matched by search or skipped"
+   "rule": "per stream, packets are aligned in order at the least cost (a pair costs the number of its aligned field and size that differ, an unpaired packet 1; of equal costs a pair is preferred); every unpaired packet is an 'unmatched' difference and every compared field of every pair is compared; a stream only one side has packets in is one 'packets' difference of the two counts; the set of streams and whether reading ended in an error are compared too",
+   "reason": "a reader emits packets in file order; aligning keeps one extra or merged packet from shifting every later pair, while nothing is skipped: an unpaired packet is a difference like any other"
   },
   {
    "id": "time-base-projection",
-   "scope": "pts, dts and duration",
+   "scope": "pts, dts and duration of both views",
    "rule": "the reader's ticks are rescaled into the FFmpeg stream time base when every time converts exactly; otherwise each duration is rounded down and the times accumulate from the first packet's time",
    "reason": "FFmpeg times elementary streams in a fixed base (MPEG audio 1/14112000, ADTS 1/28224000, AC-3 1/90000) and, where a frame's sample count does not divide it (AC-3 at 44.1 kHz), its parser rounds each duration down and adds them up"
   },
   {
    "id": "absent-trim-is-zero",
    "scope": "trim_start, trim_end",
-   "rule": "an absent trim equals a trim of zero: the reader's Trim::start and Trim::end against the skip_samples and discard_padding of FFmpeg's skip-samples side data",
+   "rule": "an absent trim equals a trim of zero: the reader's Trim::start and Trim::end (compat: skip_samples and discard_padding) against the skip_samples and discard_padding of FFmpeg's skip-samples side data",
    "reason": "FFmpeg attaches the side data only to packets it trims and writes both values when it does"
   },
   {
@@ -109,15 +153,21 @@
    "reason": "FFmpeg's Ogg demuxer replaces a link's streams in place when a chained link starts, where the reader opens new tracks"
   },
   {
-   "id": "ogg-duration-excludes-padding",
-   "scope": "ogg",
+   "id": "ogg-native-duration-includes-padding",
+   "scope": "ogg, native view",
    "rule": "the reader's duration is compared with FFmpeg's duration plus the packet's discard padding",
-   "reason": "FFmpeg's Ogg demuxer shortens the last packet's duration by the discard padding it reports; the reader keeps the coded duration and reports the padding as Trim::end, which is compared separately"
+   "reason": "FFmpeg's Ogg demuxer shortens the last packet's duration by the discard padding it reports; the reader keeps the coded duration and reports the padding as Trim::end, which is compared separately. The compat view reports FFmpeg's shortened duration and is compared as it is"
+  },
+  {
+   "id": "ogg-compat-dts-is-pts",
+   "scope": "ogg, compat view",
+   "rule": "the compat view's dts is its pts",
+   "reason": "the policy reports one time for presentation and decode, as FFmpeg's Ogg demuxer does"
   },
   {
    "id": "ogg-position-not-compared",
    "scope": "ogg",
-   "rule": "packet positions are not compared",
+   "rule": "packet positions are not compared; Ogg packets are aligned by size",
    "reason": "the reader reports the page that completes a packet and FFmpeg the page it starts on, so the two differ by definition for every packet that spans pages"
   },
   {
@@ -125,488 +175,311 @@
    "scope": "flac, mp3, aac, ac3, eac3",
    "rule": "the reader's one track is FFmpeg's first audio stream; packets of other streams are counted in the row (reference_other_packets) and not compared",
    "reason": "FFmpeg turns an ID3v2 picture into an attached-picture video stream; the reader keeps tag bytes as tags, not packets"
+  },
+  {
+   "id": "scoped-dispositions",
+   "scope": "every difference that remains",
+   "rule": "a difference neither view explains must be one of the reviewed differences of its case and view in harness/codecs/reader-differences.json (by their SHA-256), and fall within the scope (view, field, packets and value relation) of exactly one disposition the case lists, the one it was reviewed under; a case listing a disposition that covers none of its differences fails",
+   "reason": "a disposition explains only the kind of difference it names, on the packets it names"
   }
  ],
  "dispositions": [
   {
-   "id": "vorbis-first-packet",
-   "reason": "FFmpeg gives the first Vorbis audio packet the duration it states alone and starts it that long before zero (on every chain link); the reader times it as completing no samples, as the first block's output only primes the overlap"
+   "id": "ogg-negative-duration-unsigned",
+   "reason": "FFmpeg times the last Ogg page forwards from its first packet; when the page's granule position precedes its last packet's start, that packet's duration is negative and ffprobe prints it modulo 2^32. The compat view keeps it negative; the native view's coded duration is compared with FFmpeg's plus the padding, which carries the same 2^32",
+   "scope": [
+    {
+     "views": [
+      "native",
+      "compat"
+     ],
+     "fields": [
+      "duration"
+     ],
+     "packets": "last-of-stream",
+     "reference": "candidate-plus-2^32"
+    }
+   ]
   },
   {
-   "id": "vorbis-short-after-long",
-   "reason": "inside a page FFmpeg times each packet back from the granule position with the durations packets state alone; a short block after a long one states a quarter of two short blocks, not its overlap with the long block, so FFmpeg starts that packet (long - short) / 4 samples late and as much shorter; the reader uses the overlap"
-  },
-  {
-   "id": "ogg-last-page-forward",
-   "reason": "FFmpeg times the last page forwards from its first packet and reports the excess over the granule position as discard padding, so a last page whose granule position precedes its last packet's start ends in a negative duration that ffprobe prints modulo 2^32; the reader times the page backwards from its granule position with an end trim"
-  },
-  {
-   "id": "ogg-chained-link-start",
-   "reason": "FFmpeg continues a chained link where the previous link's last packet ended, without the new link's own start offset; the reader places the link by its start offset (Opus pre-skip)"
-  },
-  {
-   "id": "ogg-lost-page",
-   "reason": "the first packet after lost pages takes the granule position of the last page FFmpeg read; the reader times it from its own page's granule position"
-  },
-  {
-   "id": "opus-pre-skip-after-lost-start",
-   "reason": "when the first audio page fails its CRC, FFmpeg still reports the Opus pre-skip as skip samples on the first packet it keeps; the reader applies pre-skip to the stream start, which was lost"
+   "id": "ogg-first-packet-after-bad-page",
+   "reason": "when the first audio page fails its CRC, FFmpeg times the first packet it keeps from that packet's page; the compat view times it from the stream start, as if the lost packets had been delivered",
+   "scope": [
+    {
+     "views": [
+      "compat"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "after-resync",
+     "reference": "any"
+    }
+   ]
   },
   {
    "id": "flac-rate-change-duration",
-   "reason": "when the sample rate changes, FFmpeg delivers each FLAC frame's duration rescaled to the first frame's rate (and times later frames by those durations); the reader times every frame at its own rate"
+   "reason": "when the sample rate changes, FFmpeg delivers each FLAC frame's duration rescaled to the first frame's rate; the reader times every frame at its own rate. The reader reports no per-frame rate, so the scope is every duration",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "duration"
+     ],
+     "packets": "any",
+     "reference": "any"
+    }
+   ]
   },
   {
    "id": "flac-768k-no-duration",
-   "reason": "FFmpeg delivers FLAC frames at 768 kHz without a duration and the last one without a time; the reader times them from the frame headers"
+   "reason": "FFmpeg delivers FLAC frames at 768 kHz without a duration and the last one without a time; the reader times them from the frame headers",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "duration"
+     ],
+     "packets": "any",
+     "reference": "absent"
+    },
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "last-of-stream",
+     "reference": "absent"
+    }
+   ]
   },
   {
-   "id": "flac-variable-under-fixed-last",
-   "reason": "in a stream with varying block sizes under the fixed-blocking flag, FFmpeg times the last frame at the previous frame's end; the reader times it from its frame number"
+   "id": "flac-last-frame-at-previous-end",
+   "reason": "FFmpeg's FLAC parser times the last frame of a stream at the previous packet's end (its time plus its duration as FFmpeg reports it), not from the frame's own number; this shows where block sizes vary under the fixed-blocking flag and where FFmpeg's durations differ from the frames' (a sample rate change, a time base taken from leading bytes); the reader times every frame from its frame number",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "last-of-stream",
+     "reference": "any"
+    }
+   ]
   },
   {
    "id": "flac-damaged-frame-merge",
-   "reason": "FFmpeg merges a damaged FLAC frame with the three after it into one packet without times; the reader ends the damaged frame at the next header its CRC-16 confirms"
+   "reason": "FFmpeg merges a damaged FLAC frame with the frames after it into one packet without times, spanning the bytes of the reader's packets; the reader ends the damaged frame at the next header its CRC-16 confirms",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "size",
+      "unmatched"
+     ],
+     "packets": "resplit",
+     "reference": "any"
+    },
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts",
+      "duration"
+     ],
+     "packets": "resplit",
+     "reference": "absent"
+    }
+   ]
+  },
+  {
+   "id": "flac-parser-position-after-gap",
+   "reason": "after a packet FFmpeg's FLAC parser assembled from bytes the reader does not deliver as that packet (leading bytes, a merged damaged frame), it reports the next packet's position as its own read position; the reader reports the frame's source offset",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "position"
+     ],
+     "packets": "after-unmatched",
+     "reference": "any"
+    }
+   ]
+  },
+  {
+   "id": "flac-time-base-from-leading-bytes",
+   "reason": "in a FLAC stream without STREAMINFO that starts with unparsable bytes, FFmpeg takes the stream time base (1/32000) from a frame header in those bytes but times packets in samples of the stream rate; its times are the reader's sample times unconverted",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "any",
+     "reference": "candidate-unprojected"
+    }
+   ]
   },
   {
    "id": "leading-bytes-packet",
-   "reason": "FFmpeg delivers the bytes before the first FLAC or AC-3 frame as a packet; the reader keeps leading tags as tags and skips junk to the first confirmed frame"
+   "reason": "FFmpeg delivers the bytes before the first FLAC or AC-3 frame as a packet and times the frames after it from that packet's end; the reader keeps leading tags as tags and skips junk to the first confirmed frame",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "unmatched"
+     ],
+     "packets": "unmatched-before-first",
+     "reference": "any"
+    },
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "any",
+     "reference": "candidate-plus-unmatched-durations"
+    }
+   ]
   },
   {
    "id": "trailing-id3v1-in-last-packet",
-   "reason": "FFmpeg delivers an ID3v1 tag at the end of a FLAC or AC-3 stream as part of the last packet; the reader keeps it as a tag"
+   "reason": "FFmpeg delivers the 128-byte ID3v1 tag at the end of a FLAC or AC-3 stream as part of the last packet; the reader keeps it as a tag",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "size"
+     ],
+     "packets": "last-of-stream",
+     "reference": "candidate-plus-128"
+    }
+   ]
   },
   {
    "id": "mpeg-foreign-frame",
-   "reason": "FFmpeg accepts an MPEG audio frame of another version or sample rate, or a header in junk that no frame follows; the reader requires the frame after a header to confirm it"
+   "reason": "FFmpeg accepts an MPEG audio frame of another version or sample rate, or a header in junk that no frame follows, cutting the same bytes into other packets and timing later frames after them; the reader requires the frame after a header to confirm it",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "size",
+      "position",
+      "unmatched"
+     ],
+     "packets": "resplit",
+     "reference": "any"
+    },
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "any",
+     "reference": "candidate-plus-unmatched-durations"
+    }
+   ]
   },
   {
    "id": "mpeg-free-format",
-   "reason": "FFmpeg 9.0.2 refuses free-format MPEG audio; the reader delivers its frames"
+   "reason": "FFmpeg 9.0.2 refuses free-format MPEG audio; the reader delivers its frames",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "packets",
+      "streams",
+      "end"
+     ],
+     "packets": "file",
+     "reference": "any"
+    }
+   ]
   },
   {
    "id": "adts-position-after-junk",
-   "reason": "FFmpeg reports ADTS packet positions after junk as if the junk were not there; the reader reports each frame's source offset"
+   "reason": "FFmpeg reports ADTS packet positions after junk as if the junk were not there; the reader reports each frame's source offset, one constant offset (the junk) later",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "position"
+     ],
+     "packets": "any",
+     "reference": "constant-offset"
+    }
+   ]
   },
   {
    "id": "flac-small-max-blocksize",
-   "reason": "FFmpeg refuses to open a FLAC stream whose STREAMINFO declares a maximum block size below 16; that is a decoder decision, so the reader still delivers the frames"
+   "reason": "FFmpeg refuses to open a FLAC stream whose STREAMINFO declares a maximum block size below 16; that is a decoder decision, so the reader still delivers the frames",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "packets",
+      "streams",
+      "end"
+     ],
+     "packets": "file",
+     "reference": "any"
+    }
+   ]
   },
   {
    "id": "flac-metadata-past-end",
-   "reason": "a metadata block whose length runs past the end of the file: FFmpeg declares the stream STREAMINFO describes and delivers no packets; the reader refuses the stream as truncated, since no frame can follow the metadata"
-  }
- ],
- "cases": [
-  {
-   "name": "1.0-test_small.ogg",
-   "sha256": "9f510e92b976eaf735009b444511f856db601eb13698b54fdfc9c4e078f9f3bc",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "8d54887f8261ccdb0af76d08612b1dac67d0253f9bfaddc0c9287709593b43a0",
-   "differences": 15
-  },
-  {
-   "name": "1.0.1-test_small.ogg",
-   "sha256": "1eef411505a81a7b4e2e6bcc382844479fa51db88f2d03ed8e638682b0786e4e",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "07bbff12b2fc225f3a7ccf4058420fecd5a21e145d5f2b0b0e5d9f2853927ce7",
-   "differences": 9
-  },
-  {
-   "name": "6.ogg",
-   "sha256": "1dbce194fb1ca74250c156b4aba10b3bf76f90bc5ca8896823cef6c965a2c46a",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "5592f79393de7a4fa755d331547a748d46acbcdf44c2081c51fd70c43b86dade",
-   "differences": 30
-  },
-  {
-   "name": "beta3-test_small.ogg",
-   "sha256": "c756dbf9e72680b6b35b9d5547aa15a76298e3d53600b85f17f1a2d19714ec14",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "1c7a3d445f8af02f0cb3765ba843b0684a179c5b06c26574914d5021ddab90aa",
-   "differences": 39
-  },
-  {
-   "name": "beta4-test_small.ogg",
-   "sha256": "67517ea51560fac1c6190bd90ab3c18ff1bcdbc30d8e10e3585476ea44aba518",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "1fe546ec8e48b8d08b36504092420690fbb259ff8225601e9a62e1b96ce92d55",
-   "differences": 54
-  },
-  {
-   "name": "chain-test1_small.ogg",
-   "sha256": "f5099bddbe1c7dd80c1b46ba99930cd7f818c63f5120d7c5a5d9d991852cafe0",
-   "dispositions": [
-    "vorbis-first-packet"
-   ],
-   "difference_sha256": "d25945bdaa39a66314e37e6117b5df5b09f309742144f5caed8961bcd4573f11",
-   "differences": 3
-  },
-  {
-   "name": "chain-test2_small.ogg",
-   "sha256": "48e5024d95170b064208c469ea75915e98294cf74c7fcec2b73b4e679d0dfd0a",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "d543e4e0cb25514470c16c87587d40b3b15b542a9106c78fe1c11fec130d2a84",
-   "differences": 42
-  },
-  {
-   "name": "highrate-test_small.ogg",
-   "sha256": "9974ea9a70159b6157ff8c157ca6969183037a8e6ccdc4f0d84e4a8aa607e923",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "8ffdbe3a4c5b42af5d1a8bc3c874cadafa6bed2a17bda31d85407b3f628cef52",
-   "differences": 15
-  },
-  {
-   "name": "lsp-test2_small.ogg",
-   "sha256": "6946aa25a4d27153b38aefeb3c139fa8542689adafc5ae2bdb2ce4aa3af77e54",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "9b4f88cc578907b3aa7eebcaf876e6f8d7485f811e611286fcb59433177a1153",
-   "differences": 84
-  },
-  {
-   "name": "lsp-test3_small.ogg",
-   "sha256": "3358bacdc7cd33b0b75e4ed84913b1f11847e1d556dbe00ff60fb1e30cf711f5",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "44e384dbaa69938e83a4f8c20b39c39f2d6e0d13ba8096d244d7ffdc5bef2491",
-   "differences": 54
-  },
-  {
-   "name": "lsp-test4_small.ogg",
-   "sha256": "5dd55ac71ebffe5db1a351fc5beaeddeab61e415853ce351d268eda547b2264e",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "82dc60fa59fb98b1ba63e19c586e239df515be8480243d2c6c1f638994d4906e",
-   "differences": 48
-  },
-  {
-   "name": "lsp-test_small.ogg",
-   "sha256": "f908598728585cdec80f47d96ae36eaa9f3afaa2774c01638f52b11a6e4c5727",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "3b3867c436515df9cd7af99fd823cc7b1f54164c66212b41f77597a343cf2980",
-   "differences": 96
-  },
-  {
-   "name": "mono_small.ogg",
-   "sha256": "67565c74021eb0a6b68bd20bbef431ff76a0bd7d8c4865702b6d6408860f54cd",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "e2361a38f118d3b2e35ae17ee315fb0b078ab0500b45e54735e70d21077ddbfd",
-   "differences": 168
-  },
-  {
-   "name": "moog_small.ogg",
-   "sha256": "25778a973824fcf488c751ecbc2fdbc594e8655666802e1f7d319c11c2814461",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "a8520428c4c7c733122083cf8bba2152e00c6deec573440496c724f33aa7c309",
-   "differences": 30
-  },
-  {
-   "name": "rc1-test_small.ogg",
-   "sha256": "0db535709f6b3f9810c6980370ec72911df2a22d67cf0a32c1445aa5f2b43e99",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "5b7a43255ffb972874d936f9238b72284a0a4983509522e49e28f3ad0eb2bab7",
-   "differences": 45
-  },
-  {
-   "name": "rc2-test2_small.ogg",
-   "sha256": "db45e1c0ad0c172f2ac32a09984c1a8486963e4be4924bdf3049a4db46880ab7",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "38c4e1a042e4e203eaa6bf19595f23a15757f0951a463d4c849e237c547b8bbc",
-   "differences": 234
-  },
-  {
-   "name": "rc2-test_small.ogg",
-   "sha256": "2277d4f8278a0b38894cded850e036db53702f16b6631d69a1407f575bed2e59",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "afef43d051f393ee39e2c0eca43018d31d6f232ae912c8550c8958bc082cb16c",
-   "differences": 63
-  },
-  {
-   "name": "rc3-test_small.ogg",
-   "sha256": "f6e63631d1e757780ebee1cc82844a3f5e7aa7b49daa0ff7963bd9bcc27659d6",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "457030cff3044d7520571014ee78239001b5fb8311d7f62ad778fc95f817a6b3",
-   "differences": 45
-  },
-  {
-   "name": "sleepzor_small.ogg",
-   "sha256": "dcc01bcbccd9c1ed4cd2304f893a52e3f551573a99a2183635c8db070d18ada2",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "9c6977fc498b0c53afc68dd5ea5f2e0b1d91090906fd2cada8d4063bf0ec2e44",
-   "differences": 63
-  },
-  {
-   "name": "test-short2_small.ogg",
-   "sha256": "56900907a3603f842970467a3ea0ed19d4d7426b9c31388333cf45ca2566561c",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "fa6ba766323302b2a18b7f7534e09ec8d2a104947c8263d03088e721fb1c9b91",
-   "differences": 12
-  },
-  {
-   "name": "vorbis_chapter_extension_demo.ogg",
-   "sha256": "b3490672085ff1377f6d23f2d4738129a1b96d3e735711654f535f42228730df",
-   "dispositions": [
-    "vorbis-first-packet",
-    "vorbis-short-after-long"
-   ],
-   "difference_sha256": "3f9dfd991fa037df2ed82c93481163b33a48fe6a77582fdc406c2f5dddf94593",
-   "differences": 147
-  },
-  {
-   "name": "a_vorbis.ogg",
-   "sha256": "ff3157d4b3b1ed595665a314a597a5d357ed5f1570bb22de57b02a1d9c8a3a7c",
-   "dispositions": [
-    "vorbis-first-packet"
-   ],
-   "difference_sha256": "7880149e798cb91fa3381873c2278abf36b51bff300fbfe36a8f56a7554fc1d5",
-   "differences": 3
-  },
-  {
-   "name": "b_vorbis.ogg",
-   "sha256": "f9bd978104bcaf4c02f0232c6102ba51d744370158a51570cc78d1a6dc6ee419",
-   "dispositions": [
-    "vorbis-first-packet",
-    "ogg-last-page-forward"
-   ],
-   "difference_sha256": "aa919091144a0118483887c87a1c8ab00f65af89c18bfcd85d507f9285c9b2d5",
-   "differences": 55
-  },
-  {
-   "name": "chain_opus.opus",
-   "sha256": "8c4318d74908867bc5e56e44e6c9aaa609cbcbc5cf0886fb9e0cfabc7c534aab",
-   "dispositions": [
-    "ogg-chained-link-start"
-   ],
-   "difference_sha256": "68b8bedfef1dce7c7a8989f88e0574c6b2b87026196f0e720da5684d88e16666",
-   "differences": 62
-  },
-  {
-   "name": "chain_vorbis.ogg",
-   "sha256": "19cd38a41bd876db81c5f7a881c7fa9bdfc4821be9b8588f7fe7265202932690",
-   "dispositions": [
-    "vorbis-first-packet",
-    "ogg-last-page-forward"
-   ],
-   "difference_sha256": "854b5f85f3d085748b1afd32c43178ad49fbb22a2bdb7e1859de01a0a6da5101",
-   "differences": 58
-  },
-  {
-   "name": "crc_bad.opus",
-   "sha256": "58955283b54fc60407a235dc3579c6919619ca8d7f8f77ef7f0f41bd9430e614",
-   "dispositions": [
-    "opus-pre-skip-after-lost-start"
-   ],
-   "difference_sha256": "35f3a25bbcc51d0bb01c6c8e1b07bd513aea84458108735c60c36553dd322788",
-   "differences": 1
-  },
-  {
-   "name": "lost_page.opus",
-   "sha256": "553d074916d34d4687b6bea0bcd9d1004aa2e4b3a98713f0c4bc04fc4c819f13",
-   "dispositions": [
-    "ogg-lost-page"
-   ],
-   "difference_sha256": "37ae3f033ae3a6bc42e2fbbe894396150e2bc74b915ecb7852cf50902765dd83",
-   "differences": 2
-  },
-  {
-   "name": "flac_corrupt.flac",
-   "sha256": "a64d636b1cb23938fc5488d7b421c0d884b01c02f5fdc0ab2592a1c95d1df577",
-   "dispositions": [
-    "flac-damaged-frame-merge"
-   ],
-   "difference_sha256": "6da4cfd521dd72e975901c0c05890035b0ad159877cdc5d4a4c400f44b41a648",
-   "differences": 461
-  },
-  {
-   "name": "flac_id3.flac",
-   "sha256": "f1a8e639ad4dd5e9d00cdc723f2c139fb17b7026b04797124fdb54d46db9946f",
-   "dispositions": [
-    "trailing-id3v1-in-last-packet"
-   ],
-   "difference_sha256": "1d634afd77e0e3a1122e355ade1a335abf904fdbdbf901a2c9b18443192702f9",
-   "differences": 1
-  },
-  {
-   "name": "flac_mid_junk.flac",
-   "sha256": "e709b8e162689cd7f8c17c7b5857cde30f85c6ec7fcc28925929bf1b6727dfb4",
-   "dispositions": [
-    "flac-damaged-frame-merge"
-   ],
-   "difference_sha256": "05c6a2eb4b1b2330edad91c684ed7a83c7ae285709d4a870add6b453f3db8e5b",
-   "differences": 461
-  },
-  {
-   "name": "08 - blocksize 65536.flac",
-   "sha256": "f6e3b6b72e86f259fcdafc50486b8bf9d4d85b193e18e6e4aa63a6e1ca9e7928",
-   "dispositions": [
-    "flac-small-max-blocksize"
-   ],
-   "difference_sha256": "24d7714f8dd80d273a98d489df9c72e9f04dd057c1b778677050076e35fda057",
-   "differences": 3
-  },
-  {
-   "name": "09 - blocksize 1.flac",
-   "sha256": "4a1e703e9ac7dc67ac82dc74087ba1d62a0f13e89d11e020e01e26306a0102af",
-   "dispositions": [
-    "flac-small-max-blocksize"
-   ],
-   "difference_sha256": "2b5a3538a88d4c684a65c0ce6ef42f721e923f61b4de338ed4196f40b546dac2",
-   "differences": 3
-  },
-  {
-   "name": "27 - old format variable blocksize file created with Flake 0.11.flac",
-   "sha256": "21b486a42dbf64c043d57dcd5a038163dc77f5eec398312d994643617ec3c5b6",
-   "dispositions": [
-    "flac-variable-under-fixed-last"
-   ],
-   "difference_sha256": "61d6318efc563f9970b7a9eb70846260111e2f53511dbde28a4fe6fb3009c5a1",
-   "differences": 2
-  },
-  {
-   "name": "01 - changing samplerate.flac",
-   "sha256": "9fa8f7c57186be8708f42620885a71d4c4871767ff55cfe063eb1cf3bad8d0a5",
-   "dispositions": [
-    "flac-rate-change-duration"
-   ],
-   "difference_sha256": "72c05e8d57a739298fbe4e15c289f997946feb874f0ee1184d07eb5caf40436a",
-   "differences": 98
-  },
-  {
-   "name": "06 - samplerate 768kHz.flac",
-   "sha256": "3e773546d57f7aa7d126a225f8db152a34196725b71ffb76bf2fe05bad6fbb9f",
-   "dispositions": [
-    "flac-768k-no-duration"
-   ],
-   "difference_sha256": "2048f922631167dd19e45ec3554c8d349e707644d989084a2f474abd685e2e1c",
-   "differences": 1968
-  },
-  {
-   "name": "11 - file starting with unparsable data.flac",
-   "sha256": "40c58b833fb07f0de41259d83cde78211e3faaf9e5f844aed43fa52c18435d2f",
-   "dispositions": [
-    "leading-bytes-packet"
-   ],
-   "difference_sha256": "667584d067321f31ea5ecba54f8f10ad34c9600ef370b9ac54fa4cf91b2d956c",
-   "differences": 552
-  },
-  {
-   "name": "flac_s20_rate768k.flac",
-   "sha256": "ea3c5aa6fd530bd0b14f893f151904119d6d140d228bbfe67e4a1ac413f4bb0f",
-   "dispositions": [
-    "flac-768k-no-duration"
-   ],
-   "difference_sha256": "b432d137cb62df7eb1fa3ca35e31b3ffe4cf9b501e1197037e5902d5846fb2d0",
-   "differences": 227
-  },
-  {
-   "name": "mp3_foreign_frame.mp3",
-   "sha256": "3ab7165c4c5ae4f7f5e4acadab49656c5341fcd2266f0c5787bb46d74f479ead",
-   "dispositions": [
-    "mpeg-foreign-frame"
-   ],
-   "difference_sha256": "219ac1a1bb23632ec45252c3d417874d4a341a448450fb65298f50585fde3845",
-   "differences": 160
-  },
-  {
-   "name": "mp3_mid_junk_falsesync.mp3",
-   "sha256": "eca2f347d0862c1f87a4ec5531688657844efef96322fde1dc583874674d7240",
-   "dispositions": [
-    "mpeg-foreign-frame"
-   ],
-   "difference_sha256": "0a80acaab4a8dc27dd602cca16351084e1ea42b63134078069913efe6d7972ba",
-   "differences": 3
-  },
-  {
-   "name": "he_free.bit",
-   "sha256": "b55afc2a21492c4b3035d423f36fe87560ef34f65eb997da60af9b01f300362c",
-   "dispositions": [
-    "mpeg-free-format"
-   ],
-   "difference_sha256": "e05c6da4c3311f28a98175654fcda2b32acf5a08f213fb50231e40ef3a7883b6",
-   "differences": 3
-  },
-  {
-   "name": "adts_mid_junk.aac",
-   "sha256": "6490572a4960ed9f90277217dc982d04c5d119e7abcc8ad6d2445c9917e051e9",
-   "dispositions": [
-    "adts-position-after-junk"
-   ],
-   "difference_sha256": "51f420db7d14f897910c59fe30dfe36011f581b280b6a3a66a8810511aba8ce3",
-   "differences": 177
-  },
-  {
-   "name": "ac3_tags.ac3",
-   "sha256": "7dfdd81edc33f2734acb33acd509f7826a08400ef72474946348b138c77de316",
-   "dispositions": [
-    "leading-bytes-packet",
-    "trailing-id3v1-in-last-packet"
-   ],
-   "difference_sha256": "ac7e8b285b69e5983b307d9e499b49a7e5ee84ff964c3289e0540b579bd6044e",
-   "differences": 157
-  },
-  {
-   "name": "11 - incorrect metadata block length.flac",
-   "sha256": "3732151ba8c4e66a785165aa75a444aad814c16807ddc97b793811376acacfd6",
-   "dispositions": [
-    "flac-metadata-past-end"
-   ],
-   "difference_sha256": "6123de1ef45ea1f18080d71e672acc21091d628547e58ffd26dc281c79f0dda4",
-   "differences": 2
+   "reason": "a metadata block whose length runs past the end of the file: FFmpeg declares the stream STREAMINFO describes and delivers no packets; the reader refuses the stream as truncated, since no frame can follow the metadata",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "streams",
+      "end"
+     ],
+     "packets": "file",
+     "reference": "any"
+    }
+   ]
   }
  ]
 }
