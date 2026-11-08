@@ -1,8 +1,8 @@
 //! Sequential TS188 feed for AVC and ADTS AAC.
 
 use crate::{
-    BackendStep, Error, RawEvent, Result, Source, SourceReply, TrackKey,
-    engines::{TsEngine, TsPayloadStep},
+    Error, Result, Source, SourceReply, TrackKey,
+    engines::{NativePacket, TsEngine, TsPayloadStep},
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     io::SourceOwner,
@@ -149,50 +149,46 @@ impl<S: Source> Transport<S> {
                 let reply = self.source.poll(request, work, cancel)?;
                 if !self.provide(&reply)? {
                     if work.remaining() == 0 {
-                        return Ok(BackendStep::Yield.into());
+                        return Ok(TsPayloadStep::Yield);
                     }
                     let request = self
                         .request
                         .clone()
                         .ok_or(Error::Invalid("missing TS input request"))?;
-                    return Ok(BackendStep::NeedInput(request).into());
+                    return Ok(TsPayloadStep::NeedInput(request));
                 }
                 continue;
             }
             let before = work.remaining();
             let step = self.engine.poll_progressive_payload(work, cancel);
             self.engine.take_suppressed_events();
-            match step? {
-                event @ (TsPayloadStep::Step(BackendStep::Event(_))
-                | TsPayloadStep::Packet { .. }) => {
-                    let bytes = match &event {
-                        TsPayloadStep::Step(BackendStep::Event(event)) => event.payload_bytes(),
-                        TsPayloadStep::Packet { packet, .. } => packet.payload_len,
-                        TsPayloadStep::Step(_) => unreachable!("payload delivery"),
-                    };
-                    if bytes > maximum_payload_bytes {
-                        return Err(Error::Limit {
-                            requested: bytes,
-                            maximum: maximum_payload_bytes,
-                        });
-                    }
-                    if work.try_charge(1) {
-                        return Ok(event);
-                    }
-                    self.pending = Some(event);
+            let step = step?;
+            if let Some(bytes) = step.payload_bytes() {
+                if bytes > maximum_payload_bytes {
+                    return Err(Error::Limit {
+                        requested: bytes,
+                        maximum: maximum_payload_bytes,
+                    });
                 }
-                TsPayloadStep::Step(BackendStep::NeedInput(request)) => {
+                if work.try_charge(1) {
+                    return Ok(step);
+                }
+                self.pending = Some(step);
+                continue;
+            }
+            match step {
+                TsPayloadStep::NeedInput(request) => {
                     let request = carrier_aligned_request(request);
                     self.request = Some(request.clone());
                     if work.remaining() == 0 {
-                        return Ok(BackendStep::NeedInput(request).into());
+                        return Ok(TsPayloadStep::NeedInput(request));
                     }
                 }
-                TsPayloadStep::Step(BackendStep::Yield) if work.remaining() < before => {}
+                TsPayloadStep::Yield if work.remaining() < before => {}
                 other => return Ok(other),
             }
         }
-        Ok(BackendStep::Yield.into())
+        Ok(TsPayloadStep::Yield)
     }
 }
 
@@ -316,32 +312,24 @@ impl<S: Source> TsProgressiveReader<S> {
             Phase::Read => {
                 let transport = self.transport.as_mut().ok_or(Error::Closed)?;
                 match transport.poll(work, cancel, self.limits.transport.pes_bytes)? {
-                    TsPayloadStep::Packet { packet, clock } => self.on_packet(packet, clock)?,
-                    TsPayloadStep::Step(step) => match step {
-                        BackendStep::Event(event) => self.on_event(event)?,
-                        BackendStep::NeedInput(request) => {
-                            return Ok(TsProgressiveStep::NeedInput(request));
-                        }
-                        BackendStep::Backpressure {
-                            requested,
-                            available,
-                        } => {
-                            return Ok(TsProgressiveStep::Backpressure {
-                                requested,
-                                available,
-                            });
-                        }
-                        BackendStep::End => {
-                            self.transport = None;
-                            self.video.as_mut().ok_or(Error::Truncated)?.finish();
-                            self.audio.as_mut().ok_or(Error::Truncated)?.finish();
-                            self.phase = Phase::DrainVideo;
-                        }
-                        BackendStep::Yield => {}
-                        BackendStep::AwaitEntity => {
-                            return Err(Error::Invalid("unexpected TS entity boundary"));
-                        }
-                    },
+                    event @ (TsPayloadStep::Event(_)
+                    | TsPayloadStep::Configuration(_)
+                    | TsPayloadStep::Refusal { .. }
+                    | TsPayloadStep::Packet { .. }
+                    | TsPayloadStep::EntityEnd(_)) => self.on_event(event)?,
+                    TsPayloadStep::NeedInput(request) => {
+                        return Ok(TsProgressiveStep::NeedInput(request));
+                    }
+                    TsPayloadStep::End => {
+                        self.transport = None;
+                        self.video.as_mut().ok_or(Error::Truncated)?.finish();
+                        self.audio.as_mut().ok_or(Error::Truncated)?.finish();
+                        self.phase = Phase::DrainVideo;
+                    }
+                    TsPayloadStep::Yield => {}
+                    TsPayloadStep::AwaitEntity => {
+                        return Err(Error::Invalid("unexpected TS entity boundary"));
+                    }
                 }
             }
             Phase::Video | Phase::DrainVideo => {
@@ -400,10 +388,10 @@ impl<S: Source> TsProgressiveReader<S> {
         Ok(TsProgressiveStep::Yield)
     }
 
-    fn on_event(&mut self, event: RawEvent) -> Result<()> {
+    fn on_event(&mut self, event: TsPayloadStep) -> Result<()> {
         match event {
-            RawEvent::Ts(event) => self.on_transport(event.source)?,
-            RawEvent::NativeTsConfiguration(config) => {
+            TsPayloadStep::Event(event) => self.on_transport(event.source)?,
+            TsPayloadStep::Configuration(config) => {
                 let tracks = self
                     .tracks
                     .as_ref()
@@ -424,10 +412,11 @@ impl<S: Source> TsProgressiveReader<S> {
                     self.audio = Some(HlsAac::new(pool, config, 0x1fff)?);
                 }
             }
-            RawEvent::NativeTs { packet, clock } => {
-                self.on_packet(packet, clock)?;
-            }
-            RawEvent::NativeRefusal { track, error, .. }
+            TsPayloadStep::Packet { packet, clock } => match packet {
+                NativePacket::Owned(packet) => self.on_packet(packet, &clock)?,
+                NativePacket::Compact(packet) => self.on_packet(packet, &clock)?,
+            },
+            TsPayloadStep::Refusal { track, error, .. }
                 if self
                     .tracks
                     .as_ref()
@@ -443,7 +432,7 @@ impl<S: Source> TsProgressiveReader<S> {
     fn on_packet<P: PesInput>(
         &mut self,
         packet: P,
-        clock: triergon_mpegts::compat::pes::DemuxTimeView,
+        clock: &triergon_mpegts::compat::pes::DemuxTimeView,
     ) -> Result<()> {
         let tracks = self
             .tracks
@@ -624,6 +613,51 @@ mod tests {
     use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId};
 
     #[test]
+    fn refusal_delivery_waits_for_work_and_keeps_its_original_fields() {
+        let pool = Budget::new(256 * 1024).unwrap();
+        let id = SourceId(73);
+        let caps = SourceCapabilities {
+            length: None,
+            random_access: false,
+        };
+        let input = InputCursor::new(&pool, id, caps, 4096).unwrap();
+        let source =
+            crate::ByteSource::new(id, Bytes::copy_from_slice(&pool, &[]).unwrap(), 188).unwrap();
+        let track = TrackKey::Ts {
+            program: 7,
+            pid: 257,
+        };
+        let error = Error::Unsupported("test carriage");
+        let mut transport = Transport {
+            engine: TsEngine::progressive(input, ParseLimits::default(), true).unwrap(),
+            request: None,
+            pending: Some(TsPayloadStep::Refusal {
+                track,
+                error,
+                source_event_ordinal: 109,
+            }),
+            source: SourceOwner::new(source),
+        };
+        let cancel = AtomicBool::new(false);
+        let mut work = WorkBudget::new(0);
+        assert!(matches!(
+            transport.poll(&mut work, &cancel, 0),
+            Ok(TsPayloadStep::Yield)
+        ));
+        assert!(transport.pending.is_some());
+        assert_eq!(work.spent(), 0);
+
+        let mut work = WorkBudget::new(1);
+        assert!(
+            matches!(transport.poll(&mut work, &cancel, 0), Ok(TsPayloadStep::Refusal {
+            track: actual_track, error: actual_error, source_event_ordinal: 109,
+        }) if actual_track == track && actual_error == error)
+        );
+        assert_eq!(work.spent(), 1);
+        assert!(transport.pending.is_none());
+    }
+
+    #[test]
     fn aligned_requests_keep_identity_and_never_round_positive_limits_to_zero() {
         let pool = Budget::new(64 * 1024).unwrap();
         let input = InputCursor::new(
@@ -692,8 +726,8 @@ mod tests {
                     .poll(&mut WorkBudget::new(65536), cancel, 64 * 1024)
                     .unwrap()
                 {
-                    TsPayloadStep::Step(BackendStep::NeedInput(request)) => return request,
-                    TsPayloadStep::Step(BackendStep::Yield) => {}
+                    TsPayloadStep::NeedInput(request) => return request,
+                    TsPayloadStep::Yield => {}
                     _ => panic!("expected an input request"),
                 }
             }
@@ -829,8 +863,8 @@ mod tests {
                 .poll(&mut WorkBudget::new(65536), &cancel, 64 * 1024)
                 .unwrap()
             {
-                TsPayloadStep::Step(BackendStep::Yield) => {}
-                TsPayloadStep::Step(BackendStep::Event(RawEvent::Ts(event))) => {
+                TsPayloadStep::Yield => {}
+                TsPayloadStep::Event(event) => {
                     assert!(matches!(event.source, TraceEvent::Diagnostic(fault)
                         if fault.kind == FaultKind::Transport && fault.error == Error::Truncated));
                     truncated = true;

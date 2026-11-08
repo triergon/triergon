@@ -60,6 +60,12 @@ impl TryFrom<DemuxTimeView> for AvcTsClock {
     type Error = Error;
 
     fn try_from(clock: DemuxTimeView) -> Result<Self> {
+        Self::from_demux(&clock)
+    }
+}
+
+impl AvcTsClock {
+    fn from_demux(clock: &DemuxTimeView) -> Result<Self> {
         let narrow = |value: Option<i128>| {
             value
                 .map(i64::try_from)
@@ -359,7 +365,7 @@ impl AvcTsReader {
         mailbox: &mut Option<DemuxPacket>,
         clock: DemuxTimeView,
     ) -> Result<bool> {
-        self.push_packet(mailbox, clock)
+        self.push_packet(mailbox, &clock)
     }
 
     /// Accept the same PES facts through borrowed logical carrier ranges.
@@ -367,7 +373,7 @@ impl AvcTsReader {
     pub fn push_compact(
         &mut self,
         mailbox: &mut Option<CompactDemuxPacket>,
-        clock: DemuxTimeView,
+        clock: &DemuxTimeView,
     ) -> Result<bool> {
         self.push_packet(mailbox, clock)
     }
@@ -375,7 +381,7 @@ impl AvcTsReader {
     pub(crate) fn push_packet<P: PesInput>(
         &mut self,
         mailbox: &mut Option<P>,
-        clock: DemuxTimeView,
+        clock: &DemuxTimeView,
     ) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -417,11 +423,11 @@ impl AvcTsReader {
             header.and_then(|h| h.pts_raw33),
             header.and_then(|h| h.dts_raw33),
         );
-        if !clock_describes(&clock, &packet, pts, dts) {
+        if !clock_describes(clock, &packet, pts, dts) {
             return Err(Error::Invalid("AVC TS clock does not describe this PES"));
         }
         if header.is_some() {
-            self.remember_clock(AvcTsClock::try_from(clock)?)?;
+            self.remember_clock(AvcTsClock::from_demux(clock)?)?;
         }
         self.source_clock_epoch = Some(origin);
         let remaining = packet.payload_len;

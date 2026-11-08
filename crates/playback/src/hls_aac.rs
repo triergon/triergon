@@ -206,7 +206,7 @@ impl HlsAac {
         mailbox: &mut Option<DemuxPacket>,
         clock: DemuxTimeView,
     ) -> Result<bool> {
-        self.push_packet(mailbox, clock)
+        self.push_packet(mailbox, &clock)
     }
 
     /// Accept the same PES facts through borrowed logical carrier ranges.
@@ -214,7 +214,7 @@ impl HlsAac {
     pub fn push_compact(
         &mut self,
         mailbox: &mut Option<CompactDemuxPacket>,
-        clock: DemuxTimeView,
+        clock: &DemuxTimeView,
     ) -> Result<bool> {
         self.push_packet(mailbox, clock)
     }
@@ -222,7 +222,7 @@ impl HlsAac {
     pub(crate) fn push_packet<P: PesInput>(
         &mut self,
         mailbox: &mut Option<P>,
-        clock: DemuxTimeView,
+        clock: &DemuxTimeView,
     ) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -263,7 +263,7 @@ impl HlsAac {
         let anchor = packet.time_header();
         let raw_pts = anchor.and_then(|header| header.pts_raw33);
         let raw_dts = anchor.and_then(|header| header.dts_raw33);
-        if !clock_describes(&clock, &packet, raw_pts, raw_dts) {
+        if !clock_describes(clock, &packet, raw_pts, raw_dts) {
             return Err(Error::Invalid("HLS AAC clock does not describe this PES"));
         }
         if anchor.is_some() {
@@ -666,7 +666,7 @@ mod tests {
             .unwrap();
             assert_eq!(
                 wrong_track
-                    .push_packet(&mut packet, wrong_clock)
+                    .push_packet(&mut packet, &wrong_clock)
                     .unwrap_err(),
                 Error::Invalid("HLS AAC PES track or configuration")
             );
@@ -675,12 +675,12 @@ mod tests {
 
             let mut reader = HlsAac::new(pool, CONFIG, MAXIMUM_ADTS_BYTES).unwrap();
             assert_eq!(
-                reader.push_packet(&mut packet, wrong_clock).unwrap_err(),
+                reader.push_packet(&mut packet, &wrong_clock).unwrap_err(),
                 Error::Invalid("HLS AAC clock does not describe this PES")
             );
             assert!(packet.is_some());
             assert_eq!(pool.used(), used);
-            assert!(reader.push_packet(&mut packet, clock).unwrap());
+            assert!(reader.push_packet(&mut packet, &clock).unwrap());
             assert!(packet.is_none());
             let mut frames = Vec::new();
             assert!(matches!(

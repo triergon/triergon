@@ -328,43 +328,92 @@ pub struct TsEngine {
     boundary: Option<ts::MediaEntityEnd>,
 }
 
-enum NativePacket {
+#[derive(Debug)]
+pub(crate) enum NativePacket {
     Owned(DemuxPacket),
     Compact(CompactDemuxPacket),
 }
 
-#[expect(
-    clippy::large_enum_variant,
-    reason = "one inline delivery with charged retained buffers; no per-packet allocation"
-)]
+#[derive(Debug)]
 pub(crate) enum TsPayloadStep {
-    Step(BackendStep),
+    Event(TsEvent),
+    Configuration(TsNativeConfiguration),
+    Refusal {
+        track: TrackKey,
+        error: Error,
+        source_event_ordinal: u64,
+    },
     Packet {
-        packet: CompactDemuxPacket,
+        packet: NativePacket,
         clock: DemuxTimeView,
     },
+    EntityEnd(ts::MediaEntityEnd),
+    NeedInput(InputRequest),
+    Yield,
+    End,
+    AwaitEntity,
 }
 
-impl From<BackendStep> for TsPayloadStep {
-    fn from(step: BackendStep) -> Self {
-        Self::Step(step)
+impl TsPayloadStep {
+    pub(crate) fn payload_bytes(&self) -> Option<usize> {
+        Some(match self {
+            Self::Packet { packet, .. } => match packet {
+                NativePacket::Owned(packet) => packet.payload_len,
+                NativePacket::Compact(packet) => packet.payload_len,
+            },
+            Self::Event(TsEvent {
+                source: TraceEvent::Pes(packet),
+                ..
+            }) => packet.payload_len,
+            Self::Event(_) | Self::Configuration(_) | Self::Refusal { .. } | Self::EntityEnd(_) => {
+                0
+            }
+            _ => return None,
+        })
     }
 }
 
 // Each poller keeps the return layout of its consumer.
-trait TsStepProjection: From<BackendStep> {
-    fn compact_packet(packet: CompactDemuxPacket, clock: DemuxTimeView) -> Result<Self>;
+trait TsStepProjection: Sized {
+    fn project(step: TsPayloadStep) -> Result<Self>;
 }
 
 impl TsStepProjection for BackendStep {
-    fn compact_packet(_: CompactDemuxPacket, _: DemuxTimeView) -> Result<Self> {
-        Err(Error::Invalid("compact TS payload polling required"))
+    fn project(step: TsPayloadStep) -> Result<Self> {
+        Ok(match step {
+            TsPayloadStep::Event(event) => Self::Event(RawEvent::Ts(event)),
+            TsPayloadStep::Configuration(config) => {
+                Self::Event(RawEvent::NativeTsConfiguration(config))
+            }
+            TsPayloadStep::Refusal {
+                track,
+                error,
+                source_event_ordinal,
+            } => Self::Event(RawEvent::NativeRefusal {
+                track,
+                error,
+                source_event_ordinal,
+            }),
+            TsPayloadStep::Packet {
+                packet: NativePacket::Owned(packet),
+                clock,
+            } => Self::Event(RawEvent::NativeTs { packet, clock }),
+            TsPayloadStep::Packet {
+                packet: NativePacket::Compact(_),
+                ..
+            } => return Err(Error::Invalid("compact TS payload polling required")),
+            TsPayloadStep::EntityEnd(end) => Self::Event(RawEvent::EntityEnd(end)),
+            TsPayloadStep::NeedInput(request) => Self::NeedInput(request),
+            TsPayloadStep::Yield => Self::Yield,
+            TsPayloadStep::End => Self::End,
+            TsPayloadStep::AwaitEntity => Self::AwaitEntity,
+        })
     }
 }
 
 impl TsStepProjection for TsPayloadStep {
-    fn compact_packet(packet: CompactDemuxPacket, clock: DemuxTimeView) -> Result<Self> {
-        Ok(Self::Packet { packet, clock })
+    fn project(step: Self) -> Result<Self> {
+        Ok(step)
     }
 }
 
@@ -1929,18 +1978,13 @@ impl TsEngine {
             }
         };
         let Some(clock) = projector.project_header(pid, epochs, header, work, cancel)? else {
-            return Ok(BackendStep::Yield.into());
+            return T::project(TsPayloadStep::Yield);
         };
         let packet = self
             .native_pending
             .take()
             .ok_or(Error::Invalid("native packet missing"))?;
-        match packet {
-            NativePacket::Owned(packet) => {
-                Ok(BackendStep::Event(RawEvent::NativeTs { packet, clock }).into())
-            }
-            NativePacket::Compact(packet) => T::compact_packet(packet, clock),
-        }
+        T::project(TsPayloadStep::Packet { packet, clock })
     }
 
     // Keep backend-specific polling workspaces out of the shared dispatcher.
@@ -1958,9 +2002,9 @@ impl TsEngine {
             self.native_update_at = Some(index + 1);
             let event = match update {
                 TsNativeUpdate::Configuration(configuration) => {
-                    RawEvent::NativeTsConfiguration(configuration)
+                    TsPayloadStep::Configuration(configuration)
                 }
-                TsNativeUpdate::Refusal(error) => RawEvent::NativeRefusal {
+                TsNativeUpdate::Refusal(error) => TsPayloadStep::Refusal {
                     track: TrackKey::Ts {
                         program: self.program,
                         pid,
@@ -1969,7 +2013,7 @@ impl TsEngine {
                     source_event_ordinal: self.event_ordinal,
                 },
             };
-            return Ok(BackendStep::Event(event).into());
+            return T::project(event);
         }
         if self.native_pending.is_some() {
             return self.project_pending_packet(w, c);
@@ -2007,9 +2051,9 @@ impl TsEngine {
                         ) {
                             return self.project_pending_packet(w, c);
                         }
-                        return Ok(BackendStep::Yield.into());
+                        return T::project(TsPayloadStep::Yield);
                     }
-                    Ok(ts::AssemblyStep::Yield) => return Ok(BackendStep::Yield.into()),
+                    Ok(ts::AssemblyStep::Yield) => return T::project(TsPayloadStep::Yield),
                     Ok(ts::AssemblyStep::NeedPayload | ts::AssemblyStep::Finished) => {}
                     Err(error @ (Error::Backpressure { .. } | Error::Cancelled)) => {
                         return Err(error);
@@ -2018,7 +2062,7 @@ impl TsEngine {
                         track.refuse(error);
                         self.native_update_at = Some(index);
                         self.native_active = self.draining.then_some(index + 1);
-                        return Ok(BackendStep::Yield.into());
+                        return T::project(TsPayloadStep::Yield);
                     }
                 }
             }
@@ -2038,10 +2082,10 @@ impl TsEngine {
             )
         );
         if self.ended {
-            return Ok(BackendStep::End.into());
+            return T::project(TsPayloadStep::End);
         }
         if self.boundary.is_some() {
-            return Ok(BackendStep::AwaitEntity.into());
+            return T::project(TsPayloadStep::AwaitEntity);
         }
         loop {
             if self.pending.is_none() {
@@ -2060,8 +2104,8 @@ impl TsEngine {
                 }
                 match step? {
                     Step::Ready(e) => self.pending = Some(e),
-                    Step::NeedInput(r) => return Ok(BackendStep::NeedInput(r).into()),
-                    Step::Yield => return Ok(BackendStep::Yield.into()),
+                    Step::NeedInput(r) => return T::project(TsPayloadStep::NeedInput(r)),
+                    Step::Yield => return T::project(TsPayloadStep::Yield),
                     Step::End(_) => {
                         if self.draining {
                             return Err(Error::Invalid("TS repeated undrained entity End"));
@@ -2071,9 +2115,9 @@ impl TsEngine {
                                 self.stream.media_entity_end(&mut self.input, w, c)?
                             {
                                 self.boundary = Some(end.clone());
-                                return Ok(BackendStep::Event(RawEvent::EntityEnd(end)).into());
+                                return T::project(TsPayloadStep::EntityEnd(end));
                             }
-                            return Ok(BackendStep::Yield.into());
+                            return T::project(TsPayloadStep::Yield);
                         }
                         if self.segment_discovery.is_some() && self.pcr_pid.is_none() {
                             return Err(Error::Invalid("TS segment ended without an active PMT"));
@@ -2086,13 +2130,13 @@ impl TsEngine {
                             }
                         }
                         self.native_active = Some(0);
-                        return Ok(BackendStep::Yield.into());
+                        return T::project(TsPayloadStep::Yield);
                     }
                 }
             }
             if (feed_only || !matches!(self.pending, Some(TraceEvent::Pes(_)))) && !w.try_charge(1)
             {
-                return Ok(BackendStep::Yield.into());
+                return T::project(TsPayloadStep::Yield);
             }
             let event = self
                 .pending
@@ -2157,7 +2201,7 @@ impl TsEngine {
                     }
                     self.native_map_next += 1;
                     if self.native_map_next < self.native_tracks.as_slice().len() {
-                        return Ok(BackendStep::Yield.into());
+                        return T::project(TsPayloadStep::Yield);
                     }
                 }
                 self.facts
@@ -2252,7 +2296,7 @@ impl TsEngine {
                     || w.remaining() == 0
                     || self.suppressed_events >= Self::FEED_EVENT_QUANTUM
                 {
-                    return Ok(BackendStep::Yield.into());
+                    return T::project(TsPayloadStep::Yield);
                 }
                 continue;
             }
@@ -2284,7 +2328,7 @@ impl TsEngine {
                     .ok_or(Error::Invalid("TS PES before program discovery"))?;
                 native_clock = projector.project(pes, w, c)?;
                 if native_clock.is_none() {
-                    return Ok(BackendStep::Yield.into());
+                    return T::project(TsPayloadStep::Yield);
                 }
             }
             let event = self
@@ -2301,14 +2345,13 @@ impl TsEngine {
             if matches!(event, TraceEvent::Finished) {
                 self.ended = true;
             }
-            return Ok(BackendStep::Event(RawEvent::Ts(TsEvent {
+            return T::project(TsPayloadStep::Event(TsEvent {
                 source: event,
                 source_pts,
                 source_dts,
                 native_clock,
                 clock_key: key,
-            }))
-            .into());
+            }));
         }
     }
 }
@@ -2399,5 +2442,82 @@ impl RawEvent {
             }) => p.payload_len,
             _ => 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod projection_tests {
+    use super::*;
+    use ts::{
+        SourceEpochs,
+        clock::SourceTimePolicy,
+        compat::pes::{ClockOrigin, TimestampOrigin},
+    };
+
+    #[test]
+    fn ts_projection_preserves_source_clock_fields_and_refusal_ordinal() {
+        let key = ClockKey {
+            tsid: 3,
+            program: 7,
+            pcr_pid: 256,
+            epoch: 11,
+        };
+        let event = TsEvent {
+            source: TraceEvent::Timeline {
+                program: key.program,
+                clock_epoch: key.epoch,
+            },
+            source_pts: Some(
+                source_timestamp(Some(9), key, SourceTimePolicy::RelativeEpochZero).unwrap(),
+            ),
+            source_dts: Some(source_timestamp(None, key, SourceTimePolicy::Unanchored).unwrap()),
+            native_clock: Some(DemuxTimeView {
+                profile: DemuxProfile::PesPackets,
+                program: key.program,
+                pid: 257,
+                source_epochs: SourceEpochs {
+                    clock: key.epoch,
+                    configuration: 13,
+                },
+                source_pts_raw33: Some(9),
+                source_dts_raw33: None,
+                pts90: Some(-17),
+                dts90: Some(-17),
+                pts_origin: TimestampOrigin::SourcePts,
+                dts_origin: TimestampOrigin::PtsOnlyCompatibility,
+                origin: Some(ClockOrigin {
+                    first_reference_raw90: 9,
+                    interval_origin90: -26,
+                }),
+            }),
+            clock_key: Some(key),
+        };
+        let expected = format!("{event:?}");
+        let step = TsPayloadStep::project(TsPayloadStep::Event(event)).unwrap();
+        assert_eq!(step.payload_bytes(), Some(0));
+        let BackendStep::Event(RawEvent::Ts(event)) = BackendStep::project(step).unwrap() else {
+            panic!("source event was not delivered");
+        };
+        assert_eq!(format!("{event:?}"), expected);
+
+        let track = TrackKey::Ts {
+            program: 7,
+            pid: 257,
+        };
+        let error = Error::Unsupported("test carriage");
+        let step = TsPayloadStep::project(TsPayloadStep::Refusal {
+            track,
+            error,
+            source_event_ordinal: 109,
+        })
+        .unwrap();
+        assert_eq!(step.payload_bytes(), Some(0));
+        assert!(
+            matches!(BackendStep::project(step), Ok(BackendStep::Event(RawEvent::NativeRefusal {
+            track: actual_track, error: actual_error, source_event_ordinal: 109,
+        })) if actual_track == track && actual_error == error)
+        );
+        assert_eq!(TsPayloadStep::End.payload_bytes(), None);
+        assert_eq!(TsPayloadStep::AwaitEntity.payload_bytes(), None);
     }
 }
