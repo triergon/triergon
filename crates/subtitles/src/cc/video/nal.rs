@@ -142,18 +142,33 @@ pub fn sps_timing(codec: Codec, nal: &[u8]) -> Option<Timing> {
 
 type Bits<'a> = Rbsp<'a>;
 
-fn skip_scaling_list(bits: &mut Bits<'_>, size: usize) -> Result<(), BitError> {
+/// A parameter set FFmpeg's decoder does not take: cut short or out of range.
+struct Invalid;
+
+impl From<BitError> for Invalid {
+    fn from(_: BitError) -> Self {
+        Self
+    }
+}
+
+/// Passes over a scaling list. A delta outside -128..=127 makes the parameter
+/// set invalid, as FFmpeg's decoder rejects it.
+fn skip_scaling_list(bits: &mut Bits<'_>, size: usize) -> Result<(), Invalid> {
     let (mut last, mut next) = (8i32, 8i32);
     for _ in 0..size {
         if next != 0 {
-            next = (last + bits.se()? + 256) % 256;
+            let delta = bits.se()?;
+            if !(-128..=127).contains(&delta) {
+                return Err(Invalid);
+            }
+            next = (last + delta) & 0xff;
         }
         last = if next == 0 { last } else { next };
     }
     Ok(())
 }
 
-fn h264_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, BitError> {
+fn h264_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, Invalid> {
     let profile = bits.read(8)?;
     bits.read(16)?; // constraint flags, level_idc
     bits.ue()?; // seq_parameter_set_id
@@ -208,7 +223,7 @@ fn h264_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, BitError> {
     if !bits.flag()? {
         return Ok(None);
     }
-    skip_vui_until_timing(bits, Codec::H264)
+    Ok(skip_vui_until_timing(bits, Codec::H264)?)
 }
 
 /// A VUI's fields before its timing information; then the timing.
@@ -248,7 +263,7 @@ fn skip_vui_until_timing(bits: &mut Bits<'_>, codec: Codec) -> Result<Option<Tim
     }))
 }
 
-fn hevc_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, BitError> {
+fn hevc_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, Invalid> {
     bits.read(4)?; // sps_video_parameter_set_id
     let sub_layers = bits.read(3)? as usize; // sps_max_sub_layers_minus1
     bits.flag()?;
@@ -289,7 +304,12 @@ fn hevc_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, BitError> {
     }
     bits.ue()?;
     bits.ue()?;
-    let poc_lsb_bits = bits.ue()? + 4;
+    // log2_max_pic_order_cnt_lsb, summed in 32 bits and limited to 16 as
+    // FFmpeg's decoder does.
+    let poc_lsb_bits = bits.ue()?.wrapping_add(4);
+    if poc_lsb_bits > 16 {
+        return Err(Invalid);
+    }
     let all_layers = bits.flag()?;
     for _ in (if all_layers { 0 } else { sub_layers })..=sub_layers {
         for _ in 0..3 {
@@ -351,7 +371,7 @@ fn hevc_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, BitError> {
     }
     if bits.flag()? {
         for _ in 0..bits.ue()?.min(32) {
-            bits.read(poc_lsb_bits.min(16))?;
+            bits.read(poc_lsb_bits)?;
             bits.flag()?;
         }
     }
@@ -359,23 +379,25 @@ fn hevc_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, BitError> {
     if !bits.flag()? {
         return Ok(None);
     }
-    skip_vui_until_timing(bits, Codec::Hevc)
+    Ok(skip_vui_until_timing(bits, Codec::Hevc)?)
 }
 
-/// The NAL units of an access unit, each from its header byte on.
+/// The NAL units of an access unit, each from its header byte on. A length
+/// running past the access unit ends it; lengths of other than 1 to 4 bytes
+/// frame nothing.
 pub fn nal_units(access_unit: &[u8], framing: Framing) -> impl Iterator<Item = &[u8]> {
     let mut rest = access_unit;
     std::iter::from_fn(move || match framing {
-        Framing::Lengths(size) => {
-            let size = usize::from(size);
-            let length = rest
-                .get(..size)?
+        Framing::Lengths(size @ 1..=4) => {
+            let (prefix, tail) = rest.split_at_checked(usize::from(size))?;
+            let length = prefix
                 .iter()
                 .fold(0usize, |n, &b| (n << 8) | usize::from(b));
-            let unit = rest.get(size..size + length)?;
-            rest = &rest[size + length..];
+            let (unit, tail) = tail.split_at_checked(length)?;
+            rest = tail;
             Some(unit)
         }
+        Framing::Lengths(_) => None,
         Framing::StartCodes => loop {
             let start = find_start_code(rest, 0)?;
             let body = &rest[start + 3..];
