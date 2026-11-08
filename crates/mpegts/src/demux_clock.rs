@@ -71,7 +71,6 @@ pub struct DemuxTimeView {
 }
 
 /// Demux encoded-header time, without validated source timestamp fields.
-#[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EncodedTimeView {
     pub encoded_pts_raw33: u64,
@@ -123,6 +122,31 @@ pub struct DemuxClock {
     origin: Option<ClockOrigin>,
 }
 impl DemuxClock {
+    /// Place encoded PTS from a faulted transport packet in this demux interval.
+    /// Raw DTS stays absent; `dts90` is only the compatibility PTS-only result.
+    /// This creates no source timestamp or clock anchor.
+    pub fn project_transport_fault(
+        &mut self,
+        packet: &crate::demux_transport::TransportFaultPacket,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<EncodedTimeView>> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if work.remaining() == 0 {
+            return Ok(None);
+        }
+        if packet.program != self.program {
+            return Err(Error::Invalid("transport fault clock program mismatch"));
+        }
+        self.project_encoded_pts(
+            packet.pid,
+            packet.encoded_header.encoded_pts_raw33(),
+            work,
+            cancel,
+        )
+    }
     /// Explicit compatibility input from checked encoding in a rejected carrier.
     /// Shares the demux interval context, never creates a source PesHeader/time.
     #[cfg(feature = "reference-trace")]
@@ -133,6 +157,15 @@ impl DemuxClock {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<EncodedTimeView>> {
+        self.project_encoded_pts(pid, header.encoded_pts_raw33(), work, cancel)
+    }
+    fn project_encoded_pts(
+        &mut self,
+        pid: u16,
+        raw: u64,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<EncodedTimeView>> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -140,7 +173,6 @@ impl DemuxClock {
             return Ok(None);
         }
         crate::checked_pid(pid)?;
-        let raw = header.encoded_pts_raw33();
         check_raw33(raw)?;
         let origin = self.origin.unwrap_or_else(|| initial_interval(raw));
         let ticks = representative(Some(raw), Some(origin))?

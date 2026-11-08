@@ -643,7 +643,7 @@ fn take<'a>(bytes: &'a [u8], position: &mut usize, count: usize) -> Result<&'a [
     Ok(value)
 }
 
-fn timestamp(bytes: &[u8], prefix: u8) -> Result<u64> {
+pub(crate) fn timestamp(bytes: &[u8], prefix: u8) -> Result<u64> {
     if bytes.len() != 5
         || bytes[0] >> 4 != prefix
         || bytes[0] & 1 == 0
