@@ -16528,6 +16528,36 @@
    "sha256": "b1df5b6f79fa2644106b8e87c61799b5c6fa9075c33096017bf4c50d89ef95a0",
    "bytes": 676034441,
    "source_revision": "7be886648e47f711b0f258412df82d214158a709"
+  },
+  {
+   "name": "isobmff-armv7-runtime-linux-armv7",
+   "path": "isobmff-armv7-runtime-linux-armv7",
+   "retention": "retained",
+   "reason": "32-bit ARMv7 ISO BMFF status row: all 1,020 open and index comparisons with timing and memory for the 972 output labels; 30-pair screens of the Matroska, startup and seek, HLS, MP4 range and external-vector contracts against the base workers; codec instruction counts; the CPU, kernel and user-space package list",
+   "key": "evidence/isobmff-armv7-runtime-linux-armv7/4f57b0eff78395c45894229728f48b8d3c917fdb316ef21b0b5447664a6c8745.tar.gz",
+   "sha256": "4f57b0eff78395c45894229728f48b8d3c917fdb316ef21b0b5447664a6c8745",
+   "bytes": 3091343186,
+   "source_revision": "a8963a0acae831e3c76860a67e9bc5447983241f"
+  },
+  {
+   "name": "isobmff-armv7-runtime-linux-arm64",
+   "path": "isobmff-armv7-runtime-linux-arm64",
+   "retention": "retained",
+   "reason": "AArch64 ISO BMFF status row: all 1,020 open and index comparisons with timing for the 972 output labels; the kernel-bound memory collection with its proof and source review; 30-pair screens of the Matroska, startup and seek, HLS, MP4 range, progressive TS and external-vector contracts against the base workers; codec instruction counts",
+   "key": "evidence/isobmff-armv7-runtime-linux-arm64/bac7a2a736072b26c51d39e0c280b0973a5f0d3dcb2670ae42b84ade69dfdd22.tar.gz",
+   "sha256": "bac7a2a736072b26c51d39e0c280b0973a5f0d3dcb2670ae42b84ade69dfdd22",
+   "bytes": 3451809470,
+   "source_revision": "a8963a0acae831e3c76860a67e9bc5447983241f"
+  },
+  {
+   "name": "isobmff-armv7-runtime-checks-linux-armv7",
+   "path": "isobmff-armv7-runtime-checks-linux-armv7",
+   "retention": "retained",
+   "reason": "32-bit ARMv7 ISO BMFF worker size breakdown against main, observed resident peaks recomputed from both ARMv7 ISO BMFF gate runs, same-code against main and the progressive TS instruction counts",
+   "key": "evidence/isobmff-armv7-runtime-checks-linux-armv7/c8ba940a5e634b9a3b415293fc84aa57f2e5027d1a056bdb3f77290a6c2040d0.tar.gz",
+   "sha256": "c8ba940a5e634b9a3b415293fc84aa57f2e5027d1a056bdb3f77290a6c2040d0",
+   "bytes": 10820432,
+   "source_revision": "d0f95da39ef908dd5c8a286ccd90fe5b697a7511"
   }
  ]
 }

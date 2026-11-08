@@ -17,7 +17,7 @@ shaping against HarfBuzz 14.6.0 and FriBidi 1.0.17
 | Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four host FATE demux comparisons | 1.1590 (116/116 pass) | heap ≤0.627, RSS ≤0.965 | full EBML/Matroska scope |
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1606 (44/44 pass) | heap ≤0.404, total RSS ≤0.849 | — |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10/10 packet folds (`matroska-audio-clocks`) | 1.4510 (6/10 pass) | heap ≤1.822 (8/10 lower), total RSS ≤1.043 (0/10 lower) | audio seek |
-| ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1273 (972/972 pass) | heap ≤0.4133, total RSS ≤0.7283 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
+| ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 0.8826 (972/972 pass) | heap ≤0.4132, total RSS ≤0.7416 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
 | MP4 range playback | Regular AVC/AAC startup and backward seek with sample table durations and coded-frame trim | 4 complete open and backward-seek comparisons, 845 packets; AAC duration and trim regressions | 1.0466 (4/4 pass) | heap ≤0.556, total RSS ≤0.945 (4/4 lower) | other range playback profiles |
 | Ogg | Pages with CRC and resync, multiplexed and chained streams, Vorbis, Opus and FLAC mappings with canonical configurations, granule timing, pre-skip and end trims, bisection seeking | Packets against the pinned `ffprobe` (`cargo xtask codecs readers`) on 21 FATE Vorbis files and 13 generated Opus, Vorbis and FLAC files (multiplexed, chained, damaged, truncated), in two views: the FFmpeg-compatible `compat::clock` 31/34 pass, 3 differ only by reviewed FFmpeg behaviours; the reader's own timing 7/34 pass, 25 differ only where `compat::clock` reproduces FFmpeg, 2 by reviewed behaviours ([reader rules](../harness/codecs/reader-rules.json), [frozen differences](../harness/codecs/reader-differences.json)) | within the codec workloads | within the codec workloads | `b_vorbis.ogg`, `chain_vorbis.ogg`: a negative last duration FFmpeg prints modulo 2^32; `crc_bad.opus`: the first packet after a page that fails its CRC, which FFmpeg times from its own page and `compat::clock` from the stream start; Theora and Speex untimed; chained seeks not compared with FFmpeg |
 | Audio elementary streams | Native FLAC (with or without `fLaC`), MPEG audio with ID3v2/ID3v1/APE tags, Xing/Info/VBRI and LAME gapless trims, ADTS, AC-3/E-AC-3; one shared frame-stream engine | Packets as the readers emit them against the pinned `ffprobe` on 271 FLAC, MPEG audio, ADTS, AC-3 and E-AC-3 files (the IETF FLAC testbench, MP3 conformance, generated and crafted damaged streams): 253/271 pass, 16 differ only by reviewed FFmpeg behaviours, 2 refused by both (testbench faulty `06 - missing streaminfo metadata block`, `07 - other metadata blocks preceding streaminfo metadata block`) | within the codec workloads | within the codec workloads | FLAC `flac_s20_rate768k`, `06 - samplerate 768kHz` (no durations at 768 kHz), `01 - changing samplerate`, `27 - old format variable blocksize file created with Flake 0.11`, `11 - file starting with unparsable data`, `11 - incorrect metadata block length`, `08 - blocksize 65536`, `09 - blocksize 1`; crafted `ac3_tags`, `adts_mid_junk`, `flac_corrupt`, `flac_id3`, `flac_mid_junk`, `mp3_foreign_frame`, `mp3_mid_junk_falsesync`; MP3 `he_free` (free format, refused by FFmpeg); E-AC-3 dependent substreams on real files; ADTS and AC-3 seek cost |
@@ -100,6 +100,11 @@ repository runners.
 ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 `--subset52` selecting the 52-operation set. Packet framing uses `cargo xtask framing`.
 
+The ISO BMFF row uses the gate build at `a8963a0acae831e3c76860a67e9bc5447983241f`
+on a c8g.large pinned to CPU 1, 30 pairs. Runtime comes from the timing collection and
+memory from a separate collection under the kernel RSS bound; both are in the raw
+samples.
+
 The MP4 range playback row uses the gate build at
 `f58e444b72f94bb3962990dd515f28be1aaaa574` on a c8g.large pinned to CPU 1.
 All four original cases and 845 packets match, with 30 timing pairs of 50 complete
@@ -113,8 +118,7 @@ comparison remains archived separately.
 | Matroska startup and seek | `0e28298d038bea072629b3bad6389dcc806b4861` | `a20dcbbe804bfd21ee631cc42f61466d2400d5115abb8ea97dd243ef733ba74f` |
 | ISO BMFF / MP4 | `f958c0b9624a8b7c7bd91b7d2a0c30299ae1dbed` | `fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c` |
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
-| ISO BMFF open and index runtime | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525` |
-| ISO BMFF open and index memory | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a` |
+| ISO BMFF open and index runtime and memory | `a8963a0acae831e3c76860a67e9bc5447983241f` | `bac7a2a736072b26c51d39e0c280b0973a5f0d3dcb2670ae42b84ade69dfdd22` |
 | MPEG-TS progressive playback | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | HLS segments | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | Packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
@@ -127,7 +131,7 @@ comparison remains archived separately.
 | Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
 | MPEG-TS | `090c856df65f9247d24ea9f1c927e35cf5d528e8` | `6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1` |
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
-| ARMv7: ISO BMFF / MP4 | `9621f6063a2e517fecc1c28757e6bed50b5228a8` | `ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691` |
+| ARMv7: ISO BMFF / MP4 | `a8963a0acae831e3c76860a67e9bc5447983241f` | `4f57b0eff78395c45894229728f48b8d3c917fdb316ef21b0b5447664a6c8745` |
 | ARMv7: packet framing, codec conformance, tests | `9621f6063a2e517fecc1c28757e6bed50b5228a8` | `9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e` |
 | ARMv7: Matroska audio clocks, MPEG-TS, MP4 forward, TS program, raw Annex B | `7be886648e47f711b0f258412df82d214158a709` | `b1df5b6f79fa2644106b8e87c61799b5c6fa9075c33096017bf4c50d89ef95a0` |
 
@@ -154,7 +158,7 @@ peaks are given beside it.
 | Matroska / WebM | 116/116 (six feature groups and the external HDR vector) | 1.0940 (116/116 pass) | heap ≤0.775; total RSS ceiling ≤1.728, observed peaks ≤1.136 |
 | Matroska startup and seek | 44/44 | 0.9267 (44/44 pass) | heap ≤0.396; total RSS ceiling ≤1.448, observed peaks ≤1.016 |
 | HLS segments | 71/71 | 0.7366 (71/71 pass) | heap ≤0.020; total RSS ceiling ≤1.353, observed peaks ≤0.843 |
-| ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals) | 2.4250 (757/972 pass) | heap ≤0.364 (972/972 lower); total RSS ceiling ≤1.387, observed peaks ≤0.894 |
+| ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals) | 1.1312 (972/972 pass) | heap ≤0.364 (972/972 lower); total RSS ceiling ≤1.454, observed peaks ≤0.927 |
 | Packet framing | 125/125 AVC/HEVC reference comparisons | 0.9195 (125/125 pass) | heap ≤0.765 (125/125 lower); total RSS ceiling ≤1.962, observed peaks ≤1.112 |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the six video timing workloads decode to FFmpeg's digests | 1.7785 (8/17 pass) | no repository runner |
 | Capture | 0/15: mux and encoder pass on all 15, conversion fails on all 15 (below) | 3.7355 (2/15 pass) | heap ≤0.564, total RSS ≤0.981 (14/15; `c05-noise-960` has no valid observation) |
@@ -172,12 +176,7 @@ Above the ceiling on ARMv7: codecs `h264-high-1080p` 1.5371, `h264-main-1920x800
 2.2526, `c07-ui-static-480-bottomup` 3.7355, `c08-ui-scroll-480-bottomup` 2.4663,
 `c09-motion-480-bottomup` 2.5628, `c10-ui-transition-480-topdown` 3.3268,
 `c11-motion-960-rate1` 1.6835, `c12-motion-960-1m` 2.7349, `c13-motion-960-6m` 2.7882,
-`c14-motion-960-rate255` 2.6747; ISO BMFF 215 of 972 outputs, worst
-`clock27-u64-minus1-step12-native-index-tiny` 2.4250: 194 read in `tiny` windows from the
-fragmented-file (`f-`, `trun18-`, `flag-`, `origin18-`, `follow-flag-`, `discard22-`,
-`discard24-`, `modern-iso6-`, `order-fragment-header-`), 64-bit clock (`clock27-`,
-`order27-`) and tx3g (`r-subtitle-`) groups, and 21 `clock27-` and `order27-` outputs read
-in `ordinary` windows; MP4 forward `progressive-ten-sequential-batches` 2.6724,
+`c14-motion-960-rate255` 2.6747; MP4 forward `progressive-ten-sequential-batches` 2.6724,
 `progressive-pending-reverse-ranges` 1.8392, `progressive-pending-two-mdats` 1.7791,
 `progressive-pending-terminal` 1.7306, `progressive-pending-pair` 1.7203,
 `progressive-unknown-clock-terminal` 1.7099, `progressive-pending-unknown-clock` 1.7051,
@@ -185,7 +184,10 @@ in `ordinary` windows; MP4 forward `progressive-ten-sequential-batches` 2.6724,
 `regular-encoded-avc-aac-native-seek` 1.3406, `progressive-f-ctts-v1` 1.2993,
 `progressive-f-explicit` 1.2977, `progressive-f-no-second-tfdt` 1.2818 and
 `progressive-f-description-change` 1.2810; TS program `entry-hevc-aac-44100-00` 1.2915 and
-`entry-hevc-aac-44100-01` 1.2543. The raw samples' `report.json` lists each bound.
+`entry-hevc-aac-44100-01` 1.2543. Every ISO BMFF output is within it; the closest are
+the two-track 64-bit clock outputs indexed in `tiny` windows (`order27-`), worst
+`order27-u64-last-scale1000-cat12-native-index-tiny` 1.1312. The raw samples'
+`report.json` lists each bound.
 
 Capture conversion must stay within ±1 of FFmpeg's on every sample. On
 `c01-ui-static-960`, Triergon's conversion output is byte-identical on ARMv7 and
@@ -201,7 +203,11 @@ of 115, up to 1.136), and in 3 of the 44 startup and seek cases:
 and `seek-hevc-seek-no-default-2700-eof` 1.0163. Every packet-framing case has its total
 RSS ceiling and its observed resident peak above the reference (observed up to 1.112);
 every ISO BMFF output has its total RSS ceiling above the reference, and none its observed
-peak.
+peak. The ISO BMFF observed bound uses the graded formula with the candidate's observed
+resident peak in place of its ceiling. The ISO BMFF ceiling is the comparison worker's
+virtual peak, which counts its whole binary: the worker compiles its input driver for both
+in-memory and file input, 78 KB of text (20 pages), while the library's own code is 6.8 KB
+smaller.
 
 Every measured Matroska audio clocks, MPEG-TS, MP4 forward, TS program and raw Annex B
 case has a total RSS ceiling above the reference. Peak heap is above it in Matroska audio
