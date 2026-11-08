@@ -14,12 +14,13 @@ triergon-matroska = { path = "../media", optional = true }
 triergon-isobmff = { path = "../isobmff", optional = true }
 triergon-mpegts = { path = "../mpegts", optional = true }
 triergon-ogg = { path = "../ogg", optional = true }
+triergon-elementary = { path = "../elementary", optional = true }
 triergon-framing = { path = "../framing", optional = true }
 triergon-subtitles = { path = "../subtitles", optional = true }
 
 [dev-dependencies]
 # The workspace test run builds no other crate with this feature.
-triergon = { path = ".", features = ["isobmff", "ogg"] }
+triergon = { path = ".", features = ["isobmff", "ogg", "elementary"] }
 
 [features]
 default = ["matroska"]
@@ -27,6 +28,7 @@ matroska = ["dep:triergon-matroska"]
 isobmff = ["dep:triergon-isobmff"]
 mpegts = ["dep:triergon-mpegts"]
 ogg = ["dep:triergon-ogg"]
+elementary = ["dep:triergon-elementary"]
 framing = ["dep:triergon-framing"]
 subtitles = ["dep:triergon-subtitles"]
 
