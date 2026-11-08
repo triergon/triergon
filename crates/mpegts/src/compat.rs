@@ -26,6 +26,9 @@ pub mod pes {
     //! carriers with TEI or scrambling. Its [`TransportObservation::Faulted`]
     //! result retains the actual source diagnostic and opaque bytes separately
     //! from validated source PES.
+    //! [`PesFaultPolicy`] separately opts into isolated timing-header faults and
+    //! fully checked rejected clock fields. [`PesFaultPacket`] retains the source
+    //! refusal; [`DiagnosticTimeView`] reports optional encoded compatibility time.
     //!
     //! [`PesCutter`] cuts one PID of any stream type into the packets the demuxer
     //! hands a decoder ([`CutPes`]): each starts at a unit start and ends at its
@@ -40,7 +43,8 @@ pub mod pes {
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::demux_clock::{
-        ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, EncodedTimeView, TimestampOrigin,
+        ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, DiagnosticTimeView, EncodedTimeView,
+        TimestampOrigin,
     };
     pub use crate::demux_pes::{
         CompactDemuxPacket, CompactPayload, CutPes, DemuxBoundary, DemuxObserver, DemuxPacket,
@@ -50,6 +54,7 @@ pub mod pes {
         pcr_bounded_pts,
     };
     pub use crate::demux_transport::{
+        PesFaultCarrier, PesFaultHeader, PesFaultKind, PesFaultPacket, PesFaultPolicy,
         TransportFaultHeader, TransportFaultKind, TransportFaultPacket, TransportFaultRecovery,
         TransportObservation,
     };
