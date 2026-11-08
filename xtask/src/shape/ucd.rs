@@ -310,6 +310,10 @@ mod tests {
         fn rsync(&self, _: &str, _: &Path, _: usize) -> Result<(), String> {
             Err("not used".into())
         }
+
+        fn github_asset(&self, _: &str, _: u64, _: &str, _: usize) -> Result<Vec<u8>, String> {
+            Err("not used".into())
+        }
     }
 
     const TINY: Release = Release {

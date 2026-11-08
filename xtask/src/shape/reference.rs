@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::fetch::Transport;
+use crate::fetch::{Source, Transport};
 use crate::json::Value;
 use crate::prepare::{PinnedRelease, output, run, unpack_release, verify_xz_tree};
 use crate::sha256;
@@ -20,12 +20,20 @@ const FRIBIDI: PinnedRelease<'static> = PinnedRelease {
     file: "fribidi-1.0.17.tar.xz",
     directory: "fribidi-1.0.17",
     url: "https://github.com/fribidi/fribidi/releases/download/v1.0.17/fribidi-1.0.17.tar.xz",
+    mirrors: &[Source::GitHubAsset {
+        repo: "fribidi/fribidi",
+        id: 576_224_505,
+    }],
     sha256: "6949dcde27d41cebad1fd741fcafc36d55a1020d2d872d4a6eb3914caabbada2",
 };
 pub const HARFBUZZ: PinnedRelease<'static> = PinnedRelease {
     file: "harfbuzz-14.6.0.tar.xz",
     directory: "harfbuzz-14.6.0",
     url: "https://github.com/harfbuzz/harfbuzz/releases/download/14.6.0/harfbuzz-14.6.0.tar.xz",
+    mirrors: &[Source::GitHubAsset {
+        repo: "harfbuzz/harfbuzz",
+        id: 613_602_983,
+    }],
     sha256: "d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586",
 };
 

@@ -441,8 +441,21 @@ pub struct PinnedRelease<'a> {
     pub file: &'a str,
     /// The top-level directory it unpacks to.
     pub directory: &'a str,
+    /// The release's own address, tried first.
     pub url: &'a str,
+    /// Further sources of the same bytes, tried in order when `url` fails.
+    pub mirrors: &'a [fetch::Source<'a>],
     pub sha256: &'a str,
+}
+
+impl<'a> PinnedRelease<'a> {
+    /// Where the archive is fetched from, in order: the release's own address,
+    /// then its mirrors.
+    pub fn sources(&self) -> Vec<fetch::Source<'a>> {
+        std::iter::once(fetch::Source::Url(self.url))
+            .chain(self.mirrors.iter().copied())
+            .collect()
+    }
 }
 
 /// Downloads `release` into `cache` once, checks its hash, unpacks it and verifies
@@ -455,10 +468,13 @@ pub fn unpack_release(
     fs::create_dir_all(cache).map_err(|e| format!("{}: {e}", cache.display()))?;
     let archive_path = cache.join(release.file);
     if !archive_path.exists() {
-        let data = net.https(release.url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
-        if data.len() > ARCHIVE_LIMIT {
-            return Err(format!("{}: archive size limit", release.file));
-        }
+        let data = fetch::pinned(
+            net,
+            &release.sources(),
+            release.sha256,
+            ARCHIVE_LIMIT,
+            "triergon-reference-builder",
+        )?;
         fetch::publish(&archive_path, &data)?;
     }
     let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
@@ -558,6 +574,25 @@ fn release_manifest(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_release_is_fetched_from_its_address_then_its_mirrors() {
+        let release = PinnedRelease {
+            file: "x.tar.xz",
+            directory: "x",
+            url: "https://example.org/x.tar.xz",
+            mirrors: &[fetch::Source::GitHubAsset {
+                repo: "owner/x",
+                id: 7,
+            }],
+            sha256: "0",
+        };
+        let sources = format!("{:?}", release.sources());
+        assert_eq!(
+            sources,
+            r#"[Url("https://example.org/x.tar.xz"), GitHubAsset { repo: "owner/x", id: 7 }]"#
+        );
+    }
 
     #[test]
     fn lists_unique_sorted_fate_names_only() {
