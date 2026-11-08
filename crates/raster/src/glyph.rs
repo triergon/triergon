@@ -1,0 +1,491 @@
+//! One glyph's bitmaps: the 3D transform of `\frx` `\fry` `\frz` `\fax` `\fay`,
+//! its quantisation against the glyph's run, the border or opaque box, and their
+//! rasterisation, as libass's `get_bitmap_glyph` draws them.
+
+use triergon_core::{Budget, Error, Result};
+
+use crate::bitmap::Bitmap;
+use crate::fp;
+use crate::geometry::{OUTLINE_MAX, Rect, Vector};
+use crate::limits::Limits;
+use crate::rasterizer::Rasterizer;
+use crate::shape::Shape;
+use crate::stroke::Pen;
+use crate::transform::{BitmapTransform, MAX_PERSP_SCALE, Matrix, RunOffset};
+
+/// Stroker tolerance in outline units; outlines are scaled so it suffices.
+const STROKER_PRECISION: i32 = 16;
+/// Transform error estimate, in 1/64 pixel.
+const POSITION_PRECISION: f64 = 8.0;
+
+/// Where and how one glyph is placed: the per-glyph inputs of libass's
+/// transform.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Placement {
+    /// `\frx`, `\fry`, `\frz` in degrees.
+    pub rotation: [f64; 3],
+    /// `\fax`, `\fay`.
+    pub shear: [f64; 2],
+    /// The glyph's horizontal and vertical scale.
+    pub scale: [f64; 2],
+    /// Offset of the glyph from the rotation origin, 26.6.
+    pub shift: Vector,
+    /// Ascender and descender, 26.6.
+    pub ascender: i32,
+    pub descender: i32,
+    /// Position of the glyph origin in the frame, 26.6.
+    pub position: Vector,
+    /// Scale and offset from outline units to 26.6 before the transform: the
+    /// font scale, or the drawing scale and baseline offset.
+    pub outline_scale: [f64; 2],
+    pub outline_offset: [f64; 2],
+}
+
+/// Frame-wide scales of the renderer.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FrameScale {
+    /// Scales of `\blur` (x and y); y also sets the perspective distance.
+    pub blur: [f64; 2],
+    /// Scales of border widths and shadow offsets (x and y).
+    pub border: [f64; 2],
+    /// The pixel aspect correction applied to x.
+    pub pixel_aspect: f64,
+}
+
+/// The border a glyph is drawn with.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BorderRequest {
+    /// No border bitmap.
+    None,
+    /// `\bord` style 1: the outline stroked by `size` (x and y) pixels.
+    Outline { size: [f64; 2] },
+    /// `\bord` style 3: an opaque box around the advance, `size` beyond it.
+    /// `spacing` is the scaled `\fsp` and `advance` the glyph advance, both
+    /// 26.6, and `scale_fix` the font scale correction the box is scaled by
+    /// again.
+    OpaqueBox {
+        size: [f64; 2],
+        spacing: i32,
+        advance: i32,
+        scale_fix: f64,
+    },
+}
+
+/// What [`GlyphRaster::render`] draws: a glyph or drawing shape, where and how.
+#[derive(Clone, Copy, Debug)]
+pub struct GlyphRequest<'a> {
+    pub shape: &'a Shape,
+    pub placement: Placement,
+    pub frame: FrameScale,
+    pub border: BorderRequest,
+    /// The glyph is timed by `\kf` karaoke, so its run tracks the least x of
+    /// its transformed outline.
+    pub karaoke: bool,
+}
+
+/// The matrices of libass's glyph transform (`calc_transform_matrix`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct GlyphTransform {
+    /// From 26.6 glyph space to the frame: shear, the three rotations about the
+    /// origin `shift` away, perspective at distance 20000 · the y blur scale,
+    /// then the move to the position.
+    glyph: Matrix,
+    /// `glyph` after the outline scale and offset.
+    outline: Matrix,
+}
+
+impl GlyphTransform {
+    fn new(p: &Placement, frame: &FrameScale) -> Self {
+        let to_radians = std::f64::consts::PI / 180.0;
+        let [frx, fry, frz] = p.rotation.map(|degrees| to_radians * degrees);
+        let (sx, cx) = (-frx.sin(), frx.cos());
+        let (sy, cy) = (fry.sin(), fry.cos());
+        let (sz, cz) = (-frz.sin(), frz.cos());
+
+        let fax = p.shear[0] * p.scale[0] / p.scale[1];
+        let fay = p.shear[1] * p.scale[1] / p.scale[0];
+        let x1 = [1.0, fax, f64::from(p.shift.x) + f64::from(p.ascender) * fax];
+        let y1 = [fay, 1.0, f64::from(p.shift.y)];
+
+        let mut x2 = [0.0; 3];
+        let mut y2 = [0.0; 3];
+        for i in 0..3 {
+            x2[i] = x1[i] * cz - y1[i] * sz;
+            y2[i] = x1[i] * sz + y1[i] * cz;
+        }
+        let y3 = y2.map(|v| v * cx);
+        let z3 = y2.map(|v| v * sx);
+        let mut x4 = [0.0; 3];
+        let mut z4 = [0.0; 3];
+        for i in 0..3 {
+            x4[i] = x2[i] * cy - z3[i] * sy;
+            z4[i] = x2[i] * sy + z3[i] * cy;
+        }
+        let dist = 20000.0 * frame.blur[1];
+        z4[2] += dist;
+
+        let scale_x = dist * frame.pixel_aspect;
+        let offs_x = f64::from(p.position.x) - f64::from(p.shift.x) * frame.pixel_aspect;
+        let offs_y = f64::from(p.position.y.wrapping_sub(p.shift.y));
+        let mut m = [[0.0; 3]; 3];
+        for i in 0..3 {
+            m[0][i] = z4[i] * offs_x + x4[i] * scale_x;
+            m[1][i] = z4[i] * offs_y + y3[i] * dist;
+            m[2][i] = z4[i];
+        }
+        let glyph = Matrix(m);
+        Self {
+            glyph,
+            outline: glyph.prescaled(p.outline_scale, p.outline_offset),
+        }
+    }
+
+    /// The matrix from outline units to frame 26.6.
+    fn matrix(&self) -> &Matrix {
+        &self.outline
+    }
+
+    /// The opaque box's matrix: the unit square scaled to the advance and
+    /// height plus the border, which VSFilter scales by the font scale a second
+    /// time.
+    fn opaque_box(
+        &self,
+        p: &Placement,
+        frame: &FrameScale,
+        size: [f64; 2],
+        width: i32,
+        scale_fix: f64,
+    ) -> Matrix {
+        let mut bord = [
+            64.0 * size[0] * frame.border[0] / frame.pixel_aspect,
+            64.0 * size[1] * frame.border[1],
+        ];
+        let mut width = f64::from(width);
+        let mut height = f64::from(p.ascender.wrapping_add(p.descender));
+        let orig = [p.scale[0] * scale_fix, p.scale[1] * scale_fix];
+        bord[0] *= orig[0];
+        bord[1] *= orig[1];
+        width *= orig[0];
+        height *= orig[1];
+        // At least a pixel, to avoid gaps.
+        let bord = bord.map(|b| fp::max(64.0, b));
+        let scale = [
+            (width + 2.0 * bord[0]) / 64.0,
+            (height + 2.0 * bord[1]) / 64.0,
+        ];
+        let offset = [-bord[0], -bord[1] - f64::from(p.ascender)];
+        self.glyph.prescaled(scale, offset)
+    }
+}
+
+impl Matrix {
+    /// The matrix with a per-axis scale and offset applied to its input first.
+    fn prescaled(&self, scale: [f64; 2], offset: [f64; 2]) -> Self {
+        Self(self.0.map(|r| {
+            [
+                r[0] * scale[0],
+                r[1] * scale[1],
+                r[0] * offset[0] + r[1] * offset[1] + r[2],
+            ]
+        }))
+    }
+}
+
+/// A border outline's cache key: the scale it is stroked at and its widths in
+/// stroker units.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct BorderKey {
+    /// The outline is scaled by 2^order (x and y) before stroking.
+    scale_order: [i32; 2],
+    /// Border widths in 1/16 outline units at that scale.
+    size: Vector,
+}
+
+impl BorderKey {
+    /// The key of a border `size` pixels wide and the matrix of the scaled
+    /// outline, from the glyph's centred matrix `m` and its outline matrix: the
+    /// outline is scaled by powers of two so the stroker's fixed tolerance stays
+    /// near 1/8 pixel after the transform. `None` when the border is out of
+    /// range.
+    fn new(
+        m: &Matrix,
+        outline: &Matrix,
+        cbox: &Rect,
+        p: &Placement,
+        frame: &FrameScale,
+        size: [f64; 2],
+    ) -> Option<(Self, Matrix)> {
+        let bord_x = 64.0 * frame.border[0] * size[0] / p.outline_scale[0] / frame.pixel_aspect;
+        let bord_y = 64.0 * frame.border[1] * size[1] / p.outline_scale[1];
+        // Half extents after stroking.
+        let dx = f64::from(cbox.x_max - cbox.x_min) / 2.0 + (bord_x + 64.0);
+        let dy = f64::from(cbox.y_max - cbox.y_min) / 2.0 + (bord_y + 64.0);
+        let m = &m.0;
+        let (mxx, mxy) = (m[0][0].abs(), m[0][1].abs());
+        let (myx, myy) = (m[1][0].abs(), m[1][1].abs());
+        let (mzx, mzy) = (m[2][0].abs(), m[2][1].abs());
+        let z0 = m[2][2] - mzx * dx - mzy * dy;
+        let mut w = 1.0 / fp::max(z0, m[2][2] / MAX_PERSP_SCALE);
+        let x_lim = mxx * dx + mxy * dy;
+        let y_lim = myx * dx + myy * dy;
+        let rz = fp::max(x_lim, y_lim) * w;
+        w *= f64::from(STROKER_PRECISION) / POSITION_PRECISION;
+        let (_, order_x) = fp::frexp(w * (fp::max(mxx, myx) + mzx * rz));
+        let (_, order_y) = fp::frexp(w * (fp::max(mxy, myy) + mzy * rz));
+        let bord_x = fp::ldexp(bord_x, order_x);
+        let bord_y = fp::ldexp(bord_y, order_y);
+        let limit = f64::from(OUTLINE_MAX);
+        if !(bord_x < limit && bord_y < limit) {
+            return None;
+        }
+        let key = Self {
+            scale_order: [order_x, order_y],
+            size: Vector::new(
+                fp::lrint32(bord_x / f64::from(STROKER_PRECISION)),
+                fp::lrint32(bord_y / f64::from(STROKER_PRECISION)),
+            ),
+        };
+        let matrix = Matrix(
+            outline
+                .0
+                .map(|r| [fp::ldexp(r[0], -order_x), fp::ldexp(r[1], -order_y), r[2]]),
+        );
+        Some((key, matrix))
+    }
+}
+
+/// The state of one run of glyphs composited together: the sub-pixel origin
+/// its first drawn glyph sets, and the least transformed x of its karaoke
+/// glyphs.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Run {
+    offset: RunOffset,
+    drawn: usize,
+    leftmost_x: i32,
+}
+
+impl Default for Run {
+    fn default() -> Self {
+        Self {
+            offset: RunOffset::default(),
+            drawn: 0,
+            leftmost_x: OUTLINE_MAX,
+        }
+    }
+}
+
+impl Run {
+    /// The least x, 26.6, of the transformed outlines of the run's karaoke
+    /// glyphs; [`OUTLINE_MAX`] without any.
+    pub fn leftmost_x(&self) -> i32 {
+        self.leftmost_x
+    }
+}
+
+/// What a border bitmap is.
+#[derive(Debug)]
+pub enum Border {
+    None,
+    /// The border rounded to nothing: the glyph bitmap stands in for it.
+    Glyph,
+    Own(Bitmap),
+}
+
+/// The bitmaps of one glyph and their whole-pixel positions.
+#[derive(Debug)]
+pub struct GlyphBitmaps {
+    pub glyph: Option<Bitmap>,
+    pub border: Border,
+    pub position: Vector,
+    pub border_position: Vector,
+}
+
+impl GlyphBitmaps {
+    /// The border bitmap, which may be the glyph's.
+    pub fn border_bitmap(&self) -> Option<&Bitmap> {
+        match &self.border {
+            Border::None => None,
+            Border::Glyph => self.glyph.as_ref(),
+            Border::Own(bitmap) => Some(bitmap),
+        }
+    }
+
+    fn is_drawn(&self) -> bool {
+        self.glyph.is_some() || self.border_bitmap().is_some()
+    }
+}
+
+/// Rasterises glyphs, borders and boxes; owns the scratch shapes and the
+/// rasteriser.
+#[derive(Debug)]
+pub struct GlyphRaster {
+    rasterizer: Rasterizer,
+    transformed: Shape,
+    budget: Budget,
+    limits: Limits,
+}
+
+impl GlyphRaster {
+    pub fn new(budget: &Budget, limits: Limits) -> Self {
+        Self {
+            rasterizer: Rasterizer::new(budget, limits),
+            transformed: Shape::new(budget),
+            budget: budget.clone(),
+            limits,
+        }
+    }
+
+    /// Bytes of scratch storage currently charged.
+    pub fn retained_bytes(&self) -> usize {
+        self.rasterizer.retained_bytes() + self.transformed.retained_bytes()
+    }
+
+    /// Draws one glyph of `run` as libass does: quantises its transform against
+    /// the run (the run's first drawn glyph sets the run's sub-pixel origin),
+    /// rasterises the glyph, then its border outline or opaque box placed
+    /// against the same origin. A glyph or border that leaves the coordinate
+    /// range under its transform is not drawn, as in libass.
+    ///
+    /// # Errors
+    ///
+    /// `Policy` when the limits run out, and the budget's errors.
+    pub fn render(&mut self, request: &GlyphRequest<'_>, run: &mut Run) -> Result<GlyphBitmaps> {
+        let GlyphRequest {
+            shape: glyph,
+            placement,
+            frame,
+            karaoke,
+            ..
+        } = request;
+        let transform = GlyphTransform::new(placement, frame);
+        if *karaoke {
+            run.leftmost_x =
+                glyph.outlines()[0].min_transformed_x(transform.matrix(), run.leftmost_x);
+        }
+        let mut out = GlyphBitmaps {
+            glyph: None,
+            border: Border::None,
+            position: Vector::default(),
+            border_position: Vector::default(),
+        };
+        let starts = run.drawn == 0;
+        let continued = (!starts).then_some(run.offset);
+        let Some(quantized) =
+            BitmapTransform::quantize(transform.matrix(), glyph.cbox(), continued)
+        else {
+            return Ok(out);
+        };
+        if starts {
+            run.offset = quantized.remainder;
+        }
+        out.position = quantized.position;
+        out.border_position = quantized.position;
+        out.glyph = self.bitmap(glyph, &quantized.key)?;
+        self.render_border(request, &transform, &quantized.centred, run, &mut out)?;
+        if out.is_drawn() {
+            run.drawn += 1;
+        }
+        Ok(out)
+    }
+
+    /// The border part of [`GlyphRaster::render`].
+    fn render_border(
+        &mut self,
+        request: &GlyphRequest<'_>,
+        transform: &GlyphTransform,
+        centred: &Matrix,
+        run: &Run,
+        out: &mut GlyphBitmaps,
+    ) -> Result<()> {
+        let (placement, frame) = (&request.placement, &request.frame);
+        let (shape, m) = match request.border {
+            BorderRequest::None => return Ok(()),
+            BorderRequest::OpaqueBox {
+                size,
+                spacing,
+                advance,
+                scale_fix,
+            } => {
+                let width = spacing.wrapping_add(advance);
+                let m = transform.opaque_box(placement, frame, size, width, scale_fix);
+                (Shape::unit_box(&self.budget)?, m)
+            }
+            BorderRequest::Outline { size } => {
+                let glyph = request.shape;
+                let Some((key, m)) = BorderKey::new(
+                    centred,
+                    transform.matrix(),
+                    glyph.cbox(),
+                    placement,
+                    frame,
+                    size,
+                ) else {
+                    return Ok(());
+                };
+                if key.size == Vector::default() {
+                    out.border = Border::Glyph;
+                    return Ok(());
+                }
+                let Some(stroked) = self.stroke(glyph, &key)? else {
+                    return Ok(());
+                };
+                (stroked, m)
+            }
+        };
+        let Some(quantized) = BitmapTransform::quantize(&m, shape.cbox(), Some(run.offset)) else {
+            return Ok(());
+        };
+        if let Some(bitmap) = self.bitmap(&shape, &quantized.key)? {
+            out.border_position = quantized.position;
+            if out.glyph.is_none() {
+                out.position = quantized.position;
+            }
+            out.border = Border::Own(bitmap);
+        }
+        Ok(())
+    }
+
+    /// The bitmap of `shape` under the quantised transform `key`. An outline
+    /// that leaves the coordinate range under the transform is dropped, as
+    /// libass drops it.
+    fn bitmap(&mut self, shape: &Shape, key: &BitmapTransform) -> Result<Option<Bitmap>> {
+        let m = key.restore(shape.cbox());
+        let projection = key.projection();
+        self.transformed.rebuild(|outputs| {
+            for (source, out) in shape.outlines().iter().zip(outputs) {
+                match source.transform_into(&m, projection, out) {
+                    Ok(()) | Err(Error::Invalid(_)) => {}
+                    Err(error) => return Err(error),
+                }
+            }
+            Ok(())
+        })?;
+        self.rasterizer.rasterize(&self.transformed)
+    }
+
+    /// The border of `glyph` for `key`: its first outline scaled and stroked.
+    /// `None` when it cannot be stroked within the coordinate range.
+    fn stroke(&mut self, glyph: &Shape, key: &BorderKey) -> Result<Option<Shape>> {
+        let source = &glyph.outlines()[0];
+        let mut border = Shape::new(&self.budget);
+        if (key.size.x == 0 && key.size.y == 0) || source.is_empty() {
+            return Ok(Some(border));
+        }
+        let pen = Pen {
+            width: Vector::new(
+                key.size.x.wrapping_mul(STROKER_PRECISION),
+                key.size.y.wrapping_mul(STROKER_PRECISION),
+            ),
+            tolerance: STROKER_PRECISION,
+        };
+        let scaled = &mut self.transformed;
+        let stroked = scaled
+            .rebuild(|[first, _]| source.scale_pow2_into(first, key.scale_order))
+            .and_then(|()| scaled.outlines()[0].stroke_into(&pen, &self.limits, &mut border));
+        match stroked {
+            Ok(()) => Ok(Some(border)),
+            Err(Error::Invalid(_)) => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+}

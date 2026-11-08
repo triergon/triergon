@@ -1,0 +1,15 @@
+[package]
+name = "triergon-raster"
+version = "0.0.0"
+description = "Glyph outlines, stroking, the tile rasteriser, blur and the bitmaps libass composes subtitles from"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+triergon-core = { path = "../core" }

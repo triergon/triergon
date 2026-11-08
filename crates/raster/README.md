@@ -1,0 +1,132 @@
+# triergon-raster
+
+The outline and bitmap stages of an ASS subtitle renderer, matching libass
+0.17.5 bit for bit: glyph outlines in 26.6 fixed point, their 3D transform and
+its quantisation, border stroking, the tile rasteriser, `\blur` and `\be`, the
+composition of a run's fill, border and shadow bitmaps, and rectangle clipping
+into image parts. It depends only on [`triergon-core`](../core) for `Budget`,
+`WorkBudget` and errors. Fonts, shaping, layout and ASS parsing belong to other
+crates.
+
+## Usage
+
+```rust
+use triergon_core::Budget;
+use triergon_raster::{
+    BorderRequest, Compositor, Effects, Filter, FilterFlags, FrameScale, GlyphRaster, GlyphRef,
+    GlyphRequest, GlyphSource, Limits, Outline, Placement, PointKind, Run, Shape, SourcePoint,
+    Vector,
+};
+
+let budget = Budget::new(64 << 20)?;
+let limits = Limits::default();
+
+// A glyph outline as a font gives it at a size: 26.6, y up, tagged points.
+let on = |x, y| SourcePoint { x, y, kind: PointKind::On };
+let points = [on(0, 0), on(640, 0), on(640, 640), on(0, 640)];
+let mut outline = Outline::new(&budget);
+outline.push_glyph(&GlyphSource { points: &points, contour_ends: &[4] })?;
+let shape = Shape::from_outlines(outline, Outline::new(&budget));
+
+// One glyph at (100, 50) pixels with a 2 pixel border, rotated by \frz15.
+let placement = Placement {
+    rotation: [0.0, 0.0, 15.0],
+    shear: [0.0, 0.0],
+    scale: [1.0, 1.0],
+    shift: Vector::new(0, 0),
+    ascender: 640,
+    descender: 0,
+    position: Vector::new(100 * 64, 50 * 64),
+    outline_scale: [1.0, 1.0],
+    outline_offset: [0.0, 0.0],
+};
+let frame = FrameScale { blur: [1.0, 1.0], border: [1.0, 1.0], pixel_aspect: 1.0 };
+let request = GlyphRequest {
+    shape: &shape,
+    placement,
+    frame,
+    border: BorderRequest::Outline { size: [2.0, 2.0] },
+    karaoke: false,
+};
+let mut glyphs = GlyphRaster::new(&budget, limits);
+let mut run = Run::default();
+let bitmaps = glyphs.render(&request, &mut run)?;
+
+// The run's fill, border and shadow, blurred with \blur1.
+let flags = FilterFlags { border: true, shadow: true, ..FilterFlags::default() };
+let effects = Effects { flags, be: 0, blur: 1.0, shadow: [2.0, 2.0] };
+let glyph = GlyphRef {
+    glyph: bitmaps.glyph.as_ref(),
+    border: bitmaps.border_bitmap(),
+    position: Vector::new(0, 0),
+    border_position: Vector::new(
+        bitmaps.border_position.x - bitmaps.position.x,
+        bitmaps.border_position.y - bitmaps.position.y,
+    ),
+};
+let mut compositor = Compositor::new(&budget, limits);
+let composite = compositor.compose(&Filter::new(&effects, &frame), &[glyph])?;
+assert!(composite.fill.is_some() && composite.border.is_some() && composite.shadow.is_some());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+## What it matches
+
+| Stage | libass | Here |
+|---|---|---|
+| Outlines | `ass_outline.c`: conversion from font outlines, rectangles, rotation by 90°, affine and perspective transforms, the karaoke leftmost x, control boxes | `Outline`, `GlyphSource`, `Matrix`, `Projection` |
+| Borders | `ass_outline_stroke`, and the stroking scale `get_bitmap_glyph` chooses | `Outline::stroke_into`, `Pen` |
+| Rasteriser | `ass_rasterizer.c` with 16×16 tiles (the default build, without large tiles) | `Rasterizer`, `Shape` |
+| Glyph bitmaps | `calc_transform_matrix`, `quantize_transform`, `restore_transform`, `get_bitmap_glyph` with its border and the opaque box of `\bord` style 3 | `Placement`, `FrameScale`, `GlyphRaster`, `Run` |
+| Blur | `ass_blur.c` (the cascade Gaussian and its coefficient solver), the `\be` box blur, `ass_synth_blur` | `Blur` |
+| Composition | `quantize_blur`, `restore_blur`, `ass_composite_construct`, `ass_fix_outline`, `ass_shift_bitmap`, the additive blend | `Effects`, `Filter`, `Compositor`, `Bitmap` |
+| Clipping | `render_glyph`: `\clip` and `\iclip` rectangles and the `\kf` split; the multiply blends of vector clips | `Clip`, `ClipFrame`, `Bitmap::multiply`, `Bitmap::multiply_inverse` |
+
+The arithmetic is libass's own: 26.6 integer subdivision with its rounding, the
+16-bit wrapping of the tile and blur engines, `lrint` rounding to even, and the
+C `FFMAX`/`FFMIN` treatment of NaN. Floating-point expressions keep the C
+source's order and grouping; the reference is built without floating-point
+contraction (`-ffp-contract=off`), so neither side fuses multiply-adds and the
+result does not depend on the target. Two properties of the reference build
+are matched as well:
+
+- **The SIMD engine's row padding.** The AArch64 `\be` kernel blurs whole
+  16-byte rows, so coverage spreads into the row padding and repeated passes
+  read it back, and the fill subtraction spans whole strides. Bitmaps keep
+  libass's stride (the width rounded up to 16) and the same padding contents.
+  libass's AVX2 engine pads to 32 bytes, which changes repeated `\be` passes on
+  coverage that reaches a bitmap's right edge.
+- **libm.** Sines, cosines, exponentials and logarithms come from the platform
+  library, as libass's do.
+
+## Behaviour and limits
+
+Every input-dependent allocation is charged to the `Budget` a value was created
+with: outlines, bitmaps and the rasteriser's and blur's scratch, which are kept
+and reused. `Limits` bounds one operation: its work (`work`: subdivision steps,
+emitted points, polyline segments, tiles and filter rows, charged to a
+`WorkBudget`), the points of a stroked outline (`outline_points`) and the bytes
+of a bitmap (`bitmap_bytes`). Exceeding one is `Error::Policy`. The bitmap
+default is `MAX_BITMAP_BYTES`, libass's own bound just under 2³¹ bytes, so only
+the budget limits what libass draws; a bitmap beyond that bound is not drawn,
+as in libass. Outline coordinates stay within ±(2²⁸ − 1); conversions and
+transforms that leave the range are `Error::Invalid`, and the glyph pipeline
+drops such outlines as libass does. No input panics, including arithmetic
+overflow in debug builds; non-finite transform and blur parameters behave as
+the AArch64 build does.
+
+Not covered: glyph loading, hinting and synthetic styles (`triergon-font`),
+underline and strike-out placement, which needs the source outline's
+orientation, drawing parsing and the image list itself. The large-tile build
+of libass (`--enable-large-tiles`) is not matched.
+
+## Verification
+
+`cargo test -p triergon-raster` runs unit tests and `tests/robustness.rs`,
+which mutates random glyph sources and runs every operation on them. The
+features `raster-glyphs`, `raster-outlines`, `raster-bitmaps` and
+`raster-sweep` (`harness/features/raster-*`, run by
+`cargo xtask raster compare [--all]`) compare
+[raster-worker](../raster-worker/README.md) with the pinned libass build
+exactly: outline points and segments, bitmap positions, sizes and every pixel,
+glyph and run positions, and clip parts; see [docs/status.md](../../docs/status.md).
