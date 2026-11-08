@@ -2,14 +2,14 @@
 
 Everything is experimental. No module has yet passed every gate on its complete scope
 (see [quality](quality.md)). Runtime is the worst per-case upper bound of
-`T_triergon / T_ffmpeg`, graded against the [ceiling](quality.md#gates). Memory is peak
-heap and total resident peak RSS relative to FFmpeg. Unless noted, measurements are native
+`T_triergon / T_reference`, graded against the [ceiling](quality.md#gates). Memory is peak
+heap and total resident peak RSS relative to the reference. Unless noted, measurements are native
 AArch64 Linux.
 Containers, framing, subtitles and playback are measured against FFmpeg git revision
 `d32b387f` on the 9.0 branch; codecs, decode sessions and capture against the FFmpeg 9.0.2
-release ([reference pins](quality.md#reference-and-corpus)).
+release; fonts against FreeType 2.15.0 ([reference pins](quality.md#reference-and-corpus)).
 
-| Area | Implemented | Verified against FFmpeg | Runtime | Memory | Open |
+| Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
 | Core | Charged storage, exact time, input windows, work budgets, neutral container model with one codec identity | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | 32-bit target runs, fuzzing |
 | Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four host FATE demux comparisons | 1.1590 (116/116 pass) | heap ≤0.627, RSS ≤0.965 | full EBML/Matroska scope |
@@ -24,6 +24,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 746 of 998 matrix rows | not measured | not measured | most profiles unmeasured |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0551 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.0551 (17/17 pass) | with the codecs | — |
+| Fonts | sfnt and collections; `head`, `hhea`, `maxp`, `hmtx`, `OS/2`, `name`; `cmap` formats 0, 4, 6, 10, 12, 13; `glyf`/`loca`; CFF and CFF2 at the default instance; `kern` format 0; loading at a size as libass does with hinting off (unhinted outlines, synthetic bold and oblique, size metrics, kerning, decoration bands, default-load advances where hinting cannot move them); face matching with libass's rules (unit tests only, unverified until the libass lane compares it) | The gate covers libass's default configuration (hinting off). All 59 faces of 50 corpus files (TrueType including Arabic, Hebrew, Indic and Thai fonts, name-keyed and CID-keyed CFF, CFF2, a 10-face collection, three authored fonts; 836,291 glyphs) identical to FreeType: names, cmap, the kerning of every listed pair, advances and unscaled outlines (`font-outlines` 50/50); at 256 pixels, size metrics, kerning, every glyph's unhinted outline with its synthetic styles, and default-load advances (`font-hinting-none` 98/100, 2 open: auto-hinter); macOS AArch64 | not measured | not measured | libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL): their nine other sizes are measured, not gated (`font-hinting-modes` 882/900: unhinted outlines 450/450, default-load advances 432/450), and hinted outlines are not compared; the FreeType auto-hinter, which leaves DejaVuMathTeXGyre and authored-cmap-formats open at every size; tricky fonts and instruction-control programs; face matching against libass; `cmap` format 14; runtime and memory; Linux runs |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video with budgeted storage, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1210 (15/15 pass) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
 
 ## Measured revisions

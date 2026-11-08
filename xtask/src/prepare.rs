@@ -213,7 +213,7 @@ pub fn fate_list(listing: &str) -> String {
     names.join("\n") + "\n"
 }
 
-fn run(command: &mut Command) -> Result<(), String> {
+pub fn run(command: &mut Command) -> Result<(), String> {
     let status = command.status().map_err(|e| format!("{command:?}: {e}"))?;
     if status.success() {
         Ok(())
@@ -222,7 +222,7 @@ fn run(command: &mut Command) -> Result<(), String> {
     }
 }
 
-fn output(command: &mut Command) -> Result<String, String> {
+pub fn output(command: &mut Command) -> Result<String, String> {
     let out = command.output().map_err(|e| format!("{command:?}: {e}"))?;
     if !out.status.success() {
         return Err(format!("{command:?}: {}", out.status));
@@ -425,10 +425,19 @@ fn release_source(
             .arg("-C")
             .arg(cache))?;
     }
-    let listing = output(Command::new("tar").arg("-tvJf").arg(&archive_path))?;
+    verify_xz_tree(&archive_path, cache)?;
+    Ok((source, archive_sha))
+}
+
+/// Every regular file of an xz-compressed release archive must still match the tree
+/// unpacked under `cache`. xtask does not decode xz itself, so the concatenated
+/// contents of the files, in archive order as `tar` streams them, are compared
+/// with the same files on disk.
+pub fn verify_xz_tree(archive_path: &Path, cache: &Path) -> Result<(), String> {
+    let listing = output(Command::new("tar").arg("-tvJf").arg(archive_path))?;
     let streamed = Command::new("tar")
         .arg("-xJOf")
-        .arg(&archive_path)
+        .arg(archive_path)
         .output()
         .map_err(|e| format!("tar: {e}"))?;
     if !streamed.status.success() {
@@ -448,7 +457,7 @@ fn release_source(
     if sha256::hex(&unpacked) != sha256::hex(&streamed.stdout) {
         return Err("Pinned release tree was changed".into());
     }
-    Ok((source, archive_sha))
+    Ok(())
 }
 
 /// The identity of a release profile build: archive, configure line, the

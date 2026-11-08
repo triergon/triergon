@@ -1,11 +1,12 @@
-/* The FFmpeg reference worker. Native tooling only; never linked into Rust.
- * Uses public FFmpeg headers. No code copied from FFmpeg implementations.
+/* The reference worker. Native tooling only; never linked into Rust.
+ * Uses public FFmpeg and FreeType headers. No code copied from their implementations.
  *
- * One source, built once per pinned FFmpeg profile; each build compiles only that
+ * One source, built once per pinned reference profile; each build compiles only that
  * profile's operations:
  *   -DTRIERGON_DECODE_REFERENCE   decode, letterbox and downmix (reference_decode.h)
  *   -DTRIERGON_CAPTURE_REFERENCE  RGBA conversion, MPEG-1 encode, MPEG-TS mux
  *                                 (reference_capture.h)
+ *   -DTRIERGON_FONT_REFERENCE     font faces and outlines with FreeType (reference_font.h)
  *   otherwise                     the container operations below, with the feed
  *                                 (TRIERGON_FEED_REFERENCE), HLS segment
  *                                 (TRIERGON_HLS_REFERENCE) and combined-encoding
@@ -14,6 +15,8 @@
 #include "reference_decode.h"
 #elif defined(TRIERGON_CAPTURE_REFERENCE)
 #include "reference_capture.h"
+#elif defined(TRIERGON_FONT_REFERENCE)
+#include "reference_font.h"
 #else
 #include <libavformat/avformat.h>
 #ifdef TRIERGON_COMBINED_REFERENCE

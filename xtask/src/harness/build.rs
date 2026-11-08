@@ -237,7 +237,7 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 5] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 6] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -253,6 +253,12 @@ const ADDITIONAL_CANDIDATES: [Candidate; 5] = [
     Candidate {
         name: "capture-worker",
         package: "capture-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "font-worker",
+        package: "font-worker",
         example: None,
         features: &[],
     },
@@ -380,7 +386,7 @@ fn additional_candidates(root: &Path) -> R<Vec<(&'static str, Vec<String>)>> {
     Ok(built)
 }
 
-/// A public-API reference adapter linked against one pinned FFmpeg profile.
+/// A comparison reference linked against one pinned FFmpeg or FreeType profile.
 struct ProfileReference {
     profile: &'static str,
     binary: &'static str,
@@ -396,7 +402,7 @@ struct ProfileReference {
     /// Compiler options before the source file.
     options: &'static [&'static str],
     /// Whether the build answers `identity -` (the container builds do; the
-    /// decode and capture builds record their configuration in the profile's
+    /// decode, capture and font builds record their configuration in the profile's
     /// `build.json` instead).
     identity: bool,
 }
@@ -407,7 +413,7 @@ const CONTAINER_OPTIONS: &[&str] = &["-O3", "-Wall", "-Wextra", "-Werror"];
 const RELEASE_OPTIONS: &[&str] = &["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"];
 const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
 
-const PROFILE_REFERENCES: [ProfileReference; 7] = [
+const PROFILE_REFERENCES: [ProfileReference; 8] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -504,6 +510,19 @@ const PROFILE_REFERENCES: [ProfileReference; 7] = [
         packages: CONTAINER_PACKAGES,
         link_static: true,
         options: CONTAINER_OPTIONS,
+        identity: false,
+    },
+    ProfileReference {
+        profile: ".research/freetype",
+        binary: "freetype-font-worker",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_FONT_REFERENCE=1"),
+        record: "freetype-native",
+        kind: "FreeType 2.15.0, static, without optional libraries; face tables, cmaps, kerning and unhinted outlines",
+        libraries: "freetype_reference",
+        packages: &["freetype2"],
+        link_static: true,
+        options: RELEASE_OPTIONS,
         identity: false,
     },
 ];

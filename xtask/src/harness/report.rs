@@ -209,6 +209,169 @@ pub fn fate_coverage(
     Ok(rows)
 }
 
+/// Manifests of third-party inputs whose licences have been reviewed. Each lists
+/// `sources` with a `licence` and the `sha256` of every file a source provides.
+const REVIEWED_INPUTS: [&str; 1] = ["harness/fonts/corpus.json"];
+
+fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
+    REVIEWED_INPUTS
+        .iter()
+        .map(|path| read_json(&root.join(path)).map_err(|e| format!("{path}: {e}")))
+        .collect()
+}
+
+/// Whether a case's input may be measured: authored synthetic data, or a
+/// `reviewed-licence` file whose hash a reviewed input manifest records under the
+/// licence the case names. Any other rights value is unreviewed.
+fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
+    fn list<'a>(value: &'a Value, key: &str) -> &'a [Value] {
+        value.get(key).and_then(Value::as_array).unwrap_or_default()
+    }
+    match s(case, "rights") {
+        Some("authored-synthetic") => true,
+        Some("reviewed-licence") => {
+            let (Some(licence), Some(sha)) = (s(case, "licence"), s(case, "sha256")) else {
+                return false;
+            };
+            reviewed
+                .iter()
+                .flat_map(|manifest| list(manifest, "sources"))
+                .filter(|source| s(source, "licence") == Some(licence))
+                .flat_map(|source| list(source, "files"))
+                .any(|file| s(file, "sha256") == Some(sha))
+        }
+        _ => false,
+    }
+}
+
+/// The arguments a prefix worker takes after a case's input.
+pub fn case_arguments(case: &Value) -> Vec<std::ffi::OsString> {
+    case.get("arguments")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .map(Into::into)
+        .collect()
+}
+
+/// The directory a corpus manifest records for its cases' files, relative to the
+/// repository root.
+pub fn recorded_corpus(root: &Path, manifest: &Value) -> Option<PathBuf> {
+    s(manifest, "directory").map(|directory| root.join(directory))
+}
+
+/// A registered feature whose cases run through a prefix worker
+/// (`worker_operation`): one input and the case's arguments per run.
+pub struct PrefixFeature {
+    pub id: String,
+    pub prefix: String,
+    pub candidate: String,
+    /// The comparison reference's name in the build identity.
+    pub reference: String,
+    pub contract: PathBuf,
+    pub manifest: PathBuf,
+    pub cases: Vec<Value>,
+    pub corpus: PathBuf,
+    /// The work values the contract compares.
+    pub work_fields: Vec<String>,
+}
+
+impl PrefixFeature {
+    /// Loads a prefix feature; `corpus` overrides the manifest's `directory`.
+    pub fn load(
+        root: &Path,
+        contract: &Path,
+        manifest: &Path,
+        corpus: Option<&Path>,
+    ) -> Result<Self, String> {
+        let document = read_json(contract)?;
+        let text = |key: &str| {
+            s(&document, key)
+                .map(str::to_owned)
+                .ok_or_else(|| format!("{}: no {key}", contract.display()))
+        };
+        let id = text("id")?;
+        let (listing, _) = super::manifest::read(root, manifest)?;
+        let corpus = match corpus {
+            Some(corpus) => corpus.to_path_buf(),
+            None => recorded_corpus(root, &listing).ok_or_else(|| {
+                format!(
+                    "{}: no corpus directory; pass --corpus or record `directory`",
+                    manifest.display()
+                )
+            })?,
+        };
+        Ok(Self {
+            prefix: text("worker_operation")?,
+            candidate: text("candidate")?,
+            reference: text("reference")?,
+            cases: listing
+                .get("cases")
+                .and_then(Value::as_array)
+                .unwrap_or_default()
+                .to_vec(),
+            contract: contract.to_path_buf(),
+            manifest: manifest.to_path_buf(),
+            corpus,
+            work_fields: super::comparison::work_fields(&document)?,
+            id,
+        })
+    }
+
+    /// Every registered feature (`harness/features/<id>`) whose contract runs
+    /// `candidate` through a worker operation prefix, in id order.
+    pub fn registered(root: &Path, candidate: &str) -> Result<Vec<Self>, String> {
+        let features = root.join("harness/features");
+        let mut ids: Vec<String> = fs::read_dir(&features)
+            .map_err(|e| format!("{}: {e}", features.display()))?
+            .filter_map(Result::ok)
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        ids.sort();
+        let mut found = Vec::new();
+        for id in ids {
+            let contract = features.join(&id).join("contract.json");
+            let document = read_json(&contract)?;
+            if document.get("worker_operation").is_some()
+                && s(&document, "candidate") == Some(candidate)
+            {
+                let manifest = features.join(&id).join("corpus.json");
+                found.push(Self::load(root, &contract, &manifest, None)?);
+            }
+        }
+        Ok(found)
+    }
+
+    /// The built candidate and reference, checked against the build identity.
+    pub fn workers(&self, root: &Path) -> Result<(PathBuf, PathBuf), String> {
+        let identity = read_json(&root.join("target/harness/identity.json"))?;
+        let candidate = validation::candidate_worker(root, &identity, &self.candidate)?;
+        let record = super::comparison::reference_named(&identity, &self.reference)?;
+        let reference = root.join(s(&record, "path").unwrap_or_default());
+        if Some(super::linux::file_sha(&reference)?.as_str()) != s(&record, "sha256") {
+            return Err(format!(
+                "{} changed since build identity; rebuild",
+                self.reference
+            ));
+        }
+        Ok((candidate, reference))
+    }
+
+    /// A case's input file, which may not escape the corpus directory.
+    pub fn input(&self, case: &Value) -> Result<PathBuf, String> {
+        let file = s(case, "file").unwrap_or_default();
+        if file.is_empty()
+            || Path::new(file)
+                .components()
+                .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        {
+            return Err(format!("{}: input escapes corpus", self.id));
+        }
+        Ok(self.corpus.join(file))
+    }
+}
+
 fn save_json(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
@@ -314,6 +477,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         return Err("qualification iterations do not match the contract".into());
     }
     let contract_sha = digest(&options.contract)?;
+    let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
+    let open = open_cases(&contract, &manifest)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
@@ -344,10 +509,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             "contract_id",
             contract.get("id").cloned().unwrap_or(Value::Null),
         ),
-        (
-            "corpus_manifest_sha256",
-            Value::str(digest(&options.manifest)?),
-        ),
+        ("corpus_manifest_sha256", Value::str(&manifest_sha)),
         (
             "environment",
             Value::object([
@@ -363,8 +525,9 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         .corpus
         .canonicalize()
         .map_err(|e| format!("{}: {e}", options.corpus.display()))?;
+    let reviewed = reviewed_inputs(root)?;
     let mut rows: Vec<Value> = Vec::new();
-    for case in read_json(&options.manifest)?
+    for case in manifest
         .get("cases")
         .and_then(Value::as_array)
         .unwrap_or_default()
@@ -398,17 +561,10 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([("status", Value::str("missing-sample"))])
         } else if digest(&path)? != sha {
             Value::object([("status", Value::str("input-hash-mismatch"))])
-        } else if s(case, "rights") != Some("authored-synthetic") {
+        } else if !rights_reviewed(&reviewed, case) {
             Value::object([("status", Value::str("rights-unreviewed"))])
         } else if let Some(prefix) = &worker_operation {
-            let arguments: Vec<std::ffi::OsString> = case
-                .get("arguments")
-                .and_then(Value::as_array)
-                .unwrap_or_default()
-                .iter()
-                .filter_map(Value::as_str)
-                .map(Into::into)
-                .collect();
+            let arguments = case_arguments(case);
             row.push(("input_sha256", Value::str(sha)));
             row.push(("candidate_worker", Value::str(&candidate_name)));
             row.push(("operation", selected.operation));
@@ -598,11 +754,184 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     if (options.require_slice_acceptance && !slice) || (options.require_acceptance && !accepted) {
         return Ok(2);
     }
-    let all_pass = !rows.is_empty()
-        && rows
+    Ok(i32::from(!ratchet(&label, &rows, &open)))
+}
+
+/// A contract's `open_cases`: case ids that fail today, each tied to one of its
+/// `pending_module_requirements`. Every id must be a case of the manifest.
+fn open_cases(contract: &Value, manifest: &Value) -> Result<Vec<String>, String> {
+    let list = |value: &Value, key: &str| -> Vec<Value> {
+        value
+            .get(key)
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+            .to_vec()
+    };
+    let pending = list(contract, "pending_module_requirements");
+    let cases = list(manifest, "cases");
+    let mut open = Vec::new();
+    for entry in list(contract, "open_cases") {
+        let (Some(id), Some(requirement)) = (s(&entry, "id"), entry.get("requirement")) else {
+            return Err("an open case needs an id and a requirement".into());
+        };
+        if !pending.contains(requirement) {
+            return Err(format!("open case {id}: its requirement is not pending"));
+        }
+        if !cases.iter().any(|case| s(case, "id") == Some(id)) {
+            return Err(format!("open case {id}: not a case of the manifest"));
+        }
+        open.push(id.to_owned());
+    }
+    Ok(open)
+}
+
+/// Prints how many cases pass and which listed open cases still fail. Holds when
+/// every other case passes and every open case still fails: a listed case that
+/// starts to pass must leave the list, so the list only shrinks.
+fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
+    let passed = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("pass");
+    let listed = |row: &Value| open.iter().any(|id| s(row, "id") == Some(id));
+    let ids = |keep: &dyn Fn(&Value) -> bool| -> Vec<&str> {
+        rows.iter()
+            .filter(|row| keep(row))
+            .filter_map(|row| s(row, "id"))
+            .collect()
+    };
+    let failing = ids(&|row| !passed(row) && !listed(row));
+    let still_open = ids(&|row| !passed(row) && listed(row));
+    let closed = ids(&|row| passed(row) && listed(row));
+    println!(
+        "{label}: {} of {} cases pass",
+        rows.iter().filter(|row| passed(row)).count(),
+        rows.len()
+    );
+    if !still_open.is_empty() {
+        println!(
+            "{label}: {} open failures, as listed: {}",
+            still_open.len(),
+            still_open.join(", ")
+        );
+    }
+    if !failing.is_empty() {
+        println!("{label}: failing: {}", failing.join(", "));
+    }
+    if !closed.is_empty() {
+        println!(
+            "{label}: listed open cases now pass; remove them from open_cases: {}",
+            closed.join(", ")
+        );
+    }
+    !rows.is_empty() && failing.is_empty() && closed.is_empty()
+}
+
+#[cfg(test)]
+mod prefix_tests {
+    use super::{
+        PrefixFeature, open_cases, ratchet, recorded_corpus, reviewed_inputs, rights_reviewed,
+    };
+    use crate::json::{Value, parse};
+    use std::path::Path;
+
+    #[test]
+    fn rights_are_synthetic_or_a_recorded_reviewed_licence() {
+        let reviewed = [parse(
+            r#"{"sources": [{"licence": "OFL-1.1", "files": [{"path": "a.ttf", "sha256": "aa"}]}]}"#,
+        )
+        .unwrap()];
+        let case = |text: &str| parse(text).unwrap();
+        assert!(rights_reviewed(
+            &reviewed,
+            &case(r#"{"rights": "authored-synthetic"}"#)
+        ));
+        let font = r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "aa"}"#;
+        assert!(rights_reviewed(&reviewed, &case(font)));
+        for unreviewed in [
+            r#"{"rights": "reviewed-licence", "licence": "Apache-2.0", "sha256": "aa"}"#,
+            r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "bb"}"#,
+            r#"{"rights": "reviewed-licence", "sha256": "aa"}"#,
+            r#"{"rights": "OFL-1.1", "licence": "OFL-1.1", "sha256": "aa"}"#,
+            r#"{"sha256": "aa"}"#,
+        ] {
+            assert!(
+                !rights_reviewed(&reviewed, &case(unreviewed)),
+                "{unreviewed}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_font_features_are_registered_prefix_features() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let features = PrefixFeature::registered(root, "font-worker").unwrap();
+        let found: Vec<(&str, &str, usize)> = features
             .iter()
-            .all(|r| r.get("parity").and_then(|p| s(p, "status")) == Some("pass"));
-    Ok(i32::from(!all_pass))
+            .map(|f| (f.id.as_str(), f.prefix.as_str(), f.cases.len()))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                ("font-hinting-modes", "font-sized-", 900),
+                ("font-hinting-none", "font-sized-", 100),
+                ("font-outlines", "font-", 50),
+            ]
+        );
+        let reviewed = reviewed_inputs(root).unwrap();
+        for feature in &features {
+            assert_eq!(feature.corpus, root.join(".research/fonts/files"));
+            assert!(
+                feature
+                    .cases
+                    .iter()
+                    .all(|case| rights_reviewed(&reviewed, case))
+            );
+        }
+        assert!(
+            features[0]
+                .input(&parse(r#"{"file": "../x.ttf"}"#).unwrap())
+                .is_err()
+        );
+        assert_eq!(recorded_corpus(root, &Value::Object(vec![])), None);
+    }
+
+    #[test]
+    fn open_cases_only_shrink() {
+        let rows = |pass: &[(&str, bool)]| -> Vec<Value> {
+            pass.iter()
+                .map(|(id, ok)| {
+                    let status = if *ok { "pass" } else { "mismatch" };
+                    parse(&format!(
+                        r#"{{"id": "{id}", "parity": {{"status": "{status}"}}}}"#
+                    ))
+                    .unwrap()
+                })
+                .collect()
+        };
+        let open = vec!["b".to_owned()];
+        assert!(ratchet("f", &rows(&[("a", true), ("b", false)]), &open));
+        assert!(
+            !ratchet("f", &rows(&[("a", false), ("b", false)]), &open),
+            "unlisted failure"
+        );
+        assert!(
+            !ratchet("f", &rows(&[("a", true), ("b", true)]), &open),
+            "listed case passes"
+        );
+        assert!(ratchet("f", &rows(&[("a", true)]), &[]));
+        let contract = |requirement: &str| {
+            parse(&format!(
+                r#"{{"pending_module_requirements": ["x"], "open_cases": [{{"id": "b", "requirement": "{requirement}"}}]}}"#
+            ))
+            .unwrap()
+        };
+        let manifest = parse(r#"{"cases": [{"id": "a"}, {"id": "b"}]}"#).unwrap();
+        assert_eq!(open_cases(&contract("x"), &manifest).unwrap(), open);
+        assert!(
+            open_cases(&contract("y"), &manifest).is_err(),
+            "requirement not pending"
+        );
+        let other = parse(r#"{"cases": [{"id": "a"}]}"#).unwrap();
+        assert!(open_cases(&contract("x"), &other).is_err(), "unknown case");
+    }
 }
 
 #[cfg(test)]

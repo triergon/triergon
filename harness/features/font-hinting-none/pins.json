@@ -1,0 +1,507 @@
+{
+  "schema": 1,
+  "reference": "freetype-native",
+  "note": "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+  "pins": {
+    "arimo-bold-ttf-outlines-16384": {
+      "packets": 13168,
+      "bytes": 368100,
+      "digest": 4201244725047309044
+    },
+    "arimo-bold-ttf-advances-16384": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 5299811292356809662
+    },
+    "arimo-bolditalic-ttf-outlines-16384": {
+      "packets": 13168,
+      "bytes": 389988,
+      "digest": 8483258661655380965
+    },
+    "arimo-bolditalic-ttf-advances-16384": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 3246793694215726398
+    },
+    "arimo-italic-ttf-outlines-16384": {
+      "packets": 13168,
+      "bytes": 389252,
+      "digest": 15601471433556655191
+    },
+    "arimo-italic-ttf-advances-16384": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 17877363361939233982
+    },
+    "arimo-regular-ttf-outlines-16384": {
+      "packets": 13168,
+      "bytes": 371580,
+      "digest": 14881764564894935864
+    },
+    "arimo-regular-ttf-advances-16384": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 12850435522868236990
+    },
+    "cousine-bold-ttf-outlines-16384": {
+      "packets": 9540,
+      "bytes": 272728,
+      "digest": 17757828188127741205
+    },
+    "cousine-bold-ttf-advances-16384": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 8710863924457658949
+    },
+    "cousine-bolditalic-ttf-outlines-16384": {
+      "packets": 9540,
+      "bytes": 291704,
+      "digest": 18191775641907191708
+    },
+    "cousine-bolditalic-ttf-advances-16384": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 8710863924457658949
+    },
+    "cousine-italic-ttf-outlines-16384": {
+      "packets": 9540,
+      "bytes": 291824,
+      "digest": 14836544185853003614
+    },
+    "cousine-italic-ttf-advances-16384": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 8710863924457658949
+    },
+    "cousine-regular-ttf-outlines-16384": {
+      "packets": 9540,
+      "bytes": 272256,
+      "digest": 5741002605263111156
+    },
+    "cousine-regular-ttf-advances-16384": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 8710863924457658949
+    },
+    "tinos-bold-ttf-outlines-16384": {
+      "packets": 13116,
+      "bytes": 451456,
+      "digest": 15835204245531914369
+    },
+    "tinos-bold-ttf-advances-16384": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 16464717198505187302
+    },
+    "tinos-bolditalic-ttf-outlines-16384": {
+      "packets": 13116,
+      "bytes": 459668,
+      "digest": 4757618867570631278
+    },
+    "tinos-bolditalic-ttf-advances-16384": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 13742117827531378470
+    },
+    "tinos-italic-ttf-outlines-16384": {
+      "packets": 13116,
+      "bytes": 463156,
+      "digest": 13485308554157016966
+    },
+    "tinos-italic-ttf-advances-16384": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 4842342058489737190
+    },
+    "tinos-regular-ttf-outlines-16384": {
+      "packets": 13116,
+      "bytes": 451444,
+      "digest": 87481014522734791
+    },
+    "tinos-regular-ttf-advances-16384": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 10259766806381084454
+    },
+    "dejavumathtexgyre-ttf-outlines-16384": {
+      "packets": 17128,
+      "bytes": 554748,
+      "digest": 1861022567329097842
+    },
+    "dejavumathtexgyre-ttf-advances-16384": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 7442558121991270671
+    },
+    "dejavusans-bold-ttf-outlines-16384": {
+      "packets": 24784,
+      "bytes": 801676,
+      "digest": 10271112469067317816
+    },
+    "dejavusans-bold-ttf-advances-16384": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 2917141019285718226
+    },
+    "dejavusans-boldoblique-ttf-outlines-16384": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 5150813326450399630
+    },
+    "dejavusans-boldoblique-ttf-advances-16384": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 1662061650972444763
+    },
+    "dejavusans-extralight-ttf-outlines-16384": {
+      "packets": 8128,
+      "bytes": 236300,
+      "digest": 6077069174772204725
+    },
+    "dejavusans-extralight-ttf-advances-16384": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 7869918251775457524
+    },
+    "dejavusans-oblique-ttf-outlines-16384": {
+      "packets": 21420,
+      "bytes": 718604,
+      "digest": 7891652988452277380
+    },
+    "dejavusans-oblique-ttf-advances-16384": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 8452056479365178072
+    },
+    "dejavusans-ttf-outlines-16384": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 18087615437797549243
+    },
+    "dejavusans-ttf-advances-16384": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 7140861264819812727
+    },
+    "dejavusanscondensed-bold-ttf-outlines-16384": {
+      "packets": 24784,
+      "bytes": 801532,
+      "digest": 6037285784209802715
+    },
+    "dejavusanscondensed-bold-ttf-advances-16384": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 13987045307368672978
+    },
+    "dejavusanscondensed-boldoblique-ttf-outlines-16384": {
+      "packets": 21652,
+      "bytes": 707932,
+      "digest": 1851973008273560366
+    },
+    "dejavusanscondensed-boldoblique-ttf-advances-16384": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 693412434264497627
+    },
+    "dejavusanscondensed-oblique-ttf-outlines-16384": {
+      "packets": 21420,
+      "bytes": 718596,
+      "digest": 1422678711339049968
+    },
+    "dejavusanscondensed-oblique-ttf-advances-16384": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 5271709953611154136
+    },
+    "dejavusanscondensed-ttf-outlines-16384": {
+      "packets": 25012,
+      "bytes": 813224,
+      "digest": 11529086637336882564
+    },
+    "dejavusanscondensed-ttf-advances-16384": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 2767219207342140727
+    },
+    "dejavusansmono-bold-ttf-outlines-16384": {
+      "packets": 13264,
+      "bytes": 406336,
+      "digest": 7809370028490918632
+    },
+    "dejavusansmono-bold-ttf-advances-16384": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 10769136196632880114
+    },
+    "dejavusansmono-boldoblique-ttf-outlines-16384": {
+      "packets": 10844,
+      "bytes": 301064,
+      "digest": 15077737728306581619
+    },
+    "dejavusansmono-boldoblique-ttf-advances-16384": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 13478035233126137282
+    },
+    "dejavusansmono-oblique-ttf-outlines-16384": {
+      "packets": 10840,
+      "bytes": 303736,
+      "digest": 125202525148155079
+    },
+    "dejavusansmono-oblique-ttf-advances-16384": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 1071058324281727393
+    },
+    "dejavusansmono-ttf-outlines-16384": {
+      "packets": 13508,
+      "bytes": 412812,
+      "digest": 17217111735351727860
+    },
+    "dejavusansmono-ttf-advances-16384": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 18074706599279091797
+    },
+    "dejavuserif-bold-ttf-outlines-16384": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 14736296666720975922
+    },
+    "dejavuserif-bold-ttf-advances-16384": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 5124358126665255635
+    },
+    "dejavuserif-bolditalic-ttf-outlines-16384": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 15600377463192196921
+    },
+    "dejavuserif-bolditalic-ttf-advances-16384": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 8211139489489160403
+    },
+    "dejavuserif-italic-ttf-outlines-16384": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 2832484341883478448
+    },
+    "dejavuserif-italic-ttf-advances-16384": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 11599478880544349492
+    },
+    "dejavuserif-ttf-outlines-16384": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 5526939084971263034
+    },
+    "dejavuserif-ttf-advances-16384": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 14135625028852770120
+    },
+    "dejavuserifcondensed-bold-ttf-outlines-16384": {
+      "packets": 14024,
+      "bytes": 461332,
+      "digest": 2953429327129173469
+    },
+    "dejavuserifcondensed-bold-ttf-advances-16384": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 2909371594180152403
+    },
+    "dejavuserifcondensed-bolditalic-ttf-outlines-16384": {
+      "packets": 14024,
+      "bytes": 478956,
+      "digest": 13487461755931688522
+    },
+    "dejavuserifcondensed-bolditalic-ttf-advances-16384": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 14038249587702244947
+    },
+    "dejavuserifcondensed-italic-ttf-outlines-16384": {
+      "packets": 14028,
+      "bytes": 504224,
+      "digest": 14053301716025064730
+    },
+    "dejavuserifcondensed-italic-ttf-advances-16384": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 17725980902421320884
+    },
+    "dejavuserifcondensed-ttf-outlines-16384": {
+      "packets": 14112,
+      "bytes": 485236,
+      "digest": 2343913080001427157
+    },
+    "dejavuserifcondensed-ttf-advances-16384": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 14761974329008640392
+    },
+    "notosans-regular-ttf-outlines-16384": {
+      "packets": 15536,
+      "bytes": 503524,
+      "digest": 1129328248959741155
+    },
+    "notosans-regular-ttf-advances-16384": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 2861650922146115158
+    },
+    "notosans-regular-otf-outlines-16384": {
+      "packets": 15536,
+      "bytes": 492700,
+      "digest": 6068936937681312649
+    },
+    "notosans-regular-otf-advances-16384": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 2861650922146115158
+    },
+    "notosans-bolditalic-otf-outlines-16384": {
+      "packets": 15580,
+      "bytes": 516136,
+      "digest": 9055581322996740904
+    },
+    "notosans-bolditalic-otf-advances-16384": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 1264963795363238898
+    },
+    "notosansjp-regular-otf-outlines-16384": {
+      "packets": 71744,
+      "bytes": 6579344,
+      "digest": 3136577247463693100
+    },
+    "notosansjp-regular-otf-advances-16384": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 18025131598498724004
+    },
+    "notosansjp-vf-otf-outlines-16384": {
+      "packets": 71744,
+      "bytes": 6126388,
+      "digest": 5263975200530819313
+    },
+    "notosansjp-vf-otf-advances-16384": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 11806985750753462692
+    },
+    "notosanscjk-regular-ttc-outlines-16384": {
+      "packets": 2621400,
+      "bytes": 246262800,
+      "digest": 8152815077870958455
+    },
+    "notosanscjk-regular-ttc-advances-16384": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 12800923516534089051
+    },
+    "notosansarabic-regular-ttf-outlines-16384": {
+      "packets": 5596,
+      "bytes": 414020,
+      "digest": 472496450543021943
+    },
+    "notosansarabic-regular-ttf-advances-16384": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 4509479214031119058
+    },
+    "notonaskharabic-regular-ttf-outlines-16384": {
+      "packets": 5660,
+      "bytes": 488912,
+      "digest": 6674644212824339250
+    },
+    "notonaskharabic-regular-ttf-advances-16384": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 12940671289582405642
+    },
+    "notosanshebrew-regular-ttf-outlines-16384": {
+      "packets": 604,
+      "bytes": 12844,
+      "digest": 6857798050159228877
+    },
+    "notosanshebrew-regular-ttf-advances-16384": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 17544478805448098562
+    },
+    "notosansdevanagari-regular-ttf-outlines-16384": {
+      "packets": 3380,
+      "bytes": 148400,
+      "digest": 3202651245386612206
+    },
+    "notosansdevanagari-regular-ttf-advances-16384": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 11435734743908717767
+    },
+    "notosansbengali-regular-ttf-outlines-16384": {
+      "packets": 1672,
+      "bytes": 70192,
+      "digest": 12860914641801007463
+    },
+    "notosansbengali-regular-ttf-advances-16384": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 15499234205633560731
+    },
+    "notosanstamil-regular-ttf-outlines-16384": {
+      "packets": 976,
+      "bytes": 58464,
+      "digest": 7055367026837539297
+    },
+    "notosanstamil-regular-ttf-advances-16384": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 7193653629165022130
+    },
+    "notosansthai-regular-ttf-outlines-16384": {
+      "packets": 560,
+      "bytes": 18388,
+      "digest": 3895997191699515904
+    },
+    "notosansthai-regular-ttf-advances-16384": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 235032203970849190
+    },
+    "authored-cff-features-otf-outlines-16384": {
+      "packets": 32,
+      "bytes": 332,
+      "digest": 8552125913795513740
+    },
+    "authored-cff-features-otf-advances-16384": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 995216688312846184
+    },
+    "authored-cff-matrix-otf-outlines-16384": {
+      "packets": 8,
+      "bytes": 16,
+      "digest": 8193377031849280069
+    },
+    "authored-cff-matrix-otf-advances-16384": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 551480937387
+    },
+    "authored-cmap-formats-ttf-outlines-16384": {
+      "packets": 16,
+      "bytes": 56,
+      "digest": 14945873899608469395
+    },
+    "authored-cmap-formats-ttf-advances-16384": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 9540031431330323050
+    }
+  }
+}

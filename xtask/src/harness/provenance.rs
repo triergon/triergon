@@ -55,6 +55,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/features/hls-segments/measured.json",
         "harness/reference_feed.h",
         "harness/reference_hls.h",
+        "harness/reference_font.h",
     ]
     .map(String::from)
     .to_vec();
@@ -72,6 +73,13 @@ pub fn matroska_inputs() -> Vec<String> {
             names.push(format!("harness/features/{feature}/{file}.json"));
         }
     }
+    // Features whose manifests are generated from their pins and the font corpus.
+    for feature in crate::fonts::FEATURES {
+        for file in ["contract", "pins"] {
+            names.push(format!("harness/features/{}/{file}.json", feature.id));
+        }
+    }
+    names.extend(crate::fonts::ROW_SOURCES.map(String::from));
     names
 }
 

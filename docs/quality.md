@@ -1,14 +1,17 @@
 # Quality: reference, gates and harness
 
-Every module is measured against a pinned FFmpeg build doing the same work. A module
-is complete only when it passes all three gates on every case in its corpus.
+Every module is measured against a pinned reference implementation doing the same
+work: FFmpeg for containers, framing, subtitle decoding, codecs and capture, FreeType
+for font tables and outlines, and libass for subtitle rendering. The gates and the
+measurement rules below are the same for every reference. A module is complete only
+when it passes all three gates on every case in its corpus.
 
 ## Gates
 
 | Gate | Requirement |
 |---|---|
 | Parity | Every declared feature matches the reference on every required case. Missing inputs, crashes, unsupported declared cases and unexplained differences are failures, never omitted rows. |
-| Runtime | `T_triergon / T_ffmpeg` at most **1.20** per case, using the upper bound of a paired 95% confidence interval. The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
+| Runtime | `T_triergon / T_reference` at most **1.20** per case, using the upper bound of a paired 95% confidence interval. The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
 | Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval. |
 
 The harness reads these limits from `harness/policy.json`. Each feature's contract and
@@ -21,7 +24,7 @@ same output. A gate is never passed by narrowing the work, dropping slow cases o
 weakening a comparison. A failed result stays recorded against the exact source and
 binaries that produced it.
 
-FFmpeg is the compatibility reference, not the specification. Disagreements are
+The reference is the compatibility reference, not the specification. Disagreements are
 investigated against the standard. A reference bug or a deliberately stricter
 resource limit becomes an explicit, reviewed rule for that case.
 
@@ -41,6 +44,40 @@ resource limit becomes an explicit, reviewed rule for that case.
   capture output independently, and `capture` (gating) and `capture-small` for the
   capture comparison. The two capture profiles link FFmpeg's component libraries
   into the worker so the allocation observer can audit the code doing the work.
+- **FreeType pin.** `cargo xtask fonts prepare` builds the FreeType 2.15.0 release
+  tarball (hash-checked, tree verified before and after the build) as a static
+  library without optional dependencies and records the configure flags, library
+  and compiler in `.research/freetype/build.json`; `cargo xtask build-workers` then
+  links the reference worker (`harness/reference_font.h`). `cargo xtask fonts fetch`
+  fetches the font corpus listed with sources, licences and hashes in
+  `harness/fonts/corpus.json` and writes its authored fonts with the font crate's
+  `authored-fonts` example. Its files are the cases of three features run like
+  every other feature: `font-outlines` (face data and unscaled outlines) and
+  `font-hinting-none` (libass's default configuration: unhinted outlines and
+  default-load advances at 256 pixels), which `cargo xtask check` requires, and
+  `font-hinting-modes` (the nine other heights libass requests when hinting is on),
+  run on demand and not gated yet. `cargo xtask fonts compare` reports the
+  required two, with `--all` all three.
+- **Generated manifests and pins.** The font features commit no case rows.
+  `cargo xtask fonts manifest` generates them from `harness/fonts/corpus.json` and
+  each feature's load settings (`xtask/src/fonts/manifest.rs`), and takes each
+  case's expected work from `harness/features/<feature>/pins.json`. Pins are the
+  FreeType reference's folds: re-record them with
+  `cargo xtask fonts manifest --record` after `cargo xtask build-workers`, and never
+  edit them by hand. `cargo xtask check-design` fails when the generated case ids
+  and the pins differ or a pin file is not in the form the recorder writes. Every
+  harness command reads such a manifest at `harness/features/<feature>/corpus.json`;
+  its identity is the SHA-256 of the generated JSON, the bytes
+  `fonts manifest` writes, so it is deterministic.
+- **Open cases.** A contract may list `open_cases`: case ids that fail today, each
+  tied to one of its `pending_module_requirements`. `cargo xtask report` still runs
+  them and prints them as open failures with their count, and passes only when every
+  other case passes and every listed case still fails; a listed case that starts
+  to match must leave the list. The module stays unaccepted while any is listed.
+- **Input rights.** A case is measured only when its `rights` are
+  `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
+  reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
+  Any other case fails as `rights-unreviewed`.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).
@@ -66,7 +103,7 @@ resource limit becomes an explicit, reviewed rule for that case.
 
 ## Harness
 
-The harness runs the same operation through a Triergon worker and an FFmpeg worker and
+The harness runs the same operation through a Triergon worker and a reference worker and
 compares canonical output. Workers speak one line protocol with `trace`, `bench` and
 `memory` modes, framed by begin/end markers and a named digest.
 
@@ -93,9 +130,12 @@ and `harness/features/packet-framing/`.
 `--pairs` applying to both measurements by default.
 
 `cargo xtask report` runs the correctness comparison of one feature contract
-(`--contract`, `--manifest`, `--corpus`) and grades it. A contract may name its own
-candidate worker and reference, as `matroska-startup-seek` and `hls-segments` do with
-`playback-worker` and the `video` and `formats` references. `--benchmark` adds paired
+(`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
+and grades it. A contract may name its own candidate worker and reference, as
+`matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
+and `formats` references, and the three font features with `font-worker` and FreeType.
+Such a worker takes one input per operation through the contract's
+`worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
 (`harness/allocations*.c`), including the Linux link-closure and active-window guard
 certificates. The report records the build identity, source provenance digest and input
@@ -105,7 +145,9 @@ qualifies the mandatory external vector and `cargo xtask fate-run` runs one supp
 upstream FATE case. `cargo xtask build-workers` builds the workers and records the build
 identity every collection is checked against. `cargo xtask trace-identities` records the
 digest of every candidate trace, so a change can show its traces are byte-identical
-(`--compare` an earlier record). `cargo xtask worker-tests` runs the integration tests
+(`--compare` an earlier record): the Matroska cases for `media-worker`, every case of
+each feature that runs the `--candidate` worker through a prefix otherwise.
+`cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent
 oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`),
@@ -116,7 +158,12 @@ identities of the codec crates against the pinned FFmpeg decoders
 (`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
 pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
-debug, release and reference workers from a pinned manifest.
+debug, release and reference workers from a pinned manifest, with a timeout per
+input. With `--contract` it builds that manifest from a prefix feature's cases: the
+release candidate and its dev build, plus the reference with `--reference`; listed
+open cases are expected to be rejected by both builds, and the campaign keeps the
+manifest as `manifest.json` for replay. `cargo xtask check` runs one round on each
+required font feature.
 
 On native AArch64 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.

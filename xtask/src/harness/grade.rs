@@ -244,7 +244,7 @@ impl Binding<'_> {
             ("corpus.json", self.manifest_sha),
         ] {
             let path = root.join("harness/features").join(id).join(name);
-            if document(&path)?.1 != expected {
+            if super::manifest::read(root, &path)?.1 != expected {
                 return Err(format!(
                     "{id}/{name} differs from the complete registered feature"
                 ));
@@ -719,7 +719,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let (timed, timing_sha) = document(&options.timing)?;
     let (memory, memory_sha) = document(&options.memory)?;
     let (contract, contract_sha) = document(&options.contract)?;
-    let (manifest, manifest_sha) = document(&options.manifest)?;
+    let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
     let binding = Binding {
         contract: &contract,
         manifest: &manifest,
@@ -1205,9 +1205,15 @@ mod tests {
             ("hls-segments", 71),
             ("packet-framing", 125),
             ("isobmff-open-index", 1020),
+            ("font-outlines", 50),
+            ("font-hinting-none", 100),
+            ("font-hinting-modes", 900),
         ] {
-            let (manifest, manifest_sha) =
-                document(&root.join(format!("harness/features/{feature}/corpus.json"))).unwrap();
+            let (manifest, manifest_sha) = super::super::manifest::read(
+                root,
+                &root.join(format!("harness/features/{feature}/corpus.json")),
+            )
+            .unwrap();
             let (contract, contract_sha) =
                 document(&root.join(format!("harness/features/{feature}/contract.json"))).unwrap();
             let binding = Binding {

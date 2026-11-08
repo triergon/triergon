@@ -612,6 +612,162 @@ pub struct Campaign {
     pub timeout_seconds: f64,
 }
 
+/// A campaign over the cases of a feature whose workers take one input and the
+/// case's arguments (a contract with `worker_operation`).
+pub struct Feature {
+    pub contract: PathBuf,
+    pub manifest: PathBuf,
+    /// The corpus directory, when the manifest records none or another is wanted.
+    pub corpus: Option<PathBuf>,
+    /// Only the cases whose id contains one of these texts; every case when empty.
+    pub cases: Vec<String>,
+    /// Also run the feature's reference, for differential observations.
+    pub reference: bool,
+}
+
+/// The campaign manifest of a feature: the release candidate and a dev-profile
+/// build of it (overflow checks and debug assertions on), with `reference` also
+/// the feature's reference worker; one fold operation; each selected case as a
+/// seed with its arguments. Returns the manifest and the largest seed's size.
+pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
+    use crate::harness::report::{PrefixFeature, case_arguments};
+    let lane = PrefixFeature::load(
+        root,
+        &feature.contract,
+        &feature.manifest,
+        feature.corpus.as_deref(),
+    )?;
+    let (release, reference) = lane.workers(root)?;
+    let status = Command::new("cargo")
+        .args(["build", "--locked", "-p", &lane.candidate])
+        .env("CARGO_INCREMENTAL", "0")
+        .current_dir(root)
+        .status()
+        .map_err(|e| e.to_string())?;
+    if !status.success() {
+        return Err(format!("{} dev build failed: {status}", lane.candidate));
+    }
+    let debug = root.join("target/debug").join(&lane.candidate);
+    let relative = |path: &Path| {
+        path.strip_prefix(root)
+            .unwrap_or(path)
+            .display()
+            .to_string()
+    };
+    let mut roles = vec![("candidate", release), ("debug", debug)];
+    if feature.reference {
+        roles.push(("reference", reference));
+    }
+    let mut workers = Vec::new();
+    for (role, path) in &roles {
+        workers.push((
+            *role,
+            Value::object([
+                ("path", Value::str(relative(path))),
+                ("sha256", Value::str(sha(path)?)),
+            ]),
+        ));
+    }
+    let mode = format!("{}fold", lane.prefix);
+    let argv = Value::strings([mode.as_str(), "{input}", "{arguments}"].map(String::from));
+    let operation = Value::object([
+        ("id", Value::str("fold")),
+        (
+            "roles",
+            Value::object(roles.iter().map(|(role, _)| (*role, argv.clone()))),
+        ),
+    ]);
+    // A listed open case is one the candidate fails today: its builds reject it.
+    let open: Vec<String> = crate::checks::read_json(&feature.contract)?
+        .get("open_cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|entry| s(entry, "id").map(str::to_owned))
+        .collect();
+    let baseline = |id: &str| {
+        let outcome = |role: &str| {
+            if role != "reference" && open.iter().any(|o| o == id) {
+                "rejected"
+            } else {
+                "ok"
+            }
+        };
+        Value::object([(
+            "fold",
+            Value::object(
+                roles
+                    .iter()
+                    .map(|(role, _)| (*role, Value::str(outcome(role)))),
+            ),
+        )])
+    };
+    let (mut seeds, mut largest) = (Vec::new(), 0);
+    for case in &lane.cases {
+        let id = s(case, "id").unwrap_or_default();
+        if !feature.cases.is_empty() && !feature.cases.iter().any(|text| id.contains(text.as_str()))
+        {
+            continue;
+        }
+        let path = lane.input(case)?;
+        largest = largest.max(
+            fs::metadata(&path)
+                .map_err(|e| format!("{}: {e}", path.display()))?
+                .len() as usize,
+        );
+        seeds.push(Value::object([
+            ("id", Value::str(id)),
+            ("path", Value::str(relative(&path))),
+            ("sha256", case.get("sha256").cloned().unwrap_or(Value::Null)),
+            ("rights", case.get("rights").cloned().unwrap_or(Value::Null)),
+            (
+                "arguments",
+                Value::strings(
+                    case_arguments(case)
+                        .iter()
+                        .map(|a| a.to_string_lossy().into_owned()),
+                ),
+            ),
+            ("baseline_statuses", baseline(id)),
+        ]));
+    }
+    if seeds.is_empty() {
+        return Err(format!("{}: no case selected", lane.id));
+    }
+    let mut files = vec![lane.contract.clone()];
+    files.extend(crate::harness::manifest::sources(root, &lane.manifest));
+    let sources = files
+        .iter()
+        .map(|path| Ok((relative(path), Value::str(sha(path)?))))
+        .collect::<R<Vec<_>>>()?;
+    let manifest = Value::object([
+        ("schema", Value::int(1)),
+        ("workers", Value::object(workers)),
+        ("operations", Value::Array(vec![operation])),
+        ("source_files", Value::Object(sources)),
+        ("seeds", Value::Array(seeds)),
+    ]);
+    Ok((manifest, largest))
+}
+
+/// Run a campaign over a feature's cases (see [`feature_manifest`]). The input bound
+/// is raised to the largest seed; the generated manifest is kept as the campaign's
+/// `manifest.json`, which replays it.
+pub fn feature_campaign(root: &Path, feature: &Feature, args: &Campaign) -> R<i32> {
+    let (manifest, largest) = feature_manifest(root, feature)?;
+    let path = std::env::temp_dir().join(format!("triergon-campaign-{}.json", std::process::id()));
+    crate::corpus::write_json(&path, &manifest)?;
+    let campaign = Campaign {
+        manifest: path.clone(),
+        output: args.output.clone(),
+        maximum_input_bytes: args.maximum_input_bytes.max(largest),
+        ..*args
+    };
+    let result = self::campaign(root, &campaign);
+    let _ = fs::remove_file(&path);
+    result
+}
+
 fn label(value: &str) -> bool {
     let bytes = value.as_bytes();
     !bytes.is_empty()
@@ -771,6 +927,13 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         if !row.get("rights").is_some_and(Value::truthy) {
             return Err(format!("seed rights/provenance must be recorded: {id}"));
         }
+        let arguments_ok = row.get("arguments").is_none_or(|a| {
+            a.as_array()
+                .is_some_and(|items| items.iter().all(|v| v.as_str().is_some()))
+        });
+        if !arguments_ok {
+            return Err(format!("seed arguments must be strings: {id}"));
+        }
         let expected = row
             .get("baseline_statuses")
             .cloned()
@@ -819,12 +982,24 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
             return Err("operation needs candidate and at least one pinned comparator".into());
         }
         for (_, command) in roles {
-            let ok = command.as_array().is_some_and(|c| {
-                c.iter().all(|v| v.as_str().is_some())
-                    && c.iter().filter(|v| v.as_str() == Some("{input}")).count() == 1
-            });
+            let slots = |slot: &str| {
+                command
+                    .as_array()
+                    .unwrap_or_default()
+                    .iter()
+                    .filter(|v| v.as_str() == Some(slot))
+                    .count()
+            };
+            let ok = command
+                .as_array()
+                .is_some_and(|c| c.iter().all(|v| v.as_str().is_some()))
+                && slots("{input}") == 1
+                && slots("{arguments}") <= 1;
             if !ok {
-                return Err("worker arguments need exactly one literal {input} slot".into());
+                return Err(
+                    "worker arguments need exactly one literal {input} slot and at most one {arguments} slot"
+                        .into(),
+                );
             }
         }
     }
@@ -927,12 +1102,18 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
                         .1;
                     let mut command: Vec<OsString> = vec![worker.as_os_str().to_owned()];
                     for a in arguments.as_array().unwrap_or_default() {
-                        let a = a.as_str().unwrap_or_default();
-                        command.push(if a == "{input}" {
-                            path.as_os_str().to_owned()
-                        } else {
-                            a.into()
-                        });
+                        match a.as_str().unwrap_or_default() {
+                            "{input}" => command.push(path.as_os_str().to_owned()),
+                            "{arguments}" => command.extend(
+                                row.get("arguments")
+                                    .and_then(Value::as_array)
+                                    .unwrap_or_default()
+                                    .iter()
+                                    .filter_map(Value::as_str)
+                                    .map(OsString::from),
+                            ),
+                            a => command.push(a.into()),
+                        }
                     }
                     let before =
                         input_identity(&path, &input_sha, data.len(), args.maximum_input_bytes);
@@ -1507,6 +1688,81 @@ mod tests {
             campaign(&root, &outside).is_err(),
             "output must be under .research"
         );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn seed_arguments_fill_the_arguments_slot_and_hangs_time_out() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = crate::walk::scratch("fuzz-arguments");
+        fs::create_dir_all(root.join(".research")).unwrap();
+        fs::create_dir_all(root.join("xtask/src/harness")).unwrap();
+        for file in [
+            "xtask/src/fuzz.rs",
+            "xtask/src/json.rs",
+            "xtask/src/harness/diff.rs",
+            "xtask/src/pyrandom.rs",
+        ] {
+            fs::write(root.join(file), file).unwrap();
+        }
+        let worker = |name: &str, body: &str| {
+            let path = root.join(name);
+            fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+            path
+        };
+        // `fold INPUT ARGUMENTS...`: echo the arguments; a mutated input hangs.
+        fs::write(root.join("seed.bin"), b"seed bytes").unwrap();
+        let body = format!(
+            "cmp -s \"$2\" '{}' || sleep 30; printf '{{\"a\": \"%s %s\"}}' \"$3\" \"$4\"",
+            root.join("seed.bin").display()
+        );
+        let (candidate, debug) = (worker("candidate", &body), worker("debug", &body));
+        let sha = |p: &Path| digest_bytes(&fs::read(p).unwrap());
+        let manifest = format!(
+            r#"{{"schema": 1, "workers": {{"candidate": {{"path": "{}", "sha256": "{}"}}, "debug": {{"path": "{}", "sha256": "{}"}}}},
+            "source_files": {{"seed.bin": "{}"}},
+            "operations": [{{"id": "fold", "roles": {{"candidate": ["fold", "{{input}}", "{{arguments}}"], "debug": ["fold", "{{input}}", "{{arguments}}"]}}}}],
+            "seeds": [{{"id": "seed", "path": "seed.bin", "sha256": "{}", "rights": "authored-synthetic", "arguments": ["x", "y"], "baseline_statuses": {{"fold": {{"candidate": "ok", "debug": "ok"}}}}}}]}}"#,
+            candidate.display(),
+            sha(&candidate),
+            debug.display(),
+            sha(&debug),
+            sha(&root.join("seed.bin")),
+            sha(&root.join("seed.bin"))
+        );
+        fs::write(root.join("campaign.json"), manifest).unwrap();
+        let args = Campaign {
+            manifest: root.join("campaign.json"),
+            output: root.join(".research/arguments"),
+            rounds: 1,
+            seed: 280,
+            maximum_input_bytes: 1024,
+            maximum_output_bytes: 1024,
+            timeout_seconds: 1.0,
+        };
+        assert_eq!(campaign(&root, &args).unwrap(), 1, "the hang is a finding");
+        let case = |n: usize| root.join(format!(".research/arguments/case-{n:06}/fold"));
+        assert_eq!(
+            fs::read(case(0).join("candidate.stdout")).unwrap(),
+            b"{\"a\": \"x y\"}"
+        );
+        let observed = crate::checks::read_json(
+            &root.join(".research/arguments/case-000001/observation.json"),
+        )
+        .unwrap();
+        let status = |role: &str| {
+            observed
+                .get("operations")
+                .and_then(Value::as_array)
+                .unwrap()[0]
+                .get("workers")
+                .and_then(|w| w.get(role))
+                .and_then(|r| s(r, "status"))
+                .map(str::to_owned)
+        };
+        assert_eq!(status("candidate").as_deref(), Some("timeout"));
         fs::remove_dir_all(root).unwrap();
     }
 }

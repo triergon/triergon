@@ -8,11 +8,11 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::acceptance::acceptance;
-use super::comparison::{reference_record, reference_summary};
+use super::comparison::{reference_named, reference_record, reference_summary};
 use super::gate_build;
 use super::parity::{self, Run};
 use super::provenance::source_identity_error;
-use super::report::host_target;
+use super::report::{PrefixFeature, case_arguments, host_target};
 use super::timing::{Operation, benchmark};
 use crate::checks::read_json;
 use crate::corpus::write_json;
@@ -425,153 +425,49 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
     })
 }
 
-/// The SHA-256 of every raw candidate trace over all recorded Matroska cases,
-/// the mandatory external vector and the selected FATE vectors, with each
-/// parity verdict. Two records are equivalent only when every call matches.
+/// The SHA-256 of every raw candidate trace, with each parity verdict. A worker
+/// that registered features run through a worker operation prefix is traced over
+/// every case of those features; any other worker over all recorded Matroska
+/// cases, the mandatory external vector and the selected FATE vectors. Two records
+/// are equivalent only when every call matches.
 pub fn trace_identities(
     root: &Path,
     candidate: &Path,
     output: &Path,
     compare: Option<&Path>,
 ) -> R<i32> {
-    use super::comparison::rule_for;
-    use super::parity::Comparison;
-    const SLICES: [(&str, &str, &str); 6] = [
-        (
-            "harness/features/matroska-demux/corpus.json",
-            "harness/features/matroska-demux/contract.json",
-            ".research/fixtures",
-        ),
-        (
-            "harness/features/matroska-header-removal/corpus.json",
-            "harness/features/matroska-header-removal/contract.json",
-            ".research/header-fixtures",
-        ),
-        (
-            "harness/features/matroska-zlib/corpus.json",
-            "harness/features/matroska-zlib/contract.json",
-            ".research/zlib-fixtures",
-        ),
-        (
-            "harness/features/matroska-cues-preroll/corpus.json",
-            "harness/features/matroska-cues-preroll/contract.json",
-            ".research/seek-fixtures",
-        ),
-        (
-            "harness/features/matroska-colour/corpus.json",
-            "harness/features/matroska-colour/contract.json",
-            ".research/colour-fixtures",
-        ),
-        (
-            "harness/features/matroska-segment-metadata/corpus.json",
-            "harness/features/matroska-segment-metadata/contract.json",
-            ".research/catalogue-fixtures",
-        ),
-    ];
     let candidate =
         fs::canonicalize(candidate).map_err(|e| format!("{}: {e}", candidate.display()))?;
+    let name = candidate
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let features = PrefixFeature::registered(root, &name)?;
     let identity = read_json(&root.join("target/harness/identity.json"))?;
     let native = root.join("target/harness/ffmpeg-worker");
     let scratch = std::env::temp_dir().join(format!("triergon-traces-{}", std::process::id()));
     let started = std::time::Instant::now();
     super::worker::record_calls(&candidate);
     let mut verdicts = Vec::new();
-    let result = (|| -> R<()> {
-        for (manifest, contract_path, corpus) in SLICES {
-            let contract = read_json(&root.join(contract_path))?;
-            let id = s(&contract, "id").unwrap_or_default().to_owned();
-            for case in read_json(&root.join(manifest))?
-                .get("cases")
-                .and_then(Value::as_array)
-                .unwrap_or_default()
-            {
-                let rule = rule_for(case, &identity, Some(&id))?;
-                let reference =
-                    root.join(s(&reference_record(&identity, rule)?, "path").unwrap_or_default());
-                let path = root.join(corpus).join(s(case, "file").unwrap_or_default());
-                if Some(sha(&path)?.as_str()) != s(case, "sha256") {
-                    return Err(format!("input changed: {}", path.display()));
-                }
-                let run = Run {
-                    root,
-                    candidate: &candidate,
-                    reference: &reference,
-                    input: &path,
-                    raw: scratch.join(s(case, "id").unwrap_or_default()),
-                };
-                let comparison = rule.map(|rule| Comparison {
-                    rule,
-                    native_reference: &native,
-                });
-                let content = id == "matroska-zlib";
-                let result = if id == "matroska-segment-metadata" {
-                    parity::catalogue_parity(&run, true, comparison.as_ref(), content)?
-                } else if id == "matroska-colour" {
-                    parity::colour_parity(&run, true, comparison.as_ref(), content)?
-                } else if case.get("seek_target_ns").is_none_or(|v| *v == Value::Null) {
-                    parity::parity(&run, true, comparison.as_ref(), content, "")?
-                } else {
-                    parity::seek_parity(&run, true, comparison.as_ref(), content)?
-                };
-                verdicts.push((
-                    format!("{id}/{}", s(case, "id").unwrap_or_default()),
-                    result.get("status").cloned().unwrap_or(Value::Null),
-                ));
-            }
-        }
-        let contract =
-            read_json(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
-        let hdr = contract
-            .get("required_additional_vectors")
-            .and_then(Value::as_array)
-            .and_then(|v| v.first())
-            .cloned()
-            .unwrap_or(Value::Null);
-        let file = s(&hdr, "file").unwrap_or_default();
-        let path = root.join(".research/fate-samples").join(file);
-        if Some(sha(&path)?.as_str()) != s(&hdr, "sha256") {
-            return Err("HDR vector changed".into());
-        }
-        let run = Run {
+    let result = if features.is_empty() {
+        matroska_traces(
             root,
-            candidate: &candidate,
-            reference: &native,
-            input: &path,
-            raw: scratch.join("hdr"),
-        };
-        verdicts.push((
-            format!("hdr/{file}"),
-            parity::catalogue_parity(&run, true, None, false)?
-                .get("status")
-                .cloned()
-                .unwrap_or(Value::Null),
-        ));
-        for (_, sample, _, sequential) in
-            [FATE_CASES[0], FATE_CASES[1], FATE_CASES[2], FATE_CASES[3]]
-        {
-            let path = root.join(".research/fate-samples").join(sample);
-            let stem = Path::new(sample)
-                .file_stem()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .into_owned();
-            let run = Run {
-                root,
-                candidate: &candidate,
-                reference: &native,
-                input: &path,
-                raw: scratch.join(stem),
-            };
-            verdicts.push((
-                format!("fate/{sample}"),
-                parity::parity(&run, sequential, None, false, "")?
-                    .get("status")
-                    .cloned()
-                    .unwrap_or(Value::Null),
-            ));
-        }
-        Ok(())
-    })();
+            &candidate,
+            &identity,
+            &native,
+            &scratch,
+            &mut verdicts,
+        )
+    } else {
+        prefix_traces(
+            root,
+            &candidate,
+            &features,
+            &identity,
+            &scratch,
+            &mut verdicts,
+        )
+    };
     let calls = super::worker::stop_recording();
     let _ = fs::remove_dir_all(&scratch);
     result?;
@@ -624,6 +520,187 @@ pub fn trace_identities(
         println!("byte-identical to {}", compare.display());
     }
     Ok(0)
+}
+
+/// The candidate's traces over the recorded Matroska cases, the mandatory external
+/// vector and the selected FATE vectors.
+fn matroska_traces(
+    root: &Path,
+    candidate: &Path,
+    identity: &Value,
+    native: &Path,
+    scratch: &Path,
+    verdicts: &mut Vec<(String, Value)>,
+) -> R<()> {
+    use super::comparison::rule_for;
+    use super::parity::Comparison;
+    const SLICES: [(&str, &str, &str); 6] = [
+        (
+            "harness/features/matroska-demux/corpus.json",
+            "harness/features/matroska-demux/contract.json",
+            ".research/fixtures",
+        ),
+        (
+            "harness/features/matroska-header-removal/corpus.json",
+            "harness/features/matroska-header-removal/contract.json",
+            ".research/header-fixtures",
+        ),
+        (
+            "harness/features/matroska-zlib/corpus.json",
+            "harness/features/matroska-zlib/contract.json",
+            ".research/zlib-fixtures",
+        ),
+        (
+            "harness/features/matroska-cues-preroll/corpus.json",
+            "harness/features/matroska-cues-preroll/contract.json",
+            ".research/seek-fixtures",
+        ),
+        (
+            "harness/features/matroska-colour/corpus.json",
+            "harness/features/matroska-colour/contract.json",
+            ".research/colour-fixtures",
+        ),
+        (
+            "harness/features/matroska-segment-metadata/corpus.json",
+            "harness/features/matroska-segment-metadata/contract.json",
+            ".research/catalogue-fixtures",
+        ),
+    ];
+    for (manifest, contract_path, corpus) in SLICES {
+        let contract = read_json(&root.join(contract_path))?;
+        let id = s(&contract, "id").unwrap_or_default().to_owned();
+        for case in read_json(&root.join(manifest))?
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+        {
+            let rule = rule_for(case, identity, Some(&id))?;
+            let reference =
+                root.join(s(&reference_record(identity, rule)?, "path").unwrap_or_default());
+            let path = root.join(corpus).join(s(case, "file").unwrap_or_default());
+            if Some(sha(&path)?.as_str()) != s(case, "sha256") {
+                return Err(format!("input changed: {}", path.display()));
+            }
+            let run = Run {
+                root,
+                candidate,
+                reference: &reference,
+                input: &path,
+                raw: scratch.join(s(case, "id").unwrap_or_default()),
+            };
+            let comparison = rule.map(|rule| Comparison {
+                rule,
+                native_reference: native,
+            });
+            let content = id == "matroska-zlib";
+            let result = if id == "matroska-segment-metadata" {
+                parity::catalogue_parity(&run, true, comparison.as_ref(), content)?
+            } else if id == "matroska-colour" {
+                parity::colour_parity(&run, true, comparison.as_ref(), content)?
+            } else if case.get("seek_target_ns").is_none_or(|v| *v == Value::Null) {
+                parity::parity(&run, true, comparison.as_ref(), content, "")?
+            } else {
+                parity::seek_parity(&run, true, comparison.as_ref(), content)?
+            };
+            verdicts.push((
+                format!("{id}/{}", s(case, "id").unwrap_or_default()),
+                result.get("status").cloned().unwrap_or(Value::Null),
+            ));
+        }
+    }
+    let contract =
+        read_json(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
+    let hdr = contract
+        .get("required_additional_vectors")
+        .and_then(Value::as_array)
+        .and_then(|v| v.first())
+        .cloned()
+        .unwrap_or(Value::Null);
+    let file = s(&hdr, "file").unwrap_or_default();
+    let path = root.join(".research/fate-samples").join(file);
+    if Some(sha(&path)?.as_str()) != s(&hdr, "sha256") {
+        return Err("HDR vector changed".into());
+    }
+    let run = Run {
+        root,
+        candidate,
+        reference: native,
+        input: &path,
+        raw: scratch.join("hdr"),
+    };
+    verdicts.push((
+        format!("hdr/{file}"),
+        parity::catalogue_parity(&run, true, None, false)?
+            .get("status")
+            .cloned()
+            .unwrap_or(Value::Null),
+    ));
+    for (_, sample, _, sequential) in [FATE_CASES[0], FATE_CASES[1], FATE_CASES[2], FATE_CASES[3]] {
+        let path = root.join(".research/fate-samples").join(sample);
+        let stem = Path::new(sample)
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        let run = Run {
+            root,
+            candidate,
+            reference: native,
+            input: &path,
+            raw: scratch.join(stem),
+        };
+        verdicts.push((
+            format!("fate/{sample}"),
+            parity::parity(&run, sequential, None, false, "")?
+                .get("status")
+                .cloned()
+                .unwrap_or(Value::Null),
+        ));
+    }
+    Ok(())
+}
+
+/// The candidate's traces over every case of each feature that runs it through a
+/// worker operation prefix.
+fn prefix_traces(
+    root: &Path,
+    candidate: &Path,
+    features: &[PrefixFeature],
+    identity: &Value,
+    scratch: &Path,
+    verdicts: &mut Vec<(String, Value)>,
+) -> R<()> {
+    for feature in features {
+        let reference = reference_named(identity, &feature.reference)?;
+        let reference = root.join(s(&reference, "path").unwrap_or_default());
+        for case in &feature.cases {
+            let id = s(case, "id").unwrap_or_default();
+            let path = feature.input(case)?;
+            if Some(sha(&path)?.as_str()) != s(case, "sha256") {
+                return Err(format!("input changed: {}", path.display()));
+            }
+            let run = Run {
+                root,
+                candidate,
+                reference: &reference,
+                input: &path,
+                raw: scratch.join(&feature.id).join(id),
+            };
+            let expected = case.get("expected").unwrap_or(&Value::Null);
+            let result = parity::feed_parity(
+                &run,
+                &feature.prefix,
+                &case_arguments(case),
+                expected,
+                &feature.work_fields,
+            )?;
+            verdicts.push((
+                format!("{}/{id}", feature.id),
+                result.get("status").cloned().unwrap_or(Value::Null),
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
