@@ -11224,6 +11224,12 @@
    "sha256": "6a865704505d5a75568599906e16b88f35729ff7ded2832541f8d56a5bc86ddc"
   },
   {
+   "name": "packet-framing-hevc-resource-traces",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-hevc-resource-traces/d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884.tar.gz",
+   "sha256": "d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884"
+  },
+  {
    "name": "progressive-cursor-gate-build",
    "path": "progressive-cursor-gate-build",
    "retention": "retained",
