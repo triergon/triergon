@@ -58,6 +58,18 @@ pub use annexb::{AnnexBOutput, AnnexBWriter, BuildStep};
 pub use audio_config::{
     canonical_flac_configuration, canonical_opus_configuration, canonical_vorbis_configuration,
 };
+
+/// Progress of a configuration parser publishing into a caller-provided slot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfigProgress {
+    /// A complete configuration was placed in the previously empty slot.
+    Ready,
+    /// More work is needed; the slot remains empty.
+    Yield,
+    /// The configuration was already published; the slot remains empty.
+    Complete,
+}
+
 pub use av1::{
     Av1Leb128, Av1Obu, Av1ObuExtension, Av1ObuFacts, Av1ObuFraming, Av1ObuHeader,
     Av1ObuHeaderIssues, Av1ObuLimits, Av1ObuReader,

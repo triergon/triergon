@@ -14,6 +14,11 @@ is driven by `step`. Record and packet jobs return `BuildStep::{Yield, Ready,
 Complete}`; incremental readers return core `Step::{NeedInput, Yield, Ready, End}`
 and are fed with `provide` and closed with `finish` or `fail`.
 
+AVC and HEVC record parsers, including their compatibility wrappers, also offer
+`step_into` with an empty output slot and `ConfigProgress`. This publishes the
+configuration directly into caller storage. Occupied slots are rejected without
+advancing the parser; `step` retains the same progress and error behaviour.
+
 ```rust
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, WorkBudget};

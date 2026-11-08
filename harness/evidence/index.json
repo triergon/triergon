@@ -11212,6 +11212,12 @@
    "sha256": "8ec70d2d2a8656fa50719104ed3f70b0eb189ea0b48436eead96c55aa67c5c0f"
   },
   {
+   "name": "packet-framing-state-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-state-count/8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d.tar.gz",
+   "sha256": "8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d"
+  },
+  {
    "name": "progressive-cursor-gate-build",
    "path": "progressive-cursor-gate-build",
    "retention": "retained",

@@ -1,7 +1,7 @@
 //! ISO/IEC14496-15:2010 / incorporated2006 FRExt record grammar.
 //! The private source manifest pins the primary clauses. NAL bodies, sample-entry
 //! rules and record/SPS consistency are not decoded or certified here.
-use crate::{BuildStep, Codec, LengthSize, NalHeader};
+use crate::{BuildStep, Codec, ConfigProgress, LengthSize, NalHeader};
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
@@ -349,10 +349,64 @@ impl AvcConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AvcConfiguration>> {
+        let mut ready = None;
+        match self.step_into(work, cancel, &mut ready)? {
+            ConfigProgress::Ready => Ok(BuildStep::Ready(
+                ready.ok_or(Error::Invalid("missing published configuration"))?,
+            )),
+            ConfigProgress::Yield => Ok(BuildStep::Yield),
+            ConfigProgress::Complete => Ok(BuildStep::Complete),
+        }
+    }
+
+    /// Publishes into an empty caller-provided slot without returning the record.
+    /// An occupied slot is rejected before any state, work or retained storage changes.
+    /// Yield, completion and errors leave an initially empty slot empty.
+    pub fn step_into(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<AvcConfiguration>,
+    ) -> Result<ConfigProgress> {
+        self.step_into_with(work, cancel, ready, |record| record)
+    }
+
+    // Only publication is generic: the grammar walk is shared by source and
+    // receiver slots, without an intermediate source-record publication slot.
+    #[inline]
+    pub(crate) fn step_into_with<T>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<T>,
+        wrap: impl FnOnce(AvcConfiguration) -> T,
+    ) -> Result<ConfigProgress> {
+        if ready.is_some() {
+            return Err(Error::Invalid("configuration output sink occupied"));
+        }
         if let Some(error) = self.failure {
             return Err(error);
         }
-        let result = self.advance(work, cancel);
+        let result = self.advance(work, cancel).and_then(|progress| {
+            if progress == ConfigProgress::Ready {
+                *ready = Some(wrap(AvcConfiguration {
+                    raw: self
+                        .raw
+                        .take()
+                        .ok_or(Error::Invalid("missing AVC record"))?,
+                    source: self.source,
+                    fields: self.fields.ok_or(Error::Invalid("missing AVC fields"))?,
+                    width: self.width.ok_or(Error::Invalid("missing AVC width"))?,
+                    arrays: self.arrays.clone(),
+                    nals: self
+                        .nals
+                        .take()
+                        .ok_or(Error::Invalid("missing AVC descriptors"))?,
+                }));
+                self.phase = Phase::Complete;
+            }
+            Ok(progress)
+        });
         if let Err(error) = result
             && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
         {
@@ -363,20 +417,17 @@ impl AvcConfigParser {
         result
     }
 
-    fn advance(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<AvcConfiguration>> {
+    #[inline(never)]
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ConfigProgress> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if matches!(self.phase, Phase::Complete) {
-                return Ok(BuildStep::Complete);
+                return Ok(ConfigProgress::Complete);
             }
             if !work.try_charge(1) {
-                return Ok(BuildStep::Yield);
+                return Ok(ConfigProgress::Yield);
             }
             let raw = self
                 .raw
@@ -460,7 +511,7 @@ impl AvcConfigParser {
                                     .extension = next.extension;
                                 self.phase = Phase::Reserve;
                             } else {
-                                return self.publish(end);
+                                return self.publication_ready(end);
                             }
                         }
                         _ => {}
@@ -483,36 +534,21 @@ impl AvcConfigParser {
                         if cancel.load(Ordering::Relaxed) {
                             return Err(Error::Cancelled);
                         }
-                        return self.publish(self.understood_end);
+                        return self.publication_ready(self.understood_end);
                     }
                     self.scan = Scan::new();
                     self.phase = Phase::Fill;
                 }
-                Phase::Complete => return Ok(BuildStep::Complete),
+                Phase::Complete => return Ok(ConfigProgress::Complete),
             }
         }
     }
 
-    fn publish(&mut self, end: usize) -> Result<BuildStep<AvcConfiguration>> {
+    fn publication_ready(&self, end: usize) -> Result<ConfigProgress> {
         if end != self.understood_end || usize::from(self.filled) != self.total {
             return Err(Error::Invalid("AVC second walk"));
         }
-        let output = AvcConfiguration {
-            raw: self
-                .raw
-                .take()
-                .ok_or(Error::Invalid("missing AVC record"))?,
-            source: self.source,
-            fields: self.fields.ok_or(Error::Invalid("missing AVC fields"))?,
-            width: self.width.ok_or(Error::Invalid("missing AVC width"))?,
-            arrays: self.arrays.clone(),
-            nals: self
-                .nals
-                .take()
-                .ok_or(Error::Invalid("missing AVC descriptors"))?,
-        };
-        self.phase = Phase::Complete;
-        Ok(BuildStep::Ready(output))
+        Ok(ConfigProgress::Ready)
     }
 }
 
