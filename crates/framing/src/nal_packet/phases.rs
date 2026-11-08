@@ -210,7 +210,7 @@ impl<M> NalPacketJob<'_, M> {
                 return Ok(YIELD);
             }
             self.segment_hint = Some(1);
-            self.append(NalPacketSegment::passthrough(&source.bytes, self.total))?;
+            self.append(NalPacketSegment::passthrough(source.bytes.len()))?;
             self.phase = Phase::Reserve;
             return Ok(NEXT);
         };

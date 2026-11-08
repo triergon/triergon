@@ -393,36 +393,44 @@ pub enum NalPacketProgress {
 /// rather than independently cloned into each descriptor.
 #[derive(Clone, PartialEq, Eq)]
 pub struct NalPacketSegment {
-    source_range: Range<usize>,
+    source_start: usize,
+    // Length-framed packet NALs have at most four length bytes; configuration
+    // NALs have two. Passthrough keeps its unbounded length in the offset word.
+    payload_length: u32,
     // The high byte carries the existing source/prefix tag. The low24 bits
     // carry a configuration NAL index: avcC has at most31+255+255 NALs;
     // hvcC has at most255 arrays of65535 NALs. Packet descriptors use index0.
     // Source ranges and output offsets remain full usize values.
     nal_and_prefix: u32,
-    output_offset: usize,
+    output_offset_or_length: usize,
 }
+// Report the unchanged public range and offset fields instead of their packed storage.
+#[allow(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for NalPacketSegment {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Preserve the existing public diagnostic fields after private packing.
         let nal_index = (self.nal_and_prefix & Self::NAL_INDEX_MASK) as usize;
-        let prefix_and_source = (self.nal_and_prefix >> 24) as u8;
+        let prefix_and_source = (self.nal_and_prefix >> 24) as u8 & !Self::PASSTHROUGH;
         formatter
             .debug_struct("NalPacketSegment")
-            .field("source_range", &self.source_range)
+            .field("source_range", &self.source_range())
             .field("nal_index", &nal_index)
             .field("prefix_and_source", &prefix_and_source)
-            .field("output_offset", &self.output_offset)
+            .field("output_offset", &self.output_offset())
             .finish()
     }
 }
 impl NalPacketSegment {
     const CONFIGURATION_SOURCE: u8 = 0x80;
+    const PASSTHROUGH: u8 = 0x40;
     const NAL_INDEX_MASK: u32 = 0x00ff_ffff;
     fn packet(range: Range<usize>, prefix: u8, offset: usize) -> Self {
+        debug_assert!(u32::try_from(range.len()).is_ok());
         Self {
-            source_range: range,
+            source_start: range.start,
+            payload_length: range.len() as u32,
             nal_and_prefix: u32::from(prefix) << 24,
-            output_offset: offset,
+            output_offset_or_length: offset,
         }
     }
     fn configuration(index: usize, range: Range<usize>, offset: usize) -> Self {
@@ -430,39 +438,57 @@ impl NalPacketSegment {
         // Their literal count fields bound every index below255*65535<2^24;
         // this does not narrow source ranges, output lengths or packet offsets.
         debug_assert!(index < usize::from(u8::MAX) * usize::from(u16::MAX));
+        debug_assert!(u16::try_from(range.len()).is_ok());
         Self {
-            source_range: range,
+            source_start: range.start,
+            payload_length: range.len() as u32,
             nal_and_prefix: (index as u32) | (u32::from(Self::CONFIGURATION_SOURCE | 4) << 24),
-            output_offset: offset,
+            output_offset_or_length: offset,
         }
     }
-    fn passthrough(source: &Bytes, offset: usize) -> Self {
+    fn passthrough(length: usize) -> Self {
+        // Passthrough publishes exactly one whole-packet segment at offset zero.
         Self {
-            source_range: 0..source.len(),
-            nal_and_prefix: 0,
-            output_offset: offset,
+            source_start: 0,
+            payload_length: 0,
+            nal_and_prefix: u32::from(Self::PASSTHROUGH) << 24,
+            output_offset_or_length: length,
         }
     }
     pub fn origin(&self) -> NalPacketOrigin {
         if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
             NalPacketOrigin::Packet {
-                source_range: self.source_range.clone(),
+                source_range: self.source_range(),
             }
         } else {
             NalPacketOrigin::Configuration {
                 nal_index: (self.nal_and_prefix & Self::NAL_INDEX_MASK) as usize,
-                source_range: self.source_range.clone(),
+                source_range: self.source_range(),
             }
         }
     }
     pub fn prefix_bytes(&self) -> u8 {
-        (self.nal_and_prefix >> 24) as u8 & !Self::CONFIGURATION_SOURCE
+        (self.nal_and_prefix >> 24) as u8 & !(Self::CONFIGURATION_SOURCE | Self::PASSTHROUGH)
     }
     pub fn output_offset(&self) -> usize {
-        self.output_offset
+        if self.is_passthrough() {
+            0
+        } else {
+            self.output_offset_or_length
+        }
     }
     fn len(&self) -> usize {
-        self.source_range.end - self.source_range.start
+        if self.is_passthrough() {
+            self.output_offset_or_length
+        } else {
+            self.payload_length as usize
+        }
+    }
+    fn source_range(&self) -> Range<usize> {
+        self.source_start..self.source_start + self.len()
+    }
+    fn is_passthrough(&self) -> bool {
+        (self.nal_and_prefix >> 24) as u8 & Self::PASSTHROUGH != 0
     }
     fn owner<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> &'a Bytes {
         if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
@@ -474,7 +500,7 @@ impl NalPacketSegment {
     fn payload<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> Result<&'a [u8]> {
         self.owner(packet, configuration)
             .as_ref()
-            .get(self.source_range.clone())
+            .get(self.source_range())
             .ok_or(Error::Invalid("packet segment range"))
     }
 }
@@ -595,7 +621,7 @@ impl<M> NalPacketOutput<M> {
         let part = self.segments.as_slice().get(index)?;
         part.owner(&self.source.bytes, &self.configuration)
             .as_ref()
-            .get(part.source_range.clone())
+            .get(part.source_range())
     }
     /// One segment's payload as its own handle on the retained packet or
     /// configuration owner. No bytes are copied.
@@ -606,7 +632,7 @@ impl<M> NalPacketOutput<M> {
             .get(index)
             .ok_or(Error::Invalid("packet segment index"))?;
         part.owner(&self.source.bytes, &self.configuration)
-            .slice(part.source_range.clone())
+            .slice(part.source_range())
     }
 }
 
@@ -851,6 +877,43 @@ impl<M> NalPacketJob<'_, M> {
 #[cfg(test)]
 mod packed_plan_boundary_guards {
     use super::*;
+
+    #[test]
+    fn maximum_wire_length_preserves_full_source_and_output_offsets() {
+        let length = u32::MAX as usize;
+        let range = usize::MAX - length..usize::MAX;
+        let part = NalPacketSegment::packet(range.clone(), 4, usize::MAX);
+        assert_eq!(
+            part.origin(),
+            NalPacketOrigin::Packet {
+                source_range: range
+            }
+        );
+        assert_eq!(part.len(), length);
+        assert_eq!(part.output_offset(), usize::MAX);
+        assert_eq!(part.prefix_bytes(), 4);
+    }
+
+    #[test]
+    fn passthrough_length_is_not_limited_to_the_wire_length_field() {
+        let part = NalPacketSegment::passthrough(usize::MAX);
+        assert_eq!(
+            part.origin(),
+            NalPacketOrigin::Packet {
+                source_range: 0..usize::MAX
+            }
+        );
+        assert_eq!(part.len(), usize::MAX);
+        assert_eq!(part.output_offset(), 0);
+        assert_eq!(part.prefix_bytes(), 0);
+        assert_eq!(
+            format!("{part:?}"),
+            format!(
+                "NalPacketSegment {{ source_range: 0..{}, nal_index: 0, prefix_and_source: 0, output_offset: 0 }}",
+                usize::MAX
+            )
+        );
+    }
 
     #[test]
     fn every_configuration_index_boundary_preserves_full_source_ranges() {
