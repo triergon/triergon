@@ -35,7 +35,7 @@ impl<M> NalPacketJob<'_, M> {
                 Phase::Verify => self.verify_update(work)?,
                 Phase::Arrays => self.check_arrays(work)?,
                 Phase::Lookahead => self.lookahead(work, cancel)?,
-                Phase::Scan => self.scan_nal(work, cancel)?,
+                Phase::Scan => self.scan_packet(work, cancel)?,
                 Phase::Inject => self.inject_configuration(work)?,
                 Phase::Nal => self.append_nal(work)?,
                 Phase::Reserve => self.reserve_output(work)?,
@@ -45,6 +45,39 @@ impl<M> NalPacketJob<'_, M> {
             };
             if let Step::Break(status) = step {
                 return Ok(status);
+            }
+        }
+    }
+
+    #[inline]
+    fn scan_packet(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step> {
+        // Keep the cancellation poll at every logical phase boundary while
+        // avoiding the full driver dispatch between scanning and appending.
+        let mut first = true;
+        loop {
+            if !first && cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            first = false;
+            if let Step::Break(status) = self.scan_nal(work, cancel)? {
+                return Ok(Step::Break(status));
+            }
+            if !matches!(self.phase, Phase::Inject | Phase::Nal) {
+                return Ok(NEXT);
+            }
+            while matches!(self.phase, Phase::Inject) {
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(Error::Cancelled);
+                }
+                if let Step::Break(status) = self.inject_configuration(work)? {
+                    return Ok(Step::Break(status));
+                }
+            }
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if let Step::Break(status) = self.append_nal(work)? {
+                return Ok(Step::Break(status));
             }
         }
     }
