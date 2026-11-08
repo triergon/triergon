@@ -90,14 +90,22 @@ resource limit becomes an explicit, reviewed rule for that case.
   build-workers` then links the reference worker (`harness/reference_raster.h`):
   it includes `ass_render.c` from the pinned tree to reach libass's internal
   stages and is compiled with the flags libass compiled itself with
-  (`libass-internal.pc`). Its features run libass's outline, stroker,
+  (`libass-internal.pc`). It replaces the engine `ass_renderer_init` picks for
+  the host with libass's plain C bitmap engine
+  (`ass_bitmap_engine_init(ASS_CPU_FLAG_NONE)`: C functions, 16×16 tiles and
+  16-byte rows), recorded in `build.json` and checked at startup, on every
+  host: it is what libass runs on 32-bit ARMv7, where it has no assembly, and
+  it does not depend on the host. Its features run libass's outline, stroker,
   rasteriser, blur, composition and clipping stages on glyphs of the font
   corpus loaded as libass loads them with hinting off (FreeType in the
   reference, `triergon-font` in the candidate; `raster-glyphs`) and on seeded
   random outlines (`raster-outlines`) and bitmaps (`raster-bitmaps`), all
   required by `cargo xtask check`; `raster-sweep`, every corpus file at three
-  heights with larger random sets, runs on demand. `cargo xtask raster compare`
-  reports the required three, with `--all` all four.
+  heights with larger random sets, runs on demand. `raster-simd` runs the
+  required cases against the host's own SIMD engine (NEON, AVX2, SSSE3 or
+  SSE2) with the C engine's pins, and records where that engine departs.
+  `cargo xtask raster compare` reports the required three, with `--all` also
+  the sweep, with `--diagnostic` `raster-simd`.
 - **Generated manifests and pins.** The font, shaping and rasterising features
   commit no case rows. `cargo xtask fonts manifest`, `cargo xtask shape manifest`
   and `cargo xtask raster manifest` generate them from `harness/fonts/corpus.json`,
@@ -193,7 +201,7 @@ and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
 and `formats` references, the three font features with `font-worker` and FreeType,
 the five shaping features with `shape-worker` and HarfBuzz and FriBidi, and the
-four rasterising features with `raster-worker` and libass.
+five rasterising features with `raster-worker` and libass.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
