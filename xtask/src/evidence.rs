@@ -847,6 +847,11 @@ mod tests {
         let Ok(index) = crate::checks::read_json(&root.join(INDEX)) else {
             return;
         };
+        assert_eq!(
+            crate::json::to_python(&index, Some(1)) + "\n",
+            fs::read_to_string(root.join(INDEX)).unwrap(),
+            "{INDEX} must stay in its canonical layout, which `evidence promote` rewrites"
+        );
         let mut paths = std::collections::BTreeSet::new();
         for set in index.get("sets").and_then(Value::as_array).unwrap() {
             let sha = s(set, "sha256").unwrap();
