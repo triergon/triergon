@@ -3,7 +3,7 @@
 //! loop; `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
     AvcState, Injection, NalPacketJob, NalPacketOutput, NalPacketProgress,
-    NalPacketReceiverErrorKind, NalPacketSegment, PendingNal, Phase,
+    NalPacketReceiverErrorKind, NalPacketSegment, Phase,
 };
 use crate::{AvcConfigArrayKind, Codec, NalHeader};
 use std::ops::ControlFlow;
@@ -118,14 +118,16 @@ impl<M> NalPacketJob<'_, M> {
                 .ok_or(Error::Invalid("missing packet width"))?
                 .bytes(),
         );
-        if self.look_offset == source.bytes.len() && self.look_prefix == 0 {
+        if self.offset == source.bytes.len() && self.prefix_read == 0 {
+            self.offset = 0;
+            self.length = 0;
             self.phase = Phase::Scan;
             return Ok(NEXT);
         }
-        if self.look_prefix < width {
-            let count = (width - self.look_prefix)
+        if self.prefix_read < width {
+            let count = (width - self.prefix_read)
                 .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX))
-                .min(source.bytes.len().saturating_sub(self.look_offset));
+                .min(source.bytes.len().saturating_sub(self.offset));
             if count == 0 {
                 // Missing input still consumes the old failed-read
                 // token; exhausted work yields before that refusal.
@@ -138,14 +140,14 @@ impl<M> NalPacketJob<'_, M> {
             work.take(count as u64);
             // Width is at most four. Every reachable accumulated
             // prefix fits usize on the supported32/64-bit targets.
-            for &byte in &source.bytes[self.look_offset..self.look_offset + count] {
+            for &byte in &source.bytes[self.offset..self.offset + count] {
                 // A prefix is at most four bytes, so each partial value
                 // fits usize on supported32/64-bit targets.
-                self.look_length = (self.look_length << 8) | usize::from(byte);
+                self.length = (self.length << 8) | usize::from(byte);
             }
-            self.look_offset += count;
-            self.look_prefix += count;
-            if self.look_prefix < width {
+            self.offset += count;
+            self.prefix_read += count;
+            if self.prefix_read < width {
                 return Ok(NEXT);
             }
             if cancel.load(Ordering::Relaxed) {
@@ -155,7 +157,7 @@ impl<M> NalPacketJob<'_, M> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        if self.look_length == 0 {
+        if self.length == 0 {
             self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
             return Err(Error::Invalid("pinned HEVC empty NAL"));
         }
@@ -166,26 +168,25 @@ impl<M> NalPacketJob<'_, M> {
             });
         }
         let end = self
-            .look_offset
-            .checked_add(self.look_length)
+            .offset
+            .checked_add(self.length)
             .ok_or(Error::Overflow)?;
         if end > source.bytes.len() {
             self.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
             return Err(Error::Truncated);
         }
-        let kind = match NalHeader::parse_compact(Codec::Hevc, &source.bytes[self.look_offset..end])
-        {
+        let kind = match NalHeader::parse_compact(Codec::Hevc, &source.bytes[self.offset..end]) {
             Ok(h) => h.nal_unit_type(),
             Err(e) if self.observed_packet => {
                 self.packet_source_refusal.get_or_insert(e);
-                (source.bytes[self.look_offset] >> 1) & 63
+                (source.bytes[self.offset] >> 1) & 63
             }
             Err(e) => return Err(e.error()),
         };
         self.has_irap |= (16..=23).contains(&kind);
-        self.look_offset = end;
-        self.look_prefix = 0;
-        self.look_length = 0;
+        self.offset = end;
+        self.prefix_read = 0;
+        self.length = 0;
         self.look_nals += 1;
         Ok(NEXT)
     }
@@ -332,10 +333,7 @@ impl<M> NalPacketJob<'_, M> {
                 _ => {}
             }
         }
-        self.nal = Some(PendingNal {
-            range: self.offset..end,
-            kind,
-        });
+        self.nal = Some(kind);
         self.nals += 1;
         if self.nals == 1 {
             let injected = if inject.is_some() || (codec == Codec::Hevc && self.has_irap) {
@@ -395,18 +393,17 @@ impl<M> NalPacketJob<'_, M> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let nal = self
-            .nal
-            .as_ref()
-            .ok_or(Error::Invalid("missing source NAL"))?;
-        let prefix = if self.codec == Codec::Hevc || matches!(nal.kind, 7 | 8) || self.total == 0 {
+        let kind = self.nal.ok_or(Error::Invalid("missing source NAL"))?;
+        let prefix = if self.codec == Codec::Hevc || matches!(kind, 7 | 8) || self.total == 0 {
             4
         } else {
             3
         };
-        let range = nal.range.clone();
-        let end = range.end;
-        let segment = NalPacketSegment::packet(range, prefix, self.total);
+        let end = self
+            .offset
+            .checked_add(self.length)
+            .ok_or(Error::Overflow)?;
+        let segment = NalPacketSegment::packet(self.offset..end, prefix, self.total);
         self.append(segment)?;
         self.offset = end;
         self.length = 0;

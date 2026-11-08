@@ -355,9 +355,6 @@ impl NalPacketSession {
             injection: None,
             injected_irap: false,
             has_irap: false,
-            look_offset: 0,
-            look_length: 0,
-            look_prefix: 0,
             look_nals: 0,
             live_base: None,
             segment_hint: None,
@@ -632,10 +629,6 @@ enum Injection {
     Sps,
     Pps,
 }
-struct PendingNal {
-    range: Range<usize>,
-    kind: u8,
-}
 /// One cooperative packet framing job over the session it borrows.
 pub struct NalPacketJob<'a, M = NalPacketFields> {
     session: &'a mut NalPacketSession,
@@ -655,18 +648,17 @@ pub struct NalPacketJob<'a, M = NalPacketFields> {
     length: usize,
     prefix_read: usize,
     nals: usize,
-    nal: Option<PendingNal>,
+    // Pending NAL bounds stay in offset/length until a successful append.
+    nal: Option<u8>,
     injection: Option<(Injection, usize)>,
     injected_irap: bool,
     has_irap: bool,
-    look_offset: usize,
-    look_length: usize,
-    look_prefix: usize,
+    // Lookahead uses the scan cursor, then resets it before scanning.
     look_nals: usize,
     /// Job-invariant part of `minimum_live_bytes`: control storage, both
     /// descriptor lower bounds and the deduplicated raw owners. None of these
     /// change while segments are appended, so the sum is computed once.
-    live_base: Option<Result<usize>>,
+    live_base: Option<usize>,
     /// Segment count known before the first append: width-framed HEVC after its
     /// lookahead, or a packet whose first NAL is also its last. Only sizes the
     /// first allocation; a refused reservation falls back to ordinary growth.
@@ -713,8 +705,8 @@ impl<M> NalPacketJob<'_, M> {
     fn minimum_live_bytes(&mut self, segments: usize, output: usize) -> Result<usize> {
         let base = match self.live_base {
             Some(base) => base,
-            None => *self.live_base.insert(self.fixed_live_bytes()),
-        }?;
+            None => *self.live_base.insert(self.fixed_live_bytes()?),
+        };
         let copied_storage = if self.length_width.is_some() {
             Bytes::owner_overhead_bytes()
                 .checked_add(output)
