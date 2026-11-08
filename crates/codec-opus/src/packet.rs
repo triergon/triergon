@@ -37,15 +37,6 @@ impl Bandwidth {
             Bandwidth::Full => 21,
         }
     }
-
-    /// The SILK internal sample rate (hybrid frames code SILK at wideband).
-    pub(crate) fn silk_rate(self) -> u32 {
-        match self {
-            Bandwidth::Narrow => 8000,
-            Bandwidth::Medium => 12000,
-            _ => 16000,
-        }
-    }
 }
 
 /// Duration of one frame.

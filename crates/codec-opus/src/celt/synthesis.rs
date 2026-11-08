@@ -3,6 +3,7 @@
 
 use super::tables::WINDOW;
 use triergon_codec::mdct::Imdct;
+use triergon_codec::{Budget, StorageError};
 
 /// Window overlap between consecutive blocks.
 pub(crate) const OVERLAP: usize = WINDOW.len();
@@ -22,17 +23,15 @@ pub(crate) struct Synthesis {
 }
 
 impl Synthesis {
-    pub(crate) fn new() -> Synthesis {
-        // Every size is a product of 2, 3 and 5, which the shared transform supports.
-        #[allow(clippy::expect_used)] // 240 << lm for lm < 4 always is.
-        let imdct = core::array::from_fn(|lm| {
-            Imdct::new((2 * SHORT) << lm, 1.0).expect("CELT transform sizes are supported")
-        });
-        Synthesis {
-            imdct,
+    /// The transforms, with their tables charged to `budget`. Every size is a product
+    /// of 2, 3 and 5, which the shared transform supports.
+    pub(crate) fn new(budget: &Budget) -> Result<Synthesis, StorageError> {
+        let imdct = |lm: usize| Imdct::new((2 * SHORT) << lm, 1.0, budget);
+        Ok(Synthesis {
+            imdct: [imdct(0)?, imdct(1)?, imdct(2)?, imdct(3)?],
             coefficients: [0.0; MAX_FRAME],
             dct: [0.0; MAX_FRAME],
-        }
+        })
     }
 
     /// Transform the `freq.len()` coefficients of one channel, `blocks` interleaved short
