@@ -241,24 +241,20 @@ struct Stroker<'a> {
 impl Stroker<'_> {
     /// Strokes every contour of `source`.
     fn outline(&mut self, source: &Outline) -> Result<()> {
-        let mut curves = source.curves();
-        loop {
-            let starts_contour = curves.at_contour_start();
-            let Some((curve, segment)) = curves.next() else {
-                return Ok(());
-            };
-            if starts_contour {
-                self.last_point = curve.start();
+        for contour in source.contours() {
+            self.last_point = contour.start;
+            for curve in contour.curves {
+                match curve {
+                    Curve::Line([_, end]) => self.add_line(end, both())?,
+                    Curve::Quadratic([_, p1, end]) => self.add_quadratic(p1, end, both())?,
+                    Curve::Cubic([_, p1, p2, end]) => self.add_cubic(p1, p2, end, both())?,
+                }
             }
-            match curve {
-                Curve::Line([_, end]) => self.add_line(end, both())?,
-                Curve::Quadratic([_, p1, end]) => self.add_quadratic(p1, end, both())?,
-                Curve::Cubic([_, p1, p2, end]) => self.add_cubic(p1, p2, end, both())?,
-            }
-            if segment.closes_contour {
+            if contour.closed {
                 self.close_contour(both())?;
             }
         }
+        Ok(())
     }
 
     /// Adds `pt` displaced by ±`offs` to the outlines of `sides`, starting a
