@@ -14498,6 +14498,14 @@
      "sha256": "33d65b4f10f3ccb15f053c68c3535d259bebe15b1bb70d9eae3de6d857aa6909"
     }
    ]
+  },
+  {
+   "name": "progressive-transport-qualified",
+   "retention": "retained",
+   "reason": "Selected progressive TS188 and HLS feature comparisons",
+   "key": "evidence/progressive-transport-qualified/0f3a7a6c8de34a87a3c9f900303689b70086e6bf159cba9021729aef9682a880.tar.gz",
+   "sha256": "0f3a7a6c8de34a87a3c9f900303689b70086e6bf159cba9021729aef9682a880",
+   "source_revision": "de17cfcd2e0b7a81d9e8fac755dba88ee3df7aa1"
   }
  ]
 }
