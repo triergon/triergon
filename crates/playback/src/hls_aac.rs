@@ -647,6 +647,98 @@ mod tests {
         0xff, 0xf0, 0x50, 0x40, 1, 0x7f, 0xfc, 0x12, 0x34, 0x41, 0x42,
     ];
 
+    #[test]
+    fn shared_admission_keeps_error_order_and_clock_absence_for_both_payload_forms() {
+        fn check<P: PesInput>(pool: &Budget, mut packet: Option<P>, clock: DemuxTimeView) {
+            let used = pool.used();
+            let wrong_clock = DemuxTimeView {
+                pid: clock.pid + 1,
+                ..clock
+            };
+            let mut wrong_track = HlsAac::new(
+                pool,
+                TsNativeConfiguration {
+                    configuration_epoch: CONFIG.configuration_epoch + 1,
+                    ..CONFIG
+                },
+                MAXIMUM_ADTS_BYTES,
+            )
+            .unwrap();
+            assert_eq!(
+                wrong_track
+                    .push_packet(&mut packet, wrong_clock)
+                    .unwrap_err(),
+                Error::Invalid("HLS AAC PES track or configuration")
+            );
+            assert!(packet.is_some());
+            assert_eq!(pool.used(), used);
+
+            let mut reader = HlsAac::new(pool, CONFIG, MAXIMUM_ADTS_BYTES).unwrap();
+            assert_eq!(
+                reader.push_packet(&mut packet, wrong_clock).unwrap_err(),
+                Error::Invalid("HLS AAC clock does not describe this PES")
+            );
+            assert!(packet.is_some());
+            assert_eq!(pool.used(), used);
+            assert!(reader.push_packet(&mut packet, clock).unwrap());
+            assert!(packet.is_none());
+            let mut frames = Vec::new();
+            assert!(matches!(
+                drain(&mut reader, &mut frames),
+                AssemblyStep::NeedPayload
+            ));
+            assert_eq!(frames.len(), 1);
+            assert_eq!(frames[0].bytes.as_ref(), F48);
+            assert_eq!(
+                frames[0].pts,
+                clock.source_pts_raw33.map(|_| Time::new(1, 1).unwrap())
+            );
+            assert_eq!(frames[0].dts, None);
+        }
+
+        for compact in [false, true] {
+            for timestamp in [false, true] {
+                let mut fixture = PesFixture::new();
+                let (packet, mut clock) = fixture.chunk(&F48, 90_000, None);
+                let mut packet = packet.unwrap();
+                if !timestamp {
+                    packet.source_header.pts_raw33 = None;
+                    clock.source_pts_raw33 = None;
+                }
+                // Projected ticks cannot create a physically absent stamp.
+                assert!(clock.pts90.is_some() && clock.dts90.is_some());
+                if compact {
+                    check(
+                        &fixture.pool,
+                        Some(CompactDemuxPacket {
+                            profile: packet.profile,
+                            program: packet.program,
+                            pid: packet.pid,
+                            source_origin: packet.source_origin,
+                            source_epochs: packet.source_epochs,
+                            position: packet.position,
+                            flags: packet.flags,
+                            duration90_raw: packet.duration90_raw,
+                            stream_id: packet.stream_id,
+                            boundary: packet.boundary,
+                            payload_kind: packet.payload_kind,
+                            source_header: packet.source_header,
+                            header_source_ranges: packet.header_source_ranges,
+                            time_header_applies: packet.time_header_applies,
+                            payload_len: packet.payload_len,
+                            payload: triergon_mpegts::compat::pes::CompactPayload::from_spans(
+                                packet.spans,
+                            ),
+                        }),
+                        clock,
+                    );
+                } else {
+                    check(&fixture.pool, Some(packet), clock);
+                }
+            }
+        }
+    }
+
     fn drain(reader: &mut HlsAac, out: &mut Vec<HlsAacFrame>) -> AssemblyStep<()> {
         let cancel = AtomicBool::new(false);
         for _ in 0..128 {

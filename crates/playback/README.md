@@ -143,6 +143,7 @@ admitted carrier run. The AVC and AAC cursors borrow each logical carrier range,
 validation, work and retirement boundaries. Independently retained AAC frames
 still keep the full backing allocation charged. Both framers also expose
 `push_compact` for explicit `CompactDemuxPacket` delivery alongside ordinary `push`.
+Both paths share track, configuration-epoch and source-clock admission checks.
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
 The feed consumes validated PES continuations directly and preserves source

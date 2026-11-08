@@ -249,7 +249,8 @@ impl Active {
         let Some(packet) = mailbox.as_ref() else {
             return Ok(false);
         };
-        if !lane_track(self.config.track, self.config.configuration_epoch, &packet.facts())
+        let facts = packet.facts();
+        if !lane_track(self.config.track, self.config.configuration_epoch, &facts)
             || packet.stream_id & 0xf0 != 0xe0
             || packet.source_header.stream_id != packet.stream_id
         {
@@ -289,7 +290,7 @@ impl Active {
             header.and_then(|h| h.pts_raw33),
             header.and_then(|h| h.dts_raw33),
         );
-        if !clock_describes(&clock, &packet.facts(), pts, dts) {
+        if !clock_describes(&clock, &facts, pts, dts) {
             return Err(Error::Invalid("HLS HEVC clock does not describe this PES"));
         }
         let end = self
