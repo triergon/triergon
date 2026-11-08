@@ -1,6 +1,7 @@
-//! The lanes whose features commit only their pins: fonts, shaping and
-//! rasterising. Each generates its features' case rows from committed inputs and
-//! seeds (`harness/fonts/corpus.json`, authored texts, seeded random cases), and
+//! The lanes whose features commit only their pins: fonts, shaping, rasterising
+//! and ASS parsing. Each generates its features' case rows from committed inputs
+//! and seeds (`harness/fonts/corpus.json`, authored texts and fixtures, seeded
+//! random cases), and
 //! takes each case's expected work from `harness/features/<id>/pins.json`: the
 //! reference's folds, written only by [`Lane::record`] and never edited by hand. The
 //! harness reads a generated manifest at `harness/features/<id>/corpus.json`; its
@@ -73,10 +74,11 @@ pub struct Lane {
     pub smoke: &'static [(&'static str, &'static [&'static str])],
 }
 
-pub const LANES: [&Lane; 3] = [
+pub const LANES: [&Lane; 4] = [
     &crate::fonts::LANE,
     &crate::shape::LANE,
     &crate::raster::LANE,
+    &crate::ass::LANE,
 ];
 
 /// No generated input files, or nothing more to check.
@@ -509,7 +511,7 @@ mod tests {
 
     #[test]
     fn compare_selects_features_by_their_contracts_gate() {
-        let [fonts, shape, raster] = LANES;
+        let [fonts, shape, raster, ass] = LANES;
         assert_eq!(compared(fonts, &[]), ["font-outlines", "font-hinting-none"]);
         assert_eq!(compared(fonts, &["--all"]), fonts.features);
         assert_eq!(
@@ -531,6 +533,8 @@ mod tests {
         for flags in [["--all", "--diagnostic"], ["--diagnostic", "--all"]] {
             assert_eq!(compared(raster, &flags), raster.features, "{flags:?}");
         }
+        assert_eq!(compared(ass, &[]), ass.features);
+        assert_eq!(compared(ass, &["--all"]), ass.features);
     }
 
     #[test]

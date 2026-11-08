@@ -10,7 +10,7 @@ mod reference;
 pub use manifest::LANE;
 pub use reference::check_prepared;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::fetch;
 
@@ -50,11 +50,21 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
                 }
                 _ => return Err(USAGE.into()),
             };
-            let built = reference::prepare(root, jobs, &fetch::Network)?;
+            let built = prepare_libass(root, jobs, &fetch::Network)?;
             println!("{}", built.display());
             Ok(())
         }
         [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),
         _ => Err(USAGE.into()),
     }
+}
+
+/// Builds the pinned libass into `.research/libass`, the one build the
+/// rasterising and ASS parsing references link.
+pub fn prepare_libass(
+    root: &Path,
+    jobs: u32,
+    net: &dyn fetch::Transport,
+) -> Result<PathBuf, String> {
+    reference::prepare(root, jobs, net)
 }
