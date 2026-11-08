@@ -60,9 +60,11 @@ the pre-skip or other container trims.
 
 ## Behaviour and limits
 
-- The header's output gain is applied. Its pre-skip is not: the container trims the
-  first `pre_skip` samples, and the end of the stream (Ogg's final granule position,
-  Matroska's DiscardPadding), as FFmpeg does unless asked not to.
+- The header's output gain is applied. Its pre-skip is not: the decoder reports it as
+  its start delay (`AudioDecoder::delay`), which a consumer discards together with the
+  container's trims (Ogg's granule positions, Matroska's CodecDelay and
+  DiscardPadding), as FFmpeg does unless asked not to; `triergon-session`'s
+  `TrackDecoder` does both.
 - Following FFmpeg 9.0.2:
   - SILK output passes through FFmpeg's resampler, which holds back the last 24
     samples of the first narrowband frame after a start and releases them before the

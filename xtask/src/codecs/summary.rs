@@ -64,6 +64,15 @@ fn disposition(key: &str) -> Option<&'static str> {
         "PICSIZE_A_Bossen_1.bit" => {
             "RGBA near-tie in the odd-width output stage (harness/codecs/rgba-contract.json)"
         }
+        "01 - changing samplerate.flac"
+        | "02 - increasing number of channels.flac"
+        | "03 - decreasing number of channels.flac"
+        | "he_mode.bit" => {
+            "the stream changes sample rate or channel count; the CLI resamples later frames to the first frame's format and its device path stops at the change, while each run decodes exactly (crates/codec-flac, crates/codec-mp3)"
+        }
+        "flac_3ch_odd_mask.flac" => {
+            "FFmpeg refuses this channel mask's layout on the stereo device path; the decoder output matches exactly"
+        }
         _ => return None,
     })
 }
