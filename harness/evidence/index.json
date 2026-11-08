@@ -14646,6 +14646,42 @@
     "candidate": "46710a9305af185f3f8a7ef87c8e94b0a235185c",
     "baseline": "75eac781037de72fdd0a7399fbe03bd035ac0093"
    }
+  },
+  {
+   "name": "matroska-clock-probes-quick-check-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited same-code listings, instruction counts and the paired hls-segments and matroska-startup-seek timing screen of the shared Matroska clock probe, measured as merged against its parent",
+   "key": "evidence/matroska-clock-probes-quick-check-linux-arm64/a61b0ad7c42cbbf0aa34dfa010e1e3d2cc703835448b287f0ad3ae15d2c40bc4.tar.gz",
+   "sha256": "a61b0ad7c42cbbf0aa34dfa010e1e3d2cc703835448b287f0ad3ae15d2c40bc4",
+   "bytes": 166386089,
+   "source_revisions": {
+    "candidate": "912628d9726be2fbed8f0718b11f5ff4d150102a",
+    "baseline": "ce925b1e7523a8cbc9d5ed3f0fc9c22cdedbd65b"
+   }
+  },
+  {
+   "name": "mp4-seek-commands-quick-check-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited same-code listings, instruction counts and the paired hls-segments and matroska-startup-seek timing screen of the single MP4 seek path, measured as merged against its parent",
+   "key": "evidence/mp4-seek-commands-quick-check-linux-arm64/4524a1e620ecae5f3ce32a2225e90074438c53dee422a093e65c0c8892a1e355.tar.gz",
+   "sha256": "4524a1e620ecae5f3ce32a2225e90074438c53dee422a093e65c0c8892a1e355",
+   "bytes": 165372254,
+   "source_revisions": {
+    "candidate": "1c5c4b87e6a10495b1c603718b14b6cf3a905a83",
+    "baseline": "912628d9726be2fbed8f0718b11f5ff4d150102a"
+   }
+  },
+  {
+   "name": "one-nal-form-quick-check-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited same-code listings, instruction counts and the paired hls-segments, matroska-startup-seek and packet-framing timing screen of the single NAL configuration and packet form, measured as merged against its parent",
+   "key": "evidence/one-nal-form-quick-check-linux-arm64/da6a1d8f751d64e6a670e9fb8f7ec0d3a700f00cf21a8ffb7ed653e41c288478.tar.gz",
+   "sha256": "da6a1d8f751d64e6a670e9fb8f7ec0d3a700f00cf21a8ffb7ed653e41c288478",
+   "bytes": 339139877,
+   "source_revisions": {
+    "candidate": "cf9ad665bfc96dd64a843828d4f57a2e1a73eed8",
+    "baseline": "1c5c4b87e6a10495b1c603718b14b6cf3a905a83"
+   }
   }
  ]
 }
