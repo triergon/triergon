@@ -6,242 +6,262 @@
     "animation-ass-1080p": {
       "packets": 378,
       "bytes": 11390580,
-      "digest": 16895796720115864329
+      "digest": 7015355191729152973
     },
     "animation-ass-720p": {
       "packets": 378,
       "bytes": 7485887,
-      "digest": 18139845447341022424
+      "digest": 14647040912483946434
     },
     "arabic-ass-1080p": {
       "packets": 240,
       "bytes": 4536000,
-      "digest": 5516583681856169416
+      "digest": 17137033347825687140
     },
     "arabic-ass-720p": {
       "packets": 264,
       "bytes": 3446464,
-      "digest": 3799405096505163496
+      "digest": 1524611761127737444
     },
     "basic-ass-1080p": {
       "packets": 72,
       "bytes": 1147064,
-      "digest": 9339665041080716724
+      "digest": 8260616302430643668
     },
     "basic-ass-720p": {
       "packets": 72,
       "bytes": 802080,
-      "digest": 14578295071327654812
+      "digest": 16290077562719256916
     },
     "bidi-ass-1080p": {
       "packets": 216,
       "bytes": 3962640,
-      "digest": 12820639123078455000
+      "digest": 4359936657432470372
     },
     "bidi-ass-720p": {
       "packets": 216,
       "bytes": 2705880,
-      "digest": 18041090904623747608
+      "digest": 14682414586818681444
     },
     "blur-ass-1080p": {
       "packets": 224,
       "bytes": 5675144,
-      "digest": 15204124606579609240
+      "digest": 12603582313550525260
     },
     "blur-ass-720p": {
       "packets": 224,
       "bytes": 4208704,
-      "digest": 555957546921316936
+      "digest": 4316713449644720740
+    },
+    "box-spaces-ass-1080p": {
+      "packets": 16,
+      "bytes": 82368,
+      "digest": 2206015543902672771
+    },
+    "box-spaces-ass-720p": {
+      "packets": 16,
+      "bytes": 57728,
+      "digest": 10340577310830423555
     },
     "cjk-ass-1080p": {
       "packets": 192,
       "bytes": 7688776,
-      "digest": 44032743241627416
+      "digest": 10076839086766232372
     },
     "cjk-ass-720p": {
       "packets": 192,
       "bytes": 4578928,
-      "digest": 5708987092776473624
+      "digest": 3233143565032904036
     },
     "clip-ass-1080p": {
       "packets": 168,
       "bytes": 8708704,
-      "digest": 144550042036409896
+      "digest": 18364225394580766502
     },
     "clip-ass-720p": {
       "packets": 168,
       "bytes": 5508816,
-      "digest": 4888654769645237016
+      "digest": 9218362220370028582
     },
     "collision-ass-1080p": {
       "packets": 318,
       "bytes": 8009084,
-      "digest": 8191494980465167340
+      "digest": 18288526070104400866
     },
     "collision-ass-720p": {
       "packets": 318,
       "bytes": 5398830,
-      "digest": 6102605921366133804
+      "digest": 13148359243360822480
     },
     "drawing-ass-1080p": {
       "packets": 192,
       "bytes": 8295800,
-      "digest": 16504428862608362264
+      "digest": 2800095614753770932
     },
     "drawing-ass-720p": {
       "packets": 192,
       "bytes": 4021888,
-      "digest": 13257296177734009136
+      "digest": 15274961515406132964
     },
     "effects-ass-1080p": {
       "packets": 140,
       "bytes": 2408462,
-      "digest": 15574917599451065302
+      "digest": 1195431778937583832
     },
     "effects-ass-720p": {
       "packets": 140,
       "bytes": 1516211,
-      "digest": 16380959844697018097
+      "digest": 15765204182240479471
     },
     "fallback-ass-1080p": {
       "packets": 72,
       "bytes": 4888312,
-      "digest": 9377194788149079320
+      "digest": 11338469051498739220
     },
     "fallback-ass-720p": {
       "packets": 72,
       "bytes": 3451928,
-      "digest": 5614897680767953560
+      "digest": 8140909924374325772
     },
     "hebrew-ass-1080p": {
       "packets": 72,
       "bytes": 3483312,
-      "digest": 11038261508125913512
+      "digest": 10856609497716373604
     },
     "hebrew-ass-720p": {
       "packets": 72,
       "bytes": 2379936,
-      "digest": 9955216656483252296
+      "digest": 4329091821215781476
     },
     "indic-ass-1080p": {
       "packets": 72,
       "bytes": 3249672,
-      "digest": 1135722200728306072
+      "digest": 12913469700537781516
     },
     "indic-ass-720p": {
       "packets": 72,
       "bytes": 2241384,
-      "digest": 8767658383997155608
+      "digest": 18103072815377231572
     },
     "karaoke-ass-1080p": {
       "packets": 784,
       "bytes": 5533297,
-      "digest": 10538200023342178190
+      "digest": 11102178628284234610
     },
     "karaoke-ass-720p": {
       "packets": 786,
       "bytes": 3581296,
-      "digest": 3734115350840610757
+      "digest": 10209807940512559391
     },
     "overrides-ass-1080p": {
       "packets": 704,
       "bytes": 8440856,
-      "digest": 533321283952473496
+      "digest": 10266370513704625452
     },
     "overrides-ass-720p": {
       "packets": 704,
       "bytes": 5695040,
-      "digest": 1102437314291079888
+      "digest": 14840008432558750948
     },
     "positioning-ass-1080p": {
       "packets": 528,
       "bytes": 15327119,
-      "digest": 4677207676621336458
+      "digest": 524358066967669852
     },
     "positioning-ass-720p": {
       "packets": 528,
       "bytes": 10085280,
-      "digest": 17781672341026648021
+      "digest": 11885097762393511517
     },
     "scaling-ass-1080p": {
       "packets": 72,
       "bytes": 3721608,
-      "digest": 4440997135096599192
+      "digest": 13964222681511991292
     },
     "scaling-ass-720p": {
       "packets": 72,
       "bytes": 2375776,
-      "digest": 5839966446700887352
+      "digest": 145565869801408356
     },
     "ssa-ass-1080p": {
       "packets": 72,
       "bytes": 3076720,
-      "digest": 4009019605576283200
+      "digest": 7243672779512055268
     },
     "ssa-ass-720p": {
       "packets": 72,
       "bytes": 2132536,
-      "digest": 8222577135805465368
+      "digest": 12779834691185660276
+    },
+    "stream-change-chunks-1080p": {
+      "packets": 66,
+      "bytes": 1259505,
+      "digest": 13080225429228172361
+    },
+    "stream-change-chunks-720p": {
+      "packets": 66,
+      "bytes": 812064,
+      "digest": 1393673376155814670
     },
     "stream-fallback-chunks-1080p": {
       "packets": 126,
       "bytes": 4759530,
-      "digest": 11248699736966508571
+      "digest": 8338423596987948553
     },
     "stream-fallback-chunks-720p": {
       "packets": 126,
       "bytes": 3154668,
-      "digest": 13417790827824483203
+      "digest": 5602607288495767807
     },
     "stream-fonts-chunks-1080p": {
       "packets": 48,
       "bytes": 2454296,
-      "digest": 4244312712265650060
+      "digest": 12662383192267815214
     },
     "stream-fonts-chunks-720p": {
       "packets": 60,
       "bytes": 1664820,
-      "digest": 16115057530805330360
+      "digest": 1772677729769322634
     },
     "styles-ass-1080p": {
       "packets": 160,
       "bytes": 7863224,
-      "digest": 17313985862890722072
+      "digest": 9201929763587096372
     },
     "styles-ass-720p": {
       "packets": 160,
       "bytes": 5366096,
-      "digest": 15287185262025581744
+      "digest": 16980511577976545764
     },
     "thai-ass-1080p": {
       "packets": 48,
       "bytes": 1849928,
-      "digest": 2490775727035803160
+      "digest": 7667275337642452132
     },
     "thai-ass-720p": {
       "packets": 48,
       "bytes": 1193184,
-      "digest": 2466216419722302776
+      "digest": 9722061892853020004
     },
     "transforms-ass-1080p": {
       "packets": 168,
       "bytes": 4426096,
-      "digest": 17389600503236367080
+      "digest": 17749036883571887204
     },
     "transforms-ass-720p": {
       "packets": 168,
       "bytes": 2920440,
-      "digest": 4316004520778251800
+      "digest": 11813353727600396068
     },
     "wrap-ass-1080p": {
       "packets": 336,
       "bytes": 14769624,
-      "digest": 1868817741069137176
+      "digest": 6966681560384767252
     },
     "wrap-ass-720p": {
       "packets": 408,
       "bytes": 7434128,
-      "digest": 12250464717609477000
+      "digest": 12649947532333143652
     }
   }
 }

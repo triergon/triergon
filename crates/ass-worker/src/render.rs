@@ -6,7 +6,7 @@ use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::time::Instant;
 
-use triergon_ass::{Fonts, Image, Options, Renderer, Script, Settings};
+use triergon_ass::{CacheLimits, Change, Fonts, Image, Options, Renderer, Script, Settings};
 use triergon_core::{Budget, Bytes};
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 
@@ -73,7 +73,7 @@ pub struct Case<'a> {
 
 /// The images of every frame of one operation, folded or printed.
 trait Frames {
-    fn frame(&mut self, now: i64, images: &[Image]) -> io::Result<()>;
+    fn frame(&mut self, now: i64, change: Change, images: &[Image]) -> io::Result<()>;
 }
 
 /// The protocol's digest of the images.
@@ -81,9 +81,10 @@ trait Frames {
 struct Folded(Work);
 
 impl Frames for Folded {
-    fn frame(&mut self, now: i64, images: &[Image]) -> io::Result<()> {
+    fn frame(&mut self, now: i64, change: Change, images: &[Image]) -> io::Result<()> {
         let work = &mut self.0;
         fold(&mut work.digest, signed(now));
+        fold(&mut work.digest, signed(change.number().into()));
         fold(&mut work.digest, images.len() as u64);
         for image in images {
             for value in [
@@ -110,8 +111,8 @@ impl Frames for Folded {
 struct Printed<W: Write>(W);
 
 impl<W: Write> Frames for Printed<W> {
-    fn frame(&mut self, now: i64, images: &[Image]) -> io::Result<()> {
-        writeln!(self.0, "frame {now} {}", images.len())?;
+    fn frame(&mut self, now: i64, change: Change, images: &[Image]) -> io::Result<()> {
+        writeln!(self.0, "frame {now} {} {}", change.number(), images.len())?;
         for image in images {
             write!(
                 self.0,
@@ -157,6 +158,8 @@ impl Case<'_> {
             self.storage.width,
             self.storage.height,
         ));
+        // A player's cache limits, as the reference sets them.
+        settings.cache = CacheLimits::new(1000, 24);
         settings
     }
 
@@ -176,8 +179,8 @@ impl Case<'_> {
         };
         let mut frames = |script: &mut Script, frames: Frames_| -> Result<()> {
             for now in frames.times() {
-                let images = renderer.render(script, now)?;
-                out.frame(now, images)?;
+                let frame = renderer.render(script, now)?;
+                out.frame(now, frame.change, frame.images)?;
             }
             Ok(())
         };

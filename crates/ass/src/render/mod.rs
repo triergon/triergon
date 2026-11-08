@@ -27,14 +27,24 @@ use collisions::EventBox;
 pub(crate) use collisions::Placed;
 pub use fonts::Fonts;
 use fonts::Library;
-use geometry::{Frame, Geometry};
-pub use geometry::{FrameMargins, Settings, Size};
+pub use geometry::{CacheLimits, FrameMargins, Settings, Size};
+use geometry::{Canvas, Geometry};
+pub use images::{Change, Image, ImageKind};
 use images::{ClipMask, Clipping};
-pub use images::{Image, ImageKind};
 use layout::{Lines, TextBox};
 use outlines::Outlines;
 use shaping::{Shaper, Shaping};
 use text::Glyphs;
+
+/// One rendered frame.
+#[derive(Clone, Copy, Debug)]
+pub struct Frame<'r> {
+    /// The images, in drawing order.
+    pub images: &'r [Image],
+    /// How they differ from the previous frame's (`ass_render_frame`'s
+    /// `detect_change`).
+    pub change: Change,
+}
 
 /// Identities of renderers, which collision records are tied to.
 static RENDERERS: AtomicU64 = AtomicU64::new(1);
@@ -52,7 +62,7 @@ static RENDERERS: AtomicU64 = AtomicU64::new(1);
 /// settings.storage = Some(Size::new(1280, 720));
 /// let mut renderer = Renderer::new(&budget, &settings, &fonts)?;
 /// let mut script = Script::parse(&budget, &std::fs::read("subtitles.ass")?, &Options::default())?;
-/// for image in renderer.render(&mut script, 1500)? {
+/// for image in renderer.render(&mut script, 1500)?.images {
 ///     let _ = (image.kind, image.x, image.y, image.colour, image.rows());
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -60,7 +70,7 @@ static RENDERERS: AtomicU64 = AtomicU64::new(1);
 #[derive(Debug)]
 pub struct Renderer {
     budget: Budget,
-    frame: Frame,
+    frame: Canvas,
     id: u64,
     library: Library,
     outlines: Outlines,
@@ -80,6 +90,8 @@ struct Scratch {
     images: BudgetVec<Image>,
     boxes: BudgetVec<EventBox>,
     placed: BudgetVec<Placed>,
+    /// The frame being assembled.
+    frame: BudgetVec<Image>,
     used: BudgetVec<collisions::Rect>,
 }
 
@@ -93,7 +105,7 @@ impl Renderer {
     pub fn new(budget: &Budget, settings: &Settings, fonts: &Fonts) -> Result<Self> {
         Ok(Self {
             budget: budget.clone(),
-            frame: Frame::new(settings)?,
+            frame: Canvas::new(settings)?,
             id: RENDERERS.fetch_add(1, Ordering::Relaxed),
             library: Library::new(budget, fonts)?,
             outlines: Outlines::new(budget),
@@ -114,29 +126,38 @@ impl Renderer {
                 images: BudgetVec::new(budget),
                 boxes: BudgetVec::new(budget),
                 placed: BudgetVec::new(budget),
+                frame: BudgetVec::new(budget),
                 used: BudgetVec::new(budget),
             },
         })
     }
 
-    /// The images of `script` at `now` milliseconds, in the order libass
-    /// lists them: event by event in layer and read order, each event's
-    /// background, shadows, borders and fills. Fully transparent images are
-    /// left out. Collision handling remembers each event's place in `script`
-    /// for later frames.
+    /// The frame of `script` at `now` milliseconds: its images, in the order
+    /// libass lists them (event by event in layer and read order, each
+    /// event's background, shadows, borders and fills; fully transparent
+    /// images left out), and how they differ from the previous frame's.
+    /// Collision handling remembers each event's place in `script` for later
+    /// frames.
+    ///
+    /// A script without events gives no images and [`Change::Content`], as
+    /// libass gives when it renders nothing; the next frame is then compared
+    /// with the last one that was rendered.
     ///
     /// # Errors
     ///
     /// The budget's errors, `Policy` past a work limit, and `Unsupported`
     /// for what the renderer does not draw: glyphs of `@` fonts and
-    /// libass's simple shaping.
-    pub fn render(&mut self, script: &mut Script, now: i64) -> Result<&[Image]> {
-        self.images.clear();
+    /// libass's simple shaping. The previous frame is then kept for
+    /// comparison.
+    pub fn render(&mut self, script: &mut Script, now: i64) -> Result<Frame<'_>> {
         if script.events().is_empty() {
-            return Ok(self.images.as_slice());
+            return Ok(Frame {
+                images: &[],
+                change: Change::Content,
+            });
         }
         self.library.register_embedded(script.fonts())?;
-        self.outlines.trim();
+        self.outlines.trim(self.frame.cache.outlines)?;
         let geometry = self.frame.place(script);
         self.scratch.images.clear();
         // One budget bounds the drawing of the whole frame.
@@ -183,14 +204,24 @@ impl Renderer {
             start = end;
         }
         let images = self.scratch.images.as_slice();
+        let next = &mut self.scratch.frame;
+        next.clear();
         for b in boxes.as_slice() {
             for image in &images[b.images.clone()] {
-                self.images.try_push(image.clone()).map_err(|e| e.error)?;
+                next.try_push(image.clone()).map_err(|e| e.error)?;
             }
         }
         self.scratch.boxes = boxes;
-        images::drop_transparent(&mut self.images);
-        Ok(self.images.as_slice())
+        images::drop_transparent(next);
+        let change = Change::between(self.images.as_slice(), next.as_slice());
+        std::mem::swap(&mut self.images, next);
+        // The previous frame's images go; what they were drawn from may now
+        // leave the caches.
+        next.clear();
+        Ok(Frame {
+            images: self.images.as_slice(),
+            change,
+        })
     }
 
     /// `ass_render_event`: the event's images appended to the scratch list

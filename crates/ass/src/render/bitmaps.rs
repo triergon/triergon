@@ -7,11 +7,12 @@ use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::{
-    Bitmap, Border, Effects, FrameScale, GlyphBitmaps, GlyphRequest, Matrix, Placement, Raster,
-    Run, Shadow, Shape, Vector, pixels_26_6,
+    Bitmap, Border, Effects, EffectsKey, FrameScale, GlyphBitmaps, GlyphRequest, Matrix, Placement,
+    Raster, Run, Shadow, Shape, ShapedKey, Vector, pixels_26_6,
 };
 
 use super::math::d6_to_double;
+use super::outlines::OutlineValue;
 use super::text::{GlyphInfo, Glyphs};
 use crate::{Karaoke, Rgba};
 
@@ -30,6 +31,50 @@ pub(super) struct Combined {
     pub(super) fill: Option<Arc<Bitmap>>,
     pub(super) border: Option<Arc<Bitmap>>,
     pub(super) shadow: Option<Arc<Bitmap>>,
+    /// What libass keys the composite by; equal keys give the same bitmaps.
+    pub(super) key: Arc<RunKey>,
+}
+
+/// An outline as libass's caches identify it: by the value, shared while
+/// anything holds it, as a cache entry is.
+#[derive(Clone, Debug)]
+struct OutlineId(Arc<OutlineValue>);
+
+impl PartialEq for OutlineId {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+/// One glyph of a run's composite key (libass's `BitmapRef`): its bitmaps,
+/// with the outline they are drawn from where they depend on it, and their
+/// origin in the run.
+#[derive(Clone, Debug, PartialEq)]
+struct GlyphRef {
+    key: ShapedKey<OutlineId>,
+    offset: Vector,
+}
+
+/// A run's composite key (libass's `CompositeHashKey`): its effects and every
+/// glyph's bitmaps and place in the run.
+#[derive(Debug)]
+pub(super) struct RunKey {
+    effects: EffectsKey,
+    glyphs: BudgetVec<GlyphRef>,
+}
+
+impl PartialEq for RunKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.effects == other.effects && self.glyphs.as_slice() == other.glyphs.as_slice()
+    }
+}
+
+/// A glyph's bitmaps while its run is collected, with the outline they are
+/// drawn from.
+#[derive(Debug)]
+struct Drawn {
+    outline: Arc<OutlineValue>,
+    bitmaps: GlyphBitmaps,
 }
 
 /// A run being collected.
@@ -40,7 +85,7 @@ struct Open {
     effect_timing: i32,
     effects: Effects,
     run: Run,
-    glyphs: BudgetVec<GlyphBitmaps>,
+    glyphs: BudgetVec<Drawn>,
 }
 
 /// The effects a glyph is drawn with, as its state sets them (libass's
@@ -180,7 +225,7 @@ impl Painter {
         frame: &FrameScale,
         run: &mut Run,
         work: &mut WorkBudget,
-    ) -> Result<Option<GlyphBitmaps>> {
+    ) -> Result<Option<Drawn>> {
         let Some(outline) = &info.outline else {
             return Ok(None);
         };
@@ -206,7 +251,13 @@ impl Painter {
             effects,
             karaoke: info.effect == Some(Karaoke::Fill),
         };
-        self.raster.render(&request, run, work)
+        Ok(self
+            .raster
+            .render(&request, run, work)?
+            .map(|bitmaps| Drawn {
+                outline: Arc::clone(outline),
+                bitmaps,
+            }))
     }
 
     /// Composites a collected run.
@@ -225,9 +276,30 @@ impl Painter {
                 + d6_to_double(run.effect_timing) * frame.pixel_aspect)
                 .round() as i32;
         }
-        let composite = self
-            .raster
-            .compose(&run.effects, frame, run.glyphs.as_slice(), work)?;
+        let drawn = run.glyphs.as_slice();
+        let composite =
+            self.raster
+                .compose(&run.effects, frame, drawn.iter().map(|d| &d.bitmaps), work)?;
+        let mut key = RunKey {
+            effects: run.effects.key(frame),
+            glyphs: BudgetVec::new(&self.budget),
+        };
+        key.glyphs.try_reserve_exact(drawn.len())?;
+        for d in drawn {
+            let origin = d.bitmaps.origin();
+            key.glyphs
+                .try_push(GlyphRef {
+                    key: d
+                        .bitmaps
+                        .key()
+                        .with_shape(OutlineId(Arc::clone(&d.outline))),
+                    offset: Vector::new(
+                        origin.x.wrapping_sub(composite.origin.x),
+                        origin.y.wrapping_sub(composite.origin.y),
+                    ),
+                })
+                .map_err(|e| e.error)?;
+        }
         out.try_push(Combined {
             colours: run.colours,
             effect: run.effect,
@@ -236,6 +308,7 @@ impl Painter {
             fill: composite.fill.map(Arc::new),
             border: composite.border.map(Arc::new),
             shadow: composite.shadow.map(Arc::new),
+            key: Arc::new(key),
         })
         .map_err(|e| e.error)?;
         Ok(())

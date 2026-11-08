@@ -161,12 +161,14 @@ resource limit becomes an explicit, reviewed rule for that case.
   bitmap engine on every host, as the rasterising reference sets it, as a
   player embeds libass: the fonts a fixture attaches given to `ass_add_font`,
   font extraction on, `ass_set_fonts` with the fixture's default font file
-  and family and no system font provider, no hinting, and a frame larger than
-  the storage size. `ass-render` renders every script and Matroska packet
-  stream of `harness/fixtures/ass-render` at 1920×1080 over 1280×720 storage
+  and family and no system font provider, no hinting, libass's cache limits
+  at 1000 glyphs and 24 MiB, and a frame larger than the storage size.
+  `ass-render` renders every script and Matroska packet stream of
+  `harness/fixtures/ass-render` at 1920×1080 over 1280×720 storage
   and at 1280×720 over anamorphic 720×576 storage, at the times the fixture
-  names, and compares every image's type, position, size, colour and alpha
-  bytes in list order with `triergon_ass::Renderer`'s. It is required by
+  names, and compares every frame's change value (`ass_detect_change`) and
+  every image's type, position, size, colour and alpha bytes in list order
+  with `triergon_ass::Renderer`'s. It is required by
   `cargo xtask check` and reported by `cargo xtask ass compare`.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   features commit no case rows. `cargo xtask fonts manifest`, `cargo

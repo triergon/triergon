@@ -1,0 +1,30 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 250 2750
+; Opaque boxes around glyphs that draw nothing: U+00A0 (\h) and U+2008 are
+; different glyphs of Arimo with the same advance, so their boxes are the
+; same bitmap. Each pair of events swaps one for the other at the same place
+; (unchanged), at another place (moved), between two letters, or with the
+; box as a shadow alone.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Box,Arimo,72,&H00FFFFFF,&H000000FF,&H00203040,&H80000000,0,0,0,0,100,100,0,0,3,2,0,2,40,40,40,1
+Style: Shadowed,Arimo,72,&H00FFFFFF,&H000000FF,&H00203040,&H80000000,0,0,0,0,100,100,0,0,3,0,4,2,40,40,40,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:00.50,Box,,0,0,0,,{\pos(960,540)}\h
+Dialogue: 0,0:00:00.50,0:00:01.00,Box,,0,0,0,,{\pos(960,540)} 
+Dialogue: 0,0:00:01.00,0:00:01.50,Box,,0,0,0,,{\pos(990,570)}\h
+Dialogue: 0,0:00:01.50,0:00:02.00,Box,,0,0,0,,{\pos(960,540)}A\hB
+Dialogue: 0,0:00:02.00,0:00:02.50,Box,,0,0,0,,{\pos(960,540)}A B
+Dialogue: 0,0:00:02.50,0:00:02.75,Shadowed,,0,0,0,,{\pos(960,540)}\h
+Dialogue: 0,0:00:02.75,0:00:03.00,Shadowed,,0,0,0,,{\pos(960,540)} 

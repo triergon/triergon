@@ -30,14 +30,16 @@
  * renderer with libass's plain C bitmap engine (the one a 32-bit ARMv7 build
  * runs, on every host) and no system font provider (ASS_FONTPROVIDER_NONE), the given
  * frame and storage size and no hinting, the script read or the stream run,
- * and every frame rendered. Each frame folds its time and image count, then
+ * and every frame rendered with libass's cache limits set to 1000 glyphs and
+ * 24 MiB. Each frame folds its time, the change ass_render_frame reports (0,
+ * 1 or 2) and its image count, then
  * each image its type, position, size, colour and every row of alpha bytes, in
  * list order; `packets` counts images and `bytes` their alpha bytes. The box
  * libass draws behind a BorderStyle 4 event has no type (add_background leaves
  * it uninitialised), so a track with a BorderStyle 4 style fails. The file
  * and the fonts are read before the operation. `ass-render-dump` prints the
  * same values as lines:
- *   frame TIME IMAGES
+ *   frame TIME CHANGED IMAGES
  *   image TYPE X Y W H RRGGBBAA ROW-HEX...
  */
 
@@ -101,13 +103,14 @@ static void assr_fold_row(uint64_t *digest, const uint8_t *bytes, size_t n) {
     for (; i < n; i++) *digest = *digest * 31 + bytes[i];
 }
 
-static void assr_frame(AssImages *w, long long now, ASS_Image *images) {
+static void assr_frame(AssImages *w, long long now, int changed, ASS_Image *images) {
     size_t count = 0;
     for (ASS_Image *image = images; image; image = image->next) count++;
     if (w->dump) {
-        fprintf(w->dump, "frame %lld %zu\n", now, count);
+        fprintf(w->dump, "frame %lld %d %zu\n", now, changed, count);
     } else {
         assr_render_fold(w, (uint64_t)now);
+        assr_render_fold(w, (uint64_t)(int64_t)changed);
         assr_render_fold(w, count);
     }
     for (ASS_Image *image = images; image; image = image->next) {
@@ -139,7 +142,11 @@ static void assr_frames(AssImages *w, ASS_Renderer *r, ASS_Track *t, AssFrames f
     for (int i = 0; i < t->n_styles; i++)
         if (t->styles[i].BorderStyle == 4) w->background = 1;
     if (w->background) return;
-    for (long long now = f.start; now <= f.end; now += f.step) assr_frame(w, now, ass_render_frame(r, t, now, NULL));
+    for (long long now = f.start; now <= f.end; now += f.step) {
+        int changed = -1;
+        ASS_Image *images = ass_render_frame(r, t, now, &changed);
+        assr_frame(w, now, changed, images);
+    }
 }
 
 /* One operation; 0 when libass could not be set up. */
@@ -168,6 +175,9 @@ static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, s
     ass_set_frame_size(r, c->frame_w, c->frame_h);
     ass_set_storage_size(r, c->storage_w, c->storage_h);
     ass_set_hinting(r, ASS_HINTING_NONE);
+    /* A player's cache limits: 1000 outlines, 24 MiB of bitmaps and
+     * composites. */
+    ass_set_cache_limits(r, 1000, 24);
     ass_set_fonts(r, c->default_font, c->default_family, ASS_FONTPROVIDER_NONE, NULL, 0);
     ASS_Track *track = NULL;
     if (!stream) {

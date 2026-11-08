@@ -197,7 +197,8 @@ the least recently used values that only the store holds are dropped.
 
 `cmap` format 14 (variation selectors, which shaping will need), WOFF and WOFF2, bare CFF, Type 1 and Type 42, bitmap and colour glyphs (`EBDT`,
 `CBDT`, `sbix`, `COLR`, `SVG `), variation instances other than the default (`fvar`,
-`gvar`, `HVAR`, `avar`), vertical metrics (`vhea`, `vmtx`), `post` beyond the
+`gvar`, `HVAR`, `avar`), vertical metrics (`vhea`/`vmtx`, linear vertical advance)
+for `@` fonts, which leaves `ass-render`'s two `cjk-ass-*` cases open, `post` beyond the
 underline, hinting (`cvt ` is not read, `fpgm`, `prep` and glyph programs are
 only scanned for `INSTCTRL`, CFF hints are skipped), Apple `kern` version 1 and
 kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Type

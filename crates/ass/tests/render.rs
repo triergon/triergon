@@ -6,7 +6,7 @@
 #[path = "../../font/tests/support/mod.rs"]
 mod fonts;
 
-use triergon_ass::{Fonts, ImageKind, Options, Renderer, Script, Settings, Size};
+use triergon_ass::{Change, Fonts, ImageKind, Options, Renderer, Script, Settings, Size};
 use triergon_core::{Budget, Bytes, Error};
 
 /// "Test Sans": A is a square, B a bump, C a composite of both. A font
@@ -47,7 +47,7 @@ fn an_event_draws_its_shadows_then_borders_then_fills() {
     let budget = Budget::new(64 << 20).unwrap();
     let mut renderer = renderer(&budget);
     let mut script = script(&budget, "Dialogue: 0,0:00:00.00,0:00:02.00,Default,ABC\n");
-    let images = renderer.render(&mut script, 1000).unwrap();
+    let images = renderer.render(&mut script, 1000).unwrap().images;
     let kinds: Vec<ImageKind> = images.iter().map(|i| i.kind).collect();
     assert_eq!(
         kinds,
@@ -62,7 +62,13 @@ fn an_event_draws_its_shadows_then_borders_then_fills() {
         );
     }
     // Nothing is shown after the event ends.
-    assert!(renderer.render(&mut script, 2000).unwrap().is_empty());
+    assert!(
+        renderer
+            .render(&mut script, 2000)
+            .unwrap()
+            .images
+            .is_empty()
+    );
 }
 
 #[test]
@@ -75,7 +81,7 @@ fn colliding_events_stack_and_keep_their_place() {
          Dialogue: 0,0:00:01.00,0:00:04.00,Default,CA\n",
     );
     let fill_tops = |renderer: &mut Renderer, script: &mut Script, now| -> Vec<i32> {
-        let images = renderer.render(script, now).unwrap();
+        let images = renderer.render(script, now).unwrap().images;
         images
             .iter()
             .filter(|i| i.kind == ImageKind::Fill)
@@ -100,22 +106,52 @@ fn clips_and_karaoke_split_images() {
         "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{\\bord0\\shad0\\kf100}ABC\n",
     );
     // Halfway through the syllable the fill is split in two colours.
-    let images = renderer.render(&mut events, 500).unwrap();
+    let images = renderer.render(&mut events, 500).unwrap().images;
     let colours: Vec<u32> = images.iter().map(|i| i.colour.0).collect();
     assert_eq!(colours, [0xffff_ff00, 0xff00_0000]);
     let mut events = script(
         &budget,
         "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{\\bord0\\shad0\\iclip(0,0,320,360)}ABC\n",
     );
-    let images = renderer.render(&mut events, 500).unwrap();
+    let images = renderer.render(&mut events, 500).unwrap().images;
     assert!(images.iter().all(|i| i.x >= 640), "{images:?}");
     let mut events = script(
         &budget,
         "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{\\bord0\\shad0\\clip(m 0 0 l 1 0 1 1 0 1)}ABC\n",
     );
-    let images = renderer.render(&mut events, 500).unwrap();
+    let images = renderer.render(&mut events, 500).unwrap().images;
     // The clip misses the text: its image is kept, empty.
     assert!(images.iter().all(|i| i.width() == 0 && i.height() == 0));
+}
+
+#[test]
+fn frames_report_what_changed_since_the_last() {
+    let budget = Budget::new(64 << 20).unwrap();
+    let mut renderer = renderer(&budget);
+    let mut script = script(
+        &budget,
+        "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{\\move(100,100,300,100)}ABC\n\
+         Dialogue: 0,0:00:00.00,0:00:04.00,Default,CAB\n",
+    );
+    let change = |renderer: &mut Renderer, script: &mut Script, now| {
+        renderer.render(script, now).unwrap().change
+    };
+    assert_eq!(change(&mut renderer, &mut script, 0), Change::Content);
+    assert_eq!(change(&mut renderer, &mut script, 0), Change::None);
+    // 50 script pixels a frame: 100 frame pixels, the same bitmaps.
+    assert_eq!(change(&mut renderer, &mut script, 500), Change::Positions);
+    assert_eq!(change(&mut renderer, &mut script, 2500), Change::Content);
+    assert_eq!(change(&mut renderer, &mut script, 3000), Change::None);
+    // Without events nothing is rendered; the next frame is compared with
+    // the last one that was.
+    script.prune_events(5000);
+    assert_eq!(change(&mut renderer, &mut script, 5000), Change::Content);
+    let mut again = steady_line(&budget);
+    assert_eq!(change(&mut renderer, &mut again, 1000), Change::None);
+}
+
+fn steady_line(budget: &Budget) -> Script {
+    script(budget, "Dialogue: 0,0:00:00.00,0:00:04.00,Default,CAB\n")
 }
 
 #[test]
@@ -128,7 +164,7 @@ fn an_event_without_a_font_is_not_drawn() {
     )
     .unwrap();
     let mut script = script(&budget, "Dialogue: 0,0:00:00.00,0:00:02.00,Default,ABC\n");
-    assert!(renderer.render(&mut script, 0).unwrap().is_empty());
+    assert!(renderer.render(&mut script, 0).unwrap().images.is_empty());
     assert!(
         Renderer::new(
             &budget,

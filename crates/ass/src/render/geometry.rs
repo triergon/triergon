@@ -46,6 +46,55 @@ pub struct FrameMargins {
     pub right: i32,
 }
 
+/// How much a [`Renderer`](super::Renderer) keeps between frames: outlines
+/// by count, glyph bitmaps and composited runs by bytes.
+/// [`CacheLimits::LIBASS`], the default, is libass's; [`CacheLimits::new`]
+/// gives what `ass_set_cache_limits` sets.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CacheLimits {
+    /// Glyph and drawing outlines kept, at most.
+    pub outlines: usize,
+    /// Bytes of glyph bitmaps kept, at most.
+    pub bitmap_bytes: usize,
+    /// Bytes of composited runs kept, at most.
+    pub composite_bytes: usize,
+}
+
+impl CacheLimits {
+    /// The share of the megabytes that composites get: one part in
+    /// `COMPOSITE_RATIO + 1` (`COMPOSITE_CACHE_RATIO`).
+    const COMPOSITE_RATIO: usize = 2;
+
+    /// libass's limits before `ass_set_cache_limits`: 10,000 outlines
+    /// (`GLYPH_CACHE_MAX`), 128 MiB of glyph bitmaps and 64 MiB of
+    /// composites.
+    pub const LIBASS: Self = Self {
+        outlines: 10_000,
+        bitmap_bytes: 128 << 20,
+        composite_bytes: (128 << 20) / Self::COMPOSITE_RATIO,
+    };
+
+    /// The limits `ass_set_cache_limits(glyphs, megabytes)` sets: `glyphs`
+    /// outlines, and `megabytes` MiB split two thirds to glyph bitmaps and
+    /// one third to composites. libass reads 0 as its default for either
+    /// value; here 0 keeps nothing beyond what the last frame holds.
+    pub const fn new(glyphs: usize, megabytes: usize) -> Self {
+        let total = megabytes.saturating_mul(1 << 20);
+        let composite_bytes = total / (Self::COMPOSITE_RATIO + 1);
+        Self {
+            outlines: glyphs,
+            bitmap_bytes: total - composite_bytes,
+            composite_bytes,
+        }
+    }
+}
+
+impl Default for CacheLimits {
+    fn default() -> Self {
+        Self::LIBASS
+    }
+}
+
 /// How a [`Renderer`](super::Renderer) maps scripts onto its frame, as
 /// libass's renderer settings do. [`Settings::new`] gives libass's defaults
 /// for a frame size.
@@ -73,6 +122,8 @@ pub struct Settings {
     /// Moves bottom-aligned events up by a percentage of the frame, 0 to 100
     /// (`ass_set_line_position`).
     pub line_position: f64,
+    /// What is kept between frames.
+    pub cache: CacheLimits,
 }
 
 impl Settings {
@@ -93,6 +144,7 @@ impl Settings {
             font_scale: 1.0,
             line_spacing: 0.0,
             line_position: 0.0,
+            cache: CacheLimits::LIBASS,
         }
     }
 }
@@ -100,7 +152,7 @@ impl Settings {
 /// The settings checked once: the frame and storage sides as libass keeps
 /// them, the content area and the area it fits in without margins.
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Frame {
+pub(super) struct Canvas {
     pub width: i32,
     pub height: i32,
     pub storage: Option<(i32, i32)>,
@@ -110,13 +162,14 @@ pub(super) struct Frame {
     pub font_scale: f64,
     pub line_spacing: f64,
     pub line_position: f64,
+    pub cache: CacheLimits,
     /// `frame_content_width` and `frame_content_height`.
     pub content: (i32, i32),
     /// `fit_width` and `fit_height`.
     pub fit: (f64, f64),
 }
 
-impl Frame {
+impl Canvas {
     /// The settings as libass applies them.
     ///
     /// # Errors
@@ -160,6 +213,7 @@ impl Frame {
             font_scale: settings.font_scale,
             line_spacing: settings.line_spacing,
             line_position,
+            cache: settings.cache,
             content,
             fit,
         })
@@ -223,7 +277,7 @@ impl Frame {
 /// One frame's geometry for one script.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Geometry {
-    pub frame: Frame,
+    pub frame: Canvas,
     /// The script's play resolution after libass's defaults.
     pub play_res: (i32, i32),
     /// `ass_layout_res`.
@@ -347,15 +401,34 @@ impl Geometry {
 
 #[cfg(test)]
 mod tests {
-    use super::{Frame, Settings, Size};
+    use super::{Canvas, Settings, Size};
+
+    #[test]
+    fn cache_limits_split_as_libass_splits_them() {
+        use super::CacheLimits;
+        let default = CacheLimits::default();
+        assert_eq!(
+            (
+                default.outlines,
+                default.bitmap_bytes,
+                default.composite_bytes
+            ),
+            (10_000, 128 << 20, 64 << 20)
+        );
+        let player = CacheLimits::new(1000, 24);
+        assert_eq!(
+            (player.outlines, player.bitmap_bytes, player.composite_bytes),
+            (1000, 16 << 20, 8 << 20)
+        );
+    }
 
     #[test]
     fn frames_fit_their_content_and_reject_empty_sides() {
-        assert!(Frame::new(&Settings::new(Size::new(0, 720))).is_err());
+        assert!(Canvas::new(&Settings::new(Size::new(0, 720))).is_err());
         let mut settings = Settings::new(Size::new(1920, 1080));
         settings.margins.top = 100;
         settings.margins.bottom = 100;
-        let frame = Frame::new(&settings).unwrap();
+        let frame = Canvas::new(&settings).unwrap();
         assert_eq!(frame.content, (1920, 880));
         // The content keeps its aspect: a 1920x880 area fills the width.
         assert!((frame.fit.0 - 1920.0).abs() < 1e-9);

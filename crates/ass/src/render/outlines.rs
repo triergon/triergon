@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use triergon_core::{Budget, Error, Reservation, Result};
+use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 use triergon_font::{Font, GlyphId, Orientation};
 use triergon_raster::{Outline, Shape, Vector, pixels_26_6};
 
@@ -46,19 +46,28 @@ enum Key {
     Drawing(Box<[u8]>),
 }
 
-/// libass's outline cache limit, in entries (`ass_set_cache_limits`' default).
-const MAX_ENTRIES: usize = 10_000;
-
 /// Bytes charged per entry beyond the outline's own storage: the map slot,
 /// key and value header.
 const ENTRY_BYTES: usize = 192;
 
-/// Outlines built so far, at most [`MAX_ENTRIES`]; their storage is charged
-/// to the renderer's budget.
+/// An outline kept, `None` for one that cannot be built, and when it was
+/// last used.
+#[derive(Debug)]
+struct Entry {
+    value: Option<Arc<OutlineValue>>,
+    used: u64,
+}
+
+/// Outlines built so far, cut to the glyph limit of the renderer's
+/// [`CacheLimits`](super::CacheLimits) at each frame as libass cuts its
+/// outline cache: the least recently used that nothing else holds go first,
+/// so the outlines the last frame's images were drawn from stay. Their
+/// storage is charged to the renderer's budget.
 #[derive(Debug)]
 pub(super) struct Outlines {
     budget: Budget,
-    entries: HashMap<Key, Option<Arc<OutlineValue>>>,
+    entries: HashMap<Key, Entry>,
+    clock: u64,
     charge: Reservation,
     scratch: triergon_font::Outline,
 }
@@ -68,18 +77,44 @@ impl Outlines {
         Self {
             budget: budget.clone(),
             entries: HashMap::new(),
+            clock: 0,
             charge: Reservation::empty(budget),
             scratch: triergon_font::Outline::new(budget),
         }
     }
 
-    /// Drops every outline once the cache holds more than its limit; outlines
-    /// a frame still uses stay alive with it.
-    pub(super) fn trim(&mut self) {
-        if self.entries.len() > MAX_ENTRIES {
-            self.entries.clear();
-            self.charge = Reservation::empty(&self.budget);
+    /// Cuts the cache to `limit` outlines, oldest first, keeping those still
+    /// held elsewhere (`ass_cache_cut`).
+    pub(super) fn trim(&mut self, limit: usize) -> Result<()> {
+        if self.entries.len() <= limit {
+            return Ok(());
         }
+        let mut free = BudgetVec::new(&self.budget);
+        for (key, entry) in &self.entries {
+            if entry
+                .value
+                .as_ref()
+                .is_none_or(|v| Arc::strong_count(v) == 1)
+            {
+                free.try_push((entry.used, key.clone()))
+                    .map_err(|e| e.error)?;
+            }
+        }
+        free.as_mut_slice().sort_unstable_by_key(|(used, _)| *used);
+        let excess = self.entries.len() - limit;
+        for (_, key) in free.as_slice().iter().take(excess) {
+            self.entries.remove(key);
+        }
+        self.charge
+            .resize_to(self.entries.len().saturating_mul(ENTRY_BYTES))
+    }
+
+    /// The outline kept for `key`, marked as used now.
+    fn get(&mut self, key: &Key) -> Option<&Entry> {
+        self.clock += 1;
+        let entry = self.entries.get_mut(key)?;
+        entry.used = self.clock;
+        Some(entry)
     }
 
     /// The outline of a glyph of `font`, `None` when its face cannot load it.
@@ -89,8 +124,8 @@ impl Outlines {
         font: &RequestedFont,
     ) -> Result<Option<Arc<OutlineValue>>> {
         let key = Key::Glyph(glyph);
-        if let Some(value) = self.entries.get(&key) {
-            return Ok(value.clone());
+        if let Some(entry) = self.get(&key) {
+            return Ok(entry.value.clone());
         }
         let source = &font.faces()[glyph.face].font;
         let size = f64::from_bits(glyph.size);
@@ -104,7 +139,9 @@ impl Outlines {
     }
 
     fn insert(&mut self, key: Key, value: Option<Arc<OutlineValue>>) -> Result<()> {
-        self.entries.insert(key, value);
+        self.clock += 1;
+        let used = self.clock;
+        self.entries.insert(key, Entry { value, used });
         self.charge
             .resize_to(self.entries.len().saturating_mul(ENTRY_BYTES))
     }
@@ -116,8 +153,8 @@ impl Outlines {
         limits: &Limits,
     ) -> Result<Option<Arc<OutlineValue>>> {
         let key = Key::Drawing(drawing.text.into());
-        if let Some(value) = self.entries.get(&key) {
-            return Ok(value.clone());
+        if let Some(entry) = self.get(&key) {
+            return Ok(entry.value.clone());
         }
         let mut outline = Outline::new(&self.budget);
         let cbox = Drawing::parse(drawing.text, &mut outline, limits)?.map(|parsed| parsed.cbox);

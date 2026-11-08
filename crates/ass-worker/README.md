@@ -46,5 +46,6 @@ storage size given, at the times of its `;@frames` directive or `@frames`
 commands, as `harness/reference_ass_render.h` renders them with libass
 (feature `harness/features/ass-render/`), with `triergon_ass::Renderer`:
 one operation creates the renderer, reads the script or runs the stream and
-renders every frame; every image is folded in list order (kind, position,
-size, colour, alpha rows), and the dump mode prints the reference's lines.
+renders every frame, with libass's cache limits at 1000 glyphs and 24 MiB;
+each frame's change value is folded, then every image in list order (kind,
+position, size, colour, alpha rows), and the dump mode prints the reference's lines.
