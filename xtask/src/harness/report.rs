@@ -207,6 +207,166 @@ pub fn fate_coverage(
     Ok(rows)
 }
 
+/// Manifests of third-party inputs whose licences have been reviewed. Each lists
+/// `sources` with a `licence` and the `sha256` of every file a source provides.
+const REVIEWED_INPUTS: [&str; 1] = ["harness/fonts/corpus.json"];
+
+fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
+    REVIEWED_INPUTS
+        .iter()
+        .map(|path| read_json(&root.join(path)).map_err(|e| format!("{path}: {e}")))
+        .collect()
+}
+
+/// Whether a case's input may be measured: authored synthetic data, or a
+/// `reviewed-licence` file whose hash a reviewed input manifest records under the
+/// licence the case names. Any other rights value is unreviewed.
+fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
+    fn list<'a>(value: &'a Value, key: &str) -> &'a [Value] {
+        value.get(key).and_then(Value::as_array).unwrap_or_default()
+    }
+    match s(case, "rights") {
+        Some("authored-synthetic") => true,
+        Some("reviewed-licence") => {
+            let (Some(licence), Some(sha)) = (s(case, "licence"), s(case, "sha256")) else {
+                return false;
+            };
+            reviewed
+                .iter()
+                .flat_map(|manifest| list(manifest, "sources"))
+                .filter(|source| s(source, "licence") == Some(licence))
+                .flat_map(|source| list(source, "files"))
+                .any(|file| s(file, "sha256") == Some(sha))
+        }
+        _ => false,
+    }
+}
+
+/// The arguments a prefix worker takes after a case's input.
+pub fn case_arguments(case: &Value) -> Vec<std::ffi::OsString> {
+    case.get("arguments")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .map(Into::into)
+        .collect()
+}
+
+/// The directory a corpus manifest records for its cases' files, relative to the
+/// repository root.
+pub fn recorded_corpus(root: &Path, manifest: &Value) -> Option<PathBuf> {
+    s(manifest, "directory").map(|directory| root.join(directory))
+}
+
+/// A registered feature whose cases run through a prefix worker
+/// (`worker_operation`): one input and the case's arguments per run.
+pub struct PrefixFeature {
+    pub id: String,
+    pub prefix: String,
+    pub candidate: String,
+    /// The comparison reference's name in the build identity.
+    pub reference: String,
+    pub contract: PathBuf,
+    pub manifest: PathBuf,
+    pub cases: Vec<Value>,
+    pub corpus: PathBuf,
+}
+
+impl PrefixFeature {
+    /// Loads a prefix feature; `corpus` overrides the manifest's `directory`.
+    pub fn load(
+        root: &Path,
+        contract: &Path,
+        manifest: &Path,
+        corpus: Option<&Path>,
+    ) -> Result<Self, String> {
+        let document = read_json(contract)?;
+        let text = |key: &str| {
+            s(&document, key)
+                .map(str::to_owned)
+                .ok_or_else(|| format!("{}: no {key}", contract.display()))
+        };
+        let id = text("id")?;
+        let listing = read_json(manifest)?;
+        let corpus = match corpus {
+            Some(corpus) => corpus.to_path_buf(),
+            None => recorded_corpus(root, &listing).ok_or_else(|| {
+                format!(
+                    "{}: no corpus directory; pass --corpus or record `directory`",
+                    manifest.display()
+                )
+            })?,
+        };
+        Ok(Self {
+            prefix: text("worker_operation")?,
+            candidate: text("candidate")?,
+            reference: text("reference")?,
+            cases: listing
+                .get("cases")
+                .and_then(Value::as_array)
+                .unwrap_or_default()
+                .to_vec(),
+            contract: contract.to_path_buf(),
+            manifest: manifest.to_path_buf(),
+            corpus,
+            id,
+        })
+    }
+
+    /// Every registered feature (`harness/features/<id>`) whose contract runs
+    /// `candidate` through a worker operation prefix, in id order.
+    pub fn registered(root: &Path, candidate: &str) -> Result<Vec<Self>, String> {
+        let features = root.join("harness/features");
+        let mut ids: Vec<String> = fs::read_dir(&features)
+            .map_err(|e| format!("{}: {e}", features.display()))?
+            .filter_map(Result::ok)
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        ids.sort();
+        let mut found = Vec::new();
+        for id in ids {
+            let contract = features.join(&id).join("contract.json");
+            let document = read_json(&contract)?;
+            if document.get("worker_operation").is_some()
+                && s(&document, "candidate") == Some(candidate)
+            {
+                let manifest = features.join(&id).join("corpus.json");
+                found.push(Self::load(root, &contract, &manifest, None)?);
+            }
+        }
+        Ok(found)
+    }
+
+    /// The built candidate and reference, checked against the build identity.
+    pub fn workers(&self, root: &Path) -> Result<(PathBuf, PathBuf), String> {
+        let identity = read_json(&root.join("target/harness/identity.json"))?;
+        let candidate = validation::candidate_worker(root, &identity, &self.candidate)?;
+        let record = super::comparison::reference_named(&identity, &self.reference)?;
+        let reference = root.join(s(&record, "path").unwrap_or_default());
+        if Some(super::linux::file_sha(&reference)?.as_str()) != s(&record, "sha256") {
+            return Err(format!(
+                "{} changed since build identity; rebuild",
+                self.reference
+            ));
+        }
+        Ok((candidate, reference))
+    }
+
+    /// A case's input file, which may not escape the corpus directory.
+    pub fn input(&self, case: &Value) -> Result<PathBuf, String> {
+        let file = s(case, "file").unwrap_or_default();
+        if file.is_empty()
+            || Path::new(file)
+                .components()
+                .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        {
+            return Err(format!("{}: input escapes corpus", self.id));
+        }
+        Ok(self.corpus.join(file))
+    }
+}
+
 fn save_json(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
@@ -309,6 +469,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         .corpus
         .canonicalize()
         .map_err(|e| format!("{}: {e}", options.corpus.display()))?;
+    let reviewed = reviewed_inputs(root)?;
     let mut rows: Vec<Value> = Vec::new();
     for case in read_json(&options.manifest)?
         .get("cases")
@@ -344,17 +505,10 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([("status", Value::str("missing-sample"))])
         } else if digest(&path)? != sha {
             Value::object([("status", Value::str("input-hash-mismatch"))])
-        } else if s(case, "rights") != Some("authored-synthetic") {
+        } else if !rights_reviewed(&reviewed, case) {
             Value::object([("status", Value::str("rights-unreviewed"))])
         } else if let Some(prefix) = &worker_operation {
-            let arguments: Vec<std::ffi::OsString> = case
-                .get("arguments")
-                .and_then(Value::as_array)
-                .unwrap_or_default()
-                .iter()
-                .filter_map(Value::as_str)
-                .map(Into::into)
-                .collect();
+            let arguments = case_arguments(case);
             row.push(("input_sha256", Value::str(sha)));
             row.push(("candidate_worker", Value::str(&candidate_name)));
             row.push(("operation", selected.operation));
@@ -544,4 +698,64 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             .iter()
             .all(|r| r.get("parity").and_then(|p| s(p, "status")) == Some("pass"));
     Ok(i32::from(!all_pass))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PrefixFeature, recorded_corpus, reviewed_inputs, rights_reviewed};
+    use crate::json::{Value, parse};
+    use std::path::Path;
+
+    #[test]
+    fn rights_are_synthetic_or_a_recorded_reviewed_licence() {
+        let reviewed = [parse(
+            r#"{"sources": [{"licence": "OFL-1.1", "files": [{"path": "a.ttf", "sha256": "aa"}]}]}"#,
+        )
+        .unwrap()];
+        let case = |text: &str| parse(text).unwrap();
+        assert!(rights_reviewed(
+            &reviewed,
+            &case(r#"{"rights": "authored-synthetic"}"#)
+        ));
+        let font = r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "aa"}"#;
+        assert!(rights_reviewed(&reviewed, &case(font)));
+        for unreviewed in [
+            r#"{"rights": "reviewed-licence", "licence": "Apache-2.0", "sha256": "aa"}"#,
+            r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "bb"}"#,
+            r#"{"rights": "reviewed-licence", "sha256": "aa"}"#,
+            r#"{"rights": "OFL-1.1", "licence": "OFL-1.1", "sha256": "aa"}"#,
+            r#"{"sha256": "aa"}"#,
+        ] {
+            assert!(
+                !rights_reviewed(&reviewed, &case(unreviewed)),
+                "{unreviewed}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_font_feature_is_a_registered_prefix_feature() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let features = PrefixFeature::registered(root, "font-worker").unwrap();
+        let [font] = &features[..] else {
+            panic!("one font feature");
+        };
+        assert_eq!(
+            (font.id.as_str(), font.prefix.as_str()),
+            ("font-outlines", "font-")
+        );
+        assert_eq!(font.corpus, root.join(".research/fonts/files"));
+        assert_eq!(font.cases.len(), 47);
+        assert!(
+            font.input(&parse(r#"{"file": "../x.ttf"}"#).unwrap())
+                .is_err()
+        );
+        assert_eq!(recorded_corpus(root, &Value::Object(vec![])), None);
+        let reviewed = reviewed_inputs(root).unwrap();
+        assert!(
+            font.cases
+                .iter()
+                .all(|case| rights_reviewed(&reviewed, case))
+        );
+    }
 }

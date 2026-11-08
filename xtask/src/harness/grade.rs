@@ -1092,6 +1092,7 @@ mod tests {
             ("matroska-segment-metadata", 48),
             ("matroska-startup-seek", 44),
             ("hls-segments", 71),
+            ("font-outlines", 47),
         ] {
             let (manifest, manifest_sha) =
                 document(&root.join(format!("harness/features/{feature}/corpus.json"))).unwrap();
@@ -1141,7 +1142,7 @@ mod tests {
                 manifest_sha: &manifest_sha,
             };
             assert!(changed_binding.registered(root).is_err(), "{feature}");
-            if feature != "hls-segments" && feature != "matroska-startup-seek" {
+            if feature.starts_with("matroska-") && feature != "matroska-startup-seek" {
                 matroska += count;
             }
         }

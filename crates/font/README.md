@@ -87,6 +87,7 @@ operators ignore a malformed remainder of operands.
 
 **Kerning.** Microsoft `kern` version 0: horizontal, non-minimum format 0
 subtables, at most 32, summed, with the override bit replacing the sum.
+`kerning_pairs` lists the pairs those subtables contain.
 
 **Face matching.** `FaceInfo` and `select` score faces as libass 0.17.5 does for
 fonts it loads itself. Windows family names (or FreeType's family name when a face
@@ -134,14 +135,19 @@ composites and subroutine calls (`depth`) and the points of one outline
 
 - `cargo test -p triergon-font`: unit tests per table, faces built in memory
   (TrueType, CFF and a collection) and a deterministic mutation test over them.
-- `cargo xtask fonts compare` runs `examples/font-dump.rs` and the FreeType
-  reference worker (`harness/freetype-font.c`, FreeType 2.15.0) on every face of
-  the corpus in `harness/fonts/corpus.json` and requires identical output: metrics,
-  style, family, style and PostScript names, every name record, every cmap mapping,
-  the text charmap, kerning among the first 256 glyphs and the Latin-1 glyphs, and
-  for every glyph its `hmtx` and loaded advances and its outline at 1/64 font unit.
-- `cargo xtask fonts fuzz` runs `examples/fuzz.rs`, which mutates every corpus file
-  and reads the results in the dev profile, so overflow is checked as well.
+- The `font-outlines` feature (`harness/features/font-outlines`) runs
+  [`font-worker`](../font-worker/README.md) and the FreeType 2.15.0 reference
+  worker (`harness/reference_font.h`) on every file of the corpus in
+  `harness/fonts/corpus.json` and requires both to fold exactly what FreeType
+  folds: per face the metrics, style, family, style and PostScript names, every
+  name record, every cmap mapping, the text charmap, the kerning of every pair the
+  `kern` table lists, and for every glyph its `hmtx` and loaded advances and its
+  outline at 1/64 font unit. `cargo xtask fonts compare` runs it through
+  `cargo xtask report`, which also measures runtime and memory against FreeType
+  with `--benchmark` and `--memory`.
+- `cargo xtask fonts fuzz --output DIR` mutates every corpus file through the
+  release and dev builds of the worker (the dev build checks overflow), with a
+  timeout per input, and with `--reference` compares each result with FreeType's.
 
 The comparison establishes agreement with FreeType on that corpus, not conformance
 with the OpenType specification. Face matching is checked by unit tests only.

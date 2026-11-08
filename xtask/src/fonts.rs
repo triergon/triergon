@@ -1,15 +1,16 @@
-//! `triergon-font` against the pinned FreeType reference: build the reference
-//! worker, fetch the font corpus and compare every face line by line.
+//! The FreeType reference and the font corpus: build the pinned FreeType release
+//! and fetch the corpus. `cargo xtask build-workers` links the reference worker
+//! (`harness/reference_font.h`) against the installed library, and the
+//! `font-outlines` feature runs through `cargo xtask report` and `cargo xtask fuzz`
+//! like every other feature; `fonts compare` and `fonts fuzz` are shorthands for
+//! those two.
 //!
 //! FreeType is built from its hash-checked release tarball with recorded configure
-//! flags, as the FFmpeg references are. The worker (`harness/freetype-font.c`)
-//! links the static library and prints the same lines as the crate's `font-dump`
-//! example. The comparison is exact.
+//! flags, as the FFmpeg references are.
 
 use std::fs;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 use crate::fetch::{self, Transport};
 use crate::json::Value;
@@ -18,19 +19,17 @@ use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
        cargo xtask fonts fetch
-       cargo xtask fonts compare [--output DIR] [FILTER]
-       cargo xtask fonts fuzz [--iters N]
+       cargo xtask fonts compare [REPORT OPTION]...
+       cargo xtask fonts fuzz --output DIR [FUZZ OPTION]...
 
-  prepare  build the pinned FreeType release and its reference worker into
-           .research/freetype
+  prepare  build the pinned FreeType release into .research/freetype; then
+           `cargo xtask build-workers` builds its reference worker
   fetch    fetch and verify the font corpus (harness/fonts/corpus.json) into
            .research/fonts
-  compare  run font-dump and the FreeType worker on every corpus file whose path
-           contains FILTER and compare their output; with --output, write
-           DIR/report.json
-  fuzz     run the crate's mutation smoke test (examples/fuzz.rs, dev profile, so
-           overflow is checked) over every corpus file, N mutations each
-           (default 40)";
+  compare  `cargo xtask report` on the font-outlines feature, with any further
+           report options (--benchmark, --memory, --output DIR, ...)
+  fuzz     `cargo xtask fuzz` on the font-outlines feature, with any further
+           campaign options (--rounds N, --case TEXT, ...)";
 
 pub const VERSION: &str = "2.15.0";
 pub const ARCHIVE_SHA256: &str = "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5";
@@ -39,9 +38,35 @@ const FONT_LIMIT: usize = 64 * 1024 * 1024;
 const CACHE: &str = ".research/freetype";
 const FONTS: &str = ".research/fonts";
 const CORPUS: &str = "harness/fonts/corpus.json";
-const WORKER_SOURCE: &str = "harness/freetype-font.c";
-/// Mismatching lines kept per file in the report.
-const KEPT_MISMATCHES: usize = 5;
+/// The feature `compare` and `fuzz` run.
+const CONTRACT: &str = "harness/features/font-outlines/contract.json";
+const MANIFEST: &str = "harness/features/font-outlines/corpus.json";
+
+/// A `cargo xtask` command on the font-outlines feature, with its arguments.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Shorthand {
+    /// `fonts compare`: `cargo xtask report`.
+    Report(Vec<String>),
+    /// `fonts fuzz`: `cargo xtask fuzz`.
+    Fuzz(Vec<String>),
+}
+
+/// What `fonts compare` and `fonts fuzz` stand for; `None` for the other commands.
+pub fn shorthand(args: &[String]) -> Option<Shorthand> {
+    let (command, rest) = args.split_first()?;
+    let expanded = || {
+        let mut expanded: Vec<String> = ["--contract", CONTRACT, "--manifest", MANIFEST]
+            .map(String::from)
+            .to_vec();
+        expanded.extend(rest.iter().cloned());
+        expanded
+    };
+    match command.as_str() {
+        "compare" => Some(Shorthand::Report(expanded())),
+        "fuzz" => Some(Shorthand::Fuzz(expanded())),
+        _ => None,
+    }
+}
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {
@@ -67,62 +92,8 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
-        [command, rest @ ..] if command == "compare" => {
-            let (mut report, mut filter) = (None, None);
-            let mut rest = rest.iter();
-            while let Some(arg) = rest.next() {
-                match arg.as_str() {
-                    "--output" => report = Some(PathBuf::from(rest.next().ok_or(USAGE)?)),
-                    _ if filter.is_none() && !arg.starts_with('-') => filter = Some(arg.as_str()),
-                    _ => return Err(USAGE.into()),
-                }
-            }
-            compare(root, report.as_deref(), filter)
-        }
-        [command, rest @ ..] if command == "fuzz" => {
-            let iterations = match rest {
-                [] => 40,
-                [flag, value] if flag == "--iters" => {
-                    value.parse().map_err(|_| "iterations must be a number")?
-                }
-                _ => return Err(USAGE.into()),
-            };
-            fuzz(root, iterations)
-        }
         _ => Err(USAGE.into()),
     }
-}
-
-/// The crate's fuzz example over every corpus file.
-fn fuzz(root: &Path, iterations: u32) -> Result<(), String> {
-    run(Command::new("cargo")
-        .args([
-            "build",
-            "--locked",
-            "-p",
-            "triergon-font",
-            "--example",
-            "fuzz",
-        ])
-        .env("CARGO_INCREMENTAL", "0")
-        .current_dir(root))?;
-    let files = root.join(FONTS).join("files");
-    let paths: Vec<PathBuf> = corpus(root)?
-        .into_iter()
-        .flat_map(|(_, list)| list)
-        .map(|file| files.join(file.path))
-        .collect();
-    if let Some(missing) = paths.iter().find(|p| !p.exists()) {
-        return Err(format!(
-            "{}: missing (run `cargo xtask fonts fetch`)",
-            missing.display()
-        ));
-    }
-    run(Command::new(root.join("target/debug/examples/fuzz"))
-        .arg("--iters")
-        .arg(iterations.to_string())
-        .args(&paths)
-        .current_dir(root.join(FONTS)))
 }
 
 pub fn configure_argv(prefix: &Path) -> Vec<String> {
@@ -141,7 +112,8 @@ pub fn configure_argv(prefix: &Path) -> Vec<String> {
     .into()
 }
 
-/// Download, verify, configure, build and install FreeType, then build the worker.
+/// Download, verify, configure, build and install FreeType, and record the build in
+/// `.research/freetype/build.json`.
 fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, String> {
     if !(1..=8).contains(&jobs) {
         return Err("jobs must be 1..8".into());
@@ -189,43 +161,23 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
         .current_dir(&source))?;
     run(Command::new("make").arg("install").current_dir(&source))?;
     verify_xz_tree(&archive_path, &cache)?;
-    let pkg_config = |flag: &str| -> Result<Vec<String>, String> {
-        let text = output(
-            Command::new("pkg-config")
-                .args(["--static", flag, "freetype2"])
-                .env("PKG_CONFIG_PATH", prefix.join("lib/pkgconfig")),
-        )?;
-        Ok(text.split_whitespace().map(str::to_owned).collect())
-    };
-    let (cflags, libs) = (pkg_config("--cflags")?, pkg_config("--libs")?);
-    let worker = cache.join("freetype-font");
-    run(Command::new("cc")
-        .args(["-O2", "-Wall", "-Wextra", "-Werror"])
-        .args(&cflags)
-        .arg(root.join(WORKER_SOURCE))
-        .args(&libs)
-        .arg("-o")
-        .arg(&worker))?;
-    let hash = |path: &Path| {
-        fs::read(path)
-            .map(|d| sha256::hex(&d))
-            .map_err(|e| format!("{}: {e}", path.display()))
-    };
+    let libs = output(
+        Command::new("pkg-config")
+            .args(["--static", "--libs", "freetype2"])
+            .env("PKG_CONFIG_LIBDIR", prefix.join("lib/pkgconfig")),
+    )?;
+    let library = prefix.join("lib/libfreetype.a");
+    let library = fs::read(&library).map_err(|e| format!("{}: {e}", library.display()))?;
     let manifest = Value::object([
         ("schema", Value::int(1)),
         ("release", Value::str(VERSION)),
         ("archive_sha256", Value::str(ARCHIVE_SHA256)),
         ("configure_argv", wanted),
+        ("library_sha256", Value::str(sha256::hex(&library))),
         (
-            "library_sha256",
-            Value::str(hash(&prefix.join("lib/libfreetype.a"))?),
+            "link",
+            Value::strings(libs.split_whitespace().map(str::to_owned)),
         ),
-        ("link", Value::strings(libs)),
-        (
-            "worker_source_sha256",
-            Value::str(hash(&root.join(WORKER_SOURCE))?),
-        ),
-        ("worker_sha256", Value::str(hash(&worker)?)),
         (
             "compiler",
             Value::str(output(Command::new("cc").arg("--version"))?),
@@ -325,212 +277,28 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
     Ok(verified)
 }
 
-/// The comparison of one corpus file.
-struct Outcome {
-    lines: usize,
-    faces: usize,
-    glyphs: usize,
-    mismatches: usize,
-    kept: Vec<(usize, String, String)>,
-    exits: (i32, i32),
-}
-
-fn compare(root: &Path, report: Option<&Path>, filter: Option<&str>) -> Result<(), String> {
-    let reference = root.join(CACHE).join("freetype-font");
-    if !reference.exists() {
-        return Err("no FreeType reference worker: run `cargo xtask fonts prepare`".into());
-    }
-    run(Command::new("cargo")
-        .args([
-            "build",
-            "--release",
-            "--locked",
-            "-p",
-            "triergon-font",
-            "--example",
-            "font-dump",
-        ])
-        .env("CARGO_INCREMENTAL", "0")
-        .current_dir(root))?;
-    let candidate = root.join("target/release/examples/font-dump");
-    let files = root.join(FONTS).join("files");
-    let mut entries = Vec::new();
-    let mut failed = 0;
-    let mut compared = 0;
-    for file in corpus(root)?.into_iter().flat_map(|(_, list)| list) {
-        if filter.is_some_and(|f| !file.path.contains(f)) {
-            continue;
-        }
-        let path = files.join(&file.path);
-        let data = fetch::read_bounded(&path, FONT_LIMIT)
-            .map_err(|e| format!("{e} (run `cargo xtask fonts fetch`)"))?;
-        if sha256::hex(&data) != file.sha256 {
-            return Err(format!("{}: hash mismatch", file.path));
-        }
-        let outcome = compare_file(&reference, &candidate, &path)?;
-        let pass = outcome.mismatches == 0 && outcome.exits == (0, 0);
-        compared += 1;
-        if !pass {
-            failed += 1;
-        }
-        println!(
-            "{} {}: {} faces, {} glyphs, {} lines, {} differing",
-            if pass { "PASS" } else { "FAIL" },
-            file.path,
-            outcome.faces,
-            outcome.glyphs,
-            outcome.lines,
-            outcome.mismatches
-        );
-        for (line, expected, actual) in &outcome.kept {
-            println!("  line {line}\n    freetype: {expected}\n    triergon: {actual}");
-        }
-        entries.push(Value::object([
-            ("path", Value::str(file.path.clone())),
-            ("sha256", Value::str(file.sha256.clone())),
-            ("faces", Value::int(outcome.faces as i64)),
-            ("glyphs", Value::int(outcome.glyphs as i64)),
-            ("lines", Value::int(outcome.lines as i64)),
-            ("differing_lines", Value::int(outcome.mismatches as i64)),
-            ("reference_exit", Value::int(outcome.exits.0)),
-            ("candidate_exit", Value::int(outcome.exits.1)),
-            (
-                "first_differences",
-                Value::Array(
-                    outcome
-                        .kept
-                        .iter()
-                        .map(|(line, a, b)| {
-                            Value::object([
-                                ("line", Value::int(*line as i64)),
-                                ("freetype", Value::str(a.clone())),
-                                ("triergon", Value::str(b.clone())),
-                            ])
-                        })
-                        .collect(),
-                ),
-            ),
-        ]));
-    }
-    if compared == 0 {
-        return Err("no corpus file matched".into());
-    }
-    if let Some(dir) = report {
-        let hash = |path: &Path| {
-            fs::read(path)
-                .map(|d| sha256::hex(&d))
-                .map_err(|e| format!("{}: {e}", path.display()))
-        };
-        let build = crate::checks::read_json(&root.join(CACHE).join("build.json"))?;
-        let document = Value::object([
-            ("schema", Value::int(1)),
-            ("reference_build", build),
-            ("reference_worker_sha256", Value::str(hash(&reference)?)),
-            ("candidate_sha256", Value::str(hash(&candidate)?)),
-            ("corpus_sha256", Value::str(hash(&root.join(CORPUS))?)),
-            ("files", Value::Array(entries)),
-        ]);
-        crate::corpus::write_json(&dir.join("report.json"), &document)?;
-    }
-    println!(
-        "{} of {compared} corpus files match FreeType {VERSION}",
-        compared - failed
-    );
-    if failed == 0 {
-        Ok(())
-    } else {
-        Err(format!("{failed} corpus files differ"))
-    }
-}
-
-/// Streams both workers' output for `font` and compares it line by line.
-fn compare_file(reference: &Path, candidate: &Path, font: &Path) -> Result<Outcome, String> {
-    let spawn = |program: &Path| {
-        Command::new(program)
-            .arg(font)
-            .stdout(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("{}: {e}", program.display()))
-    };
-    let (mut a, mut b) = (spawn(reference)?, spawn(candidate)?);
-    let mut ra = BufReader::new(a.stdout.take().ok_or("no reference output")?);
-    let mut rb = BufReader::new(b.stdout.take().ok_or("no candidate output")?);
-    let mut outcome = Outcome {
-        lines: 0,
-        faces: 0,
-        glyphs: 0,
-        mismatches: 0,
-        kept: Vec::new(),
-        exits: (0, 0),
-    };
-    let (mut la, mut lb) = (Vec::new(), Vec::new());
-    loop {
-        la.clear();
-        lb.clear();
-        let na = ra.read_until(b'\n', &mut la).map_err(|e| e.to_string())?;
-        let nb = rb.read_until(b'\n', &mut lb).map_err(|e| e.to_string())?;
-        if na == 0 && nb == 0 {
-            break;
-        }
-        outcome.lines += 1;
-        if la.starts_with(b"glyph ") {
-            outcome.glyphs += 1;
-        } else if la.starts_with(b"face ") {
-            outcome.faces += 1;
-        }
-        if la != lb {
-            outcome.mismatches += 1;
-            if outcome.kept.len() < KEPT_MISMATCHES {
-                let show = |line: &[u8]| {
-                    let text = String::from_utf8_lossy(line).trim_end().to_owned();
-                    text.chars().take(160).collect::<String>()
-                };
-                outcome.kept.push((outcome.lines, show(&la), show(&lb)));
-            }
-        }
-    }
-    let code = |child: &mut std::process::Child| {
-        child
-            .wait()
-            .map(|s| s.code().unwrap_or(-1))
-            .map_err(|e| e.to_string())
-    };
-    outcome.exits = (code(&mut a)?, code(&mut b)?);
-    Ok(outcome)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{compare_file, configure_argv};
-    use std::fs;
-    use std::os::unix::fs::PermissionsExt;
+    use super::{CONTRACT, MANIFEST, Shorthand, configure_argv, shorthand};
     use std::path::Path;
 
     #[test]
-    fn differing_lines_and_exit_codes_are_reported() {
-        let dir = crate::walk::scratch("fonts-compare");
-        fs::create_dir_all(&dir).unwrap();
-        let script = |name: &str, body: &str| {
-            let path = dir.join(name);
-            fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
-            path
+    fn compare_and_fuzz_run_the_font_feature() {
+        let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
+        let feature = |rest: &[&str]| {
+            let mut all = args(&["--contract", CONTRACT, "--manifest", MANIFEST]);
+            all.extend(args(rest));
+            all
         };
-        let a = script("a", "printf 'face 0\\nglyph 1 x\\nglyph 2 y\\n'");
-        let b = script("b", "printf 'face 0\\nglyph 1 z\\n'; exit 3");
-        let same = compare_file(&a, &a, Path::new("font")).unwrap();
         assert_eq!(
-            (same.lines, same.faces, same.glyphs, same.mismatches),
-            (3, 1, 2, 0)
+            shorthand(&args(&["compare", "--memory"])),
+            Some(Shorthand::Report(feature(&["--memory"])))
         );
-        let outcome = compare_file(&a, &b, Path::new("font")).unwrap();
-        assert_eq!((outcome.mismatches, outcome.exits), (2, (0, 3)));
         assert_eq!(
-            outcome.kept[0],
-            (2, "glyph 1 x".to_owned(), "glyph 1 z".to_owned())
+            shorthand(&args(&["fuzz", "--rounds", "2"])),
+            Some(Shorthand::Fuzz(feature(&["--rounds", "2"])))
         );
-        assert_eq!(outcome.kept[1].2, "");
-        fs::remove_dir_all(dir).unwrap();
+        assert_eq!(shorthand(&args(&["prepare"])), None);
     }
 
     #[test]

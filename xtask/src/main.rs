@@ -38,9 +38,9 @@ const USAGE: &str = "usage: cargo xtask <command>
 commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
   check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
-  prepare-check  once before `check`: the pinned FFmpeg reference, the fixtures, the required
-                 vectors and the workers (built with the reference first on PATH), and the
-                 FreeType reference with its font corpus
+  prepare-check  once before `check`: the pinned FFmpeg and FreeType references, the
+                 fixtures, the required vectors, the font corpus and the workers (built with
+                 the reference first on PATH)
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -57,13 +57,20 @@ commands:
                  qualify the mandatory external metadata vector through the same gates
   fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
   trace-identities --output F [--compare F] [--candidate W]
-                 record the digest of every candidate trace over all recorded cases
+                 record the digest of every candidate trace over all recorded cases: the
+                 Matroska cases for media-worker, every case of each feature that runs W
+                 through a worker operation prefix otherwise
   evidence pack DIR OUT       deterministic .tar.gz of DIR; prints its SHA-256
   evidence fetch SET [DIR]    fetch, verify and unpack an archived evidence set
                               (harness/evidence/index.json; TRIERGON_EVIDENCE_ARCHIVE)
   fuzz           --manifest F --output DIR [--rounds N] [--seed N] [--maximum-input-bytes N]
                  [--maximum-output-bytes N] [--timeout-seconds S]
                  deterministic, replayable mutation campaign through JSON workers
+  fuzz           --contract F [--manifest F] [--corpus DIR] [--case TEXT] [--reference]
+                 --output DIR [--rounds N] ...
+                 the same campaign over the cases of a feature with a worker operation
+                 prefix: its release candidate and a dev build of it, with --reference also
+                 its reference; the bound on input size is raised to the largest case
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
   grade          TIMING MEMORY --contract F --manifest F --output DIR
                  [--additional-report F] [--require-slice-acceptance|--require-acceptance]
@@ -100,8 +107,9 @@ commands:
                  pinned FFmpeg decoders (see `cargo xtask codecs --help`)
   capture        compare|qualify|summarize|equivalence   capture pipeline against the
                  FFmpeg capture reference (see `cargo xtask capture --help`)
-  fonts          prepare|fetch|compare|fuzz   triergon-font against the pinned FreeType
-                 reference on the font corpus (see `cargo xtask fonts --help`)";
+  fonts          prepare|fetch|compare|fuzz   the pinned FreeType reference and the font
+                 corpus; compare and fuzz run report and fuzz on the font-outlines feature
+                 (see `cargo xtask fonts --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -158,7 +166,11 @@ fn main() -> ExitCode {
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
-        Some("fonts") => fonts::main(&root, &args[1..]),
+        Some("fonts") => match fonts::shorthand(&args[1..]) {
+            Some(fonts::Shorthand::Report(expanded)) => return report(&root, &expanded),
+            Some(fonts::Shorthand::Fuzz(expanded)) => return fuzz_campaign(&root, &expanded),
+            None => fonts::main(&root, &args[1..]),
+        },
         Some("build-workers") => match &args[1..] {
             [] => harness::build::build(&root, false),
             [flag] if flag == "--comparison-build" => harness::build::build(&root, true),
@@ -440,9 +452,17 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
         maximum_output_bytes: 8 << 20,
         timeout_seconds: 3.0,
     };
+    // With --contract, the campaign runs that feature's cases and --manifest names
+    // the feature's corpus manifest (by default the one beside the contract).
+    let (mut contract, mut manifest, mut corpus, mut cases, mut reference) =
+        (None, None, None, None, false);
     let mut rest = args.iter();
     let parsed = (|| -> Task {
         while let Some(flag) = rest.next() {
+            if flag == "--reference" {
+                reference = true;
+                continue;
+            }
             let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
             let number = || {
                 value
@@ -450,7 +470,10 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
                     .map_err(|_| format!("{flag}: not a number: {value}"))
             };
             match flag.as_str() {
-                "--manifest" => campaign.manifest = PathBuf::from(value),
+                "--contract" => contract = Some(PathBuf::from(value)),
+                "--manifest" => manifest = Some(PathBuf::from(value)),
+                "--corpus" => corpus = Some(PathBuf::from(value)),
+                "--case" => cases = Some(value.clone()),
                 "--output" => campaign.output = PathBuf::from(value),
                 "--rounds" => campaign.rounds = number()? as usize,
                 "--seed" => campaign.seed = number()?,
@@ -465,7 +488,23 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
         }
         Ok(())
     })();
-    exit(parsed.and_then(|()| fuzz::campaign(root, &campaign)))
+    exit(parsed.and_then(|()| match contract {
+        Some(contract) => {
+            let feature = fuzz::Feature {
+                manifest: manifest.unwrap_or_else(|| contract.with_file_name("corpus.json")),
+                contract,
+                corpus,
+                cases,
+                reference,
+            };
+            fuzz::feature_campaign(root, &feature, &campaign)
+        }
+        None if corpus.is_none() && cases.is_none() && !reference => {
+            campaign.manifest = manifest.unwrap_or_default();
+            fuzz::campaign(root, &campaign)
+        }
+        None => Err("--corpus, --case and --reference need --contract".into()),
+    }))
 }
 
 fn graph(root: &Path, args: &[String]) -> Task {
@@ -478,6 +517,7 @@ fn graph(root: &Path, args: &[String]) -> Task {
 
 fn report(root: &Path, args: &[String]) -> ExitCode {
     let mut options = harness::report::Options::defaults(root);
+    let mut corpus = None;
     let mut rest = args.iter();
     let parsed = (|| -> Task {
         while let Some(flag) = rest.next() {
@@ -489,7 +529,7 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
             match flag.as_str() {
                 "--contract" => options.contract = value()?,
                 "--manifest" => options.manifest = value()?,
-                "--corpus" => options.corpus = value()?,
+                "--corpus" => corpus = Some(value()?),
                 "--output" => options.output = value()?,
                 "--fate-cache" => options.fate_cache = Some(value()?),
                 "--baseline-worker" => options.baseline_worker = Some(value()?),
@@ -519,6 +559,14 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                 _ => return Err(USAGE.to_owned()),
             }
         }
+        // Without --corpus, a manifest that records its directory names it.
+        options.corpus = match corpus {
+            Some(corpus) => corpus,
+            None => checks::read_json(&options.manifest)
+                .ok()
+                .and_then(|manifest| harness::report::recorded_corpus(root, &manifest))
+                .unwrap_or_else(|| std::mem::take(&mut options.corpus)),
+        };
         Ok(())
     })();
     let result = parsed.and_then(|()| harness::report::run(root, &options));
@@ -766,9 +814,9 @@ fn prepare_check() -> Task {
         &["prepare-ffmpeg"][..],
         &["fixtures"],
         &["fetch-vectors"],
-        &["build-workers"],
         &["fonts", "prepare"],
         &["fonts", "fetch"],
+        &["build-workers"],
     ] {
         run(Command::new(&exe).args(step))?;
     }
@@ -830,6 +878,36 @@ const REFERENCE_TRACE_CRATES: [&str; 5] = [
     "triergon-mpegts",
     "triergon-subtitles",
 ];
+
+/// `fonts compare`, then `fonts fuzz` for one round of mutations of every font
+/// through the release and dev builds of the font worker; a campaign that finds
+/// nothing is removed.
+fn fonts_check(root: &Path) -> Task {
+    let output = root.join(format!(".research/check-fonts-fuzz-{}", std::process::id()));
+    let output = output.display().to_string();
+    let fuzz = [
+        "fuzz",
+        "--output",
+        &output,
+        "--rounds",
+        "1",
+        "--timeout-seconds",
+        "60",
+    ];
+    for args in [&["compare"][..], &fuzz] {
+        println!("$ cargo xtask fonts {}", args.join(" "));
+        let args: Vec<String> = args.iter().map(ToString::to_string).collect();
+        let code = match fonts::shorthand(&args) {
+            Some(fonts::Shorthand::Report(expanded)) => report(root, &expanded),
+            Some(fonts::Shorthand::Fuzz(expanded)) => fuzz_campaign(root, &expanded),
+            None => unreachable!("compare and fuzz are shorthands"),
+        };
+        if code != ExitCode::SUCCESS {
+            return Err(format!("cargo xtask fonts {} failed", args.join(" ")));
+        }
+    }
+    std::fs::remove_dir_all(&output).map_err(|e| format!("{output}: {e}"))
+}
 
 fn check(root: &Path) -> Task {
     cargo(root, None, &["fmt", "--all", "--check"])?;
@@ -910,10 +988,7 @@ fn check(root: &Path) -> Task {
     check_simd(root)?;
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;
-    println!("$ cargo xtask fonts compare");
-    fonts::main(root, &["compare".to_owned()])?;
-    println!("$ cargo xtask fonts fuzz");
-    fonts::main(root, &["fuzz".to_owned()])?;
+    fonts_check(root)?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;

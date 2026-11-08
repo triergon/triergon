@@ -44,8 +44,8 @@ benchmarks assume it.
   oracles (`harness/*_oracle.py`), the numpy table-recovery chains under
   `harness/codecs/`, the capture input generator `harness/capture/generate_inputs.py`
   (numpy's PCG64 generator and float draws; the cited capture inputs must not change)
-  and fixture authoring scripts. C is used only for workers that link the FFmpeg
-  reference.
+  and fixture authoring scripts. C is used only for workers that link the FFmpeg or
+  FreeType reference.
 
 ## Changing behaviour
 
@@ -55,7 +55,9 @@ benchmarks assume it.
    change.
 4. Run `cargo xtask report --fate-cache .research/fate-samples`, and the same with
    `--benchmark --memory --require-acceptance` on an isolated AArch64 Linux machine when
-   the change touches parsing or decoding hot paths. Put the per-case results in the pull
+   the change touches parsing or decoding hot paths; for `triergon-font`,
+   `cargo xtask fonts compare` with the same options and
+   `cargo xtask fonts fuzz --output DIR`. Put the per-case results in the pull
    request and update [docs/status.md](docs/status.md).
 
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and

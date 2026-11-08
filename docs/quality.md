@@ -46,12 +46,17 @@ resource limit becomes an explicit, reviewed rule for that case.
   into the worker so the allocation observer can audit the code doing the work.
 - **FreeType pin.** `cargo xtask fonts prepare` builds the FreeType 2.15.0 release
   tarball (hash-checked, tree verified before and after the build) as a static
-  library without optional dependencies, links the reference worker
-  `harness/freetype-font.c` and records the configure flags, library, worker and
-  compiler in `.research/freetype/build.json`. `cargo xtask fonts fetch` fetches the
-  font corpus listed with sources, licences and hashes in `harness/fonts/corpus.json`;
-  `cargo xtask fonts compare` requires `triergon-font`'s output to equal the worker's
-  on every face, and `cargo xtask fonts fuzz` mutates every corpus file.
+  library without optional dependencies and records the configure flags, library
+  and compiler in `.research/freetype/build.json`; `cargo xtask build-workers` then
+  links the reference worker (`harness/reference_font.h`). `cargo xtask fonts fetch`
+  fetches the font corpus listed with sources, licences and hashes in
+  `harness/fonts/corpus.json`. Its files are the cases of the `font-outlines`
+  feature, run like every other feature; `cargo xtask fonts compare` and
+  `cargo xtask fonts fuzz` are `report` and `fuzz` on that feature.
+- **Input rights.** A case is measured only when its `rights` are
+  `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
+  reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
+  Any other case fails as `rights-unreviewed`.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).
@@ -91,9 +96,12 @@ cargo xtask report --benchmark --memory --fate-cache .research/fate-samples --re
 ```
 
 `cargo xtask report` runs the correctness comparison of one feature contract
-(`--contract`, `--manifest`, `--corpus`) and grades it. A contract may name its own
-candidate worker and reference, as `matroska-startup-seek` and `hls-segments` do with
-`playback-worker` and the `video` and `formats` references. `--benchmark` adds paired
+(`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
+and grades it. A contract may name its own candidate worker and reference, as
+`matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
+and `formats` references, and `font-outlines` with `font-worker` and FreeType.
+Such a worker takes one input per operation through the contract's
+`worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
 (`harness/allocations*.c`), including the Linux link-closure and active-window guard
 certificates. The report records the build identity, source provenance digest and input
@@ -103,7 +111,9 @@ qualifies the mandatory external vector and `cargo xtask fate-run` runs one supp
 upstream FATE case. `cargo xtask build-workers` builds the workers and records the build
 identity every collection is checked against. `cargo xtask trace-identities` records the
 digest of every candidate trace, so a change can show its traces are byte-identical
-(`--compare` an earlier record). `cargo xtask worker-tests` runs the integration tests
+(`--compare` an earlier record): the Matroska cases for `media-worker`, every case of
+each feature that runs the `--candidate` worker through a prefix otherwise.
+`cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent
 oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`),
@@ -114,7 +124,10 @@ identities of the codec crates against the pinned FFmpeg decoders
 (`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
 pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
-debug, release and reference workers from a pinned manifest.
+debug, release and reference workers from a pinned manifest, with a timeout per
+input. With `--contract` it builds that manifest from a prefix feature's cases: the
+release candidate and its dev build, plus the reference with `--reference`; the
+campaign keeps it as `manifest.json` for replay.
 
 On native AArch64 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.

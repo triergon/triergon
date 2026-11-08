@@ -1,5 +1,5 @@
-//! Mutated fonts must produce errors, never panics or unbounded work. The same
-//! mutations run over the real corpus in `examples/fuzz.rs`.
+//! Mutated fonts must produce errors, never panics or unbounded work. `cargo xtask
+//! fonts fuzz` mutates the real corpus through the font worker.
 
 mod support;
 

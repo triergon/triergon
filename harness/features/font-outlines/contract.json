@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "font-outlines",
+  "operation": "font-outlines",
+  "candidate": "font-worker",
+  "worker_operation": "font-",
+  "reference": "freetype-native",
+  "contract": [
+    "one font file read from memory; every face of a collection, each opened and read in turn",
+    "per face: metrics and style flags; family, style and PostScript names; OS/2 weight; every name record",
+    "every cmap subtable of formats 0, 4, 6, 10, 12 and 13 with every mapping, and the text charmap libass selects",
+    "the kerning of every pair the kern table lists, sorted and unique, nonzero values only",
+    "for every glyph its hmtx advance, its loaded advance and its unhinted outline at 1/64 font unit; packets count glyph outlines and bytes their points",
+    "the file is read before each timed and memory operation; the reference library is created once, outside it"
+  ],
+  "required_profiles": [
+    "truetype",
+    "cff",
+    "cff-cid",
+    "cff2",
+    "collection"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}
