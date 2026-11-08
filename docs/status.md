@@ -22,8 +22,8 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases, replayed by tests from recorded output; 5,300 DVB display sets, recorded; no runner in the repository | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 746 of 998 matrix rows | not measured | not measured | most profiles unmeasured |
-| Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0524 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
-| Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.0524 | with the codecs | — |
+| Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0551 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
+| Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.0551 (17/17 pass) | with the codecs | — |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video with budgeted storage, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1210 (15/15 pass) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
 
 ## Measured revisions
@@ -36,8 +36,9 @@ at `0e28298d038bea072629b3bad6389dcc806b4861` on a c8g.large pinned to CPU 1.
 The HLS row uses the gate build at `a3e8adb2c1b67488a3168a37145a4bc9cc5aa80d`
 on a c8g.large pinned to CPU 1. It covers all 71 cases in `corpus.json`, with
 100 timing pairs of 50 operations and 30 memory pairs. Every video unit passes through
-`contiguous_feed` inside the measured operation. Codec and capture rows at
-`ceb5076` report the higher of two unpinned gate-build passes on one c8g.2xlarge.
+`contiguous_feed` inside the measured operation. Codec and decode-session runtime at
+`add6b27` is one unpinned gate-build pass of 30 pairs on a c8g.2xlarge. Capture at
+`ceb5076` reports the higher of two unpinned gate-build passes on the same instance type.
 The remaining rows retain their earlier measurements.
 The packet-framing row uses the gate build at
 `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` on a c8g.large pinned to CPU 1,
@@ -60,7 +61,7 @@ ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 | ISO BMFF open and index memory | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a` |
 | HLS segments | `a3e8adb2c1b67488a3168a37145a4bc9cc5aa80d` | `ea55e44697ea603b8ffc82e8e3f2b114888c3b8f9844c5a2dd1c6aa8c914079c` |
 | Packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
-| Codecs and decode sessions, runtime | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `12940dd90cf511dc37b8311946ccc43626f9e5e7a79cd3e7dfbeed68f48c77ed` |
+| Codecs and decode sessions, runtime | `add6b272cb622bae0d921dc3fbbf0812958c2023` | `ab2a174847322658159e93b2cd9bb994cdd9f4f9438926191518897aff28d929` |
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |
 
 ## Platforms
