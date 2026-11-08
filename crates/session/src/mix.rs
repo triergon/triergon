@@ -211,15 +211,31 @@ pub fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out:
         }
         return;
     }
-    for (i, frame) in frames.chunks_exact_mut(2).enumerate() {
-        let (mut l, mut r) = (0.0_f32, 0.0_f32);
-        for (plane, gain) in planes.iter().zip(&matrix.gains) {
-            let v = plane[i];
-            l += v * gain[0];
-            r += v * gain[1];
+    // Block by block, one plane at a time: the same additions in the same order as a
+    // per-sample loop over the planes, but each pass over a plane vectorises. A plane
+    // with no gain on either side adds only zeros and is skipped.
+    const BLOCK: usize = 256;
+    let (mut left, mut right) = ([0.0_f32; BLOCK], [0.0_f32; BLOCK]);
+    for (block, frames) in frames.chunks_mut(2 * BLOCK).enumerate() {
+        let start = block * BLOCK;
+        let len = frames.len() / 2;
+        let (left, right) = (&mut left[..len], &mut right[..len]);
+        left.fill(0.0);
+        right.fill(0.0);
+        for (plane, &[gl, gr]) in planes.iter().zip(&matrix.gains) {
+            if gl == 0.0 && gr == 0.0 {
+                continue;
+            }
+            let plane = &plane[start..start + len];
+            for ((l, r), &v) in left.iter_mut().zip(right.iter_mut()).zip(plane) {
+                *l += v * gl;
+                *r += v * gr;
+            }
         }
-        frame[0] = to_s16(l);
-        frame[1] = to_s16(r);
+        for ((frame, &l), &r) in frames.chunks_exact_mut(2).zip(&*left).zip(&*right) {
+            frame[0] = to_s16(l);
+            frame[1] = to_s16(r);
+        }
     }
 }
 
