@@ -323,7 +323,12 @@ fn invalid_index_positions_are_not_clipped_sorted_or_removed() {
             CursorStatus::End => break,
             CursorStatus::Ready => {
                 let e = c.take_entry().unwrap();
-                out.push((e.position, e.size, e.timestamp, e.range_error.is_some()));
+                out.push((
+                    e.entry.position,
+                    e.entry.size,
+                    e.entry.timestamp,
+                    e.range_error.is_some(),
+                ));
             }
         }
     }

@@ -160,14 +160,14 @@ pub mod mov {
         pub use crate::recovery_payload::{PartialSampleReader, PayloadBounds, RecoveredPayload};
         pub use crate::regular::{
             DescriptionAssociation, DescriptionContext, DescriptionEmission, DescriptionEvent,
-            DescriptionIndexCursor, DescriptionIndexEntry, DescriptionIndexEvent,
-            DescriptionPacketCursor, DescriptionRead, DescriptionRecoveryBuilder,
-            DescriptionRecoveryProfile, DescriptionRecoveryTable, DescriptionRowDiagnostic,
-            DirectAssociation, DirectContext, DirectIndexCursor, DirectIndexEntry,
-            DirectOccurrence, DirectPacketCursor, DirectRead, DirectRecoveryProfile,
-            InitialDescriptionDiagnostic, RecoveryIndexCursor, RecoveryIndexEntry,
-            RecoveryOccurrence, RecoveryPacketCursor, RecoverySourceCursor, RunCoverage, RunKind,
-            RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable, SyncDiagnostic,
+            DescriptionIndexCursor, DescriptionIndexEvent, DescriptionPacketCursor,
+            DescriptionRead, DescriptionRecoveryBuilder, DescriptionRecoveryProfile,
+            DescriptionRecoveryTable, DescriptionRowDiagnostic, DirectAssociation, DirectContext,
+            DirectIndexCursor, DirectIndexEntry, DirectOccurrence, DirectPacketCursor, DirectRead,
+            DirectRecoveryProfile, InitialDescriptionDiagnostic, NativeIndexEntry,
+            RecoveryIndexCursor, RecoveryIndexEntry, RecoveryOccurrence, RecoveryPacketCursor,
+            RecoverySourceCursor, RunCoverage, RunKind, RunRecoveryBuilder, RunRecoveryProfile,
+            RunRecoveryTable, SyncDiagnostic,
         };
     }
 

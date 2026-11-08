@@ -107,7 +107,7 @@ impl RunRecoveryTable {
                 maximum: limits.max_tracks.min(limits.max_media_extents),
             });
         }
-        count(self.storage.sample_count(), limits.max_source_samples)?;
+        bounded(self.storage.sample_count(), limits.max_source_samples)?;
         if self.storage.ctts.as_ref().is_some_and(|t| t.count > 2) {
             return Err(Error::Unsupported(
                 "v2 direct composition shift with more than two rows",
@@ -126,8 +126,7 @@ impl RunRecoveryTable {
                 context,
                 limits,
             }),
-            ready: None,
-            failed: None,
+            latch: Latched::default(),
         })
     }
     pub fn direct_index_cursor<'a>(
@@ -157,57 +156,68 @@ impl RunRecoveryTable {
             next: 0,
             distance: 0,
             limit: limits.max_entries,
-            ready: None,
-            failed: None,
+            latch: Latched::default(),
         })
     }
 }
-pub(super) fn count(n: u64, max: u64) -> Result<()> {
-    if n > max {
+pub(super) fn bounded(value: u64, maximum: u64) -> Result<()> {
+    if value > maximum {
         return Err(Error::Limit {
-            requested: usize::try_from(n).map_err(|_| Error::Overflow)?,
-            maximum: usize::try_from(max).map_err(|_| Error::Overflow)?,
+            requested: usize::try_from(value).map_err(|_| Error::Overflow)?,
+            maximum: usize::try_from(maximum).map_err(|_| Error::Overflow)?,
         });
     }
     Ok(())
 }
-/// Polls `inner` unless a failure is latched, the caller cancelled or an item is
-/// ready. Any error, cancellation included, latches and drops the ready item.
-pub(super) fn poll_latched<C, T>(
-    cursor: &mut C,
-    slots: fn(&mut C) -> (&mut Option<Error>, &mut Option<T>),
-    inner: fn(&mut C, &mut WorkBudget, &AtomicBool) -> Result<CursorStatus>,
-    work: &mut WorkBudget,
-    cancel: &AtomicBool,
-) -> Result<CursorStatus> {
-    let (failed, ready) = slots(cursor);
-    if let Some(e) = *failed {
-        return Err(e);
-    }
-    let result = if cancel.load(Ordering::Relaxed) {
-        Err(Error::Cancelled)
-    } else if ready.is_some() {
-        Ok(CursorStatus::Ready)
-    } else {
-        inner(cursor, work, cancel)
-    };
-    if let Err(e) = result {
-        let (failed, ready) = slots(cursor);
-        *failed = Some(e);
-        *ready = None;
-    }
-    result
-}
-/// The ready item unless a failure is latched.
-pub(super) fn take_latched<T>(
+/// A cursor's ready item and latched failure.
+#[derive(Debug)]
+pub(super) struct Latched<T> {
+    pub(super) ready: Option<T>,
     failed: Option<Error>,
-    ready: &mut Option<T>,
-    missing: &'static str,
-) -> Result<T> {
-    if let Some(e) = failed {
-        return Err(e);
+}
+impl<T> Default for Latched<T> {
+    fn default() -> Self {
+        Self {
+            ready: None,
+            failed: None,
+        }
     }
-    ready.take().ok_or(Error::Invalid(missing))
+}
+impl<T> Latched<T> {
+    /// The ready item unless a failure is latched.
+    pub(super) fn take(&mut self, missing: &'static str) -> Result<T> {
+        if let Some(e) = self.failed {
+            return Err(e);
+        }
+        self.ready.take().ok_or(Error::Invalid(missing))
+    }
+}
+/// A cursor that advances only while no failure is latched, the caller has not
+/// cancelled and no item is ready.
+pub(super) trait LatchedCursor {
+    type Item;
+    fn latch(&mut self) -> &mut Latched<Self::Item>;
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus>;
+    /// Any error, cancellation included, latches and drops the ready item.
+    fn poll_latched(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+        let latch = self.latch();
+        if let Some(e) = latch.failed {
+            return Err(e);
+        }
+        let result = if cancel.load(Ordering::Relaxed) {
+            Err(Error::Cancelled)
+        } else if latch.ready.is_some() {
+            Ok(CursorStatus::Ready)
+        } else {
+            self.advance(work, cancel)
+        };
+        if let Err(e) = result {
+            let latch = self.latch();
+            latch.failed = Some(e);
+            latch.ready = None;
+        }
+        result
+    }
 }
 /// Native index fields of a demux packet; the error texts name the profile.
 pub(super) fn native_index_entry(
@@ -216,17 +226,17 @@ pub(super) fn native_index_entry(
     distance: u64,
     flags_error: &'static str,
     position_error: &'static str,
-) -> Result<DescriptionIndexEntry> {
+) -> Result<NativeIndexEntry> {
     let size = packet
         .source_range
         .end
         .checked_sub(packet.source_range.start)
         .ok_or(Error::Overflow)?;
-    count(size, 0x1fff_ffff)?;
+    bounded(size, 0x1fff_ffff)?;
     if packet.flags & !1 != 0 {
         return Err(Error::Unsupported(flags_error));
     }
-    Ok(DescriptionIndexEntry {
+    Ok(NativeIndexEntry {
         ordinal,
         position: i64::try_from(packet.source_range.start)
             .map_err(|_| Error::Unsupported(position_error))?,
@@ -287,7 +297,7 @@ impl DirectCursor<'_> {
             next.byte = t.offsets.get(next.chunk)?;
             next.chunk = number;
         }
-        count(
+        bounded(
             next.ordinal.checked_add(1).ok_or(Error::Overflow)?,
             self.limits.max_occurrences,
         )?;
@@ -348,35 +358,36 @@ pub struct DirectPacketCursor<'a> {
     // state inline rather than introduce a profile-switch heap allocation.
     legacy: Option<RecoveryPacketCursor<'a>>,
     direct: Option<DirectCursor<'a>>,
-    ready: Option<DirectOccurrence>,
-    failed: Option<Error>,
+    latch: Latched<DirectOccurrence>,
 }
 impl<'a> From<RecoveryPacketCursor<'a>> for DirectPacketCursor<'a> {
     fn from(inner: RecoveryPacketCursor<'a>) -> Self {
         Self {
             legacy: Some(inner),
             direct: None,
-            ready: None,
-            failed: None,
+            latch: Latched::default(),
         }
     }
 }
 impl DirectPacketCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        poll_latched(
-            self,
-            |c| (&mut c.failed, &mut c.ready),
-            Self::poll_inner,
-            work,
-            cancel,
-        )
+        self.poll_latched(work, cancel)
     }
-    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+    pub fn take_occurrence(&mut self) -> Result<DirectOccurrence> {
+        self.latch.take("no ready v2 observation")
+    }
+}
+impl LatchedCursor for DirectPacketCursor<'_> {
+    type Item = DirectOccurrence;
+    fn latch(&mut self) -> &mut Latched<DirectOccurrence> {
+        &mut self.latch
+    }
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(c) = &mut self.legacy {
             return match c.poll(work, cancel)? {
                 CursorStatus::Ready => {
                     let r = c.take_occurrence()?;
-                    self.ready = Some(DirectOccurrence {
+                    self.latch.ready = Some(DirectOccurrence {
                         raw_chunk_description: r.demux.source_description,
                         declaration: r.source,
                         demux: r.demux,
@@ -405,24 +416,16 @@ impl DirectPacketCursor<'_> {
         }
         match c.poll(work)? {
             Some(r) => {
-                self.ready = Some(r);
+                self.latch.ready = Some(r);
                 Ok(CursorStatus::Ready)
             }
             None => Ok(CursorStatus::End),
         }
     }
-    pub fn take_occurrence(&mut self) -> Result<DirectOccurrence> {
-        take_latched(self.failed, &mut self.ready, "no ready v2 observation")
-    }
 }
 #[derive(Clone, Debug)]
 pub struct DirectIndexEntry {
-    pub ordinal: u64,
-    pub position: i64,
-    pub timestamp: i64,
-    pub flags: i32,
-    pub size: u32,
-    pub min_distance: i32,
+    pub entry: NativeIndexEntry,
     pub declaration: Sample,
     pub association: DirectAssociation,
     pub range_error: Option<Error>,
@@ -438,8 +441,7 @@ pub struct DirectIndexCursor<'a> {
     next: u64,
     distance: u64,
     limit: u64,
-    ready: Option<DirectIndexEntry>,
-    failed: Option<Error>,
+    latch: Latched<DirectIndexEntry>,
 }
 impl<'a> From<RecoveryIndexCursor<'a>> for DirectIndexCursor<'a> {
     fn from(c: RecoveryIndexCursor<'a>) -> Self {
@@ -448,33 +450,37 @@ impl<'a> From<RecoveryIndexCursor<'a>> for DirectIndexCursor<'a> {
             next: 0,
             distance: 0,
             limit: u64::MAX,
-            ready: None,
-            failed: None,
+            latch: Latched::default(),
         }
     }
 }
 impl DirectIndexCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        poll_latched(
-            self,
-            |c| (&mut c.failed, &mut c.ready),
-            Self::poll_inner,
-            work,
-            cancel,
-        )
+        self.poll_latched(work, cancel)
     }
-    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+    pub fn take_entry(&mut self) -> Result<DirectIndexEntry> {
+        self.latch.take("no ready v2 index")
+    }
+}
+impl LatchedCursor for DirectIndexCursor<'_> {
+    type Item = DirectIndexEntry;
+    fn latch(&mut self) -> &mut Latched<DirectIndexEntry> {
+        &mut self.latch
+    }
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         match &mut self.engine {
             IndexEngine::Legacy(c) => match c.poll(work, cancel)? {
                 CursorStatus::Ready => {
                     let e = c.take_entry()?;
-                    self.ready = Some(DirectIndexEntry {
-                        ordinal: e.ordinal,
-                        position: e.position,
-                        timestamp: e.timestamp,
-                        flags: e.flags,
-                        size: e.size,
-                        min_distance: e.min_distance,
+                    self.latch.ready = Some(DirectIndexEntry {
+                        entry: NativeIndexEntry {
+                            ordinal: e.ordinal,
+                            position: e.position,
+                            timestamp: e.timestamp,
+                            flags: e.flags,
+                            size: e.size,
+                            min_distance: e.min_distance,
+                        },
                         declaration: e.source,
                         association: DirectAssociation::DeclarationCoordinate,
                         range_error: None,
@@ -488,7 +494,7 @@ impl DirectIndexCursor<'_> {
                     if !work.try_charge(1) {
                         return Ok(CursorStatus::Yield);
                     }
-                    count(self.next.checked_add(1).ok_or(Error::Overflow)?, self.limit)?;
+                    bounded(self.next.checked_add(1).ok_or(Error::Overflow)?, self.limit)?;
                     let r = c.take_occurrence()?;
                     // Cannot overflow: the distance never exceeds the bounded ordinal.
                     let distance = if r.demux.flags & 1 != 0 || self.next == 0 {
@@ -496,20 +502,15 @@ impl DirectIndexCursor<'_> {
                     } else {
                         self.distance.checked_add(1).ok_or(Error::Overflow)?
                     };
-                    let e = native_index_entry(
+                    let entry = native_index_entry(
                         &r.demux,
                         self.next,
                         distance,
                         "v2 direct native index flags",
                         "native index signed position",
                     )?;
-                    self.ready = Some(DirectIndexEntry {
-                        ordinal: e.ordinal,
-                        position: e.position,
-                        timestamp: e.timestamp,
-                        flags: e.flags,
-                        size: e.size,
-                        min_distance: e.min_distance,
+                    self.latch.ready = Some(DirectIndexEntry {
+                        entry,
                         declaration: r.declaration,
                         association: r.association,
                         range_error: r.range_error,
@@ -521,8 +522,5 @@ impl DirectIndexCursor<'_> {
                 other => Ok(other),
             },
         }
-    }
-    pub fn take_entry(&mut self) -> Result<DirectIndexEntry> {
-        take_latched(self.failed, &mut self.ready, "no ready v2 index")
     }
 }
