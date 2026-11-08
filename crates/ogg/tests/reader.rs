@@ -799,10 +799,10 @@ fn budgets_and_limits_refuse_without_panicking() {
     assert_eq!(error, Some(Error::Policy("Ogg capture pattern scan")));
 
     // A pool smaller than the packets held reports backpressure, then continues once
-    // they are released.
+    // they are released. The reader itself holds its state and a page's events.
     let mut file = Vec::new();
     opus_stream(5, 200, 4, 0, &mut file);
-    let pool = Budget::new(Budget::control_storage_bytes() + 4_000).unwrap();
+    let pool = Budget::new(Budget::control_storage_bytes() + 8_000).unwrap();
     let capabilities = SourceCapabilities {
         length: None,
         random_access: false,
@@ -830,6 +830,7 @@ fn budgets_and_limits_refuse_without_panicking() {
                 Err(error) => panic!("{error}"),
             },
             Step::Backpressure(_) => {
+                assert!(!held.is_empty(), "the reader alone exceeds the pool");
                 pressured = true;
                 held.clear();
             }

@@ -3,10 +3,10 @@ use crate::compat::ReferenceClock;
 use crate::mapping::{Configuration, HeaderStep, Headers, Mapping, Previous};
 use crate::packets::{Assembler, Completed, Continuity};
 use crate::page::{MAX_PAGE, Page, PageHeader, PageReader, PageStep};
+use crate::queue::Queue;
 use crate::seek::{Bisection, Landing, Output, Probe};
 use crate::timing::{Clock, PageClock, Slot};
 use crate::track::{Packet, Track};
-use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
     ContainerReader, Event, ReaderStep, SeekMethod, SeekPolicy, SeekRequest, TrackInfo,
@@ -16,6 +16,10 @@ use triergon_core::{
     InputWindow, Result, Rounding, SourceCapabilities, SourceFailure, SourceId, SourceLocation,
     Step, Time, WorkBudget,
 };
+
+/// Events a page adds besides its packets, at most: a resync, a lost page, a link, a
+/// track, a seek receipt and the packet held for it. The end of the input adds fewer.
+const PAGE_EVENTS: usize = 6;
 
 /// Bounds of one [`Reader`], on top of the caller's memory [`Budget`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -170,7 +174,8 @@ pub struct Reader {
     completed: Vec<Completed>,
     /// Media packets of the current page (at most 255).
     media: Vec<Media>,
-    pending: VecDeque<Output>,
+    /// Events to deliver. Room for what a page adds is charged before it is handled.
+    pending: Queue<Output>,
     phase: Phase,
     landing: Option<Landing>,
     end_scanned: bool,
@@ -201,7 +206,7 @@ impl Reader {
             // Fixed by the 255 lacing values of a page, allocated once.
             completed: Vec::with_capacity(255),
             media: Vec::with_capacity(255),
-            pending: VecDeque::with_capacity(256),
+            pending: Queue::new(pool),
             phase: Phase::Pages,
             landing: None,
             end_scanned: false,
@@ -225,7 +230,7 @@ impl Reader {
         cancel: &AtomicBool,
     ) -> Result<Step<Output, Backpressure>> {
         loop {
-            if let Some(output) = self.pending.pop_front() {
+            if let Some(output) = self.pending.pop() {
                 return Ok(Step::Ready(output));
             }
             if cancel.load(Ordering::Relaxed) {
@@ -235,6 +240,7 @@ impl Reader {
                 self.process()?;
                 continue;
             }
+            self.pending.reserve(PAGE_EVENTS)?;
             let step = match &mut self.phase {
                 Phase::Ended(location) => return Ok(Step::End(*location)),
                 Phase::Pages => self.pages.next(&mut self.input, work, cancel)?,
@@ -260,10 +266,10 @@ impl Reader {
                 PageStep::Yield => return Ok(Step::Yield),
                 PageStep::End { location, skipped } => {
                     if skipped > 0 {
-                        self.pending.push_back(Event::Other(ReaderEvent::Resync {
+                        self.pending.push(Event::Other(ReaderEvent::Resync {
                             offset: location.offset - skipped,
                             bytes: skipped,
-                        }));
+                        }))?;
                     }
                     if let Some(landing) = self.landing.take() {
                         landing.finish(&mut self.pending)?;
@@ -280,7 +286,12 @@ impl Reader {
         let Some(mut current) = self.current.take() else {
             return Ok(());
         };
-        let result = self.process_page(&mut current);
+        let page = &current.page;
+        let events = page.header.completed_packets(&page.bytes) + PAGE_EVENTS;
+        let result = self
+            .pending
+            .reserve(events)
+            .and_then(|()| self.process_page(&mut current));
         if result.is_err() {
             self.current = Some(current);
         }
@@ -295,8 +306,7 @@ impl Reader {
             None => self.stream_for(&header, offset)?,
         };
         let Some(stream) = found else {
-            self.resync_event(&mut current.page);
-            return Ok(());
+            return self.resync_event(&mut current.page);
         };
         current.stream = Some(stream);
         if !current.assembled {
@@ -310,12 +320,12 @@ impl Reader {
                 s.clock = Clock::at(None);
             }
             let track = s.track;
-            self.resync_event(&mut current.page);
+            self.resync_event(&mut current.page)?;
             if let (Continuity::Lost, Some(track)) = (continuity, track) {
-                self.pending.push_back(Event::Other(ReaderEvent::Lost {
+                self.pending.push(Event::Other(ReaderEvent::Lost {
                     track,
                     page: offset,
-                }));
+                }))?;
             }
         }
         while current.next < self.completed.len() {
@@ -326,14 +336,15 @@ impl Reader {
     }
 
     /// Report the bytes skipped before a page, once.
-    fn resync_event(&mut self, page: &mut Page) {
+    fn resync_event(&mut self, page: &mut Page) -> Result<()> {
         let bytes = std::mem::take(&mut page.skipped);
-        if bytes > 0 {
-            self.pending.push_back(Event::Other(ReaderEvent::Resync {
-                offset: page.offset - bytes,
-                bytes,
-            }));
+        if bytes == 0 {
+            return Ok(());
         }
+        self.pending.push(Event::Other(ReaderEvent::Resync {
+            offset: page.offset - bytes,
+            bytes,
+        }))
     }
 
     /// The stream a page belongs to; a new one for a beginning-of-stream page, which
@@ -361,10 +372,10 @@ impl Reader {
                 })
                 .map_err(|e| e.error)?;
             if self.link > 0 {
-                self.pending.push_back(Event::Other(ReaderEvent::Link {
+                self.pending.push(Event::Other(ReaderEvent::Link {
                     index: u32::try_from(self.link).map_err(|_| Error::Overflow)?,
                     offset,
-                }));
+                }))?;
             }
         }
         let stream = Stream::new(self.input.budget(), header.serial, &self.limits);
@@ -423,7 +434,7 @@ impl Reader {
                     };
                     self.streams[stream].headers = next;
                     if next == Headers::Done {
-                        self.configured(stream, track);
+                        self.configured(stream, track)?;
                     }
                     return Ok(());
                 }
@@ -434,7 +445,7 @@ impl Reader {
                 }
             }
             self.streams[stream].headers = Headers::Done;
-            self.configured(stream, track);
+            self.configured(stream, track)?;
         }
         let s = &mut self.streams[stream];
         let durations = self.tracks[track]
@@ -484,7 +495,7 @@ impl Reader {
         s.headers = headers;
         s.reference = ReferenceClock::new(chain_end);
         if headers == Headers::Done {
-            self.configured(stream, index);
+            self.configured(stream, index)?;
         }
         Ok(())
     }
@@ -528,14 +539,14 @@ impl Reader {
     }
 
     /// A stream's headers are read: start its clock and announce a new configuration.
-    fn configured(&mut self, stream: usize, index: usize) {
+    fn configured(&mut self, stream: usize, index: usize) -> Result<()> {
         let track = &mut self.tracks[index];
         let start = track.timeline().timed().then(|| track.timeline().ticks(0));
         let s = &mut self.streams[stream];
         s.previous = Previous::Start;
         s.clock = Clock::at(start);
         if track.configured {
-            return;
+            return Ok(());
         }
         track.configured = true;
         track.time_base = track.config.time_base();
@@ -546,8 +557,7 @@ impl Reader {
                 .to_i64_ticks(track.time_base, Rounding::NearestAway)
                 .unwrap_or(0);
         }
-        self.pending
-            .push_back(Event::Other(ReaderEvent::Track(index)));
+        self.pending.push(Event::Other(ReaderEvent::Track(index)))
     }
 
     /// Time the page's media packets and deliver them.
@@ -601,7 +611,7 @@ impl Reader {
                                 self.landing = None;
                             }
                         }
-                        None => self.pending.push_back(Event::Packet(packet)),
+                        None => self.pending.push(Event::Packet(packet))?,
                     }
                 }
             }

@@ -56,3 +56,16 @@ fn an_audio_session_applies_pre_skip_and_end_trim() {
     assert_eq!(block.sample_rate, 48_000);
     assert_eq!(block.samples.len(), 2 * (5 * 960 - 312 - 100));
 }
+
+#[test]
+fn a_track_decoder_charges_its_configuration_to_the_callers_pool() {
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut source = open_blocking(std::io::Cursor::new(opus_file()), &pool).unwrap();
+    source.next_packet().unwrap();
+    let track = source.reader().track(0).unwrap();
+    let tiny = Budget::new(Budget::control_storage_bytes() + 8).unwrap();
+    let refused = TrackDecoder::new_in(track, &tiny).unwrap_err();
+    assert!(refused.0.starts_with("Limit"), "{}", refused.0);
+    let decoder = TrackDecoder::new_in(track, &Budget::new(1 << 20).unwrap()).unwrap();
+    assert_eq!(decoder.codec(), triergon_session::AudioCodec::Opus);
+}

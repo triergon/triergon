@@ -29,7 +29,7 @@
 ///
 /// Reference: the `ogg` demuxer of FFmpeg 9.0.2, observed through `ffprobe
 /// -show_packets` on the FATE Vorbis samples and on generated Vorbis, Opus and FLAC
-/// files (`examples/ogg_compare.rs`).
+/// files (`cargo xtask codecs readers`).
 pub mod clock {
     pub use crate::compat::{ReferenceTiming, packet_timing};
 }

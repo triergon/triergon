@@ -36,10 +36,11 @@ impl Discard {
             self.time_base
                 .map_or(0, |base| to_samples(ticks, base, frame.sample_rate))
         };
+        // `i64::MIN` ticks before zero do not negate; they are beyond every frame too.
         let before_zero = self
             .pts
             .filter(|&pts| pts < 0)
-            .map_or(0, |pts| samples(-pts));
+            .map_or(0, |pts| pts.checked_neg().map_or(usize::MAX, samples));
         let pending = self
             .trim
             .start
@@ -61,13 +62,14 @@ impl Discard {
     }
 }
 
-/// Samples at `rate` in `ticks` of `base`, rounded to the nearest; 0 when it does not fit.
+/// Samples at `rate` in `ticks` of `base`, rounded to the nearest. A count beyond
+/// `usize` saturates: no frame holds that many, so all of it is discarded.
 fn to_samples(ticks: i64, base: TimeBase, rate: u32) -> usize {
     TimeBase::new(1, u64::from(rate.max(1)))
         .and_then(|samples| base.rescale(ticks.max(0), samples, Rounding::NearestAway))
-        .ok()
-        .and_then(|value| usize::try_from(value).ok())
-        .unwrap_or(0)
+        .map_or(usize::MAX, |value| {
+            usize::try_from(value).unwrap_or(usize::MAX)
+        })
 }
 
 #[cfg(test)]
@@ -127,5 +129,19 @@ mod tests {
             (out.samples_per_channel, out.planes[0][0], delay),
             (47, 529.0, 0)
         );
+    }
+
+    #[test]
+    fn counts_beyond_any_frame_discard_all_of_it() {
+        // The earliest time a packet can carry, which has no positive counterpart.
+        let mut out = frame(960);
+        let mut delay = 0;
+        discard(i64::MIN, None, None, 48_000).apply(&mut out, &mut delay);
+        assert_eq!((out.samples_per_channel, delay), (0, usize::MAX - 960));
+        // A trim whose sample count overflows the rescale.
+        let mut out = frame(960);
+        let mut delay = 0;
+        discard(0, None, Some(i64::MAX), 1).apply(&mut out, &mut delay);
+        assert_eq!((out.samples_per_channel, delay), (0, 0));
     }
 }

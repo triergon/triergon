@@ -1,8 +1,9 @@
 //! Decoding the packets of one container audio track.
-use triergon_codec::{AudioDecoder, AudioFrame, DecodeFailure, DownmixLevels};
+use triergon_codec::{AudioDecoder, AudioFrame, Budget, DecodeFailure, DownmixLevels};
+use triergon_core::Bytes;
 use triergon_core::container::{PacketInfo, TrackInfo};
 
-use crate::{AudioCodec, Discard, audio_codec, audio_configuration, audio_decoder};
+use crate::{AudioCodec, Discard, audio_codec, audio_configuration, audio_decoder_in};
 
 /// The decoder of one container audio track. It chooses the decoder from the track's
 /// codec and configuration, and drops the decoded samples each packet's container marks
@@ -24,15 +25,27 @@ impl core::fmt::Debug for TrackDecoder {
 }
 
 impl TrackDecoder {
+    /// The pool [`TrackDecoder::new`] creates: the largest default of the decoders it
+    /// chooses from.
+    pub const DEFAULT_STORAGE_BYTES: usize = 32 << 20;
+
     /// The decoder for `track`; refused when this crate does not decode its codec or its
     /// configuration is invalid.
     pub fn new(track: &dyn TrackInfo) -> Result<TrackDecoder, DecodeFailure> {
+        let budget = Budget::new(Self::DEFAULT_STORAGE_BYTES).map_err(DecodeFailure::from_error)?;
+        Self::new_in(track, &budget)
+    }
+
+    /// [`TrackDecoder::new`] charging the configuration and the decoder to `budget`.
+    pub fn new_in(track: &dyn TrackInfo, budget: &Budget) -> Result<TrackDecoder, DecodeFailure> {
         let codec = audio_codec(track.codec())
             .ok_or_else(|| DecodeFailure(format!("unsupported codec {:?}", track.codec())))?;
         let mut configuration = Vec::new();
         audio_configuration(codec, track.configuration(), &mut configuration)
             .map_err(DecodeFailure::from_error)?;
-        let decoder = audio_decoder(codec, &configuration)?;
+        let configuration = Bytes::try_from_vec(budget, configuration)
+            .map_err(|refused| DecodeFailure::from_error(refused.error()))?;
+        let decoder = audio_decoder_in(codec, &configuration, budget)?;
         Ok(TrackDecoder {
             codec,
             delay: decoder.delay(),
