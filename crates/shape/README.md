@@ -109,8 +109,10 @@ paragraph separator inside the text.
 
 - Vertical directions (libass shapes `@` fonts horizontally with `vert`).
 - Apple Advanced Typography (`morx`, `kerx`, `trak` with `STAT`) and Apple `kern`
-  version 1; `kern` formats other than 0 and cross-stream kerning. A face that
-  would need them is refused with `Error::Unsupported`.
+  version 1; `kern` subtables of formats 1, 2 and 3, which HarfBuzz applies in an
+  OpenType `kern` table too (format 1 as Apple's state machine), and
+  cross-stream kerning. Shaping a face that would need them is refused with
+  `Error::Unsupported`.
 - `stch` stretching (refused when it would apply), the Windows-1256 Arabic
   fallback lookups, fallback kerning through `Metrics::h_kerning` (HarfBuzz's
   built-in functions have none).

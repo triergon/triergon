@@ -32,9 +32,10 @@ impl<'a> Kern<'a> {
         self.data.u32(0) != 0
     }
 
-    /// OpenType `kern` subtables are never state machines.
+    /// Whether a subtable is a state machine: Apple's table, or a format 1
+    /// subtable in an OpenType one, which HarfBuzz reads as Apple's.
     pub(crate) fn has_state_machine(&self) -> bool {
-        self.apple
+        self.apple || self.subtables().any(|(_, format, _)| format == 1)
     }
 
     pub(crate) fn has_cross_stream(&self) -> bool {
@@ -69,6 +70,7 @@ impl<'a> Kern<'a> {
             if coverage & HORIZONTAL == 0 {
                 continue;
             }
+            // HarfBuzz applies formats 1 (Apple's state machine), 2 and 3 too.
             if coverage & CROSS_STREAM != 0 || format != 0 {
                 return Err(Error::Unsupported("kern subtable"));
             }
