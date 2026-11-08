@@ -99,7 +99,7 @@ impl TransportFaultRecovery {
     }
 
     // Both callers check the pool first, preserving foreign-pool precedence.
-    fn check_source_input(&self, input: &InputCursor) -> Result<()> {
+    pub(super) fn check_source_input(&self, input: &InputCursor) -> Result<()> {
         let expected = self
             .boundaries
             .source_input
