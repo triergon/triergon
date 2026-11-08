@@ -112,27 +112,44 @@ pub fn audio_decoder(
         AudioCodec::Aac => Box::new(triergon_codec_aac::Decoder::new()),
         AudioCodec::Dts => Box::new(triergon_codec_dca::Decoder::new()),
         AudioCodec::Flac => Box::new(
-            triergon_codec_flac::Decoder::from_configuration(
-                configuration,
-                triergon_codec_flac::Limits::default(),
-            )
-            .map_err(DecodeFailure::from_error)?,
+            triergon_codec_flac::Decoder::new(configuration).map_err(DecodeFailure::from_error)?,
         ),
         AudioCodec::Opus => Box::new(
-            triergon_codec_opus::Decoder::from_configuration(
-                configuration,
-                triergon_codec_opus::Limits::default(),
-            )
-            .map_err(DecodeFailure::from_error)?,
+            triergon_codec_opus::Decoder::new(configuration).map_err(DecodeFailure::from_error)?,
         ),
         AudioCodec::Vorbis => Box::new(
-            triergon_codec_vorbis::Decoder::from_configuration(
-                configuration,
-                triergon_codec_vorbis::Limits::default(),
-            )
-            .map_err(DecodeFailure::from_error)?,
+            triergon_codec_vorbis::Decoder::new(configuration)
+                .map_err(DecodeFailure::from_error)?,
         ),
         AudioCodec::MpegAudio => Box::new(triergon_codec_mp3::Decoder::new()),
+    })
+}
+
+/// [`audio_decoder`] charging the decoder's storage, its output frame included, to
+/// `budget` instead of a pool of the codec's default limit.
+#[cfg(feature = "codecs")]
+pub fn audio_decoder_in(
+    codec: AudioCodec,
+    configuration: &[u8],
+    budget: &triergon_codec::Budget,
+) -> Result<Box<dyn AudioDecoder>, DecodeFailure> {
+    Ok(match codec {
+        AudioCodec::Ac3 | AudioCodec::Eac3 => Box::new(triergon_codec_ac3::Decoder::new_in(budget)),
+        AudioCodec::Aac => Box::new(triergon_codec_aac::Decoder::new_in(budget)),
+        AudioCodec::Dts => Box::new(triergon_codec_dca::Decoder::new_in(budget)),
+        AudioCodec::Flac => Box::new(
+            triergon_codec_flac::Decoder::new_in(configuration, budget)
+                .map_err(DecodeFailure::from_error)?,
+        ),
+        AudioCodec::Opus => Box::new(
+            triergon_codec_opus::Decoder::new_in(configuration, budget)
+                .map_err(DecodeFailure::from_error)?,
+        ),
+        AudioCodec::Vorbis => Box::new(
+            triergon_codec_vorbis::Decoder::new_in(configuration, budget)
+                .map_err(DecodeFailure::from_error)?,
+        ),
+        AudioCodec::MpegAudio => Box::new(triergon_codec_mp3::Decoder::new_in(budget)),
     })
 }
 

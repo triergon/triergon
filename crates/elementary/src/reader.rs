@@ -433,6 +433,8 @@ impl<F: Format> Reader<F> {
         while left > 0 {
             match self.input.skip(left, work, cancel)? {
                 Ok(count) => left -= count,
+                // A stream header that runs past the end leaves no stream to read.
+                Err(Wait::End) if matches!(then, Then::Prelude) => return Err(Error::Truncated),
                 Err(Wait::End) => return Ok(Flow::Wait(Wait::End)),
                 Err(wait) => {
                     self.phase = Phase::Discard { left, then };

@@ -135,6 +135,28 @@ impl Bytes {
         storage.data.clear();
         Ok(BytesWriter(self.storage))
     }
+    /// Refills a uniquely owned allocation in place: `fill` gets its first `len` bytes
+    /// and returns how many it wrote (at most `len`), which become this view. The bytes
+    /// hold earlier contents, or zero where nothing was written yet; capacity and charge
+    /// are unchanged. `None`, without calling `fill`, when another handle shares the
+    /// allocation or its capacity is below `len`. A failed fill leaves an empty view.
+    pub fn try_refill<E>(
+        &mut self,
+        len: usize,
+        fill: impl FnOnce(&mut [u8]) -> std::result::Result<usize, E>,
+    ) -> Option<std::result::Result<usize, E>> {
+        if len > self.storage.data.capacity() {
+            return None;
+        }
+        let storage = Arc::get_mut(&mut self.storage)?;
+        if storage.data.len() < len {
+            // Within the capacity: no allocation, and the charge already covers it.
+            storage.data.resize(len, 0);
+        }
+        let written = fill(&mut storage.data[..len]).map(|written| written.min(len));
+        self.range = 0..*written.as_ref().unwrap_or(&0);
+        Some(written)
+    }
 }
 
 /// Exclusive access to an existing charged byte allocation. Its capacity

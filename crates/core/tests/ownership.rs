@@ -30,6 +30,32 @@ fn reused_bytes_keep_the_same_allocation_and_charge() {
 }
 
 #[test]
+fn a_refill_rewrites_an_unshared_allocation_in_place() {
+    let budget = Budget::new(4096).unwrap();
+    let mut bytes = Bytes::copy_from_slice(&budget, b"abcdefgh").unwrap();
+    let address = bytes.as_ptr();
+    let charged = budget.used();
+    let alias = bytes.slice(0..2).unwrap();
+    let refused = bytes.try_refill(4, |_| Ok::<_, ()>(4));
+    assert!(refused.is_none());
+    drop(alias);
+    assert!(bytes.try_refill(9, |_| Ok::<_, ()>(9)).is_none());
+    let filled = bytes.try_refill(4, |buffer| {
+        assert_eq!(buffer, b"abcd");
+        buffer[..3].copy_from_slice(b"xyz");
+        Ok::<_, ()>(3)
+    });
+    assert_eq!(filled, Some(Ok(3)));
+    assert_eq!((bytes.as_ref(), bytes.as_ptr()), (&b"xyz"[..], address));
+    assert_eq!(bytes.try_refill(8, |_| Err(())), Some(Err(())));
+    assert!(bytes.is_empty());
+    // A count beyond the requested length is clamped to it.
+    assert_eq!(bytes.try_refill(2, |_| Ok::<_, ()>(5)), Some(Ok(2)));
+    assert_eq!(bytes.as_ref(), b"xy");
+    assert_eq!(budget.used(), charged);
+}
+
+#[test]
 fn capacity_and_hidden_prefixes_remain_charged_until_the_last_view_drops() {
     let budget = Budget::new(4096).unwrap();
     let baseline = budget.used();

@@ -15,6 +15,7 @@ pub mod compat;
 pub mod mapping;
 pub mod packets;
 pub mod page;
+mod queue;
 mod reader;
 pub mod seek;
 mod timing;

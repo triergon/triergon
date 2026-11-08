@@ -13,8 +13,8 @@
 //! number of bytes at each step, and reads forward from it. Otherwise it reads the
 //! source again from its start.
 use crate::page::{MAX_PAGE, Page};
+use crate::queue::Queue;
 use crate::track::Packet;
-use std::collections::VecDeque;
 use triergon_core::container::{Event, SeekMethod, SeekPolicy, SeekReceipt};
 use triergon_core::{Result, Time, TimeBase};
 
@@ -178,7 +178,7 @@ impl Landing {
 
     /// Offer a packet; `true` when the seek has landed and `out` holds the receipt and
     /// the packets that follow.
-    pub(crate) fn offer(&mut self, packet: Packet, out: &mut VecDeque<Output>) -> Result<bool> {
+    pub(crate) fn offer(&mut self, packet: Packet, out: &mut Queue<Output>) -> Result<bool> {
         if packet.index != self.track {
             return Ok(false);
         }
@@ -192,30 +192,31 @@ impl Landing {
         }
         let first = self.held.take();
         self.announce(first.as_ref().unwrap_or(&packet), out)?;
-        out.extend(first.map(Event::Packet));
-        out.push_back(Event::Packet(packet));
+        if let Some(first) = first {
+            out.push(Event::Packet(first))?;
+        }
+        out.push(Event::Packet(packet))?;
         Ok(true)
     }
 
     /// The input ended before the landing: land on the last packet seen, or where the
     /// track's packets ended.
-    pub(crate) fn finish(mut self, out: &mut VecDeque<Output>) -> Result<()> {
+    pub(crate) fn finish(mut self, out: &mut Queue<Output>) -> Result<()> {
         if let Some(packet) = self.held.take() {
             self.announce(&packet, out)?;
-            out.push_back(Event::Packet(packet));
+            out.push(Event::Packet(packet))?;
             return Ok(());
         }
         let landing = match self.last_end {
             Some(end) => Time::from_ticks(i128::from(end), self.time_base)?,
             None => self.requested,
         };
-        out.push_back(Event::Seek(
+        out.push(Event::Seek(
             self.receipt(landing, landing.max(self.requested)),
-        ));
-        Ok(())
+        ))
     }
 
-    fn announce(&self, landing: &Packet, out: &mut VecDeque<Output>) -> Result<()> {
+    fn announce(&self, landing: &Packet, out: &mut Queue<Output>) -> Result<()> {
         // A Vorbis packet decoded first completes no samples; its output starts at its end.
         let ticks = landing.pts.or(landing.end()).unwrap_or(self.threshold);
         let time = Time::from_ticks(i128::from(ticks), self.time_base)?;
@@ -223,8 +224,7 @@ impl Landing {
             SeekPolicy::PreviousRandomAccess => time,
             SeekPolicy::PlaybackPreroll => time.max(self.requested),
         };
-        out.push_back(Event::Seek(self.receipt(time, discard_until)));
-        Ok(())
+        out.push(Event::Seek(self.receipt(time, discard_until)))
     }
 
     fn receipt(&self, landing: Time, discard_until: Time) -> SeekReceipt {
