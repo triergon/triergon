@@ -160,19 +160,20 @@ impl Census {
 /// inwards. Starting from the edge, the colour that most of its outline
 /// shares with the edge and the colours ranked so far comes next; ranked
 /// colours take evenly spaced levels from transparent to opaque, and the rest
-/// keep their values. `pixels` holds rows of `width` indices below `out.len()`.
+/// keep their values. `pixels` holds rows of `width` indices; every value is
+/// a colour of its own, whatever the region's depth.
 pub(super) fn automatic(
     pixels: &[u8],
     width: usize,
     census: &mut Census,
-    out: &mut [u32],
+    out: &mut [u32; 256],
 ) -> Result<()> {
-    let colours = out.len();
+    let colours = pixels.iter().max().map_or(0, |&p| usize::from(p) + 1);
     let touch = census.reset(colours)?;
     // Pixels of each colour with a 4-neighbour of another colour or the edge.
     let mut edge = [0_u32; 256];
     let edge = &mut edge[..colours];
-    let class = |p: u8| usize::from(p) & (colours - 1);
+    let class = usize::from;
     let height = pixels.len().checked_div(width).unwrap_or(0);
     for y in 0..height {
         for x in 0..width {

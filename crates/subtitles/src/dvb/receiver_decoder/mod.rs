@@ -32,8 +32,9 @@ use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 /// When a region's palette is replaced by the automatic one (`compute_clut`).
 ///
-/// The automatic palette ranks a region's colours from its edge inwards and
-/// gives them evenly spaced grey-green levels from transparent to opaque.
+/// The automatic palette ranks a region's pixel values from its edge inwards,
+/// whatever its depth, and gives them evenly spaced grey-green levels from
+/// transparent to opaque.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AutomaticPalette {
     /// Never: regions keep their CLUT, or the default CLUT.
@@ -86,6 +87,7 @@ impl<'a> Subtitle<'a> {
             width: slot.width,
             height: slot.height,
             palette: &slot.palette[..1 << slot.depth.bits()],
+            colours: &slot.palette,
             pixels: match slot.region {
                 Some(index) => epoch.region_at(index).pixels(),
                 None => slot.pixels.as_slice(),
@@ -103,7 +105,12 @@ pub struct Rect<'a> {
     pub height: u16,
     /// ARGB words, alpha in the top byte; `1 << depth` of them.
     pub palette: &'a [u32],
-    /// `width * height` palette indices, row by row.
+    /// The colour of every pixel value, `palette` first. A region recomposed
+    /// at a smaller depth without a fill keeps pixel values past `palette`;
+    /// as in the reference, they are transparent, or under the automatic
+    /// palette take the levels it ranked them at.
+    pub colours: &'a [u32; 256],
+    /// `width * height` indices into `colours`, row by row.
     pub pixels: &'a [u8],
 }
 
@@ -468,15 +475,15 @@ impl ReceiverDecoder {
                 AutomaticPalette::WithoutClut => tables.is_none(),
                 AutomaticPalette::Always => true,
             };
-            let palette = &mut slot.palette[..1 << region.depth.bits()];
             if automatic {
-                palette.copy_from_slice(self.epoch.automatic_palette(
-                    index,
-                    &mut self.census,
-                    work,
-                )?);
+                slot.palette = *self
+                    .epoch
+                    .automatic_palette(index, &mut self.census, work)?;
             } else {
-                palette.copy_from_slice(tables.unwrap_or(&DEFAULT).get(region.depth));
+                let table = tables.unwrap_or(&DEFAULT).get(region.depth);
+                let (defined, rest) = slot.palette.split_at_mut(table.len());
+                defined.copy_from_slice(table);
+                rest.fill(0);
             }
             count += 1;
         }

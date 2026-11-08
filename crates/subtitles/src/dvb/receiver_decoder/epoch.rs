@@ -157,16 +157,15 @@ impl Epoch {
         &self.regions.as_slice()[index]
     }
 
-    /// Region `index`'s automatic palette at its depth, recomputed when an
-    /// object was drawn into the region since the last computation.
+    /// Region `index`'s automatic palette, recomputed when an object was
+    /// drawn into the region since the last computation.
     pub(super) fn automatic_palette(
         &mut self,
         index: usize,
         census: &mut Census,
         work: &mut WorkBudget,
-    ) -> Result<&[u32]> {
+    ) -> Result<&[u32; 256]> {
         let region = &mut self.regions.as_mut_slice()[index];
-        let colours = 1 << region.depth.bits();
         if !region.automatic_current {
             charge(work, region.pixels.len());
             let width = usize::from(region.width);
@@ -174,11 +173,11 @@ impl Epoch {
                 region.pixels.as_slice(),
                 width,
                 census,
-                &mut region.automatic[..colours],
+                &mut region.automatic,
             )?;
             region.automatic_current = true;
         }
-        Ok(&region.automatic[..colours])
+        Ok(&region.automatic)
     }
 
     /// The CLUT `id`, if one was defined in this epoch.

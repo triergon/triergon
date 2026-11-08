@@ -498,6 +498,22 @@
       }
     },
     {
+      "id": "depth-reduced-unfilled-ts",
+      "profile": "depth-reduced-unfilled-ts",
+      "file": "dvb/depth-reduced-unfilled.ts",
+      "sha256": "87fdebf0ba9e73574f287a34b65b1ecf4b8a214e4f82055eabf8e3f7bf5bdb49",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1424,
+        "digest": 11983761461453049534
+      }
+    },
+    {
       "id": "depth2-literals-ts",
       "profile": "depth2-literals-ts",
       "file": "dvb/depth2-literals.ts",
@@ -2728,6 +2744,23 @@
         "packets": 4,
         "bytes": 1804,
         "digest": 11588302090794142041
+      }
+    },
+    {
+      "id": "depth-reduced-unfilled--compute_clut-1",
+      "profile": "depth-reduced-unfilled--compute_clut-1",
+      "file": "dvb/depth-reduced-unfilled.ts",
+      "sha256": "87fdebf0ba9e73574f287a34b65b1ecf4b8a214e4f82055eabf8e3f7bf5bdb49",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1424,
+        "digest": 4206325999465978571
       }
     },
     {

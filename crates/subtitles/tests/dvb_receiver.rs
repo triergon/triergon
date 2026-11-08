@@ -158,6 +158,45 @@ fn reference_folds() {
     );
 }
 
+/// Every pixel value of a region recomposed at a smaller depth has a colour,
+/// as in the reference's 256-entry palettes: zero past the CLUT's entries,
+/// and a level of its own under the automatic palette.
+#[test]
+fn reduced_depth_pixels_have_colours() {
+    let cases: Vec<Case> = cases()
+        .into_iter()
+        .filter(|c| c.id.starts_with("depth-reduced-unfilled"))
+        .collect();
+    assert_eq!(cases.len(), 2);
+    for case in &cases {
+        let pool = Budget::new(1 << 24).unwrap();
+        let cancel = AtomicBool::new(false);
+        let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+        let mut last = None;
+        for (pts, packet) in &case.packets {
+            let mut work = WorkBudget::new(u64::MAX);
+            if let Some(subtitle) = decoder.decode(packet, *pts, &mut work, &cancel).unwrap() {
+                let rect = subtitle.rects().next().unwrap();
+                last = Some((rect.palette.to_vec(), *rect.colours, rect.pixels.to_vec()));
+            }
+        }
+        let (palette, colours, pixels) = last.unwrap();
+        assert_eq!(palette, colours[..4]);
+        let mut values: Vec<u8> = pixels.clone();
+        values.sort_unstable();
+        values.dedup();
+        assert!(values.iter().any(|&p| p >= 4), "{}", case.id);
+        if case.options.automatic_palette == AutomaticPalette::Always {
+            let mut levels: Vec<u32> = values.iter().map(|&p| colours[usize::from(p)]).collect();
+            levels.sort_unstable();
+            levels.dedup();
+            assert_eq!(levels.len(), values.len(), "{}", case.id);
+        } else {
+            assert!(colours[4..].iter().all(|&c| c == 0), "{}", case.id);
+        }
+    }
+}
+
 #[test]
 fn refuses_packets_without_a_segment() {
     let pool = Budget::new(1 << 20).unwrap();

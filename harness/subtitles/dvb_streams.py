@@ -881,6 +881,16 @@ def cases():
             (T0 + 270000, pes_data([pcs(1, 5, 3, 0, [(0, 10, 10)]),
                                     rcs(0, 30, 6, version=3, depth=2, clut=1), eds()]))]
     out["region-resize-partial"] = single(sets)
+    # An 8-bit region recomposed as 2-bit without fill keeps its 8-bit pixel
+    # values; the object drawn then has the automatic palette rank them all.
+    sets = [(T0, pes_data([pcs(1, 5, 0, 0, [(0, 10, 10)]),
+                           rcs(0, 32, 6, depth=8, clut=1, objects=[(1, 0, 0)]),
+                           cds(1, two + eight),
+                           obj(1, 8, pattern(32, 6, [0, 5, 3, 140, 200], 46)), eds()])),
+            (T0 + 90000, pes_data([pcs(1, 5, 1, 0, [(0, 10, 10)]),
+                                   rcs(0, 32, 6, version=1, depth=2, clut=1, objects=[(2, 4, 1)]),
+                                   obj(2, 2, pattern(12, 2, [1, 2], 47), version=1), eds()]))]
+    out["depth-reduced-unfilled"] = single(sets)
     # One object placed twice in a region and in two regions; a region
     # listed twice on the page.
     segs = [pcs(1, 5, 0, 0, [(0, 10, 10), (1, 10, 40), (0, 200, 10)]),
@@ -1060,6 +1070,7 @@ OPTION_CASES = [
     ("edt-sequence", ["opt:compute_edt=1"]),
     ("edt-sequence", ["opt:compute_edt=1", "opt:compute_clut=1"]),
     ("region-resize-partial", ["opt:compute_clut=1"]),
+    ("depth-reduced-unfilled", ["opt:compute_clut=1"]),
     ("pages-ancillary-after", ["opt:dvb_substream=0"]),
     ("pages-other-first", ["opt:dvb_substream=0"]),
     ("pages-unsignalled", ["opt:dvb_substream=0"]),
