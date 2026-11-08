@@ -16528,6 +16528,36 @@
    "sha256": "b1df5b6f79fa2644106b8e87c61799b5c6fa9075c33096017bf4c50d89ef95a0",
    "bytes": 676034441,
    "source_revision": "7be886648e47f711b0f258412df82d214158a709"
+   },
+   {
+   "name": "rasterising-a7b6635e-linux-x86_64",
+   "path": "rasterising-a7b6635e-linux-x86_64",
+   "retention": "retained",
+   "reason": "Rasterising status row, Linux x86_64: raster compare --all --diagnostic (the C engine and the AVX2 diagnostic), fonts and shape compare --all and the raster tests at the head, with the zero-init flag instruction counts and paired timing against an unflagged reference build",
+   "key": "evidence/rasterising-a7b6635e-linux-x86_64/1edfe455ee5a8ba42c9197bd9e8e97f42e4325eeb3f8abd6d13f0b479345ee3c.tar.gz",
+   "sha256": "1edfe455ee5a8ba42c9197bd9e8e97f42e4325eeb3f8abd6d13f0b479345ee3c",
+   "bytes": 61228629,
+   "source_revision": "a7b6635e20cc2dc9d4592a874ba0eecab24f2870"
+  },
+  {
+   "name": "rasterising-a7b6635e-linux-arm64",
+   "path": "rasterising-a7b6635e-linux-arm64",
+   "retention": "retained",
+   "reason": "Rasterising status row, Linux AArch64: raster compare --all --diagnostic (the C engine and the NEON diagnostic), fonts and shape compare --all and the raster tests at the head, with the zero-init flag instruction counts and paired timing against an unflagged reference build",
+   "key": "evidence/rasterising-a7b6635e-linux-arm64/0ba86c152cef51adc4b57d37f7d9eeeab29a2137425aec95c9b7198b0245a44f.tar.gz",
+   "sha256": "0ba86c152cef51adc4b57d37f7d9eeeab29a2137425aec95c9b7198b0245a44f",
+   "bytes": 61264981,
+   "source_revision": "a7b6635e20cc2dc9d4592a874ba0eecab24f2870"
+  },
+  {
+   "name": "rasterising-a7b6635e-linux-armv7",
+   "path": "rasterising-a7b6635e-linux-armv7",
+   "retention": "retained",
+   "reason": "Rasterising rows, 32-bit ARMv7: raster compare --all and the raster tests at the head in the armv7-userland user space, with the dumps of the two sweep cases whose composite allocation fails, with the CPU, kernel and user-space package list",
+   "key": "evidence/rasterising-a7b6635e-linux-armv7/d328061b906a28f523eddd7aeaa778b62d13b7c7750c68347659a457497465d7.tar.gz",
+   "sha256": "d328061b906a28f523eddd7aeaa778b62d13b7c7750c68347659a457497465d7",
+   "bytes": 15433902,
+   "source_revision": "a7b6635e20cc2dc9d4592a874ba0eecab24f2870"
   }
  ]
 }

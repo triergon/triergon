@@ -112,8 +112,10 @@ properties are matched:
   only takes the constant `log 256`. Neither Apple's libm nor glibc
   guarantees correct rounding for these, so a result that depends on them is
   the one libass computes against the same libm, and platforms whose libms
-  differ can differ there. The comparison covers macOS AArch64 (Apple's
-  libm) so far.
+  differ can differ there. The comparison covers Apple's libm on macOS AArch64
+  and glibc on Linux x86_64, AArch64 and 32-bit ARMv7, where every case of
+  the C engine matches apart from two sweep cases on ARMv7 whose composite cannot be
+  allocated in a 32-bit address space ([status](../../docs/status.md)).
 
 ## Behaviour and limits
 
