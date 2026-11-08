@@ -122,6 +122,30 @@ pub struct DemuxClock {
     origin: Option<ClockOrigin>,
 }
 impl DemuxClock {
+    /// Optional encoded timing from finite source-fault recovery. No source
+    /// timestamp or anchor is created, including for forbidden timing flags.
+    pub fn project_pes_fault(
+        &mut self,
+        packet: &crate::demux_transport::PesFaultPacket,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<DiagnosticTimeView>> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if work.remaining() == 0 {
+            return Ok(None);
+        }
+        if packet.program != self.program {
+            return Err(Error::Invalid("transport fault clock program mismatch"));
+        }
+        self.project_optional_encoded(
+            packet.pid,
+            packet.encoded_header.encoded_pts_raw33(),
+            work,
+            cancel,
+        )
+    }
     /// Place encoded PTS from a faulted transport packet in this demux interval.
     /// Raw DTS stays absent; `dts90` is only the compatibility PTS-only result.
     /// This creates no source timestamp or clock anchor.
@@ -305,7 +329,6 @@ impl DemuxClock {
 }
 
 /// Optional encoded time for a rejected source header, never source PTS/DTS.
-#[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DiagnosticTimeView {
     pub encoded_pts_raw33: Option<u64>,
@@ -314,12 +337,21 @@ pub struct DiagnosticTimeView {
     pub dts90: Option<i128>,
     pub origin: Option<ClockOrigin>,
 }
-#[cfg(feature = "reference-trace")]
 impl DemuxClock {
+    #[cfg(feature = "reference-trace")]
     pub fn project_diagnostic_header(
         &mut self,
         pid: u16,
         header: &crate::demux_recovery::DiagnosticHeader,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<DiagnosticTimeView>> {
+        self.project_optional_encoded(pid, header.encoded_pts_raw33(), work, cancel)
+    }
+    fn project_optional_encoded(
+        &mut self,
+        pid: u16,
+        raw: Option<u64>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<DiagnosticTimeView>> {
@@ -330,7 +362,6 @@ impl DemuxClock {
             return Ok(None);
         }
         crate::checked_pid(pid)?;
-        let raw = header.encoded_pts_raw33();
         if let Some(raw) = raw {
             check_raw33(raw)?;
         }
