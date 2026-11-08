@@ -32,9 +32,11 @@ pub enum Operation {
 /// `ass-parse-host`'s cases, pinned per target; `cargo xtask check-design`
 /// fails if one of them is the same on every target, and a flagged case
 /// fails any other feature.
-pub const PER_TARGET: [(&str, Operation); 5] = [
+pub const PER_TARGET: [(&str, Operation); 7] = [
     ("drawings-clip-overflow.ass", Operation::Walk),
     ("drawings-infinite.ass", Operation::Walk),
+    ("drawings-int-min-x.ass", Operation::Walk),
+    ("drawings-int-min-y.ass", Operation::Walk),
     ("drawings-int-min.ass", Operation::Walk),
     ("events-time-overflow.ass", Operation::Read),
     ("stream-read-order-overflow.chunks", Operation::Read),

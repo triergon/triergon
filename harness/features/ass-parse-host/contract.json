@@ -10,7 +10,7 @@
   "contract": [
     "the operations of ass-parse-scripts, ass-parse-chunks and ass-parse-events whose libass result differs by target, one fixture each, recorded as those features record them: drawing walks with a coordinate whose 26.6 value lies outside int's range or lands on INT_MIN, which the reference flags (it notes such values at double_to_d6 and ass_outline_add_point), and reads of values that go through C long beyond int: an event time read with sscanf's %d and a Matroska packet's ReadOrder read with atoi",
     "each case is pinned per target from that target's own reference run, with the reference's flag; a case passes when the candidate, the reference and the target's pin agree, and a target a case has no pin for runs and reports it without comparing",
-    "long-width behaviour follows each target's libass; out-of-range drawing coordinates are rejected as libass does on 32-bit ARM with GCC, so those walks are pinned on armv7-unknown-linux-gnueabihf only, and on aarch64-unknown-linux-gnu, where libass's result depends on the compiler, they are reported",
+    "long-width behaviour follows each target's libass; out-of-range drawing coordinates are rejected as libass does on 32-bit ARM with GCC, so drawings-infinite and drawings-int-min are pinned on armv7-unknown-linux-gnueabihf only and reported on aarch64-unknown-linux-gnu, where libass's result depends on the compiler. The one exception: a coordinate landing exactly on INT_MIN, which the crate rejects and libass built with GCC accepts; drawings-int-min-x and drawings-int-min-y are pinned on both targets from each target's reference and listed there as open cases",
     "the file is read, its directives and commands parsed and the script or stream read before each timed and memory operation, and the reference's library, renderer and track are created once, outside it"
   ],
   "required_profiles": [
@@ -36,6 +36,27 @@
         "aarch64-unknown-linux-gnu"
       ],
       "reason": "a coordinate landing on INT_MIN is in or out of bounds by compiler (abs(INT_MIN) is undefined); the crate rejects it as libass does on 32-bit ARM with GCC"
+    }
+  ],
+  "pending_module_requirements": [
+    "a deliberate divergence: libass built with GCC accepts a coordinate landing exactly on INT_MIN through abs(INT_MIN) overflow, and the crate rejects it"
+  ],
+  "open_cases": [
+    {
+      "id": "drawings-int-min-x-ass",
+      "requirement": "a deliberate divergence: libass built with GCC accepts a coordinate landing exactly on INT_MIN through abs(INT_MIN) overflow, and the crate rejects it",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "armv7-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "id": "drawings-int-min-y-ass",
+      "requirement": "a deliberate divergence: libass built with GCC accepts a coordinate landing exactly on INT_MIN through abs(INT_MIN) overflow, and the crate rejects it",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "armv7-unknown-linux-gnueabihf"
+      ]
     }
   ],
   "iterations": 1,

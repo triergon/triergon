@@ -33,6 +33,16 @@
       "bytes": 120,
       "digest": 1962855781250135605
     },
+    "drawings-int-min-x-ass": {
+      "packets": 4,
+      "bytes": 107,
+      "digest": 5213967198243137327
+    },
+    "drawings-int-min-y-ass": {
+      "packets": 4,
+      "bytes": 107,
+      "digest": 5215918556166151727
+    },
     "drawings-int-min-ass": {
       "packets": 4,
       "bytes": 120,

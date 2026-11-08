@@ -25,6 +25,34 @@
         "host_dependent": true
       }
     },
+    "drawings-int-min-x-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 31,
+        "digest": 956854100840633194,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 6,
+        "bytes": 31,
+        "digest": 956854100840633194,
+        "host_dependent": true
+      }
+    },
+    "drawings-int-min-y-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 31,
+        "digest": 6665314754141197418,
+        "host_dependent": true
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 6,
+        "bytes": 31,
+        "digest": 6665314754141197418,
+        "host_dependent": true
+      }
+    },
     "drawings-int-min-ass": {
       "armv7-unknown-linux-gnueabihf": {
         "packets": 6,
