@@ -420,20 +420,41 @@ impl LookupFlags {
     }
 }
 
+/// What a lookup's type says about its subtables.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Subtables {
+    /// All of this type.
+    Of(LookupType),
+    /// Extension subtables, each naming its own type.
+    Extension,
+    /// Of an unknown type.
+    Unknown,
+}
+
 /// One lookup: its flags and subtables.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Lookup<'a> {
     data: Data<'a>,
     stage: Stage,
+    subtables: Subtables,
+    count: usize,
     pub(crate) flags: LookupFlags,
 }
 
 impl<'a> Lookup<'a> {
     /// The lookup of `stage`'s table whose table starts at `data`.
     pub(crate) fn new(stage: Stage, data: Data<'a>) -> Self {
+        let kind = data.u16(0);
+        let subtables = if kind == stage.extension() {
+            Subtables::Extension
+        } else {
+            LookupType::of(stage, kind).map_or(Subtables::Unknown, Subtables::Of)
+        };
         Self {
             data,
             stage,
+            subtables,
+            count: data.count(4, 6, 2),
             flags: LookupFlags::read(data),
         }
     }
@@ -442,29 +463,28 @@ impl<'a> Lookup<'a> {
     /// subtable; `None` for an unknown type or an extension of an extension.
     fn subtable(&self, index: usize) -> Option<(LookupType, Data<'a>)> {
         let data = self.data.offset16(6 + 2 * index);
-        let kind = self.data.u16(0);
-        let extension = self.stage.extension();
-        let (kind, data) = if kind == extension {
-            let inner = data.u16(2);
-            if data.u16(0) != 1 || inner == extension {
-                return None;
+        match self.subtables {
+            Subtables::Of(kind) => Some((kind, data)),
+            Subtables::Extension => {
+                let inner = data.u16(2);
+                if data.u16(0) != 1 || inner == self.stage.extension() {
+                    return None;
+                }
+                Some((LookupType::of(self.stage, inner)?, data.offset32(4)))
             }
-            (inner, data.offset32(4))
-        } else {
-            (kind, data)
-        };
-        Some((LookupType::of(self.stage, kind)?, data))
+            Subtables::Unknown => None,
+        }
     }
 
     /// The subtables of a known type, in order.
     pub(crate) fn subtables(&self) -> impl Iterator<Item = (LookupType, Data<'a>)> + 'a {
         let lookup = *self;
-        (0..self.data.count(4, 6, 2)).filter_map(move |i| lookup.subtable(i))
+        (0..self.count).filter_map(move |i| lookup.subtable(i))
     }
 
     /// Whether the lookup substitutes in reverse, as its first subtable says.
     pub(crate) fn is_reverse_chain(&self) -> bool {
-        self.data.count(4, 6, 2) > 0
+        self.count > 0
             && self
                 .subtable(0)
                 .is_some_and(|(kind, _)| kind == LookupType::ReverseChain)

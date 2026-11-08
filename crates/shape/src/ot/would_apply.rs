@@ -81,13 +81,10 @@ fn applies(
         }
         LookupType::Context | LookupType::ChainContext => {
             let chained = kind == LookupType::ChainContext;
-            for rule in context::rules(data, chained, first, FirstGlyph::Unchecked) {
+            context::any_rule(data, chained, first, FirstGlyph::Unchecked, |rule| {
                 work::charge(work, 1)?;
-                if matches(&rule, glyphs, zero_context) {
-                    return Ok(true);
-                }
-            }
-            false
+                Ok(matches(rule, glyphs, zero_context))
+            })?
         }
         _ => false,
     })

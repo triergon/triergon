@@ -15,116 +15,156 @@ pub(crate) struct Sequence<'a> {
     pub(crate) values: Values<'a>,
 }
 
-impl<'a> Sequence<'a> {
-    /// The `count` 16-bit values at `at` in `data`, read as `values` reads
-    /// them, and the offset after them.
-    fn read(
-        data: Data<'a>,
-        at: usize,
-        count: usize,
-        values: impl Fn(Data<'a>) -> Values<'a>,
-    ) -> (Self, usize) {
-        let sequence = Self {
-            len: count,
-            values: values(data.at(at)),
-        };
-        (sequence, at + 2 * count)
-    }
-
+impl Sequence<'_> {
     const NONE: Self = Self {
         len: 0,
         values: Values::Any,
     };
 }
 
+/// How a rule's values are read: glyph ids, classes (backtrack, input and
+/// lookahead class definitions), or coverage offsets from the subtable.
+#[derive(Clone, Copy, Debug)]
+enum Kind<'a> {
+    Glyphs,
+    Classes([Data<'a>; 3]),
+    Coverages(Data<'a>),
+}
+
+impl<'a> Kind<'a> {
+    /// The values at `data` of sequence `which` (backtrack, input, lookahead).
+    fn values(self, which: usize, data: Data<'a>) -> Values<'a> {
+        match self {
+            Self::Glyphs => Values::Glyphs(data),
+            Self::Classes(defs) => Values::Classes(data, defs[which]),
+            Self::Coverages(subtable) => Values::Coverages(data, subtable),
+        }
+    }
+}
+
 /// One rule: the glyphs before, at and after the current one, and the nested
-/// lookups to apply.
+/// lookups to apply. What follows the input is read only once the input
+/// matches.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Rule<'a> {
+    data: Data<'a>,
+    kind: Kind<'a>,
     pub(crate) backtrack: Sequence<'a>,
     /// The input, whose length includes the current glyph; its values are
     /// those of the glyphs after it.
     pub(crate) input: Sequence<'a>,
-    pub(crate) lookahead: Sequence<'a>,
-    /// The nested lookup records: a sequence index and a lookup index each.
-    records: Data<'a>,
+    /// Where the lookahead count is, in a chained rule; in an unchained one,
+    /// where the records are.
+    after_input: usize,
+    chained: bool,
+    /// An unchained rule's record count.
     record_count: usize,
 }
 
 impl<'a> Rule<'a> {
-    /// Whether the rule needs no context around its input.
-    pub(crate) const fn has_no_context(&self) -> bool {
-        self.backtrack.len == 0 && self.lookahead.len == 0
-    }
-
-    /// The rule at `data`: a format 1 or 2 rule (counts before each array) of
-    /// a chained subtable or not, its values read by `kind`.
-    fn read(data: Data<'a>, chained: bool, kind: Kind<'a>) -> Self {
-        if !chained {
-            let inputs = data.headless_count(0, 4, 2);
-            let records = data.count(2, 4 + 2 * inputs.saturating_sub(1), 4);
-            let (input, next) = Sequence::read(data, 4, inputs.saturating_sub(1), kind.values(1));
-            return Self {
-                backtrack: Sequence::NONE,
-                input: Sequence {
-                    len: inputs,
-                    ..input
-                },
-                lookahead: Sequence::NONE,
-                records: data.at(next),
-                record_count: records,
-            };
-        }
-        let (backtrack, at) = Sequence::read(data, 2, data.count(0, 2, 2), kind.values(0));
-        let inputs = data.headless_count(at, at + 2, 2);
-        let (input, at) = Sequence::read(data, at + 2, inputs.saturating_sub(1), kind.values(1));
-        let (lookahead, at) =
-            Sequence::read(data, at + 2, data.count(at, at + 2, 2), kind.values(2));
+    /// A chained rule from `at` in `data`: the backtrack count and glyphs, then
+    /// the input count and glyphs (`headless`: without the first).
+    fn chained(data: Data<'a>, at: usize, kind: Kind<'a>, headless: bool) -> Self {
+        let backtracks = data.count(at, at + 2, 2);
+        let at = at + 2 + 2 * backtracks;
+        let (inputs, stored) = if headless {
+            let inputs = data.headless_count(at, at + 2, 2);
+            (inputs, inputs.saturating_sub(1))
+        } else {
+            let inputs = data.count(at, at + 2, 2);
+            (inputs, inputs)
+        };
+        // Stored first glyphs (format 3) are passed over: matching starts after.
+        let first = usize::from(!headless && inputs > 0);
         Self {
-            backtrack,
+            data,
+            kind,
+            backtrack: Sequence {
+                len: backtracks,
+                values: kind.values(0, data.at(at - 2 * backtracks)),
+            },
             input: Sequence {
                 len: inputs,
-                ..input
+                values: kind.values(1, data.at(at + 2 + 2 * first)),
             },
-            lookahead,
-            records: data.at(at + 2),
-            record_count: data.count(at, at + 2, 4),
+            after_input: at + 2 + 2 * stored,
+            chained: true,
+            record_count: 0,
+        }
+    }
+
+    /// An unchained rule whose input count is at `at`, its record count after
+    /// it, and its input glyphs after both (`headless`: without the first).
+    fn unchained(data: Data<'a>, at: usize, kind: Kind<'a>, headless: bool) -> Self {
+        let values_at = at + 4;
+        let (inputs, stored) = if headless {
+            let inputs = data.headless_count(at, values_at, 2);
+            (inputs, inputs.saturating_sub(1))
+        } else {
+            let inputs = data.count(at, values_at, 2);
+            (inputs, inputs)
+        };
+        let first = usize::from(!headless && inputs > 0);
+        let records_at = values_at + 2 * stored;
+        Self {
+            data,
+            kind,
+            backtrack: Sequence::NONE,
+            input: Sequence {
+                len: inputs,
+                values: kind.values(1, data.at(values_at + 2 * first)),
+            },
+            after_input: records_at,
+            chained: false,
+            record_count: data.count(at + 2, records_at, 4),
+        }
+    }
+
+    /// The rule at `data` of a format 1 or 2 subtable, its values read by
+    /// `kind`.
+    fn read(data: Data<'a>, chained: bool, kind: Kind<'a>) -> Self {
+        if chained {
+            Self::chained(data, 0, kind, true)
+        } else {
+            Self::unchained(data, 0, kind, true)
         }
     }
 
     /// The single rule of a format 3 subtable: coverage offsets from the
     /// subtable for every glyph, the input's first included.
     fn of_coverages(data: Data<'a>, chained: bool) -> Self {
-        let coverages = |offsets: Data<'a>| Values::Coverages(offsets, data);
-        if !chained {
-            let inputs = data.count(2, 6, 2);
-            return Self {
-                backtrack: Sequence::NONE,
-                input: Sequence {
-                    len: inputs,
-                    values: coverages(data.at(8)),
-                },
-                lookahead: Sequence::NONE,
-                records: data.at(6 + 2 * inputs),
-                record_count: data.count(4, 6 + 2 * inputs, 4),
-            };
+        let kind = Kind::Coverages(data);
+        if chained {
+            Self::chained(data, 2, kind, false)
+        } else {
+            Self::unchained(data, 2, kind, false)
         }
-        let (backtrack, at) = Sequence::read(data, 4, data.count(2, 4, 2), coverages);
-        let inputs = data.count(at, at + 2, 2);
-        // The input's values are those after its first glyph.
-        let (input, _) = Sequence::read(data, at + 4, inputs.saturating_sub(1), coverages);
-        let at = at + 2 + 2 * inputs;
-        let (lookahead, at) = Sequence::read(data, at + 2, data.count(at, at + 2, 2), coverages);
-        Self {
-            backtrack,
-            input: Sequence {
-                len: inputs,
-                ..input
-            },
-            lookahead,
-            records: data.at(at + 2),
-            record_count: data.count(at, at + 2, 4),
+    }
+
+    /// The glyphs after the input.
+    pub(crate) fn lookahead(&self) -> Sequence<'a> {
+        if !self.chained {
+            return Sequence::NONE;
         }
+        let at = self.after_input;
+        Sequence {
+            len: self.data.count(at, at + 2, 2),
+            values: self.kind.values(2, self.data.at(at + 2)),
+        }
+    }
+
+    /// The nested lookup records and their number.
+    fn records(&self) -> (Data<'a>, usize) {
+        if !self.chained {
+            return (self.data.at(self.after_input), self.record_count);
+        }
+        let at = self.after_input + 2 + 2 * self.lookahead().len;
+        (self.data.at(at + 2), self.data.count(at, at + 2, 4))
+    }
+
+    /// Whether the rule needs no context around its input.
+    pub(crate) fn has_no_context(&self) -> bool {
+        self.backtrack.len == 0 && self.lookahead().len == 0
     }
 
     /// Matches the rule at the current glyph and applies its nested lookups.
@@ -132,31 +172,15 @@ impl<'a> Rule<'a> {
         let Some((match_end, _)) = ctx.match_input(self.input.len, self.input.values)? else {
             return Ok(false);
         };
-        if !ctx.match_lookahead(self.lookahead.len, self.lookahead.values, match_end)?
+        let lookahead = self.lookahead();
+        if !ctx.match_lookahead(lookahead.len, lookahead.values, match_end)?
             || !ctx.match_backtrack(self.backtrack.len, self.backtrack.values)?
         {
             return Ok(false);
         }
-        ctx.apply_records(self.input.len, self.records, self.record_count, match_end)?;
+        let (records, count) = self.records();
+        ctx.apply_records(self.input.len, records, count, match_end)?;
         Ok(true)
-    }
-}
-
-/// How a format 1 or 2 rule's values are read.
-#[derive(Clone, Copy, Debug)]
-enum Kind<'a> {
-    Glyphs,
-    /// Backtrack, input and lookahead class definitions.
-    Classes([Data<'a>; 3]),
-}
-
-impl<'a> Kind<'a> {
-    /// How the values of sequence `which` (backtrack, input, lookahead) read.
-    fn values(self, which: usize) -> impl Fn(Data<'a>) -> Values<'a> {
-        move |data| match self {
-            Self::Glyphs => Values::Glyphs(data),
-            Self::Classes(defs) => Values::Classes(data, defs[which]),
-        }
     }
 }
 
@@ -169,21 +193,22 @@ pub(crate) enum FirstGlyph {
     Unchecked,
 }
 
-/// The rules of a contextual subtable that may apply at glyph `first`, in
-/// order: the rules of the set it selects in formats 1 and 2, the one rule of
-/// format 3.
-pub(crate) fn rules(
-    data: Data<'_>,
+/// Tries the rules of a contextual subtable that may apply at glyph `first`
+/// with `try_rule`, in order, until one is taken: the rules of the set it
+/// selects in formats 1 and 2, the one rule of format 3. Whether one was.
+pub(crate) fn any_rule<'a>(
+    data: Data<'a>,
     chained: bool,
     first: u32,
     check: FirstGlyph,
-) -> impl Iterator<Item = Rule<'_>> {
+    mut try_rule: impl FnMut(&Rule<'a>) -> Result<bool>,
+) -> Result<bool> {
     let covered =
         |at: usize| check == FirstGlyph::Unchecked || coverage(data.offset16(at), first).is_some();
-    let (set, kind, single) = match data.u16(0) {
+    let (set, kind) = match data.u16(0) {
         1 => match coverage(data.offset16(2), first) {
-            Some(index) => (rule_set(data, 4, index as usize), Kind::Glyphs, None),
-            None => (Data::EMPTY, Kind::Glyphs, None),
+            Some(index) => (rule_set(data, 4, index as usize), Kind::Glyphs),
+            None => return Ok(false),
         },
         2 if covered(2) => {
             let defs = if chained {
@@ -193,23 +218,29 @@ pub(crate) fn rules(
             };
             let sets_at = if chained { 10 } else { 6 };
             let index = usize::from(class(defs[1], first));
-            (rule_set(data, sets_at, index), Kind::Classes(defs), None)
+            (rule_set(data, sets_at, index), Kind::Classes(defs))
         }
         3 => {
-            let rule = Rule::of_coverages(data, chained);
-            let first_at = if chained {
-                4 + 2 * rule.backtrack.len + 2
+            // The input count and the first input coverage.
+            let (inputs, first_at) = if chained {
+                let at = 4 + 2 * data.count(2, 4, 2);
+                (data.count(at, at + 2, 2), at + 2)
             } else {
-                6
+                (data.count(2, 6, 2), 6)
             };
-            let single = (rule.input.len > 0 && covered(first_at)).then_some(rule);
-            (Data::EMPTY, Kind::Glyphs, single)
+            if inputs == 0 || !covered(first_at) {
+                return Ok(false);
+            }
+            return try_rule(&Rule::of_coverages(data, chained));
         }
-        _ => (Data::EMPTY, Kind::Glyphs, None),
+        _ => return Ok(false),
     };
-    let set_rules =
-        (0..set.count(0, 2, 2)).map(move |r| Rule::read(set.offset16(2 + 2 * r), chained, kind));
-    set_rules.chain(single)
+    for r in 0..set.count(0, 2, 2) {
+        if try_rule(&Rule::read(set.offset16(2 + 2 * r), chained, kind))? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Rule set `index` of the counted array of offsets at `at`; empty beyond it.
@@ -225,11 +256,8 @@ fn rule_set(data: Data<'_>, at: usize, index: usize) -> Data<'_> {
 /// the first of its rules that matches. Each rule tried is charged.
 pub(crate) fn apply<'a>(ctx: &mut Apply<'a, '_>, data: Data<'a>, chained: bool) -> Result<bool> {
     let glyph = ctx.buffer.cur().glyph;
-    for rule in rules(data, chained, glyph, FirstGlyph::Covered) {
+    any_rule(data, chained, glyph, FirstGlyph::Covered, |rule| {
         ctx.buffer.charge(1)?;
-        if rule.apply(ctx)? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
+        rule.apply(ctx)
+    })
 }
