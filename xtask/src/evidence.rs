@@ -1,11 +1,16 @@
-//! Raw evidence kept outside the repository: deterministic packing, and fetching
-//! a set named in `harness/evidence/index.json` from the archive that
-//! `TRIERGON_EVIDENCE_ARCHIVE` names (an `s3://` location read with the `aws` CLI).
+//! Raw evidence kept outside the repository: deterministic packing, uploading,
+//! promoting and fetching the sets named in `harness/evidence/index.json`, in the
+//! archive that `TRIERGON_EVIDENCE_ARCHIVE` names (an `s3://` location reached
+//! with the `aws` CLI).
 //!
 //! A pack is a `.tar.gz` whose bytes depend only on the files: entries sorted by
 //! path, zero timestamps and owners, and gzip stored blocks with no name or time.
 //! A set archived whole may instead be a `.tar.zst`, decompressed with the
 //! system `zstd`.
+//!
+//! Every upload lands under `qualification/`, which the archive expires 90 days
+//! after upload. A set moves under `evidence/`, which is kept, only when a result
+//! cites it, so nothing is kept that nothing cites.
 
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Read, Write};
@@ -277,6 +282,152 @@ fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
 
+/// How long the archive keeps a set, which follows from where it lives.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Retention {
+    /// Under `qualification/`: expires 90 days after upload.
+    Expiring,
+    /// Under `evidence/`: kept, because a result cites it.
+    Kept,
+}
+
+impl Retention {
+    const ALL: [Self; 2] = [Self::Expiring, Self::Kept];
+
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Expiring => "qualification/",
+            Self::Kept => "evidence/",
+        }
+    }
+
+    /// The index's `retention` value.
+    fn label(self) -> &'static str {
+        match self {
+            Self::Expiring => "90 days",
+            Self::Kept => "retained",
+        }
+    }
+
+    /// The retention a set's key implies.
+    fn of_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|r| key.starts_with(r.prefix()))
+    }
+}
+
+fn archive_location() -> Result<String, String> {
+    std::env::var("TRIERGON_EVIDENCE_ARCHIVE")
+        .map(|archive| archive.trim_end_matches('/').to_owned())
+        .map_err(|_| "set TRIERGON_EVIDENCE_ARCHIVE to the evidence archive location".into())
+}
+
+fn aws_cp(from: &str, to: &str) -> Result<(), String> {
+    let status = Command::new("aws")
+        .args(["s3", "cp", "--only-show-errors", from, to])
+        .status()
+        .map_err(|e| format!("aws: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("aws s3 cp {from} {to} failed: {status}"))
+    }
+}
+
+/// `cargo xtask evidence upload SET ARCHIVE`: upload a packed set under
+/// `qualification/SET/`, where it expires 90 days after upload unless promoted,
+/// and print the entry to add to the index.
+pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
+    if name.is_empty()
+        || !name
+            .bytes()
+            .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'-'))
+    {
+        return Err(format!(
+            "{name}: a set name is lowercase letters, digits and `-`"
+        ));
+    }
+    let file_name = archive
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
+    let compression = Compression::of(file_name)
+        .ok_or_else(|| format!("{}: not a .tar.gz or .tar.zst", archive.display()))?;
+    let sha = sha256::file_hex(archive).map_err(|e| format!("{}: {e}", archive.display()))?;
+    let bytes = fs::metadata(archive)
+        .map_err(|e| format!("{}: {e}", archive.display()))?
+        .len();
+    let key = format!(
+        "{}{name}/{sha}{}",
+        Retention::Expiring.prefix(),
+        compression.suffix()
+    );
+    let location = archive_location()?;
+    aws_cp(&archive.display().to_string(), &format!("{location}/{key}"))?;
+    let entry = Value::object([
+        ("name", Value::str(name)),
+        ("path", Value::str(name)),
+        ("retention", Value::str(Retention::Expiring.label())),
+        ("reason", Value::str("")),
+        ("key", Value::str(key)),
+        ("sha256", Value::str(sha)),
+        ("bytes", Value::int(bytes)),
+    ]);
+    Ok(crate::json::to_python(&entry, Some(1)))
+}
+
+/// `cargo xtask evidence promote SET`: copy an indexed set from `qualification/`
+/// to `evidence/` inside the archive, then record the new key and retention in
+/// the index. Promote a set when a result cites it.
+pub fn promote(root: &Path, name: &str) -> Result<String, String> {
+    let path = root.join(INDEX);
+    let text = fs::read_to_string(&path).map_err(|e| format!("{INDEX}: {e}"))?;
+    let mut index = crate::json::parse_strict(&text).map_err(|e| format!("{INDEX}: {e}"))?;
+    if crate::json::to_python(&index, Some(1)) + "\n" != text {
+        return Err(format!("{INDEX} is not in its canonical layout"));
+    }
+    let (from, to) = promote_entry(&mut index, name)?;
+    let location = archive_location()?;
+    aws_cp(&format!("{location}/{from}"), &format!("{location}/{to}"))?;
+    fs::write(&path, crate::json::to_python(&index, Some(1)) + "\n")
+        .map_err(|e| format!("{INDEX}: {e}"))?;
+    Ok(format!("{name}: {from} -> {to}"))
+}
+
+/// Rewrite set `name` in the index as kept, returning its old and new keys.
+fn promote_entry(index: &mut Value, name: &str) -> Result<(String, String), String> {
+    let Some(Value::Array(sets)) = members_mut(index, "sets") else {
+        return Err(format!("{INDEX} has no sets"));
+    };
+    let set = sets
+        .iter_mut()
+        .find(|set| s(set, "name") == Some(name))
+        .ok_or_else(|| format!("{name} is not in {INDEX}"))?;
+    let from = s(set, "key").ok_or("set without key")?.to_owned();
+    if Retention::of_key(&from) != Some(Retention::Expiring) {
+        return Err(format!(
+            "{name}: {from} is not under {}",
+            Retention::Expiring.prefix()
+        ));
+    }
+    let rest = &from[Retention::Expiring.prefix().len()..];
+    let to = format!("{}{rest}", Retention::Kept.prefix());
+    *members_mut(set, "key").ok_or("set without key")? = Value::str(to.clone());
+    *members_mut(set, "retention").ok_or("set without retention")? =
+        Value::str(Retention::Kept.label());
+    Ok((from, to))
+}
+
+fn members_mut<'a>(value: &'a mut Value, key: &str) -> Option<&'a mut Value> {
+    match value {
+        Value::Object(members) => members
+            .iter_mut()
+            .rev()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v),
+        _ => None,
+    }
+}
+
 /// `cargo xtask evidence fetch SET [DIR]`: download the named set, verify its
 /// SHA-256 and every file's SHA-256 against the index, and unpack it into DIR
 /// (default `.research/evidence/SET`).
@@ -303,22 +454,13 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
     );
     let extension =
         Compression::of(key).ok_or_else(|| format!("{key}: not a .tar.gz or .tar.zst"))?;
-    let archive = std::env::var("TRIERGON_EVIDENCE_ARCHIVE")
-        .map_err(|_| "set TRIERGON_EVIDENCE_ARCHIVE to the evidence archive location")?;
+    let archive = archive_location()?;
     let cache = root.join(".research/evidence-cache");
     fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
     let download = cache.join(format!("{expected}{}", extension.suffix()));
     if !download.is_file() {
         let partial = cache.join(format!("{expected}.part"));
-        let status = Command::new("aws")
-            .args(["s3", "cp", "--only-show-errors"])
-            .arg(format!("{}/{key}", archive.trim_end_matches('/')))
-            .arg(&partial)
-            .status()
-            .map_err(|e| format!("aws: {e}"))?;
-        if !status.success() {
-            return Err(format!("aws s3 cp failed: {status}"));
-        }
+        aws_cp(&format!("{archive}/{key}"), &partial.display().to_string())?;
         fs::rename(&partial, &download).map_err(|e| e.to_string())?;
     }
     if sha256::file_hex(&download).map_err(|e| format!("{}: {e}", download.display()))? != expected
@@ -661,6 +803,42 @@ mod tests {
     }
 
     #[test]
+    fn promotion_moves_an_expiring_set_under_evidence() {
+        let mut index = crate::json::parse_strict(
+            r#"{"sets": [
+                {"name": "a", "retention": "90 days", "key": "qualification/a/0.tar.gz"},
+                {"name": "b", "retention": "retained", "key": "evidence/b/1.tar.gz"}
+            ]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            promote_entry(&mut index, "a").unwrap(),
+            (
+                "qualification/a/0.tar.gz".into(),
+                "evidence/a/0.tar.gz".into()
+            )
+        );
+        let a = &index.get("sets").and_then(Value::as_array).unwrap()[0];
+        assert_eq!(s(a, "key"), Some("evidence/a/0.tar.gz"));
+        assert_eq!(s(a, "retention"), Some("retained"));
+        assert!(
+            promote_entry(&mut index, "a")
+                .unwrap_err()
+                .contains("not under")
+        );
+        assert!(
+            promote_entry(&mut index, "b")
+                .unwrap_err()
+                .contains("not under")
+        );
+        assert!(
+            promote_entry(&mut index, "c")
+                .unwrap_err()
+                .contains("not in")
+        );
+    }
+
+    #[test]
     fn the_index_lists_every_archived_file_once() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -678,6 +856,13 @@ mod tests {
                 [".tar.gz", ".tar.zst"]
                     .iter()
                     .any(|ext| key.ends_with(&format!("{sha}{ext}")))
+            );
+            let retention = Retention::of_key(key)
+                .unwrap_or_else(|| panic!("{key}: neither under qualification/ nor evidence/"));
+            assert_eq!(
+                s(set, "retention"),
+                Some(retention.label()),
+                "{key}: retention must follow the prefix"
             );
             let files = set.get("files");
             assert!(
