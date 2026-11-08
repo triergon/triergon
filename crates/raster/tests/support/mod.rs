@@ -166,6 +166,9 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
     }
 
     let _ = raster.rasterize(&stroked, &mut work);
+    if let Ok(Some(drawn)) = raster.draw(&stroked, &matrix(rng), &mut work) {
+        assert!(drawn.glyph().is_some() && drawn.border().is_none());
+    }
 
     let shape = Shape::from_outlines(outline, Outline::new(&budget));
     let placement = Placement {

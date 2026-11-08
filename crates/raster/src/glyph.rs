@@ -454,6 +454,38 @@ impl Raster {
         Ok(Some(out))
     }
 
+    /// Draws `shape` under `matrix` (outline units to frame 26.6) on its own,
+    /// quantised without a run, as libass draws the drawing of a vector clip:
+    /// its [`glyph`](GlyphBitmaps::glyph) bitmap only. `None` when the
+    /// transform is degenerate or out of range, or nothing is drawn.
+    ///
+    /// # Errors
+    ///
+    /// `Policy` when `work` or the limits run out, and the budget's errors.
+    pub fn draw(
+        &mut self,
+        shape: &Shape,
+        matrix: &Matrix,
+        work: &mut WorkBudget,
+    ) -> Result<Option<GlyphBitmaps>> {
+        let Some(quantized) = BitmapTransform::quantize(matrix, shape.cbox(), None) else {
+            return Ok(None);
+        };
+        let Some(glyph) = self.bitmap(shape, &quantized.key, work)? else {
+            return Ok(None);
+        };
+        Ok(Some(GlyphBitmaps {
+            glyph: Some(glyph),
+            border: BorderBitmap::None,
+            origin: quantized.position,
+            key: GlyphKey {
+                glyph: Some(quantized.key),
+                border: None,
+                border_offset: Vector::default(),
+            },
+        }))
+    }
+
     /// The border part of [`Raster::render`]: the border bitmap, placed
     /// against the glyph's origin.
     fn render_border(
