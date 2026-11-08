@@ -685,7 +685,7 @@ fn single_exports_outlive_parser_and_configuration_with_one_full_owner() {
     let config = run(&mut parser, 4096).1.unwrap();
     drop(parser);
     let table = config.descriptor_storage_bytes().unwrap();
-    assert!(table > 0);
+    assert_eq!(table, 0);
     assert_eq!(config.retained_storage_bytes().unwrap(), raw_charge + table);
     assert_eq!(pool.used(), baseline + raw_charge + table);
     let suffix = config.retain_opaque_suffix().unwrap();
@@ -1114,7 +1114,8 @@ fn actual_capacity_minimum_budget_and_resumable_pressure() {
         };
         // The configuration held only its record charge plus its actual
         // table capacity.
-        assert!(table > 0 && charge > 0);
+        assert!(charge > 0);
+        assert_eq!(table == 0, codec == "hevc");
         assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
 
@@ -1163,6 +1164,32 @@ fn actual_capacity_minimum_budget_and_resumable_pressure() {
         assert_eq!(avc_facts(&output), expected);
     }
 
+    let expected = hvc_check(&hvc, hvc_limits(), 1).1.unwrap();
+    for slots in [false, true] {
+        let pool = Budget::new(1 << 16).unwrap();
+        let raw = bytes(&pool, &hvc);
+        let mut parser = HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
+        let blocker = block(&pool);
+        let output = if slots {
+            run(&mut Slots(parser), 1).1.unwrap()
+        } else {
+            run(&mut parser, 1).1.unwrap()
+        };
+        assert_eq!(hvc_facts(&output), expected);
+        assert_eq!(output.descriptor_storage_bytes().unwrap(), 0);
+        drop(blocker);
+    }
+    let hvc = hvc_record(
+        4,
+        &[
+            (33, vec![hvc_nal(33, 9); 5]),
+            (55, vec![]),
+            (33, vec![]),
+            (32, vec![]),
+            (39, vec![]),
+        ],
+        &[],
+    );
     let expected = hvc_check(&hvc, hvc_limits(), 1).1.unwrap();
     for slots in [false, true] {
         let pool = Budget::new(1 << 16).unwrap();
