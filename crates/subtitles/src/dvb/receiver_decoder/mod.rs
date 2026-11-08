@@ -631,7 +631,8 @@ impl ReceiverDecoder {
         if self.options.end_from_next {
             let previous = self.previous_pts;
             let end = match (pts, previous) {
-                (Some(pts), Some(previous)) => millis(pts.saturating_sub(previous)) - 1,
+                // The reference subtracts in 64 bits.
+                (Some(pts), Some(previous)) => millis(pts.wrapping_sub(previous)) - 1,
                 _ => -1,
             };
             // The receiver's display time is 32 bits: a negative end wraps.
@@ -785,7 +786,9 @@ fn push_exact<T>(vec: &mut BudgetVec<T>, value: T) -> Result<()> {
     push(vec, value)
 }
 
-/// Microseconds to milliseconds, rounded to nearest.
+/// Microseconds to milliseconds, rounded to nearest with ties away from zero.
 fn millis(us: i64) -> i64 {
-    (us + if us < 0 { -500 } else { 500 }) / 1000
+    let us = i128::from(us);
+    // Within 64 bits: a thousandth of a 64-bit value.
+    ((us + if us < 0 { -500 } else { 500 }) / 1000) as i64
 }

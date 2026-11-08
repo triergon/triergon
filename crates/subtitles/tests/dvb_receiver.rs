@@ -501,3 +501,38 @@ fn refused_packet_changes_nothing() {
         assert!(!expected[1].as_ref().unwrap().is_empty());
     }
 }
+
+/// With the end taken from the next page, times at the ends of the 64-bit
+/// range subtract as the reference's do, in 64 bits, without overflow.
+#[test]
+fn end_from_next_at_the_ends_of_the_time_range() {
+    let drawn = packet(&[
+        segments::page(0, false, &[(0, 10, 10)]),
+        segments::region(0, 64, 4, &[(1, 0, 0)]),
+        segments::object(1),
+        segments::end(),
+    ]);
+    let next = packet(&[segments::page(1, false, &[(0, 10, 10)]), segments::end()]);
+    let options = Options {
+        end_from_next: true,
+        ..Options::default()
+    };
+    let pool = Budget::new(1 << 20).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+    let mut work = WorkBudget::new(u64::MAX);
+    let first = decoder
+        .decode(&drawn, Some(i64::MIN), &mut work, &cancel)
+        .unwrap();
+    assert!(first.subtitle().is_none());
+    let shown = decoder
+        .decode(&next, Some(i64::MAX), &mut work, &cancel)
+        .unwrap();
+    let subtitle = shown.subtitle().unwrap();
+    // i64::MAX - i64::MIN wraps to -1 us, which rounds to 0 ms; one less is
+    // -1, kept to 32 bits.
+    assert_eq!(
+        (subtitle.pts, subtitle.end_display_ms),
+        (Some(i64::MIN), u32::MAX)
+    );
+}
