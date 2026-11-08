@@ -3,7 +3,7 @@
 //! loop; `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
     AvcState, Injection, NalPacketJob, NalPacketOutput, NalPacketProgress,
-    NalPacketReceiverErrorKind, NalPacketSegment, PacketSegmentStorage, Phase, SegmentHint,
+    NalPacketReceiverErrorKind, NalPacketSegment, PacketSegmentStorage, Phase,
 };
 use crate::{AvcConfigArrayKind, Codec, NalHeader};
 use std::ops::ControlFlow;
@@ -209,7 +209,7 @@ impl<M> NalPacketJob<'_, M> {
             if !work.try_charge(1) {
                 return Ok(YIELD);
             }
-            self.segment_hint = Some(SegmentHint::Exact(1));
+            self.segment_hint = Some(1);
             self.append(NalPacketSegment::passthrough(source.bytes.len()))?;
             self.phase = Phase::Reserve;
             return Ok(NEXT);
@@ -349,11 +349,11 @@ impl<M> NalPacketJob<'_, M> {
                 // packet NAL. Arrays were admitted before that walk; an IRAP
                 // packet injects every configuration NAL exactly once, including
                 // duplicates already present in the packet.
-                self.segment_hint = Some(SegmentHint::Exact(self.look_nals + injected));
+                self.segment_hint = Some(self.look_nals + injected);
             } else if end == source.bytes.len() {
                 // AVC may inject SPS only, PPS only, or omit sequence extensions.
                 // The complete configuration count is therefore only a bound.
-                self.segment_hint = Some(SegmentHint::UpperBound(1 + injected));
+                self.segment_hint = Some(1 + injected);
             }
         }
         if let Some(i) = inject {

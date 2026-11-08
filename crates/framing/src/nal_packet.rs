@@ -600,19 +600,6 @@ impl NalPacketSegment {
 
 const INLINE_PACKET_SEGMENTS: usize = 4;
 
-#[derive(Clone, Copy)]
-enum SegmentHint {
-    Exact(usize),
-    UpperBound(usize),
-}
-impl SegmentHint {
-    fn count(self) -> usize {
-        match self {
-            Self::Exact(count) | Self::UpperBound(count) => count,
-        }
-    }
-}
-
 // Fixed descriptor metadata travels with the job/output. Only a heap table
 // allocates; its complete capacity stays charged through output retention.
 enum PacketSegmentStorage {
@@ -628,23 +615,6 @@ impl PacketSegmentStorage {
             data: std::array::from_fn(|_| NalPacketSegment::packet(0..0, 0, 0)),
             len: 0,
         }
-    }
-    fn with_hint(pool: &Budget, planned: Option<SegmentHint>, headroom: Option<usize>) -> Self {
-        if let Some(SegmentHint::Exact(count)) = planned
-            && count > INLINE_PACKET_SEGMENTS
-            && let Some(headroom) = headroom
-            && count
-                .checked_mul(size_of::<NalPacketSegment>())
-                .and_then(|bytes| bytes.checked_add(headroom))
-                .is_some_and(|bytes| bytes <= pool.available())
-        {
-            let mut parts = BudgetVec::new(pool);
-            if parts.try_reserve_exact(count).is_ok() && pool.available() >= headroom {
-                return Self::Heap(parts);
-            }
-        }
-        // A refused hint must not prevent the first four inline appends.
-        Self::new()
     }
     fn len(&self) -> usize {
         self.as_slice().len()
@@ -899,10 +869,9 @@ pub struct NalPacketJob<'a, M = NalPacketFields> {
     /// descriptor lower bounds and the deduplicated raw owners. None of these
     /// change while segments are appended, so the sum is computed once.
     live_base: Option<usize>,
-    /// HEVC lookahead proves the exact count. Single-NAL AVC packets have only
-    /// an upper bound: injection can select a subset of the configuration.
-    /// Only exact counts can reserve before the first inline append.
-    segment_hint: Option<SegmentHint>,
+    /// Size a later spill from the inline table. Even an exact HEVC count
+    /// never reserves storage before the fifth descriptor is appended.
+    segment_hint: Option<usize>,
     segments: Option<PacketSegmentStorage>,
     output: Option<BudgetVec<u8>>,
     total: usize,
@@ -995,32 +964,6 @@ impl<M> NalPacketJob<'_, M> {
         }
         Ok(total)
     }
-    fn segment_output_headroom(&self) -> Option<usize> {
-        let SegmentHint::Exact(count) = self.segment_hint? else {
-            return None;
-        };
-        if self.length_width.is_none() {
-            return Some(0); // Passthrough shares the existing charged payload.
-        }
-        if self.codec != Codec::Hevc {
-            return None;
-        }
-        // The raw packet contains every payload; an IRAP injects every admitted
-        // configuration NAL once. Raw record bytes bound those payloads, and
-        // four bytes per descriptor bound all prefixes. This deliberately
-        // overestimates the copy without scanning or changing work checkpoints.
-        self.source
-            .as_ref()?
-            .bytes
-            .len()
-            .checked_add(if self.has_irap {
-                self.config().bytes().len()
-            } else {
-                0
-            })?
-            .checked_add(count.checked_mul(4)?)?
-            .checked_add(Bytes::owner_overhead_bytes())
-    }
     fn append(&mut self, segment: NalPacketSegment) -> Result<()> {
         let parts = self.segments.as_ref().map_or(0, PacketSegmentStorage::len);
         if parts == self.session.limits.maximum_segments {
@@ -1048,19 +991,8 @@ impl<M> NalPacketJob<'_, M> {
                 maximum: self.session.pool.limit(),
             });
         }
-        let headroom = if parts == 0 {
-            self.segment_output_headroom()
-        } else {
-            None
-        };
-        let parts = self.segments.get_or_insert_with(|| {
-            PacketSegmentStorage::with_hint(&self.session.pool, self.segment_hint, headroom)
-        });
-        parts.try_push(
-            &self.session.pool,
-            self.segment_hint.map(SegmentHint::count),
-            segment,
-        )?;
+        let parts = self.segments.get_or_insert_with(PacketSegmentStorage::new);
+        parts.try_push(&self.session.pool, self.segment_hint, segment)?;
         if matches!(parts, PacketSegmentStorage::Heap(_)) {
             self.segment_hint = None;
         }
@@ -1224,37 +1156,25 @@ mod inline_packet_segments {
     }
 
     #[test]
-    fn a_large_hint_starts_with_a_charged_table_and_small_hints_stay_inline() {
-        let pool = Budget::new(4096).unwrap();
-        let base = pool.used();
-        for hint in [
-            None,
-            Some(SegmentHint::Exact(0)),
-            Some(SegmentHint::Exact(1)),
-            Some(SegmentHint::Exact(4)),
-            Some(SegmentHint::UpperBound(5)),
-            Some(SegmentHint::UpperBound(9)),
-        ] {
-            let parts = PacketSegmentStorage::with_hint(&pool, hint, Some(0));
-            assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
-            assert!(parts.as_slice().is_empty());
-            assert_eq!(pool.used(), base);
-        }
-        for count in [5, 9] {
-            let mut parts =
-                PacketSegmentStorage::with_hint(&pool, Some(SegmentHint::Exact(count)), Some(0));
+    fn large_hints_keep_four_inline_appends_uncharged_then_size_the_spill() {
+        for hint in [5, 9] {
+            let pool = Budget::new(4096).unwrap();
+            let base = pool.used();
+            let mut parts = PacketSegmentStorage::new();
+            for index in 0..INLINE_PACKET_SEGMENTS {
+                parts.try_push(&pool, Some(hint), segment(index)).unwrap();
+                assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
+                assert_eq!(pool.used(), base);
+                assert_eq!(pool.peak(), base);
+            }
+            parts.try_push(&pool, Some(hint), segment(4)).unwrap();
             let PacketSegmentStorage::Heap(heap) = &parts else {
-                panic!("large hint did not reserve before the first append");
+                panic!("fifth descriptor did not spill");
             };
-            assert_eq!(heap.capacity(), count);
-            assert!(heap.is_empty());
-            let charge = base + count * size_of::<NalPacketSegment>();
-            assert_eq!(pool.used(), charge);
-            for index in 0..count {
-                parts.try_push(&pool, None, segment(index)).unwrap();
-                assert_eq!(pool.used(), charge);
-                assert_eq!(parts.len(), index + 1);
-                assert_eq!(parts.as_slice()[index], segment(index));
+            assert_eq!(heap.capacity(), hint);
+            assert_eq!(pool.used(), base + hint * size_of::<NalPacketSegment>());
+            for (index, part) in parts.as_slice().iter().enumerate() {
+                assert_eq!(*part, segment(index));
             }
             drop(parts);
             assert_eq!(pool.used(), base);
@@ -1291,14 +1211,13 @@ mod inline_packet_segments {
     }
 
     #[test]
-    fn refused_hint_keeps_inline_progress_and_spill_resumes_with_exact_capacity() {
+    fn refused_spill_keeps_inline_progress_and_resumes_with_exact_capacity() {
         let pool = Budget::new(4096).unwrap();
         let blocker = pool
             .reserve(pool.available() - 4 * size_of::<NalPacketSegment>())
             .unwrap();
         let charge = pool.used();
-        let mut parts =
-            PacketSegmentStorage::with_hint(&pool, Some(SegmentHint::Exact(9)), Some(0));
+        let mut parts = PacketSegmentStorage::new();
         assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
         assert!(parts.as_slice().is_empty());
         assert_eq!(pool.used(), charge);
@@ -1351,45 +1270,14 @@ mod inline_packet_segments {
     }
 
     #[test]
-    fn exact_reservation_leaves_output_headroom_or_falls_back_without_a_charge() {
-        let table = 5 * size_of::<NalPacketSegment>();
-        let headroom = Bytes::owner_overhead_bytes() + 35;
-        for spare in [table, table + headroom - 1, table + headroom] {
-            let pool = Budget::new(Budget::control_storage_bytes() + spare).unwrap();
-            let base = pool.used();
-            let parts =
-                PacketSegmentStorage::with_hint(&pool, Some(SegmentHint::Exact(5)), Some(headroom));
-            if spare < table + headroom {
-                assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
-                assert_eq!(pool.used(), base);
-                assert_eq!(pool.peak(), base);
-            } else {
-                assert!(matches!(parts, PacketSegmentStorage::Heap(_)));
-                assert_eq!(pool.available(), headroom);
-            }
-            drop(parts);
-            assert_eq!(pool.used(), base);
-        }
-        let pool = Budget::new(4096).unwrap();
-        for headroom in [None, Some(usize::MAX)] {
-            let parts =
-                PacketSegmentStorage::with_hint(&pool, Some(SegmentHint::Exact(5)), headroom);
-            assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
-            assert_eq!(pool.peak(), Budget::control_storage_bytes());
-        }
-    }
-
-    #[test]
     fn upper_bounds_preserve_inline_progress_across_the_fifth_descriptor() {
         for actual in [3, 4, 5] {
             let pool = Budget::new(4096).unwrap();
             let base = pool.used();
-            let hint = SegmentHint::UpperBound(9);
-            let mut parts = PacketSegmentStorage::with_hint(&pool, Some(hint), Some(0));
+            let hint = 9;
+            let mut parts = PacketSegmentStorage::new();
             for index in 0..actual {
-                parts
-                    .try_push(&pool, Some(hint.count()), segment(index))
-                    .unwrap();
+                parts.try_push(&pool, Some(hint), segment(index)).unwrap();
                 assert_eq!(parts.len(), index + 1);
                 assert_eq!(parts.as_slice()[index], segment(index));
                 if index < INLINE_PACKET_SEGMENTS {
@@ -1399,11 +1287,8 @@ mod inline_packet_segments {
                     let PacketSegmentStorage::Heap(heap) = &parts else {
                         panic!("fifth descriptor did not spill");
                     };
-                    assert_eq!(heap.capacity(), hint.count());
-                    assert_eq!(
-                        pool.used(),
-                        base + hint.count() * size_of::<NalPacketSegment>()
-                    );
+                    assert_eq!(heap.capacity(), hint);
+                    assert_eq!(pool.used(), base + hint * size_of::<NalPacketSegment>());
                 }
             }
             drop(parts);
