@@ -125,23 +125,11 @@
   ],
   "open_cases": [
     {
-      "id": "pcr-timeline-discontinuity",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    },
-    {
       "id": "transport-afc-reserved",
       "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
     },
     {
       "id": "transport-adaptation-overrun",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    },
-    {
-      "id": "transport-partial-final-packet",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    },
-    {
-      "id": "transport-sync-loss",
       "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
     },
     {
