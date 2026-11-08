@@ -5,6 +5,7 @@
   "candidate": "shape-worker",
   "worker_operation": "shape-",
   "reference": "harfbuzz-native",
+  "gate": "required",
   "contract": [
     "one font file read from memory; every face of a collection, each with HarfBuzz's OpenType font functions at its default scale (units per em) and in triergon-shape with OtMetrics at units per em",
     "every text of the case shaped as one run, as libass 0.17.5 asks HarfBuzz to: hb_buffer_add_utf32 with the item and its context, the case's direction, script (hb_script_from_iso15924_tag) and language (hb_language_from_string), its global features in order; default buffer flags and cluster level",

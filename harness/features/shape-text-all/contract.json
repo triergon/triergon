@@ -5,6 +5,7 @@
   "candidate": "shape-worker",
   "worker_operation": "shape-",
   "reference": "harfbuzz-native",
+  "gate": "on-demand",
   "contract": [
     "one font file read from memory; every face of a collection, each with HarfBuzz's OpenType font functions at its default scale (units per em) and in triergon-shape with OtMetrics at units per em",
     "every text of the case shaped as one run, as libass 0.17.5 asks HarfBuzz to: hb_buffer_add_utf32 with the item and its context, the case's direction, script (hb_script_from_iso15924_tag) and language (hb_language_from_string), its global features in order; default buffer flags and cluster level",
@@ -43,7 +44,7 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "gating the full shaping sweep: cargo xtask check runs shape-text; the sweep over every corpus font and script runs on demand (cargo xtask shape compare --all) until its run time fits the check budget",
+    "gating the sweep over every corpus font and script once its run time fits the check budget",
     "CFF glyph extents as HarfBuzz's own charstring interpreter computes them (it lacks the Type 2 arithmetic and storage operators and reads some curve operands differently from FreeType), for fallback mark positioning in CFF fonts without GPOS"
   ],
   "open_cases": [

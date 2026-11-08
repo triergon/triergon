@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use crate::json::Value;
-use crate::lanes::{Feature, Gate, Lane};
+use crate::lanes::Lane;
 
 type R<T> = Result<T, String>;
 
@@ -89,27 +89,12 @@ const REQUIRED_OUTLINES: Load = Load::Outlines {
 };
 const REQUIRED_BITMAPS: Load = Load::Bitmaps { files: 2, sets: 40 };
 
-pub const FEATURES: [Feature; 5] = [
-    Feature {
-        id: "raster-glyphs",
-        gate: Gate::Required,
-    },
-    Feature {
-        id: "raster-outlines",
-        gate: Gate::Required,
-    },
-    Feature {
-        id: "raster-bitmaps",
-        gate: Gate::Required,
-    },
-    Feature {
-        id: "raster-sweep",
-        gate: Gate::OnDemand,
-    },
-    Feature {
-        id: "raster-simd",
-        gate: Gate::Diagnostic,
-    },
+pub const FEATURES: [&str; 5] = [
+    "raster-glyphs",
+    "raster-outlines",
+    "raster-bitmaps",
+    "raster-sweep",
+    "raster-simd",
 ];
 
 pub const LANE: Lane = Lane {

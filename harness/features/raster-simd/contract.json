@@ -6,6 +6,7 @@
   "worker_operation": "raster-simd-",
   "pin_operation": "raster-",
   "reference": "libass-native",
+  "gate": "diagnostic",
   "contract": [
     "records where libass's SIMD bitmap engines depart from the gated C engine: the cases of raster-glyphs, raster-outlines and raster-bitmaps, with the pins of the C engine (pin_operation raster-) and the reference run on the host's own engine (raster-simd-); a case whose reference fold differs from its pin is one where the host's engine departs, such as \\be passes over whole rows on coverage at a bitmap's right edge; the candidate computes what the C engine does",
     "one font file read from memory: glyph ids spread evenly over face 0, loaded as libass 0.17.5 loads them with hinting off (ASS_HINTING_NONE): GDI face metrics, a REAL_DIM size request of the case's 26.6 pixel height and unhinted outlines (FT_LOAD_NO_HINTING), from FreeType 2.15.0 in the reference and triergon-font in the candidate; the cases of the arguments over those glyphs, with transforms of moderate reach (rotations within 60 degrees, matrices near the target size)",
@@ -31,6 +32,6 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "matching libass's SIMD bitmap engines where they depart from its C engine (NEON blurs \\be over whole 16-byte rows, into the row padding; AVX2 pads rows to 32 bytes): the C engine is the gated reference on every host, and the SIMD engines are recorded on demand (cargo xtask raster compare --diagnostic)"
+    "matching libass's SIMD bitmap engines where they depart from its C engine (NEON blurs \\be over whole 16-byte rows, into the row padding; AVX2 pads rows to 32 bytes)"
   ]
 }

@@ -117,8 +117,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   manifest --record` or `cargo xtask raster manifest --record` after `cargo
   xtask build-workers`, and never edit them by hand. `cargo xtask check-design`
   fails when the generated case ids and the pins differ or a pin file is not in
-  the form the recorder writes. Every
-  harness command reads such a manifest at `harness/features/<feature>/corpus.json`;
+  the form the recorder writes. Each feature's contract says when it runs in
+  `gate`: `"required"` (by `cargo xtask check` and `COMMAND compare`),
+  `"on-demand"` (also by `COMMAND compare --all`) or `"diagnostic"` (by `COMMAND
+  compare --diagnostic`); `cargo xtask check-design` fails when it is missing or
+  anything else.
+  Every harness command reads such a manifest at `harness/features/<feature>/corpus.json`;
   its identity is the SHA-256 of the generated JSON, the bytes the generator
   writes, so it is deterministic.
 - **Open cases.** A contract may list `open_cases`: case ids that fail today, each

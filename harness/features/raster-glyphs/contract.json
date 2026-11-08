@@ -5,6 +5,7 @@
   "candidate": "raster-worker",
   "worker_operation": "raster-",
   "reference": "libass-native",
+  "gate": "required",
   "contract": [
     "one font file read from memory: glyph ids spread evenly over face 0, loaded as libass 0.17.5 loads them with hinting off (ASS_HINTING_NONE): GDI face metrics, a REAL_DIM size request of the case's 26.6 pixel height and unhinted outlines (FT_LOAD_NO_HINTING), from FreeType 2.15.0 in the reference and triergon-font in the candidate; the cases of the arguments over those glyphs, with transforms of moderate reach (rotations within 60 degrees, matrices near the target size)",
     "every case performed with libass 0.17.5's own stages, as the pinned build compiles them, with libass's plain C bitmap engine on every host (ass_bitmap_engine_init(ASS_CPU_FLAG_NONE): C functions, 16x16 tiles and 16-byte rows, what a 32-bit ARMv7 build gets from ass_renderer_init): ass_outline_convert, ass_outline_rotate_90, ass_outline_stroke, ass_outline_transform_2d and _3d, ass_outline_to_bitmap; a run through get_bitmap_glyph per glyph (the 3D glyph transform and its quantisation against the run, the stroked border or opaque box, the \\kf karaoke leftmost x) and ass_composite_construct (blur, \\be, the fill taken out of the border, the shifted shadow); ass_synth_blur, the engine's add, mul and imul blends, ass_fix_outline, ass_shift_bitmap and render_glyph's rectangle clipping with the karaoke split",

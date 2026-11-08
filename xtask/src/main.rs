@@ -204,12 +204,19 @@ fn main() -> ExitCode {
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
         Some(command @ ("fonts" | "shape" | "raster")) => {
             let lane = lanes::lane_named(command).expect("a registered lane");
-            if let Some(reports) = lane.reports(&args[1..]) {
-                if let Err(error) = (lane.write_inputs)(&root) {
-                    eprintln!("{error}");
-                    return ExitCode::FAILURE;
-                }
-                return lane_compare(&root, &reports);
+            if let [compare, rest @ ..] = &args[1..]
+                && compare == "compare"
+            {
+                let reports = lane
+                    .reports(&root, rest)
+                    .and_then(|reports| (lane.write_inputs)(&root).map(|()| reports));
+                return match reports {
+                    Ok(reports) => lane_compare(&root, &reports),
+                    Err(error) => {
+                        eprintln!("{error}");
+                        ExitCode::FAILURE
+                    }
+                };
             }
             match command {
                 "fonts" => fonts::main(&root, &args[1..]),
@@ -942,9 +949,7 @@ fn lane_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
 /// one round of mutations of each feature's smoke cases.
 fn lane_check(root: &Path, lane: &lanes::Lane) -> Task {
     (lane.write_inputs)(root)?;
-    let reports = lane
-        .reports(&["compare".to_owned()])
-        .expect("compare is a report");
+    let reports = lane.reports(root, &[])?;
     if lane_compare(root, &reports) != ExitCode::SUCCESS {
         return Err(format!("cargo xtask {} compare failed", lane.command));
     }
