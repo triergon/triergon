@@ -6,7 +6,7 @@
 //! (composition objects, palette entries, object data) stop at the segment end.
 
 use super::super::{ColourMatrix, CompositionObject, Crop, DisplayLimits, PacketClock};
-use super::{ReceiverObservations, Refusal};
+use super::{ReceiverObservations, Refusal, reserve_amortised};
 use std::sync::Arc;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result};
 
@@ -65,6 +65,7 @@ pub(super) struct Object {
     pub(super) height: u16,
     /// RLE bytes the first fragment declared.
     declared: usize,
+    /// The RLE bytes received so far.
     pub(super) encoded: BudgetVec<u8>,
     fragments: usize,
 }
@@ -80,6 +81,28 @@ enum Update<'a> {
     Replace(Object),
     /// An accepted continuation: bytes for which the object has room.
     Append(&'a [u8]),
+}
+
+/// Room for `additional` more RLE bytes of an object that declared `declared`.
+/// The declared length is a claim the reference allocates whole; the
+/// receiver stores only the bytes that arrive and limits those.
+fn stored(
+    encoded: &mut BudgetVec<u8>,
+    additional: usize,
+    declared: usize,
+    limits: &DisplayLimits,
+) -> Result<()> {
+    let requested = encoded
+        .len()
+        .checked_add(additional)
+        .ok_or(Error::Overflow)?;
+    if requested > limits.max_encoded {
+        return Err(Error::Limit {
+            requested,
+            maximum: limits.max_encoded,
+        });
+    }
+    reserve_amortised(encoded, additional, declared.min(limits.max_encoded))
 }
 
 /// The count after one more fragment of an object.
@@ -140,18 +163,9 @@ impl Object {
         if data.len() > length {
             return Ok(Update::Keep);
         }
-        let pixels = usize::from(width) * usize::from(height);
-        for (requested, maximum) in [
-            (pixels, limits.max_object_pixels),
-            (length, limits.max_encoded),
-        ] {
-            if requested > maximum {
-                return Err(Error::Limit { requested, maximum });
-            }
-        }
         let fragments = next_fragment(0, limits)?;
         let mut encoded = BudgetVec::new(budget);
-        encoded.try_reserve_exact(length)?;
+        stored(&mut encoded, data.len(), length, limits)?;
         encoded.try_extend_from_slice(data)?;
         Ok(Update::Replace(Self {
             id,
@@ -170,7 +184,7 @@ impl Object {
             return Ok(Update::Keep);
         }
         next_fragment(self.fragments, limits)?;
-        self.encoded.try_reserve_exact(data.len())?;
+        stored(&mut self.encoded, data.len(), self.declared, limits)?;
         Ok(Update::Append(data))
     }
 

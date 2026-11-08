@@ -551,7 +551,8 @@ impl<S: RecoveryRole> Decoder<S> {
 
     /// The next reference: a missing object is an empty rectangle at the
     /// origin, an object without data an empty one at its position; an
-    /// object with data is decoded next.
+    /// object with data is decoded next, within the pixel limits for one
+    /// object and for the display.
     fn rectangle(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Phase>> {
         let index = self.draft()?.rectangles.len();
         let Some(reference) = self.receiver.references.get(index).copied().flatten() else {
@@ -577,11 +578,13 @@ impl<S: RecoveryRole> Decoder<S> {
             .pixels
             .checked_add(area)
             .ok_or(Error::Overflow)?;
-        if total > self.limits.max_display_pixels {
-            return Err(Error::Limit {
-                requested: total,
-                maximum: self.limits.max_display_pixels,
-            });
+        for (requested, maximum) in [
+            (area, self.limits.max_object_pixels),
+            (total, self.limits.max_display_pixels),
+        ] {
+            if requested > maximum {
+                return Err(Error::Limit { requested, maximum });
+            }
         }
         Ok(Some(Phase::Raster))
     }
