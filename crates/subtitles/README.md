@@ -2,7 +2,7 @@
 
 Subtitle ingestion and decoding for demuxed packets: text cue extraction with
 explicit charset conversion; bitmap decoding of DVB, PGS and DVD subpictures into
-indexed planes with their palettes; CEA-608/708 closed captions taken from MPEG-2,
+indexed planes with their palettes; CEA-608 closed captions taken from MPEG-2,
 H.264 and HEVC video and decoded to timed text; and DVB teletext pages. It is a
 codec-layer crate that depends only on [`triergon-core`](../core) for budgets,
 `Bytes`, work accounting and exact time, and on
