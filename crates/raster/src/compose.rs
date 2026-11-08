@@ -94,8 +94,21 @@ impl Filter {
 fn quantize_blur(radius: f64) -> (i32, i32) {
     let radius = radius * BLUR_SCALE;
     let (_, order) = fp::frexp((1.0 + radius) * (POSITION_PRECISION / 2.0));
-    let mask = 1u32.wrapping_shl(order as u32).wrapping_sub(1) as i32;
-    (fp::lrint32(radius.ln_1p() / BLUR_PRECISION), mask)
+    (
+        fp::lrint32(radius.ln_1p() / BLUR_PRECISION),
+        shadow_mask(order),
+    )
+}
+
+/// libass's `((uint32_t) 1 << order) - 1`. C leaves a shift of 32 or more
+/// undefined; this is what 32-bit ARM computes, whose register shifts use the
+/// low byte of the amount and give 0 from 32 on, so the mask is then all ones.
+/// AArch64 and x86 wrap the amount modulo 32 instead. Only blur radii beyond
+/// 2³⁰ pixels reach an order of 32.
+fn shadow_mask(order: i32) -> i32 {
+    let amount = order as u32 & 0xFF;
+    let power = if amount < 32 { 1u32 << amount } else { 0 };
+    power.wrapping_sub(1) as i32
 }
 
 fn restore_blur(quantized: i32) -> f64 {
@@ -278,7 +291,7 @@ impl Compositor {
 
 #[cfg(test)]
 mod tests {
-    use super::{be_padding, quantize_blur, restore_blur};
+    use super::{be_padding, quantize_blur, restore_blur, shadow_mask};
 
     #[test]
     fn blur_quantisation_round_trips_closely() {
@@ -289,6 +302,14 @@ mod tests {
             assert!((sigma - r).abs() / r < 0.01, "{radius}: {sigma}");
         }
         assert_eq!(quantize_blur(0.0), (0, 7));
+    }
+
+    #[test]
+    fn the_shadow_mask_shift_is_32_bit_arms() {
+        assert_eq!(
+            [3, 31, 32, 255, 256, -1].map(shadow_mask),
+            [7, i32::MAX, -1, -1, 0, -1]
+        );
     }
 
     #[test]

@@ -36,13 +36,14 @@ impl Bitmap {
     /// [`MAX_BITMAP_BYTES`](crate::MAX_BITMAP_BYTES), libass's bound; `Policy`
     /// when it exceeds `limits.bitmap_bytes`; and the budget's errors.
     pub fn new(budget: &Budget, width: usize, height: usize, limits: &Limits) -> Result<Self> {
-        let stride = width.next_multiple_of(ALIGNMENT);
+        let too_large = Error::Limit {
+            requested: width.saturating_mul(height),
+            maximum: MAX_BITMAP_BYTES,
+        };
+        let stride = width.checked_next_multiple_of(ALIGNMENT).ok_or(too_large)?;
         // libass's test, with its rounding: the stride against the bound per row.
         if stride > MAX_BITMAP_BYTES / height.max(1) {
-            return Err(Error::Limit {
-                requested: stride.saturating_mul(height),
-                maximum: MAX_BITMAP_BYTES,
-            });
+            return Err(too_large);
         }
         let bytes = stride * height;
         if bytes > limits.bitmap_bytes {

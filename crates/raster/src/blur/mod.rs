@@ -126,18 +126,28 @@ impl Blur {
         if w == 0 || h == 0 {
             return Ok(());
         }
-        let end = |size: usize, m: &Method| {
-            let offset = (2 * m.radius + 9)
+        // The blurred size, in 64 bits on every target, so 32-bit ARM computes
+        // what 64-bit hosts do. libass computes the offset as a C `int`; one of
+        // 2³¹ or more overflows it, and the crate leaves such a bitmap
+        // unblurred, as the size check below does for every smaller offset that
+        // large. Only variances beyond about 4·10¹⁶ pixels² reach it.
+        let end = |size: usize, m: &Method| -> Option<usize> {
+            let offset = u64::from(2 * m.radius as u32 + 9)
                 .checked_shl(m.level)
                 .filter(|o| *o < 1 << 31)?
                 - 5;
-            Some(((size + offset) & !((1usize << m.level) - 1)) - 4)
+            let end = ((size as u64 + offset) & !((1u64 << m.level) - 1)) - 4;
+            usize::try_from(end).ok()
         };
-        // libass leaves the bitmap unblurred beyond 2²⁹ intermediate samples.
+        // libass leaves the bitmap unblurred beyond 2²⁹ intermediate samples
+        // (stripes of 8 samples, the C engine's).
         let Some((end_w, end_h)) = end(w, &mx).zip(end(h, &my)) else {
             return Ok(());
         };
-        if end_w.next_multiple_of(8).saturating_mul(end_h) > i32::MAX as usize / 4 {
+        let samples = (end_w as u64)
+            .next_multiple_of(8)
+            .saturating_mul(end_h as u64);
+        if samples > i32::MAX as u64 / 4 {
             return Ok(());
         }
         let stages = u64::from(mx.level + my.level) * 2 + 2;
