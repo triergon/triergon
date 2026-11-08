@@ -223,6 +223,7 @@ pub const FEATURES: [&str; 6] = [
 
 pub const LANE: Lane = Lane {
     command: "shape",
+    main: super::main,
     features: &FEATURES,
     reference: "harfbuzz-native",
     pin_note: "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",

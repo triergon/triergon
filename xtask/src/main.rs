@@ -135,6 +135,9 @@ fn main() -> ExitCode {
     }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = root();
+    if let Some(lane) = args.first().and_then(|command| lanes::lane_named(command)) {
+        return lane_main(&root, lane, &args[1..]);
+    }
     let result = match args.first().map(String::as_str) {
         Some("check") => check(&root),
         Some("progressive") => {
@@ -202,28 +205,6 @@ fn main() -> ExitCode {
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
-        Some(command @ ("fonts" | "shape" | "raster")) => {
-            let lane = lanes::lane_named(command).expect("a registered lane");
-            if let [compare, rest @ ..] = &args[1..]
-                && compare == "compare"
-            {
-                let reports = lane
-                    .reports(&root, rest)
-                    .and_then(|reports| (lane.write_inputs)(&root).map(|()| reports));
-                return match reports {
-                    Ok(reports) => lane_compare(&root, &reports),
-                    Err(error) => {
-                        eprintln!("{error}");
-                        ExitCode::FAILURE
-                    }
-                };
-            }
-            match command {
-                "fonts" => fonts::main(&root, &args[1..]),
-                "shape" => shape::main(&root, &args[1..]),
-                _ => raster::main(&root, &args[1..]),
-            }
-        }
         Some("build-workers") => {
             harness::build::main(&root, &args[1..]).map(|path| println!("{}", path.display()))
         }
@@ -930,6 +911,30 @@ const REFERENCE_TRACE_CRATES: [&str; 5] = [
     "triergon-mpegts",
     "triergon-subtitles",
 ];
+
+/// `cargo xtask COMMAND ARGS` for a lane: `compare` runs the reports of the
+/// features it selects, anything else is the lane's own subcommand.
+fn lane_main(root: &Path, lane: &lanes::Lane, args: &[String]) -> ExitCode {
+    let result = match args {
+        [command, rest @ ..] if command == "compare" => {
+            match lane
+                .reports(root, rest)
+                .and_then(|reports| (lane.write_inputs)(root).map(|()| reports))
+            {
+                Ok(reports) => return lane_compare(root, &reports),
+                Err(error) => Err(error),
+            }
+        }
+        _ => (lane.main)(root, args),
+    };
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::FAILURE
+        }
+    }
+}
 
 /// The reports `COMMAND compare` stands for; exits with the first failing one's
 /// code.
