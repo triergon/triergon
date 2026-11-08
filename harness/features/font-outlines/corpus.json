@@ -660,6 +660,45 @@
         "bytes": 4597,
         "digest": 12983628852468618400
       }
+    },
+    {
+      "id": "authored-cff-features-otf",
+      "profile": "cff",
+      "file": "authored/authored-cff-features.otf",
+      "sha256": "41e3eb12412361b03872524031ae3f7a704b74d9e913e8c5e5ef0c39a163cb9a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 83,
+        "digest": 131418444441568430
+      }
+    },
+    {
+      "id": "authored-cff-matrix-otf",
+      "profile": "cff",
+      "file": "authored/authored-cff-matrix.otf",
+      "sha256": "5c85f989188339917965276d808a371ded5dc1808e530864ccddd0655b8297b8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 7131425749946310748
+      }
+    },
+    {
+      "id": "authored-cmap-formats-ttf",
+      "profile": "truetype",
+      "file": "authored/authored-cmap-formats.ttf",
+      "sha256": "2dd8238413923c033680f98577fa797658f17f2e00908bdd8070647a3cb9486c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 14,
+        "digest": 2380313261258997178
+      }
     }
   ]
 }

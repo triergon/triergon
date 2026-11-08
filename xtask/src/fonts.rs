@@ -131,7 +131,14 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
 /// The crate's fuzz example over every corpus file.
 fn fuzz(root: &Path, iterations: u32, timeout: u32) -> Result<(), String> {
     run(Command::new("cargo")
-        .args(["build", "--locked", "-p", "triergon-font", "--example", "fuzz"])
+        .args([
+            "build",
+            "--locked",
+            "-p",
+            "triergon-font",
+            "--example",
+            "fuzz",
+        ])
         .env("CARGO_INCREMENTAL", "0")
         .current_dir(root))?;
     let files = root.join(FONTS).join("files");
@@ -147,7 +154,12 @@ fn fuzz(root: &Path, iterations: u32, timeout: u32) -> Result<(), String> {
         ));
     }
     run(Command::new(root.join("target/debug/examples/fuzz"))
-        .args(["--iters", &iterations.to_string(), "--timeout", &timeout.to_string()])
+        .args([
+            "--iters",
+            &iterations.to_string(),
+            "--timeout",
+            &timeout.to_string(),
+        ])
         .args(&paths)
         .current_dir(root.join(FONTS)))
 }
@@ -369,9 +381,9 @@ mod tests {
     #[test]
     fn compare_reports_every_font_feature() {
         let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let reports = reports(&args(&["compare", "--output", "out", "--memory"])).unwrap();
-        assert_eq!(reports.len(), FEATURES.len());
-        let (feature, scaled) = &reports[1];
+        let found = reports(&args(&["compare", "--output", "out", "--memory"])).unwrap();
+        assert_eq!(found.len(), FEATURES.len());
+        let (feature, scaled) = &found[1];
         assert_eq!(*feature, "font-scaled");
         assert_eq!(
             *scaled,

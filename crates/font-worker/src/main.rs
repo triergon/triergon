@@ -18,7 +18,8 @@ use triergon_font::{
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 const MAX_INPUT: u64 = 64 << 20;
-const USAGE: &str = "usage: font-worker OPERATION-fold FILE [HEIGHT] | OPERATION-bench FILE ITERATIONS [HEIGHT]
+const USAGE: &str =
+    "usage: font-worker OPERATION-fold FILE [HEIGHT] | OPERATION-bench FILE ITERATIONS [HEIGHT]
        | OPERATION-memory FILE [HEIGHT] | OPERATION-dump FILE [HEIGHT]
   OPERATION is font (no HEIGHT), font-scaled or font-hinted (HEIGHT in 26.6 pixels)";
 
@@ -99,9 +100,8 @@ fn read(file: &Bytes, budget: &Budget, operation: Operation, sink: &mut impl Sin
             Operation::Hinted(height) => {
                 sink.record(Record::SizedFace(index))?;
                 match font.at_size(height) {
-                    Ok(sized) => hinted(&font, &sized, sink).map_err(|e| {
-                        format!("face {index} at {height}: {e}")
-                    })?,
+                    Ok(sized) => hinted(&font, &sized, sink)
+                        .map_err(|e| format!("face {index} at {height}: {e}"))?,
                     Err(_) => sink.record(Record::SizeError(height))?,
                 }
             }
@@ -142,16 +142,14 @@ fn face(font: &Font, outline: &mut Outline, sink: &mut impl Sink) -> io::Result<
     for charmap in font.charmaps() {
         sink.record(Record::Charmap(charmap))?;
         for mapping in charmap.mappings() {
-            match mapping {
-                Ok((code, glyph)) => sink.record(Record::Map {
-                    code,
-                    glyph: glyph.0,
-                })?,
-                Err(_) => {
-                    sink.record(Record::MapError)?;
-                    break;
-                }
-            }
+            let Ok((code, glyph)) = mapping else {
+                sink.record(Record::MapError)?;
+                break;
+            };
+            sink.record(Record::Map {
+                code,
+                glyph: glyph.0,
+            })?;
         }
     }
     sink.record(Record::TextCharmap(font.text_charmap()))?;
@@ -237,7 +235,9 @@ fn hinted(font: &Font, sized: &SizedFont<'_>, sink: &mut impl Sink) -> Result<()
         let advance = match sized.hinted_advance(glyph) {
             Ok(advance) => Some(advance),
             Err(triergon_core::Error::Unsupported(what)) => {
-                return Err(format!("glyph {}: hinted advance unsupported: {what}", glyph.0).into());
+                return Err(
+                    format!("glyph {}: hinted advance unsupported: {what}", glyph.0).into(),
+                );
             }
             Err(_) => None,
         };

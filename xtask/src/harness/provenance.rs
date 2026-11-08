@@ -66,6 +66,8 @@ pub fn matroska_inputs() -> Vec<String> {
         "matroska-startup-seek",
         "hls-segments",
         "font-outlines",
+        "font-scaled",
+        "font-hinted",
     ] {
         for file in ["contract", "corpus"] {
             names.push(format!("harness/features/{feature}/{file}.json"));

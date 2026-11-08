@@ -734,28 +734,36 @@ mod tests {
     }
 
     #[test]
-    fn the_font_feature_is_a_registered_prefix_feature() {
+    fn the_font_features_are_registered_prefix_features() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let features = PrefixFeature::registered(root, "font-worker").unwrap();
-        let [font] = &features[..] else {
-            panic!("one font feature");
-        };
+        let found: Vec<(&str, &str, usize)> = features
+            .iter()
+            .map(|f| (f.id.as_str(), f.prefix.as_str(), f.cases.len()))
+            .collect();
         assert_eq!(
-            (font.id.as_str(), font.prefix.as_str()),
-            ("font-outlines", "font-")
+            found,
+            [
+                ("font-hinted", "font-hinted-", 500),
+                ("font-outlines", "font-", 50),
+                ("font-scaled", "font-scaled-", 500),
+            ]
         );
-        assert_eq!(font.corpus, root.join(".research/fonts/files"));
-        assert_eq!(font.cases.len(), 47);
+        let reviewed = reviewed_inputs(root).unwrap();
+        for feature in &features {
+            assert_eq!(feature.corpus, root.join(".research/fonts/files"));
+            assert!(
+                feature
+                    .cases
+                    .iter()
+                    .all(|case| rights_reviewed(&reviewed, case))
+            );
+        }
         assert!(
-            font.input(&parse(r#"{"file": "../x.ttf"}"#).unwrap())
+            features[0]
+                .input(&parse(r#"{"file": "../x.ttf"}"#).unwrap())
                 .is_err()
         );
         assert_eq!(recorded_corpus(root, &Value::Object(vec![])), None);
-        let reviewed = reviewed_inputs(root).unwrap();
-        assert!(
-            font.cases
-                .iter()
-                .all(|case| rights_reviewed(&reviewed, case))
-        );
     }
 }

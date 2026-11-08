@@ -1092,7 +1092,9 @@ mod tests {
             ("matroska-segment-metadata", 48),
             ("matroska-startup-seek", 44),
             ("hls-segments", 71),
-            ("font-outlines", 47),
+            ("font-outlines", 50),
+            ("font-scaled", 500),
+            ("font-hinted", 500),
         ] {
             let (manifest, manifest_sha) =
                 document(&root.join(format!("harness/features/{feature}/corpus.json"))).unwrap();

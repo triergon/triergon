@@ -896,7 +896,11 @@ fn fonts_compare(root: &Path, reports: &[(&str, Vec<String>)]) -> ExitCode {
             .map(|at| root.join(&args[at + 1]).join("report.json"));
         let cases = output
             .and_then(|path| checks::read_json(&path).ok())
-            .and_then(|r| r.get("cases").and_then(json::Value::as_array).map(<[_]>::to_vec))
+            .and_then(|r| {
+                r.get("cases")
+                    .and_then(json::Value::as_array)
+                    .map(<[_]>::to_vec)
+            })
             .unwrap_or_default();
         let status = |case: &json::Value| {
             case.get("parity")

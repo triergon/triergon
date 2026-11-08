@@ -57,7 +57,7 @@ benchmarks assume it.
    `--benchmark --memory --require-acceptance` on an isolated AArch64 Linux machine when
    the change touches parsing or decoding hot paths; for `triergon-font`,
    `cargo xtask fonts compare` with the same options and
-   `cargo xtask fonts fuzz --output DIR`. Put the per-case results in the pull
+   `cargo xtask fonts fuzz`. Put the per-case results in the pull
    request and update [docs/status.md](docs/status.md).
 
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and

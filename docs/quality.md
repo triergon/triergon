@@ -50,9 +50,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   and compiler in `.research/freetype/build.json`; `cargo xtask build-workers` then
   links the reference worker (`harness/reference_font.h`). `cargo xtask fonts fetch`
   fetches the font corpus listed with sources, licences and hashes in
-  `harness/fonts/corpus.json`. Its files are the cases of the `font-outlines`
-  feature, run like every other feature; `cargo xtask fonts compare` and
-  `cargo xtask fonts fuzz` are `report` and `fuzz` on that feature.
+  `harness/fonts/corpus.json` and writes its authored fonts with the font crate's
+  `authored-fonts` example. Its files are the cases of three features run like
+  every other feature: `font-outlines` (face data and unscaled outlines),
+  `font-scaled` (what libass loads at ten sizes) and `font-hinted` (default-load
+  advances at those sizes). `cargo xtask fonts compare` reports all three;
+  `cargo xtask fonts fuzz` runs the crate's mutation smoke test over the corpus.
 - **Input rights.** A case is measured only when its `rights` are
   `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
   reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
@@ -99,7 +102,7 @@ cargo xtask report --benchmark --memory --fate-cache .research/fate-samples --re
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, and `font-outlines` with `font-worker` and FreeType.
+and `formats` references, and the three font features with `font-worker` and FreeType.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers

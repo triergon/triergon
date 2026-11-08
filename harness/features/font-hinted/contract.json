@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "font-hinted",
+  "operation": "font-hinted",
+  "candidate": "font-worker",
+  "worker_operation": "font-hinted-",
+  "reference": "freetype-native",
+  "contract": [
+    "one font file read from memory; every face of a collection, each loaded at the case's 26.6 pixel height as libass requests it, as in font-scaled",
+    "for every glyph the advance of FreeType's default (hinted) load, which libass's HarfBuzz callbacks report; packets count advances",
+    "an advance the candidate cannot give (unsupported hinting) ends its operation with an error, so the case fails; it is never counted as agreement",
+    "the file is read before each timed and memory operation; the reference library is created once, outside it"
+  ],
+  "required_profiles": [
+    "truetype",
+    "cff",
+    "cff-cid",
+    "cff2",
+    "collection"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

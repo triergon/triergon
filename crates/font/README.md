@@ -204,22 +204,31 @@ composites) are
 
 - `cargo test -p triergon-font`: unit tests per table, faces built in memory
   (TrueType, CFF and a collection) and a deterministic mutation test over them.
-- `cargo xtask fonts compare` runs `examples/font-dump.rs` and the FreeType
-  reference worker (`harness/freetype-font.c`, FreeType 2.15.0) on every face of
-  the corpus in `harness/fonts/corpus.json` and requires identical output: metrics,
-  style, family, style and PostScript names, every name record, every cmap mapping,
-  the text charmap, kerning among the first 256 glyphs and the Latin-1 glyphs, and
-  for every glyph its `hmtx` and loaded advances and its outline at 1/64 font unit.
-  A second pass (`--scaled`) loads every face as libass does, after its GDI face
-  metrics, at ten 26.6 heights: 256 pixels (libass with hinting off) and 75, 82.5,
-  50, 48, 37.5, 33.75, 13.33, 24.5 and 8.4 (common ASS sizes on 1080- and 720-line
-  frames, below 25 pixels per em, and small). Each size compares the size metrics,
-  ascent and descent, HarfBuzz scale, emboldening strength, PostScript flag,
-  underline and strikeout bands and kerning; every glyph its default-load advance
-  and its unhinted outline and advance, emboldened, slanted and both. At 256 pixels
-  plain outlines are compared point by point, elsewhere and for the synthetic
-  variants by a 64-bit FNV-1a digest of the same text. A value the crate declares
-  unsupported is counted apart, never as agreement.
+- `cargo xtask fonts compare` runs three harness features
+  (`harness/features/font-*`) on every file of the corpus in
+  `harness/fonts/corpus.json` through [`font-worker`](../font-worker/README.md) and
+  the FreeType 2.15.0 reference worker (`harness/reference_font.h`), and requires
+  both to fold exactly what FreeType folds:
+  - `font-outlines`, per face: metrics, style, family, style and PostScript names,
+    every name record, every cmap mapping, the text charmap, the kerning of every
+    pair the `kern` table lists, and for every glyph its `hmtx` and loaded advances
+    and its outline at 1/64 font unit.
+  - `font-scaled`, per face at each of ten 26.6 heights, after libass's GDI face
+    metrics: 256 pixels (libass with hinting off) and 75, 82.5, 50, 48, 37.5,
+    33.75, 13.33, 24.5 and 8.4 (common ASS sizes on 1080- and 720-line frames,
+    below 25 pixels per em, and small). Each size folds the size metrics, ascent
+    and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline
+    and strikeout bands and the kerning of every listed pair; every glyph its
+    unhinted outline and advance, and that outline emboldened, slanted and both,
+    every point.
+  - `font-hinted`, at the same heights: every glyph's default-load advance. An
+    advance `hinted_advance` declares `Unsupported` ends the candidate's operation
+    with an error, so the case fails; it never counts as agreement.
+
+  `cargo xtask report` runs each feature on its own and with `--benchmark` and
+  `--memory` measures runtime and memory against FreeType. `font-dump`,
+  `font-scaled-dump` and `font-hinted-dump` print the folded values as lines in
+  both workers, for diffing a failing case.
 - The corpus includes three fonts the crate's test support writes
   (`examples/authored-fonts.rs`): `seac`, the arithmetic, logic and storage operators,
   the flex forms, counter masks, subroutines nested twelve deep, a non-default
@@ -228,8 +237,11 @@ composites) are
   corpus do not use it) and `random`, and every supported cmap format;
   `examples/font-coverage.rs` reports this.
 - `cargo xtask fonts fuzz` runs `examples/fuzz.rs`, which mutates every corpus file
-  and reads the results in the dev profile, so overflow is checked as well, and fails
-  on an input that runs past its timeout.
+  with the mutator the mutation test uses and reads the results in the dev profile,
+  so overflow is checked as well, and fails on an input that runs past its timeout.
+  `cargo xtask fuzz --contract harness/features/font-outlines/contract.json` runs a
+  replayable campaign through the release and dev builds of the worker, with
+  `--reference` comparing each result with FreeType's.
 
 The comparison establishes agreement with FreeType on that corpus, not conformance
 with the OpenType specification. Face matching is checked by unit tests only.
