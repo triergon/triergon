@@ -4,7 +4,8 @@
 
 use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
-    hls_avc::{AvcRaster, AvcTsClock, AvcTsLimits, clock_describes, lane_track},
+    hls_avc::{AvcRaster, AvcTsClock, AvcTsLimits},
+    hls_pes::{clock_describes, lane_track},
     raw_video::RawVideoConfigTracker,
     ts_payload::PesInput,
 };

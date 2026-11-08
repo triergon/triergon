@@ -52,6 +52,7 @@ pub mod hls_avc;
 pub mod hls_clock;
 mod hls_dolby;
 mod hls_hevc;
+mod hls_pes;
 pub mod hls_segment;
 mod ts_payload;
 pub mod ts_progressive;
