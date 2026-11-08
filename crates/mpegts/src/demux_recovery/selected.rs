@@ -101,6 +101,41 @@ impl DiagnosticPacket {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
 }
+impl From<crate::demux_transport::TransportFaultPacket> for DiagnosticPacket {
+    fn from(packet: crate::demux_transport::TransportFaultPacket) -> Self {
+        let header = DiagnosticHeader {
+            bytes: packet.encoded_header.backing_bytes().clone(),
+            pts: Some(packet.encoded_header.encoded_pts_raw33()),
+            markers_valid: true,
+            time_flags: 2,
+        };
+        Self {
+            profile: DemuxProfile::PesPackets,
+            program: packet.program,
+            pid: packet.pid,
+            source_origin: packet.source_origin,
+            source_epochs: packet.source_epochs,
+            position: packet.position,
+            flags: packet.flags,
+            duration90_raw: packet.duration90_raw,
+            stream_id: packet.stream_id,
+            selected_fault: match packet.kind {
+                crate::demux_transport::TransportFaultKind::TransportError => {
+                    SelectedFault::TransportError
+                }
+                crate::demux_transport::TransportFaultKind::Scrambling => SelectedFault::Scrambling,
+            },
+            source_fault: packet.source_fault,
+            carrier: DiagnosticCarrier::Transport(packet.carrier),
+            input_context: packet.input_context,
+            diagnostic_context: packet.diagnostic_context,
+            encoded_header: header,
+            header_source_ranges: packet.header_source_ranges,
+            payload_len: packet.payload_len,
+            spans: packet.spans,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub(super) struct SelectedPending {
@@ -215,6 +250,7 @@ impl RecoveryObserver {
         &mut self,
         packet: TransportPacket,
         c: SourceContext,
+        input: Option<&triergon_core::InputCursor>,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         let admission = (|| {
             self.selected_context(packet.source_id, packet.source_offset, c, &packet.source)?;
@@ -261,6 +297,17 @@ impl RecoveryObserver {
                 });
             }
         };
+        if matches!(
+            kind,
+            SelectedFault::TransportError | SelectedFault::Scrambling
+        ) {
+            let offset = packet.source_offset;
+            let job = TransportFaultJob::new(packet, c, &self.inner, input)?;
+            self.last = Some((c.source_event_ordinal, offset));
+            self.entity_first = false;
+            self.pending = Some(RecoveryPending::TransportFault(job));
+            return Ok(());
+        }
         self.last = Some((c.source_event_ordinal, packet.source_offset));
         self.entity_first = false;
         self.pending = Some(RecoveryPending::Selected(SelectedPending {
@@ -355,6 +402,12 @@ impl RecoveryObserver {
     }
     /// A wrong/stale diagnostic leaves the one original pending storage intact.
     pub fn confirm_source_fault(&mut self, fault: &TraceFault, c: SourceContext) -> Result<()> {
+        if let Some(RecoveryPending::TransportFault(job)) = self.pending.as_mut() {
+            job.confirm(fault, c)?;
+            self.last = Some((c.source_event_ordinal, fault.location.offset));
+            self.entity_first = false;
+            return Ok(());
+        }
         let Some(RecoveryPending::Selected(p)) = self.pending.as_mut() else {
             return Err(Error::Invalid(
                 "no selected source fault awaiting diagnostic",
