@@ -11,9 +11,14 @@
 use crate::{OpusHead, VorbisHeaders, flac_configuration_from_dfla, flac_configuration_from_ogg};
 use triergon_core::Result;
 
-/// Write the canonical FLAC configuration of `configuration` to `out`.
+/// Write the canonical FLAC configuration of `configuration` to `out`. A stream that
+/// starts at a frame header carries none; it stays empty and the frames describe
+/// themselves.
 pub fn canonical_flac_configuration(configuration: &[u8], out: &mut Vec<u8>) -> Result<()> {
     out.clear();
+    if configuration.is_empty() {
+        return Ok(());
+    }
     if configuration.starts_with(b"fLaC") {
         crate::flac_stream_info(configuration)?;
         out.extend_from_slice(configuration);
@@ -44,4 +49,17 @@ pub fn canonical_vorbis_configuration(configuration: &[u8], out: &mut Vec<u8>) -
     VorbisHeaders::from_laced(configuration)?;
     out.extend_from_slice(configuration);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_flac_stream_without_a_header_keeps_an_empty_configuration() {
+        let mut out = vec![1, 2, 3];
+        canonical_flac_configuration(&[], &mut out).unwrap();
+        assert!(out.is_empty());
+        assert!(canonical_flac_configuration(b"fLa", &mut out).is_err());
+    }
 }

@@ -41,7 +41,9 @@ A frame cut short by the end of the input is delivered with `Packet::is_complete
 false, and so are MPEG audio bytes after the last frame, as FFmpeg 9.0 delivers them.
 
 FLAC metadata blocks are kept up to the retention limit (PADDING by length only), and
-SEEKTABLE and STREAMINFO are read. Fixed-blocking frame numbers count STREAMINFO's block
+SEEKTABLE and STREAMINFO are read. A stream without the `fLaC` marker (joined mid-way)
+starts at the first frame header that a CRC-16-confirmed frame follows, after any bytes
+before it; its track comes from that header and its configuration is empty. Fixed-blocking frame numbers count STREAMINFO's block
 size when it declares one, else the frame's own.
 
 MPEG audio follows FFmpeg 9.0 where the specification leaves room: a first Layer III
