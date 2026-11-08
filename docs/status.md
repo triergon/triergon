@@ -25,7 +25,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 66/97 compat-view operations (`mpegts-pes`: the 272 recorded requests through the public `compat::pes` API); 31 open cases need the MPEG-TS `ContainerReader`: `pcr-timeline-discontinuity`, `pcr-extension-invalid`, `transport-tei`, `transport-scrambled`, `transport-afc-reserved`, `transport-adaptation-overrun`, `transport-partial-final-packet`, `transport-sync-loss`, `psi-crc-invalid`, `psi-pointer-overrun`, `psi-length-over-policy`, `psi-pending-not-current`, `pat-atomic-two-sections`, `pat-incomplete-version`, `pat-network-pid-not-track`, `psi-pointer-finishes-old-starts-new`, `psi-two-sections-one-payload`, `pmt-version-wrap-retypes-pid`, `pmt-opaque-language-descriptors`, `pmt-descriptor-overrun`, `pmt-multi-section-forbidden`, `psi-stuffing-tail-invalid`, `psi-truncated-eof`, `pes-timestamp-marker`, `pes-forbidden-time-flags`, `pes-optional-header-overrun`, `pes-start-prefix-invalid`, `hls-contiguous-pes-carry`, `hls-external-map`, `hls-explicit-discontinuity`, `opcr-without-pcr-invalid` | 1.0029 (66/66 pass) | heap ≤0.073, total RSS ≤0.818 (66/66 lower) | the 31 open cases; the strict source view and its native clock are not compared; access-unit demux, broader profiles |
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.1951 (3/3 pass) | heap ≤0.016, total RSS ≤0.648 (3/3 lower) | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1520 (71/71 pass) | heap ≤0.022, total RSS ≤0.727 (71/71 lower) | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing (small configuration and packet segment tables inline), AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3036 (91/125 pass for AVC/HEVC) | heap ≤0.875 (125/125 lower), total RSS ≤1.0157 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
+| Packet framing | AVC/HEVC configuration and NAL framing (small configuration and packet segment tables inline; shared planning and emission scratch), AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3509 (94/125 pass for AVC/HEVC) | heap ≤0.875 (125/125 lower), total RSS ≤1.0146 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases, replayed by tests from recorded output; 5,300 DVB display sets, recorded; no runner in the repository | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 37/38 (`mp4-forward`), TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 1.6427 (35/37 pass), TS program 1.4695 (33/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤3.382 (36/37 lower), total RSS ≤1.025 (18/37 lower); TS program heap ≤0.102, total RSS ≤0.910 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower) | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC; `mp4-forward` open case `regular-encoded-avc-aac-indexed-seek`: the native MOV view refuses an edit list over reordered samples |
@@ -61,19 +61,14 @@ against the profile's `ffprobe`. The Ogg and audio elementary-stream rows rerun 
 lane with both Ogg views at `ccd3090572433e79d8ab65a377fcd9896d2839d9` on the same instance type.
 The remaining rows retain their earlier measurements.
 The packet-framing row uses the gate build at
-`38c2b2121e201efac4222e6eee8ff8851e7bbfc4` on a c8g.large pinned to CPU 1,
-with 30 timing pairs of 50 complete operations and 30 memory pairs for all 125 cases.
-The measurement tool is pinned separately at `ddf6eb4508009db0c30ddddd88a629344bce4c36`.
-All 125 timing and memory collections are valid, including zero candidate heap
-against a positive reference. Peak heap is lower on every case; lower total RSS
-remains unachieved on every case. Shared grading rejects the complete feature.
-Paired build comparisons use the same boot, 30 pairs per case, fresh copies of
-both workers and the repository `report --baseline-worker` and `screen` commands.
-The identical-worker control has a median ratio of 1.0008. Exact HEVC reservation
-against inline packet storage has a median ratio of 1.0278; configuration lookup
-after segment selection against eager lookup has a median ratio of 0.9986.
-These comparisons are diagnostic, separate from the reference gate result.
-The earlier result at `822983dc` retains its invalid zero-heap summary.
+`b5a59b546f554756389d999c86920e09bfcc5fb7` on a c8g.large pinned to CPU 1,
+with Rust 1.99.1 and default flags, 30 timing pairs of 50 complete operations and
+30 memory pairs for all 125 cases. Every case matches and has lower peak heap.
+The highest runtime bound is `hevc-config-duplicate` at 1.3509. None has lower
+total RSS, and shared grading rejects the feature.
+Same-boot diagnostic comparisons with fresh worker copies have median ratios of
+1.0005 for identical workers and 0.9866 for compact state against configuration
+lookup. The earlier source-specific measurements remain listed separately.
 
 The progressive TS188 row uses the gate build at
 `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee`, with 30 timing pairs of 50 complete
@@ -144,7 +139,8 @@ timing of the reference built with and without zeroed automatic variables.
 | ISO BMFF open and index runtime and memory | `f99d893196908d562c897bccb20c6a972cd25d11` | `806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b` |
 | MPEG-TS progressive playback | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | HLS segments | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
-| Packet framing | `38c2b2121e201efac4222e6eee8ff8851e7bbfc4` | `f3c88cd969c581ebd803e860a0c52f5ee00285a99f85d563aa949862140cf33f` |
+| Packet framing | `b5a59b546f554756389d999c86920e09bfcc5fb7` | `7b09d5ecab0b8752146e7e548668145cb9ba488bcfd55dc18eb70a8d8f035d84` |
+| Packet framing, configuration lookup | `38c2b2121e201efac4222e6eee8ff8851e7bbfc4` | `f3c88cd969c581ebd803e860a0c52f5ee00285a99f85d563aa949862140cf33f` |
 | Packet framing, exact reservation | `953871543205cc59c7e8448e12439a165f6e3374` | `b058a0c47cc2e8e93e7b04f57b17a3a45cd0203aeb7ed6f81bdd614feded30dc` |
 | Packet framing, inline packet storage | `fc64e27d2fc6c4a1f6eed253d2e9f00c2ce1c4a4` | `297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600` |
 | Packet framing, heap segment storage | `a1b30b8f89866d9a5b401c11d3cbb28baa74109b` | `8c3eb3b37920b7b3308c0600cd3d6b68b9ce694f831d4f952fb49007a09f6628` |
