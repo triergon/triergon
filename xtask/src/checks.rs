@@ -102,8 +102,9 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     };
     errors.extend(runtime_mentions(root));
     // Generated manifests: the case ids and the pins match, in the recorded form.
-    errors.extend(crate::fonts::check(root));
-    errors.extend(crate::shape::check(root));
+    for lane in crate::lanes::LANES {
+        errors.extend(lane.check(root));
+    }
     let modules = gates
         .get("modules")
         .and_then(Value::as_array)

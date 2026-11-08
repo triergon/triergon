@@ -10,9 +10,9 @@ mod reference;
 mod texts;
 mod ucd;
 
-pub use manifest::{FEATURES, ROW_SOURCES, SMOKE_CASES, check, manifest, write_inputs};
+pub use manifest::LANE;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::fetch;
 
@@ -38,49 +38,6 @@ pub const USAGE: &str = "usage: cargo xtask shape prepare [--jobs N]
             the tables in crates/shape/src/unicode; --check fails if they would
             change";
 
-/// The `cargo xtask report` arguments `shape compare ARGS` stands for, one list per
-/// feature: the required features, or with `--all` every shaping feature; `None`
-/// for the other commands.
-pub fn reports(args: &[String]) -> Option<Vec<Vec<String>>> {
-    let (command, rest) = args.split_first()?;
-    if command != "compare" {
-        return None;
-    }
-    let (mut output, mut all) = (PathBuf::from(".research/shape-report"), false);
-    let mut options = Vec::new();
-    let mut rest = rest.iter();
-    while let Some(arg) = rest.next() {
-        match (arg.as_str(), rest.clone().next()) {
-            ("--all", _) => all = true,
-            ("--output", Some(value)) => {
-                output = PathBuf::from(value);
-                rest.next();
-            }
-            _ => options.push(arg.clone()),
-        }
-    }
-    Some(
-        FEATURES
-            .iter()
-            .filter(|feature| all || feature.required)
-            .map(|feature| {
-                let feature = feature.id;
-                let path = |file: &str| format!("harness/features/{feature}/{file}.json");
-                let mut list = vec![
-                    "--contract".to_owned(),
-                    path("contract"),
-                    "--manifest".to_owned(),
-                    path("corpus"),
-                    "--output".to_owned(),
-                    output.join(feature).display().to_string(),
-                ];
-                list.extend(options.iter().cloned());
-                list
-            })
-            .collect(),
-    )
-}
-
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {
         [help] if help == "--help" || help == "-h" => {
@@ -99,21 +56,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             println!("{}", built.display());
             Ok(())
         }
-        [command, rest @ ..] if command == "manifest" => {
-            let (mut record, mut output) = (false, root.join(".research/shape/manifests"));
-            let mut rest = rest.iter();
-            while let Some(flag) = rest.next() {
-                match flag.as_str() {
-                    "--record" => record = true,
-                    "--output" => output = PathBuf::from(rest.next().ok_or(USAGE)?),
-                    _ => return Err(USAGE.into()),
-                }
-            }
-            if record {
-                manifest::record(root)?;
-            }
-            manifest::write(root, &output)
-        }
+        [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),
         [command, rest @ ..] if command == "ucd" => ucd::main(root, rest),
         _ => Err(USAGE.into()),
     }
@@ -121,12 +64,13 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FEATURES, reports};
+    use super::LANE;
 
     #[test]
     fn compare_reports_the_required_features_or_all() {
         let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let required = reports(&args(&["compare", "--output", "out", "--memory"])).unwrap();
+        let reports = |list: &[&str]| LANE.reports(&args(list));
+        let required = reports(&["compare", "--output", "out", "--memory"]).unwrap();
         assert_eq!(required.len(), 5);
         assert_eq!(
             required[0],
@@ -141,9 +85,9 @@ mod tests {
             ])
         );
         assert_eq!(
-            reports(&args(&["compare", "--all"])).unwrap().len(),
-            FEATURES.len()
+            reports(&["compare", "--all"]).unwrap().len(),
+            LANE.features.len()
         );
-        assert!(reports(&args(&["ucd"])).is_none());
+        assert!(reports(&["ucd"]).is_none());
     }
 }

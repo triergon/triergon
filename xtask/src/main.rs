@@ -19,6 +19,7 @@ mod fuzz;
 mod harness;
 mod isobmff_bench;
 mod json;
+mod lanes;
 mod numpy;
 mod playback_golds;
 mod prepare;
@@ -43,9 +44,9 @@ const USAGE: &str = "usage: cargo xtask <command>
 commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
   check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
-  prepare-check  once before `check`: the pinned FFmpeg and FreeType references, the
-                 fixtures, the required vectors, the font corpus and the workers (built with
-                 the reference first on PATH)
+  prepare-check  once before `check`: the pinned FFmpeg, FreeType, HarfBuzz and FriBidi
+                 references, the fixtures, the required vectors, the font corpus and the
+                 workers (built with the reference first on PATH)
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -198,17 +199,21 @@ fn main() -> ExitCode {
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
-        Some("fonts") => match fonts::reports(&args[1..]) {
-            Some(reports) => return fonts_compare(&root, &reports),
-            None => fonts::main(&root, &args[1..]),
-        },
-        Some("shape") => match shape::reports(&args[1..]) {
-            Some(reports) => match shape::write_inputs(&root) {
-                Ok(()) => return fonts_compare(&root, &reports),
-                Err(error) => Err(error),
-            },
-            None => shape::main(&root, &args[1..]),
-        },
+        Some(command @ ("fonts" | "shape")) => {
+            let lane = lanes::lane_named(command).expect("a registered lane");
+            if let Some(reports) = lane.reports(&args[1..]) {
+                if let Err(error) = (lane.write_inputs)(&root) {
+                    eprintln!("{error}");
+                    return ExitCode::FAILURE;
+                }
+                return lane_compare(&root, &reports);
+            }
+            if command == "fonts" {
+                fonts::main(&root, &args[1..])
+            } else {
+                shape::main(&root, &args[1..])
+            }
+        }
         Some("build-workers") => {
             harness::build::main(&root, &args[1..]).map(|path| println!("{}", path.display()))
         }
@@ -915,8 +920,9 @@ const REFERENCE_TRACE_CRATES: [&str; 5] = [
     "triergon-subtitles",
 ];
 
-/// The reports `fonts compare` stands for; exits with the first failing one's code.
-fn fonts_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
+/// The reports `COMMAND compare` stands for; exits with the first failing one's
+/// code.
+fn lane_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
     let mut result = ExitCode::SUCCESS;
     for args in reports {
         println!("$ cargo xtask report {}", args.join(" "));
@@ -928,39 +934,24 @@ fn fonts_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
     result
 }
 
-/// `fonts compare` on the required font features, then one round of mutations of
-/// each feature's smoke cases.
-fn fonts_check(root: &Path) -> Task {
-    let reports = fonts::reports(&["compare".to_owned()]).expect("compare is a report");
-    if fonts_compare(root, &reports) != ExitCode::SUCCESS {
-        return Err("cargo xtask fonts compare failed".into());
+/// A lane's generated inputs, `COMMAND compare` on its required features, then
+/// one round of mutations of each feature's smoke cases.
+fn lane_check(root: &Path, lane: &lanes::Lane) -> Task {
+    (lane.write_inputs)(root)?;
+    let reports = lane
+        .reports(&["compare".to_owned()])
+        .expect("compare is a report");
+    if lane_compare(root, &reports) != ExitCode::SUCCESS {
+        return Err(format!("cargo xtask {} compare failed", lane.command));
     }
-    let smoke = fonts::FEATURES
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| (f.id, &fonts::SMOKE_CASES[..]));
-    smoke_campaigns(root, smoke)
-}
-
-/// The Unicode tables are what their generator writes, `shape compare` on the
-/// required shaping features passes, then one round of mutations of each
-/// feature's smoke cases, as for the fonts.
-fn shape_check(root: &Path) -> Task {
-    println!("$ cargo xtask shape ucd --check");
-    shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
-    shape::write_inputs(root)?;
-    let reports = shape::reports(&["compare".to_owned()]).expect("compare is a report");
-    if fonts_compare(root, &reports) != ExitCode::SUCCESS {
-        return Err("cargo xtask shape compare failed".into());
-    }
-    smoke_campaigns(root, shape::SMOKE_CASES.iter().map(|(f, c)| (*f, c)))
+    smoke_campaigns(root, lane.smoke.iter().copied())
 }
 
 /// One fuzz round over the given cases of each feature through the release and
 /// dev builds of its worker; a campaign that finds nothing is removed.
-fn smoke_campaigns<'a, C: AsRef<[&'a str]>>(
+fn smoke_campaigns<'a>(
     root: &Path,
-    features: impl Iterator<Item = (&'a str, C)>,
+    features: impl Iterator<Item = (&'a str, &'a [&'a str])>,
 ) -> Task {
     for (feature, cases) in features {
         let contract = format!("harness/features/{feature}/contract.json");
@@ -975,7 +966,7 @@ fn smoke_campaigns<'a, C: AsRef<[&'a str]>>(
             "--timeout-seconds",
             "60",
         ];
-        for case in cases.as_ref() {
+        for case in cases {
             args.extend(["--case", case]);
         }
         println!("$ cargo xtask fuzz {}", args.join(" "));
@@ -1067,8 +1058,11 @@ fn check(root: &Path) -> Task {
     check_simd(root)?;
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;
-    fonts_check(root)?;
-    shape_check(root)?;
+    lane_check(root, &fonts::LANE)?;
+    // The Unicode tables are what their generator writes.
+    println!("$ cargo xtask shape ucd --check");
+    shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
+    lane_check(root, &shape::LANE)?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;

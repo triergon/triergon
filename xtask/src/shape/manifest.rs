@@ -3,17 +3,13 @@
 //! segment properties and features; bidi, simple and Unicode cases are generated
 //! text files (`.research/shape/texts`) with the settings of each feature. The
 //! work each case must fold is pinned in `harness/features/<id>/pins.json`: the
-//! HarfBuzz and FriBidi reference's folds, written only by [`record`] and never
-//! edited by hand.
+//! HarfBuzz and FriBidi reference's folds (see [`crate::lanes`]).
 
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::Path;
 
 use super::texts::{self, ALPHABETS, Rng, SAMPLES};
-use crate::harness::manifest::canonical;
 use crate::json::Value;
+use crate::lanes::{Feature, Lane};
 
 type R<T> = Result<T, String>;
 
@@ -216,57 +212,59 @@ enum Load {
     Unicode,
 }
 
-/// A shaping feature: its id and what it runs, and whether `cargo xtask check`
-/// requires it.
-#[derive(Clone, Copy)]
-pub struct Feature {
-    pub id: &'static str,
-    load: Load,
-    pub required: bool,
-}
-
 pub const FEATURES: [Feature; 6] = [
     Feature {
         id: "shape-text",
-        load: Load::Text { all: false },
         required: true,
     },
     Feature {
         id: "shape-libass",
-        load: Load::Libass { size: LIBASS_SIZE },
         required: true,
     },
     Feature {
         id: "shape-text-all",
-        load: Load::Text { all: true },
         required: false,
     },
     Feature {
         id: "shape-bidi",
-        load: Load::Bidi,
         required: true,
     },
     Feature {
         id: "shape-simple",
-        load: Load::Simple,
         required: true,
     },
     Feature {
         id: "shape-unicode",
-        load: Load::Unicode,
         required: true,
     },
 ];
 
-fn feature(id: &str) -> R<Feature> {
-    FEATURES
-        .into_iter()
-        .find(|f| f.id == id)
-        .ok_or_else(|| format!("{id}: not a shaping feature"))
-}
+pub const LANE: Lane = Lane {
+    command: "shape",
+    features: &FEATURES,
+    reference: "harfbuzz-native",
+    pin_note: "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
+    report_directory: ".research/shape-report",
+    manifest_directory: ".research/shape/manifests",
+    row_sources: &ROW_SOURCES,
+    rows,
+    note,
+    directory,
+    write_inputs,
+    check_inputs,
+    smoke: &SMOKE_CASES,
+};
 
-fn pins_path(root: &Path, id: &str) -> PathBuf {
-    root.join("harness/features").join(id).join("pins.json")
+fn load(id: &str) -> R<Load> {
+    match id {
+        "shape-text" => Ok(Load::Text { all: false }),
+        "shape-libass" => Ok(Load::Libass { size: LIBASS_SIZE }),
+        "shape-text-all" => Ok(Load::Text { all: true }),
+        "shape-bidi" => Ok(Load::Bidi),
+        "shape-simple" => Ok(Load::Simple),
+        "shape-unicode" => Ok(Load::Unicode),
+        _ => Err(format!("{id}: not a shaping feature")),
+    }
 }
 
 /// Upper-case hexadecimal code points separated by single spaces.
@@ -547,16 +545,16 @@ fn text_file_rows(load: Load) -> Vec<Value> {
     rows
 }
 
-fn rows(root: &Path, feature: Feature) -> R<Vec<Value>> {
-    match feature.load {
+fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
+    match load(id)? {
         Load::Text { all } => text_rows(root, all, None),
         Load::Libass { size } => text_rows(root, false, Some(size)),
         load => Ok(text_file_rows(load)),
     }
 }
 
-fn note(feature: Feature) -> &'static str {
-    match feature.id {
+fn note(id: &str) -> &'static str {
+    match id {
         "shape-text" => {
             "A font of every outline format and of every script group the shapers cover, and fonts without layout tables, each with the authored texts and eight seeded random strings of a script under libass's run and the variants a covering face gets."
         }
@@ -576,218 +574,20 @@ fn note(feature: Feature) -> &'static str {
     }
 }
 
-fn directory(feature: Feature) -> &'static str {
-    if matches!(feature.load, Load::Text { .. } | Load::Libass { .. }) {
+fn directory(id: &str) -> &'static str {
+    if matches!(load(id), Ok(Load::Text { .. } | Load::Libass { .. })) {
         FONT_DIRECTORY
     } else {
         TEXT_DIRECTORY
     }
 }
 
-/// The pins of `id`: case id to expected work.
-fn pins(root: &Path, id: &str) -> R<Vec<(String, Value)>> {
-    let path = pins_path(root, id);
-    let document =
-        crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    match document.get("pins") {
-        Some(Value::Object(pins)) => Ok(pins.clone()),
-        _ => Err(format!("{}: no pins", path.display())),
-    }
-}
-
-/// The generated manifest of feature `id`: its rows with their pinned work. The
-/// case ids and the pinned ids must match exactly.
-pub fn manifest(root: &Path, id: &str) -> R<Value> {
-    let feature = feature(id)?;
-    let pins = pins(root, id)?;
-    let rows = rows(root, feature)?;
-    if rows.len() != pins.len() {
-        return Err(format!(
-            "{id}: {} cases but {} pins; re-record them",
-            rows.len(),
-            pins.len()
-        ));
-    }
-    let mut cases = Vec::new();
-    for (row, (pinned, expected)) in rows.into_iter().zip(pins) {
-        let case = row.get("id").and_then(Value::as_str).unwrap_or_default();
-        if case != pinned {
-            return Err(format!(
-                "{id}: case {case} is pinned as {pinned}; re-record them"
-            ));
-        }
-        let Value::Object(mut fields) = row else {
-            unreachable!("rows are objects")
-        };
-        fields.push(("expected".into(), expected));
-        cases.push(Value::Object(fields));
-    }
-    Ok(Value::object([
-        ("schema", Value::int(1)),
-        ("note", Value::str(note(feature))),
-        ("directory", Value::str(directory(feature))),
-        ("cases", Value::Array(cases)),
-    ]))
-}
-
-fn pin_file(pins: Vec<(String, Value)>) -> Value {
-    Value::object([
-        ("schema", Value::int(1)),
-        ("reference", Value::str("harfbuzz-native")),
-        (
-            "note",
-            Value::str(
-                "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
-            ),
-        ),
-        ("pins", Value::Object(pins)),
-    ])
-}
-
-/// Every registered shaping feature's generated manifest builds and its pin file
-/// is exactly what [`record`] writes for its cases.
-pub fn check(root: &Path) -> Vec<String> {
-    let mut errors = Vec::new();
-    if let Some(label) = texts::duplicate_label() {
-        errors.push(format!(
-            "xtask/src/shape/texts.rs: two samples are labelled {label}"
-        ));
-    }
-    for feature in FEATURES {
-        if !root
-            .join("harness/features")
-            .join(feature.id)
-            .join("contract.json")
-            .is_file()
-        {
-            continue;
-        }
-        if let Err(error) = manifest(root, feature.id) {
-            errors.push(error);
-            continue;
-        }
-        let path = pins_path(root, feature.id);
-        let committed = std::fs::read_to_string(&path).unwrap_or_default();
-        match pins(root, feature.id).map(|pins| canonical(&pin_file(pins))) {
-            Ok(text) if text == committed => {}
-            _ => errors.push(format!(
-                "{}: not in the form `cargo xtask shape manifest --record` writes",
-                path.display()
-            )),
-        }
-    }
-    errors
-}
-
-/// Re-records the pins of every feature from the built shaping reference.
-pub fn record(root: &Path) -> R<()> {
-    write_inputs(root)?;
-    let identity = crate::checks::read_json(&root.join("target/harness/identity.json"))?;
-    let reference = crate::harness::comparison::reference_named(&identity, "harfbuzz-native")?;
-    let worker = root.join(
-        reference
-            .get("path")
-            .and_then(Value::as_str)
-            .unwrap_or_default(),
-    );
-    let built = crate::sha256::hex(
-        &std::fs::read(&worker).map_err(|e| format!("{}: {e}", worker.display()))?,
-    );
-    if reference.get("sha256").and_then(Value::as_str) != Some(built.as_str()) {
-        return Err("the shaping reference changed since build-workers; rebuild".into());
-    }
-    for feature in FEATURES {
-        let contract = root
-            .join("harness/features")
-            .join(feature.id)
-            .join("contract.json");
-        let contract = crate::checks::read_json(&contract)?;
-        let prefix = contract
-            .get("worker_operation")
-            .and_then(Value::as_str)
-            .ok_or_else(|| format!("{}: no worker_operation", feature.id))?;
-        let rows = rows(root, feature)?;
-        let input = root.join(directory(feature));
-        let folds = fold_all(&worker, &format!("{prefix}fold"), &input, &rows)?;
-        let pins = rows
-            .iter()
-            .zip(folds)
-            .map(|(row, fold)| {
-                let id = row.get("id").and_then(Value::as_str).unwrap_or_default();
-                (id.to_owned(), fold)
-            })
-            .collect();
-        crate::corpus::write_json(&pins_path(root, feature.id), &pin_file(pins))?;
-        println!("{}: {} pins recorded", feature.id, rows.len());
-    }
-    Ok(())
-}
-
-/// The reference's `{packets, bytes, digest}` for every row, run in parallel.
-fn fold_all(worker: &Path, mode: &str, directory: &Path, rows: &[Value]) -> R<Vec<Value>> {
-    let results: Mutex<Vec<Option<R<Value>>>> = Mutex::new(vec![None; rows.len()]);
-    let next = AtomicUsize::new(0);
-    let threads = std::thread::available_parallelism().map_or(4, std::num::NonZero::get);
-    std::thread::scope(|scope| {
-        for _ in 0..threads {
-            scope.spawn(|| {
-                loop {
-                    let at = next.fetch_add(1, Ordering::Relaxed);
-                    let Some(row) = rows.get(at) else { break };
-                    let result = fold(worker, mode, directory, row);
-                    results.lock().expect("results")[at] = Some(result);
-                }
-            });
-        }
-    });
-    results
-        .into_inner()
-        .expect("results")
+/// The authored texts' labels are unique.
+fn check_inputs(_root: &Path) -> Vec<String> {
+    texts::duplicate_label()
+        .map(|label| format!("xtask/src/shape/texts.rs: two samples are labelled {label}"))
         .into_iter()
-        .map(|r| r.unwrap_or_else(|| Err("not run".into())))
         .collect()
-}
-
-fn fold(worker: &Path, mode: &str, directory: &Path, row: &Value) -> R<Value> {
-    let file = row.get("file").and_then(Value::as_str).unwrap_or_default();
-    let arguments = row
-        .get("arguments")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(Value::as_str);
-    let output = Command::new(worker)
-        .arg(mode)
-        .arg(directory.join(file))
-        .args(arguments)
-        .output()
-        .map_err(|e| format!("{}: {e}", worker.display()))?;
-    let id = row.get("id").and_then(Value::as_str).unwrap_or_default();
-    if !output.status.success() {
-        return Err(format!("{id}: the reference failed: {}", output.status));
-    }
-    let data = crate::json::parse(&String::from_utf8_lossy(&output.stdout))
-        .map_err(|e| format!("{id}: {e}"))?;
-    Ok(Value::object(["packets", "bytes", "digest"].map(|key| {
-        (key, data.get(key).cloned().unwrap_or(Value::Null))
-    })))
-}
-
-/// Writes the generated text files and every manifest to
-/// `directory/<id>/corpus.json` for reading.
-pub fn write(root: &Path, directory: &Path) -> R<()> {
-    write_inputs(root)?;
-    for feature in FEATURES {
-        let path = directory.join(feature.id).join("corpus.json");
-        let manifest = manifest(root, feature.id)?;
-        let cases = manifest
-            .get("cases")
-            .and_then(Value::as_array)
-            .map_or(0, <[_]>::len);
-        crate::corpus::write_json(&path, &manifest)?;
-        println!("{}: {cases} cases", path.display());
-    }
-    Ok(())
 }
 
 #[cfg(test)]
