@@ -18,8 +18,8 @@ use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::{Clip as ClipRect, ClipFrame, FrameScale, Matrix, Rect, Vector, pixels_26_6};
 
 use crate::{
-    Context, EventState, GlyphState, HAlign, Justify, KaraokeGlyph, Placement as EventPlacement,
-    Script, ScrollDirection, VAlign, charge,
+    Context, EventState, GlyphState, HAlign, Justify, KaraokeGlyph, Margins,
+    Placement as EventPlacement, Script, ScrollDirection, VAlign, charge,
 };
 use bitmaps::{Combined, Painter, apply_fade};
 use collisions::EventBox;
@@ -271,18 +271,12 @@ impl Renderer {
         if glyphs.len == 0 {
             return Ok(None);
         }
-        let style = context.style();
-        let margin = |own: i32, from_style: i32| if own != 0 { own } else { from_style };
         let laid = Laid {
             state: *context.state(),
             last: *context.glyph_state(),
             scales,
             explicit,
-            margins: [
-                margin(event.margins.left, style.margins.left),
-                margin(event.margins.right, style.margins.right),
-                margin(event.margins.vertical, style.margins.vertical),
-            ],
+            margins: event.margins.or(context.style().margins),
         };
         let bbox = self.lay_out(
             script,
@@ -393,12 +387,11 @@ impl Renderer {
         )?;
         layout::preliminary(glyphs);
 
-        let [margin_l, margin_r, _] = laid.margins;
         let explicit = laid.explicit;
         let max_text_width = geometry.x_right(
-            f64::from(geometry.play_res.0.wrapping_sub(margin_r)),
+            f64::from(geometry.play_res.0.wrapping_sub(laid.margins.right)),
             explicit,
-        ) - geometry.x_left(f64::from(margin_l), explicit);
+        ) - geometry.x_left(f64::from(laid.margins.left), explicit);
         let state = &laid.state;
         let lines = &mut self.scratch.lines;
         let spacing = self.frame.line_spacing;
@@ -559,8 +552,8 @@ struct Laid<'s> {
     last: GlyphState<'s>,
     scales: geometry::Scales,
     explicit: bool,
-    /// The left, right and vertical margins: the event's, else its style's.
-    margins: [i32; 3],
+    /// The event's margins, else its style's.
+    margins: Margins,
 }
 
 /// `calculate_rotation_params`: every glyph's offset from the rotation
@@ -620,7 +613,6 @@ fn device_position(
     line_position: f64,
 ) -> (f64, f64) {
     let (state, explicit) = (&laid.state, laid.explicit);
-    let [margin_l, _, margin_v] = laid.margins;
     let (mut x, mut y) = (0.0, 0.0);
     let positioned = match state.placement {
         EventPlacement::Positioned(px, py) => {
@@ -639,7 +631,7 @@ fn device_position(
         Some(s) if s.direction == ScrollDirection::LeftToRight => {
             x = geometry.x_pos(s.shift) - (bbox.x_max - bbox.x_min);
         }
-        _ if !positioned => x = geometry.x_left(f64::from(margin_l), explicit),
+        _ if !positioned => x = geometry.x_left(f64::from(laid.margins.left), explicit),
         _ => {}
     }
     let first_asc = lines.lines.as_slice()[0].asc;
@@ -651,14 +643,19 @@ fn device_position(
             y = geometry.y_mid(f64::from(y1) - s.shift, explicit) - bbox.y_min;
         }
         _ if !positioned => match state.alignment.vertical {
-            VAlign::Top => y = geometry.y_top(f64::from(margin_v), explicit) + first_asc,
+            VAlign::Top => {
+                y = geometry.y_top(f64::from(laid.margins.vertical), explicit) + first_asc;
+            }
             VAlign::Middle => {
                 let scr_y = geometry.y_mid(f64::from(play_y) / 2.0, explicit);
                 y = scr_y - (bbox.y_max + bbox.y_min) / 2.0;
             }
             VAlign::Bottom | VAlign::TopAndMiddle => {
                 let line_pos = if explicit { 0.0 } else { line_position };
-                let bottom = geometry.y_sub(f64::from(play_y.wrapping_sub(margin_v)), explicit);
+                let bottom = geometry.y_sub(
+                    f64::from(play_y.wrapping_sub(laid.margins.vertical)),
+                    explicit,
+                );
                 let top = geometry.y_top(0.0, explicit);
                 y = bottom + (top - bottom) * line_pos / 100.0;
                 y -= lines.height;
