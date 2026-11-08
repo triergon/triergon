@@ -149,6 +149,102 @@ const SPS: &[u8] = &[0x67, 66, 0, 10, 128];
 const PPS: &[u8] = &[0x68, 0xce, 6, 0xe2];
 
 #[test]
+fn configuration_windows_survive_session_close_with_shared_side_data() {
+    for variant in 0..3 {
+        let p = pool();
+        let baseline = p.used();
+        let encoded = avcc(130);
+        let backing = bytes(&p, &[encoded.as_slice(), encoded.as_slice()].concat());
+        let raw = backing.slice(0..encoded.len()).unwrap();
+        let address = raw.storage_address();
+        let pointer = raw.as_ref().as_ptr();
+        let extra = match variant {
+            0 => raw.clone(),
+            1 => backing.slice(encoded.len()..2 * encoded.len()).unwrap(),
+            _ => bytes(&p, &encoded),
+        };
+        let mut parser = AvcConfigParser::new(
+            &p,
+            AvcConfigSource {
+                source: SourceId(9),
+                generation: 12,
+                offset: 17,
+            },
+            raw,
+            AvcConfigLimits {
+                maximum_record_bytes: 4096,
+                maximum_nals: 64,
+                maximum_nal_bytes: 4096,
+            },
+        )
+        .unwrap();
+        let update = loop {
+            if let BuildStep::Ready(value) = parser
+                .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                .unwrap()
+            {
+                break value;
+            }
+        };
+        drop(parser);
+        let mut s = session(&p);
+        let mut source = packet(&p, &[IDR]);
+        source.new_extradata = Some(extra);
+        let output = run(&mut s, source, Some(update), 1).unwrap();
+        drop(s);
+        drop(backing);
+
+        assert_eq!(output.configuration_bytes().as_ref(), encoded);
+        assert_eq!(output.configuration_bytes().storage_address(), address);
+        assert_eq!(output.configuration_bytes().as_ref().as_ptr(), pointer);
+        assert_eq!(output.configuration_source_identity().unwrap().0.offset, 17);
+        assert_eq!(output.source().fields, fields());
+        for index in 0..output.segments().len() {
+            let segment = output.retain_segment_bytes(index).unwrap();
+            assert_eq!(segment.as_ref(), output.segment_bytes(index).unwrap());
+        }
+        assert!(p.used() > baseline);
+        drop(output);
+        assert_eq!(p.used(), baseline);
+    }
+}
+
+#[test]
+fn empty_configuration_keeps_its_distinct_backing_after_close() {
+    let p = pool();
+    let baseline = p.used();
+    let raw = bytes(&p, &[]);
+    let address = raw.storage_address();
+    let mut s = NalPacketSession::new(
+        &p,
+        NalPacketConfiguration::Passthrough {
+            codec: Codec::Avc,
+            raw,
+        },
+        limits(),
+    )
+    .unwrap();
+    let mut source = packet(&p, &[IDR]);
+    source.new_extradata = Some(bytes(&p, &[]));
+    let output = run(&mut s, source, None, 1).unwrap();
+    drop(s);
+
+    assert!(output.configuration_bytes().is_empty());
+    assert_eq!(output.configuration_bytes().storage_address(), address);
+    assert_ne!(
+        output.configuration_bytes().storage_address(),
+        output
+            .source()
+            .new_extradata
+            .as_ref()
+            .unwrap()
+            .storage_address()
+    );
+    drop(output);
+    assert_eq!(p.used(), baseline);
+}
+
+#[test]
 fn repeated_first_slices_inject_but_continuation_does_not() {
     let p = pool();
     let mut s = session(&p);

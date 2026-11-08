@@ -212,6 +212,10 @@ impl Bytes {
     pub fn belongs_to(&self, budget: &Budget) -> bool {
         self.storage.charge.budget.same_pool(budget)
     }
+    /// Borrow the pool that charges this span's complete backing allocation.
+    pub fn budget(&self) -> &Budget {
+        &self.storage.charge.budget
+    }
     /// Clear a uniquely owned full allocation for another write. A shared
     /// owner or a slice is returned intact.
     pub fn try_reuse(mut self) -> std::result::Result<BytesWriter, Self> {

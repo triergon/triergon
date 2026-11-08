@@ -85,7 +85,8 @@ lives (`Charged::boxed` charges a boxed value's size). A `Reservation` held apar
 from its storage is for output a caller owns, such as a decoder's output frame:
 `resize_to` charges that storage before it grows. `Bytes` is an immutable shared span: slicing and
 cloning share one backing allocation, and every alias keeps the whole backing
-capacity charged (`retained_capacity`). `BudgetVec<T>` is the charged mutable
+capacity charged (`retained_capacity`). `Bytes::budget()` borrows that allocation's
+pool without adding another shared handle. `BudgetVec<T>` is the charged mutable
 vector and reads and writes as a slice (`try_filled` builds one filled with a value,
 `try_clone` charges a copy); growth charges old and new buffers together, and a rejected push,
 reserve or `freeze` returns the original value or builder unchanged.

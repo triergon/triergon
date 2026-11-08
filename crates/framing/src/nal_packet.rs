@@ -819,6 +819,7 @@ impl<M> NalPacketJob<'_, M> {
     /// Publish a complete output directly into an empty caller-owned slot.
     /// Occupied slots are rejected before any job, work or owner change and do
     /// not poison the job. Yield, completion and errors leave the slot empty.
+    #[inline(never)]
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,
