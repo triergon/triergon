@@ -111,8 +111,8 @@ fn run(args: &[String]) -> Result<()> {
         ..Options::default()
     };
     // An accounting ceiling far above any script of the corpus, so only parity
-    // decides.
-    let budget = Budget::new(1 << 32)?;
+    // decides; it fits a 32-bit `usize`.
+    let budget = Budget::new(1 << 30)?;
     // An event walk runs over a script read before it.
     let walked = match mode {
         Mode::Events { stream: false } => parse(&budget, &data, &options)?,
