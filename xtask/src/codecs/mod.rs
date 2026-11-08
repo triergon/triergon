@@ -3,6 +3,7 @@
 
 pub mod correctness;
 pub mod equivalence;
+pub mod fuzz;
 pub mod summary;
 pub mod timing;
 
@@ -21,7 +22,10 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
        [--only ID,...] [--recollect-contaminated LABEL]
                  paired timing of the decoder workloads (30 pairs, seed 280)
   equivalence --output F [--compare F] [--jobs N]
-                 record every decoder output identity; --compare checks an earlier record";
+                 record every decoder output identity; --compare checks an earlier record
+  fuzz --lane LANE --output DIR [--rounds N] [--seed N] [--timeout-seconds S] [--only SUBSTR,...]
+                 cargo xtask fuzz campaign over the lane's vectors: release and checked
+                 codec-worker builds decode each mutation whole (4 rounds, seed 280, 30 s)";
 
 /// `--name value` and `--name=value` options and positional arguments, as
 /// `argparse` accepts them; `switches` take no value.
@@ -183,6 +187,43 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 a.get("compare").map(Path::new),
                 a.number("jobs")?.unwrap_or_else(default_jobs),
             );
+        }
+        "fuzz" => {
+            let a = Args::parse(
+                rest,
+                &[
+                    "lane",
+                    "output",
+                    "rounds",
+                    "seed",
+                    "timeout-seconds",
+                    "only",
+                ],
+                &[],
+            )?;
+            let timeout_seconds = match a.get("timeout-seconds") {
+                Some(v) => v
+                    .parse()
+                    .map_err(|_| format!("--timeout-seconds: not a number: {v}"))?,
+                None => 30.0,
+            };
+            let campaign = crate::fuzz::Campaign {
+                manifest: PathBuf::new(),
+                output: a.path("output")?,
+                rounds: a.number("rounds")?.unwrap_or(4),
+                seed: a.number("seed")?.unwrap_or(280) as u64,
+                maximum_input_bytes: 4 << 20,
+                maximum_output_bytes: 8 << 20,
+                timeout_seconds,
+            };
+            let only: Vec<String> = a
+                .get("only")
+                .unwrap_or_default()
+                .split(',')
+                .filter(|o| !o.is_empty())
+                .map(str::to_owned)
+                .collect();
+            return fuzz::run(root, a.required("lane")?, &only, &campaign);
         }
         _ => return Err(USAGE.to_owned()),
     }

@@ -88,6 +88,15 @@ lto = "fat"
 codegen-units = 1
 
 
+# Release optimisation with overflow checks and debug assertions: the second build a
+# `cargo xtask codecs fuzz` campaign decodes each mutation with.
+[profile.checked]
+inherits = "release"
+overflow-checks = true
+debug-assertions = true
+lto = false
+codegen-units = 16
+
 # Repository tasks hash and unpack large inputs; optimise them even in dev builds.
 [profile.dev.package.xtask]
 opt-level = 3

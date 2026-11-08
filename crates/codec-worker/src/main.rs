@@ -189,10 +189,11 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
 
 fn main() {
     // <lane>-<codec>-bench FILE ITERATIONS | <lane>-<codec>-memory FILE | <lane>-<codec>-raw FILE OUT
+    // | <lane>-<codec>-fold FILE
     let args: Vec<String> = std::env::args().collect();
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
-            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT"
+            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE"
         );
         std::process::exit(2);
     };
@@ -234,6 +235,17 @@ fn main() {
             )
             .expect("stdout");
             eprintln!("{{\"digest\":{}}}", out.digest.finish());
+        }
+        "fold" => {
+            // One decode and its output identity, without timing: what a fuzz campaign
+            // compares between builds.
+            run(op, &data, &mut out);
+            println!(
+                "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
+                out.frames,
+                out.bytes,
+                out.digest.finish()
+            );
         }
         "raw" => {
             out.raw = Some(std::io::BufWriter::new(

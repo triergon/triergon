@@ -170,8 +170,10 @@ debug, release and reference workers from a pinned manifest, with a timeout per
 input. With `--contract` it builds that manifest from a prefix feature's cases: the
 release candidate and its dev build, plus the reference with `--reference`; listed
 open cases are expected to be rejected by both builds, and the campaign keeps the
-manifest as `manifest.json` for replay. `cargo xtask check` runs one round on each
-required font feature.
+manifest as `manifest.json` for replay. `cargo xtask codecs fuzz --lane L` builds it
+from a codec lane's FATE vectors instead: release and `checked` builds of `codec-worker`
+(release optimisation with overflow checks and debug assertions) decode each mutation
+whole. `cargo xtask check` runs one round on each required font feature.
 
 On native AArch64 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.
