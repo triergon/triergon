@@ -5,23 +5,93 @@
 //! not trusted, because fonts with more than 64 KiB of format 4 data overflow it.
 
 use crate::GlyphId;
-use crate::read::{Meter, Reader, slice, u16_at, u32_at};
+use crate::name::Platform;
+use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
-use triergon_core::{Budget, BudgetVec, Error, Result};
+use crate::work::charge;
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 /// The last Unicode scalar value; mapping iteration stops there.
 const MAX_CODE: u32 = 0x10_ffff;
 
-/// One supported `cmap` subtable.
+/// A supported subtable format.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Charmap {
-    /// The encoding record's platform: 0 Unicode, 1 Macintosh, 3 Windows.
-    pub platform: u16,
-    /// The platform-specific encoding: for Windows, 0 Symbol, 1 Unicode BMP and 10
-    /// full Unicode.
-    pub encoding: u16,
-    /// The subtable format.
-    pub format: u16,
+pub enum CmapFormat {
+    /// Format 0: one byte per code 0 to 255.
+    ByteEncoding,
+    /// Format 4: segments of 16-bit codes with deltas or glyph arrays.
+    SegmentDelta,
+    /// Format 6: one run of 16-bit codes.
+    Trimmed,
+    /// Format 10: one run of 32-bit codes.
+    TrimmedArray,
+    /// Format 12: groups of consecutive codes mapping to consecutive glyphs.
+    SegmentedCoverage,
+    /// Format 13: groups of codes mapping to one glyph.
+    ManyToOne,
+}
+
+impl CmapFormat {
+    const fn from_number(number: u16) -> Option<Self> {
+        Some(match number {
+            0 => Self::ByteEncoding,
+            4 => Self::SegmentDelta,
+            6 => Self::Trimmed,
+            10 => Self::TrimmedArray,
+            12 => Self::SegmentedCoverage,
+            13 => Self::ManyToOne,
+            _ => return None,
+        })
+    }
+
+    /// The format number the subtable stores.
+    pub const fn number(self) -> u16 {
+        match self {
+            Self::ByteEncoding => 0,
+            Self::SegmentDelta => 4,
+            Self::Trimmed => 6,
+            Self::TrimmedArray => 10,
+            Self::SegmentedCoverage => 12,
+            Self::ManyToOne => 13,
+        }
+    }
+
+    /// The bytes the fixed header and arrays need, read from the subtable header.
+    /// Format 4's glyph array is checked per lookup instead.
+    fn needed(self, table: &[u8]) -> Option<usize> {
+        let count = |offset| u16_at(table, offset).map(usize::from);
+        let wide = |offset| u32_at(table, offset).and_then(|n| usize::try_from(n).ok());
+        match self {
+            Self::ByteEncoding => Some(6 + 256),
+            Self::SegmentDelta => count(6).map(|twice| 16 + 4 * twice),
+            Self::Trimmed => count(8).map(|n| 10 + 2 * n),
+            Self::TrimmedArray => wide(16)?.checked_mul(2)?.checked_add(20),
+            Self::SegmentedCoverage | Self::ManyToOne => wide(12)?.checked_mul(12)?.checked_add(16),
+        }
+    }
+}
+
+/// What a subtable's codes are, from its encoding record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CharEncoding {
+    /// Unicode BMP: Windows encoding 1, or Unicode-platform encodings 0 to 3.
+    Unicode,
+    /// Full Unicode: Windows encoding 10, or Unicode-platform encodings 4 and 6.
+    UnicodeFull,
+    /// Windows Symbol (encoding 0): codes usually in U+F020..U+F0FF.
+    Symbol,
+    /// Macintosh Roman (Macintosh encoding 0).
+    MacRoman,
+    /// Any other platform-specific encoding.
+    Other,
+}
+
+/// One supported subtable of a face; [`Charmap`] is its public view.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Subtable {
+    platform: Platform,
+    encoding: u16,
+    format: CmapFormat,
     /// The subtable's offset in the file.
     offset: usize,
     /// The end of the `cmap` table in the file.
@@ -33,55 +103,57 @@ pub(crate) fn parse(
     data: &[u8],
     table: Table,
     budget: &Budget,
-    meter: &mut Meter,
-) -> Result<BudgetVec<Charmap>> {
+    work: &mut WorkBudget,
+) -> Result<BudgetVec<Subtable>> {
     let bytes = slice(data, table.offset, table.len)?;
     let mut r = Reader::new(bytes);
     if r.u16()? != 0 {
         return Err(Error::Invalid("cmap version"));
     }
     let count = r.u16()?;
-    meter.charge(usize::from(count))?;
-    let mut charmaps = BudgetVec::new(budget);
+    charge(work, usize::from(count))?;
+    let mut subtables = BudgetVec::new(budget);
     for _ in 0..count {
-        let platform = r.u16()?;
+        let platform = Platform::from_id(r.u16()?);
         let encoding = r.u16()?;
         let offset = usize::try_from(r.u32()?).map_err(|_| Error::Overflow)?;
-        let Some(format) = u16_at(bytes, offset) else {
+        let Some(format) = u16_at(bytes, offset).and_then(CmapFormat::from_number) else {
             continue;
         };
-        let charmap = Charmap {
-            platform,
-            encoding,
-            format,
-            offset: table.offset + offset,
-            end: table.offset + table.len,
-        };
-        if charmap.header_fits(data) {
-            charmaps.try_push(charmap).map_err(|e| e.error)?;
+        let fits = bytes
+            .get(offset..)
+            .and_then(|sub| Some(format.needed(sub)? <= sub.len()));
+        if fits == Some(true) {
+            let subtable = Subtable {
+                platform,
+                encoding,
+                format,
+                offset: table.offset + offset,
+                end: table.offset + table.len,
+            };
+            subtables.try_push(subtable).map_err(|e| e.error)?;
         }
     }
-    Ok(charmaps)
+    Ok(subtables)
 }
 
-impl Charmap {
-    /// Whether the format is supported and its fixed header and arrays lie in the
-    /// table. Format 4's glyph array is checked per lookup instead.
-    fn header_fits(&self, data: &[u8]) -> bool {
-        let Some(table) = data.get(self.offset..self.end) else {
-            return false;
-        };
-        let at = |offset| u16_at(table, offset).map(usize::from);
-        let wide = |offset| u32_at(table, offset).and_then(|n| usize::try_from(n).ok());
-        let needed = match self.format {
-            0 => Some(6 + 256),
-            4 => at(6).map(|twice| 16 + 4 * twice),
-            6 => at(8).map(|count| 10 + 2 * count),
-            10 => wide(16).and_then(|count| count.checked_mul(2)?.checked_add(20)),
-            12 | 13 => wide(12).and_then(|count| count.checked_mul(12)?.checked_add(16)),
-            _ => None,
-        };
-        needed.is_some_and(|needed| needed <= table.len())
+impl Subtable {
+    pub(crate) const fn platform(&self) -> Platform {
+        self.platform
+    }
+
+    pub(crate) const fn encoding_id(&self) -> u16 {
+        self.encoding
+    }
+
+    pub(crate) const fn encoding(&self) -> CharEncoding {
+        match (self.platform, self.encoding) {
+            (Platform::Windows, 1) | (Platform::Unicode, 0..=3) => CharEncoding::Unicode,
+            (Platform::Windows, 10) | (Platform::Unicode, 4 | 6) => CharEncoding::UnicodeFull,
+            (Platform::Windows, 0) => CharEncoding::Symbol,
+            (Platform::Macintosh, 0) => CharEncoding::MacRoman,
+            _ => CharEncoding::Other,
+        }
     }
 
     fn table<'a>(&self, data: &'a [u8]) -> &'a [u8] {
@@ -89,74 +161,165 @@ impl Charmap {
     }
 
     /// The glyph `code` maps to, without the glyph-count check.
-    pub(crate) fn lookup(&self, data: &[u8], code: u32) -> Option<u32> {
-        let table = self.table(data);
-        let glyph = match self.format {
-            0 => u32::from(*table.get(6 + usize::try_from(code).ok().filter(|&c| c < 256)?)?),
-            4 => u32::from(format4(table, u16::try_from(code).ok()?)?),
-            6 => {
+    fn lookup(&self, table: &[u8], code: u32) -> Option<u32> {
+        match self.format {
+            CmapFormat::ByteEncoding => {
+                let code = usize::try_from(code).ok().filter(|&c| c < 256)?;
+                table.get(6 + code).map(|&g| u32::from(g))
+            }
+            CmapFormat::SegmentDelta => {
+                segment_delta(table, u16::try_from(code).ok()?).map(u32::from)
+            }
+            CmapFormat::Trimmed => {
                 let first = u32::from(u16_at(table, 6)?);
                 let count = u32::from(u16_at(table, 8)?);
-                trimmed(table, 10, first, count, code)?
+                trimmed(table, 10, first, count, code)
             }
-            10 => trimmed(table, 20, u32_at(table, 12)?, u32_at(table, 16)?, code)?,
-            12 | 13 => groups(table, self.format, code)?,
-            _ => return None,
-        };
-        Some(glyph)
+            CmapFormat::TrimmedArray => {
+                trimmed(table, 20, u32_at(table, 12)?, u32_at(table, 16)?, code)
+            }
+            CmapFormat::SegmentedCoverage => groups(table, code, true),
+            CmapFormat::ManyToOne => groups(table, code, false),
+        }
     }
 
-    /// The (code, glyph) pairs in code order, skipping glyph 0 and glyphs at or
-    /// above `glyph_count`. Codes in unordered format 4 segments follow segment
-    /// order; codes above U+10FFFF are not visited.
-    pub(crate) fn mappings<'a>(
-        &self,
-        data: &'a [u8],
-        glyph_count: u32,
-    ) -> impl Iterator<Item = (u32, GlyphId)> + 'a {
-        let charmap = *self;
-        let table = self.table(data);
-        let ranges = (0..).map_while(move |i| charmap.code_range(table, i));
-        ranges
-            .filter(|&(first, _)| first <= MAX_CODE)
-            .flat_map(|(first, last)| first..=last.min(MAX_CODE))
-            .filter_map(move |code| {
-                let glyph = charmap.lookup(data, code)?;
-                (glyph != 0 && glyph < glyph_count).then_some((code, GlyphId(glyph)))
-            })
-    }
-
-    /// Range `i` of codes the subtable can map.
-    fn code_range(&self, table: &[u8], i: u32) -> Option<(u32, u32)> {
-        let index = usize::try_from(i).ok()?;
+    /// Range `i` of codes the subtable can map, in subtable order.
+    fn code_range(&self, table: &[u8], i: usize) -> Option<(u32, u32)> {
         match self.format {
-            0 => (i == 0).then_some((0, 255)),
-            4 => {
+            CmapFormat::ByteEncoding => (i == 0).then_some((0, 255)),
+            CmapFormat::SegmentDelta => {
                 let count = usize::from(u16_at(table, 6)? / 2);
-                (index < count).then_some(())?;
-                let end = u16_at(table, 14 + 2 * index)?;
-                let start = u16_at(table, 16 + 2 * count + 2 * index)?;
+                (i < count).then_some(())?;
+                let end = u16_at(table, 14 + 2 * i)?;
+                let start = u16_at(table, 16 + 2 * count + 2 * i)?;
                 Some((u32::from(start), u32::from(end.max(start))))
             }
-            6 | 10 => {
+            CmapFormat::Trimmed | CmapFormat::TrimmedArray => {
                 (i == 0).then_some(())?;
-                let (first, count) = if self.format == 6 {
+                let (first, count) = if self.format == CmapFormat::Trimmed {
                     (u32::from(u16_at(table, 6)?), u32::from(u16_at(table, 8)?))
                 } else {
                     (u32_at(table, 12)?, u32_at(table, 16)?)
                 };
-                let last = first.checked_add(count.checked_sub(1)?)?;
-                Some((first, last))
+                Some((first, first.checked_add(count.checked_sub(1)?)?))
             }
-            12 | 13 => {
-                let count = u32_at(table, 12)?;
+            CmapFormat::SegmentedCoverage | CmapFormat::ManyToOne => {
+                let count = usize::try_from(u32_at(table, 12)?).ok()?;
                 (i < count).then_some(())?;
-                let at = 16 + 12 * index;
+                let at = 16 + 12 * i;
                 let (first, last) = (u32_at(table, at)?, u32_at(table, at + 4)?);
                 Some((first, last.max(first)))
             }
-            _ => None,
         }
+    }
+}
+
+/// A `cmap` subtable of one face. It borrows the face's bytes, so it cannot be used
+/// with another face.
+#[derive(Clone, Copy, Debug)]
+pub struct Charmap<'f> {
+    data: &'f [u8],
+    glyph_count: u32,
+    subtable: Subtable,
+    work: u64,
+}
+
+impl<'f> Charmap<'f> {
+    pub(crate) const fn new(
+        data: &'f [u8],
+        glyph_count: u32,
+        subtable: Subtable,
+        work: u64,
+    ) -> Self {
+        Self {
+            data,
+            glyph_count,
+            subtable,
+            work,
+        }
+    }
+
+    pub const fn platform(&self) -> Platform {
+        self.subtable.platform()
+    }
+
+    /// The encoding record's platform-specific encoding number.
+    pub const fn encoding_id(&self) -> u16 {
+        self.subtable.encoding_id()
+    }
+
+    pub const fn encoding(&self) -> CharEncoding {
+        self.subtable.encoding()
+    }
+
+    pub const fn format(&self) -> CmapFormat {
+        self.subtable.format
+    }
+
+    /// The glyph `code` maps to, looked up unchanged. Unmapped codes and glyphs at or
+    /// above the face's glyph count give `None`.
+    pub fn glyph(&self, code: u32) -> Option<GlyphId> {
+        let glyph = self.subtable.lookup(self.subtable.table(self.data), code)?;
+        let glyph = u16::try_from(glyph)
+            .ok()
+            .filter(|&g| g != 0 && u32::from(g) < self.glyph_count)?;
+        Some(GlyphId(u32::from(glyph)))
+    }
+
+    /// Every (code, glyph) pair without glyph 0, by segment or group in subtable
+    /// order and by code within each; codes above U+10FFFF are not visited. Each
+    /// code visited costs one unit of the face's work limit; when it runs out the
+    /// iterator yields `Error::Policy` once and ends.
+    pub fn mappings(&self) -> Mappings<'f> {
+        Mappings {
+            charmap: *self,
+            range: 0,
+            next: None,
+            work: WorkBudget::new(self.work),
+            done: false,
+        }
+    }
+}
+
+/// The iterator of [`Charmap::mappings`].
+#[derive(Debug)]
+pub struct Mappings<'f> {
+    charmap: Charmap<'f>,
+    range: usize,
+    /// The next code and the last code of the current range.
+    next: Option<(u32, u32)>,
+    work: WorkBudget,
+    done: bool,
+}
+
+impl Iterator for Mappings<'_> {
+    type Item = Result<(u32, GlyphId)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let table = self.charmap.subtable.table(self.charmap.data);
+        while !self.done {
+            let Some((code, last)) = self.next else {
+                let Some((first, last)) = self.charmap.subtable.code_range(table, self.range)
+                else {
+                    self.done = true;
+                    break;
+                };
+                self.range += 1;
+                if first <= MAX_CODE {
+                    self.next = Some((first, last.min(MAX_CODE)));
+                }
+                continue;
+            };
+            self.next = (code < last).then_some((code + 1, last));
+            if !self.work.try_charge(1) {
+                self.done = true;
+                return Some(Err(Error::Policy("font work")));
+            }
+            if let Some(glyph) = self.charmap.glyph(code) {
+                return Some(Ok((code, glyph)));
+            }
+        }
+        None
     }
 }
 
@@ -168,7 +331,7 @@ fn trimmed(table: &[u8], array: usize, first: u32, count: u32, code: u32) -> Opt
 }
 
 /// Format 4: binary search for the first segment whose end is at or after `code`.
-fn format4(table: &[u8], code: u16) -> Option<u16> {
+fn segment_delta(table: &[u8], code: u16) -> Option<u16> {
     let count = usize::from(u16_at(table, 6)? / 2);
     let end = |i: usize| u16_at(table, 14 + 2 * i);
     let (mut low, mut high) = (0, count);
@@ -209,8 +372,9 @@ fn format4(table: &[u8], code: u16) -> Option<u16> {
     })
 }
 
-/// Formats 12 and 13: binary search over sorted groups.
-fn groups(table: &[u8], format: u16, code: u32) -> Option<u32> {
+/// Formats 12 and 13: binary search over sorted groups. Format 12 groups map to
+/// consecutive glyphs, format 13 groups to one.
+fn groups(table: &[u8], code: u32, consecutive: bool) -> Option<u32> {
     let count = usize::try_from(u32_at(table, 12)?).ok()?;
     let (mut low, mut high) = (0, count);
     while low < high {
@@ -223,11 +387,11 @@ fn groups(table: &[u8], format: u16, code: u32) -> Option<u32> {
             low = mid + 1;
         } else {
             let glyph = u32_at(table, at + 8)?;
-            return Some(if format == 13 {
-                glyph
+            return if consecutive {
+                glyph.checked_add(code - start)
             } else {
-                glyph.checked_add(code - start)?
-            });
+                Some(glyph)
+            };
         }
     }
     Some(0)
@@ -235,11 +399,11 @@ fn groups(table: &[u8], format: u16, code: u32) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Charmap, parse};
+    use super::{CharEncoding, Charmap, CmapFormat, parse};
     use crate::GlyphId;
-    use crate::read::Meter;
+    use crate::name::Platform;
     use crate::sfnt::Table;
-    use triergon_core::Budget;
+    use triergon_core::{Budget, Error, WorkBudget};
 
     fn words(values: &[u16]) -> Vec<u8> {
         values.iter().flat_map(|v| v.to_be_bytes()).collect()
@@ -253,20 +417,22 @@ mod tests {
         data
     }
 
-    fn charmaps(data: &[u8]) -> Vec<Charmap> {
+    fn charmaps(data: &[u8], glyphs: u32, work: u64) -> Vec<Charmap<'_>> {
         let budget = Budget::new(1 << 20).unwrap();
         let table = Table {
             offset: 0,
             len: data.len(),
         };
-        parse(data, table, &budget, &mut Meter::new(100))
-            .unwrap()
+        let subtables = parse(data, table, &budget, &mut WorkBudget::new(100)).unwrap();
+        subtables
             .as_slice()
-            .to_vec()
+            .iter()
+            .map(|&s| Charmap::new(data, glyphs, s, work))
+            .collect()
     }
 
     #[test]
-    fn format4_deltas_glyph_arrays_and_the_sentinel() {
+    fn segment_delta_glyph_arrays_and_the_sentinel() {
         // Segments: 'A'..='C' delta +1; 'a'..='b' through the glyph array; 0xFFFF.
         let mut subtable = words(&[4, 0, 0, 6, 0, 0, 0]);
         subtable.extend(words(&[0x43, 0x62, 0xffff, 0]));
@@ -277,26 +443,33 @@ mod tests {
         subtable.extend(words(&[0, 4, 0]));
         subtable.extend(words(&[7, 0]));
         let data = cmap(&subtable);
-        let [charmap] = charmaps(&data)[..] else {
+        let [charmap] = charmaps(&data, 0x43, u64::MAX)[..] else {
             panic!("one charmap");
         };
+        assert_eq!(charmap.platform(), Platform::Windows);
+        assert_eq!(charmap.encoding(), CharEncoding::Unicode);
+        assert_eq!(charmap.format(), CmapFormat::SegmentDelta);
+        assert_eq!(charmap.glyph(0x41), Some(GlyphId(0x42)));
         assert_eq!(
-            (charmap.platform, charmap.encoding, charmap.format),
-            (3, 1, 4)
+            charmap.glyph(0x42),
+            None,
+            "glyph 0x43 is past the glyph count"
         );
-        let lookup = |code| charmap.lookup(&data, code);
-        assert_eq!(lookup(0x41), Some(0x42));
-        assert_eq!(lookup(0x44), Some(0));
-        assert_eq!(lookup(0x61), Some(17));
-        assert_eq!(lookup(0x62), Some(0));
-        assert_eq!(lookup(0xffff), Some(0));
-        assert_eq!(lookup(0x1_0000), None);
-        let pairs: Vec<_> = charmap.mappings(&data, 0x43).collect();
+        assert_eq!(charmap.glyph(0x61), Some(GlyphId(17)));
+        assert_eq!(charmap.glyph(0x62), None);
+        assert_eq!(charmap.glyph(0x1_0000), None);
+        let pairs: Vec<_> = charmap.mappings().map(Result::unwrap).collect();
         assert_eq!(pairs, [(0x41, GlyphId(0x42)), (0x61, GlyphId(17))]);
+        // Five codes in the first two segments, then the work runs out.
+        let [limited] = charmaps(&data, 0x43, 4)[..] else {
+            panic!()
+        };
+        let results: Vec<_> = limited.mappings().collect();
+        assert_eq!(results.last(), Some(&Err(Error::Policy("font work"))));
     }
 
     #[test]
-    fn format12_and_13_groups() {
+    fn coverage_and_many_to_one_groups() {
         let mut subtable = words(&[12, 0]);
         subtable.extend(40_u32.to_be_bytes());
         subtable.extend(0_u32.to_be_bytes());
@@ -305,29 +478,42 @@ mod tests {
             subtable.extend(value.to_be_bytes());
         }
         let data = cmap(&subtable);
-        let charmap = charmaps(&data)[0];
-        assert_eq!(charmap.lookup(&data, 0x21), Some(6));
-        assert_eq!(charmap.lookup(&data, 0x1_f600), Some(9));
-        assert_eq!(charmap.lookup(&data, 0x22), Some(0));
+        let charmap = charmaps(&data, 100, u64::MAX)[0];
+        assert_eq!(charmap.format(), CmapFormat::SegmentedCoverage);
+        assert_eq!(charmap.glyph(0x21), Some(GlyphId(6)));
+        assert_eq!(charmap.glyph(0x1_f600), Some(GlyphId(9)));
+        assert_eq!(charmap.glyph(0x22), None);
         let mut many = data.clone();
         many[13] = 13;
-        assert_eq!(charmaps(&many)[0].lookup(&many, 0x21), Some(5));
+        let charmap = charmaps(&many, 100, u64::MAX)[0];
+        assert_eq!(
+            (charmap.format(), charmap.glyph(0x21)),
+            (CmapFormat::ManyToOne, Some(GlyphId(5)))
+        );
         // A group count beyond the table drops the subtable.
         let mut short = data;
         short[12 + 15] = 3;
-        assert!(charmaps(&short).is_empty());
+        assert!(charmaps(&short, 100, u64::MAX).is_empty());
     }
 
     #[test]
-    fn trimmed_formats_and_unsupported_subtables() {
+    fn trimmed_byte_and_unsupported_subtables() {
         let data = cmap(&words(&[6, 0, 0, 0x30, 2, 4, 5]));
-        let charmap = charmaps(&data)[0];
+        let charmap = charmaps(&data, 10, u64::MAX)[0];
         assert_eq!(
-            [0x2f, 0x30, 0x31, 0x32].map(|c| charmap.lookup(&data, c)),
-            [None, Some(4), Some(5), None]
+            [0x2f, 0x30, 0x31, 0x32].map(|c| charmap.glyph(c)),
+            [None, Some(GlyphId(4)), Some(GlyphId(5)), None]
         );
-        assert_eq!(charmap.mappings(&data, 10).count(), 2);
-        assert!(charmaps(&cmap(&words(&[2, 0, 0]))).is_empty());
-        assert!(charmaps(&cmap(&words(&[0, 262, 0]))).is_empty());
+        assert_eq!(charmap.mappings().count(), 2);
+        let mut bytes = words(&[0, 262, 0]);
+        bytes.extend((0..=255_u8).map(|c| c / 2));
+        let byte_table = cmap(&bytes);
+        let charmap = charmaps(&byte_table, 200, u64::MAX)[0];
+        assert_eq!(
+            (charmap.format(), charmap.glyph(0x41)),
+            (CmapFormat::ByteEncoding, Some(GlyphId(0x20)))
+        );
+        assert!(charmaps(&cmap(&words(&[2, 0, 0])), 10, u64::MAX).is_empty());
+        assert!(charmaps(&cmap(&words(&[0, 262, 0])), 10, u64::MAX).is_empty());
     }
 }

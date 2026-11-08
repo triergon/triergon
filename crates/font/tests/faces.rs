@@ -3,8 +3,8 @@ mod support;
 use support::{bytes, cff_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error};
 use triergon_font::{
-    Built, FaceInfo, Font, GlyphId, Limits, OutlineFormat, Point, PointKind, Request, Segment,
-    Store, StoreKey, Style, select,
+    Built, CharEncoding, CmapFormat, FaceInfo, Font, GlyphId, Limits, OutlineFormat, Platform,
+    Point, PointKind, Request, Segment, Store, StoreKey, Style, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -44,7 +44,7 @@ fn truetype_metrics_names_and_charmap() {
         font.family_name().unwrap().chars().collect::<String>(),
         "Test Sans"
     );
-    assert_eq!(font.style_name().unwrap().platform, 3);
+    assert_eq!(font.style_name().unwrap().platform, Platform::Windows);
     assert_eq!(
         font.postscript_name().unwrap().chars().collect::<String>(),
         "TestSans-Bold"
@@ -54,10 +54,15 @@ fn truetype_metrics_names_and_charmap() {
     assert_eq!(font.glyph_index('D'), None);
     let charmap = font.text_charmap().unwrap();
     assert_eq!(
-        (charmap.platform, charmap.encoding, charmap.format),
-        (3, 1, 4)
+        (charmap.platform(), charmap.encoding(), charmap.format()),
+        (
+            Platform::Windows,
+            CharEncoding::Unicode,
+            CmapFormat::SegmentDelta
+        )
     );
-    assert_eq!(font.mappings(charmap).count(), 3);
+    assert_eq!(charmap.mappings().count(), 3);
+    assert_eq!(font.kerning_pairs().count(), 1);
     assert_eq!(font.kerning(GlyphId(1), GlyphId(2)), -40);
     assert_eq!(font.kerning(GlyphId(2), GlyphId(1)), 0);
     assert_eq!(font.advance(GlyphId(3)), Ok(600));

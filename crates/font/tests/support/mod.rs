@@ -437,9 +437,9 @@ pub fn exercise(data: &[u8], limits: Limits) {
             let _ = record.chars().count();
         }
         for charmap in font.charmaps() {
-            let _ = font.mappings(charmap).take(512).count();
+            let _ = charmap.mappings().take(512).count();
             for code in [0, 0x41, 0xffff, 0x1_0000, u32::MAX] {
-                let _ = font.glyph_for_code(charmap, code);
+                let _ = charmap.glyph(code);
             }
         }
         // The first glyphs and an even spread of the rest, about 300 in all.

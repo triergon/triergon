@@ -8,9 +8,10 @@
 //! shaping.
 
 use crate::GlyphId;
-use crate::read::{Meter, Reader, slice, u16_at, u32_at};
+use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
-use triergon_core::{Budget, BudgetVec, Result};
+use crate::work::charge;
+use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
 const MAX_SUBTABLES: u16 = 32;
 const HORIZONTAL: u16 = 0x0001;
@@ -44,7 +45,7 @@ impl Kern {
         data: &[u8],
         table: Table,
         budget: &Budget,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
     ) -> Result<Self> {
         let mut kern = Self::new(budget);
         let bytes = slice(data, table.offset, table.len)?;
@@ -73,7 +74,7 @@ impl Kern {
                 let declared = usize::from(u16_at(bytes, at + 6).unwrap_or(0));
                 let first = at + 14;
                 let count = declared.min((next - first) / 6);
-                meter.charge(count)?;
+                charge(work, count)?;
                 let ordered = (1..count).all(|i| {
                     let key = |n: usize| u32_at(bytes, first + 6 * n);
                     key(i - 1) <= key(i)
@@ -89,6 +90,23 @@ impl Kern {
             at = next;
         }
         Ok(kern)
+    }
+
+    /// Every (left, right) pair the used subtables list, in table order, with
+    /// repeats. [`Self::pair`] gives the combined value of each.
+    pub(crate) fn pairs<'a>(
+        &'a self,
+        data: &'a [u8],
+    ) -> impl Iterator<Item = (GlyphId, GlyphId)> + 'a {
+        self.subtables.as_slice().iter().flat_map(move |subtable| {
+            (0..subtable.count).filter_map(move |i| {
+                let at = subtable.pairs + 6 * i;
+                Some((
+                    GlyphId(u32::from(u16_at(data, at)?)),
+                    GlyphId(u32::from(u16_at(data, at + 2)?)),
+                ))
+            })
+        })
     }
 
     /// The kerning between `left` and `right` in font units.
@@ -141,9 +159,8 @@ impl Kern {
 mod tests {
     use super::Kern;
     use crate::GlyphId;
-    use crate::read::Meter;
     use crate::sfnt::Table;
-    use triergon_core::Budget;
+    use triergon_core::{Budget, WorkBudget};
 
     fn subtable(coverage: u16, pairs: &[(u16, u16, i16)]) -> Vec<u8> {
         let mut data = Vec::new();
@@ -178,13 +195,14 @@ mod tests {
             offset: 0,
             len: data.len(),
         };
-        let kern = Kern::parse(&data, table, &budget, &mut Meter::new(100)).unwrap();
+        let kern = Kern::parse(&data, table, &budget, &mut WorkBudget::new(100)).unwrap();
         assert_eq!(kern.pair(&data, GlyphId(1), GlyphId(2)), -57);
         assert_eq!(kern.pair(&data, GlyphId(3), GlyphId(4)), 1);
         assert_eq!(kern.pair(&data, GlyphId(2), GlyphId(1)), 0);
+        assert_eq!(kern.pairs(&data).count(), 5);
         let apple = [0, 1, 0, 0, 0, 0, 0, 0];
         let table = Table { offset: 0, len: 8 };
-        let kern = Kern::parse(&apple, table, &budget, &mut Meter::new(100)).unwrap();
+        let kern = Kern::parse(&apple, table, &budget, &mut WorkBudget::new(100)).unwrap();
         assert_eq!(kern.pair(&apple, GlyphId(1), GlyphId(2)), 0);
     }
 }

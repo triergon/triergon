@@ -3,23 +3,128 @@
 use crate::read::{Reader, slice, u16_at};
 use triergon_core::{Error, Result};
 
-/// Name identifiers this crate interprets (OpenType `name` "Name IDs").
-pub mod id {
-    pub const FAMILY: u16 = 1;
-    pub const SUBFAMILY: u16 = 2;
-    pub const FULL_NAME: u16 = 4;
-    pub const POSTSCRIPT: u16 = 6;
-    pub const TYPOGRAPHIC_FAMILY: u16 = 16;
-    pub const TYPOGRAPHIC_SUBFAMILY: u16 = 17;
-    pub const WWS_FAMILY: u16 = 21;
-    pub const WWS_SUBFAMILY: u16 = 22;
+/// A naming-table record's name identifier (OpenType `name`, "Name IDs").
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NameId {
+    Copyright,
+    Family,
+    Subfamily,
+    UniqueId,
+    FullName,
+    Version,
+    PostScript,
+    Trademark,
+    Manufacturer,
+    Designer,
+    Description,
+    VendorUrl,
+    DesignerUrl,
+    License,
+    LicenseUrl,
+    TypographicFamily,
+    TypographicSubfamily,
+    CompatibleFull,
+    SampleText,
+    PostScriptCid,
+    WwsFamily,
+    WwsSubfamily,
+    /// Any other identifier, including font-specific ones from 256.
+    Other(u16),
 }
 
-/// Platform identifiers.
-pub mod platform {
-    pub const UNICODE: u16 = 0;
-    pub const MACINTOSH: u16 = 1;
-    pub const WINDOWS: u16 = 3;
+impl NameId {
+    pub const fn from_id(id: u16) -> Self {
+        match id {
+            0 => Self::Copyright,
+            1 => Self::Family,
+            2 => Self::Subfamily,
+            3 => Self::UniqueId,
+            4 => Self::FullName,
+            5 => Self::Version,
+            6 => Self::PostScript,
+            7 => Self::Trademark,
+            8 => Self::Manufacturer,
+            9 => Self::Designer,
+            10 => Self::Description,
+            11 => Self::VendorUrl,
+            12 => Self::DesignerUrl,
+            13 => Self::License,
+            14 => Self::LicenseUrl,
+            16 => Self::TypographicFamily,
+            17 => Self::TypographicSubfamily,
+            18 => Self::CompatibleFull,
+            19 => Self::SampleText,
+            20 => Self::PostScriptCid,
+            21 => Self::WwsFamily,
+            22 => Self::WwsSubfamily,
+            other => Self::Other(other),
+        }
+    }
+
+    /// The identifier the record stores.
+    pub const fn id(self) -> u16 {
+        match self {
+            Self::Copyright => 0,
+            Self::Family => 1,
+            Self::Subfamily => 2,
+            Self::UniqueId => 3,
+            Self::FullName => 4,
+            Self::Version => 5,
+            Self::PostScript => 6,
+            Self::Trademark => 7,
+            Self::Manufacturer => 8,
+            Self::Designer => 9,
+            Self::Description => 10,
+            Self::VendorUrl => 11,
+            Self::DesignerUrl => 12,
+            Self::License => 13,
+            Self::LicenseUrl => 14,
+            Self::TypographicFamily => 16,
+            Self::TypographicSubfamily => 17,
+            Self::CompatibleFull => 18,
+            Self::SampleText => 19,
+            Self::PostScriptCid => 20,
+            Self::WwsFamily => 21,
+            Self::WwsSubfamily => 22,
+            Self::Other(id) => id,
+        }
+    }
+}
+
+/// The platform of a naming-table or `cmap` encoding record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Platform {
+    Unicode,
+    Macintosh,
+    /// ISO (deprecated); its records are UTF-16BE like Unicode-platform ones.
+    Iso,
+    Windows,
+    Custom,
+    Other(u16),
+}
+
+impl Platform {
+    pub const fn from_id(id: u16) -> Self {
+        match id {
+            0 => Self::Unicode,
+            1 => Self::Macintosh,
+            2 => Self::Iso,
+            3 => Self::Windows,
+            4 => Self::Custom,
+            other => Self::Other(other),
+        }
+    }
+
+    pub const fn id(self) -> u16 {
+        match self {
+            Self::Unicode => 0,
+            Self::Macintosh => 1,
+            Self::Iso => 2,
+            Self::Windows => 3,
+            Self::Custom => 4,
+            Self::Other(id) => id,
+        }
+    }
 }
 
 const RECORD: usize = 12;
@@ -74,10 +179,10 @@ impl Names {
             return None;
         }
         Some(NameRecord {
-            platform: field(0)?,
-            encoding: field(1)?,
-            language: field(2)?,
-            name_id: field(3)?,
+            platform: Platform::from_id(field(0)?),
+            encoding_id: field(1)?,
+            language_id: field(2)?,
+            name_id: NameId::from_id(field(3)?),
             bytes: data.get(start..end)?,
         })
     }
@@ -91,19 +196,19 @@ impl Names {
     /// else the first Windows one, unless a Macintosh record exists and the Windows
     /// one is not English; then the last English (or Roman) Macintosh record; then
     /// the last Unicode-platform record.
-    pub(crate) fn preferred(self, data: &[u8], name_id: u16) -> Option<NameRecord<'_>> {
+    pub(crate) fn preferred(self, data: &[u8], name_id: NameId) -> Option<NameRecord<'_>> {
         let (mut windows, mut english) = (None, false);
         let (mut mac_english, mut mac_roman, mut unicode) = (None, None, None);
         for record in self.records(data).filter(|r| r.name_id == name_id) {
             match record.platform {
-                platform::UNICODE | 2 => unicode = Some(record),
-                platform::MACINTOSH if record.language == 0 => mac_english = Some(record),
-                platform::MACINTOSH if record.encoding == 0 => mac_roman = Some(record),
-                platform::WINDOWS
-                    if (windows.is_none() || record.language & 0x3ff == 9)
-                        && matches!(record.encoding, 0 | 1 | 10) =>
+                Platform::Unicode | Platform::Iso => unicode = Some(record),
+                Platform::Macintosh if record.language_id == 0 => mac_english = Some(record),
+                Platform::Macintosh if record.encoding_id == 0 => mac_roman = Some(record),
+                Platform::Windows
+                    if (windows.is_none() || record.language_id & 0x3ff == 9)
+                        && matches!(record.encoding_id, 0 | 1 | 10) =>
                 {
-                    english = record.language & 0x3ff == 9;
+                    english = record.language_id & 0x3ff == 9;
                     windows = Some(record);
                 }
                 _ => {}
@@ -120,30 +225,49 @@ impl Names {
 /// One naming-table record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NameRecord<'a> {
-    pub platform: u16,
-    pub encoding: u16,
-    pub language: u16,
-    pub name_id: u16,
+    pub platform: Platform,
+    /// The platform-specific encoding number.
+    pub encoding_id: u16,
+    /// The platform-specific language number.
+    pub language_id: u16,
+    pub name_id: NameId,
     /// The encoded string.
     pub bytes: &'a [u8],
 }
 
 impl<'a> NameRecord<'a> {
-    /// Whether this crate decodes the record: Unicode and Windows platforms are
-    /// UTF-16BE, Macintosh Roman (platform 1, encoding 0) is Mac OS Roman.
+    /// Whether the record is UTF-16BE: the Unicode, ISO and Windows platforms.
+    const fn is_utf16(&self) -> bool {
+        matches!(
+            self.platform,
+            Platform::Unicode | Platform::Iso | Platform::Windows
+        )
+    }
+
+    /// Whether this crate decodes the record: UTF-16BE platforms, and Macintosh
+    /// Roman (encoding 0) as Mac OS Roman.
     pub fn is_decodable(&self) -> bool {
-        matches!(self.platform, platform::UNICODE | platform::WINDOWS)
-            || (self.platform == platform::MACINTOSH && self.encoding == 0)
+        self.is_utf16() || (self.platform == Platform::Macintosh && self.encoding_id == 0)
     }
 
     /// The decoded characters. Unpaired UTF-16 surrogates become U+FFFD; an odd
     /// final byte is dropped. Records [`Self::is_decodable`] rejects yield nothing.
     pub fn chars(&self) -> NameChars<'a> {
-        let utf16 = matches!(self.platform, platform::UNICODE | platform::WINDOWS);
         NameChars {
             bytes: if self.is_decodable() { self.bytes } else { &[] },
-            utf16,
+            utf16: self.is_utf16(),
         }
+    }
+
+    /// The raw code units: 16-bit units for UTF-16BE platforms, bytes otherwise, as
+    /// FreeType reads them when it forms ASCII names.
+    pub fn code_units(&self) -> impl Iterator<Item = u16> + 'a {
+        let width = if self.is_utf16() { 2 } else { 1 };
+        self.bytes.chunks_exact(width).map(move |unit| match unit {
+            [high, low] => u16::from_be_bytes([*high, *low]),
+            [byte] => u16::from(*byte),
+            _ => 0,
+        })
     }
 
     /// Whether the decoded string equals `text` ignoring ASCII case.
@@ -210,14 +334,14 @@ fn mac_roman(byte: u8) -> char {
 
 #[cfg(test)]
 mod tests {
-    use super::{NameRecord, Names};
+    use super::{NameId, NameRecord, Names, Platform};
 
     fn record(platform: u16, encoding: u16, bytes: &[u8]) -> NameRecord<'_> {
         NameRecord {
-            platform,
-            encoding,
-            language: 0,
-            name_id: 1,
+            platform: Platform::from_id(platform),
+            encoding_id: encoding,
+            language_id: 0,
+            name_id: NameId::Family,
             bytes,
         }
     }
@@ -253,7 +377,18 @@ mod tests {
         assert_eq!(names.record(&table, 0).unwrap().bytes, [0, b'X']);
         assert_eq!(names.record(&table, 1), None);
         assert_eq!(names.records(&table).count(), 1);
-        assert_eq!(names.preferred(&table, 1).unwrap().bytes, [0, b'X']);
+        assert_eq!(
+            names.preferred(&table, NameId::Family).unwrap().bytes,
+            [0, b'X']
+        );
+        assert_eq!(
+            (
+                NameId::from_id(6),
+                NameId::PostScript.id(),
+                NameId::from_id(300).id()
+            ),
+            (NameId::PostScript, 6, 300)
+        );
         assert!(Names::new(&table, 0, 20).is_err());
     }
 }

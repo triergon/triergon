@@ -86,12 +86,53 @@ pub struct Os2 {
     pub weight_class: u16,
     pub width_class: u16,
     pub fs_type: u16,
-    pub fs_selection: u16,
+    pub selection: FsSelection,
     pub typo_ascender: i16,
     pub typo_descender: i16,
     pub typo_line_gap: i16,
     pub win_ascent: u16,
     pub win_descent: u16,
+}
+
+/// The `OS/2.fsSelection` flags.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FsSelection(u16);
+
+impl FsSelection {
+    /// Bit 0.
+    pub const fn italic(self) -> bool {
+        self.0 & 1 != 0
+    }
+
+    /// Bit 5.
+    pub const fn bold(self) -> bool {
+        self.0 & 1 << 5 != 0
+    }
+
+    /// Bit 6.
+    pub const fn regular(self) -> bool {
+        self.0 & 1 << 6 != 0
+    }
+
+    /// Bit 7, USE_TYPO_METRICS: line spacing comes from the typographic metrics.
+    pub const fn use_typo_metrics(self) -> bool {
+        self.0 & 1 << 7 != 0
+    }
+
+    /// Bit 8, WWS: the family name already separates weight, width and slope.
+    pub const fn wws(self) -> bool {
+        self.0 & 1 << 8 != 0
+    }
+
+    /// Bit 9.
+    pub const fn oblique(self) -> bool {
+        self.0 & 1 << 9 != 0
+    }
+
+    /// The stored bits, including those without a name here.
+    pub const fn bits(self) -> u16 {
+        self.0
+    }
 }
 
 /// The `OS/2` table, or `None` when it is shorter than version 0's 78 bytes.
@@ -105,7 +146,7 @@ pub(crate) fn os2(data: &[u8]) -> Option<Os2> {
         weight_class: at(4)?,
         width_class: at(6)?,
         fs_type: at(8)?,
-        fs_selection: at(62)?,
+        selection: FsSelection(at(62)?),
         typo_ascender: at(68)?.cast_signed(),
         typo_descender: at(70)?.cast_signed(),
         typo_line_gap: at(72)?.cast_signed(),

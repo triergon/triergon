@@ -1,7 +1,7 @@
 //! Choosing a face for an ASS style's font name, bold and italic values, with
 //! libass's scoring.
 
-use crate::name::{NameRecord, id, platform};
+use crate::name::{NameId, NameRecord, Platform};
 use crate::{Font, OutlineFormat};
 
 /// What an ASS style or override asks for.
@@ -62,7 +62,7 @@ impl<'a> FaceInfo<'a> {
         };
         // With OS/2, only fsSelection's italic and bold bits count, as GDI reads them.
         let (bold, italic) = match font.os2() {
-            Some(os2) => (os2.fs_selection & 0x20 != 0, os2.fs_selection & 1 != 0),
+            Some(os2) => (os2.selection.bold(), os2.selection.italic()),
             None => (freetype.bold, freetype.italic),
         };
         Self {
@@ -98,7 +98,7 @@ impl<'a> FaceInfo<'a> {
     /// case. A face without any uses FreeType's family name in its ASCII form.
     pub fn has_family(&self, name: &str) -> bool {
         let mut any = false;
-        for record in self.windows(id::FAMILY) {
+        for record in self.windows(NameId::Family) {
             any = true;
             if record.eq_ignore_ascii_case(name) {
                 return true;
@@ -112,7 +112,7 @@ impl<'a> FaceInfo<'a> {
     /// outlines goes by its PostScript name and any other by its full name.
     pub fn has_full_name(&self, name: &str) -> bool {
         let full = self
-            .windows(id::FULL_NAME)
+            .windows(NameId::FullName)
             .any(|r| r.eq_ignore_ascii_case(name));
         let postscript = self
             .font
@@ -127,10 +127,10 @@ impl<'a> FaceInfo<'a> {
         }
     }
 
-    fn windows(&self, name_id: u16) -> impl Iterator<Item = NameRecord<'a>> + 'a {
+    fn windows(&self, name_id: NameId) -> impl Iterator<Item = NameRecord<'a>> + 'a {
         self.font
             .names()
-            .filter(move |r| r.platform == platform::WINDOWS && r.name_id == name_id)
+            .filter(move |r| r.platform == Platform::Windows && r.name_id == name_id)
     }
 
     /// The distance from `request`: 1 for an upright face asked to be italic, 4 for
@@ -157,7 +157,7 @@ impl<'a> FaceInfo<'a> {
         c.is_none_or(|c| {
             self.font
                 .text_charmap()
-                .is_some_and(|charmap| self.font.glyph_for_code(charmap, u32::from(c)).is_some())
+                .is_some_and(|charmap| charmap.glyph(u32::from(c)).is_some())
         })
     }
 }
@@ -191,22 +191,6 @@ pub fn select(faces: &[FaceInfo<'_>], request: &Request<'_>) -> Option<usize> {
     best.map(|(_, index)| index)
 }
 
-/// A record's code units: bytes for Macintosh records, UTF-16 units otherwise.
-fn units<'a>(record: &NameRecord<'a>) -> impl Iterator<Item = u32> + 'a {
-    let width = if record.platform == platform::MACINTOSH {
-        1
-    } else {
-        2
-    };
-    record.bytes.chunks_exact(width).map(move |u| {
-        if width == 1 {
-            u32::from(u[0])
-        } else {
-            u32::from(u16::from_be_bytes([u[0], u[1]]))
-        }
-    })
-}
-
 fn same(mut text: impl Iterator<Item = char>, name: &str) -> bool {
     name.chars()
         .all(|c| text.next().is_some_and(|t| t.eq_ignore_ascii_case(&c)))
@@ -216,18 +200,24 @@ fn same(mut text: impl Iterator<Item = char>, name: &str) -> bool {
 /// FreeType's ASCII form of a name compared with `name`: it ends at NUL and turns
 /// every unit outside 32..=127 into `?`.
 fn ascii_eq(record: NameRecord<'_>, name: &str) -> bool {
-    let text = units(&record).take_while(|&u| u != 0).map(|u| {
-        u8::try_from(u)
-            .ok()
-            .filter(|b| (32..=127).contains(b))
-            .map_or('?', char::from)
-    });
+    let text = record
+        .code_units()
+        .map(u32::from)
+        .take_while(|&u| u != 0)
+        .map(|u| {
+            u8::try_from(u)
+                .ok()
+                .filter(|b| (32..=127).contains(b))
+                .map_or('?', char::from)
+        });
     same(text, name)
 }
 
 /// FreeType's PostScript form, which keeps printable ASCII other than `[](){}<>/%`.
 fn postscript_eq(record: NameRecord<'_>, name: &str) -> bool {
-    let text = units(&record)
+    let text = record
+        .code_units()
+        .map(u32::from)
         .filter_map(|u| u8::try_from(u).ok())
         .filter(|&b| (33..=126).contains(&b) && !b"[](){}<>/%".contains(&b))
         .map(char::from);
