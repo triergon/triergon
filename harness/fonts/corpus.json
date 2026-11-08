@@ -376,7 +376,7 @@
       "name": "authored",
       "generator": "authored-fonts",
       "licence": "authored for this repository (MIT OR Apache-2.0)",
-      "origin": "crates/font/tests/support: seac, the charstring arithmetic, logic and storage operators, flex, counter masks, subroutines nested past ten, a non-default FontMatrix, every supported cmap format",
+      "origin": "crates/font/tests/support: seac, the charstring arithmetic, logic and storage operators, flex, counter masks, subroutines nested past ten, a non-default FontMatrix, every supported cmap format, each step of libass's text charmap selection",
       "files": [
         {
           "path": "authored/authored-cff-features.otf",
@@ -392,6 +392,11 @@
           "path": "authored/authored-cmap-formats.ttf",
           "sha256": "2dd8238413923c033680f98577fa797658f17f2e00908bdd8070647a3cb9486c",
           "format": "truetype"
+        },
+        {
+          "path": "authored/authored-cmap-order.ttc",
+          "sha256": "3d2aaf0ab526aab4c31686ede262a0e332a1d2d9f61fbb9ee6451babc34e4d4f",
+          "format": "collection"
         }
       ]
     }

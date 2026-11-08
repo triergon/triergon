@@ -215,6 +215,42 @@ pub(crate) fn parse(
     Ok(subtables)
 }
 
+/// The subtable libass selects for text when it opens a face
+/// (`ass_charmap_magic`): the first Windows (3, 10), else the first (3, 1),
+/// else the first Windows subtable of another encoding, else FreeType's
+/// default, else the first subtable.
+pub(crate) fn text_subtable(subtables: &[Subtable]) -> Option<&Subtable> {
+    let windows = |encoding: Option<u16>| {
+        subtables.iter().find(move |s| {
+            s.platform == Platform::Windows && encoding.is_none_or(|e| s.encoding == e)
+        })
+    };
+    windows(Some(10))
+        .or_else(|| windows(Some(1)))
+        .or_else(|| windows(None))
+        .or_else(|| freetype_default(subtables))
+        .or_else(|| subtables.first())
+}
+
+/// The charmap FreeType selects when it opens a face (`find_unicode_charmap`):
+/// the last full-Unicode subtable, else the last of the encodings FreeType
+/// calls Unicode (every Unicode- and ISO-platform subtable, Windows 1 and 10).
+fn freetype_default(subtables: &[Subtable]) -> Option<&Subtable> {
+    let full = |s: &&Subtable| match (s.platform, s.encoding) {
+        (Platform::Windows, 10) | (Platform::Unicode, 4) => true,
+        (Platform::Unicode, 6) => s.format == CmapFormat::ManyToOne,
+        _ => false,
+    };
+    let unicode = |s: &&Subtable| match s.platform {
+        Platform::Unicode | Platform::Iso => true,
+        Platform::Windows => matches!(s.encoding, 1 | 10),
+        _ => false,
+    };
+    // FreeType skips formats 14 and 15 there, which are not listed.
+    let mut last = subtables.iter().rev();
+    last.clone().find(full).or_else(|| last.find(unicode))
+}
+
 impl Subtable {
     pub(crate) const fn platform(&self) -> Platform {
         self.platform
@@ -471,7 +507,7 @@ fn groups(table: &[u8], code: u32, consecutive: bool) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CharEncoding, Charmap, CmapFormat, parse};
+    use super::{CharEncoding, Charmap, CmapFormat, Subtable, parse, text_subtable};
     use crate::GlyphId;
     use crate::name::Platform;
     use crate::sfnt::Table;
@@ -587,5 +623,61 @@ mod tests {
         );
         assert!(charmaps(&cmap(&words(&[2, 0, 0])), 10, u64::MAX).is_empty());
         assert!(charmaps(&cmap(&words(&[0, 262, 0])), 10, u64::MAX).is_empty());
+    }
+
+    #[test]
+    fn text_subtable_follows_libass_then_freetype() {
+        use CmapFormat::{ByteEncoding, ManyToOne, SegmentDelta, SegmentedCoverage};
+        let subtables = |records: &[(u16, u16, CmapFormat)]| -> Vec<Subtable> {
+            records
+                .iter()
+                .enumerate()
+                .map(|(offset, &(platform, encoding, format))| Subtable {
+                    platform: Platform::from_id(platform),
+                    encoding,
+                    format,
+                    offset,
+                    end: 0,
+                })
+                .collect()
+        };
+        let chosen = |records: &[(u16, u16, CmapFormat)]| {
+            text_subtable(&subtables(records)).map(|s| s.offset)
+        };
+        // (3, 10) anywhere, then the first (3, 1), then the first other Windows one.
+        let windows = [
+            (0, 3, SegmentDelta),
+            (3, 0, SegmentDelta),
+            (3, 1, SegmentDelta),
+            (3, 1, SegmentDelta),
+            (3, 10, SegmentedCoverage),
+            (3, 10, SegmentedCoverage),
+        ];
+        assert_eq!(chosen(&windows), Some(4));
+        assert_eq!(chosen(&windows[..4]), Some(2));
+        assert_eq!(chosen(&windows[..2]), Some(1));
+        assert_eq!(
+            chosen(&[(1, 0, ByteEncoding), (3, 5, SegmentDelta)]),
+            Some(1)
+        );
+        // Without Windows subtables, FreeType's default: the last full-Unicode
+        // one ((0, 6) only in format 13), else the last Unicode or ISO one.
+        let unicode = [
+            (0, 4, SegmentedCoverage),
+            (0, 3, SegmentDelta),
+            (0, 6, SegmentedCoverage),
+            (2, 1, SegmentDelta),
+            (1, 0, ByteEncoding),
+        ];
+        assert_eq!(chosen(&unicode), Some(0));
+        assert_eq!(chosen(&unicode[1..]), Some(2));
+        assert_eq!(chosen(&unicode[1..3]), Some(1));
+        assert_eq!(chosen(&[(0, 3, SegmentDelta), (0, 6, ManyToOne)]), Some(1));
+        // Otherwise the first subtable.
+        assert_eq!(
+            chosen(&[(1, 0, ByteEncoding), (1, 1, SegmentDelta)]),
+            Some(0)
+        );
+        assert_eq!(chosen(&[]), None);
     }
 }

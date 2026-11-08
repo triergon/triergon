@@ -502,6 +502,16 @@
       "packets": 4,
       "bytes": 0,
       "digest": 9540031431330323050
+    },
+    "authored-cmap-order-ttc-outlines-16384": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 10890522402561742145
+    },
+    "authored-cmap-order-ttc-advances-16384": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 9198687805921699467
     }
   }
 }

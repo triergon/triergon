@@ -441,33 +441,21 @@ impl Font {
         )
     }
 
-    /// The charmap for text: the first Windows Unicode subtable (3, 1) or (3, 10)
-    /// in directory order, else the first Windows subtable, else the Unicode
-    /// subtable FreeType selects by default (the last full-Unicode one, else the
-    /// last Unicode-platform or Windows Unicode one), else the first subtable. This
-    /// is the selection libass makes.
+    /// The charmap libass 0.17.5 uses for text, as it selects one when it opens
+    /// a face (`ass_charmap_magic`). In directory order: the first Windows
+    /// full-Unicode subtable (3, 10); else the first Windows BMP subtable (3, 1);
+    /// else the first other Windows subtable, such as Symbol (3, 0). A face
+    /// without Windows subtables keeps the charmap FreeType selects on opening
+    /// it: the last full-Unicode subtable ((0, 4), or (0, 6) in format 13),
+    /// else the last Unicode- or ISO-platform one. Without one of those, it is
+    /// the first subtable.
+    ///
+    /// Only the subtables [`Self::charmaps`] lists take part. FreeType also
+    /// lists formats 2, 8 and 14, and adds a Unicode charmap built from glyph
+    /// names to a CFF face without a (3, 1) or Unicode-platform subtable; libass
+    /// may select either, which this selection does not reproduce.
     pub fn text_charmap(&self) -> Option<Charmap<'_>> {
-        let all = self.charmaps.as_slice();
-        let windows = |c: &&cmap::Subtable| c.platform() == Platform::Windows;
-        let windows_unicode = |c: &&cmap::Subtable| {
-            windows(c)
-                && matches!(
-                    c.encoding(),
-                    CharEncoding::Unicode | CharEncoding::UnicodeFull
-                )
-        };
-        let full = |c: &&cmap::Subtable| c.encoding() == CharEncoding::UnicodeFull;
-        let unicode = |c: &&cmap::Subtable| {
-            c.platform() == Platform::Unicode && c.encoding() != CharEncoding::UnicodeVariations
-                || windows_unicode(c)
-        };
-        all.iter()
-            .find(windows_unicode)
-            .or_else(|| all.iter().find(windows))
-            .or_else(|| all.iter().rev().find(full))
-            .or_else(|| all.iter().rev().find(unicode))
-            .or_else(|| all.first())
-            .map(|&subtable| self.charmap(subtable))
+        cmap::text_subtable(self.charmaps.as_slice()).map(|&subtable| self.charmap(subtable))
     }
 
     /// The glyph for `c` through [`Self::text_charmap`]. A Windows Symbol charmap

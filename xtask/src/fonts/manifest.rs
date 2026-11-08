@@ -369,9 +369,9 @@ mod tests {
         assert_eq!(
             FEATURES.map(|f| (f.id, count(f.id))),
             [
-                ("font-outlines", 50),
-                ("font-hinting-none", 100),
-                ("font-hinting-modes", 900)
+                ("font-outlines", 51),
+                ("font-hinting-none", 102),
+                ("font-hinting-modes", 918)
             ]
         );
         let none = manifest(root, "font-hinting-none").unwrap();
