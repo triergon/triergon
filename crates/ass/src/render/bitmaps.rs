@@ -1,19 +1,18 @@
-//! Drawing an event's glyphs and combining them run by run, as libass's
-//! `render_and_combine_glyphs` does through the bitmap and composite caches:
-//! each glyph's fill and border placed in the frame, then each run's fill,
+//! The last stage: an event's placed glyphs drawn and combined run by run,
+//! as libass's `render_and_combine_glyphs` does through the bitmap and
+//! composite caches: each glyph's fill and border, then each run's fill,
 //! border and shadow composited.
 
 use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::{
-    Bitmap, Border, Effects, EffectsKey, FrameScale, GlyphBitmaps, GlyphRequest, Matrix, Placement,
-    Raster, Run, Shadow, Shape, ShapedKey, Vector, pixels_26_6,
+    Bitmap, EffectsKey, FrameScale, GlyphBitmaps, Matrix, Raster, Run, Shape, ShapedKey, Vector,
 };
 
 use super::layout::d6_to_double;
 use super::outlines::OutlineValue;
-use super::text::{GlyphInfo, Glyphs};
+use super::placement::{PlacedRun, Runs};
 use crate::{Karaoke, Rgba};
 
 /// One run of glyphs composited together (libass's `CombinedBitmapInfo`),
@@ -77,59 +76,6 @@ struct Drawn {
     bitmaps: GlyphBitmaps,
 }
 
-/// A run being collected.
-#[derive(Debug)]
-struct Open {
-    colours: [Rgba; 4],
-    effect: Option<Karaoke>,
-    effect_timing: i32,
-    effects: Effects,
-    run: Run,
-    glyphs: BudgetVec<Drawn>,
-}
-
-/// The effects a glyph is drawn with, as its state sets them (libass's
-/// filter flags, which it takes per glyph): its border and opaque box, and,
-/// for the glyph that starts a run, the run's composite.
-fn effects(g: &GlyphInfo<'_>) -> Effects {
-    let stroked = g.border[0] != 0.0 || g.border[1] != 0.0;
-    let alpha = |c: Rgba| c.0 & 0xff;
-    let border = if g.border_style.0 == 3 {
-        Border::OpaqueBox {
-            size: g.border,
-            shown: stroked,
-        }
-    } else if stroked {
-        Border::Outline {
-            size: g.border,
-            keeps_fill: alpha(g.colours[0]) == 0 && alpha(g.colours[1]) == 0 && g.fade == 0,
-        }
-    } else {
-        Border::None
-    };
-    Effects {
-        border,
-        shadow: Shadow {
-            offset: g.shadow,
-            keeps_fill: matches!(g.effect, Some(Karaoke::Fill | Karaoke::Outline))
-                || alpha(g.colours[0]) != 0xff,
-        },
-        blur: g.blur,
-        be: u32::from(g.be),
-    }
-}
-
-/// `ass_apply_fade`: a positive fade raises the alpha towards transparent.
-pub(super) fn apply_fade(colour: Rgba, fade: i32) -> Rgba {
-    if fade <= 0 {
-        return colour;
-    }
-    let a = u64::from(colour.0 & 0xff);
-    let fade = u64::from(fade.unsigned_abs());
-    let faded = a - (a * fade + 0x7f) / 0xff + fade;
-    Rgba((colour.0 & 0xffff_ff00) | (faded as u32 & 0xff))
-}
-
 /// The renderer's drawing state: the rasterising context.
 #[derive(Debug)]
 pub(super) struct Painter {
@@ -156,132 +102,60 @@ impl Painter {
         self.raster.draw(shape, matrix, work)
     }
 
-    /// Draws and combines the glyphs of an event placed at `device` (pre-
-    /// aspect pixels); the runs in logical order.
-    pub(super) fn render(
+    /// Draws and combines an event's placed runs, in order.
+    pub(super) fn draw(
         &mut self,
-        glyphs: &mut Glyphs<'_>,
-        device: (f64, f64),
+        runs: &Runs,
         frame: &FrameScale,
-        left_margin: i32,
         out: &mut BudgetVec<Combined>,
         work: &mut WorkBudget,
     ) -> Result<()> {
         out.clear();
-        let par = frame.pixel_aspect;
-        let left = f64::from(left_margin);
-        let device_x = (device.0 - left) * par + left;
-        let mut new_run = true;
-        let mut open: Option<Open> = None;
-        for i in 0..glyphs.len {
-            if glyphs.get(i).starts_new_run {
-                new_run = true;
-            }
-            if glyphs.get(i).skip {
-                continue;
-            }
-            let mut member = Some(i);
-            while let Some(g) = member {
-                member = glyphs.get(g).next;
-                let effects = effects(glyphs.get(g));
-                if new_run {
-                    if let Some(run) = open.take() {
-                        self.finish(run, frame, out, work)?;
-                    }
-                    open = Some(Self::open(glyphs.get(g), effects, &self.budget));
-                    new_run = false;
-                }
-                let info = glyphs.get_mut(g);
-                info.pos.x = pixels_26_6(device_x + d6_to_double(info.pos.x) * par);
-                info.pos.y = pixels_26_6(device.1).wrapping_add(info.pos.y);
-                let Some(run) = open.as_mut() else { continue };
-                if let Some(drawn) = self.draw(info, &effects, frame, &mut run.run, work)? {
-                    run.glyphs.try_push(drawn).map_err(|e| e.error)?;
+        for (placed, glyphs) in runs.iter() {
+            let mut run = Run::default();
+            let mut drawn = BudgetVec::new(&self.budget);
+            for glyph in glyphs {
+                if let Some(bitmaps) = self.raster.render(&glyph.request(frame), &mut run, work)? {
+                    drawn
+                        .try_push(Drawn {
+                            outline: Arc::clone(&glyph.outline),
+                            bitmaps,
+                        })
+                        .map_err(|e| e.error)?;
                 }
             }
-        }
-        if let Some(run) = open.take() {
-            self.finish(run, frame, out, work)?;
+            self.finish(placed, &run, &drawn, frame, out, work)?;
         }
         Ok(())
     }
 
-    fn open(g: &GlyphInfo<'_>, effects: Effects, budget: &Budget) -> Open {
-        Open {
-            colours: g.colours.map(|c| apply_fade(c, g.fade)),
-            effect: g.effect,
-            effect_timing: g.effect_timing,
-            effects,
-            run: Run::default(),
-            glyphs: BudgetVec::new(budget),
-        }
-    }
-
-    /// `get_bitmap_glyph`: the glyph's bitmaps, `None` when it draws nothing.
-    fn draw(
-        &mut self,
-        info: &GlyphInfo<'_>,
-        effects: &Effects,
-        frame: &FrameScale,
-        run: &mut Run,
-        work: &mut WorkBudget,
-    ) -> Result<Option<Drawn>> {
-        let Some(outline) = &info.outline else {
-            return Ok(None);
-        };
-        if info.symbol == u32::from(b'\n') || info.symbol == 0 || info.skip {
-            return Ok(None);
-        }
-        let request = GlyphRequest {
-            shape: &outline.shape,
-            placement: Placement {
-                rotation: info.rotation,
-                shear: info.shear,
-                scale: info.scale,
-                shift: info.shift,
-                ascender: info.asc,
-                descender: info.desc,
-                advance: info.spacing_scaled.wrapping_add(info.advance.x),
-                scale_fix: info.scale_fix,
-                position: info.pos,
-                outline_scale: info.outline_scale,
-                outline_offset: info.outline_offset,
-            },
-            frame: *frame,
-            effects,
-            karaoke: info.effect == Some(Karaoke::Fill),
-        };
-        Ok(self
-            .raster
-            .render(&request, run, work)?
-            .map(|bitmaps| Drawn {
-                outline: Arc::clone(outline),
-                bitmaps,
-            }))
-    }
-
-    /// Composites a collected run.
+    /// Composites a drawn run.
     fn finish(
         &mut self,
-        mut run: Open,
+        placed: &PlacedRun,
+        run: &Run,
+        drawn: &[Drawn],
         frame: &FrameScale,
         out: &mut BudgetVec<Combined>,
         work: &mut WorkBudget,
     ) -> Result<()> {
-        if run.glyphs.is_empty() {
+        if drawn.is_empty() {
             return Ok(());
         }
-        if run.effect == Some(Karaoke::Fill) {
-            run.effect_timing = (d6_to_double(run.run.leftmost_x())
-                + d6_to_double(run.effect_timing) * frame.pixel_aspect)
+        let mut effect_timing = placed.effect_timing;
+        if placed.effect == Some(Karaoke::Fill) {
+            effect_timing = (d6_to_double(run.leftmost_x())
+                + d6_to_double(effect_timing) * frame.pixel_aspect)
                 .round() as i32;
         }
-        let drawn = run.glyphs.as_slice();
-        let composite =
-            self.raster
-                .compose(&run.effects, frame, drawn.iter().map(|d| &d.bitmaps), work)?;
+        let composite = self.raster.compose(
+            &placed.effects,
+            frame,
+            drawn.iter().map(|d| &d.bitmaps),
+            work,
+        )?;
         let mut key = RunKey {
-            effects: run.effects.key(frame),
+            effects: placed.effects.key(frame),
             glyphs: BudgetVec::new(&self.budget),
         };
         key.glyphs.try_reserve_exact(drawn.len())?;
@@ -301,9 +175,9 @@ impl Painter {
                 .map_err(|e| e.error)?;
         }
         out.try_push(Combined {
-            colours: run.colours,
-            effect: run.effect,
-            effect_timing: run.effect_timing,
+            colours: placed.colours,
+            effect: placed.effect,
+            effect_timing,
             origin: composite.origin,
             fill: composite.fill.map(Arc::new),
             border: composite.border.map(Arc::new),

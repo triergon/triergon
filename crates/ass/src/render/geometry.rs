@@ -6,7 +6,7 @@
 
 use triergon_core::{Error, Result};
 
-use crate::Script;
+use crate::{Margins, Script};
 
 /// A size in whole pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -174,21 +174,17 @@ impl Settings {
     }
 }
 
-/// The settings checked once: the frame and storage sides as libass keeps
-/// them, the content area and the area it fits in without margins.
-#[derive(Clone, Copy, Debug)]
+/// The settings, held once, and what libass derives from them: the frame and
+/// storage sides as it keeps them, the content area and the area that area
+/// fits in without margins.
+#[derive(Debug)]
 pub(super) struct Canvas {
+    pub settings: Settings,
     pub width: i32,
     pub height: i32,
     pub storage: Option<(i32, i32)>,
-    pub margins: FrameMargins,
-    pub use_margins: bool,
-    pub pixel_aspect: Option<f64>,
-    pub font_scale: f64,
-    pub line_spacing: f64,
-    pub line_position: f64,
-    pub cache: CacheLimits,
-    pub work: u64,
+    /// The pixel aspect set by hand, 0 for none: a negative one is none.
+    pub pixel_aspect: f64,
     /// `frame_content_width` and `frame_content_height`.
     pub content: (i32, i32),
     /// `fit_width` and `fit_height`.
@@ -226,28 +222,21 @@ impl Canvas {
                 f64::from(content.1) * f64::from(width) / f64::from(content.0)
             },
         );
-        let line_position = settings.line_position;
         Ok(Self {
+            settings: *settings,
             width,
             height,
             storage: settings.storage.and_then(Size::checked),
-            margins: m,
-            use_margins: settings.use_margins,
             pixel_aspect: settings
                 .pixel_aspect
-                .map(|par| if par < 0.0 { 0.0 } else { par }),
-            font_scale: settings.font_scale,
-            line_spacing: settings.line_spacing,
-            line_position,
-            cache: settings.cache,
-            work: settings.work,
+                .map_or(0.0, |par| if par < 0.0 { 0.0 } else { par }),
             content,
             fit,
         })
     }
 
     /// The geometry of `script` in this frame.
-    pub(super) fn place(&self, script: &Script) -> Geometry {
+    pub(super) fn place(&self, script: &Script) -> Geometry<'_> {
         let info = script.info();
         let play_res = info.play_res();
         let layout_res = self.layout_res(play_res, info.layout_res());
@@ -255,7 +244,7 @@ impl Canvas {
         // aspect and the layout resolution's whenever the script names a
         // layout resolution, or none is set and the storage size is known.
         let (cw, ch) = self.content;
-        let user = self.pixel_aspect.unwrap_or(0.0);
+        let user = self.pixel_aspect;
         let par = if user == 0.0 || info.layout_res().is_some() {
             if cw != 0 && ch != 0 && (info.layout_res().is_some() || self.storage.is_some()) {
                 let dar = f64::from(cw) / f64::from(ch);
@@ -268,7 +257,7 @@ impl Canvas {
             user
         };
         Geometry {
-            frame: *self,
+            canvas: self,
             play_res,
             layout_res,
             par,
@@ -284,7 +273,7 @@ impl Canvas {
         if let Some(storage) = self.storage {
             return storage;
         }
-        let par = self.pixel_aspect.unwrap_or(0.0);
+        let par = self.pixel_aspect;
         let (cw, ch) = self.content;
         #[allow(clippy::float_cmp)] // libass's test for exactly square pixels
         if par <= 0.0 || par == 1.0 || cw == 0 || ch == 0 {
@@ -303,8 +292,8 @@ impl Canvas {
 
 /// One frame's geometry for one script.
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Geometry {
-    pub frame: Canvas,
+pub(super) struct Geometry<'c> {
+    pub canvas: &'c Canvas,
     /// The script's play resolution after libass's defaults.
     pub play_res: (i32, i32),
     /// `ass_layout_res`.
@@ -325,7 +314,7 @@ pub(super) struct Scales {
     pub border: [f64; 2],
 }
 
-impl Geometry {
+impl Geometry<'_> {
     /// The play resolution as `f64`.
     fn res(&self) -> (f64, f64) {
         (f64::from(self.play_res.0), f64::from(self.play_res.1))
@@ -334,17 +323,17 @@ impl Geometry {
     /// Whether an event uses the margin mapping: one placed by its margins
     /// when the settings let it use the frame margins.
     pub(super) fn margin_mode(&self, explicit: bool) -> bool {
-        !explicit && self.frame.use_margins
+        !explicit && self.canvas.settings.use_margins
     }
 
     pub(super) fn x_pos(&self, x: f64) -> f64 {
-        x * f64::from(self.frame.content.0) / self.par / self.res().0
-            + f64::from(self.frame.margins.left)
+        x * f64::from(self.canvas.content.0) / self.par / self.res().0
+            + f64::from(self.canvas.settings.margins.left)
     }
 
     pub(super) fn x_left(&self, x: f64, explicit: bool) -> f64 {
         if self.margin_mode(explicit) {
-            x * self.frame.fit.0 / self.par / self.res().0
+            x * self.canvas.fit.0 / self.par / self.res().0
         } else {
             self.x_pos(x)
         }
@@ -352,26 +341,37 @@ impl Geometry {
 
     pub(super) fn x_right(&self, x: f64, explicit: bool) -> f64 {
         if self.margin_mode(explicit) {
-            x * self.frame.fit.0 / self.par / self.res().0
-                + (f64::from(self.frame.width) - self.frame.fit.0)
+            x * self.canvas.fit.0 / self.par / self.res().0
+                + (f64::from(self.canvas.width) - self.canvas.fit.0)
         } else {
             self.x_pos(x)
         }
     }
 
+    /// The width an event's lines wrap at and are aligned in, in pixels: the
+    /// play resolution less its left and right margins.
+    pub(super) fn text_width(&self, margins: Margins, explicit: bool) -> f64 {
+        self.x_right(
+            f64::from(self.play_res.0.wrapping_sub(margins.right)),
+            explicit,
+        ) - self.x_left(f64::from(margins.left), explicit)
+    }
+
     /// Without the pixel aspect: clip rectangles.
     pub(super) fn x_pos_scaled(&self, x: f64) -> f64 {
-        x * f64::from(self.frame.content.0) / self.res().0 + f64::from(self.frame.margins.left)
+        x * f64::from(self.canvas.content.0) / self.res().0
+            + f64::from(self.canvas.settings.margins.left)
     }
 
     pub(super) fn y_pos(&self, y: f64) -> f64 {
-        y * f64::from(self.frame.content.1) / self.res().1 + f64::from(self.frame.margins.top)
+        y * f64::from(self.canvas.content.1) / self.res().1
+            + f64::from(self.canvas.settings.margins.top)
     }
 
     pub(super) fn y_mid(&self, y: f64, explicit: bool) -> f64 {
         if self.margin_mode(explicit) {
-            y * self.frame.fit.1 / self.res().1
-                + (f64::from(self.frame.height) - self.frame.fit.1) * 0.5
+            y * self.canvas.fit.1 / self.res().1
+                + (f64::from(self.canvas.height) - self.canvas.fit.1) * 0.5
         } else {
             self.y_pos(y)
         }
@@ -379,7 +379,7 @@ impl Geometry {
 
     pub(super) fn y_top(&self, y: f64, explicit: bool) -> f64 {
         if self.margin_mode(explicit) {
-            y * self.frame.fit.1 / self.res().1
+            y * self.canvas.fit.1 / self.res().1
         } else {
             self.y_pos(y)
         }
@@ -387,7 +387,8 @@ impl Geometry {
 
     pub(super) fn y_sub(&self, y: f64, explicit: bool) -> f64 {
         if self.margin_mode(explicit) {
-            y * self.frame.fit.1 / self.res().1 + (f64::from(self.frame.height) - self.frame.fit.1)
+            y * self.canvas.fit.1 / self.res().1
+                + (f64::from(self.canvas.height) - self.canvas.fit.1)
         } else {
             self.y_pos(y)
         }
@@ -397,11 +398,11 @@ impl Geometry {
     /// unless the event is explicit (its default selective-style setting).
     pub(super) fn scales(&self, explicit: bool, scaled_border: bool) -> Scales {
         let (w, h) = if self.margin_mode(explicit) {
-            self.frame.fit
+            self.canvas.fit
         } else {
             (
-                f64::from(self.frame.content.0),
-                f64::from(self.frame.content.1),
+                f64::from(self.canvas.content.0),
+                f64::from(self.canvas.content.1),
             )
         };
         let (rx, ry) = self.res();
@@ -417,7 +418,7 @@ impl Geometry {
             border,
         };
         if !explicit {
-            let k = self.frame.font_scale;
+            let k = self.canvas.settings.font_scale;
             for v in [&mut scales.screen, &mut scales.blur, &mut scales.border] {
                 *v = v.map(|s| s * k);
             }
