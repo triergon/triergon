@@ -100,13 +100,29 @@ fn audio(channels: u32, mode: u64, y: u64, residue: &[u64]) -> Vec<u8> {
     b.bytes
 }
 
-fn decoder(channels: u8, limits: Limits) -> Result<Decoder, DecodeError> {
-    Decoder::from_headers(
+/// The three headers Xiph-laced, as a configuration.
+fn laced(identification: &[u8], comment: &[u8], setup: &[u8]) -> Vec<u8> {
+    let mut laced = vec![2];
+    for header in [identification, comment] {
+        laced.extend(std::iter::repeat_n(255, header.len() / 255));
+        laced.push((header.len() % 255) as u8);
+    }
+    laced.extend_from_slice(identification);
+    laced.extend_from_slice(comment);
+    laced.extend_from_slice(setup);
+    laced
+}
+
+fn configuration(channels: u8) -> Vec<u8> {
+    laced(
         &identification(channels, 0x76),
         &comment(),
         &setup(u32::from(channels), 64),
-        limits,
     )
+}
+
+fn decoder(channels: u8, limits: Limits) -> Result<Decoder, DecodeError> {
+    Decoder::with_limits(&configuration(channels), limits)
 }
 
 #[test]
@@ -129,16 +145,17 @@ fn packets_yield_the_span_between_block_centres() {
 
 #[test]
 fn configuration_is_the_laced_headers() {
-    let mut laced = vec![2];
-    let (id, c, s) = (identification(1, 0x76), comment(), setup(1, 64));
-    laced.push(id.len() as u8);
-    laced.push(c.len() as u8);
-    laced.extend_from_slice(&id);
-    laced.extend_from_slice(&c);
-    laced.extend_from_slice(&s);
-    let decoder = Decoder::from_configuration(&laced, Limits::default()).unwrap();
+    let decoder = Decoder::new(&configuration(1)).unwrap();
     assert_eq!(decoder.sample_rate(), 48_000);
     assert_eq!(decoder.layout().channels(), 1);
+    let (id, c, s) = (identification(1, 0x76), comment(), setup(1, 64));
+    let budget = Budget::new(1 << 20).unwrap();
+    let packets = Decoder::from_headers_in(&id, &c, &s, &budget).unwrap();
+    assert_eq!(packets.layout(), decoder.layout());
+    assert!(matches!(
+        Decoder::new(&s),
+        Err(DecodeError::Invalid("Vorbis configuration"))
+    ));
 }
 
 #[test]
@@ -149,15 +166,40 @@ fn a_small_budget_is_refused() {
     assert!(matches!(decoder(2, tiny), Err(DecodeError::Budget(_))));
     // A shared pool carries the decoder's charge while it lives.
     let budget = Budget::new(1 << 20).unwrap();
-    let decoder =
-        Decoder::from_headers_in(&identification(8, 0xd6), &comment(), &setup(8, 64), &budget)
-            .unwrap();
+    let eight = laced(&identification(8, 0xd6), &comment(), &setup(8, 64));
+    let decoder = Decoder::new_in(&eight, &budget).unwrap();
     let used = budget.used();
+    // Eight channels' spectra, overlaps and floors of 4096-sample blocks.
+    assert!(used > 8 * 3 * 4 * 1024, "{used}");
     drop(decoder);
-    assert!(
-        budget.used() < used,
+    assert_eq!(
+        budget.used(),
+        Budget::control_storage_bytes(),
         "dropping the decoder returns its charge"
     );
+}
+
+#[test]
+fn decoding_resumes_after_the_output_frame_is_refused() {
+    let budget = Budget::new(256 << 10).unwrap();
+    let mut decoder = Decoder::new_in(&configuration(2), &budget).unwrap();
+    let mut reference = Decoder::new(&configuration(2)).unwrap();
+    let mut frame = AudioFrame::default();
+    let mut expected = AudioFrame::default();
+    let packet = |mode| audio(2, mode, 200, &[1; 32]);
+    decoder.decode(&packet(1), &mut frame).unwrap();
+    reference.decode(&packet(1), &mut expected).unwrap();
+    // Another holder takes the rest of the pool: the next frame cannot be charged.
+    let held = budget.reserve(budget.available()).unwrap();
+    assert!(decoder.decode(&packet(1), &mut frame).is_err());
+    drop(held);
+    // The refused packet left the overlap as it was.
+    for mode in [1, 0, 1] {
+        decoder.decode(&packet(mode), &mut frame).unwrap();
+        reference.decode(&packet(mode), &mut expected).unwrap();
+        assert_eq!(frame.samples_per_channel, expected.samples_per_channel);
+        assert_eq!(frame.planes, expected.planes);
+    }
 }
 
 #[test]
@@ -212,12 +254,13 @@ fn reset_drops_the_overlap() {
 fn malformed_setups_are_rejected() {
     let id = identification(2, 0x76);
     let mut setup = setup(2, 64);
+    let budget = Budget::new(Limits::default().live_storage_bytes).unwrap();
     for len in 0..setup.len() {
-        assert!(Decoder::from_headers(&id, &comment(), &setup[..len], Limits::default()).is_err());
+        assert!(Decoder::from_headers_in(&id, &comment(), &setup[..len], &budget).is_err());
     }
     // Break the codebook sync pattern.
     setup[8] ^= 0xff;
-    assert!(Decoder::from_headers(&id, &comment(), &setup, Limits::default()).is_err());
+    assert!(Decoder::from_headers_in(&id, &comment(), &setup, &budget).is_err());
     let mut seed = 99u32;
     for _ in 0..500 {
         let mut setup = self::setup(2, 64);
@@ -226,7 +269,7 @@ fn malformed_setups_are_rejected() {
             let at = 7 + (seed >> 8) as usize % (setup.len() - 7);
             setup[at] ^= 1 << (seed % 8);
         }
-        if let Ok(mut decoder) = Decoder::from_headers(&id, &comment(), &setup, Limits::default()) {
+        if let Ok(mut decoder) = Decoder::from_headers_in(&id, &comment(), &setup, &budget) {
             let mut frame = AudioFrame::default();
             for mode in [0, 1, 0] {
                 let _ = decoder.decode(&audio(2, mode, 100, &[1, 1, 0, 1]), &mut frame);

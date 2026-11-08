@@ -10,7 +10,6 @@
 )]
 // Pending: `missing_docs`.
 
-mod bits;
 mod codebook;
 mod floor0;
 mod floor1;
@@ -18,7 +17,6 @@ mod mapping;
 mod residue;
 mod setup;
 mod spectra;
-mod storage;
 mod tables;
 mod window;
 
@@ -26,8 +24,8 @@ use triergon_bitstream::LsbReader;
 use triergon_codec::layout::{native_order, vorbis_order};
 use triergon_codec::mdct::Imdct;
 use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, ChannelLayout, DecodeFailure, DownmixLevels, Reservation,
-    StorageError,
+    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, DecodeFailure, DownmixLevels,
+    Reservation, StorageError,
 };
 use triergon_framing::{VorbisHeaders, VorbisIdentification};
 
@@ -37,7 +35,6 @@ use mapping::{Mapping, Mode, decouple};
 use residue::Member;
 use setup::{Floor, Setup};
 use spectra::Spectra;
-use storage::Meter;
 use window::{Block, Slopes, fade_out, fold, overlap_add};
 
 /// Bounds of one decoder.
@@ -92,6 +89,11 @@ pub(crate) fn ilog(x: u32) -> u32 {
     u32::BITS - x.leading_zeros()
 }
 
+/// Appends `value` to `list`, charging room for it unless reserved.
+pub(crate) fn push<T>(list: &mut BudgetVec<T>, value: T) -> Result<(), StorageError> {
+    list.try_push(value).map_err(|refused| refused.error)
+}
+
 /// The floor one channel decoded in the current packet.
 #[derive(Clone, Copy, Debug)]
 enum Curve {
@@ -131,14 +133,12 @@ pub struct Decoder {
     /// The last output quarter of each channel's previous inverse MDCT, which with its
     /// reverse makes the right half the next block laps.
     overlap: Spectra,
-    floors: Vec<ChannelFloor>,
+    floors: BudgetVec<ChannelFloor>,
     /// The DCT-IV of one channel's spectrum.
-    dct: Vec<f32>,
+    dct: BudgetVec<f32>,
     scratch: residue::Scratch,
     /// The block size of the previous packet; `None` until a packet primed the overlap.
     previous: Option<Block>,
-    /// Charge of the setup tables and channel buffers above.
-    _tables: Reservation,
     /// Charge of the output frame the last packet sized.
     output: Reservation,
 }
@@ -147,33 +147,31 @@ pub struct Decoder {
 const IMDCT_SCALE: f64 = 1.0;
 
 impl Decoder {
-    /// A decoder for the canonical configuration: the three header packets, Xiph-laced.
-    pub fn from_configuration(
-        configuration: &[u8],
-        limits: Limits,
-    ) -> Result<Decoder, DecodeError> {
+    /// A decoder for `configuration`, the identification, comment and setup headers
+    /// Xiph-laced (Matroska `CodecPrivate`), with a pool of the default limit.
+    pub fn new(configuration: &[u8]) -> Result<Decoder, DecodeError> {
+        Decoder::with_limits(configuration, Limits::default())
+    }
+
+    /// As [`Decoder::new`], with a pool of `limits.live_storage_bytes`.
+    pub fn with_limits(configuration: &[u8], limits: Limits) -> Result<Decoder, DecodeError> {
+        Decoder::new_in(configuration, &Budget::new(limits.live_storage_bytes)?)
+    }
+
+    /// As [`Decoder::new`], charging the caller's pool.
+    pub fn new_in(configuration: &[u8], budget: &Budget) -> Result<Decoder, DecodeError> {
         let headers = VorbisHeaders::from_laced(configuration)
             .map_err(|_| DecodeError::Invalid("Vorbis configuration"))?;
-        Decoder::from_headers(
+        Decoder::from_headers_in(
             headers.identification,
             headers.comment,
             headers.setup,
-            limits,
+            budget,
         )
     }
 
-    /// A decoder for the identification, comment and setup header packets.
-    pub fn from_headers(
-        identification: &[u8],
-        comment: &[u8],
-        setup: &[u8],
-        limits: Limits,
-    ) -> Result<Decoder, DecodeError> {
-        let budget = Budget::new(limits.live_storage_bytes)?;
-        Decoder::from_headers_in(identification, comment, setup, &budget)
-    }
-
-    /// As [`Decoder::from_headers`], charging the caller's pool.
+    /// A decoder for the identification, comment and setup header packets as an Ogg
+    /// stream carries them, charging the caller's pool.
     pub fn from_headers_in(
         identification: &[u8],
         comment: &[u8],
@@ -195,27 +193,18 @@ impl Decoder {
         }
         let blocksizes = id.blocksize.map(usize::from);
         let (layout, planes) = output_layout(channels);
-        let mut meter = Meter(Reservation::empty(budget));
-        let setup = Setup::parse(setup, channels, blocksizes, &mut meter)?;
+        let setup = Setup::parse(setup, channels, blocksizes, budget)?;
 
         let half = blocksizes[1] / 2;
-        meter.add::<u8>(Imdct::table_bytes(blocksizes[0]) + Imdct::table_bytes(blocksizes[1]))?;
-        let imdct = blocksizes.map(|n| Imdct::new(n, IMDCT_SCALE));
-        let [Some(short), Some(long)] = imdct else {
-            return Err(DecodeError::Invalid("block size"));
+        let imdct = [
+            Imdct::new(blocksizes[0], IMDCT_SCALE, budget)?,
+            Imdct::new(blocksizes[1], IMDCT_SCALE, budget)?,
+        ];
+        let floor = ChannelFloor {
+            curve: Curve::Unused,
+            points: [0; floor1::MAX_POINTS],
+            coefficients: [0.0; floor0::MAX_ORDER],
         };
-        let slopes = Slopes::new(blocksizes, &mut meter)?;
-        let spectra = Spectra::new(channels, half, &mut meter)?;
-        let overlap = Spectra::new(channels, half, &mut meter)?;
-        let floors = meter.vec(
-            channels,
-            ChannelFloor {
-                curve: Curve::Unused,
-                points: [0; floor1::MAX_POINTS],
-                coefficients: [0.0; floor0::MAX_ORDER],
-            },
-        )?;
-        let dct = meter.vec(half, 0.0)?;
         let interleaves = setup.residues.iter().any(residue::Residue::interleaves);
         let classes = setup
             .residues
@@ -223,25 +212,27 @@ impl Decoder {
             .map(|residue| residue.class_slots(channels, half))
             .max()
             .unwrap_or(0);
-        let scratch = residue::Scratch {
-            interleaved: meter.vec(if interleaves { channels * half } else { 0 }, 0.0)?,
-            classes: meter.vec(classes, 0)?,
-        };
         Ok(Decoder {
             sample_rate: id.sample_rate,
             layout,
             planes,
             blocksizes,
+            imdct,
+            slopes: Slopes::new(blocksizes, budget)?,
+            spectra: Spectra::new(channels, half, budget)?,
+            overlap: Spectra::new(channels, half, budget)?,
+            floors: BudgetVec::try_filled(budget, floor, channels)?,
+            dct: BudgetVec::try_filled(budget, 0.0, half)?,
+            scratch: residue::Scratch {
+                interleaved: BudgetVec::try_filled(
+                    budget,
+                    0.0,
+                    if interleaves { channels * half } else { 0 },
+                )?,
+                classes: BudgetVec::try_filled(budget, 0, classes)?,
+            },
             setup,
-            imdct: [short, long],
-            slopes,
-            spectra,
-            overlap,
-            floors,
-            dct,
-            scratch,
             previous: None,
-            _tables: meter.0,
             output: Reservation::empty(budget),
         })
     }
@@ -350,7 +341,7 @@ fn decode_floors(
     r: &mut LsbReader<'_>,
     floors: &mut [ChannelFloor],
 ) -> Result<(), DecodeError> {
-    for (floor, &submap) in floors.iter_mut().zip(&mapping.mux) {
+    for (floor, &submap) in floors.iter_mut().zip(mapping.mux.iter()) {
         let number = mapping.submaps[usize::from(submap)].floor;
         floor.curve = match &setup.floors[usize::from(number)] {
             Floor::Lsp(lsp) => match lsp.decode(r, &setup.codebooks, &mut floor.coefficients)? {
@@ -385,7 +376,7 @@ fn decode_residues(
     for (coded, floor) in coded.iter_mut().zip(floors) {
         *coded = !matches!(floor.curve, Curve::Unused);
     }
-    for step in &mapping.coupling {
+    for step in mapping.coupling.iter() {
         let (m, a) = (usize::from(step.magnitude), usize::from(step.angle));
         if coded[m] || coded[a] {
             coded[m] = true;
@@ -434,7 +425,7 @@ fn apply_floors(
     spectra: &mut Spectra,
     coded: usize,
 ) {
-    for ((spectrum, floor), &submap) in spectra.channels_mut().zip(floors).zip(&mapping.mux) {
+    for ((spectrum, floor), &submap) in spectra.channels_mut().zip(floors).zip(mapping.mux.iter()) {
         let spectrum = &mut spectrum[..coded];
         let number = mapping.submaps[usize::from(submap)].floor;
         match (floor.curve, &setup.floors[usize::from(number)]) {

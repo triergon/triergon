@@ -1,9 +1,6 @@
 //! Block sizes, window slopes and overlap-add (Vorbis I sections 1.3.2, 4.3.1, 4.3.8).
 
-use core::f64::consts::FRAC_PI_2;
-
-use crate::storage::Meter;
-use triergon_codec::StorageError;
+use triergon_codec::{Budget, BudgetVec, StorageError, vorbis_window};
 
 /// Which of the stream's two block sizes a packet uses.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,20 +13,19 @@ pub(crate) enum Block {
 /// `sin(π/2 sin²((i + 1/2) / m · π/2))`, rising and (reversed) falling.
 #[derive(Debug)]
 pub(crate) struct Slope {
-    rising: Vec<f32>,
-    falling: Vec<f32>,
+    rising: BudgetVec<f32>,
+    falling: BudgetVec<f32>,
 }
 
 impl Slope {
-    fn new(blocksize: usize, meter: &mut Meter) -> Result<Slope, StorageError> {
+    fn new(blocksize: usize, budget: &Budget) -> Result<Slope, StorageError> {
         let m = blocksize / 2;
-        let mut rising = meter.with_capacity(m)?;
-        rising.extend((0..m).map(|i| {
-            let s = ((i as f64 + 0.5) / m as f64 * FRAC_PI_2).sin();
-            (FRAC_PI_2 * s * s).sin() as f32
-        }));
-        let mut falling = meter.with_capacity(m)?;
-        falling.extend(rising.iter().rev());
+        let mut rising = BudgetVec::try_filled(budget, 0.0, m)?;
+        vorbis_window(&mut rising);
+        let mut falling = BudgetVec::try_filled(budget, 0.0, m)?;
+        for (falling, &rising) in falling.iter_mut().zip(rising.iter().rev()) {
+            *falling = rising;
+        }
         Ok(Slope { rising, falling })
     }
 
@@ -44,10 +40,10 @@ impl Slope {
 pub(crate) struct Slopes([Slope; 2]);
 
 impl Slopes {
-    pub(crate) fn new(blocksizes: [usize; 2], meter: &mut Meter) -> Result<Slopes, StorageError> {
+    pub(crate) fn new(blocksizes: [usize; 2], budget: &Budget) -> Result<Slopes, StorageError> {
         Ok(Slopes([
-            Slope::new(blocksizes[0], meter)?,
-            Slope::new(blocksizes[1], meter)?,
+            Slope::new(blocksizes[0], budget)?,
+            Slope::new(blocksizes[1], budget)?,
         ]))
     }
 
@@ -146,18 +142,16 @@ pub(crate) fn fold(current: &[f32], saved: &mut [f32]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use triergon_codec::{Budget, Reservation};
 
     #[test]
     fn slopes_are_power_complementary() {
         let budget = Budget::new(1 << 16).unwrap();
-        let mut meter = Meter(Reservation::empty(&budget));
-        let slopes = Slopes::new([64, 256], &mut meter).unwrap();
+        let slopes = Slopes::new([64, 256], &budget).unwrap();
         for slope in [
             slopes.between(Block::Short, Block::Long),
             slopes.between(Block::Long, Block::Long),
         ] {
-            for (up, down) in slope.rising.iter().zip(&slope.falling) {
+            for (up, down) in slope.rising.iter().zip(slope.falling.iter()) {
                 assert!((up * up + down * down - 1.0).abs() < 1e-6);
             }
         }
@@ -209,9 +203,15 @@ mod tests {
         let (short, long) = (slope(32), slope(128));
         let bits = |v: &[f32]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
         // Blocks of 64 and 256 samples: DCT-IVs of 32 and 128 values.
+        let budget = Budget::new(1 << 16).unwrap();
+        let charged = |values: Vec<f32>| {
+            let mut out = BudgetVec::new(&budget);
+            out.try_extend_from_slice(&values).unwrap();
+            out
+        };
         let lap = |rising: &[f32]| Slope {
-            rising: rising.to_vec(),
-            falling: rising.iter().rev().copied().collect(),
+            rising: charged(rising.to_vec()),
+            falling: charged(rising.iter().rev().copied().collect()),
         };
         let (short_lap, long_lap) = (lap(&short), lap(&long));
         for (p, c, slope, lap) in [
