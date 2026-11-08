@@ -22,6 +22,10 @@ pub mod pes {
     //! select the carriage: [`RegisteredCarriage`] for AVC, HEVC and AAC,
     //! [`PrivateAudioCarriage`] for AC-3 and E-AC-3, and
     //! [`DvbSubtitlesDescriptors`] for DVB subtitles.
+    //! [`TransportFaultRecovery`] adds opt-in extraction from finite TS188 AVC
+    //! carriers with TEI or scrambling. Its [`TransportObservation::Faulted`]
+    //! result retains the actual source diagnostic and opaque bytes separately
+    //! from validated source PES.
     //!
     //! [`DemuxClock`] places a packet's timestamps in the demuxer's 33-bit interval,
     //! fixed by the first timestamp it sees, and returns a [`DemuxTimeView`] beside
@@ -29,13 +33,17 @@ pub mod pes {
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::demux_clock::{
-        ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, TimestampOrigin,
+        ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, EncodedTimeView, TimestampOrigin,
     };
     pub use crate::demux_pes::{
         CompactDemuxPacket, CompactPayload, DemuxBoundary, DemuxObserver, DemuxPacket,
         DemuxPayloadKind, DemuxScope, DemuxSpan, DemuxSpanView, DemuxSpanViews,
         DvbSubtitlesDescriptors, PayloadCursor, PrivateAudioCarriage, PrivateAudioDescriptors,
         ReadyContinuation, RegisteredCarriage, SourceContext,
+    };
+    pub use crate::demux_transport::{
+        TransportFaultHeader, TransportFaultKind, TransportFaultPacket, TransportFaultRecovery,
+        TransportObservation,
     };
     /// Control-only completion from complete physical carrier coverage and
     /// actual source EOF. The confirmation never creates a validated PES scope
