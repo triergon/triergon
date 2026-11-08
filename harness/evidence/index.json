@@ -16453,6 +16453,16 @@
      "sha256": "36715f9e8fa567874efa7cc8b5fb2d238753e71e7ee4cb90956e90f60a89424c"
     }
    ]
+  },
+  {
+   "name": "runners-gate-build-linux-arm64",
+   "path": "runners-gate-build-linux-arm64",
+   "retention": "retained",
+   "reason": "AArch64 status rows for the matroska-audio-clocks, mp4-forward, ts-program, raw-annex-b, subtitles-pgs, subtitles-text and mpegts-pes contracts: timing pinned to one CPU, the kernel RSS proof and memory, 30 pairs each; also the 32-bit progressive reference check (same-code and instruction counts)",
+   "key": "evidence/runners-gate-build-linux-arm64/907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136.tar.gz",
+   "sha256": "907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136",
+   "bytes": 2385629442,
+   "source_revision": "b3579f729494a37a4dbebe03c475f7b38484046e"
   }
  ]
 }

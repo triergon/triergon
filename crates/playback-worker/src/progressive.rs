@@ -1,13 +1,13 @@
 //! A bounded forward-only AVC/AAC TS188 session with two retained units per stream.
 #![forbid(unsafe_code)]
 
+use crate::runner::{Invocation, Mode, Result, Totals, measure};
 use std::cell::Cell;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::atomic::AtomicBool;
-use std::time::Instant;
 use triergon_core::{
     Budget, Bytes, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceId, Time,
     WorkBudget,
@@ -20,7 +20,7 @@ use triergon_playback::{
     },
 };
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub const PREFIX: &str = "progressive-";
 const OP: &str = "ProgressiveAvcAacTsOwnedFeedV1";
 const WINDOW: usize = 4096;
 const DEPTH: usize = 2;
@@ -396,64 +396,53 @@ fn operation(
     Ok(work)
 }
 
+/// `progressive-fold FILE CLOCK PROGRESS`, `progressive-bench FILE 50 CLOCK PROGRESS`,
+/// `progressive-memory FILE CLOCK PROGRESS` or `progressive-trace FILE CLOCK PROGRESS`
+/// (`fold` with every retired unit printed, and the stream facts on stderr); CLOCK
+/// is `pts-only` or `pts-dts`, PROGRESS `before-eof` or `at-eof`. Every operation
+/// reads the file from disk in bounded windows.
 pub(super) fn run(args: &[String]) -> Result<()> {
-    let (mode, path, clock, progress, iterations) = match args {
-        [mode, path, clock, progress]
-            if matches!(mode.as_str(), "progressive-trace" | "progressive-fold" | "progressive-memory") =>
-        {
-            (mode.as_str(), path, clock, progress, 1)
-        }
-        [mode, path, n, clock, progress] if mode == "progressive-bench" && n == "50" =>
-            (mode.as_str(), path, clock, progress, 50),
-        _ => return Err("usage: playback-worker progressive-trace|progressive-fold|progressive-memory FILE CLOCK PROGRESS | progressive-bench FILE 50 CLOCK PROGRESS".into()),
+    let invocation = Invocation::parse(args, PREFIX, " CLOCK PROGRESS", 2..=2, true)?;
+    let [clock, progress] = invocation.arguments else {
+        return Err("expected CLOCK and PROGRESS".into());
     };
     let has_dts = match clock.as_str() {
         "pts-dts" => true,
         "pts-only" => false,
         _ => return Err("expected pts-only or pts-dts video clock".into()),
     };
-    let trace = mode == "progressive-trace";
-    let memory = mode == "progressive-memory";
     let require_streaming = match progress.as_str() {
         "before-eof" => true,
         "at-eof" => false,
         _ => return Err("expected before-eof or at-eof progress requirement".into()),
     };
-    if (memory || mode == "progressive-bench")
-        && !cfg!(all(target_os = "linux", target_arch = "aarch64"))
-    {
-        return Err("numeric modes require native Linux AArch64".into());
+    match invocation.mode {
+        Mode::Bench if invocation.iterations != 50 => {
+            return Err("progressive-bench runs 50 sessions".into());
+        }
+        Mode::Bench | Mode::Memory if !cfg!(all(target_os = "linux", target_arch = "aarch64")) => {
+            return Err("numeric modes require native Linux AArch64".into());
+        }
+        _ => {}
     }
-    let mut out = io::BufWriter::new(io::stdout().lock());
-    if memory {
-        writeln!(out, "TRIERGON_BEGIN_V1")?;
-        out.flush()?;
-    }
-    let start = (mode == "progressive-bench").then(Instant::now);
-    let mut total = Work::default();
-    for _ in 0..iterations {
-        let work = operation(
-            Path::new(path),
-            has_dts,
-            trace.then_some(&mut out as &mut dyn Write),
-            require_streaming,
-        )?;
-        total.packets += work.packets;
-        total.bytes += work.bytes;
-        mix(&mut total.digest, work.digest);
-    }
-    let elapsed = start.map_or(0, |t| t.elapsed().as_nanos());
-    if memory {
-        writeln!(out, "TRIERGON_END_V1")?;
-        out.flush()?;
-    }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"{OP}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        total.packets, total.bytes, total.digest,
-    )?;
-    out.flush()?;
-    Ok(())
+    let path = Path::new(invocation.path);
+    let trace = invocation.mode == Mode::Trace;
+    // Every operation reads the file into its own pool and checks that pool itself.
+    measure(&invocation, OP, None, || {
+        let work = if trace {
+            let mut out = io::BufWriter::new(io::stdout().lock());
+            let work = operation(path, has_dts, Some(&mut out), require_streaming)?;
+            out.flush()?;
+            work
+        } else {
+            operation(path, has_dts, None, require_streaming)?
+        };
+        Ok(Totals {
+            packets: work.packets,
+            bytes: work.bytes,
+            digest: work.digest,
+        })
+    })
 }
 
 #[cfg(test)]

@@ -1,10 +1,7 @@
 //! Compare every packet of a regular AVC/AAC file through range playback.
 
-use std::{
-    io::{self, Write},
-    sync::atomic::AtomicBool,
-    time::Instant,
-};
+use crate::runner::{Invocation, Result, Totals, measure};
+use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, BudgetVec, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget,
 };
@@ -29,7 +26,8 @@ use triergon_playback::{
     mp4_plan::PlanLimits,
 };
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub const PREFIX: &str = "mp4-range-";
+const OPERATION: &str = "mp4-range-playback";
 const WINDOW: usize = 32 * 1024;
 const MAX_INPUT: usize = 64 * 1024 * 1024;
 
@@ -68,9 +66,17 @@ impl Work {
         self.bytes += bytes.len() as u64;
         Ok(())
     }
+
+    fn totals(self) -> Totals {
+        Totals {
+            packets: self.packets,
+            bytes: self.bytes,
+            digest: self.digest,
+        }
+    }
 }
 
-fn measure(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Work> {
+fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
     let id = SourceId(1);
     let input = InputCursor::new(
         pool,
@@ -193,59 +199,25 @@ fn measure(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Work> {
             }
         }
         match progress {
-            Progress::Ended => return Ok(result),
+            Progress::Ended => return Ok(result.totals()),
             Progress::Backpressure { .. } => return Err("range playback ran out of space".into()),
             _ => {}
         }
     }
 }
 
-pub(super) fn run(args: &[String]) -> Result<()> {
-    let [mode, path, rest @ ..] = args else {
-        return Err("expected a range operation and input".into());
-    };
-    let (iterations, rest) = match (mode.as_str(), rest) {
-        ("mp4-range-fold" | "mp4-range-memory", rest) => (1, rest),
-        ("mp4-range-bench", [count, rest @ ..]) => (count.parse()?, rest),
-        _ => return Err("unknown range operation".into()),
-    };
-    let seek = match rest {
-        [] => None,
-        [timestamp] => Some(timestamp.parse()?),
-        _ => return Err("expected at most one seek timestamp in video ticks".into()),
-    };
-    if !(1..=1_000_000).contains(&iterations) || std::fs::metadata(path)?.len() > MAX_INPUT as u64 {
-        return Err("range worker limit".into());
-    }
+/// `mp4-range-fold FILE [SEEK]`, `mp4-range-bench FILE ITERATIONS [SEEK]` or
+/// `mp4-range-memory FILE [SEEK]`; SEEK is a backward seek target in video ticks.
+pub fn run(args: &[String]) -> Result<()> {
+    let invocation = Invocation::parse(args, PREFIX, " [SEEK]", 0..=1, false)?;
+    let seek = invocation
+        .arguments
+        .first()
+        .map(|timestamp| timestamp.parse())
+        .transpose()?;
     let pool = Budget::new(MAX_INPUT * 2)?;
-    let raw = Bytes::copy_from_slice(&pool, &std::fs::read(path)?)?;
-    let mut out = io::stdout().lock();
-    let memory = mode == "mp4-range-memory";
-    if memory {
-        writeln!(out, "TRIERGON_BEGIN_V1")?;
-        out.flush()?;
-    }
-    let start = Instant::now();
-    let mut total = Work::default();
-    for _ in 0..iterations {
-        let work = measure(&pool, &raw, seek)?;
-        total.packets += work.packets;
-        total.bytes += work.bytes;
-        fold(&mut total.digest, work.digest);
-    }
-    let elapsed = if mode == "mp4-range-bench" {
-        start.elapsed().as_nanos()
-    } else {
-        0
-    };
-    if memory {
-        writeln!(out, "TRIERGON_END_V1")?;
-        out.flush()?;
-    }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"mp4-range-playback\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        total.packets, total.bytes, total.digest
-    )?;
-    Ok(())
+    let raw = Bytes::copy_from_slice(&pool, &invocation.input(MAX_INPUT as u64)?)?;
+    measure(&invocation, OPERATION, Some(&pool), || {
+        session(&pool, &raw, seek)
+    })
 }

@@ -4,10 +4,8 @@
 //! application audio clock, materialize each contiguous video feed, and fold
 //! video units first and audio units second, followed by their presentation tails.
 
-use std::io::{self, Write};
-use std::path::Path;
+use crate::runner::{Invocation, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
-use std::time::Instant;
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_playback::{
     ByteSource,
@@ -19,7 +17,7 @@ use triergon_playback::{
     },
 };
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub const PREFIX: &str = "hls-";
 const MAX_INPUT: u64 = 64 * 1024 * 1024;
 const OPERATION: &str = "hls-segment-feed";
 
@@ -95,6 +93,14 @@ impl Work {
         self.packets += 1;
         Ok(())
     }
+
+    fn totals(&self) -> Totals {
+        Totals {
+            packets: self.packets as u64,
+            bytes: self.bytes as u64,
+            digest: self.digest,
+        }
+    }
 }
 
 fn open_segment(pool: &Budget, raw: &Bytes, profile: HlsMediaProfile) -> Result<Segment> {
@@ -150,7 +156,7 @@ fn open_segment(pool: &Budget, raw: &Bytes, profile: HlsMediaProfile) -> Result<
     Err("segment never reached logical EOF".into())
 }
 
-fn measure(pool: &Budget, segment: Segment) -> Result<Work> {
+fn fold_segment(pool: &Budget, segment: Segment) -> Result<Work> {
     let mut work = Work::default();
     let (video_tail, audio_tail, feed_bytes, count) = match segment {
         Segment::AvcAac(segment) => {
@@ -223,23 +229,13 @@ fn measure(pool: &Budget, segment: Segment) -> Result<Work> {
     Ok(work)
 }
 
-/// `hls-bench FILE ITERATIONS VIDEO AUDIO`, `hls-fold FILE VIDEO AUDIO` or
+/// `hls-fold FILE VIDEO AUDIO`, `hls-bench FILE ITERATIONS VIDEO AUDIO` or
 /// `hls-memory FILE VIDEO AUDIO`; VIDEO is `avc` or `hevc`, AUDIO `aac`, `ac3` or `eac3`.
 pub fn run(args: &[String]) -> Result<()> {
-    let usage = "usage: playback-worker hls-bench FILE N VIDEO AUDIO | hls-fold FILE VIDEO AUDIO | hls-memory FILE VIDEO AUDIO";
-    let (mode, path, video, audio, iterations) = match args {
-        [mode, path, video, audio] if mode == "hls-fold" || mode == "hls-memory" => {
-            (mode, path, video, audio, 1)
-        }
-        [mode, path, count, video, audio] if mode == "hls-bench" => {
-            (mode, path, video, audio, count.parse::<u64>()?)
-        }
-        _ => return Err(usage.into()),
+    let invocation = Invocation::parse(args, PREFIX, " VIDEO AUDIO", 2..=2, false)?;
+    let [video, audio] = invocation.arguments else {
+        return Err("expected VIDEO and AUDIO".into());
     };
-    if !(1..=1_000_000).contains(&iterations) {
-        return Err(usage.into());
-    }
-    let memory = mode == "hls-memory";
     let profile = HlsMediaProfile {
         video: match video.as_str() {
             "avc" => HlsVideoCodec::Avc,
@@ -253,48 +249,21 @@ pub fn run(args: &[String]) -> Result<()> {
             _ => return Err("expected aac, ac3 or eac3".into()),
         }),
     };
-    let path = Path::new(path);
-    let size = path.metadata()?.len();
-    if size == 0 || size > MAX_INPUT || size % 188 != 0 {
+    let raw = invocation.input(MAX_INPUT)?;
+    if raw.is_empty() || !raw.len().is_multiple_of(188) {
         return Err("input must be bounded TS188".into());
     }
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let raw = Bytes::try_from_vec(&pool, std::fs::read(path)?).map_err(|error| error.error())?;
-    let retained = pool.used();
-    let mut out = io::stdout().lock();
-    if memory {
-        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
-        out.flush()?;
-    }
-    let start = (mode == "hls-bench").then(Instant::now);
-    let mut total = Work::default();
-    for _ in 0..iterations {
+    let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error())?;
+    measure(&invocation, OPERATION, Some(&pool), || {
         let segment = open_segment(&pool, std::hint::black_box(&raw), profile)?;
-        let work = measure(&pool, segment)?;
-        total.mix(work.digest);
-        total.packets += work.packets;
-        total.bytes += work.bytes;
-        if pool.used() != retained {
-            return Err("segment operation retained charged storage".into());
-        }
-    }
-    let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
-    if memory {
-        out.write_all(b"TRIERGON_END_V1\n")?;
-        out.flush()?;
-    }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"{OPERATION}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        total.packets, total.bytes, total.digest,
-    )?;
-    out.flush()?;
-    Ok(())
+        Ok(fold_segment(&pool, segment)?.totals())
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{HlsAudioCodec, HlsMediaProfile, HlsVideoCodec, measure, open_segment};
+    use super::{HlsAudioCodec, HlsMediaProfile, HlsVideoCodec, fold_segment, open_segment};
     use triergon_core::{Budget, Bytes, Error};
 
     #[test]
@@ -327,7 +296,7 @@ mod tests {
             };
             let segment = open_segment(&pool, &raw, profile).unwrap();
             let foreign_pool = Budget::new(256 * 1024 * 1024).unwrap();
-            let Err(error) = measure(&foreign_pool, segment) else {
+            let Err(error) = fold_segment(&foreign_pool, segment) else {
                 panic!("video measurement skipped contiguous_feed for {fixture}");
             };
             assert_eq!(error.downcast_ref::<Error>(), Some(&Error::ForeignPool));

@@ -1279,6 +1279,10 @@ mod tests {
             ("font-outlines", 51),
             ("font-hinting-none", 102),
             ("font-hinting-modes", 918),
+            ("matroska-audio-clocks", 10),
+            ("mp4-forward", 38),
+            ("ts-program", 35),
+            ("raw-annex-b", 6),
         ] {
             let (manifest, manifest_sha) = super::super::manifest::read(
                 root,
@@ -1331,7 +1335,9 @@ mod tests {
                 manifest_sha: &manifest_sha,
             };
             assert!(changed_binding.registered(root).is_err(), "{feature}");
-            if feature.starts_with("matroska-") && feature != "matroska-startup-seek" {
+            if feature.starts_with("matroska-")
+                && !matches!(feature, "matroska-startup-seek" | "matroska-audio-clocks")
+            {
                 matroska += count;
             }
         }

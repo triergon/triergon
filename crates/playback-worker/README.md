@@ -1,48 +1,49 @@
 # playback-worker
 
-Playback measurement worker for the harness. It opens a Matroska file through the
-[triergon-playback](../playback/README.md) engine with a 4 KiB read window, discovers
-the streams, selects the first video track and produces its AVC or HEVC packets with
-native PTS, DTS and duration, either from startup or after a backward seek. The FFmpeg
-reference worker in `harness/` performs the same operation. It is tooling
-(`publish = false`), not part of the library.
+Playback measurement worker for the harness. Each mode family runs one operation of
+the [triergon-playback](../playback/README.md) engine on one input; the FFmpeg
+reference worker in `harness/` performs the same operation through public FFmpeg APIs.
+It is tooling (`publish = false`), not part of the library.
 
 ## Command line
 
+Every mode family has one prefix and the same command line (`src/runner.rs`):
+
 ```text
-playback-worker feed-bench  CAPSULE ITERATIONS
-playback-worker feed-fold   CAPSULE
-playback-worker feed-memory CAPSULE
-playback-worker hls-fold    FILE VIDEO AUDIO
-playback-worker hls-bench   FILE ITERATIONS VIDEO AUDIO
-playback-worker hls-memory  FILE VIDEO AUDIO
+playback-worker PREFIXfold   FILE ARGS
+playback-worker PREFIXbench  FILE ITERATIONS ARGS
+playback-worker PREFIXmemory FILE ARGS
+playback-worker PREFIXtrace  FILE ARGS
 ```
+
+Every mode prints one JSON line with the packet and byte counts and the ordered fold
+of each operation's digest. `bench` runs the operation ITERATIONS times and adds the
+elapsed time of that loop, `memory` brackets one operation with the allocation-window
+markers, and `trace`, where a family has it, prints what the operation folds before
+the result. Reading the input, process start-up and the result line are outside the
+timed loop and the allocation window. An operation on a preloaded input fails when it
+leaves any of that input's pool charged.
+
+| Prefix | ARGS | Operation | Contract |
+|---|---|---|---|
+| `feed-` | none; FILE is a capsule | Matroska discovery with a 4 KiB read window; the first video track's AVC or HEVC packets with native PTS, DTS and duration, from startup or after a backward seek | `matroska-startup-seek` |
+| `hls-` | VIDEO (`avc`, `hevc`) and AUDIO (`aac`, `ac3`, `eac3`) | one TS188 segment: every access unit retained through segment EOF, then `contiguous_feed` for every video unit, folding its payload, the audio bytes, timing and both stream tails | `hls-segments` |
+| `mp4-range-` | an optional backward seek target in video ticks | every AVC and AAC packet of a regular MP4 file through range playback, optionally after one packet and a backward seek; the digest covers order, source extents, clocks, flags, trim and bytes | `mp4-range` |
+| `progressive-` | CLOCK (`pts-only`, `pts-dts`) and PROGRESS (`before-eof`, `at-eof`) | a forward-only AVC/AAC TS188 session read from the file in 4 KiB windows, two retained units per stream; `bench` runs 50 sessions, `bench` and `memory` only on Linux AArch64, and `trace` prints every unit with the stream facts on stderr | `progressive-ts188` |
+| `mkv-audio-` | `aac`, `dolby` or `all` | Matroska stream discovery in 4 KiB windows; the AAC-LC, AC-3 and E-AC-3 tracks the reader identifies through `native_aac_clock_probe` or `native_dolby_clock_probe` over the discovery prefix, then the forward clock; times in nanoseconds | `matroska-audio-clocks` |
+| `mp4-forward-` | `regular` or `progressive` | `Mp4Open` and `Mp4IndexJob` in the native MOV view; a seekable file through `Engine::mp4`, or a forward-only front-`moov` file through its native front plan and `Engine::mp4_native_terminal_v1`; every track, times in the track time base | `mp4-forward` |
+| `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE` | explicit PIDs of program 1 through `Engine::ts_native_program_v1`, or one M2TS192 PID through `NativeStartup::new_m2ts_prefix_v2`; native 90 kHz clocks | `ts-program` |
+| `raw-video-` | `avc` or `hevc` | `RawVideoProbe`, `RawVideoSource` and `RawVideoFeed` over forward-only Annex B; no container clock, the duration is the active SPS picture period in 1/1,200,000 s | `raw-annex-b` |
 
 A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
 2 seek after reading to the end), the seek target in milliseconds as a big-endian
-`i64`, then the Matroska file. Every mode prints one JSON line with the packet and
-byte counts and an ordered digest of every selected packet's timing and payload;
-`feed-bench` adds the elapsed time of the timed loop and `feed-memory` brackets the
-operation with the allocation-window markers. The corpus is
-`harness/features/matroska-startup-seek/`.
+`i64`, then the Matroska file. `cargo xtask fixtures` writes the capsules and the
+MP4 range inputs under `.research/`.
 
-The `hls-fold`, `hls-bench` and `hls-memory` modes accept one TS188 segment
-and selected AVC/HEVC video with AAC, AC-3 or E-AC-3 audio. They retain every
-access unit through segment EOF, then call `contiguous_feed` for every video
-unit and fold its complete payload, audio bytes, timing and both stream tails.
-Allocation, copying and release of each contiguous feed are inside the timed
-and memory operations, in the order specified by
-`harness/features/hls-segments/contract.json`.
+The last four families share one packet fold (`src/packet_fold.rs`): track, PTS, DTS,
+duration, flags, size and every payload byte, with an unknown time folded as
+`i64::MIN` and an unknown duration as zero; `trace` prints one line per packet. The
+reference side is `harness/reference_packet_fold.h`.
 
-```text
-playback-worker mp4-range-bench  FILE ITERATIONS [VIDEO_TICKS]
-playback-worker mp4-range-fold   FILE [VIDEO_TICKS]
-playback-worker mp4-range-memory FILE [VIDEO_TICKS]
-```
-
-The range operation reads every AVC and AAC packet of a regular MP4 file. With
-a seek timestamp, it reads one packet, seeks backward from the supplied video
-timestamp and reads through EOF. Its digest includes the packet order, source
-extents, clocks, flags, trim and bytes. `cargo xtask fixtures` writes the
-comparison inputs to `.research/mp4-range-fixtures`. The corpus contract is
-`harness/features/mp4-range/contract.json`.
+The contracts are in `harness/features/<contract>/`. The corpora of the last four
+name inputs relative to the repository root, which they record as their `directory`.
