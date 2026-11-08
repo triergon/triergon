@@ -548,7 +548,7 @@ mod tests {
         }
         for feature in crate::lanes::LANES.iter().flat_map(|lane| lane.features) {
             for file in ["contract", "pins"] {
-                let name = format!("harness/features/{}/{file}.json", feature.id);
+                let name = format!("harness/features/{feature}/{file}.json");
                 assert!(
                     shared.get(&name).is_some(),
                     "missing source binding: {name}"

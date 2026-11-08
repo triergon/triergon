@@ -7,7 +7,7 @@ use std::path::Path;
 
 use super::{CORPUS, corpus};
 use crate::json::Value;
-use crate::lanes::{self, Feature, Gate, Lane};
+use crate::lanes::{self, Lane};
 
 type R<T> = Result<T, String>;
 
@@ -52,20 +52,7 @@ enum Load {
     Sized(&'static [i32]),
 }
 
-pub const FEATURES: [Feature; 3] = [
-    Feature {
-        id: "font-outlines",
-        gate: Gate::Required,
-    },
-    Feature {
-        id: "font-hinting-none",
-        gate: Gate::Required,
-    },
-    Feature {
-        id: "font-hinting-modes",
-        gate: Gate::OnDemand,
-    },
-];
+pub const FEATURES: [&str; 3] = ["font-outlines", "font-hinting-none", "font-hinting-modes"];
 
 pub const LANE: Lane = Lane {
     command: "fonts",
@@ -177,7 +164,7 @@ mod tests {
                 .len()
         };
         assert_eq!(
-            FEATURES.map(|f| (f.id, count(f.id))),
+            FEATURES.map(|f| (f, count(f))),
             [
                 ("font-outlines", 51),
                 ("font-hinting-none", 102),

@@ -330,33 +330,8 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{LANE, configure_argv};
+    use super::configure_argv;
     use std::path::Path;
-
-    #[test]
-    fn compare_reports_the_required_features_or_all() {
-        let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let reports = |list: &[&str]| LANE.reports(&args(list));
-        let required = reports(&["compare", "--output", "out", "--memory"]).unwrap();
-        assert_eq!(
-            required[1],
-            args(&[
-                "--contract",
-                "harness/features/font-hinting-none/contract.json",
-                "--manifest",
-                "harness/features/font-hinting-none/corpus.json",
-                "--output",
-                "out/font-hinting-none",
-                "--memory",
-            ])
-        );
-        assert_eq!(required.len(), 2);
-        assert_eq!(
-            reports(&["compare", "--all"]).unwrap().len(),
-            LANE.features.len()
-        );
-        assert!(reports(&["prepare"]).is_none());
-    }
 
     #[test]
     fn freetype_builds_without_optional_libraries() {

@@ -5,6 +5,7 @@
   "candidate": "raster-worker",
   "worker_operation": "raster-",
   "reference": "libass-native",
+  "gate": "on-demand",
   "contract": [
     "one font file read from memory: glyph ids spread evenly over face 0, loaded as libass 0.17.5 loads them with hinting off (ASS_HINTING_NONE): GDI face metrics, a REAL_DIM size request of the case's 26.6 pixel height and unhinted outlines (FT_LOAD_NO_HINTING), from FreeType 2.15.0 in the reference and triergon-font in the candidate; the cases of the arguments over those glyphs",
     "one case file read from memory, one case per line, generated from a seed: random outline and random bitmap cases as in raster-outlines and raster-bitmaps",
@@ -29,6 +30,6 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "gating the full rasterising sweep: cargo xtask check runs raster-glyphs, raster-outlines and raster-bitmaps; the sweep over every corpus file at three heights and the larger random sets runs on demand (cargo xtask raster compare --all) until its run time fits the check budget"
+    "gating the sweep over every corpus file at three heights and the larger random sets once its run time fits the check budget"
   ]
 }

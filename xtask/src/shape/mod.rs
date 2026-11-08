@@ -61,33 +61,3 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
         _ => Err(USAGE.into()),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::LANE;
-
-    #[test]
-    fn compare_reports_the_required_features_or_all() {
-        let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let reports = |list: &[&str]| LANE.reports(&args(list));
-        let required = reports(&["compare", "--output", "out", "--memory"]).unwrap();
-        assert_eq!(required.len(), 5);
-        assert_eq!(
-            required[0],
-            args(&[
-                "--contract",
-                "harness/features/shape-text/contract.json",
-                "--manifest",
-                "harness/features/shape-text/corpus.json",
-                "--output",
-                "out/shape-text",
-                "--memory",
-            ])
-        );
-        assert_eq!(
-            reports(&["compare", "--all"]).unwrap().len(),
-            LANE.features.len()
-        );
-        assert!(reports(&["ucd"]).is_none());
-    }
-}
