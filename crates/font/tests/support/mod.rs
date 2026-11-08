@@ -938,6 +938,91 @@ fn cmap_formats_tables() -> Tables {
     tables
 }
 
+/// TrueType faces that differ only in their cmap, one for each step of the
+/// charmap libass selects for text: (3, 10) after (3, 1), the first (3, 1)
+/// after Symbol, Symbol over the Unicode and Macintosh subtables, and without
+/// Windows subtables FreeType's choice (ISO after Unicode BMP, (0, 4) over a
+/// later format 12 (0, 6)) or the first subtable. The subtables map 'A' (and
+/// 'B' and 'C') to different glyphs. An `fpgm` keeps the auto-hinter off them.
+fn cmap_order_faces() -> Vec<(&'static [u8; 4], Tables)> {
+    let bmp = |pairs: &[(u16, u16)]| cmap(pairs)[12..].to_vec();
+    let faces = [
+        (
+            "Full",
+            vec![
+                (0, 3, bmp(&[(0x41, 1), (0x42, 2), (0x43, 3)])),
+                (3, 1, bmp(&[(0x41, 1), (0x42, 2), (0x43, 3)])),
+                (
+                    3,
+                    10,
+                    cmap_groups(
+                        12,
+                        &[
+                            (0x41, 0x41, 3),
+                            (0x42, 0x42, 2),
+                            (0x43, 0x43, 1),
+                            (0x1_d400, 0x1_d400, 1),
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        (
+            "BMP",
+            vec![
+                (3, 0, bmp(&[(0xf041, 3), (0xf042, 2)])),
+                (3, 1, bmp(&[(0x41, 1), (0x42, 2)])),
+                (3, 1, cmap_trimmed(6, 0x41, &[2, 1])),
+            ],
+        ),
+        (
+            "Symbol",
+            vec![
+                (0, 3, bmp(&[(0x41, 1)])),
+                (1, 0, cmap_format0(&[(0x41, 2)])),
+                (3, 0, bmp(&[(0xf041, 3)])),
+            ],
+        ),
+        (
+            "ISO",
+            vec![
+                (0, 3, bmp(&[(0x41, 1)])),
+                (2, 1, bmp(&[(0x41, 2)])),
+                (1, 0, cmap_format0(&[(0x41, 3)])),
+            ],
+        ),
+        (
+            "UCS4",
+            vec![
+                (0, 4, cmap_groups(12, &[(0x41, 0x41, 1)])),
+                (0, 6, cmap_groups(12, &[(0x41, 0x41, 2)])),
+                (0, 3, bmp(&[(0x41, 3)])),
+            ],
+        ),
+        (
+            "Macintosh",
+            vec![
+                (1, 0, cmap_format0(&[(0x41, 1)])),
+                (1, 1, cmap_trimmed(6, 0x41, &[2])),
+            ],
+        ),
+    ];
+    faces
+        .into_iter()
+        .map(|(style, records)| {
+            let mut tables = truetype_tables(400, 0x40, "Authored Cmap Order", style);
+            for table in &mut tables {
+                if &table.0 == b"cmap" {
+                    table.1 = cmap_records(&records);
+                }
+            }
+            // PUSHB_1 0; POP
+            tables.push((*b"fpgm", vec![0xb0, 0, 0x21]));
+            (b"\0\x01\0\0", tables)
+        })
+        .collect()
+}
+
 /// Authored fonts for the FreeType comparison: features the freely licensed
 /// corpus does not exercise. Named by their file in the corpus.
 pub fn authored_fonts() -> Vec<(&'static str, Vec<u8>)> {
@@ -954,6 +1039,7 @@ pub fn authored_fonts() -> Vec<(&'static str, Vec<u8>)> {
             "authored-cmap-formats.ttf",
             font(b"\0\x01\0\0", &cmap_formats_tables()),
         ),
+        ("authored-cmap-order.ttc", collection(&cmap_order_faces())),
     ]
 }
 

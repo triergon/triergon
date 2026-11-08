@@ -41,6 +41,7 @@
 #include FT_ADVANCES_H
 #include FT_OUTLINE_H
 #include FT_SFNT_NAMES_H
+#include FT_TRUETYPE_IDS_H
 #include FT_TRUETYPE_TABLES_H
 #include FT_TRUETYPE_TAGS_H
 #include FT_TYPE1_TABLES_H
@@ -166,18 +167,33 @@ static int font_supported(FT_CharMap charmap) {
     }
 }
 
-/* The charmap libass selects: the first Windows Unicode subtable, else the first
- * Windows subtable, else FreeType's default, else the first. */
+/* The charmap libass 0.17.5 selects for text when it opens a face
+ * (ass_charmap_magic in ass_font.c), over FreeType's charmaps in directory
+ * order: a Microsoft UCS-4 one is set at once; else the first Microsoft
+ * Unicode BMP one, else the first Microsoft one of another encoding; else the
+ * charmap FreeType selected on opening the face stays, and only a face without
+ * one gets its first charmap. libass sets it with FT_Set_Charmap, so it is read
+ * back from face->charmap. Call it on a face as opened. */
 static FT_CharMap font_text_charmap(FT_Face face) {
-    FT_CharMap windows = NULL;
+    int microsoft = -1, microsoft_unicode = -1;
     for (int i = 0; i < face->num_charmaps; i++) {
         FT_CharMap c = face->charmaps[i];
-        if (c->platform_id == 3 && (c->encoding_id == 1 || c->encoding_id == 10)) return c;
-        if (c->platform_id == 3 && !windows) windows = c;
+        if (c->platform_id != TT_PLATFORM_MICROSOFT) continue;
+        if (c->encoding_id == TT_MS_ID_UCS_4) {
+            FT_Set_Charmap(face, c);
+            return face->charmap;
+        }
+        if (c->encoding_id == TT_MS_ID_UNICODE_CS) {
+            if (microsoft_unicode < 0) microsoft = microsoft_unicode = i;
+        } else if (microsoft < 0) {
+            microsoft = i;
+        }
     }
-    if (windows) return windows;
-    if (face->charmap) return face->charmap;
-    return face->num_charmaps ? face->charmaps[0] : NULL;
+    if (microsoft >= 0)
+        FT_Set_Charmap(face, face->charmaps[microsoft]);
+    else if (!face->charmap && face->num_charmaps > 0)
+        FT_Set_Charmap(face, face->charmaps[0]);
+    return face->charmap;
 }
 
 static int font_key_order(const void *a, const void *b) {
@@ -543,8 +559,7 @@ static int font_read(FT_Library library, const FT_Byte *data, FT_Long size, Font
                 font_fold(w, (uint64_t)i);
             }
             font_gdi_metrics(face);
-            FT_CharMap textmap = font_text_charmap(face);
-            if (textmap) FT_Set_Charmap(face, textmap);
+            font_text_charmap(face);
             FT_Size_RequestRec rq;
             memset(&rq, 0, sizeof rq);
             rq.type = FT_SIZE_REQUEST_TYPE_REAL_DIM;

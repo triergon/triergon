@@ -1269,9 +1269,9 @@ mod tests {
             ("hls-segments", 71),
             ("packet-framing", 125),
             ("isobmff-open-index", 1020),
-            ("font-outlines", 50),
-            ("font-hinting-none", 100),
-            ("font-hinting-modes", 900),
+            ("font-outlines", 51),
+            ("font-hinting-none", 102),
+            ("font-hinting-modes", 918),
         ] {
             let (manifest, manifest_sha) = super::super::manifest::read(
                 root,

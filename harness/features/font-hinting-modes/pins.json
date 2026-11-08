@@ -4502,6 +4502,96 @@
       "packets": 4,
       "bytes": 0,
       "digest": 9375889883228149610
+    },
+    "authored-cmap-order-ttc-outlines-4800": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 3811527549656137639
+    },
+    "authored-cmap-order-ttc-advances-4800": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 1082734243068054411
+    },
+    "authored-cmap-order-ttc-outlines-5280": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 1960679050837110503
+    },
+    "authored-cmap-order-ttc-advances-5280": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 15501635381527792523
+    },
+    "authored-cmap-order-ttc-outlines-3200": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 1155119001055605043
+    },
+    "authored-cmap-order-ttc-advances-3200": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 12704480106154507915
+    },
+    "authored-cmap-order-ttc-outlines-3072": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 14636232950969802163
+    },
+    "authored-cmap-order-ttc-advances-3072": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 11429250581954698891
+    },
+    "authored-cmap-order-ttc-outlines-2400": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 8332625322934205311
+    },
+    "authored-cmap-order-ttc-advances-2400": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 1394377078850588683
+    },
+    "authored-cmap-order-ttc-outlines-2160": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 13058440888996508127
+    },
+    "authored-cmap-order-ttc-advances-2160": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 8429940943931027851
+    },
+    "authored-cmap-order-ttc-outlines-853": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 12410486253313666073
+    },
+    "authored-cmap-order-ttc-advances-853": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 15667659171661853451
+    },
+    "authored-cmap-order-ttc-outlines-1568": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 8515683953237559409
+    },
+    "authored-cmap-order-ttc-advances-1568": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 8531018125256221067
+    },
+    "authored-cmap-order-ttc-outlines-538": {
+      "packets": 96,
+      "bytes": 336,
+      "digest": 13983562898578452393
+    },
+    "authored-cmap-order-ttc-advances-538": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 4256478963032741003
     }
   }
 }
