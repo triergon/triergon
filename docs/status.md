@@ -27,11 +27,11 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1520 (71/71 pass) | heap ≤0.022, total RSS ≤0.727 (71/71 lower) | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
-| Subtitles, PGS | Presentation, window, palette and object segments to display sets, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska) | 0.8605 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤1.027 (316/317 lower) | `long-movie-mkv` total RSS; FATE coverage |
-| Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 217/219 cases (`subtitle-dvb`: TS and Matroska) | 0.7609 (217/219 pass) | heap ≤0.995, total RSS ≤0.821 (217/219 lower) | `region-resize-partial--compute_clut-1`, `versions-repeated--compute_clut-1`; FATE coverage |
-| Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 222/222 cases (`subtitle-dvd`) | 0.8501 (222/222 pass) | heap ≤0.873, total RSS ≤0.889 (222/222 lower) | FATE coverage |
-| Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 185/185 cases (`subtitle-cc`) | 0.7140 (185/185 pass) | heap ≤0.128, total RSS ≤0.811 (185/185 lower) | FATE coverage |
-| Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 70/70 cases (`subtitle-teletext`) | 0.4094 (70/70 pass) | heap ≤0.620, total RSS ≤0.697 (70/70 lower) | FATE coverage |
+| Subtitles, PGS | Presentation, window, palette and object segments to display sets, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska) | 0.8719 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤1.002 (316/317 lower) | `long-movie-mkv` total RSS; FATE coverage |
+| Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 221/221 cases (`subtitle-dvb`: TS and Matroska) | 0.7761 (221/221 pass) | heap ≤0.984, total RSS ≤0.782 (221/221 lower) | FATE coverage |
+| Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 223/223 cases (`subtitle-dvd`) | 0.8606 (223/223 pass) | heap ≤0.873, total RSS ≤0.832 (223/223 lower) | FATE coverage |
+| Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 197/197 cases (`subtitle-cc`) | 0.9752 (197/197 pass) | heap ≤0.123, total RSS ≤0.955 (197/197 lower) | FATE coverage |
+| Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 70/70 cases (`subtitle-teletext`) | 0.4262 (70/70 pass) | heap ≤0.622, total RSS ≤0.675 (70/70 lower) | FATE coverage |
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 37/38 (`mp4-forward`), TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 1.6427 (35/37 pass), TS program 1.4695 (33/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤3.382 (36/37 lower), total RSS ≤1.025 (18/37 lower); TS program heap ≤0.102, total RSS ≤0.910 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower) | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC; `mp4-forward` open case `regular-encoded-avc-aac-indexed-seek`: the native MOV view refuses an edit list over reordered samples |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0551 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths; AAC charges in-band reconfiguration when it appears, and a refused access unit leaves the decoder unchanged unless an earlier raw data block or Main-prediction element of it was decoded |
 | Audio codecs in files | FLAC (RFC 9639, 4 to 32 bits, 1 to 8 channels); Opus (RFC 6716 and 8251: SILK, CELT, hybrid, families 0, 1 and 255); Vorbis I; MPEG-1, 2 and 2.5 audio Layer I, II and III | 315/321 pass through the container readers (FATE Vorbis, Opus and MP3 conformance, the IETF FLAC testbench, generated streams): FLAC bit-exact, the others within the [numeric rules](../harness/codecs/numeric-rules.json) | 1.0834 (10/10 pass) | heap ≤0.904, total RSS ≤0.966 (10/10) | FLAC `01 - changing samplerate`, `02 - increasing number of channels`, `03 - decreasing number of channels` and MP3 `he_mode` change format mid-stream, which the CLI converts; FLAC `flac_3ch_odd_mask`, whose layout FFmpeg refuses on its stereo output; MP3 `he_free` (free format: FFmpeg finds no two consecutive frames, and the decoder refuses free-format frames), refused by both; runtime toward the target for Opus music (1.0301) and 5.1 (1.0834), Vorbis 5.1 (0.9356) and stereo (0.8423) and Opus speech (0.8719); Opus families 2 and 3 |
@@ -102,14 +102,12 @@ under the kernel RSS proof. The 31 open cases are not timed or measured, and
 timing and memory reports. Only `pes-header-every-byte` is above the runtime target
 (1.0029).
 
-The subtitle rows use the gate build at `0da10bd906655029d224faaed2ca19520631de48` on a
+The subtitle rows use the gate build at `efd61988a7c0d354df0ad07ecf74ef6f9e303323` on a
 c8g.xlarge pinned to CPU 1, with 30 timing pairs of 50 operations and 30 memory pairs under
-the kernel RSS proof; every row is a graded report. Cases whose parity fails are not timed
-or measured. DVB `region-resize-partial--compute_clut-1` and
-`versions-repeated--compute_clut-1` fail parity: FFmpeg's output depends on palette memory
-it never initialises. PGS `long-movie-mkv` total RSS is at or above the reference (1.027):
-its observed resident peak is lower than the reference's, but the proven ceiling also counts
-three window planes that glibc maps before its mmap threshold adapts.
+the kernel RSS proof; every row is a graded report. PGS `long-movie-mkv` total RSS is at the
+reference (1.002): its observed resident peak is lower than the reference's, but the proven
+ceiling also counts the pages faulted in again each time a display set's planes are freed
+and allocated.
 
 ISO BMFF, plus codec and decode-session memory, await gate-build measurement with
 repository runners.
@@ -155,7 +153,7 @@ timing of the reference built with and without zeroed automatic variables.
 | Ogg, audio elementary streams | `ccd3090572433e79d8ab65a377fcd9896d2839d9` | `8123e0f020a9c4ccedd83aea3e665d4486d55e26612e8bc29626e9a3026e2cd1` |
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |
 | Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
-| Subtitles: PGS, DVB, DVD, closed captions, teletext | `0da10bd906655029d224faaed2ca19520631de48` | `fe40bd4c498c70c2eb99fcac8030ae8295f1d7ff7376907f317c21d6675cc798` |
+| Subtitles: PGS, DVB, DVD, closed captions, teletext | `efd61988a7c0d354df0ad07ecf74ef6f9e303323` | `b9dc70bf9e2258cc1a6ce776ed2881212fd92eea2847e234d9d7df034cceec30` |
 | MPEG-TS | `090c856df65f9247d24ea9f1c927e35cf5d528e8` | `6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1` |
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | ARMv7: ISO BMFF / MP4 | `f99d893196908d562c897bccb20c6a972cd25d11` | `bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1` |
