@@ -313,6 +313,15 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
         bins
     }
 
+    /// A fixed-length syntax element of `count` (at most 31) bypass bins. A corrupt stream
+    /// can leave the offset at or above the range, so the bins of
+    /// [`bypass_bits`](Self::bypass_bits) can exceed `count` bits; the element keeps its
+    /// width, so it can index a table of `2^count` entries.
+    #[inline(always)]
+    pub fn bypass_field(&mut self, count: u32) -> u32 {
+        self.bypass_bits(count) & ((1 << count) - 1)
+    }
+
     /// Counts a unary prefix of bypass 1-bins ended by a 0-bin, which is consumed. Stops
     /// at `max` ones. Peeks 8 bins per division and consumes only what it uses.
     #[inline(always)]
