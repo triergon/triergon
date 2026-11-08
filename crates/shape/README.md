@@ -59,6 +59,13 @@ per line (both within `bidi::Limits`), and `bidi::shape_simple` for libass's
 simple shaping level (FriBidi's joining, Arabic presentation forms and
 mirroring).
 
+The character properties shaping reads are public too, typed: HarfBuzz's
+(Unicode 18.0.0) are `unicode::GeneralCategory::of`, `unicode::combining_class`,
+`Script::of`, `unicode::mirroring` and `unicode::decompose` (a
+`unicode::Decomposition` into one or two characters); FriBidi's (Unicode 14.0.0)
+are `bidi::BidiClass::of`, `bidi::Bracket::of` with `Bracket::pair`,
+`bidi::mirror` and `bidi::JoiningType::of`.
+
 ## What it covers
 
 **Pipeline.** The glyph ids, clusters and positions `hb_shape` gives for a
@@ -115,9 +122,9 @@ paragraph separator inside the text.
 
 - Vertical directions (libass shapes `@` fonts horizontally with `vert`).
 - Apple Advanced Typography (`morx`, `kerx`, `trak` with `STAT`) and Apple `kern`
-  version 1; `kern` subtables of formats 1, 2 and 3, which HarfBuzz applies in an
-  OpenType `kern` table too (format 1 as Apple's state machine), and
-  cross-stream kerning. Shaping a face that would need them is refused with
+  version 1; in an OpenType `kern` table, subtables of formats 1, 2 and 3, which
+  HarfBuzz applies too (format 1 as Apple's state machine), and cross-stream
+  kerning. Shaping a face that would need them is refused with
   `Error::Unsupported`.
 - `stch` stretching (refused when it would apply) and the Windows-1256 Arabic
   fallback lookups.

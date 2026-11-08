@@ -486,10 +486,10 @@ fn reorder_syllable(buffer: &mut Buffer, range: Range<usize>) -> Result<()> {
 /// USE composition: Unicode's, but never of a mark with what follows, so that
 /// split vowel signs stay split.
 pub(super) fn compose(a: u32, b: u32) -> Option<u32> {
-    if unicode::general_category(a).is_mark() {
+    if unicode::code_point::general_category(a).is_mark() {
         return None;
     }
-    unicode::compose(a, b)
+    unicode::code_point::compose(a, b)
 }
 
 #[cfg(test)]

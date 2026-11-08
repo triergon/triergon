@@ -14,10 +14,10 @@
 //! sides, a LAM and ALEF pair at one odd level forms the mandatory ligature
 //! (the LAM becoming U+FEFF), and characters at odd levels are mirrored.
 
-use super::class::{BidiClass, Level};
+use super::class::{BidiClass, JoiningType, Level};
 use super::mirror;
 use crate::unicode::ArabicForm;
-use crate::unicode::fribidi::{self, JoiningType};
+use crate::unicode::fribidi;
 use triergon_core::{Error, Result};
 
 /// What replaces a LAM that forms a ligature with the ALEF after it.
@@ -102,7 +102,7 @@ enum Kind {
 
 impl Joining {
     fn of(c: char) -> Self {
-        let (right, left, shapes, kind) = match fribidi::joining_type(u32::from(c)) {
+        let (right, left, shapes, kind) = match JoiningType::of(c) {
             JoiningType::NonJoining => (false, false, false, Kind::Base),
             JoiningType::RightJoining => (true, false, true, Kind::Base),
             JoiningType::DualJoining => (true, true, true, Kind::Base),

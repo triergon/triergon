@@ -1,7 +1,7 @@
 //! The character properties a glyph carries through shaping.
 
 use crate::buffer::{CharFlag, Info, Scratch, UnicodeProps};
-use crate::unicode::{self, GeneralCategory};
+use crate::unicode::{GeneralCategory, code_point};
 
 /// Whether HarfBuzz treats `c` as default ignorable: invisible unless the font
 /// has a glyph a lookup uses.
@@ -33,7 +33,7 @@ pub(crate) fn modified_combining_class(c: u32) -> u8 {
         0x0F39 => return 127,
         _ => {}
     }
-    match unicode::combining_class(c) {
+    match code_point::combining_class(c) {
         10 => 22,
         11 => 15,
         12 => 16,
@@ -74,7 +74,7 @@ pub(crate) fn modified_combining_class(c: u32) -> u8 {
 /// later steps must look for.
 pub(crate) fn set_unicode_props(info: &mut Info, scratch: &mut Scratch) {
     let c = info.glyph;
-    let category = unicode::general_category(c);
+    let category = code_point::general_category(c);
     let mut props = UnicodeProps::new(category);
     if c >= 0x80 {
         if is_default_ignorable(c) {
@@ -139,7 +139,7 @@ pub(crate) fn set_all(infos: &mut [Info], scratch: &mut Scratch, global_mask: u3
             }
         } else if infos[i].is_zwj() {
             continuation(&mut infos[i], scratch);
-            if i + 1 < infos.len() && unicode::is_extended_pictographic(infos[i + 1].glyph) {
+            if i + 1 < infos.len() && code_point::is_extended_pictographic(infos[i + 1].glyph) {
                 i += 1;
                 infos[i].mask = global_mask;
                 set_unicode_props(&mut infos[i], scratch);

@@ -1,7 +1,8 @@
 //! The Arabic joining and fallback shaping data of HarfBuzz's Arabic shaper
 //! (`hb-ot-shaper-arabic-table.hh`).
 
-use super::{GeneralCategory, general_category, tables};
+use super::code_point::general_category;
+use super::{GeneralCategory, tables};
 
 /// How a character joins, as HarfBuzz's Arabic shaper classifies it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

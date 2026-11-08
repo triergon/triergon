@@ -185,7 +185,7 @@ impl Shaper {
         match self {
             Self::Indic => indic::decompose(ab),
             Self::Khmer => khmer::decompose(ab),
-            _ => crate::unicode::decompose(ab),
+            _ => crate::unicode::code_point::decompose(ab),
         }
     }
 
@@ -195,7 +195,7 @@ impl Shaper {
             Self::Hebrew => hebrew::compose(plan, a, b),
             Self::Indic => indic::compose(a, b),
             Self::Universal | Self::Khmer => universal::compose(a, b),
-            _ => crate::unicode::compose(a, b),
+            _ => crate::unicode::code_point::compose(a, b),
         }
     }
 

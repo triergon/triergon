@@ -15,7 +15,7 @@ const DAGESH_FORMS: [u32; 27] = [
 /// Unicode composition, then, when the font cannot position marks with GPOS, the
 /// Alphabetic Presentation Forms block.
 pub(super) fn compose(plan: &Plan, a: u32, b: u32) -> Option<u32> {
-    if let Some(ab) = crate::unicode::compose(a, b) {
+    if let Some(ab) = crate::unicode::code_point::compose(a, b) {
         return Some(ab);
     }
     if plan.has_gpos_mark {

@@ -12,7 +12,6 @@
 
 pub mod bidi;
 mod buffer;
-mod dump;
 mod face;
 mod fallback;
 mod metrics;
@@ -23,12 +22,10 @@ mod props;
 mod shape;
 mod shapers;
 mod tag;
-mod unicode;
+pub mod unicode;
 mod work;
 
 pub use buffer::{Buffer, Glyph, Position};
-#[doc(hidden)]
-pub use dump::{ReferenceProperties, reference_properties};
 pub use face::Face;
 pub use metrics::{Extents, Metrics, OtMetrics, Scale, SizedMetrics};
 pub use plan::{Feature, Plan};

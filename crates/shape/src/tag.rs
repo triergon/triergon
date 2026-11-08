@@ -59,6 +59,18 @@ impl Script {
         Self(code)
     }
 
+    /// The Script property of `c`, as `hb_unicode_script` gives it: [`COMMON`]
+    /// and [`INHERITED`] for characters of several scripts, [`UNKNOWN`] for
+    /// unassigned code points.
+    ///
+    /// [`COMMON`]: Self::COMMON
+    /// [`INHERITED`]: Self::INHERITED
+    /// [`UNKNOWN`]: Self::UNKNOWN
+    #[must_use]
+    pub fn of(c: char) -> Self {
+        crate::unicode::code_point::script(u32::from(c))
+    }
+
     /// The four letters of the script's ISO 15924 code, such as `*b"Arab"`.
     #[must_use]
     pub const fn to_bytes(self) -> [u8; 4] {

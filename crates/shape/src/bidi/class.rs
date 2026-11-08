@@ -143,12 +143,12 @@ impl BidiClass {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Bracket {
     /// The identity both brackets of a pair share (see [`fribidi::bracket`]).
-    pair: u32,
+    pair: char,
     opens: bool,
 }
 
 impl Bracket {
-    pub(crate) const fn new(pair: u32, opens: bool) -> Self {
+    pub(crate) const fn new(pair: char, opens: bool) -> Self {
         Self { pair, opens }
     }
 
@@ -170,10 +170,42 @@ impl Bracket {
         self.pair == other.pair
     }
 
-    /// The identity both brackets of a pair share: the opening bracket, after
-    /// FriBidi's folding.
-    pub(crate) const fn pair(self) -> u32 {
+    /// The identity both brackets of a pair share: the opening bracket, or the
+    /// first character of its decomposition, as FriBidi folds it (U+2329 and
+    /// U+232A pair as U+3008, U+FF08 and U+FF09 as U+0028).
+    #[must_use]
+    pub const fn pair(self) -> char {
         self.pair
+    }
+}
+
+/// The joining type of a character (ArabicShaping.txt), as FriBidi 1.0.17
+/// assigns it from Unicode 14.0.0.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum JoiningType {
+    /// U: does not join.
+    NonJoining,
+    /// R: joins the preceding character (in logical order) only.
+    RightJoining,
+    /// D: joins both sides.
+    DualJoining,
+    /// C: causes joining on both sides without changing form.
+    JoinCausing,
+    /// T: marks and format characters, skipped by joining.
+    Transparent,
+    /// L: joins the following character only.
+    LeftJoining,
+    /// G: BN and the explicit directional formatting characters, skipped by joining.
+    Ignored,
+}
+
+impl JoiningType {
+    /// The joining type of `c`, as `fribidi_get_joining_type` gives it:
+    /// ArabicShaping.txt's type, else transparent for Mn, Me and Cf, ignored for
+    /// BN and the explicit formatting classes, and non-joining otherwise.
+    #[must_use]
+    pub fn of(c: char) -> Self {
+        fribidi::joining_type(u32::from(c))
     }
 }
 

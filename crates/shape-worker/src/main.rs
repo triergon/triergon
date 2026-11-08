@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 mod record;
+mod unicode;
 
 use record::{Dump, Record, Sink, Work};
 use std::error::Error;
@@ -402,22 +403,7 @@ fn shape_unicode(data: &[u8], sink: &mut impl Sink) -> Result<()> {
         };
         sink.record(Record::Range(first, last))?;
         for cp in first..=last {
-            let p = triergon_shape::reference_properties(cp);
-            let optional = |v: Option<u32>| v.map_or(-1, i64::from);
-            let (a, b) = p.decomposition.unzip();
-            sink.record(Record::Point([
-                cp.into(),
-                p.general_category.into(),
-                p.combining_class.into(),
-                p.script.into(),
-                p.mirroring.into(),
-                p.bidi_type.into(),
-                p.bracket.into(),
-                optional(p.mirror),
-                p.joining_type.into(),
-                optional(a),
-                optional(b),
-            ]))?;
+            sink.record(Record::Point(unicode::point(cp)))?;
             sink.count(1, 0);
         }
     }

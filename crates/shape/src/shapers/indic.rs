@@ -1074,20 +1074,20 @@ pub(super) fn decompose(ab: u32) -> Option<(u32, u32)> {
     match ab {
         // Devanagari RRA, Bengali RRA and RHA, Tamil AU.
         0x0931 | 0x09DC | 0x09DD | 0x0B94 => None,
-        _ => unicode::decompose(ab),
+        _ => unicode::code_point::decompose(ab),
     }
 }
 
 /// Indic composition: Unicode's, but never of a mark with what follows (split
 /// matras stay split), and Bengali YYA despite its composition exclusion.
 pub(super) fn compose(a: u32, b: u32) -> Option<u32> {
-    if unicode::general_category(a).is_mark() {
+    if unicode::code_point::general_category(a).is_mark() {
         return None;
     }
     if (a, b) == (0x09AF, 0x09BC) {
         return Some(0x09DF);
     }
-    unicode::compose(a, b)
+    unicode::code_point::compose(a, b)
 }
 
 #[cfg(test)]

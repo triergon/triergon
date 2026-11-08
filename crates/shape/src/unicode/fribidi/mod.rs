@@ -7,7 +7,7 @@ mod tables;
 
 use super::ArabicForm;
 
-pub(crate) use crate::bidi::{BidiClass, Bracket};
+pub(crate) use crate::bidi::{BidiClass, Bracket, JoiningType};
 
 /// `fribidi_get_bidi_type`. Code points UnicodeData.txt does not list, including
 /// those inside its ranges, have FriBidi's defaults: R or AL in the blocks
@@ -33,10 +33,8 @@ pub(crate) enum BracketKind {
 #[inline]
 pub(crate) fn bracket(cp: u32) -> Option<Bracket> {
     let (offset, kind) = tables::BRACKETS[usize::from(tables::BRACKET.get(cp))]?;
-    Some(Bracket::new(
-        cp.wrapping_add_signed(offset),
-        kind == BracketKind::Open,
-    ))
+    let pair = char::from_u32(cp.wrapping_add_signed(offset))?;
+    Some(Bracket::new(pair, kind == BracketKind::Open))
 }
 
 /// `fribidi_get_mirror_char`: the Bidi_Mirroring_Glyph of `cp`, if it has one.
@@ -44,25 +42,6 @@ pub(crate) fn bracket(cp: u32) -> Option<Bracket> {
 pub(crate) fn mirror(cp: u32) -> Option<u32> {
     let delta = tables::MIRROR_DELTAS[usize::from(tables::MIRROR.get(cp))];
     (delta != 0).then(|| cp.wrapping_add_signed(delta))
-}
-
-/// A joining type, as FriBidi assigns them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum JoiningType {
-    /// U: does not join.
-    NonJoining,
-    /// R: joins the preceding character (in logical order) only.
-    RightJoining,
-    /// D: joins both sides.
-    DualJoining,
-    /// C: causes joining on both sides without changing form.
-    JoinCausing,
-    /// T: marks and format characters, skipped by joining.
-    Transparent,
-    /// L: joins the following character only.
-    LeftJoining,
-    /// G: BN and the explicit directional formatting characters, skipped by joining.
-    Ignored,
 }
 
 /// `fribidi_get_joining_type`: ArabicShaping.txt's type, else transparent for Mn,
@@ -133,19 +112,19 @@ mod tests {
     fn brackets_and_mirrors() {
         use BracketKind::*;
         let bracket_at = |pair, kind| Some(Bracket::new(pair, kind == Open));
-        assert_eq!(bracket(0x0028), bracket_at(0x0028, Open));
-        assert_eq!(bracket(0x0029), bracket_at(0x0028, Close));
-        assert_eq!(bracket(0x005D), bracket_at(0x005B, Close));
-        assert_eq!(bracket(0x2329), bracket_at(0x3008, Open));
-        assert_eq!(bracket(0x232A), bracket_at(0x3008, Close));
-        assert_eq!(bracket(0x3008), bracket_at(0x3008, Open));
-        assert_eq!(bracket(0x3009), bracket_at(0x3008, Close));
+        assert_eq!(bracket(0x0028), bracket_at('(', Open));
+        assert_eq!(bracket(0x0029), bracket_at('(', Close));
+        assert_eq!(bracket(0x005D), bracket_at('[', Close));
+        assert_eq!(bracket(0x2329), bracket_at('\u{3008}', Open));
+        assert_eq!(bracket(0x232A), bracket_at('\u{3008}', Close));
+        assert_eq!(bracket(0x3008), bracket_at('\u{3008}', Open));
+        assert_eq!(bracket(0x3009), bracket_at('\u{3008}', Close));
         assert_eq!(
             bracket(0xFF08),
-            bracket_at(0x0028, Open),
+            bracket_at('(', Open),
             "compatibility folding"
         );
-        assert_eq!(bracket(0xFF09), bracket_at(0x0028, Close));
+        assert_eq!(bracket(0xFF09), bracket_at('(', Close));
         assert_eq!(bracket(0x0041), None);
         assert_eq!(bracket(u32::MAX), None);
         assert_eq!(mirror(0x0028), Some(0x0029));

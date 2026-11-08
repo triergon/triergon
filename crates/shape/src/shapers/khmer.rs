@@ -183,7 +183,7 @@ fn reorder_syllable(masks: &[u32; 5], buffer: &mut Buffer, range: Range<usize>) 
 pub(super) fn decompose(ab: u32) -> Option<(u32, u32)> {
     match ab {
         0x17BE..=0x17C0 | 0x17C4 | 0x17C5 => Some((0x17C1, ab)),
-        _ => unicode::decompose(ab),
+        _ => unicode::code_point::decompose(ab),
     }
 }
 

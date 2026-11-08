@@ -11,7 +11,7 @@ use crate::ot::layout::{LayoutTable, Lookup};
 use crate::plan::{Plan, StageMap};
 use crate::shapers::{Shaper, ZeroMarks};
 use crate::tag::Direction;
-use crate::unicode::{self, GeneralCategory};
+use crate::unicode::{GeneralCategory, code_point};
 use std::ops::Range;
 use triergon_core::Result;
 
@@ -146,7 +146,7 @@ impl Run<'_, '_> {
         }
         let rtlm = self.plan.rtlm_mask;
         for info in buffer.infos_mut() {
-            let mirrored = unicode::mirroring(info.glyph);
+            let mirrored = code_point::mirroring(info.glyph);
             if mirrored != info.glyph && self.font.glyph(mirrored).is_some() {
                 info.glyph = mirrored;
             } else {

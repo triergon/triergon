@@ -10,7 +10,8 @@
 //! 3. [`reorder_line`] each line with its paragraph's resolved direction.
 //!
 //! [`shape_simple`] is the joining, Arabic presentation forms and mirroring of
-//! libass's simple shaping level, between steps 2 and 3.
+//! libass's simple shaping level, between steps 2 and 3. It reads FriBidi's
+//! [`JoiningType::of`] and [`mirror`] of each character.
 //!
 //! Results equal FriBidi's, including where it reads UAX #9 its own way; each
 //! module lists those choices. In short: rules X9 to I2 work on runs of
@@ -31,7 +32,7 @@ mod weak;
 use std::ops::Range;
 
 pub use arabic::shape_simple;
-pub use class::{BaseDirection, BidiClass, Bracket, Level};
+pub use class::{BaseDirection, BidiClass, Bracket, JoiningType, Level};
 pub use line::{reorder_line, reorder_line_with_limits};
 
 use crate::Direction;
