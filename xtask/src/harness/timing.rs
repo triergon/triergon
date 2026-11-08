@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use super::acceptance::{LINUX_CPU_KEY, active_cpu};
 use super::validation::{array, field, text};
-use super::worker::{self, DEFAULT_TIMEOUT, arg, data, ok};
+use super::worker::{self, arg, data, ok};
 use crate::json::Value;
 use crate::pyrandom::PyRandom;
 use crate::stats;
@@ -474,7 +474,7 @@ fn module_state(module: &Path) -> Value {
 }
 
 /// The worker operation timed: `{prefix}bench FILE ITERATIONS ARGS...`.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Operation {
     pub prefix: String,
     pub arguments: Vec<OsString>,
@@ -482,6 +482,8 @@ pub struct Operation {
     pub candidate_options: Vec<OsString>,
     /// Contract work fields in addition to the mandatory packet/byte/digest work.
     pub work_fields: Vec<String>,
+    /// How long one worker run may take.
+    pub timeout: Duration,
 }
 
 impl Operation {
@@ -704,7 +706,7 @@ fn benchmark_once(
     let input_sha = digest(input)?;
     for (name, worker) in &workers {
         module_check!(format!("before-warmup:{name}"));
-        let warm = worker::execute(&argv(name, worker), DEFAULT_TIMEOUT);
+        let warm = worker::execute(&argv(name, worker), operation.timeout);
         warmups.push(Value::object([
             ("worker", Value::str(*name)),
             ("result", warm.clone()),
@@ -751,7 +753,7 @@ fn benchmark_once(
             module_check!(format!("before-pair:{index}:{name}"));
             row.push((
                 name.to_string(),
-                worker::execute(&argv(name, worker), DEFAULT_TIMEOUT),
+                worker::execute(&argv(name, worker), operation.timeout),
             ));
             *samples.last_mut().expect("row") = Value::Object(row.clone());
             module_check!(format!("after-pair:{index}:{name}"));
@@ -914,6 +916,7 @@ mod tests {
             arguments: ["1", "0", "memory", "4096"].map(OsString::from).to_vec(),
             candidate_options: vec!["--bounded-timing".into(), "--bounded-sync".into()],
             work_fields: vec![],
+            timeout: worker::DEFAULT_TIMEOUT,
         };
         let expected = ["open-bench", "input.mov", "50", "1", "0", "memory", "4096"]
             .map(OsString::from)
@@ -937,6 +940,7 @@ mod tests {
             arguments: vec!["avc".into(), "aac".into()],
             candidate_options: vec![],
             work_fields: vec![],
+            timeout: worker::DEFAULT_TIMEOUT,
         };
         for candidate in [false, true] {
             assert_eq!(

@@ -144,6 +144,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   `"on-demand"` (also by `COMMAND compare --all`) or `"diagnostic"` (by `COMMAND
   compare --diagnostic`); `cargo xtask check-design` fails when it is missing or
   anything else.
+  A contract may set `timeout_seconds`, how long one worker run of its cases may
+  take: a whole number of seconds from 1 to 3600, 30 when absent. `report` (its
+  parity, timing and memory runs), `external-vector`, `trace-identities` and `fuzz
+  --contract` (unless `--timeout-seconds` is given) honour it, and `cargo xtask
+  check-design` fails on any other value. `raster-sweep` sets 120 for its heaviest
+  cases on 32-bit ARMv7.
   Pins are recorded with the feature's `worker_operation`, the operation
   `report`, `grade` and `fuzz` run. A diagnostic feature that compares another
   reference with these pins names the features in `cases_from` (`raster-simd`
@@ -260,7 +266,7 @@ and compares the packets of the audio container readers with its `ffprobe`
 pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest, with a timeout per
-input. With `--contract` it builds that manifest from a prefix feature's cases: the
+input (`--timeout-seconds`, 3 by default, or the contract's `timeout_seconds`). With `--contract` it builds that manifest from a prefix feature's cases: the
 release candidate and its dev build, plus the reference with `--reference`; listed
 open cases are expected to be rejected by both builds, and the campaign keeps the
 manifest as `manifest.json` for replay. `cargo xtask codecs fuzz --lane L` builds it

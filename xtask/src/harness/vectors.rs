@@ -77,6 +77,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
     let contract_path = root.join("harness/features/matroska-segment-metadata/contract.json");
     let contract = read_json(&contract_path)?;
     let contract_sha = sha(&contract_path)?;
+    let timeout = super::worker::contract_timeout(&contract)?;
     let spec = contract
         .get("required_additional_vectors")
         .and_then(Value::as_array)
@@ -112,6 +113,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         reference: &reference,
         input: &path,
         raw: options.output.join("raw"),
+        timeout,
     };
     let result = parity::catalogue_parity(&run, true, None, false)?;
     let mut case = vec![
@@ -131,6 +133,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         arguments: vec![],
         candidate_options: vec![],
         work_fields: super::comparison::work_fields(&contract)?,
+        timeout,
     };
     if s(&result, "status") == Some("pass") {
         let comparison = options.baseline_worker.as_ref().unwrap_or(&reference);
@@ -402,6 +405,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
             reference: &reference,
             input: &path,
             raw: root.join(format!(".research/fate-candidate-{label}")),
+            timeout: super::worker::DEFAULT_TIMEOUT,
         };
         let comparison = host.parity(&run, sequential)?;
         let status = s(&comparison, "status").unwrap_or_default().to_owned();
@@ -570,6 +574,7 @@ fn matroska_traces(
     for (manifest, contract_path, corpus) in SLICES {
         let contract = read_json(&root.join(contract_path))?;
         let id = s(&contract, "id").unwrap_or_default().to_owned();
+        let timeout = super::worker::contract_timeout(&contract)?;
         for case in read_json(&root.join(manifest))?
             .get("cases")
             .and_then(Value::as_array)
@@ -588,6 +593,7 @@ fn matroska_traces(
                 reference: &reference,
                 input: &path,
                 raw: scratch.join(s(case, "id").unwrap_or_default()),
+                timeout,
             };
             let comparison = rule.map(|rule| Comparison {
                 rule,
@@ -628,6 +634,7 @@ fn matroska_traces(
         reference: native,
         input: &path,
         raw: scratch.join("hdr"),
+        timeout: super::worker::contract_timeout(&contract)?,
     };
     verdicts.push((
         format!("hdr/{file}"),
@@ -649,6 +656,7 @@ fn matroska_traces(
             reference: native,
             input: &path,
             raw: scratch.join(stem),
+            timeout: super::worker::DEFAULT_TIMEOUT,
         };
         verdicts.push((
             format!("fate/{sample}"),
@@ -686,6 +694,7 @@ fn prefix_traces(
                 reference: &reference,
                 input: &path,
                 raw: scratch.join(&feature.id).join(id),
+                timeout: feature.timeout,
             };
             let expected = case.get("expected").unwrap_or(&Value::Null);
             let result = parity::feed_parity(

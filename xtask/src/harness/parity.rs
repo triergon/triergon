@@ -5,10 +5,11 @@
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use super::diff::differences;
 use super::oracle::{self, Kind};
-use super::worker::{self, DEFAULT_TIMEOUT, arg, data, ok, status};
+use super::worker::{self, arg, data, ok, status};
 use crate::json::Value;
 
 /// The workers and files of one parity run.
@@ -18,6 +19,8 @@ pub struct Run<'a> {
     pub reference: &'a Path,
     pub input: &'a Path,
     pub raw: PathBuf,
+    /// How long one worker run may take.
+    pub timeout: Duration,
 }
 
 /// An approved, input-bound comparison rule (see `comparison-rules.json`).
@@ -34,7 +37,7 @@ impl Run<'_> {
             self.input.as_os_str().to_owned(),
         ];
         argv.extend_from_slice(extra);
-        worker::execute(&argv, DEFAULT_TIMEOUT)
+        worker::execute(&argv, self.timeout)
     }
 
     fn candidate(&self, op: &str, extra: &[OsString]) -> Value {

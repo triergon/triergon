@@ -609,8 +609,15 @@ pub struct Campaign {
     pub seed: u64,
     pub maximum_input_bytes: usize,
     pub maximum_output_bytes: usize,
-    pub timeout_seconds: f64,
+    /// How long one worker run may take: `--timeout-seconds`, or when absent the
+    /// contract's `timeout_seconds` in a feature campaign, otherwise
+    /// [`DEFAULT_TIMEOUT_SECONDS`].
+    pub timeout_seconds: Option<f64>,
 }
+
+/// A campaign's per-run timeout when neither the command nor a contract sets one:
+/// mutated inputs that hang are findings, so it is far below a comparison's.
+pub const DEFAULT_TIMEOUT_SECONDS: f64 = 3.0;
 
 /// A campaign over the cases of a feature whose workers take one input and the
 /// case's arguments (a contract with `worker_operation`).
@@ -755,12 +762,20 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
 /// `manifest.json`, which replays it.
 pub fn feature_campaign(root: &Path, feature: &Feature, args: &Campaign) -> R<i32> {
     let (manifest, largest) = feature_manifest(root, feature)?;
+    let contract = crate::checks::read_json(&feature.contract)?;
+    let declared = contract
+        .get("timeout_seconds")
+        .map(|_| crate::harness::worker::contract_timeout(&contract))
+        .transpose()?;
     let path = std::env::temp_dir().join(format!("triergon-campaign-{}.json", std::process::id()));
     crate::corpus::write_json(&path, &manifest)?;
     let campaign = Campaign {
         manifest: path.clone(),
         output: args.output.clone(),
         maximum_input_bytes: args.maximum_input_bytes.max(largest),
+        timeout_seconds: args
+            .timeout_seconds
+            .or(declared.map(|timeout| timeout.as_secs_f64())),
         ..*args
     };
     let result = self::campaign(root, &campaign);
@@ -843,12 +858,13 @@ fn count(counts: &mut Vec<(String, Value)>, key: &str) {
 /// Run a pinned campaign; returns the exit code (1 when anything was found or
 /// an input changed under a worker).
 pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
+    let timeout_seconds = args.timeout_seconds.unwrap_or(DEFAULT_TIMEOUT_SECONDS);
     if !(1..=10000).contains(&args.rounds) || !(1..=64 << 20).contains(&args.maximum_input_bytes) {
         return Err("invalid finite mutation bounds".into());
     }
     if !((1..=64 << 20).contains(&args.maximum_output_bytes)
-        && args.timeout_seconds > 0.0
-        && args.timeout_seconds <= 60.0)
+        && timeout_seconds > 0.0
+        && timeout_seconds <= crate::harness::worker::MAXIMUM_TIMEOUT_SECONDS as f64)
     {
         return Err("invalid finite observation bounds".into());
     }
@@ -1055,7 +1071,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
                     "maximum_output_bytes",
                     Value::int(args.maximum_output_bytes as i64),
                 ),
-                ("timeout_seconds", Value::float(args.timeout_seconds)),
+                ("timeout_seconds", Value::float(timeout_seconds)),
             ]),
         ),
         ("qualification", Value::Bool(false)),
@@ -1071,7 +1087,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
     let mut unchanged = true;
     let index = output.join("findings.jsonl");
     fs::write(&index, b"").map_err(|e| e.to_string())?;
-    let timeout = Duration::from_secs_f64(args.timeout_seconds);
+    let timeout = Duration::from_secs_f64(timeout_seconds);
     for (row, (id, original)) in seeds.iter().zip(&seed_bytes) {
         for round in 0..=args.rounds {
             let (data, recipe) = if round == 0 {
@@ -1650,7 +1666,7 @@ mod tests {
                 seed: 280,
                 maximum_input_bytes: 1024,
                 maximum_output_bytes: 1024,
-                timeout_seconds: 5.0,
+                timeout_seconds: Some(5.0),
             };
             (
                 campaign(&root, &args).unwrap(),
@@ -1682,7 +1698,7 @@ mod tests {
             seed: 1,
             maximum_input_bytes: 1024,
             maximum_output_bytes: 1024,
-            timeout_seconds: 1.0,
+            timeout_seconds: Some(1.0),
         };
         assert!(
             campaign(&root, &outside).is_err(),
@@ -1740,7 +1756,7 @@ mod tests {
             seed: 280,
             maximum_input_bytes: 1024,
             maximum_output_bytes: 1024,
-            timeout_seconds: 1.0,
+            timeout_seconds: Some(1.0),
         };
         assert_eq!(campaign(&root, &args).unwrap(), 1, "the hang is a finding");
         let case = |n: usize| root.join(format!(".research/arguments/case-{n:06}/fold"));

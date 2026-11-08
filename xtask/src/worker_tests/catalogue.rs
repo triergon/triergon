@@ -60,6 +60,7 @@ pub fn original_hdr_vector_is_not_stripped_and_matches_complete_protocol(
         reference: &workers.reference,
         input: &path,
         raw: scratch.path().to_path_buf(),
+        timeout: crate::harness::worker::DEFAULT_TIMEOUT,
     };
     let result = catalogue_parity(&run, true, None, false)?;
     let status = |key: &str| result.get(key).cloned().unwrap_or(Value::Null);

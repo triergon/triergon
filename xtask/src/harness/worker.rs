@@ -8,7 +8,33 @@ use std::time::{Duration, Instant};
 
 use crate::json::{self, Value};
 
+/// How long one worker run may take unless its contract says otherwise.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The largest `timeout_seconds` a contract may declare.
+pub const MAXIMUM_TIMEOUT_SECONDS: u64 = 3600;
+
+/// How long one worker run of `contract`'s cases may take: its `timeout_seconds`,
+/// a whole number of seconds from 1 to [`MAXIMUM_TIMEOUT_SECONDS`], or
+/// [`DEFAULT_TIMEOUT`] when it declares none.
+pub fn contract_timeout(contract: &Value) -> Result<Duration, String> {
+    let Some(declared) = contract.get("timeout_seconds") else {
+        return Ok(DEFAULT_TIMEOUT);
+    };
+    match declared {
+        Value::Number(number) => number
+            .as_i128()
+            .and_then(|seconds| u64::try_from(seconds).ok())
+            .filter(|seconds| (1..=MAXIMUM_TIMEOUT_SECONDS).contains(seconds))
+            .map(Duration::from_secs),
+        _ => None,
+    }
+    .ok_or_else(|| {
+        format!(
+            "timeout_seconds must be a whole number of seconds from 1 to {MAXIMUM_TIMEOUT_SECONDS}"
+        )
+    })
+}
 
 /// One argument of a worker command line.
 pub fn arg(value: impl ToString) -> OsString {
@@ -239,6 +265,42 @@ pub fn ok(outcome: &Value) -> bool {
 /// `data` of an outcome, or JSON null.
 pub fn data(outcome: &Value) -> &Value {
     outcome.get("data").unwrap_or(&Value::Null)
+}
+
+#[cfg(test)]
+mod timeout_tests {
+    use super::*;
+
+    fn declaring(seconds: &str) -> Value {
+        json::parse(&format!(r#"{{"id": "f", "timeout_seconds": {seconds}}}"#)).unwrap()
+    }
+
+    #[test]
+    fn a_contract_without_a_timeout_takes_the_default() {
+        let contract = json::parse(r#"{"id": "f"}"#).unwrap();
+        assert_eq!(contract_timeout(&contract), Ok(DEFAULT_TIMEOUT));
+    }
+
+    #[test]
+    fn a_declared_timeout_is_whole_seconds_within_the_bound() {
+        assert_eq!(
+            contract_timeout(&declaring("1")),
+            Ok(Duration::from_secs(1))
+        );
+        assert_eq!(
+            contract_timeout(&declaring("120")),
+            Ok(Duration::from_secs(120))
+        );
+        assert_eq!(
+            contract_timeout(&declaring("3600")),
+            Ok(Duration::from_secs(MAXIMUM_TIMEOUT_SECONDS))
+        );
+        for invalid in [
+            "0", "-30", "3601", "1.5", "120.0", "\"120\"", "null", "true",
+        ] {
+            assert!(contract_timeout(&declaring(invalid)).is_err(), "{invalid}");
+        }
+    }
 }
 
 #[cfg(all(test, unix))]
