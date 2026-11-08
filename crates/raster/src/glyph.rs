@@ -5,6 +5,7 @@
 use triergon_core::{Error, Result, WorkBudget, round_ties_even_i32};
 
 use crate::bitmap::Bitmap;
+use crate::compose::{Border, Effects, FilterFlags};
 use crate::fp;
 use crate::geometry::{OUTLINE_MAX, Rect, Vector};
 use crate::raster::Raster;
@@ -35,6 +36,13 @@ pub struct Placement {
     /// The descender, 26.6, positive below the baseline: the distance down to
     /// the bottom of the opaque box.
     pub descender: i32,
+    /// The width of the opaque box before its border, 26.6: the glyph's
+    /// advance plus the scaled `\fsp` letter spacing.
+    pub advance: i32,
+    /// The font scale correction (libass's `scale_fix`): `scale` times it is
+    /// the scale the style asks for, which the opaque box is scaled by again,
+    /// as VSFilter does. 1 for a drawing.
+    pub scale_fix: f64,
     /// Position of the glyph origin in the frame, 26.6.
     pub position: Vector,
     /// Scale (x and y) from outline units to 26.6 before the transform: the
@@ -56,35 +64,6 @@ pub struct FrameScale {
     pub pixel_aspect: f64,
 }
 
-/// The border a glyph is drawn with.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Border {
-    /// No border bitmap.
-    None,
-    /// `\bord` style 1: the outline stroked by `size` (x and y) pixels.
-    Outline {
-        /// `\xbord` and `\ybord` in script pixels, before the frame's border
-        /// scale.
-        size: [f64; 2],
-    },
-    /// `\bord` style 3: an opaque box around the advance, `size` beyond it.
-    /// `spacing` is the scaled `\fsp` and `advance` the glyph advance, both
-    /// 26.6, and `scale_fix` the font scale correction the box is scaled by
-    /// again.
-    OpaqueBox {
-        /// `\xbord` and `\ybord` in script pixels, before the frame's border
-        /// scale; the box reaches at least a pixel beyond the advance and the
-        /// height before the transform.
-        size: [f64; 2],
-        /// The scaled `\fsp` letter spacing, 26.6.
-        spacing: i32,
-        /// The glyph advance, 26.6.
-        advance: i32,
-        /// The font scale correction (libass's `scale_fix`).
-        scale_fix: f64,
-    },
-}
-
 /// What [`Raster::render`] draws: a glyph or drawing shape, where and how.
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphRequest<'a> {
@@ -95,8 +74,10 @@ pub struct GlyphRequest<'a> {
     pub placement: Placement,
     /// The renderer's frame-wide scales.
     pub frame: FrameScale,
-    /// The border to draw alongside the glyph.
-    pub border: Border,
+    /// The effects of the glyph's run, whose border is drawn alongside the
+    /// glyph: the stroked outline, or the opaque box when it is shown or the
+    /// run casts a shadow.
+    pub effects: &'a Effects,
     /// The glyph is timed by `\kf` karaoke, so its run tracks the least x of
     /// its transformed outline.
     pub karaoke: bool,
@@ -167,21 +148,14 @@ impl GlyphTransform {
     /// The opaque box's matrix: the unit square scaled to the advance and
     /// height plus the border, which VSFilter scales by the font scale a second
     /// time.
-    fn opaque_box(
-        &self,
-        p: &Placement,
-        frame: &FrameScale,
-        size: [f64; 2],
-        width: i32,
-        scale_fix: f64,
-    ) -> Matrix {
+    fn opaque_box(&self, p: &Placement, frame: &FrameScale, size: [f64; 2]) -> Matrix {
         let mut bord = [
             64.0 * size[0] * frame.border[0] / frame.pixel_aspect,
             64.0 * size[1] * frame.border[1],
         ];
-        let mut width = f64::from(width);
+        let mut width = f64::from(p.advance);
         let mut height = f64::from(p.ascender.wrapping_add(p.descender));
-        let orig = [p.scale[0] * scale_fix, p.scale[1] * scale_fix];
+        let orig = [p.scale[0] * p.scale_fix, p.scale[1] * p.scale_fix];
         bord[0] *= orig[0];
         bord[1] *= orig[1];
         width *= orig[0];
@@ -498,19 +472,17 @@ impl Raster {
         work: &mut WorkBudget,
     ) -> Result<()> {
         let (placement, frame) = (&request.placement, &request.frame);
-        let (shape, m, stroke) = match request.border {
+        let (shape, m, stroke) = match request.effects.border {
             Border::None => return Ok(()),
-            Border::OpaqueBox {
-                size,
-                spacing,
-                advance,
-                scale_fix,
-            } => {
-                let width = spacing.wrapping_add(advance);
-                let m = transform.opaque_box(placement, frame, size, width, scale_fix);
+            Border::OpaqueBox { size, .. } => {
+                let flags = FilterFlags::new(request.effects);
+                if !flags.border && !flags.shadow {
+                    return Ok(());
+                }
+                let m = transform.opaque_box(placement, frame, size);
                 (Shape::unit_box(&self.budget)?, m, None)
             }
-            Border::Outline { size } => {
+            Border::Outline { size, .. } => {
                 let glyph = request.shape;
                 let Some((key, m)) = BorderKey::new(
                     centred,

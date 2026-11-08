@@ -6,8 +6,7 @@ use std::io;
 use triergon_core::{Budget, Error, Result as CoreResult, WorkBudget};
 use triergon_raster::{
     Bitmap, Border, Clip, ClipFrame, Colour, Effects, FrameScale, GlyphBitmaps, GlyphRequest,
-    Limits, OUTLINE_MAX, Outline, Pen, Placement, Raster, Rect, Run, RunBorder, Shadow, Shape,
-    Vector,
+    Limits, OUTLINE_MAX, Outline, Pen, Placement, Raster, Rect, Run, Shadow, Shape, Vector,
 };
 
 use crate::case::{Case, Glyph, Random, RunCase, Source};
@@ -350,15 +349,21 @@ impl<'g> Runner<'g> {
             border: [r[5], r[6]],
             pixel_aspect: r[7],
         };
-        let effects = Effects {
+        // The case gives each glyph its border size, which libass keeps for a
+        // whole run; the composite does not depend on it.
+        let effects = |size| Effects {
             border: if bit(1) {
-                RunBorder::OpaqueBox { shown: bit(2) }
+                Border::OpaqueBox {
+                    size,
+                    shown: bit(2),
+                }
             } else if bit(2) {
-                RunBorder::Outline {
+                Border::Outline {
+                    size,
                     keeps_fill: bit(16),
                 }
             } else {
-                RunBorder::None
+                Border::None
             },
             shadow: Shadow {
                 offset: if bit(4) { [r[1], r[2]] } else { [0.0, 0.0] },
@@ -367,10 +372,6 @@ impl<'g> Runner<'g> {
             blur: r[0],
             be: case.be,
         };
-        // libass draws a glyph's box when the box is shown or casts a shadow,
-        // and a stroked border when the run has one.
-        let [x, y] = effects.shadow.offset;
-        let casts = x != 0.0 || y != 0.0;
         let mut run = Run::default();
         let mut drawn = Vec::new();
         for glyph in &case.glyphs {
@@ -384,17 +385,7 @@ impl<'g> Runner<'g> {
             };
             let shape = Shape::from_outlines(outline, Outline::new(&self.budget));
             let (gr, gi) = (&glyph.reals, &glyph.ints);
-            let size = [gr[11], gr[12]];
-            let border = match effects.border {
-                RunBorder::OpaqueBox { shown } if shown || casts => Border::OpaqueBox {
-                    size,
-                    spacing: gi[6],
-                    advance: gi[7],
-                    scale_fix: gr[13],
-                },
-                RunBorder::Outline { .. } => Border::Outline { size },
-                _ => Border::None,
-            };
+            let glyph_effects = effects([gr[11], gr[12]]);
             let request = GlyphRequest {
                 shape: &shape,
                 placement: Placement {
@@ -407,9 +398,11 @@ impl<'g> Runner<'g> {
                     ascender: gi[2],
                     descender: gi[3],
                     position: Vector::new(gi[4], gi[5]),
+                    advance: gi[6].wrapping_add(gi[7]),
+                    scale_fix: gr[13],
                 },
                 frame,
-                border,
+                effects: &glyph_effects,
                 karaoke: bit(32),
             };
             let bitmaps = match self.raster.render(&request, &mut run, &mut self.work) {
@@ -432,13 +425,14 @@ impl<'g> Runner<'g> {
             }
             return Ok(());
         }
-        let composite = match self
-            .raster
-            .compose(&effects, &frame, &drawn, &mut self.work)
-        {
-            Ok(composite) => composite,
-            Err(error) => return sink.value(refused(&error)),
-        };
+        let composite =
+            match self
+                .raster
+                .compose(&effects([0.0; 2]), &frame, &drawn, &mut self.work)
+            {
+                Ok(composite) => composite,
+                Err(error) => return sink.value(refused(&error)),
+            };
         for bitmap in [&composite.fill, &composite.border, &composite.shadow] {
             sink.bitmap(bitmap.as_ref())?;
         }

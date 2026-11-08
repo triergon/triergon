@@ -5,7 +5,7 @@ use triergon_core::{Budget, WorkBudget};
 use triergon_font::{OutlinePoint, Point, PointKind};
 use triergon_raster::{
     Bitmap, Border, Clip, ClipFrame, Effects, FrameScale, GlyphRequest, Limits, Matrix, Outline,
-    Pen, Placement, Projection, Raster, Rect, Run, RunBorder, Shadow, Shape, Vector,
+    Pen, Placement, Projection, Raster, Rect, Run, Shadow, Shape, Vector,
 };
 
 /// xorshift64.
@@ -181,6 +181,8 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
         position: Vector::new(rng.signed(1 << 17) as i32, rng.signed(1 << 17) as i32),
         outline_scale: [rng.scale(), rng.scale()],
         outline_offset: [rng.real(), rng.real()],
+        advance: rng.signed(1 << 12) as i32,
+        scale_fix: rng.scale(),
     };
     let frame = FrameScale {
         blur: [rng.scale(), rng.scale()],
@@ -188,21 +190,30 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
         pixel_aspect: rng.scale(),
     };
     let size = [rng.scale() * 4.0, rng.scale() * 4.0];
-    let border = match rng.below(3) {
-        0 => Border::None,
-        1 => Border::Outline { size },
-        _ => Border::OpaqueBox {
-            size,
-            spacing: rng.signed(256) as i32,
-            advance: rng.signed(1 << 12) as i32,
-            scale_fix: rng.scale(),
+    let effects = Effects {
+        border: match rng.below(3) {
+            0 => Border::None,
+            1 => Border::Outline {
+                size,
+                keeps_fill: rng.below(2) == 0,
+            },
+            _ => Border::OpaqueBox {
+                size,
+                shown: rng.below(2) == 0,
+            },
         },
+        shadow: Shadow {
+            offset: [rng.real(), rng.real()],
+            keeps_fill: rng.below(2) == 0,
+        },
+        be: rng.below(12) as u32,
+        blur: rng.scale() * 3.0,
     };
     let request = GlyphRequest {
         shape: &shape,
         placement,
         frame,
-        border,
+        effects: &effects,
         karaoke: rng.below(2) == 0,
     };
     let mut run = Run::default();
@@ -221,23 +232,6 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
         }
     }
 
-    let effects = Effects {
-        border: match rng.below(3) {
-            0 => RunBorder::None,
-            1 => RunBorder::Outline {
-                keeps_fill: rng.below(2) == 0,
-            },
-            _ => RunBorder::OpaqueBox {
-                shown: rng.below(2) == 0,
-            },
-        },
-        shadow: Shadow {
-            offset: [rng.real(), rng.real()],
-            keeps_fill: rng.below(2) == 0,
-        },
-        be: rng.below(12) as u32,
-        blur: rng.scale() * 3.0,
-    };
     let _ = effects.key(&frame);
     let composite = raster.compose(&effects, &frame, &rendered, &mut work);
 
