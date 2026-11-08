@@ -6,11 +6,13 @@
 //! retention limit, PADDING by its length only; STREAMINFO and SEEKTABLE are also
 //! read. A stream without the marker starts at its first frame.
 use crate::stream::Limits;
-use crate::syntax::{Gap, Length, Plan, Prelude, Probe, SeekContext, Syntax, TrackFacts, Verdict};
+use crate::syntax::{Gap, Length, Plan, Prelude, Probe, SeekContext, Syntax, TrackFacts};
 use triergon_bitstream::crc::crc16_a52;
 use triergon_core::container::{CodecId, SeekMethod};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
-use triergon_framing::{FLAC_STREAMINFO, FlacBlocking, FlacFrameHeader, FlacStreamInfo};
+use triergon_framing::{
+    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacFrameHeader, FlacStreamInfo,
+};
 
 /// The kind of a metadata block (RFC 9639 section 8.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -131,16 +133,18 @@ impl Flac {
         self.expect = if last { Expect::Frames } else { Expect::Block };
     }
 
-    /// Samples of a fixed-blocking frame number: STREAMINFO's block size when the
-    /// stream declares one, the frame's own otherwise (as FFmpeg reads streams that
-    /// vary their block size under the fixed flag).
+    /// Samples per fixed-blocking frame number: the first frame's block size when
+    /// STREAMINFO declares a fixed block size (or is absent), the frame's own when it
+    /// declares a range (as FFmpeg reads streams that vary their block size under the
+    /// fixed flag). The first frame, not STREAMINFO, decides the size, as for FFmpeg when
+    /// STREAMINFO states it wrongly.
     fn fixed_block_size(&self, header: &FlacFrameHeader) -> u64 {
         match (self.stream_info, self.first) {
-            (Some(info), _) if info.min_block_size == info.max_block_size => {
-                u64::from(info.max_block_size)
+            (Some(info), _) if info.min_block_size != info.max_block_size => {
+                u64::from(header.block_size)
             }
-            (None, Some(first)) => u64::from(first.block_size),
-            _ => u64::from(header.block_size),
+            (_, Some(first)) => u64::from(first.block_size),
+            (_, None) => u64::from(header.block_size),
         }
     }
 }
@@ -185,23 +189,17 @@ impl Syntax for Flac {
         reference.blocking == next.blocking
     }
 
-    fn verdict(
-        &self,
-        frame: &[u8],
-        header: &FlacFrameHeader,
-        next: Option<&FlacFrameHeader>,
-    ) -> Verdict {
-        if crc16_a52(0, frame) == 0 {
-            return Verdict::Confirmed;
-        }
+    fn numbers_on(&self, header: &FlacFrameHeader, next: &FlacFrameHeader) -> bool {
         let expected = match header.blocking {
             FlacBlocking::Fixed => header.number + 1,
             FlacBlocking::Variable => header.number + u64::from(header.block_size),
         };
-        match next {
-            Some(next) if next.number == expected => Verdict::Plausible,
-            _ => Verdict::No,
-        }
+        next.number == expected
+    }
+
+    /// The CRC-16 of the whole frame, its footer included, leaves zero.
+    fn checks(&self, frame: &[u8]) -> bool {
+        crc16_a52(0, frame) == 0
     }
 
     fn samples(&self, header: &FlacFrameHeader) -> u32 {
@@ -234,6 +232,13 @@ impl Syntax for Flac {
                 };
                 let kind = FlacBlockKind::from_code(header[0] & 0x7f);
                 let len = u32::from_be_bytes([0, header[1], header[2], header[3]]);
+                // RFC 9639 section 8: STREAMINFO comes first; FFmpeg refuses the stream
+                // otherwise.
+                if self.metadata.is_empty() && kind != FlacBlockKind::StreamInfo {
+                    return Err(Error::Invalid(
+                        "FLAC first metadata block is not STREAMINFO",
+                    ));
+                }
                 self.expect = Expect::Body {
                     kind,
                     len,
@@ -295,9 +300,23 @@ impl Syntax for Flac {
                     .find(|block| block.kind == FlacBlockKind::StreamInfo)
                     .and_then(|block| block.body.as_ref())
                     .ok_or(Error::Invalid("FLAC STREAMINFO not kept"))?;
+                // The decoder reads the channel mask from the Vorbis comment, as FFmpeg's
+                // demuxer does.
+                let comment = self
+                    .metadata
+                    .iter()
+                    .find(|block| block.kind == FlacBlockKind::VorbisComment)
+                    .and_then(|block| block.body.as_ref());
+                let last = if comment.is_some() { 0 } else { 0x80 };
                 configuration.try_extend_from_slice(b"fLaC")?;
-                configuration.try_extend_from_slice(&[0x80 | FLAC_STREAMINFO, 0, 0, 34])?;
+                configuration.try_extend_from_slice(&[last | FLAC_STREAMINFO, 0, 0, 34])?;
                 configuration.try_extend_from_slice(&body[..FlacStreamInfo::BYTES])?;
+                if let Some(comment) = comment {
+                    let len = u32::try_from(comment.len()).map_err(|_| Error::Overflow)?;
+                    let [_, a, b, c] = len.to_be_bytes();
+                    configuration.try_extend_from_slice(&[0x80 | FLAC_VORBIS_COMMENT, a, b, c])?;
+                    configuration.try_extend_from_slice(comment)?;
+                }
                 (
                     info.sample_rate,
                     info.channels,

@@ -525,3 +525,42 @@ fn flac_without_its_marker_starts_at_the_first_confirmed_frame() {
     assert!(track.configuration().is_empty());
     assert!(reader.format().stream_info().is_none());
 }
+
+#[test]
+fn the_flac_configuration_carries_the_vorbis_comment_for_its_channel_mask() {
+    let comment =
+        b"\x00\x00\x00\x00\x01\x00\x00\x00\x26\x00\x00\x00WAVEFORMATEXTENSIBLE_CHANNEL_MASK=0x3F";
+    let mut file = b"fLaC\x00\x00\x00\x22".to_vec();
+    file.extend(streaminfo(4096));
+    file.extend([0x04, 0, 0, comment.len() as u8]);
+    file.extend(comment);
+    file.extend([0x81, 0, 0, 10]);
+    file.extend([0; 10]);
+    file.extend(flac_frame(0, 300));
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open::<Flac>(&pool, &file, true);
+    read(&mut reader, &pool, &file, 1 << 20, 4096).unwrap();
+    let config = reader.stream().unwrap().configuration();
+    let mut expected = b"fLaC\x00\x00\x00\x22".to_vec();
+    expected.extend(streaminfo(4096));
+    expected.extend([0x84, 0, 0, comment.len() as u8]);
+    expected.extend(comment);
+    assert_eq!(
+        config, expected,
+        "STREAMINFO and VORBIS_COMMENT, PADDING left out"
+    );
+}
+
+#[test]
+fn a_flac_stream_whose_first_block_is_not_streaminfo_is_refused() {
+    let mut file = b"fLaC\x04\x00\x00\x08".to_vec();
+    file.extend([0; 8]);
+    file.extend([0x80, 0, 0, 0x22]);
+    file.extend(streaminfo(4096));
+    file.extend(flac_frame(0, 300));
+    let error = read_file::<Flac>(&file, 1 << 20, 4096, true).unwrap_err();
+    assert_eq!(
+        error,
+        Error::Invalid("FLAC first metadata block is not STREAMINFO")
+    );
+}

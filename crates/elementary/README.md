@@ -32,7 +32,7 @@ is a random-access point. Tags are kept as bounded opaque bytes (`Reader::tags`)
 
 | Format | Frame end | Bytes between frames | Configuration | Codec tag |
 |---|---|---|---|---|
-| FLAC | next header with a valid CRC-8 that the frame's CRC-16 confirms, or that numbers on from a damaged frame | part of the frame before | `fLaC` + STREAMINFO, as FFmpeg keeps it | `fLaC` |
+| FLAC | next header with a valid CRC-8 that the frame's CRC-16 confirms, or that numbers on from a damaged frame | part of the frame before | `fLaC` + STREAMINFO + VORBIS_COMMENT (FFmpeg keeps STREAMINFO and honours the comment's `WAVEFORMATEXTENSIBLE_CHANNEL_MASK`) | `fLaC` |
 | MPEG audio | header length; free format runs to the next header | prepended to the next packet | none | `mp1`, `mp2`, `mp3` |
 | ADTS | `frame_length` | dropped | none (packets keep their ADTS header) | `adts` |
 | AC-3, E-AC-3 | `frmsiz`; an access unit adds the dependent and further substreams after substream 0 | appended to the packet before | none | `ac-3`, `ec-3` |
@@ -41,10 +41,12 @@ A frame cut short by the end of the input is delivered with `Packet::is_complete
 false, and so are MPEG audio bytes after the last frame, as FFmpeg 9.0 delivers them.
 
 FLAC metadata blocks are kept up to the retention limit (PADDING by length only), and
-SEEKTABLE and STREAMINFO are read. A stream without the `fLaC` marker (joined mid-way)
+SEEKTABLE and STREAMINFO are read; a stream whose first block is not STREAMINFO is
+refused, as FFmpeg refuses it. A stream without the `fLaC` marker (joined mid-way)
 starts at the first frame header that a CRC-16-confirmed frame follows, after any bytes
-before it; its track comes from that header and its configuration is empty. Fixed-blocking frame numbers count STREAMINFO's block
-size when it declares one, else the frame's own.
+before it; its track comes from that header and its configuration is empty.
+Fixed-blocking frame numbers count the first frame's block size, or each frame's own
+when STREAMINFO declares a range of sizes, as FFmpeg counts them.
 
 MPEG audio follows FFmpeg 9.0 where the specification leaves room: a first Layer III
 frame with a Xing, Info or VBRI description is not delivered; a LAME tag written by
@@ -86,4 +88,7 @@ Xing/Info and LAME tags, MP2, ADTS, AC-3, E-AC-3), except where FFmpeg:
 - accepts an MPEG audio frame of another version or sample rate, or a header in junk
   that no frame follows;
 - reports ADTS positions after junk as if the junk were not there;
-- rejects free-format MPEG audio.
+- rejects free-format MPEG audio;
+- refuses to open a FLAC stream whose STREAMINFO declares a maximum block size below 16
+  (testbench faulty 08 and 09): a decoder decision, so this reader still delivers the
+  frames.

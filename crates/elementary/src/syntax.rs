@@ -23,19 +23,10 @@ pub enum Probe<H> {
 pub enum Length {
     /// The header states the length.
     Known(usize),
-    /// The frame runs to the next header that [`Syntax::verdict`] accepts, at least
-    /// `minimum` bytes on.
+    /// The frame runs to the next header of the stream that numbers on from it
+    /// ([`Syntax::numbers_on`]) or that the frame's own check confirms
+    /// ([`Syntax::checks`]), at least `minimum` bytes on.
     Search { minimum: usize },
-}
-
-/// Whether a candidate header ends the frame before it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Verdict {
-    No,
-    /// Consistent, but the frame's own check failed: accepted for a damaged frame.
-    Plausible,
-    /// The frame's own check passed.
-    Confirmed,
 }
 
 /// Where bytes between two frames go.
@@ -137,15 +128,15 @@ pub(crate) mod sealed {
         fn joins(&self, _unit: &Self::Header, _next: &Self::Header) -> bool {
             false
         }
-        /// Whether a frame `frame` with header `header` ends where `next` starts (`None`:
-        /// the end of the audio).
-        fn verdict(
-            &self,
-            _frame: &[u8],
-            _header: &Self::Header,
-            _next: Option<&Self::Header>,
-        ) -> Verdict {
-            Verdict::Confirmed
+        /// Whether a header `next` continues the numbering of the frame with `header`:
+        /// with a header CRC this ends a frame whatever its own check says, so a damaged
+        /// frame still ends at its successor.
+        fn numbers_on(&self, _header: &Self::Header, _next: &Self::Header) -> bool {
+            false
+        }
+        /// Whether `frame`, a whole candidate frame, passes its own check.
+        fn checks(&self, _frame: &[u8]) -> bool {
+            true
         }
         /// Samples one access unit starting with `header` decodes to.
         fn samples(&self, header: &Self::Header) -> u32;

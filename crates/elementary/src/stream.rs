@@ -89,8 +89,10 @@ impl TrackInfo for Track {
     fn codec(&self) -> CodecId<'_> {
         self.facts.codec
     }
-    /// FLAC: `fLaC` and the STREAMINFO block, as FFmpeg keeps it. Empty for the other
-    /// formats, whose frames describe themselves.
+    /// FLAC: `fLaC`, STREAMINFO and the VORBIS_COMMENT block when the stream has one
+    /// (FFmpeg keeps STREAMINFO as extradata and applies the comment's channel mask),
+    /// empty for a stream without STREAMINFO. Empty for the other formats, whose frames
+    /// describe themselves.
     fn configuration(&self) -> &[u8] {
         &self.facts.configuration
     }
