@@ -168,6 +168,8 @@ impl MatroskaHevcDolbySetup {
     }
 }
 
+// Keep the bounded HEVC configuration inline to avoid another feed allocation.
+#[allow(clippy::large_enum_variant)]
 enum FeedCodec {
     Hevc(HevcAnnexBConfig),
     Dolby(DolbyCodec),
