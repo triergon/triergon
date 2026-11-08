@@ -1054,6 +1054,7 @@ impl DemuxObserver {
         self.previous_counter = Some(counter);
         self.set_payload_len(next);
     }
+    #[cfg(any(test, feature = "reference-trace"))]
     pub(crate) fn transport_bounds(packet: &TransportPacket) -> Result<()> {
         Self::transport_bounds_to(packet, None)
     }
