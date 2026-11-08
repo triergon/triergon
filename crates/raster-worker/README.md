@@ -31,8 +31,9 @@ compositor, blur, the bitmap blends, the border's fill subtraction, shifts and
 clipping. A case outside the grammar is recorded as unparsed, a source or
 parameter libass rejects as invalid, and an operation libass fails as failed.
 An operation the crate refuses where libass draws is recorded with a status of
-its own, one for a policy limit (the case's work, one frame's worth, or the
-crate's `Limits`) and one for the storage budget, so the case fails. The fold, bench and memory modes print the
+its own, so the case fails: one for a limit (`Error::Policy` or `Error::Limit`:
+the case's work, one frame's worth, the crate's `Limits` or a fixed size
+bound) and one for a storage budget that ran out. The fold, bench and memory modes print the
 harness protocol's one JSON line, whose `digest` folds every record in a fixed
 order (`src/record.rs`); the bench mode adds the elapsed time of the timed loop
 and the memory mode brackets one operation with the allocation-window markers.

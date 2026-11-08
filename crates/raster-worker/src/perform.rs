@@ -16,8 +16,9 @@ use crate::record::{Kind, Sink};
 /// Status values of a record. The first three are the reference's: the source
 /// or parameters are invalid, the operation succeeded, or it failed as libass
 /// fails it (`Error::Invalid`). The reference never records the last two, so a
-/// case that reaches them fails: the crate refused under a policy limit (the
-/// case's work or [`Limits`]), or under its storage budget.
+/// case that reaches them fails: the crate refused under a limit (the case's
+/// work, [`Limits`] or a fixed size bound: `Error::Policy` and
+/// `Error::Limit`), or because its storage budget ran out.
 const INVALID: i64 = 0;
 const OK: i64 = 1;
 const FAILED: i64 = 2;
@@ -31,7 +32,8 @@ const CASE_WORK: u64 = 1 << 32;
 fn refused(error: &Error) -> i64 {
     match error {
         Error::Invalid(_) => FAILED,
-        Error::Policy(_) => POLICY,
+        Error::Policy(_) | Error::Limit { .. } => POLICY,
+        // The storage budget ran out (`Backpressure`, `Allocation`).
         _ => BUDGET,
     }
 }
