@@ -25,6 +25,15 @@ impl Text {
         self.0.clear();
     }
 
+    pub(crate) fn truncate(&mut self, len: usize) {
+        self.0.truncate(len);
+    }
+
+    /// Copies the bytes in `source` to `destination` within the buffer.
+    pub(crate) fn copy_within(&mut self, source: std::ops::Range<usize>, destination: usize) {
+        self.0.as_mut_slice().copy_within(source, destination);
+    }
+
     pub(crate) fn as_bytes(&self) -> &[u8] {
         self.0.as_slice()
     }

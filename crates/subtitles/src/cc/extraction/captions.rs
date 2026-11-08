@@ -154,12 +154,32 @@ fn dish_pairs(available: &[u8]) -> Option<([[u8; 2]; 2], usize)> {
     }
 }
 
+/// Gathered bytes and format as they were, to go back to.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Mark {
+    len: usize,
+    format: Option<Format>,
+}
+
 impl Gathered {
     pub(super) fn new(pool: &Budget) -> Self {
         Self {
             bytes: Text::new(pool),
             format: None,
         }
+    }
+
+    pub(super) fn mark(&self) -> Mark {
+        Mark {
+            len: self.bytes.len(),
+            format: self.format,
+        }
+    }
+
+    /// Goes back to `mark`, dropping the bytes gathered since.
+    pub(super) fn rollback(&mut self, mark: Mark) {
+        self.bytes.truncate(mark.len);
+        self.format = mark.format;
     }
 
     /// The A/53 constructs of a T.35 SEI payload.

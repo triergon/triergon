@@ -1,7 +1,12 @@
 //! FFmpeg's MPEG-2 video decoder as far as captions go: which pictures it
 //! outputs, in which order, with which caption bytes and times.
+//!
+//! A push or the finish either succeeds or leaves the decoder and its output
+//! as they were: while it runs, buffers are only appended to and the rest of
+//! the state is a copy, and what it no longer needs is dropped once it has
+//! succeeded.
 
-use super::captions::Gathered;
+use super::captions::{Gathered, Mark};
 use super::queue::FrameQueue;
 use crate::cc::text::Text;
 use crate::cc::video::mpeg2::{
@@ -17,19 +22,18 @@ struct Stamp {
     pts: Option<i64>,
 }
 
-/// A reference picture waiting for output; its bytes are in `held_bytes`.
+/// A reference picture waiting for output, with its bytes in `captions`.
 #[derive(Clone, Copy, Debug)]
 struct Held {
     pts: Option<i64>,
     duration: Option<i64>,
+    start: usize,
+    end: usize,
 }
 
-/// The decoder's state between pictures.
-#[derive(Debug)]
-struct Decoding {
-    /// Timed by PES PTS in `time_base`, or (`None`) as a raw stream.
-    time_base: Option<(u32, u32)>,
-    stamps: BudgetVec<Stamp>,
+/// The decoder's state between pictures, besides its buffers.
+#[derive(Clone, Copy, Debug, Default)]
+struct Progress {
     /// Stamps before this index have been taken.
     stamp_head: usize,
     rate: Option<FrameRate>,
@@ -41,10 +45,21 @@ struct Decoding {
     /// next output frame once one has left.
     decode_time: i64,
     raw_next: Option<i64>,
-    /// The bytes of the pictures decoded since the last frame took theirs.
-    pending: Gathered,
     held: Option<Held>,
-    held_bytes: Text,
+    /// Where in `captions` the bytes of the pictures decoded since the last
+    /// frame took theirs start.
+    pending: usize,
+}
+
+#[derive(Debug)]
+struct Decoding {
+    /// Timed by PES PTS in `time_base`, or (`None`) as a raw stream.
+    time_base: Option<(u32, u32)>,
+    stamps: BudgetVec<Stamp>,
+    /// The bytes of the held picture, then those pending; before and between
+    /// them, bytes of frames that have left.
+    captions: Gathered,
+    progress: Progress,
 }
 
 /// MPEG-2 video elementary stream bytes, buffered until whole start-code
@@ -62,6 +77,18 @@ pub(super) struct Mpeg2Decode {
     decoding: Decoding,
 }
 
+/// The decoder and its output before a step, to go back to.
+#[derive(Clone, Copy, Debug)]
+struct Checkpoint {
+    es: usize,
+    cursor: usize,
+    searched: usize,
+    stamps: usize,
+    progress: Progress,
+    captions: Mark,
+    frames: usize,
+}
+
 impl Mpeg2Decode {
     /// `time_base` for PES timing; `None` for a raw stream.
     pub(super) fn new(pool: &Budget, time_base: Option<(u32, u32)>) -> Self {
@@ -73,17 +100,8 @@ impl Mpeg2Decode {
             decoding: Decoding {
                 time_base,
                 stamps: BudgetVec::new(pool),
-                stamp_head: 0,
-                rate: None,
-                progressive_sequence: false,
-                after_sequence_header: false,
-                first_field: None,
-                references: 0,
-                decode_time: 0,
-                raw_next: None,
-                pending: Gathered::new(pool),
-                held: None,
-                held_bytes: Text::new(pool),
+                captions: Gathered::new(pool),
+                progress: Progress::default(),
             },
         }
     }
@@ -96,23 +114,65 @@ impl Mpeg2Decode {
         pts: Option<i64>,
         out: &mut FrameQueue,
     ) -> Result<()> {
-        if self.decoding.time_base.is_some() {
-            self.decoding.stamp(self.base + self.es.len(), pts)?;
-        }
-        self.es.put(data)?;
-        self.process(false, out)
+        self.step(out, |decode, out| {
+            if decode.decoding.time_base.is_some() {
+                let offset = decode.base + decode.es.len();
+                decode.decoding.stamp(offset, pts)?;
+            }
+            decode.es.put(data)?;
+            decode.process(false, out)
+        })
     }
 
     /// The end of the stream: the last units and the reference picture held.
     pub(super) fn finish(&mut self, out: &mut FrameQueue) -> Result<()> {
-        self.process(true, out)?;
-        let decoding = &mut self.decoding;
-        if let Some(last) = decoding.held.take() {
-            // A raw stream's last frame has no time.
-            let pts = decoding.time_base.and(last.pts);
-            out.push(pts, last.duration, decoding.held_bytes.as_bytes())?;
+        self.step(out, |decode, out| {
+            decode.process(true, out)?;
+            decode.decoding.release_held(out)
+        })
+    }
+
+    /// Runs `step`, then drops what is no longer needed; when it fails, the
+    /// decoder and `out` are left as they were.
+    fn step(
+        &mut self,
+        out: &mut FrameQueue,
+        step: impl FnOnce(&mut Self, &mut FrameQueue) -> Result<()>,
+    ) -> Result<()> {
+        let checkpoint = Checkpoint {
+            es: self.es.len(),
+            cursor: self.cursor,
+            searched: self.searched,
+            stamps: self.decoding.stamps.len(),
+            progress: self.decoding.progress,
+            captions: self.decoding.captions.mark(),
+            frames: out.len(),
+        };
+        let result = step(self, out);
+        if result.is_ok() {
+            self.settle();
+        } else {
+            self.es.truncate(checkpoint.es);
+            self.cursor = checkpoint.cursor;
+            self.searched = checkpoint.searched;
+            let decoding = &mut self.decoding;
+            decoding.stamps.truncate(checkpoint.stamps);
+            decoding.progress = checkpoint.progress;
+            decoding.captions.rollback(checkpoint.captions);
+            out.truncate(checkpoint.frames);
         }
-        Ok(())
+        result
+    }
+
+    /// Drops the stream bytes decoded once they are at least half of them.
+    fn settle(&mut self) {
+        if self.cursor > 0 && self.cursor * 2 >= self.es.len() {
+            self.es.drop_front(self.cursor);
+            self.base += self.cursor;
+            self.searched -= self.cursor.min(self.searched);
+            self.cursor = 0;
+        }
+        self.decoding.settle();
     }
 
     /// Decodes every complete unit from the cursor on (at the end, every unit).
@@ -125,7 +185,7 @@ impl Mpeg2Decode {
                 // Bytes before a start code are not decoded; only the last
                 // three can begin one.
                 self.cursor = self.cursor.max(es.len().saturating_sub(3));
-                break;
+                return Ok(());
             };
             self.cursor = start;
             // A picture runs to the next picture, GOP or sequence header,
@@ -141,7 +201,7 @@ impl Mpeg2Decode {
             };
             let Some(end) = end.or(finishing.then_some(es.len())) else {
                 self.searched = at.max(es.len().saturating_sub(3));
-                break;
+                return Ok(());
             };
             if code == PICTURE {
                 self.decoding
@@ -156,27 +216,11 @@ impl Mpeg2Decode {
             self.cursor = end;
             self.searched = end;
         }
-        if self.cursor > 0 && self.cursor * 2 >= self.es.len() {
-            self.es.drop_front(self.cursor);
-            self.base += self.cursor;
-            self.searched -= self.cursor.min(self.searched);
-            self.cursor = 0;
-        }
-        Ok(())
     }
 }
 
 impl Decoding {
     fn stamp(&mut self, offset: usize, pts: Option<i64>) -> Result<()> {
-        // Taken stamps leave once they are at least half, so each moves once.
-        let len = self.stamps.len();
-        if self.stamp_head > 0 && self.stamp_head * 2 >= len {
-            self.stamps
-                .as_mut_slice()
-                .copy_within(self.stamp_head..len, 0);
-            self.stamps.truncate(len - self.stamp_head);
-            self.stamp_head = 0;
-        }
         if self.stamps.len() == self.stamps.capacity() {
             self.stamps.try_reserve_exact(self.stamps.len().max(16))?;
         }
@@ -187,32 +231,33 @@ impl Decoding {
 
     /// A sequence header and the sequence extension right after it.
     fn header(&mut self, unit: StartCode<'_>) {
+        let progress = &mut self.progress;
         match unit.code {
             SEQUENCE_HEADER => {
-                self.rate = mpeg2::sequence_frame_rate(unit.data);
-                self.after_sequence_header = true;
+                progress.rate = mpeg2::sequence_frame_rate(unit.data);
+                progress.after_sequence_header = true;
                 return;
             }
-            EXTENSION if self.after_sequence_header => {
+            EXTENSION if progress.after_sequence_header => {
                 if let Some(extension) = SequenceExtension::parse(unit.data) {
-                    self.rate = self.rate.map(|r| extension.frame_rate(r));
-                    self.progressive_sequence = extension.progressive_sequence;
+                    progress.rate = progress.rate.map(|r| extension.frame_rate(r));
+                    progress.progressive_sequence = extension.progressive_sequence;
                 }
             }
             _ => {}
         }
-        self.after_sequence_header = false;
+        progress.after_sequence_header = false;
     }
 
     /// One picture: from its start code to the next picture, GOP or sequence
     /// header, starting at stream offset `offset`.
     fn picture(&mut self, picture: &[u8], offset: usize, out: &mut FrameQueue) -> Result<()> {
-        self.after_sequence_header = false;
+        self.progress.after_sequence_header = false;
         // A PTS belongs to the first picture starting in its PES packet.
-        let stamps = &self.stamps.as_slice()[self.stamp_head..];
+        let stamps = &self.stamps.as_slice()[self.progress.stamp_head..];
         let taken = stamps.iter().take_while(|s| s.offset <= offset).count();
         let pts = stamps[..taken].last().and_then(|stamp| stamp.pts);
-        self.stamp_head += taken;
+        self.progress.stamp_head += taken;
         let mut units = mpeg2::start_codes(picture);
         let Some(header) = units.next().and_then(|u| PictureHeader::parse(u.data)) else {
             return Ok(());
@@ -228,57 +273,114 @@ impl Decoding {
                 mpeg2::USER_DATA => {
                     // FFmpeg reads announced constructs up to the picture's end.
                     let available = &picture[unit.offset + 4..];
-                    self.pending
+                    self.captions
                         .picture_user_data(available, coding.top_field_first)?;
                 }
                 _ => {}
             }
         }
+        let time_base = self.time_base;
+        let progress = &mut self.progress;
         // The second field of a frame passes its bytes on.
         if coding.structure != PictureStructure::Frame {
-            match self.first_field.take() {
+            match progress.first_field.take() {
                 Some(first) if first != coding.structure => return Ok(()),
-                _ => self.first_field = Some(coding.structure),
+                _ => progress.first_field = Some(coding.structure),
             }
         }
-        let duration = self.duration(coding.display_fields(self.progressive_sequence));
-        let decoded_at = self.decode_time;
-        self.decode_time = self.decode_time.saturating_add(duration.unwrap_or(0));
-        if header.picture_type == PictureType::Bidirectional && self.references < 2 {
+        let fields = coding.display_fields(progress.progressive_sequence);
+        let duration = progress.duration(time_base, fields);
+        let decoded_at = progress.decode_time;
+        progress.decode_time = progress.decode_time.saturating_add(duration.unwrap_or(0));
+        if header.picture_type == PictureType::Bidirectional && progress.references < 2 {
             return Ok(());
         }
-        let frame = Held { pts, duration };
+        let bytes = self.captions.bytes.as_bytes();
         if header.picture_type.is_reference() {
-            self.references = self.references.saturating_add(1);
-            if let Some(previous) = self.held.replace(frame) {
-                let at = self.output_time(previous, decoded_at);
-                out.push(at, previous.duration, self.held_bytes.as_bytes())?;
+            progress.references = progress.references.saturating_add(1);
+            let frame = Held {
+                pts,
+                duration,
+                start: progress.pending,
+                end: bytes.len(),
+            };
+            if let Some(previous) = progress.held.replace(frame) {
+                let at =
+                    progress.output_time(time_base, previous.pts, previous.duration, decoded_at);
+                out.push(at, previous.duration, &bytes[previous.start..previous.end])?;
             }
-            std::mem::swap(&mut self.held_bytes, &mut self.pending.bytes);
         } else {
-            let at = self.output_time(frame, decoded_at);
-            out.push(at, duration, self.pending.bytes.as_bytes())?;
+            let at = progress.output_time(time_base, pts, duration, decoded_at);
+            out.push(at, duration, &bytes[progress.pending..])?;
         }
-        self.pending.bytes.clear();
+        progress.pending = bytes.len();
         Ok(())
     }
 
+    /// Outputs the reference picture held, at the end of the stream.
+    fn release_held(&mut self, out: &mut FrameQueue) -> Result<()> {
+        if let Some(last) = self.progress.held.take() {
+            // A raw stream's last frame has no time.
+            let pts = self.time_base.and(last.pts);
+            let bytes = &self.captions.bytes.as_bytes()[last.start..last.end];
+            out.push(pts, last.duration, bytes)?;
+        }
+        Ok(())
+    }
+
+    /// Drops taken stamps and the bytes of frames that have left once they
+    /// are at least half of their buffer, so each moves a bounded number of
+    /// times.
+    fn settle(&mut self) {
+        let progress = &mut self.progress;
+        let len = self.stamps.len();
+        if progress.stamp_head > 0 && progress.stamp_head * 2 >= len {
+            self.stamps
+                .as_mut_slice()
+                .copy_within(progress.stamp_head..len, 0);
+            self.stamps.truncate(len - progress.stamp_head);
+            progress.stamp_head = 0;
+        }
+        let bytes = &mut self.captions.bytes;
+        let len = bytes.len();
+        let held = progress.held.map_or(0..0, |held| held.start..held.end);
+        let live = held.len() + (len - progress.pending);
+        if len - live > 0 && len - live >= live {
+            bytes.copy_within(held.clone(), 0);
+            bytes.copy_within(progress.pending..len, held.len());
+            bytes.truncate(live);
+            if let Some(held) = &mut progress.held {
+                held.end -= held.start;
+                held.start = 0;
+            }
+            progress.pending = held.len();
+        }
+    }
+}
+
+impl Progress {
     /// A frame's time: its PES PTS; in a raw stream the decode time of the
     /// picture that outputs it for the first frame, then the end of the frame
     /// before.
-    fn output_time(&mut self, frame: Held, decoded_at: i64) -> Option<i64> {
-        if self.time_base.is_some() {
-            return frame.pts;
+    fn output_time(
+        &mut self,
+        time_base: Option<(u32, u32)>,
+        pts: Option<i64>,
+        duration: Option<i64>,
+        decoded_at: i64,
+    ) -> Option<i64> {
+        if time_base.is_some() {
+            return pts;
         }
         let at = self.raw_next.unwrap_or(decoded_at);
-        self.raw_next = Some(at.saturating_add(frame.duration.unwrap_or(0)));
+        self.raw_next = Some(at.saturating_add(duration.unwrap_or(0)));
         Some(at)
     }
 
     /// `fields` field periods in the clock's time base, truncated.
-    fn duration(&self, fields: u32) -> Option<i64> {
+    fn duration(&self, time_base: Option<(u32, u32)>, fields: u32) -> Option<i64> {
         let rate = self.rate?;
-        let (num, den) = self.time_base.unwrap_or(super::RAW_MPEG2_TIME_BASE);
+        let (num, den) = time_base.unwrap_or(super::RAW_MPEG2_TIME_BASE);
         let numerator = i64::from(den) * i64::from(rate.denominator) * i64::from(fields);
         let denominator = i64::from(num) * i64::from(rate.numerator) * 2;
         (denominator > 0).then(|| numerator / denominator)
@@ -308,6 +410,6 @@ mod tests {
             .push(&[0, 0, 1, 0, 0, 8], None, &mut out)
             .expect("push");
         let decoding = &decode.decoding;
-        assert_eq!(decoding.stamps.len() - decoding.stamp_head, 2001);
+        assert_eq!(decoding.stamps.len() - decoding.progress.stamp_head, 2001);
     }
 }

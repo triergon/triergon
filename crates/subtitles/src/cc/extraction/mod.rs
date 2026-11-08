@@ -154,7 +154,8 @@ impl CaptionExtractor {
     ///
     /// # Errors
     ///
-    /// When `work` cannot cover the packet or the pool cannot hold the frames.
+    /// When `work` cannot cover the packet or the pool cannot hold the frames;
+    /// the extractor is then as it was before the call.
     pub fn push(&mut self, packet: VideoPacket<'_>, work: &mut WorkBudget) -> Result<()> {
         charge(work, packet.data.len())?;
         match &mut self.decode {
@@ -173,7 +174,8 @@ impl CaptionExtractor {
     ///
     /// # Errors
     ///
-    /// When the pool cannot hold the frames.
+    /// When the pool cannot hold the frames; the extractor is then as it was
+    /// before the call.
     pub fn finish(&mut self) -> Result<()> {
         match &mut self.decode {
             Decode::Mpeg2(decode) => decode.finish(&mut self.output),
@@ -186,7 +188,8 @@ impl CaptionExtractor {
     ///
     /// # Errors
     ///
-    /// When the pool cannot hold the remaining frames while it compacts them.
+    /// When the pool cannot hold the remaining frames while it compacts them;
+    /// they are then kept as they were.
     pub fn pop(&mut self) -> Result<Option<CaptionFrame<'_>>> {
         self.output.pop_front()
     }

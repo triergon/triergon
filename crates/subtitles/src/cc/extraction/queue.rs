@@ -1,5 +1,5 @@
 //! A queue of caption frames: entries over one byte arena that is compacted as
-//! frames leave.
+//! frames leave. A change that fails leaves the frames as they were.
 
 use super::CaptionFrame;
 use crate::cc::text::Text;
@@ -53,11 +53,11 @@ impl FrameQueue {
             return Ok(());
         }
         self.compact()?;
-        let start = self.data.len();
-        self.data.put(bytes)?;
         if self.entries.len() == self.entries.capacity() {
             self.entries.try_reserve_exact(self.entries.len().max(16))?;
         }
+        let start = self.data.len();
+        self.data.put(bytes)?;
         self.entries
             .try_push(Entry {
                 pts,
@@ -73,6 +73,11 @@ impl FrameQueue {
     /// The live entries, front first.
     pub(super) fn entries(&self) -> &[Entry] {
         &self.entries.as_slice()[self.head..]
+    }
+
+    /// The bytes of a live entry.
+    pub(super) fn bytes(&self, entry: &Entry) -> &[u8] {
+        &self.data.as_bytes()[entry.start..entry.end]
     }
 
     /// Takes the front frame; it stays readable until the queue next changes.
@@ -106,33 +111,54 @@ impl FrameQueue {
         Ok(())
     }
 
+    /// Keeps the first `len` live frames, dropping the newer ones.
+    pub(super) fn truncate(&mut self, len: usize) {
+        while self.len() > len {
+            if let Some(entry) = self.entries.pop() {
+                self.live -= entry.end - entry.start;
+            }
+        }
+        let end = self.entries.as_slice().last().map_or(0, |entry| entry.end);
+        self.data.truncate(end);
+    }
+
+    /// Drops every frame.
+    pub(super) fn clear(&mut self) {
+        self.entries.clear();
+        self.head = 0;
+        self.live = 0;
+        self.data.clear();
+    }
+
     /// Drops the bytes of frames that have left once they outweigh the rest.
     fn compact(&mut self) -> Result<()> {
         if self.head == self.entries.len() {
-            self.entries.clear();
-            self.head = 0;
-            self.data.clear();
+            self.clear();
             return Ok(());
         }
         if self.data.len() < 4096 || self.data.len() < 2 * self.live {
             return Ok(());
         }
         self.spare.clear();
-        let head = self.head;
-        let mut kept = 0;
-        for i in head..self.entries.len() {
-            let mut entry = self.entries.as_slice()[i];
-            let start = self.spare.len();
+        let live = &self.entries.as_slice()[self.head..];
+        for entry in live {
             self.spare
                 .put(&self.data.as_bytes()[entry.start..entry.end])?;
-            entry.start = start;
-            entry.end = self.spare.len();
-            self.entries.as_mut_slice()[kept] = entry;
-            kept += 1;
         }
-        while self.entries.len() > kept {
-            self.entries.pop();
+        let mut start = 0;
+        let head = self.head;
+        let entries = self.entries.as_mut_slice();
+        for kept in 0..entries.len() - head {
+            let entry = entries[head + kept];
+            let end = start + (entry.end - entry.start);
+            entries[kept] = Entry {
+                start,
+                end,
+                ..entry
+            };
+            start = end;
         }
+        self.entries.truncate(self.entries.len() - head);
         self.head = 0;
         std::mem::swap(&mut self.data, &mut self.spare);
         Ok(())

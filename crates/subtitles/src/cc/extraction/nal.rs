@@ -1,8 +1,11 @@
 //! FFmpeg's H.264 and HEVC decoders as far as captions go: which pictures
 //! they output, with which caption bytes, released in presentation order.
+//!
+//! An access unit or the finish either succeeds or leaves the decoder and its
+//! output as they were.
 
 use super::captions::Gathered;
-use super::queue::FrameQueue;
+use super::queue::{Entry, FrameQueue};
 use crate::cc::video::nal::{
     self, Codec, Framing, SEI_RECOVERY_POINT, SEI_USER_DATA_REGISTERED, SliceType, Timing, h264,
     hevc,
@@ -19,15 +22,22 @@ pub(super) struct NalDecode {
     codec: Codec,
     framing: Framing,
     time_base: (u32, u32),
+    progress: Progress,
+    gathered: Gathered,
+    /// Decoded frames not yet released, at most [`REORDER_DEPTH`] between
+    /// access units.
+    reorder: FrameQueue,
+}
+
+/// The decoder's state between access units, besides its buffers.
+#[derive(Clone, Copy, Debug, Default)]
+struct Progress {
     timing: Option<Timing>,
     h264: H264Output,
     hevc: HevcDecoding,
-    gathered: Gathered,
     /// The least step between successive decode times so far.
     last_decode: Option<i64>,
     step: Option<i64>,
-    /// Decoded frames not yet released.
-    reorder: FrameQueue,
 }
 
 impl NalDecode {
@@ -41,12 +51,8 @@ impl NalDecode {
             codec,
             framing,
             time_base,
-            timing: None,
-            h264: H264Output::default(),
-            hevc: HevcDecoding::default(),
+            progress: Progress::default(),
             gathered: Gathered::new(pool),
-            last_decode: None,
-            step: None,
             reorder: FrameQueue::new(pool),
         }
     }
@@ -59,13 +65,35 @@ impl NalDecode {
         duration: Option<i64>,
         out: &mut FrameQueue,
     ) -> Result<()> {
+        let progress = self.progress;
+        let gathered = self.gathered.mark();
+        let (waiting, frames) = (self.reorder.len(), out.len());
+        let result = self.decode(data, pts, dts, duration, out);
+        if result.is_err() {
+            self.progress = progress;
+            self.gathered.rollback(gathered);
+            self.reorder.truncate(waiting);
+            out.truncate(frames);
+        }
+        result
+    }
+
+    fn decode(
+        &mut self,
+        data: &[u8],
+        pts: Option<i64>,
+        dts: Option<i64>,
+        duration: Option<i64>,
+        out: &mut FrameQueue,
+    ) -> Result<()> {
+        let progress = &mut self.progress;
         if let Some(at) = dts.or(pts) {
-            if let Some(delta) = self.last_decode.and_then(|last| at.checked_sub(last))
+            if let Some(delta) = progress.last_decode.and_then(|last| at.checked_sub(last))
                 && delta > 0
             {
-                self.step = Some(self.step.map_or(delta, |s| s.min(delta)));
+                progress.step = Some(progress.step.map_or(delta, |s| s.min(delta)));
             }
-            self.last_decode = Some(at);
+            progress.last_decode = Some(at);
         }
         let codec = self.codec;
         let mut picture = Picture::default();
@@ -84,7 +112,7 @@ impl NalDecode {
                 }
                 (Codec::H264, h264::SPS) | (Codec::Hevc, hevc::SPS) => {
                     if let Some(found) = nal::sps_timing(codec, nal) {
-                        self.timing = Some(found);
+                        progress.timing = Some(found);
                     }
                 }
                 (Codec::Hevc, hevc::EOS) => picture.end_of_sequence = true,
@@ -107,8 +135,8 @@ impl NalDecode {
             }
         }
         let fate = match codec {
-            Codec::H264 => self.h264.fate(&picture, pts),
-            Codec::Hevc => self.hevc.fate(&picture),
+            Codec::H264 => progress.h264.fate(&picture, pts),
+            Codec::Hevc => progress.hevc.fate(&picture),
         };
         match fate {
             Fate::Output => {
@@ -118,43 +146,72 @@ impl NalDecode {
             Fate::Discard => {}
             Fate::Skip => return Ok(()),
         }
+        // At most one frame is over the depth. Its release is the last step
+        // that can fail, and a failed release removes nothing.
+        if self.reorder.len() > REORDER_DEPTH {
+            self.release(out)?;
+        }
         self.gathered.bytes.clear();
-        while self.reorder.len() > REORDER_DEPTH {
-            self.release(out)?;
-        }
         Ok(())
     }
 
-    /// The end of the stream: every frame still waiting.
+    /// The end of the stream: every frame still waiting, in release order.
     pub(super) fn finish(&mut self, out: &mut FrameQueue) -> Result<()> {
-        while self.reorder.len() > 0 {
-            self.release(out)?;
+        let frames = out.len();
+        let period = self.period();
+        let waiting = self.reorder.entries();
+        let mut released = None;
+        while let Some((index, entry)) = waiting
+            .iter()
+            .enumerate()
+            .filter(|&(index, entry)| {
+                released.is_none_or(|last| release_order(index, entry) > last)
+            })
+            .min_by_key(|&(index, entry)| release_order(index, entry))
+        {
+            released = Some(release_order(index, entry));
+            let bytes = self.reorder.bytes(entry);
+            if let Err(error) = out.push(entry.pts, entry.duration.or(period), bytes) {
+                out.truncate(frames);
+                return Err(error);
+            }
         }
+        self.reorder.clear();
         Ok(())
     }
 
-    /// Releases the waiting frame presented first (equal times in decode
-    /// order, unknown times last), lasting its packet's duration or one frame
-    /// period.
+    /// Releases the waiting frame presented first, lasting its packet's
+    /// duration or one frame period.
     fn release(&mut self, out: &mut FrameQueue) -> Result<()> {
         let Some(index) = self
             .reorder
             .entries()
             .iter()
             .enumerate()
-            .min_by_key(|(i, e)| (e.pts.is_none(), e.pts, *i))
-            .map(|(i, _)| i)
+            .min_by_key(|&(index, entry)| release_order(index, entry))
+            .map(|(index, _)| index)
         else {
             return Ok(());
         };
-        let period = self
-            .timing
-            .and_then(|t| stream_period(self.codec, t, self.time_base))
-            .or(self.step);
+        let period = self.period();
         self.reorder.remove(index, |entry, bytes| {
             out.push(entry.pts, entry.duration.or(period), bytes)
         })
     }
+
+    /// One frame period of the VUI timing, else the least decode time step.
+    fn period(&self) -> Option<i64> {
+        self.progress
+            .timing
+            .and_then(|t| stream_period(self.codec, t, self.time_base))
+            .or(self.progress.step)
+    }
+}
+
+/// Waiting frames leave presented first: equal times in decode order, unknown
+/// times last.
+fn release_order(index: usize, entry: &Entry) -> (bool, Option<i64>, usize) {
+    (entry.pts.is_none(), entry.pts, index)
 }
 
 /// What FFmpeg's decoder does with a picture.
@@ -185,7 +242,7 @@ struct Picture {
 /// discarded, and so are pictures presented before that one (its leading
 /// pictures). Started at a non-IDR intra picture without a recovery point SEI,
 /// it also discards the first P picture after leading pictures.
-#[derive(Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 struct H264Output {
     start: Option<Start>,
 }
@@ -232,7 +289,7 @@ impl H264Output {
 /// HEVC decoding (8.1.3): nothing before the first IRAP picture, and no RASL
 /// picture of an IRAP picture that starts decoding (the first, any after an
 /// end of sequence, a BLA picture).
-#[derive(Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 struct HevcDecoding {
     started: bool,
     after_end_of_sequence: bool,
