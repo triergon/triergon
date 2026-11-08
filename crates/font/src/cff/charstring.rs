@@ -380,19 +380,76 @@ impl OperatorSet {
 }
 
 /// What the interpreter reports while it runs: nothing on the outline path, the
-/// operators it executes when coverage is asked for.
+/// operators it executes when coverage is asked for, the points it draws when
+/// bounds are.
 pub(super) trait Observe {
-    fn operator(&mut self, op: CharstringOperator);
-}
-
-impl Observe for () {
     #[inline(always)]
     fn operator(&mut self, _: CharstringOperator) {}
+
+    /// A move, and the start of each charstring or `seac` component.
+    #[inline(always)]
+    fn move_to(&mut self) {}
+
+    /// A line or curve from the current point through `points`, in 16.16
+    /// charstring coordinates.
+    #[inline(always)]
+    fn draw(&mut self, _from: (Fixed, Fixed), _points: &[(Fixed, Fixed)]) {}
 }
+
+impl Observe for () {}
 
 impl Observe for OperatorSet {
     fn operator(&mut self, op: CharstringOperator) {
         self.0 |= op.bit();
+    }
+}
+
+/// The box of every point a glyph's program draws, control points included, in
+/// 16.16 charstring coordinates before any FontMatrix: the bounds HarfBuzz
+/// takes CFF glyph extents from. A subpath's start counts once it draws.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CharstringBounds {
+    pub x_min: i32,
+    pub y_min: i32,
+    pub x_max: i32,
+    pub y_max: i32,
+}
+
+/// [`CharstringBounds`] as the interpreter runs.
+#[derive(Debug, Default)]
+pub(super) struct Bounds {
+    bounds: Option<CharstringBounds>,
+    open: bool,
+}
+
+impl Bounds {
+    fn add(&mut self, (x, y): (Fixed, Fixed)) {
+        let b = self.bounds.get_or_insert(CharstringBounds {
+            x_min: x,
+            y_min: y,
+            x_max: x,
+            y_max: y,
+        });
+        b.x_min = b.x_min.min(x);
+        b.y_min = b.y_min.min(y);
+        b.x_max = b.x_max.max(x);
+        b.y_max = b.y_max.max(y);
+    }
+}
+
+impl Observe for Bounds {
+    fn move_to(&mut self) {
+        self.open = false;
+    }
+
+    fn draw(&mut self, from: (Fixed, Fixed), points: &[(Fixed, Fixed)]) {
+        if !self.open {
+            self.open = true;
+            self.add(from);
+        }
+        for &p in points {
+            self.add(p);
+        }
     }
 }
 
@@ -460,6 +517,29 @@ pub(super) fn operators(
     );
     run.top_glyph(glyph)?;
     Ok(run.observer)
+}
+
+/// The bounds of what `glyph`'s program draws, `None` if it draws nothing;
+/// `outline` is scratch storage.
+pub(super) fn bounds(
+    cff: &Cff,
+    table: &[u8],
+    glyph: u32,
+    outline: &mut Outline,
+    limits: &Limits,
+    work: &mut WorkBudget,
+) -> Result<Option<CharstringBounds>> {
+    outline.begin(limits.points);
+    let mut run = Run::new(
+        cff,
+        table,
+        work,
+        limits,
+        Builder::new(outline),
+        Bounds::default(),
+    );
+    run.top_glyph(glyph)?;
+    Ok(run.observer.bounds)
 }
 
 struct Run<'a, 'o, O> {
@@ -546,6 +626,7 @@ impl<'a, 'o, O: Observe> Run<'a, 'o, O> {
     ) -> Result<()> {
         let charstring = self.cff.charstrings.get(self.table, glyph)?;
         let private = self.cff.private(self.table, glyph)?;
+        self.observer.move_to();
         let mut s = State::<N> {
             private,
             stack: Stack::new(),
@@ -723,6 +804,7 @@ impl<'a, 'o, O: Observe> Run<'a, 'o, O> {
         let pen = &mut s.pen;
         pen.x = pen.x.wrapping_add(dx);
         pen.y = pen.y.wrapping_add(dy);
+        self.observer.move_to();
         pen.path.move_to(&mut self.builder, (pen.x, pen.y))
     }
 
@@ -880,8 +962,10 @@ impl<'a, 'o, O: Observe> Run<'a, 'o, O> {
     }
 
     fn line_by(&mut self, pen: &mut Pen, dx: Fixed, dy: Fixed) -> Result<()> {
+        let from = (pen.x, pen.y);
         pen.x = pen.x.wrapping_add(dx);
         pen.y = pen.y.wrapping_add(dy);
+        self.observer.draw(from, &[(pen.x, pen.y)]);
         pen.path.line_to(&mut self.builder, (pen.x, pen.y))
     }
 
@@ -889,6 +973,7 @@ impl<'a, 'o, O: Observe> Run<'a, 'o, O> {
         let c1 = (pen.x.wrapping_add(d[0]), pen.y.wrapping_add(d[1]));
         let c2 = (c1.0.wrapping_add(d[2]), c1.1.wrapping_add(d[3]));
         let end = (c2.0.wrapping_add(d[4]), c2.1.wrapping_add(d[5]));
+        self.observer.draw((pen.x, pen.y), &[c1, c2, end]);
         (pen.x, pen.y) = end;
         pen.path.curve_to(&mut self.builder, c1, c2, end)
     }

@@ -3,7 +3,7 @@ mod support;
 use support::{bytes, cff_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error};
 use triergon_font::{
-    Built, CharEncoding, CmapFormat, FaceInfo, Font, GlyphId, Limits, Orientation, Outline,
+    Built, CharEncoding, CharstringBounds, CmapFormat, FaceInfo, Font, GlyphId, Limits, Orientation, Outline,
     OutlineFormat, Platform, Point, PointKind, Request, Segment, Store, StoreKey, Style,
     pixels_26_6, select,
 };
@@ -187,6 +187,33 @@ fn cff_charstrings_with_subroutines_hints_and_flex() {
     assert_eq!(curve[3], (60, 0, on));
     assert_eq!(curve[9], (110, 0, on));
     assert_eq!(curve[4].2, PointKind::Cubic);
+}
+
+#[test]
+fn charstring_bounds_are_unrounded_and_include_control_points() {
+    let cff = parse(&font(b"OTTO", &cff_tables()));
+    let budget = Budget::new(1 << 20).unwrap();
+    let mut scratch = Outline::new(&budget);
+    let mut bounds = |glyph| cff.charstring_bounds(GlyphId(glyph), &mut scratch).unwrap();
+    let unit = |v: i32| v << 16;
+    assert_eq!(
+        bounds(1),
+        Some(CharstringBounds {
+            x_min: unit(50),
+            y_min: 0,
+            x_max: unit(150),
+            y_max: unit(100),
+        })
+    );
+    let curve = bounds(2).unwrap();
+    let (points, _, _) = points(&cff, 2);
+    for (x, y, _) in points {
+        assert!((curve.x_min..=curve.x_max).contains(&unit(x)));
+        assert!((curve.y_min..=curve.y_max).contains(&unit(y)));
+    }
+    let tables = truetype_tables(400, 0, "Test Sans", "Regular");
+    let truetype = parse(&font(b"\0\x01\0\0", &tables));
+    assert_eq!(truetype.charstring_bounds(GlyphId(1), &mut scratch), Ok(None));
 }
 
 #[test]

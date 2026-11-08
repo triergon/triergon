@@ -25,7 +25,7 @@ mod store;
 mod synthesis;
 mod work;
 
-pub use cff::{CharstringOperator, OperatorSet};
+pub use cff::{CharstringBounds, CharstringOperator, OperatorSet};
 pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings};
 pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
@@ -245,6 +245,15 @@ impl Font {
     /// The font bytes.
     pub fn data(&self) -> &Bytes {
         &self.data
+    }
+
+    /// The bytes of table `tag`: the first nonempty record with that tag whose
+    /// range lies inside the file, as FreeType's `FT_Load_Sfnt_Table` finds it.
+    /// Tables this crate does not read, such as `GDEF`, `GSUB` and `GPOS`, are
+    /// found the same way.
+    pub fn table(&self, tag: [u8; 4]) -> Option<&[u8]> {
+        let data = self.data.as_ref();
+        sfnt::find(data, self.tables.records, tag).map(|t| t.bytes(data))
     }
 
     /// The face's index in its file.
@@ -563,6 +572,29 @@ impl Font {
             Outlines::Cff(cff) => {
                 let mut work = WorkBudget::new(self.limits.work);
                 cff.operators(self.data.as_ref(), glyph, scratch, &self.limits, &mut work)
+            }
+        }
+    }
+
+    /// The box of every point `glyph`'s charstring draws, before the FontMatrix
+    /// and unrounded; `None` for TrueType outlines and for a glyph that draws
+    /// nothing. Shaping takes CFF glyph extents from it; `scratch` is reused
+    /// storage.
+    ///
+    /// # Errors
+    ///
+    /// As [`Font::outline_into`].
+    pub fn charstring_bounds(
+        &self,
+        glyph: GlyphId,
+        scratch: &mut Outline,
+    ) -> Result<Option<CharstringBounds>> {
+        self.check(glyph)?;
+        match &self.outlines {
+            Outlines::Glyf(_) => Ok(None),
+            Outlines::Cff(cff) => {
+                let mut work = WorkBudget::new(self.limits.work);
+                cff.bounds(self.data.as_ref(), glyph, scratch, &self.limits, &mut work)
             }
         }
     }
