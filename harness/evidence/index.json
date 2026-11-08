@@ -46,6 +46,14 @@
  },
  "sets": [
   {
+   "name": "mpegts-control-completion-linux-arm64",
+   "retention": "retained",
+   "key": "evidence/mpegts-control-completion-linux-arm64/1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2.tar.gz",
+   "sha256": "1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2",
+   "bytes": 80420878,
+   "reason": "MPEG-TS measurements cited by docs/status.md"
+  },
+  {
    "name": "mpegts-control-completion-macos",
    "retention": "retained",
    "reason": "MPEG-TS control-only completion status row: the complete 97-case live macOS comparison, 81 matching operations, 16 explicit open cases, previous outputs and refusals, exact source and workers",
