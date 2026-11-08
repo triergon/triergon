@@ -351,14 +351,14 @@ panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
-- `ass-render` renders the 23 scripts and 3 packet streams of
+- `ass-render` renders the 24 scripts and 3 packet streams of
   `harness/fixtures/ass-render` as a player configures libass (attached fonts,
   a default family and font file, no system font provider, no hinting) at
   1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB): 50 of its 52 cases match. The two open cases are the
+  glyphs and 24 MiB): 52 of its 54 cases match. The two open cases are the
   fixture with an `@` font.
 
 The comparison establishes agreement with libass on that corpus, not conformance
