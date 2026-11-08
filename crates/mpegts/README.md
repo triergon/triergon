@@ -51,9 +51,10 @@ not physical file offsets. Video scatter payloads are coalesced cooperatively
 into charged immutable storage. Cloning a packet or `SourceEvent` shares its
 charged storage; it never performs an infallible vector clone.
 
-`Track::configuration_epoch()` is the PMT/source configuration epoch. In-band
-SPS/PPS changes remain in the source NALs and do not advance it. Consumers must
-track parsed codec-configuration changes separately.
+`Track::configuration_epoch()` comes from its elementary route, which can be
+reused across PMT versions and PCR binding changes. In-band SPS/PPS changes remain
+in the source NALs and do not advance it. Consumers track parsed codec-configuration
+changes separately.
 
 `ReaderEvent::Source` delivers every original `TraceEvent` in order. PMT track
 catalogues change atomically with the corresponding source event. A PMT, clock
@@ -63,6 +64,11 @@ Logical EOF drains the framers before the original `Finished` event and final
 `Step::End`. Annex-B groups without an admitted primary/base-layer picture
 remain `ReaderEvent::VideoHeaders`,
 outside the AU packet stream. Packets and events remain usable after close or reset.
+
+A completed PES whose header predates a program boundary remains available as
+`ReaderEvent::InterruptedPes`, together with the boundary event. Framing resumes
+with PES that start after the boundary. This keeps a retained PES from inheriting
+a newer PMT or PCR binding.
 
 A PES time anchor applies once, to the first AU whose start-code/sync byte is
 at or after that PES start. An anchor inside a frame waits for the next frame.
