@@ -8,7 +8,9 @@
  *                                 (reference_capture.h)
  *   -DTRIERGON_FONT_REFERENCE     font faces and outlines with FreeType (reference_font.h)
  *   otherwise                     the container operations below, with the feed
- *                                 (TRIERGON_FEED_REFERENCE), HLS segment and MP4 range
+ *                                 and Matroska audio clock
+ *                                 (TRIERGON_FEED_REFERENCE), HLS segment, MP4
+ *                                 range, MP4 forward, TS program and raw Annex B
  *                                 (TRIERGON_HLS_REFERENCE) and combined-encoding
  *                                 (TRIERGON_COMBINED_REFERENCE) variants. */
 #if defined(TRIERGON_DECODE_REFERENCE)
@@ -201,11 +203,17 @@ done:
 static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return(uint64_t)t.tv_sec*1000000000+(uint64_t)t.tv_nsec;}
 #ifdef TRIERGON_FEED_REFERENCE
 #include "reference_feed.h"
+#include "reference_packet_fold.h"
+#include "reference_matroska_audio.h"
 #endif
 #ifdef TRIERGON_HLS_REFERENCE
 #include "reference_hls.h"
 #include "reference_progressive.h"
 #include "reference_mp4_range.h"
+#include "reference_packet_fold.h"
+#include "reference_mp4_forward.h"
+#include "reference_ts_program.h"
+#include "reference_raw_video.h"
 #endif
 int main(int argc,char **argv){
     av_log_set_level(AV_LOG_ERROR);
@@ -228,10 +236,14 @@ int main(int argc,char **argv){
     if(!strcmp(argv[1],"baseline")){printf("{\"input_bytes\":%ld}\n",size);free(data);return 0;}
 #ifdef TRIERGON_FEED_REFERENCE
     if(!strncmp(argv[1],"feed-",5)){int result=feed_main(argc,argv,data,size);free(data);return result;}
+    if(!strncmp(argv[1],"mkv-audio-",10)){int result=mkv_audio_main(argc,argv,data,size);free(data);return result;}
 #endif
 #ifdef TRIERGON_HLS_REFERENCE
     if(!strncmp(argv[1],"hls-",4)){int result=hls_main(argc,argv,data,size);free(data);return result;}
     if(!strncmp(argv[1],"mp4-range-",10)){int result=mp4_range_main(argc,argv,data,size);free(data);return result;}
+    if(!strncmp(argv[1],"mp4-forward-",12)){int result=mp4_forward_main(argc,argv,data,size);free(data);return result;}
+    if(!strncmp(argv[1],"ts-program-",11)){int result=ts_program_main(argc,argv,data,size);free(data);return result;}
+    if(!strncmp(argv[1],"raw-video-",10)){int result=raw_video_main(argc,argv,data,size);free(data);return result;}
 #endif
     int metadata=!strncmp(argv[1],"catalogue-",10)?2:!strncmp(argv[1],"metadata-",9);
     int seek_mode=!strncmp(argv[1],"seek-",5);

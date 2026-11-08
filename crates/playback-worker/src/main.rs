@@ -1,8 +1,14 @@
 //! Playback measurement worker; serialization and startup are outside the timed loop.
 #![forbid(unsafe_code)]
 mod hls;
+mod matroska_audio;
+mod mp4_forward;
 mod mp4_range;
+mod packet_fold;
 mod progressive;
+mod raw_video;
+mod runner;
+mod ts_program;
 use std::{
     io::{self, Write},
     process::ExitCode,
@@ -334,6 +340,9 @@ fn work() -> Result<(), Box<dyn std::error::Error>> {
         .is_some_and(|mode| mode.starts_with("mp4-range-"))
     {
         return mp4_range::run(&all);
+    }
+    if let Some(result) = runner::dispatch(&all) {
+        return result;
     }
     let mut args = all.into_iter();
     let usage = "usage: playback-worker feed-bench CAPSULE ITERATIONS | feed-fold CAPSULE | feed-memory CAPSULE";

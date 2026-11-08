@@ -735,6 +735,30 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
             Some("playback-worker"),
             Some("ffmpeg-formats-native"),
         ),
+        (
+            "matroska-audio-clocks",
+            "playback-mkv-audio-fold-v1",
+            Some("playback-worker"),
+            Some("ffmpeg-video-native"),
+        ),
+        (
+            "mp4-forward",
+            "playback-mp4-forward-fold-v1",
+            Some("playback-worker"),
+            Some("ffmpeg-formats-native"),
+        ),
+        (
+            "ts-program",
+            "playback-ts-program-fold-v1",
+            Some("playback-worker"),
+            Some("ffmpeg-formats-native"),
+        ),
+        (
+            "raw-annex-b",
+            "playback-raw-video-fold-v1",
+            Some("playback-worker"),
+            Some("ffmpeg-formats-native"),
+        ),
     ] {
         let contract = load(&format!("harness/features/{feature}/contract.json"));
         let manifest = load(&format!("harness/features/{feature}/corpus.json"));
@@ -789,7 +813,7 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
             checked += 1;
         }
     }
-    assert_eq!(checked, 230);
+    assert_eq!(checked, 319);
     let mut contract = load("harness/features/matroska-zlib/contract.json");
     put(&mut contract, &[], "reference", Value::str("not-built"));
     assert!(super::validation::selected_operation(&mixed_case(), &contract, &identity).is_ok());

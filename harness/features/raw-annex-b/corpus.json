@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "avc-80x48",
+      "profile": "avc-80x48",
+      "file": "crates/playback/tests/fixtures/raw-video/avc-80x48.h264",
+      "sha256": "6226446529abb9659e50f445fbaa5414b64c924f6ae894ea77a6899264286ec3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1840,
+        "digest": 4891333860876651018
+      }
+    },
+    {
+      "id": "avc-short",
+      "profile": "avc-short",
+      "file": "crates/playback/tests/fixtures/raw-video/avc-short.h264",
+      "sha256": "db2b0296e6e3fff980f9d79f201cdec1a9d55b77138c1b07ef0e0b0d7550bd3f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 46,
+        "digest": 5514334070048411997
+      }
+    },
+    {
+      "id": "avc-aud0",
+      "profile": "avc-aud0",
+      "file": "crates/framing/fixtures/raw-annex-b/avc-aud0.h264",
+      "sha256": "96d3d39385d7a86463410e0e4f00377062a815532134805e2a552549954b6796",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "avc"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 9221,
+        "digest": 15090145557511601648
+      }
+    },
+    {
+      "id": "avc-aud1",
+      "profile": "avc-aud1",
+      "file": "crates/framing/fixtures/raw-annex-b/avc-aud1.h264",
+      "sha256": "76460acc3bfc5376661ce04417b4a562ad01f3168ab9df8d1023c0fec840e62e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "avc"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 9284,
+        "digest": 233087253778403757
+      }
+    },
+    {
+      "id": "hevc-aud0",
+      "profile": "hevc-aud0",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-aud0.hevc",
+      "sha256": "7c076acbe5c6cf3db1939534527b1d52fd7f4c31a2063f537440f51c75b08f70",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "hevc"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 15780,
+        "digest": 6234071059473453237
+      }
+    },
+    {
+      "id": "hevc-aud1",
+      "profile": "hevc-aud1",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-aud1.hevc",
+      "sha256": "f6ce36d642462840df7347d66305ee05b9716a1417d292d7d58390b5a47f2a56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "hevc"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 15854,
+        "digest": 13496571037838508401
+      }
+    }
+  ]
+}
