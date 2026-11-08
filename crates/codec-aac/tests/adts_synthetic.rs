@@ -382,3 +382,31 @@ fn a_refused_sbr_start_leaves_the_decoder_as_it_was() {
     let units = [&plain, &plain, &sbr, &plain, &plain].map(Vec::clone);
     a_refusal_is_as_if_the_access_unit_never_arrived(&units, 2);
 }
+
+/// A refusal after an earlier raw data block of the same frame was decoded cannot undo
+/// that block, but the decoder stays consistent: the configuration is the old one, and the
+/// following access units decode.
+#[test]
+fn a_refusal_after_a_decoded_block_leaves_a_consistent_decoder() {
+    let budget = Budget::new(8 << 20).unwrap();
+    let mut d = Decoder::new_in(&budget);
+    let mut f = AudioFrame::default();
+    let mono = || noise_block(true, false, false);
+    d.decode(&adts(1, 4, 0, &[mono(), mono()], false), &mut f)
+        .unwrap();
+    let switch = adts(1, 4, 0, &[mono(), noise_block(true, true, false)], false);
+    let pressure = budget.reserve(budget.available()).unwrap();
+    let r = d.decode(&switch, &mut f);
+    assert!(matches!(r, Err(DecodeError::Budget(_))), "{r:?}");
+    drop(pressure);
+    for (block, channels) in [
+        (mono(), 1),
+        (noise_block(true, true, false), 2),
+        (mono(), 1),
+    ] {
+        d.decode(&adts(1, 4, 0, &[block], false), &mut f).unwrap();
+        assert_eq!(f.planes.len(), channels);
+        assert_eq!(f.samples_per_channel, 1024);
+        assert!(f.planes.iter().flatten().all(|s| s.is_finite()));
+    }
+}
