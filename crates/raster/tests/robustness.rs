@@ -93,3 +93,85 @@ fn bitmaps_beyond_libass_s_bound_are_refused() {
         .unwrap();
     assert!(composite.fill.is_none());
 }
+
+/// A 1×1 bitmap blurred with a variance of 5·10⁵ pixels² would need planes of
+/// about 6000 × 6000 samples, beyond a 4 MiB bitmap limit: it is refused before
+/// anything that size is allocated or worked on.
+#[test]
+fn a_blur_beyond_the_bitmap_limit_is_refused_before_it_allocates() {
+    use triergon_core::{Budget, Error, WorkBudget};
+    use triergon_raster::{Bitmap, Raster};
+    let budget = Budget::new(256 << 20).unwrap();
+    let limits = Limits {
+        bitmap_bytes: 4 << 20,
+        ..Limits::default()
+    };
+    let mut raster = Raster::new(&budget, limits);
+    let mut bitmap = Bitmap::new(&budget, 1, 1, &limits).unwrap();
+    bitmap.rows_mut().for_each(|row| row.fill(255));
+    let mut work = WorkBudget::new(1 << 40);
+    let refused = raster.blur(&mut bitmap, 0, [5e5, 5e5], &mut work);
+    assert_eq!(refused, Err(Error::Policy("bitmap size")));
+    assert_eq!(work.spent(), 0);
+    assert!(budget.peak() < 1 << 20, "peak {}", budget.peak());
+    assert_eq!((bitmap.width(), bitmap.height(), bitmap.row(0)), (1, 1, &[255][..]));
+}
+
+/// Blurs within the limits charge their work in proportion to the samples
+/// they write, so a frame's work budget refuses a large blur before it runs.
+#[test]
+fn blur_work_follows_the_blurred_area() {
+    use triergon_core::{Budget, Error, WorkBudget};
+    use triergon_raster::{Bitmap, Raster};
+    let budget = Budget::new(1 << 30).unwrap();
+    let mut raster = Raster::new(&budget, Limits::default());
+    let blurred = |raster: &mut Raster, size, be, variance, work: &mut WorkBudget| {
+        let mut bitmap = Bitmap::new(&budget, size, size, &Limits::default()).unwrap();
+        raster.blur(&mut bitmap, be, variance, work).map(|()| bitmap)
+    };
+
+    // A Gaussian blur charges at least a unit per 16 samples of its output.
+    let mut work = WorkBudget::new(1 << 40);
+    let out = blurred(&mut raster, 1, 0, [400.0, 400.0], &mut work).unwrap();
+    assert!(out.width() > 100);
+    assert!(work.spent() >= (out.width() * out.height() / 16) as u64);
+
+    // The variance of the scenario above, within the default limits, is
+    // refused by a frame's work before its planes are allocated.
+    let peak = budget.peak();
+    let mut work = WorkBudget::new(1 << 24);
+    let refused = blurred(&mut raster, 1, 0, [5e5, 5e5], &mut work);
+    assert_eq!(refused.err(), Some(Error::Policy("raster work")));
+    assert!(budget.peak() < peak + (1 << 20), "peak {}", budget.peak());
+
+    // `\be` charges every pass over the whole area.
+    let mut work = WorkBudget::new(1 << 40);
+    blurred(&mut raster, 1024, 100, [0.0, 0.0], &mut work).unwrap();
+    assert!(work.spent() >= 100 * 1024 * 1024 / 16);
+    let mut work = WorkBudget::new(1 << 16);
+    let refused = blurred(&mut raster, 1024, 100, [0.0, 0.0], &mut work);
+    assert_eq!(refused.err(), Some(Error::Policy("raster work")));
+}
+
+/// The rasteriser charges a unit per tile it fills, solid ones included.
+#[test]
+fn rasteriser_work_follows_the_tiles_filled() {
+    use triergon_core::{Budget, Error, WorkBudget};
+    use triergon_raster::{Outline, Raster, Shape, Vector};
+    let budget = Budget::new(1 << 30).unwrap();
+    let mut raster = Raster::new(&budget, Limits::default());
+    let mut outline = Outline::new(&budget);
+    outline
+        .push_rect(Vector::new(0, 0), Vector::new(4000 * 64, 4000 * 64))
+        .unwrap();
+    let square = Shape::from_outlines(outline, Outline::new(&budget));
+    let mut work = WorkBudget::new(1 << 40);
+    let bitmap = raster.rasterize(&square, &mut work).unwrap().unwrap();
+    let tiles = (bitmap.width() / 16 * (bitmap.height() / 16)) as u64;
+    assert!(work.spent() >= tiles, "{} < {tiles}", work.spent());
+    let mut work = WorkBudget::new(tiles / 2);
+    assert_eq!(
+        raster.rasterize(&square, &mut work).err(),
+        Some(Error::Policy("raster work"))
+    );
+}

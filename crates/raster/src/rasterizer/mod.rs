@@ -476,13 +476,23 @@ impl Rasterizer {
         let (group0, group1) = all.split_at(counts[0]);
         let fills = [Fill::of(group0, winding[0]), Fill::of(group1, winding[1])];
         let single = (region.width, region.height) == (TILE, TILE);
+        // A region filled whole costs a unit per tile it covers.
+        let tiles = ((region.width / TILE) * (region.height / TILE)) as u64;
         match fills {
-            [Fill::Solid, _] | [_, Fill::Solid] => solid(canvas, region, true),
-            [Fill::Empty, Fill::Empty] => solid(canvas, region, false),
+            [Fill::Solid, _] | [_, Fill::Solid] => {
+                charge(work, tiles)?;
+                solid(canvas, region, true);
+            }
+            [Fill::Empty, Fill::Empty] => {
+                charge(work, tiles)?;
+                solid(canvas, region, false);
+            }
             [Fill::Halfplane { reverse }, Fill::Empty] => {
+                charge(work, tiles)?;
                 halfplane(canvas, region, &group0[0], reverse);
             }
             [Fill::Empty, Fill::Halfplane { reverse }] => {
+                charge(work, tiles)?;
                 halfplane(canvas, region, &group1[0], reverse);
             }
             [first, second] if single => {
