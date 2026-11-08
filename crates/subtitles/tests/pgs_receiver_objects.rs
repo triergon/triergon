@@ -20,8 +20,9 @@ fn hex(text: &str) -> Vec<u8> {
         .collect()
 }
 
-/// Each packet's presented rectangles, at every work quantum.
-fn presented(packets: &[&str], limits: DisplayLimits) -> Vec<Vec<Rectangle>> {
+/// Each packet's presented rectangles, or `None` for a refused packet, at
+/// every work quantum.
+fn presented(packets: &[&str], limits: DisplayLimits) -> Vec<Option<Vec<Rectangle>>> {
     let mut runs = [1, 7, 4096].map(|quantum| {
         let budget = Budget::new(64 << 20).unwrap();
         let cancel = AtomicBool::new(false);
@@ -45,15 +46,20 @@ fn presented(packets: &[&str], limits: DisplayLimits) -> Vec<Vec<Rectangle>> {
                     status => panic!("packet {index}: {status:?}"),
                 }
             };
+            if packet.refusal().is_some() {
+                assert!(packet.receiver_output().is_none());
+                out.push(None);
+                continue;
+            }
             let event = packet.receiver_output().unwrap();
             assert_eq!(event.pts_microseconds, Some(1_000_000 * (index as i64 + 1)));
-            out.push(
+            out.push(Some(
                 event
                     .rectangles()
                     .iter()
                     .map(|r| (r.x, r.y, r.width, r.height, r.stride, r.pixels().to_vec()))
                     .collect(),
-            );
+            ));
         }
         out
     });
@@ -78,11 +84,11 @@ fn a_declared_length_past_the_rle_limit_is_a_claim_not_an_allocation() {
     assert_eq!(
         presented(&packets, limits),
         [
-            vec![(3, 0, 2, 1, 2, vec![1, 1])],
-            vec![(3, 0, 2, 1, 2, vec![2, 2])],
-            vec![(3, 0, 0, 0, 2, vec![])],
-            vec![(3, 0, 0, 0, 2, vec![])],
-            vec![(3, 0, 2, 1, 2, vec![2, 2])],
+            Some(vec![(3, 0, 2, 1, 2, vec![1, 1])]),
+            Some(vec![(3, 0, 2, 1, 2, vec![2, 2])]),
+            Some(vec![(3, 0, 0, 0, 2, vec![])]),
+            Some(vec![(3, 0, 0, 0, 2, vec![])]),
+            Some(vec![(3, 0, 2, 1, 2, vec![2, 2])]),
         ]
     );
 }
@@ -101,9 +107,28 @@ fn an_object_past_the_pixel_limit_ends_nothing_until_it_is_displayed() {
     assert_eq!(
         presented(&packets, limits),
         [
-            vec![(3, 0, 2, 1, 2, vec![1, 1])],
-            vec![(3, 0, 2, 1, 2, vec![2, 2])],
-            vec![(3, 0, 2, 1, 2, vec![2, 2])],
+            Some(vec![(3, 0, 2, 1, 2, vec![1, 1])]),
+            Some(vec![(3, 0, 2, 1, 2, vec![2, 2])]),
+            Some(vec![(3, 0, 2, 1, 2, vec![2, 2])]),
+        ]
+    );
+}
+
+#[test]
+fn an_object_length_refusal_drops_the_objects_data_and_keeps_its_new_size() {
+    // A 16x4 epoch shows object 1 (2x1) at x 3; a first fragment of it
+    // declaring 3 bytes refuses its packet; the next display shows it.
+    let packets = [
+        "1600130010000410000080000001000100000003000014000c000001eb8080ff021080808015000f000100c00000080002000101010000800000",
+        "1600130010000410000100000001000100000003000015000c000100c00000030002000101800000",
+        "16001300100004100002000000010001000000030000800000",
+    ];
+    assert_eq!(
+        presented(&packets, DisplayLimits::default()),
+        [
+            Some(vec![(3, 0, 2, 1, 2, vec![1, 1])]),
+            None,
+            Some(vec![(3, 0, 0, 0, 0, vec![])]),
         ]
     );
 }

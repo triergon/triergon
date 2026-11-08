@@ -75,8 +75,9 @@ pub(super) struct Object {
 enum Update<'a> {
     /// The receiver rejects the fragment.
     Keep,
-    /// The receiver refuses the packet at the fragment.
-    Refuse(Refusal),
+    /// A first fragment whose data length the receiver fails to allocate:
+    /// the object takes its size without data, and the packet is refused.
+    Unallocated(Object),
     /// An accepted first fragment: the object it starts.
     Replace(Object),
     /// An accepted continuation: bytes for which the object has room.
@@ -156,9 +157,14 @@ impl Object {
         {
             return Ok(Update::Keep);
         }
-        // The receiver cannot allocate a negative data length.
+        // The receiver cannot allocate a negative data length, and frees
+        // the object's previous data trying.
         let Some(length) = declared.checked_sub(4) else {
-            return Ok(Update::Refuse(Refusal::ObjectLength));
+            return Ok(Update::Unallocated(Self {
+                width,
+                height,
+                ..Self::empty(id, budget)
+            }));
         };
         if data.len() > length {
             return Ok(Update::Keep);
@@ -406,9 +412,10 @@ impl Receiver {
     /// ODS: one fragment of an object (a new one while fewer than the limit
     /// exist, otherwise the segment is ignored). A first fragment that the
     /// receiver accepts replaces the object; a rejected one leaves it as it was,
-    /// though a new id still takes a slot. The fragment is checked and its
-    /// storage allocated before the cache changes, so an error leaves the
-    /// cache as it was.
+    /// though a new id still takes a slot; one that declares a negative data
+    /// length leaves it with the new size and no data. The fragment is
+    /// checked and its storage allocated before the cache changes, so an
+    /// error leaves the cache as it was.
     pub(super) fn object_fragment(
         &mut self,
         body: &[u8],
@@ -430,19 +437,18 @@ impl Receiver {
         } else {
             Update::Keep
         };
-        let refusal = match update {
-            Update::Refuse(refusal) => Some(refusal),
-            _ => None,
-        };
+        let refusal = matches!(update, Update::Unallocated(_)).then_some(Refusal::ObjectLength);
         match (index, update) {
-            (Some(index), Update::Replace(object)) => self.objects.as_mut_slice()[index] = object,
+            (Some(index), Update::Replace(object) | Update::Unallocated(object)) => {
+                self.objects.as_mut_slice()[index] = object;
+            }
             (Some(index), Update::Append(data)) => {
                 let object = &mut self.objects.as_mut_slice()[index];
                 object.encoded.try_extend_from_slice(data)?;
                 object.fragments += 1;
             }
-            (Some(_), Update::Keep | Update::Refuse(_)) => {}
-            (None, Update::Replace(object)) => {
+            (Some(_), Update::Keep) => {}
+            (None, Update::Replace(object) | Update::Unallocated(object)) => {
                 self.objects.try_push(object).map_err(|e| e.error)?;
             }
             (None, _) => {

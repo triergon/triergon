@@ -74,7 +74,8 @@ pub enum Refusal {
     /// Shorter than one segment header; nothing in it is read.
     ShortPacket,
     /// An object's first fragment declares fewer data bytes than its own size
-    /// fields; the rest of the packet is skipped.
+    /// fields; the object keeps the fragment's size without data, and the
+    /// rest of the packet is skipped.
     ObjectLength,
 }
 
@@ -550,9 +551,9 @@ impl<S: RecoveryRole> Decoder<S> {
     }
 
     /// The next reference: a missing object is an empty rectangle at the
-    /// origin, an object without data an empty one at its position; an
-    /// object with data is decoded next, within the pixel limits for one
-    /// object and for the display.
+    /// origin, an object without data an empty one at its position with no
+    /// row width; an object with data is decoded next, within the pixel
+    /// limits for one object and for the display.
     fn rectangle(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Phase>> {
         let index = self.draft()?.rectangles.len();
         let Some(reference) = self.receiver.references.get(index).copied().flatten() else {
@@ -567,9 +568,8 @@ impl<S: RecoveryRole> Decoder<S> {
             return Ok(Some(Phase::Rectangle));
         };
         if !object.has_data() {
-            let stride = object.width;
             let empty = self.packet()?.slice(0..0)?;
-            self.push_rect(reference, Placement::Object, Bitmap::empty(stride, empty))?;
+            self.push_rect(reference, Placement::Object, Bitmap::empty(0, empty))?;
             return Ok(Some(Phase::Rectangle));
         }
         let area = usize::from(object.width) * usize::from(object.height);
