@@ -117,8 +117,13 @@ The complete host observations and exact source are retained as
 
 Source-boundary policies additionally require a real Timeline for a selected
 PCR/DI transition, or real core/framer EOF and source Finished for one unusable
-final carrier after completed nonempty finite packets. These policies have no
-native timing or memory qualification.
+final carrier after completed nonempty finite packets. A separate live macOS
+(`aarch64-apple-darwin`) comparison at
+`e7e1102c0afd466af24e9e8b969e823d5772a230` matches 90 of 97 operations against
+the pinned FFmpeg formats worker and unchanged recorded folds, retaining all
+272 requests. Four malformed empty-reference operations and three operations
+across media entities remain failures. No timing or memory was collected for
+this source; these PES folds do not qualify source clocks or access units.
 
 The earlier macOS parity comparison at
 `65eeada0888bcd112d4cbd90e68795fea93fd864` also matches 81 of 97 operations.
