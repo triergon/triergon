@@ -770,6 +770,22 @@
       }
     },
     {
+      "id": "fill-after-draw-ts",
+      "profile": "fill-after-draw-ts",
+      "file": "dvb/fill-after-draw.ts",
+      "sha256": "05da6769b01bad665af0ba409afd5c6bf63dbf2f1b19fa0419a7abc53787e26e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 480,
+        "digest": 3743547239539767033
+      }
+    },
+    {
       "id": "fill-depth2-ts",
       "profile": "fill-depth2-ts",
       "file": "dvb/fill-depth2.ts",
@@ -2761,6 +2777,23 @@
         "packets": 2,
         "bytes": 1424,
         "digest": 4206325999465978571
+      }
+    },
+    {
+      "id": "fill-after-draw--compute_clut-1",
+      "profile": "fill-after-draw--compute_clut-1",
+      "file": "dvb/fill-after-draw.ts",
+      "sha256": "05da6769b01bad665af0ba409afd5c6bf63dbf2f1b19fa0419a7abc53787e26e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 480,
+        "digest": 3743547239539767033
       }
     },
     {

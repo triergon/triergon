@@ -891,6 +891,22 @@ def cases():
                                    rcs(0, 32, 6, version=1, depth=2, clut=1, objects=[(2, 4, 1)]),
                                    obj(2, 2, pattern(12, 2, [1, 2], 47), version=1), eds()]))]
     out["depth-reduced-unfilled"] = single(sets)
+    # The automatic palette is computed when a region is presented, from its
+    # pixels then, and computed again only after an object is drawn into it:
+    # a fill after the last presentation keeps the palette as computed, while
+    # a fill after a drawing in the same packet is ranked with it.
+    sets = [(T0, pes_data([pcs(1, 5, 0, 0, [(0, 10, 10)]),
+                           rcs(0, 24, 4, depth=4, clut=1, objects=[(1, 0, 0)]),
+                           obj(1, 4, pattern(24, 4, [1, 2, 3, 4, 5], 61)), eds()])),
+            (T0 + 90000, pes_data([pcs(1, 5, 1, 0, [(0, 10, 10)]),
+                                   rcs(0, 24, 4, version=1, fill=True, depth=4, clut=1, bg=(0, 7, 0)),
+                                   eds()])),
+            (T0 + 180000, pes_data([pcs(1, 5, 2, 0, [(0, 10, 10)]),
+                                    rcs(0, 24, 4, version=2, depth=4, clut=1, objects=[(1, 4, 1)]),
+                                    obj(1, 4, pattern(8, 2, [2, 9], 62), version=1),
+                                    rcs(0, 24, 4, version=3, fill=True, depth=4, clut=1, bg=(0, 11, 0),
+                                        objects=[(1, 4, 1)]), eds()]))]
+    out["fill-after-draw"] = single(sets)
     # One object placed twice in a region and in two regions; a region
     # listed twice on the page.
     segs = [pcs(1, 5, 0, 0, [(0, 10, 10), (1, 10, 40), (0, 200, 10)]),
@@ -1071,6 +1087,7 @@ OPTION_CASES = [
     ("edt-sequence", ["opt:compute_edt=1", "opt:compute_clut=1"]),
     ("region-resize-partial", ["opt:compute_clut=1"]),
     ("depth-reduced-unfilled", ["opt:compute_clut=1"]),
+    ("fill-after-draw", ["opt:compute_clut=1"]),
     ("pages-ancillary-after", ["opt:dvb_substream=0"]),
     ("pages-other-first", ["opt:dvb_substream=0"]),
     ("pages-unsignalled", ["opt:dvb_substream=0"]),
