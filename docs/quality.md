@@ -84,7 +84,8 @@ resource limit becomes an explicit, reviewed rule for that case.
   tarball (hash-checked, tree verified after the build) as a static library
   without a system font provider (`--disable-fontconfig --disable-coretext
   --disable-directwrite --disable-libunibreak
-  --disable-require-system-font-provider`), `-O2 -ffp-contract=off`, against
+  --disable-require-system-font-provider`), `-O2 -ffp-contract=off
+  -ftrivial-auto-var-init=zero`, against
   the FreeType, FriBidi and HarfBuzz builds above, so each library has one
   build, and records it in `.research/libass/build.json`. `cargo xtask
   build-workers` then links the reference worker (`harness/reference_raster.h`):
@@ -95,7 +96,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   (`ass_bitmap_engine_init(ASS_CPU_FLAG_NONE)`: C functions, 16×16 tiles and
   16-byte rows), recorded in `build.json` and checked at startup, on every
   host: it is what libass runs on 32-bit ARMv7, where it has no assembly, and
-  it does not depend on the host. Its features run libass's outline, stroker,
+  it does not depend on the host. Uninitialised automatic variables are zeroed
+  for the same reason: the pinned source reads one (the face `uid` in
+  `add_face`), and zero is the value both deployment targets' results agree
+  with. Its features run libass's outline, stroker,
   rasteriser, blur, composition and clipping stages on glyphs of the font
   corpus loaded as libass loads them with hinting off (FreeType in the
   reference, `triergon-font` in the candidate; `raster-glyphs`) and on seeded

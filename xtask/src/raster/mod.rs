@@ -8,6 +8,7 @@ mod manifest;
 mod reference;
 
 pub use manifest::LANE;
+pub use reference::check_prepared;
 
 use std::path::Path;
 
