@@ -494,11 +494,10 @@ impl<M> NalPacketJob<'_, M> {
                     .as_ref()
                     .ok_or(Error::Invalid("missing packet source"))?
                     .bytes;
-                let configuration = self
-                    .update
-                    .as_ref()
-                    .unwrap_or(&self.session.configuration)
-                    .bytes();
+                let configuration = self.update.as_ref().map_or_else(
+                    || self.session.configuration.bytes(),
+                    super::AvcUpdate::bytes,
+                );
                 let payload = p.payload(source, configuration)?;
                 b.try_extend_from_slice(&payload[start..start + count])?;
             }
@@ -546,7 +545,7 @@ impl<M> NalPacketJob<'_, M> {
                 .and_then(|s| s.new_extradata.as_ref())
                 .is_some_and(Bytes::is_empty);
         if let Some(c) = self.update.take() {
-            self.session.configuration = c;
+            c.install(&mut self.session.configuration);
         }
         self.session.avc = self.avc;
         self.session.receiver_epoch = self.epoch;

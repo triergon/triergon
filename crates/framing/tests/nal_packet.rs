@@ -416,6 +416,7 @@ fn avc_update_is_atomic_and_source_side_data_remains_retained() {
     );
     assert_eq!(out.configuration_bytes().as_ref(), avcc(130));
     assert_eq!(s.receiver_epoch(), 1);
+    assert!(matches!(s.configuration(), NalPacketConfiguration::Avc(_)));
 }
 #[test]
 fn empty_avc_update_is_present_source_but_not_new_epoch() {
@@ -705,6 +706,7 @@ fn valid_native_config_update_survives_bad_packet_as_separate_fact() {
     ));
     assert_eq!(s.receiver_epoch(), 1);
     assert_eq!(s.configuration().bytes().as_ref(), avcc(131));
+    assert!(matches!(s.configuration(), NalPacketConfiguration::Avc(_)));
     let out = run(&mut s, packet(&p, &[IDR]), None, 1).unwrap();
     assert_eq!(out.configuration_bytes().as_ref(), avcc(131));
     assert_eq!(out.source().fields, fields());

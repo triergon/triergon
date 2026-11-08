@@ -167,6 +167,100 @@ impl NalConfigurationRefusal {
     }
 }
 
+// Packet side data can replace only an AVC record. Keep its source/receiver
+// distinction without reserving space for HEVC or passthrough configurations.
+enum AvcUpdate {
+    Source(AvcConfiguration),
+    Receiver(crate::compat::nal::ReceiverAvcConfiguration),
+}
+impl AvcUpdate {
+    fn record(&self) -> &AvcConfiguration {
+        match self {
+            Self::Source(record) => record,
+            Self::Receiver(record) => record.record(),
+        }
+    }
+    fn bytes(&self) -> &Bytes {
+        self.record().source_bytes()
+    }
+    fn refusal(&self) -> NalConfigurationRefusal {
+        match self {
+            Self::Receiver(record) if record.fields().length_size_minus_one() == 2 => {
+                NalConfigurationRefusal::AvcWidthThree
+            }
+            _ => NalConfigurationRefusal::None,
+        }
+    }
+    fn install(self, configuration: &mut NalPacketConfiguration) {
+        match self {
+            Self::Source(record) => *configuration = NalPacketConfiguration::Avc(record),
+            Self::Receiver(record) => {
+                *configuration = NalPacketConfiguration::ReceiverAvc(record);
+            }
+        }
+    }
+}
+
+// Borrow the active configuration without widening an in-flight AVC update.
+enum ConfigurationRef<'a> {
+    Current(&'a NalPacketConfiguration),
+    Update(&'a AvcUpdate),
+}
+impl<'a> ConfigurationRef<'a> {
+    fn bytes(self) -> &'a Bytes {
+        match self {
+            Self::Current(configuration) => configuration.bytes(),
+            Self::Update(update) => update.bytes(),
+        }
+    }
+    fn source_identity(self) -> Option<(SourceLocation, u64)> {
+        match self {
+            Self::Current(configuration) => configuration.source_identity(),
+            Self::Update(update) => {
+                let source = update.record().source();
+                Some((
+                    SourceLocation {
+                        source: source.source,
+                        offset: source.offset,
+                    },
+                    source.generation,
+                ))
+            }
+        }
+    }
+    fn refusal(self) -> NalConfigurationRefusal {
+        match self {
+            Self::Current(configuration) => configuration.refusal(),
+            Self::Update(update) => update.refusal(),
+        }
+    }
+    fn hevc_array_type(self, index: usize) -> Option<u8> {
+        match self {
+            Self::Current(configuration) => configuration.hevc_array_type(index),
+            Self::Update(_) => None,
+        }
+    }
+    fn config_nal(self, index: usize) -> Option<ConfigNal<'a>> {
+        match self {
+            Self::Current(configuration) => configuration.config_nal(index),
+            Self::Update(update) => {
+                let record = update.record();
+                record.nal(index).map(|nal| ConfigNal {
+                    kind: Some(nal.array_kind()),
+                    owner: record.source_bytes(),
+                    range: nal.source_range(),
+                })
+            }
+        }
+    }
+    fn config_nal_count(self) -> usize {
+        match self {
+            Self::Current(configuration) => configuration.config_nal_count(),
+            Self::Update(update) => update.record().nal_count(),
+        }
+    }
+}
+
 /// One configuration NAL as the packet and initialization writers read it.
 pub(crate) struct ConfigNal<'a> {
     /// AVC array kind; HEVC records select every NAL.
@@ -263,7 +357,7 @@ impl NalPacketSession {
         source: NalPacket<M>,
         avc_update: Option<AvcConfiguration>,
     ) -> Result<NalPacketJob<'_, M>> {
-        self.begin_packet(source, avc_update.map(NalPacketConfiguration::Avc), false)
+        self.begin_packet(source, avc_update.map(AvcUpdate::Source), false)
     }
     /// Frames a packet with the receiver's acceptance ([`crate::compat::nal`]):
     /// a NAL header the strict path refuses is framed and its refusal recorded.
@@ -274,16 +368,12 @@ impl NalPacketSession {
         source: NalPacket<M>,
         update: Option<crate::compat::nal::ReceiverAvcConfiguration>,
     ) -> Result<NalPacketJob<'_, M>> {
-        self.begin_packet(
-            source,
-            update.map(NalPacketConfiguration::ReceiverAvc),
-            true,
-        )
+        self.begin_packet(source, update.map(AvcUpdate::Receiver), true)
     }
     fn begin_packet<M>(
         &mut self,
         source: NalPacket<M>,
-        avc_update: Option<NalPacketConfiguration>,
+        avc_update: Option<AvcUpdate>,
         observed_packet: bool,
     ) -> Result<NalPacketJob<'_, M>> {
         if self.drained {
@@ -327,7 +417,10 @@ impl NalPacketSession {
         } else {
             self.avc
         };
-        let length_width = avc_update.as_ref().unwrap_or(&self.configuration).width();
+        let length_width = match &avc_update {
+            Some(update) => Some(update.record().sample_length_size()),
+            None => self.configuration.width(),
+        };
         let phase = if changes {
             Phase::Verify
         } else if codec == Codec::Hevc {
@@ -659,7 +752,7 @@ enum Injection {
 pub struct NalPacketJob<'a, M = NalPacketFields> {
     session: &'a mut NalPacketSession,
     source: Option<NalPacket<M>>,
-    update: Option<NalPacketConfiguration>,
+    update: Option<AvcUpdate>,
     // Codec and width stay fixed while the job borrows the session. A valid
     // update changes only the width of this AVC packet and subsequent packets.
     codec: Codec,
@@ -700,8 +793,11 @@ pub struct NalPacketJob<'a, M = NalPacketFields> {
     packet_source_refusal: Option<NalHeaderError>,
 }
 impl<M> NalPacketJob<'_, M> {
-    fn config(&self) -> &NalPacketConfiguration {
-        self.update.as_ref().unwrap_or(&self.session.configuration)
+    fn config(&self) -> ConfigurationRef<'_> {
+        match &self.update {
+            Some(update) => ConfigurationRef::Update(update),
+            None => ConfigurationRef::Current(&self.session.configuration),
+        }
     }
     pub fn source(&self) -> Option<&NalPacket<M>> {
         self.source.as_ref()
@@ -756,12 +852,12 @@ impl<M> NalPacketJob<'_, M> {
             .ok_or(Error::Overflow)?;
         if let Some(c) = &self.update {
             total = total
-                .checked_add(c.descriptor_lower_bound()?)
+                .checked_add(c.record().descriptor_lower_bound()?)
                 .ok_or(Error::Overflow)?;
         }
         let owners = [
             Some(self.session.configuration.bytes()),
-            self.update.as_ref().map(NalPacketConfiguration::bytes),
+            self.update.as_ref().map(AvcUpdate::bytes),
             Some(&packet.bytes),
             packet.new_extradata.as_ref(),
         ];
@@ -861,7 +957,7 @@ impl<M> NalPacketJob<'_, M> {
                 && self.update_verified
                 && let Some(configuration) = self.update.take()
             {
-                self.session.configuration = configuration;
+                configuration.install(&mut self.session.configuration);
                 self.session.receiver_epoch = self.epoch;
                 self.session.avc = AvcState::default();
             }
