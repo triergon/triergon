@@ -30,7 +30,7 @@ pub const ROW_SOURCES: [&str; 3] = [
 
 /// The cases `cargo xtask check` mutates, by feature: fonts with layout tables of
 /// every kind and with none, and the random text files.
-pub const SMOKE_CASES: [(&str, &[&str]); 3] = [
+pub const SMOKE_CASES: [(&str, &[&str]); 4] = [
     (
         "shape-text",
         &[
@@ -38,6 +38,14 @@ pub const SMOKE_CASES: [(&str, &[&str]); 3] = [
             "notosansarabic-regular-ttf-arab-libass",
             "notosansdevanagari-regular-ttf-deva-libass",
             "authored-cmap-formats-ttf-latn-libass",
+        ],
+    ),
+    (
+        "shape-libass",
+        &[
+            "arimo-regular-ttf-latn-libass",
+            "notosansarabic-regular-ttf-arab-libass",
+            "notosans-regular-otf-latn-libass",
         ],
     ),
     ("shape-bidi", &["bidi-random-lines-on-brackets"]),
@@ -188,12 +196,20 @@ const RANDOM_ALL: usize = 48;
 const RANDOM_BIDI: usize = 2000;
 const RANDOM_SIMPLE: usize = 1000;
 
+/// libass's font size with hinting off: 256 pixels in 26.6.
+const LIBASS_SIZE: u32 = 256 << 6;
+
 /// What a feature runs.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Load {
     /// Text cases: the required fonts and scripts, or every font with every script.
     Text {
         all: bool,
+    },
+    /// The required text cases through libass's font functions at a 26.6 pixel
+    /// size.
+    Libass {
+        size: u32,
     },
     Bidi,
     Simple,
@@ -209,10 +225,15 @@ pub struct Feature {
     pub required: bool,
 }
 
-pub const FEATURES: [Feature; 5] = [
+pub const FEATURES: [Feature; 6] = [
     Feature {
         id: "shape-text",
         load: Load::Text { all: false },
+        required: true,
+    },
+    Feature {
+        id: "shape-libass",
+        load: Load::Libass { size: LIBASS_SIZE },
         required: true,
     },
     Feature {
@@ -334,8 +355,9 @@ fn covers(name: &str, script: &str) -> bool {
         .any(|(file, scripts)| *file == name && scripts.contains(&script))
 }
 
-/// The text case rows of a feature, in corpus order.
-fn text_rows(root: &Path, all: bool) -> R<Vec<Value>> {
+/// The text case rows of a feature, in corpus order; with a `size`, each row's
+/// arguments start with it.
+fn text_rows(root: &Path, all: bool, size: Option<u32>) -> R<Vec<Value>> {
     let mut rows = Vec::new();
     for (source, files) in crate::fonts::corpus(root)? {
         if !crate::fonts::serves(&source, "shape") {
@@ -373,8 +395,8 @@ fn text_rows(root: &Path, all: bool) -> R<Vec<Value>> {
                 };
                 let random = if all { RANDOM_ALL } else { RANDOM_REQUIRED };
                 for variant in runs {
-                    let mut arguments =
-                        vec![variant.settings(script)[0].to_owned(), script.to_owned()];
+                    let mut arguments: Vec<String> = size.iter().map(ToString::to_string).collect();
+                    arguments.extend([variant.settings(script)[0].to_owned(), script.to_owned()]);
                     arguments.extend(
                         variant.settings(script)[1..]
                             .iter()
@@ -527,7 +549,8 @@ fn text_file_rows(load: Load) -> Vec<Value> {
 
 fn rows(root: &Path, feature: Feature) -> R<Vec<Value>> {
     match feature.load {
-        Load::Text { all } => text_rows(root, all),
+        Load::Text { all } => text_rows(root, all, None),
+        Load::Libass { size } => text_rows(root, false, Some(size)),
         load => Ok(text_file_rows(load)),
     }
 }
@@ -536,6 +559,9 @@ fn note(feature: Feature) -> &'static str {
     match feature.id {
         "shape-text" => {
             "A font of every outline format and of every script group the shapers cover, and fonts without layout tables, each with the authored texts and eight seeded random strings of a script under libass's run and the variants a covering face gets."
+        }
+        "shape-libass" => {
+            "The cases of shape-text through libass's font functions at 256 pixels with hinting off: its charmap, and FreeType's default-load advances, extents and contour points and its kerning at that size and ppem."
         }
         "shape-text-all" => {
             "Every font of the corpus with the texts of every script: libass's run for all, every variant for the scripts a face covers, 48 seeded random strings per script."
@@ -551,7 +577,7 @@ fn note(feature: Feature) -> &'static str {
 }
 
 fn directory(feature: Feature) -> &'static str {
-    if matches!(feature.load, Load::Text { .. }) {
+    if matches!(feature.load, Load::Text { .. } | Load::Libass { .. }) {
         FONT_DIRECTORY
     } else {
         TEXT_DIRECTORY
@@ -771,7 +797,7 @@ mod tests {
     #[test]
     fn the_required_cases_cover_every_shaper_and_bidi_class() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let rows = text_rows(root, false).unwrap();
+        let rows = text_rows(root, false, None).unwrap();
         let scripts: Vec<&str> = rows
             .iter()
             .filter_map(|r| r.get("profile").and_then(Value::as_str))
@@ -793,6 +819,21 @@ mod tests {
             "0627", "05D0", "202E", "2068", "0300", "2029", "0009", "FF09",
         ] {
             assert!(random.contains(code), "{code}");
+        }
+        // libass's cases are the text cases with the size first.
+        let libass = text_rows(root, false, Some(LIBASS_SIZE)).unwrap();
+        assert_eq!(libass.len(), rows.len());
+        let arguments = |row: &Value| -> Vec<String> {
+            let list = row.get("arguments").and_then(Value::as_array).unwrap();
+            list.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        };
+        for (sized, text) in libass.iter().zip(&rows) {
+            assert_eq!(sized.get("id"), text.get("id"));
+            assert_eq!(arguments(sized)[0], "16384");
+            assert_eq!(arguments(sized)[1..], arguments(text)[..]);
         }
         assert_eq!(text_file_rows(Load::Bidi).len(), 4 * 6);
         assert_eq!(text_file_rows(Load::Simple).len(), 2 * 3);

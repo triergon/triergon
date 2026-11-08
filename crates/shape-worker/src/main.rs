@@ -16,7 +16,8 @@ use triergon_core::{Budget, Bytes};
 use triergon_font::{Font, Limits};
 use triergon_shape::bidi::{self, BaseDirection, BidiClass, Bracket, Level, Resolver};
 use triergon_shape::{
-    Buffer, Direction, Face, Feature, Language, OtMetrics, Plan, Scale, Script, Tag,
+    Buffer, Direction, Face, Feature, Language, Metrics, OtMetrics, Plan, Scale, Script,
+    SizedMetrics, Tag,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -28,7 +29,8 @@ const MAX_FEATURES: usize = 64;
 const USAGE: &str = "usage: shape-worker OPERATION-fold FILE ARGUMENT...
        | OPERATION-bench FILE ITERATIONS ARGUMENT...
        | OPERATION-memory FILE ARGUMENT... | OPERATION-dump FILE ARGUMENT...
-  OPERATION: shape (DIRECTION SCRIPT LANGUAGE FEATURES TEXT...), bidi (BASE BRACKETS),
+  OPERATION: shape (DIRECTION SCRIPT LANGUAGE FEATURES TEXT...),
+  shape-libass (SIZE DIRECTION SCRIPT LANGUAGE FEATURES TEXT...), bidi (BASE BRACKETS),
   simple (BASE) or unicode";
 
 /// What one operation does with its file.
@@ -46,7 +48,10 @@ enum Operation {
 impl Operation {
     const fn name(&self) -> &'static str {
         match self {
-            Self::Shape(_) => "shape-text",
+            Self::Shape(settings) => match settings.functions {
+                Functions::OpenType => "shape-text",
+                Functions::Libass(_) => "shape-libass",
+            },
             Self::Bidi(..) => "shape-bidi",
             Self::Simple(_) => "shape-simple",
             Self::Unicode => "shape-unicode",
@@ -54,8 +59,19 @@ impl Operation {
     }
 }
 
-/// The segment properties and features of a shape operation, and its texts.
+/// The font functions a shape operation shapes with.
+#[derive(Clone, Copy)]
+enum Functions {
+    /// HarfBuzz's own, at units per em.
+    OpenType,
+    /// libass's, at a 26.6 pixel height.
+    Libass(i32),
+}
+
+/// The font functions, segment properties and features of a shape operation,
+/// and its texts.
 struct Settings {
+    functions: Functions,
     direction: Direction,
     script: Script,
     language: String,
@@ -201,56 +217,79 @@ fn shape_text(
     sink: &mut impl Sink,
 ) -> Result<()> {
     let faces = Font::face_count(file.as_ref()).unwrap_or(0);
-    let language = Language::new(&settings.language).ok();
     let mut buffer = Buffer::new(budget);
     for index in 0..faces {
         let Ok(font) = Font::new(file.clone(), index, budget, Limits::default()) else {
             sink.record(Record::FaceError(index))?;
             continue;
         };
-        sink.record(Record::Face(index))?;
-        let face = Face::new(&font);
-        let plan = language.as_ref().and_then(|language| {
-            let (direction, script) = (settings.direction, settings.script);
-            Plan::new(
-                &face,
-                direction,
-                script,
-                language,
-                &settings.features,
-                budget,
-            )
-            .ok()
-        });
-        let scale = Scale::units(font.units_per_em());
-        let metrics = OtMetrics::new(&font, scale);
-        for (t, argument) in settings.texts.iter().enumerate() {
-            let Some((text, item)) = item(argument) else {
-                sink.record(Record::TextError(t))?;
-                continue;
-            };
-            let Some(plan) = &plan else {
-                sink.record(Record::ShapeError(t))?;
-                continue;
-            };
-            let length = item.len();
-            if triergon_shape::shape(&face, &metrics, plan, &text, item, &mut buffer).is_err() {
-                sink.record(Record::ShapeError(t))?;
-                continue;
+        match settings.functions {
+            Functions::OpenType => {
+                sink.record(Record::Face(index))?;
+                let metrics = OtMetrics::new(&font, Scale::units(font.units_per_em()));
+                shape_texts(&font, &metrics, budget, settings, &mut buffer, sink)?;
             }
-            sink.record(Record::Text(buffer.len()))?;
-            for (glyph, p) in buffer.glyphs() {
-                sink.record(Record::Glyph {
-                    id: glyph.id.0,
-                    cluster: glyph.cluster,
-                    x_advance: p.x_advance,
-                    y_advance: p.y_advance,
-                    x_offset: p.x_offset,
-                    y_offset: p.y_offset,
-                })?;
+            Functions::Libass(height) => {
+                let Ok(metrics) = font.at_size(height).and_then(SizedMetrics::new) else {
+                    sink.record(Record::FaceError(index))?;
+                    continue;
+                };
+                sink.record(Record::Face(index))?;
+                shape_texts(&font, &metrics, budget, settings, &mut buffer, sink)?;
             }
-            sink.count(buffer.len(), length);
         }
+    }
+    Ok(())
+}
+
+/// Every text of the operation shaped as one run with `font` and `metrics`.
+fn shape_texts(
+    font: &Font,
+    metrics: &dyn Metrics,
+    budget: &Budget,
+    settings: &Settings,
+    buffer: &mut Buffer,
+    sink: &mut impl Sink,
+) -> Result<()> {
+    let face = Face::new(font);
+    let plan = Language::new(&settings.language).ok().and_then(|language| {
+        let (direction, script) = (settings.direction, settings.script);
+        Plan::new(
+            &face,
+            direction,
+            script,
+            &language,
+            &settings.features,
+            budget,
+        )
+        .ok()
+    });
+    for (t, argument) in settings.texts.iter().enumerate() {
+        let Some((text, item)) = item(argument) else {
+            sink.record(Record::TextError(t))?;
+            continue;
+        };
+        let Some(plan) = &plan else {
+            sink.record(Record::ShapeError(t))?;
+            continue;
+        };
+        let length = item.len();
+        if triergon_shape::shape(&face, metrics, plan, &text, item, buffer).is_err() {
+            sink.record(Record::ShapeError(t))?;
+            continue;
+        }
+        sink.record(Record::Text(buffer.len()))?;
+        for (glyph, p) in buffer.glyphs() {
+            sink.record(Record::Glyph {
+                id: glyph.id.0,
+                cluster: glyph.cluster,
+                x_advance: p.x_advance,
+                y_advance: p.y_advance,
+                x_offset: p.x_offset,
+                y_offset: p.y_offset,
+            })?;
+        }
+        sink.count(buffer.len(), length);
     }
     Ok(())
 }
@@ -416,23 +455,13 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
         _ => return Err(USAGE.into()),
     };
     let operation = match (operation, arguments) {
-        ("shape", [direction, script, language, features, texts @ ..]) => {
-            let direction = match direction.as_str() {
-                "ltr" => Direction::LeftToRight,
-                "rtl" => Direction::RightToLeft,
-                _ => return Err(USAGE.into()),
-            };
-            let script = tag(script.as_bytes()).ok_or(USAGE)?;
-            if language.is_empty() {
-                return Err(USAGE.into());
-            }
-            Operation::Shape(Settings {
-                direction,
-                script: Script::from_iso15924(script),
-                language: language.clone(),
-                features: self::features(features).ok_or(USAGE)?,
-                texts: texts.to_vec(),
-            })
+        ("shape", arguments) => Operation::Shape(shape_settings(Functions::OpenType, arguments)?),
+        ("shape-libass", [size, arguments @ ..]) => {
+            let height = decimal(size.as_bytes())
+                .and_then(|h| i32::try_from(h).ok())
+                .filter(|&h| h > 0)
+                .ok_or(USAGE)?;
+            Operation::Shape(shape_settings(Functions::Libass(height), arguments)?)
         }
         ("bidi", [base, brackets]) if matches!(brackets.as_str(), "0" | "1") => {
             Operation::Bidi(self::base(base).ok_or(USAGE)?, brackets == "1")
@@ -442,6 +471,30 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
         _ => return Err(USAGE.into()),
     };
     Ok((action, operation, path))
+}
+
+/// `DIRECTION SCRIPT LANGUAGE FEATURES TEXT...`.
+fn shape_settings(functions: Functions, arguments: &[String]) -> Result<Settings> {
+    let [direction, script, language, features, texts @ ..] = arguments else {
+        return Err(USAGE.into());
+    };
+    let direction = match direction.as_str() {
+        "ltr" => Direction::LeftToRight,
+        "rtl" => Direction::RightToLeft,
+        _ => return Err(USAGE.into()),
+    };
+    let script = tag(script.as_bytes()).ok_or(USAGE)?;
+    if language.is_empty() {
+        return Err(USAGE.into());
+    }
+    Ok(Settings {
+        functions,
+        direction,
+        script: Script::from_iso15924(script),
+        language: language.clone(),
+        features: self::features(features).ok_or(USAGE)?,
+        texts: texts.to_vec(),
+    })
 }
 
 fn run(args: &[String]) -> Result<()> {

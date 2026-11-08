@@ -1,6 +1,8 @@
 /*
- * Shaping reference: the HarfBuzz and FriBidi build of harness/reference.c (tooling
- * only; never linked into the library). Public HarfBuzz and FriBidi API only.
+ * Shaping reference: the HarfBuzz, FriBidi and FreeType build of harness/reference.c
+ * (tooling only; never linked into the library). Public HarfBuzz, FriBidi and
+ * FreeType API only; the libass operation restates libass 0.17.5's font functions
+ * over them, each piece naming the libass function it reproduces.
  *
  * Usage:
  *   reference OPERATION-fold   FILE ARGUMENT...
@@ -18,6 +20,14 @@
  *            hb_buffer_add_utf32 takes it). Every face of the file gets a font with
  *            HarfBuzz's OpenType font functions at the default scale, and every
  *            text is one hb_shape call: glyph ids, clusters, advances and offsets.
+ *   shape-libass  FILE is a font; ARGUMENTs are SIZE (a 26.6 pixel height) and then
+ *            those of shape. Every face of the file is opened with FreeType and set up
+ *            as libass 0.17.5 sets up its faces and HarfBuzz fonts with hinting off:
+ *            its charmap (ass_charmap_magic), GDI metrics (set_font_metrics), the
+ *            size (ass_face_set_size) and a HarfBuzz font over the face's tables
+ *            (ass_create_hb_font) with libass's font functions at its scale and
+ *            ppem (get_hb_font, update_hb_size, init_font_funcs); then as shape.
+ *            The font is not an @ font, so glyph advances are not rotated.
  *   bidi     FILE holds one text per line, each optionally followed by `|` and
  *            comma-separated line starts; ARGUMENTs are BASE (ltr, rtl or on) and
  *            BRACKETS (0 or 1). As libass's ass_shaper_shape and ass_shaper_reorder
@@ -44,6 +54,11 @@
 #include <fribidi.h>
 #include <hb-ot.h>
 #include <hb.h>
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_TRUETYPE_TABLES_H
+#include FT_TRUETYPE_IDS_H
 
 #include <inttypes.h>
 #include <limits.h>
@@ -79,10 +94,10 @@ enum {
     UNICODE_RANGE_ERROR,
 };
 
-typedef enum { SHAPE_SHAPE, SHAPE_BIDI, SHAPE_SIMPLE, SHAPE_UNICODE } ShapeOperation;
+typedef enum { SHAPE_SHAPE, SHAPE_BIDI, SHAPE_SIMPLE, SHAPE_UNICODE, SHAPE_LIBASS } ShapeOperation;
 
 static const char *const shape_operation_names[] = {"shape-text", "shape-bidi", "shape-simple",
-                                                    "shape-unicode"};
+                                                    "shape-unicode", "shape-libass"};
 
 typedef struct {
     uint64_t packets, bytes, digest;
@@ -268,52 +283,340 @@ static int shape_parse_item(const char *arg, uint32_t *text, size_t *len, unsign
     return 1;
 }
 
+/* Every text of `s` shaped with `font`, one hb_shape call each. */
+static int shape_texts(hb_font_t *font, hb_buffer_t *buffer, const ShapeSettings *s, uint32_t *text,
+                       ShapeWork *w) {
+    for (int t = 0; t < s->text_count; t++) {
+        size_t len;
+        unsigned long start, length;
+        if (!shape_parse_item(s->texts[t], text, &len, &start, &length)) {
+            shape_record1(w, SHAPE_TEXT_ERROR, "text-error", t);
+            continue;
+        }
+        hb_buffer_reset(buffer);
+        hb_buffer_add_utf32(buffer, text, (int)len, (unsigned)start, (int)length);
+        hb_segment_properties_t props = HB_SEGMENT_PROPERTIES_DEFAULT;
+        props.direction = s->direction;
+        props.script = s->script;
+        props.language = s->language;
+        hb_buffer_set_segment_properties(buffer, &props);
+        hb_shape(font, buffer, s->features, s->feature_count);
+        if (!hb_buffer_allocation_successful(buffer)) return 2;
+        unsigned glyphs;
+        const hb_glyph_info_t *info = hb_buffer_get_glyph_infos(buffer, &glyphs);
+        const hb_glyph_position_t *pos = hb_buffer_get_glyph_positions(buffer, NULL);
+        shape_record1(w, SHAPE_TEXT, "text", glyphs);
+        for (unsigned g = 0; g < glyphs; g++) {
+            int64_t v[6] = {info[g].codepoint, info[g].cluster, pos[g].x_advance,
+                            pos[g].y_advance,  pos[g].x_offset, pos[g].y_offset};
+            shape_record(w, SHAPE_GLYPH, "glyph", v, 6);
+        }
+        w->packets += glyphs;
+        w->bytes += length;
+    }
+    return 0;
+}
+
 static int shape_text(hb_blob_t *blob, const ShapeSettings *s, uint32_t *text, ShapeWork *w) {
     unsigned faces = hb_face_count(blob);
     hb_buffer_t *buffer = hb_buffer_create();
     if (!hb_buffer_allocation_successful(buffer)) return 2;
-    for (unsigned i = 0; i < faces; i++) {
+    int status = 0;
+    for (unsigned i = 0; i < faces && !status; i++) {
         hb_face_t *face = hb_face_create(blob, i);
         hb_font_t *font = hb_font_create(face);
         shape_record1(w, SHAPE_FACE, "face", i);
-        for (int t = 0; t < s->text_count; t++) {
-            size_t len;
-            unsigned long start, length;
-            if (!shape_parse_item(s->texts[t], text, &len, &start, &length)) {
-                shape_record1(w, SHAPE_TEXT_ERROR, "text-error", t);
-                continue;
-            }
-            hb_buffer_reset(buffer);
-            hb_buffer_add_utf32(buffer, text, (int)len, (unsigned)start, (int)length);
-            hb_segment_properties_t props = HB_SEGMENT_PROPERTIES_DEFAULT;
-            props.direction = s->direction;
-            props.script = s->script;
-            props.language = s->language;
-            hb_buffer_set_segment_properties(buffer, &props);
-            hb_shape(font, buffer, s->features, s->feature_count);
-            if (!hb_buffer_allocation_successful(buffer)) {
-                hb_font_destroy(font);
-                hb_face_destroy(face);
-                hb_buffer_destroy(buffer);
-                return 2;
-            }
-            unsigned glyphs;
-            const hb_glyph_info_t *info = hb_buffer_get_glyph_infos(buffer, &glyphs);
-            const hb_glyph_position_t *pos = hb_buffer_get_glyph_positions(buffer, NULL);
-            shape_record1(w, SHAPE_TEXT, "text", glyphs);
-            for (unsigned g = 0; g < glyphs; g++) {
-                int64_t v[6] = {info[g].codepoint, info[g].cluster, pos[g].x_advance,
-                                pos[g].y_advance,  pos[g].x_offset, pos[g].y_offset};
-                shape_record(w, SHAPE_GLYPH, "glyph", v, 6);
-            }
-            w->packets += glyphs;
-            w->bytes += length;
-        }
+        status = shape_texts(font, buffer, s, text, w);
         hb_font_destroy(font);
         hb_face_destroy(face);
     }
     hb_buffer_destroy(buffer);
-    return 0;
+    return status;
+}
+
+/* ----------------------------------------------------------- shape-libass */
+
+/* libass's face, size and glyph metrics cache for one face: the values
+ * ass_glyph_metrics_construct caches, per glyph of the face. */
+typedef struct {
+    FT_Glyph_Metrics metrics;
+    unsigned char state; /* 0 not loaded, 1 loaded, 2 FT_Load_Glyph failed */
+} ShapeCachedMetrics;
+
+typedef struct {
+    FT_Face face;
+    long height;
+    ShapeCachedMetrics *cache;
+} ShapeLibassFont;
+
+/* libass ass_face_set_size: a REAL_DIM request without width or resolution. */
+static void shape_libass_set_size(FT_Face face, long height) {
+    FT_Size_RequestRec rq;
+    memset(&rq, 0, sizeof rq);
+    rq.type = FT_SIZE_REQUEST_TYPE_REAL_DIM;
+    rq.height = height;
+    FT_Request_Size(face, &rq);
+}
+
+/* libass ass_glyph_metrics_construct (without @ font rotation): the default load
+ * at the size, cached; get_cached_metrics: NULL when the load failed. */
+static const FT_Glyph_Metrics *shape_libass_metrics(ShapeLibassFont *f, hb_codepoint_t glyph,
+                                                    FT_Glyph_Metrics *scratch) {
+    int cached = glyph < (hb_codepoint_t)f->face->num_glyphs;
+    ShapeCachedMetrics *entry = cached ? &f->cache[glyph] : NULL;
+    if (entry && entry->state) return entry->state == 1 ? &entry->metrics : NULL;
+    shape_libass_set_size(f->face, f->height);
+    int failed = FT_Load_Glyph(f->face, glyph,
+                               FT_LOAD_DEFAULT | FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH |
+                                   FT_LOAD_IGNORE_TRANSFORM) != 0;
+    FT_Glyph_Metrics *out = entry ? &entry->metrics : scratch;
+    if (!failed) *out = f->face->glyph->metrics;
+    if (entry) entry->state = failed ? 2 : 1;
+    return failed ? NULL : out;
+}
+
+/* libass ass_font_index_magic for the charmaps it maps without conversion:
+ * Unicode as is, Windows Symbol at 0xF000 | c. */
+static uint32_t shape_libass_index_magic(FT_Face face, uint32_t symbol) {
+    if (face->charmap && face->charmap->platform_id == TT_PLATFORM_MICROSOFT &&
+        face->charmap->encoding == FT_ENCODING_MS_SYMBOL)
+        return 0xF000 | symbol;
+    return symbol;
+}
+
+/* libass get_glyph_nominal. */
+static hb_bool_t shape_libass_nominal(hb_font_t *font, void *data, hb_codepoint_t unicode,
+                                      hb_codepoint_t *glyph, void *user) {
+    (void)font, (void)user;
+    ShapeLibassFont *f = data;
+    FT_Glyph_Metrics scratch;
+    *glyph = shape_libass_index_magic(f->face, unicode);
+    if (*glyph) *glyph = FT_Get_Char_Index(f->face, *glyph);
+    if (!*glyph) return 0;
+    shape_libass_metrics(f, *glyph, &scratch);
+    return 1;
+}
+
+/* libass get_glyph_variation. */
+static hb_bool_t shape_libass_variation(hb_font_t *font, void *data, hb_codepoint_t unicode,
+                                        hb_codepoint_t variation, hb_codepoint_t *glyph, void *user) {
+    (void)font, (void)user;
+    ShapeLibassFont *f = data;
+    FT_Glyph_Metrics scratch;
+    *glyph = shape_libass_index_magic(f->face, unicode);
+    if (*glyph) *glyph = FT_Face_GetCharVariantIndex(f->face, *glyph, variation);
+    if (!*glyph) return 0;
+    shape_libass_metrics(f, *glyph, &scratch);
+    return 1;
+}
+
+/* libass cached_h_advance. */
+static hb_position_t shape_libass_h_advance(hb_font_t *font, void *data, hb_codepoint_t glyph,
+                                            void *user) {
+    (void)font, (void)user;
+    FT_Glyph_Metrics scratch;
+    const FT_Glyph_Metrics *m = shape_libass_metrics(data, glyph, &scratch);
+    return m ? (hb_position_t)m->horiAdvance : 0;
+}
+
+/* libass cached_h_origin. */
+static hb_bool_t shape_libass_h_origin(hb_font_t *font, void *data, hb_codepoint_t glyph,
+                                       hb_position_t *x, hb_position_t *y, void *user) {
+    (void)font, (void)data, (void)glyph, (void)x, (void)y, (void)user;
+    return 1;
+}
+
+/* libass get_h_kerning. */
+static hb_position_t shape_libass_h_kerning(hb_font_t *font, void *data, hb_codepoint_t first,
+                                            hb_codepoint_t second, void *user) {
+    (void)font, (void)user;
+    ShapeLibassFont *f = data;
+    FT_Vector kern;
+    if (FT_Get_Kerning(f->face, first, second, FT_KERNING_DEFAULT, &kern)) return 0;
+    return (hb_position_t)kern.x;
+}
+
+/* libass cached_extents. */
+static hb_bool_t shape_libass_extents(hb_font_t *font, void *data, hb_codepoint_t glyph,
+                                      hb_glyph_extents_t *extents, void *user) {
+    (void)font, (void)user;
+    FT_Glyph_Metrics scratch;
+    const FT_Glyph_Metrics *m = shape_libass_metrics(data, glyph, &scratch);
+    if (!m) return 0;
+    extents->x_bearing = (hb_position_t)m->horiBearingX;
+    extents->y_bearing = (hb_position_t)m->horiBearingY;
+    extents->width = (hb_position_t)m->width;
+    extents->height = (hb_position_t)-m->height;
+    return 1;
+}
+
+/* libass get_contour_point. */
+static hb_bool_t shape_libass_contour_point(hb_font_t *font, void *data, hb_codepoint_t glyph,
+                                            unsigned point, hb_position_t *x, hb_position_t *y,
+                                            void *user) {
+    (void)font, (void)user;
+    ShapeLibassFont *f = data;
+    if (FT_Load_Glyph(f->face, glyph,
+                      FT_LOAD_DEFAULT | FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH |
+                          FT_LOAD_IGNORE_TRANSFORM))
+        return 0;
+    if (point >= (unsigned)f->face->glyph->outline.n_points) return 0;
+    *x = (hb_position_t)f->face->glyph->outline.points[point].x;
+    *y = (hb_position_t)f->face->glyph->outline.points[point].y;
+    return 1;
+}
+
+/* libass init_font_funcs, the horizontal callbacks. */
+static hb_font_funcs_t *shape_libass_funcs(void) {
+    hb_font_funcs_t *funcs = hb_font_funcs_create();
+    hb_font_funcs_set_nominal_glyph_func(funcs, shape_libass_nominal, NULL, NULL);
+    hb_font_funcs_set_variation_glyph_func(funcs, shape_libass_variation, NULL, NULL);
+    hb_font_funcs_set_glyph_h_advance_func(funcs, shape_libass_h_advance, NULL, NULL);
+    hb_font_funcs_set_glyph_h_origin_func(funcs, shape_libass_h_origin, NULL, NULL);
+    hb_font_funcs_set_glyph_h_kerning_func(funcs, shape_libass_h_kerning, NULL, NULL);
+    hb_font_funcs_set_glyph_extents_func(funcs, shape_libass_extents, NULL, NULL);
+    hb_font_funcs_set_glyph_contour_point_func(funcs, shape_libass_contour_point, NULL, NULL);
+    hb_font_funcs_make_immutable(funcs);
+    return funcs;
+}
+
+/* libass ass_charmap_magic: a full Microsoft Unicode charmap anywhere, else the
+ * first BMP one, else the first Microsoft one, else FreeType's choice or the
+ * first. */
+static void shape_libass_charmap(FT_Face face) {
+    int ms_cmap = -1, ms_unicode_cmap = -1;
+    for (int i = 0; i < face->num_charmaps; i++) {
+        FT_CharMap cmap = face->charmaps[i];
+        if (cmap->platform_id != TT_PLATFORM_MICROSOFT) continue;
+        switch (cmap->encoding_id) {
+        case TT_MS_ID_UCS_4:
+            FT_Set_Charmap(face, cmap);
+            return;
+        case TT_MS_ID_UNICODE_CS:
+            if (ms_unicode_cmap < 0) ms_unicode_cmap = ms_cmap = i;
+            break;
+        default:
+            if (ms_cmap < 0) ms_cmap = i;
+        }
+    }
+    if (ms_cmap >= 0) {
+        FT_Set_Charmap(face, face->charmaps[ms_cmap]);
+        return;
+    }
+    if (!face->charmap && face->num_charmaps > 0) FT_Set_Charmap(face, face->charmaps[0]);
+}
+
+/* libass set_font_metrics: GDI's ascender, descender and height. */
+static void shape_libass_gdi_metrics(FT_Face face) {
+    TT_OS2 *os2 = FT_Get_Sfnt_Table(face, FT_SFNT_OS2);
+    if (os2 && ((short)os2->usWinAscent + (short)os2->usWinDescent != 0)) {
+        face->ascender = (short)os2->usWinAscent;
+        face->descender = -(short)os2->usWinDescent;
+        face->height = face->ascender - face->descender;
+    }
+    if (face->ascender - face->descender == 0 || face->height == 0) {
+        if (os2 && (os2->sTypoAscender - os2->sTypoDescender) != 0) {
+            face->ascender = os2->sTypoAscender;
+            face->descender = os2->sTypoDescender;
+        } else {
+            face->ascender = face->bbox.yMax;
+            face->descender = face->bbox.yMin;
+        }
+        face->height = face->ascender - face->descender;
+    }
+}
+
+/* Whether ass_font_index_magic would convert codes for the face's charmap, which
+ * this restatement does not: the Windows multibyte encodings (iconv) and Symbol
+ * charmaps of the legacy Arabic character sets. */
+static int shape_libass_converts(FT_Face face) {
+    FT_CharMap c = face->charmap;
+    if (!c || c->platform_id != TT_PLATFORM_MICROSOFT) return 0;
+    if (c->encoding == FT_ENCODING_MS_SYMBOL) {
+        TT_OS2 *os2 = FT_Get_Sfnt_Table(face, FT_SFNT_OS2);
+        unsigned charset = os2 ? (os2->fsSelection >> 8) & 0xFF : 0;
+        return charset == 178 || charset == 179;
+    }
+    return c->encoding == FT_ENCODING_SJIS || c->encoding == FT_ENCODING_PRC ||
+           c->encoding == FT_ENCODING_BIG5 || c->encoding == FT_ENCODING_WANSUNG ||
+           c->encoding == FT_ENCODING_JOHAB;
+}
+
+/* libass get_reference_table: the face's tables as FreeType reads them. */
+static hb_blob_t *shape_libass_table(hb_face_t *face, hb_tag_t tag, void *data) {
+    (void)face;
+    FT_ULong len = 0;
+    if (FT_Load_Sfnt_Table(data, tag, 0, NULL, &len)) return NULL;
+    char *buf = malloc(len ? len : 1);
+    if (!buf) return NULL;
+    if (FT_Load_Sfnt_Table(data, tag, 0, (FT_Byte *)buf, &len)) {
+        free(buf);
+        return NULL;
+    }
+    return hb_blob_create(buf, (unsigned)len, HB_MEMORY_MODE_WRITABLE, buf, free);
+}
+
+static int shape_libass(FT_Library library, const char *data, size_t size, long height,
+                        const ShapeSettings *s, uint32_t *text, ShapeWork *w) {
+    FT_Face probe;
+    long faces = 0;
+    if (!FT_New_Memory_Face(library, (const FT_Byte *)data, (FT_Long)size, -1, &probe)) {
+        faces = probe->num_faces;
+        FT_Done_Face(probe);
+    }
+    hb_buffer_t *buffer = hb_buffer_create();
+    hb_font_funcs_t *funcs = shape_libass_funcs();
+    if (!hb_buffer_allocation_successful(buffer) || funcs == hb_font_funcs_get_empty()) {
+        hb_buffer_destroy(buffer);
+        hb_font_funcs_destroy(funcs);
+        return 2;
+    }
+    int status = 0;
+    for (long i = 0; i < faces && !status; i++) {
+        FT_Face face;
+        if (FT_New_Memory_Face(library, (const FT_Byte *)data, (FT_Long)size, i, &face)) {
+            shape_record1(w, SHAPE_FACE_ERROR, "face-error", i);
+            continue;
+        }
+        /* ass_face_open, add_face, ass_face_size_metrics_construct */
+        shape_libass_charmap(face);
+        shape_libass_gdi_metrics(face);
+        shape_libass_set_size(face, height);
+        if (shape_libass_converts(face)) {
+            fprintf(stderr, "face %ld: libass converts codes for this charmap\n", i);
+            status = 2;
+        } else if (!face->size->metrics.x_ppem || !face->size->metrics.y_ppem) {
+            shape_record1(w, SHAPE_FACE_ERROR, "face-error", i);
+        } else {
+            ShapeLibassFont f = {face, height, calloc((size_t)face->num_glyphs + 1, sizeof *f.cache)};
+            /* ass_create_hb_font */
+            hb_face_t *hb_face = hb_face_create_for_tables(shape_libass_table, face, NULL);
+            hb_face_set_index(hb_face, (unsigned)face->face_index);
+            hb_face_set_upem(hb_face, face->units_per_EM);
+            hb_font_t *parent = hb_font_create(hb_face);
+            hb_face_destroy(hb_face);
+            /* get_hb_font, update_hb_size */
+            hb_font_t *font = hb_font_create_sub_font(parent);
+            hb_font_set_funcs(font, funcs, &f, NULL);
+            FT_Size_Metrics *m = &face->size->metrics;
+            hb_font_set_scale(font, (int)(((uint64_t)m->x_scale * (uint64_t)face->units_per_EM) >> 16),
+                              (int)(((uint64_t)m->y_scale * (uint64_t)face->units_per_EM) >> 16));
+            hb_font_set_ppem(font, m->x_ppem, m->y_ppem);
+            if (!f.cache || hb_font_is_immutable(font)) {
+                status = 2;
+            } else {
+                shape_record1(w, SHAPE_FACE, "face", i);
+                status = shape_texts(font, buffer, s, text, w);
+            }
+            hb_font_destroy(font);
+            hb_font_destroy(parent);
+            free(f.cache);
+        }
+        FT_Done_Face(face);
+    }
+    hb_font_funcs_destroy(funcs);
+    hb_buffer_destroy(buffer);
+    return status;
 }
 
 /* ------------------------------------------------------------- bidi, simple */
@@ -483,6 +786,8 @@ typedef struct {
     ShapeSettings settings;
     FriBidiParType base;
     int brackets;
+    long height;
+    FT_Library library;
 } ShapeCase;
 
 static int shape_run(const ShapeCase *c, const char *data, size_t size, hb_blob_t *blob,
@@ -490,6 +795,8 @@ static int shape_run(const ShapeCase *c, const char *data, size_t size, hb_blob_
     switch (c->operation) {
     case SHAPE_SHAPE:
         return shape_text(blob, &c->settings, text, w);
+    case SHAPE_LIBASS:
+        return shape_libass(c->library, data, size, c->height, &c->settings, text, w);
     case SHAPE_BIDI:
         return shape_bidi(data, size, c->base, c->brackets, text, b, w);
     case SHAPE_SIMPLE:
@@ -505,15 +812,16 @@ int main(int argc, char **argv) {
                         "       | OPERATION-bench FILE N ARGUMENT...\n"
                         "       | OPERATION-memory FILE ARGUMENT... | OPERATION-dump FILE ARGUMENT...\n"
                         "  OPERATION: shape (DIRECTION SCRIPT LANGUAGE FEATURES TEXT...),\n"
+                        "  shape-libass (SIZE DIRECTION SCRIPT LANGUAGE FEATURES TEXT...),\n"
                         "  bidi (BASE BRACKETS), simple (BASE) or unicode\n";
     const char *mode = argc > 1 ? argv[1] : "";
     const char *action = strrchr(mode, '-');
     size_t prefix = action ? (size_t)(action - mode) : 0;
-    static const char *const names[] = {"shape", "bidi", "simple", "unicode"};
+    static const char *const names[] = {"shape", "bidi", "simple", "unicode", "shape-libass"};
     ShapeCase c;
     memset(&c, 0, sizeof c);
     int known = 0;
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 5; i++)
         if (prefix == strlen(names[i]) && !strncmp(mode, names[i], prefix)) {
             c.operation = (ShapeOperation)i;
             known = 1;
@@ -542,6 +850,13 @@ int main(int argc, char **argv) {
     case SHAPE_SHAPE:
         valid = shape_settings(args, count, &c.settings);
         break;
+    case SHAPE_LIBASS: {
+        unsigned long height = 0;
+        valid = count > 0 && shape_parse_decimal(args[0], strlen(args[0]), &height) && height > 0 &&
+                shape_settings(args + 1, count - 1, &c.settings);
+        c.height = (long)height;
+        break;
+    }
     case SHAPE_BIDI:
         valid = count == 2 && shape_parse_base(args[0], &c.base) &&
                 (!strcmp(args[1], "0") || !strcmp(args[1], "1"));
@@ -571,7 +886,9 @@ int main(int argc, char **argv) {
     fclose(file);
     uint32_t *text = malloc(SHAPE_MAX_TEXT * sizeof *text);
     ShapeBidi *b = malloc(sizeof *b);
-    if (!read_ok || !text || !b) {
+    /* The FreeType library is created once, outside the operation. */
+    int library_ok = c.operation != SHAPE_LIBASS || !FT_Init_FreeType(&c.library);
+    if (!read_ok || !text || !b || !library_ok) {
         fprintf(stderr, "%s: unreadable or too large\n", argv[2]);
         free(data);
         free(text);
@@ -604,6 +921,7 @@ int main(int argc, char **argv) {
     }
     if (status) fprintf(stderr, "%s: the operation failed\n", argv[2]);
     hb_blob_destroy(blob);
+    if (c.library) FT_Done_FreeType(c.library);
     free(data);
     free(text);
     free(b);

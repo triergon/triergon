@@ -30,8 +30,8 @@ pub const USAGE: &str = "usage: cargo xtask shape prepare [--jobs N]
             (default .research/shape/manifests); with --record, first re-record
             every pin from the built reference
   compare   `cargo xtask report` on each required shaping feature (shape-text,
-            shape-bidi, shape-simple, shape-unicode), with --all also on
-            shape-text-all; further report options pass through, and each report
+            shape-libass, shape-bidi, shape-simple, shape-unicode), with --all also
+            on shape-text-all; further report options pass through, and each report
             goes to OUTPUT/<feature> (OUTPUT: --output, default
             .research/shape-report)
   ucd       fetch the hash-pinned Unicode Character Database files and regenerate
@@ -127,7 +127,7 @@ mod tests {
     fn compare_reports_the_required_features_or_all() {
         let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
         let required = reports(&args(&["compare", "--output", "out", "--memory"])).unwrap();
-        assert_eq!(required.len(), 4);
+        assert_eq!(required.len(), 5);
         assert_eq!(
             required[0],
             args(&[
