@@ -205,6 +205,13 @@ checks the worker libraries using the probe and observer in `target/harness`.
 It prints the calibration certificate and exits nonzero if coverage cannot
 be established. Use built workers you trust.
 
+`cargo xtask build-workers --only framing-worker` rebuilds the primary `media-worker`
+and only the named additional Rust worker. `--only media-worker` builds just the
+primary Rust worker. Reference workers and memory observers are still built as usual.
+The new identity contains only rebuilt candidates; unselected binaries left on disk
+are not current. Without `--only`, all Rust workers are built. The gate-build guard
+and the comparison-only meaning of `--comparison-build` apply with either selection.
+
 ### Separate timing and memory collections
 
 `cargo xtask grade TIMING MEMORY --contract F --manifest F --output DIR` joins

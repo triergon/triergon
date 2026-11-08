@@ -15,6 +15,32 @@ use crate::json::Value;
 
 type R<T> = Result<T, String>;
 
+const USAGE: &str = "usage: cargo xtask build-workers [--comparison-build] [--only WORKER]";
+
+fn options(args: &[String]) -> R<(bool, Option<&str>)> {
+    let mut comparison_build = false;
+    let mut only = None;
+    let mut args = args.iter();
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--comparison-build" if !comparison_build => comparison_build = true,
+            "--only" if only.is_none() => {
+                only = Some(args.next().ok_or(USAGE)?.as_str());
+            }
+            _ => return Err(USAGE.into()),
+        }
+    }
+    Ok((comparison_build, only))
+}
+
+pub fn main(root: &Path, args: &[String]) -> R<PathBuf> {
+    let (comparison_build, only) = options(args)?;
+    match only {
+        None => build(root, comparison_build),
+        Some(name) => build_selected(root, comparison_build, Some(name)),
+    }
+}
+
 fn sha(path: &Path) -> R<String> {
     linux::file_sha(path)
 }
@@ -230,6 +256,7 @@ fn which(program: &str) -> Option<PathBuf> {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`, with the command that builds each.
+#[derive(Debug, PartialEq, Eq)]
 struct Candidate {
     name: &'static str,
     package: &'static str,
@@ -348,9 +375,24 @@ pub(crate) fn candidate_worker(root: &Path, identity: &Value, name: &str) -> R<P
     Ok(path)
 }
 
-fn additional_candidates(root: &Path) -> R<Vec<(&'static str, Vec<String>)>> {
+fn selected_candidates(only: Option<&str>) -> R<Vec<&'static Candidate>> {
+    match only {
+        None => Ok(ADDITIONAL_CANDIDATES.iter().collect()),
+        Some("media-worker") => Ok(Vec::new()),
+        Some(name) => ADDITIONAL_CANDIDATES
+            .iter()
+            .find(|spec| spec.name == name)
+            .map(|spec| vec![spec])
+            .ok_or_else(|| format!("unknown measurement worker {name}")),
+    }
+}
+
+fn additional_candidates(
+    root: &Path,
+    selected: &[&Candidate],
+) -> R<Vec<(&'static str, Vec<String>)>> {
     let mut built = Vec::new();
-    for spec in &ADDITIONAL_CANDIDATES {
+    for spec in selected {
         let mut command: Vec<String> = [
             "cargo",
             "build",
@@ -390,6 +432,23 @@ fn additional_candidates(root: &Path) -> R<Vec<(&'static str, Vec<String>)>> {
         built.push((spec.name, command));
     }
     Ok(built)
+}
+
+fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
+    let mut candidates = Vec::new();
+    for (name, command) in built {
+        let path = format!("target/release/{name}");
+        candidates.push((
+            *name,
+            Value::object([
+                ("path", Value::str(&path)),
+                ("sha256", Value::str(sha(&root.join(&path))?)),
+                ("command", strings(command)),
+                ("selected_graph", candidate_graph(root, name)?),
+            ]),
+        ));
+    }
+    Ok(Value::object(candidates))
 }
 
 /// A comparison reference linked against one pinned FFmpeg, FreeType or HarfBuzz
@@ -569,6 +628,11 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
 ];
 
 pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
+    build_selected(root, comparison_build, None)
+}
+
+fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<PathBuf> {
+    let selected = selected_candidates(only)?;
     gate_build::admit(root, comparison_build)?;
     let linux = cfg!(target_os = "linux");
     let mut candidate_command: Vec<String> = [
@@ -594,7 +658,7 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
     if !status.success() {
         return Err(format!("candidate build failed: {status}"));
     }
-    let additional = additional_candidates(root)?;
+    let additional = additional_candidates(root, &selected)?;
     let out = root.join("target/harness");
     fs::create_dir_all(&out).map_err(|e| e.to_string())?;
     let pinned = root.join(".research/reference/build.json");
@@ -817,19 +881,7 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
     };
     let metadata = cargo_metadata(root)?;
     let graph = selected_graph(root, &metadata, "media-worker", &matroska_inputs())?;
-    let mut candidates = Vec::new();
-    for (name, command) in &additional {
-        let path = format!("target/release/{name}");
-        candidates.push((
-            *name,
-            Value::object([
-                ("path", Value::str(&path)),
-                ("sha256", Value::str(sha(&root.join(&path))?)),
-                ("command", strings(command)),
-                ("selected_graph", candidate_graph(root, name)?),
-            ]),
-        ));
-    }
+    let candidates = candidate_records(root, &additional)?;
     let pinned_build = if pinned.exists() {
         Some(read_json(&pinned)?)
     } else {
@@ -950,7 +1002,7 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
         ),
         ("candidate_command", strings(&candidate_command)),
         ("selected_graph", graph.clone()),
-        ("additional_candidates", Value::object(candidates)),
+        ("additional_candidates", candidates),
         (
             "source_revision",
             pinned_build
@@ -1122,6 +1174,118 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn args(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_owned()).collect()
+    }
+
+    #[test]
+    fn worker_options_preserve_defaults_and_accept_either_flag_order() {
+        assert_eq!(options(&[]).unwrap(), (false, None));
+        assert_eq!(
+            options(&args(&["--comparison-build"])).unwrap(),
+            (true, None)
+        );
+        for name in std::iter::once("media-worker")
+            .chain(ADDITIONAL_CANDIDATES.iter().map(|spec| spec.name))
+        {
+            assert_eq!(
+                options(&args(&["--only", name])).unwrap(),
+                (false, Some(name))
+            );
+            for arguments in [
+                args(&["--only", name, "--comparison-build"]),
+                args(&["--comparison-build", "--only", name]),
+            ] {
+                assert_eq!(options(&arguments).unwrap(), (true, Some(name)));
+            }
+        }
+    }
+
+    #[test]
+    fn worker_selection_uses_the_registry_and_keeps_default_order() {
+        let all = selected_candidates(None).unwrap();
+        assert_eq!(all.len(), ADDITIONAL_CANDIDATES.len());
+        for (actual, registered) in all.iter().zip(&ADDITIONAL_CANDIDATES) {
+            assert_eq!(*actual, registered);
+            let selected = selected_candidates(Some(registered.name)).unwrap();
+            assert_eq!(selected.len(), 1);
+            assert_eq!(selected[0], registered);
+        }
+        assert!(
+            selected_candidates(Some("media-worker"))
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn invalid_worker_options_are_refused_before_build_admission() {
+        let root = Path::new("/nonexistent-worker-build-root");
+        for arguments in [
+            args(&["--only"]),
+            args(&["--only", "framing-worker", "--only", "framing-worker"]),
+            args(&["--only", "framing-worker", "--only", "codec-worker"]),
+            args(&["--comparison-build", "--comparison-build"]),
+            args(&["--unknown"]),
+            args(&["framing-worker"]),
+        ] {
+            assert_eq!(main(root, &arguments).unwrap_err(), USAGE);
+        }
+        for name in ["unknown-worker", "--comparison-build", ""] {
+            let error = main(root, &args(&["--only", name])).unwrap_err();
+            assert_eq!(error, format!("unknown measurement worker {name}"));
+        }
+    }
+
+    #[test]
+    fn selected_workers_still_require_the_gate_build() {
+        let root = std::env::temp_dir().join(format!("worker-build-gate-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join(".cargo")).unwrap();
+        fs::write(
+            root.join("rust-toolchain.toml"),
+            "[toolchain]\nchannel = \"1.99.1\"\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join(".cargo/config.toml"),
+            "[build]\nrustflags = [\"--cfg=worker_selection_guard\"]\n",
+        )
+        .unwrap();
+        for arguments in [
+            Vec::new(),
+            args(&["--only", "media-worker"]),
+            args(&["--only", "framing-worker"]),
+        ] {
+            let error = main(&root, &arguments).unwrap_err();
+            assert!(error.contains("not the gate build"), "{error}");
+            assert!(error.contains("build.rustflags"), "{error}");
+            assert!(!root.join("target").exists());
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn primary_only_identity_does_not_adopt_stale_additional_binaries() {
+        let root = std::env::temp_dir().join(format!("worker-build-stale-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("target/release")).unwrap();
+        for spec in &ADDITIONAL_CANDIDATES {
+            fs::write(root.join("target/release").join(spec.name), b"stale").unwrap();
+        }
+        let candidates = candidate_records(&root, &[]).unwrap();
+        assert!(matches!(&candidates, Value::Object(records) if records.is_empty()));
+        let identity = Value::object([("additional_candidates", candidates)]);
+        for spec in &ADDITIONAL_CANDIDATES {
+            let error = candidate_worker(&root, &identity, spec.name).unwrap_err();
+            assert_eq!(
+                error,
+                format!("{} is not in the build identity; rebuild", spec.name)
+            );
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn isobmff_comparison_graph_enables_trace_without_changing_defaults() {
