@@ -173,7 +173,9 @@ pub fn manifest(out: &Path, lanes: &[String]) -> Result<(), String> {
                         continue;
                     }
                 } else {
-                    let want = audio_suffixes(lane).ok_or_else(|| unknown(lane))?;
+                    let want = audio_suffixes(lane)
+                        .or_else(|| super::readers::suffixes(lane))
+                        .ok_or_else(|| unknown(lane))?;
                     if !want.iter().any(|suffix| name.ends_with(suffix)) {
                         continue;
                     }

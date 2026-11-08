@@ -1,21 +1,14 @@
 #!/usr/bin/env python3
-"""Generate synthetic FLAC vectors and grade the decoder against FFmpeg, bit-exact.
+"""Generate the synthetic FLAC vectors of the flac lane of cargo xtask codecs grade.
 
-    flac_vectors.py generate OUT_DIR
-    flac_vectors.py grade DECODER VECTOR_DIR... [--ffmpeg PATH] [--ffprobe PATH]
+    flac_vectors.py FFMPEG FLAC OUT_DIR
 
-`generate` writes deterministic synthetic signals as WAV and encodes them with FFmpeg's
-FLAC encoder and the reference `flac` encoder over a matrix of bit depths, channel
-counts, sample rates, block sizes and encoder options. Media stays outside git.
-
-`grade` decodes every .flac below the given directories with DECODER (the decode_flac
-example) and with `ffmpeg -f f32le -c:a pcm_f32le`, and compares the output bytes, the
-per-frame layouts and sample counts (ffprobe -show_frames) and the stream sample rate.
-A stream whose sample rate or channel count changes is graded run by run, because the
-FFmpeg command line resamples and remixes such a stream to its first format; FLAC frames
-are independent, so each run decodes alike on its own.
+Writes deterministic synthetic signals as WAV and encodes them with FFMPEG's FLAC
+encoder and the reference FLAC encoder over a matrix of bit depths, channel counts,
+sample rates, block sizes and encoder options, into OUT_DIR (the manifest's
+.research/flac-generated). The vectors are identified by their SHA-256 in
+harness/codecs/correctness-manifest.json. Media stays outside git.
 """
-import json
 import math
 import os
 import random
@@ -24,9 +17,6 @@ import subprocess
 import sys
 import tempfile
 
-FFMPEG = "/opt/homebrew/bin/ffmpeg"
-FFPROBE = "/opt/homebrew/bin/ffprobe"
-FLAC = "flac"
 
 # --------------------------------------------------------------------------- signals
 
@@ -170,7 +160,7 @@ def matrix():
     return cases
 
 
-def generate(out_dir):
+def generate(ffmpeg, flac, out_dir):
     os.makedirs(out_dir, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         for seed, (name, bits, ch, rate, encoder, options, extra) in enumerate(matrix()):
@@ -180,199 +170,23 @@ def generate(out_dir):
             write_wav(wav, planes, bits, rate, extra.get("mask"))
             if encoder == "ffmpeg":
                 fmt = "s16" if bits <= 16 else "s32"
-                cmd = [FFMPEG, "-nostdin", "-v", "error", "-y", "-i", wav, "-c:a", "flac",
+                cmd = [ffmpeg, "-nostdin", "-v", "error", "-y", "-i", wav, "-c:a", "flac",
                        "-sample_fmt", fmt, "-bits_per_raw_sample", str(bits)]
                 if bits == 32:
                     cmd += ["-strict", "experimental"]
                 cmd += options + [target]
             else:
-                cmd = [FLAC, "-s", "-f"] + options + ["-o", target, wav]
+                cmd = [flac, "-s", "-f"] + options + ["-o", target, wav]
             result = subprocess.run(cmd, capture_output=True, text=True)
             status = "ok" if result.returncode == 0 else "FAILED " + result.stderr.strip()[:200]
             print(f"{name}: {status}")
 
 
-# --------------------------------------------------------------------------- grading
-
-
-def run(cmd):
-    return subprocess.run(cmd, capture_output=True)
-
-
-def ffprobe_json(path, entries, extra=()):
-    out = run([FFPROBE, "-v", "error", "-select_streams", "a:0", *extra, "-show_entries", entries,
-               "-of", "json", path])
-    try:
-        return json.loads(out.stdout or b"{}")
-    except json.JSONDecodeError:
-        return {}
-
-
-def reference(path, out, fmt=()):
-    result = run([FFMPEG, "-nostdin", "-v", "error", "-threads", "1", *fmt, "-i", path,
-                  "-f", "f32le", "-c:a", "pcm_f32le", "-y", out])
-    return result.returncode
-
-
-def channel_runs(path):
-    """Packets of `path` grouped into runs of equal (sample rate code, channel count)."""
-    data = open(path, "rb").read()
-    packets = ffprobe_json(path, "packet=pos,size").get("packets", [])
-    runs = []
-    for p in packets:
-        if "pos" not in p:
-            continue
-        pos, size = int(p["pos"]), int(p["size"])
-        head = data[pos:pos + 4]
-        if len(head) < 4 or head[0] != 0xFF or head[1] & 0xFE != 0xF8:
-            continue  # data before the first frame
-        assignment = head[3] >> 4
-        key = (head[2] & 15, assignment + 1 if assignment < 8 else 2)
-        if runs and runs[-1][0] == key:
-            runs[-1][1].append(data[pos:pos + size])
-        else:
-            runs.append((key, [data[pos:pos + size]]))
-    return runs
-
-
-def compare(candidate, expected, channels):
-    """(exact, worst rms, worst abs, first differing sample) over interleaved f32le."""
-    a = open(candidate, "rb").read()
-    b = open(expected, "rb").read()
-    if a == b:
-        return True, 0.0, 0.0, None
-    n = min(len(a), len(b)) // 4
-    xa = struct.unpack(f"<{n}f", a[: 4 * n])
-    xb = struct.unpack(f"<{n}f", b[: 4 * n])
-    channels = max(channels, 1)
-    sums = [0.0] * channels
-    worst = 0.0
-    first = None
-    for i, (u, v) in enumerate(zip(xa, xb)):
-        d = u - v
-        if d != 0 and first is None:
-            first = i // channels
-        sums[i % channels] += d * d
-        worst = max(worst, abs(d))
-    per = n // channels or 1
-    rms = max(math.sqrt(s / per) for s in sums)
-    return False, rms, worst, first
-
-
-def grade_file(decoder, path, tmp):
-    cand = os.path.join(tmp, "c.f32")
-    ref = os.path.join(tmp, "r.f32")
-    dec = run([decoder, path, cand, "--per-frame"])
-    lines = [json.loads(l) for l in dec.stderr.decode().splitlines() if l.startswith("{")]
-    summary = lines[-1] if lines else {}
-    frames = [l for l in lines[:-1] if "frame" in l and "error" not in l]
-    notes = []
-    stream = ffprobe_json(path, "stream=sample_rate,channels,channel_layout").get("streams", [{}])
-    stream = stream[0] if stream else {}
-    if reference(path, ref) != 0 and not summary.get("frames"):
-        # FFmpeg refuses the stream and the decoder decodes none of it.
-        return True, 0.0, 0.0, summary, ["refused by both"]
-    probe_frames = ffprobe_json(path, "frame=channel_layout,nb_samples").get("frames", [])
-    exp_layouts = [f.get("channel_layout") for f in probe_frames]
-    got_layouts = [f["layout"] for f in frames]
-    if exp_layouts != got_layouts:
-        notes.append(f"layouts {summarise(got_layouts)} vs {summarise(exp_layouts)}")
-    exp_counts = [int(f.get("nb_samples", -1)) for f in probe_frames]
-    got_counts = [f["samples"] for f in frames]
-    if exp_counts != got_counts:
-        notes.append(f"frame sample counts differ ({len(got_counts)} vs {len(exp_counts)} frames)")
-    runs = channel_runs(path)
-    exact = True
-    rms = worst = 0.0
-    if len(runs) <= 1:
-        if summary.get("sample_rate") != int(stream.get("sample_rate", 0)):
-            notes.append(f"rate {summary.get('sample_rate')} vs {stream.get('sample_rate')}")
-        exact, rms, worst, first = compare(cand, ref, summary.get("channels", 1))
-        if not exact:
-            notes.append(f"first difference at sample {first}")
-    else:
-        # Run by run: the decoder output is cut at the same frame boundaries.
-        out = open(cand, "rb").read()
-        at = 0
-        frame_at = 0
-        for index, (key, packets) in enumerate(runs):
-            raw = os.path.join(tmp, "run.flac")
-            open(raw, "wb").write(b"".join(packets))
-            reference(raw, ref, ("-f", "flac"))
-            run_rate = ffprobe_json(raw, "stream=sample_rate", ("-f", "flac"))["streams"][0]
-            rates = {f["sample_rate"] for f in frames[frame_at:frame_at + len(packets)]}
-            frame_at += len(packets)
-            if rates != {int(run_rate["sample_rate"])}:
-                notes.append(f"rate run {index}: {sorted(rates)} vs {run_rate['sample_rate']}")
-            expected = open(ref, "rb").read()
-            piece = os.path.join(tmp, "piece.f32")
-            open(piece, "wb").write(out[at:at + len(expected)])
-            at += len(expected)
-            e, r, w, first = compare(piece, ref, key[1])
-            if not e:
-                notes.append(f"run {index} {key}: first difference at sample {first}")
-            exact &= e
-            rms, worst = max(rms, r), max(worst, w)
-        if at != len(out):
-            exact = False
-            notes.append(f"{len(out) - at} bytes beyond the runs")
-        notes.append(f"graded as {len(runs)} runs")
-    return exact and not any(n.startswith(("layouts", "rate", "frame sample")) for n in notes), \
-        rms, worst, summary, notes
-
-
-def summarise(items):
-    out = []
-    for item in items:
-        if out and out[-1][0] == item:
-            out[-1][1] += 1
-        else:
-            out.append([item, 1])
-    return ",".join(f"{k}x{n}" for k, n in out)
-
-
-def grade(decoder, dirs):
-    files = sorted(
-        os.path.join(root, f)
-        for d in dirs
-        for root, _, names in os.walk(d)
-        for f in names
-        if f.endswith(".flac")
-    )
-    totals = {}
-    with tempfile.TemporaryDirectory() as tmp:
-        for path in files:
-            ok, rms, worst, summary, notes = grade_file(decoder, path, tmp)
-            group = os.path.basename(os.path.dirname(path))
-            passed, total = totals.get(group, (0, 0))
-            totals[group] = (passed + ok, total + 1)
-            status = "PASS" if ok else "FAIL"
-            print(f"{status} {os.path.relpath(path)} rms={rms:.3g} abs={worst:.3g} "
-                  f"frames={summary.get('frames')} errors={summary.get('errors')} "
-                  f"layout={summary.get('layout')} {'; '.join(notes)}", flush=True)
-    for group, (passed, total) in totals.items():
-        print(f"{group}: {passed}/{total} bit-exact")
-
-
 def main(argv):
-    global FFMPEG, FFPROBE
-    args = [a for a in argv]
-    for flag in ("--ffmpeg", "--ffprobe"):
-        if flag in args:
-            i = args.index(flag)
-            value = args[i + 1]
-            del args[i:i + 2]
-            if flag == "--ffmpeg":
-                FFMPEG = value
-            else:
-                FFPROBE = value
-    if len(args) >= 2 and args[0] == "generate":
-        generate(args[1])
-    elif len(args) >= 3 and args[0] == "grade":
-        grade(args[1], args[2:])
-    else:
+    if len(argv) != 3:
         print(__doc__)
         return 2
+    generate(*argv)
     return 0
 
 
