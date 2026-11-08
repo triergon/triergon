@@ -183,6 +183,11 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
         s(set, "key").ok_or("set without key")?,
         s(set, "sha256").ok_or("set without sha256")?,
     );
+    if !key.ends_with(".tar.gz") {
+        return Err(format!(
+            "{name}: {key} is not a pack; download it with the aws CLI and check its SHA-256"
+        ));
+    }
     let archive = std::env::var("TRIERGON_EVIDENCE_ARCHIVE")
         .map_err(|_| "set TRIERGON_EVIDENCE_ARCHIVE to the evidence archive location")?;
     let cache = root.join(".research/evidence-cache");
@@ -292,7 +297,12 @@ mod tests {
         for set in index.get("sets").and_then(Value::as_array).unwrap() {
             let sha = s(set, "sha256").unwrap();
             assert!(sha.len() == 64 && sha.bytes().all(|b| b.is_ascii_hexdigit()));
-            assert!(s(set, "key").unwrap().ends_with(&format!("{sha}.tar.gz")));
+            let key = s(set, "key").unwrap();
+            assert!(
+                [".tar.gz", ".tar.zst"]
+                    .iter()
+                    .any(|ext| key.ends_with(&format!("{sha}{ext}")))
+            );
             for file in set
                 .get("files")
                 .and_then(Value::as_array)

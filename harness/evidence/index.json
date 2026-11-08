@@ -14682,6 +14682,15 @@
     "candidate": "cf9ad665bfc96dd64a843828d4f57a2e1a73eed8",
     "baseline": "1c5c4b87e6a10495b1c603718b14b6cf3a905a83"
    }
+  },
+  {
+   "name": "playback-terminal-matrix-ffprobe",
+   "path": "playback-terminal-matrix-ffprobe",
+   "retention": "retained",
+   "reason": "The FFprobe 9.0.2 packet records the MP4 terminal-media matrix test compares with (tests/fixtures/native_terminal_matrix_golds.rs), with the matrix inputs and the replays that captured them. Captured on 2026-11-04 from a working tree identified by its source digests, not a commit; the FFprobe records do not depend on it. A zstd-compressed tar: download it with the aws CLI and check its SHA-256.",
+   "key": "evidence/playback-terminal-matrix-ffprobe/5eb191f3826461ffcc4c8fe47132fd03e060fb930f10b92e26b3031d9a3a465e.tar.zst",
+   "sha256": "5eb191f3826461ffcc4c8fe47132fd03e060fb930f10b92e26b3031d9a3a465e",
+   "bytes": 209168659
   }
  ]
 }
