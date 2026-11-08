@@ -533,6 +533,23 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
     Ok(())
 }
 
+/// A case the contract lists in `open_cases`: its parity is graded, its timing and
+/// memory are not. A listed case that passes must leave the list, which only
+/// shrinks.
+fn open_case(timed: &Value, measured: &Value) -> R<Value> {
+    require_same(
+        &without(timed, &["timing", "memory"])?,
+        &without(measured, &["timing", "memory"])?,
+        "case fields/parity",
+    )?;
+    if super::acceptance::parity_passes(timed) {
+        return Err("listed open case now passes; remove it from open_cases".into());
+    }
+    let mut row = without(timed, &["timing", "memory"])?;
+    put(&mut row, "open_case", Value::Bool(true))?;
+    Ok(row)
+}
+
 fn join_case(
     timed: &Value,
     measured: &Value,
@@ -741,6 +758,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let (memory, memory_sha) = document(&options.memory)?;
     let (contract, contract_sha) = document(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
+    let open = super::report::open_cases(&contract, &manifest)?;
     let binding = Binding {
         contract: &contract,
         manifest: &manifest,
@@ -774,6 +792,9 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         let id = text(spec, "id")?;
         let clock = expanded_case(&timed, &options.timing, timed_rows[id])?;
         let measured = expanded_case(&memory, &options.memory, memory_rows[id])?;
+        if open.iter().any(|listed| listed == id) {
+            return open_case(&clock, &measured).map_err(|e| format!("{id}: {e}"));
+        }
         join_case(&clock, &measured, spec, &contract, identity, target)
             .map_err(|e| format!("{id}: {e}"))
     };
@@ -880,7 +901,10 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                 .map_err(|e| format!("{}: {e}", destination.display()))?;
         }
     }
-    let code = exit_code(&verdict, rows(&memory, kind)?, options.requirement);
+    let mut code = exit_code(&verdict, rows(&memory, kind)?, options.requirement);
+    if !super::report::ratchet(text(&contract, "id")?, rows(&timed, kind)?, &open) {
+        code = code.max(1);
+    }
     println!(
         "{} cases; slice accepted: {}; accepted: {}; {}",
         expected.len(),
@@ -1412,6 +1436,48 @@ mod tests {
         assert!(aliases(&altered, &membership(&altered, &actual).unwrap()).is_err());
         put(&mut actual[0], "sampled_as", Value::int(0)).unwrap();
         assert!(aliases(&expected, &membership(&expected, &actual).unwrap()).is_err());
+    }
+
+    /// The open-case ratchet: a listed failing case is graded on parity alone, a
+    /// listed case that passes is refused, a listed id outside the corpus is
+    /// refused, and an unlisted failing case still needs its measurements.
+    #[test]
+    fn open_cases_are_graded_on_parity_and_only_shrink() {
+        let mut fixture = Fixture::new();
+        let failing = object(&[
+            ("status", Value::str("mismatch")),
+            ("source_timing_status", Value::str("pass")),
+        ]);
+        for row in [&mut fixture.timed, &mut fixture.measured] {
+            *row = without(row, &["timing", "memory"]).unwrap();
+            put(row, "parity", failing.clone()).unwrap();
+        }
+        let graded = open_case(&fixture.timed, &fixture.measured).unwrap();
+        assert_eq!(graded.get("open_case"), Some(&Value::Bool(true)));
+        assert_eq!(graded.get("parity"), Some(&failing));
+        assert!(graded.get("timing").is_none() && graded.get("memory").is_none());
+        assert!(fixture.join().unwrap_err().contains("missing timing"));
+
+        let passing = Fixture::new();
+        let error = open_case(&passing.timed, &passing.measured).unwrap_err();
+        assert!(error.contains("remove it from open_cases"), "{error}");
+
+        let mut other = fixture.measured.clone();
+        put(&mut other, "parity", Value::Null).unwrap();
+        assert!(open_case(&fixture.timed, &other).is_err());
+
+        let contract = |id: &str| {
+            json::parse_strict(&format!(
+                r#"{{"pending_module_requirements": ["reader"], "open_cases": [{{"id": "{id}", "requirement": "reader"}}]}}"#
+            ))
+            .unwrap()
+        };
+        let manifest = json::parse_strict(r#"{"cases": [{"id": "a"}]}"#).unwrap();
+        assert_eq!(
+            super::super::report::open_cases(&contract("a"), &manifest).unwrap(),
+            ["a"]
+        );
+        assert!(super::super::report::open_cases(&contract("gone"), &manifest).is_err());
     }
 
     #[test]

@@ -96,7 +96,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   tied to one of its `pending_module_requirements`. `cargo xtask report` still runs
   them and prints them as open failures with their count, and passes only when every
   other case passes and every listed case still fails; a listed case that starts
-  to match must leave the list. The module stays unaccepted while any is listed.
+  to match must leave the list. `cargo xtask grade` applies the same rule: it grades
+  a listed case's parity and skips its timing and memory, refuses a listed case that
+  passes or is not in the corpus, and still needs measurements for any other failing
+  case. The module stays unaccepted while any is listed.
 - **Input rights.** A case is measured only when its `rights` are
   `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
   reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.

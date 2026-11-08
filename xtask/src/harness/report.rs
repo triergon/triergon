@@ -774,7 +774,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
 
 /// A contract's `open_cases`: case ids that fail today, each tied to one of its
 /// `pending_module_requirements`. Every id must be a case of the manifest.
-fn open_cases(contract: &Value, manifest: &Value) -> Result<Vec<String>, String> {
+pub(super) fn open_cases(contract: &Value, manifest: &Value) -> Result<Vec<String>, String> {
     let list = |value: &Value, key: &str| -> Vec<Value> {
         value
             .get(key)
@@ -803,7 +803,7 @@ fn open_cases(contract: &Value, manifest: &Value) -> Result<Vec<String>, String>
 /// Prints how many cases pass and which listed open cases still fail. Holds when
 /// every other case passes and every open case still fails: a listed case that
 /// starts to pass must leave the list, so the list only shrinks.
-fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
+pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
     let passed = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("pass");
     let listed = |row: &Value| open.iter().any(|id| s(row, "id") == Some(id));
     let ids = |keep: &dyn Fn(&Value) -> bool| -> Vec<&str> {
