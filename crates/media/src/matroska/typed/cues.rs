@@ -292,5 +292,8 @@ impl CuesJob {
 
 super::usage::storage!(CuesJob, |s| [s.source, s.positions, s.output]);
 
+// The preimage records exact charges, which include storage headers sized by the
+// pointer width; it was recorded on a 64-bit target.
 #[cfg(test)]
+#[cfg(target_pointer_width = "64")]
 mod cue_arena_regressions;

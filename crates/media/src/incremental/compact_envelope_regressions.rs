@@ -454,7 +454,9 @@ fn compact_envelope_freeze_pressure_retains_builder_and_retries_once() {
 fn compact_envelope_progress_has_no_leaf_owner_and_uses_bounded_existing_state() {
     assert_eq!(size_of::<BodyTransfer>(), 1);
     assert!(size_of::<CompactEnvelopeProgress>() < size_of::<EnvelopeProgress>());
-    assert!(size_of::<CompactElementEvent>() <= size_of::<ElementHeader>() + size_of::<usize>());
+    // At most one 8-byte word beyond the header (a `usize` on 64-bit targets; on 32-bit
+    // targets the event keeps the header's 8-byte alignment).
+    assert!(size_of::<CompactElementEvent>() <= size_of::<ElementHeader>() + size_of::<u64>());
     println!(
         "COMPACT_ENVELOPE_LAYOUT old={} new={} body={} header={} transfer={}",
         size_of::<EnvelopeProgress>(),
