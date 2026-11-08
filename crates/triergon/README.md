@@ -52,6 +52,11 @@ for i in 0..reader.track_count() {
 A seek is `reader.request_seek(SeekRequest { track, target, policy })?`; the reader
 then asks for input and delivers `Event::Seek(SeekReceipt)` before the next packet.
 
+`open_blocking(source, &pool)` does the probing and input handling for a
+`std::io::Read + Seek` source and returns a `Blocking` driver with `next_event`,
+`next_packet` and `seek`; `open_sequential` does the same for a pipe, which the readers
+then treat as FFmpeg treats one (no seeking, no known length).
+
 ## Supported
 
 | Feature | Default | Module | Through `AnyReader` |
@@ -59,6 +64,8 @@ then asks for input and delivers `Event::Seek(SeekReceipt)` before the next pack
 | `matroska` | yes | `triergon::matroska` ([triergon-matroska](../media/README.md)) | yes |
 | `isobmff` | no | `triergon::isobmff` ([triergon-isobmff](../isobmff/README.md)) | yes, for seekable sources |
 | `mpegts` | no | `triergon::mpegts` ([triergon-mpegts](../mpegts/README.md)) | probed, refused by `open` |
+| `ogg` | no | `triergon::ogg` ([triergon-ogg](../ogg/README.md)) | yes |
+| `elementary` | no | `triergon::elementary` ([triergon-elementary](../elementary/README.md)): native FLAC, MPEG audio, ADTS, AC-3 | yes |
 | `framing` | no | `triergon::framing` ([triergon-framing](../framing/README.md)) | not a reader |
 | `subtitles` | no | `triergon::subtitles` ([triergon-subtitles](../subtitles/README.md)) | not a reader |
 
@@ -79,7 +86,11 @@ The meaning of each type is documented in
   (`1A 45 DF A3`), `Probe::Isobmff` when bytes 4–8 are `ftyp`, `styp`, `moov`,
   `moof`, `mdat`, `free`, `skip` or `sidx`, and `Probe::Ts` when sync bytes `0x47`
   sit at offsets 0, 188 and 376 (at least 377 bytes). 192-byte M2TS is not probed.
-  Anything else, including a prefix too short to decide, is `Probe::Unknown`.
+  `Probe::Ogg` is an `OggS` page. With the `elementary` feature,
+  `triergon_elementary::probe` recognises native FLAC (`fLaC`, or a frame header that a
+  second one continues) and MPEG audio, ADTS and AC-3 by two frames that agree, after
+  any ID3v2 tag. Anything else, including a prefix too short to decide, is
+  `Probe::Unknown`.
 - **Opening.** `AnyReader::open` refuses MPEG-TS with `Error::Unsupported` whatever
   features are enabled, because its reader does not implement `ContainerReader`; use
   `triergon::mpegts` directly. Unknown sources, a format without its feature, and ISO
@@ -91,8 +102,9 @@ The meaning of each type is documented in
   `AnyReader::Matroska` or `AnyReader::Isobmff`.
 - **Dispatch.** Forwarding is one `match` per call with no allocation and no
   dynamic dispatch on the packet path. Tracks are returned as `&dyn TrackInfo`.
-  `AnyPacket` implements `PacketInfo`; match `AnyPacket::Matroska(p)` or
-  `AnyPacket::Isobmff(p)` for the format's own packet type.
+  `AnyPacket` implements `PacketInfo`; match `AnyPacket::Matroska(p)`,
+  `AnyPacket::Isobmff(p)`, `AnyPacket::Ogg(p)` or `AnyPacket::Elementary(p)` for the
+  format's own packet type.
 - **Other events.** `Event::Other` carries an `AnyOther`; match
   `AnyOther::Matroska(event)` for Matroska configuration, documents and structure,
   or `AnyOther::Isobmff(event)` for root boxes and the end of opening. ISO BMFF has
@@ -110,4 +122,6 @@ the format crates, and the rules every reader follows are the
 `tests/any_reader.rs` checks that `probe` classifies the three container families,
 that an authored Matroska file reads through `AnyReader` with the expected track and
 packet, and that MPEG-TS is refused. `tests/any_reader_isobmff.rs` reads and seeks an
-authored MP4 through `AnyReader`. Gates: [docs/quality.md](../../docs/quality.md).
+authored MP4 through `AnyReader`; `tests/any_reader_ogg.rs` and
+`tests/any_reader_elementary.rs` read authored Ogg Opus, MPEG audio and headerless FLAC
+streams with their trims. Gates: [docs/quality.md](../../docs/quality.md).
