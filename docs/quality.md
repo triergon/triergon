@@ -231,9 +231,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   as `shape-text` and `shape-text-all` for the shaper, keep their open cases listed
   without blocking it.
 - **Input rights.** A case is measured only when its `rights` are
-  `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
-  reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
-  Any other case fails as `rights-unreviewed`.
+  `authored-synthetic`, `reviewed-licence` with a `licence` under which a
+  reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash, or
+  `fetched-not-redistributed` for an upstream regression sample, or a local remux
+  of one, whose hash `harness/fate/samples.json` records: fetched into the ignored
+  corpus cache, compared locally and never redistributed, its redistribution
+  rights unreviewed. Any other case fails as `rights-unreviewed`.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).

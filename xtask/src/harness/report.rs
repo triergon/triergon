@@ -226,9 +226,11 @@ pub fn fate_coverage(
     Ok(rows)
 }
 
-/// Manifests of third-party inputs whose licences have been reviewed. Each lists
-/// `sources` with a `licence` and the `sha256` of every file a source provides.
-const REVIEWED_INPUTS: [&str; 1] = ["harness/fonts/corpus.json"];
+/// Manifests of third-party inputs that may be measured: ones whose licences have
+/// been reviewed, which list `sources` with a `licence` and the `sha256` of every
+/// file a source provides, and the fetched upstream samples compared locally only,
+/// which list `samples` with their `sha256`.
+const REVIEWED_INPUTS: [&str; 2] = ["harness/fonts/corpus.json", "harness/fate/samples.json"];
 
 fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
     REVIEWED_INPUTS
@@ -237,15 +239,22 @@ fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
         .collect()
 }
 
-/// Whether a case's input may be measured: authored synthetic data, or a
+/// Whether a case's input may be measured: authored synthetic data, a
 /// `reviewed-licence` file whose hash a reviewed input manifest records under the
-/// licence the case names. Any other rights value is unreviewed.
+/// licence the case names, or a `fetched-not-redistributed` sample whose hash a
+/// manifest of fetched samples records. Any other rights value is unreviewed.
 fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
     fn list<'a>(value: &'a Value, key: &str) -> &'a [Value] {
         value.get(key).and_then(Value::as_array).unwrap_or_default()
     }
     match s(case, "rights") {
         Some("authored-synthetic") => true,
+        Some("fetched-not-redistributed") => s(case, "sha256").is_some_and(|sha| {
+            reviewed
+                .iter()
+                .flat_map(|manifest| list(manifest, "samples"))
+                .any(|sample| s(sample, "sha256") == Some(sha))
+        }),
         Some("reviewed-licence") => {
             let (Some(licence), Some(sha)) = (s(case, "licence"), s(case, "sha256")) else {
                 return false;
@@ -924,17 +933,21 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
 #[cfg(test)]
 mod prefix_tests {
     use super::{
-        PrefixFeature, open_cases, ratchet, recorded_corpus, reviewed_inputs, rights_reviewed,
+        PrefixFeature, open_cases, ratchet, read_json, recorded_corpus, reviewed_inputs,
+        rights_reviewed, s,
     };
     use crate::json::{Value, parse};
     use std::path::Path;
 
     #[test]
     fn rights_are_synthetic_or_a_recorded_reviewed_licence() {
-        let reviewed = [parse(
-            r#"{"sources": [{"licence": "OFL-1.1", "files": [{"path": "a.ttf", "sha256": "aa"}]}]}"#,
-        )
-        .unwrap()];
+        let reviewed = [
+            parse(
+                r#"{"sources": [{"licence": "OFL-1.1", "files": [{"path": "a.ttf", "sha256": "aa"}]}]}"#,
+            )
+            .unwrap(),
+            parse(r#"{"samples": [{"path": "fate/a.ts", "sha256": "cc"}]}"#).unwrap(),
+        ];
         let case = |text: &str| parse(text).unwrap();
         assert!(rights_reviewed(
             &reviewed,
@@ -942,7 +955,12 @@ mod prefix_tests {
         ));
         let font = r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "aa"}"#;
         assert!(rights_reviewed(&reviewed, &case(font)));
+        let fetched = r#"{"rights": "fetched-not-redistributed", "sha256": "cc"}"#;
+        assert!(rights_reviewed(&reviewed, &case(fetched)));
         for unreviewed in [
+            r#"{"rights": "fetched-not-redistributed", "sha256": "aa"}"#,
+            r#"{"rights": "fetched-not-redistributed", "source": "fate-suite/a.ts"}"#,
+            r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "cc"}"#,
             r#"{"rights": "reviewed-licence", "licence": "Apache-2.0", "sha256": "aa"}"#,
             r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "bb"}"#,
             r#"{"rights": "reviewed-licence", "sha256": "aa"}"#,
@@ -953,6 +971,23 @@ mod prefix_tests {
                 !rights_reviewed(&reviewed, &case(unreviewed)),
                 "{unreviewed}"
             );
+        }
+    }
+
+    #[test]
+    fn every_subtitle_case_may_be_measured() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let reviewed = reviewed_inputs(root).unwrap();
+        for feature in ["pgs", "dvb", "dvd", "cc", "teletext"] {
+            let path = root.join(format!("harness/features/subtitle-{feature}/corpus.json"));
+            let manifest = read_json(&path).unwrap();
+            for case in manifest.get("cases").and_then(Value::as_array).unwrap() {
+                assert!(
+                    rights_reviewed(&reviewed, case),
+                    "{}",
+                    s(case, "id").unwrap()
+                );
+            }
         }
     }
 
