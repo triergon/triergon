@@ -3,8 +3,6 @@
 
 use crate::range::RangeDecoder;
 
-/// Most pulses a band codes (`pulse_count` of the largest cached index).
-pub(super) const MAX_PULSES: usize = 128;
 /// Widest band: 22 bins of the last band times eight short blocks.
 pub(super) const MAX_BAND: usize = 176;
 
@@ -38,66 +36,84 @@ impl Spread {
     }
 }
 
-/// The codebook rows of RFC 6716 section 4.3.4.2: U(n, k) counts the vectors of `n`
+/// The codebook sizes of RFC 6716 section 4.3.4.2: U(n, k) counts the vectors of `n`
 /// dimensions with at most `k - 1` pulses whose first entry is positive, so that
-/// V(n, k) = U(n, k) + U(n, k + 1) codewords exist; U obeys
-/// U(n, k) = U(n - 1, k) + U(n, k - 1) + U(n - 1, k - 1).
+/// V(n, k) = U(n, k) + U(n, k + 1) codewords exist. U is symmetric and obeys
+/// U(n, k) = U(n - 1, k) + U(n, k - 1) + U(n - 1, k - 1), with U(0, 0) = 1 and
+/// U(n, 0) = U(0, k) = 0 otherwise.
 ///
-/// Fill `u[j] = U(n, j)` for `j <= k + 1` (`n >= 2`) and return V(n, k).
-fn codebook_row(n: usize, k: usize, u: &mut [u32]) -> u32 {
-    // Row 2: U(2, 0) = 0, U(2, j) = 2j - 1.
-    u[0] = 0;
-    for (j, value) in u.iter_mut().enumerate().skip(1) {
-        *value = 2 * j as u32 - 1;
-    }
-    // U(r + 1, 1) = 1 and U(r + 1, j) = U(r, j) + U(r, j - 1) + U(r + 1, j - 1).
-    for _ in 2..n {
-        let mut previous_old = u[1];
-        u[1] = 1;
-        for j in 2..u.len() {
-            let old = u[j];
-            u[j] = old.wrapping_add(previous_old).wrapping_add(u[j - 1]);
-            previous_old = old;
+/// Every codebook the pulse cache allows has V(n, k) < 2^32 and min(n, k + 1) <= 13 for
+/// n <= 176, so `U_TABLE[min(n, k)][max(n, k)]` holds every value decoding needs, without
+/// overflow (larger entries wrap and are never read).
+const U_ROWS: usize = 14;
+const U_COLUMNS: usize = MAX_BAND + 1;
+static U_TABLE: [[u32; U_COLUMNS]; U_ROWS] = {
+    let mut table = [[0u32; U_COLUMNS]; U_ROWS];
+    table[0][0] = 1;
+    let mut a = 1;
+    while a < U_ROWS {
+        let mut b = 1;
+        while b < U_COLUMNS {
+            table[a][b] = table[a - 1][b]
+                .wrapping_add(table[a][b - 1])
+                .wrapping_add(table[a - 1][b - 1]);
+            b += 1;
         }
+        a += 1;
     }
-    u[k].wrapping_add(u[k + 1])
+    table
+};
+
+/// U(n, k).
+#[inline(always)]
+fn u(n: usize, k: usize) -> u32 {
+    U_TABLE[n.min(k)][n.max(k)]
 }
 
-/// The vector of codeword `index` given row `u` of [`codebook_row`] (destroyed).
-fn codeword(mut index: u32, mut k: usize, u: &mut [u32], y: &mut [i32]) {
-    for value in y.iter_mut() {
-        // Indices from U(n, k + 1) on have a negative entry here.
-        let negative = index >= u[k + 1];
+/// The vector of codeword `index` of `k` pulses over `y.len()` dimensions: at each
+/// position with `n` dimensions left, indices from U(n, k + 1) on have a negative entry
+/// there, and the entry's magnitude takes the pulses down to the largest `k'` with
+/// U(n, k') <= the index. O(n + k) lookups.
+fn codeword(mut index: u32, mut k: usize, y: &mut [i32]) {
+    y.fill(0);
+    let mut n = y.len();
+    let mut j = 0;
+    while k > 0 {
+        if n > k + 1 {
+            // With more dimensions than pulses, U(n, k) and U(n, k + 1) are column n of
+            // rows k and k + 1; the entry is zero while the index lies between them.
+            let (row, next) = (&U_TABLE[k], &U_TABLE[k + 1]);
+            while n > k + 1 && (row[n]..next[n]).contains(&index) {
+                index -= row[n];
+                j += 1;
+                n -= 1;
+            }
+        }
+        let split = u(n, k + 1);
+        let negative = index >= split;
         if negative {
-            index -= u[k + 1];
+            index -= split;
         }
         let total = k;
-        while u[k] > index {
+        let mut below = u(n, k);
+        while below > index {
             k -= 1;
+            // With fewer pulses than dimensions the walk stays in column n.
+            below = if k < n { U_TABLE[k][n] } else { U_TABLE[n][k] };
         }
-        index -= u[k];
+        index -= below;
         let magnitude = (total - k) as i32;
-        *value = if negative { -magnitude } else { magnitude };
-        // Back to row n - 1: U(n - 1, j) = U(n, j) - U(n, j - 1) - U(n - 1, j - 1).
-        let mut previous_new = 0u32;
-        let mut previous_old = u[0];
-        u[0] = 0;
-        for j in 1..k + 2 {
-            let old = u[j];
-            previous_new = old.wrapping_sub(previous_old).wrapping_sub(previous_new);
-            u[j] = previous_new;
-            previous_old = old;
-        }
+        y[j] = if negative { -magnitude } else { magnitude };
+        j += 1;
+        n -= 1;
     }
 }
 
 /// Decode the codeword of `k` pulses over `y.len() >= 2` dimensions.
 fn decode_pulses(rc: &mut RangeDecoder<'_>, y: &mut [i32], k: usize) {
-    let mut row = [0u32; MAX_PULSES + 2];
-    let u = &mut row[..k + 2];
-    let codewords = codebook_row(y.len(), k, u);
-    let index = rc.uint(codewords);
-    codeword(index, k, u, y);
+    let n = y.len();
+    let index = rc.uint(u(n, k).wrapping_add(u(n, k + 1)));
+    codeword(index, k, y);
 }
 
 /// One pass of the spreading rotation over pairs `stride` apart, forwards then backwards.
@@ -173,7 +189,8 @@ pub(super) fn decode_band(
     let mut pulses = [0i32; MAX_BAND];
     let y = &mut pulses[..x.len()];
     decode_pulses(rc, y, k);
-    let energy = y.iter().fold(0f32, |e, &v| e + (v as f32) * (v as f32));
+    // Exact in integers: at most 128 pulses.
+    let energy = y.iter().map(|&v| v * v).sum::<i32>() as f32;
     let g = 1.0 / energy.sqrt() * gain;
     for (out, &v) in x.iter_mut().zip(y.iter()) {
         *out = g * v as f32;
@@ -215,8 +232,7 @@ mod tests {
     fn every_index_decodes_to_a_distinct_vector_of_k_pulses() {
         for n in 2..8usize {
             for k in 1..7usize {
-                let mut u = vec![0u32; k + 2];
-                let total = codebook_row(n, k, &mut u);
+                let total = u(n, k) + u(n, k + 1);
                 assert_eq!(
                     u64::from(total),
                     codewords(n as u64, k as u64),
@@ -224,17 +240,38 @@ mod tests {
                 );
                 let mut seen = std::collections::HashSet::new();
                 for index in 0..total {
-                    let mut row = u.clone();
                     let mut y = vec![0; n];
-                    codeword(index, k, &mut row, &mut y);
+                    codeword(index, k, &mut y);
                     assert_eq!(y.iter().map(|v| v.unsigned_abs()).sum::<u32>(), k as u32);
                     assert!(seen.insert(y), "n {n} k {k} index {index}");
                 }
             }
         }
-        // The largest codebooks still fit 32 bits.
-        let mut u = vec![0u32; MAX_PULSES + 2];
-        assert_eq!(codebook_row(2, MAX_PULSES, &mut u), 4 * MAX_PULSES as u32);
+    }
+
+    #[test]
+    fn the_table_covers_every_cached_codebook_exactly() {
+        use super::super::alloc::pulse_count;
+        use super::super::tables::{BANDS, CACHE_BITS, CACHE_INDEX, EBANDS};
+        for lm in -1i32..4 {
+            for band in 0..BANDS {
+                let index = CACHE_INDEX[(lm + 1) as usize * BANDS + band];
+                if index < 0 {
+                    continue;
+                }
+                let width = EBANDS[band + 1] - EBANDS[band];
+                let n = if lm < 0 { width >> 1 } else { width << lm };
+                let k = pulse_count(usize::from(CACHE_BITS[index as usize]));
+                if n < 2 {
+                    continue;
+                }
+                assert!(n.min(k + 1) < U_ROWS && n.max(k + 1) < U_COLUMNS, "{n} {k}");
+                assert!(
+                    u64::from(u(n, k)) + u64::from(u(n, k + 1)) == codewords(n as u64, k as u64),
+                    "V({n}, {k})"
+                );
+            }
+        }
     }
 
     #[test]
