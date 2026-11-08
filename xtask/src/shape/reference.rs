@@ -52,13 +52,15 @@ pub fn fribidi_argv(prefix: &Path) -> Vec<String> {
     ]
 }
 
-/// The C++ runtime HarfBuzz needs when C code links it.
-fn cxx_runtime() -> &'static str {
-    if cfg!(target_os = "macos") {
+/// What a C program linking the static HarfBuzz needs after it: the C++ runtime
+/// and libm, which GNU ld does not add implicitly.
+fn link_libraries() -> [&'static str; 2] {
+    let cxx = if cfg!(target_os = "macos") {
         "-lc++"
     } else {
         "-lstdc++"
-    }
+    };
+    [cxx, "-lm"]
 }
 
 /// Runs `argv` as configure in `source` unless the recorded arguments match.
@@ -132,7 +134,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
             "prefix={}\nName: harfbuzz\nDescription: HarfBuzz amalgamation\nVersion: 14.6.0\n\
              Libs: -L${{prefix}}/lib -lharfbuzz\nLibs.private: {}\nCflags: -I${{prefix}}/include/harfbuzz\n",
             prefix.display(),
-            cxx_runtime()
+            link_libraries().join(" ")
         ),
     )
     .map_err(|e| e.to_string())?;
@@ -159,6 +161,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
         ("releases", Value::Array(releases.into())),
         ("fribidi_configure_argv", fribidi_argv),
         ("harfbuzz_flags", Value::strings(HARFBUZZ_FLAGS)),
+        ("harfbuzz_link_libraries", Value::strings(link_libraries())),
         ("libraries", Value::object(libraries?)),
         (
             "compiler",
