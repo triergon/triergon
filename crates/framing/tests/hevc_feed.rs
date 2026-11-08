@@ -1,8 +1,8 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    BuildStep, HevcAnnexBConfig, HevcAnnexBLimits, HvcConfigLimits, HvcConfigSource,
-    HvcConfigViewParser, HvcConfigurationView,
+    BuildStep, HevcAnnexBConfig, HevcAnnexBLimits, HvcConfigLimits, HvcConfigParser,
+    HvcConfigSource, HvcConfiguration,
 };
 
 const LIMITS: HevcAnnexBLimits = HevcAnnexBLimits {
@@ -13,7 +13,7 @@ const LIMITS: HevcAnnexBLimits = HevcAnnexBLimits {
 static OFF: AtomicBool = AtomicBool::new(false);
 const START_CODE: &[u8] = &[0, 0, 0, 1];
 
-fn view(width: u8, arrays: &[(u8, u8, u8)]) -> (HvcConfigurationView, Bytes) {
+fn hvcc(width: u8, arrays: &[(u8, u8, u8)]) -> (HvcConfiguration, Bytes) {
     let pool = Budget::new(4096).unwrap();
     let mut record = vec![0; 23];
     record[0] = 1;
@@ -25,7 +25,7 @@ fn view(width: u8, arrays: &[(u8, u8, u8)]) -> (HvcConfigurationView, Bytes) {
         record.extend_from_slice(&[declaration | 0x80, 0, 1, 0, 3, nal_type << 1, 1, tag]);
     }
     let raw = Bytes::copy_from_slice(&pool, &record).unwrap();
-    let mut parser = HvcConfigViewParser::new(
+    let mut parser = HvcConfigParser::new(
         &pool,
         HvcConfigSource {
             source: SourceId(1),
@@ -49,7 +49,7 @@ fn view(width: u8, arrays: &[(u8, u8, u8)]) -> (HvcConfigurationView, Bytes) {
 
 #[test]
 fn irap_types_prepend_only_parameter_sets_in_declaration_order() {
-    let (record, raw) = view(
+    let (record, raw) = hvcc(
         1,
         &[
             (34, 34, 11),
@@ -126,7 +126,7 @@ fn irap_types_prepend_only_parameter_sets_in_declaration_order() {
 #[test]
 fn configuration_width_selects_sample_length_fields() {
     for width in [1, 2, 4] {
-        let (record, _) = view(width, &[]);
+        let (record, _) = hvcc(width, &[]);
         let config = HevcAnnexBConfig::new(record).unwrap();
         let sample = [0, 0, 0, 2, 0x02, 1];
         let mut job = config
@@ -142,7 +142,7 @@ fn configuration_width_selects_sample_length_fields() {
 
 #[test]
 fn bad_tails_headers_limits_and_cancel_do_not_publish() {
-    let (record, _) = view(4, &[(32, 32, 3)]);
+    let (record, _) = hvcc(4, &[(32, 32, 3)]);
     let config = HevcAnnexBConfig::new(record).unwrap();
     let truncated = [0, 0, 0, 2, 0x20, 1, 0, 0, 0, 2, 0x02];
     let mut job = config.job(&truncated, LIMITS).unwrap();
@@ -229,7 +229,7 @@ fn bad_tails_headers_limits_and_cancel_do_not_publish() {
 #[test]
 fn parameter_set_array_mismatches_refuse_configuration() {
     for pair in [(32, 39, 7), (39, 34, 8), (32, 33, 9)] {
-        let (record, _) = view(4, &[pair]);
+        let (record, _) = hvcc(4, &[pair]);
         assert_eq!(
             HevcAnnexBConfig::new(record).err(),
             Some(Error::Invalid("hvcC parameter-set declaration"))

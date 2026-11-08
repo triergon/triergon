@@ -1,7 +1,5 @@
 //! A four-byte-start-code AVC feed, over complete length-prefixed samples.
-use crate::{
-    AvcConfigArrayKind, AvcConfigNalRef, AvcConfigurationView, BuildStep, Codec, NalHeader,
-};
+use crate::{AvcConfigArrayKind, AvcConfigNal, AvcConfiguration, BuildStep, Codec, NalHeader};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -9,12 +7,12 @@ const START_CODE: &[u8; 4] = &[0, 0, 0, 1];
 
 /// Holds one bounded record. A random-access feed uses its SPS and PPS arrays.
 pub struct AvcAnnexBConfig {
-    record: AvcConfigurationView,
+    record: AvcConfiguration,
     parameter_bytes: usize,
 }
 
 impl AvcAnnexBConfig {
-    pub fn new(record: AvcConfigurationView) -> Result<Self> {
+    pub fn new(record: AvcConfiguration) -> Result<Self> {
         let mut parameter_bytes = 0usize;
         for nal in record.nals().filter(parameter_set) {
             parameter_bytes = add_nal_bytes(parameter_bytes, nal.source_bytes().len())?;
@@ -25,12 +23,12 @@ impl AvcAnnexBConfig {
         })
     }
 
-    pub fn record(&self) -> &AvcConfigurationView {
+    pub fn record(&self) -> &AvcConfiguration {
         &self.record
     }
 }
 
-fn parameter_set(nal: &AvcConfigNalRef<'_>) -> bool {
+fn parameter_set(nal: &AvcConfigNal<'_>) -> bool {
     matches!(
         nal.array_kind(),
         AvcConfigArrayKind::Sequence | AvcConfigArrayKind::Picture
@@ -99,7 +97,7 @@ impl AvcAnnexBAccessUnit<'_> {
 }
 
 struct AnnexBSegments<'a> {
-    configuration: Option<&'a AvcConfigurationView>,
+    configuration: Option<&'a AvcConfiguration>,
     parameter_index: usize,
     sample: &'a [u8],
     length_width: usize,

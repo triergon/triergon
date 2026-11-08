@@ -16,10 +16,9 @@ pub mod reference_trace;
 
 mod nal_packet;
 pub use nal_packet::{
-    NalPacket, NalPacketCompactJob, NalPacketCompactOutput, NalPacketConfiguration,
-    NalPacketFields, NalPacketJob, NalPacketLimits, NalPacketOrigin, NalPacketOutput,
-    NalPacketProgress, NalPacketRangeSegment, NalPacketReceiverErrorKind, NalPacketRejection,
-    NalPacketSegment, NalPacketSession, NalPacketViewConfiguration, NalPacketViewJob,
+    NalPacket, NalPacketConfiguration, NalPacketFields, NalPacketJob, NalPacketLimits,
+    NalPacketOrigin, NalPacketOutput, NalPacketProgress, NalPacketReceiverErrorKind,
+    NalPacketRejection, NalPacketSegment, NalPacketSession,
 };
 
 mod ac3;
@@ -175,13 +174,5 @@ pub use nal_packet_config::{
 };
 
 mod nal_receiver_config;
-
-// Compact configuration inspection.
-pub use avc_config::{
-    AvcConfigArrayRef, AvcConfigNalRef, AvcConfigViewParser, AvcConfigurationView,
-};
-pub use hevc_config::{
-    HvcConfigArrayRef, HvcConfigNalRef, HvcConfigViewParser, HvcConfigurationView,
-};
 
 pub use raw_annex_b::{RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};

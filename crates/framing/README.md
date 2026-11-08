@@ -18,8 +18,8 @@ and are fed with `provide` and closed with `finish` or `fail`.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
 use triergon_framing::{
-    AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigSource,
-    AvcConfigViewParser, BuildStep,
+    AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigParser,
+    AvcConfigSource, BuildStep,
 };
 
 let pool = Budget::new(1 << 20)?;
@@ -34,7 +34,7 @@ let avcc = [
 ];
 let source = AvcConfigSource { source: SourceId(1), generation: 0, offset: 0 };
 let limits = AvcConfigLimits { maximum_record_bytes: 4096, maximum_nals: 64, maximum_nal_bytes: 4096 };
-let mut parser = AvcConfigViewParser::new(&pool, source, Bytes::copy_from_slice(&pool, &avcc)?, limits)?;
+let mut parser = AvcConfigParser::new(&pool, source, Bytes::copy_from_slice(&pool, &avcc)?, limits)?;
 let record = loop {
     match parser.step(&mut work, &cancel)? {
         BuildStep::Ready(record) => break record,
@@ -75,8 +75,8 @@ assert_eq!(decoder_input, [
 |---|---|---|
 | NAL streams | `NalReader`, `Framing::{AnnexB, LengthPrefixed}`, `LengthSize` | Incremental AVC/HEVC NAL extraction from any chunking; 1–4 byte big-endian lengths or Annex-B start codes; fixed NAL header facts |
 | Raw Annex-B access units | `RawAnnexBReader`, `RawAccessUnit` | Groups an elementary AVC/HEVC stream into access units (H.264 §7.4.1.2.3–4, H.265 §7.4.2.4.4); reports IDR/IRAP; keeps original start codes and padding |
-| avcC | `AvcConfigParser`, `AvcConfigViewParser` | Full record: fixed fields, SPS/PPS/SPS-ext arrays, high-profile extension, trailing bytes |
-| hvcC | `HvcConfigParser`, `HvcConfigViewParser`, `inspect_hvc_config_prefix` | Version 1: 23-byte fixed prefix, all NAL arrays in order (unknown/duplicate/empty arrays kept) |
+| avcC | `AvcConfigParser` | Full record: fixed fields, SPS/PPS/SPS-ext arrays, high-profile extension, trailing bytes |
+| hvcC | `HvcConfigParser`, `inspect_hvc_config_prefix` | Version 1: 23-byte fixed prefix, all NAL arrays in order (unknown/duplicate/empty arrays kept) |
 | Sample to Annex-B | `AvcAnnexBJob`, `HevcAnnexBJob` | Four-byte start codes; prepends record SPS/PPS (VPS/SPS/PPS) before IDR/IRAP; zero-copy segments |
 | Record to Annex-B | `HvcAnnexBWriter`, `HvcDecoderConfigWriter`, `AnnexBWriter` | All hvcC NALs in order, or the decoder subset (types 32–34, 39, 40); single NAL with `00 00 00 01` |
 | FFmpeg-compatible BSF | `NalPacketSession`, `NalPacketConfigWriter`, `compat::nal` | Stateful `h264_mp4toannexb`/`hevc_mp4toannexb` packet behaviour, including in-band parameter-set tracking and AVC `NEW_EXTRADATA` |

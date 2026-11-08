@@ -114,156 +114,6 @@ pub fn inspect_hvc_config_prefix(raw: &[u8]) -> Result<HvcConfigFields> {
             .map_err(|_| Error::Truncated)?,
     })
 }
-#[derive(Clone)]
-pub struct HvcConfigArray {
-    header: Bytes,
-    range: Range<usize>,
-    first_nal: u32,
-    nal_count: u16,
-}
-// Shows the derived ranges and counts instead of their stored parts.
-#[allow(clippy::missing_fields_in_debug)]
-impl std::fmt::Debug for HvcConfigArray {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("HvcConfigArray")
-            .field("header", &self.header)
-            .field("range", &self.range)
-            .field("nals", &self.nal_indices())
-            .finish()
-    }
-}
-impl HvcConfigArray {
-    pub fn source_header_bytes(&self) -> &Bytes {
-        &self.header
-    }
-    pub fn completeness(&self) -> bool {
-        self.header[0] & 128 != 0
-    }
-    pub fn reserved_bit(&self) -> bool {
-        self.header[0] & 64 != 0
-    }
-    pub fn declared_nal_type(&self) -> u8 {
-        self.header[0] & 63
-    }
-    pub fn source_range(&self) -> Range<usize> {
-        self.range.clone()
-    }
-    pub fn nal_indices(&self) -> Range<usize> {
-        let start = self.first_nal as usize;
-        start..start + usize::from(self.nal_count)
-    }
-}
-#[derive(Clone)]
-pub struct HvcConfigNal {
-    payload: Bytes,
-    length: Bytes,
-    // The checked source end is start+payload.len(). Both bytes and this
-    // source-relative start are immutable; no offset or length is narrowed.
-    range_start: usize,
-    header: NalHeader,
-    // Scan admits at most the literal u8 array_count, so NAL indices refer
-    // to arrays0..254. The public getter still returns the exact usize value.
-    array: u8,
-    declared_type: u8,
-}
-// Shows the derived ranges and counts instead of their stored parts.
-#[allow(clippy::missing_fields_in_debug)]
-impl std::fmt::Debug for HvcConfigNal {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("HvcConfigNal")
-            .field("payload", &self.payload)
-            .field("length", &self.length)
-            .field("range", &self.source_range())
-            .field("header", &self.header)
-            .field("array", &self.array)
-            .field("declared_type", &self.declared_type)
-            .finish()
-    }
-}
-impl HvcConfigNal {
-    pub fn source_bytes(&self) -> &Bytes {
-        &self.payload
-    }
-    pub fn length_field_bytes(&self) -> &Bytes {
-        &self.length
-    }
-    pub fn source_range(&self) -> Range<usize> {
-        // Construction already checked start..end against the original record
-        // and sliced exactly that span. Its immutable length is end-start,
-        // including when the record itself is a view of a larger owner.
-        self.range_start..self.range_start + self.payload.len()
-    }
-    pub const fn header(&self) -> NalHeader {
-        self.header
-    }
-    pub const fn array_index(&self) -> usize {
-        self.array as usize
-    }
-    pub const fn declared_nal_type(&self) -> u8 {
-        self.declared_type
-    }
-    pub fn type_matches_declaration(&self) -> bool {
-        self.header.nal_unit_type() == self.declared_type
-    }
-}
-pub struct HvcConfiguration {
-    raw: Bytes,
-    source: HvcConfigSource,
-    fields: HvcConfigFields,
-    width: LengthSize,
-    arrays: BudgetVec<HvcConfigArray>,
-    nals: BudgetVec<HvcConfigNal>,
-    understood_end: usize,
-}
-impl HvcConfiguration {
-    pub fn source_bytes(&self) -> &Bytes {
-        &self.raw
-    }
-    pub const fn source(&self) -> HvcConfigSource {
-        self.source
-    }
-    pub const fn fields(&self) -> HvcConfigFields {
-        self.fields
-    }
-    pub const fn length_size(&self) -> LengthSize {
-        self.width
-    }
-    pub fn arrays(&self) -> &[HvcConfigArray] {
-        self.arrays.as_slice()
-    }
-    pub fn nals(&self) -> &[HvcConfigNal] {
-        self.nals.as_slice()
-    }
-    pub const fn understood_end(&self) -> usize {
-        self.understood_end
-    }
-    pub fn opaque_suffix(&self) -> Result<Bytes> {
-        self.raw.slice(self.understood_end..self.raw.len())
-    }
-    /// Unique retained owners: full source backing plus actual descriptor
-    /// capacities. Aliasing NAL/array/suffix slices do not multiply the charge.
-    pub fn retained_storage_bytes(&self) -> Result<usize> {
-        self.arrays
-            .capacity()
-            .checked_mul(size_of::<HvcConfigArray>())
-            .and_then(|a| {
-                self.nals
-                    .capacity()
-                    .checked_mul(size_of::<HvcConfigNal>())
-                    .and_then(|n| a.checked_add(n))
-            })
-            .and_then(|n| n.checked_add(self.raw.retained_storage_bytes()))
-            .ok_or(Error::Overflow)
-    }
-    /// Includes reserved array-header bits and declared-vs-actual fixed NAL type.
-    pub fn syntax_issues(&self) -> u32 {
-        self.fields.syntax_issues()
-            | u32::from(self.arrays().iter().any(HvcConfigArray::reserved_bit)) << 6
-            | u32::from(self.nals().iter().any(|n| !n.type_matches_declaration())) << 7
-    }
-}
 #[derive(Clone, Copy)]
 enum ScanPhase {
     Array,
@@ -380,7 +230,7 @@ enum Phase {
 /// descriptors. Source bytes, including unknown NAL bodies, all arrays and any
 /// suffix, are retained without rewriting. Fixed-header validity is distinct
 /// from array/type/reserved-pattern issues and from decoder validity.
-struct HvcParser<S: HvcStorage> {
+pub struct HvcConfigParser {
     raw: Option<Bytes>,
     source: HvcConfigSource,
     limits: HvcConfigLimits,
@@ -392,14 +242,14 @@ struct HvcParser<S: HvcStorage> {
     understood_end: usize,
     // Taken by the published output and dropped by a latched failure, so no
     // spare pool handle or empty replacement vectors are kept for either.
-    arrays: Option<BudgetVec<S::Array>>,
-    nals: Option<BudgetVec<S::Nal>>,
+    arrays: Option<BudgetVec<HvcArrayDescriptor>>,
+    nals: Option<BudgetVec<HvcNalDescriptor>>,
     failure: Option<Error>,
     observed_width_three: bool,
 }
 
-impl<S: HvcStorage> HvcParser<S> {
-    fn new(
+impl HvcConfigParser {
+    pub fn new(
         pool: &Budget,
         source: HvcConfigSource,
         raw: Bytes,
@@ -432,7 +282,7 @@ impl<S: HvcStorage> HvcParser<S> {
 
     // Crate-private: only the separately typed observed-record wrapper can
     // publish this result. The ordinary source constructor remains strict.
-    fn new_observed_width(
+    pub(crate) fn new_observed_width(
         pool: &Budget,
         source: HvcConfigSource,
         raw: Bytes,
@@ -443,7 +293,11 @@ impl<S: HvcStorage> HvcParser<S> {
         Ok(parser)
     }
 
-    fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStep<S::Output>> {
+    pub fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<BuildStep<HvcConfiguration>> {
         if let Some(error) = self.failure {
             return Err(error);
         }
@@ -463,7 +317,7 @@ impl<S: HvcStorage> HvcParser<S> {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<S::Output>> {
+    ) -> Result<BuildStep<HvcConfiguration>> {
         loop {
             if matches!(self.phase, Phase::Complete) {
                 return Ok(BuildStep::Complete);
@@ -509,7 +363,7 @@ impl<S: HvcStorage> HvcParser<S> {
                                 self.arrays
                                     .as_mut()
                                     .ok_or(Error::Invalid("missing hvcC descriptors"))?
-                                    .try_push(S::array(raw, header, first, count)?)
+                                    .try_push(HvcArrayDescriptor::new(header, first, count)?)
                                     .map_err(|e| e.error)?;
                             }
                         }
@@ -521,14 +375,13 @@ impl<S: HvcStorage> HvcParser<S> {
                             self.nals
                                 .as_mut()
                                 .ok_or(Error::Invalid("missing hvcC descriptors"))?
-                                .try_push(S::nal(
-                                    raw,
-                                    length,
+                                .try_push(HvcNalDescriptor::new(
+                                    &length,
                                     payload,
                                     header,
                                     usize::from(next.index),
                                     next.declared_type,
-                                )?)
+                                ))
                                 .map_err(|e| e.error)?;
                         }
                         Event::ArrayEnd(end) if matches!(self.phase, Phase::Fill) => {
@@ -539,12 +392,12 @@ impl<S: HvcStorage> HvcParser<S> {
                                 .as_mut_slice()
                                 .last_mut()
                                 .ok_or(Error::Invalid("missing hvcC array"))?;
-                            if S::array_nal_end(array)
+                            if array.nal_indices().end
                                 != self.nals.as_ref().map_or(0, BudgetVec::len)
                             {
                                 return Err(Error::Invalid("hvcC array second walk"));
                             }
-                            S::set_array_end(array, end);
+                            array.range.end = end;
                         }
                         Event::End(end) => {
                             if matches!(self.phase, Phase::Count) {
@@ -553,11 +406,11 @@ impl<S: HvcStorage> HvcParser<S> {
                                 // blaming caller retention. Capacity is charged by
                                 // BudgetVec, including any allocator over-allocation.
                                 let array_bytes = usize::from(self.scan.array_count)
-                                    .checked_mul(size_of::<S::Array>())
+                                    .checked_mul(size_of::<HvcArrayDescriptor>())
                                     .ok_or(Error::Overflow)?;
                                 let nal_bytes = self
                                     .total
-                                    .checked_mul(size_of::<S::Nal>())
+                                    .checked_mul(size_of::<HvcNalDescriptor>())
                                     .ok_or(Error::Overflow)?;
                                 let minimum = Budget::control_storage_bytes()
                                     .checked_add(raw.retained_storage_bytes())
@@ -585,7 +438,7 @@ impl<S: HvcStorage> HvcParser<S> {
                                 let width = self
                                     .width
                                     .ok_or(Error::Invalid("missing hvcC length width"))?;
-                                let output = S::finish(HvcBuild {
+                                let output = HvcConfiguration {
                                     raw: self
                                         .raw
                                         .take()
@@ -602,7 +455,7 @@ impl<S: HvcStorage> HvcParser<S> {
                                         .take()
                                         .ok_or(Error::Invalid("missing hvcC descriptors"))?,
                                     understood_end: end,
-                                });
+                                };
                                 self.phase = Phase::Complete;
                                 return Ok(BuildStep::Ready(output));
                             }
@@ -640,119 +493,6 @@ fn check_limit(requested: usize, maximum: usize) -> Result<()> {
     }
 }
 
-trait HvcStorage {
-    type Array;
-    type Nal;
-    type Output;
-    fn array(raw: &Bytes, header: Range<usize>, first: usize, count: usize) -> Result<Self::Array>;
-    fn nal(
-        raw: &Bytes,
-        length: Range<usize>,
-        payload: Range<usize>,
-        header: NalHeader,
-        array: usize,
-        declared_type: u8,
-    ) -> Result<Self::Nal>;
-    fn array_nal_end(array: &Self::Array) -> usize;
-    fn set_array_end(array: &mut Self::Array, end: usize);
-    fn finish(data: HvcBuild<Self::Array, Self::Nal>) -> Self::Output;
-}
-#[derive(Debug)]
-struct HvcBuild<A, N> {
-    raw: Bytes,
-    source: HvcConfigSource,
-    fields: HvcConfigFields,
-    width: LengthSize,
-    arrays: BudgetVec<A>,
-    nals: BudgetVec<N>,
-    understood_end: usize,
-}
-struct EagerHvc;
-impl HvcStorage for EagerHvc {
-    type Array = HvcConfigArray;
-    type Nal = HvcConfigNal;
-    type Output = HvcConfiguration;
-    fn array(raw: &Bytes, header: Range<usize>, first: usize, count: usize) -> Result<Self::Array> {
-        Ok(HvcConfigArray {
-            header: raw.slice(header.clone())?,
-            range: header,
-            first_nal: {
-                // Preserve the existing checked-add after the checked slice.
-                first.checked_add(count).ok_or(Error::Overflow)?;
-                first as u32
-            },
-            nal_count: count as u16,
-        })
-    }
-    fn nal(
-        raw: &Bytes,
-        length: Range<usize>,
-        payload: Range<usize>,
-        header: NalHeader,
-        array: usize,
-        declared_type: u8,
-    ) -> Result<Self::Nal> {
-        Ok(HvcConfigNal {
-            payload: raw.slice(payload.clone())?,
-            length: raw.slice(length)?,
-            range_start: payload.start,
-            header,
-            array: array as u8,
-            declared_type,
-        })
-    }
-    fn array_nal_end(array: &Self::Array) -> usize {
-        array.nal_indices().end
-    }
-    fn set_array_end(array: &mut Self::Array, end: usize) {
-        array.range.end = end;
-    }
-    fn finish(data: HvcBuild<Self::Array, Self::Nal>) -> Self::Output {
-        HvcConfiguration {
-            raw: data.raw,
-            source: data.source,
-            fields: data.fields,
-            width: data.width,
-            arrays: data.arrays,
-            nals: data.nals,
-            understood_end: data.understood_end,
-        }
-    }
-}
-/// Existing eager API, delegated to the shared checked engine.
-pub struct HvcConfigParser {
-    inner: HvcParser<EagerHvc>,
-}
-impl HvcConfigParser {
-    pub fn new(
-        pool: &Budget,
-        source: HvcConfigSource,
-        raw: Bytes,
-        limits: HvcConfigLimits,
-    ) -> Result<Self> {
-        Ok(Self {
-            inner: HvcParser::new(pool, source, raw, limits)?,
-        })
-    }
-    pub(crate) fn new_observed_width(
-        pool: &Budget,
-        source: HvcConfigSource,
-        raw: Bytes,
-        limits: HvcConfigLimits,
-    ) -> Result<Self> {
-        Ok(Self {
-            inner: HvcParser::new_observed_width(pool, source, raw, limits)?,
-        })
-    }
-    pub fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<HvcConfiguration>> {
-        self.inner.step(work, cancel)
-    }
-}
-
 #[derive(Clone, Debug)]
 struct HvcArrayDescriptor {
     range: Range<usize>,
@@ -760,6 +500,15 @@ struct HvcArrayDescriptor {
     nal_count: u16,
 }
 impl HvcArrayDescriptor {
+    fn new(header: Range<usize>, first: usize, count: usize) -> Result<Self> {
+        // Scan already physically checked the three literal header bytes.
+        first.checked_add(count).ok_or(Error::Overflow)?;
+        Ok(Self {
+            range: header,
+            first_nal: first as u32,
+            nal_count: count as u16,
+        })
+    }
     fn nal_indices(&self) -> Range<usize> {
         let first = self.first_nal as usize;
         first..first + usize::from(self.nal_count)
@@ -789,6 +538,26 @@ impl std::fmt::Debug for HvcNalDescriptor {
     }
 }
 impl HvcNalDescriptor {
+    fn new(
+        length: &Range<usize>,
+        payload: Range<usize>,
+        header: NalHeader,
+        array: usize,
+        declared_type: u8,
+    ) -> Self {
+        // Scan::next checked body + size with size decoded from exactly two
+        // wire bytes. Its payload range therefore has this u16 length.
+        debug_assert!(length.end == payload.start && length.len() == 2);
+        let payload_len = payload.len();
+        debug_assert!(u16::try_from(payload_len).is_ok());
+        Self {
+            payload_start: payload.start,
+            payload_len: payload_len as u16,
+            header,
+            array: array as u8,
+            declared_type,
+        }
+    }
     fn payload_range(&self) -> Range<usize> {
         // The checked end from Scan is start + the same immutable length.
         self.payload_start..self.payload_start + usize::from(self.payload_len)
@@ -798,151 +567,98 @@ impl HvcNalDescriptor {
         self.payload_start - 2
     }
 }
-struct CompactHvc;
-impl HvcStorage for CompactHvc {
-    type Array = HvcArrayDescriptor;
-    type Nal = HvcNalDescriptor;
-    type Output = HvcConfigurationView;
-    fn array(
-        _raw: &Bytes,
-        header: Range<usize>,
-        first: usize,
-        count: usize,
-    ) -> Result<Self::Array> {
-        // Scan already physically checked the three literal header bytes.
-        first.checked_add(count).ok_or(Error::Overflow)?;
-        Ok(HvcArrayDescriptor {
-            range: header,
-            first_nal: first as u32,
-            nal_count: count as u16,
-        })
-    }
-    fn nal(
-        _raw: &Bytes,
-        length: Range<usize>,
-        payload: Range<usize>,
-        header: NalHeader,
-        array: usize,
-        declared_type: u8,
-    ) -> Result<Self::Nal> {
-        // Scan::next checked body + size with size decoded from exactly two
-        // wire bytes. Its payload range therefore has this u16 length.
-        debug_assert!(length.end == payload.start && length.len() == 2);
-        let payload_len = payload.len();
-        debug_assert!(u16::try_from(payload_len).is_ok());
-        Ok(HvcNalDescriptor {
-            payload_start: payload.start,
-            payload_len: payload_len as u16,
-            header,
-            array: array as u8,
-            declared_type,
-        })
-    }
-    fn array_nal_end(array: &Self::Array) -> usize {
-        array.nal_indices().end
-    }
-    fn set_array_end(array: &mut Self::Array, end: usize) {
-        array.range.end = end;
-    }
-    fn finish(data: HvcBuild<Self::Array, Self::Nal>) -> Self::Output {
-        HvcConfigurationView { data }
-    }
-}
-
 /// Complete hvcC facts with one raw record handle and independently charged
 /// descriptor capacities; array headers and NAL spans are borrowed inspections.
 #[derive(Debug)]
-pub struct HvcConfigurationView {
-    data: HvcBuild<HvcArrayDescriptor, HvcNalDescriptor>,
+pub struct HvcConfiguration {
+    raw: Bytes,
+    source: HvcConfigSource,
+    fields: HvcConfigFields,
+    width: LengthSize,
+    arrays: BudgetVec<HvcArrayDescriptor>,
+    nals: BudgetVec<HvcNalDescriptor>,
+    understood_end: usize,
 }
-impl HvcConfigurationView {
+impl HvcConfiguration {
     pub fn source_bytes(&self) -> &Bytes {
-        &self.data.raw
+        &self.raw
     }
     pub const fn source(&self) -> HvcConfigSource {
-        self.data.source
+        self.source
     }
     pub const fn fields(&self) -> HvcConfigFields {
-        self.data.fields
+        self.fields
     }
     pub const fn length_size(&self) -> LengthSize {
-        self.data.width
+        self.width
     }
     pub const fn understood_end(&self) -> usize {
-        self.data.understood_end
+        self.understood_end
     }
     pub fn nal_count(&self) -> usize {
-        self.data.nals.len()
+        self.nals.len()
     }
     pub fn array_count(&self) -> usize {
-        self.data.arrays.len()
+        self.arrays.len()
     }
-    pub fn nal(&self, index: usize) -> Option<HvcConfigNalRef<'_>> {
-        self.data
-            .nals
+    pub fn nal(&self, index: usize) -> Option<HvcConfigNal<'_>> {
+        self.nals
             .as_slice()
             .get(index)
-            .map(|descriptor| HvcConfigNalRef {
-                raw: &self.data.raw,
-                source: self.data.source,
+            .map(|descriptor| HvcConfigNal {
+                raw: &self.raw,
+                source: self.source,
                 descriptor,
             })
     }
     pub fn nals(
         &self,
-    ) -> impl ExactSizeIterator<Item = HvcConfigNalRef<'_>> + DoubleEndedIterator + '_ {
-        self.data
-            .nals
+    ) -> impl ExactSizeIterator<Item = HvcConfigNal<'_>> + DoubleEndedIterator + '_ {
+        self.nals
             .as_slice()
             .iter()
-            .map(move |descriptor| HvcConfigNalRef {
-                raw: &self.data.raw,
-                source: self.data.source,
+            .map(move |descriptor| HvcConfigNal {
+                raw: &self.raw,
+                source: self.source,
                 descriptor,
             })
     }
-    pub fn array(&self, index: usize) -> Option<HvcConfigArrayRef<'_>> {
-        self.data
-            .arrays
+    pub fn array(&self, index: usize) -> Option<HvcConfigArray<'_>> {
+        self.arrays
             .as_slice()
             .get(index)
-            .map(|descriptor| HvcConfigArrayRef {
-                raw: &self.data.raw,
-                source: self.data.source,
+            .map(|descriptor| HvcConfigArray {
+                raw: &self.raw,
+                source: self.source,
                 descriptor,
             })
     }
     pub fn arrays(
         &self,
-    ) -> impl ExactSizeIterator<Item = HvcConfigArrayRef<'_>> + DoubleEndedIterator + '_ {
-        self.data
-            .arrays
+    ) -> impl ExactSizeIterator<Item = HvcConfigArray<'_>> + DoubleEndedIterator + '_ {
+        self.arrays
             .as_slice()
             .iter()
-            .map(move |descriptor| HvcConfigArrayRef {
-                raw: &self.data.raw,
-                source: self.data.source,
+            .map(move |descriptor| HvcConfigArray {
+                raw: &self.raw,
+                source: self.source,
                 descriptor,
             })
     }
     pub fn opaque_suffix(&self) -> &[u8] {
-        &self.data.raw[self.data.understood_end..]
+        &self.raw[self.understood_end..]
     }
     pub fn retain_opaque_suffix(&self) -> Result<Bytes> {
-        self.data
-            .raw
-            .slice(self.data.understood_end..self.data.raw.len())
+        self.raw.slice(self.understood_end..self.raw.len())
     }
-    /// Element-count lower bound for live descriptor storage, as the eager
-    /// record's lower bound counts its leaves (capacity may be larger).
+    /// Element-count lower bound for live descriptor storage (capacity may be
+    /// larger).
     pub(crate) fn descriptor_lower_bound(&self) -> Result<usize> {
-        self.data
-            .nals
+        self.nals
             .len()
             .checked_mul(size_of::<HvcNalDescriptor>())
             .and_then(|n| {
-                self.data
-                    .arrays
+                self.arrays
                     .len()
                     .checked_mul(size_of::<HvcArrayDescriptor>())
                     .and_then(|a| a.checked_add(n))
@@ -950,13 +666,11 @@ impl HvcConfigurationView {
             .ok_or(Error::Overflow)
     }
     pub fn descriptor_storage_bytes(&self) -> Result<usize> {
-        self.data
-            .arrays
+        self.arrays
             .capacity()
             .checked_mul(size_of::<HvcArrayDescriptor>())
             .and_then(|a| {
-                self.data
-                    .nals
+                self.nals
                     .capacity()
                     .checked_mul(size_of::<HvcNalDescriptor>())
                     .and_then(|n| a.checked_add(n))
@@ -965,7 +679,7 @@ impl HvcConfigurationView {
     }
     pub fn retained_storage_bytes(&self) -> Result<usize> {
         self.descriptor_storage_bytes()?
-            .checked_add(self.data.raw.retained_storage_bytes())
+            .checked_add(self.raw.retained_storage_bytes())
             .ok_or(Error::Overflow)
     }
     pub fn syntax_issues(&self) -> u32 {
@@ -978,8 +692,8 @@ impl HvcConfigurationView {
 /// A borrowed hvcC leaf is tied to its configuration's lifetime.
 ///
 /// ```compile_fail,E0505
-/// use triergon_framing::HvcConfigurationView;
-/// fn escape(view: HvcConfigurationView) {
+/// use triergon_framing::HvcConfiguration;
+/// fn escape(view: HvcConfiguration) {
 ///     let leaf = view.nal(0).unwrap();
 ///     drop(view);
 ///     let _ = leaf.length_field_bytes();
@@ -987,20 +701,20 @@ impl HvcConfigurationView {
 /// ```
 ///
 /// ```compile_fail,E0505
-/// use triergon_framing::HvcConfigurationView;
-/// fn escape(view: HvcConfigurationView) -> usize {
+/// use triergon_framing::HvcConfiguration;
+/// fn escape(view: HvcConfiguration) -> usize {
 ///     let suffix = view.opaque_suffix();
 ///     drop(view);
 ///     suffix.len()
 /// }
 /// ```
 #[derive(Clone, Copy, Debug)]
-pub struct HvcConfigNalRef<'a> {
+pub struct HvcConfigNal<'a> {
     raw: &'a Bytes,
     source: HvcConfigSource,
     descriptor: &'a HvcNalDescriptor,
 }
-impl<'a> HvcConfigNalRef<'a> {
+impl<'a> HvcConfigNal<'a> {
     pub fn source_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.payload_range()]
     }
@@ -1028,20 +742,20 @@ impl<'a> HvcConfigNalRef<'a> {
 }
 
 /// ```compile_fail,E0505
-/// use triergon_framing::HvcConfigurationView;
-/// fn escape(view: HvcConfigurationView) -> usize {
+/// use triergon_framing::HvcConfiguration;
+/// fn escape(view: HvcConfiguration) -> usize {
 ///     let header = view.array(0).unwrap().source_header_bytes();
 ///     drop(view);
 ///     header.len()
 /// }
 /// ```
 #[derive(Clone, Copy, Debug)]
-pub struct HvcConfigArrayRef<'a> {
+pub struct HvcConfigArray<'a> {
     raw: &'a Bytes,
     source: HvcConfigSource,
     descriptor: &'a HvcArrayDescriptor,
 }
-impl<'a> HvcConfigArrayRef<'a> {
+impl<'a> HvcConfigArray<'a> {
     pub fn source_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.range.clone()]
     }
@@ -1068,48 +782,14 @@ impl<'a> HvcConfigArrayRef<'a> {
     }
 }
 
-/// View output using the same hvcC Scan/Event transitions.
-pub struct HvcConfigViewParser {
-    inner: HvcParser<CompactHvc>,
-}
-impl HvcConfigViewParser {
-    pub fn new(
-        pool: &Budget,
-        source: HvcConfigSource,
-        raw: Bytes,
-        limits: HvcConfigLimits,
-    ) -> Result<Self> {
-        Ok(Self {
-            inner: HvcParser::new(pool, source, raw, limits)?,
-        })
-    }
-    pub(crate) fn new_observed_width(
-        pool: &Budget,
-        source: HvcConfigSource,
-        raw: Bytes,
-        limits: HvcConfigLimits,
-    ) -> Result<Self> {
-        Ok(Self {
-            inner: HvcParser::new_observed_width(pool, source, raw, limits)?,
-        })
-    }
-    pub fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<HvcConfigurationView>> {
-        self.inner.step(work, cancel)
-    }
-}
-
 #[cfg(test)]
-mod compact_descriptor_guards {
+mod descriptor_guards {
     use super::*;
 
     const PACKED_NAL_BYTES: usize = size_of::<usize>() + 8;
 
     #[test]
-    fn compact_nal_descriptor_uses_one_word_and_eight_bytes() {
+    fn nal_descriptor_uses_one_word_and_eight_bytes() {
         assert_eq!(size_of::<HvcNalDescriptor>(), PACKED_NAL_BYTES);
     }
 
@@ -1143,7 +823,7 @@ mod compact_descriptor_guards {
             maximum_nals: 2,
             maximum_nal_bytes: 65_535,
         };
-        let mut parser = HvcConfigViewParser::new(&pool, source, raw, limits).unwrap();
+        let mut parser = HvcConfigParser::new(&pool, source, raw, limits).unwrap();
         let cancel = AtomicBool::new(false);
         let view = (0..32)
             .find_map(
@@ -1170,43 +850,24 @@ mod compact_descriptor_guards {
     }
 
     #[test]
-    fn compact_descriptors_hold_no_owner_and_eager_leaves_do() {
+    fn descriptors_hold_no_owner() {
         assert!(!std::mem::needs_drop::<HvcNalDescriptor>());
         assert!(!std::mem::needs_drop::<HvcArrayDescriptor>());
-        assert!(std::mem::needs_drop::<HvcConfigNal>());
-        assert!(std::mem::needs_drop::<HvcConfigArray>());
-        assert!(size_of::<HvcNalDescriptor>() < size_of::<HvcConfigNal>());
-        assert!(size_of::<HvcArrayDescriptor>() < size_of::<HvcConfigArray>());
     }
 
     #[test]
-    fn symbolic_maximum_membership_and_checked_add_match_eager_order() {
-        let pool = Budget::new(4096).unwrap();
-        let raw = Bytes::copy_from_slice(&pool, &[0x20, 0xff, 0xff]).unwrap();
+    fn symbolic_maximum_membership_and_checked_add() {
         // 254 full arrays precede the last one: 255*65535 memberships fit u32.
         let first = 254 * 65_535;
-        let array = CompactHvc::array(&raw, 0..3, first, 65_535).unwrap();
+        let array = HvcArrayDescriptor::new(0..3, first, 65_535).unwrap();
         assert_eq!(array.nal_indices(), first..255 * 65_535);
-        let eager = EagerHvc::array(&raw, 0..3, first, 65_535).unwrap();
-        assert_eq!(eager.nal_indices(), array.nal_indices());
-        assert_eq!(eager.source_range(), array.range);
-        // The checked membership add still fails with Overflow; the eager
-        // adapter reports its earlier physical slice failure first.
         assert_eq!(
-            CompactHvc::array(&raw, 0..3, usize::MAX, 1).err(),
+            HvcArrayDescriptor::new(0..3, usize::MAX, 1).err(),
             Some(Error::Overflow)
-        );
-        assert_eq!(
-            EagerHvc::array(&raw, 0..3, usize::MAX, 1).err(),
-            Some(Error::Overflow)
-        );
-        assert_eq!(
-            EagerHvc::array(&raw, 1..4, usize::MAX, 1).err(),
-            Some(Error::Invalid("byte span range"))
         );
         let header = NalHeader::parse(Codec::Hevc, &[0x40, 0x01]).unwrap();
         let high = usize::MAX - 2;
-        let nal = CompactHvc::nal(&raw, high - 2..high, high..usize::MAX, header, 254, 32).unwrap();
+        let nal = HvcNalDescriptor::new(&(high - 2..high), high..usize::MAX, header, 254, 32);
         assert_eq!(nal.payload_range(), high..usize::MAX);
         assert_eq!(nal.length_offset(), high - 2);
         assert_eq!((nal.array, nal.declared_type), (254, 32));

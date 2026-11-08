@@ -31,8 +31,7 @@
 /// Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 pub mod nal {
     pub use crate::nal_receiver_config::{
-        ReceiverAvcConfigParser, ReceiverAvcConfigViewParser, ReceiverAvcConfiguration,
-        ReceiverAvcConfigurationView, ReceiverAvcUpdateRejection, ReceiverHevcConfigParser,
-        ReceiverHevcConfigViewParser, ReceiverHevcConfiguration, ReceiverHevcConfigurationView,
+        ReceiverAvcConfigParser, ReceiverAvcConfiguration, ReceiverAvcUpdateRejection,
+        ReceiverHevcConfigParser, ReceiverHevcConfiguration,
     };
 }

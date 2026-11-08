@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
     AacAdtsParameters, AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits,
-    AvcConfigSource, AvcConfigViewParser, BuildStep, inspect_aac_adts_header,
+    AvcConfigParser, AvcConfigSource, BuildStep, inspect_aac_adts_header,
 };
 
 const LIMITS: AvcAnnexBLimits = AvcAnnexBLimits {
@@ -30,7 +30,7 @@ fn avc_config(width: u8) -> AvcAnnexBConfig {
         0x68,
         43,
     ];
-    let mut parser = AvcConfigViewParser::new(
+    let mut parser = AvcConfigParser::new(
         &pool,
         AvcConfigSource {
             source: SourceId(1),

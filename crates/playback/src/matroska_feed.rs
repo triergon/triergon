@@ -30,8 +30,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
     AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource, AvcAnnexBAccessUnit,
-    AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigSource,
-    AvcConfigViewParser, BuildStep,
+    AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigParser,
+    AvcConfigSource, BuildStep,
 };
 use triergon_matroska::typed::{Configuration, Event, Packet};
 pub use video_clock::MatroskaAvcClock;
@@ -82,7 +82,7 @@ impl Association {
 }
 
 enum Parser {
-    Avc(AvcConfigViewParser),
+    Avc(AvcConfigParser),
     Aac(AacAscParser),
 }
 
@@ -135,7 +135,7 @@ impl MatroskaFeedSetup {
             None => Bytes::copy_from_slice(pool, init.data)?,
         };
         let parser = if codec == "V_MPEG4/ISO/AVC" {
-            Parser::Avc(AvcConfigViewParser::new(
+            Parser::Avc(AvcConfigParser::new(
                 pool,
                 AvcConfigSource {
                     source,

@@ -1,5 +1,5 @@
 //! A four-byte-start-code HEVC feed over complete length-prefixed samples.
-use crate::{AvcAnnexBLimits, BuildStep, Codec, HvcConfigNalRef, HvcConfigurationView, NalHeader};
+use crate::{AvcAnnexBLimits, BuildStep, Codec, HvcConfigNal, HvcConfiguration, NalHeader};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -11,12 +11,12 @@ pub type HevcAnnexBLimits = AvcAnnexBLimits;
 
 /// Holds the hvcC record and its declaration-order VPS/SPS/PPS extent.
 pub struct HevcAnnexBConfig {
-    record: HvcConfigurationView,
+    record: HvcConfiguration,
     parameter_bytes: usize,
 }
 
 impl HevcAnnexBConfig {
-    pub fn new(record: HvcConfigurationView) -> Result<Self> {
+    pub fn new(record: HvcConfiguration) -> Result<Self> {
         let mut parameter_bytes = 0;
         for nal in record.nals() {
             let declared_parameter = is_parameter_set(&nal);
@@ -35,7 +35,7 @@ impl HevcAnnexBConfig {
         })
     }
 
-    pub fn record(&self) -> &HvcConfigurationView {
+    pub fn record(&self) -> &HvcConfiguration {
         &self.record
     }
 
@@ -67,7 +67,7 @@ impl HevcAnnexBConfig {
     }
 }
 
-fn is_parameter_set(nal: &HvcConfigNalRef<'_>) -> bool {
+fn is_parameter_set(nal: &HvcConfigNal<'_>) -> bool {
     matches!(nal.declared_nal_type(), 32..=34)
 }
 

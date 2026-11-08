@@ -2,8 +2,8 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    BuildStep, HvcAnnexBOutput, HvcAnnexBWriter, HvcConfigArray, HvcConfigLimits, HvcConfigNal,
-    HvcConfigParser, HvcConfigSource, HvcConfiguration,
+    BuildStep, HvcAnnexBOutput, HvcAnnexBWriter, HvcConfigLimits, HvcConfigParser, HvcConfigSource,
+    HvcConfiguration,
 };
 fn raw() -> Vec<u8> {
     vec![
@@ -69,10 +69,7 @@ fn whole_ordered_conversion_preserves_every_array_duplicate_unknown_mismatch_and
         assert_eq!(o.configuration().source_bytes().as_ref(), bytes);
         assert_eq!(o.configuration().arrays().len(), 3);
         assert_eq!(o.configuration().nals().len(), 4);
-        assert_eq!(
-            o.configuration().opaque_suffix().unwrap().as_ref(),
-            [0xa5, 0xff]
-        );
+        assert_eq!(o.configuration().opaque_suffix(), [0xa5, 0xff]);
         assert_ne!(o.configuration().syntax_issues() & 0xc0, 0);
         assert_eq!(o.configuration().source().offset, 71);
         assert!(matches!(
@@ -180,12 +177,13 @@ fn every_selected_cancel_boundary_releases_descriptors_and_output_capacity() {
 #[test]
 fn intrinsically_impossible_retained_source_plus_output_is_limit() {
     let bytes = raw();
-    let size = Budget::control_storage_bytes()
-        + Bytes::owner_overhead_bytes()
-        + bytes.len()
-        + 3 * size_of::<HvcConfigArray>()
-        + 4 * size_of::<HvcConfigNal>()
-        + 1;
+    // The record, its descriptor table and one byte: no room for the output.
+    let roomy = Budget::new(100_000).unwrap();
+    let table = config(&roomy, Bytes::copy_from_slice(&roomy, &bytes).unwrap())
+        .descriptor_storage_bytes()
+        .unwrap();
+    let size =
+        Budget::control_storage_bytes() + Bytes::owner_overhead_bytes() + bytes.len() + table + 1;
     let pool = Budget::new(size).unwrap();
     let c = config(&pool, Bytes::copy_from_slice(&pool, &bytes).unwrap());
     let mut w = HvcAnnexBWriter::new(&pool, c, 1000).unwrap();

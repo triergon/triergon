@@ -4,7 +4,6 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget,
 };
-use triergon_framing::NalPacketCompactOutput as NalPacketOutput;
 use triergon_framing::compat::nal::*;
 use triergon_framing::*;
 
@@ -16,7 +15,7 @@ fn avc(
     raw: Bytes,
     offset: u64,
     update: bool,
-) -> std::result::Result<ReceiverAvcConfigurationView, (Error, Option<i32>)> {
+) -> std::result::Result<ReceiverAvcConfiguration, (Error, Option<i32>)> {
     let source = AvcConfigSource {
         source: SourceId(1),
         generation: 1,
@@ -28,9 +27,9 @@ fn avc(
         maximum_nal_bytes: 65535,
     };
     let mut parser = if update {
-        ReceiverAvcConfigViewParser::new_update(pool, source, raw, limits)
+        ReceiverAvcConfigParser::new_update(pool, source, raw, limits)
     } else {
-        ReceiverAvcConfigViewParser::new(pool, source, raw, limits)
+        ReceiverAvcConfigParser::new(pool, source, raw, limits)
     }
     .map_err(|e| (e, None))?;
     loop {
@@ -50,20 +49,20 @@ fn avc(
     }
 }
 
-fn configuration(case: &Case) -> Result<NalPacketViewConfiguration> {
+fn configuration(case: &Case) -> Result<NalPacketConfiguration> {
     let raw = &case.configuration;
     if raw.len() < 4 || raw.starts_with(&[0, 0, 1]) || raw.starts_with(&[0, 0, 0, 1]) {
-        return Ok(NalPacketViewConfiguration::Passthrough {
+        return Ok(NalPacketConfiguration::Passthrough {
             codec: case.codec,
             raw: raw.clone(),
         });
     }
     match case.codec {
         Codec::Avc => avc(&case.pool, raw.clone(), case.config_offset, false)
-            .map(NalPacketViewConfiguration::ReceiverAvc)
+            .map(NalPacketConfiguration::ReceiverAvc)
             .map_err(|(e, _)| e),
         Codec::Hevc => {
-            let mut parser = ReceiverHevcConfigViewParser::new(
+            let mut parser = ReceiverHevcConfigParser::new(
                 &case.pool,
                 HvcConfigSource {
                     source: SourceId(1),
@@ -80,7 +79,7 @@ fn configuration(case: &Case) -> Result<NalPacketViewConfiguration> {
             )?;
             loop {
                 match parser.step(&mut WorkBudget::new(QUANTUM), &CANCEL)? {
-                    BuildStep::Ready(v) => return Ok(NalPacketViewConfiguration::ReceiverHevc(v)),
+                    BuildStep::Ready(v) => return Ok(NalPacketConfiguration::ReceiverHevc(v)),
                     BuildStep::Yield => (),
                     BuildStep::Complete => return Err(Error::Invalid("configuration missing")),
                 }
@@ -149,7 +148,7 @@ fn retain_output<T>(kept: &mut BudgetVec<T>, value: T, following: &[Event]) -> R
 fn operation(case: &Case) -> Result<Outcome> {
     let mut outcome = Outcome::default();
     let config = configuration(case)?;
-    let mut session = NalPacketSession::new_view(
+    let mut session = NalPacketSession::new(
         &case.pool,
         config,
         NalPacketLimits {
@@ -161,7 +160,7 @@ fn operation(case: &Case) -> Result<Outcome> {
     )?;
     let configured = {
         let mut writer =
-            NalPacketConfigWriter::new_view(&case.pool, session.configuration(), 32 * 1024 * 1024)?;
+            NalPacketConfigWriter::new(&case.pool, session.configuration(), 32 * 1024 * 1024)?;
         loop {
             match writer.step(&mut WorkBudget::new(QUANTUM), &CANCEL) {
                 Ok(BuildStep::Ready(v)) => break v,
@@ -238,7 +237,7 @@ fn operation(case: &Case) -> Result<Outcome> {
             generation: 1,
             new_extradata: extra.clone(),
         };
-        let mut job = match session.receiver_packet_view(packet, update) {
+        let mut job = match session.receiver_packet(packet, update) {
             Ok(job) => job,
             Err(Error::Invalid("packet after drain requires flush")) if drained => continue,
             Err(error) => return Err(error),

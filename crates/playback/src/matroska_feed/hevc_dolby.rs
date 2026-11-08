@@ -11,7 +11,7 @@ use triergon_bitstream::crc::crc16_a52;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
     Ac3Family, Ac3FrameDetails, Ac3FrameHeader, BuildStep, HevcAnnexBAccessUnit, HevcAnnexBConfig,
-    HevcAnnexBJob, HevcAnnexBLimits, HvcConfigLimits, HvcConfigSource, HvcConfigViewParser,
+    HevcAnnexBJob, HevcAnnexBLimits, HvcConfigLimits, HvcConfigParser, HvcConfigSource,
     probe_ac3_header,
 };
 use triergon_matroska::typed::{Configuration, Packet};
@@ -50,7 +50,7 @@ impl DolbyCodec {
     reason = "the bounded inline parser avoids a separate uncharged setup allocation"
 )]
 enum SetupCodec {
-    Hevc(HvcConfigViewParser),
+    Hevc(HvcConfigParser),
     Dolby(DolbyCodec),
 }
 
@@ -88,7 +88,7 @@ impl MatroskaHevcDolbySetup {
                     Some(record) => record,
                     None => Bytes::copy_from_slice(pool, init.data)?,
                 };
-                SetupCodec::Hevc(HvcConfigViewParser::new(
+                SetupCodec::Hevc(HvcConfigParser::new(
                     pool,
                     HvcConfigSource {
                         source,

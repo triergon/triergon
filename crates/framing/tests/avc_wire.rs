@@ -80,25 +80,25 @@ fn wire_grammar_is_implemented_instead_of_declared_layout_only() {
     assert_eq!(value.fields().raw_extension(), None);
     assert_eq!(value.fields().syntax_issues(), 0);
     assert_eq!(value.arrays().len(), 2);
-    assert_eq!(value.arrays()[0].kind(), AvcConfigArrayKind::Sequence);
-    assert_eq!(value.arrays()[0].source_range(), 5..10);
-    assert_eq!(value.arrays()[0].count_offset(), 5);
-    assert_eq!(value.arrays()[0].nal_indices(), 0..1);
-    assert_eq!(value.arrays()[1].kind(), AvcConfigArrayKind::Picture);
-    assert_eq!(value.arrays()[1].source_range(), 10..15);
-    assert_eq!(value.arrays()[1].count_offset(), 10);
-    assert_eq!(value.arrays()[1].nal_indices(), 1..2);
+    assert_eq!(value.array(0).unwrap().kind(), AvcConfigArrayKind::Sequence);
+    assert_eq!(value.array(0).unwrap().source_range(), 5..10);
+    assert_eq!(value.array(0).unwrap().count_offset(), 5);
+    assert_eq!(value.array(0).unwrap().nal_indices(), 0..1);
+    assert_eq!(value.array(1).unwrap().kind(), AvcConfigArrayKind::Picture);
+    assert_eq!(value.array(1).unwrap().source_range(), 10..15);
+    assert_eq!(value.array(1).unwrap().count_offset(), 10);
+    assert_eq!(value.array(1).unwrap().nal_indices(), 1..2);
     assert_eq!(value.nals().len(), 2);
-    assert_eq!(value.nals()[0].source_range(), 8..10);
-    assert_eq!(value.nals()[0].length_field_bytes().as_ref(), [0, 2]);
-    assert_eq!(value.nals()[0].source_bytes().as_ref(), [0x67, 0x80]);
-    assert_eq!(value.nals()[0].header().nal_unit_type(), 7);
-    assert_eq!(value.nals()[1].source_range(), 13..15);
-    assert_eq!(value.nals()[1].length_field_bytes().as_ref(), [0, 2]);
-    assert_eq!(value.nals()[1].source_bytes().as_ref(), [0x68, 0x40]);
-    assert_eq!(value.nals()[1].header().nal_unit_type(), 8);
+    assert_eq!(value.nal(0).unwrap().source_range(), 8..10);
+    assert_eq!(value.nal(0).unwrap().length_field_bytes(), [0, 2]);
+    assert_eq!(value.nal(0).unwrap().source_bytes(), [0x67, 0x80]);
+    assert_eq!(value.nal(0).unwrap().header().nal_unit_type(), 7);
+    assert_eq!(value.nal(1).unwrap().source_range(), 13..15);
+    assert_eq!(value.nal(1).unwrap().length_field_bytes(), [0, 2]);
+    assert_eq!(value.nal(1).unwrap().source_bytes(), [0x68, 0x40]);
+    assert_eq!(value.nal(1).unwrap().header().nal_unit_type(), 8);
     assert_eq!(value.understood_end(), 15);
-    assert!(value.trailing_bytes().unwrap().is_empty());
+    assert!(value.trailing_bytes().is_empty());
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn all82_independent_records_and_spans_agree_at_each_work_quantum() {
                         unhex(cells[6])
                     );
                     assert_eq!(v.understood_end().to_string(), cells[7]);
-                    assert_eq!(v.trailing_bytes().unwrap().as_ref(), unhex(cells[8]));
+                    assert_eq!(v.trailing_bytes(), unhex(cells[8]));
                     let arrays: Vec<_> = cells[9].split('|').collect();
                     assert_eq!(arrays.len(), v.arrays().len());
                     for (expected, a) in arrays.iter().zip(v.arrays()) {
@@ -161,15 +161,18 @@ fn all82_independent_records_and_spans_agree_at_each_work_quantum() {
                         let val = |i: usize| c[i].parse::<usize>().unwrap();
                         assert_eq!(kind(n.array_kind()), val(0));
                         assert_eq!(n.source_range(), val(2)..val(3));
-                        assert_eq!(n.source_bytes().as_ref(), unhex(c[4]));
-                        assert_eq!(n.length_field_bytes().as_ref(), &bytes[val(1)..val(2)]);
+                        assert_eq!(n.source_bytes(), unhex(c[4]));
+                        assert_eq!(n.length_field_bytes(), &bytes[val(1)..val(2)]);
                         assert_eq!(
                             usize::from(u16::from_be_bytes(
-                                n.length_field_bytes().as_ref().try_into().unwrap()
+                                n.length_field_bytes().try_into().unwrap()
                             )),
                             n.source_bytes().len()
                         );
-                        assert!(n.source_bytes().shares_storage_with(v.source_bytes()));
+                        assert_eq!(
+                            n.source_bytes().as_ptr_range(),
+                            v.source_bytes()[n.source_range()].as_ptr_range()
+                        );
                     }
                 }
                 "truncated" => assert!(matches!(result, Err(Error::Truncated)), "{}", cells[0]),
@@ -190,12 +193,12 @@ fn empty_arrays_and_high_extension_presence_are_physical_facts() {
     let pool = Budget::new(65536).unwrap();
     let base = parse(&pool, &unhex("0142a528ffe000")).unwrap();
     assert_eq!(base.arrays().len(), 2);
-    assert!(base.nals().is_empty());
+    assert_eq!(base.nal_count(), 0);
     assert_eq!(base.fields().raw_extension(), None);
     let high = parse(&pool, &unhex("0164a528ffe000fdf8f800")).unwrap();
     assert_eq!(high.arrays().len(), 3);
     assert_eq!(high.fields().raw_extension(), Some([0xfd, 0xf8, 0xf8, 0]));
-    assert_eq!(high.arrays()[2].source_range(), 7..11);
+    assert_eq!(high.array(2).unwrap().source_range(), 7..11);
 }
 
 #[test]
@@ -217,7 +220,7 @@ fn selected2010_profile_branch_does_not_guess_newer_profile_extensions() {
     let v = parse(&pool, &unhex("01f4a528ffe000fdf8f800")).unwrap();
     assert_eq!(v.fields().profile_indication(), 244);
     assert_eq!(v.fields().raw_extension(), None);
-    assert_eq!(v.trailing_bytes().unwrap().as_ref(), [0xfd, 0xf8, 0xf8, 0]);
+    assert_eq!(v.trailing_bytes(), [0xfd, 0xf8, 0xf8, 0]);
     assert!(matches!(
         parse(&pool, &unhex("0164a528ffe000")),
         Err(Error::Truncated)
@@ -315,21 +318,20 @@ fn exact_descriptor_reservation_retries_without_skipping_a_nal() {
     drop(block);
     let v = drive(&mut p, 1).unwrap();
     assert_eq!(v.nals().len(), 2);
-    assert_eq!(v.nals()[0].source_bytes().as_ref(), [0x67, 0x80]);
-    assert_eq!(v.nals()[1].source_bytes().as_ref(), [0x68, 0x40]);
+    assert_eq!(v.nal(0).unwrap().source_bytes(), [0x67, 0x80]);
+    assert_eq!(v.nal(1).unwrap().source_bytes(), [0x68, 0x40]);
 }
 
 #[test]
-fn retained_nal_view_keeps_complete_owner_after_configuration_drop() {
+fn configuration_holds_one_record_owner_and_releases_on_another_thread() {
     let pool = Budget::new(65536).unwrap();
     let baseline = pool.used();
     let v = parse(&pool, &raw()).unwrap();
     let owner = v.source_bytes().retained_storage_bytes();
-    let n = v.nals()[1].clone();
-    drop(v);
-    assert_eq!(pool.used(), baseline + owner);
-    assert_eq!(n.source_bytes().as_ref(), [0x68, 0x40]);
-    std::thread::spawn(move || drop(n)).join().unwrap();
+    let table = v.descriptor_storage_bytes().unwrap();
+    assert_eq!(pool.used(), baseline + owner + table);
+    assert_eq!(v.nal(1).unwrap().source_bytes(), [0x68, 0x40]);
+    std::thread::spawn(move || drop(v)).join().unwrap();
     assert_eq!(pool.used(), baseline);
 }
 
@@ -404,8 +406,8 @@ fn original_length_fields_and_opaque_nal_body_bytes_are_not_rewritten() {
     let bytes = unhex("0142a528ffe20005670000030100021f800100036800ffbb00");
     let v = parse(&pool, &bytes).unwrap();
     assert_eq!(v.nals().len(), 3);
-    assert_eq!(v.nals()[0].source_bytes().as_ref(), [0x67, 0, 0, 3, 1]);
-    assert_eq!(v.nals()[1].header().nal_unit_type(), 31);
-    assert_eq!(v.trailing_bytes().unwrap().as_ref(), [0xbb, 0]);
+    assert_eq!(v.nal(0).unwrap().source_bytes(), [0x67, 0, 0, 3, 1]);
+    assert_eq!(v.nal(1).unwrap().header().nal_unit_type(), 31);
+    assert_eq!(v.trailing_bytes(), [0xbb, 0]);
     assert_eq!(v.source_bytes().as_ref(), bytes);
 }
