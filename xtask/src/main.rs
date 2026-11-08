@@ -27,6 +27,7 @@ mod process;
 mod progressive_bench;
 mod pyrandom;
 mod python;
+mod raster;
 mod sha256;
 mod shape;
 mod stats;
@@ -44,9 +45,9 @@ const USAGE: &str = "usage: cargo xtask <command>
 commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
   check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
-  prepare-check  once before `check`: the pinned FFmpeg, FreeType, HarfBuzz and FriBidi
-                 references, the fixtures, the required vectors, the font corpus and the
-                 workers (built with the reference first on PATH)
+  prepare-check  once before `check`: the pinned FFmpeg, FreeType, HarfBuzz, FriBidi and
+                 libass references, the fixtures, the required vectors, the font corpus and
+                 the workers (built with the reference first on PATH)
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -124,7 +125,9 @@ commands:
                  corpus and the font features' manifests; compare reports the required
                  font features, --all every one (see `cargo xtask fonts --help`)
   shape          prepare|manifest|compare|ucd   triergon-shape against the pinned
-                 HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)";
+                 HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)
+  raster         prepare|manifest|compare   triergon-raster against the pinned libass
+                 reference (see `cargo xtask raster --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -199,7 +202,7 @@ fn main() -> ExitCode {
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
-        Some(command @ ("fonts" | "shape")) => {
+        Some(command @ ("fonts" | "shape" | "raster")) => {
             let lane = lanes::lane_named(command).expect("a registered lane");
             if let Some(reports) = lane.reports(&args[1..]) {
                 if let Err(error) = (lane.write_inputs)(&root) {
@@ -208,10 +211,10 @@ fn main() -> ExitCode {
                 }
                 return lane_compare(&root, &reports);
             }
-            if command == "fonts" {
-                fonts::main(&root, &args[1..])
-            } else {
-                shape::main(&root, &args[1..])
+            match command {
+                "fonts" => fonts::main(&root, &args[1..]),
+                "shape" => shape::main(&root, &args[1..]),
+                _ => raster::main(&root, &args[1..]),
             }
         }
         Some("build-workers") => {
@@ -857,6 +860,7 @@ fn prepare_check() -> Task {
         &["fonts", "prepare"],
         &["fonts", "fetch"],
         &["shape", "prepare"],
+        &["raster", "prepare"],
         &["build-workers"],
     ] {
         run(Command::new(&exe).args(step))?;
@@ -1063,6 +1067,7 @@ fn check(root: &Path) -> Task {
     println!("$ cargo xtask shape ucd --check");
     shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
     lane_check(root, &shape::LANE)?;
+    lane_check(root, &raster::LANE)?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;

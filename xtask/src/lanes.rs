@@ -1,5 +1,5 @@
-//! The lanes whose features commit only their pins: fonts and shaping. Each
-//! generates its features' case rows from committed inputs and
+//! The lanes whose features commit only their pins: fonts, shaping and
+//! rasterising. Each generates its features' case rows from committed inputs and
 //! seeds (`harness/fonts/corpus.json`, authored texts, seeded random cases), and
 //! takes each case's expected work from `harness/features/<id>/pins.json`: the
 //! reference's folds, written only by [`Lane::record`] and never edited by hand. The
@@ -51,7 +51,11 @@ pub struct Lane {
     pub smoke: &'static [(&'static str, &'static [&'static str])],
 }
 
-pub const LANES: [&Lane; 2] = [&crate::fonts::LANE, &crate::shape::LANE];
+pub const LANES: [&Lane; 3] = [
+    &crate::fonts::LANE,
+    &crate::shape::LANE,
+    &crate::raster::LANE,
+];
 
 /// No generated input files, or nothing more to check.
 pub fn no_inputs(_root: &Path) -> R<()> {
