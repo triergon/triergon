@@ -6,14 +6,21 @@ use triergon_core::InputCursor;
 type Reposition<R> = fn(&mut R, u64) -> std::io::Result<u64>;
 type Position<R> =
     fn(&mut InputFeeder<R>, &mut InputCursor, &InputRequest, &AtomicBool) -> Result<()>;
+/// How a seekable source repositions and resynchronizes its cursor.
+type Seeking<R> = (Reposition<R>, Position<R>);
+
+/// The one source a blocking reader reads.
+const SOURCE: SourceId = SourceId(1);
+/// Input window and per-step work of a blocking reader.
+const WINDOW: usize = 8192;
+const WORK: u64 = 8192;
 /// Blocking adapter over the same retained typed jobs. It adds only std I/O
 /// supply; it does not own a second input cursor, parser, clock or pool.
 #[derive(Debug)]
 pub struct BlockingReader<R: Read> {
     reader: Reader,
     input: InputFeeder<R>,
-    reposition: Option<Reposition<R>>,
-    position: Option<Position<R>>,
+    seek: Option<Seeking<R>>,
 }
 impl<R: Read> BlockingReader<R> {
     pub fn open(source: R, limits: Limits) -> Result<Self> {
@@ -38,24 +45,26 @@ impl<R: Read> BlockingReader<R> {
         pool: &Budget,
         policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
-        let reader = Reader::new(pool, SourceId(1), capabilities(false), limits, 8192)?;
-        Self::construct(reader, InputFeeder::new(source, 8192)?, None, policy)
+        let reader = Reader::new(pool, SOURCE, capabilities(false), limits, WINDOW)?;
+        Self::construct(reader, InputFeeder::new(source, WINDOW)?, None, policy)
     }
     pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
         self.reader.payload_ownership()
     }
+    fn reposition(&self) -> Option<Reposition<R>> {
+        self.seek.map(|(reposition, _)| reposition)
+    }
     fn construct(
         mut reader: Reader,
         input: InputFeeder<R>,
-        seek: Option<(Reposition<R>, Position<R>)>,
+        seek: Option<Seeking<R>>,
         policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
         reader.envelope.set_payload_ownership(policy);
         Self::initialize(Self {
             reader,
             input,
-            reposition: seek.map(|(reposition, _)| reposition),
-            position: seek.map(|(_, position)| position),
+            seek,
         })
     }
     fn initialize(mut result: Self) -> Result<Self> {
@@ -85,7 +94,7 @@ impl<R: Read> BlockingReader<R> {
         self.reader
             .set_adapter_storage(self.input.retained_buffer_bytes());
         match self.reader.step_projected_with_source::<D>(
-            &mut WorkBudget::new(8192),
+            &mut WorkBudget::new(WORK),
             cancel,
             self.input.owned_source_storage(),
         )? {
@@ -103,26 +112,27 @@ impl<R: Read> BlockingReader<R> {
                     }
                     None => self.reader.blocking_seek_header_refill(&request)?,
                 };
+                let reposition = self.reposition();
                 let result = if let Some(plan) = refill.as_ref().filter(|_| discard) {
                     self.input.feed_typed_discard_refill(
                         self.reader.envelope.range_input(),
                         plan,
                         cancel,
-                        self.reposition,
+                        reposition,
                     )
                 } else if let Some(plan) = refill {
                     self.input.feed_typed_header_refill(
                         self.reader.envelope.range_input(),
                         &plan,
                         cancel,
-                        self.reposition,
+                        reposition,
                     )
                 } else if discard {
                     self.input.feed_typed_discard_request(
                         self.reader.envelope.range_input(),
                         &request,
                         cancel,
-                        self.reposition,
+                        reposition,
                     )
                 } else {
                     self.input.feed_typed_request(
@@ -130,7 +140,7 @@ impl<R: Read> BlockingReader<R> {
                         &request,
                         header,
                         cancel,
-                        self.reposition,
+                        reposition,
                     )
                 };
                 self.reader
@@ -160,7 +170,7 @@ impl<R: Read> BlockingReader<R> {
         }
     }
     fn synchronize(&mut self, cancel: &AtomicBool) -> Result<()> {
-        if let Some(position) = self.position {
+        if let Some((_, position)) = self.seek {
             let request = self.reader.request();
             if let Err(error) = position(
                 &mut self.input,
@@ -314,7 +324,7 @@ impl<R: Read> BlockingReader<R> {
     }
 }
 impl<R: Read + Seek> BlockingReader<R> {
-    const SEEK: (Reposition<R>, Position<R>) = (
+    const SEEK: Seeking<R> = (
         |reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset)),
         |feed, cursor, request, cancel| feed.synchronize_seekable_position(cursor, request, cancel),
     );
@@ -340,10 +350,10 @@ impl<R: Read + Seek> BlockingReader<R> {
         pool: &Budget,
         policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
-        let reader = Reader::new(pool, SourceId(1), capabilities(true), limits, 8192)?;
+        let reader = Reader::new(pool, SOURCE, capabilities(true), limits, WINDOW)?;
         Self::construct(
             reader,
-            InputFeeder::new(source, 8192)?,
+            InputFeeder::new(source, WINDOW)?,
             Some(Self::SEEK),
             policy,
         )
@@ -382,11 +392,11 @@ impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
             return Err(Error::ForeignPool);
         }
         let reader = if webm_vp9_t35 {
-            new_reader(pool, SourceId(1), capabilities(true), limits, 8192)?
+            new_reader(pool, SOURCE, capabilities(true), limits, WINDOW)?
         } else {
-            Reader::new(pool, SourceId(1), capabilities(true), limits, 8192)?
+            Reader::new(pool, SOURCE, capabilities(true), limits, WINDOW)?
         };
-        let input = InputFeeder::from_owned(std::io::Cursor::new(source), 8192)?;
+        let input = InputFeeder::from_owned(std::io::Cursor::new(source), WINDOW)?;
         Self::construct(reader, input, Some(Self::SEEK), policy)
     }
 }
