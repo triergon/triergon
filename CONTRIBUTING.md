@@ -60,11 +60,13 @@ benchmarks assume it.
    the change touches parsing or decoding hot paths; for `triergon-font`,
    `cargo xtask fonts compare --all` with the same options, for `triergon-shape`
    `cargo xtask shape compare --all`, for `triergon-raster`
-   `cargo xtask raster compare --all`, and
+   `cargo xtask raster compare --all`, for `triergon-ass` `cargo xtask ass compare`,
+   and
    `cargo xtask fuzz --contract harness/features/<feature>/contract.json --output DIR`.
-   When a reference changes, re-record its pins with `cargo xtask fonts manifest
-   --record`, `cargo xtask shape manifest --record` or `cargo xtask raster manifest
-   --record`; pins are never edited by hand. Put the
+   When a reference or a fixture changes, re-record its pins with `cargo xtask fonts
+   manifest --record`, `cargo xtask shape manifest --record`, `cargo xtask raster
+   manifest --record` or `cargo xtask ass manifest --record`; pins are never
+   edited by hand. Put the
    per-case results in the pull request and update [docs/status.md](docs/status.md).
 
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
