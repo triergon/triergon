@@ -5,12 +5,14 @@
 //! program's one elementary stream; the transport packets of that PID feed the
 //! observer, and `compat::pes::DemuxClock` places each packet's timestamps.
 //!
-//! The crate has no published program-level reader yet, so this runner does no
-//! routing of its own. Anything that would need one ends the operation with its
-//! cause instead of a fold: a program with more than one stream or a carriage the
-//! observer has no constructor for, a later PMT, a clock or format boundary, a
-//! quarantined clock, a transport, PES-time, program or active PSI fault, a second
-//! media entity, and an operation that finishes without a packet.
+//! This packet operation binds one observer. Anything beyond that scope ends
+//! the operation with its cause instead of a fold: a program with more than one
+//! stream or a carriage the observer has no constructor for, a later PMT, a clock or format boundary, a
+//! quarantined clock, a transport, PES-time, program or active PSI fault, or a second
+//! media entity. A single-entity program-policy refusal with no emitted packets
+//! can instead complete when `PacketCompletion` proves every physical carrier is
+//! control-only and the source reached actual EOF. The proof runs inside the
+//! operation and never changes source validation.
 //!
 //! Each packet folds its stream index, PID, PTS, DTS, duration, position, flags,
 //! payload and side data, the same fields in the same order as the reference
@@ -25,7 +27,8 @@ use triergon_core::{
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors,
-    PrivateAudioCarriage, PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
+    NoMediaConfirmation, PacketCompletion, PrivateAudioCarriage, PrivateAudioDescriptors,
+    RegisteredCarriage, SourceContext,
 };
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, DvbNamespaceEvidence, ProgramMap};
 use triergon_mpegts::{
@@ -378,8 +381,31 @@ struct Request {
     more_entities: bool,
 }
 
-/// One operation: its fold, or the refusal that ended it.
+struct PacketAttempt {
+    totals: Totals,
+    try_control_completion: bool,
+}
+
+/// Keep the packet path's refusal unless a separate physical-source proof
+/// confirms this entire single entity contained no media.
 fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
+    let attempt = packet_operation(pool, request, cancel)?;
+    if attempt.try_control_completion
+        && attempt.totals.packets == 0
+        && !request.more_entities
+        && control_completion(pool, request, cancel)?.is_some()
+    {
+        return Ok(Totals::default());
+    }
+    Ok(attempt.totals)
+}
+
+/// One packet attempt: its fold, or the typed refusal that ended it.
+fn packet_operation(
+    pool: &Budget,
+    request: &Request,
+    cancel: &AtomicBool,
+) -> Result<PacketAttempt> {
     let raw = &request.input;
     let mut input = InputCursor::new(
         pool,
@@ -405,9 +431,15 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
     };
     let mut ordinal = 0_u64;
     let mut logical_eof = None;
-    let refused = |mut session: Session, error: &dyn std::fmt::Display, cause: Cause| {
+    let refused = |mut session: Session,
+                   error: &dyn std::fmt::Display,
+                   cause: Cause,
+                   try_control_completion| {
         session.totals.refusal = Some(Box::new(cause.refusal(error)));
-        Ok(session.totals)
+        Ok(PacketAttempt {
+            totals: session.totals,
+            try_control_completion,
+        })
     };
     loop {
         let step = match demux.poll(&mut input, &mut WorkBudget::new(WORK), cancel) {
@@ -419,7 +451,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     input.position(),
                     demux.source_epochs(),
                 );
-                return refused(session, &error, cause);
+                return refused(session, &error, cause, false);
             }
         };
         match step {
@@ -434,18 +466,23 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     demux.clock_is_quarantined(),
                 );
                 if let Err(error) = routed {
-                    return refused(session, &error, cause);
+                    let eligible = error == Error::Unsupported(UNROUTED);
+                    return refused(session, &error, cause, eligible);
                 }
                 if let Err(error) = session.drain(cancel) {
-                    return refused(session, &error, cause);
+                    return refused(session, &error, cause, false);
                 }
                 if matches!(event, TraceEvent::Finished) {
                     let Some(eof) = logical_eof else {
                         let error = Error::Invalid("source finished without logical EOF");
-                        return refused(session, &error, cause);
+                        return refused(session, &error, cause, false);
                     };
                     if let Err(error) = session.logical_end(cancel) {
-                        return refused(session, &error, eof);
+                        let eligible = matches!(
+                            error.downcast_ref::<Error>(),
+                            Some(Error::Unsupported(UNROUTED))
+                        );
+                        return refused(session, &error, eof, eligible);
                     }
                     break;
                 }
@@ -476,7 +513,12 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 };
                 if request.more_entities {
                     let error = Error::Unsupported(UNROUTED);
-                    return refused(session, &error, boundary("entity_end_not_logical_eof"));
+                    return refused(
+                        session,
+                        &error,
+                        boundary("entity_end_not_logical_eof"),
+                        false,
+                    );
                 }
                 logical_eof = Some(boundary("logical_eof"));
                 demux.end_of_source()?;
@@ -491,9 +533,115 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
             input.position(),
             demux.source_epochs(),
         );
-        return refused(session, &error, cause);
+        return refused(session, &error, cause, true);
     }
-    Ok(session.totals)
+    Ok(PacketAttempt {
+        totals: session.totals,
+        try_control_completion: false,
+    })
+}
+
+/// A bounded replay is needed because a program-policy refusal may precede
+/// physical EOF. Only the completion policy's confirmation can replace that refusal;
+/// an empty observer, parse error or advertised input length cannot do so.
+fn control_completion(
+    pool: &Budget,
+    request: &Request,
+    cancel: &AtomicBool,
+) -> Result<Option<NoMediaConfirmation>> {
+    let raw = &request.input;
+    let limits = ParseLimits::default();
+    let mut input = InputCursor::new(
+        pool,
+        SourceId(1),
+        SourceCapabilities {
+            length: Some(raw.len() as u64),
+            random_access: false,
+        },
+        WINDOW,
+    )?;
+    let mut demux = TransportStream::new_with_namespace(
+        pool.clone(),
+        request.format,
+        limits,
+        request.program,
+        request.namespace,
+    )?;
+    let mut completion =
+        PacketCompletion::new_for_format(pool.clone(), limits, request.program, request.format)?;
+    let mut ordinal = 0_u64;
+    loop {
+        match demux.poll(&mut input, &mut WorkBudget::new(WORK), cancel)? {
+            Step::Ready(event) => {
+                let context = SourceContext {
+                    source_event_ordinal: ordinal,
+                    epochs: demux.source_epochs(),
+                    byte_run_epoch: None,
+                };
+                let work = completion.required_work(&event)?;
+                match completion.observe(
+                    &event,
+                    input.source(),
+                    context,
+                    &mut WorkBudget::new(work),
+                    cancel,
+                ) {
+                    Ok(true) => {}
+                    Ok(false) => return Err("completion yielded on its required grant".into()),
+                    Err(Error::Invalid(_) | Error::Unsupported(_) | Error::Truncated) => {
+                        return Ok(None);
+                    }
+                    Err(error) => return Err(error.into()),
+                }
+                ordinal = ordinal.checked_add(1).ok_or(Error::Overflow)?;
+                if matches!(event, TraceEvent::Finished) {
+                    let work = completion.required_end_work()?;
+                    return match completion.confirm_no_media(
+                        &mut input,
+                        &mut WorkBudget::new(work),
+                        cancel,
+                    ) {
+                        Ok(Some(confirmation)) => Ok(Some(confirmation)),
+                        Ok(None) => Err("completion yielded on its required terminal grant".into()),
+                        Err(Error::Invalid(_) | Error::Unsupported(_) | Error::Truncated) => {
+                            Ok(None)
+                        }
+                        Err(error) => Err(error.into()),
+                    };
+                }
+            }
+            Step::Yield => {}
+            Step::NeedInput(request) => {
+                let offset = usize::try_from(request.offset)?;
+                let end = raw.len().min(offset.saturating_add(request.maximum));
+                if offset < end {
+                    input.provide_owned(InputWindow::new(
+                        request.source,
+                        request.token,
+                        request.offset,
+                        raw.slice(offset..end)?,
+                    )?)?;
+                } else {
+                    input.finish(request.source, request.token)?;
+                }
+            }
+            Step::End(_) => {
+                let end = demux
+                    .media_entity_end(&mut input, &mut WorkBudget::new(WORK), cancel)?
+                    .ok_or("physical end yielded on a fixed grant")?;
+                let work = completion.required_end_work()?;
+                if !completion.seal_physical_end(
+                    &end,
+                    &mut input,
+                    &mut WorkBudget::new(work),
+                    cancel,
+                )? {
+                    return Err("completion yielded on its required end grant".into());
+                }
+                demux.end_of_source()?;
+            }
+        }
+    }
 }
 
 fn parse(pool: &Budget, path: &Path, arguments: &[String]) -> Result<Request> {
@@ -564,11 +712,11 @@ pub fn run(args: &[String]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{operation, parse};
+    use super::{control_completion, operation, parse};
     use crate::runner::Totals;
     use std::path::Path;
     use std::sync::atomic::AtomicBool;
-    use triergon_core::Budget;
+    use triergon_core::{Budget, Error};
 
     fn run(file: &str, arguments: &[&str]) -> Totals {
         let pool = Budget::new(64 * 1024 * 1024).unwrap();
@@ -601,25 +749,86 @@ mod tests {
 
     #[test]
     fn contexts_outside_the_observer_end_with_their_cause() {
-        for (file, arguments, reason) in [
+        for (file, arguments) in [
             (
                 "hls-contiguous-part-a.ts",
                 &["188", "1", "hls-contiguous-part-b.ts"][..],
-                "unsupported: needs a program-level reader",
             ),
+            ("hls-map-init.ts", &["188", "1", "hls-map-media.ts"][..]),
             (
-                "psi-crc-invalid.ts",
-                &["188", "1"][..],
-                "unsupported: needs a program-level reader",
-            ),
-            (
-                "pmt-opaque-language-descriptors.ts",
-                &["188", "1"][..],
-                "unsupported: empty observation is not acceptance",
+                "ts188-basic.ts",
+                &["188", "1", "--discontinuity", "hls-new-timeline.ts"][..],
             ),
         ] {
             let refusal = run(file, arguments).refusal.expect(file);
-            assert_eq!(refusal.reason, reason, "{file}");
+            assert_eq!(
+                refusal.reason, "unsupported: needs a program-level reader",
+                "{file}"
+            );
         }
+    }
+
+    #[test]
+    fn control_only_inputs_finish_with_a_real_physical_confirmation() {
+        for file in [
+            "psi-crc-invalid.ts",
+            "psi-pointer-overrun.ts",
+            "psi-length-over-policy.ts",
+            "psi-pending-not-current.ts",
+            "pat-atomic-two-sections.ts",
+            "pat-incomplete-version.ts",
+            "pat-network-pid-not-track.ts",
+            "psi-pointer-finishes-old-starts-new.ts",
+            "psi-two-sections-one-payload.ts",
+            "pmt-version-wrap-retypes-pid.ts",
+            "pmt-opaque-language-descriptors.ts",
+            "pmt-descriptor-overrun.ts",
+            "pmt-multi-section-forbidden.ts",
+            "psi-stuffing-tail-invalid.ts",
+            "psi-truncated-eof.ts",
+        ] {
+            let totals = run(file, &["188", "1"]);
+            assert!(totals.refusal.is_none(), "{file}");
+            assert_eq!(
+                (totals.packets, totals.bytes, totals.digest),
+                (0, 0, 0),
+                "{file}"
+            );
+        }
+    }
+
+    #[test]
+    fn damaged_transport_and_pes_and_unfinished_input_stay_refused() {
+        for file in [
+            "transport-afc-reserved.ts",
+            "transport-adaptation-overrun.ts",
+            "pes-optional-header-overrun.ts",
+            "pes-start-prefix-invalid.ts",
+            "packet-completion-v1/physical-truncated-tail.ts",
+            "packet-completion-v1/pmt-control-truncated-section.ts",
+            "packet-completion-v1/unknown-pid-continuation-after-control.ts",
+        ] {
+            assert!(run(file, &["188", "1"]).refusal.is_some(), "{file}");
+        }
+    }
+
+    #[test]
+    fn completion_cancellation_and_storage_pressure_remain_errors() {
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../mpegts/tests/data/psi-crc-invalid.ts");
+        let request = parse(&pool, &path, &["188".into(), "1".into()]).unwrap();
+        let idle = pool.used();
+        let error = control_completion(&pool, &request, &AtomicBool::new(true)).unwrap_err();
+        assert_eq!(error.downcast_ref::<Error>(), Some(&Error::Cancelled));
+        assert_eq!(pool.used(), idle);
+        let pressure = pool.reserve(pool.available()).unwrap();
+        let error = control_completion(&pool, &request, &AtomicBool::new(false)).unwrap_err();
+        assert!(matches!(
+            error.downcast_ref::<Error>(),
+            Some(Error::Backpressure { .. })
+        ));
+        drop(pressure);
+        assert_eq!(pool.used(), idle);
     }
 }
