@@ -648,7 +648,9 @@ mod tests {
                 let expected = (0..maximum.min(188))
                     .find_map(|trim| {
                         let count = maximum - trim;
-                        ((offset % 188 + (count % 188) as u64) % 188 == 0).then_some(count)
+                        (offset % 188 + (count % 188) as u64)
+                            .is_multiple_of(188)
+                            .then_some(count)
                     })
                     .unwrap_or(maximum);
                 assert_eq!(
@@ -671,7 +673,7 @@ mod tests {
                 request: &InputRequest,
                 _: &mut WorkBudget,
                 _: &AtomicBool,
-            ) -> triergon_core::Result<SourceReply> {
+            ) -> Result<SourceReply> {
                 self.0.set(request.maximum);
                 Ok(SourceReply::Pending)
             }
