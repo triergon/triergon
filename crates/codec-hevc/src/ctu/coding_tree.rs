@@ -85,14 +85,14 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                             *a = -*a;
                         }
                     }
-                    p.band_pos[c_idx] = self.cabac.bypass_field(5) as u8;
+                    p.band_pos[c_idx] = self.cabac.bypass_bits(5) as u8;
                     p.offset[c_idx] = abs;
                 } else {
                     p.offset[c_idx] = [abs[0], abs[1], -abs[2], -abs[3]];
                     if c_idx == 0 {
-                        p.eo_class[0] = self.cabac.bypass_field(2) as u8;
+                        p.eo_class[0] = self.cabac.bypass_bits(2) as u8;
                     } else if c_idx == 1 {
-                        p.eo_class[1] = self.cabac.bypass_field(2) as u8;
+                        p.eo_class[1] = self.cabac.bypass_bits(2) as u8;
                     }
                 }
             }
@@ -432,7 +432,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             }
         }
         let consumed = r.position().div_ceil(8);
-        self.cabac.restart(pos + consumed);
+        self.cabac.restart(pos + consumed)?;
         Ok(())
     }
 
@@ -483,7 +483,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                 };
                 list[idx]
             } else {
-                let mut m = self.cabac.bypass_field(5);
+                let mut m = self.cabac.bypass_bits(5);
                 if list[0] > list[1] {
                     list.swap(0, 1);
                 }
@@ -512,7 +512,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         {
             4
         } else {
-            self.cabac.bypass_field(2)
+            self.cabac.bypass_bits(2)
         };
         let ym = self.ipm[0];
         cu.chroma_mode = match icpm {

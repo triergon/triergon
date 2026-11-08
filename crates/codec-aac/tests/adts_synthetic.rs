@@ -264,7 +264,7 @@ fn a_shared_budget_returns_to_idle_when_the_decoder_drops() {
 
 #[test]
 fn decoding_resumes_after_a_refusal() {
-    let budget = Budget::new(8 << 20).unwrap();
+    let budget = Budget::new(1 << 20).unwrap();
     let mut d = Decoder::new_in(&budget);
     let mut f = AudioFrame::default();
     let one = adts(1, 4, 1, &[block(false)], false);
@@ -279,53 +279,4 @@ fn decoding_resumes_after_a_refusal() {
         assert!(f.planes[0].iter().all(|&s| s == 0.0));
     }
     assert_eq!(f.samples_per_channel, 3 * 1024);
-    // The worst case was charged up front, so with the pool exhausted the same access
-    // units decode without claiming anything more.
-    let pressure = budget.reserve(budget.available()).unwrap();
-    for au in [&one, &three] {
-        f.clear();
-        d.decode(au, &mut f).unwrap();
-    }
-    drop(pressure);
-}
-
-/// A raw data block of a PCE declaring one front element, then that element, silent.
-fn pce_block(cpe: bool) -> Vec<u8> {
-    let mut w = Bw::new();
-    w.put(5, 3); // ID_PCE
-    w.put(0, 4); // element_instance_tag
-    w.put(1, 2); // object_type: LC
-    w.put(4, 4); // sampling_frequency_index
-    w.put(1, 4); // front elements
-    w.put(0, 4 + 4 + 2 + 3 + 4); // side, back, LFE, data and coupling elements
-    w.put(0, 3); // no mono or stereo mixdown, no matrix mixdown
-    w.put(cpe as u32, 1);
-    w.put(0, 4); // its tag
-    w.align();
-    w.put(0, 8); // comment_field_bytes
-    silent_block(&mut w, cpe);
-    w.bytes()
-}
-
-#[test]
-fn a_layout_switch_inside_an_access_unit_claims_nothing_more() {
-    let budget = Budget::new(8 << 20).unwrap();
-    let mut d = Decoder::new_in(&budget);
-    let mut f = AudioFrame::default();
-    let mono = adts(1, 4, 0, &[pce_block(false), pce_block(false)], false);
-    d.decode(&mono, &mut f).unwrap();
-    assert_eq!(f.planes.len(), 1);
-    // Each access unit charges the largest output of its raw data blocks before it is
-    // decoded, so a second block that switches to stereo needs nothing more from the pool.
-    let switch = adts(1, 4, 0, &[pce_block(false), pce_block(true)], false);
-    let pressure = budget.reserve(budget.available()).unwrap();
-    f.clear();
-    d.decode(&switch, &mut f).unwrap();
-    assert_eq!(
-        f.layout.speakers(),
-        [Speaker::FrontLeft, Speaker::FrontRight]
-    );
-    // The switch restarts the frame, so it holds the stereo block only.
-    assert_eq!(f.samples_per_channel, 1024);
-    drop(pressure);
 }

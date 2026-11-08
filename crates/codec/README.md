@@ -50,8 +50,7 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 | `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
 | `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
 | `DecodeFailure` | the refusing codec error's `Debug` text; `from_error` builds one |
-| `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first; the charge only grows |
-| `AudioFrame::charge_for` | charges a frame's bound without allocating, so it can grow to that size within one access unit |
+| `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first |
 | `kbd_window` | rising half of a Kaiser-Bessel-derived window of any length and alpha |
 
 ### Channel order

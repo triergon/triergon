@@ -23,8 +23,6 @@ pub(crate) const ID_END: u8 = 7;
 
 const EXT_SBR_DATA: u32 = 13;
 const EXT_SBR_DATA_CRC: u32 = 14;
-/// Samples per channel of one raw data block with SBR.
-const MAX_FRAME_LEN: usize = 2048;
 const PNS_INITIAL_STATE: u32 = 0x1f2e3d4c;
 
 /// Persistent per-channel state.
@@ -228,7 +226,7 @@ impl Core {
     }
 
     pub(crate) fn frame_len(&self) -> usize {
-        if self.sbr_active { MAX_FRAME_LEN } else { 1024 }
+        if self.sbr_active { 2048 } else { 1024 }
     }
 
     /// (Re)configure from an ADTS header. Returns true when the configuration changed.
@@ -741,21 +739,10 @@ impl Core {
         }
     }
 
-    /// Charge the largest output an access unit of `blocks` raw data blocks can make:
-    /// every plane a layout can have, at the SBR frame length. Done before the access unit
-    /// changes any state, so nothing the access unit configures or decodes can be refused.
-    pub(crate) fn reserve_access_unit(&mut self, out: &AudioFrame, blocks: usize) -> Result<()> {
-        out.charge_for(
-            ChannelLayout::CAPACITY,
-            blocks * MAX_FRAME_LEN,
-            &mut self.output_charge,
-        )?;
-        Ok(())
-    }
-
-    /// Size the output for the access unit's `blocks` raw data blocks in the current
-    /// layout, within the charge [`reserve_access_unit`](Self::reserve_access_unit) made.
-    pub(crate) fn size_output(&mut self, out: &mut AudioFrame, blocks: usize) -> Result<()> {
+    /// Charge the output of `blocks` raw data blocks in the current layout before any is
+    /// decoded, so that a refusal leaves the decoder unchanged. `emit_planes` grows the frame
+    /// again only when the layout or SBR switches inside the access unit.
+    pub(crate) fn reserve_output(&mut self, out: &mut AudioFrame, blocks: usize) -> Result<()> {
         let (channels, len) = (self.layout.channels(), blocks * self.frame_len());
         if out.planes.len() < channels || out.planes[..channels].iter().any(|p| p.capacity() < len)
         {

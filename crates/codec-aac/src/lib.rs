@@ -112,7 +112,6 @@ impl Decoder {
             return Err(DecodeError::Truncated);
         }
         let core = &mut self.core;
-        core.reserve_access_unit(out, h.raw_data_blocks as usize)?;
         core.configure_adts(&h)?;
         let mut hdr = 7;
         if !h.protection_absent {
@@ -126,7 +125,7 @@ impl Decoder {
         #[cfg(feature = "inspect")]
         core.sbr_fil_ranges.clear();
         let mut br = CachedBitReader::new(payload);
-        core.size_output(out, h.raw_data_blocks as usize)?;
+        core.reserve_output(out, h.raw_data_blocks as usize)?;
         for _ in 0..h.raw_data_blocks {
             let start = br.position();
             core.decode_block(&mut br, start)?;

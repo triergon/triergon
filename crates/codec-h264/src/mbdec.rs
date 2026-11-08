@@ -1064,7 +1064,7 @@ impl SliceDecoder<'_> {
                 return Err(inval("I_PCM truncated"));
             }
             samples[..n].copy_from_slice(&data[pos..pos + n]);
-            c.reinit_at(pos + n);
+            c.reinit_at(pos + n)?;
         } else {
             self.br.align(8);
             for v in &mut samples[..n] {

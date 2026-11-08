@@ -163,7 +163,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
         data: &'a [u8],
         slice_idx: u16,
         poc: i32,
-    ) -> Self {
+    ) -> Result<Self> {
         let init_type = match sh.slice_type {
             SLICE_I => 0,
             SLICE_P => {
@@ -182,7 +182,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
             }
         };
         let start = sh.data_offset;
-        SliceDecoder {
+        Ok(SliceDecoder {
             sps,
             pps,
             sh,
@@ -192,7 +192,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
             refs,
             sc,
             data,
-            cabac: Cabac::new(data, start.min(data.len())),
+            cabac: Cabac::new(data, start.min(data.len()))?,
             c: [0; ctx::NUM],
             slice_idx,
             poc,
@@ -220,7 +220,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
             cu_qp_delta: 0,
             ipm: [1; 4],
             inner_edges: false,
-        }
+        })
     }
 
     // ------------------------------------------------------------------ availability
@@ -429,7 +429,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                     return Err(DecodeError::InvalidData("end_of_subset_one_bit"));
                 }
                 let pos = self.cabac.aligned_byte_position();
-                self.cabac.restart(pos);
+                self.cabac.restart(pos)?;
             }
         }
     }

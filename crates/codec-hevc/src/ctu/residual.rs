@@ -2,7 +2,6 @@
 
 use super::{Cu, Scratch, SliceDecoder};
 use crate::cabac::{Bins, ctx};
-use crate::error::{DecodeError, Result};
 use crate::picture::Pixel;
 use crate::tables::{
     CTX_IDX_MAP_SCAN, LEVEL_SCALE, SCAN_INV_4X4, SCAN_POS_4X4, SIG_CTX_SCAN, qpc_from_qpi,
@@ -19,7 +18,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         log2: u32,
         c_idx: usize,
         pred_mode_intra: u32,
-    ) -> Result<()> {
+    ) {
         let n = 1usize << log2;
         let mut cab = self.cabac;
         let c = &mut self.c;
@@ -106,13 +105,9 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let nb = (py >> 1) - 1;
             last_y = (1 << nb) * (2 + (py & 1)) + cab.bypass_bits(nb);
         }
+        // The prefix bound keeps both below n: the largest is 3 << nb plus nb bypass bins.
         if scan_idx == 2 {
             core::mem::swap(&mut last_x, &mut last_y);
-        }
-        if last_x as usize >= n || last_y as usize >= n {
-            return Err(DecodeError::InvalidData(
-                "last significant coefficient outside block",
-            ));
         }
 
         let log2_sb = log2 - 2;
@@ -328,6 +323,5 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                 ch.fill(0);
             }
         }
-        Ok(())
     }
 }

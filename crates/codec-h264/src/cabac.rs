@@ -1,7 +1,7 @@
 //! CABAC context layout and binarizations (clause 9.3) over the shared arithmetic engine.
 
 use crate::tables_cabac_init::CABAC_INIT_MN;
-use triergon_bitstream::cabac::init_state;
+use triergon_bitstream::cabac::{InvalidOffset, init_state};
 
 type Engine<'a> = triergon_bitstream::cabac::Engine<'a, false>;
 
@@ -91,14 +91,14 @@ impl<'a> Cabac<'a> {
         end: usize,
         slice_qp: i32,
         init_idx: usize,
-    ) -> Self {
+    ) -> Result<Self, InvalidOffset> {
         let mut c = Cabac {
-            e: Engine::new(data, start),
+            e: Engine::new(data, start)?,
             end,
             ctx: [0; NUM_CTX],
         };
         c.init_contexts(slice_qp, init_idx);
-        c
+        Ok(c)
     }
 
     fn init_contexts(&mut self, slice_qp: i32, init_idx: usize) {
@@ -110,8 +110,8 @@ impl<'a> Cabac<'a> {
     }
 
     /// Re-initialise the engine at a byte position (after I_PCM samples).
-    pub(crate) fn reinit_at(&mut self, byte_pos: usize) {
-        self.e.restart(byte_pos);
+    pub(crate) fn reinit_at(&mut self, byte_pos: usize) -> Result<(), InvalidOffset> {
+        self.e.restart(byte_pos)
     }
     /// Byte position following the bits consumed by the engine (for I_PCM: after decoding the
     /// terminate bin, pcm_alignment_zero_bits follow up to the next byte boundary).
@@ -493,7 +493,7 @@ mod tests {
         let data = [0u8; 32];
         for idx in 0..4 {
             for qp in [0, 26, 51] {
-                let c = Cabac::new(&data, 0, 16, qp, idx);
+                let c = Cabac::new(&data, 0, 16, qp, idx).unwrap();
                 assert!(c.ctx.iter().all(|&s| (s >> 1) <= 62));
             }
         }

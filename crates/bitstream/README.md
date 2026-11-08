@@ -66,18 +66,22 @@ assert_eq!(rbsp.read(24), Ok(1));
 
 [`cabac::Engine`] is the CABAC engine of H.264 and H.265, which differ only in their
 binarizations and context tables. A context is one state byte; `decision_unfilled` and
-`refill` let a hot loop decode two bins per refill on a local copy of the engine. The
-`HEADROOM` parameter only matters on corrupt streams, where it fixes what a decoder does
-once the offset has left its range.
+`refill` let a hot loop decode two bins per refill on a local copy of the engine.
+`Engine::new` and `restart` refuse an initial offset of 510 or 511 (`InvalidOffset`),
+which the specifications forbid. Every decoding process then keeps the offset below the
+range, so `bypass_bits(n)` returns at most `n` bits on any input. The `HEADROOM`
+parameter chooses a register layout; both decode every stream the same.
 
 ```rust
-use triergon_bitstream::cabac::{Engine, init_state};
+use triergon_bitstream::cabac::{Engine, InvalidOffset, init_state};
 
 let mut state = init_state(0, 64, 26);
-let mut engine = Engine::<true>::new(&[0; 16], 0);
+let mut engine = Engine::<true>::new(&[0; 16], 0)?;
 assert_eq!(engine.decision(&mut state), 1); // the most probable symbol of this context
 assert_eq!(engine.bypass(), 0);
 assert_eq!(engine.terminate(), 0);
+assert_eq!(Engine::<true>::new(&[0xff, 0x80], 0).err(), Some(InvalidOffset));
+# Ok::<(), InvalidOffset>(())
 ```
 
 ## Checksums

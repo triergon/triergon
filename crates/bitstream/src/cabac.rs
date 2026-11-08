@@ -4,6 +4,10 @@
 //! [`Engine`] keeps the 9-bit offset in the top bits of a 64-bit register with look-ahead
 //! stream bits below it, so a comparison uses a constant shift and renormalisation is a
 //! shift plus an occasional 32-bit refill off the critical path.
+//!
+//! Every decoding process keeps the offset below the range once it starts there, so the
+//! engine refuses the two initial offsets that do not (510 and 511) and a bin string of
+//! `n` bypass bins never exceeds `n` bits.
 
 /// `rangeTabLPS[pStateIdx][qCodIRangeIdx]` (H.264 Table 9-44, H.265 Table 9-52).
 const RANGE_TAB_LPS: [[u8; 4]; 64] = [
@@ -122,14 +126,16 @@ static NEXT_LPS: [u8; 128] = {
     table
 };
 
+/// An initial offset of 510 or 511, which H.264 clause 9.3.1.2 and H.265 clause 9.3.2.5
+/// forbid: no range covers it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InvalidOffset;
+
 /// The arithmetic decoding engine. Reads past the end of the slice yield zero bits; a
 /// decoder bounds a corrupt stream through [`Engine::bits_read`] or [`Engine::next_byte`].
 ///
 /// `HEADROOM` keeps one bit free above the offset and starts with seven bytes of look-ahead
-/// instead of four. A conforming stream decodes the same either way, because its offset
-/// stays below the range and it never asks for more bypass bins than the look-ahead holds.
-/// A corrupt stream can do both, and then the register layout decides the result, so each
-/// decoder keeps the layout that fixes its own results on such input.
+/// instead of four. Every stream decodes the same either way.
 ///
 /// Hot loops can work on a local copy, which keeps the registers in machine registers.
 #[derive(Clone, Copy, Debug)]
@@ -148,8 +154,7 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
 
     /// Initialises the engine at byte `start` of `data`: ivlCurrRange = 510 and
     /// ivlOffset = read_bits(9).
-    #[must_use]
-    pub fn new(data: &'a [u8], start: usize) -> Self {
+    pub fn new(data: &'a [u8], start: usize) -> Result<Self, InvalidOffset> {
         let mut engine = Self {
             data,
             next: start,
@@ -157,12 +162,12 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
             value: 0,
             available: 0,
         };
-        engine.restart(start);
-        engine
+        engine.restart(start)?;
+        Ok(engine)
     }
 
     /// Initialises the engine again at byte `start`, after PCM samples or at a substream.
-    pub fn restart(&mut self, start: usize) {
+    pub fn restart(&mut self, start: usize) -> Result<(), InvalidOffset> {
         self.next = start;
         self.range = 510;
         if HEADROOM {
@@ -177,6 +182,10 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
             self.value = self.load() << 32;
             self.available = 32 - 9;
         }
+        if self.value >> Self::OFFSET_SHIFT >= 510 {
+            return Err(InvalidOffset);
+        }
+        Ok(())
     }
 
     #[inline(always)]
@@ -207,8 +216,7 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
         }
     }
 
-    /// Appends 32 bits below the look-ahead. A corrupt stream's long [`Engine::bypass_bits`]
-    /// can get here with too much look-ahead for 32 more bits, and the shift then wraps.
+    /// Appends 32 bits below the look-ahead, which must hold fewer than 23 bits.
     #[inline(always)]
     fn append(&mut self) {
         let word = self.load();
@@ -297,13 +305,24 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
         self.available -= count as i32;
     }
 
-    /// `count` bypass bins, first bin in the most significant position. A conforming
-    /// stream asks for at most 16.
+    /// `count` (at most 32) bypass bins, first bin in the most significant position. A
+    /// conforming stream asks for at most 16; a longer read takes them in two parts.
     #[inline(always)]
     pub fn bypass_bits(&mut self, count: u32) -> u32 {
+        debug_assert!(count <= 32);
         if count <= 1 {
             return if count == 1 { self.bypass() } else { 0 };
         }
+        if count > 16 {
+            let high = self.bins(count - 16);
+            return (high << 16) | self.bins(16);
+        }
+        self.bins(count)
+    }
+
+    /// 2 to 16 bypass bins.
+    #[inline(always)]
+    fn bins(&mut self, count: u32) -> u32 {
         if self.available < count as i32 {
             self.append();
         }
@@ -311,15 +330,6 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
         self.consume_bypass(count, bins);
         self.refill();
         bins
-    }
-
-    /// A fixed-length syntax element of `count` (at most 31) bypass bins. A corrupt stream
-    /// can leave the offset at or above the range, so the bins of
-    /// [`bypass_bits`](Self::bypass_bits) can exceed `count` bits; the element keeps its
-    /// width, so it can index a table of `2^count` entries.
-    #[inline(always)]
-    pub fn bypass_field(&mut self, count: u32) -> u32 {
-        self.bypass_bits(count) & ((1 << count) - 1)
     }
 
     /// Counts a unary prefix of bypass 1-bins ended by a 0-bin, which is consumed. Stops
@@ -474,7 +484,7 @@ mod tests {
     fn follows_the_serial_process<const HEADROOM: bool>() {
         let mut random = noise(0x1234_5678);
         let data: Vec<u8> = (0..4096).map(|_| random() as u8).collect();
-        let mut engine = Engine::<HEADROOM>::new(&data, 0);
+        let mut engine = Engine::<HEADROOM>::new(&data, 0).unwrap();
         let mut serial = Serial::new(&data);
         let mut fast: Vec<u8> = (0..64).map(|i| init_state(i - 32, 60, 30)).collect();
         let mut slow = fast.clone();
@@ -483,7 +493,7 @@ mod tests {
             match random() % 8 {
                 0 => assert_eq!(engine.bypass(), serial.bypass(), "bypass {i}"),
                 1 => {
-                    let count = 2 + random() % 21;
+                    let count = 2 + random() % 31;
                     let expected = (0..count).fold(0, |bins, _| (bins << 1) | serial.bypass());
                     assert_eq!(engine.bypass_bits(count), expected, "bypass bits {i}");
                 }
@@ -518,35 +528,25 @@ mod tests {
         follows_the_serial_process::<true>();
     }
 
-    /// A corrupt stream's reads of 24 to 31 bins, past the room for one more word.
-    fn over_long_bypass_reads<const HEADROOM: bool>() -> u64 {
-        let mut random = noise(0x0bad_cafe);
-        let data: Vec<u8> = (0..4096).map(|_| random() as u8).collect();
-        let mut engine = Engine::<HEADROOM>::new(&data, 0);
-        let mut digest = 0xcbf2_9ce4_8422_2325u64;
-        for _ in 0..4000 {
-            let count = 2 + random() % 30;
-            let bins = u64::from(engine.bypass_bits(count));
-            digest = (digest ^ bins).wrapping_mul(0x0100_0000_01b3);
+    #[test]
+    fn an_offset_no_range_covers_is_refused() {
+        for (data, offset) in [([0xff, 0x00], 510), ([0xff, 0x80], 511)] {
+            let refused = Err(InvalidOffset);
+            assert_eq!(
+                Engine::<true>::new(&data, 0).map(|_| ()),
+                refused,
+                "{offset}"
+            );
+            assert_eq!(
+                Engine::<false>::new(&data, 0).map(|_| ()),
+                refused,
+                "{offset}"
+            );
+            let data = [0, 0, data[0], data[1]];
+            let mut engine = Engine::<true>::new(&data, 0).unwrap();
+            assert_eq!(engine.restart(2), refused, "{offset}");
         }
-        digest
-    }
-
-    #[test]
-    fn over_long_bypass_reads_are_the_same_in_every_build() {
-        assert_eq!(over_long_bypass_reads::<false>(), 15052386680786097469);
-        assert_eq!(over_long_bypass_reads::<true>(), 5587722021355268864);
-    }
-
-    #[test]
-    fn headroom_decides_a_corrupt_offset() {
-        // Nine set bits: an offset of 511 against a range of 510, which no conforming
-        // stream starts with. A bypass bin leaves 512, which needs the free bit.
-        let data = [0xff, 0x80, 0, 0, 0, 0, 0, 0];
-        let mut with = Engine::<true>::new(&data, 0);
-        let mut without = Engine::<false>::new(&data, 0);
-        assert_eq!((with.bypass(), without.bypass()), (1, 1));
-        assert_eq!((with.terminate(), without.terminate()), (1, 0));
+        assert!(Engine::<true>::new(&[0xfe, 0x80], 0).is_ok());
     }
 
     fn noise(mut seed: u32) -> impl FnMut() -> u32 {
@@ -561,26 +561,26 @@ mod tests {
     #[test]
     fn terminate_and_restart() {
         let mut data = [0u8; 16];
-        let mut engine = Engine::<false>::new(&data, 0);
+        let mut engine = Engine::<false>::new(&data, 0).unwrap();
         assert_eq!(engine.terminate(), 0);
         for _ in 0..40 {
             assert_eq!(engine.bypass(), 0);
         }
         assert_eq!(engine.terminate(), 0);
-        // An offset of 510 is past any range after a terminate.
-        data[3] = 0xff;
-        data[4] = 0x00;
-        let mut engine = Engine::<true>::new(&data, 3);
+        // An offset of 509 is past the range a terminate leaves.
+        data[3] = 0xfe;
+        data[4] = 0x80;
+        let mut engine = Engine::<true>::new(&data, 3).unwrap();
         assert_eq!(engine.bits_read(), 3 * 8 + 9);
         assert_eq!(engine.terminate(), 1);
         assert_eq!(engine.aligned_byte_position(), 5);
-        engine.restart(0);
+        engine.restart(0).unwrap();
         assert_eq!(engine.bits_read(), 9);
     }
 
     #[test]
     fn reads_past_the_end_yield_zero_bits() {
-        let mut engine = Engine::<false>::new(&[], 0);
+        let mut engine = Engine::<false>::new(&[], 0).unwrap();
         for _ in 0..1000 {
             assert_eq!(engine.bypass(), 0);
         }
