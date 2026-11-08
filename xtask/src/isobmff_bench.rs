@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
-use std::io::{BufWriter, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -37,8 +37,8 @@ pub const CANDIDATE: &str = "isobmff-worker";
 pub const REFERENCE: &str = "ffmpeg-isobmff-native";
 const FEATURE: &str = "harness/features/isobmff-open-index";
 const FIXTURES: &str = "harness/fixtures/isobmff-open-index";
-const CONTRACT_SHA: &str = "b3db01421af70fe4a50bc5c8b80c7b635fe21f5614dd32b5e93330fa8273a1f8";
-const CORPUS_SHA: &str = "47ce95fbe3ccd822b55c51b64b95352705fc0e5cd5a31a4b7fe6eb5efcab04b0";
+const CONTRACT_SHA: &str = "0419a8ea026d84e1aa98d4896faa79ec2c3f2261bd356a6b04a65e22b8d9b760";
+const CORPUS_SHA: &str = "03761df0849a8d60a3cc2222e35dd8fe02308c0fe774b3e442b6850d99704e58";
 const SUBSET_SHA: &str = "d5efa68f708ffe403018a8c34aaeb10aa693cb4e5abcf9a0b571339c69d40b61";
 const WORK_CONTRACT: &str = "0a924396626871e84b2f91ec612a0c60b09258f0f016afe0753cf7c75fdecf8a";
 const ITERATIONS: u32 = 50;
@@ -133,8 +133,8 @@ struct Case {
     arguments: Vec<String>,
     candidate_options: Vec<String>,
     alias: Option<usize>,
-    time_work: Value,
-    memory_work: Value,
+    time_outputs: Value,
+    memory_outputs: Value,
 }
 
 fn compatibility_options(label: &str) -> Vec<String> {
@@ -187,12 +187,12 @@ impl Case {
             arguments: strings(value, "arguments")?,
             candidate_options: strings(value, "candidate_leading_arguments")?,
             alias,
-            time_work: value
-                .get("expected_time_work")
+            time_outputs: value
+                .get("expected_time_outputs")
                 .cloned()
                 .ok_or("missing time work")?,
-            memory_work: value
-                .get("expected_memory_work")
+            memory_outputs: value
+                .get("expected_memory_outputs")
                 .cloned()
                 .ok_or("missing memory work")?,
         };
@@ -215,22 +215,56 @@ impl Case {
         {
             return Err(format!("invalid operation at {index}"));
         }
-        for (work, iterations) in [(&case.time_work, ITERATIONS), (&case.memory_work, 1)] {
-            if number(work, "iterations")? != i128::from(iterations)
-                || text(work, "input_sha256")? != case.input_sha
-                || number(work, "input_bytes")? != case.input_bytes as i128
-                || text(work, "contract_sha256")? != WORK_CONTRACT
+        if text(value, "id")? != case.id()
+            || text(value, "profile")? != case.id()
+            || text(value, "sha256")? != case.input_sha
+            || text(value, "file")? != case.input
+            || value.get("operation") != Some(&case.operation_record())
+        {
+            return Err(format!("inconsistent registered case at {index}"));
+        }
+        for (timed, iterations) in [(true, ITERATIONS), (false, 1)] {
+            let work = case.work(false, timed);
+            if number(&work, "schema")? != 1
+                || number(&work, "elapsed_ns")? != 0
+                || number(&work, "iterations")? != i128::from(iterations)
+                || text(&work, "input_sha256")? != case.input_sha
+                || number(&work, "input_bytes")? != case.input_bytes as i128
+                || text(&work, "contract_sha256")? != WORK_CONTRACT
             {
                 return Err(format!("invalid work metadata at {index}"));
             }
             for key in ["packets", "bytes", "digest"] {
-                u64::try_from(number(work, key)?).map_err(|e| e.to_string())?;
+                u64::try_from(number(&work, key)?).map_err(|e| e.to_string())?;
+            }
+            let Value::Object(fields) = &work else {
+                return Err("expected reference work object".into());
+            };
+            let candidate = Value::Object(
+                fields
+                    .iter()
+                    .filter(|(key, _)| {
+                        [
+                            "schema",
+                            "elapsed_ns",
+                            "iterations",
+                            "packets",
+                            "bytes",
+                            "digest",
+                        ]
+                        .contains(&key.as_str())
+                    })
+                    .cloned()
+                    .collect(),
+            );
+            if case.work(true, timed) != candidate {
+                return Err(format!("invalid candidate work projection at {index}"));
             }
             if case.refusal
-                && (number(work, "open_refusal_code")? != REFERENCE_REFUSAL
-                    || number(work, "open_refusals")? != i128::from(iterations)
-                    || number(work, "packets")? != 0
-                    || number(work, "bytes")? != 0)
+                && (number(&work, "open_refusal_code")? != REFERENCE_REFUSAL
+                    || number(&work, "open_refusals")? != i128::from(iterations)
+                    || number(&work, "packets")? != 0
+                    || number(&work, "bytes")? != 0)
             {
                 return Err(format!("invalid refusal at {index}"));
             }
@@ -247,34 +281,40 @@ impl Case {
         }
     }
 
+    fn id(&self) -> String {
+        format!("{}-{}-{}", self.label, self.mode, self.schedule)
+    }
+
+    fn operation_record(&self) -> Value {
+        Value::object([
+            ("name", Value::str("isobmff-open-index")),
+            ("view", Value::str("ordered-trace-and-packet-fold")),
+            ("prefix", Value::str(format!("{}-", self.mode))),
+            ("arguments", Value::strings(self.arguments.clone())),
+            (
+                "candidate_options",
+                Value::strings(self.candidate_options.clone()),
+            ),
+        ])
+    }
+
     fn path(&self, root: &Path) -> PathBuf {
         root.join(FIXTURES).join(&self.input)
     }
 
     fn work(&self, candidate: bool, timed: bool) -> Value {
-        let work = if timed {
-            &self.time_work
+        let outputs = if timed {
+            &self.time_outputs
         } else {
-            &self.memory_work
+            &self.memory_outputs
         };
-        let mut fields = vec![
-            ("schema".into(), Value::int(1)),
-            ("elapsed_ns".into(), Value::int(0)),
-        ];
-        if let Value::Object(source) = work {
-            fields.extend(
-                source
-                    .iter()
-                    .filter(|(k, _)| {
-                        !candidate
-                            || ["iterations", "packets", "bytes", "digest"].contains(&k.as_str())
-                    })
-                    .cloned(),
-            );
-        }
-        Value::Object(fields)
+        outputs
+            .get(if candidate { "candidate" } else { "reference" })
+            .cloned()
+            .unwrap_or(Value::Null)
     }
 
+    #[cfg(test)]
     fn evidence(&self, kind: &str, raw: Value) -> Value {
         Value::object([
             ("input_sha256", Value::str(&self.input_sha)),
@@ -288,38 +328,13 @@ impl Case {
 
     fn description(&self) -> Value {
         Value::object([
-            (
-                "id",
-                Value::str(format!("{}-{}-{}", self.label, self.mode, self.schedule)),
-            ),
-            (
-                "profile",
-                Value::str(format!("{}-{}-{}", self.label, self.mode, self.schedule)),
-            ),
+            ("id", Value::str(self.id())),
+            ("profile", Value::str(self.id())),
             ("candidate_worker", Value::str(CANDIDATE)),
             ("reference_worker", Value::str(REFERENCE)),
-            (
-                "expected_time_outputs",
-                if self.refusal {
-                    Value::Null
-                } else {
-                    Value::object([
-                        ("candidate", self.work(true, true)),
-                        ("reference", self.work(false, true)),
-                    ])
-                },
-            ),
-            (
-                "expected_memory_outputs",
-                if self.refusal {
-                    Value::Null
-                } else {
-                    Value::object([
-                        ("candidate", self.work(true, false)),
-                        ("reference", self.work(false, false)),
-                    ])
-                },
-            ),
+            ("operation", self.operation_record()),
+            ("expected_time_outputs", self.time_outputs.clone()),
+            ("expected_memory_outputs", self.memory_outputs.clone()),
             ("index", Value::int(self.index as i128)),
             ("case", Value::str(&self.label)),
             ("mode", Value::str(&self.mode)),
@@ -392,6 +407,29 @@ impl Suite {
     }
 
     fn validate(&self) -> R<()> {
+        let profiles: Vec<_> = self
+            .cases
+            .iter()
+            .map(|case| Value::str(case.id()))
+            .collect();
+        let refusals: Vec<_> = self
+            .cases
+            .iter()
+            .filter(|case| case.refusal)
+            .map(|case| {
+                Value::object([
+                    ("id", Value::str(case.id())),
+                    ("profile", Value::str(case.id())),
+                    ("sha256", Value::str(&case.input_sha)),
+                ])
+            })
+            .collect();
+        if self.contract.get("required_profiles") != Some(&Value::Array(profiles))
+            || self.contract.get("required_refusals") != Some(&Value::Array(refusals))
+            || self.contract.get("case_operations") != Some(&Value::Bool(true))
+        {
+            return Err("contract outcomes differ from the complete corpus".into());
+        }
         let (mut labels, mut inputs, mut operations) = (
             BTreeMap::<&str, Vec<&Case>>::new(),
             BTreeMap::new(),
@@ -414,8 +452,8 @@ impl Suite {
                 let prior: &&Case = prior;
                 if case.alias != Some(prior.index)
                     || case.refusal
-                    || case.time_work != prior.time_work
-                    || case.memory_work != prior.memory_work
+                    || case.time_outputs != prior.time_outputs
+                    || case.memory_outputs != prior.memory_outputs
                 {
                     return Err(format!("invalid alias at {}", case.index));
                 }
@@ -568,7 +606,7 @@ fn output_matches(case: &Case, candidate: &Finished, reference: &Finished) -> bo
     trace.get("work").is_some_and(|work| {
         ["packets", "bytes", "digest"]
             .iter()
-            .all(|k| work.get(k) == case.memory_work.get(k))
+            .all(|k| work.get(k) == case.work(true, false).get(k))
     })
 }
 
@@ -610,6 +648,7 @@ fn trace(
                     ("exit_code", Value::int(done.code)),
                     ("stdout_sha256", Value::str(sha256::hex(&done.stdout))),
                     ("stderr_sha256", Value::str(sha256::hex(&done.stderr))),
+                    ("stderr", Value::str(String::from_utf8_lossy(&done.stderr))),
                 ])
             }
             Ok(None) => Value::object([("status", Value::str("timeout"))]),
@@ -638,30 +677,19 @@ fn trace(
         Value::object([
             ("status", Value::str(if matched { "pass" } else { "fail" })),
             (
+                "source_timing_status",
+                Value::str(if matched { "pass" } else { "fail" }),
+            ),
+            (
                 "comparison",
                 Value::str(if case.refusal { "refusal" } else { "output" }),
             ),
+            ("expected", case.work(true, false)),
+            ("candidate", case.work(true, false)),
+            ("reference", case.work(true, false)),
         ]),
     );
     Ok(row)
-}
-
-/// Exact key sets and integer types matter, including 64-bit work digests.
-fn work_matches(actual: &Value, expected: &Value, timed: bool) -> bool {
-    let (Value::Object(actual), Value::Object(expected)) = (actual, expected) else {
-        return false;
-    };
-    actual.len() == expected.len()
-        && actual.iter().map(|(k, _)| k).collect::<BTreeSet<_>>().len() == actual.len()
-        && expected.iter().all(|(key, target)| {
-            let Some((_, value)) = actual.iter().find(|(k, _)| k == key) else {
-                return false;
-            };
-            if key == "elapsed_ns" && timed {
-                return integer(value).is_some_and(|n| n > 0);
-            }
-            value == target
-        })
 }
 
 fn native() -> bool {
@@ -675,68 +703,6 @@ fn native() -> bool {
 fn sampling_matches(raw: &Value, pairs: usize, seed: u64) -> bool {
     number(raw, "pairs").ok() == Some(pairs as i128)
         && number(raw, "seed").ok() == Some(i128::from(seed))
-}
-
-/// Complete role-specific output metadata supplements the shared work projection.
-fn timing_outputs_match(raw: &Value, case: &Case) -> bool {
-    let check = || -> Option<bool> {
-        let warmups = raw.get("warmups")?.as_array()?;
-        let samples = raw.get("samples")?.as_array()?;
-        if warmups.len() != 2 {
-            return Some(false);
-        }
-        for (index, candidate) in [true, false].into_iter().enumerate() {
-            let expected = case.work(candidate, true);
-            if !work_matches(worker::data(warmups[index].get("result")?), &expected, true) {
-                return Some(false);
-            }
-            let role = if candidate { "candidate" } else { "reference" };
-            for sample in samples {
-                if !work_matches(worker::data(sample.get(role)?), &expected, true) {
-                    return Some(false);
-                }
-            }
-        }
-        Some(true)
-    };
-    check().unwrap_or(false)
-}
-
-fn memory_outputs_match(raw: &Value, expected: &Value) -> bool {
-    raw.get("samples")
-        .and_then(Value::as_array)
-        .is_some_and(|samples| {
-            samples.iter().all(|sample| {
-                let Value::Object(entries) = sample else {
-                    return false;
-                };
-                entries.len() == 4
-                    && ["candidate", "reference"].iter().all(|role| {
-                        ["heap", "rss"].iter().all(|mode| {
-                            sample
-                                .get(&format!("{role}_{mode}"))
-                                .and_then(|value| value.get("work"))
-                                .zip(expected.get(role))
-                                .is_some_and(|(actual, expected)| {
-                                    work_matches(actual, expected, false)
-                                })
-                        })
-                    })
-            })
-        })
-}
-
-fn upper(value: &Value, key: &str, limit: f64, exclusive: bool) -> bool {
-    value
-        .get(key)
-        .and_then(Value::as_f64)
-        .is_some_and(|n| n.is_finite() && n > 0.0 && if exclusive { n < limit } else { n <= limit })
-}
-
-fn memory_pass(raw: &Value) -> bool {
-    upper(raw, "heap_ratio_upper_95", 1.0, true)
-        && upper(raw, "total_rss_ratio_upper_95", 1.0, true)
-        && raw.get("heap_lower_in_each_pair") == Some(&Value::Bool(true))
 }
 
 struct Options {
@@ -891,42 +857,6 @@ fn file_sha(path: &Path) -> R<String> {
     ))
 }
 
-fn policy(root: &Path) -> R<Value> {
-    let policy = read_json(&root.join("harness/policy.json"))?;
-    if policy
-        .get("runtime")
-        .and_then(|v| v.get("ratio_max"))
-        .and_then(Value::as_f64)
-        != Some(1.20)
-        || policy
-            .get("runtime")
-            .and_then(|v| v.get("optimisation_target"))
-            .and_then(Value::as_f64)
-            != Some(0.80)
-        || policy
-            .get("runtime")
-            .and_then(|v| v.get("minimum_pairs"))
-            .and_then(integer)
-            != Some(MINIMUM_PAIRS as i128)
-        || policy
-            .get("memory")
-            .and_then(|v| v.get("peak_live_heap_ratio_max_exclusive"))
-            .and_then(Value::as_f64)
-            != Some(1.0)
-        || policy
-            .get("memory")
-            .and_then(|v| v.get("total_resident_peak_rss_ratio_max_exclusive"))
-            .and_then(Value::as_f64)
-            != Some(1.0)
-    {
-        return Err(
-            "ISO BMFF requires the current 1.20/0.80 runtime and strictly lower memory policy"
-                .into(),
-        );
-    }
-    Ok(policy)
-}
-
 fn case_directory(output: &Path, index: usize) -> PathBuf {
     output.join(format!("case-{index:04}"))
 }
@@ -944,6 +874,7 @@ fn measure(
     case: &Case,
     options: &Options,
     contract: &Value,
+    row: &Value,
 ) -> R<(Value, Value)> {
     let directory = case_directory(&options.output, case.index);
     let operation = case.operation();
@@ -961,37 +892,23 @@ fn measure(
             &operation,
         )
         .unwrap_or_else(measurement_error);
-        let evidence = case.evidence("timing", raw);
-        let raw = evidence.get("timing").expect("recorded timing evidence");
-        let require_linux = cfg!(target_os = "linux");
-        let valid = text(raw, "status").ok() == Some("measured")
-            && number(raw, "iterations").ok() == Some(i128::from(ITERATIONS))
-            && sampling_matches(raw, options.pairs, options.seed)
-            && raw.get("contaminants").is_some_and(|value| !value.truthy())
-            && timing_outputs_match(raw, case)
-            && acceptance::timing_valid(&evidence, contract, &build.workers, require_linux)
-            && raw
-                .get("samples")
-                .and_then(Value::as_array)
-                .is_some_and(|samples| {
-                    timing::validate_module_absence(raw, samples, require_linux).is_ok()
-                });
-        let digest = write_json(&directory.join("timing.json"), raw)?;
+        let mut evidence = row.clone();
+        field(&mut evidence, "timing", raw.clone());
+        let verdict = acceptance::grade_case(
+            root,
+            contract,
+            &evidence,
+            &build.identity,
+            &report::host_target(),
+        );
+        let pass = verdict.timing_pass && sampling_matches(&raw, options.pairs, options.seed);
+        let digest = write_json(&directory.join("timing.json"), &raw)?;
         time = Value::object([
             (
                 "status",
-                Value::str(text(raw, "status").unwrap_or("invalid")),
+                Value::str(text(&raw, "status").unwrap_or("invalid")),
             ),
-            ("work_matches", Value::Bool(valid)),
-            (
-                "pass",
-                Value::Bool(
-                    valid
-                        && raw
-                            .get("ratio")
-                            .is_some_and(|r| upper(r, "upper_95", 1.20, false)),
-                ),
-            ),
+            ("pass", Value::Bool(pass)),
             ("ratio", raw.get("ratio").cloned().unwrap_or(Value::Null)),
             (
                 "per_iteration_ns",
@@ -1035,29 +952,24 @@ fn measure(
             },
         )
         .unwrap_or_else(measurement_error);
-        let evidence = case.evidence("memory", raw);
-        let raw = evidence.get("memory").expect("recorded memory evidence");
-        let valid = text(raw, "status").ok() == Some("qualified")
-            && sampling_matches(raw, options.memory_pairs, options.seed)
-            && memory_outputs_match(raw, &expected)
-            && memory::evidence_valid_with_outputs(
-                root,
-                &evidence,
-                raw,
-                contract,
-                &build.identity,
-                &build.workers,
-                cfg!(target_os = "linux"),
-                Some(&expected),
-            );
-        let digest = write_json(&directory.join("memory.json"), raw)?;
+        let mut evidence = row.clone();
+        field(&mut evidence, "memory", raw.clone());
+        let verdict = acceptance::grade_case(
+            root,
+            contract,
+            &evidence,
+            &build.identity,
+            &report::host_target(),
+        );
+        let pass =
+            verdict.memory_pass && sampling_matches(&raw, options.memory_pairs, options.seed);
+        let digest = write_json(&directory.join("memory.json"), &raw)?;
         memory_result = Value::object([
             (
                 "status",
-                Value::str(text(raw, "status").unwrap_or("invalid")),
+                Value::str(text(&raw, "status").unwrap_or("invalid")),
             ),
-            ("work_matches", Value::Bool(valid)),
-            ("pass", Value::Bool(valid && memory_pass(raw))),
+            ("pass", Value::Bool(pass)),
             (
                 "heap_ratio_upper_95",
                 raw.get("heap_ratio_upper_95")
@@ -1131,12 +1043,6 @@ fn summary(rows: &[Value], selection: &[usize], options: &Options, unchanged: bo
         && unchanged
         && (!options.benchmark || time == selection.len())
         && (!options.memory || memory == selection.len());
-    let qualified = all_requested
-        && native()
-        && !options.subset
-        && options.benchmark
-        && options.memory
-        && selection.len() == TIMABLE_OUTPUTS;
     Value::object([
         ("parity_matches", Value::int(parity_matches as i128)),
         (
@@ -1168,7 +1074,6 @@ fn summary(rows: &[Value], selection: &[usize], options: &Options, unchanged: bo
         ("memory_passes", Value::int(memory as i128)),
         ("source_and_workers_unchanged", Value::Bool(unchanged)),
         ("all_requested_checks_pass", Value::Bool(all_requested)),
-        ("qualified", Value::Bool(qualified)),
     ])
 }
 
@@ -1184,6 +1089,18 @@ fn checkpoint(
     let summary = summary(rows, selection, options, unchanged);
     field(&mut report, "summary", summary.clone());
     field(&mut report, "cases", Value::Array(rows.to_vec()));
+    field(&mut report, "case_storage", Value::str("sha256-files"));
+    field(
+        &mut report,
+        "collection_status",
+        Value::str(
+            if summary.get("collection_complete") == Some(&Value::Bool(true)) {
+                "complete"
+            } else {
+                "partial"
+            },
+        ),
+    );
     fs::write(
         output.join("partial.json"),
         format!("{}\n", json::canonical(&report)),
@@ -1194,34 +1111,19 @@ fn checkpoint(
 
 /// Expand only this case, including explicit aliases, from its checked raw files.
 fn report_case(output: &Path, row: &Value) -> R<Value> {
-    let mut row = row.clone();
-    for kind in ["timing", "memory"] {
-        if let Some(grade) = row.get(kind).filter(|v| **v != Value::Null).cloned() {
-            let path = text(&grade, "raw")?;
-            if Path::new(path)
-                .components()
-                .any(|c| !matches!(c, std::path::Component::Normal(_)))
-            {
-                return Err("measurement path escapes report".into());
-            }
-            let bytes = fs::read(output.join(path)).map_err(|e| format!("{path}: {e}"))?;
-            if sha256::hex(&bytes) != text(&grade, "raw_sha256")? {
-                return Err("raw measurement changed during report assembly".into());
-            }
-            let raw = json::parse(std::str::from_utf8(&bytes).map_err(|e| e.to_string())?)
-                .map_err(|e| e.to_string())?;
-            field(&mut row, kind, raw);
-            field(&mut row, &format!("{kind}_grade"), grade);
-        }
-    }
-    Ok(row)
+    crate::harness::validation::expand_measurements(output, row)
 }
 
 /// Write canonical report JSON with at most one case's raw observations in memory.
 /// Publish only a complete document and never replace an existing report.
-fn final_report(output: &Path, base: &Value, rows: &[Value], summary: &Value) -> R<()> {
+fn final_report(
+    output: &Path,
+    base: &Value,
+    rows: &[Value],
+    summary: &Value,
+    verdict: &Value,
+) -> R<()> {
     let mut report = base.clone();
-    let qualified = summary.get("qualified") == Some(&Value::Bool(true));
     field(&mut report, "summary", summary.clone());
     field(
         &mut report,
@@ -1235,63 +1137,17 @@ fn final_report(output: &Path, base: &Value, rows: &[Value], summary: &Value) ->
         ),
     );
     field(&mut report, "cases", Value::Null);
-    field(
-        &mut report,
-        "acceptance",
-        Value::object([
-            ("accepted", Value::Bool(qualified)),
-            ("slice_accepted", Value::Bool(qualified)),
-            (
-                "reasons",
-                Value::strings(if qualified {
-                    vec![]
-                } else {
-                    vec![
-                        "complete parity, full runtime and memory sets, unchanged gate build and native AArch64 Linux are required",
-                    ]
-                }),
-            ),
-        ]),
-    );
-    let Value::Object(fields) = &report else {
-        return Err("report header must be an object".into());
-    };
-    let fields: BTreeMap<_, _> = fields
-        .iter()
-        .map(|(key, value)| (key.as_str(), value))
-        .collect();
-    let temporary = output.join("report.json.tmp");
-    let destination = output.join("report.json");
-    let file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&temporary)
-        .map_err(|e| format!("{}: {e}", temporary.display()))?;
-    let result = (|| -> std::io::Result<()> {
-        let mut writer = BufWriter::new(file);
-        write!(writer, "{{")?;
-        for (index, (key, value)) in fields.iter().enumerate() {
-            let separator = if index == 0 { "" } else { "," };
-            write!(writer, "{separator}{}:", json::canonical(&Value::str(*key)))?;
-            if *key == "cases" {
-                write!(writer, "[")?;
-                for (index, row) in rows.iter().enumerate() {
-                    let case = report_case(output, row).map_err(std::io::Error::other)?;
-                    let separator = if index == 0 { "" } else { "," };
-                    write!(writer, "{separator}{}", json::canonical(&case))?;
-                }
-                write!(writer, "]")?;
-            } else {
-                write!(writer, "{}", json::canonical(value))?;
-            }
-        }
-        writeln!(writer, "}}")?;
-        writer.flush()?;
-        drop(writer);
-        fs::hard_link(&temporary, &destination)
-    })();
-    let _ = fs::remove_file(&temporary);
-    result.map_err(|e| format!("{}: {e}", destination.display()))
+    field(&mut report, "acceptance", verdict.clone());
+    field(&mut report, "case_storage", Value::str("inline"));
+    report::write_case_report(
+        output,
+        &report,
+        rows.iter().map(|row| report_case(output, row)),
+    )?;
+    field(&mut report, "case_storage", Value::str("sha256-files"));
+    field(&mut report, "cases", Value::Array(rows.to_vec()));
+    write_json(&output.join("collection.json"), &report)?;
+    Ok(())
 }
 
 /// Compare the full corpus and optionally measure the full or 52-operation set.
@@ -1303,7 +1159,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let options = Options::parse(&root, args)?;
     let suite = Suite::load(&root)?;
-    let policy = policy(&root)?;
+    let policy = read_json(&root.join("harness/policy.json"))?;
     let build = Build::load(&root)?;
     if let Some(parent) = options.output.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -1428,10 +1284,14 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                     checkpoint(&options.output, &base, &rows, &selection, &options, false)?;
                     break;
                 }
-                measure(&root, &build, case, &options, &suite.contract)?
+                measure(&root, &build, case, &options, &suite.contract, &rows[index])?
             };
-            field(&mut rows[index], "timing", time);
-            field(&mut rows[index], "memory", memory);
+            if time != Value::Null {
+                field(&mut rows[index], "timing", time);
+            }
+            if memory != Value::Null {
+                field(&mut rows[index], "memory", memory);
+            }
             write_json(
                 &case_directory(&options.output, index).join("result.json"),
                 &rows[index],
@@ -1447,28 +1307,60 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             println!("{}: {} {} {}", index, case.label, case.mode, case.schedule);
         }
     }
-    let summary = checkpoint(
+    unchanged &= build.unchanged(&root)?;
+    let mut summary = checkpoint(
         &options.output,
         &base,
         &rows,
         &selection,
         &options,
-        unchanged && build.unchanged(&root)?,
+        unchanged,
     )?;
-    final_report(&options.output, &base, &rows, &summary)?;
+    let observations = rows.iter().map(|row| report_case(&options.output, row));
+    let errors = (!unchanged).then(|| Err("source or worker changed during collection".to_owned()));
+    let verdict = acceptance::acceptance_iter(
+        &root,
+        &suite.contract,
+        observations.chain(errors),
+        &build.identity,
+        &report::host_target(),
+        &[],
+        &[],
+    );
+    field(
+        &mut summary,
+        "qualified",
+        verdict
+            .get("slice_accepted")
+            .cloned()
+            .unwrap_or(Value::Bool(false)),
+    );
+    final_report(&options.output, &base, &rows, &summary, &verdict)?;
     println!("{}", json::canonical(&summary));
     println!("report: {}", options.output.join("report.json").display());
-    let ok = summary.get(if options.require_acceptance {
-        "qualified"
+    let ok = if options.require_acceptance {
+        verdict.get("slice_accepted")
     } else {
-        "all_requested_checks_pass"
-    }) == Some(&Value::Bool(true));
+        summary.get("all_requested_checks_pass")
+    } == Some(&Value::Bool(true));
     Ok(i32::from(!ok))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::harness::acceptance::{
+        memory_outputs_match, output_matches as work_matches, timing_outputs_match,
+    };
+
+    fn final_report(output: &Path, base: &Value, rows: &[Value], summary: &Value) -> R<()> {
+        let verdict = Value::object([
+            ("accepted", Value::Bool(false)),
+            ("slice_accepted", Value::Bool(false)),
+            ("reasons", Value::strings(["missing observations"])),
+        ]);
+        super::final_report(output, base, rows, summary, &verdict)
+    }
 
     fn root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1671,7 +1563,7 @@ mod tests {
                 ])]),
             ),
         ]);
-        assert!(timing_outputs_match(&raw, case));
+        assert!(timing_outputs_match(&raw, &case.time_outputs));
         for path in [
             vec!["warmups", "1", "result", "data", "input_sha256"],
             vec!["warmups", "1", "result", "data", "contract_sha256"],
@@ -1680,7 +1572,10 @@ mod tests {
         ] {
             let mut changed = raw.clone();
             *value_at(&mut changed, &path) = Value::str("changed");
-            assert!(!timing_outputs_match(&changed, case), "{path:?}");
+            assert!(
+                !timing_outputs_match(&changed, &case.time_outputs),
+                "{path:?}"
+            );
         }
         for path in [
             vec!["warmups", "0", "result", "data", "elapsed_ns"],
@@ -1688,7 +1583,10 @@ mod tests {
         ] {
             let mut changed = raw.clone();
             *value_at(&mut changed, &path) = Value::int(0);
-            assert!(!timing_outputs_match(&changed, case), "{path:?}");
+            assert!(
+                !timing_outputs_match(&changed, &case.time_outputs),
+                "{path:?}"
+            );
         }
     }
 
@@ -1766,17 +1664,17 @@ mod tests {
     fn every_fifty_iteration_count_and_digest_composes_from_single_operation_work() {
         let suite = Suite::load(&root()).unwrap();
         for case in &suite.cases {
-            let one = u64::try_from(number(&case.memory_work, "digest").unwrap()).unwrap();
+            let one = u64::try_from(number(&case.work(false, false), "digest").unwrap()).unwrap();
             let digest =
                 (0..ITERATIONS).fold(0u64, |total, _| total.wrapping_mul(31).wrapping_add(one));
             assert_eq!(
-                number(&case.time_work, "digest").unwrap(),
+                number(&case.work(false, true), "digest").unwrap(),
                 i128::from(digest)
             );
             for key in ["packets", "bytes"] {
                 assert_eq!(
-                    number(&case.time_work, key).unwrap(),
-                    number(&case.memory_work, key).unwrap() * i128::from(ITERATIONS)
+                    number(&case.work(false, true), key).unwrap(),
+                    number(&case.work(false, false), key).unwrap() * i128::from(ITERATIONS)
                 );
             }
         }
@@ -1806,28 +1704,7 @@ mod tests {
     }
 
     #[test]
-    fn current_policy_is_strict_and_partial_runs_cannot_qualify() {
-        policy(&root()).unwrap();
-        assert!(!upper(
-            &Value::object([("upper_95", Value::float(1.21))]),
-            "upper_95",
-            1.20,
-            false
-        ));
-        assert!(upper(
-            &Value::object([("upper_95", Value::float(1.20))]),
-            "upper_95",
-            1.20,
-            false
-        ));
-        let mut memory = Value::object([
-            ("heap_ratio_upper_95", Value::float(0.9)),
-            ("total_rss_ratio_upper_95", Value::float(1.0)),
-            ("heap_lower_in_each_pair", Value::Bool(true)),
-        ]);
-        assert!(!memory_pass(&memory));
-        field(&mut memory, "total_rss_ratio_upper_95", Value::float(0.99));
-        assert!(memory_pass(&memory));
+    fn partial_measurement_sets_cannot_request_acceptance() {
         let suite = Suite::load(&root()).unwrap();
         let options = Options::parse(
             &root(),
@@ -1847,7 +1724,7 @@ mod tests {
             .collect();
         let result = summary(&rows, &suite.selection(true), &options, true);
         assert_eq!(result.get("parity_matches"), Some(&Value::int(1020)));
-        assert_eq!(result.get("qualified"), Some(&Value::Bool(false)));
+        assert!(result.get("qualified").is_none());
         let mut failed = rows;
         field(&mut failed[100], "match", Value::Bool(false));
         assert_eq!(
@@ -1992,8 +1869,8 @@ mod tests {
         assert_eq!(cases[1].get("sampled_as"), Some(&Value::int(0)));
         for case in &cases[..2] {
             assert!(case.get("memory").is_some_and(|v| equal(v, &memory)));
-            assert!(case.get("memory_grade").is_some());
-            assert!(case.get("timing_grade").is_some());
+            assert!(case.get("memory_grade").is_none());
+            assert!(case.get("timing_grade").is_none());
         }
         assert!(cases[2].get("timing").is_none());
         assert_eq!(cases[2].get("memory"), Some(&Value::Null));

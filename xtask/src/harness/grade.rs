@@ -7,7 +7,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
-use super::acceptance::acceptance;
+use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
 use super::timing::validate_module_absence as timing_module_absent;
@@ -126,6 +126,17 @@ fn document(path: &Path) -> R<(Value, String)> {
     Ok((value, sha256::hex(&bytes)))
 }
 
+fn expanded_case(report: &Value, path: &Path, row: &Value) -> R<Value> {
+    match report.get("case_storage").and_then(Value::as_str) {
+        None | Some("inline") => Ok(row.clone()),
+        Some("sha256-files") => validation::expand_measurements(
+            path.parent().ok_or("report has no parent directory")?,
+            row,
+        ),
+        Some(_) => Err("unsupported report case storage".into()),
+    }
+}
+
 /// Only the kernel proof pin may be added after timing. All other build fields,
 /// including source graphs, compiler settings and every worker hash, stay equal.
 fn identities(timed: &Value, memory: &Value) -> R<()> {
@@ -227,7 +238,7 @@ impl Binding<'_> {
         {
             return Err("contract must name a registered feature".into());
         }
-        // The complete registered feature fixes case membership and gate values.
+        // The complete registered feature fixes case membership and operations.
         for (name, expected) in [
             ("contract.json", self.contract_sha),
             ("corpus.json", self.manifest_sha),
@@ -248,6 +259,15 @@ impl Binding<'_> {
             return Err("report case shapes differ".into());
         }
         for report in [timed, memory] {
+            let unchanged = report
+                .get("summary")
+                .and_then(|summary| summary.get("source_and_workers_unchanged"));
+            if unchanged.is_some_and(|value| *value != Value::Bool(true))
+                || (self.contract.get("case_operations") == Some(&Value::Bool(true))
+                    && unchanged.is_none())
+            {
+                return Err("source or worker bookend missing or changed during collection".into());
+            }
             if integer(report, "schema")? != 1 {
                 return Err("unsupported report schema".into());
             }
@@ -354,6 +374,54 @@ fn membership<'a>(expected: &[Value], actual: &'a [Value]) -> R<BTreeMap<&'a str
     Ok(found)
 }
 
+/// An alias keeps its own parity proof but reuses only an identical operation.
+fn aliases(expected: &[Value], actual: &BTreeMap<&str, &Value>) -> R<()> {
+    for spec in expected {
+        let id = text(spec, "id")?;
+        let row = actual[id];
+        let Some(alias) = spec.get("alias_of").filter(|value| **value != Value::Null) else {
+            if row.get("sampled_as").is_some() || row.get("sampled_profile").is_some() {
+                return Err(format!("{id}: undeclared measurement alias"));
+            }
+            continue;
+        };
+        let index = integer(spec, "index")?;
+        let Some(prior) = expected
+            .iter()
+            .find(|prior| prior.get("index") == Some(alias))
+        else {
+            return Err(format!("{id}: alias operation is missing"));
+        };
+        if integer(prior, "index")? >= index
+            || prior.get("outcome").and_then(Value::as_str) != Some("output")
+            || row.get("sampled_as") != Some(alias)
+            || row.get("sampled_profile") != prior.get("profile")
+        {
+            return Err(format!("{id}: invalid measurement alias"));
+        }
+        let previous = actual[text(prior, "id")?];
+        for key in [
+            "sha256",
+            "operation",
+            "expected_time_outputs",
+            "expected_memory_outputs",
+        ] {
+            require_same(field(spec, key)?, field(prior, key)?, "alias operation")?;
+        }
+        for key in ["timing", "memory"] {
+            same_field(row, previous, key)?;
+        }
+        for key in ["candidate_trace", "reference_trace"] {
+            require_same(
+                field(field(row, key)?, "stdout_sha256")?,
+                field(field(previous, key)?, "stdout_sha256")?,
+                "alias trace",
+            )?;
+        }
+    }
+    Ok(())
+}
+
 fn selected(row: &Value, expected: &Value, contract: &Value, identity: &Value) -> R<Value> {
     let id = text(contract, "id")?;
     let resolved = selected_operation(expected, contract, identity)?;
@@ -373,6 +441,30 @@ fn selected(row: &Value, expected: &Value, contract: &Value, identity: &Value) -
         &resolved.operation,
         "contract operation",
     )?;
+    for key in [
+        "expected_time_outputs",
+        "expected_memory_outputs",
+        "outcome",
+        "alias_of",
+    ] {
+        if let Some(value) = expected.get(key) {
+            let observed = row.get(key).ok_or_else(|| format!("missing {key}"))?;
+            if key.ends_with("_outputs") {
+                let expected_roles = members(value)?;
+                if members(observed)?.len() != expected_roles.len()
+                    || expected_roles.iter().any(|(role, output)| {
+                        !observed.get(role).is_some_and(|actual| {
+                            super::acceptance::output_matches(actual, output, false)
+                        })
+                    })
+                {
+                    return Err(format!("{key} differs from the exact registered outputs"));
+                }
+            } else {
+                require_same(observed, value, key)?;
+            }
+        }
+    }
     super::comparison::validate_case_evidence(row, identity, Some(id))
 }
 
@@ -434,13 +526,26 @@ fn join_case(
         "case fields/parity",
     )?;
     let workers = selected(timed, expected, contract, identity)?;
+    if expected.get("outcome").and_then(Value::as_str) == Some("refusal") {
+        if [timed, measured].iter().any(|row| {
+            ["timing", "memory"]
+                .iter()
+                .any(|key| row.get(key).is_some_and(|value| *value != Value::Null))
+        }) {
+            return Err("a registered refusal cannot contain successful measurements".into());
+        }
+        return Ok(timed.clone());
+    }
     let fields = super::comparison::work_fields(contract)?;
     let clock = field(timed, "timing")?;
     let memory = field(measured, "memory")?;
-    if let Some(previous) = timed.get("memory") {
+    if let Some(previous) = timed.get("memory").filter(|value| **value != Value::Null) {
         require_same(previous, memory, "retained memory measurement")?;
     }
-    if let Some(previous) = measured.get("timing") {
+    if let Some(previous) = measured
+        .get("timing")
+        .filter(|value| **value != Value::Null)
+    {
         require_same(previous, clock, "retained timing measurement")?;
     }
     let minimum = integer(contract, "minimum_pairs")?;
@@ -635,21 +740,15 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let expected = binding.expected(&timed, kind)?;
     let timed_rows = membership(&expected, rows(&timed, kind)?)?;
     let memory_rows = membership(&expected, rows(&memory, kind)?)?;
-    let mut combined = Vec::new();
-    for expected in &expected {
-        let id = text(expected, "id")?;
-        combined.push(
-            join_case(
-                timed_rows[id],
-                memory_rows[id],
-                expected,
-                &contract,
-                identity,
-                target,
-            )
-            .map_err(|e| format!("{id}: {e}"))?,
-        );
-    }
+    aliases(&expected, &timed_rows)?;
+    aliases(&expected, &memory_rows)?;
+    let combine = |spec: &Value| -> R<Value> {
+        let id = text(spec, "id")?;
+        let clock = expanded_case(&timed, &options.timing, timed_rows[id])?;
+        let measured = expanded_case(&memory, &options.memory, memory_rows[id])?;
+        join_case(&clock, &measured, spec, &contract, identity, target)
+            .map_err(|e| format!("{id}: {e}"))
+    };
     let mut additional = match memory.get("additional_cases") {
         Some(Value::Array(rows)) => rows.clone(),
         None => Vec::new(),
@@ -670,7 +769,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     validate_additional(&additional, &binding, identity, target)?;
     let derived;
     let selected_contract = if kind == Shape::External {
-        derived = external_contract(&contract, text(&combined[0], "id")?)?;
+        derived = external_contract(&contract, text(&expected[0], "id")?)?;
         &derived
     } else {
         &contract
@@ -680,22 +779,31 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         None => &[],
         _ => return Err("fate_coverage must be an array".into()),
     };
-    let verdict = acceptance(
+    let mut join_error = None;
+    let verdict = acceptance_iter(
         root,
         selected_contract,
-        &combined,
+        expected.iter().map(|spec| {
+            combine(spec).inspect_err(|error| {
+                join_error = Some(error.clone());
+            })
+        }),
         identity,
         target,
         coverage,
         &additional,
     );
-    let mut report = memory.clone();
+    if let Some(error) = join_error {
+        return Err(error);
+    }
+    let mut report = without(&memory, &["cases", "case"])?;
     for (key, value) in [
         ("collection_status", Value::str("complete")),
         ("contract_id", field(&contract, "id")?.clone()),
         ("corpus_manifest_sha256", Value::str(manifest_sha)),
         ("additional_cases", Value::Array(additional)),
         ("acceptance", verdict.clone()),
+        ("case_storage", Value::str("inline")),
         (
             "timing_environment",
             timed.get("environment").cloned().unwrap_or(Value::Null),
@@ -723,25 +831,31 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     ] {
         put(&mut report, key, value)?;
     }
-    match kind {
-        Shape::Corpus => put(&mut report, "cases", Value::Array(combined.clone()))?,
-        Shape::External => put(&mut report, "case", combined[0].clone())?,
-    }
     // Refuse replacement so an earlier failed grade and its inputs stay intact.
     fs::create_dir_all(&options.output)
         .map_err(|e| format!("{}: {e}", options.output.display()))?;
     let destination = options.output.join("report.json");
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&destination)
-        .map_err(|e| format!("{}: {e}", destination.display()))?;
-    file.write_all(json::to_python(&report, Some(2)).as_bytes())
-        .map_err(|e| format!("{}: {e}", destination.display()))?;
-    let code = exit_code(&verdict, &combined, options.requirement);
+    match kind {
+        Shape::Corpus => super::report::write_case_report(
+            &options.output,
+            &report,
+            expected.iter().map(combine),
+        )?,
+        Shape::External => {
+            put(&mut report, "case", combine(&expected[0])?)?;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&destination)
+                .map_err(|e| format!("{}: {e}", destination.display()))?;
+            file.write_all(json::to_python(&report, Some(2)).as_bytes())
+                .map_err(|e| format!("{}: {e}", destination.display()))?;
+        }
+    }
+    let code = exit_code(&verdict, rows(&memory, kind)?, options.requirement);
     println!(
         "{} cases; slice accepted: {}; accepted: {}; {}",
-        combined.len(),
+        expected.len(),
         verdict.get("slice_accepted") == Some(&Value::Bool(true)),
         verdict.get("accepted") == Some(&Value::Bool(true)),
         destination.display()
@@ -1089,6 +1203,8 @@ mod tests {
             ("matroska-segment-metadata", 48),
             ("matroska-startup-seek", 44),
             ("hls-segments", 71),
+            ("packet-framing", 125),
+            ("isobmff-open-index", 1020),
         ] {
             let (manifest, manifest_sha) =
                 document(&root.join(format!("harness/features/{feature}/corpus.json"))).unwrap();
@@ -1138,7 +1254,7 @@ mod tests {
                 manifest_sha: &manifest_sha,
             };
             assert!(changed_binding.registered(root).is_err(), "{feature}");
-            if feature != "hls-segments" && feature != "matroska-startup-seek" {
+            if feature.starts_with("matroska-") && feature != "matroska-startup-seek" {
                 matroska += count;
             }
         }
@@ -1152,6 +1268,81 @@ mod tests {
                     .len(),
             116
         );
+    }
+
+    #[test]
+    fn aliases_require_registered_identical_operations_and_separate_traces() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let manifest =
+            read_json(&root.join("harness/features/isobmff-open-index/corpus.json")).unwrap();
+        let cases = array(&manifest, "cases").unwrap();
+        let expected = [cases[56].clone(), cases[248].clone()];
+        let mut actual: Vec<_> = expected
+            .iter()
+            .map(|spec| {
+                let mut row = spec.clone();
+                put(
+                    &mut row,
+                    "input_sha256",
+                    field(spec, "sha256").unwrap().clone(),
+                )
+                .unwrap();
+                for key in ["candidate_trace", "reference_trace"] {
+                    put(
+                        &mut row,
+                        key,
+                        object(&[("stdout_sha256", Value::str(digest('1')))]),
+                    )
+                    .unwrap();
+                }
+                row
+            })
+            .collect();
+        put(&mut actual[1], "sampled_as", Value::int(56)).unwrap();
+        put(
+            &mut actual[1],
+            "sampled_profile",
+            field(&expected[0], "profile").unwrap().clone(),
+        )
+        .unwrap();
+        assert!(aliases(&expected, &membership(&expected, &actual).unwrap()).is_ok());
+
+        let mut altered = actual.clone();
+        put(&mut altered[1], "sampled_as", Value::int(55)).unwrap();
+        assert!(aliases(&expected, &membership(&expected, &altered).unwrap()).is_err());
+        let mut altered = actual.clone();
+        change(
+            &mut altered[1],
+            &["candidate_trace"],
+            "stdout_sha256",
+            Value::str(digest('2')),
+        );
+        assert!(aliases(&expected, &membership(&expected, &altered).unwrap()).is_err());
+        let mut altered = expected.clone();
+        change(
+            &mut altered[1],
+            &["operation"],
+            "arguments",
+            Value::strings(["1", "0", "memory", "3"]),
+        );
+        assert!(aliases(&altered, &membership(&altered, &actual).unwrap()).is_err());
+        put(&mut actual[0], "sampled_as", Value::int(0)).unwrap();
+        assert!(aliases(&expected, &membership(&expected, &actual).unwrap()).is_err());
+    }
+
+    #[test]
+    fn explicit_refusals_join_without_successful_samples() {
+        let mut fixture = Fixture::new();
+        put(&mut fixture.expected, "outcome", Value::str("refusal")).unwrap();
+        for row in [&mut fixture.timed, &mut fixture.measured] {
+            *row = without(row, &["timing", "memory"]).unwrap();
+            put(row, "outcome", Value::str("refusal")).unwrap();
+        }
+        let joined = fixture.join().unwrap();
+        assert!(joined.get("timing").is_none());
+        assert!(joined.get("memory").is_none());
+        put(&mut fixture.measured, "memory", object(&[])).unwrap();
+        assert!(fixture.join().unwrap_err().contains("refusal"));
     }
 
     #[test]
@@ -1231,6 +1422,54 @@ mod tests {
         assert_eq!(
             text(field(&joined, "memory").unwrap(), "status").unwrap(),
             "observer-unqualified"
+        );
+    }
+
+    #[test]
+    fn absent_phase_values_allow_separate_collections_to_join() {
+        let mut fixture = Fixture::new();
+        put(&mut fixture.timed, "memory", Value::Null).unwrap();
+        put(&mut fixture.measured, "timing", Value::Null).unwrap();
+        assert!(fixture.join().is_ok());
+    }
+
+    #[test]
+    fn registered_role_proofs_reject_integer_to_float_coercion() {
+        let mut fixture = Fixture::new();
+        let proof = object(&[
+            ("candidate", object(&[("input_bytes", Value::int(747))])),
+            ("reference", object(&[("input_bytes", Value::int(747))])),
+        ]);
+        put(
+            &mut fixture.expected,
+            "expected_time_outputs",
+            proof.clone(),
+        )
+        .unwrap();
+        put(&mut fixture.timed, "expected_time_outputs", proof).unwrap();
+        assert!(
+            selected(
+                &fixture.timed,
+                &fixture.expected,
+                &fixture.contract,
+                &fixture.identity
+            )
+            .is_ok()
+        );
+        change(
+            &mut fixture.timed,
+            &["expected_time_outputs", "reference"],
+            "input_bytes",
+            Value::float(747.0),
+        );
+        assert!(
+            selected(
+                &fixture.timed,
+                &fixture.expected,
+                &fixture.contract,
+                &fixture.identity
+            )
+            .is_err()
         );
     }
 
@@ -1722,6 +1961,17 @@ mod tests {
             let mut changed = header.clone();
             put(&mut changed, key, value).unwrap();
             assert!(binding.headers(&header, &changed).is_err(), "{key}");
+        }
+        for unchanged in [Value::Bool(false), Value::Null, Value::int(1)] {
+            let mut failed = header.clone();
+            put(
+                &mut failed,
+                "summary",
+                object(&[("source_and_workers_unchanged", unchanged)]),
+            )
+            .unwrap();
+            assert!(binding.headers(&header, &failed).is_err());
+            assert!(binding.headers(&failed, &header).is_err());
         }
         let external = object(&[
             ("id", Value::str("external.mkv")),

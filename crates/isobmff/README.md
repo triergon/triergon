@@ -334,6 +334,19 @@ run, with `TRIERGON_RSS_KERNEL_BOUND` unset or `0`. Each case completes timing
 before memory on the same recorded worker pair. The conservative RSS observer
 must pass the strict memory gates. Final report assembly streams one case's raw
 observations at a time and keeps the individual JSON files and hashes alongside it.
+Runtime and memory verdicts use the shared harness acceptance evaluator and its
+current policy. Each collection also writes a compact `collection.json` that
+references hash-checked samples. Join separate timing and memory collections with:
+
+```sh
+cargo xtask grade TIMING/collection.json MEMORY/collection.json \
+    --contract harness/features/isobmff-open-index/contract.json \
+    --manifest harness/features/isobmff-open-index/corpus.json --output DIR
+```
+
+The grader checks the complete corpus, exact outputs for each role, refusal
+diagnostics and alias operations. It reads one case's raw observations at a time;
+the 52-operation selection cannot qualify the complete feature.
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).

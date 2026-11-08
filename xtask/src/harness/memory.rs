@@ -1413,7 +1413,7 @@ pub fn evidence_valid(
         identity,
         selected,
         require_linux,
-        None,
+        row.get("expected_memory_outputs"),
     )
 }
 

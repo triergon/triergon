@@ -33,10 +33,6 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "runtime_policy": "runtime-ceiling-1.20",
-  "runtime_ratio_max": 1.2,
-  "runtime_optimization_ratio_target": 0.8,
-  "memory_ratio_max_exclusive": 1.0,
   "refusal": {
     "reference_exit_code": 1,
     "reference_error_code": -1094995529,
@@ -1182,6 +1178,249 @@
     {
       "profile": "follow-brand-major-qt-compat-qt-native-index-tiny",
       "sampled_as": "r-front-stco-native-index-tiny"
+    }
+  ],
+  "case_operations": true,
+  "required_refusals": [
+    {
+      "id": "r-private-carriage-open-ordinary",
+      "profile": "r-private-carriage-open-ordinary",
+      "sha256": "1f31da70782270b688a870fb6415fddd7e2f4879192f0c97166c9c61f93e4781"
+    },
+    {
+      "id": "r-private-carriage-native-index-ordinary",
+      "profile": "r-private-carriage-native-index-ordinary",
+      "sha256": "1f31da70782270b688a870fb6415fddd7e2f4879192f0c97166c9c61f93e4781"
+    },
+    {
+      "id": "r-private-carriage-open-tiny",
+      "profile": "r-private-carriage-open-tiny",
+      "sha256": "1f31da70782270b688a870fb6415fddd7e2f4879192f0c97166c9c61f93e4781"
+    },
+    {
+      "id": "r-private-carriage-native-index-tiny",
+      "profile": "r-private-carriage-native-index-tiny",
+      "sha256": "1f31da70782270b688a870fb6415fddd7e2f4879192f0c97166c9c61f93e4781"
+    },
+    {
+      "id": "bad-box-size-below-header-open-ordinary",
+      "profile": "bad-box-size-below-header-open-ordinary",
+      "sha256": "6ff93639dcc13ac0f0754eff7ec1610247c9addda6e884e3fe263a3de89a5e75"
+    },
+    {
+      "id": "bad-box-size-below-header-native-index-ordinary",
+      "profile": "bad-box-size-below-header-native-index-ordinary",
+      "sha256": "6ff93639dcc13ac0f0754eff7ec1610247c9addda6e884e3fe263a3de89a5e75"
+    },
+    {
+      "id": "bad-box-size-below-header-open-tiny",
+      "profile": "bad-box-size-below-header-open-tiny",
+      "sha256": "6ff93639dcc13ac0f0754eff7ec1610247c9addda6e884e3fe263a3de89a5e75"
+    },
+    {
+      "id": "bad-box-size-below-header-native-index-tiny",
+      "profile": "bad-box-size-below-header-native-index-tiny",
+      "sha256": "6ff93639dcc13ac0f0754eff7ec1610247c9addda6e884e3fe263a3de89a5e75"
+    },
+    {
+      "id": "bad-largesize-below-header-open-ordinary",
+      "profile": "bad-largesize-below-header-open-ordinary",
+      "sha256": "98b22133d82f8db81e79429d6219d1247ddc2fad2ae10a2eb950aaa7a5b69b7c"
+    },
+    {
+      "id": "bad-largesize-below-header-native-index-ordinary",
+      "profile": "bad-largesize-below-header-native-index-ordinary",
+      "sha256": "98b22133d82f8db81e79429d6219d1247ddc2fad2ae10a2eb950aaa7a5b69b7c"
+    },
+    {
+      "id": "bad-largesize-below-header-open-tiny",
+      "profile": "bad-largesize-below-header-open-tiny",
+      "sha256": "98b22133d82f8db81e79429d6219d1247ddc2fad2ae10a2eb950aaa7a5b69b7c"
+    },
+    {
+      "id": "bad-largesize-below-header-native-index-tiny",
+      "profile": "bad-largesize-below-header-native-index-tiny",
+      "sha256": "98b22133d82f8db81e79429d6219d1247ddc2fad2ae10a2eb950aaa7a5b69b7c"
+    },
+    {
+      "id": "bad-stsz-count-overrun-open-ordinary",
+      "profile": "bad-stsz-count-overrun-open-ordinary",
+      "sha256": "4d1cc5123ba1cbde82d38dcf64d781b836db89c735243690c5a897c4accbc621"
+    },
+    {
+      "id": "bad-stsz-count-overrun-native-index-ordinary",
+      "profile": "bad-stsz-count-overrun-native-index-ordinary",
+      "sha256": "4d1cc5123ba1cbde82d38dcf64d781b836db89c735243690c5a897c4accbc621"
+    },
+    {
+      "id": "bad-stsz-count-overrun-open-tiny",
+      "profile": "bad-stsz-count-overrun-open-tiny",
+      "sha256": "4d1cc5123ba1cbde82d38dcf64d781b836db89c735243690c5a897c4accbc621"
+    },
+    {
+      "id": "bad-stsz-count-overrun-native-index-tiny",
+      "profile": "bad-stsz-count-overrun-native-index-tiny",
+      "sha256": "4d1cc5123ba1cbde82d38dcf64d781b836db89c735243690c5a897c4accbc621"
+    },
+    {
+      "id": "clock27-i63-minus2-step12-open-ordinary",
+      "profile": "clock27-i63-minus2-step12-open-ordinary",
+      "sha256": "0cf757dd06904c03a0d0d5410078f0f6426c893274ad23b4d47704bdcba75bdf"
+    },
+    {
+      "id": "clock27-i63-minus2-step12-native-index-ordinary",
+      "profile": "clock27-i63-minus2-step12-native-index-ordinary",
+      "sha256": "0cf757dd06904c03a0d0d5410078f0f6426c893274ad23b4d47704bdcba75bdf"
+    },
+    {
+      "id": "clock27-i63-minus2-step12-open-tiny",
+      "profile": "clock27-i63-minus2-step12-open-tiny",
+      "sha256": "0cf757dd06904c03a0d0d5410078f0f6426c893274ad23b4d47704bdcba75bdf"
+    },
+    {
+      "id": "clock27-i63-minus2-step12-native-index-tiny",
+      "profile": "clock27-i63-minus2-step12-native-index-tiny",
+      "sha256": "0cf757dd06904c03a0d0d5410078f0f6426c893274ad23b4d47704bdcba75bdf"
+    },
+    {
+      "id": "clock27-i63-minus2-step21-open-ordinary",
+      "profile": "clock27-i63-minus2-step21-open-ordinary",
+      "sha256": "e1b5744e8f06400d5ed34106a150e8144c27700f25714167698f8e72747444b3"
+    },
+    {
+      "id": "clock27-i63-minus2-step21-native-index-ordinary",
+      "profile": "clock27-i63-minus2-step21-native-index-ordinary",
+      "sha256": "e1b5744e8f06400d5ed34106a150e8144c27700f25714167698f8e72747444b3"
+    },
+    {
+      "id": "clock27-i63-minus2-step21-open-tiny",
+      "profile": "clock27-i63-minus2-step21-open-tiny",
+      "sha256": "e1b5744e8f06400d5ed34106a150e8144c27700f25714167698f8e72747444b3"
+    },
+    {
+      "id": "clock27-i63-minus2-step21-native-index-tiny",
+      "profile": "clock27-i63-minus2-step21-native-index-tiny",
+      "sha256": "e1b5744e8f06400d5ed34106a150e8144c27700f25714167698f8e72747444b3"
+    },
+    {
+      "id": "clock27-i63-minus1-step12-open-ordinary",
+      "profile": "clock27-i63-minus1-step12-open-ordinary",
+      "sha256": "34da09539cbe016fbed836ae14ce90512a673f2c80785218bebdfe889aa6ab05"
+    },
+    {
+      "id": "clock27-i63-minus1-step12-native-index-ordinary",
+      "profile": "clock27-i63-minus1-step12-native-index-ordinary",
+      "sha256": "34da09539cbe016fbed836ae14ce90512a673f2c80785218bebdfe889aa6ab05"
+    },
+    {
+      "id": "clock27-i63-minus1-step12-open-tiny",
+      "profile": "clock27-i63-minus1-step12-open-tiny",
+      "sha256": "34da09539cbe016fbed836ae14ce90512a673f2c80785218bebdfe889aa6ab05"
+    },
+    {
+      "id": "clock27-i63-minus1-step12-native-index-tiny",
+      "profile": "clock27-i63-minus1-step12-native-index-tiny",
+      "sha256": "34da09539cbe016fbed836ae14ce90512a673f2c80785218bebdfe889aa6ab05"
+    },
+    {
+      "id": "clock27-i63-minus1-step21-open-ordinary",
+      "profile": "clock27-i63-minus1-step21-open-ordinary",
+      "sha256": "af3406797326c3c402aee8754eb17136d35047ad718c15dc83874f090fe7cf0b"
+    },
+    {
+      "id": "clock27-i63-minus1-step21-native-index-ordinary",
+      "profile": "clock27-i63-minus1-step21-native-index-ordinary",
+      "sha256": "af3406797326c3c402aee8754eb17136d35047ad718c15dc83874f090fe7cf0b"
+    },
+    {
+      "id": "clock27-i63-minus1-step21-open-tiny",
+      "profile": "clock27-i63-minus1-step21-open-tiny",
+      "sha256": "af3406797326c3c402aee8754eb17136d35047ad718c15dc83874f090fe7cf0b"
+    },
+    {
+      "id": "clock27-i63-minus1-step21-native-index-tiny",
+      "profile": "clock27-i63-minus1-step21-native-index-tiny",
+      "sha256": "af3406797326c3c402aee8754eb17136d35047ad718c15dc83874f090fe7cf0b"
+    },
+    {
+      "id": "clock27-PTS-enters-MIN-before-DTS-open-ordinary",
+      "profile": "clock27-PTS-enters-MIN-before-DTS-open-ordinary",
+      "sha256": "8b3fe092067c64974ee93fd783e09075d6337994f24fe073870bbfadb0784262"
+    },
+    {
+      "id": "clock27-PTS-enters-MIN-before-DTS-native-index-ordinary",
+      "profile": "clock27-PTS-enters-MIN-before-DTS-native-index-ordinary",
+      "sha256": "8b3fe092067c64974ee93fd783e09075d6337994f24fe073870bbfadb0784262"
+    },
+    {
+      "id": "clock27-PTS-enters-MIN-before-DTS-open-tiny",
+      "profile": "clock27-PTS-enters-MIN-before-DTS-open-tiny",
+      "sha256": "8b3fe092067c64974ee93fd783e09075d6337994f24fe073870bbfadb0784262"
+    },
+    {
+      "id": "clock27-PTS-enters-MIN-before-DTS-native-index-tiny",
+      "profile": "clock27-PTS-enters-MIN-before-DTS-native-index-tiny",
+      "sha256": "8b3fe092067c64974ee93fd783e09075d6337994f24fe073870bbfadb0784262"
+    },
+    {
+      "id": "clock27-signed-CTO-crossing-open-ordinary",
+      "profile": "clock27-signed-CTO-crossing-open-ordinary",
+      "sha256": "48b82767ca56929c36ecf993cde24e3e655822be573f607b091c553a94cd7229"
+    },
+    {
+      "id": "clock27-signed-CTO-crossing-native-index-ordinary",
+      "profile": "clock27-signed-CTO-crossing-native-index-ordinary",
+      "sha256": "48b82767ca56929c36ecf993cde24e3e655822be573f607b091c553a94cd7229"
+    },
+    {
+      "id": "clock27-signed-CTO-crossing-open-tiny",
+      "profile": "clock27-signed-CTO-crossing-open-tiny",
+      "sha256": "48b82767ca56929c36ecf993cde24e3e655822be573f607b091c553a94cd7229"
+    },
+    {
+      "id": "clock27-signed-CTO-crossing-native-index-tiny",
+      "profile": "clock27-signed-CTO-crossing-native-index-tiny",
+      "sha256": "48b82767ca56929c36ecf993cde24e3e655822be573f607b091c553a94cd7229"
+    },
+    {
+      "id": "clock27-split-runs-at-MIN-open-ordinary",
+      "profile": "clock27-split-runs-at-MIN-open-ordinary",
+      "sha256": "714e9028dd6d4dfb83b1f9abad94299be9d615f8e4107cb66f78eb9ec93af073"
+    },
+    {
+      "id": "clock27-split-runs-at-MIN-native-index-ordinary",
+      "profile": "clock27-split-runs-at-MIN-native-index-ordinary",
+      "sha256": "714e9028dd6d4dfb83b1f9abad94299be9d615f8e4107cb66f78eb9ec93af073"
+    },
+    {
+      "id": "clock27-split-runs-at-MIN-open-tiny",
+      "profile": "clock27-split-runs-at-MIN-open-tiny",
+      "sha256": "714e9028dd6d4dfb83b1f9abad94299be9d615f8e4107cb66f78eb9ec93af073"
+    },
+    {
+      "id": "clock27-split-runs-at-MIN-native-index-tiny",
+      "profile": "clock27-split-runs-at-MIN-native-index-tiny",
+      "sha256": "714e9028dd6d4dfb83b1f9abad94299be9d615f8e4107cb66f78eb9ec93af073"
+    },
+    {
+      "id": "order27-signed-max-rescale-overflow-open-ordinary",
+      "profile": "order27-signed-max-rescale-overflow-open-ordinary",
+      "sha256": "8aebb029fd190cbed7968440b19d787f3a4bdf17ca810581f49c1f5ce96cac10"
+    },
+    {
+      "id": "order27-signed-max-rescale-overflow-native-index-ordinary",
+      "profile": "order27-signed-max-rescale-overflow-native-index-ordinary",
+      "sha256": "8aebb029fd190cbed7968440b19d787f3a4bdf17ca810581f49c1f5ce96cac10"
+    },
+    {
+      "id": "order27-signed-max-rescale-overflow-open-tiny",
+      "profile": "order27-signed-max-rescale-overflow-open-tiny",
+      "sha256": "8aebb029fd190cbed7968440b19d787f3a4bdf17ca810581f49c1f5ce96cac10"
+    },
+    {
+      "id": "order27-signed-max-rescale-overflow-native-index-tiny",
+      "profile": "order27-signed-max-rescale-overflow-native-index-tiny",
+      "sha256": "8aebb029fd190cbed7968440b19d787f3a4bdf17ca810581f49c1f5ce96cac10"
     }
   ]
 }
