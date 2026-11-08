@@ -30,5 +30,23 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "timeout_seconds": 120,
-  "pending_module_requirements": []
+  "pending_module_requirements": [
+    "libass silently draws nothing when its composite allocation fails; the crate returns `Allocation`"
+  ],
+  "open_cases": [
+    {
+      "id": "outlines-71",
+      "requirement": "libass silently draws nothing when its composite allocation fails; the crate returns `Allocation`",
+      "targets": [
+        "armv7-unknown-linux-gnueabihf"
+      ]
+    },
+    {
+      "id": "outlines-83",
+      "requirement": "libass silently draws nothing when its composite allocation fails; the crate returns `Allocation`",
+      "targets": [
+        "armv7-unknown-linux-gnueabihf"
+      ]
+    }
+  ]
 }
