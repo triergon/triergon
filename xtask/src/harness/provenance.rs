@@ -550,7 +550,7 @@ mod tests {
             for file in ["contract", "pins"] {
                 let name = format!("harness/features/{feature}/{file}.json");
                 assert!(
-                    shared.get(&name).is_some(),
+                    shared.get(&name).is_some() || !root.join(&name).exists(),
                     "missing source binding: {name}"
                 );
             }

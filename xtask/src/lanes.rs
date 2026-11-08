@@ -133,24 +133,85 @@ fn pins(root: &Path, id: &str) -> R<Vec<(String, Value)>> {
 }
 
 impl Lane {
-    /// The generated manifest of feature `id`: its rows with their pinned work.
-    /// The case ids and the pinned ids must match exactly.
+    /// The features whose rows and pins make feature `id`'s manifest: `id`
+    /// itself, or the features its contract's `cases_from` names, in order. Each
+    /// named feature is another of the lane's, with its own rows and pins in the
+    /// same case directory.
+    fn sources(&self, root: &Path, id: &str) -> R<Vec<&'static str>> {
+        let document = contract(root, id)?;
+        let Some(named) = document.get("cases_from") else {
+            let own = self.features.iter().copied().find(|&feature| feature == id);
+            return Ok(Vec::from_iter(own));
+        };
+        let named = named
+            .as_array()
+            .filter(|named| !named.is_empty())
+            .ok_or_else(|| format!("{id}: cases_from is not a list of features"))?;
+        named
+            .iter()
+            .map(|name| {
+                let name = name.as_str().unwrap_or_default();
+                let source = self
+                    .features
+                    .iter()
+                    .copied()
+                    .find(|&feature| feature == name && feature != id)
+                    .ok_or_else(|| {
+                        format!(
+                            "{id}: cases_from: {name} is not another {} feature",
+                            self.command
+                        )
+                    })?;
+                if contract(root, source)?.get("cases_from").is_some() {
+                    return Err(format!(
+                        "{id}: cases_from: {source} takes its cases from other features"
+                    ));
+                }
+                if (self.directory)(source) != (self.directory)(id) {
+                    return Err(format!(
+                        "{id}: cases_from: {source} has another case directory"
+                    ));
+                }
+                Ok(source)
+            })
+            .collect()
+    }
+
+    /// The files feature `id`'s manifest is generated from besides its contract:
+    /// the pins it takes and the lane's row sources, relative to the root. A
+    /// feature whose contract cannot be read is listed with its own pins.
+    pub fn inputs(&self, root: &Path, id: &str) -> Vec<String> {
+        let pinned = self.sources(root, id).unwrap_or_default();
+        let mut files: Vec<String> = if pinned.is_empty() { vec![id] } else { pinned }
+            .into_iter()
+            .map(|feature| format!("harness/features/{feature}/pins.json"))
+            .collect();
+        files.extend(self.row_sources.iter().map(|&source| source.to_owned()));
+        files
+    }
+
+    /// The generated manifest of feature `id`: the rows of its sources with their
+    /// pinned work (see [`Lane::sources`]). The case ids and the pinned ids must
+    /// match exactly.
     pub fn manifest(&self, root: &Path, id: &str) -> R<Value> {
-        let pins = pins(root, id)?;
-        let rows = (self.rows)(root, id)?;
-        if rows.len() != pins.len() {
+        let (mut rows, mut pinned) = (Vec::new(), Vec::new());
+        for source in self.sources(root, id)? {
+            rows.extend((self.rows)(root, source)?);
+            pinned.extend(pins(root, source)?);
+        }
+        if rows.len() != pinned.len() {
             return Err(format!(
                 "{id}: {} cases but {} pins; re-record them",
                 rows.len(),
-                pins.len()
+                pinned.len()
             ));
         }
         let mut cases = Vec::new();
-        for (row, (pinned, expected)) in rows.into_iter().zip(pins) {
+        for (row, (pin, expected)) in rows.into_iter().zip(pinned) {
             let case = row.get("id").and_then(Value::as_str).unwrap_or_default();
-            if case != pinned {
+            if case != pin {
                 return Err(format!(
-                    "{id}: case {case} is pinned as {pinned}; re-record them"
+                    "{id}: case {case} is pinned as {pin}; re-record them"
                 ));
             }
             let Value::Object(mut fields) = row else {
@@ -177,22 +238,47 @@ impl Lane {
         ])
     }
 
-    /// Every registered feature's generated manifest builds and its pin file is
-    /// exactly what [`Lane::record`] writes for its cases.
+    /// Every registered feature has a gate and its generated manifest builds. A
+    /// feature with its own cases has a pin file exactly as [`Lane::record`]
+    /// writes it; one that takes another's (`cases_from`) is diagnostic and has
+    /// none. Pins are always recorded with the `worker_operation` the harness
+    /// runs, so no contract names another operation for them.
     pub fn check(&self, root: &Path) -> Vec<String> {
         let mut errors = (self.check_inputs)(root);
         for &feature in self.features {
             if !contract_path(root, feature).is_file() {
                 continue;
             }
-            if let Err(error) = gate(root, feature) {
-                errors.push(error);
+            let gate = gate(root, feature);
+            if let Err(error) = &gate {
+                errors.push(error.clone());
+            }
+            if contract(root, feature).is_ok_and(|c| c.get("pin_operation").is_some()) {
+                errors.push(format!(
+                    "{feature}: pins are recorded with worker_operation; \
+                     name the features whose pins apply in cases_from"
+                ));
             }
             if let Err(error) = self.manifest(root, feature) {
                 errors.push(error);
                 continue;
             }
             let path = pins_path(root, feature);
+            if self.sources(root, feature).is_ok_and(|s| s != [feature]) {
+                if gate.is_ok_and(|gate| gate != Gate::Diagnostic) {
+                    errors.push(format!(
+                        "{feature}: it takes its cases and pins from cases_from, \
+                         so its gate is diagnostic"
+                    ));
+                }
+                if path.exists() {
+                    errors.push(format!(
+                        "{}: {feature} takes its pins from cases_from",
+                        path.display()
+                    ));
+                }
+                continue;
+            }
             let committed = std::fs::read_to_string(&path).unwrap_or_default();
             match pins(root, feature).map(|pins| canonical(&self.pin_file(pins))) {
                 Ok(text) if text == committed => {}
@@ -206,7 +292,8 @@ impl Lane {
         errors
     }
 
-    /// Re-records the pins of every feature from the built reference.
+    /// Re-records the pins of every feature with its own cases from the built
+    /// reference, running each case's `worker_operation` fold.
     pub fn record(&self, root: &Path) -> R<()> {
         (self.write_inputs)(root)?;
         let identity = crate::checks::read_json(&root.join("target/harness/identity.json"))?;
@@ -227,13 +314,15 @@ impl Lane {
             ));
         }
         for &feature in self.features {
-            let contract = contract(root, feature)?;
-            // A diagnostic feature's pins are the gated reference's folds
-            // (`pin_operation`), so its report shows where its own reference departs.
-            let prefix = contract
-                .get("pin_operation")
-                .or_else(|| contract.get("worker_operation"))
+            let sources = self.sources(root, feature)?;
+            if sources != [feature] {
+                println!("{feature}: the pins of {}", sources.join(", "));
+                continue;
+            }
+            let prefix = contract(root, feature)?
+                .get("worker_operation")
                 .and_then(Value::as_str)
+                .map(str::to_owned)
                 .ok_or_else(|| format!("{feature}: no worker_operation"))?;
             let rows = (self.rows)(root, feature)?;
             let directory = root.join((self.directory)(feature));
@@ -382,19 +471,18 @@ fn fold(worker: &Path, mode: &str, directory: &Path, row: &Value) -> R<Value> {
     })))
 }
 
-/// Every generated feature's contract, pins and the files its rows come from,
-/// once each: the inputs a report's provenance covers.
+/// Every generated feature's contract, the pins it takes and the files its rows
+/// come from, once each: the inputs a report's provenance covers.
 pub fn provenance_inputs() -> Vec<String> {
+    let root = crate::root();
     let mut names: Vec<String> = Vec::new();
     for lane in LANES {
-        for feature in lane.features {
-            for file in ["contract", "pins"] {
-                names.push(format!("harness/features/{feature}/{file}.json"));
-            }
-        }
-        for source in lane.row_sources {
-            if !names.iter().any(|name| name == source) {
-                names.push((*source).into());
+        for &feature in lane.features {
+            let contract = format!("harness/features/{feature}/contract.json");
+            for name in std::iter::once(contract).chain(lane.inputs(&root, feature)) {
+                if !names.contains(&name) {
+                    names.push(name);
+                }
             }
         }
     }
@@ -440,6 +528,69 @@ mod tests {
         for flags in [["--all", "--diagnostic"], ["--diagnostic", "--all"]] {
             assert_eq!(compared(raster, &flags), raster.features, "{flags:?}");
         }
+    }
+
+    #[test]
+    fn a_feature_takes_its_cases_and_pins_from_cases_from() {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let root = crate::walk::scratch("lane-cases-from");
+        let features = root.join("harness/features");
+        std::fs::create_dir_all(features.join("font-outlines")).unwrap();
+        std::fs::create_dir_all(features.join("font-hinting-none")).unwrap();
+        std::fs::create_dir_all(root.join("harness/fonts")).unwrap();
+        for file in [
+            "harness/fonts/corpus.json",
+            "harness/features/font-outlines/contract.json",
+            "harness/features/font-outlines/pins.json",
+        ] {
+            std::fs::copy(source.join(file), root.join(file)).unwrap();
+        }
+        let lane = &crate::fonts::LANE;
+        let derived = features.join("font-hinting-none");
+        let check = |contract: &str| {
+            std::fs::write(derived.join("contract.json"), contract).unwrap();
+            lane.check(&root)
+        };
+        let diagnostic = r#"{"gate": "diagnostic", "cases_from": ["font-outlines"]}"#;
+        assert_eq!(check(diagnostic), Vec::<String>::new());
+        let cases = |id| lane.manifest(&root, id).unwrap().get("cases").cloned();
+        assert_eq!(cases("font-hinting-none"), cases("font-outlines"));
+        assert_eq!(
+            lane.inputs(&root, "font-hinting-none")[0],
+            "harness/features/font-outlines/pins.json"
+        );
+        for (contract, error) in [
+            (
+                r#"{"gate": "required", "cases_from": ["font-outlines"]}"#,
+                "diagnostic",
+            ),
+            (r#"{"gate": "diagnostic", "cases_from": []}"#, "not a list"),
+            (
+                r#"{"gate": "diagnostic", "cases_from": ["font-hinting-none"]}"#,
+                "not another",
+            ),
+            (
+                r#"{"gate": "diagnostic", "cases_from": ["shape-text"]}"#,
+                "not another",
+            ),
+            (
+                r#"{"gate": "diagnostic", "cases_from": ["font-outlines"], "pin_operation": "font-"}"#,
+                "worker_operation",
+            ),
+        ] {
+            let found = check(contract);
+            assert!(
+                found.iter().any(|e| e.contains(error)),
+                "{contract}: {found:?}"
+            );
+        }
+        std::fs::copy(
+            features.join("font-outlines/pins.json"),
+            derived.join("pins.json"),
+        )
+        .unwrap();
+        assert!(check(diagnostic)[0].contains("takes its pins from cases_from"));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
