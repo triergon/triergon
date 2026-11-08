@@ -70,6 +70,7 @@ dependencies = [
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
+ "triergon-ogg",
  "triergon-subtitles",
 ]
 
@@ -172,6 +173,8 @@ dependencies = [
  "triergon-codec",
  "triergon-core",
  "triergon-framing",
+ "triergon-matroska",
+ "triergon-ogg",
 ]
 
 [[package]]
@@ -182,6 +185,7 @@ dependencies = [
  "triergon-codec",
  "triergon-core",
  "triergon-framing",
+ "triergon-ogg",
 ]
 
 [[package]]
