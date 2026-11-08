@@ -177,6 +177,14 @@ Verification:
 - `fixtures/raw-annex-b/*.packets` hold the packet extents and key flags FFmpeg's
   raw H.264/HEVC demuxers produce for the paired streams.
 
+From the repository root, `cargo xtask framing` compares all 125 AVC/HEVC
+packet-framing scripts with the pinned FFmpeg bitstream-filter API. The
+[contract](../../harness/features/packet-framing/contract.json) covers configuration,
+complete packet fields and side data, malformed input, flush and drain actions,
+and retained packet access after close. Add `--benchmark --memory` to collect
+paired runtime and memory measurements through the shared harness; qualification
+requires the pinned gate build on native AArch64 Linux.
+
 Per-module parity, runtime and memory results are in
 [docs/status.md](../../docs/status.md); the gates and harness are described in
 [docs/quality.md](../../docs/quality.md).

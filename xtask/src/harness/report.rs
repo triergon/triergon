@@ -3,7 +3,9 @@
 //! Completed cases are checkpointed so an interrupted run keeps its evidence;
 //! a checkpoint is never an acceptance.
 
-use std::fs;
+use std::collections::BTreeMap;
+use std::fs::{self, OpenOptions};
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -16,7 +18,7 @@ use super::timing::{Operation, benchmark};
 use super::validation::{self, selected_operation};
 use crate::checks::read_json;
 use crate::corpus::write_json;
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256;
 
 pub struct Options {
@@ -213,6 +215,57 @@ fn save_json(path: &Path, value: &Value) -> Result<(), String> {
     fs::rename(&temporary, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+/// Stream canonical report JSON, retaining at most one case from the iterator.
+/// Publish a complete report without replacing an existing destination.
+pub(crate) fn write_case_report(
+    output: &Path,
+    header: &Value,
+    rows: impl Iterator<Item = Result<Value, String>>,
+) -> Result<(), String> {
+    let Value::Object(fields) = header else {
+        return Err("report header must be an object".into());
+    };
+    let mut fields: BTreeMap<_, _> = fields
+        .iter()
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
+    let placeholder = Value::Null;
+    fields.insert("cases", &placeholder);
+    let temporary = output.join("report.json.tmp");
+    let destination = output.join("report.json");
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| format!("{}: {error}", temporary.display()))?;
+    let result = (|| -> std::io::Result<()> {
+        let mut writer = BufWriter::new(file);
+        let mut rows = rows;
+        write!(writer, "{{")?;
+        for (index, (key, value)) in fields.iter().enumerate() {
+            let separator = if index == 0 { "" } else { "," };
+            write!(writer, "{separator}{}:", json::canonical(&Value::str(*key)))?;
+            if *key == "cases" {
+                write!(writer, "[")?;
+                for (index, row) in rows.by_ref().enumerate() {
+                    let row = row.map_err(std::io::Error::other)?;
+                    let separator = if index == 0 { "" } else { "," };
+                    write!(writer, "{separator}{}", json::canonical(&row))?;
+                }
+                write!(writer, "]")?;
+            } else {
+                write!(writer, "{}", json::canonical(value))?;
+            }
+        }
+        writeln!(writer, "}}")?;
+        writer.flush()?;
+        drop(writer);
+        fs::hard_link(&temporary, &destination)
+    })();
+    let _ = fs::remove_file(&temporary);
+    result.map_err(|error| format!("{}: {error}", destination.display()))
+}
+
 fn object(pairs: Vec<(&str, Value)>) -> Value {
     Value::Object(pairs.into_iter().map(|(k, v)| (k.to_owned(), v)).collect())
 }
@@ -234,6 +287,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     }
     let (candidate, native) = validation::current_workers(root, &identity)?;
     let contract = read_json(&options.contract)?;
+    let work_fields = super::comparison::work_fields(&contract)?;
     let candidate_name = s(&contract, "candidate")
         .unwrap_or("media-worker")
         .to_owned();
@@ -371,6 +425,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 Operation {
                     prefix: prefix.clone(),
                     arguments: arguments.clone(),
+                    candidate_options: vec![],
+                    work_fields: work_fields.clone(),
                 },
             ));
             parity::feed_parity(
@@ -378,6 +434,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 prefix,
                 &arguments,
                 case.get("expected").unwrap_or(&Value::Null),
+                &work_fields,
             )?
         } else {
             row.push(("input_sha256", Value::str(sha)));
@@ -412,7 +469,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 ""
             };
             let arguments = match (&seek, catalogue || colour || rule.is_some()) {
-                (Some(seek), false) => vec![crate::json::to_python(seek, None).into()],
+                (Some(seek), false) => vec![json::to_python(seek, None).into()],
                 _ => vec![],
             };
             timed = Some((
@@ -421,6 +478,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 Operation {
                     prefix: prefix.into(),
                     arguments,
+                    candidate_options: vec![],
+                    work_fields: work_fields.clone(),
                 },
             ));
             if catalogue {
@@ -544,4 +603,126 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             .iter()
             .all(|r| r.get("parity").and_then(|p| s(p, "status")) == Some("pass"));
     Ok(i32::from(!all_pass))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    struct Output(PathBuf);
+
+    impl Output {
+        fn new() -> Self {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "triergon-case-report-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for Output {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn case_report_preserves_raw_rows_and_number_precision() {
+        let output = Output::new();
+        let header = Value::object([
+            (
+                "z",
+                Value::object([("b", Value::int(2)), ("a", Value::int(1))]),
+            ),
+            ("cases", Value::strings(["replace this value"])),
+            ("a", Value::str("complete")),
+        ]);
+        let raw = [
+            r#"{"id":"one","timing":{"samples":[{"digest":18446744073709551615,"elapsed_ns":9007199254740993,"ratio":0.123456789012345678901234567890}]}}"#,
+            r#"{"id":"two","memory":{"samples":[{"low":-170141183460469231731687303715884105728,"bytes":170141183460469231731687303715884105727}]},"proof":{"valid":true,"source":"input"}}"#,
+        ];
+        write_case_report(
+            &output.0,
+            &header,
+            raw.iter()
+                .map(|text| json::parse_strict(text).map_err(|error| error.to_string())),
+        )
+        .unwrap();
+        let expected = Value::object([
+            ("z", header.get("z").unwrap().clone()),
+            (
+                "cases",
+                Value::Array(
+                    raw.iter()
+                        .map(|text| json::parse_strict(text).unwrap())
+                        .collect(),
+                ),
+            ),
+            ("a", Value::str("complete")),
+        ]);
+        let text = fs::read_to_string(output.0.join("report.json")).unwrap();
+        assert_eq!(text, format!("{}\n", json::canonical(&expected)));
+        for number in [
+            "18446744073709551615",
+            "9007199254740993",
+            "0.123456789012345678901234567890",
+            "-170141183460469231731687303715884105728",
+        ] {
+            assert!(text.contains(number));
+        }
+        assert!(!output.0.join("report.json.tmp").exists());
+    }
+
+    #[test]
+    fn case_report_iteration_failure_is_not_published() {
+        let output = Output::new();
+        let rows = [Ok(Value::int(1)), Err("raw case unavailable".to_owned())]
+            .into_iter()
+            .chain(std::iter::once_with(|| {
+                panic!("iteration continued after error")
+            }));
+        let error = write_case_report(&output.0, &Value::Object(Vec::new()), rows).unwrap_err();
+        assert!(error.contains("raw case unavailable"));
+        assert!(!output.0.join("report.json").exists());
+        assert!(!output.0.join("report.json.tmp").exists());
+    }
+
+    #[test]
+    fn case_report_keeps_existing_destination() {
+        let output = Output::new();
+        let destination = output.0.join("report.json");
+        fs::write(&destination, b"existing report\n").unwrap();
+        assert!(
+            write_case_report(
+                &output.0,
+                &Value::object([("schema", Value::int(1))]),
+                std::iter::once(Ok(Value::int(2))),
+            )
+            .is_err()
+        );
+        assert_eq!(fs::read(&destination).unwrap(), b"existing report\n");
+        assert!(!output.0.join("report.json.tmp").exists());
+    }
+
+    #[test]
+    fn case_report_keeps_existing_temporary_file() {
+        let output = Output::new();
+        let temporary = output.0.join("report.json.tmp");
+        fs::write(&temporary, b"in progress\n").unwrap();
+        assert!(
+            write_case_report(
+                &output.0,
+                &Value::object([("schema", Value::int(1))]),
+                std::iter::empty(),
+            )
+            .is_err()
+        );
+        assert_eq!(fs::read(&temporary).unwrap(), b"in progress\n");
+        assert!(!output.0.join("report.json").exists());
+    }
 }

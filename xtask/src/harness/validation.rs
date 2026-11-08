@@ -63,6 +63,37 @@ pub(super) fn hash<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     Ok(digest)
 }
 
+/// Resolve hash-bound measurements without holding another case's samples.
+pub(crate) fn expand_measurements(directory: &Path, row: &Value) -> Result<Value, String> {
+    let directory = directory.canonicalize().map_err(|e| e.to_string())?;
+    let mut expanded = row.clone();
+    for kind in ["timing", "memory"] {
+        let Some(record) = row.get(kind).filter(|value| **value != Value::Null) else {
+            continue;
+        };
+        let name = text(record, "raw")?;
+        if Path::new(name)
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_)))
+        {
+            return Err("measurement path escapes report".into());
+        }
+        let path = directory.join(name);
+        if provenance::file_identity(&directory, &path)?.1 != hash(record, "raw_sha256")? {
+            return Err("raw measurement changed during report assembly".into());
+        }
+        let bytes = std::fs::read(&path).map_err(|e| format!("{name}: {e}"))?;
+        // Bind the bytes actually parsed as well as the regular-file check.
+        if crate::sha256::hex(&bytes) != hash(record, "raw_sha256")? {
+            return Err("raw measurement changed during report assembly".into());
+        }
+        let raw = crate::json::parse(std::str::from_utf8(&bytes).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+        put(&mut expanded, kind, raw)?;
+    }
+    Ok(expanded)
+}
+
 /// A declared iteration count fixes the measured operation.
 pub(super) fn iterations_valid(contract: &Value, observed: &Value) -> bool {
     let Value::Number(value) = observed else {
@@ -105,13 +136,25 @@ pub(super) fn selected_operation<'a>(
         None => reference_record(identity, rule)?,
     };
     let prefix = contract.get("worker_operation").and_then(Value::as_str);
-    let candidate_worker = prefix.map(|_| {
+    let case_operations = contract.get("case_operations") == Some(&Value::Bool(true));
+    let candidate_worker = (prefix.is_some() || case_operations).then(|| {
         contract
             .get("candidate")
             .and_then(Value::as_str)
             .unwrap_or("media-worker")
     });
-    let operation = if let Some(prefix) = prefix {
+    let operation = if case_operations {
+        let operation = field(case, "operation")?;
+        for key in ["name", "view", "prefix"] {
+            text(operation, key)?;
+        }
+        for key in ["arguments", "candidate_options"] {
+            if array(operation, key)?.iter().any(|v| v.as_str().is_none()) {
+                return Err(format!("operation {key} must contain strings"));
+            }
+        }
+        operation.clone()
+    } else if let Some(prefix) = prefix {
         Value::object([
             ("name", field(contract, "operation")?.clone()),
             ("view", Value::str(format!("playback-{prefix}fold-v1"))),
@@ -199,12 +242,7 @@ pub(super) fn candidate_worker(
         return Err(format!("{name} changed since build identity; rebuild"));
     }
     let recorded = field(record, "selected_graph")?;
-    let current = provenance::selected_graph(
-        root,
-        &provenance::cargo_metadata(root)?,
-        name,
-        &provenance::matroska_inputs(),
-    )?;
+    let current = super::build::candidate_graph(root, name)?;
     require_same(recorded, &current, "candidate source graph")?;
     Ok(path)
 }
