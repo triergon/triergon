@@ -184,6 +184,7 @@ struct Drive<'a> {
     chunk: usize,
     work: u64,
     catalogue: Vec<(u16, u64)>,
+    catalogue_epoch_override: Option<u64>,
 }
 impl<'a> Drive<'a> {
     fn new(raw: &'a [u8], limits: ReaderLimits, chunk: usize, work: u64) -> Self {
@@ -206,6 +207,7 @@ impl<'a> Drive<'a> {
             chunk,
             work,
             catalogue: Vec::new(),
+            catalogue_epoch_override: None,
         }
     }
     fn next(&mut self) -> Result<Option<Event<Packet, ReaderEvent>>, Error> {
@@ -226,7 +228,13 @@ impl<'a> Drive<'a> {
                             .streams
                             .as_slice()
                             .iter()
-                            .map(|stream| (stream.pid, *configuration_epoch))
+                            .map(|stream| {
+                                (
+                                    stream.pid,
+                                    self.catalogue_epoch_override
+                                        .unwrap_or(*configuration_epoch),
+                                )
+                            })
                             .collect();
                     }
                     self.assert_catalogue();
@@ -911,4 +919,283 @@ fn in_band_sps_changes_do_not_advance_the_pmt_source_configuration_epoch() {
     }
     assert!(sps.len() >= 2, "fixtures must change the in-band SPS");
     assert_eq!(bytes, [first.as_slice(), second.as_slice()].concat());
+}
+
+#[test]
+fn signalled_counter_break_before_eof_interrupts_an_incomplete_avc_au() {
+    let raw = include_bytes!("../../framing/fixtures/raw-annex-b/avc-aud0.h264");
+    // The first literal AU is 2045 bytes; omit its final ten bytes.
+    let partial = &raw[..2035];
+    let mut ts = Transport::new();
+    ts.tables(&[(0x1b, PID, &[])], 0);
+    ts.pes(PID, 0xe0, partial, Some(90_000), None);
+    let mut boundary = [0xff; 188];
+    // Adaptation only, counter 8 instead of 11, discontinuity flag, no PCR.
+    boundary[..6].copy_from_slice(&[0x47, (PID >> 8) as u8, PID as u8, 0x28, 183, 0x80]);
+    ts.bytes.extend_from_slice(&boundary);
+
+    let mut drive = Drive::new(&ts.bytes, ReaderLimits::default(), 7, 1);
+    let mut interrupted = 0;
+    let mut counter_break = false;
+    let mut finished = false;
+    while let Some(event) = drive.next().unwrap() {
+        match event {
+            Event::Packet(_) => panic!("counter break certified an incomplete AVC AU at EOF"),
+            Event::Other(ReaderEvent::Interrupted {
+                track,
+                elementary_range,
+                cause,
+            }) => {
+                assert_eq!(track.stream().pid, PID);
+                assert_eq!(elementary_range, 0..partial.len() as u64);
+                assert!(
+                    matches!(cause.event(), TraceEvent::Continuity { pid, outcome }
+                    if *pid == PID
+                        && *outcome == triergon_mpegts::ContinuityOutcome::SignalledDiscontinuity)
+                );
+                interrupted += 1;
+            }
+            Event::Other(ReaderEvent::Source(source)) => match source.event() {
+                TraceEvent::Continuity { pid, outcome }
+                    if *pid == PID
+                        && *outcome
+                            == triergon_mpegts::ContinuityOutcome::SignalledDiscontinuity =>
+                {
+                    counter_break = true;
+                }
+                TraceEvent::Finished => finished = true,
+                _ => (),
+            },
+            _ => (),
+        }
+    }
+    assert!(counter_break);
+    assert!(finished);
+    assert_eq!(interrupted, 1);
+}
+
+#[test]
+fn pmt_pcr_rebind_interrupts_old_pes_and_admits_a_fresh_pes() {
+    use triergon_mpegts::clock::{
+        ClockKey, SourceClockAnchor, SourceClockSample, SourceTimePolicy, SourceTimeStatus,
+    };
+
+    let frame = adts(&[0x55; 500]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    let mut body = Transport::new();
+    body.counters = ts.counters;
+    body.pes(PID, 0xc0, &frame, Some(90_000), None);
+    ts.bytes.extend_from_slice(&body.bytes[..188]);
+    // Version 1 retains the ADTS stream but rebinds PCR from PID 256 to 257.
+    ts.section(
+        4096,
+        vec![
+            2,
+            0xb0,
+            18,
+            0,
+            PROGRAM as u8,
+            0xc3,
+            0,
+            0,
+            0xe1,
+            1,
+            0xf0,
+            0,
+            0x0f,
+            0xe1,
+            0,
+            0xf0,
+            0,
+        ],
+    );
+    ts.bytes.extend_from_slice(&body.bytes[188..]);
+    let fresh_frame = adts(b"fresh PES after PCR rebind");
+    ts.counters[usize::from(PID)] = body.counters[usize::from(PID)];
+    ts.pes(PID, 0xc0, &fresh_frame, Some(180_000), None);
+    let key = ClockKey {
+        tsid: 9,
+        program: PROGRAM,
+        pcr_pid: PID + 1,
+        epoch: 0,
+    };
+    let mut drive = Drive::new(
+        &ts.bytes,
+        ReaderLimits {
+            time_policy: SourceTimePolicy::Bounded(SourceClockAnchor {
+                key,
+                sample: SourceClockSample::Pts90(180_000),
+                maximum_distance27: 0,
+            }),
+            ..ReaderLimits::default()
+        },
+        7,
+        1,
+    );
+    // This unchanged route keeps epoch 2 while the PMT's global epoch becomes 3.
+    drive.catalogue_epoch_override = Some(2);
+    let mut original_epoch = None;
+    let mut rebound = false;
+    let mut source_pes = Vec::new();
+    let mut interrupted = None;
+    let mut retained = None;
+    while let Some(event) = drive.next().unwrap() {
+        match event {
+            Event::Other(ReaderEvent::Source(source)) => {
+                if let TraceEvent::ProgramMap {
+                    map,
+                    active: true,
+                    configuration_epoch,
+                } = source.event()
+                {
+                    if map.header.version == 0 {
+                        original_epoch = Some(*configuration_epoch);
+                    } else {
+                        assert_eq!(map.header.version, 1);
+                        assert_eq!(map.pcr_pid, PID + 1);
+                        assert_eq!(*configuration_epoch, 3);
+                        rebound = true;
+                    }
+                } else if matches!(source.event(), TraceEvent::Pes(_)) {
+                    source_pes.push(source);
+                }
+            }
+            Event::Other(ReaderEvent::InterruptedPes { source, boundary }) => {
+                assert!(rebound);
+                assert!(matches!(boundary.event(), TraceEvent::ProgramMap {
+                    map,
+                    active: true,
+                    configuration_epoch: 3,
+                } if map.header.version == 1 && map.pcr_pid == PID + 1));
+                assert!(interrupted.replace(source).is_none());
+            }
+            Event::Packet(packet) => {
+                assert!(rebound);
+                assert!(interrupted.is_some());
+                assert_eq!(packet.payload(), fresh_frame);
+                assert!(retained.replace(packet).is_none());
+            }
+            _ => (),
+        }
+    }
+    assert!(rebound);
+    assert_eq!(original_epoch, Some(2));
+    assert_eq!(source_pes.len(), 2);
+    let interrupted = interrupted.expect("crossing PES must report the PMT boundary");
+    let TraceEvent::Pes(original) = source_pes[0].event() else {
+        unreachable!()
+    };
+    let TraceEvent::Pes(rejected) = interrupted.event() else {
+        panic!("interruption must retain the original PES");
+    };
+    for pes in [original, rejected] {
+        assert_eq!(pes.header.pts_raw33, Some(90_000));
+        assert_eq!(pes.epochs.configuration, 2);
+        assert_eq!(pes.payload().flatten().copied().collect::<Vec<_>>(), frame);
+    }
+    assert_eq!(rejected.header.as_bytes(), original.header.as_bytes());
+    assert_eq!(rejected.epochs, original.epochs);
+    assert_eq!(
+        rejected.header_source_ranges.as_slice(),
+        original.header_source_ranges.as_slice()
+    );
+    let TraceEvent::Pes(fresh) = source_pes[1].event() else {
+        unreachable!()
+    };
+    assert_eq!(fresh.header.pts_raw33, Some(180_000));
+    assert_eq!(fresh.epochs.configuration, 2);
+    assert_eq!(
+        fresh.payload().flatten().copied().collect::<Vec<_>>(),
+        fresh_frame
+    );
+    let packet = retained.expect("fresh PES must be admitted after the PMT update");
+    assert_eq!(packet.payload(), fresh_frame);
+    assert_eq!(packet.epochs().configuration, original_epoch.unwrap());
+    assert_eq!(
+        packet.track_info().configuration_epoch(),
+        packet.epochs().configuration
+    );
+    assert_eq!(packet.track_info().program_map().header.version, 1);
+    assert_eq!(packet.track_info().program_map().pcr_pid, PID + 1);
+    let clock = packet.clock().unwrap();
+    assert_eq!(clock.key, key);
+    assert_eq!(clock.pts.raw33, Some(180_000));
+    assert_eq!(clock.pts.status, SourceTimeStatus::Anchored);
+    assert_eq!(packet.pts(), Some(180_000));
+    assert_eq!(packet.dts(), None);
+}
+
+#[test]
+fn pcr_discontinuity_with_pusi_admits_a_fresh_adts_pes_in_the_same_carrier() {
+    let frame = adts(b"fresh");
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    let carrier_offset = ts.bytes.len();
+    ts.pes(PID, 0xc0, &frame, Some(90_000), None);
+    assert_eq!(ts.bytes.len(), carrier_offset + 188);
+    let carrier = &mut ts.bytes[carrier_offset..];
+    assert_ne!(carrier[1] & 0x40, 0);
+    assert!(carrier[4] >= 7);
+    // Add the PCR and discontinuity to this PES's PUSI carrier, before its payload.
+    carrier[5] = 0x90;
+    carrier[6..12].copy_from_slice(&[0, 0, 0, 0, 0x7e, 0]);
+    let header_offset = (carrier_offset + 5 + usize::from(carrier[4])) as u64;
+
+    let mut drive = Drive::new(&ts.bytes, ReaderLimits::default(), 7, 1);
+    let mut timeline = false;
+    let mut pes_count = 0;
+    let mut retained = None;
+    while let Some(event) = drive.next().unwrap() {
+        match event {
+            Event::Other(ReaderEvent::Source(source)) => match source.event() {
+                TraceEvent::Transport(packet) if packet.pid == PID => {
+                    assert_eq!(packet.source_offset, carrier_offset as u64);
+                    assert!(packet.payload_unit_start);
+                    assert!(packet.discontinuity_indicator());
+                    assert!(packet.adaptation.as_ref().unwrap().pcr.is_some());
+                    assert_eq!(packet.payload_source_offset, header_offset);
+                }
+                TraceEvent::Timeline {
+                    program,
+                    clock_epoch,
+                } => {
+                    assert_eq!(*program, PROGRAM);
+                    assert_eq!(*clock_epoch, 1);
+                    assert_eq!(pes_count, 0);
+                    assert!(!timeline);
+                    timeline = true;
+                }
+                TraceEvent::Pes(pes) => {
+                    assert!(timeline);
+                    assert_eq!(pes.epochs.clock, 1);
+                    assert_eq!(pes.header_source_ranges.as_slice()[0].offset, header_offset);
+                    assert_eq!(pes.payload().flatten().copied().collect::<Vec<_>>(), frame);
+                    pes_count += 1;
+                }
+                _ => (),
+            },
+            Event::Other(ReaderEvent::InterruptedPes { .. } | ReaderEvent::Interrupted { .. }) => {
+                panic!("fresh PES starts after the clock transition in its own carrier");
+            }
+            Event::Packet(packet) => {
+                assert!(timeline);
+                assert_eq!(pes_count, 1);
+                assert!(retained.replace(packet).is_none());
+            }
+            _ => (),
+        }
+    }
+    assert!(timeline);
+    assert_eq!(pes_count, 1);
+    let packet = retained.expect("same-carrier PES must produce a fresh AU");
+    assert!(matches!(packet.access_unit(), AccessUnit::Adts(_)));
+    assert_eq!(packet.payload(), frame);
+    assert_eq!(packet.epochs().clock, 1);
+    assert_eq!(packet.pts(), Some(90_000));
+    assert_eq!(packet.dts(), None);
+    let clock = packet.clock().unwrap();
+    assert_eq!(clock.key.epoch, 1);
+    assert_eq!(clock.key.pcr_pid, PID);
+    assert!(!clock.quarantined);
 }
