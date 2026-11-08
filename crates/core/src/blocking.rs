@@ -1,6 +1,8 @@
 //! Driving any [`ContainerReader`] from a [`std::io`] source.
 use crate::container::{ContainerReader, Event, SeekRequest};
-use crate::{Budget, BudgetVec, Error, InputRequest, InputWindow, Result, SourceCapabilities, Step};
+use crate::{
+    Budget, BudgetVec, Error, InputRequest, InputWindow, Result, SourceCapabilities, Step,
+};
 use crate::{SourceFailure, WorkBudget};
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::atomic::AtomicBool;
