@@ -31,5 +31,7 @@ pub use triergon_isobmff as isobmff;
 pub use triergon_matroska as matroska;
 #[cfg(feature = "mpegts")]
 pub use triergon_mpegts as mpegts;
+#[cfg(feature = "ogg")]
+pub use triergon_ogg as ogg;
 #[cfg(feature = "subtitles")]
 pub use triergon_subtitles as subtitles;
