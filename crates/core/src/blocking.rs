@@ -1,20 +1,24 @@
 //! Driving any [`ContainerReader`] from a [`std::io`] source.
 use crate::container::{ContainerReader, Event, SeekRequest};
 use crate::{
-    Budget, BudgetVec, Error, InputRequest, InputWindow, Result, SourceCapabilities, Step,
+    Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
+    SourceFailure, Step, WorkBudget,
 };
-use crate::{SourceFailure, WorkBudget};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{ErrorKind, Read, Seek, SeekFrom};
 use std::sync::atomic::AtomicBool;
 
 /// Work units per reader step.
 const WORK: u64 = 1 << 20;
 
+/// The flag of the calls that take none: never set.
+static NOT_CANCELLED: AtomicBool = AtomicBool::new(false);
+
 type Reposition<S> = fn(&mut S, u64) -> std::io::Result<u64>;
 
 /// A reader fed from a blocking [`Read`] source, which is seeked on demand when it is
-/// also [`Seek`]. Each requested window is read straight into charged storage of the
-/// reader's pool.
+/// also [`Seek`]. Windows are read into one allocation charged to the reader's pool and
+/// refilled in place once the reader has released it; a new one is made only while the
+/// reader or its packets still hold the previous window.
 #[derive(Debug)]
 pub struct Blocking<R, S> {
     reader: R,
@@ -22,16 +26,15 @@ pub struct Blocking<R, S> {
     pool: Budget,
     position: u64,
     reposition: Option<Reposition<S>>,
-    cancel: AtomicBool,
+    /// The last window read.
+    window: Option<Bytes>,
 }
 
 /// The capabilities of a seekable source: its length, found by seeking to the end, and
 /// random access. The source is left at its start.
 pub fn seekable_capabilities(source: &mut impl Seek) -> Result<SourceCapabilities> {
-    let length = source
-        .seek(SeekFrom::End(0))
-        .map_err(|e| Error::Io(e.kind()))?;
-    source.rewind().map_err(|e| Error::Io(e.kind()))?;
+    let length = source.seek(SeekFrom::End(0))?;
+    source.rewind()?;
     Ok(SourceCapabilities {
         length: Some(length),
         random_access: true,
@@ -51,7 +54,7 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
             pool: pool.clone(),
             position: 0,
             reposition,
-            cancel: AtomicBool::new(false),
+            window: None,
         }
     }
 
@@ -63,10 +66,22 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
         &mut self.reader
     }
 
+    pub fn into_inner(self) -> S {
+        self.source
+    }
+
     /// The next event; `None` at the end of the source.
     pub fn next_event(&mut self) -> Result<Option<Event<R::Packet, R::Other>>> {
+        self.next_event_or_cancel(&NOT_CANCELLED)
+    }
+
+    /// [`Blocking::next_event`], failing with [`Error::Cancelled`] once `cancel` is set.
+    pub fn next_event_or_cancel(
+        &mut self,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Event<R::Packet, R::Other>>> {
         loop {
-            match self.reader.step(&mut WorkBudget::new(WORK), &self.cancel)? {
+            match self.reader.step(&mut WorkBudget::new(WORK), cancel)? {
                 Step::Ready(event) => return Ok(Some(event)),
                 Step::Yield => {}
                 Step::NeedInput(request) => self.serve(request)?,
@@ -103,33 +118,46 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
                 return Err(Error::Unsupported("random-access input"));
             };
             if let Err(error) = reposition(&mut self.source, request.offset) {
-                self.reader
-                    .fail(request.source, request.token, SourceFailure::Transport)?;
-                return Err(Error::Io(error.kind()));
+                return self.transport(request, error);
             }
             self.position = request.offset;
         }
-        let mut window = BudgetVec::new(&self.pool);
-        window.try_resize(request.maximum, 0)?;
-        let read = loop {
-            match self.source.read(window.as_mut_slice()) {
-                Ok(read) => break read,
-                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(error) => {
-                    self.reader
-                        .fail(request.source, request.token, SourceFailure::Transport)?;
-                    return Err(Error::Io(error.kind()));
-                }
-            }
+        let bytes = match self.fill(request.maximum)? {
+            Ok(bytes) => bytes,
+            Err(error) => return self.transport(request, error),
         };
-        if read == 0 {
+        if bytes.is_empty() {
             return self.reader.finish(request.source, request.token);
         }
-        window.truncate(read);
-        let bytes = window.freeze().map_err(|refused| refused.error)?;
-        self.position += read as u64;
+        self.position += bytes.len() as u64;
         let window = InputWindow::new(request.source, request.token, request.offset, bytes)?;
         self.reader.provide(&window)
+    }
+
+    /// Read up to `maximum` bytes into the window: in place when nothing else holds it,
+    /// otherwise into a new charged allocation. The outer error is the pool's, the inner
+    /// one the source's.
+    fn fill(&mut self, maximum: usize) -> Result<std::io::Result<Bytes>> {
+        // A new allocation is unshared and holds `maximum` bytes: at most two rounds.
+        loop {
+            let source = &mut self.source;
+            if let Some(window) = self.window.as_mut()
+                && let Some(read) =
+                    window.try_refill(maximum, |buffer| read_retrying(source, buffer))
+            {
+                return Ok(read.map(|_| window.clone()));
+            }
+            self.window = None;
+            let buffer = BudgetVec::try_filled(&self.pool, 0, maximum)?;
+            self.window = Some(buffer.freeze().map_err(|refused| refused.error)?);
+        }
+    }
+
+    /// Report a failed source to the reader, which fails from then on.
+    fn transport(&mut self, request: InputRequest, error: std::io::Error) -> Result<()> {
+        self.reader
+            .fail(request.source, request.token, SourceFailure::Transport)?;
+        Err(error.into())
     }
 }
 
@@ -143,5 +171,14 @@ impl<R: ContainerReader, S: Read + Seek> Blocking<R, S> {
             pool,
             Some(|source, at| source.seek(SeekFrom::Start(at))),
         )
+    }
+}
+
+fn read_retrying(source: &mut impl Read, buffer: &mut [u8]) -> std::io::Result<usize> {
+    loop {
+        match source.read(buffer) {
+            Err(error) if error.kind() == ErrorKind::Interrupted => {}
+            result => return result,
+        }
     }
 }
