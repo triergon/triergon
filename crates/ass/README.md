@@ -203,8 +203,8 @@ selective style overrides), in the frame and storage size and margins of its
   at each frame as libass registers them (a renderer that draws several
   scripts registers each one's as it first draws them, where libass, whose
   tracks share one library, registers every track's as soon as it is read;
-  fonts registered once stay selectable in both), are matched by family, full or
-  PostScript name, weight and slant with `triergon_font::select`, as libass
+  fonts registered once stay selectable in both), are matched by family, full
+  or PostScript name, weight and slant with `triergon_font::select`, as libass
   matches fonts without a system font provider. Each requested font keeps the
   faces it gathers: the one selected for it, then, for a character none of
   them maps, one selected for that character from the requested family, the
@@ -227,8 +227,8 @@ selective style overrides), in the frame and storage size and margins of its
   origin.
 - **Bitmaps.** Each glyph's fill and border or opaque box through
   `triergon_raster::Raster::render`, quantised against its run, and each run
-  composited with its blur, `\be` and shadow by `Raster::compose`; then each run's shadow,
-  border and fill as images, clipped by the clip rectangle (with `\kf`'s
+  composited with its blur, `\be` and shadow by `Raster::compose`; then each
+  run's shadow, border and fill as images, clipped by the clip rectangle (with `\kf`'s
   split), multiplied by a vector clip, and the box of `BorderStyle` 4.
 - **The frame.** Events are taken in layer and read order, and in the
   script's order where both are equal (libass's `qsort` leaves that order
@@ -269,9 +269,9 @@ asked for; libass keeps them all, so a font asked for again after it left
 starts over from its first face. Shaping plans are kept up to 256. All of it
 is charged to the renderer's budget, family names and drawing texts by
 length, and looked up by the names and texts the script holds, without
-copying them. The byte limits
-bound nothing: there is no bitmap or composite cache, so glyph bitmaps and
-composites are drawn again each frame, with the same images.
+copying them. The byte limits bound nothing: there is no bitmap or composite
+cache, so glyph bitmaps and composites are drawn again each frame, with the
+same images.
 
 ## Arithmetic
 
@@ -302,13 +302,6 @@ convention asks:
   coordinate lies beyond the outline bound and discards the drawing, and a NaN
   one (such as `0e400`) is 0. libass's own result is the compiler's and the
   target's.
-  The renderer converts as libass's renderer does, and by the same rule: its
-  `lrint`s (`triergon_core::round_ties_even_i32`: glyph boxes, advances and
-  metrics), its `lround`s (the layout resolution, `\kf`'s split column, a
-  `BorderStyle` 4 shadow, clip and scroll rectangles), its `(int)` casts (the
-  collision box, line borders, the baseline shear, the content area) and
-  `double_to_d6` (`triergon_raster::pixels_26_6`) all saturate at `int`'s
-  range with NaN as 0, also where libass's `long` is 64 bits wide.
 - The one exception: libass built with GCC accepts a coordinate landing exactly
   on `INT_MIN` through `abs(INT_MIN)` overflow, and the crate rejects it, so
   the raster stages never see that coordinate.
@@ -317,6 +310,19 @@ Those cases are compared in `ass-parse-host`, pinned per target. The exception's
 two cases are open there on the GCC targets, as are, on
 `aarch64-unknown-linux-gnu`, the two drawings whose coordinates libass converts
 with a 64-bit `long` there.
+
+The renderer follows the same rule where libass's renderer converts: its
+`lrint`s (`triergon_core::round_ties_even_i32`: glyph boxes, advances and
+metrics), its `lround`s (the layout resolution, `\kf`'s split column, a
+`BorderStyle` 4 shadow, clip and scroll rectangles), its `(int)` casts (the
+collision box, line borders, the baseline shear, the content area) and
+`double_to_d6` (`triergon_raster::pixels_26_6`) all saturate at `int`'s range
+with NaN as 0, also where libass's `long` is 64 bits wide. Collision handling
+keeps the boxes placed so far in order of their top edges, compared as values;
+libass sorts them with `cmp_rect_y0`, which subtracts them and so overflows,
+undefined in C, for tops more than 2³¹ apart, and leaves equal tops in an
+unspecified order, where the crate keeps the order they were placed in. No
+fixture of `ass-render` converts out of range or places boxes that far apart.
 
 ## Behaviour and limits
 
