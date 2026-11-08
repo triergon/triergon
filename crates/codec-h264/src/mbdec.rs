@@ -762,12 +762,23 @@ impl SliceDecoder<'_> {
     }
 
     /// Read mvd_lX for the (sub-)partition with top-left (x, y) (CAVLC se(v) / CABAC UEG3).
+    /// 7.4.5.1 bounds its horizontal component to -8192..8191.75 luma samples, and its
+    /// vertical one to less; a component outside the horizontal bound is refused. Motion
+    /// vectors are stored in 16 bits, so a prediction plus such a difference stays in range.
     fn read_mvd(&mut self, list: usize, x: i32, y: i32) -> Result<[i32; 2], SliceError> {
-        if !self.s.cabac {
-            let a = self.br.se();
-            let b = self.br.se();
-            return Ok([a, b]);
+        const RANGE: core::ops::RangeInclusive<i32> = -(8192 * 4)..=8192 * 4 - 1;
+        let mvd = if self.s.cabac {
+            self.read_cabac_mvd(list, x, y)
+        } else {
+            [self.br.se(), self.br.se()]
+        };
+        if !(RANGE.contains(&mvd[0]) && RANGE.contains(&mvd[1])) {
+            return Err(inval("mvd out of range"));
         }
+        Ok(mvd)
+    }
+
+    fn read_cabac_mvd(&mut self, list: usize, x: i32, y: i32) -> [i32; 2] {
         let mut out = [0i32; 2];
         for comp in 0..2 {
             let mut sum = 0i32;
@@ -805,7 +816,7 @@ impl SliceDecoder<'_> {
             let o = if comp == 0 { off::MVD_X } else { off::MVD_Y };
             out[comp] = self.cabac.as_mut().unwrap().mvd(o, inc);
         }
-        Ok(out)
+        out
     }
 
     // ------------------------------------------------------------------ residual
