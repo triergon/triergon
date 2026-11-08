@@ -3,8 +3,7 @@
 Ten synthetic TS188 inputs for the `mpegts-pes` contract (`harness/features/mpegts-pes/`).
 The contract's other inputs are the authored streams under
 [`crates/mpegts/tests/data/`](../../../crates/mpegts/tests/data/manifest.json). Like
-those, these were constructed byte by byte from ITU-T H.222.0 with the same authoring
-code: no encoder, upstream media or other implementation is involved, and the
+those, these were constructed byte by byte from ITU-T H.222.0: no encoder, upstream media or other implementation is involved, and the
 payloads are opaque markers rather than decodable media.
 
 | Inputs | Construction |
