@@ -7,9 +7,13 @@
 //! reader reports: the track index, `pts`, `dts`, `duration` and `trim_start`/`trim_end`
 //! in the packet's time base, the payload size, the source position (Ogg: the page that
 //! completes the packet; elementary streams: the first byte) and whether the access unit
-//! is complete. The last line lists the tracks and how reading ended: `eof`, or `error`
-//! with the reader's message (an error opening the file leaves no tracks). Reader
-//! errors are results, so the process exits 0 whenever it could read the file.
+//! is complete. Ogg packets also carry `compat`, the reader's FFmpeg-compatible view
+//! (`triergon_ogg::compat::clock::packet_timing`: `pts`, which is also the decode time,
+//! `duration`, `skip_samples` and `discard_padding`), and the reader's `resync` and
+//! `lost` events are lines of their own (`{"event": ...}`) where they occur. The last
+//! line lists the tracks and how reading ended: `eof`, or `error` with the reader's
+//! message (an error opening the file leaves no tracks). Reader errors are results, so
+//! the process exits 0 whenever it could read the file.
 
 use std::fmt::Write as _;
 use std::fs::File;
@@ -17,8 +21,8 @@ use std::io::{BufReader, BufWriter, Write};
 use std::sync::atomic::AtomicBool;
 
 use triergon::elementary::{self, Ac3, Adts, Flac, Format, MpegAudio};
-use triergon::ogg;
-use triergon::{PacketInfo, TimeBase, TrackInfo};
+use triergon::ogg::{self, compat::clock};
+use triergon::{Event, PacketInfo, TimeBase, TrackInfo};
 
 /// One packet as the reader reports it.
 struct Row {
@@ -31,6 +35,7 @@ struct Row {
     size: usize,
     position: u64,
     complete: bool,
+    compat: Option<clock::ReferenceTiming>,
 }
 
 impl Row {
@@ -45,6 +50,7 @@ impl Row {
             size: packet.payload().len(),
             position,
             complete,
+            compat: None,
         }
     }
 
@@ -63,6 +69,16 @@ impl Row {
         field(&mut line, "size", &self.size.to_string());
         field(&mut line, "position", &self.position.to_string());
         field(&mut line, "complete", &self.complete.to_string());
+        if let Some(compat) = self.compat {
+            let _ = write!(
+                line,
+                ",\"compat\":{{\"pts\":{},\"duration\":{},\"skip_samples\":{},\"discard_padding\":{}}}",
+                number(compat.pts),
+                number(compat.duration),
+                compat.skip_samples,
+                compat.discard_padding
+            );
+        }
         line.push('}');
         writeln!(out, "{line}")
     }
@@ -125,10 +141,21 @@ fn ogg_packets(file: File, out: &mut impl Write) -> std::io::Result<()> {
         Err(error) => return finish(out, &[], Err(error)),
     };
     let end = loop {
-        match reader.next_packet(&cancel) {
-            Ok(Some(packet)) => {
-                Row::of(&packet, packet.track_index(), packet.page_offset(), true).write(out)?;
+        match reader.next_event(&cancel) {
+            Ok(Some(Event::Packet(packet))) => {
+                let mut row = Row::of(&packet, packet.track_index(), packet.page_offset(), true);
+                row.compat = Some(clock::packet_timing(&packet));
+                row.write(out)?;
             }
+            Ok(Some(Event::Other(ogg::ReaderEvent::Resync { offset, bytes }))) => writeln!(
+                out,
+                "{{\"event\":\"resync\",\"offset\":{offset},\"bytes\":{bytes}}}"
+            )?,
+            Ok(Some(Event::Other(ogg::ReaderEvent::Lost { track, page }))) => writeln!(
+                out,
+                "{{\"event\":\"lost\",\"track\":{track},\"page\":{page}}}"
+            )?,
+            Ok(Some(_)) => {}
             Ok(None) => break Ok(()),
             Err(error) => break Err(error),
         }
