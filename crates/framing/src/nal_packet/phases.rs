@@ -501,10 +501,16 @@ impl<M> NalPacketJob<'_, M> {
                     .as_ref()
                     .ok_or(Error::Invalid("missing packet source"))?
                     .bytes;
-                let configuration = self.update.as_ref().map_or_else(
-                    || self.session.configuration.bytes(),
-                    super::AvcUpdate::bytes,
-                );
+                let configuration =
+                    if (p.nal_and_prefix >> 24) as u8 & NalPacketSegment::CONFIGURATION_SOURCE == 0
+                    {
+                        source
+                    } else {
+                        self.update.as_ref().map_or_else(
+                            || self.session.configuration.bytes(),
+                            super::AvcUpdate::bytes,
+                        )
+                    };
                 let payload = p.payload(source, configuration)?;
                 b.try_extend_from_slice(&payload[start..start + count])?;
             }
