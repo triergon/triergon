@@ -99,12 +99,11 @@ impl Prepared for Dvd {
         let mut decoder = Decoder::new(&self.pool, settings, Limits::default());
         sink.header(self.track.packets.len(), None)?;
         for (index, packet) in self.track.packets.iter().enumerate() {
-            let status = loop {
-                match decoder.decode(&packet.data, &mut WorkBudget::new(crate::WORK_SLICE))? {
-                    Status::Yield => {}
-                    status => break status,
-                }
-            };
+            let mut status =
+                decoder.decode(&packet.data, &mut WorkBudget::new(crate::WORK_SLICE))?;
+            while status == Status::Yield {
+                status = decoder.resume(&mut WorkBudget::new(crate::WORK_SLICE))?;
+            }
             let Status::Subtitle(subtitle) = status else {
                 continue;
             };

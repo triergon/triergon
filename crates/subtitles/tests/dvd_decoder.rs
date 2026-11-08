@@ -577,19 +577,37 @@ fn work_is_charged_and_an_exhausted_budget_consumes_nothing() {
             .unwrap(),
         Status::Yield
     );
-    // The work of the attempt that yielded counts towards the next one.
+    // The yielded unit waits for `resume`; another packet is refused.
+    assert!(matches!(
+        decoder.decode(&a[30..], &mut WorkBudget::new(u64::MAX)),
+        Err(Error::Invalid(_))
+    ));
+    // The work of the slice that yielded counts towards the rest.
     let mut work = WorkBudget::new(need);
     assert!(matches!(
-        decoder.decode(&a[30..], &mut work).unwrap(),
+        decoder.resume(&mut work).unwrap(),
         Status::Subtitle(_)
     ));
     assert_eq!(work.spent(), 1);
-    // Any quantum makes progress.
+    // Any quantum makes progress, and the slices pay the unit's work once.
     let mut attempts = 0;
-    while decoder.decode(&a, &mut WorkBudget::new(7)).unwrap() == Status::Yield {
+    let mut status = decoder.decode(&a, &mut WorkBudget::new(7)).unwrap();
+    while status == Status::Yield {
         attempts += 1;
+        status = decoder.resume(&mut WorkBudget::new(7)).unwrap();
     }
+    assert!(matches!(status, Status::Subtitle(_)));
     assert_eq!(attempts, need.div_ceil(7) - 1);
+    // An abandoned unit leaves the decoder as it was.
+    assert_eq!(
+        decoder.decode(&a, &mut WorkBudget::new(7)).unwrap(),
+        Status::Yield
+    );
+    decoder.abandon();
+    assert!(matches!(
+        decoder.resume(&mut WorkBudget::new(7)),
+        Err(Error::Invalid(_))
+    ));
     // A decode can be undone and repeated, colours included.
     let first = decoder.decode(&a, &mut WorkBudget::new(u64::MAX)).unwrap();
     assert!(matches!(first, Status::Subtitle(_)));

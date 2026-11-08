@@ -82,6 +82,52 @@ fn charged_work_scales_with_the_work_the_input_demands() {
     }
 }
 
+/// Decode one packet in slices of `quantum`: the calls it took and the work
+/// they were charged in all.
+fn sliced(packet: &[u8], quantum: u64) -> (u64, u64) {
+    let budget = Budget::new(1 << 26).unwrap();
+    let mut decoder = Decoder::new(&budget, Settings::default(), Limits::default());
+    let mut work = WorkBudget::new(quantum);
+    let mut status = decoder.decode(packet, &mut work).unwrap();
+    let (mut calls, mut spent) = (1, work.spent());
+    while status == Status::Yield {
+        let mut work = WorkBudget::new(quantum);
+        status = decoder.resume(&mut work).unwrap();
+        calls += 1;
+        spent += work.spent();
+    }
+    (calls, spent)
+}
+
+#[test]
+fn slices_pay_the_work_of_one_call() {
+    for (blocks, run) in [(40, 300), (500, 4000), (2000, 0)] {
+        let unit = chained(blocks, run);
+        let whole = chained_work(blocks, run);
+        for quantum in [1, 7, whole / 100, whole / 3] {
+            let (calls, spent) = sliced(&unit, quantum.max(1));
+            assert_eq!(spent, whole, "{blocks} blocks, quantum {quantum}");
+            assert_eq!(
+                calls,
+                whole.div_ceil(quantum.max(1)),
+                "{blocks} blocks, quantum {quantum}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_largest_chained_unit_finishes_in_worker_slices() {
+    // Thirteen thousand chained sequences in a 16-bit unit, at the subtitle
+    // worker's slice: each call continues where the last one stopped.
+    let blocks = 13_000;
+    let unit = chained(blocks, 0xffff - 4 - 5 * blocks);
+    let whole = chained_work(blocks, 0xffff - 4 - 5 * blocks);
+    let (calls, spent) = sliced(&unit, 1 << 16);
+    assert_eq!(spent, whole);
+    assert_eq!(calls, whole.div_ceil(1 << 16));
+}
+
 #[test]
 fn quadratic_control_areas_stop_at_the_work_budget() {
     // Thirteen thousand chained sequences fill a 16-bit unit; reading them all

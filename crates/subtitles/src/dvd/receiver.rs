@@ -192,11 +192,12 @@ pub enum Status<'a> {
     /// Nothing to present: the packet was buffered, dropped, or its unit shows
     /// no visible pixels.
     Nothing,
-    /// The work budget ran out. Nothing was consumed but the work, which counts
-    /// towards the next attempt: decode the same packet again. A unit needs its
-    /// bytes, the command bytes each of its sequences reads and the pixels of
-    /// every area it draws. Running out of memory
-    /// ([`Error::Backpressure`]) consumes nothing either.
+    /// The work budget ran out. The decoder keeps the unit and how far it got:
+    /// [`resume`](Decoder::resume) it with more work, or
+    /// [`abandon`](Decoder::abandon) it; [`decode`](Decoder::decode) refuses
+    /// another packet until then. A unit needs its bytes, the command bytes each
+    /// of its sequences reads and the pixels of every area it draws, each paid
+    /// once however many slices it takes.
     Yield,
 }
 
@@ -233,11 +234,12 @@ pub enum Status<'a> {
 /// * **Presentation.** A forced start anywhere in the unit keeps the whole
 ///   area (a menu); otherwise rows and columns of fully transparent pixels are
 ///   removed, and a fully transparent bitmap presents nothing.
-/// * **Refusal.** A decode that yields or fails changes nothing the decoder
-///   carries to later packets: a unit over [`Limits::max_unit`], an area over
-///   [`Limits::max_pixels`] or memory the budget refuses leaves the buffered
-///   bytes, the colours and what [`rewind`](Self::rewind) undoes as they
-///   were, so the decoder continues as if the packet had never been sent.
+/// * **Refusal.** A decode that fails, or yields and is abandoned, changes
+///   nothing the decoder carries to later packets: a unit over
+///   [`Limits::max_unit`], an area over [`Limits::max_pixels`] or memory the
+///   budget refuses leaves the buffered bytes, the colours and what
+///   [`rewind`](Self::rewind) undoes as they were, so the decoder continues as
+///   if the packet had never been sent.
 #[derive(Debug)]
 pub struct Decoder {
     settings: Settings,
@@ -248,8 +250,20 @@ pub struct Decoder {
     palette: [u32; 256],
     /// How to undo the last decode that neither yielded nor failed.
     last: Option<Undo>,
-    /// Work granted to attempts at the current packet that yielded.
-    credit: u64,
+    /// The unit that yielded, if any.
+    suspended: Option<Suspended>,
+    /// A copy of a yielded unit that came whole in its packet.
+    held: BudgetVec<u8>,
+}
+
+/// A unit that yielded: how far its run got and how to finish it.
+#[derive(Clone, Copy, Debug)]
+struct Suspended {
+    cursor: Cursor,
+    header: Header,
+    /// The unit is in the reassembly buffer rather than in `held`.
+    buffered: bool,
+    undo: Undo,
 }
 
 /// The state before a decode: its colours, the length of the reassembly
@@ -290,7 +304,8 @@ impl Decoder {
             colours: Colours::default(),
             palette: [0; 256],
             last: None,
-            credit: 0,
+            suspended: None,
+            held: BudgetVec::new(budget),
         }
     }
 
@@ -311,6 +326,11 @@ impl Decoder {
 
     /// Decode one packet. An empty packet presents nothing.
     pub fn decode(&mut self, packet: &[u8], work: &mut WorkBudget) -> Result<Status<'_>> {
+        if self.suspended.is_some() {
+            return Err(Error::Invalid(
+                "DVD receiver: resume or abandon the yielded unit",
+            ));
+        }
         // A unit the last decode completed is discarded by this one.
         let resumed = match self.last {
             Some(Undo {
@@ -346,47 +366,79 @@ impl Decoder {
                 self.restart_pending(start.map_or(&[], |_| packet))?;
             }
             self.last = Some(undo);
-            self.credit = 0;
             return Ok(Status::Nothing);
         };
-        let unit = if continues {
-            self.pending.as_slice()
-        } else {
-            packet
+        let unit = Suspended {
+            cursor: Cursor::new(self.colours),
+            header,
+            buffered: continues,
+            undo,
         };
-        let mut colours = self.colours;
-        let granted = work.remaining();
-        let mut banked = WorkBudget::new(granted.saturating_add(self.credit));
+        self.run(unit, (!continues).then_some(packet), work)
+    }
+
+    /// Continue the unit that yielded, from where it stopped.
+    pub fn resume(&mut self, work: &mut WorkBudget) -> Result<Status<'_>> {
+        let unit = self
+            .suspended
+            .take()
+            .ok_or(Error::Invalid("DVD receiver: no yielded unit"))?;
+        self.run(unit, None, work)
+    }
+
+    /// Drop the unit that yielded, as if its packet had never been sent.
+    pub fn abandon(&mut self) {
+        if let Some(unit) = self.suspended.take()
+            && unit.buffered
+        {
+            self.pending.truncate(unit.undo.pending);
+        }
+    }
+
+    /// Run a complete unit on from its cursor: `packet` when the unit is a
+    /// fresh packet of its own, otherwise the buffered or held copy.
+    fn run(
+        &mut self,
+        mut unit: Suspended,
+        packet: Option<&[u8]>,
+        work: &mut WorkBudget,
+    ) -> Result<Status<'_>> {
+        let bytes = match packet {
+            Some(packet) => packet,
+            None if unit.buffered => self.pending.as_slice(),
+            None => self.held.as_slice(),
+        };
         let outcome = Pass {
             settings: &self.settings,
             limits: self.limits,
-            colours: &mut colours,
             palette: &mut self.palette,
             plane: &mut self.plane,
-            work: &mut banked,
+            work,
+            cursor: &mut unit.cursor,
         }
-        .run(unit, header);
-        if let Err(Halt::Yield) = outcome {
-            work.take(granted);
-            self.credit = self.credit.saturating_add(granted);
-        } else {
-            work.take(banked.spent().saturating_sub(self.credit));
-            self.credit = 0;
-        }
+        .run(bytes, unit.header);
         match outcome {
             Ok(_) | Err(Halt::Malformed) => {
-                self.colours = colours;
-                if !continues {
+                self.colours = unit.cursor.colours;
+                if !unit.buffered {
                     self.pending.clear();
                 }
                 self.last = Some(Undo {
-                    completed: continues,
-                    ..undo
+                    completed: unit.buffered,
+                    ..unit.undo
                 });
             }
-            Err(Halt::Yield | Halt::Failed(_)) => {
-                if continues {
-                    self.pending.truncate(resumed);
+            Err(Halt::Yield) => {
+                if let Some(packet) = packet {
+                    // The packet goes back to its caller: keep a copy.
+                    self.held.clear();
+                    self.held.try_extend_from_slice(packet)?;
+                }
+                self.suspended = Some(unit);
+            }
+            Err(Halt::Failed(_)) => {
+                if unit.buffered {
+                    self.pending.truncate(unit.undo.pending);
                 }
             }
         }
@@ -503,14 +555,53 @@ impl Shown {
 
 /// What a unit's commands have set so far.
 #[derive(Clone, Copy, Debug, Default)]
-struct UnitState<'a> {
+struct UnitState {
     start: u16,
     stop: u16,
     forced: bool,
     /// An extended area made the unit's bitmaps eight-bit.
     eight_bit: bool,
-    /// The unit's last `0x83` colours.
-    extended_palette: Option<&'a [u8; 768]>,
+    /// Where the unit's last `0x83` colours start.
+    extended_palette: Option<usize>,
+}
+
+/// How far a run through a unit got. Every step is paid for before it changes
+/// anything, so a run that yields stops between steps and continues from here.
+#[derive(Clone, Copy, Debug)]
+struct Cursor {
+    /// The unit's bytes are paid for.
+    paid: bool,
+    /// Work granted towards the step that did not fit, paid with it.
+    credit: u64,
+    /// The sequence being run, and how far its commands have been read.
+    at: usize,
+    read: usize,
+    /// Every command of that sequence has run.
+    ended: bool,
+    area: Option<DvdArea>,
+    fields: Option<Fields>,
+    state: UnitState,
+    drawn: Option<Drawn>,
+    failed: bool,
+    colours: Colours,
+}
+
+impl Cursor {
+    fn new(colours: Colours) -> Self {
+        Self {
+            paid: false,
+            credit: 0,
+            at: 0,
+            read: 0,
+            ended: false,
+            area: None,
+            fields: None,
+            state: UnitState::default(),
+            drawn: None,
+            failed: false,
+            colours,
+        }
+    }
 }
 
 /// The last bitmap drawn.
@@ -532,101 +623,64 @@ struct Fields {
     bottom: usize,
 }
 
-/// One run of a unit through its control sequences.
+/// One slice of a unit's run through its control sequences.
 struct Pass<'d, 'w> {
     settings: &'d Settings,
     limits: Limits,
-    colours: &'d mut Colours,
     palette: &'d mut [u32; 256],
     plane: &'d mut BudgetVec<u8>,
     work: &'w mut WorkBudget,
+    cursor: &'d mut Cursor,
 }
 
 impl Pass<'_, '_> {
     fn run(&mut self, unit: &[u8], header: Header) -> std::result::Result<Shown, Halt> {
-        if !self.work.try_charge(unit.len() as u64) {
-            return Err(Halt::Yield);
+        if !self.cursor.paid {
+            if !self.pay(unit.len()) {
+                return Err(Halt::Yield);
+            }
+            self.cursor.paid = true;
+            self.cursor.at = header.control;
         }
         // Offset 0 holds the unit's own header, never a sequence.
         if header.control == 0 {
             return Err(Halt::Malformed);
         }
-        let mut state = UnitState::default();
-        let mut drawn = None;
-        let mut failed = false;
-        let mut at = header.control;
         let head_bytes = header.sequence_header();
         while let Some((head, body)) = unit
-            .get(at..)
+            .get(self.cursor.at..)
             .and_then(|rest| rest.split_at_checked(head_bytes))
         {
             let date = u16::from_be_bytes([head[0], head[1]]);
             let next = head[2..]
                 .iter()
                 .fold(0_usize, |n, &b| n << 8 | usize::from(b));
-            let (mut area, mut fields) = (None, None);
-            let mut commands = Commands::resume(body, 0, 0, usize::MAX);
-            while commands.position() < body.len() {
-                let from = commands.position();
-                let command = commands.next().ok_or(Halt::Malformed)?;
-                // A sequence reads on to its end command, through the bytes of
-                // the sequences after it if need be: each sequence pays for
-                // what it reads.
-                if !self.work.try_charge((commands.position() - from) as u64) {
-                    return Err(Halt::Yield);
-                }
-                match command.map_err(|_| Halt::Malformed)? {
-                    Command::ForcedStart => state.forced = true,
-                    Command::Start => state.start = date,
-                    Command::Stop => state.stop = date,
-                    Command::Palette(word) => {
-                        self.colours.selectors =
-                            std::array::from_fn(|i| (word >> (4 * i) & 15) as u8);
-                    }
-                    Command::Alpha(word) => {
-                        for i in 0..4 {
-                            self.colours.contrast[i] = (word >> (4 * i) & 15) as u8;
-                        }
-                    }
-                    Command::ExtendedContrast(values) => {
-                        for (alpha, value) in self.colours.contrast.iter_mut().zip(values) {
-                            *alpha = 255 - value;
-                        }
-                    }
-                    Command::ExtendedPalette(colours) => state.extended_palette = Some(colours),
-                    Command::Area(value) => area = Some(value),
-                    Command::ExtendedArea(value) => {
-                        area = Some(value);
-                        state.eight_bit = true;
-                    }
-                    Command::Fields(value) => {
-                        fields = Some(Fields {
-                            top: usize::from(value.top),
-                            bottom: usize::from(value.bottom),
-                        });
-                    }
-                    Command::ExtendedFields { top, bottom } => {
-                        fields = Some(Fields {
-                            top: top as usize,
-                            bottom: bottom as usize,
-                        });
-                    }
-                    Command::End | Command::Opaque { .. } => break,
-                }
+            if !self.cursor.ended {
+                self.commands(body, self.cursor.at + head_bytes, date)?;
+                self.cursor.ended = true;
             }
-            if let (Some(area), Some(fields)) = (area, fields) {
-                match self.draw(unit, area, fields, &state) {
-                    Ok(Some(next)) => drawn = Some(next),
+            let cursor = *self.cursor;
+            if let (Some(area), Some(fields)) = (cursor.area, cursor.fields) {
+                match self.draw(unit, area, fields, &cursor.state) {
+                    Ok(Some(next)) => self.cursor.drawn = Some(next),
                     Ok(None) => {}
-                    Err(Halt::Malformed) => failed = true,
+                    Err(Halt::Malformed) => self.cursor.failed = true,
                     Err(halt) => return Err(halt),
                 }
             }
-            if next <= at {
+            if next <= self.cursor.at {
                 break;
             }
-            at = next;
+            let cursor = &mut *self.cursor;
+            (cursor.at, cursor.read, cursor.ended) = (next, 0, false);
+            (cursor.area, cursor.fields) = (None, None);
         }
+        let Cursor {
+            state,
+            drawn,
+            failed,
+            ..
+        } = *self.cursor;
         let drawn = drawn.filter(|_| !failed).ok_or(Halt::Malformed)?;
         if self.settings.forced_only && !drawn.forced {
             return Err(Halt::Malformed);
@@ -659,6 +713,79 @@ impl Pass<'_, '_> {
         })
     }
 
+    /// Pay for the next step, or bank all the work left towards it and yield.
+    fn pay(&mut self, cost: usize) -> bool {
+        let owed = (cost as u64).saturating_sub(self.cursor.credit);
+        if self.work.try_charge(owed) {
+            self.cursor.credit = 0;
+            return true;
+        }
+        let rest = self.work.remaining();
+        self.work.take(rest);
+        self.cursor.credit = self.cursor.credit.saturating_add(rest);
+        false
+    }
+
+    /// Run a sequence's commands from where the cursor stopped; `start` is
+    /// where `body` sits in the unit.
+    fn commands(&mut self, body: &[u8], start: usize, date: u16) -> std::result::Result<(), Halt> {
+        let mut commands = Commands::resume(body, self.cursor.read, 0, usize::MAX);
+        while commands.position() < body.len() {
+            let from = commands.position();
+            let command = commands.next().ok_or(Halt::Malformed)?;
+            // A sequence reads on to its end command, through the bytes of the
+            // sequences after it if need be: each sequence pays for what it
+            // reads.
+            if !self.pay(commands.position() - from) {
+                return Err(Halt::Yield);
+            }
+            self.cursor.read = commands.position();
+            let cursor = &mut *self.cursor;
+            match command.map_err(|_| Halt::Malformed)? {
+                Command::ForcedStart => cursor.state.forced = true,
+                Command::Start => cursor.state.start = date,
+                Command::Stop => cursor.state.stop = date,
+                Command::Palette(word) => {
+                    cursor.colours.selectors =
+                        std::array::from_fn(|i| (word >> (4 * i) & 15) as u8);
+                }
+                Command::Alpha(word) => {
+                    for i in 0..4 {
+                        cursor.colours.contrast[i] = (word >> (4 * i) & 15) as u8;
+                    }
+                }
+                Command::ExtendedContrast(values) => {
+                    for (alpha, value) in cursor.colours.contrast.iter_mut().zip(values) {
+                        *alpha = 255 - value;
+                    }
+                }
+                // The colours follow the opcode.
+                Command::ExtendedPalette(_) => {
+                    cursor.state.extended_palette = Some(start + from + 1);
+                }
+                Command::Area(value) => cursor.area = Some(value),
+                Command::ExtendedArea(value) => {
+                    cursor.area = Some(value);
+                    cursor.state.eight_bit = true;
+                }
+                Command::Fields(value) => {
+                    cursor.fields = Some(Fields {
+                        top: usize::from(value.top),
+                        bottom: usize::from(value.bottom),
+                    });
+                }
+                Command::ExtendedFields { top, bottom } => {
+                    cursor.fields = Some(Fields {
+                        top: top as usize,
+                        bottom: bottom as usize,
+                    });
+                }
+                Command::End | Command::Opaque { .. } => break,
+            }
+        }
+        Ok(())
+    }
+
     /// Resolve the colours and expand one area into the plane; `None` for an
     /// area the receiver skips (reversed, or a single row).
     fn draw(
@@ -666,7 +793,7 @@ impl Pass<'_, '_> {
         unit: &[u8],
         area: DvdArea,
         fields: Fields,
-        state: &UnitState<'_>,
+        state: &UnitState,
     ) -> std::result::Result<Option<Drawn>, Halt> {
         let Ok((width, height)) = area.dimensions() else {
             return Ok(None);
@@ -682,25 +809,28 @@ impl Pass<'_, '_> {
                 maximum: self.limits.max_pixels,
             }));
         }
-        if !self.work.try_charge(pixels as u64) {
+        if !self.pay(pixels) {
             return Err(Halt::Yield);
         }
         let colours = if state.eight_bit {
-            let table = state.extended_palette.ok_or(Halt::Malformed)?;
+            let table: &[u8; 768] = state
+                .extended_palette
+                .and_then(|at| unit.get(at..at.checked_add(768)?)?.try_into().ok())
+                .ok_or(Halt::Malformed)?;
             for ((argb, yuv), alpha) in self
                 .palette
                 .iter_mut()
                 .zip(table.chunks_exact(3))
-                .zip(self.colours.contrast)
+                .zip(self.cursor.colours.contrast)
             {
                 *argb = u32::from(alpha) << 24 | YcbcrRounding::Nearest.rgb(yuv[0], yuv[1], yuv[2]);
             }
             256
         } else {
-            let contrast = std::array::from_fn(|i| self.colours.contrast[i]);
+            let contrast = std::array::from_fn(|i| self.cursor.colours.contrast[i]);
             let four = four_colours(
                 self.settings.palette.as_ref(),
-                self.colours.selectors,
+                self.cursor.colours.selectors,
                 contrast,
             );
             self.palette[..4].copy_from_slice(&four);

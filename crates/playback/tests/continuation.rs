@@ -1681,7 +1681,8 @@ fn dvd_receiver_presents_the_first_unit_of_a_packet_and_discards_the_tail() {
         receiver.step(&mut WorkBudget::new(0), &off()).unwrap(),
         DvdReceiverStep::Yield
     ));
-    assert_eq!(b.used(), before);
+    // The decoder keeps a copy of the yielded unit to resume from.
+    assert_eq!(b.used() - before, raw.len());
     let out = dvd_next(&mut receiver, 1).unwrap();
     assert_eq!(out.packet.input().raw.as_ref(), raw);
     assert_eq!(out.packet.input().clock.pts, None);

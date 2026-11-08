@@ -571,6 +571,8 @@ pub struct DvdReceiver<M> {
     scope: BitmapScope,
     decoder: compat::dvd::Decoder,
     packet: Option<BitmapOwner<M>>,
+    /// The last step yielded, so the next one resumes the decoder.
+    yielded: bool,
     last_sequence: Option<u64>,
     finished: bool,
 }
@@ -582,6 +584,7 @@ impl<M> DvdReceiver<M> {
             scope,
             decoder: compat::dvd::Decoder::new(pool, config.settings, config.limits),
             packet: None,
+            yielded: false,
             last_sequence: None,
             finished: false,
         })
@@ -652,6 +655,8 @@ impl<M> DvdReceiver<M> {
         cancel: &AtomicBool,
     ) -> Result<DvdReceiverStep<M>> {
         if cancel.load(Ordering::Relaxed) {
+            self.decoder.abandon();
+            self.yielded = false;
             self.packet = None;
             self.finished = true;
             return Err(Error::Cancelled);
@@ -663,7 +668,13 @@ impl<M> DvdReceiver<M> {
                 DvdReceiverStep::NeedPacket
             });
         };
-        let picture = match self.decoder.decode(&packet.input().raw, work) {
+        let status = if self.yielded {
+            self.decoder.resume(work)
+        } else {
+            self.decoder.decode(&packet.input().raw, work)
+        };
+        self.yielded = matches!(status, Ok(compat::dvd::Status::Yield));
+        let picture = match status {
             Ok(compat::dvd::Status::Yield) => return Ok(DvdReceiverStep::Yield),
             Ok(compat::dvd::Status::Nothing) => None,
             Ok(compat::dvd::Status::Subtitle(subtitle)) => match DvdPicture::copy(
