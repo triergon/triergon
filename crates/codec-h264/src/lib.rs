@@ -84,6 +84,12 @@ pub(crate) enum SliceError {
     InvalidData(&'static str),
 }
 
+impl From<triergon_bitstream::cabac::InvalidOffset> for SliceError {
+    fn from(_: triergon_bitstream::cabac::InvalidOffset) -> Self {
+        SliceError::InvalidData("arithmetic code offset out of range")
+    }
+}
+
 impl From<SliceError> for DecodeError {
     fn from(error: SliceError) -> Self {
         match error {

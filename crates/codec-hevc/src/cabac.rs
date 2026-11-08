@@ -227,13 +227,8 @@ impl Bins for Cabac<'_> {
         if prefix <= 3 {
             (prefix << rice) + self.bypass_bits(rice)
         } else {
-            let nb = prefix - 3 + rice;
-            let suf = if nb > 16 {
-                let hi = self.bypass_bits(nb - 16);
-                (hi << 16) | self.bypass_bits(16)
-            } else {
-                self.bypass_bits(nb)
-            };
+            // A conforming stream's suffix is at most 32 bins.
+            let suf = self.bypass_bits((prefix - 3 + rice).min(32));
             (((1u32 << (prefix - 3).min(31)) + 2) << rice).wrapping_add(suf)
         }
     }
@@ -256,7 +251,7 @@ mod tests {
         // With range 510 bypass is not exactly raw bits, but decoding must not panic and
         // terminate on zero data must return 0.
         let data = [0u8; 16];
-        let mut c = Cabac::new(&data, 0);
+        let mut c = Cabac::new(&data, 0).unwrap();
         for _ in 0..40 {
             assert_eq!(c.bypass(), 0);
         }
@@ -284,7 +279,7 @@ mod bench {
         let n = 4_000_000usize;
         let mut best = f64::MAX;
         for _ in 0..5 {
-            let mut c = Cabac::new(&data, 0);
+            let mut c = Cabac::new(&data, 0).unwrap();
             let mut st = states;
             let t = std::time::Instant::now();
             let mut acc = 0u32;
@@ -305,7 +300,7 @@ mod bench {
         for name in ["decode skew"] {
             let mut best = f64::MAX;
             for _ in 0..5 {
-                let mut c = Cabac::new(&skew, 0);
+                let mut c = Cabac::new(&skew, 0).unwrap();
                 let mut st = states;
                 let t = std::time::Instant::now();
                 let mut acc = 0u32;
@@ -320,7 +315,7 @@ mod bench {
         }
         let mut best = f64::MAX;
         for _ in 0..5 {
-            let mut c = Cabac::new(&data, 0);
+            let mut c = Cabac::new(&data, 0).unwrap();
             let t = std::time::Instant::now();
             let mut acc = 0u32;
             for _ in 0..n {
@@ -332,7 +327,7 @@ mod bench {
         eprintln!("bypass: {:.2} ns/bin", best * 1e9);
         let mut best = f64::MAX;
         for _ in 0..5 {
-            let mut c = Cabac::new(&data, 0);
+            let mut c = Cabac::new(&data, 0).unwrap();
             let t = std::time::Instant::now();
             let mut acc = 0u32;
             for _ in 0..n / 8 {

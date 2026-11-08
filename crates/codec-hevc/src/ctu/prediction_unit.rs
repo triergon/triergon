@@ -466,8 +466,10 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             return None;
         }
         let mv = cm.mv[l];
-        let col_diff = self.refs.col_poc - cm.ref_poc[l];
-        let cur_diff = self.poc - cur.poc;
+        // A conforming stream's POC differences fit 16 bits (8.3.1). A corrupt stream's POCs
+        // can be any i32, so the differences wrap, and scaling clips them to 8.5.3.2.8's range.
+        let col_diff = self.refs.col_poc.wrapping_sub(cm.ref_poc[l]);
+        let cur_diff = self.poc.wrapping_sub(cur.poc);
         if cur.lt || col_diff == cur_diff {
             Some(mv)
         } else {

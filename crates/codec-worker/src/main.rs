@@ -2,7 +2,7 @@
 //! the decode build of `harness/reference.c`, through the session decoders.
 //!
 //! usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
-//! KIND-CODEC-raw FILE OUT | packets FORMAT FILE, KIND-CODEC one of video-h264,
+//! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE, KIND-CODEC one of video-h264,
 //! video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac, audio-mp3,
 //! audio-vorbis, audio-opus. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest
@@ -265,7 +265,7 @@ fn main() {
     }
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
-            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | packets FORMAT FILE"
+            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE"
         );
         std::process::exit(2);
     };
@@ -307,6 +307,17 @@ fn main() {
             )
             .expect("stdout");
             eprintln!("{{\"digest\":{}}}", out.digest.finish());
+        }
+        "fold" => {
+            // One decode and its output identity, without timing: what a fuzz campaign
+            // compares between builds.
+            run(op, &data, &mut out);
+            println!(
+                "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
+                out.frames,
+                out.bytes,
+                out.digest.finish()
+            );
         }
         "raw" => {
             out.raw = Some(std::io::BufWriter::new(

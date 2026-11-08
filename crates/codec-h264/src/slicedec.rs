@@ -578,7 +578,7 @@ impl<'a> SliceDecoder<'a> {
                 len,
                 sh.slice_qp,
                 init_idx,
-            ));
+            )?);
         }
         let mut more = true;
         let mut prev_skipped = false;

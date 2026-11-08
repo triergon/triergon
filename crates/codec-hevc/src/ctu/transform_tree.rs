@@ -181,7 +181,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         }
         if cbf_luma {
             self.set_blk_area(x0, y0, n, n, |b| b.flags |= F_NZ);
-            self.residual(cu, x0, y0, log2, 0, luma_mode)?;
+            self.residual(cu, x0, y0, log2, 0, luma_mode);
         }
         // Chroma
         if log2 > 2 {
@@ -192,7 +192,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                     self.intra_predict(c, xc, yc, log2 - 1, cu.chroma_mode);
                 }
                 if cbf {
-                    self.residual(cu, xc, yc, log2 - 1, c, cu.chroma_mode)?;
+                    self.residual(cu, xc, yc, log2 - 1, c, cu.chroma_mode);
                 }
             }
         } else if blk_idx == 3 {
@@ -203,7 +203,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                     self.intra_predict(c, xc, yc, 2, cu.chroma_mode);
                 }
                 if cbf {
-                    self.residual(cu, xc, yc, 2, c, cu.chroma_mode)?;
+                    self.residual(cu, xc, yc, 2, c, cu.chroma_mode);
                 }
             }
         }

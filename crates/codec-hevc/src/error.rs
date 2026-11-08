@@ -1,6 +1,7 @@
 //! Typed decoder errors.
 
 use core::fmt;
+use triergon_bitstream::cabac::InvalidOffset;
 use triergon_codec::StorageError;
 
 /// Decoder error. Unsupported features are named so callers can tell a gap in the
@@ -17,6 +18,12 @@ pub enum DecodeError {
     MissingParameterSet(&'static str),
     /// Storage the stream needs does not fit the decoder's budget.
     Budget(StorageError),
+}
+
+impl From<InvalidOffset> for DecodeError {
+    fn from(_: InvalidOffset) -> Self {
+        DecodeError::InvalidData("arithmetic code offset out of range")
+    }
 }
 
 impl From<StorageError> for DecodeError {

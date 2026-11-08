@@ -23,6 +23,8 @@ pub(crate) const ID_END: u8 = 7;
 
 const EXT_SBR_DATA: u32 = 13;
 const EXT_SBR_DATA_CRC: u32 = 14;
+/// Samples per channel of one raw data block with SBR.
+const SBR_FRAME_LEN: usize = 2048;
 const PNS_INITIAL_STATE: u32 = 0x1f2e3d4c;
 
 /// Persistent per-channel state.
@@ -124,6 +126,38 @@ impl ElementState {
             bs_tag: tag,
         })
     }
+
+    /// Return to the state of `new` in place: a layout switch reuses the element of an
+    /// identity both layouts have without charging it again.
+    fn renew(&mut self) {
+        let ElementState {
+            kind,
+            tag,
+            ch,
+            sbr,
+            out,
+            decoded,
+            nch,
+            cd,
+            bs_tag,
+            ch_decoded,
+        } = self;
+        for c in ch {
+            c.reset();
+        }
+        if let Some(s) = sbr {
+            s.renew();
+        }
+        *out = [[0.0; 2048]; 2];
+        *decoded = false;
+        *nch = if *kind == ID_CPE { 2 } else { 1 };
+        for cd in cd {
+            let cd: &mut ChannelData = cd;
+            *cd = ChannelData::new();
+        }
+        *bs_tag = *tag;
+        *ch_decoded = [false; 2];
+    }
 }
 
 #[derive(Debug)]
@@ -164,8 +198,6 @@ pub(crate) struct Core {
     pub skip_samples: usize,
     /// Frames output since the last (re)configuration.
     pub frames_out: u64,
-    /// PS may switch a mono output to stereo after the first frame (not FFmpeg behaviour).
-    pub ps_upgrade_allowed: bool,
     /// Development aid: bit ranges (relative to the payload) of SBR fill elements of the
     /// last frame.
     #[cfg(feature = "inspect")]
@@ -201,7 +233,6 @@ impl Core {
             #[cfg(feature = "inspect")]
             sbr_fil_ranges: Vec::new(),
             frames_out: 0,
-            ps_upgrade_allowed: false,
         }
     }
 
@@ -226,7 +257,7 @@ impl Core {
     }
 
     pub(crate) fn frame_len(&self) -> usize {
-        if self.sbr_active { 2048 } else { 1024 }
+        if self.sbr_active { SBR_FRAME_LEN } else { 1024 }
     }
 
     /// (Re)configure from an ADTS header. Returns true when the configuration changed.
@@ -249,32 +280,99 @@ impl Core {
         if !changed {
             return Ok(false);
         }
+        // The new configuration starts from nothing. Until its element state is charged
+        // the decoder is unconfigured, so a refusal here is retried by the next header.
+        self.elements.clear();
+        self.cce.clear();
+        self.configured = false;
+        let slots = if h.channel_config != 0 {
+            fixed_config_slots(h.channel_config)
+        } else {
+            Vec::new()
+        };
+        let elements = self.build_elements(aot, &slots, false, &[])?;
         self.aot = aot;
         self.sf_index = h.sf_index as usize;
         self.channel_config = h.channel_config;
         self.sbr_active = false;
         self.ps_active = false;
         self.frames_out = 0;
-        self.elements.clear();
-        self.cce.clear();
+        self.elements = elements;
         self.configured = true;
         self.unordered = false;
+        self.slots = slots;
         if h.channel_config != 0 {
-            self.slots = fixed_config_slots(h.channel_config);
             self.pce = None;
-        } else {
-            self.slots.clear();
         }
         self.rebuild_layout();
         Ok(true)
     }
 
+    /// The state of every element `slots` declare (once per element identity, a kind and
+    /// a tag) that `existing` lacks, with SBR when `sbr`, built before a configuration
+    /// applies so that a refused charge applies nothing.
+    fn build_elements(
+        &self,
+        aot: u8,
+        slots: &[Slot],
+        sbr: bool,
+        existing: &[Charged<Box<ElementState>>],
+    ) -> Result<Vec<Charged<Box<ElementState>>>> {
+        let mut elements: Vec<Charged<Box<ElementState>>> = Vec::with_capacity(slots.len());
+        for s in slots {
+            let has = |e: &Charged<Box<ElementState>>| e.kind == s.kind && e.tag == s.tag;
+            if elements.iter().any(has) || existing.iter().any(has) {
+                continue;
+            }
+            let mut e = ElementState::new(&self.budget, aot, s.kind, s.tag)?;
+            if sbr {
+                e.sbr = Some(new_sbr(&self.budget, self.sf_index)?);
+            }
+            elements.push(Charged::boxed(&self.budget, e)?);
+        }
+        Ok(elements)
+    }
+
+    /// Room in `out` for the access unit's remaining `blocks` raw data blocks as
+    /// `emit_planes` will fill them in a layout of `channels` planes at `frame_len`, made
+    /// before an in-band reconfiguration applies.
+    fn make_room(
+        &mut self,
+        out: &mut AudioFrame,
+        channels: usize,
+        frame_len: usize,
+        blocks: usize,
+    ) -> Result<()> {
+        // A change of plane count restarts the collection, as in `emit_planes`.
+        let base = if out.planes.len() == channels {
+            out.planes.first().map_or(0, Vec::len)
+        } else {
+            0
+        };
+        let len = base + blocks * frame_len;
+        if out.planes.len() >= channels
+            && out.planes[..channels].iter().all(|p| p.capacity() >= len)
+        {
+            return Ok(());
+        }
+        out.try_resize(channels, len, &mut self.output_charge)?;
+        for p in &mut out.planes {
+            p.truncate(base);
+        }
+        Ok(())
+    }
+
     pub(crate) fn rebuild_layout(&mut self) {
+        (self.layout, self.plane_of) = self.layout_of(&self.slots, self.unordered);
+    }
+
+    /// The layout of `slots` and the plane of each slot's channels.
+    fn layout_of(&self, slots: &[Slot], unordered: bool) -> (ChannelLayout, Vec<[usize; 2]>) {
         // Expand slots to planes; PS doubles the single mono slot.
         let mut entries: Vec<(Speaker, usize, usize)> = Vec::new();
-        for (i, s) in self.slots.iter().enumerate() {
+        for (i, s) in slots.iter().enumerate() {
             let mut sp = s.speakers;
-            if self.ps_active && s.kind == ID_SCE && self.slots.len() == 1 {
+            if self.ps_active && s.kind == ID_SCE && slots.len() == 1 {
                 sp = [Some(Speaker::FrontLeft), Some(Speaker::FrontRight)];
             }
             for (c, x) in sp.iter().enumerate() {
@@ -284,18 +382,58 @@ impl Core {
             }
         }
         // stable sort by speaker id: FFmpeg native order
-        if !self.unordered {
+        if !unordered {
             entries.sort_by_key(|e| e.0);
         }
-        self.plane_of = vec![[usize::MAX; 2]; self.slots.len()];
+        let mut plane_of = vec![[usize::MAX; 2]; slots.len()];
         for (p, e) in entries.iter().enumerate() {
-            self.plane_of[e.1][e.2] = p;
+            plane_of[e.1][e.2] = p;
         }
         // A PCE yields one slot per listed element: at most CAPACITY planes.
-        self.layout = ChannelLayout::new(entries.iter().map(|e| e.0)).expect("PCE channel bound");
+        let layout = ChannelLayout::new(entries.iter().map(|e| e.0)).expect("PCE channel bound");
+        (layout, plane_of)
     }
 
-    fn element_index(&mut self, kind: u8, tag: u8, occurrence: usize) -> Result<Option<usize>> {
+    /// Apply an in-band layout of `slots`: its elements and the room it needs in `out` are
+    /// charged first, so a refusal leaves the configuration as it was.
+    fn switch_layout(
+        &mut self,
+        slots: Vec<Slot>,
+        unordered: bool,
+        out: &mut AudioFrame,
+        blocks: usize,
+    ) -> Result<()> {
+        let (layout, plane_of) = self.layout_of(&slots, unordered);
+        self.make_room(out, layout.channels(), self.frame_len(), blocks)?;
+        // Both layouts together hold at most 48 identities (16 tags of each kind), so the
+        // switch never holds more element state than that.
+        let mut added = self.build_elements(self.aot, &slots, self.sbr_active, &self.elements)?;
+        let mut old = core::mem::take(&mut self.elements);
+        for s in &slots {
+            let has = |e: &Charged<Box<ElementState>>| e.kind == s.kind && e.tag == s.tag;
+            if self.elements.iter().any(has) {
+                continue;
+            }
+            let e = match old.iter().position(has) {
+                Some(i) => {
+                    let mut e = old.swap_remove(i);
+                    e.renew();
+                    e
+                }
+                None => added.remove(added.iter().position(has).expect("built above")),
+            };
+            self.elements.push(e);
+        }
+        drop(old);
+        self.cce.clear();
+        self.slots = slots;
+        self.unordered = unordered;
+        self.layout = layout;
+        self.plane_of = plane_of;
+        Ok(())
+    }
+
+    fn element_index(&self, kind: u8, tag: u8, occurrence: usize) -> Option<usize> {
         // map to a slot
         let slot = if self.channel_config != 0 {
             // FFmpeg maps fixed configurations by element order, ignoring tags.
@@ -316,30 +454,22 @@ impl Core {
                 .iter()
                 .position(|s| s.kind == kind && s.tag == tag)
         };
-        let Some(slot) = slot else {
-            return Ok(None);
-        };
-        let s = &self.slots[slot];
-        if let Some(e) = self
-            .elements
+        // Every slot's element exists once its configuration applies.
+        let s = &self.slots[slot?];
+        self.elements
             .iter()
             .position(|e| e.kind == s.kind && e.tag == s.tag)
-        {
-            return Ok(Some(e));
-        }
-        let mut e = ElementState::new(&self.budget, self.aot, s.kind, s.tag)?;
-        if self.sbr_active {
-            e.sbr = Some(new_sbr(&self.budget, self.sf_index)?);
-        }
-        self.elements.push(Charged::boxed(&self.budget, e)?);
-        Ok(Some(self.elements.len() - 1))
     }
 
     /// Decode one raw_data_block(); appends `frame_len()` samples per plane to `planes`.
+    /// Decode one raw_data_block() of the `blocks` (this one included) the access unit has
+    /// left; `out` gets room for an in-band reconfiguration before it applies.
     pub(crate) fn decode_block(
         &mut self,
         br: &mut CachedBitReader<'_>,
         block_start: usize,
+        out: &mut AudioFrame,
+        blocks: usize,
     ) -> Result<bool> {
         for e in &mut self.elements {
             e.decoded = false;
@@ -365,11 +495,11 @@ impl Core {
                     let tag = br.read(4) as u8;
                     let o = occ[id as usize];
                     occ[id as usize] += 1;
-                    let mut ei = self.element_index(id, tag, o)?;
+                    let mut ei = self.element_index(id, tag, o);
                     if ei.is_none() && self.channel_config == 2 && id == ID_SCE && o < 2 {
                         // FFmpeg maps SCEs of a channel_configuration 2 stream to FL then FR
                         // (probed); the CPE slot's channel o carries them.
-                        if let Some(i) = self.element_index(ID_CPE, 0, 0)? {
+                        if let Some(i) = self.element_index(ID_CPE, 0, 0) {
                             self.elements[i].bs_tag = tag;
                             self.decode_sce(br, &cfg, i, o)?;
                             last_elem = Some(i);
@@ -379,12 +509,10 @@ impl Core {
                     if ei.is_none() && self.channel_config == 1 && id == ID_CPE && o == 0 {
                         // FFmpeg switches a channel_configuration 1 stream to stereo when a
                         // CPE appears (probed).
-                        self.slots = fixed_config_slots(2);
-                        self.elements.clear();
+                        self.switch_layout(fixed_config_slots(2), self.unordered, out, blocks)?;
                         self.channel_config = 2;
-                        self.rebuild_layout();
                         layout_changed = true;
-                        ei = self.element_index(id, tag, o)?;
+                        ei = self.element_index(id, tag, o);
                     }
                     let ei = ei.ok_or(DecodeError::InvalidData(
                         "element not in channel configuration",
@@ -418,16 +546,10 @@ impl Core {
                 ID_PCE => {
                     let p = parse_pce(br, block_start)?;
                     if self.channel_config == 0 && self.pce.as_ref() != Some(&p) {
-                        {
-                            let (slots, unordered) = pce_slots(&p);
-                            self.slots = slots;
-                            self.unordered = unordered;
-                            self.pce = Some(p);
-                            self.elements.clear();
-                            self.cce.clear();
-                            self.rebuild_layout();
-                            layout_changed = true;
-                        }
+                        let (slots, unordered) = pce_slots(&p);
+                        self.switch_layout(slots, unordered, out, blocks)?;
+                        self.pce = Some(p);
+                        layout_changed = true;
                     }
                     last_elem = None;
                 }
@@ -468,8 +590,8 @@ impl Core {
                             self.sbr_fil_ranges.push((fil_start, end));
                             let saved_end = br.end();
                             br.set_end(end);
-                            let r =
-                                self.decode_sbr_ext(br, ei, ext == EXT_SBR_DATA_CRC, count * 8 - 4);
+                            let crc = ext == EXT_SBR_DATA_CRC;
+                            let r = self.decode_sbr_ext(br, ei, crc, count * 8 - 4, out, blocks);
                             br.set_end(saved_end);
                             if r? {
                                 layout_changed = true;
@@ -585,37 +707,47 @@ impl Core {
         ei: usize,
         crc: bool,
         bits: usize,
+        out: &mut AudioFrame,
+        blocks: usize,
     ) -> Result<bool> {
-        let rate = SAMPLE_RATES[self.sf_index];
+        let is_cpe = self.elements[ei].kind == ID_CPE;
+        // A mono stream whose very first frame carries SBR is output as stereo (FFmpeg assumes
+        // HE-AAC v2 for implicitly signalled mono SBR).
+        let to_stereo = self.frames_out == 0 && !self.ps_active && !is_cpe && self.slots.len() == 1;
+        let channels = if to_stereo { 2 } else { self.layout.channels() };
         let mut changed = false;
         if !self.sbr_active {
             // implicit SBR signalling: FFmpeg switches the output to twice the core rate
-            if rate > 48000 {
+            if SAMPLE_RATES[self.sf_index] > 48000 {
                 // FFmpeg refuses SBR above 48 kHz core rate; ignore the payload
                 return Ok(false);
             }
-            // every element runs SBR from now on (new ones get it when they appear)
-            for e in &mut self.elements {
-                if e.sbr.is_none() {
-                    e.sbr = Some(new_sbr(&self.budget, self.sf_index)?);
+            // Every element runs SBR from now on; its state and the longer output are
+            // charged before SBR starts.
+            self.make_room(out, channels, SBR_FRAME_LEN, blocks)?;
+            let mut sbr = Vec::with_capacity(self.elements.len());
+            for e in &self.elements {
+                sbr.push(match e.sbr {
+                    None => Some(new_sbr(&self.budget, self.sf_index)?),
+                    Some(_) => None,
+                });
+            }
+            for (e, s) in self.elements.iter_mut().zip(sbr) {
+                if s.is_some() {
+                    e.sbr = s;
                 }
             }
             self.sbr_active = true;
             changed = true;
+        } else if to_stereo {
+            self.make_room(out, channels, self.frame_len(), blocks)?;
         }
         let e: &mut ElementState = &mut self.elements[ei];
-        let is_cpe = e.kind == ID_CPE;
-        let s = e.sbr.as_mut().unwrap();
-        let ps_found = s.parse(br, crc, bits, is_cpe)?;
-        // A mono stream whose very first frame carries SBR is output as stereo (FFmpeg assumes
-        // HE-AAC v2 for implicitly signalled mono SBR); later PS data is applied when it appears.
-        let first_frame = self.frames_out == 0;
-        if (ps_found || first_frame)
-            && !self.ps_active
-            && !is_cpe
-            && self.slots.len() == 1
-            && (first_frame || ps_found && self.ps_upgrade_allowed)
-        {
+        e.sbr
+            .as_mut()
+            .expect("every element runs SBR")
+            .parse(br, crc, bits, is_cpe)?;
+        if to_stereo {
             self.ps_active = true;
             self.rebuild_layout();
             changed = true;
@@ -739,9 +871,10 @@ impl Core {
         }
     }
 
-    /// Charge the output of `blocks` raw data blocks in the current layout before any is
-    /// decoded, so that a refusal leaves the decoder unchanged. `emit_planes` grows the frame
-    /// again only when the layout or SBR switches inside the access unit.
+    /// Charge the output of `blocks` raw data blocks in the configured layout before any is
+    /// decoded. `emit_planes` grows the frame again only when the access unit reconfigures
+    /// the decoder in band (a PCE, a CPE in a mono stream, the start of SBR or PS), which
+    /// creates state when it appears.
     pub(crate) fn reserve_output(&mut self, out: &mut AudioFrame, blocks: usize) -> Result<()> {
         let (channels, len) = (self.layout.channels(), blocks * self.frame_len());
         if out.planes.len() < channels || out.planes[..channels].iter().any(|p| p.capacity() < len)
@@ -1108,9 +1241,23 @@ fn is_libfaac_signature(t: &[u8]) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::cce::CceState;
+
+    /// `value`'s `Debug` text without the counters of the pools it is charged to.
+    pub(crate) fn without_pools(value: &impl core::fmt::Debug) -> String {
+        let text = format!("{value:?}");
+        let mut out = String::with_capacity(text.len());
+        let mut rest = text.as_str();
+        while let Some(at) = rest.find("Budget(") {
+            out.push_str(&rest[..at]);
+            let end = rest[at..].find("})").map_or(rest.len(), |e| at + e + 2);
+            rest = &rest[end..];
+        }
+        out.push_str(rest);
+        out
+    }
 
     /// The bytes `make` leaves charged to a fresh pool while its result lives.
     fn charge_of<T>(make: impl FnOnce(&Budget) -> Result<T>) -> usize {
@@ -1123,9 +1270,33 @@ mod tests {
     }
 
     #[test]
-    fn the_default_limit_holds_the_largest_layout() {
-        // A PCE of 15 front, 15 side and 15 back CPEs and 3 LFEs: 48 elements, 93 channels,
-        // each with SBR and PS, in the profile with the largest channel state.
+    fn a_renewed_element_is_a_new_one() {
+        let budget = Budget::new(1 << 30).unwrap();
+        for aot in [AOT_LC, AOT_MAIN, AOT_LTP] {
+            for kind in [ID_SCE, ID_CPE] {
+                let fresh = || {
+                    let mut e = ElementState::new(&budget, aot, kind, 3).unwrap();
+                    e.sbr = Some(new_sbr(&budget, 4).unwrap());
+                    e
+                };
+                let mut e = fresh();
+                e.ch[0].overlap.fill(1.0);
+                e.ch[1].prev_shape = 1;
+                e.out[1][7] = 2.0;
+                (e.decoded, e.nch, e.bs_tag, e.ch_decoded) = (true, 2, 9, [true; 2]);
+                e.cd[0].global_gain = 120;
+                e.renew();
+                assert_eq!(without_pools(&e), without_pools(&fresh()), "{aot} {kind}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_default_limit_holds_a_switch_between_the_largest_layouts() {
+        // An element is a kind and a 4-bit tag, so a PCE can list 45 CPEs but has at most
+        // 16 distinct ones, and two layouts together hold at most 48 elements (16 SCEs, 16
+        // CPEs, 16 LFEs): a switch reuses what both have. Each element here carries SBR and
+        // PS in the profile with the largest channel state.
         let element = [AOT_MAIN, AOT_LTP].map(|aot| {
             charge_of(|b| {
                 let mut e = Charged::boxed(b, ElementState::new(b, aot, ID_CPE, 0)?)?;
@@ -1144,6 +1315,7 @@ mod tests {
         let limit = crate::Limits::default().live_storage_bytes;
         let pool = Budget::new(limit).unwrap().used();
         let worst = pool + 48 * element + 16 * cce + output;
+        eprintln!("element {element}, cce {cce}, output {output}, worst {worst}");
         assert!(worst <= limit, "{worst} > {limit}");
     }
 }

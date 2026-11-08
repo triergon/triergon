@@ -44,8 +44,9 @@ use triergon_codec::{AudioDecoder, Budget, DecodeFailure, DownmixLevels};
 pub struct Limits {
     /// Live storage that depends on the stream: element and coupling-channel state
     /// (overlap, prediction, LTP, spectra, SBR and PS) and the output frame the decoder
-    /// fills. The default holds the largest PCE layout (48 elements, 93 channels) with
-    /// SBR and Main prediction, 16 coupling channels and four raw data blocks of output.
+    /// fills. The default holds 48 elements (16 tags each of SCE, CPE and LFE, the most a
+    /// PCE switch between two layouts holds) with SBR and Main prediction, 16 coupling
+    /// channels and four raw data blocks of 93 channels.
     pub live_storage_bytes: usize,
 }
 
@@ -96,8 +97,13 @@ impl Decoder {
             p.clear();
         }
         out.samples_per_channel = 0;
+        // A refused access unit leaves the decoder as if it had not arrived: what it may
+        // have advanced before the refusal is restored with it.
+        let (random, skip_samples) = (self.core.random, self.core.skip_samples);
         let r = self.decode_inner(au, out);
         if r.is_err() {
+            self.core.random = random;
+            self.core.skip_samples = skip_samples;
             for p in &mut out.planes {
                 p.clear();
             }
@@ -126,9 +132,9 @@ impl Decoder {
         core.sbr_fil_ranges.clear();
         let mut br = CachedBitReader::new(payload);
         core.reserve_output(out, h.raw_data_blocks as usize)?;
-        for _ in 0..h.raw_data_blocks {
+        for block in 0..h.raw_data_blocks {
             let start = br.position();
-            core.decode_block(&mut br, start)?;
+            core.decode_block(&mut br, start, out, (h.raw_data_blocks - block) as usize)?;
             core.emit_planes(out)?;
             if !h.protection_absent && h.raw_data_blocks > 1 {
                 br.skip(16); // adts_raw_data_block_error_check

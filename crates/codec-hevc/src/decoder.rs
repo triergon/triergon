@@ -225,7 +225,6 @@ struct CurPic {
     st_after: Vec<usize>,
     lt_curr: Vec<usize>,
     info: Arc<OutInfo>,
-    slices: u16,
     /// Collocated motion of this picture, filled when it is finished.
     col: ColMotion,
 }
@@ -477,11 +476,6 @@ impl Context {
         }
         self.st.reserve_slice()?;
         let cur = self.cur.as_mut().unwrap();
-        if !sh.dependent_slice_segment {
-            cur.prev_sh = Some(sh.clone());
-        }
-        let slice_idx = cur.slices;
-        cur.slices += 1;
         // Reference picture lists (8.3.4) and SliceInfo.
         let mut info = SliceInfo {
             slice_addr_rs: sh.slice_addr_rs,
@@ -538,8 +532,15 @@ impl Context {
                 }
             }
         }
+        // A slice counts once its state is recorded, so a refused slice leaves nothing,
+        // neither an index nor a header, that later slices of the picture could reach.
+        let slice_idx = u16::try_from(self.st.slices.len())
+            .map_err(|_| DecodeError::InvalidData("too many slice segments in a picture"))?;
         // Cannot fail: `reserve_slice` made room before the picture state changed.
         self.st.slices.try_push(info).map_err(|e| e.error)?;
+        if !sh.dependent_slice_segment {
+            cur.prev_sh = Some(sh.clone());
+        }
         let layout = cur.layout.clone();
         let poc = cur.poc;
 
@@ -867,7 +868,6 @@ impl Context {
             st_after,
             lt_curr,
             info,
-            slices: 0,
             col,
         });
         Ok(())
@@ -965,6 +965,10 @@ impl Context {
                     continue;
                 }
                 let ctb = (ly >> sps.log2_ctb) * sps.pic_w_ctb as usize + (lx >> sps.log2_ctb);
+                // A CTB no slice of this picture decoded holds an earlier picture's motion.
+                if self.st.ctb_slice_addr[ctb] == u32::MAX {
+                    continue;
+                }
                 let Some(si) = self.st.slices.get(self.st.ctb_slice_idx[ctb] as usize) else {
                     continue;
                 };
@@ -1240,6 +1244,6 @@ fn decode_slice_generic<P: Pixel>(
     }
     let mut dec = SliceDecoder::new(
         sps, pps, sh, layout, frame, st, &refs, sc, rbsp, slice_idx, poc,
-    );
+    )?;
     dec.decode()
 }

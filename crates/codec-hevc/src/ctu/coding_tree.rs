@@ -432,7 +432,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             }
         }
         let consumed = r.position().div_ceil(8);
-        self.cabac.restart(pos + consumed);
+        self.cabac.restart(pos + consumed)?;
         Ok(())
     }
 

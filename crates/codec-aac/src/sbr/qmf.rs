@@ -111,6 +111,8 @@ impl Analysis {
     pub(crate) fn reset(&mut self) {
         self.x.fill(0.0);
         self.pos = 320;
+        self.re = [0.0; 64];
+        self.im = [0.0; 64];
     }
 
     /// Process 32 new input samples (oldest first) into 32 complex subband samples.
@@ -165,6 +167,9 @@ impl Synthesis {
     pub(crate) fn reset(&mut self) {
         self.v.fill(0.0);
         self.pos = 1280;
+        for scratch in [&mut self.a, &mut self.b, &mut self.c, &mut self.d] {
+            *scratch = [0.0; 64];
+        }
     }
 
     /// One time slot: `x` holds 64 complex subband samples; writes 64 output samples.

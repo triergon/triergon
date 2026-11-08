@@ -280,3 +280,174 @@ fn decoding_resumes_after_a_refusal() {
     }
     assert_eq!(f.samples_per_channel, 3 * 1024);
 }
+
+/// A long-window channel stream of four noise (PNS) bands: audible output that depends on
+/// the decoder's history (overlap and the PNS seed) without spectral data.
+fn noise_ics(w: &mut Bw) {
+    w.put(100, 8); // global_gain
+    w.put(0, 1); // reserved
+    w.put(0, 2); // ONLY_LONG
+    w.put(0, 1); // sine
+    w.put(4, 6); // max_sfb
+    w.put(0, 1); // predictor_data_present
+    w.put(13, 4); // NOISE_HCB
+    w.put(4, 5); // for all four bands
+    w.put(256, 9); // first noise energy: global_gain - 90
+    w.put(0, 3); // three scalefactor codes of delta 0
+    w.put(0, 3); // pulse, tns, gain control
+}
+
+/// A raw data block: optionally a PCE of one front element, then that element (an SCE or a
+/// CPE) of noise, optionally an SBR fill element after it, then END.
+fn noise_block(pce: bool, cpe: bool, sbr: bool) -> Vec<u8> {
+    let mut w = Bw::new();
+    if pce {
+        w.put(5, 3); // ID_PCE
+        w.put(0, 4); // element_instance_tag
+        w.put(1, 2); // object_type: LC
+        w.put(4, 4); // sampling_frequency_index
+        w.put(1, 4); // front elements
+        w.put(0, 4 + 4 + 2 + 3 + 4); // side, back, LFE, data and coupling elements
+        w.put(0, 3); // no mixdowns
+        w.put(cpe as u32, 1);
+        w.put(0, 4); // its tag
+        w.align();
+        w.put(0, 8); // comment_field_bytes
+    }
+    if cpe {
+        w.put(1, 3);
+        w.put(0, 4);
+        w.put(0, 1); // common_window 0
+        noise_ics(&mut w);
+        noise_ics(&mut w);
+    } else {
+        w.put(0, 3);
+        w.put(0, 4);
+        noise_ics(&mut w);
+    }
+    if sbr {
+        w.put(6, 3); // ID_FIL
+        w.put(4, 4); // four bytes
+        w.put(13, 4); // EXT_SBR_DATA
+        w.put(0, 28);
+    }
+    w.put(7, 3);
+    w.bytes()
+}
+
+/// Decode `units`; the access unit at `refused` is decoded with the pool exhausted and must
+/// be refused. Returns every other access unit's output, in order.
+fn decode_refusing(units: &[Vec<u8>], refused: Option<usize>) -> Vec<Vec<Vec<f32>>> {
+    decode_refusing_with(units, refused, 0)
+}
+
+/// [`decode_refusing`], with `spare` bytes of the pool left free for the refused one.
+fn decode_refusing_with(
+    units: &[Vec<u8>],
+    refused: Option<usize>,
+    spare: usize,
+) -> Vec<Vec<Vec<f32>>> {
+    let budget = Budget::new(8 << 20).unwrap();
+    let mut d = Decoder::new_in(&budget);
+    let mut f = AudioFrame::default();
+    let mut outputs = Vec::new();
+    for (i, au) in units.iter().enumerate() {
+        if refused == Some(i) {
+            let pressure = budget.reserve(budget.available() - spare).unwrap();
+            let r = d.decode(au, &mut f);
+            assert!(matches!(r, Err(DecodeError::Budget(_))), "{r:?}");
+            assert_eq!(f.samples_per_channel, 0);
+            drop(pressure);
+        } else {
+            d.decode(au, &mut f).unwrap();
+            outputs.push(f.planes.clone());
+        }
+    }
+    outputs
+}
+
+/// After a refused in-band reconfiguration the decoder continues exactly as if the refused
+/// access unit had never arrived.
+fn a_refusal_is_as_if_the_access_unit_never_arrived(units: &[Vec<u8>], refused: usize) {
+    a_refusal_with_spare_is_as_if_the_access_unit_never_arrived(units, refused, 0);
+}
+
+fn a_refusal_with_spare_is_as_if_the_access_unit_never_arrived(
+    units: &[Vec<u8>],
+    refused: usize,
+    spare: usize,
+) {
+    let mut without = units.to_vec();
+    without.remove(refused);
+    let expected = decode_refusing(&without, None);
+    assert!(expected.iter().flatten().flatten().any(|&s| s != 0.0));
+    assert_eq!(decode_refusing_with(units, Some(refused), spare), expected);
+}
+
+#[test]
+fn a_refused_pce_switch_leaves_the_decoder_as_it_was() {
+    let mono = adts(1, 4, 0, &[noise_block(true, false, false)], false);
+    let stereo = adts(1, 4, 0, &[noise_block(true, true, false)], false);
+    let units = [&mono, &mono, &stereo, &mono, &stereo, &stereo, &mono].map(Vec::clone);
+    a_refusal_is_as_if_the_access_unit_never_arrived(&units, 2);
+}
+
+#[test]
+fn a_refused_sbr_start_leaves_the_decoder_as_it_was() {
+    let plain = adts(1, 4, 1, &[noise_block(false, false, false)], false);
+    let sbr = adts(1, 4, 1, &[noise_block(false, false, true)], false);
+    let units = [&plain, &plain, &sbr, &plain, &plain].map(Vec::clone);
+    a_refusal_is_as_if_the_access_unit_never_arrived(&units, 2);
+}
+
+/// A refusal after an earlier raw data block of the same frame was decoded cannot undo
+/// that block, but the decoder stays consistent: the configuration is the old one, and the
+/// following access units decode.
+#[test]
+fn a_refusal_after_a_decoded_block_leaves_a_consistent_decoder() {
+    let budget = Budget::new(8 << 20).unwrap();
+    let mut d = Decoder::new_in(&budget);
+    let mut f = AudioFrame::default();
+    let mono = || noise_block(true, false, false);
+    d.decode(&adts(1, 4, 0, &[mono(), mono()], false), &mut f)
+        .unwrap();
+    let switch = adts(1, 4, 0, &[mono(), noise_block(true, true, false)], false);
+    let pressure = budget.reserve(budget.available()).unwrap();
+    let r = d.decode(&switch, &mut f);
+    assert!(matches!(r, Err(DecodeError::Budget(_))), "{r:?}");
+    drop(pressure);
+    for (block, channels) in [
+        (mono(), 1),
+        (noise_block(true, true, false), 2),
+        (mono(), 1),
+    ] {
+        d.decode(&adts(1, 4, 0, &[block], false), &mut f).unwrap();
+        assert_eq!(f.planes.len(), channels);
+        assert_eq!(f.samples_per_channel, 1024);
+        assert!(f.planes.iter().flatten().all(|s| s.is_finite()));
+    }
+}
+
+#[test]
+fn a_refused_cpe_in_a_mono_stream_leaves_the_decoder_as_it_was() {
+    let mono = adts(1, 4, 1, &[noise_block(false, false, false)], false);
+    let cpe = adts(1, 4, 1, &[noise_block(false, true, false)], false);
+    let units = [&mono, &mono, &cpe, &mono, &mono].map(Vec::clone);
+    a_refusal_is_as_if_the_access_unit_never_arrived(&units, 2);
+}
+
+#[test]
+fn a_refused_ps_start_leaves_the_decoder_as_it_was() {
+    // SBR on a mono stream's first frame starts PS, which makes the output stereo. Spare
+    // the pool what a plain first frame needs, so that the refusal is the start's.
+    let plain = adts(1, 4, 1, &[noise_block(false, false, false)], false);
+    let sbr = adts(1, 4, 1, &[noise_block(false, false, true)], false);
+    let budget = Budget::new(8 << 20).unwrap();
+    let idle = budget.used();
+    Decoder::new_in(&budget)
+        .decode(&plain, &mut AudioFrame::default())
+        .unwrap();
+    let first = budget.peak() - idle;
+    let units = [&sbr, &plain, &plain].map(Vec::clone);
+    a_refusal_with_spare_is_as_if_the_access_unit_never_arrived(&units, 0, first);
+}
