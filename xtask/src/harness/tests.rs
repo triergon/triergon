@@ -154,6 +154,168 @@ fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
     )
 }
 
+#[test]
+fn zero_heap_is_valid_evidence_with_positive_reference_and_unchanged_rss() {
+    let (contract, rows, identity) = matched_gate_fixture();
+    let original = rows[0].get("memory").unwrap();
+    let certificate = original.get("certificate").unwrap();
+    let mut samples = original
+        .get("samples")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .to_vec();
+    for sample in &mut samples {
+        put(
+            sample,
+            &["candidate_heap", "observer"],
+            "heap_peak_bytes",
+            Value::int(0),
+        );
+    }
+    let memory = super::memory::evaluate(root(), &samples, 30, 0, certificate, None);
+    assert_eq!(memory.get("status"), Some(&Value::str("qualified")));
+    assert_eq!(memory.get("heap_ratio_upper_95"), Some(&Value::float(0.0)));
+    assert_eq!(
+        memory.get("heap_ratio"),
+        Some(&v(r#"{"median":0.0,"lower_95":0.0,"upper_95":0.0}"#))
+    );
+    for field in [
+        "total_rss_ratio",
+        "rss_growth_ratio",
+        "total_rss_ratio_upper_95",
+        "rss_growth_ratio_upper_95",
+    ] {
+        assert_eq!(memory.get(field), original.get(field));
+    }
+    let selected = identity.get("binaries").unwrap();
+    let accepts = |memory: &Value| {
+        let mut changed = rows.clone();
+        put(&mut changed[0], &[], "memory", memory.clone());
+        verdict(&contract, &changed, &identity)
+    };
+    assert!(super::memory::evidence_valid(
+        root(),
+        &rows[0],
+        &memory,
+        &contract,
+        &identity,
+        selected,
+        false
+    ));
+    assert_eq!(accepts(&memory), (true, true));
+    for (candidate, reference) in [(-1, 100), (0, 0), (0, -1)] {
+        let mut invalid = samples.clone();
+        put(
+            &mut invalid[0],
+            &["candidate_heap", "observer"],
+            "heap_peak_bytes",
+            Value::int(candidate),
+        );
+        put(
+            &mut invalid[0],
+            &["reference_heap", "observer"],
+            "heap_peak_bytes",
+            Value::int(reference),
+        );
+        let rejected = super::memory::evaluate(root(), &invalid, 30, 0, certificate, None);
+        assert_eq!(
+            rejected.get("status"),
+            Some(&Value::str("invalid-memory-observation"))
+        );
+        assert_eq!(accepts(&rejected), (false, false));
+    }
+    for count in [29, 31] {
+        let mut changed = memory.clone();
+        put(&mut changed, &[], "pairs", Value::int(count));
+        assert!(!super::memory::evidence_valid(
+            root(),
+            &rows[0],
+            &changed,
+            &contract,
+            &identity,
+            selected,
+            false
+        ));
+        assert_eq!(accepts(&changed), (false, false));
+    }
+    let mut changed = memory.clone();
+    put(
+        &mut changed,
+        &["certificate", "probe_heap", "observer"],
+        "heap_live_end",
+        Value::int(1),
+    );
+    assert!(!super::memory::evidence_valid(
+        root(),
+        &rows[0],
+        &changed,
+        &contract,
+        &identity,
+        selected,
+        false
+    ));
+    assert_eq!(accepts(&changed), (false, false));
+
+    let mut short = memory.clone();
+    put(
+        &mut short,
+        &[],
+        "samples",
+        Value::Array(samples[..29].to_vec()),
+    );
+    put(&mut short, &[], "pairs", Value::int(29));
+    assert_eq!(accepts(&short), (false, false));
+
+    for peak in [296, 297] {
+        let mut rss = samples.clone();
+        for sample in &mut rss {
+            for field in ["rss_peak_observed", "hwm_end"] {
+                put(
+                    sample,
+                    &["candidate_rss", "observer"],
+                    field,
+                    Value::int(peak),
+                );
+            }
+        }
+        let bounded = super::memory::evaluate(root(), &rss, 30, 0, certificate, None);
+        assert_eq!(bounded.get("status"), Some(&Value::str("qualified")));
+        assert!(super::memory::evidence_valid(
+            root(),
+            &rows[0],
+            &bounded,
+            &contract,
+            &identity,
+            selected,
+            false
+        ));
+        assert_eq!(accepts(&bounded), (false, false));
+    }
+    for field in ["heap_ratio_upper_95", "total_rss_ratio_upper_95"] {
+        for invalid in [f64::NAN, f64::INFINITY, -1.0, 1.0] {
+            let mut changed = memory.clone();
+            put(&mut changed, &[], field, Value::float(invalid));
+            assert_eq!(accepts(&changed), (false, false));
+        }
+    }
+    let mut changed = memory.clone();
+    put(
+        &mut changed,
+        &[],
+        "total_rss_ratio_upper_95",
+        Value::float(0.0),
+    );
+    assert_eq!(accepts(&changed), (false, false));
+    put(
+        &mut changed,
+        &[],
+        "status",
+        Value::str("invalid-memory-observation"),
+    );
+    assert_eq!(accepts(&changed), (false, false));
+}
+
 fn four_field_gate_fixture() -> (Value, Vec<Value>, Value) {
     let (mut contract, mut rows, identity) = matched_gate_fixture();
     put(

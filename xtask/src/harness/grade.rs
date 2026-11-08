@@ -482,9 +482,16 @@ fn selected(row: &Value, expected: &Value, contract: &Value, identity: &Value) -
     super::comparison::validate_case_evidence(row, identity, Some(id))
 }
 
-fn samples(measurement: &Value, minimum: i128) -> R<&[Value]> {
+fn samples(measurement: &Value, minimum: i128, failed_memory: bool) -> R<&[Value]> {
     let raw = array(measurement, "samples")?;
-    let pairs = integer(measurement, "pairs")?;
+    // Failed memory summaries can retain complete raw pairs without reporting a
+    // count. Validate their actual membership without inventing summary fields.
+    // A qualified memory row or any timing row must still declare its count.
+    let pairs = if failed_memory && measurement.get("pairs").is_none() {
+        raw.len() as i128
+    } else {
+        integer(measurement, "pairs")?
+    };
     if pairs < minimum.max(30) || pairs != raw.len() as i128 {
         return Err("missing paired samples or pair count mismatch".into());
     }
@@ -563,8 +570,8 @@ fn join_case(
         require_same(previous, clock, "retained timing measurement")?;
     }
     let minimum = integer(contract, "minimum_pairs")?;
-    let timed_raw = samples(clock, minimum)?;
-    let memory_raw = samples(memory, minimum)?;
+    let timed_raw = samples(clock, minimum, false)?;
+    let memory_raw = samples(memory, minimum, text(memory, "status")? != "qualified")?;
     if text(clock, "status")? != "measured" || integer(clock, "iterations")? < 1 {
         return Err("timing is not measured".into());
     }
@@ -1493,6 +1500,96 @@ mod tests {
             text(field(&joined, "memory").unwrap(), "status").unwrap(),
             "observer-unqualified"
         );
+    }
+
+    #[test]
+    fn failed_memory_without_pair_count_is_written_and_cannot_pass() {
+        let mut fixture = Fixture::new();
+        let mut memory = without(field(&fixture.measured, "memory").unwrap(), &["pairs"]).unwrap();
+        put(
+            &mut memory,
+            "status",
+            Value::str("invalid-memory-observation"),
+        )
+        .unwrap();
+        put(&mut fixture.measured, "memory", memory.clone()).unwrap();
+        let joined = fixture.join().unwrap();
+        assert_eq!(joined.get("memory"), Some(&memory));
+        assert!(field(&joined, "memory").unwrap().get("pairs").is_none());
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let verdict = super::super::acceptance::grade_case(
+            root,
+            &fixture.contract,
+            &joined,
+            &fixture.identity,
+            "unqualified-test",
+        );
+        assert!(!verdict.memory_pass);
+        let acceptance = acceptance_iter(
+            root,
+            &fixture.contract,
+            [Ok(joined.clone())].into_iter(),
+            &fixture.identity,
+            "unqualified-test",
+            &[],
+            &[],
+        );
+        assert_eq!(acceptance.get("accepted"), Some(&Value::Bool(false)));
+        assert_eq!(acceptance.get("slice_accepted"), Some(&Value::Bool(false)));
+        let output =
+            std::env::temp_dir().join(format!("grade-failed-memory-{}", std::process::id()));
+        fs::create_dir_all(&output).unwrap();
+        super::super::report::write_case_report(
+            &output,
+            &object(&[("acceptance", acceptance)]),
+            [Ok(joined.clone())].into_iter(),
+        )
+        .unwrap();
+        let written = read_json(&output.join("report.json")).unwrap();
+        require_same(
+            field(&written, "cases").unwrap(),
+            &Value::Array(vec![joined]),
+            "retained failed cases",
+        )
+        .unwrap();
+        fs::remove_dir_all(output).unwrap();
+
+        for (path, key) in [
+            (vec!["memory"], "input_sha256"),
+            (vec!["memory", "certificate"], "observer_sha256"),
+            (vec!["memory", "certificate", "worker_hashes"], "candidate"),
+        ] {
+            let mut changed = fixture.measured.clone();
+            change(&mut changed, &path, key, Value::str(digest('f')));
+            let mut invalid = Fixture::new();
+            invalid.measured = changed;
+            assert!(invalid.join().is_err(), "{path:?}/{key}");
+        }
+    }
+
+    #[test]
+    fn missing_pair_counts_never_relax_success_or_minimum_sample_guards() {
+        let fixture = Fixture::new();
+        let mut memory = without(field(&fixture.measured, "memory").unwrap(), &["pairs"]).unwrap();
+        assert_eq!(samples(&memory, 30, true).unwrap().len(), 30);
+        assert!(samples(&memory, 31, true).is_err());
+        assert!(samples(&memory, 30, false).is_err());
+        let raw = array(&memory, "samples").unwrap()[..29].to_vec();
+        put(&mut memory, "samples", Value::Array(raw)).unwrap();
+        assert!(samples(&memory, 30, true).is_err());
+
+        let mut fixture = Fixture::new();
+        let mut clock = without(field(&fixture.timed, "timing").unwrap(), &["pairs"]).unwrap();
+        assert!(samples(&clock, 30, false).is_err());
+        put(&mut clock, "status", Value::str("measured")).unwrap();
+        put(&mut fixture.timed, "timing", clock).unwrap();
+        assert!(fixture.join().unwrap_err().contains("pairs"));
+
+        let mut fixture = Fixture::new();
+        let mut memory = without(field(&fixture.measured, "memory").unwrap(), &["pairs"]).unwrap();
+        put(&mut memory, "status", Value::str("qualified")).unwrap();
+        put(&mut fixture.measured, "memory", memory).unwrap();
+        assert!(fixture.join().unwrap_err().contains("pairs"));
     }
 
     #[test]

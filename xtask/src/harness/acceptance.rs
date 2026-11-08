@@ -481,7 +481,9 @@ fn grade_case_with_runtime(
         .get("expected_memory_outputs")
         .is_none_or(|expected| memory_outputs_match(memory, expected))
         && s(memory, "status") == Some("qualified")
-        && ratios.iter().all(|r| r.is_finite() && *r > 0.0 && *r < 1.0);
+        && ratios.iter().all(|r| r.is_finite() && *r < 1.0)
+        && ratios[0] > 0.0
+        && ratios[1] >= 0.0;
     if !memory_ok {
         reasons.push(format!(
             "{id}: lower RSS/live allocation gate unproven or failed"
