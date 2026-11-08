@@ -64,24 +64,77 @@ fn frames_decode_to_their_layer_and_version_shape() {
 }
 
 #[test]
-fn a_budget_too_small_for_the_output_frame_is_a_typed_error() {
+fn the_default_limit_holds_the_state_and_the_largest_frame_with_room_to_spare() {
+    let budget = Budget::new(Limits::default().live_storage_bytes).unwrap();
+    let mut decoder = Decoder::new_in(&budget);
+    let mut out = AudioFrame::default();
+    for header in [LAYER3, LAYER3_LSF, LAYER2, LAYER1] {
+        decoder
+            .decode_frame(&silent_frame(header), &mut out)
+            .unwrap();
+    }
+    assert!(budget.peak() < budget.limit() / 4, "{}", budget.peak());
+}
+
+#[test]
+fn a_budget_too_small_is_a_typed_error_that_leaves_the_frame_empty() {
+    // What a mono low-sampling-frequency frame (576 samples) charges, the state included.
+    let budget = Budget::new(1 << 20).unwrap();
+    Decoder::new_in(&budget)
+        .decode_frame(&silent_frame(LAYER3_LSF), &mut AudioFrame::default())
+        .unwrap();
+    let limits = Limits {
+        live_storage_bytes: budget.peak(),
+    };
+    let mut decoder = Decoder::with_limits(limits).unwrap();
+    let mut out = AudioFrame::default();
+    // Two channels of 1152 samples do not fit beside the state; the decoder stays usable.
+    let error = decoder
+        .decode_frame(&silent_frame(LAYER3), &mut out)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        DecodeError::Budget(StorageError::Backpressure { .. })
+    ));
+    assert_eq!(out.samples_per_channel, 0);
+    decoder
+        .decode_frame(&silent_frame(LAYER3_LSF), &mut out)
+        .unwrap();
+    // A pool smaller than the state refuses every frame.
     let mut decoder = Decoder::with_limits(Limits {
         live_storage_bytes: 4096,
     })
     .unwrap();
-    let error = decoder
-        .decode_frame(&silent_frame(LAYER3), &mut AudioFrame::default())
-        .unwrap_err();
+    for header in [LAYER3_LSF, LAYER1] {
+        assert!(matches!(
+            decoder.decode_frame(&silent_frame(header), &mut out),
+            Err(DecodeError::Budget(StorageError::Limit { .. }))
+        ));
+    }
+}
+
+#[test]
+fn decoding_resumes_after_a_refused_charge() {
+    // Layer II decodes any body, so random bytes give a frame of nonzero samples.
+    let mut random = Lcg(3);
+    let mut frame = silent_frame(LAYER2);
+    for byte in &mut frame[4..] {
+        *byte = random.next();
+    }
+    let budget = Budget::new(Limits::default().live_storage_bytes).unwrap();
+    let mut decoder = Decoder::new_in(&budget);
+    let mut out = AudioFrame::default();
+    let held = budget.reserve(budget.available()).unwrap();
     assert!(matches!(
-        error,
-        DecodeError::Budget(StorageError::Limit { .. })
+        decoder.decode_frame(&frame, &mut out),
+        Err(DecodeError::Budget(StorageError::Backpressure { .. }))
     ));
-    // A mono low-sampling-frequency frame (576 samples) fits.
-    assert!(
-        decoder
-            .decode_frame(&silent_frame(LAYER3_LSF), &mut AudioFrame::default())
-            .is_ok()
-    );
+    drop(held);
+    decoder.decode_frame(&frame, &mut out).unwrap();
+    let mut expected = AudioFrame::default();
+    Decoder::new().decode_frame(&frame, &mut expected).unwrap();
+    assert!(expected.planes[0].iter().any(|&s| s != 0.0));
+    assert_eq!(out.planes, expected.planes);
 }
 
 #[test]
