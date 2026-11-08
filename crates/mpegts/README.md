@@ -2,16 +2,18 @@
 
 Bounded, incremental MPEG-2 transport stream reader for 188-byte TS and
 192-byte M2TS. It is a format-layer crate on top of `triergon-core` (input cursor,
-budgets, exact time) and `triergon-bitstream` (the section CRC). It frames packets, checks
+budgets, exact time), `triergon-bitstream` (the section CRC) and
+`triergon-framing` (access-unit framing). It frames packets, checks
 continuity, assembles PSI sections and PAT/PMT tables, and assembles PES
-packets with their raw timestamps. A PES is a byte run, not a codec access
-unit: access-unit framing belongs to `triergon-framing`, decoding to the codec
+packets with their raw timestamps. `Reader` composes those source facts with
+the existing framers to implement `ContainerReader` over complete access units.
+A PES is a byte run, never an access-unit packet. Decoding belongs to the codec
 crates. The crate does no I/O and does not seek. The `mux` module writes a
 single-program stream for one video elementary stream ([Writing TS](#writing-ts)).
 
 The crate exposes two views:
 
-- **Source view** (`TransportStream` and its parts). Every value is a wire
+- **Source view** (`Reader`, `TransportStream` and its parts). Every value is a wire
   fact: raw 33-bit PTS/DTS, raw PCR, descriptor bytes, source byte ranges.
   Unknown DTS stays unknown.
 - **FFmpeg-compatible view** (`compat::pes`, `compat::input`). It reproduces
@@ -122,6 +124,61 @@ a healthy cursor. `required_work` bounds per-event admission. A short grant
 leaves the event available for retry. Fixed policy state and charged aliases
 reuse the parser's original bytes.
 
+## Access units
+
+`Reader::new(&pool, source, capabilities, ReaderLimits::default(), input_window)`
+opens a sequential TS188 source. Set `ReaderLimits::format` for M2TS192, and
+`program` to select a program explicitly. Without a selection, the PAT must
+contain exactly one media program. `ContainerReader` supplies the normal
+input-window, work, cancellation, backpressure and reset protocol. Seeking
+returns `Error::Unsupported` without changing reader state.
+
+The admitted AU carriages are AVC and HEVC Annex B, single-block ADTS AAC-LC,
+and AC-3 in private PES with explicitly declared DVB namespace and unambiguous
+AC-3 descriptors. Existing framers delimit their complete source bytes; no
+parameter sets are injected and no AAC/AC-3 envelopes are stripped. LATM,
+MPEG audio/video, E-AC-3 grouping, subtitles and ambiguous private streams
+currently emit `ReaderEvent::Unsupported`. Their original PMTs and PES remain
+available as source events; none is relabelled as an AU.
+
+`Packet` implements `PacketInfo` and retains its exact PMT, source configuration epoch,
+framer syntax and intersecting PES events. `sources()` maps its elementary-byte
+extent to retained PES events, including all physical source and header ranges.
+Framer coordinates use a private concatenated elementary view (`SourceId(0)`),
+not physical file offsets. Video scatter payloads are coalesced cooperatively
+into charged immutable storage. Cloning a packet or `SourceEvent` shares its
+charged storage; it never performs an infallible vector clone.
+
+`Track::configuration_epoch()` is the PMT/source configuration epoch. In-band
+SPS/PPS changes remain in the source NALs and do not advance it. Consumers must
+track parsed codec-configuration changes separately.
+
+`ReaderEvent::Source` delivers every original `TraceEvent` in order. PMT track
+catalogues change atomically with the corresponding source event. A PMT, clock
+or interrupted-byte-run boundary reports unpublished bytes through
+`ReaderEvent::Interrupted`, rather than treating a loss boundary as EOF.
+Logical EOF drains the framers before the original `Finished` event and final
+`Step::End`. Annex-B groups without an admitted primary/base-layer picture
+remain `ReaderEvent::VideoHeaders`,
+outside the AU packet stream. Packets and events remain usable after close or reset.
+
+A PES time anchor applies once, to the first AU whose start-code/sync byte is
+at or after that PES start. An anchor inside a frame waits for the next frame.
+`PacketClock` retains raw timestamps, the source clock key and lifting status.
+Quarantined source clocks keep their raw fields and an explicit flag, while
+their lifted timestamps remain unresolved.
+The default policy explicitly chooses period zero; `Unanchored` and bounded
+source-clock policies are also available. Missing DTS and later unanchored
+per-frame timestamps stay absent. Exact audio sample duration is available
+through `sample_duration()`; the neutral 90-kHz duration stays absent when it
+cannot represent that duration exactly. Codec configuration NALs and audio
+headers stay on the rich source types; the PMT track does not fabricate a
+decoder configuration record.
+
+`ReaderLimits` bounds PES retention per pending AU, framed output count per
+byte run, audio frame size, video NAL/AU sizes and elementary input windows,
+in addition to the transport limits and shared live-capacity budget.
+
 ## Usage
 
 ```rust
@@ -170,6 +227,7 @@ file.
 
 | Task | Entry points |
 | --- | --- |
+| Complete source access units | `Reader`, `ReaderLimits`, `ContainerReader` |
 | Whole stream, one program | `TransportStream::{new, new_with_namespace}` |
 | One HLS segment (TS188, in-band PAT/PMT) | `TransportStream::new_single_program_segment`, `new_single_program_feed` |
 | Sequential TS188 playback input | `TransportStream::new_single_program_progressive_feed` |

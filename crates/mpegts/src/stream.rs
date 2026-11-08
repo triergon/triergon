@@ -483,7 +483,7 @@ impl TransportStream {
         Ok(())
     }
 
-    fn new_with_program(
+    pub(crate) fn new_with_program(
         budget: Budget,
         format: PacketFormat,
         limits: ParseLimits,

@@ -3,14 +3,13 @@
 //! A player may receive Matroska directly and TS or fragmented MP4 through HLS,
 //! so the reader is chosen at open time from probed bytes. Each variant sits behind its format
 //! feature; forwarding is one predictable `match` per step with no allocation
-//! and no dynamic dispatch on the packet path. MPEG-TS joins once its reader
-//! implements [`ContainerReader`]; until then [`probe`] reports it and
-//! [`AnyReader::open`] refuses it explicitly.
+//! and no dynamic dispatch on the packet path.
 // With no format feature the enums are empty and their forwarding is dead code.
 #![cfg_attr(
     not(any(
         feature = "matroska",
         feature = "isobmff",
+        feature = "mpegts",
         feature = "ogg",
         feature = "elementary"
     )),
@@ -31,6 +30,7 @@ use triergon_core::{
 #[cfg(any(
     feature = "matroska",
     feature = "isobmff",
+    feature = "mpegts",
     feature = "ogg",
     feature = "elementary"
 ))]
@@ -45,6 +45,8 @@ pub enum Probe {
     Isobmff,
     /// 188-byte MPEG transport packets.
     Ts,
+    /// 192-byte M2TS packets with their four-byte arrival prefixes.
+    M2ts,
     /// An Ogg page (`OggS`).
     Ogg,
     /// Native FLAC (`fLaC`, or a frame header the next one numbers on from), possibly
@@ -81,6 +83,9 @@ pub fn probe(bytes: &[u8]) -> Probe {
     if bytes.len() > 188 * 2 && bytes[0] == 0x47 && bytes[188] == 0x47 && bytes[376] == 0x47 {
         return Probe::Ts;
     }
+    if bytes.len() > 192 * 2 + 4 && bytes[4] == 0x47 && bytes[196] == 0x47 && bytes[388] == 0x47 {
+        return Probe::M2ts;
+    }
     elementary(bytes)
 }
 
@@ -113,6 +118,8 @@ pub enum AnyReader {
     Matroska(triergon_matroska::typed::Reader),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Reader),
+    #[cfg(feature = "mpegts")]
+    MpegTs(triergon_mpegts::Reader),
     #[cfg(feature = "ogg")]
     Ogg(triergon_ogg::Reader),
     #[cfg(feature = "elementary")]
@@ -134,6 +141,8 @@ pub enum AnyPacket {
     Matroska(triergon_matroska::typed::Packet),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Packet),
+    #[cfg(feature = "mpegts")]
+    MpegTs(triergon_mpegts::Packet),
     #[cfg(feature = "ogg")]
     Ogg(triergon_ogg::Packet),
     /// Every elementary stream reader's packet.
@@ -150,6 +159,8 @@ pub enum AnyOther {
     Matroska(triergon_matroska::typed::Event),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::ReaderEvent),
+    #[cfg(feature = "mpegts")]
+    MpegTs(triergon_mpegts::ReaderEvent),
     #[cfg(feature = "ogg")]
     Ogg(triergon_ogg::ReaderEvent),
     #[cfg(feature = "elementary")]
@@ -163,6 +174,8 @@ macro_rules! each {
             Self::Matroska($inner) => $body,
             #[cfg(feature = "isobmff")]
             Self::Isobmff($inner) => $body,
+            #[cfg(feature = "mpegts")]
+            Self::MpegTs($inner) => $body,
             #[cfg(feature = "ogg")]
             Self::Ogg($inner) => $body,
             #[cfg(feature = "elementary")]
@@ -176,6 +189,7 @@ macro_rules! each {
             #[cfg(not(any(
                 feature = "matroska",
                 feature = "isobmff",
+                feature = "mpegts",
                 feature = "ogg",
                 feature = "elementary"
             )))]
@@ -191,6 +205,8 @@ macro_rules! each_packet {
             Self::Matroska($inner) => $body,
             #[cfg(feature = "isobmff")]
             Self::Isobmff($inner) => $body,
+            #[cfg(feature = "mpegts")]
+            Self::MpegTs($inner) => $body,
             #[cfg(feature = "ogg")]
             Self::Ogg($inner) => $body,
             #[cfg(feature = "elementary")]
@@ -198,6 +214,7 @@ macro_rules! each_packet {
             #[cfg(not(any(
                 feature = "matroska",
                 feature = "isobmff",
+                feature = "mpegts",
                 feature = "ogg",
                 feature = "elementary"
             )))]
@@ -210,6 +227,7 @@ macro_rules! each_packet {
 #[cfg(any(
     feature = "matroska",
     feature = "isobmff",
+    feature = "mpegts",
     feature = "ogg",
     feature = "elementary"
 ))]
@@ -288,9 +306,23 @@ impl AnyReader {
                 capabilities,
                 triergon_elementary::Limits::default(),
             )?)),
-            Probe::Ts => Err(Error::Unsupported(
-                "the MPEG-TS reader does not implement ContainerReader yet",
-            )),
+            #[cfg(feature = "mpegts")]
+            kind @ (Probe::Ts | Probe::M2ts) => Ok(Self::MpegTs(triergon_mpegts::Reader::new(
+                pool,
+                source,
+                capabilities,
+                triergon_mpegts::ReaderLimits {
+                    format: if kind == Probe::Ts {
+                        triergon_mpegts::PacketFormat::Ts188
+                    } else {
+                        triergon_mpegts::PacketFormat::M2ts192
+                    },
+                    ..triergon_mpegts::ReaderLimits::default()
+                },
+                WINDOW,
+            )?)),
+            #[cfg(not(feature = "mpegts"))]
+            Probe::Ts | Probe::M2ts => Err(Error::Unsupported("MPEG-TS reader feature disabled")),
             _ => {
                 let _ = (pool, source, capabilities);
                 Err(Error::Unsupported("source format not recognised"))
@@ -436,6 +468,10 @@ impl ContainerReader for AnyReader {
             Self::Isobmff(reader) => {
                 neutral_step!(ContainerReader::step(reader, work, cancel)?, Isobmff)
             }
+            #[cfg(feature = "mpegts")]
+            Self::MpegTs(reader) => {
+                neutral_step!(ContainerReader::step(reader, work, cancel)?, MpegTs)
+            }
             #[cfg(feature = "ogg")]
             Self::Ogg(reader) => neutral_step!(ContainerReader::step(reader, work, cancel)?, Ogg),
             #[cfg(feature = "elementary")]
@@ -457,6 +493,7 @@ impl ContainerReader for AnyReader {
             #[cfg(not(any(
                 feature = "matroska",
                 feature = "isobmff",
+                feature = "mpegts",
                 feature = "ogg",
                 feature = "elementary"
             )))]
