@@ -41,7 +41,7 @@ impl PageSelection {
 /// The pages whose latest header marks them as subtitles: C6 (subtitle) and
 /// C7 (suppress header) without C5 (newsflash). Selection and the output
 /// follow it as it stands after all headers of the packet that completed a page.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct SubtitlePages([u64; 32]);
 
 impl SubtitlePages {

@@ -24,6 +24,9 @@ const ANY_SUBCODE: Subcode = Subcode(0x3F7F);
 /// packets its magazine had at the first of them; one without keeps the
 /// presentation of its copy that had them, else takes its magazine's M/29
 /// packets when it completes.
+///
+/// Changes since the last [`commit`](Self::commit) can be undone with
+/// [`rollback`](Self::rollback); a change that fails makes none.
 #[derive(Debug)]
 pub(super) struct PageMemory {
     copies: BudgetVec<Remembered>,
@@ -32,6 +35,29 @@ pub(super) struct PageMemory {
     /// The page each magazine is receiving.
     transmissions: [Transmission; 8],
     /// The page of the last header, if it did not keep its copy.
+    last_dropped: Option<PageNumber>,
+    /// How to undo the changes to `copies` since the last commit, oldest first.
+    undo: BudgetVec<Undo>,
+    /// The copies those changes replaced, oldest first.
+    replaced: BudgetVec<Remembered>,
+}
+
+/// One change to the copies, undone.
+#[derive(Clone, Copy, Debug)]
+enum Undo {
+    /// The copy at this position was last used then.
+    Used(usize, u64),
+    /// The copy at this position was the newest in `replaced`.
+    Replaced(usize),
+    /// A copy was added after the others.
+    Added,
+}
+
+/// The page memory's state besides its copies, to go back to.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Checkpoint {
+    clock: u64,
+    transmissions: [Transmission; 8],
     last_dropped: Option<PageNumber>,
 }
 
@@ -67,26 +93,79 @@ impl PageMemory {
             clock: 0,
             transmissions: [Transmission::default(); 8],
             last_dropped: None,
+            undo: BudgetVec::new(pool),
+            replaced: BudgetVec::new(pool),
         }
+    }
+
+    pub(super) fn checkpoint(&self) -> Checkpoint {
+        Checkpoint {
+            clock: self.clock,
+            transmissions: self.transmissions,
+            last_dropped: self.last_dropped,
+        }
+    }
+
+    /// Keeps the changes made since the last commit.
+    pub(super) fn commit(&mut self) {
+        self.undo.clear();
+        self.replaced.clear();
+    }
+
+    /// Undoes the changes made since the last commit, back to `checkpoint`
+    /// taken then.
+    pub(super) fn rollback(&mut self, checkpoint: Checkpoint) {
+        while let Some(undo) = self.undo.pop() {
+            let copies = self.copies.as_mut_slice();
+            match undo {
+                Undo::Used(index, stored) => copies[index].stored = stored,
+                Undo::Replaced(index) => {
+                    if let Some(copy) = self.replaced.pop() {
+                        copies[index] = copy;
+                    }
+                }
+                Undo::Added => {
+                    self.copies.pop();
+                }
+            }
+        }
+        self.clock = checkpoint.clock;
+        self.transmissions = checkpoint.transmissions;
+        self.last_dropped = checkpoint.last_dropped;
+    }
+
+    /// Records a change made by `change`, which runs only once there is room
+    /// to record it and fails without making it.
+    fn record(&mut self, change: impl FnOnce(&mut Self) -> Result<Undo>) -> Result<()> {
+        reserve_one(&mut self.undo)?;
+        let undo = change(self)?;
+        self.undo.try_push(undo).map_err(|rejected| rejected.error)
     }
 
     /// Starts the reception of the page `header` introduces. A page that
     /// keeps its last copy uses it from its header, even if it does not
     /// complete.
-    pub(super) fn begin(&mut self, header: &Header) {
+    pub(super) fn begin(&mut self, header: &Header) -> Result<()> {
         let control = header.control;
         let follows_dropped = self.last_dropped == Some(header.page);
         let subtitle = control.subtitle && control.suppress_header && !control.newsflash;
         let keeps_previous = !(control.erase || follows_dropped && subtitle);
         if keeps_previous && let Some(index) = self.find((header.page, header.subcode)) {
-            self.clock += 1;
-            self.copies.as_mut_slice()[index].stored = self.clock;
+            self.record(|memory| {
+                memory.clock += 1;
+                let copy = &mut memory.copies.as_mut_slice()[index];
+                Ok(Undo::Used(
+                    index,
+                    std::mem::replace(&mut copy.stored, memory.clock),
+                ))
+            })?;
         }
         self.transmissions[header.page.magazine.index()] = Transmission {
             keeps_previous,
             magazine: None,
         };
         self.last_dropped = (!keeps_previous).then_some(header.page);
+        Ok(())
     }
 
     /// Notes that the page `magazine` is receiving took an X/28 packet while
@@ -130,14 +209,27 @@ impl PageMemory {
                 self.newest(number, |stored| stored == subcode)
             }
         });
-        let copies = self.copies.as_mut_slice();
-        if let Some(index) = replaced {
-            copies[index] = entry;
-        } else if copies.len() < self.capacity {
-            self.copies.try_push(entry).map_err(|error| error.error)?;
-        } else if let Some(oldest) = copies.iter_mut().min_by_key(|r| r.stored) {
-            *oldest = entry;
-        }
+        let replaced = replaced.or_else(|| {
+            let copies = self.copies.as_slice();
+            (copies.len() >= self.capacity)
+                .then(|| (0..copies.len()).min_by_key(|&i| copies[i].stored))
+                .flatten()
+        });
+        self.record(|memory| {
+            if let Some(index) = replaced {
+                reserve_one(&mut memory.replaced)?;
+                let copy = &mut memory.copies.as_mut_slice()[index];
+                let previous = std::mem::replace(copy, entry);
+                memory
+                    .replaced
+                    .try_push(previous)
+                    .map_err(|rejected| rejected.error)?;
+                Ok(Undo::Replaced(index))
+            } else {
+                memory.copies.try_push(entry).map_err(|error| error.error)?;
+                Ok(Undo::Added)
+            }
+        })?;
         Ok(Completed {
             page,
             presentations: presentations.unwrap_or(*magazine),
@@ -162,4 +254,12 @@ impl PageMemory {
                 || (subcode == Subcode(0) && stored == ANY_SUBCODE)
         })
     }
+}
+
+/// Room for one more element, growing geometrically.
+fn reserve_one<T>(vec: &mut BudgetVec<T>) -> Result<()> {
+    if vec.len() == vec.capacity() {
+        vec.try_reserve_exact(vec.len().max(4))?;
+    }
+    Ok(())
 }

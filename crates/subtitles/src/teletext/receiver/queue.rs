@@ -53,6 +53,15 @@ impl Queue {
         self.len += 1;
     }
 
+    pub(super) fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Keeps the oldest `len` subtitles, dropping the newer ones.
+    pub(super) fn truncate(&mut self, len: usize) {
+        self.len = self.len.min(len);
+    }
+
     pub(super) fn pop_front(&mut self) -> Option<&Slot> {
         if self.len == 0 {
             return None;

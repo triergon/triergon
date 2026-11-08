@@ -12,7 +12,7 @@ use crate::teletext::page::Page;
 use crate::teletext::presentation::Presentations;
 use triergon_core::Result;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct Writer {
     pub(super) format: Format,
     /// The default character set designation.

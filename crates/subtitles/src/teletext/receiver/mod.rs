@@ -22,7 +22,7 @@ use super::data_unit::{
     DATA_UNIT_BYTES, DataField, DataUnitKind, TeletextUnit, is_teletext_data_identifier,
 };
 use super::page::{Assembler, Reception};
-use memory::{Completed, PageMemory};
+use memory::{Checkpoint, Completed, PageMemory};
 use out::Out;
 use queue::Queue;
 use selection::SubtitlePages;
@@ -112,6 +112,9 @@ pub enum Decoded<'a> {
 /// page those units complete is laid out, written and queued (up to 25); the
 /// call then returns the oldest queued subtitle. A call that found the queue
 /// full returns [`Refusal::QueueFull`] instead.
+///
+/// A call that returns an error or [`Refusal::InvalidData`] leaves the
+/// decoder as it was.
 #[derive(Debug)]
 pub struct Decoder {
     selection: PageSelection,
@@ -123,6 +126,16 @@ pub struct Decoder {
     completed: BudgetVec<Completed>,
     queue: Queue,
     writer: Writer,
+}
+
+/// The decoder before a packet, to go back to when the packet fails.
+#[derive(Debug)]
+struct Staged {
+    assembler: Assembler,
+    memory: Checkpoint,
+    subtitle_pages: SubtitlePages,
+    writer: Writer,
+    queued: usize,
 }
 
 impl Decoder {
@@ -189,41 +202,21 @@ impl Decoder {
                 let teletext = units
                     .filter_map(|unit| TeletextUnit::parse(unit.try_into().ok()?))
                     .take(UNITS_PER_PACKET);
-                let Self {
-                    assembler,
-                    memory,
-                    subtitle_pages,
-                    completed,
-                    ..
-                } = self;
-                let mut spent = 0;
-                for unit in teletext {
-                    spent += UNIT_WORK;
-                    assembler.push(&unit.packet, |reception| match reception {
-                        Reception::Header(header) => {
-                            memory.begin(header);
-                            subtitle_pages.observe(header);
-                            Ok(())
+                let staged = self.stage();
+                match self.receive(teletext, pts) {
+                    Ok((spent, lost)) => {
+                        self.memory.commit();
+                        work.take(spent);
+                        if lost {
+                            return Ok(Decoded::Refused(Refusal::QueueFull));
                         }
-                        Reception::Presentation { page, magazine } => {
-                            memory.presentation_received(page.header.page.magazine, magazine);
-                            Ok(())
-                        }
-                        Reception::Page { page, magazine } => {
-                            let completed_page = memory.complete(page.clone(), magazine)?;
-                            if !completed_page.page.header.page.is_decimal() {
-                                return Ok(());
-                            }
-                            spent += PAGE_WORK;
-                            completed.try_push(completed_page).map_err(|e| e.error)
-                        }
-                    })?;
+                    }
+                    Err(error) => {
+                        self.restore(staged);
+                        return Err(error);
+                    }
                 }
-                work.take(spent);
             }
-        }
-        if self.write_completed(pts)? {
-            return Ok(Decoded::Refused(Refusal::QueueFull));
         }
         let end_display = self.end_display;
         Ok(match self.queue.pop_front() {
@@ -240,6 +233,66 @@ impl Decoder {
 }
 
 impl Decoder {
+    fn stage(&self) -> Staged {
+        Staged {
+            assembler: self.assembler.clone(),
+            memory: self.memory.checkpoint(),
+            subtitle_pages: self.subtitle_pages,
+            writer: self.writer,
+            queued: self.queue.len(),
+        }
+    }
+
+    fn restore(&mut self, staged: Staged) {
+        self.assembler = staged.assembler;
+        self.memory.rollback(staged.memory);
+        self.subtitle_pages = staged.subtitle_pages;
+        self.writer = staged.writer;
+        self.queue.truncate(staged.queued);
+        self.completed.clear();
+    }
+
+    /// Decodes a packet's teletext units, then writes and queues the
+    /// selected pages they complete; the work spent and whether a page was
+    /// lost to a full queue.
+    fn receive(
+        &mut self,
+        units: impl Iterator<Item = TeletextUnit>,
+        pts: Option<i64>,
+    ) -> Result<(u64, bool)> {
+        let Self {
+            assembler,
+            memory,
+            subtitle_pages,
+            completed,
+            ..
+        } = self;
+        let mut spent = 0;
+        for unit in units {
+            spent += UNIT_WORK;
+            assembler.push(&unit.packet, |reception| match reception {
+                Reception::Header(header) => {
+                    memory.begin(header)?;
+                    subtitle_pages.observe(header);
+                    Ok(())
+                }
+                Reception::Presentation { page, magazine } => {
+                    memory.presentation_received(page.header.page.magazine, magazine);
+                    Ok(())
+                }
+                Reception::Page { page, magazine } => {
+                    let completed_page = memory.complete(page.clone(), magazine)?;
+                    if !completed_page.page.header.page.is_decimal() {
+                        return Ok(());
+                    }
+                    spent += PAGE_WORK;
+                    completed.try_push(completed_page).map_err(|e| e.error)
+                }
+            })?;
+        }
+        Ok((spent, self.write_completed(pts)?))
+    }
+
     /// Writes and queues the selected pages the packet completed; reports
     /// whether one was lost to a full queue.
     fn write_completed(&mut self, pts: Option<i64>) -> Result<bool> {

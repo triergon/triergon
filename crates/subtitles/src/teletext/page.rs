@@ -206,7 +206,7 @@ pub enum Reception<'a> {
 /// progress. A completed page holds only the packets of its transmission: a
 /// receiver keeping page memory merges a page sent without C4 (erase) onto its
 /// previous copy with [`Page::complete_from`].
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Assembler {
     receiving: [Option<Page>; 8],
     magazines: [Presentations; 8],
