@@ -15,6 +15,8 @@ pub use style::{
     Style, VAlign,
 };
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
 use crate::number::header_int;
@@ -24,6 +26,10 @@ use fonts::PendingFont;
 use info::{Header, Headers};
 use read_order::ReadOrder;
 use style::Field;
+
+/// Identities of scripts, which a renderer registers each one's embedded
+/// fonts by.
+static SCRIPTS: AtomicU64 = AtomicU64::new(1);
 
 const ASS_STYLE_FORMAT: &[u8] = b"Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, \
 OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, \
@@ -62,6 +68,7 @@ pub struct Options<'a> {
 /// and the parser state libass keeps between packets of a stream.
 #[derive(Debug)]
 pub struct Script {
+    id: u64,
     budget: Budget,
     limits: Limits,
     extract_fonts: bool,
@@ -98,6 +105,7 @@ impl Script {
             .try_push(Style::libass_default(budget)?)
             .map_err(|e| e.error)?;
         Ok(Self {
+            id: SCRIPTS.fetch_add(1, Ordering::Relaxed),
             budget: budget.clone(),
             limits: options.limits,
             extract_fonts: options.extract_fonts,
@@ -307,6 +315,11 @@ impl Script {
     /// Fonts decoded from `[Fonts]` when [`Options::extract_fonts`] is set.
     pub fn fonts(&self) -> &[EmbeddedFont] {
         self.fonts.as_slice()
+    }
+
+    /// The script's identity, no other script's in the process.
+    pub(crate) const fn id(&self) -> u64 {
+        self.id
     }
 
     /// The bounds the script was read with.

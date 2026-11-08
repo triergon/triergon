@@ -200,7 +200,10 @@ selective style overrides), in the frame and storage size and margins of its
 
 - **Fonts.** The `Fonts` a player gives (attached font files, a default
   family and a default font file) and the script's embedded fonts, registered
-  at each frame as libass registers them, are matched by family, full or
+  at each frame as libass registers them (a renderer that draws several
+  scripts registers each one's as it first draws them, where libass, whose
+  tracks share one library, registers every track's as soon as it is read;
+  fonts registered once stay selectable in both), are matched by family, full or
   PostScript name, weight and slant with `triergon_font::select`, as libass
   matches fonts without a system font provider. Each requested font keeps the
   faces it gathers: the one selected for it, then, for a character none of
@@ -250,8 +253,7 @@ Settings beyond the frame and storage size (margins, `use_margins`, a pixel
 aspect, font scale, line spacing and position) follow libass's formulas but
 are not compared. Not rendered: the glyphs of `@` fonts, which libass draws
 rotated with vertical metrics (`Error::Unsupported`), libass's simple shaping
-level, its hinting modes, selective style overrides and track features. One
-renderer registers one script's embedded fonts: they are taken by position.
+level, its hinting modes, selective style overrides and track features.
 
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
 default is libass's (10,000 outlines, 128 MiB of glyph bitmaps, 64 MiB of

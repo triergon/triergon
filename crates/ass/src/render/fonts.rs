@@ -137,8 +137,9 @@ pub(super) struct Library {
     limits: Limits,
     faces: BudgetVec<Face>,
     next_uid: u32,
-    /// How many of a script's embedded fonts are registered.
-    embedded: usize,
+    /// How many of each script's embedded fonts are registered, by the
+    /// script's identity.
+    embedded: HashMap<u64, usize>,
     default_family: Option<Box<[u8]>>,
     default_font: DefaultFont,
     fonts: HashMap<FontId, RequestedFont>,
@@ -163,7 +164,7 @@ impl Library {
             limits: Limits::default(),
             faces: BudgetVec::new(budget),
             next_uid: 1,
-            embedded: 0,
+            embedded: HashMap::new(),
             default_family: fonts.default_family.as_deref().map(Box::from),
             default_font: fonts
                 .default_font
@@ -183,14 +184,22 @@ impl Library {
         Ok(library)
     }
 
-    /// Registers a script's embedded fonts that are not yet, as libass does
-    /// at the start of each frame.
-    pub(super) fn register_embedded(&mut self, fonts: &[EmbeddedFont]) -> Result<()> {
-        for font in fonts.get(self.embedded..).unwrap_or_default() {
+    /// Registers the embedded fonts of `script` that are not yet, as libass
+    /// does at the start of each frame. libass keeps every track's embedded
+    /// fonts in the library the tracks share and registers those added since
+    /// the last frame, whichever track the frame renders; here each script's
+    /// are registered when a frame of it is rendered, after those of the
+    /// scripts rendered before, which stay selectable as in libass.
+    pub(super) fn register_embedded(&mut self, script: u64, fonts: &[EmbeddedFont]) -> Result<()> {
+        let registered = self.embedded.get(&script).copied().unwrap_or(0);
+        if registered >= fonts.len() {
+            return Ok(());
+        }
+        for font in &fonts[registered..] {
             self.register(&font.data)?;
         }
-        self.embedded = self.embedded.max(fonts.len());
-        Ok(())
+        self.embedded.insert(script, fonts.len());
+        self.charge_entries()
     }
 
     /// Every face of `file` that opens and has a family name.
@@ -220,7 +229,7 @@ impl Library {
     }
 
     fn charge_entries(&mut self) -> Result<()> {
-        let entries = self.faces.len() + self.requested + self.fonts.len();
+        let entries = self.faces.len() + self.requested + self.fonts.len() + self.embedded.len();
         self.charge.resize_to(
             entries
                 .saturating_mul(ENTRY_BYTES)

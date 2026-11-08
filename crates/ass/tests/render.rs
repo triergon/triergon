@@ -322,6 +322,64 @@ fn a_refused_frame_leaves_collision_records_unchanged() {
     assert_ne!(kept[2], skipped[1]);
 }
 
+/// A script embedding `font` in its `[Fonts]` section, with one event in
+/// the style of `family`.
+fn embedding(budget: &Budget, family: &str, font: &[u8]) -> Script {
+    let mut encoded = Vec::new();
+    for group in font.chunks(3) {
+        let mut value = 0_u32;
+        for (i, &byte) in group.iter().enumerate() {
+            value |= u32::from(byte) << (16 - 8 * i);
+        }
+        for i in 0..=group.len() {
+            encoded.push(((value >> (18 - 6 * i)) & 63) as u8 + 33);
+        }
+    }
+    let lines: Vec<String> = encoded
+        .chunks(80)
+        .map(|line| String::from_utf8(line.to_vec()).unwrap())
+        .collect();
+    let text = format!(
+        "[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\n\
+         [V4+ Styles]\nFormat: Name, Fontname, Fontsize\nStyle: Default,{family},40\n\
+         [Fonts]\nfontname: {family}.ttf\n{}\n\
+         [Events]\nFormat: Layer, Start, End, Style, Text\n\
+         Dialogue: 0,0:00:00.00,0:00:02.00,Default,ABC\n",
+        lines.join("\n")
+    );
+    let options = Options {
+        extract_fonts: true,
+        ..Options::default()
+    };
+    Script::parse(budget, text.as_bytes(), &options).unwrap()
+}
+
+#[test]
+fn every_script_rendered_has_its_embedded_fonts_registered() {
+    let budget = Budget::new(64 << 20).unwrap();
+    let font = |family| {
+        let mut tables = fonts::truetype_tables(400, 0x40, family, "Regular");
+        tables.push((*b"fpgm", vec![0xb0, 0x01]));
+        fonts::font(b"\0\x01\0\0", &tables)
+    };
+    let mut first = embedding(&budget, "Test Sans", &font("Test Sans"));
+    let mut second = embedding(&budget, "Test Two", &font("Test Two"));
+    assert_eq!((first.fonts().len(), second.fonts().len()), (1, 1));
+    let mut renderer = Renderer::new(
+        &budget,
+        &Settings::new(Size::new(640, 360)),
+        &Fonts::default(),
+    )
+    .unwrap();
+    // The second script's font is registered though the first had as many,
+    // and the first's stays selectable.
+    for which in [0, 1, 0] {
+        let script = if which == 0 { &mut first } else { &mut second };
+        let images = renderer.render(script, 1000).unwrap().images;
+        assert!(!images.is_empty(), "script {which}");
+    }
+}
+
 struct Rng(u64);
 
 impl Rng {
