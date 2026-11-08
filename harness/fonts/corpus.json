@@ -233,6 +233,97 @@
         }
       ],
       "sha256": "b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a"
+    },
+    {
+      "name": "NotoSansArabic-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansArabic/hinted/ttf/NotoSansArabic-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "files": [
+        {
+          "path": "NotoSansArabic-Regular.ttf",
+          "sha256": "bdff3e5659d67e67def05b33f749683b9376ae819d65d3dd62ac4640b3aaef48"
+        }
+      ],
+      "sha256": "bdff3e5659d67e67def05b33f749683b9376ae819d65d3dd62ac4640b3aaef48"
+    },
+    {
+      "name": "NotoNaskhArabic-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoNaskhArabic/hinted/ttf/NotoNaskhArabic-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "files": [
+        {
+          "path": "NotoNaskhArabic-Regular.ttf",
+          "sha256": "6f0a92031367b2f5a2078fe9d24f3433122b61a0bad57c423aad8f3c39aa2e6e"
+        }
+      ],
+      "sha256": "6f0a92031367b2f5a2078fe9d24f3433122b61a0bad57c423aad8f3c39aa2e6e"
+    },
+    {
+      "name": "NotoSansHebrew-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansHebrew/hinted/ttf/NotoSansHebrew-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "files": [
+        {
+          "path": "NotoSansHebrew-Regular.ttf",
+          "sha256": "cdefaf8efd47045f6820928eba84db5bed7557539328952b5f828315485e02ee"
+        }
+      ],
+      "sha256": "cdefaf8efd47045f6820928eba84db5bed7557539328952b5f828315485e02ee"
+    },
+    {
+      "name": "NotoSansDevanagari-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansDevanagari/hinted/ttf/NotoSansDevanagari-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "files": [
+        {
+          "path": "NotoSansDevanagari-Regular.ttf",
+          "sha256": "4e3c66638958c3e2ab5d37f47a8deb89fffeb7be9985c665a519bbc7ba762313"
+        }
+      ],
+      "sha256": "4e3c66638958c3e2ab5d37f47a8deb89fffeb7be9985c665a519bbc7ba762313"
+    },
+    {
+      "name": "NotoSansBengali-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansBengali/hinted/ttf/NotoSansBengali-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "files": [
+        {
+          "path": "NotoSansBengali-Regular.ttf",
+          "sha256": "b55c62ee531e3214da6c0701daecea89a52ba42db7d8206b92e6b51f397a3193"
+        }
+      ],
+      "sha256": "b55c62ee531e3214da6c0701daecea89a52ba42db7d8206b92e6b51f397a3193"
+    },
+    {
+      "name": "NotoSansTamil-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansTamil/hinted/ttf/NotoSansTamil-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "files": [
+        {
+          "path": "NotoSansTamil-Regular.ttf",
+          "sha256": "3c0a186feb3c63c7f6d63e1511dcdc144e745ae09b98e217c83f3e317974f6f9"
+        }
+      ],
+      "sha256": "3c0a186feb3c63c7f6d63e1511dcdc144e745ae09b98e217c83f3e317974f6f9"
+    },
+    {
+      "name": "NotoSansThai-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansThai/hinted/ttf/NotoSansThai-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "files": [
+        {
+          "path": "NotoSansThai-Regular.ttf",
+          "sha256": "61cf814eec46b294d6ea4401ac295d0cecd5207bd2331dcc5a15e7301d30ee44"
+        }
+      ],
+      "sha256": "61cf814eec46b294d6ea4401ac295d0cecd5207bd2331dcc5a15e7301d30ee44"
     }
   ]
 }
