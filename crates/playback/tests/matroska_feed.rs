@@ -80,7 +80,7 @@ fn matroska_source(
     ownership: triergon_matroska::typed::PayloadOwnership,
 ) -> (Engine, SourceOwner<ByteSource>, Budget) {
     let pool = Budget::new(2 << 20).unwrap();
-    let engine = Engine::matroska_with_payload_ownership(
+    let reader = triergon_matroska::typed::Reader::new_with_payload_ownership(
         &pool,
         ID,
         SourceCapabilities {
@@ -92,6 +92,7 @@ fn matroska_source(
         ownership,
     )
     .unwrap();
+    let engine = Engine::matroska_reader(reader, ID);
     let source =
         ByteSource::new(ID, Bytes::copy_from_slice(&pool, input).unwrap(), quantum).unwrap();
     (engine, SourceOwner::new(source), pool)
