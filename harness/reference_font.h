@@ -30,9 +30,8 @@
  * Each group of values starts with a tag and folds as crates/font-worker/src/
  * record.rs folds it; `packets` counts outlines (or hinted advances) and `bytes`
  * outline points. The file is read before the operation and the FreeType library
- * is created once, outside it. Kerning pairs: those of every format 0 subtable of
- * the raw version 0 `kern` table, within the subtable's length, sorted and unique;
- * nonzero values are folded. `-dump` prints the same values as lines, identical
+ * is created once, outside it. Kerning pairs: those of the `kern` subtables
+ * FreeType uses, sorted and unique; nonzero values are folded. `-dump` prints the same values as lines, identical
  * to font-worker's.
  */
 #define _POSIX_C_SOURCE 200809L
@@ -184,7 +183,9 @@ static int font_key_order(const void *a, const void *b) {
     return (x > y) - (x < y);
 }
 
-/* Every pair the raw `kern` table lists, as left << 16 | right, sorted and unique. */
+/* Every pair of the `kern` subtables FreeType uses (tt_face_load_kern: no version
+ * check, at most 32 subtables, horizontal non-minimum format 0, counts cut to the
+ * subtable), as left << 16 | right, sorted and unique. */
 static size_t font_kern_pairs(FT_Face face, uint32_t **keys) {
     FT_ULong length = 0;
     *keys = NULL;
@@ -192,19 +193,22 @@ static size_t font_kern_pairs(FT_Face face, uint32_t **keys) {
     FT_Byte *table = malloc(length);
     if (!table) return 0;
     size_t count = 0;
-    if (!FT_Load_Sfnt_Table(face, TTAG_kern, 0, table, &length) && font_u16(table) == 0 &&
+    if (!FT_Load_Sfnt_Table(face, TTAG_kern, 0, table, &length) &&
         (*keys = malloc(length / 6 * sizeof **keys))) {
         unsigned subtables = font_u16(table + 2);
+        if (subtables > 32) subtables = 32;
         size_t at = 4;
-        for (unsigned t = 0; t < subtables && at + 14 <= length; t++) {
-            size_t size = font_u16(table + at + 2), end = at + size < length ? at + size : length;
-            if (size < 14) break;
-            if (font_u16(table + at + 4) >> 8 == 0) {
+        for (unsigned t = 0; t < subtables && at + 6 <= length; t++) {
+            size_t size = font_u16(table + at + 2);
+            if (size <= 14) break;
+            size_t end = at + size < length ? at + size : length;
+            unsigned coverage = font_u16(table + at + 4);
+            if (coverage >> 8 == 0 && (coverage & 3) == 1 && at + 14 <= end) {
                 unsigned pairs = font_u16(table + at + 6);
                 for (size_t p = 0, o = at + 14; p < pairs && o + 6 <= end; p++, o += 6)
                     (*keys)[count++] = (uint32_t)font_u16(table + o) << 16 | font_u16(table + o + 2);
             }
-            at += size;
+            at = end;
         }
         qsort(*keys, count, sizeof **keys, font_key_order);
         size_t unique = 0;
