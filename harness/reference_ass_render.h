@@ -1,6 +1,7 @@
 /*
  * ASS rendering reference: libass 0.17.5's ass_render_frame through its public
- * API, as a player embeds it. Included by reference_ass.h, whose fixture
+ * API, as a player embeds it, with the bitmap engine set through the renderer's
+ * internals. Included by reference_ass.h, whose fixture
  * reader, stream commands and libass build it shares (tooling only; never
  * linked into the library).
  *
@@ -26,11 +27,14 @@
  * point of the stream, after the packets and prunes before it.
  *
  * One operation: a library with font extraction on and the attached fonts, a
- * renderer with no system font provider (ASS_FONTPROVIDER_NONE), the given
+ * renderer with libass's plain C bitmap engine (the one a 32-bit ARMv7 build
+ * runs, on every host) and no system font provider (ASS_FONTPROVIDER_NONE), the given
  * frame and storage size and no hinting, the script read or the stream run,
  * and every frame rendered. Each frame folds its time and image count, then
  * each image its type, position, size, colour and every row of alpha bytes, in
- * list order; `packets` counts images and `bytes` their alpha bytes. The file
+ * list order; `packets` counts images and `bytes` their alpha bytes. The box
+ * libass draws behind a BorderStyle 4 event has no type (add_background leaves
+ * it uninitialised), so a track with a BorderStyle 4 style fails. The file
  * and the fonts are read before the operation. `ass-render-dump` prints the
  * same values as lines:
  *   frame TIME IMAGES
@@ -64,6 +68,7 @@ typedef struct {
 typedef struct {
     uint64_t packets, bytes, digest;
     FILE *dump;
+    int background; /* a style with BorderStyle 4 was rendered */
 } AssImages;
 
 static void assr_render_fold(AssImages *w, uint64_t v) { w->digest = w->digest * 31 + v; }
@@ -129,6 +134,11 @@ static void assr_frame(AssImages *w, long long now, ASS_Image *images) {
 }
 
 static void assr_frames(AssImages *w, ASS_Renderer *r, ASS_Track *t, AssFrames f) {
+    /* add_background leaves the type of BorderStyle 4's box uninitialised, so
+     * a track that can draw one is refused rather than its type read. */
+    for (int i = 0; i < t->n_styles; i++)
+        if (t->styles[i].BorderStyle == 4) w->background = 1;
+    if (w->background) return;
     for (long long now = f.start; now <= f.end; now += f.step) assr_frame(w, now, ass_render_frame(r, t, now, NULL));
 }
 
@@ -143,6 +153,18 @@ static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, s
         ass_add_font(lib, c->fonts[i].path, c->fonts[i].data, (int)c->fonts[i].size);
     ASS_Renderer *r = ass_renderer_init(lib);
     if (!r) return 0;
+    /* libass's plain C engine on every host, as reference_raster.h sets it:
+     * ass_renderer_init picks the host's SIMD engine (AVX2's 32-byte rows
+     * change \be at a bitmap's right edge), so the C engine replaces it and
+     * the rasteriser state is rebuilt for it. It is what a 32-bit ARMv7 build
+     * runs: 16x16 tiles and 16-byte rows. */
+    r->engine = ass_bitmap_engine_init(ASS_CPU_FLAG_NONE);
+    if (r->engine.tile_order != 4 || r->engine.align_order != 4) {
+        fprintf(stderr, "the C engine is not 16x16 tiles with 16-byte rows\n");
+        return 0;
+    }
+    ass_rasterizer_done(&r->state.rasterizer);
+    if (!ass_rasterizer_init(&r->engine, &r->state.rasterizer, RASTERIZER_PRECISION)) return 0;
     ass_set_frame_size(r, c->frame_w, c->frame_h);
     ass_set_storage_size(r, c->storage_w, c->storage_h);
     ass_set_hinting(r, ASS_HINTING_NONE);
@@ -297,14 +319,14 @@ static int assr_render_main(int argc, char **argv) {
     }
     int status = 0;
     if (dump) {
-        AssImages work = {0, 0, 0, stdout};
-        if (!assr_render(&work, &c, data, size, stream, &fixture)) status = 2;
+        AssImages work = {0, 0, 0, stdout, 0};
+        if (!assr_render(&work, &c, data, size, stream, &fixture) || work.background) status = 2;
     } else {
         if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) status = 2;
         uint64_t start = assr_now_ns(), packets = 0, bytes = 0, digest = 0;
         for (unsigned long i = 0; i < iterations && !status; i++) {
-            AssImages work = {0, 0, 0, NULL};
-            if (!assr_render(&work, &c, data, size, stream, &fixture)) status = 2;
+            AssImages work = {0, 0, 0, NULL, 0};
+            if (!assr_render(&work, &c, data, size, stream, &fixture) || work.background) status = 2;
             packets += work.packets;
             bytes += work.bytes;
             digest = digest * 31 + work.digest;
@@ -317,7 +339,7 @@ static int assr_render_main(int argc, char **argv) {
                    iterations, packets, bytes, digest, elapsed);
     }
     fflush(stdout);
-    if (status) fprintf(stderr, "%s: libass could not be set up\n", argv[2]);
+    if (status) fprintf(stderr, "%s: libass could not be set up, or a style has BorderStyle 4\n", argv[2]);
     for (size_t i = 0; i < c.n_fonts; i++) {
         free(c.fonts[i].path);
         free(c.fonts[i].data);

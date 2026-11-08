@@ -157,7 +157,8 @@ resource limit becomes an explicit, reviewed rule for that case.
   ReadOrder); that feature is pinned per target. `cargo xtask ass compare`
   reports all four.
 - **libass rendering.** The same reference worker renders frames with
-  `ass_render_frame` (`harness/reference_ass_render.h`, public API only), as a
+  `ass_render_frame` (`harness/reference_ass_render.h`) with libass's plain C
+  bitmap engine on every host, as the rasterising reference sets it, as a
   player embeds libass: the fonts a fixture attaches given to `ass_add_font`,
   font extraction on, `ass_set_fonts` with the fixture's default font file
   and family and no system font provider, no hinting, and a frame larger than
