@@ -4,6 +4,7 @@
 // Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
 
 pub mod audio;
+mod discard;
 pub mod mix;
 pub mod queue;
 #[cfg(feature = "codecs")]
@@ -11,6 +12,7 @@ mod track;
 pub mod video;
 
 pub use audio::{AudioSession, PcmBlock};
+pub use discard::Discard;
 pub use queue::{FeedError, QueueLimits};
 #[cfg(feature = "codecs")]
 pub use track::TrackDecoder;

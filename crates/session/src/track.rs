@@ -1,15 +1,13 @@
 //! Decoding the packets of one container audio track.
 use triergon_codec::{AudioDecoder, AudioFrame, DecodeFailure, DownmixLevels};
 use triergon_core::container::{PacketInfo, TrackInfo};
-use triergon_core::{Rounding, TimeBase};
 
-use crate::{AudioCodec, audio_codec, audio_configuration, audio_decoder};
+use crate::{AudioCodec, Discard, audio_codec, audio_configuration, audio_decoder};
 
 /// The decoder of one container audio track. It chooses the decoder from the track's
-/// codec and configuration, and drops the decoded samples a packet's container marks
-/// for discarding: its [`Trim`](triergon_core::container::Trim), any samples before
-/// time zero (Matroska CodecDelay, Opus pre-skip in Ogg), and at least the decoder's own
-/// start delay ([`AudioDecoder::delay`]) at the start of the stream.
+/// codec and configuration, and drops the decoded samples each packet's container marks
+/// for discarding ([`Discard`]), and at least the decoder's own start delay
+/// ([`AudioDecoder::delay`]) at the start of the stream.
 pub struct TrackDecoder {
     codec: AudioCodec,
     decoder: Box<dyn AudioDecoder>,
@@ -54,31 +52,7 @@ impl TrackDecoder {
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, DecodeFailure> {
         let levels = self.decoder.decode(packet.payload(), out)?;
-        let len = out.samples_per_channel;
-        if len == 0 {
-            return Ok(levels);
-        }
-        let samples = |ticks: i64| to_samples(ticks, packet.time_base(), out.sample_rate);
-        let trim = packet.trim();
-        let before_zero = packet
-            .pts()
-            .filter(|&pts| pts < 0)
-            .map_or(0, |pts| samples(-pts));
-        let start = trim
-            .start
-            .map_or(0, samples)
-            .max(before_zero)
-            .max(self.delay)
-            .min(len);
-        self.delay -= start.min(self.delay);
-        let end = trim.end.map_or(0, samples).min(len - start);
-        if start > 0 || end > 0 {
-            for plane in &mut out.planes {
-                plane.copy_within(start..len - end, 0);
-                plane.truncate(len - start - end);
-            }
-            out.samples_per_channel = len - start - end;
-        }
+        Discard::of(packet).apply(out, &mut self.delay);
         Ok(levels)
     }
 
@@ -91,13 +65,9 @@ impl TrackDecoder {
     pub fn reset(&mut self) {
         self.decoder.reset();
     }
-}
 
-/// Samples at `rate` in `ticks` of `base`, rounded to the nearest; 0 when it does not fit.
-fn to_samples(ticks: i64, base: TimeBase, rate: u32) -> usize {
-    TimeBase::new(1, u64::from(rate.max(1)))
-        .and_then(|samples| base.rescale(ticks.max(0), samples, Rounding::NearestAway))
-        .ok()
-        .and_then(|value| usize::try_from(value).ok())
-        .unwrap_or(0)
+    /// The decoder, for a session that paces it ([`crate::AudioSession::load`]).
+    pub fn into_decoder(self) -> Box<dyn AudioDecoder> {
+        self.decoder
+    }
 }
