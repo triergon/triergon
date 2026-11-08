@@ -598,7 +598,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             && a.memory_pairs >= 30
             && cfg!(all(
                 target_os = "linux",
-                target_arch = "aarch64",
+                any(target_arch = "aarch64", target_arch = "arm"),
                 target_env = "gnu"
             ));
         let lower = |name| {

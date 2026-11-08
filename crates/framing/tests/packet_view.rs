@@ -23,21 +23,41 @@ const LIMITS: NalPacketLimits = NalPacketLimits {
 /// published or refused fact, in order.
 #[derive(Default)]
 struct Run {
-    events: Vec<String>,
+    /// Each event, and the pool charge after it for a step.
+    events: Vec<(String, Option<usize>)>,
 }
 impl Run {
-    fn count(&self, prefix: &str) -> usize {
-        self.events.iter().filter(|e| e.starts_with(prefix)).count()
+    fn push(&mut self, event: String) {
+        self.events.push((event, None));
     }
-    /// FNV-1a over the events, one per line.
-    fn digest(&self) -> u64 {
+    fn push_charged(&mut self, event: String, charge: usize) {
+        self.events.push((event, Some(charge)));
+    }
+    fn count(&self, prefix: &str) -> usize {
         self.events
             .iter()
-            .flat_map(|e| e.bytes().chain(*b"\n"))
-            .fold(0xcbf2_9ce4_8422_2325, |h, b| {
-                (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
-            })
+            .filter(|(e, _)| e.starts_with(prefix))
+            .count()
     }
+    /// FNV-1a over the events with their charges, one per line. Charges include
+    /// storage headers, which depend on the pointer width.
+    fn digest(&self) -> u64 {
+        fnv(self.events.iter().map(|(e, charge)| match charge {
+            Some(charge) => format!("{e} {charge}"),
+            None => e.clone(),
+        }))
+    }
+    /// FNV-1a over the events without the charges, the same on every target.
+    fn portable_digest(&self) -> u64 {
+        fnv(self.events.iter().map(|(e, _)| e.clone()))
+    }
+}
+fn fnv(lines: impl Iterator<Item = String>) -> u64 {
+    lines
+        .flat_map(|e| e.into_bytes().into_iter().chain(*b"\n"))
+        .fold(0xcbf2_9ce4_8422_2325, |h, b| {
+            (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+        })
 }
 
 struct Packet {
@@ -148,15 +168,11 @@ fn step<T>(
         Ok(BuildStep::Complete) => "complete".to_string(),
         Err(e) => format!("error {e:?}"),
     };
-    run.events.push(format!(
-        "{label} {kind} {} {}",
-        work.remaining(),
-        pool.used()
-    ));
+    run.push_charged(format!("{label} {kind} {}", work.remaining()), pool.used());
 }
 
 fn output(run: &mut Run, out: &NalPacketOutput) {
-    run.events.push(format!(
+    run.push(format!(
         "out {:?} cfg {:?} id {:?} crefuse {:?} prefuse {:?} epoch {} fwd {}",
         out.bytes().as_ref(),
         out.configuration_bytes().as_ref(),
@@ -167,7 +183,7 @@ fn output(run: &mut Run, out: &NalPacketOutput) {
         out.forward_new_extradata(),
     ));
     for (i, s) in out.segments().iter().enumerate() {
-        run.events.push(format!(
+        run.push(format!(
             "seg {i} {:?} {} {} {:?}",
             s.origin(),
             s.prefix_bytes(),
@@ -222,7 +238,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
             step(&mut run, &pool, "init", &w, &r);
             match r {
                 Ok(BuildStep::Ready(v)) => {
-                    run.events.push(format!(
+                    run.push(format!(
                         "init {:?} src {:?} refuse {:?}",
                         v.bytes().as_ref(),
                         v.source_bytes().as_ref(),
@@ -233,7 +249,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
                 Ok(BuildStep::Yield) => (),
                 _ => {
                     let r = writer.take_receiver_rejection();
-                    run.events.push(format!(
+                    run.push(format!(
                         "init-rejection {:?}",
                         r.map(|r| (r.source_bytes().to_vec(), r.declared_array_type()))
                     ));
@@ -273,7 +289,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
                             if let Some(r) = &r {
                                 assert_eq!(r.native_receive_result(), -1_094_995_529);
                             }
-                            run.events.push(format!(
+                            run.push(format!(
                                 "update-rejection {:?}",
                                 r.map(|r| (r.source_bytes().to_vec(), r.source_error()))
                             ));
@@ -308,7 +324,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
         let mut job = match session.receiver_packet(source, update) {
             Ok(job) => job,
             Err(e) => {
-                run.events.push(format!("begin {e:?}"));
+                run.push(format!("begin {e:?}"));
                 continue;
             }
         };
@@ -326,7 +342,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
                 Ok(BuildStep::Complete) => break,
                 Err(_) => {
                     let r = job.take_receiver_rejection();
-                    run.events.push(format!(
+                    run.push(format!(
                         "rejection {:?}",
                         r.map(|r| (
                             r.kind(),
@@ -342,8 +358,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
                 }
             }
         }
-        run.events
-            .push(format!("epoch {}", session.receiver_epoch()));
+        run.push(format!("epoch {}", session.receiver_epoch()));
     }
     drop(session);
     // Outputs keep every fact after the session closes.
@@ -380,13 +395,41 @@ const DIGESTS: &[(&str, [u64; 7])] = &[
     ("hevc unsupported-array w4", [9276415840149683133, 6722290642593121470, 10083458655981451603, 6426923991653888973, 15108859086384853719, 16137964412663070607, 17233005384820849888]),
 ];
 
+/// The same runs without the pool charges, which are the same on every target.
+#[rustfmt::skip]
+const PORTABLE_DIGESTS: &[(&str, [u64; 7])] = &[
+    ("avc w1 ppsfalse", [2256347623992834736, 4265673472245162728, 15179184187654749746, 14183514230321850004, 10733758782645297225, 10385725381043726226, 7899794078024733482]),
+    ("avc w1 ppstrue", [673931533190296135, 11569350596395407627, 17042810944419291250, 17053433291019092563, 14600224433648516894, 17137894179538144598, 3901527180633955406]),
+    ("avc w2 ppsfalse", [1333730246525783658, 16481891829050580865, 15458473768405367110, 12835335555160797256, 2181590641699057207, 10770550681163530829, 16589189909287955982]),
+    ("avc w2 ppstrue", [2672104647541187067, 990982567357414665, 13336318473568418580, 11749976466042846923, 5890670006291799502, 9635557289109933814, 470434865908464858]),
+    ("avc w3", [14794570997764277023, 3942294613383599726, 12890687309931322494, 16349812548964505545, 10552020776402667272, 1472709340843449154, 4644804317486818587]),
+    ("avc w4 ppsfalse", [2771369101774375842, 7422381978175873312, 8086263135789596404, 5071467325665359230, 12840526548302979639, 15000201055667970146, 14138028527097126004]),
+    ("avc w4 ppstrue", [12957772225580837573, 17922710448879971380, 5478737309477967284, 11041241092048836835, 733269565343069318, 18041960493422402684, 11575726872333999118]),
+    ("hevc duplicate w1", [3807593546944538082, 9341538096988435899, 2986500487649268218, 1606637359708142752, 16960322981971877170, 8022824650958261625, 9589664023962805108]),
+    ("hevc duplicate w2", [9059684322830037237, 12714935978012710789, 2979174008314602419, 12941609899127453151, 12313172972877992617, 9999246069050355548, 10394502468612717250]),
+    ("hevc duplicate w4", [16023726762582414611, 17735381764492022889, 13856624053045341443, 707584774695000347, 17654158894063860901, 6927230372977447786, 5260356241055734295]),
+    ("hevc empty-arrays w1", [17628941545287898271, 4088224800533671157, 13008012973909832347, 5724959958633547481, 408887850132911475, 2819163014179527510, 16691644663871955096]),
+    ("hevc empty-arrays w2", [15551017428459297090, 10455839012469780273, 11965778491528756246, 17317721042073365910, 4886024492691062822, 12163574026891353463, 10861673632531298777]),
+    ("hevc empty-arrays w4", [6533590736436913496, 17161162342851925719, 9740457345307462296, 1542060123559435814, 4234586079152330638, 51559739484233620, 18348119467985174682]),
+    ("hevc plain w1", [2906661291560124328, 2740011613605216506, 5141227049611859962, 9299217723769507158, 10106706095059315164, 9103600998391546905, 7987420119865469659]),
+    ("hevc plain w2", [10209181214667542147, 9312304363666431564, 17204778475029579189, 11778581045963711521, 8516161193010253717, 12753858519870983018, 13931392850846800403]),
+    ("hevc plain w4", [11477059864794006601, 9954995569936385152, 12194593930012743111, 16095011437634768657, 16340096133160850501, 11024078131276237554, 15079941682612678308]),
+    ("hevc unsupported-array w1", [15961570404249900217, 11820551920314727283, 6347649427229525621, 1850938885543510223, 9777632856047298019, 5701286876594803038, 17709725954489604001]),
+    ("hevc unsupported-array w2", [6907556066812535354, 11422264675295448804, 15145571379425607734, 5044977320886142112, 16755333616125670932, 2011747524977357757, 14854009784908230114]),
+    ("hevc unsupported-array w4", [4444520668675455896, 13959612938313425998, 14786629297830374284, 1951013741772967682, 10683691208253335742, 16285626213819425795, 4351122034030628480]),
+];
+
 /// Each scenario's event stream at every quantum, as recorded from the receiver
 /// before its configuration forms were merged.
 fn assert_receives(codec: Codec, record: &[u8], packets: &[Packet], label: &str) {
-    let Some(&(_, expected)) = DIGESTS.iter().find(|(l, _)| *l == label) else {
-        panic!("no digests for {label}");
+    let find = |table: &[(&str, [u64; 7])]| {
+        let Some(&(_, digests)) = table.iter().find(|(l, _)| *l == label) else {
+            panic!("no digests for {label}");
+        };
+        digests
     };
-    for (q, expected) in QUANTA.into_iter().zip(expected) {
+    let (expected, portable) = (find(DIGESTS), find(PORTABLE_DIGESTS));
+    for ((q, expected), portable) in QUANTA.into_iter().zip(expected).zip(portable) {
         let run = receive(codec, record, packets, q);
         // Every scenario reaches the packet engine or the decoder-array refusal.
         assert!(
@@ -394,7 +437,11 @@ fn assert_receives(codec: Codec, record: &[u8], packets: &[Packet], label: &str)
                 || (run.count("out ") >= 8 && run.count("rejection Some") >= 1),
             "{label} quantum {q}"
         );
-        assert_eq!(run.digest(), expected, "{label} quantum {q}");
+        assert_eq!(run.portable_digest(), portable, "{label} quantum {q}");
+        // The charges were recorded on a 64-bit target.
+        if cfg!(target_pointer_width = "64") {
+            assert_eq!(run.digest(), expected, "{label} quantum {q}");
+        }
     }
 }
 

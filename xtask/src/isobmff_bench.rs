@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::checks::read_json;
+use crate::codecs::correctness::file_sha;
 use crate::harness::diff::equal;
 use crate::harness::timing::{self, Operation};
 use crate::harness::worker::{self, Finished};
@@ -849,12 +850,6 @@ impl Build {
                 && equal(&current.graph, &self.graph)
         }))
     }
-}
-
-fn file_sha(path: &Path) -> R<String> {
-    Ok(sha256::hex(
-        &fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
-    ))
 }
 
 fn case_directory(output: &Path, index: usize) -> PathBuf {

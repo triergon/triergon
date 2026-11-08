@@ -200,7 +200,7 @@ from a codec lane's FATE vectors instead: release and `checked` builds of `codec
 (release optimisation with overflow checks and debug assertions) decode each mutation
 whole. `cargo xtask check` runs one round on each required font feature.
 
-On native AArch64 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
+On native AArch64 or 32-bit ARMv7 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.
 It prints the calibration certificate and exits nonzero if coverage cannot
 be established. Use built workers you trust.
@@ -282,8 +282,46 @@ may override that count for diagnostic comparisons.
   group median above 0.75%, so a slowdown of 1% on one case passes. Where functions
   sit moves a case by about 1% either way, so a flagged case with unchanged functions
   and instruction counts is placement. A screen never replaces a recorded result.
-- Qualification runs on native AArch64 Linux. Results on one platform do not establish
-  another; 32-bit ARMv7 needs its own runs.
+- Qualification runs natively: on AArch64 Linux, and on 32-bit ARMv7 Linux in an armhf
+  user space (below). Results on one platform do not establish another.
+
+### 32-bit ARMv7
+
+The harness runs natively in a 32-bit ARM Linux user space. The same commands
+build xtask, the workers and the FFmpeg references there, and reports name the
+target of the toolchain that built them, `armv7-unknown-linux-gnueabihf`. That
+toolchain's default target has no NEON, while FFmpeg selects its NEON code at run
+time, so on this target the gate build compares Rust built without NEON with
+FFmpeg's NEON paths. An AWS Graviton2 host (Neoverse N1) runs a 32-bit user space
+on its AArch64 kernel; later Graviton generations cannot.
+
+The results in [status](status.md#32-bit-armv7) come from the Ubuntu 24.04 armhf user
+space archived as evidence set `armv7-userland` (211 packages; the image holds no home
+directory, toolchain or build output). Unpack it on the host and enter it:
+
+```sh
+sha=f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533
+aws s3 cp "$TRIERGON_EVIDENCE_ARCHIVE/evidence/armv7-userland/$sha.tar.gz" armv7-userland.tar.gz
+echo "$sha  armv7-userland.tar.gz" | sha256sum --check
+sudo mkdir -p /srv/armhf
+sudo tar -xpzf armv7-userland.tar.gz --numeric-owner -C /srv/armhf
+for d in proc sys dev dev/pts; do sudo mount --bind /$d /srv/armhf/$d; done
+sudo cp /etc/resolv.conf /srv/armhf/etc/resolv.conf
+sudo install -d -o 1000 -g 1000 /srv/armhf/home/ubuntu
+sudo chroot /srv/armhf setarch linux32 sudo -u ubuntu -H bash -l
+```
+
+The image was made with `debootstrap --arch=armhf --variant=buildd
+--components=main,universe noble` from `http://ports.ubuntu.com/ubuntu-ports`, with
+`noble-updates` and `noble-security` enabled, then `apt-get install build-essential
+pkg-config zlib1g-dev python3 python3-numpy make git zstd curl ca-certificates sudo jq
+time`. It has a user `ubuntu` (uid 1000, passwordless `sudo`); its home directory is not
+part of the image.
+A user space built the same way later can pick up newer packages; compare its
+`dpkg-query -W` list before treating its results as comparable. Inside, install rustup
+as on any host, and run every command under `setarch linux32`. Memory uses the standard
+bounds: the kernel RSS proof module has no 32-bit ioctl entry point. Record the CPU,
+kernel and user-space package list with the results.
 
 ## Robustness
 
@@ -311,5 +349,6 @@ lists every archived set:
 The index also records how identifiers were renamed. With `TRIERGON_EVIDENCE_ARCHIVE` set
 to the archive location, `cargo xtask evidence fetch SET` downloads a set, verifies it
 against the index and unpacks it into `.research/evidence/SET/`; a `.tar.zst` set is
-decompressed with the system `zstd`. `cargo xtask evidence pack DIR OUT` writes the
-deterministic archive a new set is uploaded as.
+decompressed with the system `zstd`. Both stream, hashing and writing each file as it
+leaves the archive, so a set larger than memory unpacks on a 32-bit host. `cargo xtask
+evidence pack DIR OUT` writes the deterministic archive a new set is uploaded as.

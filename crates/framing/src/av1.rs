@@ -469,18 +469,18 @@ impl Av1ObuReader {
                             .checked_sub(prefix)
                             .ok_or(Error::Truncated)?
                     };
-                    self.payload_length = usize::try_from(payload).map_err(|_| Error::Overflow)?;
-                    self.wire_length = self
-                        .prefix_len
-                        .checked_add(self.payload_length)
-                        .ok_or(Error::Overflow)?;
-                    if self.wire_length > self.limits.maximum_obu_bytes {
+                    // The limit is checked on the 64-bit wire length, so a declared size
+                    // that does not fit `usize` is a limit refusal on every target.
+                    let wire = prefix.checked_add(payload).ok_or(Error::Overflow)?;
+                    let maximum = self.limits.maximum_obu_bytes;
+                    if wire > u64::try_from(maximum).unwrap_or(u64::MAX) {
                         return Err(Error::Limit {
-                            requested: self.wire_length,
-                            maximum: self.limits.maximum_obu_bytes,
+                            requested: usize::try_from(wire).unwrap_or(usize::MAX),
+                            maximum,
                         });
                     }
-                    let wire = u64::try_from(self.wire_length).map_err(|_| Error::Overflow)?;
+                    self.payload_length = usize::try_from(payload).map_err(|_| Error::Overflow)?;
+                    self.wire_length = usize::try_from(wire).map_err(|_| Error::Overflow)?;
                     if self
                         .external_length
                         .is_some_and(|external| external != wire)

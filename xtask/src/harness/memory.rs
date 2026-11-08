@@ -1194,11 +1194,13 @@ fn measure(
 /// Check the exact worker closure and emit the observer's calibration results.
 pub fn admission(root: &Path, candidate: &Path, reference: &Path) -> R<()> {
     if !cfg!(all(
-        target_arch = "aarch64",
+        any(target_arch = "aarch64", target_arch = "arm"),
         target_os = "linux",
         target_env = "gnu"
     )) {
-        return Err("memory admission requires native AArch64 Linux with glibc".into());
+        return Err(
+            "memory admission requires native AArch64 or 32-bit ARMv7 Linux with glibc".into(),
+        );
     }
     let _lock = lock()?;
     let busy = competing_builds()?;

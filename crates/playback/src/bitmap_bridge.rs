@@ -90,9 +90,12 @@ fn packet_queue_start_ns(clock: pgs::PacketClock) -> Result<i64> {
 fn queue_canvas_dimensions(width: u32, height: u32) -> bool {
     (160..=8192).contains(&width) && (160..=8192).contains(&height)
 }
-#[expect(
-    clippy::result_large_err,
-    reason = "returns exact caller metadata and packet on admission failure"
+#[cfg_attr(
+    target_pointer_width = "64",
+    expect(
+        clippy::result_large_err,
+        reason = "returns exact caller metadata and packet on admission failure"
+    )
 )]
 fn owner<M>(
     pool: &Budget,
@@ -105,9 +108,12 @@ fn owner<M>(
     allocate_owner(pool, input)
 }
 
-#[expect(
-    clippy::result_large_err,
-    reason = "returns exact caller metadata and packet on allocation failure"
+#[cfg_attr(
+    target_pointer_width = "64",
+    expect(
+        clippy::result_large_err,
+        reason = "returns exact caller metadata and packet on allocation failure"
+    )
 )]
 fn allocate_owner<M>(
     pool: &Budget,
@@ -265,9 +271,12 @@ impl<M> PgsBridge<M> {
             maximum_packet: limits.max_packet_bytes,
         })
     }
-    #[expect(
-        clippy::result_large_err,
-        reason = "returns exact packet owner on refusal"
+    #[cfg_attr(
+        target_pointer_width = "64",
+        expect(
+            clippy::result_large_err,
+            reason = "returns exact packet owner on refusal"
+        )
     )]
     pub fn provide(
         &mut self,
@@ -546,9 +555,12 @@ pub struct DvdJob<M> {
     phase: DvdJobPhase,
 }
 impl<M> DvdJob<M> {
-    #[expect(
-        clippy::result_large_err,
-        reason = "returns exact source packet on admission failure"
+    #[cfg_attr(
+        target_pointer_width = "64",
+        expect(
+            clippy::result_large_err,
+            reason = "returns exact source packet on admission failure"
+        )
     )]
     pub fn new(
         pool: &Budget,
@@ -582,9 +594,12 @@ impl<M> DvdJob<M> {
         }
     }
 
-    #[expect(
-        clippy::result_large_err,
-        reason = "returns exact source packet on admission failure"
+    #[cfg_attr(
+        target_pointer_width = "64",
+        expect(
+            clippy::result_large_err,
+            reason = "returns exact source packet on admission failure"
+        )
     )]
     fn admit(
         &mut self,
@@ -811,9 +826,12 @@ impl<M> DvdReceiver<M> {
         Ok(())
     }
 
-    #[expect(
-        clippy::result_large_err,
-        reason = "returns exact source packet and metadata on admission failure"
+    #[cfg_attr(
+        target_pointer_width = "64",
+        expect(
+            clippy::result_large_err,
+            reason = "returns exact source packet and metadata on admission failure"
+        )
     )]
     pub fn provide(
         &mut self,

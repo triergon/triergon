@@ -7,10 +7,12 @@
 //! A set archived whole may instead be a `.tar.zst`, decompressed with the
 //! system `zstd`.
 
-use std::fs;
+use std::fs::{self, File};
+use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::archive::{TarFiles, TarReader};
 use crate::json::Value;
 use crate::sha256;
 
@@ -73,15 +75,21 @@ fn header(name: &[u8], prefix: &[u8], size: u64, executable: bool, kind: u8) -> 
     h
 }
 
-fn pad(out: &mut Vec<u8>) {
-    out.resize(out.len().div_ceil(512) * 512, 0);
+/// Zeros that pad `len` bytes to the next 512-byte record.
+fn padding(len: u64) -> &'static [u8] {
+    &[0; 512][..(len.next_multiple_of(512) - len) as usize]
 }
 
-/// A ustar archive of `files`; paths that do not fit a ustar name and prefix use
-/// a pax `path` record.
-pub fn tar(files: &[(String, Vec<u8>, bool)]) -> Vec<u8> {
-    let mut out = Vec::new();
-    for (path, data, executable) in files {
+/// Writes a ustar archive of `files` (relative path, source file) to `out`, one file
+/// at a time; paths that do not fit a ustar name and prefix use a pax `path` record.
+/// Errors name the source file, or `out_name` for a failed write.
+fn write_tar(
+    out: &mut impl Write,
+    out_name: &str,
+    files: &[(String, PathBuf)],
+) -> Result<(), String> {
+    let written = |e: io::Error| format!("{out_name}: {e}");
+    for (path, source) in files {
         let bytes = path.as_bytes();
         let split = (bytes.len() > 100)
             .then(|| {
@@ -103,66 +111,166 @@ pub fn tar(files: &[(String, Vec<u8>, bool)]) -> Vec<u8> {
                     length = format!("{length}{record}").len();
                 }
                 record = format!("{length}{record}");
-                out.extend(header(b"pax", b"", record.len() as u64, false, b'x'));
-                out.extend(record.as_bytes());
-                pad(&mut out);
+                let size = record.len() as u64;
+                out.write_all(&header(b"pax", b"", size, false, b'x'))
+                    .map_err(written)?;
+                out.write_all(record.as_bytes()).map_err(written)?;
+                out.write_all(padding(size)).map_err(written)?;
                 (&bytes[bytes.len().saturating_sub(100)..], b"")
             }
         };
-        out.extend(header(name, prefix, data.len() as u64, *executable, b'0'));
-        out.extend(data);
-        pad(&mut out);
-    }
-    out.extend([0u8; 1024]);
-    out
-}
-
-/// gzip of `data` in stored deflate blocks, with no name and a zero timestamp.
-pub fn gzip_stored(data: &[u8]) -> Vec<u8> {
-    let mut out = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255];
-    let mut chunks = data.chunks(65_535).peekable();
-    if chunks.peek().is_none() {
-        out.extend([1, 0, 0, 0xff, 0xff]);
-    }
-    while let Some(chunk) = chunks.next() {
-        let len = chunk.len() as u16;
-        out.push(u8::from(chunks.peek().is_none()));
-        out.extend(len.to_le_bytes());
-        out.extend((!len).to_le_bytes());
-        out.extend(chunk);
-    }
-    out.extend(crate::zlib::crc32(data).to_le_bytes());
-    out.extend((data.len() as u32).to_le_bytes());
-    out
-}
-
-/// The deterministic pack of every file under `dir`.
-pub fn pack(dir: &Path) -> Result<Vec<u8>, String> {
-    let mut entries = Vec::new();
-    for (relative, path) in files(dir)? {
-        let data = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let read = |e: io::Error| format!("{}: {e}", source.display());
+        let file = File::open(source).map_err(read)?;
+        let metadata = file.metadata().map_err(read)?;
         #[cfg(unix)]
         let executable = {
             use std::os::unix::fs::PermissionsExt;
-            fs::metadata(&path)
-                .map_err(|e| e.to_string())?
-                .permissions()
-                .mode()
-                & 0o111
-                != 0
+            metadata.permissions().mode() & 0o111 != 0
         };
         #[cfg(not(unix))]
         let executable = false;
-        entries.push((relative, data, executable));
+        let size = metadata.len();
+        out.write_all(&header(name, prefix, size, executable, b'0'))
+            .map_err(written)?;
+        let mut body = file.take(size);
+        let mut buffer = vec![0u8; 1 << 16];
+        let mut copied = 0u64;
+        loop {
+            let n = match body.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(n) => n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(read(e)),
+            };
+            out.write_all(&buffer[..n]).map_err(written)?;
+            copied += n as u64;
+        }
+        if copied != size {
+            return Err(format!("{}: shrank while packing", source.display()));
+        }
+        out.write_all(padding(size)).map_err(written)?;
     }
-    Ok(gzip_stored(&tar(&entries)))
+    out.write_all(&[0; 1024]).map_err(written)
 }
 
-/// `cargo xtask evidence pack DIR OUT`: write the pack and print its SHA-256.
+const STORED_BLOCK: usize = 65_535;
+
+/// A gzip member of stored deflate blocks, with no name and a zero timestamp, written
+/// as the data arrives. A full block waits for more data so the last one can be
+/// marked final.
+struct GzipStored<W: Write> {
+    out: W,
+    block: Vec<u8>,
+    crc: u32,
+    len: u64,
+}
+
+impl<W: Write> GzipStored<W> {
+    fn new(mut out: W) -> io::Result<Self> {
+        out.write_all(&[0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255])?;
+        Ok(Self {
+            out,
+            block: Vec::with_capacity(STORED_BLOCK),
+            crc: 0,
+            len: 0,
+        })
+    }
+
+    fn emit(&mut self, last: bool) -> io::Result<()> {
+        let len = self.block.len() as u16;
+        self.out.write_all(&[u8::from(last)])?;
+        self.out.write_all(&len.to_le_bytes())?;
+        self.out.write_all(&(!len).to_le_bytes())?;
+        self.out.write_all(&self.block)?;
+        self.block.clear();
+        Ok(())
+    }
+
+    fn finish(mut self) -> io::Result<W> {
+        self.emit(true)?;
+        self.out.write_all(&self.crc.to_le_bytes())?;
+        // ISIZE is the length modulo 2^32.
+        self.out.write_all(&(self.len as u32).to_le_bytes())?;
+        Ok(self.out)
+    }
+}
+
+impl<W: Write> Write for GzipStored<W> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        if self.block.len() == STORED_BLOCK && !data.is_empty() {
+            self.emit(false)?;
+        }
+        let taken = &data[..data.len().min(STORED_BLOCK - self.block.len())];
+        self.block.extend_from_slice(taken);
+        self.crc = crate::zlib::crc32_extend(self.crc, taken);
+        self.len += taken.len() as u64;
+        Ok(taken.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()
+    }
+}
+
+/// Passes writes through to `out` and hashes them.
+struct Hashed<W> {
+    out: W,
+    hash: sha256::Sha256,
+}
+
+impl<W: Write> Write for Hashed<W> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        let written = self.out.write(data)?;
+        self.hash.update(&data[..written]);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()
+    }
+}
+
+/// Writes the deterministic pack of `files` to `out`, streaming each file, and
+/// returns `out`.
+fn pack_files<W: Write>(files: &[(String, PathBuf)], out: W, out_name: &str) -> Result<W, String> {
+    let written = |e: io::Error| format!("{out_name}: {e}");
+    let mut gzip = GzipStored::new(out).map_err(written)?;
+    write_tar(&mut gzip, out_name, files)?;
+    gzip.finish().map_err(written)
+}
+
+/// `cargo xtask evidence pack DIR OUT`: write the pack and print its SHA-256. The
+/// pack is written to `OUT.part` and renamed once complete.
 pub fn pack_command(dir: &Path, out: &Path) -> Result<String, String> {
-    let data = pack(dir)?;
-    fs::write(out, &data).map_err(|e| format!("{}: {e}", out.display()))?;
-    Ok(sha256::hex(&data))
+    let files = files(dir)?;
+    let mut partial = out.as_os_str().to_owned();
+    partial.push(".part");
+    let partial = PathBuf::from(partial);
+    let name = partial.display().to_string();
+    let file = File::create(&partial).map_err(|e| format!("{name}: {e}"))?;
+    let hashed = Hashed {
+        out: BufWriter::new(file),
+        hash: sha256::Sha256::default(),
+    };
+    let packed = pack_files(&files, hashed, &name).and_then(
+        |Hashed {
+             out: mut written,
+             hash,
+         }| {
+            written.flush().map_err(|e| format!("{name}: {e}"))?;
+            Ok(hash.finish_hex())
+        },
+    );
+    match packed {
+        Ok(digest) => {
+            fs::rename(&partial, out).map_err(|e| format!("{}: {e}", out.display()))?;
+            Ok(digest)
+        }
+        Err(error) => {
+            let _ = fs::remove_file(&partial);
+            Err(error)
+        }
+    }
 }
 
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -181,6 +289,14 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
         .iter()
         .find(|set| s(set, "name") == Some(name))
         .ok_or_else(|| format!("{name} is not in {INDEX}"))?;
+    if set
+        .get("files")
+        .is_some_and(|files| files.as_array().is_none())
+    {
+        return Err(format!(
+            "{name}: `files` must list {{path, sha256}} objects"
+        ));
+    }
     let (key, expected) = (
         s(set, "key").ok_or("set without key")?,
         s(set, "sha256").ok_or("set without sha256")?,
@@ -205,32 +321,75 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
         }
         fs::rename(&partial, &download).map_err(|e| e.to_string())?;
     }
-    let data = fs::read(&download).map_err(|e| e.to_string())?;
-    if sha256::hex(&data) != expected {
+    if sha256::file_hex(&download).map_err(|e| format!("{}: {e}", download.display()))? != expected
+    {
         let _ = fs::remove_file(&download);
         return Err(format!("{key}: SHA-256 differs from the index"));
-    }
-    let tar = extension.decompress(&data)?;
-    let entries = crate::archive::tar_files(&tar)?;
-    // A set packed from repository files lists each file; an archived run copied
-    // in whole is verified by its archive hash alone.
-    let listed = set.get("files").and_then(Value::as_array);
-    if listed.is_some_and(|l| l.len() != entries.len()) {
-        return Err(format!("{name}: archive and index list different files"));
     }
     let target = into.map_or_else(
         || root.join(".research/evidence").join(name),
         Path::to_path_buf,
     );
-    for (at, entry) in entries.iter().enumerate() {
-        let relative = entry.path.as_str();
-        if let Some(file) = listed.map(|l| &l[at]) {
+    // A set packed from repository files lists each file; an archived run copied
+    // in whole is verified by its archive hash alone.
+    let mut tar = TarReader::new(Unpack {
+        name,
+        listed: set.get("files").and_then(Value::as_array),
+        set_path: s(set, "path").unwrap_or_default(),
+        target: &target,
+        unpacked: 0,
+        current: None,
+    });
+    extension.unpack(&download, &mut tar)?;
+    let unpacked = tar.finish()?.unpacked;
+    if listed_len(set).is_some_and(|len| len != unpacked) {
+        return Err(format!("{name}: archive and index list different files"));
+    }
+    Ok(format!(
+        "{name}: {unpacked} files verified into {}",
+        target.display()
+    ))
+}
+
+fn listed_len(set: &Value) -> Option<usize> {
+    set.get("files")
+        .and_then(Value::as_array)
+        .map(<[Value]>::len)
+}
+
+/// Writes each file of a fetched set under `target` as it streams out of the
+/// archive, checking it against the index's list when the set has one.
+struct Unpack<'a> {
+    name: &'a str,
+    listed: Option<&'a [Value]>,
+    set_path: &'a str,
+    target: &'a Path,
+    unpacked: usize,
+    current: Option<(BufWriter<File>, sha256::Sha256, PathBuf)>,
+}
+
+impl Unpack<'_> {
+    fn indexed(&self) -> Result<Option<&Value>, String> {
+        self.listed
+            .map(|listed| {
+                listed
+                    .get(self.unpacked)
+                    .ok_or_else(|| format!("{}: archive and index list different files", self.name))
+            })
+            .transpose()
+    }
+}
+
+impl TarFiles for Unpack<'_> {
+    fn begin(&mut self, relative: &str, _size: u64) -> Result<(), String> {
+        let name = self.name;
+        if let Some(file) = self.indexed()? {
             let path = s(file, "path").unwrap_or_default();
             let indexed = path
-                .strip_prefix(s(set, "path").unwrap_or_default())
+                .strip_prefix(self.set_path)
                 .and_then(|p| p.strip_prefix('/'))
                 .unwrap_or(path);
-            if relative != indexed || Some(sha256::hex(entry.data).as_str()) != s(file, "sha256") {
+            if relative != indexed {
                 return Err(format!("{name}: {relative} differs from the index"));
             }
         }
@@ -240,15 +399,37 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
         {
             return Err(format!("{name}: {relative} escapes the set"));
         }
-        let out = target.join(relative);
-        fs::create_dir_all(out.parent().expect("file has a parent")).map_err(|e| e.to_string())?;
-        fs::write(&out, entry.data).map_err(|e| format!("{}: {e}", out.display()))?;
+        let out = self.target.join(relative);
+        fs::create_dir_all(out.parent().expect("file has a parent"))
+            .map_err(|e| format!("{}: {e}", out.display()))?;
+        let file = File::create(&out).map_err(|e| format!("{}: {e}", out.display()))?;
+        self.current = Some((BufWriter::new(file), sha256::Sha256::default(), out));
+        Ok(())
     }
-    Ok(format!(
-        "{name}: {} files verified into {}",
-        entries.len(),
-        target.display()
-    ))
+
+    fn data(&mut self, chunk: &[u8]) -> Result<(), String> {
+        let (file, hash, out) = self.current.as_mut().expect("a file is open");
+        hash.update(chunk);
+        file.write_all(chunk)
+            .map_err(|e| format!("{}: {e}", out.display()))
+    }
+
+    fn end(&mut self) -> Result<(), String> {
+        let (mut file, hash, out) = self.current.take().expect("a file is open");
+        file.flush()
+            .map_err(|e| format!("{}: {e}", out.display()))?;
+        if let Some(indexed) = self.indexed()?
+            && Some(hash.finish_hex().as_str()) != s(indexed, "sha256")
+        {
+            return Err(format!(
+                "{}: {} differs from the index",
+                self.name,
+                out.strip_prefix(self.target).unwrap_or(&out).display()
+            ));
+        }
+        self.unpacked += 1;
+        Ok(())
+    }
 }
 
 /// How an archived set is compressed, by its key's extension.
@@ -258,8 +439,9 @@ enum Compression {
     Zstd,
 }
 
-/// The largest tar an archived set may decompress to.
-const TAR_LIMIT: usize = 1 << 32;
+/// The largest tar an archived set may decompress to. Sets are unpacked as they
+/// stream, so this bounds disk use, not memory.
+const TAR_LIMIT: u64 = 1 << 40;
 
 impl Compression {
     fn of(key: &str) -> Option<Self> {
@@ -279,43 +461,43 @@ impl Compression {
         }
     }
 
-    fn decompress(self, data: &[u8]) -> Result<Vec<u8>, String> {
+    /// Decompress the archive at `path` into `out` as it is read.
+    fn unpack(self, path: &Path, out: &mut impl Write) -> Result<(), String> {
+        let file = File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
         match self {
-            Self::Gzip => crate::archive::gunzip(data, TAR_LIMIT),
-            Self::Zstd => unzstd(data),
+            Self::Gzip => {
+                crate::archive::gunzip_to(io::BufReader::new(file), out, TAR_LIMIT).map(drop)
+            }
+            Self::Zstd => unzstd(file, out),
         }
     }
 }
 
-/// Decompress a zstd frame with the system `zstd`, refusing more than
+/// Decompress a zstd stream with the system `zstd`, refusing more than
 /// [`TAR_LIMIT`] bytes of output.
-fn unzstd(data: &[u8]) -> Result<Vec<u8>, String> {
-    use std::io::{Read, Write};
+fn unzstd(input: File, out: &mut impl Write) -> Result<(), String> {
     use std::process::Stdio;
     let mut child = Command::new("zstd")
         .args(["--decompress", "--stdout", "--quiet"])
-        .stdin(Stdio::piped())
+        .stdin(input)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("zstd: {e}"))?;
-    let mut stdin = child.stdin.take().expect("piped stdin");
-    let mut stdout = child.stdout.take().expect("piped stdout");
-    let input = data.to_vec();
-    let writer = std::thread::spawn(move || stdin.write_all(&input));
-    let mut tar = Vec::new();
-    let limit = u64::try_from(TAR_LIMIT).expect("limit fits u64");
-    stdout
-        .by_ref()
-        .take(limit + 1)
-        .read_to_end(&mut tar)
-        .map_err(|e| format!("zstd: {e}"))?;
-    if tar.len() > TAR_LIMIT {
+    let stdout = child.stdout.take().expect("piped stdout");
+    let copied = io::copy(&mut stdout.take(TAR_LIMIT + 1), out);
+    let refuse = |child: &mut std::process::Child, error: String| {
         let _ = child.kill();
         let _ = child.wait();
-        return Err(format!("zstd: more than {TAR_LIMIT} bytes"));
+        Err(error)
+    };
+    match copied {
+        Err(e) => return refuse(&mut child, format!("zstd: {e}")),
+        Ok(n) if n > TAR_LIMIT => {
+            return refuse(&mut child, format!("zstd: more than {TAR_LIMIT} bytes"));
+        }
+        Ok(_) => {}
     }
-    let written = writer.join().map_err(|_| "zstd: writer panicked")?;
     let output = child.wait_with_output().map_err(|e| format!("zstd: {e}"))?;
     if !output.status.success() {
         return Err(format!(
@@ -324,13 +506,16 @@ fn unzstd(data: &[u8]) -> Result<Vec<u8>, String> {
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
-    written.map_err(|e| format!("zstd: {e}"))?;
-    Ok(tar)
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pack<W: Write>(dir: &Path, out: W) -> Result<W, String> {
+        pack_files(&files(dir)?, out, "the pack")
+    }
 
     #[test]
     fn packs_are_deterministic_and_round_trip() {
@@ -342,8 +527,8 @@ mod tests {
         fs::write(dir.join("b.txt"), vec![7u8; 200_000]).unwrap();
         fs::write(dir.join(&long).join(format!("{long}.json")), b"long").unwrap();
         fs::write(dir.join("empty"), b"").unwrap();
-        let first = pack(&dir).unwrap();
-        assert_eq!(first, pack(&dir).unwrap());
+        let first = pack(&dir, Vec::new()).unwrap();
+        assert_eq!(first, pack(&dir, Vec::new()).unwrap());
         let tar = crate::archive::gunzip(&first, 1 << 30).unwrap();
         let entries = crate::archive::tar_files(&tar).unwrap();
         let names: Vec<_> = entries.iter().map(|e| e.path.clone()).collect();
@@ -360,13 +545,64 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
+    /// The pack of a fixed tree, byte for byte: stored gzip blocks, a pax record,
+    /// a ustar prefix, a hidden file, an empty file and an executable one.
+    #[test]
+    fn pack_bytes_are_fixed() {
+        let dir = crate::walk::scratch("evidence-golden");
+        let long = "a".repeat(120);
+        let paxed = format!("d/{}", "e".repeat(150));
+        let tree: [(&str, Vec<u8>, u32); 6] = [
+            ("x/.hidden/f.json", b"{}\n".to_vec(), 0o644),
+            (
+                "b.txt",
+                (0..200_000u32).map(|i| (i * 7 % 251) as u8).collect(),
+                0o644,
+            ),
+            (&format!("{long}/{long}.json"), b"long".to_vec(), 0o644),
+            ("empty", Vec::new(), 0o644),
+            ("tool.sh", b"#!/bin/sh\n".to_vec(), 0o755),
+            (&paxed, b"pax".to_vec(), 0o644),
+        ];
+        for (path, data, mode) in &tree {
+            let file = dir.join(path);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(&file, data).unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&file, fs::Permissions::from_mode(*mode)).unwrap();
+            }
+            #[cfg(not(unix))]
+            let _ = mode;
+        }
+        let out = dir.with_extension("tar.gz");
+        let digest = pack_command(&dir, &out).unwrap();
+        assert_eq!(sha256::file_hex(&out).unwrap(), digest);
+        #[cfg(unix)]
+        assert_eq!(
+            digest,
+            "4a08933099a9a4b3771bee9e2223824efd7b39413ca17547e4e60fcfafce4fcd"
+        );
+        fs::remove_file(out).unwrap();
+
+        // A missing directory fails before OUT exists.
+        let missing = dir.join("missing");
+        let target = dir.join("never.tar.gz");
+        let error = pack_command(&missing, &target).unwrap_err();
+        assert!(error.contains("missing"), "{error}");
+        assert!(!target.exists() && !dir.join("never.tar.gz.part").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn zstd_sets_unpack_through_the_system_zstd() {
         let dir = crate::walk::scratch("evidence-zstd");
         fs::create_dir_all(dir.join("in/a")).unwrap();
         fs::write(dir.join("in/a/f.json"), b"{}\n").unwrap();
         fs::write(dir.join("in/b.bin"), vec![3u8; 70_000]).unwrap();
-        let tar = crate::archive::gunzip(&pack(&dir.join("in")).unwrap(), 1 << 30).unwrap();
+        let tar =
+            crate::archive::gunzip(&pack(&dir.join("in"), Vec::new()).unwrap(), 1 << 30).unwrap();
         fs::write(dir.join("set.tar"), &tar).unwrap();
         let status = Command::new("zstd")
             .args(["--quiet", "-19"])
@@ -376,17 +612,52 @@ mod tests {
             .status()
             .expect("zstd is installed");
         assert!(status.success());
-        let compressed = fs::read(dir.join("set.tar.zst")).unwrap();
         assert_eq!(Compression::of("x/abc.tar.zst"), Some(Compression::Zstd));
         assert_eq!(Compression::of("x/abc.tar.gz"), Some(Compression::Gzip));
         assert_eq!(Compression::of("x/abc.tar.xz"), None);
-        let unpacked = Compression::Zstd.decompress(&compressed).unwrap();
+        let mut unpacked = Vec::new();
+        Compression::Zstd
+            .unpack(&dir.join("set.tar.zst"), &mut unpacked)
+            .unwrap();
         assert_eq!(unpacked, tar);
         let entries = crate::archive::tar_files(&unpacked).unwrap();
         let names: Vec<_> = entries.iter().map(|e| e.path.as_str()).collect();
         assert_eq!(names, ["a/f.json", "b.bin"]);
-        assert!(Compression::Zstd.decompress(b"not zstd").is_err());
+        fs::write(dir.join("bad.tar.zst"), b"not zstd").unwrap();
+        assert!(
+            Compression::Zstd
+                .unpack(&dir.join("bad.tar.zst"), &mut Vec::new())
+                .is_err()
+        );
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn stored_gzip_blocks_split_at_the_block_size_whatever_the_writes() {
+        for len in [0, 1, STORED_BLOCK, STORED_BLOCK + 1, 2 * STORED_BLOCK] {
+            let data: Vec<u8> = (0..len).map(|i| (i * 7 % 251) as u8).collect();
+            let mut expected = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255];
+            let blocks: Vec<&[u8]> = data.chunks(STORED_BLOCK).collect();
+            for (at, block) in blocks.iter().enumerate() {
+                let n = block.len() as u16;
+                expected.push(u8::from(at + 1 == blocks.len()));
+                expected.extend(n.to_le_bytes());
+                expected.extend((!n).to_le_bytes());
+                expected.extend(*block);
+            }
+            if blocks.is_empty() {
+                expected.extend([1, 0, 0, 0xff, 0xff]);
+            }
+            expected.extend(crate::zlib::crc32(&data).to_le_bytes());
+            expected.extend((len as u32).to_le_bytes());
+            let mut gzip = GzipStored::new(Vec::new()).unwrap();
+            for piece in data.chunks(4_099) {
+                gzip.write_all(piece).unwrap();
+            }
+            let streamed = gzip.finish().unwrap();
+            assert_eq!(streamed, expected, "{len} bytes");
+            assert_eq!(crate::archive::gunzip(&streamed, 1 << 20).unwrap(), data);
+        }
     }
 
     #[test]
@@ -408,11 +679,18 @@ mod tests {
                     .iter()
                     .any(|ext| key.ends_with(&format!("{sha}{ext}")))
             );
-            for file in set
-                .get("files")
-                .and_then(Value::as_array)
-                .unwrap_or_default()
-            {
+            let files = set.get("files");
+            assert!(
+                files.is_none_or(|files| files.as_array().is_some()),
+                "{}: `files` must list {{path, sha256}} objects",
+                s(set, "name").unwrap()
+            );
+            for file in files.and_then(Value::as_array).unwrap_or_default() {
+                assert!(
+                    s(file, "sha256").is_some(),
+                    "{} has no sha256",
+                    s(file, "path").unwrap()
+                );
                 let path = s(file, "path").unwrap();
                 assert!(paths.insert(path.to_owned()), "{path} listed twice");
                 if path.starts_with("research/") {
