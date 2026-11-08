@@ -57,5 +57,14 @@
   ],
   "iterations": 50,
   "minimum_pairs": 30,
-  "confidence": 0.95
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "native MOV view edit lists over samples with composition offsets"
+  ],
+  "open_cases": [
+    {
+      "id": "regular-encoded-avc-aac-indexed-seek",
+      "requirement": "native MOV view edit lists over samples with composition offsets"
+    }
+  ]
 }
