@@ -1,6 +1,6 @@
 //! Version1 hvcC source-wire facts.
 //! Raw syntax, fixed NAL headers and bounded extents; no RBSP/decoder certificate.
-use crate::{BuildStep, Codec, LengthSize, NalHeader};
+use crate::{BuildStep, Codec, ConfigProgress, LengthSize, NalHeader};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
@@ -298,10 +298,71 @@ impl HvcConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<HvcConfiguration>> {
+        let mut ready = None;
+        match self.step_into(work, cancel, &mut ready)? {
+            ConfigProgress::Ready => Ok(BuildStep::Ready(
+                ready.ok_or(Error::Invalid("missing published configuration"))?,
+            )),
+            ConfigProgress::Yield => Ok(BuildStep::Yield),
+            ConfigProgress::Complete => Ok(BuildStep::Complete),
+        }
+    }
+
+    /// Publishes into an empty caller-provided slot without returning the record.
+    /// An occupied slot is rejected before any state, work or retained storage changes.
+    /// Yield, completion and errors leave an initially empty slot empty.
+    pub fn step_into(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<HvcConfiguration>,
+    ) -> Result<ConfigProgress> {
+        self.step_into_with(work, cancel, ready, |record| record)
+    }
+
+    // Share the outlined grammar walk; adapt only the final publication.
+    #[inline]
+    pub(crate) fn step_into_with<T>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<T>,
+        wrap: impl FnOnce(HvcConfiguration) -> T,
+    ) -> Result<ConfigProgress> {
+        if ready.is_some() {
+            return Err(Error::Invalid("configuration output sink occupied"));
+        }
         if let Some(error) = self.failure {
             return Err(error);
         }
-        let result = self.advance(work, cancel);
+        let result = self.advance(work, cancel).and_then(|progress| {
+            if progress == ConfigProgress::Ready {
+                let fields = self.fields.ok_or(Error::Invalid("missing hvcC fields"))?;
+                let width = self
+                    .width
+                    .ok_or(Error::Invalid("missing hvcC length width"))?;
+                *ready = Some(wrap(HvcConfiguration {
+                    raw: self
+                        .raw
+                        .take()
+                        .ok_or(Error::Invalid("missing hvcC record"))?,
+                    source: self.source,
+                    fields,
+                    width,
+                    arrays: self
+                        .arrays
+                        .take()
+                        .ok_or(Error::Invalid("missing hvcC descriptors"))?,
+                    nals: self
+                        .nals
+                        .take()
+                        .ok_or(Error::Invalid("missing hvcC descriptors"))?,
+                    understood_end: self.understood_end,
+                }));
+                self.phase = Phase::Complete;
+            }
+            Ok(progress)
+        });
         if let Err(error) = result
             && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
         {
@@ -313,20 +374,17 @@ impl HvcConfigParser {
         result
     }
 
-    fn advance(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<HvcConfiguration>> {
+    #[inline(never)]
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ConfigProgress> {
         loop {
             if matches!(self.phase, Phase::Complete) {
-                return Ok(BuildStep::Complete);
+                return Ok(ConfigProgress::Complete);
             }
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
-                return Ok(BuildStep::Yield);
+                return Ok(ConfigProgress::Yield);
             }
             let raw = self
                 .raw
@@ -433,31 +491,7 @@ impl HvcConfigParser {
                                 {
                                     return Err(Error::Invalid("hvcC second walk"));
                                 }
-                                let fields =
-                                    self.fields.ok_or(Error::Invalid("missing hvcC fields"))?;
-                                let width = self
-                                    .width
-                                    .ok_or(Error::Invalid("missing hvcC length width"))?;
-                                let output = HvcConfiguration {
-                                    raw: self
-                                        .raw
-                                        .take()
-                                        .ok_or(Error::Invalid("missing hvcC record"))?,
-                                    source: self.source,
-                                    fields,
-                                    width,
-                                    arrays: self
-                                        .arrays
-                                        .take()
-                                        .ok_or(Error::Invalid("missing hvcC descriptors"))?,
-                                    nals: self
-                                        .nals
-                                        .take()
-                                        .ok_or(Error::Invalid("missing hvcC descriptors"))?,
-                                    understood_end: end,
-                                };
-                                self.phase = Phase::Complete;
-                                return Ok(BuildStep::Ready(output));
+                                return Ok(ConfigProgress::Ready);
                             }
                         }
                         _ => {}
@@ -479,7 +513,7 @@ impl HvcConfigParser {
                     self.scan = Scan::new(self.scan.array_count);
                     self.phase = Phase::Fill;
                 }
-                Phase::Complete => return Ok(BuildStep::Complete),
+                Phase::Complete => return Ok(ConfigProgress::Complete),
             }
         }
     }
