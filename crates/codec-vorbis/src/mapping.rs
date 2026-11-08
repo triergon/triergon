@@ -126,14 +126,18 @@ impl Mode {
 /// A zero magnitude takes the positive branch, as in FFmpeg: the specification's
 /// "greater than zero" gives the opposite signs when the magnitude is exactly zero and
 /// the angle is not, which FFmpeg's own encoder produces.
+///
+/// The four cases of the specification fold into two: with the angle's sign flipped
+/// for a negative magnitude, a positive angle gives `(m, m - a)` and any other
+/// `(m + a, m)` (`x + -y` and `x - y` round alike).
 pub(crate) fn decouple(magnitude: &mut [f32], angle: &mut [f32]) {
     for (m, a) in magnitude.iter_mut().zip(angle) {
         let (mv, av) = (*m, *a);
-        (*m, *a) = match (mv >= 0.0, av > 0.0) {
-            (true, true) => (mv, mv - av),
-            (true, false) => (mv + av, mv),
-            (false, true) => (mv, mv + av),
-            (false, false) => (mv - av, mv),
+        let signed = if mv >= 0.0 { av } else { -av };
+        (*m, *a) = if av > 0.0 {
+            (mv, mv - signed)
+        } else {
+            (mv + signed, mv)
         };
     }
 }

@@ -27,6 +27,12 @@ pub(crate) struct Residue {
     classbook: u8,
     /// The book of each pass, per classification.
     books: Vec<[Option<u8>; 8]>,
+    /// One more than the last pass any classification codes; at least 1, as pass 0 also
+    /// reads the classifications.
+    passes: usize,
+    /// How far the last VQ vector of a partition may reach past it: the largest
+    /// dimension of a book that does not divide the partition size, else 0.
+    overhang: usize,
 }
 
 /// A channel of a submap and whether its residue is coded in this packet.
@@ -132,6 +138,21 @@ impl Residue {
         if per_word == 0 || words.is_none() {
             return Err(DecodeError::Invalid("residue classbook"));
         }
+        let overhang = books
+            .iter()
+            .flatten()
+            .flatten()
+            .map(|&book| codebooks[usize::from(book)].dimensions())
+            .filter(|&dimensions| {
+                format != Format::Strided && !partition_size.is_multiple_of(dimensions)
+            })
+            .max()
+            .unwrap_or(0);
+        let passes = books
+            .iter()
+            .filter_map(|passes| passes.iter().rposition(Option::is_some))
+            .max()
+            .map_or(1, |last| last + 1);
         Ok(Residue {
             format,
             begin,
@@ -139,6 +160,8 @@ impl Residue {
             partition_size,
             classbook,
             books,
+            passes,
+            overhang,
         })
     }
 
@@ -160,7 +183,8 @@ impl Residue {
     }
 
     /// Decodes the residue vectors of the `members` of a submap into the first `half`
-    /// values of their `spectra` (section 8.6.2), which must be zero on entry.
+    /// values of their `spectra` (section 8.6.2), which must be zero on entry. Returns
+    /// how many leading values of each vector decode may have set; the rest stay zero.
     pub(crate) fn decode(
         &self,
         r: &mut LsbReader<'_>,
@@ -169,21 +193,18 @@ impl Residue {
         members: &[Member],
         spectra: &mut Spectra,
         scratch: &mut Scratch,
-    ) {
+    ) -> usize {
         if !members.iter().any(|member| member.coded) {
-            return;
+            return 0;
         }
+        let count = members.len();
         if self.format == Format::Interleaved {
-            let count = members.len();
+            let extent = self.reach(count * half).div_ceil(count).min(half);
             let vector = &mut scratch.interleaved[..count * half];
-            vector.fill(0.0);
+            vector[..extent * count].fill(0.0);
             self.decode_bundle(r, codebooks, &mut Single(vector), &mut scratch.classes);
-            for (j, member) in members.iter().enumerate() {
-                let channel = &mut spectra.channel_mut(usize::from(member.channel))[..half];
-                for (out, &value) in channel.iter_mut().zip(vector.iter().skip(j).step_by(count)) {
-                    *out = value;
-                }
-            }
+            deinterleave(&vector[..extent * count], members, half, spectra);
+            extent
         } else {
             let mut bundle = Members {
                 spectra,
@@ -191,7 +212,26 @@ impl Residue {
                 len: half,
             };
             self.decode_bundle(r, codebooks, &mut bundle, &mut scratch.classes);
+            self.reach(half)
         }
+    }
+
+    /// The first value and the number of partitions decode codes in a vector of `len`.
+    fn coded(&self, len: usize) -> (usize, usize) {
+        let begin = self.begin.min(len);
+        (
+            begin,
+            self.end.min(len).saturating_sub(begin) / self.partition_size,
+        )
+    }
+
+    /// The end of the values decode may set in a vector of `len`.
+    fn reach(&self, len: usize) -> usize {
+        let (begin, partitions) = self.coded(len);
+        if partitions == 0 {
+            return 0;
+        }
+        (begin + partitions * self.partition_size + self.overhang).min(len)
     }
 
     fn decode_bundle(
@@ -201,9 +241,7 @@ impl Residue {
         vectors: &mut impl Bundle,
         classes: &mut [u8],
     ) {
-        let len = vectors.get(0).len();
-        let begin = self.begin.min(len);
-        let partitions = self.end.min(len).saturating_sub(begin) / self.partition_size;
+        let (begin, partitions) = self.coded(vectors.get(0).len());
         if partitions == 0 {
             return;
         }
@@ -213,7 +251,7 @@ impl Residue {
         let Some(classes) = classes.get_mut(..count * partitions) else {
             return;
         };
-        for pass in 0..8 {
+        for pass in 0..self.passes {
             let mut start = 0;
             while start < partitions {
                 let stop = (start + per_word).min(partitions);
@@ -230,12 +268,11 @@ impl Residue {
                 }
                 for partition in start..stop {
                     let offset = begin + partition * self.partition_size;
-                    for j in 0..count {
+                    for (j, row) in classes.chunks_exact(partitions).enumerate() {
                         if !vectors.coded(j) {
                             continue;
                         }
-                        let class = usize::from(classes[j * partitions + partition]);
-                        let Some(book) = self.books[class][pass] else {
+                        let Some(book) = self.books[usize::from(row[partition])][pass] else {
                             continue;
                         };
                         let book = &codebooks[usize::from(book)];
@@ -273,43 +310,91 @@ impl Residue {
     fn read_partition(&self, book: &Codebook, r: &mut LsbReader<'_>, out: &mut [f32]) -> bool {
         let size = self.partition_size;
         let dimensions = book.dimensions();
-        match self.format {
-            Format::Strided => {
-                let step = size / dimensions;
-                let out = &mut out[..size];
-                for i in 0..step {
-                    let Some(vector) = book.vector(r) else {
-                        return false;
-                    };
-                    for (slot, &value) in out[i..].iter_mut().step_by(step).zip(vector) {
-                        *slot += value;
-                    }
+        if self.format == Format::Strided {
+            let step = size / dimensions;
+            let out = &mut out[..size];
+            let mut offset = 0;
+            return book.vectors(r, step, |vector| {
+                for (slot, &value) in out[offset..].iter_mut().step_by(step).zip(vector) {
+                    *slot += value;
                 }
+                offset += 1;
+            });
+        }
+        if !size.is_multiple_of(dimensions) {
+            // A last vector that overhangs the partition spills into the next.
+            let mut chunks = out.chunks_mut(dimensions).take(size.div_ceil(dimensions));
+            return book.vectors(r, chunks.len(), |vector| add(chunks.next(), vector));
+        }
+        let out = &mut out[..size];
+        match dimensions {
+            1 => add_vectors::<1>(book, r, out),
+            2 => add_vectors::<2>(book, r, out),
+            3 => add_vectors::<3>(book, r, out),
+            4 => add_vectors::<4>(book, r, out),
+            5 => add_vectors::<5>(book, r, out),
+            8 => add_vectors::<8>(book, r, out),
+            _ => {
+                let mut chunks = out.chunks_exact_mut(dimensions);
+                book.vectors(r, chunks.len(), |vector| add(chunks.next(), vector))
             }
-            Format::Sequential | Format::Interleaved => {
-                if size.is_multiple_of(dimensions) {
-                    for chunk in out[..size].chunks_exact_mut(dimensions) {
-                        let Some(vector) = book.vector(r) else {
-                            return false;
-                        };
-                        for (slot, &value) in chunk.iter_mut().zip(vector) {
-                            *slot += value;
-                        }
-                    }
-                } else {
-                    // A last vector that overhangs the partition spills into the next.
-                    for chunk in out.chunks_mut(dimensions).take(size.div_ceil(dimensions)) {
-                        let Some(vector) = book.vector(r) else {
-                            return false;
-                        };
-                        for (slot, &value) in chunk.iter_mut().zip(vector) {
-                            *slot += value;
-                        }
-                    }
+        }
+    }
+}
+
+/// Adds `vector` to `chunk`, if there is one.
+#[inline(always)]
+fn add(chunk: Option<&mut [f32]>, vector: &[f32]) {
+    for (slot, &value) in chunk.into_iter().flatten().zip(vector) {
+        *slot += value;
+    }
+}
+
+/// Adds consecutive VQ vectors of `book`, of `D` values each, over `out`. False if a
+/// codeword does not decode.
+#[inline(always)]
+fn add_vectors<const D: usize>(book: &Codebook, r: &mut LsbReader<'_>, out: &mut [f32]) -> bool {
+    let mut chunks = out.chunks_exact_mut(D);
+    book.vectors(r, chunks.len(), |vector| {
+        if let (Some(chunk), Ok(vector)) = (chunks.next(), <&[f32; D]>::try_from(vector)) {
+            for (slot, &value) in chunk.iter_mut().zip(vector) {
+                *slot += value;
+            }
+        }
+    })
+}
+
+/// Spreads type 2's interleaved vector over the members' spectra.
+fn deinterleave(vector: &[f32], members: &[Member], half: usize, spectra: &mut Spectra) {
+    match members.len() {
+        2 => spread::<2>(vector, members, half, spectra),
+        3 => spread::<3>(vector, members, half, spectra),
+        4 => spread::<4>(vector, members, half, spectra),
+        5 => spread::<5>(vector, members, half, spectra),
+        6 => spread::<6>(vector, members, half, spectra),
+        7 => spread::<7>(vector, members, half, spectra),
+        8 => spread::<8>(vector, members, half, spectra),
+        count => {
+            for (j, member) in members.iter().enumerate() {
+                let channel = &mut spectra.channel_mut(usize::from(member.channel))[..half];
+                for (out, frame) in channel.iter_mut().zip(vector.chunks_exact(count)) {
+                    *out = frame[j];
                 }
             }
         }
-        true
+    }
+}
+
+/// [`deinterleave`] for `C` members, frame by frame.
+fn spread<const C: usize>(vector: &[f32], members: &[Member], half: usize, spectra: &mut Spectra) {
+    let channels: [usize; C] = core::array::from_fn(|j| usize::from(members[j].channel));
+    let Some(mut channels) = spectra.disjoint_mut(channels) else {
+        return;
+    };
+    for (i, frame) in vector.chunks_exact(C).take(half).enumerate() {
+        for (channel, &value) in channels.iter_mut().zip(frame) {
+            channel[i] = value;
+        }
     }
 }
 

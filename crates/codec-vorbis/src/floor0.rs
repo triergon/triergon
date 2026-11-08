@@ -153,6 +153,9 @@ impl Floor0 {
         let level = (amplitude as f64 * self.amplitude_step) as f32;
         let mut values = spectrum;
         for band in &self.bands[block as usize] {
+            if values.is_empty() {
+                break;
+            }
             let cos_w = band.cos_omega;
             let product = |start: usize| {
                 cos_lsp
