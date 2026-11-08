@@ -30,6 +30,35 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
+/// Room for `additional` more items in `items`, which never needs more than
+/// `bound`: capacity at least doubles, so a vector grown one item at a time
+/// moves each item a bounded number of times. Under pool pressure the exact
+/// request is tried instead.
+pub(super) fn reserve_amortised<T>(
+    items: &mut BudgetVec<T>,
+    additional: usize,
+    bound: usize,
+) -> Result<()> {
+    let needed = items.len().checked_add(additional).ok_or(Error::Overflow)?;
+    if needed <= items.capacity() {
+        return Ok(());
+    }
+    let target = items
+        .capacity()
+        .saturating_mul(2)
+        .max(4)
+        .min(bound)
+        .max(needed);
+    items
+        .try_reserve_exact(target - items.len())
+        .or_else(|error| match error {
+            Error::Backpressure { .. } | Error::Limit { .. } if target > needed => {
+                items.try_reserve_exact(additional)
+            }
+            error => Err(error),
+        })
+}
+
 /// The end of full recovery's input. The receiver holds no delayed subtitle,
 /// so its drain returns nothing; the strict source decoder may still report
 /// what its last packets left incomplete (a missing END is a truncation).
@@ -659,10 +688,11 @@ impl<S: RecoveryRole> Decoder<S> {
     }
 
     fn store_event(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Phase>> {
-        if !self.pay(work, cancel, 1)? {
+        let cost = self.role.event_cost()?;
+        if !self.pay(work, cancel, cost)? {
             return Ok(None);
         }
-        self.role.reserve_event()?;
+        self.role.reserve_event(self.limits.max_segments)?;
         let draft = self
             .draft
             .take()

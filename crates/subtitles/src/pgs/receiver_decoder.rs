@@ -163,7 +163,10 @@ impl RecoveryRole for NativeOnly {
     fn palette_candidate(&self) -> Option<&PaletteSnapshot> {
         None
     }
-    fn reserve_event(&mut self) -> Result<()> {
+    fn event_cost(&self) -> Result<usize> {
+        Ok(1)
+    }
+    fn reserve_event(&mut self, _maximum: usize) -> Result<()> {
         Ok(())
     }
     fn store_event(&mut self, event: RecoveredEvent) -> Result<()> {

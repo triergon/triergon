@@ -717,3 +717,78 @@ fn source_refusal_does_not_disable_subsequent_receiver_pixel_reference_or_fragme
         assert_eq!(b.used(), Budget::control_storage_bytes());
     }
 }
+
+/// The receiver events, work and peak storage of one packet of `ends` END
+/// segments: the first knocks out the strict decoder, and every later one
+/// builds a display the reference ignores.
+fn end_run(ends: usize) -> (usize, usize, usize) {
+    let b = Budget::new(64 * 1024 * 1024).unwrap();
+    let limits = DisplayLimits {
+        max_segments: 4096,
+        ..DisplayLimits::default()
+    };
+    let mut d = RecoveryDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
+    let raw = segment(0x80, &[]).repeat(ends);
+    let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
+    d.push(&mut bytes, stamp(), &AtomicBool::new(false))
+        .unwrap();
+    let out = ready(&mut d, 4096);
+    assert!(out.source_error().is_some());
+    (out.receiver_sets().len(), d.work_spent(), b.peak())
+}
+#[test]
+fn ignored_displays_cost_work_and_storage_linear_in_their_count() {
+    let n = 500;
+    let (events, work, peak) = end_run(n);
+    assert_eq!(events, n);
+    for k in [2, 8] {
+        let (events, scaled_work, scaled_peak) = end_run(k * n);
+        assert_eq!(events, k * n);
+        let ratio = scaled_work as f64 / work as f64;
+        assert!(
+            (0.9 * k as f64..=1.1 * k as f64).contains(&ratio),
+            "work for {k}x the ENDs grew {ratio:.2}x"
+        );
+        let ratio = scaled_peak as f64 / peak as f64;
+        assert!(
+            ratio <= 1.5 * k as f64,
+            "storage for {k}x the ENDs grew {ratio:.2}x"
+        );
+    }
+}
+#[test]
+fn a_packet_holds_at_most_max_segments_receiver_events() {
+    for ends in [8, 9] {
+        let b = Budget::new(4 * 1024 * 1024).unwrap();
+        let c = AtomicBool::new(false);
+        let limits = DisplayLimits {
+            max_segments: 8,
+            ..DisplayLimits::default()
+        };
+        let mut d = RecoveryDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
+        let raw = segment(0x80, &[]).repeat(ends);
+        let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
+        d.push(&mut bytes, stamp(), &c).unwrap();
+        let result = loop {
+            match d.poll(&mut WorkBudget::new(4096), &c) {
+                Ok(RecoveryStatus::OutputReady) => break Ok(d.take_output(&c).unwrap()),
+                Ok(RecoveryStatus::Yield) => {}
+                Ok(other) => panic!("unexpected {other:?}"),
+                Err(error) => break Err(error),
+            }
+        };
+        match result {
+            Ok(out) => assert_eq!((ends, out.receiver_sets().len()), (8, 8)),
+            Err(error) => assert_eq!(
+                (ends, error),
+                (
+                    9,
+                    Error::Limit {
+                        requested: 9,
+                        maximum: 8
+                    }
+                )
+            ),
+        }
+    }
+}

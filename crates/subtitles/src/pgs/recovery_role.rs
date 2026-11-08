@@ -5,7 +5,7 @@ use super::display_model::{PaletteSnapshot, StoredDisplaySet};
 use super::display_work::DisplayWork;
 use super::indexed_argb::ArgbStorage;
 use super::recovery::{
-    Phase, ReceiverObservations, RecoveredEvent, Refusal, StoredRecoveredPacket,
+    Phase, ReceiverObservations, RecoveredEvent, Refusal, StoredRecoveredPacket, reserve_amortised,
 };
 use super::{DisplayConfig, DisplayLimits, DisplayStatus, Envelope, PacketClock, RecoveryEof};
 use std::fmt::Debug;
@@ -41,7 +41,11 @@ pub trait RecoveryRole: Debug {
     /// they were validated from, when the role shares them.
     fn validated_indices(&self, id: u16, width: u16, height: u16) -> Option<(Bytes, Bytes)>;
     fn palette_candidate(&self) -> Option<&PaletteSnapshot>;
-    fn reserve_event(&mut self) -> Result<()>;
+    /// Work to store the next event: one, plus a move of every stored event
+    /// when their storage has to grow.
+    fn event_cost(&self) -> Result<usize>;
+    /// Room for the next event; a packet holds at most `maximum` events.
+    fn reserve_event(&mut self, maximum: usize) -> Result<()>;
     fn store_event(&mut self, event: RecoveredEvent) -> Result<()>;
     fn finish_packet(
         &mut self,
@@ -263,11 +267,30 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
             .filter(|_| self.source_error.is_none())
     }
 
-    fn reserve_event(&mut self) -> Result<()> {
-        self.events
+    fn event_cost(&self) -> Result<usize> {
+        let events = self
+            .events
+            .as_ref()
+            .ok_or(Error::Invalid("PGS events absent"))?;
+        Ok(if events.len() == events.capacity() {
+            events.len() + 1
+        } else {
+            1
+        })
+    }
+
+    fn reserve_event(&mut self, maximum: usize) -> Result<()> {
+        let events = self
+            .events
             .as_mut()
-            .ok_or(Error::Invalid("PGS events absent"))?
-            .try_reserve_exact(1)
+            .ok_or(Error::Invalid("PGS events absent"))?;
+        if events.len() >= maximum {
+            return Err(Error::Limit {
+                requested: events.len() + 1,
+                maximum,
+            });
+        }
+        reserve_amortised(events, 1, maximum)
     }
 
     fn store_event(&mut self, event: RecoveredEvent) -> Result<()> {
