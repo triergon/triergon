@@ -3,7 +3,7 @@
 Every module is measured against a pinned reference implementation doing the same
 work: FFmpeg for containers, framing, subtitle decoding, codecs and capture, FreeType
 for font tables and outlines, HarfBuzz and FriBidi for shaping and bidi, and libass
-for subtitle rendering. The gates and the
+for rasterising and subtitle rendering. The gates and the
 measurement rules below are the same for every reference. A module is complete only
 when it passes all three gates on every case in its corpus.
 
@@ -80,15 +80,36 @@ resource limit becomes an explicit, reviewed rule for that case.
   the shaper rests on `shape-libass`, `shape-bidi`, `shape-simple` and
   `shape-unicode`. `cargo xtask shape compare` reports the required five, with
   `--all` all six.
-- **Generated manifests and pins.** The font and shaping features commit no case
-  rows. `cargo xtask fonts manifest` and `cargo xtask shape manifest` generate them
-  from `harness/fonts/corpus.json`, the shaping texts and each feature's settings
-  (`xtask/src/fonts/manifest.rs`, `xtask/src/shape/manifest.rs`), and take each
-  case's expected work from `harness/features/<feature>/pins.json`. Pins are the
-  reference's folds: re-record them with `cargo xtask fonts manifest --record` or
-  `cargo xtask shape manifest --record` after `cargo xtask build-workers`, and never
-  edit them by hand. `cargo xtask check-design` fails when the generated case ids
-  and the pins differ or a pin file is not in the form the recorder writes. Every
+- **libass pin.** `cargo xtask raster prepare` builds the libass 0.17.5 release
+  tarball (hash-checked, tree verified after the build) as a static library
+  without a system font provider (`--disable-fontconfig --disable-coretext
+  --disable-directwrite --disable-libunibreak
+  --disable-require-system-font-provider`), `-O2 -ffp-contract=off`, against
+  the FreeType, FriBidi and HarfBuzz builds above, so each library has one
+  build, and records it in `.research/libass/build.json`. `cargo xtask
+  build-workers` then links the reference worker (`harness/reference_raster.h`):
+  it includes `ass_render.c` from the pinned tree to reach libass's internal
+  stages and is compiled with the flags libass compiled itself with
+  (`libass-internal.pc`). Its features run libass's outline, stroker,
+  rasteriser, blur, composition and clipping stages on glyphs of the font
+  corpus loaded as libass loads them with hinting off (FreeType in the
+  reference, `triergon-font` in the candidate; `raster-glyphs`) and on seeded
+  random outlines (`raster-outlines`) and bitmaps (`raster-bitmaps`), all
+  required by `cargo xtask check`; `raster-sweep`, every corpus file at three
+  heights with larger random sets, runs on demand. `cargo xtask raster compare`
+  reports the required three, with `--all` all four.
+- **Generated manifests and pins.** The font, shaping and rasterising features
+  commit no case rows. `cargo xtask fonts manifest`, `cargo xtask shape manifest`
+  and `cargo xtask raster manifest` generate them from `harness/fonts/corpus.json`,
+  the shaping texts, seeded random cases and each feature's settings
+  (`xtask/src/{fonts,shape,raster}/manifest.rs`, registered in
+  `xtask/src/lanes.rs`), and take each case's expected work from
+  `harness/features/<feature>/pins.json`. Pins are the reference's folds:
+  re-record them with `cargo xtask fonts manifest --record`, `cargo xtask shape
+  manifest --record` or `cargo xtask raster manifest --record` after `cargo
+  xtask build-workers`, and never edit them by hand. `cargo xtask check-design`
+  fails when the generated case ids and the pins differ or a pin file is not in
+  the form the recorder writes. Every
   harness command reads such a manifest at `harness/features/<feature>/corpus.json`;
   its identity is the SHA-256 of the generated JSON, the bytes the generator
   writes, so it is deterministic.
@@ -164,8 +185,9 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, the three font features with `font-worker` and FreeType, and
-the five shaping features with `shape-worker` and HarfBuzz and FriBidi.
+and `formats` references, the three font features with `font-worker` and FreeType,
+the five shaping features with `shape-worker` and HarfBuzz and FriBidi, and the
+four rasterising features with `raster-worker` and libass.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
@@ -198,7 +220,8 @@ open cases are expected to be rejected by both builds, and the campaign keeps th
 manifest as `manifest.json` for replay. `cargo xtask codecs fuzz --lane L` builds it
 from a codec lane's FATE vectors instead: release and `checked` builds of `codec-worker`
 (release optimisation with overflow checks and debug assertions) decode each mutation
-whole. `cargo xtask check` runs one round on each required font feature.
+whole. `cargo xtask check` runs one round on smoke cases of each required font,
+shaping and rasterising feature.
 
 On native AArch64 or 32-bit ARMv7 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.

@@ -4,7 +4,7 @@
 
 You need Rust (see `rust-version` in `Cargo.toml`; the full check also installs the
 dated nightly toolchain pinned in xtask for the optional SIMD lane), Python 3, a C compiler,
-a C++ compiler and `make` (for the FFmpeg, FreeType, HarfBuzz and FriBidi builds),
+a C++ compiler and `make` (for the FFmpeg, FreeType, HarfBuzz, FriBidi and libass builds),
 `pkg-config` and zlib headers (NASM on x86), and `zstd` (for zstd-compressed evidence sets
 and their test). The references are only needed for differential and performance work.
 
@@ -12,7 +12,8 @@ and their test). The references are only needed for differential and performance
 cargo xtask fixtures              # generate the authored test corpus into .research/
 cargo test --workspace            # library tests
 cargo xtask prepare-check         # once: pinned references (FFmpeg, FreeType,
-                                  # HarfBuzz, FriBidi), fixtures, font corpus, workers
+                                  # HarfBuzz, FriBidi, libass), fixtures, font
+                                  # corpus, workers
 cargo xtask check                 # everything CI runs
 ```
 
@@ -46,7 +47,7 @@ benchmarks assume it.
   `harness/codecs/`, the capture input generator `harness/capture/generate_inputs.py`
   (numpy's PCG64 generator and float draws; the cited capture inputs must not change)
   and fixture authoring scripts. C is used only for workers that link a reference
-  (FFmpeg, FreeType, HarfBuzz and FriBidi).
+  (FFmpeg, FreeType, HarfBuzz, FriBidi and libass).
 
 ## Changing behaviour
 
@@ -58,10 +59,12 @@ benchmarks assume it.
    `--benchmark --memory --require-acceptance` on an isolated AArch64 Linux machine when
    the change touches parsing or decoding hot paths; for `triergon-font`,
    `cargo xtask fonts compare --all` with the same options, for `triergon-shape`
-   `cargo xtask shape compare --all`, and
+   `cargo xtask shape compare --all`, for `triergon-raster`
+   `cargo xtask raster compare --all`, and
    `cargo xtask fuzz --contract harness/features/<feature>/contract.json --output DIR`.
    When a reference changes, re-record its pins with `cargo xtask fonts manifest
-   --record` or `cargo xtask shape manifest --record`; pins are never edited by hand. Put the
+   --record`, `cargo xtask shape manifest --record` or `cargo xtask raster manifest
+   --record`; pins are never edited by hand. Put the
    per-case results in the pull request and update [docs/status.md](docs/status.md).
 
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
