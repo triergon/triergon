@@ -78,13 +78,18 @@ selected AVC, a drained TS188 PUSI carrier carrying valid PCR and a discontinuit
 indicator may emit a complete finite packet in its original source epoch. The
 actual later source `Timeline` must confirm exactly the next clock epoch through
 `confirm_source_timeline` before more input or EOF. Configuration and entity stay
-the same. Only future packet source epochs change; the existing `DemuxClock`
+the same. Confirmation consumes its source event ordinal, so later carriers
+cannot reuse it. Only future packet source epochs change; the existing `DemuxClock`
 interval stays intact. A missing Timeline or quarantined clock remains a refusal.
 
 `PesFaultPolicy::terminal_transport` can preserve completed nonempty finite AVC
 packets before one final partial or sync-invalid TS188 carrier. Its original
 transport diagnostic must immediately follow the last admitted carrier, with no
-unfinished PES. `hold_terminal_transport` only stages that diagnostic. Real
+unfinished PES. Bind the original core cursor with `bind_source_input` before
+admitting any carrier. Late binding and replacement bindings are refused. The
+same pool, source, generation and sequential request must supply both terminal
+confirmations; a fresh cursor cannot replace a failed one. `hold_terminal_transport`
+only stages that diagnostic. Real
 `TransportStream::media_entity_end` and core EOF must seal the exact final extent
 through `seal_terminal_end`, followed by source `Finished` and another core EOF
 check through `confirm_terminal_finished`. Only then does `terminal_confirmation`

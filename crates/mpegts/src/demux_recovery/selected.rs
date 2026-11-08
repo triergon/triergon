@@ -453,7 +453,10 @@ impl RecoveryObserver {
                 "selected source Timeline context unobserved",
             ));
         }
-        self.inner.commit_clock_epoch(c.epochs);
+        self.inner.commit_clock_epoch(c);
+        if let Some((ordinal, _)) = self.last.as_mut() {
+            *ordinal = (*ordinal).max(c.source_event_ordinal);
+        }
         self.pending_timeline = None;
         Ok(())
     }

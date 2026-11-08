@@ -119,7 +119,9 @@ The complete host observations and exact source are retained as
 
 Source-boundary policies additionally require a real Timeline for a selected
 PCR/DI transition, or real core/framer EOF and source Finished for one unusable
-final carrier after completed nonempty finite packets. A separate live macOS
+final carrier after completed nonempty finite packets. Confirmed Timeline
+ordinals fence later input, and terminal proofs require the core input identity
+bound before carrier admission. A separate live macOS
 (`aarch64-apple-darwin`) comparison at
 `e7e1102c0afd466af24e9e8b969e823d5772a230` matches 90 of 97 operations against
 the pinned FFmpeg formats worker and unchanged recorded folds, retaining all
