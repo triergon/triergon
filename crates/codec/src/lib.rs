@@ -49,12 +49,28 @@ impl DecodeFailure {
     }
 }
 
+/// The sample format a decoder produces natively, before its samples become the
+/// frame's `f32` planes. Mixing follows it: FFmpeg's resampler mixes 16-bit input in
+/// fixed point.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SampleFormat {
+    #[default]
+    Float,
+    /// Signed 16-bit; each sample is exactly `x / 2^15`.
+    S16,
+    /// Signed 32-bit, left-justified; each sample is `x / 2^31` rounded to `f32`,
+    /// exact for up to 24 significant bits.
+    S32,
+}
+
 /// Decoded audio of one access unit: planar `f32` at full scale 1.0.
 #[derive(Clone, Debug, Default)]
 pub struct AudioFrame {
     pub sample_rate: u32,
     pub layout: ChannelLayout,
     pub samples_per_channel: usize,
+    /// What the planes are images of.
+    pub sample_format: SampleFormat,
     /// One plane per speaker of `layout`, in its order, `samples_per_channel` samples each.
     pub planes: Vec<Vec<f32>>,
 }
