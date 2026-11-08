@@ -16730,6 +16730,15 @@
    "sha256": "65161697b5c5a79289df268d63ff79ef6e776559db48b36b9e45e1c219cf51e7",
    "bytes": 14049861,
    "source_revision": "f99d893196908d562c897bccb20c6a972cd25d11"
+  },
+  {
+   "name": "packet-framing-configuration-lookup",
+   "path": "packet-framing-configuration-lookup",
+   "retention": "retained",
+   "reason": "packet-framing configuration lookup and paired build comparisons cited by docs/status.md",
+   "key": "evidence/packet-framing-configuration-lookup/f3c88cd969c581ebd803e860a0c52f5ee00285a99f85d563aa949862140cf33f.tar.gz",
+   "sha256": "f3c88cd969c581ebd803e860a0c52f5ee00285a99f85d563aa949862140cf33f",
+   "bytes": 104415028
   }
  ]
 }

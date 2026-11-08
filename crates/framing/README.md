@@ -142,6 +142,9 @@ charges their full element size, including inline descriptors. Passthrough packe
 share the original payload. Segment descriptors store the wire-bounded NAL
 length once, with full-width source and output offsets. Whole-packet passthrough
 lengths remain full width as well.
+Contiguous copying selects the packet buffer directly for packet segments and
+looks up the active configuration only for configuration segments. Both paths
+retain their checked payload ranges.
 
 **Codec-specific limits.**
 
