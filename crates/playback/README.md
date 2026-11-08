@@ -137,11 +137,11 @@ reads in a 1/1 base, and a zero-size read ends native delivery, with a
 `NativeEmptyPacket` where FFmpeg emits one. On a seekable source the recovery
 opener refuses a zero-size fragment sample in the header, as FFmpeg does.
 `Mp4Open::new` refuses out-of-source, truncated and zero-timescale media and
-reads zero-size samples as declared. On a source of unknown length it reports
-a chunk offset beyond the end of the file followed by a lower one as an
-unsupported layout (`Unsupported`) rather than invalid data, because the index
-refuses the decreasing offsets before the `mdat` extent is known; this is a
-known defect.
+reads zero-size samples as declared. When a single track's first chunk lies
+beyond the media read before indexing and a later chunk lies before it, a
+source of unknown length may still hold that chunk in a later `mdat`: the
+view reads on and refuses it as outside the media extent (`Invalid`) at the
+physical end, or as an unsupported layout once the source passes its start.
 
 **MPEG-TS.** `ts_native_program_v1` selects up to 64 PIDs of one program.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB

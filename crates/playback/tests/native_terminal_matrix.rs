@@ -438,12 +438,11 @@ fn recovery_native_view_matches_ffprobe_on_the_terminal_matrix() {
 /// - It reads the zero-size fragment samples that FFprobe refuses from a
 ///   seekable source.
 /// - It refuses a zero media timescale while opening.
-/// - It refuses a chunk offset outside the source while indexing. On a source
-///   of unknown length this is a known defect: the first chunk lies beyond the
-///   end of the file and the next one before it, and the index refuses the
-///   decreasing offsets as an unsupported layout before the `mdat` extent that
-///   would show the first chunk outside the source is known, so malformed data
-///   is reported as `Unsupported`.
+/// - It refuses a chunk offset outside the source. The first chunk lies beyond
+///   the end of the file and the next one before it. When the source declares
+///   its length, the index refuses the first chunk; when it does not, the
+///   chunk could lie in a later `mdat`, so the refusal comes at the physical
+///   end of the source.
 /// - It refuses a sample that runs past the end of the source. When the
 ///   source declares its length, a final `mdat` of size zero has a known end,
 ///   and a sample beyond it is outside the media extent (`Invalid`); when it
@@ -456,8 +455,6 @@ fn strict_native_view_refuses_malformed_media_on_the_terminal_matrix() {
     use Outcome::{Completed, Refused};
     use Stage::{Index, Open, Read};
     const OUTSIDE: Error = Error::Invalid("sample outside media extent");
-    const LAYOUT: Error =
-        Error::Unsupported("physical merge needs nondecreasing per-track source offsets");
     const ZERO_SCALE: Error = Error::Invalid("zero media/movie timescale");
     assert_matrix(
         Opener::Strict,
@@ -479,7 +476,7 @@ fn strict_native_view_refuses_malformed_media_on_the_terminal_matrix() {
                 "mp4--bad-chunk-offset-outside-source",
                 Pipe,
                 6,
-                Refused(Index, LAYOUT),
+                Refused(Read, OUTSIDE),
             ),
             (
                 "mp4--bad-chunk-offset-outside-source",
