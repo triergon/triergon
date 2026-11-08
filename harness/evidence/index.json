@@ -46,6 +46,15 @@
  },
  "sets": [
   {
+   "name": "mpegts-control-completion-macos",
+   "retention": "retained",
+   "reason": "MPEG-TS control-only completion status row: the complete 97-case live macOS comparison, 81 matching operations, 16 explicit open cases, previous outputs and refusals, exact source and workers",
+   "key": "evidence/mpegts-control-completion-macos/d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b.tar.gz",
+   "sha256": "d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b",
+   "bytes": 52915620,
+   "source_revision": "65eeada0888bcd112d4cbd90e68795fea93fd864"
+  },
+  {
    "name": "worker-build-selection",
    "retention": "90 days",
    "key": "qualification/repository/worker-build-selection/67d70ab82906705f581bbb02215ab30a42aa505e1334cb1691fed9a8302d8dc4.tar.gz",

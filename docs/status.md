@@ -99,8 +99,11 @@ including completion code commit `08bf9e9ef6e4d932b3eb46d03893ca62797b273a`
 on main `1f7b54799e9a9716abbfec0e0c6515d384641835`.
 The complete 97-case comparison report has SHA-256
 `345fd608c847f0b8fead1706f2ff73ef10fe34622be02f97fc26cdd8525d9586`
-and records source graph and worker binary identities. This comparison collected
-no runtime or memory measurements and does not qualify access units.
+and records source graph and worker binary identities. Raw comparisons, source
+and worker binaries are archived at SHA-256
+`d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b`.
+This comparison collected no runtime or memory measurements and does not qualify
+access units.
 
 The MPEG-TS runtime and memory columns use the gate build at `090c856df65f9247d24ea9f1c927e35cf5d528e8` on a
 c8g.2xlarge pinned to CPU 1, with 30 timing pairs of 50 operations and 30 memory pairs
@@ -154,6 +157,7 @@ timing of the reference built with and without zeroed automatic variables.
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |
 | Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
 | MPEG-TS | `090c856df65f9247d24ea9f1c927e35cf5d528e8` | `6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1` |
+| MPEG-TS control-only completion (macOS) | `65eeada0888bcd112d4cbd90e68795fea93fd864` | `d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b` |
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | ARMv7: ISO BMFF / MP4 | `f99d893196908d562c897bccb20c6a972cd25d11` | `bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1` |
 | ARMv7: packet framing, codec conformance, tests | `9621f6063a2e517fecc1c28757e6bed50b5228a8` | `9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e` |
