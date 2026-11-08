@@ -339,9 +339,11 @@ Verification:
   it. Every measured case passes those numeric gates. The 16 parity failures
   keep the feature unaccepted.
 
-The separate macOS host comparison of the finite source-fault policies matches
-87 of 97 operations, retaining all 272 requests. Its other 10 operations remain
-failures. Those policies have not been qualified by the native measurement above.
+A separate live comparison of the finite source-fault policies on macOS
+(`aarch64-apple-darwin`, source `f3f439b803e079208c9ab422270a77feb6281207`)
+checks all 97 operations and 272 requests against the pinned FFmpeg formats worker
+and unchanged recorded folds: 87 match and 10 remain failures. That source has no
+native timing or memory qualification; the native figures above apply to `5634f47d`.
 
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
