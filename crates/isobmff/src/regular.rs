@@ -1272,6 +1272,13 @@ pub struct SyncDiagnostic {
     pub field_end: u64,
     pub strict_error: Error,
 }
+/// A recovered declaration whose sync rows were rejected has unknown access.
+fn recovery_access(mut source: Sample, unknown_access: bool) -> Sample {
+    if unknown_access {
+        source.access = Access::Unknown;
+    }
+    source
+}
 #[derive(Debug)]
 pub struct RecoverySourceCursor<'a> {
     inner: SampleCursor<'a>,
@@ -1280,12 +1287,10 @@ pub struct RecoverySourceCursor<'a> {
 impl RecoverySourceCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
         match self.inner.poll(work)? {
-            SampleStep::Sample(mut source) => {
-                if self.unknown_access {
-                    source.access = Access::Unknown;
-                }
-                Ok(SampleStep::Sample(source))
-            }
+            SampleStep::Sample(source) => Ok(SampleStep::Sample(recovery_access(
+                source,
+                self.unknown_access,
+            ))),
             other => Ok(other),
         }
     }
@@ -1315,12 +1320,8 @@ impl RecoveryPacketCursor<'_> {
     }
     pub fn take_occurrence(&mut self) -> Result<RecoveryOccurrence> {
         let row = self.inner.take_occurrence()?;
-        let mut source = row.source;
-        if self.unknown_access {
-            source.access = Access::Unknown;
-        }
         Ok(RecoveryOccurrence {
-            source,
+            source: recovery_access(row.source, self.unknown_access),
             demux: row.demux,
             track_id: row.track_id,
             source_timescale: self.source_timescale,
@@ -1354,10 +1355,6 @@ impl RecoveryIndexCursor<'_> {
     }
     pub fn take_entry(&mut self) -> Result<RecoveryIndexEntry> {
         let e = self.inner.take_entry()?;
-        let mut source = e.occurrence.source;
-        if self.unknown_access {
-            source.access = Access::Unknown;
-        }
         Ok(RecoveryIndexEntry {
             ordinal: e.ordinal,
             position: e.position,
@@ -1365,7 +1362,7 @@ impl RecoveryIndexCursor<'_> {
             flags: e.flags,
             size: e.size,
             min_distance: e.min_distance,
-            source,
+            source: recovery_access(e.occurrence.source, self.unknown_access),
             source_timescale: self.source_timescale,
         })
     }

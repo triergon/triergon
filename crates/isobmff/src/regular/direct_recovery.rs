@@ -162,7 +162,7 @@ impl RunRecoveryTable {
         })
     }
 }
-fn count(n: u64, max: u64) -> Result<()> {
+pub(super) fn count(n: u64, max: u64) -> Result<()> {
     if n > max {
         return Err(Error::Limit {
             requested: usize::try_from(n).map_err(|_| Error::Overflow)?,
@@ -170,6 +170,71 @@ fn count(n: u64, max: u64) -> Result<()> {
         });
     }
     Ok(())
+}
+/// Polls `inner` unless a failure is latched, the caller cancelled or an item is
+/// ready. Any error, cancellation included, latches and drops the ready item.
+pub(super) fn poll_latched<C, T>(
+    cursor: &mut C,
+    slots: fn(&mut C) -> (&mut Option<Error>, &mut Option<T>),
+    inner: fn(&mut C, &mut WorkBudget, &AtomicBool) -> Result<CursorStatus>,
+    work: &mut WorkBudget,
+    cancel: &AtomicBool,
+) -> Result<CursorStatus> {
+    let (failed, ready) = slots(cursor);
+    if let Some(e) = *failed {
+        return Err(e);
+    }
+    let result = if cancel.load(Ordering::Relaxed) {
+        Err(Error::Cancelled)
+    } else if ready.is_some() {
+        Ok(CursorStatus::Ready)
+    } else {
+        inner(cursor, work, cancel)
+    };
+    if let Err(e) = result {
+        let (failed, ready) = slots(cursor);
+        *failed = Some(e);
+        *ready = None;
+    }
+    result
+}
+/// The ready item unless a failure is latched.
+pub(super) fn take_latched<T>(
+    failed: Option<Error>,
+    ready: &mut Option<T>,
+    missing: &'static str,
+) -> Result<T> {
+    if let Some(e) = failed {
+        return Err(e);
+    }
+    ready.take().ok_or(Error::Invalid(missing))
+}
+/// Native index fields of a demux packet; the error texts name the profile.
+pub(super) fn native_index_entry(
+    packet: &PacketView,
+    ordinal: u64,
+    distance: u64,
+    flags_error: &'static str,
+    position_error: &'static str,
+) -> Result<DescriptionIndexEntry> {
+    let size = packet
+        .source_range
+        .end
+        .checked_sub(packet.source_range.start)
+        .ok_or(Error::Overflow)?;
+    count(size, 0x1fff_ffff)?;
+    if packet.flags & !1 != 0 {
+        return Err(Error::Unsupported(flags_error));
+    }
+    Ok(DescriptionIndexEntry {
+        ordinal,
+        position: i64::try_from(packet.source_range.start)
+            .map_err(|_| Error::Unsupported(position_error))?,
+        timestamp: packet.dts_field.signed_ticks(),
+        flags: i32::from(packet.flags & 1 != 0),
+        size: u32::try_from(size).map_err(|_| Error::Overflow)?,
+        min_distance: i32::try_from(distance).map_err(|_| Error::Overflow)?,
+    })
 }
 #[derive(Debug, Clone, Copy, Default)]
 struct DirectState {
@@ -257,12 +322,8 @@ impl DirectCursor<'_> {
         } else {
             DirectAssociation::DeclarationCoordinate
         };
-        let mut declaration = declaration;
-        if self.table.sync_diagnostic.is_some() {
-            declaration.access = Access::Unknown;
-        }
         let row = DirectOccurrence {
-            declaration,
+            declaration: recovery_access(declaration, self.table.sync_diagnostic.is_some()),
             demux,
             source_timescale: self.source_timescale,
             association,
@@ -302,23 +363,15 @@ impl<'a> From<RecoveryPacketCursor<'a>> for DirectPacketCursor<'a> {
 }
 impl DirectPacketCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        if let Some(e) = self.failed {
-            return Err(e);
-        }
-        let r = self.poll_inner(work, cancel);
-        if let Err(e) = r {
-            self.failed = Some(e);
-            self.ready = None;
-        }
-        r
+        poll_latched(
+            self,
+            |c| (&mut c.failed, &mut c.ready),
+            Self::poll_inner,
+            work,
+            cancel,
+        )
     }
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if self.ready.is_some() {
-            return Ok(CursorStatus::Ready);
-        }
         if let Some(c) = &mut self.legacy {
             return match c.poll(work, cancel)? {
                 CursorStatus::Ready => {
@@ -359,12 +412,7 @@ impl DirectPacketCursor<'_> {
         }
     }
     pub fn take_occurrence(&mut self) -> Result<DirectOccurrence> {
-        if let Some(e) = self.failed {
-            return Err(e);
-        }
-        self.ready
-            .take()
-            .ok_or(Error::Invalid("no ready v2 observation"))
+        take_latched(self.failed, &mut self.ready, "no ready v2 observation")
     }
 }
 #[derive(Clone, Debug)]
@@ -407,23 +455,15 @@ impl<'a> From<RecoveryIndexCursor<'a>> for DirectIndexCursor<'a> {
 }
 impl DirectIndexCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        if let Some(e) = self.failed {
-            return Err(e);
-        }
-        let r = self.poll_inner(work, cancel);
-        if let Err(e) = r {
-            self.failed = Some(e);
-            self.ready = None;
-        }
-        r
+        poll_latched(
+            self,
+            |c| (&mut c.failed, &mut c.ready),
+            Self::poll_inner,
+            work,
+            cancel,
+        )
     }
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if self.ready.is_some() {
-            return Ok(CursorStatus::Ready);
-        }
         match &mut self.engine {
             IndexEngine::Legacy(c) => match c.poll(work, cancel)? {
                 CursorStatus::Ready => {
@@ -450,30 +490,26 @@ impl DirectIndexCursor<'_> {
                     }
                     count(self.next.checked_add(1).ok_or(Error::Overflow)?, self.limit)?;
                     let r = c.take_occurrence()?;
-                    let size = r
-                        .demux
-                        .source_range
-                        .end
-                        .checked_sub(r.demux.source_range.start)
-                        .ok_or(Error::Overflow)?;
-                    count(size, 0x1fff_ffff)?;
-                    if r.demux.flags & !1 != 0 {
-                        return Err(Error::Unsupported("v2 direct native index flags"));
-                    }
-                    let key = r.demux.flags & 1 != 0;
-                    let distance = if key || self.next == 0 {
+                    // Cannot overflow: the distance never exceeds the bounded ordinal.
+                    let distance = if r.demux.flags & 1 != 0 || self.next == 0 {
                         0
                     } else {
                         self.distance.checked_add(1).ok_or(Error::Overflow)?
                     };
+                    let e = native_index_entry(
+                        &r.demux,
+                        self.next,
+                        distance,
+                        "v2 direct native index flags",
+                        "native index signed position",
+                    )?;
                     self.ready = Some(DirectIndexEntry {
-                        ordinal: self.next,
-                        position: i64::try_from(r.demux.source_range.start)
-                            .map_err(|_| Error::Unsupported("native index signed position"))?,
-                        timestamp: r.demux.dts_field.signed_ticks(),
-                        flags: i32::from(key),
-                        size: u32::try_from(size).map_err(|_| Error::Overflow)?,
-                        min_distance: i32::try_from(distance).map_err(|_| Error::Overflow)?,
+                        ordinal: e.ordinal,
+                        position: e.position,
+                        timestamp: e.timestamp,
+                        flags: e.flags,
+                        size: e.size,
+                        min_distance: e.min_distance,
                         declaration: r.declaration,
                         association: r.association,
                         range_error: r.range_error,
@@ -487,9 +523,6 @@ impl DirectIndexCursor<'_> {
         }
     }
     pub fn take_entry(&mut self) -> Result<DirectIndexEntry> {
-        if let Some(e) = self.failed {
-            return Err(e);
-        }
-        self.ready.take().ok_or(Error::Invalid("no ready v2 index"))
+        take_latched(self.failed, &mut self.ready, "no ready v2 index")
     }
 }
