@@ -87,9 +87,9 @@ impl Track {
     pub fn program(&self) -> u16 {
         self.program_map().header.extension
     }
-    /// The original PMT/source configuration epoch. In-band SPS/PPS changes
-    /// remain source NALs and do not advance this value; this is not a parsed
-    /// codec-configuration revision.
+    /// The elementary route's configuration epoch. Reused routes keep it across
+    /// PMT version or PCR binding changes. In-band parameter sets remain source
+    /// NALs and do not advance this value.
     pub fn configuration_epoch(&self) -> u64 {
         self.epoch
     }
@@ -276,6 +276,13 @@ impl PacketInfo for Packet {
 #[derive(Clone, Debug)]
 pub enum ReaderEvent {
     Source(SourceEvent),
+    /// A completed PES whose source header predates a program boundary.
+    /// Both source events remain available for recovery without asserting an AU
+    /// association across the changed map or clock binding.
+    InterruptedPes {
+        source: SourceEvent,
+        boundary: SourceEvent,
+    },
     /// No complete AU framer is admitted for this stream. Its PMT and PES
     /// still surface as source events; no PES is relabelled as an AU.
     Unsupported {
