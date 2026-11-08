@@ -71,9 +71,30 @@ impl RequestedFont {
     }
 }
 
-/// A requested font, by its index in the [`Library`].
+/// A requested font, by an identity the [`Library`] never gives another
+/// font, so what is keyed by it (outlines) cannot be taken for another font
+/// once the font leaves the library.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(super) struct FontId(usize);
+pub(super) struct FontId(u64);
+
+/// One description of a family the library was asked for: its weight, slant
+/// and orientation, the font made for it (`None` when no face could be
+/// found, which is remembered, as libass remembers it), and the frame it was
+/// last asked for in.
+#[derive(Debug)]
+struct Requested {
+    weight: u32,
+    slant: u32,
+    vertical: bool,
+    font: Option<FontId>,
+    used: u64,
+}
+
+impl Requested {
+    fn is(&self, desc: &FontDesc<'_>) -> bool {
+        self.weight == desc.weight && self.slant == desc.slant && self.vertical == desc.vertical
+    }
+}
 
 /// libass's font description (`ASS_FontDesc`).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -99,13 +120,17 @@ enum DefaultFont {
     None,
 }
 
-/// Bytes charged for each requested font and registered face beyond the
-/// storage that charges itself: the map slot, key and handle.
+/// Bytes charged for each requested font, description and registered face
+/// beyond the storage that charges itself and the family names, which are
+/// charged by length: the map slots and handles.
 const ENTRY_BYTES: usize = 128;
 
-/// The faces fonts are selected from and the fonts requested so far. Like
-/// libass's font cache it is never trimmed: the faces a font gathered decide
-/// later lookups.
+/// The faces fonts are selected from and the fonts requested so far, cut to
+/// the font limit of the renderer's [`CacheLimits`](super::CacheLimits) at
+/// each frame: the descriptions asked for least recently go first, never one
+/// the last frame asked for. libass keeps every font it made; a font asked
+/// for again after it left the library starts over from the face selected
+/// for it, without the faces it had gathered for other characters.
 #[derive(Debug)]
 pub(super) struct Library {
     budget: Budget,
@@ -116,8 +141,17 @@ pub(super) struct Library {
     embedded: usize,
     default_family: Option<Box<[u8]>>,
     default_font: DefaultFont,
-    fonts: BudgetVec<RequestedFont>,
-    by_key: HashMap<Key, Option<FontId>>,
+    fonts: HashMap<FontId, RequestedFont>,
+    next_font: u64,
+    /// The descriptions asked for, by family name, so a lookup borrows the
+    /// name it is given.
+    by_family: HashMap<Box<[u8]>, Vec<Requested>>,
+    /// How many descriptions `by_family` holds.
+    requested: usize,
+    /// The bytes of the family names held: the map's keys and the fonts'.
+    name_bytes: usize,
+    /// The current frame, which descriptions are stamped with when asked for.
+    frame: u64,
     charge: Reservation,
 }
 
@@ -135,8 +169,12 @@ impl Library {
                 .default_font
                 .clone()
                 .map_or(DefaultFont::None, DefaultFont::Unopened),
-            fonts: BudgetVec::new(budget),
-            by_key: HashMap::new(),
+            fonts: HashMap::new(),
+            next_font: 0,
+            by_family: HashMap::new(),
+            requested: 0,
+            name_bytes: 0,
+            frame: 0,
             charge: Reservation::empty(budget),
         };
         for file in &fonts.attached {
@@ -182,8 +220,57 @@ impl Library {
     }
 
     fn charge_entries(&mut self) -> Result<()> {
-        let entries = self.faces.len() + self.by_key.len();
-        self.charge.resize_to(entries.saturating_mul(ENTRY_BYTES))
+        let entries = self.faces.len() + self.requested + self.fonts.len();
+        self.charge.resize_to(
+            entries
+                .saturating_mul(ENTRY_BYTES)
+                .saturating_add(self.name_bytes),
+        )
+    }
+
+    /// Starts a frame: cuts the fonts to `limit` descriptions, least recently
+    /// asked for first, keeping those the last frame asked for.
+    pub(super) fn begin_frame(&mut self, limit: usize) -> Result<()> {
+        self.frame += 1;
+        let excess = self.requested.saturating_sub(limit);
+        if excess == 0 {
+            return Ok(());
+        }
+        let last = self.frame - 1;
+        let mut stamps = BudgetVec::new(&self.budget);
+        stamps.try_reserve_exact(self.requested)?;
+        for requested in self.by_family.values().flatten() {
+            if requested.used < last {
+                stamps.try_push(requested.used).map_err(|e| e.error)?;
+            }
+        }
+        if stamps.is_empty() {
+            return Ok(());
+        }
+        stamps.as_mut_slice().sort_unstable();
+        // Frames stamp many descriptions alike: the oldest frames go whole.
+        let oldest = stamps.as_slice()[excess.min(stamps.len()) - 1];
+        let fonts = &mut self.fonts;
+        let (mut removed, mut freed) = (0, 0);
+        self.by_family.retain(|family, list| {
+            list.retain(|requested| {
+                let keep = requested.used > oldest;
+                if !keep {
+                    removed += 1;
+                    if let Some(font) = requested.font.and_then(|id| fonts.remove(&id)) {
+                        freed += font.key.family.len();
+                    }
+                }
+                keep
+            });
+            if list.is_empty() {
+                freed += family.len();
+            }
+            !list.is_empty()
+        });
+        self.requested -= removed;
+        self.name_bytes -= freed;
+        self.charge_entries()
     }
 
     /// The requested font for `desc` (`ass_font_new`): built and given its
@@ -194,35 +281,53 @@ impl Library {
         desc: &FontDesc<'_>,
         work: &mut WorkBudget,
     ) -> Result<Option<FontId>> {
+        let frame = self.frame;
+        if let Some(requested) = self
+            .by_family
+            .get_mut(desc.family)
+            .and_then(|list| list.iter_mut().find(|r| r.is(desc)))
+        {
+            requested.used = frame;
+            return Ok(requested.font);
+        }
         let key = Key {
             family: desc.family.into(),
             weight: desc.weight,
             slant: desc.slant,
             vertical: desc.vertical,
         };
-        if let Some(&id) = self.by_key.get(&key) {
-            return Ok(id);
-        }
-        let mut font = RequestedFont {
-            key: key.clone(),
-            faces: BudgetVec::new(&self.budget),
-        };
         let id = match self.choose(&key, 0, work)? {
             Some(face) => {
-                font.faces.try_push(face).map_err(|e| e.error)?;
-                let id = FontId(self.fonts.len());
-                self.fonts.try_push(font).map_err(|e| e.error)?;
+                let mut faces = BudgetVec::new(&self.budget);
+                faces.try_push(face).map_err(|e| e.error)?;
+                let id = FontId(self.next_font);
+                self.next_font += 1;
+                self.name_bytes += key.family.len();
+                self.fonts.insert(id, RequestedFont { key, faces });
                 Some(id)
             }
             None => None,
         };
-        self.by_key.insert(key, id);
+        let requested = Requested {
+            weight: desc.weight,
+            slant: desc.slant,
+            vertical: desc.vertical,
+            font: id,
+            used: frame,
+        };
+        if let Some(list) = self.by_family.get_mut(desc.family) {
+            list.push(requested);
+        } else {
+            self.name_bytes += desc.family.len();
+            self.by_family.insert(desc.family.into(), vec![requested]);
+        }
+        self.requested += 1;
         self.charge_entries()?;
         Ok(id)
     }
 
     pub(super) fn get(&self, id: FontId) -> &RequestedFont {
-        &self.fonts.as_slice()[id.0]
+        &self.fonts[&id]
     }
 
     /// The face and glyph of `symbol` in font `id` (`ass_font_get_index`):
@@ -237,7 +342,7 @@ impl Library {
         if symbol < 0x20 {
             return Ok((0, GlyphId(0)));
         }
-        let font = &self.fonts.as_slice()[id.0];
+        let font = &self.fonts[&id];
         // Each face the font has gathered is tried.
         charge(work, font.faces.len())?;
         if let Some(found) = font
@@ -255,7 +360,9 @@ impl Library {
         let Some(face) = self.choose(&key, symbol, work)? else {
             return Ok((0, GlyphId(0)));
         };
-        let font = &mut self.fonts.as_mut_slice()[id.0];
+        let Some(font) = self.fonts.get_mut(&id) else {
+            return Ok((0, GlyphId(0)));
+        };
         let index = if let Some(index) = font.faces().iter().position(|f| f.uid == face.uid) {
             index
         } else {
@@ -289,13 +396,9 @@ impl Library {
                 None => return Ok(None),
             },
         };
-        let mut infos = BudgetVec::new(&self.budget);
-        infos.try_reserve_exact(self.faces.len())?;
-        for face in self.faces.as_slice() {
-            infos
-                .try_push(FaceInfo::new(&face.font))
-                .map_err(|e| e.error)?;
-        }
+        // What matching reads of a face is three fields of the parsed font, so
+        // each search reads them as it reaches the face, without storage.
+        let infos = || self.faces.iter().map(|face| FaceInfo::new(&face.font));
         let by_family = |family: &[u8]| {
             let family = std::str::from_utf8(family).ok()?;
             let request = Request {
@@ -304,7 +407,7 @@ impl Library {
                 slant: key.slant,
                 character,
             };
-            select(infos.as_slice(), &request).map(Choice::Registered)
+            select(infos(), &request).map(Choice::Registered)
         };
         let requested = Some(&*key.family)
             .filter(|family| !family.is_empty())
@@ -365,5 +468,39 @@ mod tests {
         assert_eq!(library.font(&desc, &mut work), Ok(None));
         // The failure is remembered.
         assert_eq!(library.font(&desc, &mut work), Ok(None));
+    }
+
+    #[test]
+    fn names_are_charged_and_the_least_recent_leave() {
+        let budget = Budget::new(16 << 20).unwrap();
+        let mut library = Library::new(&budget, &Fonts::default()).unwrap();
+        let mut work = triergon_core::WorkBudget::new(1 << 20);
+        let empty = budget.used();
+        let names: Vec<Vec<u8>> = (0..20).map(|i| format!("{i:04000}").into_bytes()).collect();
+        let desc = |family| crate::FontDesc {
+            family,
+            vertical: false,
+            weight: 400,
+            slant: 0,
+        };
+        for (frame, name) in names.iter().enumerate() {
+            library.begin_frame(4).unwrap();
+            // Each frame asks for a new name and the one before it again.
+            library.font(&desc(name), &mut work).unwrap();
+            if frame > 0 {
+                library.font(&desc(&names[frame - 1]), &mut work).unwrap();
+            }
+            assert!(library.requested <= 5, "{}", library.requested);
+            // The names are charged by length.
+            assert!(budget.used() >= empty + library.requested * 4000);
+        }
+        // The last frame's names stay; the oldest went.
+        let kept = |library: &Library, name: &[u8]| library.by_family.contains_key(name);
+        assert!(kept(&library, &names[19]) && kept(&library, &names[18]));
+        assert!(!kept(&library, &names[0]));
+        // With no room, only what the last frame asked for stays.
+        library.begin_frame(0).unwrap();
+        assert!(kept(&library, &names[19]) && kept(&library, &names[18]));
+        assert!(!kept(&library, &names[17]));
     }
 }

@@ -259,9 +259,14 @@ composites), and `CacheLimits::new(glyphs, megabytes)` gives what
 `ass_set_cache_limits` sets. The outline count bounds the outline cache:
 glyph and drawing outlines are kept between frames and cut to it at each
 frame as libass cuts its outline cache, least recently used first, never one
-the previous frame's images were drawn from. Requested fonts and their faces
-are kept for the renderer's life, as libass keeps its font cache, and shaping
-plans up to 256; all are charged to the renderer's budget. The byte limits
+the previous frame's images were drawn from. Requested fonts and the faces
+they gathered are kept up to `CacheLimits::fonts` font descriptions (10,000
+by default), cut at each frame the same way, never one the previous frame
+asked for; libass keeps them all, so a font asked for again after it left
+starts over from its first face. Shaping plans are kept up to 256. All of it
+is charged to the renderer's budget, family names and drawing texts by
+length, and looked up by the names and texts the script holds, without
+copying them. The byte limits
 bound nothing: there is no bitmap or composite cache, so glyph bitmaps and
 composites are drawn again each frame, with the same images.
 

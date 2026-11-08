@@ -40,18 +40,12 @@ pub(super) struct GlyphKey {
     pub(super) decorations: Decorations,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum Key {
-    Glyph(GlyphKey),
-    Drawing(Box<[u8]>),
-}
-
 /// Work units charged per outline built beyond its points or text: sizing
 /// the face and loading the glyph.
 const OUTLINE_UNITS: usize = 64;
 
-/// Bytes charged per entry beyond the outline's own storage: the map slot,
-/// key and value header.
+/// Bytes charged per entry beyond the outline's own storage and a drawing's
+/// text, which is charged by length: the map slot, key and value header.
 const ENTRY_BYTES: usize = 192;
 
 /// An outline kept, `None` for one that cannot be built, and when it was
@@ -70,7 +64,11 @@ struct Entry {
 #[derive(Debug)]
 pub(super) struct Outlines {
     budget: Budget,
-    entries: HashMap<Key, Entry>,
+    glyphs: HashMap<GlyphKey, Entry>,
+    /// Drawings by their text, so a lookup borrows the text it is given.
+    drawings: HashMap<Box<[u8]>, Entry>,
+    /// The bytes of the drawings' texts.
+    text_bytes: usize,
     clock: u64,
     charge: Reservation,
     scratch: triergon_font::Outline,
@@ -80,45 +78,73 @@ impl Outlines {
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
             budget: budget.clone(),
-            entries: HashMap::new(),
+            glyphs: HashMap::new(),
+            drawings: HashMap::new(),
+            text_bytes: 0,
             clock: 0,
             charge: Reservation::empty(budget),
             scratch: triergon_font::Outline::new(budget),
         }
     }
 
+    fn len(&self) -> usize {
+        self.glyphs.len() + self.drawings.len()
+    }
+
+    fn charge_entries(&mut self) -> Result<()> {
+        self.charge.resize_to(
+            self.len()
+                .saturating_mul(ENTRY_BYTES)
+                .saturating_add(self.text_bytes),
+        )
+    }
+
     /// Cuts the cache to `limit` outlines, oldest first, keeping those still
     /// held elsewhere (`ass_cache_cut`).
     pub(super) fn trim(&mut self, limit: usize) -> Result<()> {
-        if self.entries.len() <= limit {
+        let excess = self.len().saturating_sub(limit);
+        if excess == 0 {
             return Ok(());
         }
-        let mut free = BudgetVec::new(&self.budget);
-        for (key, entry) in &self.entries {
-            if entry
+        // Every use is stamped apart, so the stamp of the `excess`th oldest
+        // free entry divides those that go from those that stay.
+        let free = |entry: &Entry| {
+            entry
                 .value
                 .as_ref()
                 .is_none_or(|v| Arc::strong_count(v) == 1)
-            {
-                free.try_push((entry.used, key.clone()))
-                    .map_err(|e| e.error)?;
+        };
+        let mut stamps = BudgetVec::new(&self.budget);
+        stamps.try_reserve_exact(self.len())?;
+        for entry in self.glyphs.values().chain(self.drawings.values()) {
+            if free(entry) {
+                stamps.try_push(entry.used).map_err(|e| e.error)?;
             }
         }
-        free.as_mut_slice().sort_unstable_by_key(|(used, _)| *used);
-        let excess = self.entries.len() - limit;
-        for (_, key) in free.as_slice().iter().take(excess) {
-            self.entries.remove(key);
+        if stamps.is_empty() {
+            return Ok(());
         }
-        self.charge
-            .resize_to(self.entries.len().saturating_mul(ENTRY_BYTES))
+        stamps.as_mut_slice().sort_unstable();
+        let oldest = stamps.as_slice()[excess.min(stamps.len()) - 1];
+        let stays = |entry: &Entry| entry.used > oldest || !free(entry);
+        self.glyphs.retain(|_, entry| stays(entry));
+        let mut freed = 0;
+        self.drawings.retain(|text, entry| {
+            let keep = stays(entry);
+            if !keep {
+                freed += text.len();
+            }
+            keep
+        });
+        self.text_bytes -= freed;
+        self.charge_entries()
     }
 
-    /// The outline kept for `key`, marked as used now.
-    fn get(&mut self, key: &Key) -> Option<&Entry> {
-        self.clock += 1;
-        let entry = self.entries.get_mut(key)?;
-        entry.used = self.clock;
-        Some(entry)
+    /// Marks `entry` as used now.
+    fn touch(clock: &mut u64, entry: &mut Entry) -> Option<Arc<OutlineValue>> {
+        *clock += 1;
+        entry.used = *clock;
+        entry.value.clone()
     }
 
     /// The outline of a glyph of `font`, `None` when its face cannot load it.
@@ -128,9 +154,8 @@ impl Outlines {
         font: &RequestedFont,
         work: &mut WorkBudget,
     ) -> Result<Option<Arc<OutlineValue>>> {
-        let key = Key::Glyph(glyph);
-        if let Some(entry) = self.get(&key) {
-            return Ok(entry.value.clone());
+        if let Some(entry) = self.glyphs.get_mut(&glyph) {
+            return Ok(Self::touch(&mut self.clock, entry));
         }
         charge(work, OUTLINE_UNITS)?;
         let source = &font.faces()[glyph.face].font;
@@ -140,16 +165,14 @@ impl Outlines {
             Err(Error::Invalid(_) | Error::Overflow) => None,
             Err(error) => return Err(error),
         };
-        self.insert(key, value.clone())?;
-        Ok(value)
-    }
-
-    fn insert(&mut self, key: Key, value: Option<Arc<OutlineValue>>) -> Result<()> {
         self.clock += 1;
-        let used = self.clock;
-        self.entries.insert(key, Entry { value, used });
-        self.charge
-            .resize_to(self.entries.len().saturating_mul(ENTRY_BYTES))
+        let entry = Entry {
+            value: value.clone(),
+            used: self.clock,
+        };
+        self.glyphs.insert(glyph, entry);
+        self.charge_entries()?;
+        Ok(value)
     }
 
     /// The outline of a drawing, `None` when libass discards it.
@@ -159,9 +182,8 @@ impl Outlines {
         limits: &Limits,
         work: &mut WorkBudget,
     ) -> Result<Option<Arc<OutlineValue>>> {
-        let key = Key::Drawing(drawing.text.into());
-        if let Some(entry) = self.get(&key) {
-            return Ok(entry.value.clone());
+        if let Some(entry) = self.drawings.get_mut(drawing.text) {
+            return Ok(Self::touch(&mut self.clock, entry));
         }
         // The parser passes over the text once.
         charge(work, OUTLINE_UNITS.saturating_add(drawing.text.len()))?;
@@ -175,7 +197,14 @@ impl Outlines {
                 shape: Shape::from_outlines(outline, Outline::new(&self.budget)),
             })
         });
-        self.insert(key, value.clone())?;
+        self.clock += 1;
+        let entry = Entry {
+            value: value.clone(),
+            used: self.clock,
+        };
+        self.text_bytes += drawing.text.len();
+        self.drawings.insert(drawing.text.into(), entry);
+        self.charge_entries()?;
         Ok(value)
     }
 

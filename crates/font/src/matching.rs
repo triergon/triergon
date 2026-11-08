@@ -1,6 +1,8 @@
 //! Choosing a face for an ASS style's font name, bold and italic values, with
 //! libass's scoring.
 
+use std::borrow::Borrow;
+
 use crate::name::{NameId, NameRecord, Platform};
 use crate::{Font, OutlineFormat};
 
@@ -154,10 +156,17 @@ impl<'a> FaceInfo<'a> {
 /// A face whose family name matches scores [`FaceInfo::score`]; one whose full or
 /// PostScript name matches instead scores zero. The lowest score wins, the
 /// earlier face on a tie, and a face that does not map `request.character` is
-/// passed over. A face scoring zero ends the search.
-pub fn select(faces: &[FaceInfo<'_>], request: &Request<'_>) -> Option<usize> {
+/// passed over. A face scoring zero ends the search. `faces` is any sequence
+/// of infos, such as a slice of them or infos made as the search reaches each
+/// face, which needs no storage.
+pub fn select<'a, I>(faces: I, request: &Request<'_>) -> Option<usize>
+where
+    I: IntoIterator,
+    I::Item: Borrow<FaceInfo<'a>>,
+{
     let mut best: Option<(u32, usize)> = None;
-    for (index, face) in faces.iter().enumerate() {
+    for (index, face) in faces.into_iter().enumerate() {
+        let face = face.borrow();
         let score = if face.has_family(request.family) {
             face.score(request)
         } else if face.has_full_name(request.family) {

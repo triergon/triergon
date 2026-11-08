@@ -157,6 +157,7 @@ impl Renderer {
             });
         }
         self.library.register_embedded(script.fonts())?;
+        self.library.begin_frame(self.frame.cache.fonts)?;
         self.outlines.trim(self.frame.cache.outlines)?;
         let geometry = self.frame.place(script);
         self.scratch.images.clear();

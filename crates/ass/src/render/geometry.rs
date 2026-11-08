@@ -47,9 +47,9 @@ pub struct FrameMargins {
 }
 
 /// How much a [`Renderer`](super::Renderer) keeps between frames: outlines
-/// by count, glyph bitmaps and composited runs by bytes.
-/// [`CacheLimits::LIBASS`], the default, is libass's; [`CacheLimits::new`]
-/// gives what `ass_set_cache_limits` sets.
+/// and font descriptions by count, glyph bitmaps and composited runs by
+/// bytes. [`CacheLimits::LIBASS`], the default, is libass's;
+/// [`CacheLimits::new`] gives what `ass_set_cache_limits` sets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CacheLimits {
     /// Glyph and drawing outlines kept, at most.
@@ -58,6 +58,11 @@ pub struct CacheLimits {
     pub bitmap_bytes: usize,
     /// Bytes of composited runs kept, at most.
     pub composite_bytes: usize,
+    /// Font descriptions (family, weight, slant, orientation) kept with the
+    /// fonts made for them, at most. libass keeps them all; past this many,
+    /// those asked for least recently go, never one the last frame asked
+    /// for, and a font asked for again starts over from its first face.
+    pub fonts: usize,
 }
 
 impl CacheLimits {
@@ -65,19 +70,25 @@ impl CacheLimits {
     /// `COMPOSITE_RATIO + 1` (`COMPOSITE_CACHE_RATIO`).
     const COMPOSITE_RATIO: usize = 2;
 
+    /// The font descriptions kept, which libass does not bound: far more
+    /// than a script names.
+    pub const FONTS: usize = 10_000;
+
     /// libass's limits before `ass_set_cache_limits`: 10,000 outlines
     /// (`GLYPH_CACHE_MAX`), 128 MiB of glyph bitmaps and 64 MiB of
-    /// composites.
+    /// composites, and [`CacheLimits::FONTS`] font descriptions.
     pub const LIBASS: Self = Self {
         outlines: 10_000,
         bitmap_bytes: 128 << 20,
         composite_bytes: (128 << 20) / Self::COMPOSITE_RATIO,
+        fonts: Self::FONTS,
     };
 
     /// The limits `ass_set_cache_limits(glyphs, megabytes)` sets: `glyphs`
     /// outlines, and `megabytes` MiB split two thirds to glyph bitmaps and
     /// one third to composites. libass reads 0 as its default for either
-    /// value; here 0 keeps nothing beyond what the last frame holds.
+    /// value; here 0 keeps nothing beyond what the last frame holds. Font
+    /// descriptions keep their bound, [`CacheLimits::FONTS`].
     pub const fn new(glyphs: usize, megabytes: usize) -> Self {
         let total = megabytes.saturating_mul(1 << 20);
         let composite_bytes = total / (Self::COMPOSITE_RATIO + 1);
@@ -85,6 +96,7 @@ impl CacheLimits {
             outlines: glyphs,
             bitmap_bytes: total - composite_bytes,
             composite_bytes,
+            fonts: Self::FONTS,
         }
     }
 }
