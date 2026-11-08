@@ -131,8 +131,11 @@ retain extra pool handles or add descriptor heap charges.
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs allocate segment storage as needed and share the original
-payload for passthrough packets. Segment descriptors store the wire-bounded NAL
+Stateful packet jobs keep up to four segment descriptors inline, then spill the
+complete table into charged heap storage. A refused spill keeps the inline
+descriptors intact for retry. Retaining complete outputs in a `BudgetVec` charges
+their full element size, including inline descriptors. Passthrough packets share
+the original payload. Segment descriptors store the wire-bounded NAL
 length once, with full-width source and output offsets. Whole-packet passthrough
 lengths remain full width as well.
 
