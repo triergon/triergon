@@ -66,7 +66,9 @@ pub(super) struct EventBox {
 }
 
 impl EventBox {
-    fn takes_part(&self) -> bool {
+    /// Whether collision handling moves the event: it detects collisions and
+    /// has an area.
+    pub(super) fn takes_part(&self) -> bool {
         self.detect_collisions && self.height != 0 && self.width != 0
     }
 

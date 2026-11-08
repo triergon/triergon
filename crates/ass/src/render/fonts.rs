@@ -7,10 +7,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use triergon_core::{Budget, BudgetVec, Bytes, Reservation, Result};
+use triergon_core::{Budget, BudgetVec, Bytes, Reservation, Result, WorkBudget};
 use triergon_font::{FaceInfo, Font, GlyphId, Limits, Request, select};
 
-use crate::{EmbeddedFont, FontDesc};
+use crate::{EmbeddedFont, FontDesc, charge};
 
 /// Faces libass keeps per requested font at most (`ASS_FONT_MAX_FACES`).
 const MAX_FACES: usize = 10;
@@ -189,7 +189,11 @@ impl Library {
     /// The requested font for `desc` (`ass_font_new`): built and given its
     /// first face on first request; `None` when no face can be found for it,
     /// which makes an event that uses it fail.
-    pub(super) fn font(&mut self, desc: &FontDesc<'_>) -> Result<Option<FontId>> {
+    pub(super) fn font(
+        &mut self,
+        desc: &FontDesc<'_>,
+        work: &mut WorkBudget,
+    ) -> Result<Option<FontId>> {
         let key = Key {
             family: desc.family.into(),
             weight: desc.weight,
@@ -203,7 +207,7 @@ impl Library {
             key: key.clone(),
             faces: BudgetVec::new(&self.budget),
         };
-        let id = match self.choose(&key, 0)? {
+        let id = match self.choose(&key, 0, work)? {
             Some(face) => {
                 font.faces.try_push(face).map_err(|e| e.error)?;
                 let id = FontId(self.fonts.len());
@@ -224,11 +228,18 @@ impl Library {
     /// The face and glyph of `symbol` in font `id` (`ass_font_get_index`):
     /// the first face that maps it, else a face selected for it and added to
     /// the font, else glyph 0 of that face or of the first.
-    pub(super) fn glyph(&mut self, id: FontId, symbol: u32) -> Result<(usize, GlyphId)> {
+    pub(super) fn glyph(
+        &mut self,
+        id: FontId,
+        symbol: u32,
+        work: &mut WorkBudget,
+    ) -> Result<(usize, GlyphId)> {
         if symbol < 0x20 {
             return Ok((0, GlyphId(0)));
         }
         let font = &self.fonts.as_slice()[id.0];
+        // Each face the font has gathered is tried.
+        charge(work, font.faces.len())?;
         if let Some(found) = font
             .faces()
             .iter()
@@ -241,7 +252,7 @@ impl Library {
             return Ok((0, GlyphId(0)));
         }
         let key = font.key.clone();
-        let Some(face) = self.choose(&key, symbol)? else {
+        let Some(face) = self.choose(&key, symbol, work)? else {
             return Ok((0, GlyphId(0)));
         };
         let font = &mut self.fonts.as_mut_slice()[id.0];
@@ -257,7 +268,10 @@ impl Library {
 
     /// `ass_font_select` for `font` and `code` (any face for 0): the face to
     /// add, opening the default font file if it is chosen.
-    fn choose(&mut self, key: &Key, code: u32) -> Result<Option<Face>> {
+    fn choose(&mut self, key: &Key, code: u32, work: &mut WorkBudget) -> Result<Option<Face>> {
+        // The requested and the default family are each matched against
+        // every registered face.
+        charge(work, self.faces.len().saturating_mul(2))?;
         Ok(match self.select(key, code)? {
             Some(Choice::Registered(index)) => Some(self.faces.as_slice()[index].clone()),
             Some(Choice::Default) => self.default_face(),
@@ -347,8 +361,9 @@ mod tests {
             weight: 400,
             slant: 0,
         };
-        assert_eq!(library.font(&desc), Ok(None));
+        let mut work = triergon_core::WorkBudget::new(1 << 20);
+        assert_eq!(library.font(&desc, &mut work), Ok(None));
         // The failure is remembered.
-        assert_eq!(library.font(&desc), Ok(None));
+        assert_eq!(library.font(&desc, &mut work), Ok(None));
     }
 }

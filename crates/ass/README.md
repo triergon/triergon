@@ -319,11 +319,19 @@ and the events held; exceeding one is `Error::Policy`, an exhausted budget
 so tag evaluation recurses at most one level. `Syllables` is linear in the glyphs
 it is given. Evaluating an event allocates nothing. A `Renderer` charges its
 glyph lists, outlines, plans, fonts, bitmaps, images and scratch to its
-`Budget`; the layout of an event takes its work from the script's `Limits`
-(a pass per stage over its glyphs, and one for every rebalancing pass), and so
-does the drawing of a frame: one work budget for all its glyph bitmaps,
-composites and vector clips, charged as `triergon-raster` charges them.
-Shaping and bidi run under the limits of their crates.
+`Budget`. `Settings::work` bounds the work of a whole frame, by default
+`Settings::DEFAULT_WORK` (2²⁸ units), and every stage of every shown event
+shares that one budget: evaluation (a pass over the effect and the text),
+font selection (each registered face matched, each gathered face tried),
+shaping (each run's characters and the few characters of context it reads),
+outlines (each one built and its points), layout (a pass per stage over the
+glyphs, and one for every rebalancing pass), drawing (glyph bitmaps,
+composites and vector clips, charged as `triergon-raster` charges them) and
+collision handling (each event against those placed before it in its
+layer). The charge grows linearly with the events and their text. Where
+libass would go on drawing, running out is `Error::Policy`; a caller that
+wants libass's unbounded behaviour raises the setting. Shaping and bidi also
+run under the limits of their crates.
 Malformed input is read as libass reads it, skipping what it skips, and never
 panics.
 

@@ -52,6 +52,7 @@ pub(super) fn retrieve(
     limits: &Limits,
     scales: &Scales,
     par: f64,
+    work: &mut WorkBudget,
 ) -> Result<()> {
     for i in 0..glyphs.len {
         let mut member = Some(i);
@@ -59,7 +60,7 @@ pub(super) fn retrieve(
             member = glyphs.get(g).next;
             let info = glyphs.get(g);
             let (value, scale, offset_y, asc, desc) = if let Some(drawing) = info.drawing {
-                let Some(value) = outlines.drawing(&drawing, limits)? else {
+                let Some(value) = outlines.drawing(&drawing, limits, work)? else {
                     continue;
                 };
                 let base = 1_i32.wrapping_shl(drawing.scale.wrapping_sub(1) as u32);
@@ -83,7 +84,7 @@ pub(super) fn retrieve(
                     italic: info.italic,
                     decorations: info.decorations,
                 };
-                let Some(value) = outlines.glyph(key, font)? else {
+                let Some(value) = outlines.glyph(key, font, work)? else {
                     continue;
                 };
                 let (asc, desc) = (value.asc, value.desc);

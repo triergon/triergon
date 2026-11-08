@@ -160,8 +160,9 @@ impl Renderer {
         self.outlines.trim(self.frame.cache.outlines)?;
         let geometry = self.frame.place(script);
         self.scratch.images.clear();
-        // One budget bounds the drawing of the whole frame.
-        let mut work = script.limits().work();
+        // One budget bounds the whole frame: every event's evaluation, font
+        // selection, shaping, layout and drawing, and collision handling.
+        let mut work = WorkBudget::new(self.frame.work);
         let mut boxes = std::mem::replace(&mut self.scratch.boxes, BudgetVec::new(&self.budget));
         boxes.clear();
         for index in 0..script.events().len() {
@@ -183,6 +184,9 @@ impl Renderer {
                 .position(|b| b.layer != layer)
                 .map_or(boxes.len(), |n| start + n);
             let group = &mut boxes.as_mut_slice()[start..end];
+            // Each event that takes part is fitted against those before it.
+            let taking_part = group.iter().filter(|b| b.takes_part()).count();
+            charge(&mut work, taking_part.saturating_mul(taking_part))?;
             let placed = &mut self.scratch.placed;
             placed.clear();
             for b in group.iter() {
@@ -238,6 +242,14 @@ impl Renderer {
         if event.style >= script.styles().len() {
             return Ok(None);
         }
+        // Evaluation passes over the effect and the text once.
+        charge(
+            work,
+            event
+                .effect()
+                .map_or(0, <[u8]>::len)
+                .saturating_add(event.text().len()),
+        )?;
         let mut context = Context::new(script, event, now, geometry.layout_res)?;
         let explicit = context.state().explicit;
         let scales = geometry.scales(explicit, script.info().scaled_border_and_shadow);
@@ -247,6 +259,7 @@ impl Renderer {
             &mut self.library,
             &scales,
             geometry.par,
+            work,
         )?
         else {
             return Ok(None);
@@ -267,7 +280,14 @@ impl Renderer {
                 margin(event.margins.vertical, style.margins.vertical),
             ],
         };
-        let bbox = self.lay_out(script, event.start, now, geometry, &laid, &mut glyphs)?;
+        let bbox = self.lay_out(
+            script,
+            now.wrapping_sub(event.start),
+            geometry,
+            &laid,
+            &mut glyphs,
+            work,
+        )?;
         let lines = &self.scratch.lines;
         let device = device_position(geometry, &laid, &bbox, lines, self.frame.line_position);
         set_shifts(&mut glyphs, geometry, &laid, &bbox, device);
@@ -332,22 +352,21 @@ impl Renderer {
         }))
     }
 
-    /// Shapes and lays out an event's glyphs, from its style runs to the
-    /// baseline shear: the text box.
+    /// Shapes and lays out an event's glyphs, `elapsed` milliseconds into
+    /// the event, from its style runs to the baseline shear: the text box.
     fn lay_out(
         &mut self,
         script: &Script,
-        start: i64,
-        now: i64,
+        elapsed: i64,
         geometry: &Geometry,
         laid: &Laid<'_>,
         glyphs: &mut Glyphs<'_>,
+        work: &mut WorkBudget,
     ) -> Result<TextBox> {
         let info = script.info();
-        // Every stage below passes over the glyphs once (the line
-        // rebalancing charges its own passes).
-        let mut work = script.limits().work();
-        charge(&mut work, glyphs.list.len().saturating_mul(16))?;
+        // Every stage below passes over the glyphs once; font fallback,
+        // shaping, outlines and the line rebalancing charge their own work.
+        charge(work, glyphs.list.len().saturating_mul(16))?;
         glyphs.split_style_runs(&self.library);
         let (base, whole_text) = Shaping::base_for(laid.last.encoding);
         let shaping = Shaping {
@@ -357,8 +376,8 @@ impl Renderer {
             language: info.language(),
         };
         self.shaper
-            .find_runs(glyphs, &mut self.library, shaping.whole_text)?;
-        let mut bidi = self.shaper.shape(glyphs, &self.library, &shaping)?;
+            .find_runs(glyphs, &mut self.library, shaping.whole_text, work)?;
+        let mut bidi = self.shaper.shape(glyphs, &self.library, &shaping, work)?;
         layout::retrieve(
             glyphs,
             &self.library,
@@ -366,6 +385,7 @@ impl Renderer {
             script.limits(),
             &laid.scales,
             geometry.par,
+            work,
         )?;
         layout::preliminary(glyphs);
 
@@ -385,9 +405,9 @@ impl Renderer {
             spacing,
             &laid.scales,
             lines,
-            &mut work,
+            work,
         )?;
-        layout::karaoke(glyphs, now.wrapping_sub(start), &mut self.scratch.karaoke)?;
+        layout::karaoke(glyphs, elapsed, &mut self.scratch.karaoke)?;
         shaping::reorder(glyphs, &mut bidi, &shaping, &mut self.scratch.map)?;
         let map = self.scratch.map.as_slice();
         layout::reorder(glyphs, map, lines, spacing);
@@ -497,7 +517,7 @@ impl Renderer {
             scale: clip.scale,
             baseline: 0,
         };
-        let Some(outline) = self.outlines.drawing(&drawing, script.limits())? else {
+        let Some(outline) = self.outlines.drawing(&drawing, script.limits(), work)? else {
             return Ok(None);
         };
         let base = 1_i32.wrapping_shl(clip.scale.wrapping_sub(1) as u32);

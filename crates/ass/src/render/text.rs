@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use triergon_core::{Budget, BudgetVec, Result};
+use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_font::GlyphId;
 use triergon_raster::{Rect, Vector, pixels_26_6};
 use triergon_shape::Script as WritingScript;
@@ -157,12 +157,13 @@ impl<'s> Glyphs<'s> {
         library: &mut Library,
         scales: &Scales,
         par: f64,
+        work: &mut WorkBudget,
     ) -> Result<Option<Self>> {
         let mut list = BudgetVec::new(budget);
         while let Some(glyph) = context.next_glyph()? {
             let state = glyph.state;
             let desc = state.font();
-            let Some(font) = library.font(&desc)? else {
+            let Some(font) = library.font(&desc, work)? else {
                 return Ok(None);
             };
             let (symbol, drawing) = match glyph.symbol {

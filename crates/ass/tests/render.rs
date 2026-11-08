@@ -190,6 +190,84 @@ fn an_exhausted_budget_is_an_error() {
     ));
 }
 
+/// `events` events of `\fe-1` text with a colour change at every glyph, so
+/// each glyph is a run of its own shaped within the whole text, at their own
+/// places so they do not collide.
+fn coloured_lines(events: usize, glyphs: usize) -> String {
+    let mut text = String::new();
+    for event in 0..events {
+        let y = 20 + event * 7 % 340;
+        text.push_str(&format!(
+            "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{{\\pos(320,{y})\\fe-1}}"
+        ));
+        for glyph in 0..glyphs {
+            let letter = ['A', 'B', 'C'][glyph % 3];
+            text.push_str(&format!("{{\\c&H{:06X}&}}{letter}", glyph * 0x0001_0103));
+        }
+        text.push('\n');
+    }
+    text
+}
+
+/// Whether a fresh renderer whose frames are bounded by `work` units renders
+/// `events` at 1 s; a frame beyond the bound is refused as `Policy`.
+fn renders_within(budget: &Budget, events: &str, work: u64) -> bool {
+    let mut settings = Settings::new(Size::new(1280, 720));
+    settings.storage = Some(Size::new(640, 360));
+    settings.work = work;
+    let fonts = Fonts {
+        attached: vec![test_sans(budget)],
+        ..Fonts::default()
+    };
+    let mut renderer = Renderer::new(budget, &settings, &fonts).unwrap();
+    let mut script = script(budget, events);
+    match renderer.render(&mut script, 1000) {
+        Ok(frame) => {
+            assert!(!frame.images.is_empty());
+            true
+        }
+        Err(Error::Policy(_)) => false,
+        Err(error) => panic!("{error:?}"),
+    }
+}
+
+/// The work units a frame of `events` is charged: the least bound that
+/// renders it.
+fn frame_work(budget: &Budget, events: &str) -> u64 {
+    let (mut refused, mut rendered) = (0, Settings::DEFAULT_WORK);
+    assert!(renders_within(budget, events, rendered));
+    while rendered - refused > 1 {
+        let mid = refused + (rendered - refused) / 2;
+        if renders_within(budget, events, mid) {
+            rendered = mid;
+        } else {
+            refused = mid;
+        }
+    }
+    rendered
+}
+
+#[test]
+fn a_frame_is_bounded_by_its_work_setting_and_charged_linearly() {
+    let budget = Budget::new(256 << 20).unwrap();
+    let base = coloured_lines(4, 30);
+    let work = frame_work(&budget, &base);
+    // Every stage of the frame shares the bound: one unit less is refused.
+    assert!(!renders_within(&budget, &base, work - 1));
+    // Twice the events or twice the text cost about twice the work, not four
+    // times: shaping a run reads only its own text and a few characters of
+    // context, however long the text it is shaped within.
+    let events = frame_work(&budget, &coloured_lines(8, 30));
+    let longer = frame_work(&budget, &coloured_lines(4, 60));
+    for (what, units) in [("events", events), ("glyphs", longer)] {
+        let ratio = units as f64 / work as f64;
+        assert!(
+            (1.7..2.3).contains(&ratio),
+            "{what}: {work} -> {units} units"
+        );
+    }
+}
+
 struct Rng(u64);
 
 impl Rng {

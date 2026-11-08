@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use triergon_core::{Budget, BudgetVec, Reservation, Result, round_ties_even_i32};
+use triergon_core::{Budget, BudgetVec, Reservation, Result, WorkBudget, round_ties_even_i32};
 use triergon_raster::pixels_26_6;
 use triergon_shape::bidi::{BaseDirection, BidiClass, Level, Resolver, reorder_line};
 use triergon_shape::{
@@ -15,6 +15,7 @@ use triergon_shape::{
 
 use super::fonts::Library;
 use super::text::{Break, DRAWN_SIZE, Glyphs};
+use crate::charge;
 
 /// How an event's text is shaped and reordered.
 #[derive(Clone, Copy, Debug)]
@@ -61,6 +62,13 @@ struct PlanKey {
     language: [u8; 4],
     features: [bool; 3],
 }
+
+/// The characters of context a shaping call reads on either side of its item
+/// (HarfBuzz's `HB_BUFFER_CONTEXT_LENGTH`, as `triergon-shape` keeps it).
+const CONTEXT: usize = 5;
+/// Work units charged per shaping call beyond its characters: sizing the
+/// face and finding the plan.
+const RUN_UNITS: usize = 16;
 
 /// Plans kept at most; more are built again when needed.
 const MAX_PLANS: usize = 256;
@@ -185,6 +193,7 @@ impl Shaper {
         glyphs: &mut Glyphs<'_>,
         library: &mut Library,
         whole_text: bool,
+        work: &mut WorkBudget,
     ) -> Result<()> {
         determine_scripts(glyphs);
         let roots = glyphs.roots_mut();
@@ -196,7 +205,7 @@ impl Shaper {
         let mut run = 0;
         for i in 0..roots.len() {
             if !roots[i].is_drawing() && !roots[i].skip {
-                let (face, glyph) = library.glyph(roots[i].font, roots[i].symbol)?;
+                let (face, glyph) = library.glyph(roots[i].font, roots[i].symbol, work)?;
                 roots[i].face = face;
                 roots[i].glyph = glyph;
             }
@@ -228,6 +237,7 @@ impl Shaper {
         glyphs: &mut Glyphs<'_>,
         library: &Library,
         shaping: &Shaping<'_>,
+        work: &mut WorkBudget,
     ) -> Result<Bidi> {
         let len = glyphs.len;
         self.text.clear();
@@ -272,7 +282,7 @@ impl Shaper {
                 start = i + 1;
             }
         }
-        self.shape_runs(glyphs, library, shaping, bidi.levels.as_slice())?;
+        self.shape_runs(glyphs, library, shaping, bidi.levels.as_slice(), work)?;
         Ok(bidi)
     }
 
@@ -283,6 +293,7 @@ impl Shaper {
         library: &Library,
         shaping: &Shaping<'_>,
         levels: &[Level],
+        work: &mut WorkBudget,
     ) -> Result<()> {
         let len = glyphs.len;
         for glyph in glyphs.roots_mut() {
@@ -327,6 +338,13 @@ impl Shaper {
                 );
                 offset - lead..i + 1 + trail
             };
+            // A call shapes the item and reads at most `CONTEXT` characters of
+            // the context on either side (HarfBuzz's buffer context), however
+            // much of the text is handed to it.
+            let read = item.len()
+                + (item.start - context.start).min(CONTEXT)
+                + (context.end - item.end).min(CONTEXT);
+            charge(work, read.saturating_add(RUN_UNITS))?;
             let sized = face_font.font.at_size(pixels_26_6(DRAWN_SIZE))?;
             let metrics = SizedMetrics::new(sized)?;
             let shaper_face = Face::new(&face_font.font);

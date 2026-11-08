@@ -124,9 +124,20 @@ pub struct Settings {
     pub line_position: f64,
     /// What is kept between frames.
     pub cache: CacheLimits,
+    /// Work units bounding one frame as a whole, per frame and not per
+    /// event: every shown event's evaluation, font selection and fallback,
+    /// shaping, outlines, layout and drawing (glyph bitmaps, composites,
+    /// vector clips), and collision handling. Running out is
+    /// `Error::Policy`, where libass would go on drawing;
+    /// [`Settings::DEFAULT_WORK`] by default, and a caller that wants libass's
+    /// unbounded behaviour raises it.
+    pub work: u64,
 }
 
 impl Settings {
+    /// The default work bound of a frame, 2²⁸ units.
+    pub const DEFAULT_WORK: u64 = 1 << 28;
+
     /// libass's defaults for a frame of `frame` pixels: no storage size, no
     /// margins, a derived pixel aspect, font scale 1.
     pub const fn new(frame: Size) -> Self {
@@ -145,6 +156,7 @@ impl Settings {
             line_spacing: 0.0,
             line_position: 0.0,
             cache: CacheLimits::LIBASS,
+            work: Self::DEFAULT_WORK,
         }
     }
 }
@@ -163,6 +175,7 @@ pub(super) struct Canvas {
     pub line_spacing: f64,
     pub line_position: f64,
     pub cache: CacheLimits,
+    pub work: u64,
     /// `frame_content_width` and `frame_content_height`.
     pub content: (i32, i32),
     /// `fit_width` and `fit_height`.
@@ -214,6 +227,7 @@ impl Canvas {
             line_spacing: settings.line_spacing,
             line_position,
             cache: settings.cache,
+            work: settings.work,
             content,
             fit,
         })

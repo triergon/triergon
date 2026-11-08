@@ -6,13 +6,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
+use triergon_core::{Budget, BudgetVec, Error, Reservation, Result, WorkBudget};
 use triergon_font::{Font, GlyphId, Orientation};
 use triergon_raster::{Outline, Shape, Vector, pixels_26_6};
 
 use super::fonts::{FontId, RequestedFont};
 use super::text::{Decorations, DrawingText};
-use crate::{Bold, Drawing, Italic, Limits};
+use crate::{Bold, Drawing, Italic, Limits, charge};
 
 /// An outline and what layout needs of it.
 #[derive(Debug)]
@@ -45,6 +45,10 @@ enum Key {
     Glyph(GlyphKey),
     Drawing(Box<[u8]>),
 }
+
+/// Work units charged per outline built beyond its points or text: sizing
+/// the face and loading the glyph.
+const OUTLINE_UNITS: usize = 64;
 
 /// Bytes charged per entry beyond the outline's own storage: the map slot,
 /// key and value header.
@@ -122,14 +126,16 @@ impl Outlines {
         &mut self,
         glyph: GlyphKey,
         font: &RequestedFont,
+        work: &mut WorkBudget,
     ) -> Result<Option<Arc<OutlineValue>>> {
         let key = Key::Glyph(glyph);
         if let Some(entry) = self.get(&key) {
             return Ok(entry.value.clone());
         }
+        charge(work, OUTLINE_UNITS)?;
         let source = &font.faces()[glyph.face].font;
         let size = f64::from_bits(glyph.size);
-        let value = match self.load(source, font, size, glyph.glyph, glyph.decorations) {
+        let value = match self.load(source, font, size, glyph.glyph, glyph.decorations, work) {
             Ok(value) => Some(Arc::new(value)),
             Err(Error::Invalid(_) | Error::Overflow) => None,
             Err(error) => return Err(error),
@@ -151,11 +157,14 @@ impl Outlines {
         &mut self,
         drawing: &DrawingText<'_>,
         limits: &Limits,
+        work: &mut WorkBudget,
     ) -> Result<Option<Arc<OutlineValue>>> {
         let key = Key::Drawing(drawing.text.into());
         if let Some(entry) = self.get(&key) {
             return Ok(entry.value.clone());
         }
+        // The parser passes over the text once.
+        charge(work, OUTLINE_UNITS.saturating_add(drawing.text.len()))?;
         let mut outline = Outline::new(&self.budget);
         let cbox = Drawing::parse(drawing.text, &mut outline, limits)?.map(|parsed| parsed.cbox);
         let value = cbox.map(|cbox| {
@@ -178,6 +187,7 @@ impl Outlines {
         size: f64,
         glyph: GlyphId,
         decorations: Decorations,
+        work: &mut WorkBudget,
     ) -> Result<OutlineValue> {
         if decorations.rotate {
             return Err(Error::Unsupported("the vertical advance of an @ font"));
@@ -185,6 +195,8 @@ impl Outlines {
         let sized = source.at_size(pixels_26_6(size))?;
         let scratch = &mut self.scratch;
         let metrics = sized.outline_into(glyph, scratch)?;
+        // Synthesis, decoration and the conversion pass over its points.
+        charge(work, scratch.points().len())?;
         sized.synthesize(scratch, source.synthesis(font.weight(), font.slant()))?;
         let advance = metrics.advance;
         let lines = [
