@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "raw-annex-b",
+  "operation": "raw-annex-b-feed",
+  "candidate": "playback-worker",
+  "worker_operation": "raw-video-",
+  "reference": "ffmpeg-formats-native",
+  "contract": [
+    "raw AVC or HEVC Annex B from a preloaded forward-only source read in 4 KiB windows: RawVideoProbe detects the codec, RawVideoSource replays the probed prefix and RawVideoFeed tracks the active configuration; the reference uses the h264 or hevc demuxer and its stock parser",
+    "every access unit through a clean end of the source",
+    "each access unit folded with stream index, unknown PTS and DTS, the picture period of the active SPS timing in 1/1,200,000 s ticks, the IDR or IRAP key flag, size and every payload byte",
+    "the expected fold is recorded per case from the pinned reference worker"
+  ],
+  "required_profiles": [
+    "avc-80x48",
+    "avc-short",
+    "avc-aud0",
+    "avc-aud1",
+    "hevc-aud0",
+    "hevc-aud1"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}
