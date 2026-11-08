@@ -31,9 +31,9 @@ use triergon_core::{
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors,
-    NoMediaConfirmation, PacketCompletion, PesFaultPolicy, PrivateAudioCarriage,
-    PrivateAudioDescriptors, RegisteredCarriage, SourceContext, TransportFaultRecovery,
-    TransportObservation,
+    MalformedInputCompletion, MalformedSourceDisposition, NoMediaConfirmation, PacketCompletion,
+    PesFaultPolicy, PrivateAudioCarriage, PrivateAudioDescriptors, RegisteredCarriage,
+    SourceContext, TransportFaultRecovery, TransportObservation,
 };
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, DvbNamespaceEvidence, ProgramMap};
 use triergon_mpegts::{
@@ -556,6 +556,13 @@ fn packet_operation(
     };
     let mut ordinal = 0_u64;
     let mut logical_eof = None;
+    let mut malformed = MalformedInputCompletion::new(
+        &input,
+        request.format,
+        ParseLimits::default(),
+        request.program,
+    )?;
+    let mut no_packets = None;
     let refused = |mut session: Session,
                    error: &dyn std::fmt::Display,
                    cause: Cause,
@@ -583,13 +590,33 @@ fn packet_operation(
             Step::Ready(event) => {
                 let cause = Cause::event(&event, ordinal, input.source(), demux.source_epochs());
                 ordinal += 1;
-                let routed = session.observe(
-                    &input,
-                    request.program,
-                    &event,
-                    cause,
-                    demux.clock_is_quarantined(),
-                );
+                let grant = malformed.required_work(&event)?;
+                let quarantined = demux.clock_is_quarantined();
+                let disposition = if quarantined {
+                    Ok(Some(MalformedSourceDisposition::Forward))
+                } else {
+                    malformed.observe_source(
+                        &event,
+                        cause.context()?,
+                        &mut input,
+                        session.observer.as_mut(),
+                        &mut WorkBudget::new(grant),
+                        cancel,
+                    )
+                };
+                let routed = match disposition {
+                    Ok(Some(MalformedSourceDisposition::Forward)) => {
+                        session.observe(&input, request.program, &event, cause, quarantined)
+                    }
+                    Ok(Some(
+                        MalformedSourceDisposition::AwaitDiagnostic
+                        | MalformedSourceDisposition::Reported(_),
+                    )) => Ok(()),
+                    Ok(None) => {
+                        return Err("malformed completion yielded on its required grant".into());
+                    }
+                    Err(error) => Err(error),
+                };
                 if let Err(error) = routed {
                     let eligible = error == Error::Unsupported(UNROUTED);
                     return refused(session, &error, cause, eligible);
@@ -615,6 +642,22 @@ fn packet_operation(
                             Ok(true) => {}
                             Ok(false) => {
                                 return Err("terminal confirmation yielded on fixed grant".into());
+                            }
+                            Err(error) => return refused(session, &error, cause, false),
+                        }
+                    }
+                    if malformed.discarded_carriers() != 0 && session.totals.packets == 0 {
+                        match malformed.confirm_no_packets(
+                            session.observer.as_mut(),
+                            &mut input,
+                            &mut WorkBudget::new(WORK),
+                            cancel,
+                        ) {
+                            Ok(Some(confirmation)) => no_packets = Some(confirmation),
+                            Ok(None) => {
+                                return Err(
+                                    "malformed completion terminal yielded on fixed grant".into()
+                                );
                             }
                             Err(error) => return refused(session, &error, cause, false),
                         }
@@ -662,14 +705,22 @@ fn packet_operation(
                         false,
                     );
                 }
+                let physical_end = demux
+                    .media_entity_end(&mut input, &mut WorkBudget::new(WORK), cancel)?
+                    .ok_or("source End yielded on fixed grant")?;
+                if !malformed.seal_physical_end(
+                    &physical_end,
+                    &mut input,
+                    &mut WorkBudget::new(WORK),
+                    cancel,
+                )? {
+                    return Err("malformed completion physical End yielded on fixed grant".into());
+                }
                 if let Some(observer) = session.observer.as_mut()
                     && observer.awaiting_terminal_completion()
                 {
-                    let end = demux
-                        .media_entity_end(&mut input, &mut WorkBudget::new(WORK), cancel)?
-                        .ok_or("source End yielded on fixed grant")?;
                     if !observer.seal_terminal_end(
-                        &end,
+                        &physical_end,
                         &mut input,
                         &mut WorkBudget::new(WORK),
                         cancel,
@@ -682,7 +733,7 @@ fn packet_operation(
             }
         }
     }
-    if session.totals.packets == 0 {
+    if session.totals.packets == 0 && no_packets.is_none() {
         let error = Error::Unsupported("empty observation is not acceptance");
         let cause = Cause::boundary(
             "logical_eof",
@@ -1017,12 +1068,30 @@ mod tests {
     }
 
     #[test]
-    fn damaged_transport_and_pes_and_unfinished_input_stay_refused() {
+    fn reported_malformed_input_reaches_eof_with_no_packets() {
         for file in [
             "transport-afc-reserved.ts",
             "transport-adaptation-overrun.ts",
             "pes-optional-header-overrun.ts",
             "pes-start-prefix-invalid.ts",
+        ] {
+            let totals = run(file, &["188", "1"]);
+            assert!(
+                totals.refusal.is_none(),
+                "{file}: {:?}",
+                totals.refusal.as_ref().map(|r| &r.reason)
+            );
+            assert_eq!(
+                (totals.packets, totals.bytes, totals.digest),
+                (0, 0, 0),
+                "{file}"
+            );
+        }
+    }
+
+    #[test]
+    fn unfinished_and_unexplained_input_stay_refused() {
+        for file in [
             "packet-completion-v1/physical-truncated-tail.ts",
             "packet-completion-v1/pmt-control-truncated-section.ts",
             "packet-completion-v1/unknown-pid-continuation-after-control.ts",
