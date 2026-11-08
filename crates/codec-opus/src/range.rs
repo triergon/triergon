@@ -16,8 +16,6 @@ pub(crate) struct RangeDecoder<'a> {
     rng: u32,
     val: u32,
     rem: u32,
-    /// A decoded symbol or raw-bit read was out of range.
-    error: bool,
 }
 
 const SYM_BITS: u32 = 8;
@@ -46,7 +44,6 @@ impl<'a> RangeDecoder<'a> {
             rng: 1 << CODE_EXTRA,
             val: 0,
             rem: 0,
-            error: false,
         };
         decoder.rem = decoder.read_front();
         decoder.val = decoder.rng - 1 - (decoder.rem >> (SYM_BITS - CODE_EXTRA));
@@ -56,20 +53,20 @@ impl<'a> RangeDecoder<'a> {
 
     #[inline(always)]
     fn read_front(&mut self) -> u32 {
-        // Past the end the decoder reads zeros; the front never overlaps raw bits the
-        // encoder wrote, and a malformed frame only decodes garbage.
-        let byte = if self.offset + self.end_offset < self.data.len() {
-            u32::from(self.data[self.offset])
-        } else {
-            0
-        };
-        self.offset += 1;
-        byte
+        // Past the end the decoder reads zeros. The front may read bytes that also hold
+        // raw bits: the encoder shares the byte where the two meet.
+        match self.data.get(self.offset) {
+            Some(&byte) => {
+                self.offset += 1;
+                u32::from(byte)
+            }
+            None => 0,
+        }
     }
 
     #[inline(always)]
     fn read_back(&mut self) -> u32 {
-        if self.offset + self.end_offset < self.data.len() {
+        if self.end_offset < self.data.len() {
             self.end_offset += 1;
             u32::from(self.data[self.data.len() - self.end_offset])
         } else {
@@ -104,19 +101,12 @@ impl<'a> RangeDecoder<'a> {
     pub(crate) fn update(&mut self, fl: u32, fh: u32, ft: u32, ext: u32) {
         let s = ext * (ft - fh);
         self.val -= s;
-        self.rng = if fl > 0 { ext * (fh - fl) } else { self.rng - s };
+        self.rng = if fl > 0 {
+            ext * (fh - fl)
+        } else {
+            self.rng - s
+        };
         self.normalize();
-    }
-
-    /// A symbol from a frequency table given as `(fl, fh)` lookups: decodes with
-    /// `ec_decode` and returns the index `k` with `cdf[k] <= fs < cdf[k + 1]`, where
-    /// `cdf` has `ft = cdf[last]`.
-    pub(crate) fn decode_cdf(&mut self, cdf: &[u32]) -> usize {
-        let ft = *cdf.last().unwrap_or(&1);
-        let (fs, ext) = self.decode(ft);
-        let k = cdf[1..].iter().position(|&c| fs < c).unwrap_or(cdf.len() - 2);
-        self.update(cdf[k], cdf[k + 1], ft, ext);
-        k
     }
 
     /// `ec_dec_bit_logp`: one bit whose probability of being 1 is `1 / 2^logp`.
@@ -158,7 +148,7 @@ impl<'a> RangeDecoder<'a> {
     }
 
     /// `ec_dec_uint`: a value uniformly distributed in `0..ft`, `ft > 1` (RFC 6716
-    /// section 4.1.5). An out-of-range value sets the error flag and saturates.
+    /// section 4.1.5). An out-of-range value saturates.
     pub(crate) fn uint(&mut self, ft: u32) -> u32 {
         debug_assert!(ft > 1);
         let ft1 = ft - 1;
@@ -169,11 +159,7 @@ impl<'a> RangeDecoder<'a> {
             let (s, ext) = self.decode(top);
             self.update(s, s + 1, top, ext);
             let value = (s << shift) | self.bits(shift);
-            if value > ft1 {
-                self.error = true;
-                return ft1;
-            }
-            value
+            value.min(ft1)
         } else {
             let (s, ext) = self.decode(ft);
             self.update(s, s + 1, ft, ext);
@@ -210,8 +196,10 @@ impl<'a> RangeDecoder<'a> {
     }
 
     /// `ec_tell_frac`: bits used so far in 1/8 bit units, rounded up (section 4.1.6.2).
-    pub(crate) fn tell_frac(&self) -> u32 {
-        let whole = (self.total_bits as u32) << 3;
+    /// After [`Self::exhaust`] on an empty frame this is slightly negative, as the
+    /// reference's unsigned value is once its callers convert it.
+    pub(crate) fn tell_frac(&self) -> i32 {
+        let whole = self.total_bits << 3;
         let mut l = ilog(self.rng);
         let mut r = self.rng >> (l - 16);
         for _ in 0..3 {
@@ -220,7 +208,14 @@ impl<'a> RangeDecoder<'a> {
             l = (l << 1) | b;
             r >>= b;
         }
-        whole - l
+        whole - l as i32
+    }
+
+    /// Account every remaining bit as used, so that [`Self::tell`] reports the whole
+    /// frame (a CELT silence flag ends the frame this way).
+    pub(crate) fn exhaust(&mut self) {
+        let total = (self.data.len() * 8) as i32;
+        self.total_bits += total - self.tell();
     }
 
     /// Total frame bytes.
@@ -231,11 +226,6 @@ impl<'a> RangeDecoder<'a> {
     /// The final range value, which the reference test vectors record per packet.
     pub(crate) fn range(&self) -> u32 {
         self.rng
-    }
-
-    /// Whether a symbol or raw-bit read was out of range.
-    pub(crate) fn error(&self) -> bool {
-        self.error
     }
 
     /// Shrink the frame so that the last `bytes` bytes are no longer read (used when a
@@ -257,7 +247,6 @@ mod tests {
         assert!(!rc.bit_logp(15));
         assert_eq!(rc.bits(8), 0);
         assert!(rc.tell() >= 9);
-        assert!(!rc.error());
     }
 
     #[test]
@@ -266,8 +255,12 @@ mod tests {
         let mut rc = RangeDecoder::new(&data);
         for logp in [1, 2, 3, 15, 4, 1, 1] {
             let _ = rc.bit_logp(logp);
-            let frac = rc.tell_frac() as i32;
-            assert!(frac <= rc.tell() * 8 && frac > (rc.tell() - 1) * 8, "{frac} {}", rc.tell());
+            let frac = rc.tell_frac();
+            assert!(
+                frac <= rc.tell() * 8 && frac > (rc.tell() - 1) * 8,
+                "{frac} {}",
+                rc.tell()
+            );
         }
         let _ = rc.uint(300);
         assert!(rc.tell() <= 64 + 8);

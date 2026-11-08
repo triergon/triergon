@@ -78,10 +78,7 @@ impl Fft {
         for radix in [4, 2, 3, 5] {
             while rest.is_multiple_of(radix) && rest > 1 {
                 rest /= radix;
-                stages.push(Stage {
-                    radix,
-                    span: rest,
-                });
+                stages.push(Stage { radix, span: rest });
             }
         }
         if rest != 1 {
@@ -341,7 +338,9 @@ mod tests {
     #[test]
     fn fft_matches_the_definition_for_every_radix() {
         let mut seed = 7;
-        for len in [1, 2, 3, 4, 5, 6, 8, 12, 15, 16, 30, 60, 64, 120, 240, 480, 512] {
+        for len in [
+            1, 2, 3, 4, 5, 6, 8, 12, 15, 16, 30, 60, 64, 120, 240, 480, 512,
+        ] {
             let fft = Fft::new(len).unwrap();
             let input: Vec<Cpx> = (0..len)
                 .map(|_| Cpx::new(lcg(&mut seed), lcg(&mut seed)))

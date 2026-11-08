@@ -199,17 +199,34 @@ fn file_audio(data: &[u8], out: &mut Output) {
         if packet.track() != *track {
             continue;
         }
-        match decoder.decode(&packet, &mut frame) {
-            Ok(_) if frame.samples_per_channel == 0 => {}
-            Ok(levels) => {
-                pcm.clear();
-                downmix.mix(&frame, levels.unwrap_or_default(), &mut pcm);
-                bytes.clear();
-                bytes.extend(pcm.iter().flat_map(|s| s.to_le_bytes()));
-                out.emit(&bytes);
-            }
-            Err(error) => eprintln!("decode error: {}", error.0),
+        let decoded = decoder.decode(&packet, &mut frame);
+        emit_mixed(decoded, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+    }
+    if let Some((_, decoder)) = decoder.as_mut() {
+        let flushed = decoder.flush(&mut frame).map(|()| None);
+        emit_mixed(flushed, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+    }
+}
+
+/// Mix one decode result to stereo s16 and emit it.
+fn emit_mixed(
+    decoded: Result<Option<triergon_codec::DownmixLevels>, triergon_codec::DecodeFailure>,
+    frame: &AudioFrame,
+    downmix: &mut Downmix,
+    pcm: &mut Vec<i16>,
+    bytes: &mut Vec<u8>,
+    out: &mut Output,
+) {
+    match decoded {
+        Ok(_) if frame.samples_per_channel == 0 => {}
+        Ok(levels) => {
+            pcm.clear();
+            downmix.mix(frame, levels.unwrap_or_default(), pcm);
+            bytes.clear();
+            bytes.extend(pcm.iter().flat_map(|s| s.to_le_bytes()));
+            out.emit(bytes);
         }
+        Err(error) => eprintln!("decode error: {}", error.0),
     }
 }
 

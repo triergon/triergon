@@ -180,6 +180,17 @@ pub trait AudioDecoder: Send {
         au: &[u8],
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, DecodeFailure>;
+    /// Samples at the start of the stream that carry no signal and are discarded unless
+    /// the container says otherwise (the Opus pre-skip); 0 for most decoders.
+    fn delay(&self) -> usize {
+        0
+    }
+    /// End of stream: replace `out` with any samples the decoder still holds back
+    /// (`samples_per_channel == 0` when there are none, as for most decoders).
+    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), DecodeFailure> {
+        out.clear();
+        Ok(())
+    }
     /// Discontinuity: drop all signal history.
     fn reset(&mut self);
 }

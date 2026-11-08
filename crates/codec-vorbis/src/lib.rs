@@ -26,7 +26,7 @@ use triergon_codec::layout::{native_order, vorbis_order};
 use triergon_codec::mdct::Imdct;
 use triergon_codec::{
     AudioDecoder, AudioFrame, Budget, ChannelLayout, DecodeFailure, DownmixLevels, Reservation,
-    Speaker, StorageError,
+    StorageError,
 };
 use triergon_framing::{VorbisHeaders, VorbisIdentification};
 
@@ -449,8 +449,7 @@ fn output_layout(channels: usize) -> (ChannelLayout, [u8; ChannelLayout::CAPACIT
     for (i, plane) in planes.iter_mut().enumerate() {
         *plane = i as u8;
     }
-    let layout = ChannelLayout::new(core::iter::repeat_n(Speaker::FrontCenter, channels))
-        .unwrap_or_default();
+    let layout = ChannelLayout::unspecified(channels).unwrap_or_default();
     (layout, planes)
 }
 

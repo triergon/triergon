@@ -14,5 +14,9 @@ triergon-codec = { path = "../codec" }
 triergon-core = { path = "../core" }
 triergon-framing = { path = "../framing" }
 
+[dev-dependencies]
+triergon-matroska = { path = "../media" }
+triergon-ogg = { path = "../ogg" }
+
 [lints]
 workspace = true

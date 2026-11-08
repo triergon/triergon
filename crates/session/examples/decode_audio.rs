@@ -37,7 +37,11 @@ fn main() {
     eprintln!(
         "{{\"sample_rate\":{rate},\"channels\":{},\"layout\":\"{}\",\"frames\":{},\"samples_per_channel\":{},\"errors\":{},\"last_error\":{:?}}}",
         layout.channels(),
-        if summary.format.is_some() { layout.name() } else { String::new() },
+        if summary.format.is_some() {
+            layout.name()
+        } else {
+            String::new()
+        },
         summary.frames,
         summary.samples,
         summary.errors,
@@ -45,13 +49,10 @@ fn main() {
     );
 }
 
-fn decode(
-    file: std::fs::File,
-    out: &mut impl Write,
-    summary: &mut Summary,
-) -> Result<(), String> {
+fn decode(file: std::fs::File, out: &mut impl Write, summary: &mut Summary) -> Result<(), String> {
     let pool = Budget::new(256 << 20).map_err(|e| e.to_string())?;
-    let mut source = open_blocking(std::io::BufReader::new(file), &pool).map_err(|e| e.to_string())?;
+    let mut source =
+        open_blocking(std::io::BufReader::new(file), &pool).map_err(|e| e.to_string())?;
     let mut decoder: Option<(triergon::TrackId, TrackDecoder)> = None;
     let mut frame = AudioFrame::default();
     let mut bytes = Vec::new();
@@ -70,25 +71,44 @@ fn decode(
         if packet.track() != *track {
             continue;
         }
-        match decoder.decode(&packet, &mut frame) {
+        let decoded = decoder.decode(&packet, &mut frame);
+        summary.write(decoded, &frame, &mut bytes, out)?;
+    }
+    if let Some((_, decoder)) = decoder.as_mut() {
+        let flushed = decoder.flush(&mut frame);
+        summary.write(flushed, &frame, &mut bytes, out)?;
+    }
+    Ok(())
+}
+
+impl Summary {
+    /// Account for one decode result and write its samples.
+    fn write<T>(
+        &mut self,
+        decoded: Result<T, triergon_codec::DecodeFailure>,
+        frame: &AudioFrame,
+        bytes: &mut Vec<u8>,
+        out: &mut impl Write,
+    ) -> Result<(), String> {
+        match decoded {
             Ok(_) if frame.samples_per_channel == 0 => {}
             Ok(_) => {
-                summary.frames += 1;
-                summary.samples += frame.samples_per_channel as u64;
-                summary.format.get_or_insert((frame.sample_rate, frame.layout));
+                self.frames += 1;
+                self.samples += frame.samples_per_channel as u64;
+                self.format.get_or_insert((frame.sample_rate, frame.layout));
                 bytes.clear();
                 for i in 0..frame.samples_per_channel {
                     for plane in &frame.planes {
                         bytes.extend_from_slice(&plane[i].to_le_bytes());
                     }
                 }
-                out.write_all(&bytes).map_err(|e| e.to_string())?;
+                out.write_all(bytes).map_err(|e| e.to_string())?;
             }
             Err(error) => {
-                summary.errors += 1;
-                summary.last_error = error.0;
+                self.errors += 1;
+                self.last_error = error.0;
             }
         }
+        Ok(())
     }
-    Ok(())
 }

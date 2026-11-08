@@ -109,7 +109,12 @@ impl Downmix {
             .as_ref()
             .is_some_and(|(layout, cached, _)| *layout == frame.layout && *cached == levels)
         {
-            let matrix = StereoMatrix::with_levels(frame.layout.speakers(), levels);
+            // FFmpeg's resampler mixes an unspecified order as its default layout.
+            let layout = Some(frame.layout)
+                .filter(|layout| layout.mask() != 0 || layout.channels() < 2)
+                .or_else(|| ChannelLayout::default_for(frame.layout.channels()))
+                .unwrap_or(frame.layout);
+            let matrix = StereoMatrix::with_levels(layout.speakers(), levels);
             self.cached = Some((frame.layout, levels, matrix));
         }
         let (_, _, matrix) = self.cached.as_ref().expect("matrix");
