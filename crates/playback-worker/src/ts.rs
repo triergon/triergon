@@ -200,11 +200,12 @@ impl Cause {
 /// The observer of the program's one elementary stream, built from its PMT with the
 /// constructor its carriage selects.
 fn observer(
-    pool: &Budget,
+    input: &InputCursor,
     program: u16,
     map: &ProgramMap,
     cause: Cause,
 ) -> triergon_core::Result<TransportFaultRecovery> {
+    let pool = input.budget();
     let unrouted = Error::Unsupported(UNROUTED);
     let [stream] = map.streams.as_slice() else {
         return Err(unrouted);
@@ -269,7 +270,7 @@ fn observer(
     } else {
         Err(unrouted)
     }?;
-    TransportFaultRecovery::with_policy(
+    let mut recovery = TransportFaultRecovery::with_policy(
         observer,
         PesFaultPolicy {
             timing_headers: true,
@@ -278,7 +279,9 @@ fn observer(
             terminal_transport: true,
         },
     )
-    .map_err(|rejected| rejected.error)
+    .map_err(|rejected| rejected.error)?;
+    recovery.bind_source_input(input)?;
+    Ok(recovery)
 }
 
 /// The observer, its clock and the folded packets of one operation.
@@ -295,7 +298,7 @@ impl Session {
     /// alone cannot take is refused.
     fn observe(
         &mut self,
-        pool: &Budget,
+        input: &InputCursor,
         program: u16,
         event: &TraceEvent,
         cause: Cause,
@@ -333,7 +336,7 @@ impl Session {
                 if self.observer.is_some() || quarantined {
                     return Err(unrouted());
                 }
-                self.observer = Some(observer(pool, program, map, cause)?);
+                self.observer = Some(observer(input, program, map, cause)?);
             }
             TraceEvent::Transport(packet) => {
                 if let Some(observer) = self.observer.as_mut()
@@ -581,7 +584,7 @@ fn packet_operation(
                 let cause = Cause::event(&event, ordinal, input.source(), demux.source_epochs());
                 ordinal += 1;
                 let routed = session.observe(
-                    pool,
+                    &input,
                     request.program,
                     &event,
                     cause,

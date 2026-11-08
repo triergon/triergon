@@ -176,6 +176,7 @@ fn tail_from_source(
     SourceContext,
 ) {
     let mut observer = policy(pool, options());
+    observer.bind_source_input(&source.input).unwrap();
     let mut packets = Vec::new();
     loop {
         let Step::Ready(event) = source.next().unwrap() else {
@@ -726,4 +727,198 @@ fn unfinished_pes_and_unbound_pcr_pid_preserve_strict_refusals() {
             }
         }
     }
+}
+
+#[test]
+fn confirmed_timeline_fences_later_carriers_without_consuming_rejected_input() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut source = Source::new(THREE, &pool, 4096, 4096);
+    let mut observer = policy(&pool, options());
+    let mut confirmed = None;
+    loop {
+        let Step::Ready(event) = source.next().unwrap() else {
+            panic!("no carrier after Timeline");
+        };
+        let context = source.context();
+        match event {
+            TraceEvent::Transport(packet) if packet.pid == 256 => {
+                if let Some(ordinal) = confirmed {
+                    let used = pool.used();
+                    for stale in [ordinal - 1, ordinal] {
+                        let rejected = observer
+                            .push(
+                                packet.clone(),
+                                SourceContext {
+                                    source_event_ordinal: stale,
+                                    ..context
+                                },
+                            )
+                            .expect_err("a confirmed source ordinal cannot be reused");
+                        assert_eq!(
+                            rejected.error,
+                            Error::Invalid("native PES source event order")
+                        );
+                        assert!(rejected.value.source.shares_storage_with(&packet.source));
+                        assert_eq!(rejected.value.source_offset, packet.source_offset);
+                        assert_eq!(pool.used(), used);
+                    }
+                    observer.push(packet, context).unwrap();
+                    let packets = drain(&mut observer, 1).unwrap();
+                    assert_eq!(packets.len(), 1);
+                    assert_eq!(packets[0].source_epochs.clock, 1);
+                    return;
+                }
+                observer.push(packet, context).unwrap();
+                drain(&mut observer, 1).unwrap();
+            }
+            TraceEvent::Timeline { .. } => {
+                observer.confirm_source_timeline(&event, context).unwrap();
+                confirmed = Some(context.source_event_ordinal);
+            }
+            _ => {}
+        }
+    }
+}
+
+#[test]
+fn replacement_cursor_and_end_cannot_hide_the_original_transport_failure() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let (mut original, mut observer, _, fault, context) = tail(&pool, SYNC);
+    observer.hold_terminal_transport(&fault, context).unwrap();
+    let original_token = original.input.token();
+    original
+        .input
+        .fail(
+            SourceId(1),
+            original_token.clone(),
+            SourceFailure::Transport,
+        )
+        .unwrap();
+    let (mut replacement, ..) = tail(&pool, SYNC);
+    let end = replacement.end();
+    let used = pool.used();
+    let mut work = WorkBudget::new(1);
+    let expected = Error::StaleGeneration {
+        expected: original_token.generation(),
+        received: replacement.input.generation(),
+    };
+    assert_eq!(
+        observer.seal_terminal_end(&end, &mut replacement.input, &mut work, &RUN),
+        Err(expected)
+    );
+    assert_eq!(work.remaining(), 1);
+    assert_eq!(pool.used(), used);
+    assert!(observer.terminal_confirmation().is_none());
+    let (finished, context) = replacement.finished();
+    assert_eq!(
+        observer.confirm_terminal_finished(
+            &finished,
+            context,
+            &mut replacement.input,
+            &mut WorkBudget::new(1),
+            &RUN
+        ),
+        Err(expected)
+    );
+    assert!(observer.end_of_source().is_err());
+    assert_eq!(
+        original
+            .input
+            .read_into(&mut [0], &mut WorkBudget::new(1), &RUN)
+            .unwrap_err(),
+        Error::Transport
+    );
+}
+
+#[test]
+fn terminal_input_binding_cannot_be_added_after_carriers_or_replaced() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut source = Source::new(SYNC, &pool, 4096, 4096);
+    let mut unbound = policy(&pool, options());
+    loop {
+        let Step::Ready(event) = source.next().unwrap() else {
+            panic!("no terminal diagnostic");
+        };
+        let context = source.context();
+        match event {
+            TraceEvent::Transport(packet) if packet.pid == 256 => {
+                unbound.push(packet, context).unwrap();
+                drain(&mut unbound, 1).unwrap();
+                assert_eq!(
+                    unbound.bind_source_input(&source.input),
+                    Err(Error::Invalid(
+                        "source input binding must precede admitted carriers"
+                    ))
+                );
+            }
+            TraceEvent::Diagnostic(fault) => {
+                assert_eq!(
+                    unbound.hold_terminal_transport(&fault, context),
+                    Err(Error::Unsupported(
+                        "terminal transport source input not bound"
+                    ))
+                );
+                break;
+            }
+            _ => {}
+        }
+    }
+    let (mut original, mut bound, _, fault, context) = tail(&pool, SYNC);
+    let (mut replacement, ..) = tail(&pool, SYNC);
+    assert!(bound.bind_source_input(&replacement.input).is_err());
+    bound.hold_terminal_transport(&fault, context).unwrap();
+    let end = original.end();
+    assert!(
+        bound
+            .seal_terminal_end(&end, &mut original.input, &mut WorkBudget::new(1), &RUN)
+            .unwrap()
+    );
+    // Both cursor and witness match each other, but not the bound operation.
+    let replacement_end = replacement.end();
+    assert!(
+        bound
+            .seal_terminal_end(
+                &replacement_end,
+                &mut replacement.input,
+                &mut WorkBudget::new(1),
+                &RUN
+            )
+            .is_err()
+    );
+    assert!(bound.terminal_confirmation().is_none());
+}
+
+#[test]
+fn terminal_end_rejects_same_cursor_request_changes_and_keeps_cancel_priority() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let (mut source, mut observer, _, fault, context) = tail(&pool, SYNC);
+    observer.hold_terminal_transport(&fault, context).unwrap();
+    let old_token = source.input.token();
+    let _ = source.end();
+    // continue_source keeps the generation but starts a different entity request.
+    source
+        .input
+        .continue_source(
+            SourceId(1),
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+        )
+        .unwrap();
+    let (mut replacement, ..) = tail(&pool, SYNC);
+    let end = replacement.end();
+    let mut work = WorkBudget::new(0);
+    assert_eq!(
+        observer.seal_terminal_end(&end, &mut source.input, &mut work, &CANCEL),
+        Err(Error::Cancelled)
+    );
+    assert_eq!(
+        observer.seal_terminal_end(&end, &mut source.input, &mut work, &RUN),
+        Err(Error::StaleRequest {
+            expected: old_token.request(),
+            received: source.input.token().request(),
+        })
+    );
+    assert!(observer.terminal_confirmation().is_none());
 }

@@ -520,6 +520,9 @@ impl DemuxObserver {
             && !self.ended
             && self.fault.is_none()
     }
+    pub(crate) fn recovery_pristine(&self) -> bool {
+        self.recovery_idle() && self.last_input.is_none()
+    }
     pub(crate) fn recovery_budget(&self) -> &Budget {
         &self.budget
     }
@@ -634,8 +637,12 @@ impl DemuxObserver {
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, true, None)
     }
-    pub(crate) fn commit_clock_epoch(&mut self, epochs: SourceEpochs) {
-        self.scope.epochs = epochs;
+    pub(crate) fn commit_clock_epoch(&mut self, context: SourceContext) {
+        self.scope.epochs = context.epochs;
+        // The Timeline consumes an ordinal, not another physical carrier.
+        if let Some((ordinal, _)) = self.last_input.as_mut() {
+            *ordinal = (*ordinal).max(context.source_event_ordinal);
+        }
     }
     /// A drained codec-map commit. Returned old packets keep their original
     /// headers/storage. Retire only the idle internal header alias; preserve wire
