@@ -15,8 +15,7 @@ triergon-core = { path = "../core" }
 triergon-framing = { path = "../framing" }
 
 [dev-dependencies]
-triergon-matroska = { path = "../media" }
-triergon-ogg = { path = "../ogg" }
+triergon = { path = "../triergon", features = ["ogg"] }
 
 [lints]
 workspace = true
