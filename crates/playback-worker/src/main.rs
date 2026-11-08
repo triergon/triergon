@@ -1,6 +1,7 @@
 //! Playback measurement worker; serialization and startup are outside the timed loop.
 #![forbid(unsafe_code)]
 mod hls;
+mod mp4_range;
 mod progressive;
 use std::{
     io::{self, Write},
@@ -327,6 +328,12 @@ fn work() -> Result<(), Box<dyn std::error::Error>> {
     }
     if all.first().is_some_and(|mode| mode.starts_with("hls-")) {
         return hls::run(&all);
+    }
+    if all
+        .first()
+        .is_some_and(|mode| mode.starts_with("mp4-range-"))
+    {
+        return mp4_range::run(&all);
     }
     let mut args = all.into_iter();
     let usage = "usage: playback-worker feed-bench CAPSULE ITERATIONS | feed-fold CAPSULE | feed-memory CAPSULE";

@@ -12,13 +12,14 @@ use std::process::Command;
 use crate::json::{self, Value};
 use crate::sha256;
 
-/// Explicit operation inputs of the Matroska worker. Adding a Matroska
-/// operation updates this list and therefore requires a fresh build identity.
+/// Explicit inputs shared by container and playback operations. Changing an
+/// operation's inputs requires a fresh build identity.
 pub fn matroska_inputs() -> Vec<String> {
     let mut names: Vec<String> = [
         "specs/sources.json",
         "harness/fate/index.json",
         "harness/oracles.py",
+        "xtask/src/corpus.rs",
         "xtask/src/harness/acceptance.rs",
         "xtask/src/harness/build.rs",
         "xtask/src/harness/comparison.rs",
@@ -65,6 +66,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/features/progressive-ts188/inputs/later-entry-48000.ts",
         "harness/features/progressive-ts188/inputs/duplicate-control-44100.ts",
         "harness/features/progressive-ts188/inputs/legal-duplicate-44100.ts",
+        "harness/reference_mp4_range.h",
     ]
     .map(String::from)
     .to_vec();
@@ -78,6 +80,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "matroska-startup-seek",
         "hls-segments",
         "progressive-ts188",
+        "mp4-range",
     ] {
         for file in ["contract", "corpus"] {
             names.push(format!("harness/features/{feature}/{file}.json"));
@@ -572,5 +575,20 @@ mod tests {
             file_identity(&root, Path::new("Cargo.toml")).unwrap().0,
             "Cargo.toml"
         );
+    }
+
+    #[test]
+    fn playback_graph_binds_range_contract_corpus_and_fixture_recipe() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let graph = crate::harness::build::candidate_graph(root, "playback-worker").unwrap();
+        let shared = graph.get("shared_files").unwrap();
+        for input in [
+            "harness/features/mp4-range/contract.json",
+            "harness/features/mp4-range/corpus.json",
+            "xtask/src/corpus.rs",
+        ] {
+            let (_, digest) = file_identity(root, Path::new(input)).unwrap();
+            assert_eq!(shared.get(input), Some(&Value::str(digest)), "{input}");
+        }
     }
 }

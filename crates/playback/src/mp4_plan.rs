@@ -6,10 +6,16 @@ use crate::{
     sample_sort::SampleSort,
 };
 use std::{
-    ops::Range,
-    sync::atomic::{AtomicBool, Ordering},
+    alloc::Layout,
+    ops::{Deref, Range},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
 };
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Rounding, Time, TimeBase, WorkBudget};
+use triergon_core::{
+    Budget, BudgetVec, Bytes, Error, Reservation, Rounding, Time, TimeBase, WorkBudget,
+};
 use triergon_isobmff::{
     self as iso, BoxView, EditList, InterleaveStatus, PhysicalInterleaveLimits,
     PhysicalSampleCursor, Sample, SampleCursor, SampleDescription, SampleStep, SourceTrack,
@@ -58,8 +64,12 @@ impl PlanLimits {
         }
     }
 }
+/// Immutable track metadata shared by the plan and its emitted packets.
 #[derive(Clone, Debug)]
-pub struct TrackSnapshot {
+pub struct TrackSnapshot(Arc<TrackMetadata>);
+
+#[derive(Debug)]
+pub struct TrackMetadata {
     pub track_id: u32,
     pub base: SourceTimeBase,
     pub handler: [u8; 4],
@@ -71,6 +81,24 @@ pub struct TrackSnapshot {
     pub raw_edits: Option<BoxView>,
     pub raw_dref: BoxView,
     pub native_catalogue: std::result::Result<StreamView, Error>,
+    _charge: Reservation,
+}
+
+impl TrackSnapshot {
+    fn reserve(pool: &Budget) -> Result<Reservation> {
+        let (layout, _) = Layout::new::<[AtomicUsize; 2]>()
+            .extend(Layout::new::<TrackMetadata>())
+            .map_err(|_| Error::Overflow)?;
+        pool.reserve(layout.pad_to_align().size())
+    }
+}
+
+impl Deref for TrackSnapshot {
+    type Target = TrackMetadata;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 #[derive(Clone, Debug)]
 pub struct Mp4Configuration {
@@ -84,6 +112,25 @@ pub struct PlanTrack {
     pub snapshot: TrackSnapshot,
     pub descriptions: BudgetVec<SampleDescription>,
     pub edits: Option<EditList>,
+}
+impl PlanTrack {
+    pub(crate) fn configuration(
+        &self,
+        description_index: u32,
+        revision: u64,
+    ) -> Result<Mp4Configuration> {
+        let description = self
+            .descriptions
+            .as_slice()
+            .iter()
+            .find(|d| d.index == description_index)
+            .ok_or(Error::Invalid("sample description absent"))?;
+        Ok(Mp4Configuration {
+            track: self.snapshot.clone(),
+            description: description.clone(),
+            revision,
+        })
+    }
 }
 #[derive(Clone, Debug)]
 pub struct SourceRow {
@@ -234,18 +281,8 @@ impl PreparedMp4 {
         }
     }
     pub fn config(&self, row: &SourceRow, revision: u64) -> Result<Mp4Configuration> {
-        let t = self.track(row.track_id)?;
-        let d = t
-            .descriptions
-            .as_slice()
-            .iter()
-            .find(|d| d.index == row.sample.description_index)
-            .ok_or(Error::Invalid("sample description absent"))?;
-        Ok(Mp4Configuration {
-            track: t.snapshot.clone(),
-            description: d.clone(),
-            revision,
-        })
+        self.track(row.track_id)?
+            .configuration(row.sample.description_index, revision)
     }
 }
 pub struct Mp4IndexJob<'a> {
@@ -653,7 +690,7 @@ impl<'a> Mp4IndexJob<'a> {
                                     .find(|x| x.track_id == t.header().track_id)
                                     .copied(),
                                 next_ordinal: t.next_ordinal(),
-                                snapshot: TrackSnapshot {
+                                snapshot: TrackSnapshot(Arc::new(TrackMetadata {
                                     track_id: h.track_id,
                                     base,
                                     handler: h.handler,
@@ -665,7 +702,8 @@ impl<'a> Mp4IndexJob<'a> {
                                     raw_edits: t.edits().map(|e| e.raw().clone()),
                                     raw_dref: t.raw_dref().clone(),
                                     native_catalogue,
-                                },
+                                    _charge: TrackSnapshot::reserve(&p.pool)?,
+                                })),
                                 descriptions: BudgetVec::new(&p.pool),
                                 edits: t
                                     .edits()
@@ -719,8 +757,11 @@ impl<'a> Mp4IndexJob<'a> {
                     }
                     push(&mut p.media_cache, extent.clone())?;
                 } else {
-                    self.phase = if self.range_duration.is_some() {
+                    self.phase = if let Some(duration) = &self.range_duration {
                         if let Some(cursor) = &mut self.native {
+                            if !duration.scan {
+                                cursor.check_projections_before_replay()?;
+                            }
                             cursor.enable_range_seek_checkpoints();
                         }
                         4
@@ -849,9 +890,6 @@ impl<'a> Mp4IndexJob<'a> {
                             CursorStatus::Ready if !w.try_charge(1) => return Ok(false),
                             CursorStatus::Ready => {
                                 let row = cursor.take_occurrence()?;
-                                if !duration.scan {
-                                    continue;
-                                }
                                 let Some(pts) = row.demux.pts else { continue };
                                 let end =
                                     pts.checked_add(row.demux.duration).ok_or(Error::Overflow)?;

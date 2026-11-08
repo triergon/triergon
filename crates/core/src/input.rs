@@ -566,13 +566,32 @@ impl InputCursor {
     /// Internal metadata/range jump: invalidate I/O requests, preserving the
     /// parser generation. Does not recover an existing source failure.
     pub fn request_range(&mut self, offset: u64) -> Result<InputRequest> {
+        self.start_range(offset, false)
+    }
+    /// Start a range transaction that may reuse bytes from the current shared
+    /// window of the same source generation. Responses to older requests are
+    /// still stale. Callers should read buffered bytes before polling for input.
+    pub fn request_range_reusing_window(&mut self, offset: u64) -> Result<InputRequest> {
+        self.start_range(offset, true)
+    }
+    fn start_range(&mut self, offset: u64, reuse: bool) -> Result<InputRequest> {
         self.healthy()?;
         if !self.capabilities.random_access {
             return Err(Error::Unsupported("random-access input"));
         }
         self.validate_offset(offset)?;
         let request = self.token.request.checked_add(1).ok_or(Error::Overflow)?;
-        self.discard_at(offset);
+        if reuse
+            && let Some(window) = &self.window
+            && let Some(relative) = offset.checked_sub(self.position - self.consumed as u64)
+            && relative < window.len() as u64
+        {
+            self.position = offset;
+            self.consumed = relative as usize;
+            self.end = None;
+        } else {
+            self.discard_at(offset);
+        }
         self.token.request = request;
         Ok(self.request())
     }
