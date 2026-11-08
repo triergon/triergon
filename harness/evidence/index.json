@@ -16528,8 +16528,8 @@
    "sha256": "b1df5b6f79fa2644106b8e87c61799b5c6fa9075c33096017bf4c50d89ef95a0",
    "bytes": 676034441,
    "source_revision": "7be886648e47f711b0f258412df82d214158a709"
-   },
-   {
+  },
+  {
    "name": "rasterising-a7b6635e-linux-x86_64",
    "path": "rasterising-a7b6635e-linux-x86_64",
    "retention": "retained",
