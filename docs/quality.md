@@ -103,7 +103,20 @@ resource limit becomes an explicit, reviewed rule for that case.
   (`harness/reference.c` and `harness/reference_raster.h`), which takes the
   same flags; there a read of an uninitialised variable fails the build
   (`-Wall -Werror -Werror=uninitialized`). libass's included sources are
-  compiled as system headers, without warnings. Its features run libass's outline, stroker,
+  compiled as system headers, without warnings. Runtime is not measured yet;
+  two rules hold when it is. Timing uses an unflagged build: the same source,
+  pins and configure flags without `-ftrivial-auto-var-init`, both recorded in
+  `build.json`, while parity keeps the flagged one. The flag changes the
+  reference's instruction counts by under 0.5% on the required workloads, but
+  its code layout makes small-glyph workloads 8% to 40% slower on Linux
+  AArch64 and x86_64. And the reference's timed region holds only the work
+  the candidate's does: libass's per-run cache reset (`ass_cache_empty`),
+  most of a small-glyph operation, leaves the clock, or both sides do the
+  equivalent reset inside it, whichever matches how a caller uses the
+  library; caches that would make repeats unfairly cheap are disabled for
+  timing, not reset inside the clock. The change that first times the
+  rasterising or rendering features makes `cargo xtask check-design` or the
+  timing code refuse a lane whose reference build is flagged. Its features run libass's outline, stroker,
   rasteriser, blur, composition and clipping stages on glyphs of the font
   corpus loaded as libass loads them with hinting off (FreeType in the
   reference, `triergon-font` in the candidate; `raster-glyphs`) and on seeded
