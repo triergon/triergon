@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "reference": "harfbuzz-native",
+  "note": "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
+  "pins": {
+    "unicode-ranges": {
+      "packets": 1112064,
+      "bytes": 0,
+      "digest": 6519369414572640622
+    }
+  }
+}

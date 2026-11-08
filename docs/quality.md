@@ -2,7 +2,8 @@
 
 Every module is measured against a pinned reference implementation doing the same
 work: FFmpeg for containers, framing, subtitle decoding, codecs and capture, FreeType
-for font tables and outlines, and libass for subtitle rendering. The gates and the
+for font tables and outlines, HarfBuzz and FriBidi for shaping and bidi, and libass
+for subtitle rendering. The gates and the
 measurement rules below are the same for every reference. A module is complete only
 when it passes all three gates on every case in its corpus.
 
@@ -63,17 +64,34 @@ resource limit becomes an explicit, reviewed rule for that case.
   `font-hinting-modes` (the nine other heights libass requests when hinting is on),
   run on demand and not gated yet. `cargo xtask fonts compare` reports the
   required two, with `--all` all three.
-- **Generated manifests and pins.** The font features commit no case rows.
-  `cargo xtask fonts manifest` generates them from `harness/fonts/corpus.json` and
-  each feature's load settings (`xtask/src/fonts/manifest.rs`), and takes each
+- **HarfBuzz and FriBidi pin.** `cargo xtask shape prepare` builds the FriBidi
+  1.0.17 and HarfBuzz 14.6.0 release tarballs (hash-checked) as static libraries:
+  FriBidi with its own configure, HarfBuzz from its single-file amalgamation
+  without optional integrations, both `-O2 -ffp-contract=off`, recorded in
+  `.research/harfbuzz/build.json`; `cargo xtask build-workers` then links the
+  reference worker (`harness/reference_shape.h`) with them and the pinned
+  FreeType. Its features shape the font corpus with authored texts and seeded
+  random strings as libass does, through FreeType-backed font functions at 256
+  pixels (`shape-libass`) and through HarfBuzz's own at units per em
+  (`shape-text`), resolve bidi paragraphs and lines (`shape-bidi`), run libass's
+  simple shaping level (`shape-simple`) and read every code point's properties
+  (`shape-unicode`), all required by `cargo xtask check`; `shape-text-all`, every
+  corpus face with every script at units per em, runs on demand. Acceptance of
+  the shaper rests on `shape-libass`, `shape-bidi`, `shape-simple` and
+  `shape-unicode`. `cargo xtask shape compare` reports the required five, with
+  `--all` all six.
+- **Generated manifests and pins.** The font and shaping features commit no case
+  rows. `cargo xtask fonts manifest` and `cargo xtask shape manifest` generate them
+  from `harness/fonts/corpus.json`, the shaping texts and each feature's settings
+  (`xtask/src/fonts/manifest.rs`, `xtask/src/shape/manifest.rs`), and take each
   case's expected work from `harness/features/<feature>/pins.json`. Pins are the
-  FreeType reference's folds: re-record them with
-  `cargo xtask fonts manifest --record` after `cargo xtask build-workers`, and never
+  reference's folds: re-record them with `cargo xtask fonts manifest --record` or
+  `cargo xtask shape manifest --record` after `cargo xtask build-workers`, and never
   edit them by hand. `cargo xtask check-design` fails when the generated case ids
   and the pins differ or a pin file is not in the form the recorder writes. Every
   harness command reads such a manifest at `harness/features/<feature>/corpus.json`;
-  its identity is the SHA-256 of the generated JSON, the bytes
-  `fonts manifest` writes, so it is deterministic.
+  its identity is the SHA-256 of the generated JSON, the bytes the generator
+  writes, so it is deterministic.
 - **Open cases.** A contract may list `open_cases`: case ids that fail today, each
   tied to one of its `pending_module_requirements`. `cargo xtask report` still runs
   them and prints them as open failures with their count, and passes only when every
@@ -146,7 +164,8 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, and the three font features with `font-worker` and FreeType.
+and `formats` references, the three font features with `font-worker` and FreeType, and
+the five shaping features with `shape-worker` and HarfBuzz and FriBidi.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers

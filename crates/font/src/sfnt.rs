@@ -36,9 +36,11 @@ impl Table {
     }
 }
 
-/// The tables this crate reads. Others are ignored.
+/// The tables this crate reads, and the directory records for looking up others.
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Tables {
+    /// The face's table records, 16 bytes each.
+    pub(crate) records: Table,
     pub(crate) head: Option<Table>,
     pub(crate) hhea: Option<Table>,
     pub(crate) hmtx: Option<Table>,
@@ -80,6 +82,20 @@ impl Tables {
             _ => return None,
         })
     }
+}
+
+/// The first nonempty table `tag` among `records` that lies inside `data`, as
+/// FreeType's sanitised directory gives it.
+pub(crate) fn find(data: &[u8], records: Table, tag: [u8; 4]) -> Option<Table> {
+    records
+        .bytes(data)
+        .chunks_exact(TABLE_RECORD)
+        .filter(|record| record[..4] == tag)
+        .find_map(|record| {
+            let offset = usize::try_from(u32_be(record, 8)?).ok()?;
+            let len = usize::try_from(u32_be(record, 12)?).ok()?;
+            (len > 0 && offset.checked_add(len)? <= data.len()).then_some(Table { offset, len })
+        })
 }
 
 /// The number of faces in `data`: the collection's count, or one for a single font.
@@ -135,8 +151,15 @@ pub(crate) fn directory(
     let count = usize::from(r.u16()?);
     r.skip(6)?; // searchRange, entrySelector, rangeShift
     charge(work, count)?;
+    let records_at = r.offset();
     let records = r.take(count.checked_mul(TABLE_RECORD).ok_or(Error::Overflow)?)?;
-    let mut tables = Tables::default();
+    let mut tables = Tables {
+        records: Table {
+            offset: records_at,
+            len: records.len(),
+        },
+        ..Tables::default()
+    };
     for record in records.chunks_exact(TABLE_RECORD) {
         let mut r = Reader::new(record);
         let tag = r.tag()?;
@@ -225,6 +248,10 @@ mod tests {
         assert_eq!(tables.glyf.unwrap().len, 4);
         assert_eq!(tables.hmtx.unwrap().len, 4);
         assert!(tables.name.is_none());
+        // Lookups by tag skip the empty first record the same way.
+        assert_eq!(super::find(&data, tables.records, *b"glyf").unwrap().len, 4);
+        assert!(super::find(&data, tables.records, *b"name").is_none());
+        assert!(super::find(&data, tables.records, *b"GSUB").is_none());
     }
 
     #[test]

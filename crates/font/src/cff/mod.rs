@@ -2,7 +2,7 @@
 
 mod charstring;
 
-pub use charstring::{CharstringOperator, OperatorSet};
+pub use charstring::{CharstringBounds, CharstringOperator, OperatorSet};
 mod dict;
 mod index;
 mod matrix;
@@ -485,6 +485,23 @@ impl Cff {
             self.table.bytes(data),
             u32::from(glyph.0),
             outline,
+            limits,
+            work,
+        )
+    }
+
+    /// The bounds of what `glyph`'s program draws, without building it.
+    pub(crate) fn bounds(
+        &self,
+        data: &[u8],
+        glyph: GlyphId,
+        limits: &Limits,
+        work: &mut WorkBudget,
+    ) -> Result<Option<CharstringBounds>> {
+        charstring::bounds(
+            self,
+            self.table.bytes(data),
+            u32::from(glyph.0),
             limits,
             work,
         )

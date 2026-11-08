@@ -93,6 +93,16 @@ pub fn matroska_inputs() -> Vec<String> {
         }
     }
     names.extend(crate::fonts::ROW_SOURCES.map(String::from));
+    for feature in crate::shape::FEATURES {
+        for file in ["contract", "pins"] {
+            names.push(format!("harness/features/{}/{file}.json", feature.id));
+        }
+    }
+    for source in crate::shape::ROW_SOURCES {
+        if !names.iter().any(|name| name == source) {
+            names.push(source.into());
+        }
+    }
     names
 }
 

@@ -7,6 +7,8 @@
  *   -DTRIERGON_CAPTURE_REFERENCE  RGBA conversion, MPEG-1 encode, MPEG-TS mux
  *                                 (reference_capture.h)
  *   -DTRIERGON_FONT_REFERENCE     font faces and outlines with FreeType (reference_font.h)
+ *   -DTRIERGON_SHAPE_REFERENCE    shaping, bidi and Unicode properties with HarfBuzz and
+ *                                 FriBidi (reference_shape.h)
  *   otherwise                     the container operations below, with the feed
  *                                 (TRIERGON_FEED_REFERENCE), HLS segment and MP4 range
  *                                 (TRIERGON_HLS_REFERENCE) and combined-encoding
@@ -17,6 +19,8 @@
 #include "reference_capture.h"
 #elif defined(TRIERGON_FONT_REFERENCE)
 #include "reference_font.h"
+#elif defined(TRIERGON_SHAPE_REFERENCE)
+#include "reference_shape.h"
 #else
 #include <libavformat/avformat.h>
 #ifdef TRIERGON_COMBINED_REFERENCE

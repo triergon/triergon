@@ -3,9 +3,9 @@ mod support;
 use support::{bytes, cff_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error};
 use triergon_font::{
-    Built, CharEncoding, CmapFormat, FaceInfo, Font, GlyphId, Limits, Orientation, Outline,
-    OutlineFormat, Platform, Point, PointKind, Request, Segment, Store, StoreKey, Style,
-    pixels_26_6, select,
+    Bounds, Built, CharEncoding, CharstringBounds, CmapFormat, ControlBox, FaceInfo, Font, GlyphId,
+    Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind, Request, Segment,
+    Store, StoreKey, Style, pixels_26_6, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -187,6 +187,62 @@ fn cff_charstrings_with_subroutines_hints_and_flex() {
     assert_eq!(curve[3], (60, 0, on));
     assert_eq!(curve[9], (110, 0, on));
     assert_eq!(curve[4].2, PointKind::Cubic);
+}
+
+#[test]
+fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
+    let cff = parse(&font(b"OTTO", &cff_tables()));
+    let unit = |v: i32| v << 16;
+    assert_eq!(
+        cff.control_box(GlyphId(1)),
+        Ok(ControlBox::Charstring(CharstringBounds {
+            x_min: unit(50),
+            y_min: 0,
+            x_max: unit(150),
+            y_max: unit(100),
+        }))
+    );
+    let Ok(ControlBox::Charstring(curve)) = cff.control_box(GlyphId(2)) else {
+        panic!("glyph 2 draws a curve");
+    };
+    let (points, _, _) = points(&cff, 2);
+    for (x, y, _) in points {
+        assert!((curve.x_min..=curve.x_max).contains(&unit(x)));
+        assert!((curve.y_min..=curve.y_max).contains(&unit(y)));
+    }
+    // No outline is built, so the point limit does not apply.
+    let (budget, data) = bytes(&font(b"OTTO", &cff_tables()));
+    let few = Limits {
+        points: 1,
+        ..Limits::default()
+    };
+    let cff = Font::new(data, 0, &budget, few).unwrap();
+    assert!(matches!(
+        cff.outline(GlyphId(2), &budget),
+        Err(Error::Policy(_))
+    ));
+    assert_eq!(
+        cff.control_box(GlyphId(2)),
+        Ok(ControlBox::Charstring(curve))
+    );
+
+    let tables = truetype_tables(400, 0, "Test Sans", "Regular");
+    let truetype = parse(&font(b"\0\x01\0\0", &tables));
+    assert_eq!(truetype.control_box(GlyphId(0)), Ok(ControlBox::Empty));
+    assert_eq!(
+        truetype.control_box(GlyphId(1)),
+        Ok(ControlBox::Glyf(Bounds {
+            x_min: 100,
+            y_min: 0,
+            x_max: 300,
+            y_max: 200,
+        }))
+    );
+    assert_eq!(truetype.side_bearing(GlyphId(1)), Ok(50));
+    assert!(matches!(
+        truetype.control_box(GlyphId(4)),
+        Err(Error::Invalid(_))
+    ));
 }
 
 #[test]

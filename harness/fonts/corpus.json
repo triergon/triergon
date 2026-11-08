@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "note": "Freely licensed fonts compared with the FreeType reference by `cargo xtask fonts compare`. Fetched into .research/fonts by `cargo xtask fonts fetch`; nothing here is redistributed.",
+  "note": "Freely licensed fonts compared with the FreeType reference by `cargo xtask fonts compare`. Fetched into .research/fonts by `cargo xtask fonts fetch`; nothing here is redistributed. Sources that list `lanes` serve only those lanes (`shape`: the shaping features).",
   "sources": [
     {
       "name": "croscorefonts-1.31.0.tar.bz2",
@@ -375,6 +375,176 @@
         }
       ],
       "sha256": "61cf814eec46b294d6ea4401ac295d0cecd5207bd2331dcc5a15e7301d30ee44"
+    },
+    {
+      "name": "NotoNastaliqUrdu-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoNastaliqUrdu/hinted/ttf/NotoNastaliqUrdu-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "sha256": "4d05b6821862ca1f3c80c47c80a352b47dd349ab73814f60e377eea311e0e42c",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoNastaliqUrdu-Regular.ttf",
+          "sha256": "4d05b6821862ca1f3c80c47c80a352b47dd349ab73814f60e377eea311e0e42c",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
+      "name": "NotoSansGujarati-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansGujarati/hinted/ttf/NotoSansGujarati-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "sha256": "9b5a7aaeeb649a2e75a49d8b006a1f87db1b61c0df3b001609f4e0725d88dbf6",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoSansGujarati-Regular.ttf",
+          "sha256": "9b5a7aaeeb649a2e75a49d8b006a1f87db1b61c0df3b001609f4e0725d88dbf6",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
+      "name": "NotoSansGurmukhi-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansGurmukhi/hinted/ttf/NotoSansGurmukhi-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "sha256": "658d0207da305a1411c539a8b0bbeda64d4146e54fb4827facddb890b6b90d74",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoSansGurmukhi-Regular.ttf",
+          "sha256": "658d0207da305a1411c539a8b0bbeda64d4146e54fb4827facddb890b6b90d74",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
+      "name": "NotoSansKannada-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansKannada/hinted/ttf/NotoSansKannada-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "sha256": "9ad74dc64838c6855b96f671fc08e425a58921b9d0c71712ea79c328a27e6e38",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoSansKannada-Regular.ttf",
+          "sha256": "9ad74dc64838c6855b96f671fc08e425a58921b9d0c71712ea79c328a27e6e38",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
+      "name": "NotoSansMalayalam-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansMalayalam/hinted/ttf/NotoSansMalayalam-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "sha256": "c08de7fa8d032a5d6a4d120fb82c78cec60b362a4e73fa26360d89759ff2a7f9",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoSansMalayalam-Regular.ttf",
+          "sha256": "c08de7fa8d032a5d6a4d120fb82c78cec60b362a4e73fa26360d89759ff2a7f9",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
+      "name": "NotoSansTelugu-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansTelugu/hinted/ttf/NotoSansTelugu-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "sha256": "b274780b69d1d23fe84b55e809a152cb2ac5306d33864b1f87622f6971871aae",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoSansTelugu-Regular.ttf",
+          "sha256": "b274780b69d1d23fe84b55e809a152cb2ac5306d33864b1f87622f6971871aae",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
+      "name": "NotoSansSinhala-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansSinhala/hinted/ttf/NotoSansSinhala-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "sha256": "9e32612d47004552f3125e78648a9e2e7899a216ccd3cefbb93a9b5f4c809feb",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoSansSinhala-Regular.ttf",
+          "sha256": "9e32612d47004552f3125e78648a9e2e7899a216ccd3cefbb93a9b5f4c809feb",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
+      "name": "NotoSansKhmer-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansKhmer/hinted/ttf/NotoSansKhmer-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "sha256": "e66675f2082788f0511a714bef5a1748928294b38c8e286a96ea73a864b5e605",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoSansKhmer-Regular.ttf",
+          "sha256": "e66675f2082788f0511a714bef5a1748928294b38c8e286a96ea73a864b5e605",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
+      "name": "NotoSansMyanmar-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansMyanmar/hinted/ttf/NotoSansMyanmar-Regular.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto fonts at a pinned repository commit",
+      "sha256": "fafce4db400bc0b214907ccdbfb0ad2f18a57bfefd08c8a571830b84088cf2fc",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoSansMyanmar-Regular.ttf",
+          "sha256": "fafce4db400bc0b214907ccdbfb0ad2f18a57bfefd08c8a571830b84088cf2fc",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
+      "name": "NotoEmoji-wght.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/notoemoji/NotoEmoji%5Bwght%5D.ttf",
+      "licence": "OFL-1.1",
+      "origin": "Noto Emoji (monochrome, variable) at a pinned google/fonts commit",
+      "sha256": "de6c18832938afc99caf132b39d6a30a19bac7f2e812e28db2535b4608d27551",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "NotoEmoji-wght.ttf",
+          "sha256": "de6c18832938afc99caf132b39d6a30a19bac7f2e812e28db2535b4608d27551",
+          "format": "truetype"
+        }
+      ]
     },
     {
       "name": "authored",

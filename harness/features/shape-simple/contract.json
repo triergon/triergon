@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "shape-simple",
+  "operation": "shape-simple",
+  "candidate": "shape-worker",
+  "worker_operation": "simple-",
+  "reference": "harfbuzz-native",
+  "contract": [
+    "one text file read from memory: one text per line",
+    "libass 0.17.5's ASS_SHAPING_SIMPLE over each line as one paragraph: FriBidi 1.0.17's levels with the case's base direction, fribidi_get_joining_types, fribidi_join_arabic and fribidi_shape with FRIBIDI_FLAGS_DEFAULT | FRIBIDI_FLAGS_ARABIC",
+    "per line: its length and the shaped code points; packets count lines and bytes code points",
+    "a line that does not parse is recorded as such; the file is read before each timed and memory operation"
+  ],
+  "required_profiles": [
+    "authored",
+    "random"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

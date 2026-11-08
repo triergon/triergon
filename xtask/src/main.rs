@@ -27,6 +27,7 @@ mod progressive_bench;
 mod pyrandom;
 mod python;
 mod sha256;
+mod shape;
 mod stats;
 mod toml;
 mod walk;
@@ -120,7 +121,9 @@ commands:
                  FFmpeg capture reference (see `cargo xtask capture --help`)
   fonts          prepare|fetch|manifest|compare   the pinned FreeType reference, the font
                  corpus and the font features' manifests; compare reports the required
-                 font features, --all every one (see `cargo xtask fonts --help`)";
+                 font features, --all every one (see `cargo xtask fonts --help`)
+  shape          prepare|manifest|compare|ucd   triergon-shape against the pinned
+                 HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -198,6 +201,13 @@ fn main() -> ExitCode {
         Some("fonts") => match fonts::reports(&args[1..]) {
             Some(reports) => return fonts_compare(&root, &reports),
             None => fonts::main(&root, &args[1..]),
+        },
+        Some("shape") => match shape::reports(&args[1..]) {
+            Some(reports) => match shape::write_inputs(&root) {
+                Ok(()) => return fonts_compare(&root, &reports),
+                Err(error) => Err(error),
+            },
+            None => shape::main(&root, &args[1..]),
         },
         Some("build-workers") => match &args[1..] {
             [] => harness::build::build(&root, false),
@@ -844,6 +854,7 @@ fn prepare_check() -> Task {
         &["fetch-vectors"],
         &["fonts", "prepare"],
         &["fonts", "fetch"],
+        &["shape", "prepare"],
         &["build-workers"],
     ] {
         run(Command::new(&exe).args(step))?;
@@ -921,16 +932,42 @@ fn fonts_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
 }
 
 /// `fonts compare` on the required font features, then one round of mutations of
-/// each feature's smoke cases through the release and dev builds of the font
-/// worker; a campaign that finds nothing is removed.
+/// each feature's smoke cases.
 fn fonts_check(root: &Path) -> Task {
     let reports = fonts::reports(&["compare".to_owned()]).expect("compare is a report");
     if fonts_compare(root, &reports) != ExitCode::SUCCESS {
         return Err("cargo xtask fonts compare failed".into());
     }
-    for feature in fonts::FEATURES.iter().filter(|f| f.required) {
-        let contract = format!("harness/features/{}/contract.json", feature.id);
-        let output = format!(".research/check-fuzz-{}-{}", feature.id, std::process::id());
+    let smoke = fonts::FEATURES
+        .iter()
+        .filter(|f| f.required)
+        .map(|f| (f.id, &fonts::SMOKE_CASES[..]));
+    smoke_campaigns(root, smoke)
+}
+
+/// The Unicode tables are what their generator writes, `shape compare` on the
+/// required shaping features passes, then one round of mutations of each
+/// feature's smoke cases, as for the fonts.
+fn shape_check(root: &Path) -> Task {
+    println!("$ cargo xtask shape ucd --check");
+    shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
+    shape::write_inputs(root)?;
+    let reports = shape::reports(&["compare".to_owned()]).expect("compare is a report");
+    if fonts_compare(root, &reports) != ExitCode::SUCCESS {
+        return Err("cargo xtask shape compare failed".into());
+    }
+    smoke_campaigns(root, shape::SMOKE_CASES.iter().map(|(f, c)| (*f, c)))
+}
+
+/// One fuzz round over the given cases of each feature through the release and
+/// dev builds of its worker; a campaign that finds nothing is removed.
+fn smoke_campaigns<'a, C: AsRef<[&'a str]>>(
+    root: &Path,
+    features: impl Iterator<Item = (&'a str, C)>,
+) -> Task {
+    for (feature, cases) in features {
+        let contract = format!("harness/features/{feature}/contract.json");
+        let output = format!(".research/check-fuzz-{feature}-{}", std::process::id());
         let mut args = vec![
             "--contract",
             &contract,
@@ -941,16 +978,13 @@ fn fonts_check(root: &Path) -> Task {
             "--timeout-seconds",
             "60",
         ];
-        for case in fonts::SMOKE_CASES {
+        for case in cases.as_ref() {
             args.extend(["--case", case]);
         }
         println!("$ cargo xtask fuzz {}", args.join(" "));
         let args: Vec<String> = args.iter().map(ToString::to_string).collect();
         if fuzz_campaign(root, &args) != ExitCode::SUCCESS {
-            return Err(format!(
-                "the {} campaign found problems: {output}",
-                feature.id
-            ));
+            return Err(format!("the {feature} campaign found problems: {output}"));
         }
         std::fs::remove_dir_all(root.join(&output)).map_err(|e| format!("{output}: {e}"))?;
     }
@@ -1037,6 +1071,7 @@ fn check(root: &Path) -> Task {
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;
     fonts_check(root)?;
+    shape_check(root)?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;

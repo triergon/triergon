@@ -2,12 +2,12 @@
 
 OpenType and TrueType faces for a subtitle renderer: the table directory and font
 collections, face metrics and names, character mapping, unhinted glyph outlines in
-font units with their advances, `kern` pair kerning, and choosing a face for an ASS
-font name, bold and italic value. At a pixel size it gives what libass obtains from
-FreeType: scaled 26.6 outlines, size metrics, advances, kerning, decoration lines
-and libass's synthetic oblique and bold. It depends only on
-[`triergon-core`](../core) for `Bytes`, `Budget` and errors. Shaping, rasterising
-and ASS parsing belong to other crates.
+font units with their advances, `kern` pair kerning, raw table bytes for other
+readers, and choosing a face for an ASS font name, bold and italic value. At a
+pixel size it gives what libass obtains from FreeType: scaled 26.6 outlines, size
+metrics, advances, kerning, decoration lines and libass's synthetic oblique and
+bold. It depends only on [`triergon-core`](../core) for `Bytes`, `Budget` and
+errors. Shaping, rasterising and ASS parsing belong to other crates.
 
 ## Usage
 
@@ -125,6 +125,12 @@ matrix implies other units per em scales its glyphs by the ratio. Drawing
 operators read operand counts the format does not allow as FreeType's engine reads
 them, and a glyph whose operator reads past its operands fails; operand types are
 not tracked.
+
+**Control boxes.** `Font::control_box` reads a glyph's box without building its
+outline, so no point limit applies: a TrueType glyph's `glyf` header box as
+stored, or the box of every point a charstring draws, control points included,
+in unrounded 16.16 before the FontMatrix (`ControlBox::Empty` when there are no
+points). HarfBuzz takes glyph extents from them.
 
 **At a size.** `Font::at_size` takes a 26.6 pixel height and sets up the face as
 FreeType does when libass requests the size (`ass_face_set_size`:

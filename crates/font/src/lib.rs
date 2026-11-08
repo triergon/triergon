@@ -25,7 +25,7 @@ mod store;
 mod synthesis;
 mod work;
 
-pub use cff::{CharstringOperator, OperatorSet};
+pub use cff::{CharstringBounds, CharstringOperator, OperatorSet};
 pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings};
 pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
@@ -111,13 +111,30 @@ pub struct GlyphMetrics {
     pub advance: i32,
 }
 
-/// The `head` bounding box of all glyphs, in font units.
+/// A box in font units as a table stores it: the `head` box of all glyphs, or
+/// one glyph's `glyf` header box.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Bounds {
     pub x_min: i16,
     pub y_min: i16,
     pub x_max: i16,
     pub y_max: i16,
+}
+
+/// A glyph's control box before scaling, as its outline format records or draws
+/// it: [`Font::control_box`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ControlBox {
+    /// The glyph has no points: a `glyf` entry without data or contours, or a
+    /// charstring that draws nothing.
+    Empty,
+    /// A TrueType glyph's `glyf` header box, as stored: minimum and maximum are
+    /// not reordered, and a composite's box is its own header's.
+    Glyf(Bounds),
+    /// The box of every point a charstring draws, control points included, in
+    /// unrounded 16.16 font units before the FontMatrix. A subpath's start counts
+    /// once it draws.
+    Charstring(CharstringBounds),
 }
 
 /// The `hhea` line metrics, in font units.
@@ -245,6 +262,15 @@ impl Font {
     /// The font bytes.
     pub fn data(&self) -> &Bytes {
         &self.data
+    }
+
+    /// The bytes of table `tag`: the first nonempty record with that tag whose
+    /// range lies inside the file, as FreeType's `FT_Load_Sfnt_Table` finds it.
+    /// Tables this crate does not read, such as `GDEF`, `GSUB` and `GPOS`, are
+    /// found the same way.
+    pub fn table(&self, tag: [u8; 4]) -> Option<&[u8]> {
+        let data = self.data.as_ref();
+        sfnt::find(data, self.tables.records, tag).map(|t| t.bytes(data))
     }
 
     /// The face's index in its file.
@@ -483,6 +509,13 @@ impl Font {
         Ok(self.hmtx.advance(self.data.as_ref(), glyph))
     }
 
+    /// The `hmtx` left side bearing of `glyph` in font units; zero where the
+    /// table has no value for it, as FreeType reads a short table.
+    pub fn side_bearing(&self, glyph: GlyphId) -> Result<i16> {
+        let glyph = self.check(glyph)?;
+        Ok(self.hmtx.side_bearing(self.data.as_ref(), glyph))
+    }
+
     /// The `kern` table value for the pair, in font units.
     pub fn kerning(&self, left: GlyphId, right: GlyphId) -> i32 {
         self.kern.pair(self.data.as_ref(), left, right)
@@ -530,7 +563,7 @@ impl Font {
                 outline.begin(self.limits.points);
                 let m = table.outline(&self.glyf_context(), glyph, scale, outline, &mut work)?;
                 // FreeType's phantom points: the origin and the advance.
-                let origin = i64::from(m.x_min) - i64::from(self.side_bearing(m.glyph));
+                let origin = i64::from(m.x_min) - i64::from(self.bearing(m.glyph));
                 let advance = i64::from(self.hmtx.advance(data, m.glyph));
                 let pp1 = mul_fix(origin, scale.x);
                 let pp2 = mul_fix(origin + advance, scale.x);
@@ -567,6 +600,38 @@ impl Font {
         }
     }
 
+    /// The control box of `glyph`, read without building its outline: the
+    /// `glyf` header box of a TrueType glyph, the box of every point a CFF or CFF2
+    /// charstring draws. HarfBuzz takes glyph extents from it.
+    ///
+    /// # Errors
+    ///
+    /// `Invalid` for a glyph outside the face and malformed glyph data (a `glyf`
+    /// header cut short, a charstring that fails); `Policy` when a charstring
+    /// exceeds the [`Limits`] work or depth. No point limit applies.
+    pub fn control_box(&self, glyph: GlyphId) -> Result<ControlBox> {
+        self.check(glyph)?;
+        let data = self.data.as_ref();
+        match &self.outlines {
+            Outlines::Glyf(table) => Ok(match table.header(data, glyph.0)? {
+                Some((contours, [x_min, y_min, x_max, y_max])) if contours != 0 => {
+                    ControlBox::Glyf(Bounds {
+                        x_min,
+                        y_min,
+                        x_max,
+                        y_max,
+                    })
+                }
+                _ => ControlBox::Empty,
+            }),
+            Outlines::Cff(cff) => {
+                let mut work = WorkBudget::new(self.limits.work);
+                let bounds = cff.bounds(data, glyph, &self.limits, &mut work)?;
+                Ok(bounds.map_or(ControlBox::Empty, ControlBox::Charstring))
+            }
+        }
+    }
+
     /// Loads `glyph` into a new outline charged to `budget`.
     pub fn outline(&self, glyph: GlyphId, budget: &Budget) -> Result<(Outline, GlyphMetrics)> {
         let mut outline = Outline::new(budget);
@@ -595,8 +660,8 @@ impl Font {
         }
     }
 
-    /// The `hmtx` left side bearing of `glyph`.
-    fn side_bearing(&self, glyph: u16) -> i32 {
+    /// The `hmtx` left side bearing of a glyph known to be in the face.
+    fn bearing(&self, glyph: u16) -> i32 {
         i32::from(self.hmtx.side_bearing(self.data.as_ref(), glyph))
     }
 
