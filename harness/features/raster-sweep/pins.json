@@ -753,6 +753,21 @@
       "bytes": 1272954,
       "digest": 16554169843422566679
     },
+    "authored-cmap-order-ttc-853": {
+      "packets": 180,
+      "bytes": 19182,
+      "digest": 6035255135906265718
+    },
+    "authored-cmap-order-ttc-2400": {
+      "packets": 180,
+      "bytes": 24508,
+      "digest": 10887587598621370333
+    },
+    "authored-cmap-order-ttc-16384": {
+      "packets": 180,
+      "bytes": 34086,
+      "digest": 2406089747806139522
+    },
     "outlines-0": {
       "packets": 261,
       "bytes": 7843306,
