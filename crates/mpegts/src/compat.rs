@@ -43,7 +43,7 @@ pub mod pes {
         DemuxPayloadKind, DemuxScope, DemuxSpan, DemuxSpanView, DemuxSpanViews,
         DvbSubtitlesDescriptors, PayloadCursor, PesCutter, PrivateAudioCarriage,
         PrivateAudioDescriptors, ReadyContinuation, RegisteredCarriage, SourceContext,
-        pcr_bounded_pts,
+        pcr_bounded_pts, selected_track_kind,
     };
 }
 

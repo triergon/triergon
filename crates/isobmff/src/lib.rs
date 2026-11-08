@@ -317,4 +317,4 @@ pub use fragment::OwnedFragmentCursor;
 pub mod open;
 
 mod container;
-pub use container::{Packet, Reader, ReaderEvent, ReaderLimits, Track};
+pub use container::{Packet, Reader, ReaderEvent, ReaderLimits, Track, media_kind};

@@ -9,13 +9,15 @@ pub(crate) const PES_PRIVATE_DATA: u8 = 0x06;
 impl ElementaryStream {
     /// The codec this entry names, or `None` when it names none [`CodecId`] has.
     ///
-    /// The stream types are H.222.0 Table 2-34: 0x01 and 0x02 MPEG video, 0x0f
-    /// AAC with ADTS, 0x11 AAC with LATM, 0x1b AVC and 0x24 HEVC. PES private data
+    /// H.222.0 Table 2-34 assigns 0x01 and 0x02 to MPEG video, 0x03 and 0x04
+    /// to MPEG audio, 0x0f to AAC with ADTS, 0x11 to AAC with LATM, 0x1b to
+    /// AVC and 0x24 to HEVC. PES private data
     /// (0x06) names a codec only through a DVB descriptor, so only under a DVB
     /// [`DescriptorNamespace`] ([`Self::dvb_descriptor_codec`]).
     pub fn codec(&self) -> Option<CodecId<'static>> {
         match self.stream_type {
             0x01 | 0x02 => Some(CodecId::Mpeg2Video),
+            0x03 | 0x04 => Some(CodecId::MpegAudio),
             0x0f => Some(CodecId::Aac),
             0x11 => Some(CodecId::AacLatm),
             0x1b => Some(CodecId::H264),
