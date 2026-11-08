@@ -37,7 +37,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use triergon_core::Budget;
-use triergon_harness_runner::{Invocation, Mode, Totals, measure};
+use triergon_harness_runner::{Invocation, Mode, Refusal, Totals, measure};
 
 /// The words after the file: KIND and its arguments.
 const USAGE: &str = " KIND [ARG...]";
@@ -124,6 +124,33 @@ impl Args {
     }
 }
 
+/// A decoder error at an input packet: the operation stops there and reports
+/// it as its refusal.
+#[derive(Debug)]
+pub struct Refused {
+    packet: usize,
+    error: triergon_core::Error,
+}
+
+impl std::fmt::Display for Refused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "packet {}: {}", self.packet, self.error)
+    }
+}
+
+impl std::error::Error for Refused {}
+
+/// Attribute a decoder's error to the packet it stopped at.
+pub trait At<T> {
+    fn at(self, packet: usize) -> Result<T>;
+}
+
+impl<T> At<T> for triergon_core::Result<T> {
+    fn at(self, packet: usize) -> Result<T> {
+        self.map_err(|error| Refused { packet, error }.into())
+    }
+}
+
 /// Prepared input for one kind: everything the timed operation reads.
 pub trait Prepared {
     /// One operation: decoder creation, every packet, the drain and teardown.
@@ -187,12 +214,21 @@ fn run(words: &[String]) -> Result<()> {
         Some(prepared.pool()),
         || {
             let mut sink = Sink::new(None);
-            prepared.run(&mut sink)?;
+            let refusal = match prepared.run(&mut sink) {
+                Ok(()) => None,
+                Err(error) => {
+                    let refused = error.downcast::<Refused>()?;
+                    Some(Box::new(Refusal {
+                        reason: refused.error.to_string(),
+                        cause: format!("{{\"packet\":{}}}", refused.packet),
+                    }))
+                }
+            };
             Ok(Totals {
                 packets: sink.work.events,
                 bytes: sink.work.bytes,
                 digest: sink.work.digest,
-                refusal: None,
+                refusal,
             })
         },
     )

@@ -15,7 +15,7 @@
 
 use crate::container::{self, Result, Track};
 use crate::sink::{EventHead, RectHead, RectKind, Sink};
-use crate::{Args, Prepared};
+use crate::{Args, At, Prepared};
 use std::path::Path;
 use triergon::CodecId;
 use triergon_core::{Budget, WorkBudget};
@@ -116,7 +116,7 @@ impl Prepared for Teletext {
                 None => (&[][..], None),
             };
             let mut work = WorkBudget::new(Decoder::MAX_PACKET_WORK);
-            let subtitle = match decoder.decode(data, pts, &mut work)? {
+            let subtitle = match decoder.decode(data, pts, &mut work).at(index)? {
                 Decoded::Subtitle(subtitle) => subtitle,
                 Decoded::Refused(refusal) => {
                     sink.refused(index, error_code(refusal))?;

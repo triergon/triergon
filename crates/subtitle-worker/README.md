@@ -41,8 +41,11 @@ The fold, bench and memory modes run through
 leaves storage charged to the pool, and print the harness protocol's one JSON line:
 `packets` counts output subtitles, `bytes` folded bytes and `digest` folds every
 subtitle's packet index, times, and per rectangle its geometry, flags, palette,
-pixels, text and ASS line. The bench mode adds the elapsed time of the timed loop
-and the memory mode brackets one operation with the allocation-window markers. The
+pixels, text and ASS line. A decoder error, such as memory the pool refuses, ends
+the operation: the line counts what was folded before it and carries the error as
+its `refusal`, with the packet it stopped at as its `cause`. The bench mode adds the
+elapsed time of the timed loop and the memory mode brackets one operation with the
+allocation-window markers. The
 trace mode prints the same values as lines, identical to the reference's trace, so a
 failing case can be diffed; the input mode prints the prepared packets. The features
 are `harness/features/subtitle-{pgs,dvb,dvd,cc,teletext}/`.

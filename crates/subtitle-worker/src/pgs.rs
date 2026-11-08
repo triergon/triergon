@@ -9,7 +9,7 @@
 
 use crate::container::{self, Packet, Result, Track};
 use crate::sink::{Bitmap, EventHead, RectHead, RectKind, Sink};
-use crate::{Args, Prepared};
+use crate::{Args, At, Prepared};
 use std::cell::OnceCell;
 use std::fs::File;
 use std::io::BufReader;
@@ -100,10 +100,15 @@ impl Prepared for Pgs {
             if payload.is_empty() {
                 continue;
             }
-            decoder.push(&mut Some(payload.clone()), *clock, &cancel)?;
+            decoder
+                .push(&mut Some(payload.clone()), *clock, &cancel)
+                .at(index)?;
             let out = loop {
-                match decoder.poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)? {
-                    RecoveryStatus::OutputReady => break decoder.take_output(&cancel)?,
+                match decoder
+                    .poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)
+                    .at(index)?
+                {
+                    RecoveryStatus::OutputReady => break decoder.take_output(&cancel).at(index)?,
                     RecoveryStatus::Yield => {}
                     status => return Err(format!("pgs: unexpected {status:?}").into()),
                 }
@@ -132,8 +137,11 @@ impl Prepared for Pgs {
                 sink.end()?;
             }
         }
-        decoder.finish_input(&cancel)?;
-        while decoder.poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)?
+        let end = self.packets.len();
+        decoder.finish_input(&cancel).at(end)?;
+        while decoder
+            .poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)
+            .at(end)?
             != RecoveryStatus::Ended
         {}
         Ok(())

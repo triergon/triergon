@@ -10,7 +10,7 @@
 
 use crate::container::{self, Packet, Result, Track};
 use crate::sink::{EventHead, RectHead, RectKind, Sink};
-use crate::{Args, Prepared};
+use crate::{Args, At, Prepared};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -292,12 +292,15 @@ impl Prepared for Captions {
                 duration_ms: packet.duration.map_or(0, |d| milliseconds(d, base)),
             };
             let mut work = WorkBudget::new(Decoder::packet_work(packet.data.len()));
-            if decoder.decode(&packet.data, clock, &mut subtitle, &mut work)? {
+            if decoder
+                .decode(&packet.data, clock, &mut subtitle, &mut work)
+                .at(index)?
+            {
                 emit(sink, index, &subtitle)?;
             }
         }
         for _ in 0..MAX_DRAIN {
-            if !decoder.drain(&mut subtitle)? {
+            if !decoder.drain(&mut subtitle).at(packets.len())? {
                 break;
             }
             emit(sink, packets.len(), &subtitle)?;

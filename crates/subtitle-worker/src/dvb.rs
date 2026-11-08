@@ -13,7 +13,7 @@
 
 use crate::container::{self, Result, Track};
 use crate::sink::{Bitmap, EventHead, RectHead, RectKind, Sink};
-use crate::{Args, Prepared};
+use crate::{Args, At, Prepared};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use triergon::CodecId;
@@ -105,7 +105,7 @@ impl Prepared for Dvb {
                     sink.refused(index, INVALID_DATA)?;
                     continue;
                 }
-                Err(error) => return Err(error.into()),
+                Err(error) => return Err(error).at(index),
             };
             sink.begin(EventHead {
                 packet: index as u64,

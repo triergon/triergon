@@ -10,7 +10,7 @@
 
 use crate::container::{self, Packet, Result, Track};
 use crate::sink::{Bitmap, EventHead, RectHead, RectKind, Sink};
-use crate::{Args, Prepared};
+use crate::{Args, At, Prepared};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
@@ -99,10 +99,13 @@ impl Prepared for Dvd {
         let mut decoder = Decoder::new(&self.pool, settings, Limits::default());
         sink.header(self.track.packets.len(), None)?;
         for (index, packet) in self.track.packets.iter().enumerate() {
-            let mut status =
-                decoder.decode(&packet.data, &mut WorkBudget::new(crate::WORK_SLICE))?;
+            let mut status = decoder
+                .decode(&packet.data, &mut WorkBudget::new(crate::WORK_SLICE))
+                .at(index)?;
             while status == Status::Yield {
-                status = decoder.resume(&mut WorkBudget::new(crate::WORK_SLICE))?;
+                status = decoder
+                    .resume(&mut WorkBudget::new(crate::WORK_SLICE))
+                    .at(index)?;
             }
             let Status::Subtitle(subtitle) = status else {
                 continue;
