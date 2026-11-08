@@ -8,7 +8,7 @@
 //! [`AnyReader::open`] refuses it explicitly.
 // With no format feature the enums are empty and their forwarding is dead code.
 #![cfg_attr(
-    not(any(feature = "matroska", feature = "isobmff")),
+    not(any(feature = "matroska", feature = "isobmff", feature = "ogg")),
     allow(unused_imports, unused_variables, unreachable_code)
 )]
 use std::sync::atomic::AtomicBool;
@@ -22,7 +22,7 @@ use triergon_core::{
 };
 
 /// The largest input window a reader asks for at once.
-#[cfg(any(feature = "matroska", feature = "isobmff"))]
+#[cfg(any(feature = "matroska", feature = "isobmff", feature = "ogg"))]
 const WINDOW: usize = 64 * 1024;
 
 /// What the first bytes of a source look like.
@@ -34,6 +34,8 @@ pub enum Probe {
     Isobmff,
     /// 188-byte MPEG transport packets.
     Ts,
+    /// An Ogg page (`OggS`).
+    Ogg,
     /// Not recognised from these bytes.
     Unknown,
 }
@@ -51,6 +53,9 @@ pub fn probe(bytes: &[u8]) -> Probe {
     {
         return Probe::Isobmff;
     }
+    if bytes.starts_with(b"OggS\0") {
+        return Probe::Ogg;
+    }
     if bytes.len() > 188 * 2 && bytes[0] == 0x47 && bytes[188] == 0x47 && bytes[376] == 0x47 {
         return Probe::Ts;
     }
@@ -66,6 +71,8 @@ pub enum AnyReader {
     Matroska(triergon_matroska::typed::Reader),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Reader),
+    #[cfg(feature = "ogg")]
+    Ogg(triergon_ogg::Reader),
 }
 
 /// The packet of whichever reader produced it.
@@ -77,6 +84,8 @@ pub enum AnyPacket {
     Matroska(triergon_matroska::typed::Packet),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Packet),
+    #[cfg(feature = "ogg")]
+    Ogg(triergon_ogg::Packet),
 }
 
 /// Non-packet events of whichever reader produced them.
@@ -88,6 +97,8 @@ pub enum AnyOther {
     Matroska(triergon_matroska::typed::Event),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::ReaderEvent),
+    #[cfg(feature = "ogg")]
+    Ogg(triergon_ogg::ReaderEvent),
 }
 
 macro_rules! each {
@@ -97,14 +108,16 @@ macro_rules! each {
             Self::Matroska($inner) => $body,
             #[cfg(feature = "isobmff")]
             Self::Isobmff($inner) => $body,
-            #[cfg(not(any(feature = "matroska", feature = "isobmff")))]
+            #[cfg(feature = "ogg")]
+            Self::Ogg($inner) => $body,
+            #[cfg(not(any(feature = "matroska", feature = "isobmff", feature = "ogg")))]
             _ => unreachable!("no format feature: the enum is uninhabited"),
         }
     };
 }
 
 /// Wrap one reader's step in the closed enums.
-#[cfg(any(feature = "matroska", feature = "isobmff"))]
+#[cfg(any(feature = "matroska", feature = "isobmff", feature = "ogg"))]
 macro_rules! neutral_step {
     ($step:expr, $variant:ident) => {
         match $step {
@@ -142,6 +155,14 @@ impl AnyReader {
                 source,
                 capabilities,
                 triergon_isobmff::ReaderLimits::default(),
+                WINDOW,
+            )?)),
+            #[cfg(feature = "ogg")]
+            Probe::Ogg => Ok(Self::Ogg(triergon_ogg::Reader::new(
+                pool,
+                source,
+                capabilities,
+                triergon_ogg::Limits::default(),
                 WINDOW,
             )?)),
             Probe::Ts => Err(Error::Unsupported(
@@ -218,7 +239,9 @@ impl ContainerReader for AnyReader {
             Self::Isobmff(reader) => {
                 neutral_step!(ContainerReader::step(reader, work, cancel)?, Isobmff)
             }
-            #[cfg(not(any(feature = "matroska", feature = "isobmff")))]
+            #[cfg(feature = "ogg")]
+            Self::Ogg(reader) => neutral_step!(ContainerReader::step(reader, work, cancel)?, Ogg),
+            #[cfg(not(any(feature = "matroska", feature = "isobmff", feature = "ogg")))]
             _ => unreachable!("no format feature: the enum is uninhabited"),
         })
     }
