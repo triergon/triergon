@@ -104,6 +104,7 @@ pub fn matroska_inputs() -> Vec<String> {
     }
     // Features whose manifests are generated from their pins and committed inputs.
     names.extend(crate::lanes::provenance_inputs());
+    names.extend(crate::transport_fixtures::source_inputs());
     names
 }
 

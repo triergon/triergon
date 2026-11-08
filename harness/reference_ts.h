@@ -9,10 +9,13 @@
  * returns AVERROR_EOF. FFmpeg probes the packet size itself, and its demuxer has no
  * caller-declared descriptor namespace, so the size and --dvb arguments describe
  * the candidate's request only. An operation over more than one media entity has
- * no single-input equivalent here and is refused. */
+ * no single-input equivalent here and is refused. The ts-au modes enable codec
+ * parsing while retaining NOFILLIN and the same program filter and packet fold;
+ * they observe access units separately from the unchanged PES operation. */
 #include <libavformat/avformat.h>
 
 #define TS_OPERATION "mpegts-pes-packets"
+#define TS_AU_OPERATION "mpegts-access-unit-packets"
 enum { TS_AVIO_BYTES = 32 * 1024, TS_MAXIMUM_READ = 64 * 1024 };
 
 typedef struct { const uint8_t *data; size_t size, used; } TsInput;
@@ -63,7 +66,8 @@ static int ts_in_program(const AVFormatContext *format, int index, int program)
 
 /* One operation. Returns 1 at AVERROR_EOF, or the negative error that stopped the
  * demuxer before it. */
-static int ts_operation(const uint8_t *bytes, size_t size, int program, TsWork *work)
+static int ts_operation(const uint8_t *bytes, size_t size, int program,
+                        int access_units, TsWork *work)
 {
     TsInput in = {bytes, size, 0};
     AVFormatContext *format = avformat_alloc_context();
@@ -81,7 +85,9 @@ static int ts_operation(const uint8_t *bytes, size_t size, int program, TsWork *
         goto done;
     }
     format->pb = io;
-    format->flags |= AVFMT_FLAG_CUSTOM_IO | AVFMT_FLAG_NOPARSE | AVFMT_FLAG_NOFILLIN;
+    format->flags |= AVFMT_FLAG_CUSTOM_IO | AVFMT_FLAG_NOFILLIN;
+    if (!access_units)
+        format->flags |= AVFMT_FLAG_NOPARSE;
     rc = avformat_open_input(&format, NULL, av_find_input_format("mpegts"), NULL);
     if (rc < 0)
         goto done;
@@ -125,12 +131,15 @@ done:
 }
 
 /* ts-fold FILE SIZE PROGRAM [OPTIONS] | ts-bench FILE N SIZE PROGRAM [OPTIONS] |
- * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb and further entities. */
+ * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb and further entities.
+ * ts-au-fold, ts-au-bench and ts-au-memory use the same arguments with parsing. */
 static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
 {
-    const int bench = !strcmp(argv[1], "ts-bench");
-    const int memory = !strcmp(argv[1], "ts-memory");
-    if (!bench && !memory && strcmp(argv[1], "ts-fold"))
+    const int access_units = !strncmp(argv[1], "ts-au-", 6);
+    const char *mode = argv[1] + (access_units ? 6 : 3);
+    const int bench = !strcmp(mode, "bench");
+    const int memory = !strcmp(mode, "memory");
+    if (!bench && !memory && strcmp(mode, "fold"))
         return 2;
     int at = bench ? 4 : 3;
     if (argc < at + 2)
@@ -160,7 +169,7 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     const uint64_t start = bench ? now_ns() : 0;
     for (unsigned long i = 0; i < iterations && !refusal; ++i) {
         TsWork work = {0, 0, 0};
-        rc = ts_operation(bytes, (size_t)size, (int)program, &work);
+        rc = ts_operation(bytes, (size_t)size, (int)program, access_units, &work);
         fold(&total.digest, work.digest);
         total.packets += work.packets;
         total.bytes += work.bytes;
@@ -173,8 +182,9 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     const uint64_t elapsed = bench ? now_ns() - start : 0;
     if (memory && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16)
         return 2;
-    printf("{\"schema\":1,\"operation\":\"" TS_OPERATION "\",\"iterations\":%lu,\"packets\":%" PRIu64
+    printf("{\"schema\":1,\"operation\":\"%s\",\"iterations\":%lu,\"packets\":%" PRIu64
            ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 ",\"eof\":%s",
+           access_units ? TS_AU_OPERATION : TS_OPERATION,
            iterations, total.packets, total.bytes, total.digest, elapsed, eof ? "true" : "false");
     if (refusal) {
         printf(",\"refusal\":");
