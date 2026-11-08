@@ -1,24 +1,29 @@
 # Decoder comparison material
 
 Inputs, rules and tools used to compare the codec crates (`crates/codec-aac`,
-`codec-ac3`, `codec-dca`, `codec-h264`, `codec-hevc`) and the session crate
-(`crates/session`) with FFmpeg 9.0.2. What each decoder supports and refuses is in its crate
-README. The comparison harness is the decode build of `harness/reference.c` with
-`cargo xtask codecs` (`manifest`, `grade`, `summarize`, `time`, `equivalence`; see
-`cargo xtask codecs --help`). Gate definitions:
+`codec-ac3`, `codec-dca`, `codec-flac`, `codec-h264`, `codec-hevc`, `codec-mp3`,
+`codec-opus`, `codec-vorbis`), the session crate (`crates/session`) and the audio
+container readers (`crates/ogg`, `crates/elementary`) with FFmpeg 9.0.2. What each
+decoder supports and refuses is in its crate README. The comparison harness is the
+decode build of `harness/reference.c` and the decode profile's `ffmpeg` and `ffprobe`,
+driven by `cargo xtask codecs` (`manifest`, `grade`, `summarize`, `readers`, `time`,
+`memory`, `equivalence`; see `cargo xtask codecs --help`). Gate definitions:
 [docs/quality.md](../../docs/quality.md).
 
 | Path | Content |
 |---|---|
-| `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB |
-| `correctness-manifest.json` | The 454 correctness vectors |
+| `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: lossy audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; FLAC bit-exact; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB; and the reviewed rules for the Layer I and II float decoders and the integer stereo mix of 16-bit FLAC |
+| `correctness-manifest.json` | The 775 correctness vectors: 454 of the video and elementary-stream lanes and 321 of the file-format lanes (FLAC 187, MP3 39, MP2 20, MP1 5, Vorbis 21, Opus 49) |
+| `reader-manifest.json`, `reader-rules.json` | The 305 reader comparison inputs, and the fields compared per format, the reviewed comparison rules and the dispositions of FFmpeg behaviours `cargo xtask codecs readers` applies |
 | `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 17 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
 | [measurement-policy.md](measurement-policy.md) | What counts as equivalent work in timing and memory runs |
 | [adapter-contract.md](adapter-contract.md) | Session-layer contract for a host adapter |
-| `downmix-*.json` | Observed stereo downmix (`-ac 2`) rules |
+| `downmix-*.json`, [downmix-integer.md](downmix-integer.md) | Observed stereo downmix (`-ac 2`) rules, for float and for integer decoder output |
 | `rgba-*.json` | Observed letterbox scaling and RGBA conversion rules |
 | `codec-comparison` evidence set | Correctness rows and summaries, timing and memory records, identity hashes; `cargo xtask evidence fetch codec-comparison` unpacks it into `.research/evidence/codec-comparison/` |
+| `audio-formats-linux-arm64`, `audio-readers-mac-arm64` evidence sets | The file-format lanes' correctness rows, timing and memory records; the reader comparisons and the generated Ogg inputs (`inputs/ogg-generated`) |
 | `aac/`, `ac3/`, `dca/`, `h264/`, `hevc/` | Per-codec tools and derivation notes |
+| `flac/`, `mp3/`, `ogg/` | Generators of the FLAC, MPEG audio and Ogg vectors |
 | `codec-reference-binary`, `codec-reference-reproduction` evidence sets | The reference worker the cited results were measured with, and the proof that `prepare-ffmpeg --profile decode` rebuilds it: byte-identical output on every vector and workload, identical classifications |
 
 ## Running the comparison
@@ -26,12 +31,14 @@ README. The comparison harness is the decode build of `harness/reference.c` with
 ```sh
 cargo xtask prepare-ffmpeg --profile decode   # FFmpeg 9.0.2, default configuration
 cargo xtask build-workers                     # ffmpeg-decode-worker, codec-worker, …
+FF=.research/reference-decode/install/bin
 cargo xtask codecs grade --manifest harness/codecs/correctness-manifest.json --root . \
-  --bin DIR --ffmpeg .research/reference-decode/install/bin/ffmpeg \
-  --ffprobe .research/reference-decode/install/bin/ffprobe \
+  --bin DIR --ffmpeg $FF/ffmpeg --ffprobe $FF/ffprobe \
   --codec-worker target/release/codec-worker \
   --reference target/harness/ffmpeg-decode-worker --out run.jsonl
 cargo xtask codecs summarize run.jsonl summary.json
+cargo xtask codecs readers --manifest harness/codecs/reader-manifest.json --root . \
+  --ffprobe $FF/ffprobe --codec-worker target/release/codec-worker --out readers.jsonl
 ```
 
 `--bin` names a directory with the decoder examples as `codec-h264-decode`,
@@ -39,19 +46,78 @@ cargo xtask codecs summarize run.jsonl summary.json
 (`target/release/examples/decode_{h264,hevc,ac3,aac,dts}`), and `audio-decode`
 (`crates/session/examples/decode_audio`, built with `--features codecs`) for the `flac`,
 `mp3`, `mp2`, `mp1`, `vorbis` and `opus` lanes, which read their file through the
-container readers and apply its trims as the CLI does. Those lanes compare with FFmpeg's
-native decoders by name, and Layer I and II with its float decoders.
+container readers and apply its trims as the CLI does. Every run checks each input
+against its manifest SHA-256 and writes one row per input, whatever its outcome.
 
 The vectors are the FATE suite's `aac`, `ac3`, `eac3`, `dts`, `h264-conformance` and
 `hevc-conformance` directories in `.research/fate-samples`, plus 71 elementary streams
 derived from them with the decode profile's `ffmpeg` (manifest paths under `target/`):
 ADTS from the MP4 and 3GP vectors (`-map 0:a:0 -c:a copy -f adts`), DTS cores
 (`-map 0:a:0 -c:a copy -bsf:a dca_core -f dts`) and AC-3 streams copied out of their
-containers (`-map 0:a:N -c:a copy -f ac3`). Grading checks every input against its
-manifest SHA-256. The file-format lanes add FATE's `vorbis`, `opus` and
-`mp3-conformance` directories, the IETF CELLAR FLAC test files (`subset`, `uncommon`;
-CC0) and streams generated by `harness/codecs/flac/flac_vectors.py` and
-`harness/codecs/mp3/make_vectors.sh`.
+containers (`-map 0:a:N -c:a copy -f ac3`). The file-format lanes add FATE's `vorbis`,
+`opus` and `mp3-conformance` directories, the IETF CELLAR FLAC test files (`subset`,
+`uncommon`; CC0), the FLAC streams `harness/codecs/flac/flac_vectors.py FFMPEG FLAC
+.research/flac-generated` encodes, the MPEG audio streams
+`harness/codecs/mp3/make_vectors.sh FFMPEG .research/mp3/vectors` writes (Layer III with
+libmp3lame, so FFMPEG is an FFmpeg 9.0.2 build with it) and 34 generated Opus streams
+in `.research/opus-generated`. `cargo xtask codecs manifest` rehashes them:
+
+```sh
+cargo xtask codecs manifest --out harness/codecs/correctness-manifest.json \
+  h264=.research/fate-samples/h264-conformance hevc=.research/fate-samples/hevc-conformance \
+  ac3=target/agent-ac3/es eac3=target/agent-ac3/es aac=target/agent-aac/vec \
+  dts=target/agent-dca/vec \
+  flac=.research/flac-test-files/subset,.research/flac-test-files/uncommon,.research/flac-generated \
+  mp3=.research/fate-samples/mp3-conformance,.research/mp3/vectors mp2=.research/mp3/vectors \
+  mp1=.research/mp3/vectors vorbis=.research/fate-samples/vorbis \
+  opus=.research/fate-samples/opus,.research/opus-generated
+cargo xtask codecs manifest --out harness/codecs/reader-manifest.json \
+  reader-ogg=.research/fate-samples/vorbis,.research/ogg-generated \
+  reader-flac=.research/elementary,.research/flac-test-files,.research/flac-generated \
+  reader-mp3=.research/elementary,.research/fate-samples/mp3-conformance \
+  reader-aac=.research/elementary reader-ac3=.research/elementary \
+  reader-eac3=.research/elementary
+```
+
+## File-format lanes
+
+The `flac`, `mp3`, `mp2`, `mp1`, `vorbis` and `opus` lanes compare with FFmpeg's native
+decoders by name. FLAC is lossless: its float output must equal FFmpeg's exactly
+(`lossless_audio_decode`), with the same rate, layout and sample counts; the other
+lanes take the lossy audio rule. Layer I and II are compared with FFmpeg's float
+decoders `mp1float` and `mp2float`, whose fixed-point defaults round to 16 bits
+(`mpeg-audio-float-decoders`). The stereo s16 output of 16-bit FLAC is FFmpeg's integer
+mix, which `codec-worker` reproduces (`flac-integer-device-mix`).
+
+## Reader lane
+
+`cargo xtask codecs readers` compares the packets the container readers emit with the
+decode profile's `ffprobe -show_packets`, the demuxer forced on both sides. Its inputs
+are FATE's `vorbis` and `mp3-conformance` directories, the Ogg files
+`harness/codecs/ogg/make_vectors.sh` generated (archived in `audio-readers-mac-arm64`
+under `inputs/ogg-generated`; copy them to `.research/ogg-generated`), the FLAC test
+files and generated FLAC streams, and the streams in `.research/elementary` (encoded by
+FFmpeg, and crafted damaged ones in `crafted/`). `codec-worker packets FORMAT FILE`
+prints every packet `triergon_ogg::BlockingReader` or the `triergon_elementary` reader
+emits: track, pts, dts, duration, size, position and trims as the reader reports them.
+The rules in `reader-rules.json` project the reader's times into FFmpeg's stream time
+base and pair packets in order per stream; position is compared for elementary
+streams, not for Ogg, where the reader reports the completing page and FFmpeg the
+starting one. Each input is a row: `pass`, `refused-by-both`, `disposition` with the
+reviewed FFmpeg behaviours that explain exactly its differences (pinned by input and
+difference SHA-256), or `fail`.
+
+## Timing and memory
+
+`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280).
+`cargo xtask codecs memory --candidate target/release/codec-worker --reference
+target/harness/ffmpeg-decode-worker --workloads harness/codecs/file-workloads.json
+--root . --out DIR` measures both workers' `OP-memory` runs under the shared observer
+of `target/harness` (30 pairs, seed 282). Each worker's work is checked first and must
+be equal; the gate is the paired 95% upper bounds of peak heap
+(`heap_ratio_upper_95`) and total resident peak RSS (`total_rss_ratio_upper_95`), both
+below 1.0, on native AArch64 Linux with the gate build. `DIR` keeps every raw
+observation per workload and `summary.json`.
 
 ## Dispositions cited by the correctness summaries
 
