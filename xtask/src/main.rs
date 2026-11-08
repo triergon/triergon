@@ -122,8 +122,8 @@ commands:
   fonts          prepare|fetch|manifest|compare   the pinned FreeType reference, the font
                  corpus and the font features' manifests; compare reports the required
                  font features, --all every one (see `cargo xtask fonts --help`)
-  shape          ucd|fetch|compare|fuzz   triergon-shape against the pinned HarfBuzz and
-                 FriBidi reference (see `cargo xtask shape --help`)";
+  shape          prepare|manifest|compare|ucd   triergon-shape against the pinned
+                 HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
