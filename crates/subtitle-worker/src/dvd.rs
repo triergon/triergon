@@ -28,6 +28,7 @@ const POOL_BYTES: usize = 64 << 20;
 struct Dvd {
     track: Track,
     options: Options,
+    pool: Budget,
 }
 
 /// The decoder options, applied when the timed operation opens the decoder.
@@ -85,14 +86,17 @@ pub fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
             Some(other) => return Err(format!("forced_subs_only={other}").into()),
         },
     };
-    Ok(Box::new(Dvd { track, options }))
+    Ok(Box::new(Dvd {
+        track,
+        options,
+        pool: Budget::new(POOL_BYTES)?,
+    }))
 }
 
 impl Prepared for Dvd {
     fn run(&self, sink: &mut Sink<'_>) -> Result<()> {
-        let pool = Budget::new(POOL_BYTES)?;
         let settings = self.options.settings(&self.track.configuration);
-        let mut decoder = Decoder::new(&pool, settings, Limits::default());
+        let mut decoder = Decoder::new(&self.pool, settings, Limits::default());
         sink.header(self.track.packets.len(), None)?;
         for (index, packet) in self.track.packets.iter().enumerate() {
             let status = decoder.decode(&packet.data, &mut WorkBudget::new(u64::MAX))?;
@@ -137,6 +141,10 @@ impl Prepared for Dvd {
             sink.end()?;
         }
         Ok(())
+    }
+
+    fn pool(&self) -> &Budget {
+        &self.pool
     }
 
     fn input(&self) -> Option<&Track> {

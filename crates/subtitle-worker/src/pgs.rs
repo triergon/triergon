@@ -137,6 +137,10 @@ impl Prepared for Pgs {
         Ok(())
     }
 
+    fn pool(&self) -> &Budget {
+        &self.pool
+    }
+
     fn input(&self) -> Option<&Track> {
         Some(self.input.get_or_init(|| {
             Track {

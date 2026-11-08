@@ -201,9 +201,11 @@ fn read(
         CodecId::Hevc => Some(CodecId::Hevc),
         _ => None,
     };
-    let timestamp_scale = match &reader {
-        AnyReader::Matroska(m) => Some(m.timestamp_scale_ns()),
-        _ => None,
+    // The reader's variants depend on the facade's features in the build.
+    let timestamp_scale = if let AnyReader::Matroska(m) = &reader {
+        Some(m.timestamp_scale_ns())
+    } else {
+        None
     };
     if let AnyReader::Isobmff(mp4) = &reader
         && track.kind() == MediaKind::Subtitle

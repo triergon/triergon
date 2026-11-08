@@ -12,12 +12,13 @@
 //! the video stream, the default) or `source=packets` (608 byte pairs, such as an
 //! SCC file).
 //!
-//! Preparation (reading the file, demuxing, extracting caption data) is outside
-//! the timed interval and memory window. The operation creates the decoder,
-//! decodes every prepared packet in order, drains it, folds every output subtitle
-//! into the canonical [`sink`] form and drops everything. `sub-fold`, `sub-bench`
-//! and `sub-memory` print one JSON line with the event count, folded bytes and
-//! digest; `sub-trace` prints the header line and one line per event instead.
+//! Preparation (reading the file, demuxing, extracting caption data, creating the
+//! decoder's pool) is outside the timed interval and memory window. The operation
+//! creates the decoder, decodes every prepared packet in order, drains it, folds
+//! every output subtitle into the canonical [`sink`] form and drops everything.
+//! `sub-fold`, `sub-bench` and `sub-memory` print one JSON line with the event
+//! count, folded bytes and digest (`triergon-harness-runner`); `sub-trace` prints
+//! the header line and one line per event instead.
 //! `sub-input` prints the prepared packets as the reference's `sub-input` does:
 //! a header line with the time base and configuration, then one line per packet.
 #![forbid(unsafe_code)]
@@ -31,10 +32,15 @@ mod sink;
 mod teletext;
 
 use container::Result;
-use sink::{Sink, Work};
+use sink::Sink;
 use std::io::{self, Write};
 use std::path::Path;
-use std::time::Instant;
+use std::process::ExitCode;
+use triergon_core::Budget;
+use triergon_harness_runner::{Invocation, Mode, Totals, measure};
+
+/// The words after the file: KIND and its arguments.
+const USAGE: &str = " KIND [ARG...]";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -118,6 +124,9 @@ impl Args {
 pub trait Prepared {
     /// One operation: decoder creation, every packet, the drain and teardown.
     fn run(&self, sink: &mut Sink<'_>) -> Result<()>;
+    /// The pool the prepared input and the decoder are charged to; an operation
+    /// leaves it as it found it.
+    fn pool(&self) -> &Budget;
     /// The prepared packets, for `sub-input`.
     fn input(&self) -> Option<&container::Track> {
         None
@@ -134,77 +143,53 @@ fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
     }
 }
 
-fn mix(total: &mut Work, once: Work) {
-    total.events += once.events;
-    total.bytes += once.bytes;
-    triergon_harness_protocol::digest::fold(&mut total.digest, once.digest);
-}
-
-fn main() {
+fn main() -> ExitCode {
     let words: Vec<String> = std::env::args().skip(1).collect();
     match run(&words) {
-        Ok(code) => std::process::exit(code),
+        Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("subtitle-worker: {error}");
-            std::process::exit(1);
+            ExitCode::from(2)
         }
     }
 }
 
-fn run(words: &[String]) -> Result<i32> {
-    let Some((mode, rest)) = words.split_first() else {
-        return Ok(2);
-    };
-    let bench = mode == "sub-bench";
-    let memory = mode == "sub-memory";
-    let trace = mode == "sub-trace";
-    if !(bench || memory || trace || mode == "sub-fold" || mode == "sub-input") {
-        return Ok(2);
-    }
-    let first = if bench { 2 } else { 1 };
-    if rest.len() <= first {
-        return Ok(2);
-    }
-    let iterations: u64 = if bench { rest[1].parse()? } else { 1 };
-    if iterations == 0 || iterations > 1_000_000 {
-        return Ok(2);
-    }
-    let args = Args::parse(&rest[first..])?;
-    let prepared = prepare(Path::new(&rest[0]), &args)?;
-    let stdout = io::stdout();
-    if mode == "sub-input" {
-        let track = prepared.input().ok_or("no prepared packet view")?;
-        container::write_input(&mut stdout.lock(), track)?;
-        return Ok(0);
-    }
-    if memory {
-        stdout.lock().write_all(b"TRIERGON_BEGIN_V1\n")?;
-        stdout.lock().flush()?;
-    }
-    let mut total = Work::default();
-    let start = Instant::now();
-    let mut lock = stdout.lock();
-    for _ in 0..iterations {
-        let mut sink = if trace {
-            Sink::new(Some(&mut lock))
-        } else {
-            Sink::new(None)
+fn run(words: &[String]) -> Result<()> {
+    if let Some(("sub-input", rest)) = words.split_first().map(|(m, r)| (m.as_str(), r)) {
+        let [file, arguments @ ..] = rest else {
+            return Err(format!("usage: subtitle-worker sub-input FILE{USAGE}").into());
         };
-        prepared.run(&mut sink)?;
-        let once = sink.work;
-        mix(&mut total, once);
+        let prepared = prepare(Path::new(file), &Args::parse(arguments)?)?;
+        let track = prepared.input().ok_or("no prepared packet view")?;
+        let mut out = io::stdout().lock();
+        container::write_input(&mut out, track)?;
+        out.flush()?;
+        return Ok(());
     }
-    let elapsed = if bench { start.elapsed().as_nanos() } else { 0 };
-    if memory {
-        lock.write_all(b"TRIERGON_END_V1\n")?;
+    let invocation = Invocation::parse(words, "sub-", USAGE, 1..=usize::MAX, true)?;
+    let prepared = prepare(
+        Path::new(invocation.path),
+        &Args::parse(invocation.arguments)?,
+    )?;
+    if invocation.mode == Mode::Trace {
+        let mut out = io::stdout().lock();
+        prepared.run(&mut Sink::new(Some(&mut out)))?;
+        out.flush()?;
+        return Ok(());
     }
-    if !trace {
-        writeln!(
-            lock,
-            "{{\"schema\":1,\"operation\":\"subtitle-decode\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-            total.events, total.bytes, total.digest
-        )?;
-    }
-    lock.flush()?;
-    Ok(0)
+    measure(
+        &invocation,
+        "subtitle-decode",
+        Some(prepared.pool()),
+        || {
+            let mut sink = Sink::new(None);
+            prepared.run(&mut sink)?;
+            Ok(Totals {
+                packets: sink.work.events,
+                bytes: sink.work.bytes,
+                digest: sink.work.digest,
+                refusal: None,
+            })
+        },
+    )
 }

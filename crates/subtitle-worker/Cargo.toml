@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 triergon-core = { path = "../core" }
 triergon-harness-protocol = { path = "../harness-protocol" }
+triergon-harness-runner = { path = "../harness-runner" }
 triergon = { path = "../triergon", features = ["matroska", "isobmff"] }
 triergon-mpegts = { path = "../mpegts" }
 triergon-subtitles = { path = "../subtitles" }

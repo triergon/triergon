@@ -150,6 +150,10 @@ impl Prepared for Teletext {
         Ok(())
     }
 
+    fn pool(&self) -> &Budget {
+        &self.pool
+    }
+
     fn input(&self) -> Option<&Track> {
         Some(&self.track)
     }

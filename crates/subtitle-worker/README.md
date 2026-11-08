@@ -31,12 +31,14 @@ stream, the default) or `source=packets` (608 byte pairs, such as an SCC file).
 
 Preparation is outside the timed interval and the memory window: reading the file
 through the Triergon container readers, selecting the stream, copying its packets
-in demux order and, for captions, extracting the caption data of every picture in
-output order. The operation creates the decoder, decodes every prepared packet with
+in demux order, for captions extracting the caption data of every picture in
+output order, and creating the pool the decoder is charged to. The operation creates the decoder, decodes every prepared packet with
 one call each, drains it, folds every output subtitle (`src/sink.rs`) and frees
 everything.
 
-The fold, bench and memory modes print the harness protocol's one JSON line:
+The fold, bench and memory modes run through
+[triergon-harness-runner](../harness-runner/README.md), which fails an operation that
+leaves storage charged to the pool, and print the harness protocol's one JSON line:
 `packets` counts output subtitles, `bytes` folded bytes and `digest` folds every
 subtitle's packet index, times, and per rectangle its geometry, flags, palette,
 pixels, text and ASS line. The bench mode adds the elapsed time of the timed loop

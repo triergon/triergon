@@ -50,6 +50,15 @@ pub struct Bitmap<'a> {
     pub stride: usize,
 }
 
+impl Bitmap<'_> {
+    /// Row `row`'s first `w` index bytes.
+    fn row(&self, row: usize, w: usize) -> io::Result<&[u8]> {
+        row.checked_mul(self.stride)
+            .and_then(|start| self.pixels.get(start..)?.get(..w))
+            .ok_or_else(|| io::Error::other("bitmap rows outside its pixels"))
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Work {
     pub events: u64,
@@ -160,7 +169,7 @@ impl<'a> Sink<'a> {
         let rows = bitmap.filter(|_| w > 0 && h > 0);
         if let Some(b) = rows {
             for row in 0..h {
-                fold_bytes(&mut self.work.digest, &b.pixels[row * b.stride..][..w]);
+                fold_bytes(&mut self.work.digest, b.row(row, w)?);
             }
             self.work.bytes += (w * h) as u64;
         }
@@ -181,7 +190,7 @@ impl<'a> Sink<'a> {
             out.write_all(b"\",\"pixels\":\"")?;
             if let Some(b) = rows {
                 for row in 0..h {
-                    for byte in &b.pixels[row * b.stride..][..w] {
+                    for byte in b.row(row, w)? {
                         write!(out, "{byte:02x}")?;
                     }
                 }

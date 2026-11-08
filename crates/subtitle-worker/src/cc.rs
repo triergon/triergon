@@ -32,7 +32,11 @@ pub fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
     } else {
         scc_track(&std::fs::read(file)?)?
     };
-    Ok(Box::new(Captions { track, options }))
+    Ok(Box::new(Captions {
+        track,
+        options,
+        pool: Budget::new(POOL_BYTES)?,
+    }))
 }
 
 fn options(args: &Args) -> Result<Options> {
@@ -264,16 +268,19 @@ fn length_framing(codec: Codec, configuration: &[u8]) -> Framing {
         .map_or(Framing::StartCodes, |b| Framing::Lengths((b & 3) + 1))
 }
 
+/// The decoder's storage limit.
+const POOL_BYTES: usize = 1 << 26;
+
 struct Captions {
     track: Track,
     options: Options,
+    pool: Budget,
 }
 
 impl Prepared for Captions {
     fn run(&self, sink: &mut Sink<'_>) -> Result<()> {
-        let pool = Budget::new(1 << 26)?;
-        let mut decoder = Decoder::new(&pool, self.options);
-        let mut subtitle = Subtitle::new(&pool);
+        let mut decoder = Decoder::new(&self.pool, self.options);
+        let mut subtitle = Subtitle::new(&self.pool);
         let packets = &self.track.packets;
         sink.header(packets.len(), Some(decoder.header().as_bytes()))?;
         let base = self.track.time_base;
@@ -295,6 +302,10 @@ impl Prepared for Captions {
             emit(sink, packets.len(), &subtitle)?;
         }
         Ok(())
+    }
+
+    fn pool(&self) -> &Budget {
+        &self.pool
     }
 
     fn input(&self) -> Option<&Track> {

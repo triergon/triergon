@@ -133,6 +133,10 @@ impl Prepared for Dvb {
         Ok(())
     }
 
+    fn pool(&self) -> &Budget {
+        &self.pool
+    }
+
     fn input(&self) -> Option<&Track> {
         Some(&self.track)
     }
