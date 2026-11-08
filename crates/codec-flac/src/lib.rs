@@ -16,6 +16,7 @@ mod layout;
 mod output;
 mod predict;
 mod residual;
+mod rice;
 mod sample;
 mod scratch;
 mod stereo;
