@@ -242,7 +242,9 @@ fn short_imdct(
 /// `w[m] = sum_k x[k] columns[k][m]`, accumulated a column at a time so the sum over
 /// the `L` lanes (`m`, padded to whole vectors) vectorizes. Trailing zero coefficients
 /// are skipped: adding a zero product to a sum that starts at +0 never changes it.
-/// Kept out of line, so the use of its outputs does not reshape the vector loop.
+/// Kept out of line, so the use of its outputs does not reshape the vector loop. At 18
+/// and 6 points, and with the high lines mostly zero, this direct form is faster than
+/// the FFT-based [`triergon_codec::mdct::Imdct`].
 #[inline(never)]
 fn dct_iv<const N: usize, const L: usize>(columns: &[[f32; L]; N], x: &[f32; N]) -> [f32; L] {
     let used = x.iter().rposition(|&v| v != 0.0).map_or(0, |last| last + 1);
