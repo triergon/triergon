@@ -4,7 +4,7 @@ mod model;
 use crate::clock::{ClockKey, SourceTimePolicy};
 use crate::psi::DescriptorNamespace;
 use crate::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
-use lane::{Lane, LaneStep};
+use lane::{Lane, LaneStep, StorageScan};
 pub use model::{AccessUnit, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track};
 use model::{ClockContext, Shared};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,6 +14,16 @@ use triergon_core::{
     Result, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 use triergon_framing::RawAnnexBLimits;
+
+/// Reporting of unfinished audio bytes at logical source EOF.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AudioEofPolicy {
+    /// Keep the audio framer's truncation error.
+    #[default]
+    RejectIncomplete,
+    /// Report validated PES bytes as a source fragment, never as a complete AU.
+    ReportIncomplete,
+}
 
 /// Bounds and source interpretation for the AU reader, independent of its live
 /// storage budget. An absent program selects the sole PAT media program;
@@ -26,6 +36,7 @@ pub struct ReaderLimits {
     pub transport: ParseLimits,
     pub video: RawAnnexBLimits,
     pub maximum_audio_frame_bytes: usize,
+    pub audio_eof_policy: AudioEofPolicy,
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
@@ -43,6 +54,7 @@ impl Default for ReaderLimits {
             transport: ParseLimits::default(),
             video: RawAnnexBLimits::default(),
             maximum_audio_frame_bytes: 8192,
+            audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             maximum_access_units: 32_000_000,
             maximum_pes_per_access_unit: 4096,
             elementary_input_window: 64 * 1024,
@@ -59,6 +71,8 @@ enum Phase {
     DrainLane(usize),
     FaultLane(usize),
     Feed(usize),
+    Fragments(usize),
+    FragmentOutput(usize),
     Publish,
 }
 
@@ -92,6 +106,8 @@ pub struct Reader {
     end: Option<SourceLocation>,
     finished: bool,
     failure: Option<Error>,
+    deferred_audio: bool,
+    storage: Option<StorageScan>,
 }
 
 impl std::fmt::Debug for Reader {
@@ -157,6 +173,8 @@ impl Reader {
             end: None,
             finished: false,
             failure: None,
+            deferred_audio: false,
+            storage: None,
         })
     }
     pub fn tracks(&self) -> &[Track] {
@@ -237,6 +255,7 @@ impl Reader {
         self.queued_pes = None;
         self.unsupported_at = None;
         self.boundary = None;
+        self.storage = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         self.healthy()?;
@@ -258,10 +277,14 @@ impl Reader {
         }
     }
     fn output(packet: Packet) -> Event<Packet, ReaderEvent> {
-        if matches!(packet.access_unit(), AccessUnit::Video(unit) if !unit.has_vcl) {
-            Event::Other(ReaderEvent::VideoHeaders(packet))
-        } else {
-            Event::Packet(packet)
+        match packet.access_unit() {
+            AccessUnit::IncompleteAudio { .. } => {
+                Event::Other(ReaderEvent::IncompleteAudio(packet))
+            }
+            AccessUnit::Video(unit) if !unit.has_vcl => {
+                Event::Other(ReaderEvent::VideoHeaders(packet))
+            }
+            _ => Event::Packet(packet),
         }
     }
     fn lane_step(
@@ -274,6 +297,10 @@ impl Reader {
         match self.lanes.as_mut_slice()[index].step(draining, work, cancel)? {
             LaneStep::Packet(packet) => Ok(Some(Step::Ready(Self::output(packet)))),
             LaneStep::Yield => Ok(Some(Step::Yield)),
+            LaneStep::DeferredAudio => {
+                self.deferred_audio = true;
+                Ok(None)
+            }
             LaneStep::End | LaneStep::NeedPayload => Ok(None),
         }
     }
@@ -380,6 +407,21 @@ impl Reader {
                             }
                             self.phase = Phase::DrainAll(index + 1);
                         } else {
+                            if self.deferred_audio
+                                && matches!(
+                                    self.pending.as_ref().expect("pending boundary").event(),
+                                    TraceEvent::Finished
+                                )
+                            {
+                                // No transport or framer can produce more bytes.
+                                // Release opaque parser storage before auditing
+                                // the remaining owners for fragment publication.
+                                self.stream = None;
+                                self.boundary = None;
+                                self.active = None;
+                                self.phase = Phase::Fragments(0);
+                                continue;
+                            }
                             if !matches!(
                                 self.pending.as_ref().expect("pending boundary").event(),
                                 TraceEvent::Finished
@@ -488,6 +530,33 @@ impl Reader {
                         };
                         self.queued_pes = Some((index, source.clone(), clock));
                         self.phase = Phase::Publish;
+                    }
+                    Phase::Fragments(index) => {
+                        if index == self.lanes.len() {
+                            self.phase = Phase::Publish;
+                        } else if self.lanes.as_slice()[index].has_incomplete() {
+                            let mut storage = match self.storage.take() {
+                                Some(storage) => storage,
+                                None => StorageScan::new(self)?,
+                            };
+                            if !storage.step(self, work, cancel)? {
+                                self.storage = Some(storage);
+                                return Ok(Step::Yield);
+                            }
+                            self.lanes.as_mut_slice()[index].set_reader_storage(storage.bytes());
+                            self.phase = Phase::FragmentOutput(index);
+                        } else {
+                            if !work.try_charge(1) {
+                                return Ok(Step::Yield);
+                            }
+                            self.phase = Phase::Fragments(index + 1);
+                        }
+                    }
+                    Phase::FragmentOutput(index) => {
+                        if let Some(step) = self.lane_step(index, true, work, cancel)? {
+                            return Ok(step);
+                        }
+                        self.phase = Phase::Fragments(index + 1);
                     }
                     Phase::Publish => {
                         if !work.try_charge(1) {
