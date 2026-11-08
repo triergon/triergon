@@ -7,6 +7,9 @@ use crate::{AssemblyStep, FaultKind, SourceEpochs, SourceRange, TraceFault, Tran
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, PushError, Result, SourceLocation, WorkBudget};
 
+mod boundaries;
+pub use boundaries::TransportTailConfirmation;
+
 /// The sole transport fault admitted by this compatibility policy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransportFaultKind {
@@ -19,6 +22,11 @@ pub enum TransportFaultKind {
 pub struct PesFaultPolicy {
     pub timing_headers: bool,
     pub rejected_clock_fields: bool,
+    /// The PCR PID from the active source PMT. Only a selected AVC PID is admitted.
+    pub source_pcr_pid: Option<u16>,
+    /// Keep completed finite AVC packets across one unusable final TS188 carrier.
+    /// Actual physical EOF and source Finished are mandatory.
+    pub terminal_transport: bool,
 }
 
 /// A source fault retained by finite-PES extraction.
@@ -225,13 +233,15 @@ pub enum TransportObservation {
 /// source diagnostic. Other contexts remain unsupported. Drain `poll` after each
 /// input; `NeedPayload` while awaiting a diagnostic does not release the carrier.
 /// `with_policy` adds the explicit finite source-fault choices in `PesFaultPolicy`.
-/// There is no implicit entity, clock or configuration transition.
+/// There is no implicit entity or configuration transition. A clock transition
+/// requires the actual source Timeline through `confirm_source_timeline`.
 #[derive(Debug)]
 pub struct TransportFaultRecovery {
     inner: DemuxObserver,
     pending: Option<TransportFaultJob>,
     fault: Option<Error>,
     policy: PesFaultPolicy,
+    boundaries: boundaries::Boundaries,
 }
 impl TransportFaultRecovery {
     /// Wrap a drained, unbound observer. No storage is allocated.
@@ -268,6 +278,7 @@ impl TransportFaultRecovery {
             pending: None,
             fault: None,
             policy,
+            boundaries: boundaries::Boundaries::default(),
         })
     }
     pub fn scope(&self) -> DemuxScope {
@@ -288,11 +299,14 @@ impl TransportFaultRecovery {
         packet: TransportPacket,
         context: SourceContext,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
-        let error = self.fault.or_else(|| {
-            self.pending
-                .as_ref()
-                .map(|_| Error::Invalid("transport recovery input not drained"))
-        });
+        let error = self
+            .fault
+            .or_else(|| self.boundaries.input_error())
+            .or_else(|| {
+                self.pending
+                    .as_ref()
+                    .map(|_| Error::Invalid("transport recovery input not drained"))
+            });
         if let Some(error) = error {
             return Err(PushError {
                 error,
@@ -306,7 +320,7 @@ impl TransportFaultRecovery {
             self.pending = Some(TransportFaultJob::new_header(packet, context, &self.inner)?);
             Ok(())
         } else {
-            self.inner.push(packet, context)
+            self.push_ordinary(packet, context)
         }
     }
     /// A stale or unrelated diagnostic leaves the pending original input intact.
@@ -330,6 +344,7 @@ impl TransportFaultRecovery {
         if self.pending.is_some() {
             return Err(Error::Invalid("transport recovery input not drained"));
         }
+        self.boundaries.check_end()?;
         self.inner.end_of_source()
     }
     /// Admit only a sole, fully checked PCR/OPCR rejection and keep it opaque.
@@ -344,6 +359,7 @@ impl TransportFaultRecovery {
     ) -> std::result::Result<(), PushError<TraceFault>> {
         let error = self
             .fault
+            .or_else(|| self.boundaries.input_error())
             .or_else(|| {
                 self.pending
                     .as_ref()
@@ -375,6 +391,9 @@ impl TransportFaultRecovery {
             return Err(error);
         }
         let result = self.poll_inner(work, cancel);
+        if let Ok(AssemblyStep::Output(TransportObservation::Accepted(packet))) = &result {
+            self.boundaries.note_packet(packet);
+        }
         if let Err(error) = result
             && !matches!(
                 error,
