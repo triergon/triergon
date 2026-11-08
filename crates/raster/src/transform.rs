@@ -25,6 +25,7 @@ const MAX_QUANTIZED: f64 = 1_000_000.0;
 pub struct Matrix(pub [[f64; 3]; 3]);
 
 impl Matrix {
+    /// The transform that leaves every point where it is.
     pub const IDENTITY: Self = Self([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
 
     /// Row `i` applied to (x, y, 1): `mᵢ₀x + mᵢ₁y + mᵢ₂`, in that order.
