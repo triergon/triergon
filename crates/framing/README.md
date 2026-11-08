@@ -121,6 +121,10 @@ keeps up to four NAL descriptors inline; larger records use charged heap storage
 Small records reuse the checked offsets from the validation pass when the
 remaining work budget covers publishing the descriptors. Array counts and the
 validated end offset are derived from those descriptors and the extension fields.
+HEVC configurations independently keep up to four array descriptors and four NAL
+descriptors inline. Larger tables use exact-capacity charged heap storage. Both
+validation and fill walks run for every HEVC configuration; inline tables do not
+retain extra pool handles or add descriptor heap charges.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
@@ -190,6 +194,10 @@ complete packet fields and side data, malformed input, flush and drain actions,
 and retained packet access after close. Add `--benchmark --memory` to collect
 paired runtime and memory measurements through the shared harness; qualification
 requires the pinned gate build on native AArch64 Linux.
+
+Set `TRIERGON_PACKET_EVENTS` to a private output directory when running
+`cargo test -p triergon-framing --features reference-trace --test packet_view`
+to export every complete event trace and digest with all digest assertions active.
 
 Per-module parity, runtime and memory results are in
 [docs/status.md](../../docs/status.md); the gates and harness are described in

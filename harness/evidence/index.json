@@ -11218,6 +11218,12 @@
    "sha256": "8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d"
   },
   {
+   "name": "packet-framing-publication-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-publication-count/6a865704505d5a75568599906e16b88f35729ff7ded2832541f8d56a5bc86ddc.tar.gz",
+   "sha256": "6a865704505d5a75568599906e16b88f35729ff7ded2832541f8d56a5bc86ddc"
+  },
+  {
    "name": "progressive-cursor-gate-build",
    "path": "progressive-cursor-gate-build",
    "retention": "retained",
