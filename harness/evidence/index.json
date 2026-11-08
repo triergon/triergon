@@ -11182,6 +11182,12 @@
    "sha256": "168d82b8b981e37b3d03f071a8d712b1bee7e05b01db94ca9cf432054bebfaf9"
   },
   {
+   "name": "packet-framing-resident-diagnostics",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-resident-diagnostics/2e72d7940fe328712d4505c259c32a2da3c61640d46a79f1c7185b67bcb404f5.tar.gz",
+   "sha256": "2e72d7940fe328712d4505c259c32a2da3c61640d46a79f1c7185b67bcb404f5"
+  },
+  {
    "name": "packet-framing-profiles",
    "retention": "90 days",
    "key": "qualification/repository/packet-framing-profiles/a72d9872b39c6c01ca8e1f22ba36b33b8f57a1073dea735e2f20634667e7b77f.tar.gz",
