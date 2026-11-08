@@ -135,3 +135,5 @@ performance gates where it touches hot code.
    worker will render the same script at the same times and frame sizes, and the harness
    will compare every image and position exactly. Behaviour where libass departs from the
    ASS specification by choice will follow the compat-policy convention above.
+   The renderer offers no hinting option until libass's hinting-enabled modes and
+   FreeType's auto-hinter pass the reference and are gated.

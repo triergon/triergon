@@ -205,6 +205,17 @@ unscaled). Coordinates are `i32`; a scaled coordinate beyond it is
 anything beyond 2^28 itself). The `random` operator does not follow FreeType's
 generator.
 
+## Hinting
+
+The gate covers libass's default configuration, hinting off: unhinted outlines at
+256 pixels and the default-load advances libass's HarfBuzz callbacks read at that
+size (`font-hinting-none`). Two of its cases are open: DejaVuMathTeXGyre and
+authored-cmap-formats, whose default-load advances FreeType's auto-hinter moves.
+For libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL), the unhinted outlines
+and default-load advances at nine other sizes are only measured
+(`font-hinting-modes`), and hinted outlines are not compared. This crate does not
+hint, so hinting-enabled output is unverified.
+
 ## Behaviour and limits
 
 Parsing a face reads the directory and fixed headers and checks every structure a
