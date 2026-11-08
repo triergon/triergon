@@ -9888,7 +9888,145 @@
    "key": "evidence/codec-budgets-linux-arm64/8d88beeb36031151a6040855beec20cbd58f386942c32450749a7843159e4312.tar.gz",
    "sha256": "8d88beeb36031151a6040855beec20cbd58f386942c32450749a7843159e4312",
    "bytes": 11368312,
-   "source_revision": "e99f12ca2c398fa3cba559c2885b6e8845d3fd04"
+   "source_revision": "e99f12ca2c398fa3cba559c2885b6e8845d3fd04",
+   "files": [
+    {
+     "path": "codec-budgets-linux-arm64/README.txt",
+     "sha256": "4e3ede63692a39f6c34e005df03f7b9feeb8e7055f7131b47717561147ab745e"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/cap-cand.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/cap-main.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/capcount.log",
+     "sha256": "c23bd610e5f57b2c723ea474163673c601d054541437b01140025f7addc9c31a"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/eq-cand.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/eq-main.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/host.txt",
+     "sha256": "0f5b136a1904dc8263a961411ac195d0e4695077761cc4edee3bef326efde575"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/round.log",
+     "sha256": "b3291e2364bc744aeee6b4a40e81520547928334f1c4258c4b401e87c9c70f3d"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/same-code-capture-worker.txt",
+     "sha256": "506ea4edf25da8c41b645c5efcf7baecd1913c91459b65b170cef91cb438b689"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/same-code-codec-worker.txt",
+     "sha256": "2dc8740abf620903ccd67a67d6bdddbdab818cf44909f1ed26961d87c0e7b78e"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/same-code-media-worker.txt",
+     "sha256": "3624ec044afe9ec82b49744533e45c274fcf501b208d31bd01928f876692d4c5"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/same-code-playback-worker.txt",
+     "sha256": "cec449508a0074e74b3276941986c55087128c9175f9c373758dcb4e51a9a6e7"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/screen.txt",
+     "sha256": "420bb6ce6b91fdbbe7f2166a526c48526e32af0a0f9d04501fbe983f9fc1e1ae"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/ledger.json",
+     "sha256": "14035723a920fdbd9f752d0fe7ebfaa602152fc52c11d76710cec259bbf3fe1e"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/aac-lc-5.1.json",
+     "sha256": "b7b23bc7fea20f855f448082fc34c5fab7635c947976c598979c58f8621d0e59"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/aac-lc-stereo.json",
+     "sha256": "2ecb7baf0f005afaebed0b9198a72bc6f0624dd1d5fb52f0364472b472d85c5e"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/ac3-2.0-192.json",
+     "sha256": "a0bcfee7954e02290b3365845428aa9ff2dcc4322629db1c98e44a13c22e1e34"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/ac3-4.0.json",
+     "sha256": "ea91c19bbf0b578e3938e07a1539fe445f7945d4675a7116d885b08984f5d0f4"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/ac3-5.1-448.json",
+     "sha256": "af7e4c8d9d437b0320e37a091a97c38d0b3d4ec942f458b4d1f058d66609ac94"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/dts-core-7.1-master.json",
+     "sha256": "9028e547d9b714fde342bd354d6382b36a2a31e62f5375e1f27a9ef732585b41"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/dts-core-es-6.1.json",
+     "sha256": "b34120f9e05acfcf796ef97e4419573e3c8df609a0836ed8dc306c215b6d4ac6"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/eac3-5.1-1536.json",
+     "sha256": "438c67e3eaccebebc98e4ecf137caabb70f90b725d683d8e1616ee23a7961f14"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/eac3-5.1-spx.json",
+     "sha256": "992b05124d8e15525c59f3fc477c8bbb8a664620f3a3f811003f76f3dfc3fa5f"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/eac3-7.1.json",
+     "sha256": "cf8deb9d34f2dc541d1086cc31f1d2ffc51abb9a4c5990c088d5a1151a1f4fdd"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/eac3-stereo-spx.json",
+     "sha256": "84a918c64ef25f5aa255b111e9a81c422899e97bede6ecd9c8150f5d735bd526"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/h264-high-1080p.json",
+     "sha256": "ef1e392db6f958c5ecfc0e2169f2f7b8979c3783f7ad2f24e102e855a9dc2113"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/h264-high-720p.json",
+     "sha256": "abb0aa9492b94f24e1873151878883e64e671674a3941f3d030ea22398b62999"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/h264-main-1920x800.json",
+     "sha256": "9f7ba4ef23c79f9c295dbb493fe62397f1198d5bf391cac1e60d7ddbeadf31d2"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/hevc-main-1080p.json",
+     "sha256": "d4dcb5ecaf979acddf5a659e8c393a80e4c171427874e0526485d55404f645da"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/hevc-main10-1080p.json",
+     "sha256": "042b21ac91bf7da31bec0293745454ef64c03404a870788f01b724b33ba2eb95"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/out/hevc-main10-2160p.json",
+     "sha256": "0291b622cafb54258f738d36952b9f8a80995395e218b0d93a0fd49f0665c038"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/timing/reports/codecs/report.json",
+     "sha256": "185e051235daa25ecf3350329bc39ccbe02ce8889f56d7cc7860fd86217d62ab"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/traces-cand.json",
+     "sha256": "854f092429a3a029e3ce0ada4944b51b937bde21f57dc1479758cca7c02ef4e6"
+    },
+    {
+     "path": "codec-budgets-linux-arm64/traces-main.json",
+     "sha256": "32f0a9c47b40b336e377e2b1571893e6f5350e7b7b780d93421296658b1c38b0"
+    }
+   ]
   },
   {
    "name": "codecs-gate-build-add6b27-linux-arm64",
