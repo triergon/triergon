@@ -5,7 +5,7 @@ use triergon_core::{Error, Result, WorkBudget, round_ties_even_i32};
 
 use crate::bitmap::Bitmap;
 use crate::fp;
-use crate::geometry::Vector;
+use crate::geometry::{Vector, pixels_26_6};
 use crate::glyph::{FrameScale, GlyphBitmaps};
 use crate::limits::{charge, row_work};
 use crate::raster::Raster;
@@ -148,8 +148,7 @@ impl Filter {
         let (blur_y, mask_y) = quantize_blur(radius * (frame.blur[1] * radius_scale));
         let flags = FilterFlags::new(effects);
         let shadow = if flags.shadow {
-            let snap =
-                |v: f64, mask: i32| (round_ties_even_i32(v * 64.0).wrapping_add(mask >> 1)) & !mask;
+            let snap = |v: f64, mask: i32| (pixels_26_6(v).wrapping_add(mask >> 1)) & !mask;
             let [x, y] = effects.shadow.offset;
             Vector::new(
                 snap(x * frame.border[0], mask_x),

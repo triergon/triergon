@@ -5,7 +5,7 @@ use triergon_core::{Budget, Bytes, Error};
 use triergon_font::{
     Bounds, Built, CharEncoding, CharstringBounds, CmapFormat, ControlBox, FaceInfo, Font, GlyphId,
     Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind, Request, Segment,
-    Store, StoreKey, Style, pixels_26_6, select,
+    Store, StoreKey, Style, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -116,7 +116,7 @@ fn sizes_scale_as_freetype_does_for_libass() {
         (gdi.ascender, gdi.descender, gdi.height),
         (1024, -256, 1280)
     );
-    let sized = face.at_size(pixels_26_6(256.0)).unwrap();
+    let sized = face.at_size(16_384).unwrap();
     let m = sized.metrics();
     assert_eq!((m.x_scale, m.y_scale, m.x_ppem), (838_861, 838_861, 200));
     assert_eq!((m.ascender, m.descender, m.height), (13120, -3328, 16384));
