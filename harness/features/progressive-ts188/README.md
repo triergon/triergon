@@ -5,10 +5,10 @@ checks ten literal per-engine outcomes across five functional inputs. It validat
 all outcomes before collecting timing or memory samples.
 
 Add `--benchmark` or `--memory` for paired collection on native AArch64 Linux.
-Each of the three comparable inputs must satisfy the 1.20 runtime ceiling and
-strictly lower peak heap and total resident RSS at the upper paired 95% bound.
-The runtime optimization target is 0.80. Timing uses 50 complete sessions per
-sample and at least 30 pairs.
+Each of the three comparable inputs must pass the
+[runtime and memory gates](../../../docs/quality.md#gates). Timing uses 50 complete
+sessions per sample and at least 30 pairs. Timing and memory reports must match
+this contract's hash.
 
 Both numeric workers use the harness's exact grouped byte fold. Every payload
 byte contributes to the same ordered checksum as the scalar trace path.

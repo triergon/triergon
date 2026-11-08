@@ -133,8 +133,8 @@ and `harness/features/packet-framing/`.
 packet folds and all five functional inputs before measurement. All ten literal
 worker outcomes are asserted, including positive normative Rust output and the
 recorded reference refusal on the legal duplicate control. `--benchmark --memory`
-measures only the three original comparable cases, with unchanged runtime, heap
-and total RSS limits. Its contract, separate functional-control manifest and
+measures only the three original comparable cases under the [runtime and memory
+gates](#gates). Its contract, separate functional-control manifest and
 hash-pinned inputs live in `harness/features/progressive-ts188/`.
 
 `cargo xtask report` runs the correctness comparison of one feature contract

@@ -17,8 +17,8 @@ release; fonts against FreeType 2.15.0 ([reference pins](quality.md#reference-an
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1273 (972/972 pass) | heap ≤0.4133, total RSS ≤0.7283 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open), recorded; no runner in the repository | not measured | not measured | access-unit demux, broader profiles |
-| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.2895 (2/3 pass) | heap ≤0.015, total RSS ≤0.667 (3/3) | runtime optimization, broader transport and codec profiles |
-| HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1732 (71/71 pass) | heap ≤0.022, total RSS ≤0.744 | other profiles |
+| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.2895 (2/3 pass) | heap ≤0.015, total RSS ≤0.667 (3/3) | current-contract qualification, runtime optimization, broader transport and codec profiles |
+| HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1732 (71/71 pass) | heap ≤0.022, total RSS ≤0.744 | current-contract qualification, other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases, replayed by tests from recorded output; 5,300 DVB display sets, recorded; no runner in the repository | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
@@ -28,7 +28,7 @@ release; fonts against FreeType 2.15.0 ([reference pins](quality.md#reference-an
 | Fonts | sfnt and collections; `head`, `hhea`, `maxp`, `hmtx`, `OS/2`, `name`; `cmap` formats 0, 4, 6, 10, 12, 13; `glyf`/`loca`; CFF and CFF2 at the default instance; `kern` format 0; loading at a size as libass does with hinting off (unhinted outlines, synthetic bold and oblique, size metrics, kerning, decoration bands, default-load advances where hinting cannot move them); face matching with libass's rules (unit tests only, unverified until the libass lane compares it) | The gate covers libass's default configuration (hinting off). All 59 faces of 50 corpus files (TrueType including Arabic, Hebrew, Indic and Thai fonts, name-keyed and CID-keyed CFF, CFF2, a 10-face collection, three authored fonts; 836,291 glyphs) identical to FreeType: names, cmap, the kerning of every listed pair, advances and unscaled outlines (`font-outlines` 50/50); at 256 pixels, size metrics, kerning, every glyph's unhinted outline with its synthetic styles, and default-load advances (`font-hinting-none` 98/100, 2 open: auto-hinter); macOS AArch64 | not measured | not measured | libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL): their nine other sizes are measured, not gated (`font-hinting-modes` 882/900: unhinted outlines 450/450, default-load advances 432/450), and hinted outlines are not compared; the FreeType auto-hinter, which leaves DejaVuMathTeXGyre and authored-cmap-formats open at every size; tricky fonts and instruction-control programs; face matching against libass; `cmap` format 14; runtime and memory; Linux runs |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video with budgeted storage, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1210 (15/15 pass) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
 
-## Above the 1.20 ceiling
+## Above the runtime ceiling
 
 | Case | Upper runtime bound |
 |---|---|
@@ -38,6 +38,9 @@ release; fonts against FreeType 2.15.0 ([reference pins](quality.md#reference-an
 
 Each row names the source revision a result above was measured on and, where the raw
 samples are archived, their SHA-256. Update the row in the same change as the result.
+
+The progressive TS188 and HLS results below use the contract hashes in their
+archives. They do not qualify the current contracts; fresh collections are pending.
 
 The Matroska and startup and seek rows use the [gate build](quality.md#measuring-performance)
 at `0e28298d038bea072629b3bad6389dcc806b4861` on a c8g.large pinned to CPU 1.

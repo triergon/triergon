@@ -1141,11 +1141,17 @@ mod tests {
         let options = options(root(), &[]).unwrap();
         validate(root(), &options).unwrap();
         let contract = read_json(&options.contract).unwrap();
-        assert_eq!(contract.get("runtime_ratio_max"), Some(&Value::float(1.2)));
-        assert_eq!(
-            contract.get("memory_ratio_max_exclusive"),
-            Some(&Value::float(1.0))
-        );
+        for field in [
+            "runtime_ratio_max",
+            "runtime_optimization_ratio_target",
+            "memory_ratio_max_exclusive",
+            "runtime_policy",
+        ] {
+            assert!(
+                contract.get(field).is_none(),
+                "duplicate policy field: {field}"
+            );
+        }
         assert_eq!(contract.get("iterations"), Some(&Value::int(50)));
         assert_eq!(contract.get("minimum_pairs"), Some(&Value::int(30)));
         assert_eq!(
