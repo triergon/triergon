@@ -14682,6 +14682,16 @@
     "candidate": "cf9ad665bfc96dd64a843828d4f57a2e1a73eed8",
     "baseline": "1c5c4b87e6a10495b1c603718b14b6cf3a905a83"
    }
+  },
+  {
+   "name": "codec-followups-linux-arm64",
+   "path": "codec-followups-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited decoder, capture and trace identities, function comparison, instruction counts, a paired codec timing screen and HEVC mutation runs of the malformed-slice and AAC access-unit reserve changes against main at cf9ad665",
+   "key": "evidence/codec-followups-linux-arm64/9caf0337091a46656045e5973b1029e2c73f7c0be1f555b4be76ad6759353452.tar.gz",
+   "sha256": "9caf0337091a46656045e5973b1029e2c73f7c0be1f555b4be76ad6759353452",
+   "bytes": 10556732,
+   "source_revision": "f292f6880534b1fde8af95da3bcfb4eeb80091e4"
   }
  ]
 }
