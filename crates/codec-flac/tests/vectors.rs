@@ -2,7 +2,7 @@
 //! (`.research/flac-generated`), when present: the integer output must reproduce the
 //! STREAMINFO MD5 the encoder recorded, the float output must be the integer output
 //! scaled, and the damaged files of `faulty` must decode or fail without a panic.
-//! Bit-exactness against FFmpeg is graded by `tools/flac_vectors.py`.
+//! Bit-exactness against FFmpeg is graded by `harness/codecs/flac/flac_vectors.py`.
 #[path = "../examples/decode_flac/native.rs"]
 mod native;
 

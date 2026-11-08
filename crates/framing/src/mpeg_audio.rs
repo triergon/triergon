@@ -34,6 +34,19 @@ pub enum MpegChannelMode {
     Mono,
 }
 
+/// De-emphasis a frame header asks for. It does not change decoding.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MpegEmphasis {
+    None,
+    /// 50/15 microseconds.
+    FiftyFifteen,
+    /// The reserved value, which FFmpeg decodes like the others (ISO/IEC 11172-4
+    /// stream `hecommon` carries it).
+    Reserved,
+    /// CCITT J.17.
+    CcittJ17,
+}
+
 /// A decoded MPEG audio frame header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MpegAudioHeader {
@@ -49,7 +62,7 @@ pub struct MpegAudioHeader {
     pub mode_extension: u8,
     pub copyright: bool,
     pub original: bool,
-    pub emphasis: u8,
+    pub emphasis: MpegEmphasis,
 }
 
 const BITRATES: [[[u16; 15]; 3]; 2] = [
@@ -77,7 +90,7 @@ const BITRATES: [[[u16; 15]; 3]; 2] = [
 
 impl MpegAudioHeader {
     /// Parse a big-endian header word. `None` for a word that is not a valid header:
-    /// no 11-bit sync, a reserved version, layer, bit rate, sample rate or emphasis.
+    /// no 11-bit sync, a reserved version, layer, bit rate or sample rate.
     pub fn parse(word: u32) -> Option<MpegAudioHeader> {
         if word >> 21 != 0x7ff {
             return None;
@@ -96,7 +109,7 @@ impl MpegAudioHeader {
         };
         let bitrate_index = ((word >> 12) & 15) as usize;
         let rate_index = ((word >> 10) & 3) as usize;
-        if bitrate_index == 15 || rate_index == 3 || word & 3 == 2 {
+        if bitrate_index == 15 || rate_index == 3 {
             return None;
         }
         let base = [44_100, 48_000, 32_000][rate_index];
@@ -122,7 +135,12 @@ impl MpegAudioHeader {
             mode_extension: ((word >> 4) & 3) as u8,
             copyright: word & 8 != 0,
             original: word & 4 != 0,
-            emphasis: (word & 3) as u8,
+            emphasis: match word & 3 {
+                0 => MpegEmphasis::None,
+                1 => MpegEmphasis::FiftyFifteen,
+                2 => MpegEmphasis::Reserved,
+                _ => MpegEmphasis::CcittJ17,
+            },
         })
     }
 

@@ -86,8 +86,8 @@ pub use flac_config::{
     flac_metadata_blocks, flac_stream_info,
 };
 pub use mpeg_audio::{
-    LameTag, MpegAudioHeader, MpegChannelMode, MpegInfoFrame, MpegInfoKind, MpegLayer, MpegVersion,
-    mpeg_audio_crc_ok, mpeg_info_frame,
+    LameTag, MpegAudioHeader, MpegChannelMode, MpegEmphasis, MpegInfoFrame, MpegInfoKind,
+    MpegLayer, MpegVersion, mpeg_audio_crc_ok, mpeg_info_frame,
 };
 pub use opus_config::{
     OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
