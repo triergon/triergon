@@ -505,12 +505,22 @@ fn bitmap_cases(rng: &mut Rng) -> Vec<String> {
             rng.real(0.0, 1.0).powi(2) * 30.0
         }
     };
-    let rx = radius(rng);
-    let ry = if rng.chance(0.6) { rx } else { radius(rng) };
+    // One blur in ten reaches beyond libass's `\blur` clamp, so far that the
+    // blurred bitmap would pass libass's bound of 2^29 samples and stays
+    // unblurred.
+    let (rx, ry) = if rng.chance(0.1) {
+        let r = rng.real(2e4, 1e6);
+        (r, r * rng.real(1.0, 2.0))
+    } else {
+        let rx = radius(rng);
+        (rx, if rng.chance(0.6) { rx } else { radius(rng) })
+    };
+    // The last tenth beyond `\be`'s clamp of 127 passes.
     let be = match rng.below(10) {
         0..=4 => 0,
-        5..=8 => rng.range(1, 6),
-        _ => rng.range(7, 40),
+        5..=7 => rng.range(1, 6),
+        8 => rng.range(7, 40),
+        _ => rng.range(128, 255),
     };
     cases.push(format!(
         "blur {w} {h} {seed} {} {} {be}",

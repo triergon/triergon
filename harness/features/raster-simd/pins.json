@@ -75,13 +75,13 @@
     },
     "bitmaps-required-0": {
       "packets": 280,
-      "bytes": 1830987,
-      "digest": 16018646881908390643
+      "bytes": 1621599,
+      "digest": 15607243300809175070
     },
     "bitmaps-required-1": {
       "packets": 280,
-      "bytes": 1671281,
-      "digest": 6390816825886779189
+      "bytes": 1631941,
+      "digest": 17123793532238808561
     }
   }
 }
