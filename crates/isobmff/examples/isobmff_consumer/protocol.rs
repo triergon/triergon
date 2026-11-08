@@ -329,7 +329,9 @@ pub struct Stats {
     pub digest: u64,
 }
 impl Stats {
-    pub fn start(&mut self, retain: usize, max_read: usize, file_io: bool) -> Result<(), Error> {
+    /// Folds the operation's settings, as the reference does. Input is always read
+    /// from memory, so its file-I/O flag is zero.
+    pub fn start(&mut self, retain: usize, max_read: usize) -> Result<(), Error> {
         fold(&mut self.digest, DOMAIN);
         fold(
             &mut self.digest,
@@ -339,7 +341,7 @@ impl Stats {
             &mut self.digest,
             u64::try_from(max_read).map_err(|_| Error::Overflow)?,
         );
-        fold(&mut self.digest, u64::from(file_io));
+        fold(&mut self.digest, 0);
         Ok(())
     }
     pub fn packet(&mut self, p: &Packet) -> Result<(), Error> {
