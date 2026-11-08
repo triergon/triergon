@@ -3,11 +3,13 @@
 Media containers, packet framing, subtitles, fonts and decoders in safe Rust, with no
 dependencies.
 
-Triergon reads Matroska/WebM, MP4/MOV and MPEG-TS, frames H.264, HEVC, AV1, VP9, AAC,
-AC-3 and DTS packets for hardware or software decoders, decodes text and bitmap
-subtitles, reads OpenType and TrueType fonts, and includes software decoders for H.264,
-HEVC, AAC, AC-3/E-AC-3 and DTS. It is written from the published standards and measured
-case by case against a pinned reference: FFmpeg for media, FreeType for fonts.
+Triergon reads Matroska/WebM, MP4/MOV, MPEG-TS, Ogg, native FLAC and raw MPEG audio,
+ADTS and AC-3 streams, frames H.264, HEVC, AV1, VP9, AAC, AC-3 and DTS packets for
+hardware or software decoders, decodes text and bitmap subtitles, reads OpenType and
+TrueType fonts, and includes software decoders for H.264, HEVC, AAC, AC-3/E-AC-3, DTS,
+FLAC, Opus, Vorbis and MPEG audio Layer I, II and III. It is written from the published
+standards and measured case by case against a pinned reference: FFmpeg for media,
+FreeType for fonts.
 
 > **Status: experimental.** APIs change without notice and nothing is published to
 > crates.io yet. See [status](docs/status.md) for what is verified today.
@@ -39,16 +41,18 @@ case by case against a pinned reference: FFmpeg for media, FreeType for fonts.
 | [`triergon-matroska`](crates/media) | Matroska and WebM reader with seeking, chapters, tags, attachments, colour and HDR |
 | [`triergon-isobmff`](crates/isobmff) | MP4, MOV and fragmented MP4: sample tables, edit lists, range-based playback |
 | [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES assembly, timestamps, HLS segments |
+| [`triergon-ogg`](crates/ogg) | Ogg with the FLAC, Opus and Vorbis mappings: chained and multiplexed streams, granule timing, trims, seeking |
+| [`triergon-elementary`](crates/elementary) | Native FLAC, MPEG audio (ID3, Xing/Info/VBRI, LAME gapless), ADTS and AC-3 streams |
 | [`triergon-framing`](crates/framing) | Codec configuration and packet conversion for H.264, HEVC, AV1, VP9, AAC, AC-3, DTS |
 | [`triergon-subtitles`](crates/subtitles) | SRT, WebVTT, ASS, mov_text and tx3g; PGS, DVB and DVD bitmap subtitles |
 | [`triergon-font`](crates/font) | OpenType and TrueType faces and collections: cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | [`triergon-pixel`](crates/pixel) | Decoded-picture views, BT.601 RGBA to YUV 4:2:0, letterboxing into a 1920×1080 RGBA canvas |
-| [`triergon-codec`](crates/codec) | Decoder traits, audio frames, channel layouts and the shared channel order |
+| [`triergon-codec`](crates/codec) | Decoder traits, audio frames, channel layouts and orders, the shared inverse MDCT |
 | [`triergon-codec-h264`](crates/codec-h264), [`-hevc`](crates/codec-hevc) | Software video decoders |
-| [`triergon-codec-aac`](crates/codec-aac), [`-ac3`](crates/codec-ac3), [`-dca`](crates/codec-dca) | Software audio decoders |
+| [`triergon-codec-aac`](crates/codec-aac), [`-ac3`](crates/codec-ac3), [`-dca`](crates/codec-dca), [`-flac`](crates/codec-flac), [`-opus`](crates/codec-opus), [`-vorbis`](crates/codec-vorbis), [`-mp3`](crates/codec-mp3) | Software audio decoders |
 | [`triergon-codec-mpeg1`](crates/codec-mpeg1) | MPEG-1 video encoder with I and P pictures |
 | [`triergon-playback`](crates/playback) | Container-independent packet feeds with seeking |
-| [`triergon-session`](crates/session) | Decode sessions: queues, clocks and output over the decoders |
+| [`triergon-session`](crates/session) | Decode sessions: queues, clocks and output over the decoders, container track decoding with trims |
 | [`triergon-capture`](crates/capture) | Capture session: RGBA frames in, MPEG-1 video in MPEG-TS out |
 
 ## Getting started
