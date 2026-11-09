@@ -1,4 +1,5 @@
 use crate::clock::{ClockKey, SourceTimestamp};
+use crate::compat::pes::PrivateAudioCarriage;
 use crate::psi::{ElementaryStream, ProgramMap};
 use crate::{SourceEpochs, TraceEvent};
 use std::alloc::Layout;
@@ -412,7 +413,7 @@ impl PacketInfo for Packet {
 }
 
 #[derive(Debug)]
-pub(super) struct IncompleteVideoData {
+pub(super) struct UnframedData {
     pub track: Track,
     pub range: Range<u64>,
     pub bytes: Bytes,
@@ -425,7 +426,7 @@ pub(super) struct IncompleteVideoData {
 /// Annex B start code. Its original payload and first source anchor are
 /// retained at logical EOF. Clones share the charged storage.
 #[derive(Clone, Debug)]
-pub struct IncompleteVideo(pub(super) Shared<IncompleteVideoData>);
+pub struct IncompleteVideo(pub(super) Shared<UnframedData>);
 
 impl IncompleteVideo {
     pub fn track_info(&self) -> &Track {
@@ -445,6 +446,39 @@ impl IncompleteVideo {
     }
     pub fn epochs(&self) -> SourceEpochs {
         self.0.epochs
+    }
+}
+
+/// Opaque bytes from one validated private-audio PES with no syncword.
+/// Clones share the charged bytes, track, original PES ranges and clock.
+#[derive(Clone, Debug)]
+pub struct UnframedAudio {
+    pub(super) data: Shared<UnframedData>,
+    pub(super) carriage: PrivateAudioCarriage,
+}
+
+impl UnframedAudio {
+    /// Carriage selected by the compatibility policy.
+    pub fn carriage(&self) -> PrivateAudioCarriage {
+        self.carriage
+    }
+    pub fn track_info(&self) -> &Track {
+        &self.data.track
+    }
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.data.range.clone()
+    }
+    pub fn bytes(&self) -> &Bytes {
+        &self.data.bytes
+    }
+    pub fn sources(&self) -> &[PayloadSource] {
+        self.data.sources.as_slice()
+    }
+    pub fn clock(&self) -> Option<&PacketClock> {
+        self.data.clock.as_ref()
+    }
+    pub fn epochs(&self) -> SourceEpochs {
+        self.data.epochs
     }
 }
 
@@ -484,4 +518,6 @@ pub enum ReaderEvent {
     LatmPes(crate::compat::latm::PesPacket),
     /// Complete segments before an overlong final segment in the source PES.
     DvbSubtitlePrefix(Packet),
+    /// An opaque private-audio PES admitted by the explicit EOF policy.
+    UnframedAudio(UnframedAudio),
 }

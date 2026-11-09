@@ -27,9 +27,9 @@ fn coalescing_freeze_and_packet_publication_retry_without_duplicate_bytes_or_ori
                 return None;
             };
             let done = if checkpoints == 0 {
-                build.video_bytes.is_none() && build.nal == unit.nals().len()
+                build.assembled_bytes.is_none() && build.nal == unit.nals().len()
             } else {
-                build.video_bytes.is_some() && build.origin == lane.pieces.len()
+                build.assembled_bytes.is_some() && build.origin == lane.pieces.len()
             };
             done.then(|| unit.segments().flatten().copied().collect::<Vec<_>>())
         });

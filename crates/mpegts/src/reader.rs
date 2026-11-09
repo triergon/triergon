@@ -3,13 +3,14 @@ mod lane;
 mod model;
 use crate::clock::{ClockKey, SourceTimePolicy};
 use crate::compat::annex_b::VideoEofPolicy;
+use crate::compat::pes::UnframedAudioPolicy;
 use crate::compat::{dvb, latm};
 use crate::psi::DescriptorNamespace;
 use crate::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
 use lane::{Lane, LaneStep, StorageScan};
 pub use model::{
     Ac3AccessUnit, AccessUnit, DvbSubtitleUnit, IncompleteVideo, LoasFrame, Packet, PacketClock,
-    PayloadSource, ReaderEvent, SourceEvent, Track,
+    PayloadSource, ReaderEvent, SourceEvent, Track, UnframedAudio,
 };
 use model::{ClockContext, Shared};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -43,6 +44,7 @@ pub struct ReaderLimits {
     /// Maximum bytes in one audio syncframe or LOAS envelope.
     pub maximum_audio_frame_bytes: usize,
     pub audio_eof_policy: AudioEofPolicy,
+    pub unframed_audio_policy: UnframedAudioPolicy,
     /// Reporting policy for validated video PES payload without Annex B framing.
     pub video_eof_policy: VideoEofPolicy,
     /// LOAS framing by default. PES preservation emits source observations.
@@ -67,6 +69,7 @@ impl Default for ReaderLimits {
             video: RawAnnexBLimits::default(),
             maximum_audio_frame_bytes: 8192,
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
+            unframed_audio_policy: UnframedAudioPolicy::Strict,
             video_eof_policy: VideoEofPolicy::RejectUnframed,
             latm_packet_policy: latm::PacketPolicy::Strict,
             dvb_subtitle_tail_policy: dvb::TailPolicy::RejectTruncated,
@@ -316,6 +319,9 @@ impl Reader {
             LaneStep::Packet(packet) => Ok(Some(Step::Ready(Self::output(packet)))),
             LaneStep::IncompleteVideo(video) => Ok(Some(Step::Ready(Event::Other(
                 ReaderEvent::IncompleteVideo(video),
+            )))),
+            LaneStep::UnframedAudio(audio) => Ok(Some(Step::Ready(Event::Other(
+                ReaderEvent::UnframedAudio(audio),
             )))),
             LaneStep::LatmPes(packet) => Ok(Some(Step::Ready(Event::Other(ReaderEvent::LatmPes(
                 packet,

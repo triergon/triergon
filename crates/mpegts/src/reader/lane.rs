@@ -1,17 +1,18 @@
 mod dvb;
 mod eac3;
 mod loas;
+mod unframed_audio;
 mod unframed_video;
 
-use super::model::{ClockContext, IncompleteVideoData, PacketData, Shared};
+use super::model::{ClockContext, PacketData, Shared, UnframedData};
 use super::{
     Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, Packet, PacketClock, PayloadSource,
-    ReaderLimits, SourceEvent, Track,
+    ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
-use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors};
+use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors, UnframedAudioPolicy};
 use crate::psi::{CodecIdentification, DescriptorNamespace};
 use std::{
     ops::Range,
@@ -294,6 +295,7 @@ impl StorageCursor {
             Self::Lane(index) => {
                 if let Some(lane) = reader.lanes.as_slice().get(index) {
                     if lane.framer.is_some()
+                        || lane.residue.is_some()
                         || lane.input.is_some()
                         || lane.build.is_some()
                         || reader
@@ -444,17 +446,28 @@ impl StorageScan {
     }
 }
 
+enum ResidueScan {
+    Video(UnframedVideoScan),
+    Audio(unframed_audio::Scan),
+}
+
+#[derive(Clone, Copy)]
+enum UnframedKind {
+    Video,
+    Audio(PrivateAudioCarriage),
+}
+
 #[derive(Clone, Copy)]
 enum FragmentKind {
     Audio,
-    Video,
+    Unframed(UnframedKind),
 }
 
 impl FragmentKind {
     fn publication_bytes(self) -> Result<usize> {
         match self {
             Self::Audio => Shared::<PacketData>::allocation_bytes(),
-            Self::Video => Shared::<IncompleteVideoData>::allocation_bytes(),
+            Self::Unframed(_) => Shared::<UnframedData>::allocation_bytes(),
         }
     }
 }
@@ -664,14 +677,14 @@ impl Incomplete {
 
 enum BuildUnit {
     Packet(AccessUnit),
-    IncompleteVideo(Range<u64>),
+    Unframed(UnframedKind, Range<u64>),
 }
 
 impl BuildUnit {
     fn range_and_anchor(&self) -> (Range<u64>, u64) {
         match self {
             Self::Packet(unit) => (unit.range(), unit.anchor_offset()),
-            Self::IncompleteVideo(range) => (range.clone(), range.start),
+            Self::Unframed(_, range) => (range.clone(), range.start),
         }
     }
 }
@@ -679,7 +692,7 @@ impl BuildUnit {
 struct Build {
     unit: BuildUnit,
     buffer: Option<BudgetVec<u8>>,
-    video_bytes: Option<Bytes>,
+    assembled_bytes: Option<Bytes>,
     nal: usize,
     part: u8,
     copied: usize,
@@ -697,7 +710,7 @@ impl Build {
     }
     fn with_unit(
         unit: BuildUnit,
-        video_bytes: Option<Bytes>,
+        assembled_bytes: Option<Bytes>,
         pool: &Budget,
         last_anchor: u64,
     ) -> Self {
@@ -706,7 +719,7 @@ impl Build {
         Self {
             unit,
             buffer,
-            video_bytes,
+            assembled_bytes,
             nal: 0,
             part: 0,
             copied: 0,
@@ -719,7 +732,7 @@ impl Build {
         }
     }
     fn copy(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
-        if self.video_bytes.is_some() {
+        if self.assembled_bytes.is_some() {
             return Ok(true);
         }
         let BuildUnit::Packet(AccessUnit::Video(unit)) = &self.unit else {
@@ -779,7 +792,7 @@ impl Build {
             return Ok(false);
         }
         match self.buffer.take().expect("coalescing storage").freeze() {
-            Ok(bytes) => self.video_bytes = Some(bytes),
+            Ok(bytes) => self.assembled_bytes = Some(bytes),
             Err(error) => {
                 self.buffer = Some(error.buffer);
                 return Err(error.error);
@@ -792,6 +805,7 @@ impl Build {
 pub(super) enum LaneStep {
     Packet(Packet),
     IncompleteVideo(IncompleteVideo),
+    UnframedAudio(UnframedAudio),
     LatmPes(latm::PesPacket),
     NeedPayload,
     Yield,
@@ -809,7 +823,7 @@ pub(super) struct Lane {
     pieces: BudgetVec<Piece>,
     build: Option<Build>,
     incomplete: Option<Incomplete>,
-    unframed_video: Option<UnframedVideoScan>,
+    residue: Option<ResidueScan>,
     supplied: u64,
     serial: u64,
     last_anchor: u64,
@@ -823,9 +837,13 @@ pub(super) struct Lane {
 
 impl Lane {
     pub(super) fn new(pool: &Budget, track: Track, limits: ReaderLimits) -> Result<Self> {
-        let (framer, unsupported) = match Framer::new(pool, &track, limits) {
-            Ok(framer) => (Some(framer), None),
-            Err(error @ Error::Unsupported(_)) => (None, Some(error)),
+        let (framer, unsupported, residue) = match Framer::new(pool, &track, limits) {
+            Ok(framer) => (Some(framer), None, None),
+            Err(error @ Error::Unsupported(_)) => {
+                let residue =
+                    unframed_audio::Scan::for_track(&track, limits)?.map(ResidueScan::Audio);
+                (None, residue.is_none().then_some(error), residue)
+            }
             Err(error) => return Err(error),
         };
         Ok(Self {
@@ -838,7 +856,7 @@ impl Lane {
             pieces: BudgetVec::new(pool),
             build: None,
             incomplete: None,
-            unframed_video: None,
+            residue,
             supplied: 0,
             serial: 0,
             last_anchor: 0,
@@ -868,7 +886,7 @@ impl Lane {
         clock: ClockContext,
         work: &mut WorkBudget,
     ) -> Result<bool> {
-        if self.framer.is_none() && self.unframed_video.is_none() {
+        if self.framer.is_none() && self.residue.is_none() {
             return Ok(true);
         }
         if self.input.is_some() {
@@ -906,8 +924,14 @@ impl Lane {
             .supplied
             .checked_add(u64::try_from(pes.payload_len).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
-        if self.unframed_video.is_some() {
-            self.check_unframed_video_extent(end)?;
+        match &self.residue {
+            Some(ResidueScan::Video(_)) => self.check_unframed_video_extent(end)?,
+            Some(ResidueScan::Audio(_)) => unframed_audio::Scan::check_pes(
+                pes,
+                self.pieces.is_empty(),
+                self.limits.maximum_audio_frame_bytes,
+            )?,
+            None => (),
         }
         self.pieces.try_reserve_exact(1)?;
         let serial = self.serial.checked_add(1).ok_or(Error::Overflow)?;
@@ -992,8 +1016,8 @@ impl Lane {
                         &self.pool,
                         self.last_anchor,
                     ),
-                    FragmentKind::Video => Build::with_unit(
-                        BuildUnit::IncompleteVideo(incomplete.range),
+                    FragmentKind::Unframed(kind) => Build::with_unit(
+                        BuildUnit::Unframed(kind, incomplete.range),
                         Some(bytes),
                         &self.pool,
                         self.last_anchor,
@@ -1003,24 +1027,41 @@ impl Lane {
                 self.build = Some(build);
                 continue;
             }
-            if let Some(scan) = &mut self.unframed_video {
-                if !scan.step(self.pieces.as_slice(), work, cancel)? {
-                    return Ok(LaneStep::Yield);
-                }
-                self.supplied = self
-                    .pieces
-                    .as_slice()
-                    .last()
-                    .expect("video residue PES")
-                    .range
-                    .end;
+            if self.pieces.is_empty() && matches!(self.residue, Some(ResidueScan::Audio(_))) {
                 if !draining {
                     return Ok(LaneStep::NeedPayload);
                 }
-                self.unframed_video = None;
+                self.residue = None;
+                self.eof = true;
+                continue;
+            }
+            if let Some(residue) = &mut self.residue {
+                let pieces = self.pieces.as_slice();
+                let (ready, kind) = match residue {
+                    ResidueScan::Video(scan) => {
+                        (scan.step(pieces, work, cancel)?, UnframedKind::Video)
+                    }
+                    ResidueScan::Audio(scan) => {
+                        let [piece] = pieces else {
+                            return Err(unframed_audio::NEED_PES);
+                        };
+                        (
+                            scan.step(piece.source.pes(), work, cancel)?,
+                            UnframedKind::Audio(scan.carriage),
+                        )
+                    }
+                };
+                if !ready {
+                    return Ok(LaneStep::Yield);
+                }
+                self.supplied = pieces.last().expect("unframed PES").range.end;
+                if !draining {
+                    return Ok(LaneStep::NeedPayload);
+                }
+                self.residue = None;
                 self.eof = true;
                 self.incomplete = Some(Incomplete::new(
-                    FragmentKind::Video,
+                    FragmentKind::Unframed(kind),
                     0..self.supplied,
                     &self.pool,
                 ));
@@ -1078,7 +1119,7 @@ impl Lane {
                     self.check_unframed_video_extent(end)?;
                     // Recheck all retained bytes, including the portion the
                     // framer already read and any unsupplied part of this PES.
-                    self.unframed_video = Some(UnframedVideoScan::default());
+                    self.residue = Some(ResidueScan::Video(UnframedVideoScan::default()));
                     self.framer = None;
                     self.input = None;
                     continue;
@@ -1119,7 +1160,9 @@ impl Lane {
                 Step::End(_) => {
                     if draining
                         && (self.limits.audio_eof_policy == AudioEofPolicy::ReportIncomplete
-                            || self.limits.video_eof_policy == VideoEofPolicy::ReportUnframed)
+                            || self.limits.video_eof_policy == VideoEofPolicy::ReportUnframed
+                            || self.limits.unframed_audio_policy
+                                == UnframedAudioPolicy::ReportAtEof)
                     {
                         self.framer = None;
                         continue;
@@ -1289,9 +1332,7 @@ impl Lane {
             BuildUnit::Packet(unit) => {
                 (Shared::<PacketData>::reserve(&self.pool)?, unit.duration()?)
             }
-            BuildUnit::IncompleteVideo(_) => {
-                (Shared::<IncompleteVideoData>::reserve(&self.pool)?, None)
-            }
+            BuildUnit::Unframed(..) => (Shared::<UnframedData>::reserve(&self.pool)?, None),
         };
         let duration90 = duration
             .map(|time| -> Result<Option<i64>> {
@@ -1310,7 +1351,7 @@ impl Lane {
             .flatten();
         let packet_clock = match &build.unit {
             BuildUnit::Packet(_) => build.clock.as_ref(),
-            BuildUnit::IncompleteVideo(_) => None,
+            BuildUnit::Unframed(..) => None,
         };
         let pts = packet_clock
             .and_then(|clock| clock.pts.ticks90)
@@ -1341,7 +1382,7 @@ impl Lane {
                 PacketData {
                     track,
                     unit,
-                    video_bytes: build.video_bytes,
+                    video_bytes: build.assembled_bytes,
                     sources: build.origins,
                     clock: build.clock,
                     epochs,
@@ -1352,18 +1393,24 @@ impl Lane {
                 },
                 charge,
             )))),
-            BuildUnit::IncompleteVideo(range) => {
-                Ok(LaneStep::IncompleteVideo(IncompleteVideo(Shared::new(
-                    IncompleteVideoData {
+            BuildUnit::Unframed(kind, range) => {
+                let data = Shared::new(
+                    UnframedData {
                         track,
                         range,
-                        bytes: build.video_bytes.expect("copied unframed video"),
+                        bytes: build.assembled_bytes.expect("copied unframed payload"),
                         sources: build.origins,
                         clock: build.clock,
                         epochs,
                     },
                     charge,
-                ))))
+                );
+                Ok(match kind {
+                    UnframedKind::Video => LaneStep::IncompleteVideo(IncompleteVideo(data)),
+                    UnframedKind::Audio(carriage) => {
+                        LaneStep::UnframedAudio(UnframedAudio { data, carriage })
+                    }
+                })
             }
         }
     }
