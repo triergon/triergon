@@ -8,6 +8,7 @@
   "contract": [
     "Preloaded TS188 or M2TS192 input, SIZE PROGRAM [--dvb|--atsc] and the original ordered media-entity arguments; the candidate uses the public MPEG-TS access-unit reader, with no PES-as-AU fallback.",
     "The Annex B EOF policy reports an unframed run of validated AVC or HEVC PES bytes with no start code. The candidate folds the opaque observation separately from complete video access units.",
+    "LATM controls wrap the pinned AAC-LC payload in independently authored LOAS envelopes and also carry opaque or truncated envelopes. The LATM compatibility policy reports one unsplit packet per validated nonempty PES, with its original clocks and position.",
     "A single entity can complete empty after a PSI diagnostic or an empty read only when the control-only proof classifies the original carriers through physical end and logical EOF.",
     "Reference: the MPEG-TS demuxer with custom AVIO, NOFILLIN, parsers enabled, no stream discovery and no decoders; every parsed packet of the selected program in demux order, including EOF parser drain.",
     "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
@@ -166,7 +167,15 @@
     "au-dvb-ac3-discontinuity-two-frames",
     "au-atsc-ac3-multiple-per-pes",
     "au-dvb-eac3-32000",
-    "au-atsc-eac3-multiple-per-pes"
+    "au-atsc-eac3-multiple-per-pes",
+    "au-latm-aac-lc-three-frames-in-pes",
+    "au-latm-aac-lc-header-across-pes",
+    "au-latm-aac-lc-opaque-prefix-in-pes",
+    "au-latm-aac-lc-opaque-then-coded",
+    "au-latm-aac-lc-coded-then-opaque",
+    "au-latm-aac-lc-two-opaque-pes",
+    "au-latm-aac-lc-truncated-envelope",
+    "au-latm-aac-lc-empty-envelope"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

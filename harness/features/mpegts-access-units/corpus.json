@@ -4873,6 +4873,242 @@
         "digest": 5644235614647431299
       },
       "reference_result_sha256": "27cf3383332fd062e63e835e83e1d487e0453e93928d80b9b851aa73bdac9b10"
+    },
+    {
+      "id": "au-latm-aac-lc-three-frames-in-pes",
+      "profile": "au-latm-aac-lc-three-frames-in-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-three-frames-in-pes.ts",
+      "sha256": "c915cbe3d34aae637e32343e5e89db4460b7014a9bba7a895caa87913d334667",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 584,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 584,
+        "digest": 15074905587973214698
+      },
+      "reference_result_sha256": "fe5b9e8cae5ca8047122d3f293b8edde8cd8d915dbbd6c024f4bf2cb36fd1ba8"
+    },
+    {
+      "id": "au-latm-aac-lc-header-across-pes",
+      "profile": "au-latm-aac-lc-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-header-across-pes.ts",
+      "sha256": "3b6fdaa65daf6bf38b76b96a7d71ecbf01024219a956deb8ba6ed9255ce7b616",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 582,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 584,
+        "digest": 1769109294796948231
+      },
+      "reference_result_sha256": "a90760243ab1330cb10e5457513d6ccc64603999ce917e6206a932deaa8ef2df"
+    },
+    {
+      "id": "au-latm-aac-lc-opaque-prefix-in-pes",
+      "profile": "au-latm-aac-lc-opaque-prefix-in-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-opaque-prefix-in-pes.ts",
+      "sha256": "7690b508979ed1482bd072cb4232169a6b398060b080760211590e2615b72999",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 220,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 220,
+        "digest": 16613187259993382962
+      },
+      "reference_result_sha256": "b0f2db261439e53528c1fd8d084a86bd3877caa29edb74ea2bf9e4b614271490"
+    },
+    {
+      "id": "au-latm-aac-lc-opaque-then-coded",
+      "profile": "au-latm-aac-lc-opaque-then-coded",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-opaque-then-coded.ts",
+      "sha256": "fe856cf7164bf07e75e3a017d81c6d2bf367d0742518e3ae35353d1ace64e396",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 22,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 198,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 220,
+        "digest": 12059753546944082767
+      },
+      "reference_result_sha256": "43245f10a7db7b17e37505d66e763a45417f8b0cf5024fa0e395a12e3b2a985f"
+    },
+    {
+      "id": "au-latm-aac-lc-coded-then-opaque",
+      "profile": "au-latm-aac-lc-coded-then-opaque",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-coded-then-opaque.ts",
+      "sha256": "cdda104b0012664992e2da712655d4224ae4a29c6ead170084fac0322d76aec5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 198,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 22,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 220,
+        "digest": 6566358389590218443
+      },
+      "reference_result_sha256": "d7961ae0fa1ba6eda14fb8007c32461b46b7605e8987e82077e1f447d5e1fb15"
+    },
+    {
+      "id": "au-latm-aac-lc-two-opaque-pes",
+      "profile": "au-latm-aac-lc-two-opaque-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-two-opaque-pes.ts",
+      "sha256": "7f903a0fe6755d3845c71eb375cc1e7be45da2ca89c41a835d5f461cea8656ab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 22,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 4,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 26,
+        "digest": 15095274907949675884
+      },
+      "reference_result_sha256": "dddd49824fc5d4bccb57d3e64b3242e208df08e5677c2254d5a4241cd15715da"
+    },
+    {
+      "id": "au-latm-aac-lc-truncated-envelope",
+      "profile": "au-latm-aac-lc-truncated-envelope",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-truncated-envelope.ts",
+      "sha256": "34e60ad9a88822d6a7c896b15076196a552261f80d465dbe49144872e1cc764e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 197,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 197,
+        "digest": 3226882278880041755
+      },
+      "reference_result_sha256": "0d25fcb1878072dc10663e76a2ac33b32b6069bcc8254c938bc3bacb6d67c08d"
+    },
+    {
+      "id": "au-latm-aac-lc-empty-envelope",
+      "profile": "au-latm-aac-lc-empty-envelope",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-empty-envelope.ts",
+      "sha256": "0a5ff910cf3d24221749b1df719b4317560491b77ae03be7e430df3eb6cf0bdc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 3,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 3,
+        "digest": 14082017935433025708
+      },
+      "reference_result_sha256": "d9717741637f29f1a38c9787fb9791266d7aaa074f649b5989807f496820831b"
     }
   ]
 }
