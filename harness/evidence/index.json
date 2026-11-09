@@ -16756,6 +16756,15 @@
    "sha256": "1d64f438deca9655092d6b01d80730db4c34d05343c7152791bcef29296e4254",
    "bytes": 69117613,
    "source_revision": "af1b9b933480dbe44856bc54afcda636128b0702"
+  },
+  {
+   "name": "mp4-range-roll-regression",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-roll-regression/ba09a896d810c6fbca384f2b47ae1b7b5981c9fbd36b9c4262caa36c3567d1e9.tar.gz",
+   "sha256": "ba09a896d810c6fbca384f2b47ae1b7b5981c9fbd36b9c4262caa36c3567d1e9",
+   "bytes": 85733795,
+   "source_revision": "7213bca65559deb8d87860afd9f74c8193a837d5"
   }
  ]
 }
