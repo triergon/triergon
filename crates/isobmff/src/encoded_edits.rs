@@ -10,7 +10,7 @@ use triergon_core::{
     Budget, Error, InputCursor, InputToken, Result, Rounding, SourceId, Time, TimeBase, WorkBudget,
 };
 use triergon_framing::{
-    Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration, BuildStep,
+    Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration, BuildStep, OPUS_RATE,
 };
 
 pub(crate) mod fragment_aac;
@@ -39,6 +39,13 @@ pub struct EncodedEditContext<'a> {
     pub media_base: TimeBase,
     pub movie_base: TimeBase,
 }
+#[derive(Clone, Copy, Debug)]
+enum EditTiming {
+    Video,
+    FixedAudio(u32),
+    Opus,
+}
+
 #[derive(Clone, Debug)]
 pub struct EncodedEditPlan {
     source_table: BoxView,
@@ -53,7 +60,7 @@ pub struct EncodedEditPlan {
     source_end: i128,
     presentation_end: i128,
     count: u64,
-    frame: u32, // Media ticks per coded audio sample. Zero for video.
+    timing: EditTiming,
     dts_scale: Option<u32>,
     dependency_table: bool,
     dependency_recovery: bool,
@@ -92,6 +99,15 @@ impl EncodedEditPlan {
     pub fn selected_end_ticks(&self) -> i128 {
         self.end
     }
+    pub(crate) fn align_seek_timestamp(&self, timestamp: i64, base: TimeBase) -> Result<i64> {
+        if !matches!(self.timing, EditTiming::Opus) {
+            return Ok(timestamp);
+        }
+        // The MOV receiver backs up secondary Opus by 10 ms on a video
+        // seek. Decoder recovery uses the source roll group separately.
+        let lead = Time::new(1, 100)?.to_i64_ticks(base, Rounding::NearestAway)?;
+        timestamp.checked_sub(lead).ok_or(Error::Overflow)
+    }
     pub(crate) fn matches(
         &self,
         table: &SampleTable,
@@ -119,7 +135,8 @@ impl EncodedEditPlan {
         let cts = source
             .cts_ticks
             .ok_or(Error::Unsupported("encoded edit source CTS unknown"))?;
-        if self.frame != 0 && dts >= self.end {
+        let audio = !matches!(self.timing, EditTiming::Video);
+        if audio && dts >= self.end {
             return Ok(None);
         }
         let dts_field =
@@ -129,7 +146,7 @@ impl EncodedEditPlan {
         let source_end = dts
             .checked_add(i128::from(source.duration_ticks))
             .ok_or(Error::Overflow)?;
-        let discard = if self.frame != 0 {
+        let discard = if audio {
             source_end <= i128::from(self.entry.media_time)
         } else {
             cts < self.anchor || cts >= self.presentation_end
@@ -166,12 +183,26 @@ impl EncodedEditPlan {
     }
     /// Demux skip-samples side data for a sample from this plan's source track.
     /// The first two little-endian words give leading and trailing sample counts.
-    /// DTS counts use the sample-entry clock. The packet retains the original
-    /// source sample duration, including a shortened final DTS sample.
+    /// DTS counts use the sample-entry clock. Opus carries the leading edit in
+    /// 48 kHz samples and retains the source duration of its final packet.
     pub fn skip_samples(&self, source: &Sample) -> Result<Option<[u8; 10]>> {
-        if self.frame == 0 {
-            return Ok(None);
-        }
+        let frame = match self.timing {
+            EditTiming::Video => return Ok(None),
+            EditTiming::FixedAudio(frame) => frame,
+            EditTiming::Opus => {
+                if source.ordinal != 1 || self.entry.media_time == 0 {
+                    return Ok(None);
+                }
+                let pcm_base = TimeBase::new(1, u64::from(OPUS_RATE))?;
+                let start =
+                    self.media_base
+                        .rescale(self.entry.media_time, pcm_base, Rounding::Ceil)?;
+                let start = u32::try_from(start).map_err(|_| Error::Overflow)?;
+                let mut bytes = [0; 10];
+                bytes[..4].copy_from_slice(&start.to_le_bytes());
+                return Ok(Some(bytes));
+            }
+        };
         let dts = source
             .dts_ticks
             .ok_or(Error::Unsupported("encoded edit source DTS unknown"))?;
@@ -191,9 +222,7 @@ impl EncodedEditPlan {
             let desired = self.end.min(self.source_end);
             // stts can shorten the last DTS packet without changing the
             // number of samples it decodes. Measure trim from the coded size.
-            let nominal = dts
-                .checked_add(i128::from(self.frame))
-                .ok_or(Error::Overflow)?;
+            let nominal = dts.checked_add(i128::from(frame)).ok_or(Error::Overflow)?;
             u32::try_from(nominal.checked_sub(desired).ok_or(Error::Overflow)?.max(0))
                 .map_err(|_| Error::Overflow)?
         } else {
@@ -335,6 +364,7 @@ impl<'a> EncodedEditJob<'a> {
     /// Range playback admits leading encoder-delay edits for AC-3, E-AC-3
     /// and DTS. DTS also supports a leading empty edit before the media edit.
     /// AAC uses the sample durations in `stts` and the coded frame length for trim.
+    /// Opus uses the edit list for priming and keeps each source duration.
     pub fn new_range_playback(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -622,6 +652,11 @@ impl<'a> EncodedEditJob<'a> {
             match self.context.stream.kind() {
                 kind if kind.is_video() => {}
                 EncodedEntryKind::Dts => {}
+                EncodedEntryKind::Opus => {
+                    // Opus in ISO BMFF, section 4.4. dOps PreSkip does not
+                    // determine the presentation window.
+                    self.anchor = Some(i128::from(self.entry.media_time));
+                }
                 EncodedEntryKind::Aac => {
                     // Narrow LC/standard-rate/channel-config profile. Body
                     // tools, PCE, SBR signalling and decoder validity stay opaque.
@@ -704,7 +739,14 @@ impl<'a> EncodedEditJob<'a> {
                         "encoded Dolby edit must end at source end",
                     ));
                 }
-                if self.frame == 0 {
+                let timing = if self.context.stream.kind() == EncodedEntryKind::Opus {
+                    if i128::from(self.entry.media_time) >= self.source_end {
+                        return Err(Error::Invalid("Opus edit starts after the last sample"));
+                    }
+                    EditTiming::Opus
+                } else if self.frame != 0 {
+                    EditTiming::FixedAudio(self.frame)
+                } else {
                     let duration = self
                         .end
                         .checked_sub(i128::from(self.entry.media_time))
@@ -715,7 +757,8 @@ impl<'a> EncodedEditJob<'a> {
                             "encoded video tail selection not established",
                         ));
                     }
-                }
+                    EditTiming::Video
+                };
                 self.result = Some(EncodedEditPlan {
                     source_table: self.context.table.raw().clone(),
                     source_edit: self.context.edits.raw().clone(),
@@ -729,7 +772,7 @@ impl<'a> EncodedEditJob<'a> {
                     source_end: self.source_end,
                     presentation_end,
                     count: self.count,
-                    frame: self.frame,
+                    timing,
                     dts_scale: self.dts_scale,
                     dependency_table: self.dependency_table,
                     dependency_recovery: self.dependency_recovery,
@@ -811,6 +854,10 @@ impl<'a> EncodedEditJob<'a> {
                         return Err(Error::Unsupported(
                             "encoded AAC source packet clock profile",
                         ));
+                    }
+                } else if self.context.stream.kind() == EncodedEntryKind::Opus {
+                    if c != d || !s.is_container_sync() {
+                        return Err(Error::Invalid("Opus sample timing or sync flag"));
                     }
                 } else if c >= i128::from(self.entry.media_time) {
                     self.anchor = Some(self.anchor.map_or(c, |prior| prior.min(c)));

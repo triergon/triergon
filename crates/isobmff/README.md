@@ -306,6 +306,10 @@ rejects boxes extending past the source.
   The compatible view of a complete fragmented file supports one open-ended
   rate-one initialization edit. Packet clocks and backward seek queries share
   the edit's offset. AAC leading trim uses the configured audio sample rate.
+  Regular Opus range playback retains the `dOps` record, exposes its canonical
+  identification header, and uses the edit list for initial trim. The MOV
+  seek policy searches the Opus track 10 ms before the video landing. The
+  source `roll` groups remain available for decoder preroll.
 - **Seek.** Seek planners select a preceding container sync sample, record
   available and missing preroll, and validate every media range before
   publishing a plan. A sync sample is a container fact, not proof of decoder

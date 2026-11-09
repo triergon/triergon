@@ -122,7 +122,9 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
             {
                 video = Some((header.track_id, entry.format));
             }
-            (kind, [entry]) if kind == *b"soun" && entry.format == *b"mp4a" && !audio => {
+            (kind, [entry])
+                if kind == *b"soun" && matches!(&entry.format, b"mp4a" | b"Opus") && !audio =>
+            {
                 audio = true;
             }
             _ => return Err("unexpected MP4 range track".into()),
