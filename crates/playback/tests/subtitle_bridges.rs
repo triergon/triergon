@@ -13,7 +13,7 @@ use triergon_mpegts::{
     psi::{DescriptorNamespace, DvbNamespaceEvidence},
 };
 use triergon_playback::{
-    bitmap_bridge::{DvdReceiver, DvdReceiverStep, PgsBridge, PgsMode, PgsQueueAction, PgsStep},
+    bitmap_bridge::{DvdReceiver, DvdReceiverStep, PgsBridge, PgsQueueAction, PgsStep},
     caption_bridge::{CaptionBridge, CaptionStep, CaptionUnit, CaptionVideo},
     io::{SelectedInput, SourceOwner},
     mp4_dvd::Mp4DvdSetup,
@@ -209,7 +209,6 @@ fn ts_pgs_reaches_the_pgs_bridge() {
     let mut pgs = PgsBridge::new(
         &b,
         track.scope(),
-        PgsMode::NativeCompatibility,
         pgs::DisplayLimits::default(),
         pgs::DisplayConfig::default(),
     )
@@ -239,7 +238,7 @@ fn ts_pgs_reaches_the_pgs_bridge() {
             match pgs.step(&mut WorkBudget::new(64), &off()).unwrap() {
                 PgsStep::Yield => {}
                 PgsStep::NeedPacket => break,
-                PgsStep::Compatibility(output) => match output.packet_clock_action().unwrap() {
+                PgsStep::Output(output) => match output.packet_clock_action().unwrap() {
                     Some(PgsQueueAction::Show(picture)) => {
                         let rect = picture.rectangles().next().unwrap();
                         actions.push((
@@ -250,7 +249,7 @@ fn ts_pgs_reaches_the_pgs_bridge() {
                     Some(PgsQueueAction::Clear { at_ns }) => actions.push((at_ns, None)),
                     None => {}
                 },
-                _ => panic!("unexpected PGS step"),
+                PgsStep::Finished => panic!("unexpected PGS step"),
             }
         }
     }

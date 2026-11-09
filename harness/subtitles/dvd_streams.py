@@ -1007,9 +1007,9 @@ def fixture_packets(path):
 
 
 FIXTURE_SETS = [
-    "crates/subtitles/tests/hd-source-fixtures",
-    "crates/subtitles/tests/hd-additive-fixtures",
-    "crates/subtitles/tests/hd-policy-fixtures",
+    "harness/subtitles/dvd-fixtures/hd-source-fixtures",
+    "harness/subtitles/dvd-fixtures/hd-additive-fixtures",
+    "harness/subtitles/dvd-fixtures/hd-policy-fixtures",
     "harness/subtitles/dvd-fixtures/hd-multi-fixtures",
     "harness/subtitles/dvd-fixtures/hd-context-fixtures",
 ]

@@ -6,20 +6,6 @@
 //! builds. Their reference revision is the one named on the matching
 //! [`compat`](crate::compat) family.
 
-/// The PGS receiver projection of strict source display sets.
-///
-/// [`Projector`](pgs::Projector) projects each strict
-/// [`DisplaySet`](crate::pgs::DisplaySet) onto the rectangles FFmpeg's public
-/// API returns for it, keeping the source set alongside. A
-/// [`ProjectedPacket`](pgs::ProjectedPacket) groups the sets of one packet, of
-/// which the receiver reports only the first.
-pub mod pgs {
-    pub use crate::pgs::projector::{
-        Canvas, ProjectedDisplay, ProjectedPacket, ProjectedRect, ProjectionStatus, Projector,
-        RasterOrigin,
-    };
-}
-
 /// Text carriage in the form of FFmpeg's demuxer API.
 ///
 /// [`Session`](carriage::Session) publishes one immutable

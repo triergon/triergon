@@ -1,14 +1,13 @@
-//! Reference-compatible policies.
+//! FFmpeg's subtitle receivers.
 //!
-//! The decoders in the format modules follow the specifications and keep every
-//! source byte, clock and palette fact. Where FFmpeg presents a subtitle
-//! differently and a consumer needs FFmpeg's result, the policies here reproduce
-//! FFmpeg's receiver for that input. They never rewrite the source output. Each
-//! module is one policy family; its documentation names the FFmpeg build it
+//! Each module reproduces one FFmpeg decoder, or the demuxer and decoder
+//! together, for every input it accepts, malformed ones included. The format
+//! modules carry what these receivers read: segments, packets and container
+//! configuration. Each module's documentation names the FFmpeg build it
 //! reproduces.
 //!
-//! Projections that exist only to compare traces with FFmpeg are not policies.
-//! They are compiled only with the `reference-trace` feature.
+//! Projections that exist only to compare traces with FFmpeg are not here;
+//! they are compiled only with the `reference-trace` feature.
 
 pub mod dvb {
     //! The DVB receiver: FFmpeg's `dvbsub` decoder.
@@ -31,33 +30,18 @@ pub mod dvb {
 }
 
 pub mod pgs {
-    //! The PGS receiver.
+    //! The PGS receiver: FFmpeg's `pgssub` decoder.
     //!
-    //! [`RecoveryDecoder`] and [`IndexedRecoveryDecoder`] run the strict source
-    //! decoder and FFmpeg's `pgssub` receiver over the same packets and report
-    //! both, including the receiver's packet recovery. [`ReceiverDecoder`] runs
-    //! only the receiver, for a consumer of its events.
-    //!
-    //! The receiver returns what the reference returns for every packet it
-    //! decodes, malformed ones included: the first display of each packet, its
-    //! presentation PTS, rectangles, palettes and pixels, forced flags and the
-    //! `forced_subs_only` palette. A packet the reference refuses carries a
+    //! [`ReceiverDecoder`] returns what the reference returns for every packet
+    //! it decodes, malformed ones included: the first display of each packet,
+    //! its presentation PTS, rectangles, palettes and pixels, forced flags and
+    //! the `forced_subs_only` palette. A packet the reference refuses carries a
     //! [`Refusal`]; the receiver keeps the state its earlier segments left and
     //! decodes the next packet.
     //!
-    //! The display sets of [`pgs::DisplayDecoder`](crate::pgs::DisplayDecoder)
-    //! also carry the receiver's ARGB words and clock beside the source facts:
-    //! [`ColourMatrix`] converts Y/Cr/Cb as the receiver does, [`ColourOrigin`]
-    //! and [`ClockSource`] say where a word or clock came from, and [`ArgbView`]
-    //! writes an object's receiver ARGB plane on demand.
-    //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::pgs::display_model::{ClockSource, ColourMatrix, ColourOrigin};
-    pub use crate::pgs::indexed_argb::ArgbView;
-    pub use crate::pgs::receiver_decoder::{ReceiverDecoder, ReceiverEof, ReceiverPacket};
-    pub use crate::pgs::recovery::{IndexedRecoveryDecoder, RecoveryDecoder, RecoveryEof, Refusal};
+    pub use crate::pgs::receiver::{ReceiverDecoder, ReceiverEof, ReceiverPacket, Refusal};
 }
-
 pub mod dvd {
     //! FFmpeg's DVD subtitle receiver and the packets its demuxers deliver.
     //!
@@ -65,7 +49,8 @@ pub mod dvd {
     //! sequences, 2-bit and 8-bit pixels, colours carried between units,
     //! transparent-border crop and `forced_subs_only`, configured by
     //! [`Settings`] from the stream configuration and the `palette` and
-    //! `ifo_palette` options ([`ifo_palette`]). Its packets come from
+    //! `ifo_palette` options ([`ifo_palette`]). The configuration's `size:`
+    //! line sets the canvas the subpictures are placed on. Its packets come from
     //! [`VobSubIndex`] (the `vobsub` demuxer's `.idx`/`.sub` reading), from
     //! [`SubpictureParser`] over a program stream's subpicture packets (the
     //! `mpegps` demuxer and DVD subtitle parser, streams numbered by

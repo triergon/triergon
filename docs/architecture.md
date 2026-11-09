@@ -106,6 +106,11 @@ choice deliberately and document it. A crate keeps three kinds of API apart:
 A rename keeps every value that reaches a trace (profile strings, error texts)
 unchanged, so worker traces stay byte-identical.
 
+A format whose only consumer need is FFmpeg's result has no specification decoder.
+The DVB, PGS and DVD bitmap subtitles in `triergon-subtitles` are decoded only by
+their receivers in `compat`. The crate root keeps the segment, packet and container
+configuration types that playback binds its tracks with.
+
 ## Dispatch and errors
 
 Readers are concrete types implementing `ContainerReader`, used through generics. A

@@ -16697,6 +16697,26 @@
    "sha256": "81c9bd14feced61e567abc733c0db9d83eea122e7cedb7d1c13f9516cf2208b6",
    "bytes": 15417,
    "source_revision": "a6e366d61ac06a37fe303cfd11ebe0b159b17579"
+  },
+  {
+   "name": "subtitles-count-9e3067b9-linux-arm64",
+   "path": "subtitles-count-9e3067b9-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of keeping only the FFmpeg receivers for DVB, PGS and DVD subtitles, on a c8g.xlarge (Linux AArch64): same-code against main at e86089da for the subtitle, subtitle capsule and playback workers, the instruction count of every case of subtitle-pgs, -dvb, -dvd, -cc, -teletext and subtitle-pgs-capsules at both revisions, 50 operations on CPU 1, and the fold of every subtitle corpus case and PGS capsule. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-count-9e3067b9-linux-arm64/168d07687cbeb2dc93ec997a01c368a0df162e3ec12a87576c8f0bde789c14e9.tar.zst",
+   "sha256": "168d07687cbeb2dc93ec997a01c368a0df162e3ec12a87576c8f0bde789c14e9",
+   "bytes": 19605,
+   "source_revision": "9e3067b98b955205aa1ddea155d60f312992abaf"
+  },
+  {
+   "name": "subtitles-count-5130d0e9-linux-arm64",
+   "path": "subtitles-count-5130d0e9-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of keeping only the FFmpeg receivers for DVB, PGS and DVD subtitles after review, with the VobSub canvas read from the configuration, on a c8g.xlarge (Linux AArch64): same-code against main at e86089da for the subtitle, subtitle capsule and playback workers, the instruction count of every case of subtitle-pgs, -dvb, -dvd, -cc, -teletext and subtitle-pgs-capsules at both revisions, 50 operations on CPU 1, and the fold of every subtitle corpus case and PGS capsule. The dvb, dvd, cc and teletext counts are of the parent build, whose subtitle worker differs only in the PGS run loop. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-count-5130d0e9-linux-arm64/149b1cfa87eb6658f5396e6cd4c5d39bd95418f80307eb086046581319d6dcc4.tar.zst",
+   "sha256": "149b1cfa87eb6658f5396e6cd4c5d39bd95418f80307eb086046581319d6dcc4",
+   "bytes": 19922,
+   "source_revision": "5130d0e99222ba72419dc1adb357d1104d6f03bf"
   }
  ]
 }

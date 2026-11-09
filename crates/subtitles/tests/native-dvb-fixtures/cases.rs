@@ -10,7 +10,6 @@ pub(super) static CASES: &[Case] = &[
         end_ms: 2000,
         canvas: [16, 12],
         geometry: [1, 1, 5, 2],
-        source_error: None,
     },
     Case {
         id: "ancillary-end-nonempty",
@@ -22,7 +21,6 @@ pub(super) static CASES: &[Case] = &[
         end_ms: 2000,
         canvas: [16, 12],
         geometry: [1, 1, 5, 2],
-        source_error: Some(Error::Invalid("DVB EOD payload")),
     },
     Case {
         id: "composition-end-control",
@@ -34,7 +32,6 @@ pub(super) static CASES: &[Case] = &[
         end_ms: 2000,
         canvas: [16, 12],
         geometry: [1, 1, 5, 2],
-        source_error: None,
     },
     Case {
         id: "shared-composition-end-compat",
@@ -46,7 +43,6 @@ pub(super) static CASES: &[Case] = &[
         end_ms: 2000,
         canvas: [16, 12],
         geometry: [1, 1, 5, 2],
-        source_error: None,
     },
     Case {
         id: "foreign-end-filter-control",
@@ -58,6 +54,5 @@ pub(super) static CASES: &[Case] = &[
         end_ms: 2000,
         canvas: [16, 12],
         geometry: [1, 1, 5, 2],
-        source_error: None,
     },
 ];

@@ -8,27 +8,81 @@ use super::wire::{Command, Commands, DvdArea};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
 
-/// The receiver's colour and selection settings: the decoder options and the
-/// `palette:` line of the stream configuration.
+/// The receiver's colour and selection settings and its canvas: the decoder
+/// options and the `palette:` and `size:` lines of the stream configuration.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Settings {
     /// Sixteen `0xRRGGBB` colours, or `None` for the receiver's automatic greys.
     pub palette: Option<[u32; 16]>,
+    /// The width and height the subpictures are placed on, from the last
+    /// `size:` line; `None` without one, when the container's size applies.
+    pub canvas: Option<[u32; 2]>,
     /// Drop every subpicture without a forced start (`forced_subs_only`).
     pub forced_only: bool,
 }
 
 impl Settings {
-    /// Settings from VobSub-style configuration text. Each line beginning
-    /// `palette:` replaces the palette; other lines are ignored.
-    pub fn from_configuration(text: &[u8]) -> Self {
-        let palette = text
-            .split(|&b| b == b'\n')
-            .filter_map(|line| line.strip_prefix(b"palette:"))
-            .next_back()
-            .map(parse_colour_list);
+    /// Settings from VobSub-style configuration text, read as the reference
+    /// reads it: up to the first NUL, a line at a time (CR and LF both end a
+    /// line). A line beginning `palette:` replaces the palette and one
+    /// beginning `size:` the canvas; other lines are ignored. Both values are
+    /// scanned from the rest of the text, so they can continue on the next
+    /// line. A `size:` line without two numbers is ignored.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` for a size the reference refuses to open a decoder
+    /// with: a dimension of zero or less, or a picture too large to address.
+    pub fn from_configuration(text: &[u8]) -> Result<Self> {
+        // Every `palette:` line replaces the whole palette, so only the last
+        // one is read. The scans stop at a NUL by themselves.
+        let mut palette = None;
+        let mut canvas = None;
+        let mut line = |start: usize| -> Result<()> {
+            let rest = &text[start..];
+            match rest.first() {
+                Some(b'p') => palette = rest.strip_prefix(b"palette:").or(palette),
+                Some(b's') => {
+                    if let Some(size) = rest.strip_prefix(b"size:").and_then(scan_size) {
+                        canvas = Some(checked_canvas(size)?);
+                    }
+                }
+                _ => {}
+            }
+            Ok(())
+        };
+        // Lines start after each LF or CR. A word without a byte below 0x0e
+        // has neither, nor a NUL, and is passed over whole.
+        let mut start = 0;
+        let mut at = 0;
+        while at < text.len() {
+            let end = text.len().min(at + 8);
+            let chunk = &text[at..end];
+            if let Ok(&word) = <&[u8; 8]>::try_from(chunk)
+                && below_0e(u64::from_le_bytes(word)) == 0
+            {
+                at = end;
+                continue;
+            }
+            for (offset, &byte) in chunk.iter().enumerate() {
+                if matches!(byte, b'\n' | b'\r' | 0) {
+                    line(start)?;
+                    if byte == 0 {
+                        return Ok(Self::configured(palette, canvas));
+                    }
+                    start = at + offset + 1;
+                }
+            }
+            at = end;
+        }
+        line(start)?;
+        Ok(Self::configured(palette, canvas))
+    }
+
+    fn configured(palette: Option<&[u8]>, canvas: Option<[u32; 2]>) -> Self {
         Self {
-            palette,
+            palette: palette.map(parse_colour_list),
+            canvas,
             forced_only: false,
         }
     }
@@ -47,32 +101,144 @@ impl Settings {
     }
 }
 
-/// Up to sixteen hexadecimal numbers separated by commas, each keeping its low
-/// 24 bits; the list stops at the first entry without digits and the remaining
-/// colours are black.
+/// Non-zero when some byte of `word` is below 0x0e: subtracting 0x0e from
+/// each byte then borrows into its top bit while the byte's own top bit is
+/// clear.
+fn below_0e(word: u64) -> u64 {
+    const ONES: u64 = u64::from_le_bytes([0x01; 8]);
+    const HIGHS: u64 = u64::from_le_bytes([0x80; 8]);
+    word.wrapping_sub(ONES * 0x0e) & !word & HIGHS
+}
+
+/// Sixteen colours as the reference's `parse_palette` reads them: each number
+/// converted as `strtoul` does in base 16 (after white space, with an optional
+/// sign and `0x`) and kept to its low 24 bits, then any run of commas and
+/// white space skipped. An entry without digits is black and leaves the text
+/// where it was, so once the skip cannot move either, the rest are black.
 fn parse_colour_list(text: &[u8]) -> [u32; 16] {
     let mut colours = [0; 16];
-    let mut rest = text;
+    let mut at = 0;
     for colour in &mut colours {
-        rest = rest.trim_ascii_start();
-        let digits = rest
-            .strip_prefix(b"0x")
-            .or_else(|| rest.strip_prefix(b"0X"))
-            .filter(|tail| tail.first().is_some_and(u8::is_ascii_hexdigit))
-            .unwrap_or(rest);
-        let length = digits.iter().take_while(|b| b.is_ascii_hexdigit()).count();
-        if length == 0 {
+        let start = at;
+        let (value, end) = strtoul16(text, at);
+        *colour = (value & 0x00ff_ffff) as u32;
+        at = end;
+        while text.get(at).is_some_and(|&b| b == b',' || is_space(b)) {
+            at += 1;
+        }
+        // Stuck: every later entry reads the same nothing.
+        if at == start {
             break;
         }
-        let value = digits[..length].iter().fold(0_u64, |value, &digit| {
-            let nibble = char::from(digit).to_digit(16).unwrap_or(0);
-            value.saturating_mul(16).saturating_add(u64::from(nibble))
-        });
-        *colour = (value & 0x00ff_ffff) as u32;
-        rest = digits[length..].trim_ascii_start();
-        rest = rest.strip_prefix(b",").unwrap_or(rest);
     }
     colours
+}
+
+/// C's `isspace` in the C locale.
+fn is_space(b: u8) -> bool {
+    matches!(b, b' ' | b'\t'..=b'\r')
+}
+
+/// `strtoul(text + start, &end, 16)`: the value and `end`, which stays at
+/// `start` without digits. Out of range is `ULONG_MAX` whatever the sign; in
+/// range, a minus negates in unsigned arithmetic.
+fn strtoul16(text: &[u8], start: usize) -> (u64, usize) {
+    let hex = |at: usize| match text.get(at) {
+        Some(&b @ b'0'..=b'9') => Some(b - b'0'),
+        Some(&b @ b'a'..=b'f') => Some(b - b'a' + 10),
+        Some(&b @ b'A'..=b'F') => Some(b - b'A' + 10),
+        _ => None,
+    };
+    let mut at = start;
+    while text.get(at).copied().is_some_and(is_space) {
+        at += 1;
+    }
+    let negative = text.get(at) == Some(&b'-');
+    if matches!(text.get(at), Some(b'-' | b'+')) {
+        at += 1;
+    }
+    if text.get(at) == Some(&b'0')
+        && matches!(text.get(at + 1), Some(b'x' | b'X'))
+        && hex(at + 2).is_some()
+    {
+        at += 2;
+    }
+    let digits = at;
+    let (mut value, mut overflow) = (0_u64, false);
+    while let Some(nibble) = hex(at) {
+        overflow |= value >> 60 != 0;
+        value = value << 4 | u64::from(nibble);
+        at += 1;
+    }
+    if at == digits {
+        (0, start)
+    } else if overflow {
+        (u64::MAX, at)
+    } else if negative {
+        (value.wrapping_neg(), at)
+    } else {
+        (value, at)
+    }
+}
+
+/// `%dx%d` as C's `sscanf` reads it: each number after optional white space,
+/// with an optional sign, the `x` right after the first.
+fn scan_size(text: &[u8]) -> Option<[i32; 2]> {
+    let (width, end) = scan_int(text, 0)?;
+    if text.get(end) != Some(&b'x') {
+        return None;
+    }
+    let (height, _) = scan_int(text, end + 1)?;
+    Some([width, height])
+}
+
+/// One `%d` from `start`: a decimal number converted as `strtol` does (out of
+/// range is `LONG_MAX` or `LONG_MIN`) and stored in an `int`, which keeps its
+/// low 32 bits; with the index after it.
+fn scan_int(text: &[u8], start: usize) -> Option<(i32, usize)> {
+    let mut at = start;
+    while text.get(at).copied().is_some_and(is_space) {
+        at += 1;
+    }
+    let negative = text.get(at) == Some(&b'-');
+    if matches!(text.get(at), Some(b'-' | b'+')) {
+        at += 1;
+    }
+    let digits = at;
+    let (mut magnitude, mut overflow) = (0_u64, false);
+    while let Some(&byte @ b'0'..=b'9') = text.get(at) {
+        let (scaled, carry) = magnitude.overflowing_mul(10);
+        let (sum, wrapped) = scaled.overflowing_add(u64::from(byte - b'0'));
+        overflow |= carry | wrapped;
+        magnitude = sum;
+        at += 1;
+    }
+    if at == digits {
+        return None;
+    }
+    let value = match (overflow, negative) {
+        (false, false) => i64::try_from(magnitude).unwrap_or(i64::MAX),
+        (false, true) => 0_i64.checked_sub_unsigned(magnitude).unwrap_or(i64::MIN),
+        (true, false) => i64::MAX,
+        (true, true) => i64::MIN,
+    };
+    Some((value as i32, at))
+}
+
+/// A size the reference opens a decoder with: both dimensions positive, and
+/// eight bytes per pixel plus 128 pixels of padding each way addressable
+/// with an `int`.
+fn checked_canvas([width, height]: [i32; 2]) -> Result<[u32; 2]> {
+    let limit = u64::from(i32::MAX.unsigned_abs());
+    match (u32::try_from(width), u32::try_from(height)) {
+        (Ok(w @ 1..), Ok(h @ 1..))
+            if 8 * (u64::from(w) + 128) < limit
+                && 8 * (u64::from(w) + 128) * (u64::from(h) + 128) < limit =>
+        {
+            Ok([w, h])
+        }
+        _ => Err(Error::Invalid("DVD configuration size")),
+    }
 }
 
 /// The colour table of the first program chain of a DVD-Video title set IFO
@@ -739,7 +905,7 @@ impl Pass<'_, '_> {
     /// Run a sequence's commands from where the cursor stopped; `start` is
     /// where `body` sits in the unit.
     fn commands(&mut self, body: &[u8], start: usize, date: u16) -> std::result::Result<(), Halt> {
-        let mut commands = Commands::resume(body, self.cursor.read, 0, usize::MAX);
+        let mut commands = Commands::resume(body, self.cursor.read);
         while commands.position() < body.len() {
             let from = commands.position();
             let command = commands.next().ok_or(Halt::Malformed)?;
@@ -790,7 +956,7 @@ impl Pass<'_, '_> {
                         bottom: bottom as usize,
                     });
                 }
-                Command::End | Command::Opaque { .. } => break,
+                Command::End | Command::Unknown => break,
             }
         }
         Ok(())
@@ -1254,5 +1420,39 @@ impl Bounds {
             width: self.right - self.left + 1,
             height: bottom - top + 1,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Settings, below_0e};
+
+    #[test]
+    fn below_0e_flags_exactly_the_words_with_a_low_byte() {
+        for byte in 0..=u8::MAX {
+            for at in 0..8 {
+                for fill in [b'a', 0x0e, 0x80, 0xff] {
+                    let mut bytes = [fill; 8];
+                    bytes[at] = byte;
+                    let word = u64::from_le_bytes(bytes);
+                    assert_eq!(below_0e(word) != 0, byte < 0x0e, "{bytes:?}");
+                }
+            }
+        }
+    }
+
+    /// Line starts are found at every alignment, after LF and CR alike, and
+    /// nothing after a NUL is read.
+    #[test]
+    fn lines_start_after_every_break_at_every_offset() {
+        for prefix in 0..20 {
+            for (stop, found) in [(b'\n', true), (b'\r', true), (0, false), (b'\t', false)] {
+                let mut text = vec![b'.'; prefix];
+                text.push(stop);
+                text.extend_from_slice(b"palette: 7");
+                let palette = Settings::from_configuration(&text).unwrap().palette;
+                assert_eq!(palette.map(|p| p[0]), found.then_some(7), "{text:?}");
+            }
+        }
     }
 }
