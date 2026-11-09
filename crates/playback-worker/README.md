@@ -36,7 +36,7 @@ and the input event it is attributed to.
 | `mp4-forward-` | `regular` or `progressive` | `Mp4Open` and `Mp4IndexJob` in the native MOV view; a seekable file through the checked range index and `Engine::mp4`, with encoded plans for edits over composition offsets, or a forward-only front-`moov` file through its native front plan and `Engine::mp4_native_terminal_v1`; every track, times in the track time base | `mp4-forward` |
 | `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE` | explicit PIDs of program 1 through `Engine::ts_native_program_v1`, or one M2TS192 PID through `NativeStartup::new_m2ts_prefix_v2`; native 90 kHz clocks | `ts-program` |
 | `raw-video-` | `avc` or `hevc` | `RawVideoProbe`, `RawVideoSource` and `RawVideoFeed` over forward-only Annex B; no container clock, the duration is the active SPS picture period in 1/1,200,000 s | `raw-annex-b` |
-| `ts-au-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` or `--atsc` | the MPEG-TS source reader through `AnyReader`: complete AVC/HEVC, ADTS AAC-LC and explicitly signalled DVB or ATSC AC-3 and E-AC-3 units, plus separately reported video-header groups, incomplete audio and unframed video at logical EOF; the packet comparison uses original PES anchors through `compat::pes::DemuxClock`, leaving source clocks unchanged; source diagnostics, unsupported carriages and empty observations remain refusals | `mpegts-access-units` |
+| `ts-au-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` or `--atsc` | the MPEG-TS source reader through `AnyReader`: complete AVC/HEVC, ADTS AAC-LC and explicitly signalled DVB or ATSC AC-3 and E-AC-3 units, plus separately reported video-header groups, incomplete audio and unframed video at logical EOF; the packet comparison uses original PES anchors through `compat::pes::DemuxClock`; empty completion requires a confirmed control-only input | `mpegts-access-units` |
 | `ts-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` and further media entities (`[--discontinuity] FILE`) | the FFmpeg-compatible packets of one program through the public API: `TransportStream` selects the program, its first active PMT binds a `compat::pes::DemuxObserver` to the one elementary stream, that PID's transport packets feed it and `DemuxClock` places the timestamps; a context the observer alone cannot take (more streams, a later PMT, clock or format boundaries, transport, PES-time and active PSI faults, rejected carriers, a second entity) and an operation without a packet end with their cause; the strict source view and its native clock are not compared | `mpegts-pes` |
 
 A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
@@ -61,6 +61,9 @@ reported separately from complete units, with its original bytes and refusal
 reason; it never enters the neutral packet stream.
 The Annex B EOF policy also reports unframed video as an opaque source event.
 The comparison folds its original payload, clock anchor and PES position.
+If a single entity ends without an access unit or stops at a PSI diagnostic,
+the comparison can complete empty after the control-only proof classifies the
+original carriers through physical end and logical EOF.
 Its generic refusal context records the last input-window offset; source
 diagnostics carry their exact source location.
 
