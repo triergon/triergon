@@ -41,11 +41,10 @@ pub struct Band {
 /// How FreeType's default (hinted) loading treats the face's advances.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Hinting {
-    /// None: a size without pixels per em loads glyphs unscaled and unhinted.
-    Off,
-    /// The unhinted advance rounded to a whole pixel: CFF, and TrueType whose
-    /// programs keep the v40 interpreter's backward compatibility.
-    Rounded,
+    /// The unhinted advance, fitted to the size's grid: CFF, TrueType whose
+    /// programs keep the v40 interpreter's backward compatibility, and any
+    /// face at zero pixels per em, which loads unhinted.
+    Unhinted,
     /// Advances that depend on what this crate does not run.
     Unsupported(&'static str),
 }
@@ -55,9 +54,16 @@ enum Hinting {
 pub struct SizedFont<'f> {
     font: &'f Font,
     metrics: SizeMetrics,
+    /// The scales glyphs load at: the size's, or none at all (font units) at
+    /// zero pixels per em.
+    scale: Scale,
     /// The x scale hinted loading uses: TrueType faces that ask for integer
     /// pixels per em (`head.flags` bit 3) scale by the rounded ppem there.
     hinted_scale: i64,
+    /// The grid hinted loading fits advances to, as the mask of a 26.6
+    /// value's fraction: whole pixels (63), or none (0) at zero pixels per
+    /// em.
+    grid: i64,
     hinting: Hinting,
 }
 
@@ -144,6 +150,16 @@ impl Font {
                 scale,
             )),
         };
+        if ppem == 0 {
+            return Ok(SizedFont {
+                font: self,
+                metrics,
+                scale: Scale::UNITS,
+                hinted_scale: Scale::UNITS.x,
+                grid: 0,
+                hinting: Hinting::Unhinted,
+            });
+        }
         let integer_ppem = matches!(self.outlines, Outlines::Glyf(_)) && self.head.flags & 8 != 0;
         let hinted_scale = if integer_ppem {
             div_fix(i64::from(ppem) << 6, upem)
@@ -153,19 +169,17 @@ impl Font {
         Ok(SizedFont {
             font: self,
             metrics,
+            scale: Scale { x: scale, y: scale },
             hinted_scale,
-            hinting: if ppem == 0 {
-                Hinting::Off
-            } else {
-                self.hinting()
-            },
+            grid: 63,
+            hinting: self.hinting(),
         })
     }
 
     /// How FreeType's default loading treats this face's advances.
     fn hinting(&self) -> Hinting {
         if !matches!(self.outlines, Outlines::Glyf(_)) {
-            return Hinting::Rounded;
+            return Hinting::Unhinted;
         }
         if self.is_tricky() {
             return Hinting::Unsupported("hinted advances of a tricky TrueType font");
@@ -178,7 +192,7 @@ impl Font {
             return Hinting::Unsupported("hinted advances of an auto-hinted TrueType font");
         }
         if [fpgm, prep].into_iter().flatten().all(keeps_compatibility) {
-            Hinting::Rounded
+            Hinting::Unhinted
         } else {
             Hinting::Unsupported("hinted advances under a TrueType instruction control")
         }
@@ -317,18 +331,7 @@ impl<'f> SizedFont<'f> {
     /// Those of [`Font::outline_into`]; `Overflow` for coordinates beyond
     /// `i32`.
     pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
-        self.font.load(glyph, self.scale(), outline)
-    }
-
-    /// The scales glyphs load at.
-    const fn scale(&self) -> Scale {
-        match self.hinting {
-            Hinting::Off => Scale::UNITS,
-            _ => Scale {
-                x: self.metrics.x_scale,
-                y: self.metrics.y_scale,
-            },
-        }
+        self.font.load(glyph, self.scale, outline)
     }
 
     /// Applies libass's synthetic styles to an outline loaded by
@@ -361,11 +364,9 @@ impl<'f> SizedFont<'f> {
     /// in `fpgm`, `prep` or the glyph's programs). Otherwise the errors of
     /// [`Self::outline_into`].
     pub fn hinted_advance(&self, glyph: GlyphId) -> Result<i32> {
-        let hinted = match self.hinting {
-            Hinting::Off => false,
-            Hinting::Rounded => true,
-            Hinting::Unsupported(what) => return Err(Error::Unsupported(what)),
-        };
+        if let Hinting::Unsupported(what) = self.hinting {
+            return Err(Error::Unsupported(what));
+        }
         let font = self.font;
         let index = font.check(glyph)?;
         let data = font.data.as_ref();
@@ -377,25 +378,22 @@ impl<'f> SizedFont<'f> {
                     compatible &= keeps_compatibility(program);
                     Ok(())
                 })?;
-                if hinted && !compatible {
+                // Unhinted loading runs no program.
+                if !compatible && self.grid != 0 {
                     return Err(Error::Unsupported(
                         "hinted advances under a TrueType instruction control",
                     ));
                 }
                 let origin = i64::from(m.x_min) - i64::from(font.bearing(m.glyph));
                 let advance = i64::from(font.hmtx.advance(data, m.glyph));
-                let x = if hinted {
-                    self.hinted_scale
-                } else {
-                    self.scale().x
-                };
+                let x = self.hinted_scale;
                 mul_fix(origin + advance, x) - mul_fix(origin, x)
             }
             Outlines::Cff(cff) => {
-                cff.advance(data, glyph, font.hmtx.advance(data, index), self.scale())?
+                cff.advance(data, glyph, font.hmtx.advance(data, index), self.scale)?
             }
         };
-        glyf::narrow(if hinted { pix_round(advance) } else { advance })
+        glyf::narrow((advance + (self.grid + 1) / 2) & !self.grid)
     }
 
     /// The `kern` value for the pair as libass's HarfBuzz callback reads it
