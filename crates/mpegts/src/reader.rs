@@ -184,6 +184,7 @@ impl Reader {
             limits.program,
             limits.descriptor_namespace,
         )?;
+        stream.share_input();
         if limits.adts_pes_policy == adts::PesPolicy::ReportUnbounded {
             stream.allow_unbounded_adts();
         }

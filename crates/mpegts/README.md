@@ -193,6 +193,8 @@ Framer coordinates use a private concatenated elementary view (`SourceId(0)`),
 not physical file offsets. Video scatter payloads are coalesced cooperatively
 into charged immutable storage. Audio packets borrow their access unit's stored
 bytes. Cloning a packet or `SourceEvent` shares the charged storage.
+Complete transport carriers share bounded input windows. Carriers split over
+windows and views into oversized allocations use charged copies.
 
 `Track::configuration_epoch()` comes from its elementary route, which can be
 reused across PMT versions and PCR binding changes. In-band SPS/PPS changes remain

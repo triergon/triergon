@@ -435,6 +435,58 @@ fn adts(body: &[u8]) -> Vec<u8> {
 }
 
 #[test]
+fn complete_carriers_share_only_bounded_input_storage() {
+    use triergon_core::BudgetVec;
+
+    let frame = adts(&[0x32; 321]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &frame, Some(90_000), None);
+    for (capacity, shares) in [(ts.bytes.len(), true), (129 * 1024, false)] {
+        let pool = Budget::new(8 << 20).unwrap();
+        let mut bytes = BudgetVec::new(&pool);
+        bytes.try_reserve_exact(capacity).unwrap();
+        bytes.try_extend_from_slice(&ts.bytes).unwrap();
+        let input = bytes.freeze().unwrap();
+        let mut reader = Reader::new(
+            &pool,
+            ID,
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            ReaderLimits::default(),
+            ts.bytes.len(),
+        )
+        .unwrap();
+        let request = reader.request().unwrap();
+        reader
+            .provide(&InputWindow::new(ID, request.token, 0, input.clone()).unwrap())
+            .unwrap();
+        let mut found = false;
+        for _ in 0..2_000 {
+            match reader.step(&mut WorkBudget::new(4096), &OFF).unwrap() {
+                Step::Ready(Event::Packet(packet)) => {
+                    assert_eq!(packet.payload(), frame);
+                    let TraceEvent::Pes(pes) = packet.sources()[0].pes.event() else {
+                        panic!("expected original PES");
+                    };
+                    assert!(pes.spans().len() > 1);
+                    for span in pes.spans() {
+                        assert_eq!(span.backing_bytes().shares_storage_with(&input), shares);
+                    }
+                    found = true;
+                }
+                Step::NeedInput(request) => reader.finish(ID, request.token).unwrap(),
+                Step::End(_) => break,
+                _ => (),
+            }
+        }
+        assert!(found);
+    }
+}
+
+#[test]
 fn audio_anchors_wait_for_the_next_frame_start_and_missing_dts_stays_absent() {
     let frames = [adts(b"first"), adts(b"second"), adts(b"third")];
     let body = frames.concat();

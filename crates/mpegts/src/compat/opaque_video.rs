@@ -240,13 +240,14 @@ impl OpaqueRecovery {
             ));
         }
         let budget = input.budget().clone();
-        let source = TransportStream::new_with_namespace(
+        let mut source = TransportStream::new_with_namespace(
             budget.clone(),
             PacketFormat::Ts188,
             limits,
             program,
             namespace,
         )?;
+        source.share_input();
         Ok(Self {
             source,
             observer: None,

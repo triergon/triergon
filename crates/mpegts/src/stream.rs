@@ -1596,6 +1596,10 @@ impl TransportStream {
         self.unbounded_adts = true;
     }
 
+    pub(crate) fn share_input(&mut self) {
+        self.framer.share_input();
+    }
+
     /// Offer stable PES continuations to a feed before publishing a trace event.
     /// The callback receives the number of preceding events omitted in this poll
     /// window and the current source epochs. Buffered consumes the carrier,
