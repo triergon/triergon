@@ -16657,6 +16657,16 @@
    "sha256": "06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077",
    "bytes": 2332946,
    "source_revision": "0d70bebfc0799f65df14f170ed97e68c5a35daa7"
+  },
+  {
+   "name": "subtitles-count-434f2f82-linux-arm64",
+   "path": "subtitles-count-434f2f82-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of the DVB refusal change on a c8g.xlarge (Linux AArch64): same-code.txt compares the subtitle worker at 434f2f82 with main's at 7e09bc4e (only the DVB operation differs), and count.tsv holds each DVB case's instruction count at both, 50 operations on CPU 1. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-count-434f2f82-linux-arm64/bccf80c6522991d2091da329d784fba97b0988b248411c1b80c7408e506e69e0.tar.zst",
+   "sha256": "bccf80c6522991d2091da329d784fba97b0988b248411c1b80c7408e506e69e0",
+   "bytes": 3963,
+   "source_revision": "434f2f8238d455424cc4d40648ec2acdd59884eb"
   }
  ]
 }
