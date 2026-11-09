@@ -71,8 +71,8 @@ impl Boundaries {
 }
 impl TransportFaultRecovery {
     /// Bind the original sequential core input before admitting any carrier.
-    /// Terminal recovery requires this identity; reset, seek, entity continuation
-    /// and a replacement cursor cannot supply this operation's EOF proof.
+    /// Terminal recovery requires this identity. Only a proved media-entity
+    /// continuation can advance it to the next request of this cursor.
     /// Binding retains a fixed-size token, with no byte or `Budget` handle clone.
     pub fn bind_source_input(&mut self, input: &InputCursor) -> Result<()> {
         if let Some(error) = self.fault {
@@ -98,8 +98,25 @@ impl TransportFaultRecovery {
         Ok(())
     }
 
-    // Both callers check the pool first, preserving foreign-pool precedence.
+    // The callers check the pool first, preserving foreign-pool precedence.
     pub(super) fn check_source_input(&self, input: &InputCursor) -> Result<()> {
+        self.check_source_token(&input.token())?;
+        if input.source() != self.scope().entity {
+            return Err(Error::SourceMismatch);
+        }
+        Ok(())
+    }
+
+    /// Whether an explicit discontinuity may retire this observer without
+    /// losing unpublished PES or an unresolved source fault.
+    pub fn discard_idle(&self) -> bool {
+        self.fault.is_none()
+            && self.pending.is_none()
+            && self.boundaries.input_error().is_none()
+            && self.inner.recovery_idle()
+    }
+
+    fn check_source_token(&self, received: &InputToken) -> Result<()> {
         let expected = self
             .boundaries
             .source_input
@@ -107,7 +124,6 @@ impl TransportFaultRecovery {
             .ok_or(Error::Unsupported(
                 "terminal transport source input not bound",
             ))?;
-        let received = input.token();
         if expected.generation() != received.generation() {
             return Err(Error::StaleGeneration {
                 expected: expected.generation(),
@@ -120,10 +136,54 @@ impl TransportFaultRecovery {
                 received: received.request(),
             });
         }
-        if input.source() != self.scope().entity {
-            return Err(Error::SourceMismatch);
-        }
         Ok(())
+    }
+
+    /// Advance the bound cursor through a proved contiguous entity boundary.
+    /// Pending PES assembly survives. Per-entity terminal facts are retired
+    /// only after the inner observer commits the continuation.
+    pub fn continue_media_entity(
+        &mut self,
+        end: &MediaEntityEnd,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if let Some(error) = self.fault {
+            return Err(error);
+        }
+        if work.remaining() == 0 {
+            return Ok(false);
+        }
+        let budget = self.inner.recovery_budget();
+        if !budget.same_pool(input.budget()) || !budget.same_pool(&end.budget) {
+            return Err(Error::ForeignPool);
+        }
+        self.check_source_token(&end.token)?;
+        if let Some(error) = self.boundaries.input_error() {
+            return Err(error);
+        }
+        if self.pending.is_some()
+            || self
+                .boundaries
+                .last_carrier
+                .is_some_and(|(offset, _, _)| offset > end.location.offset)
+        {
+            return Err(Error::Invalid(
+                "transport recovery media entity not drained",
+            ));
+        }
+        if !self.inner.continue_media_entity(end, input, work, cancel)? {
+            return Ok(false);
+        }
+        self.boundaries = Boundaries {
+            source_input: Some(input.token()),
+            ..Boundaries::default()
+        };
+        Ok(true)
     }
 
     #[allow(
