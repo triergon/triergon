@@ -2,16 +2,19 @@
 //! its quantisation against the glyph's run, the border or opaque box, and their
 //! rasterisation, as libass's `get_bitmap_glyph` draws them.
 
+use std::ops::Deref;
+use std::sync::Arc;
+
 use triergon_core::{Error, Result, WorkBudget, round_ties_even_i32};
 
 use crate::bitmap::Bitmap;
-use crate::compose::{Border, Effects, FilterFlags};
+use crate::compose::{Border, Effects};
 use crate::fp;
 use crate::geometry::{OUTLINE_MAX, Rect, Vector};
 use crate::raster::Raster;
 use crate::shape::Shape;
-use crate::stroke::{Pen, stroke};
-use crate::transform::{BitmapTransform, MAX_PERSP_SCALE, Matrix, RunOffset};
+use crate::stroke::{Pen, stroke as stroke_outline};
+use crate::transform::{BitmapTransform, MAX_PERSP_SCALE, Matrix, Quantized, RunOffset};
 
 /// Stroker tolerance in outline units; outlines are scaled so it suffices.
 const STROKER_PRECISION: i32 = 16;
@@ -184,22 +187,24 @@ impl Matrix {
     }
 }
 
-/// A border outline's cache key: the scale it is stroked at and its widths in
-/// stroker units.
+/// How a glyph's border is stroked: the scale its outline is stroked at and
+/// the border widths at that scale. The border of a shape under equal strokes
+/// is the same outline, so a renderer keys the stroked outline by the shape
+/// and this, as libass's outline cache keys a border.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct BorderKey {
+pub struct BorderStroke {
     /// The outline is scaled by 2^order (x and y) before stroking.
     scale_order: [i32; 2],
     /// Border widths in 1/16 outline units at that scale.
     size: Vector,
 }
 
-impl BorderKey {
-    /// The key of a border `size` pixels wide and the matrix of the scaled
-    /// outline, from the glyph's centred matrix `m` and its outline matrix: the
-    /// outline is scaled by powers of two so the stroker's fixed tolerance stays
-    /// near 1/8 pixel after the transform. `None` when the border is out of
-    /// range.
+impl BorderStroke {
+    /// The stroke of a border `size` pixels wide and the matrix of the
+    /// stroked outline, from the glyph's centred matrix `m` and its outline
+    /// matrix: the outline is scaled by powers of two so the stroker's fixed
+    /// tolerance stays near 1/8 pixel after the transform. `None` when the
+    /// border is out of range.
     fn new(
         m: &Matrix,
         outline: &Matrix,
@@ -231,7 +236,7 @@ impl BorderKey {
         if !(bord_x < limit && bord_y < limit) {
             return None;
         }
-        let key = Self {
+        let stroke = Self {
             scale_order: [order_x, order_y],
             size: Vector::new(
                 round_ties_even_i32(bord_x / f64::from(STROKER_PRECISION)),
@@ -243,13 +248,18 @@ impl BorderKey {
                 .0
                 .map(|r| [fp::ldexp(r[0], -order_x), fp::ldexp(r[1], -order_y), r[2]]),
         );
-        Some((key, matrix))
+        Some((stroke, matrix))
+    }
+
+    /// Whether the border rounds to nothing, so the fill stands in for it.
+    fn is_empty(&self) -> bool {
+        self.size == Vector::default()
     }
 }
 
 /// The state of one run of glyphs composited together: the sub-pixel origin
-/// its first drawn glyph sets, and the least transformed x of its karaoke
-/// glyphs.
+/// its first drawn glyph sets, how many glyphs it has drawn, and the least
+/// transformed x of its karaoke glyphs.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Run {
     offset: RunOffset,
@@ -267,7 +277,142 @@ impl Default for Run {
     }
 }
 
+/// Where a glyph's border bitmap comes from once the glyph is placed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PlacedBorder {
+    /// No border: none is drawn, or it leaves the coordinate range.
+    None,
+    /// The border rounds to nothing, and the fill's bitmap stands in for it.
+    Fill,
+    /// The opaque box, which does not depend on the glyph's shape: the
+    /// [`Shape::unit_box`] under this transform, `None` when the transform
+    /// leaves the coordinate range and no box is drawn.
+    Box(Option<Quantized>),
+    /// The glyph's first outline stroked by [`Raster::stroke_border`], then
+    /// placed by [`GlyphPlacement::place_stroke`].
+    Stroke(BorderStroke),
+}
+
+/// A glyph quantised and placed in its run by [`Run::place`]: what its fill
+/// and border bitmaps are drawn from and under which transforms, before any
+/// is drawn.
+#[derive(Clone, Copy, Debug)]
+pub struct GlyphPlacement {
+    fill: Quantized,
+    border: PlacedBorder,
+    /// The stroked border's matrix, for [`PlacedBorder::Stroke`].
+    stroke_matrix: Matrix,
+    /// The run's sub-pixel origin, which the border is placed against.
+    offset: RunOffset,
+}
+
+impl GlyphPlacement {
+    /// The glyph's fill: its shape under this transform, drawn by
+    /// [`Raster::draw`].
+    pub fn fill(&self) -> Quantized {
+        self.fill
+    }
+
+    /// The glyph's border.
+    pub fn border(&self) -> PlacedBorder {
+        self.border
+    }
+
+    /// The border of [`PlacedBorder::Stroke`] placed in the run, `stroked`
+    /// being the glyph's outline as [`Raster::stroke_border`] strokes it.
+    /// `None` when its transform leaves the coordinate range; the glyph then
+    /// has no border, as in libass.
+    pub fn place_stroke(&self, stroked: &Shape) -> Option<Quantized> {
+        let quantized =
+            BitmapTransform::quantize(&self.stroke_matrix, stroked.cbox(), Some(self.offset))?;
+        Some(quantized.placed)
+    }
+}
+
 impl Run {
+    /// Places one glyph of the run as libass's `get_bitmap_glyph` does
+    /// (`ass_render.c:1383-1542` in 0.17.5), without drawing it: a `\kf` glyph moves the run's karaoke leftmost x,
+    /// its transform is quantised against the run's sub-pixel origin (a glyph
+    /// that comes before any drawn one sets that origin), and its border is
+    /// placed against the same origin. `None` when the glyph's transform is
+    /// degenerate or out of range: nothing of it is drawn, as in libass.
+    ///
+    /// Draw its bitmaps, then [`add`](Run::add) them before placing the next
+    /// glyph, which sets the run's origin again if this one draws nothing.
+    pub fn place(&mut self, request: &GlyphRequest<'_>) -> Option<GlyphPlacement> {
+        let GlyphRequest {
+            shape,
+            placement,
+            frame,
+            effects,
+            karaoke,
+        } = request;
+        let transform = GlyphTransform::new(placement, frame);
+        if *karaoke {
+            self.leftmost_x =
+                shape.outlines()[0].min_transformed_x(transform.matrix(), self.leftmost_x);
+        }
+        let starts = self.drawn == 0;
+        let continued = (!starts).then_some(self.offset);
+        let quantized = BitmapTransform::quantize(transform.matrix(), shape.cbox(), continued)?;
+        if starts {
+            self.offset = quantized.remainder;
+        }
+        let mut out = GlyphPlacement {
+            fill: quantized.placed,
+            border: PlacedBorder::None,
+            stroke_matrix: Matrix::IDENTITY,
+            offset: self.offset,
+        };
+        match effects.border {
+            Border::None => {}
+            Border::OpaqueBox { size, shown } => {
+                if shown || effects.casts_shadow() {
+                    let m = transform.opaque_box(placement, frame, size);
+                    let q = BitmapTransform::quantize(&m, &UNIT_BOX, Some(self.offset));
+                    out.border = PlacedBorder::Box(q.map(|q| q.placed));
+                }
+            }
+            Border::Outline { size, .. } => {
+                let stroke = BorderStroke::new(
+                    &quantized.centred,
+                    transform.matrix(),
+                    shape.cbox(),
+                    placement,
+                    frame,
+                    size,
+                );
+                if let Some((stroke, matrix)) = stroke {
+                    out.border = if stroke.is_empty() {
+                        PlacedBorder::Fill
+                    } else {
+                        out.stroke_matrix = matrix;
+                        PlacedBorder::Stroke(stroke)
+                    };
+                }
+            }
+        }
+        Some(out)
+    }
+
+    /// Adds a placed glyph's drawn bitmaps to the run: its fill, and its
+    /// border (the fill's own bitmap for [`PlacedBorder::Fill`]). `None`
+    /// when neither draws anything: libass takes a bitmap without pixels as
+    /// none (`ass_render.c:1412-1414`, `1536-1541`), and
+    /// `render_and_combine_glyphs` leaves a glyph without bitmaps out of the
+    /// run (`2548-2549`), so the next glyph sets the run's sub-pixel origin.
+    pub fn add<B>(
+        &mut self,
+        fill: Option<PlacedBitmap<B>>,
+        border: Option<PlacedBitmap<B>>,
+    ) -> Option<GlyphBitmaps<B>> {
+        if fill.is_none() && border.is_none() {
+            return None;
+        }
+        self.drawn += 1;
+        Some(GlyphBitmaps { fill, border })
+    }
+
     /// The least x, 26.6, of the transformed outlines of the run's karaoke
     /// glyphs; [`OUTLINE_MAX`] without any.
     pub fn leftmost_x(&self) -> i32 {
@@ -275,135 +420,188 @@ impl Run {
     }
 }
 
-/// A glyph's border bitmap.
-#[derive(Debug)]
-enum BorderBitmap {
-    /// No border: none was requested, or it could not be drawn.
-    None,
-    /// The border rounded to nothing: the glyph bitmap stands in for it.
-    Glyph,
-    /// A bitmap of its own: the stroked outline or the opaque box.
-    Own(Bitmap),
+/// The control box of [`Shape::unit_box`], which every opaque box is drawn
+/// from.
+const UNIT_BOX: Rect = Rect::new(0, 0, 64, 64);
+
+/// A bitmap placed in the frame: its [`position`](Bitmap::position) counts
+/// from `origin`. The bitmap is held through `B`, a shared handle: an `Arc`,
+/// or a renderer's handle to the bitmap it keeps.
+#[derive(Clone, Debug)]
+pub struct PlacedBitmap<B = Arc<Bitmap>> {
+    /// The bitmap.
+    pub bitmap: B,
+    /// The whole-pixel frame position the bitmap's position counts from.
+    pub origin: Vector,
 }
 
-/// The bitmaps [`Raster::render`] draws for a glyph, placed against one
-/// origin.
-#[derive(Debug)]
-pub struct GlyphBitmaps {
-    glyph: Option<Bitmap>,
-    border: BorderBitmap,
-    origin: Vector,
-    key: GlyphKey,
+/// The bitmaps of one glyph of a run: a fill, a border, or both.
+#[derive(Clone, Debug)]
+pub struct GlyphBitmaps<B = Arc<Bitmap>> {
+    fill: Option<PlacedBitmap<B>>,
+    border: Option<PlacedBitmap<B>>,
 }
 
-impl GlyphBitmaps {
-    /// The glyph's fill, `None` when it has nothing to draw or leaves the
-    /// coordinate range.
-    pub fn glyph(&self) -> Option<&Bitmap> {
-        self.glyph.as_ref()
+impl<B> GlyphBitmaps<B> {
+    /// The glyph's fill, `None` when it draws nothing.
+    pub fn fill(&self) -> Option<&PlacedBitmap<B>> {
+        self.fill.as_ref()
     }
 
-    /// The border: the stroked outline or the opaque box, or the glyph's own
+    /// The border: the stroked outline or the opaque box, or the fill's
     /// bitmap when the border rounds to nothing. `None` without a border.
-    pub fn border(&self) -> Option<&Bitmap> {
-        match &self.border {
-            BorderBitmap::None => None,
-            BorderBitmap::Glyph => self.glyph.as_ref(),
-            BorderBitmap::Own(bitmap) => Some(bitmap),
+    pub fn border(&self) -> Option<&PlacedBitmap<B>> {
+        self.border.as_ref()
+    }
+
+    /// The glyph's place in its run: the fill's origin, or the border's
+    /// without a fill (libass's `pos`).
+    pub fn origin(&self) -> Vector {
+        match (&self.fill, &self.border) {
+            (Some(placed), _) | (None, Some(placed)) => placed.origin,
+            (None, None) => Vector::default(),
         }
     }
 
-    /// The whole-pixel frame position both bitmaps'
-    /// [`position`](Bitmap::position)s count from: the glyph's quantised
-    /// position, or the border's when only the border is drawn.
-    pub fn origin(&self) -> Vector {
-        self.origin
-    }
-
-    /// What identifies these bitmaps besides the shape they are drawn from;
-    /// see [`GlyphKey`].
-    pub fn key(&self) -> GlyphKey {
-        self.key
+    /// The border's origin, or the fill's without a border (libass's
+    /// `pos_o`).
+    pub fn border_origin(&self) -> Vector {
+        self.border
+            .as_ref()
+            .map_or_else(|| self.origin(), |b| b.origin)
     }
 }
 
 #[cfg(test)]
 impl GlyphBitmaps {
     /// A glyph bitmap without a border, at `origin`.
-    pub(crate) fn of_glyph(glyph: Bitmap, origin: Vector) -> Self {
+    pub(crate) fn of_fill(bitmap: Bitmap, origin: Vector) -> Self {
         Self {
-            glyph: Some(glyph),
-            border: BorderBitmap::None,
-            origin,
-            key: GlyphKey {
-                glyph: None,
-                border: None,
-                border_offset: Vector::default(),
-            },
+            fill: Some(PlacedBitmap {
+                bitmap: Arc::new(bitmap),
+                origin,
+            }),
+            border: None,
         }
     }
 }
 
-/// What identifies a glyph's bitmaps besides its shape: the quantised
-/// transforms they were drawn with, the border's stroking scale and widths or
-/// opaque box, and where the border sits against the glyph. Bitmaps of the
-/// same shape with equal keys are equal. A renderer keys its glyph and run
-/// caches, as libass keys its bitmap and composite caches, with
-/// [`GlyphKey::with_shape`], which leaves the shape out where the bitmaps do
-/// not depend on it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct GlyphKey {
-    /// The glyph bitmap's transform, if it is drawn.
-    glyph: Option<BitmapTransform>,
-    /// The border bitmap, if it is drawn.
-    border: Option<BorderId>,
-    /// The border bitmap's own origin from the glyph's, in whole pixels.
-    border_offset: Vector,
+/// Where [`Raster::render_with`] gets a placed glyph's bitmaps: drawn on the
+/// spot, as [`Raster::render`] draws them, or kept by a renderer between
+/// frames. Each is `None` when it draws nothing.
+pub trait GlyphSource {
+    /// The handle the bitmaps are held through; a border that rounds to
+    /// nothing holds the fill's again.
+    type Bitmap: Clone + Deref<Target = Bitmap>;
+
+    /// The fill: the glyph's `shape` under `at`.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::draw`], and the source's own.
+    fn fill(
+        &mut self,
+        raster: &mut Raster,
+        shape: &Shape,
+        at: Quantized,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap<Self::Bitmap>>>;
+
+    /// The opaque box: [`Shape::unit_box`] under `at`
+    /// ([`Raster::draw_box`]), or nothing when `at` is `None`, the box's
+    /// transform being out of range. libass fetches the unit square before
+    /// it places the box, so it is asked for either way.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::draw`], and the source's own.
+    fn opaque_box(
+        &mut self,
+        raster: &mut Raster,
+        at: Option<Quantized>,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap<Self::Bitmap>>>;
+
+    /// The border: `shape` stroked by `stroke` ([`Raster::stroke_border`]),
+    /// placed by `placement` once stroked ([`GlyphPlacement::place_stroke`]).
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::stroke_border`] and [`Raster::draw`], and the
+    /// source's own.
+    fn border(
+        &mut self,
+        raster: &mut Raster,
+        shape: &Shape,
+        stroke: BorderStroke,
+        placement: &GlyphPlacement,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap<Self::Bitmap>>>;
 }
 
-impl GlyphKey {
-    /// This key with `shape`, the caller's identity of the shape the bitmaps
-    /// were drawn from, kept only where they depend on it: a fill that draws
-    /// something, or a stroked border. An opaque box does not, and a glyph
-    /// whose fill draws nothing has none, so such glyphs of different shapes
-    /// have equal keys under the same transform, as libass's bitmap cache
-    /// keys the box by its own outline and its composite cache takes an empty
-    /// fill as none.
-    pub fn with_shape<S>(self, shape: S) -> ShapedKey<S> {
-        let stroked = matches!(self.border, Some(BorderId::Stroke(..)));
-        ShapedKey {
-            shape: (self.glyph.is_some() || stroked).then_some(shape),
-            key: self,
-        }
+/// The bitmaps of a glyph drawn as they are asked for.
+struct Drawing;
+
+impl Drawing {
+    fn placed(bitmap: Option<Bitmap>, at: Quantized) -> Option<PlacedBitmap> {
+        bitmap.map(|bitmap| PlacedBitmap {
+            bitmap: Arc::new(bitmap),
+            origin: at.position,
+        })
     }
 }
 
-/// A [`GlyphKey`] with the identity of the shape its bitmaps were drawn
-/// from where they depend on it: equal exactly when libass's bitmap cache
-/// gives both glyphs the same fill and border bitmaps. See
-/// [`GlyphKey::with_shape`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ShapedKey<S> {
-    shape: Option<S>,
-    key: GlyphKey,
-}
+impl GlyphSource for Drawing {
+    type Bitmap = Arc<Bitmap>;
 
-/// What a border bitmap is drawn from.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum BorderId {
-    /// The glyph bitmap stands in for it.
-    Glyph,
-    /// The glyph's first outline stroked under `BorderKey`.
-    Stroke(BorderKey, BitmapTransform),
-    /// The opaque box.
-    Box(BitmapTransform),
+    fn fill(
+        &mut self,
+        raster: &mut Raster,
+        shape: &Shape,
+        at: Quantized,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap>> {
+        Ok(Self::placed(raster.draw(shape, &at.transform, work)?, at))
+    }
+
+    fn opaque_box(
+        &mut self,
+        raster: &mut Raster,
+        at: Option<Quantized>,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap>> {
+        let Some(at) = at else {
+            return Ok(None);
+        };
+        Ok(Self::placed(raster.draw_box(&at.transform, work)?, at))
+    }
+
+    fn border(
+        &mut self,
+        raster: &mut Raster,
+        shape: &Shape,
+        stroke: BorderStroke,
+        placement: &GlyphPlacement,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap>> {
+        let Some(stroked) = raster.stroke_border(shape, &stroke, work)? else {
+            return Ok(None);
+        };
+        let Some(at) = placement.place_stroke(&stroked) else {
+            return Ok(None);
+        };
+        Ok(Self::placed(
+            raster.draw(&stroked, &at.transform, work)?,
+            at,
+        ))
+    }
 }
 
 impl Raster {
-    /// Draws one glyph of `run` as libass does: quantises its transform against
-    /// the run (the run's first drawn glyph sets the run's sub-pixel origin),
-    /// rasterises the glyph, then its border outline or opaque box placed
-    /// against the same origin. A glyph or border that leaves the coordinate
+    /// Draws one glyph of `run` as libass does: places it
+    /// ([`Run::place`]), draws its fill and its border outline or opaque box
+    /// ([`Raster::draw`], [`Raster::stroke_border`]), and adds them to the
+    /// run ([`Run::add`]). A glyph or border that leaves the coordinate
     /// range under its transform is not drawn, as in libass; `None` when
     /// nothing is drawn, and the glyph is then no part of the run.
     ///
@@ -416,51 +614,41 @@ impl Raster {
         run: &mut Run,
         work: &mut WorkBudget,
     ) -> Result<Option<GlyphBitmaps>> {
-        let GlyphRequest {
-            shape,
-            placement,
-            frame,
-            karaoke,
-            ..
-        } = request;
-        let transform = GlyphTransform::new(placement, frame);
-        if *karaoke {
-            run.leftmost_x =
-                shape.outlines()[0].min_transformed_x(transform.matrix(), run.leftmost_x);
-        }
-        let starts = run.drawn == 0;
-        let continued = (!starts).then_some(run.offset);
-        let Some(quantized) =
-            BitmapTransform::quantize(transform.matrix(), shape.cbox(), continued)
-        else {
-            return Ok(None);
-        };
-        if starts {
-            run.offset = quantized.remainder;
-        }
-        let glyph = self.bitmap(shape, &quantized.key, work)?;
-        let mut out = GlyphBitmaps {
-            key: GlyphKey {
-                glyph: glyph.is_some().then_some(quantized.key),
-                border: None,
-                border_offset: Vector::default(),
-            },
-            glyph,
-            border: BorderBitmap::None,
-            origin: quantized.position,
-        };
-        self.render_border(request, &transform, &quantized.centred, run, &mut out, work)?;
-        if out.glyph.is_none() && out.border().is_none() {
-            return Ok(None);
-        }
-        run.drawn += 1;
-        Ok(Some(out))
+        self.render_with(request, run, &mut Drawing, work)
     }
 
-    /// Draws `shape` under `matrix` (outline units to frame 26.6) on its own,
-    /// quantised without a run, as libass draws the drawing of a vector clip:
-    /// its [`glyph`](GlyphBitmaps::glyph) bitmap only. `None` when the
-    /// transform is degenerate or out of range, or nothing is drawn.
+    /// [`Raster::render`] with the bitmaps from `source`: a renderer that
+    /// keeps the bitmaps it draws hands out those it has.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::render`] and of `source`.
+    pub fn render_with<S: GlyphSource>(
+        &mut self,
+        request: &GlyphRequest<'_>,
+        run: &mut Run,
+        source: &mut S,
+        work: &mut WorkBudget,
+    ) -> Result<Option<GlyphBitmaps<S::Bitmap>>> {
+        let Some(placement) = run.place(request) else {
+            return Ok(None);
+        };
+        let shape = request.shape;
+        let fill = source.fill(self, shape, placement.fill(), work)?;
+        let border = match placement.border() {
+            PlacedBorder::None => None,
+            PlacedBorder::Fill => fill.clone(),
+            PlacedBorder::Box(at) => source.opaque_box(self, at, work)?,
+            PlacedBorder::Stroke(stroke) => source.border(self, shape, stroke, &placement, work)?,
+        };
+        Ok(run.add(fill, border))
+    }
+
+    /// The bitmap of `shape` under the quantised `transform`, placed at the
+    /// transform's position: a glyph's fill, its stroked border, or a
+    /// drawing quantised on its own. An outline that leaves the coordinate
+    /// range under the transform is dropped, as libass drops it. `None` when
+    /// nothing is drawn.
     ///
     /// # Errors
     ///
@@ -468,107 +656,11 @@ impl Raster {
     pub fn draw(
         &mut self,
         shape: &Shape,
-        matrix: &Matrix,
-        work: &mut WorkBudget,
-    ) -> Result<Option<GlyphBitmaps>> {
-        let Some(quantized) = BitmapTransform::quantize(matrix, shape.cbox(), None) else {
-            return Ok(None);
-        };
-        let Some(glyph) = self.bitmap(shape, &quantized.key, work)? else {
-            return Ok(None);
-        };
-        Ok(Some(GlyphBitmaps {
-            glyph: Some(glyph),
-            border: BorderBitmap::None,
-            origin: quantized.position,
-            key: GlyphKey {
-                glyph: Some(quantized.key),
-                border: None,
-                border_offset: Vector::default(),
-            },
-        }))
-    }
-
-    /// The border part of [`Raster::render`]: the border bitmap, placed
-    /// against the glyph's origin.
-    fn render_border(
-        &mut self,
-        request: &GlyphRequest<'_>,
-        transform: &GlyphTransform,
-        centred: &Matrix,
-        run: &Run,
-        out: &mut GlyphBitmaps,
-        work: &mut WorkBudget,
-    ) -> Result<()> {
-        let (placement, frame) = (&request.placement, &request.frame);
-        let (shape, m, stroke) = match request.effects.border {
-            Border::None => return Ok(()),
-            Border::OpaqueBox { size, .. } => {
-                let flags = FilterFlags::new(request.effects);
-                if !flags.border && !flags.shadow {
-                    return Ok(());
-                }
-                let m = transform.opaque_box(placement, frame, size);
-                (Shape::unit_box(&self.budget)?, m, None)
-            }
-            Border::Outline { size, .. } => {
-                let glyph = request.shape;
-                let Some((key, m)) = BorderKey::new(
-                    centred,
-                    transform.matrix(),
-                    glyph.cbox(),
-                    placement,
-                    frame,
-                    size,
-                ) else {
-                    return Ok(());
-                };
-                if key.size == Vector::default() {
-                    out.border = BorderBitmap::Glyph;
-                    out.key.border = out.glyph.is_some().then_some(BorderId::Glyph);
-                    return Ok(());
-                }
-                let Some(stroked) = self.stroke_border(glyph, &key, work)? else {
-                    return Ok(());
-                };
-                (stroked, m, Some(key))
-            }
-        };
-        let Some(quantized) = BitmapTransform::quantize(&m, shape.cbox(), Some(run.offset)) else {
-            return Ok(());
-        };
-        let Some(mut bitmap) = self.bitmap(&shape, &quantized.key, work)? else {
-            return Ok(());
-        };
-        if out.glyph.is_none() {
-            out.origin = quantized.position;
-        }
-        let offset = Vector::new(
-            quantized.position.x.wrapping_sub(out.origin.x),
-            quantized.position.y.wrapping_sub(out.origin.y),
-        );
-        bitmap.position.x = bitmap.position.x.wrapping_add(offset.x);
-        bitmap.position.y = bitmap.position.y.wrapping_add(offset.y);
-        out.border = BorderBitmap::Own(bitmap);
-        out.key.border = Some(match stroke {
-            Some(key) => BorderId::Stroke(key, quantized.key),
-            None => BorderId::Box(quantized.key),
-        });
-        out.key.border_offset = offset;
-        Ok(())
-    }
-
-    /// The bitmap of `shape` under the quantised transform `key`. An outline
-    /// that leaves the coordinate range under the transform is dropped, as
-    /// libass drops it.
-    fn bitmap(
-        &mut self,
-        shape: &Shape,
-        key: &BitmapTransform,
+        transform: &BitmapTransform,
         work: &mut WorkBudget,
     ) -> Result<Option<Bitmap>> {
-        let m = key.restore(shape.cbox());
-        let projection = key.projection();
+        let m = transform.restore(shape.cbox());
+        let projection = transform.projection();
         self.transformed.rebuild(|outputs| {
             for (source, out) in shape.outlines().iter().zip(outputs) {
                 match source.transform_into(&m, projection, out) {
@@ -582,31 +674,58 @@ impl Raster {
             .rasterize(&self.transformed, &self.limits, work)
     }
 
-    /// The border of `glyph` for `key`: its first outline scaled and stroked.
-    /// `None` when it cannot be stroked within the coordinate range.
-    fn stroke_border(
+    /// The bitmap of an opaque box: [`Shape::unit_box`] under the quantised
+    /// `transform` of [`PlacedBorder::Box`], drawn from the one unit square
+    /// the raster keeps; see [`Raster::draw`].
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::draw`].
+    pub fn draw_box(
+        &mut self,
+        transform: &BitmapTransform,
+        work: &mut WorkBudget,
+    ) -> Result<Option<Bitmap>> {
+        let unit_box = match self.unit_box.take() {
+            Some(unit_box) => unit_box,
+            None => Shape::unit_box(&self.budget)?,
+        };
+        let drawn = self.draw(&unit_box, transform, work);
+        self.unit_box = Some(unit_box);
+        drawn
+    }
+
+    /// The border of `glyph` for [`PlacedBorder::Stroke`]: its first outline
+    /// scaled and stroked, as libass builds a border outline. `None` when it
+    /// cannot be stroked within the coordinate range; the glyph then has no
+    /// border.
+    ///
+    /// # Errors
+    ///
+    /// `Policy` when `work` or the limits run out, and the budget's errors.
+    pub fn stroke_border(
         &mut self,
         glyph: &Shape,
-        key: &BorderKey,
+        stroke: &BorderStroke,
         work: &mut WorkBudget,
     ) -> Result<Option<Shape>> {
         let source = &glyph.outlines()[0];
         let mut border = Shape::new(&self.budget);
-        if (key.size.x == 0 && key.size.y == 0) || source.is_empty() {
+        if stroke.is_empty() || source.is_empty() {
             return Ok(Some(border));
         }
         let pen = Pen {
             width: Vector::new(
-                key.size.x.wrapping_mul(STROKER_PRECISION),
-                key.size.y.wrapping_mul(STROKER_PRECISION),
+                stroke.size.x.wrapping_mul(STROKER_PRECISION),
+                stroke.size.y.wrapping_mul(STROKER_PRECISION),
             ),
             tolerance: STROKER_PRECISION,
         };
         let scaled = &mut self.transformed;
         let points = self.limits.outline_points;
         let stroked = scaled
-            .rebuild(|[first, _]| source.scale_pow2_into(first, key.scale_order))
-            .and_then(|()| stroke(&scaled.outlines()[0], &pen, points, &mut border, work));
+            .rebuild(|[first, _]| source.scale_pow2_into(first, stroke.scale_order))
+            .and_then(|()| stroke_outline(&scaled.outlines()[0], &pen, points, &mut border, work));
         match stroked {
             Ok(()) => Ok(Some(border)),
             Err(Error::Invalid(_)) => Ok(None),
@@ -619,11 +738,48 @@ impl Raster {
 mod tests {
     use triergon_core::{Budget, WorkBudget};
 
-    use super::{FrameScale, GlyphRequest, Placement, Run};
+    use super::{FrameScale, GlyphRequest, PlacedBorder, Placement, Run};
     use crate::{Border, Effects, Limits, Outline, Raster, Shape, Vector};
 
-    /// The key of `shape` drawn alone with an opaque box at a fixed place.
-    fn boxed_key(raster: &mut Raster, shape: &Shape, shape_id: u32) -> super::ShapedKey<u32> {
+    fn placement(x: i32) -> Placement {
+        Placement {
+            rotation: [0.0; 3],
+            shear: [0.0; 2],
+            scale: [1.0, 1.0],
+            shift: Vector::new(0, 0),
+            ascender: 640,
+            descender: 128,
+            advance: 640,
+            scale_fix: 1.0,
+            position: Vector::new(x, 50 * 64),
+            outline_scale: [1.0, 1.0],
+            outline_offset: [0.0, 0.0],
+        }
+    }
+
+    const FRAME: FrameScale = FrameScale {
+        blur: [1.0, 1.0],
+        border: [1.0, 1.0],
+        pixel_aspect: 1.0,
+    };
+
+    fn square(budget: &Budget) -> Shape {
+        let mut square = Outline::new(budget);
+        square
+            .push_rect(Vector::new(0, -640), Vector::new(640, 0))
+            .unwrap();
+        Shape::from_outlines(square, Outline::new(budget))
+    }
+
+    #[test]
+    fn opaque_boxes_are_placed_by_the_unit_box() {
+        let budget = Budget::new(1 << 20).unwrap();
+        assert_eq!(*Shape::unit_box(&budget).unwrap().cbox(), super::UNIT_BOX);
+    }
+
+    #[test]
+    fn an_opaque_box_is_placed_without_the_shape() {
+        let budget = Budget::new(16 << 20).unwrap();
         let effects = Effects {
             border: Border::OpaqueBox {
                 size: [2.0, 2.0],
@@ -631,61 +787,42 @@ mod tests {
             },
             ..Effects::default()
         };
-        let request = GlyphRequest {
-            shape,
-            placement: Placement {
-                rotation: [0.0; 3],
-                shear: [0.0; 2],
-                scale: [1.0, 1.0],
-                shift: Vector::new(0, 0),
-                ascender: 640,
-                descender: 128,
-                advance: 640,
-                scale_fix: 1.0,
-                position: Vector::new(100 * 64, 50 * 64),
-                outline_scale: [1.0, 1.0],
-                outline_offset: [0.0, 0.0],
-            },
-            frame: FrameScale {
-                blur: [1.0, 1.0],
-                border: [1.0, 1.0],
-                pixel_aspect: 1.0,
-            },
-            effects: &effects,
-            karaoke: false,
+        let border = |shape: &Shape| {
+            let request = GlyphRequest {
+                shape,
+                placement: placement(100 * 64),
+                frame: FRAME,
+                effects: &effects,
+                karaoke: false,
+            };
+            Run::default().place(&request).unwrap().border()
         };
-        let mut work = WorkBudget::new(1 << 24);
-        let drawn = raster
-            .render(&request, &mut Run::default(), &mut work)
-            .unwrap()
-            .unwrap();
-        assert!(drawn.border().is_some());
-        drawn.key().with_shape(shape_id)
+        let boxed = border(&Shape::new(&budget));
+        assert!(matches!(boxed, PlacedBorder::Box(Some(_))));
+        assert_eq!(boxed, border(&square(&budget)));
     }
 
     #[test]
-    fn an_opaque_box_is_keyed_without_the_shape_a_fill_with_it() {
+    fn a_glyph_that_draws_nothing_leaves_the_run_to_the_next() {
         let budget = Budget::new(16 << 20).unwrap();
         let mut raster = Raster::new(&budget, Limits::default());
-        let [empty, other_empty] = [Shape::new(&budget), Shape::new(&budget)];
-        // Glyphs that draw nothing: only their boxes, which are equal.
-        assert_eq!(
-            boxed_key(&mut raster, &empty, 1),
-            boxed_key(&mut raster, &other_empty, 2)
-        );
-        let mut square = Outline::new(&budget);
-        square
-            .push_rect(Vector::new(0, -640), Vector::new(640, 0))
+        let mut work = WorkBudget::new(1 << 24);
+        let effects = Effects::default();
+        let (empty, square) = (Shape::new(&budget), square(&budget));
+        let request = |shape, x| GlyphRequest {
+            shape,
+            placement: placement(x),
+            frame: FRAME,
+            effects: &effects,
+            karaoke: false,
+        };
+        let mut run = Run::default();
+        let nothing = raster.render(&request(&empty, 100 * 64 + 13), &mut run, &mut work);
+        assert!(nothing.unwrap().is_none());
+        let after_nothing = run.place(&request(&square, 200 * 64 + 5)).unwrap();
+        let first = Run::default()
+            .place(&request(&square, 200 * 64 + 5))
             .unwrap();
-        let square = Shape::from_outlines(square, Outline::new(&budget));
-        // A drawn fill is the shape's own.
-        assert_ne!(
-            boxed_key(&mut raster, &square, 3),
-            boxed_key(&mut raster, &square, 4)
-        );
-        assert_eq!(
-            boxed_key(&mut raster, &square, 3),
-            boxed_key(&mut raster, &square, 3)
-        );
+        assert_eq!(after_nothing.fill(), first.fill());
     }
 }

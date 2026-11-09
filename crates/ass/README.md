@@ -240,13 +240,16 @@ selective style overrides), in the frame and storage size and margins of its
 - **Change detection.** `Frame::change` is what libass's `ass_detect_change`
   reports: `Change::Content` when the image count differs or an image's size,
   stride, colour or bitmap does, `Change::Positions` when only places do,
-  else `Change::None`. Bitmaps are told apart as libass's caches tell them
-  apart: an image of a run shows the same bitmap as one of the previous frame
-  when the run's composite key (its effects key, and each glyph's bitmap
-  key, with its outline only where the bitmaps depend on it, and origin in
-  the run) and the image's part and window are equal, so glyphs that draw
-  nothing but an opaque box compare equal whatever their outlines; pixels a
-  vector clip or a `BorderStyle` 4 box makes are always new.
+  else `Change::None`. Bitmaps are told apart as libass tells them apart, by
+  the cached composite they show: an image shows the same bitmap as one of
+  the previous frame when it is the same part and window of the same
+  composite. A run finds the composite of an equal key (its effects key, and
+  each glyph's fill and border bitmap keys and origins in the run), and a
+  glyph the bitmap of an equal key (its outline and quantised transform), so
+  glyphs that draw nothing but an opaque box find the same composite
+  whatever their outlines. Whatever the previous frame shows survives the
+  caches' cut, so eviction changes no change value; pixels a vector clip or
+  a `BorderStyle` 4 box makes are always new.
   A frame of a script without events reports new content and leaves the
   previous frame in place for the next comparison, as libass does.
 
@@ -259,10 +262,24 @@ level, its hinting modes, selective style overrides and track features.
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
 default is libass's (10,000 outlines, 128 MiB of glyph bitmaps, 64 MiB of
 composites), and `CacheLimits::new(glyphs, megabytes)` gives what
-`ass_set_cache_limits` sets. The outline count bounds the outline cache:
-glyph and drawing outlines are kept between frames and cut to it at each
-frame as libass cuts its outline cache, least recently used first, never one
-the previous frame's images were drawn from. Requested fonts and the faces
+`ass_set_cache_limits` sets. Outlines (glyphs, drawings, stroked
+borders and the unit square of opaque boxes), glyph bitmaps (with a
+bitmap that draws nothing) and composited runs are kept between frames in one kind of cache, bounded by
+the outline count and the two byte limits. When a frame
+starts the composites, then the bitmaps, then the outlines are cut as libass
+cuts its caches (`ass_cache_cut`): least recently used first, until what is
+kept fits, never one the previous frame's images or another entry's key
+hold, which leaves the order and goes the moment nothing holds it; a run
+holds its glyphs' bitmaps while it is drawn, and a vector clip its bitmap. A cache is
+also cut the same way when an insertion takes it past its limit and when
+the renderer lets go of a run or an event, so it holds at most its limit
+beyond what is in use; libass keeps a frame's entries until the next frame,
+and nothing it would show differs. Sizes are counted as libass counts them:
+an outline as 1; a bitmap's pixels, libass's records in the target's words
+and the points and segments of its outline; a composite's pixels and
+records. A composite is keyed by its glyphs' bitmap keys where libass holds
+the bitmaps, which finds the same composites and lets the bitmaps go.
+Requested fonts and the faces
 they gathered are kept up to `CacheLimits::fonts` font descriptions (10,000
 by default), cut at each frame the same way, never one the previous frame
 asked for; libass keeps them all, so a font asked for again after it left
@@ -270,9 +287,9 @@ starts over from its first face. A caller that wants libass's behaviour sets
 `CacheLimits::fonts` to `usize::MAX`. Shaping plans are kept up to 256. All of it
 is charged to the renderer's budget, family names and drawing texts by
 length, and looked up by the names and texts the script holds, without
-copying them. The byte limits bound nothing: there is no bitmap or composite
-cache, so glyph bitmaps and composites are drawn again each frame, with the
-same images.
+copying them. Every bitmap or composite lookup charges `Settings::work` a
+unit per bitmap and per glyph of a composite key; only a miss charges the
+drawing besides.
 
 ## Arithmetic
 
@@ -371,14 +388,15 @@ panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
-- `ass-render` renders the 25 scripts and 3 packet streams of
+- `ass-render` renders the 26 scripts and 3 packet streams of
   `harness/fixtures/ass-render` as a player configures libass (attached fonts,
   a default family and font file, no system font provider, no hinting) at
   1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB): 54/56 pass. The box behind a `BorderStyle` 4 event is
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 56/58 pass. The
+  box behind a `BorderStyle` 4 event is
   compared without its kind, since libass leaves its type uninitialised. The
   two open cases are the fixture with an `@` font.
 - `cargo xtask ass equivalence --base REV` renders the `ass-render`
@@ -386,8 +404,11 @@ panics.
   settings and style overrides, and scripts generated from a seed, with the
   renderer of REV and of the working tree (`examples/equivalence.rs`, built
   with the `work-probe` feature), and requires the same change, images,
-  error and work for every frame; it prints the peak budget of each
-  workload for both.
+  error and work for every frame (`--work any` leaves the work out, for a
+  change such as a cache that does less of it, and counts apart a case whose
+  frames part where one side runs out of work; `--cache` gives every case
+  other cache limits); it prints the peak budget of each workload for
+  both.
 
 The comparison establishes agreement with libass on that corpus, not conformance
 with any specification of the format.

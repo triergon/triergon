@@ -49,14 +49,20 @@ pub struct FrameMargins {
 /// How much a [`Renderer`](super::Renderer) keeps between frames: outlines
 /// and font descriptions by count, glyph bitmaps and composited runs by
 /// bytes. [`CacheLimits::LIBASS`], the default, is libass's;
-/// [`CacheLimits::new`] gives what `ass_set_cache_limits` sets.
+/// [`CacheLimits::new`] gives what `ass_set_cache_limits` sets. The caches
+/// are cut to them as libass cuts its caches, never what the last frame's
+/// images were drawn from, which stays until nothing holds it, and hold at
+/// most them beyond what a frame is using.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CacheLimits {
-    /// Glyph and drawing outlines kept, at most.
+    /// Outlines kept, at most: glyphs, drawings, stroked borders and the
+    /// unit square of opaque boxes.
     pub outlines: usize,
-    /// Bytes of glyph bitmaps kept, at most.
+    /// Bytes of glyph bitmaps kept, at most, counted as libass counts them:
+    /// pixels, records and the points of the outline drawn.
     pub bitmap_bytes: usize,
-    /// Bytes of composited runs kept, at most.
+    /// Bytes of composited runs kept, at most, counted as libass counts
+    /// them: pixels and records.
     pub composite_bytes: usize,
     /// Font descriptions (family, weight, slant, orientation) kept with the
     /// fonts made for them, at most. libass keeps them all; past this many,
@@ -140,7 +146,12 @@ pub struct Settings {
     /// Work units bounding one frame as a whole, per frame and not per
     /// event: every shown event's evaluation, font selection and fallback,
     /// shaping, outlines, layout and drawing (glyph bitmaps, composites,
-    /// vector clips), and collision handling. Running out is
+    /// vector clips), and collision handling. Every lookup of a glyph bitmap
+    /// or composite in the renderer's caches charges a unit per bitmap, and
+    /// per glyph of a composite; one that finds it charges nothing more, so a
+    /// frame drawn again from the caches spends little, and one that does not
+    /// charges the drawing besides, so a frame drawn anew near the bound may
+    /// now be refused. Running out is
     /// `Error::Policy`, where libass would go on drawing;
     /// [`Settings::DEFAULT_WORK`] by default, and a caller that wants libass's
     /// unbounded behaviour raises it.

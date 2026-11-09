@@ -69,12 +69,22 @@ assert!(composite.fill.is_some() && composite.border.is_some() && composite.shad
 ```
 
 A bitmap's `position` is its first pixel relative to the origin it is placed
-against: a glyph's fill and border count from `GlyphBitmaps::origin`, the
-glyph's place in the frame, and a run's composite from `Composite::origin`,
-the least origin of its glyphs. A renderer keys its caches with
-`GlyphBitmaps::key`, joined with its own identity of the glyph's shape by
-`GlyphKey::with_shape` where the bitmaps depend on the shape, and with
-`Effects::key`: opaque values that are equal when libass's cache keys are.
+against: a glyph's fill and border each count from their `PlacedBitmap::origin`,
+and a run's composite from `Composite::origin`, the least origin of its glyphs.
+
+`Raster::render` draws a glyph in one call. A renderer that keeps the bitmaps it
+draws, as libass's caches do, renders through `Raster::render_with` and a
+`GlyphSource` of its own, which hands out the fill, the opaque box and the
+border it has and draws only the others, held through a handle of its own
+(`GlyphSource::Bitmap`; `Raster::render` uses `Arc<Bitmap>`), which the run
+and `Raster::compose` hold them by. The steps are public too: `Run::place`
+quantises and places the glyph without drawing it, giving the `BitmapTransform`
+its fill and border are drawn under; `Raster::stroke_border` strokes the border
+and `Raster::draw` draws each, the opaque box from `Shape::unit_box`; and
+`Run::add` adds what was drawn to the run. A bitmap is then keyed by its shape
+and its transform, a stroked border by its glyph and its `BorderStroke`, and a
+composite by `Effects::key` and its glyphs' bitmaps and places, as libass keys
+them.
 
 ## What it matches
 
@@ -83,7 +93,7 @@ the least origin of its glyphs. A renderer keys its caches with
 | Outlines | `ass_outline.c`: conversion from font outlines, rectangles, rotation by 90°, affine and perspective transforms, the karaoke leftmost x, control boxes | `Outline`, `Matrix`, `Projection` |
 | Borders | `ass_outline_stroke`, and the stroking scale `get_bitmap_glyph` chooses | `Raster::stroke`, `Pen` |
 | Rasteriser | `ass_rasterizer.c` with 16×16 tiles (the default build, without large tiles) | `Raster::rasterize`, `Shape` |
-| Glyph bitmaps | `calc_transform_matrix`, `quantize_transform`, `restore_transform`, `get_bitmap_glyph` with its border and the opaque box of `\bord` style 3 | `Raster::render`, `GlyphRequest`, `Placement`, `FrameScale`, `Run`, `GlyphBitmaps`; `Raster::draw` for the drawing of a vector clip |
+| Glyph bitmaps | `calc_transform_matrix`, `quantize_transform`, `restore_transform`, `get_bitmap_glyph` with its border and the opaque box of `\bord` style 3 | `Raster::render`, `GlyphRequest`, `Placement`, `FrameScale`, `Run`, `GlyphPlacement`, `GlyphBitmaps`; `Quantized::standalone` and `Raster::draw` for the drawing of a vector clip |
 | Blur | `ass_blur.c` (the cascade Gaussian and its coefficient solver), the `\be` box blur, `ass_synth_blur` | `Raster::blur` |
 | Composition | the filter flags `render_and_combine_glyphs` derives, `quantize_blur`, `restore_blur`, `ass_composite_construct`, `ass_fix_outline`, `ass_shift_bitmap`, the additive blend | `Raster::compose`, `Effects`, `Border`, `Shadow`, `Composite`, `Bitmap` |
 | Clipping | `render_glyph`: `\clip` and `\iclip` rectangles and the `\kf` split; the multiply blends of vector clips | `Clip`, `ClipFrame`, `Bitmap::multiply`, `Bitmap::multiply_inverse` |

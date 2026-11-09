@@ -1,15 +1,16 @@
-//! Glyph and drawing outlines as libass's outline cache builds them
-//! (`ass_outline_construct`): a glyph loaded at its drawn size without
-//! hinting, with libass's synthetic styles and decoration lines, or a
-//! drawing parsed; with its advance and the face's ascent and descent.
+//! Outlines as libass's outline cache builds them (`ass_outline_construct`):
+//! a glyph loaded at its drawn size without hinting, with libass's
+//! synthetic styles and decoration lines, or a drawing parsed, with its
+//! advance and the face's ascent and descent; and a glyph's border
+//! stroked.
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::hash::{Hash, Hasher};
 
-use triergon_core::{Budget, BudgetVec, Error, Reservation, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_font::{Font, GlyphId, Orientation};
-use triergon_raster::{Outline, Shape, Vector, pixels_26_6};
+use triergon_raster::{BorderStroke, Outline, Raster, Shape, Vector, pixels_26_6};
 
+use super::cache::{Cache, CacheKey, Kept, Lookup};
 use super::fonts::{FontId, RequestedFont};
 use super::text::{Decorations, DrawingText};
 use crate::{Bold, Drawing, Italic, Limits, charge};
@@ -24,6 +25,44 @@ pub(super) struct OutlineValue {
     /// The ascent and descent, 26.6.
     pub asc: i32,
     pub desc: i32,
+}
+
+/// An outline as libass's caches identify it: by the value, which a key
+/// holds while it is kept, as libass's keys hold theirs.
+#[derive(Clone, Debug)]
+pub(super) struct OutlineId(pub(super) Kept<OutlineValue>);
+
+impl PartialEq for OutlineId {
+    fn eq(&self, other: &Self) -> bool {
+        Kept::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for OutlineId {}
+
+impl Hash for OutlineId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Kept::as_ptr(&self.0).hash(state);
+    }
+}
+
+/// A border outline (libass's `BorderHashKey`): a glyph's outline stroked.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct BorderKey {
+    glyph: OutlineId,
+    stroke: BorderStroke,
+}
+
+impl OutlineValue {
+    /// A shape that is not laid out: a border or the unit square.
+    fn of_shape(shape: Shape) -> Self {
+        Self {
+            shape,
+            advance: 0,
+            asc: 0,
+            desc: 0,
+        }
+    }
 }
 
 /// A glyph outline: a glyph of a face of a requested font at a size, with
@@ -44,33 +83,53 @@ pub(super) struct GlyphKey {
 /// the face and loading the glyph.
 const OUTLINE_UNITS: usize = 64;
 
-/// Bytes charged per entry beyond the outline's own storage and a drawing's
-/// text, which is charged by length: the map slot, key and value header.
-const ENTRY_BYTES: usize = 192;
-
-/// An outline kept, `None` for one that cannot be built, and when it was
-/// last used.
+/// An outline's key in the cache (libass's `OutlineHashKey`).
 #[derive(Debug)]
-struct Entry {
-    value: Option<Arc<OutlineValue>>,
-    used: u64,
+enum OutlineKey {
+    Glyph(GlyphKey),
+    /// A drawing by its text.
+    Drawing(BudgetVec<u8>),
+    Border(BorderKey),
+    /// The unit square opaque boxes are drawn from.
+    UnitBox,
 }
 
-/// Outlines built so far, cut to the glyph limit of the renderer's
-/// [`CacheLimits`](super::CacheLimits) at each frame as libass cuts its
-/// outline cache: the least recently used that nothing else holds go first,
-/// so the outlines the last frame's images were drawn from stay. Their
-/// storage is charged to the renderer's budget.
+/// An outline's key as it is looked up, a drawing's text borrowed from the
+/// script.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum KeyRef<'a> {
+    Glyph(&'a GlyphKey),
+    Drawing(&'a [u8]),
+    Border(&'a BorderKey),
+    UnitBox,
+}
+
+impl CacheKey for OutlineKey {
+    type View<'a> = KeyRef<'a>;
+
+    fn view(&self) -> KeyRef<'_> {
+        match self {
+            Self::Glyph(glyph) => KeyRef::Glyph(glyph),
+            Self::Drawing(text) => KeyRef::Drawing(text),
+            Self::Border(border) => KeyRef::Border(border),
+            Self::UnitBox => KeyRef::UnitBox,
+        }
+    }
+
+    fn same(a: &KeyRef<'_>, b: &KeyRef<'_>) -> bool {
+        a == b
+    }
+}
+
+/// Outlines built so far: glyphs, drawings, borders and the unit square of
+/// opaque boxes, each counted as 1 as libass counts its outline entries,
+/// and cut to the outline limit of the renderer's [`CacheLimits`](super::CacheLimits) as
+/// libass cuts its outline cache (see [`Cache`]). Their storage is charged
+/// to the renderer's budget.
 #[derive(Debug)]
 pub(super) struct Outlines {
     budget: Budget,
-    glyphs: HashMap<GlyphKey, Entry>,
-    /// Drawings by their text, so a lookup borrows the text it is given.
-    drawings: HashMap<Box<[u8]>, Entry>,
-    /// The bytes of the drawings' texts.
-    text_bytes: usize,
-    clock: u64,
-    charge: Reservation,
+    cache: Cache<OutlineKey, OutlineValue>,
     scratch: triergon_font::Outline,
 }
 
@@ -78,73 +137,43 @@ impl Outlines {
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
             budget: budget.clone(),
-            glyphs: HashMap::new(),
-            drawings: HashMap::new(),
-            text_bytes: 0,
-            clock: 0,
-            charge: Reservation::empty(budget),
+            cache: Cache::new(budget),
             scratch: triergon_font::Outline::new(budget),
         }
     }
 
-    fn len(&self) -> usize {
-        self.glyphs.len() + self.drawings.len()
+    /// Cuts the cache to `limit` outlines (`ass_cache_cut`).
+    pub(super) fn cut(&mut self, limit: usize) {
+        self.cache.cut(limit);
     }
 
-    fn charge_entries(&mut self) -> Result<()> {
-        self.charge.resize_to(
-            self.len()
-                .saturating_mul(ENTRY_BYTES)
-                .saturating_add(self.text_bytes),
-        )
+    /// Cuts the cache to its limit again once the renderer has let go of
+    /// outlines (see [`Cache::cut`]).
+    pub(super) fn settle(&mut self) {
+        self.cache.settle();
     }
 
-    /// Cuts the cache to `limit` outlines, oldest first, keeping those still
-    /// held elsewhere (`ass_cache_cut`).
-    pub(super) fn trim(&mut self, limit: usize) -> Result<()> {
-        let excess = self.len().saturating_sub(limit);
-        if excess == 0 {
-            return Ok(());
+    /// The outline kept for `key`, if one is: `Ok(None)` for one that
+    /// cannot be built.
+    fn find(&mut self, key: KeyRef<'_>) -> Option<Result<Option<Kept<OutlineValue>>>> {
+        match self.cache.get(key) {
+            Lookup::Miss => None,
+            Lookup::Empty => Some(Ok(None)),
+            Lookup::Hit(found) => Some(Ok(Some(found))),
         }
-        // Every use is stamped apart, so the stamp of the `excess`th oldest
-        // free entry divides those that go from those that stay.
-        let free = |entry: &Entry| {
-            entry
-                .value
-                .as_ref()
-                .is_none_or(|v| Arc::strong_count(v) == 1)
-        };
-        let mut stamps = BudgetVec::new(&self.budget);
-        stamps.try_reserve_exact(self.len())?;
-        for entry in self.glyphs.values().chain(self.drawings.values()) {
-            if free(entry) {
-                stamps.try_push(entry.used).map_err(|e| e.error)?;
-            }
-        }
-        if stamps.is_empty() {
-            return Ok(());
-        }
-        stamps.as_mut_slice().sort_unstable();
-        let oldest = stamps.as_slice()[excess.min(stamps.len()) - 1];
-        let stays = |entry: &Entry| entry.used > oldest || !free(entry);
-        self.glyphs.retain(|_, entry| stays(entry));
-        let mut freed = 0;
-        self.drawings.retain(|text, entry| {
-            let keep = stays(entry);
-            if !keep {
-                freed += text.len();
-            }
-            keep
-        });
-        self.text_bytes -= freed;
-        self.charge_entries()
     }
 
-    /// Marks `entry` as used now.
-    fn touch(clock: &mut u64, entry: &mut Entry) -> Option<Arc<OutlineValue>> {
-        *clock += 1;
-        entry.used = *clock;
-        entry.value.clone()
+    /// Keeps `value` for `key`, counted as 1; `None` for an outline that
+    /// cannot be built.
+    fn keep(
+        &mut self,
+        key: OutlineKey,
+        value: Option<OutlineValue>,
+    ) -> Result<Option<Kept<OutlineValue>>> {
+        match value {
+            Some(value) => self.cache.insert(key, value, 1).map(Some),
+            None => self.cache.insert_empty(key, 1).map(|()| None),
+        }
     }
 
     /// The outline of a glyph of `font`, `None` when its face cannot load it.
@@ -153,26 +182,57 @@ impl Outlines {
         glyph: GlyphKey,
         font: &RequestedFont,
         work: &mut WorkBudget,
-    ) -> Result<Option<Arc<OutlineValue>>> {
-        if let Some(entry) = self.glyphs.get_mut(&glyph) {
-            return Ok(Self::touch(&mut self.clock, entry));
+    ) -> Result<Option<Kept<OutlineValue>>> {
+        if let Some(found) = self.find(KeyRef::Glyph(&glyph)) {
+            return found;
         }
         charge(work, OUTLINE_UNITS)?;
         let source = &font.faces()[glyph.face].font;
         let size = f64::from_bits(glyph.size);
         let value = match self.load(source, font, size, glyph.glyph, glyph.decorations, work) {
-            Ok(value) => Some(Arc::new(value)),
+            Ok(value) => Some(value),
             Err(Error::Invalid(_) | Error::Overflow) => None,
             Err(error) => return Err(error),
         };
-        self.clock += 1;
-        let entry = Entry {
-            value: value.clone(),
-            used: self.clock,
+        self.keep(OutlineKey::Glyph(glyph), value)
+    }
+
+    /// The border of `glyph` stroked by `stroke` with `raster`, `None` when
+    /// it cannot be stroked.
+    pub(super) fn border(
+        &mut self,
+        glyph: &Kept<OutlineValue>,
+        stroke: BorderStroke,
+        raster: &mut Raster,
+        work: &mut WorkBudget,
+    ) -> Result<Option<Kept<OutlineValue>>> {
+        let key = BorderKey {
+            glyph: OutlineId(glyph.clone()),
+            stroke,
         };
-        self.glyphs.insert(glyph, entry);
-        self.charge_entries()?;
-        Ok(value)
+        if let Some(found) = self.find(KeyRef::Border(&key)) {
+            return found;
+        }
+        let value = match raster.stroke_border(&glyph.shape, &stroke, work)? {
+            Some(mut shape) => {
+                // The stroker grows its output as it goes; a kept border
+                // keeps only what it holds.
+                shape.shrink_to_fit()?;
+                Some(OutlineValue::of_shape(shape))
+            }
+            None => None,
+        };
+        self.keep(OutlineKey::Border(key), value)
+    }
+
+    /// The unit square opaque boxes are drawn from, which libass keeps as
+    /// an outline (`ass_render.c:1294-1309`, `1423`).
+    pub(super) fn unit_box(&mut self) -> Result<Kept<OutlineValue>> {
+        if let Lookup::Hit(found) = self.cache.get(KeyRef::UnitBox) {
+            return Ok(found);
+        }
+        let value = OutlineValue::of_shape(Shape::unit_box(&self.budget)?);
+        self.cache.insert(OutlineKey::UnitBox, value, 1)
     }
 
     /// The outline of a drawing, `None` when libass discards it.
@@ -181,31 +241,23 @@ impl Outlines {
         drawing: &DrawingText<'_>,
         limits: &Limits,
         work: &mut WorkBudget,
-    ) -> Result<Option<Arc<OutlineValue>>> {
-        if let Some(entry) = self.drawings.get_mut(drawing.text) {
-            return Ok(Self::touch(&mut self.clock, entry));
+    ) -> Result<Option<Kept<OutlineValue>>> {
+        if let Some(found) = self.find(KeyRef::Drawing(drawing.text)) {
+            return found;
         }
         // The parser passes over the text once.
         charge(work, OUTLINE_UNITS.saturating_add(drawing.text.len()))?;
         let mut outline = Outline::new(&self.budget);
         let cbox = Drawing::parse(drawing.text, &mut outline, limits)?.map(|parsed| parsed.cbox);
-        let value = cbox.map(|cbox| {
-            Arc::new(OutlineValue {
-                advance: cbox.x_max.wrapping_sub(cbox.x_min),
-                asc: cbox.y_max.wrapping_sub(cbox.y_min),
-                desc: 0,
-                shape: Shape::from_outlines(outline, Outline::new(&self.budget)),
-            })
+        let value = cbox.map(|cbox| OutlineValue {
+            advance: cbox.x_max.wrapping_sub(cbox.x_min),
+            asc: cbox.y_max.wrapping_sub(cbox.y_min),
+            desc: 0,
+            shape: Shape::from_outlines(outline, Outline::new(&self.budget)),
         });
-        self.clock += 1;
-        let entry = Entry {
-            value: value.clone(),
-            used: self.clock,
-        };
-        self.text_bytes += drawing.text.len();
-        self.drawings.insert(drawing.text.into(), entry);
-        self.charge_entries()?;
-        Ok(value)
+        let mut text = BudgetVec::new(&self.budget);
+        text.try_extend_from_slice(drawing.text)?;
+        self.keep(OutlineKey::Drawing(text), value)
     }
 
     /// Loads a glyph as libass does with hinting off.

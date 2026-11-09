@@ -3,13 +3,14 @@
 //! libass rasterises a glyph once per distinct quantised transform: the output
 //! origin moves to the transformed bounding-box centre, which is rounded to 1/8
 //! pixel, and the remaining matrix is rounded to steps that keep the position
-//! error near 1/8 pixel. [`BitmapTransform`] is that quantised key;
+//! error near 1/8 pixel. [`BitmapTransform`] is that quantised transform, and
 //! [`BitmapTransform::restore`] rebuilds the matrix the bitmap is drawn with.
 
 use triergon_core::round_ties_even_i32;
 
 use crate::fp;
 use crate::geometry::{Rect, Vector};
+use crate::shape::Shape;
 
 /// Transform error estimate, in 1/64 pixel.
 const POSITION_PRECISION: f64 = 8.0;
@@ -56,9 +57,13 @@ pub(crate) struct RunOffset {
     pub(crate) y: f64,
 }
 
-/// A quantised transform: the bitmap-cache key of one outline's rendering.
+/// A quantised transform: what one shape's bitmap is drawn under, its
+/// sub-pixel offset and its matrix rounded to steps that keep the position
+/// error near 1/8 pixel. The same shape under equal transforms draws equal
+/// bitmaps, so a renderer keys its bitmaps by the shape and this, as libass's
+/// bitmap cache does.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub(crate) struct BitmapTransform {
+pub struct BitmapTransform {
     /// Sub-pixel position of the box centre, in 1/8 pixel (0..8).
     offset: Vector,
     /// Quantised first row (x and y coefficients).
@@ -69,12 +74,30 @@ pub(crate) struct BitmapTransform {
     z: Vector,
 }
 
+/// A shape's transform quantised: what its bitmap is drawn under, and where
+/// that bitmap is placed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Quantized {
+    /// The transform the bitmap is drawn under.
+    pub transform: BitmapTransform,
+    /// The whole-pixel frame position the bitmap's
+    /// [`position`](crate::Bitmap::position) counts from.
+    pub position: Vector,
+}
+
+impl Quantized {
+    /// `shape` under `matrix` (outline units to frame 26.6) quantised on its
+    /// own, without a run, as libass quantises the drawing of a vector clip.
+    /// `None` when the transform is degenerate or out of range.
+    pub fn standalone(shape: &Shape, matrix: &Matrix) -> Option<Self> {
+        BitmapTransform::quantize(matrix, shape.cbox(), None).map(|q| q.placed)
+    }
+}
+
 /// The result of [`BitmapTransform::quantize`].
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Quantized {
-    /// The whole-pixel position of the bitmap origin.
-    pub(crate) position: Vector,
-    pub(crate) key: BitmapTransform,
+pub(crate) struct Quantization {
+    pub(crate) placed: Quantized,
     /// The sub-pixel remainder of the box centre: the run's offset when this
     /// bitmap starts a run.
     pub(crate) remainder: RunOffset,
@@ -108,7 +131,11 @@ impl BitmapTransform {
     /// Quantises `m` for an outline with control box `cbox`, placed against the
     /// remainder of the run it continues (`None` for a run's first bitmap, or a
     /// bitmap of its own). `None` when the transform is degenerate or too large.
-    pub(crate) fn quantize(m: &Matrix, cbox: &Rect, run: Option<RunOffset>) -> Option<Quantized> {
+    pub(crate) fn quantize(
+        m: &Matrix,
+        cbox: &Rect,
+        run: Option<RunOffset>,
+    ) -> Option<Quantization> {
         let frame = BoxFrame::new(cbox);
         let [x0, y0] = frame.centre;
         let [dx, dy] = frame.half;
@@ -160,13 +187,15 @@ impl BitmapTransform {
         }
 
         let mask = (1 << SUBPIXEL_ORDER) - 1;
-        Some(Quantized {
-            position: Vector::new(qr[0] >> SUBPIXEL_ORDER, qr[1] >> SUBPIXEL_ORDER),
-            key: Self {
-                offset: Vector::new(qr[0] & mask, qr[1] & mask),
-                x: Vector::new(qm[0][0], qm[0][1]),
-                y: Vector::new(qm[1][0], qm[1][1]),
-                z: Vector::new(qm[2][0], qm[2][1]),
+        Some(Quantization {
+            placed: Quantized {
+                transform: Self {
+                    offset: Vector::new(qr[0] & mask, qr[1] & mask),
+                    x: Vector::new(qm[0][0], qm[0][1]),
+                    y: Vector::new(qm[1][0], qm[1][1]),
+                    z: Vector::new(qm[2][0], qm[2][1]),
+                },
+                position: Vector::new(qr[0] >> SUBPIXEL_ORDER, qr[1] >> SUBPIXEL_ORDER),
             },
             remainder: RunOffset {
                 x: centre[0] - f64::from(qr[0]),
