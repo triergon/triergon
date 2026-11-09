@@ -37,8 +37,10 @@ returns `Error::Unsupported` without changing reader state.
 
 The admitted AU carriages are AVC and HEVC Annex B, single-block ADTS AAC-LC,
 and AC-3 in private PES with explicitly declared DVB namespace and unambiguous
-AC-3 descriptors. Existing framers delimit their complete source bytes; no
-parameter sets are injected and no AAC/AC-3 envelopes are stripped. LATM,
+AC-3 descriptors. The track reports the signalled AC-3 codec and retains the
+private-data stream type as its codec tag.
+The framers delimit complete source bytes and preserve the original parameter
+sets and AAC or AC-3 envelopes. LATM,
 MPEG audio/video, E-AC-3 grouping, subtitles and ambiguous private streams
 currently emit `ReaderEvent::Unsupported`. Their original PMTs and PES remain
 available as source events; none is relabelled as an AU.
