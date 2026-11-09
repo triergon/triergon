@@ -16841,6 +16841,15 @@
    "sha256": "25546feeeb50edf887dd0656502e5cca96b3d61f90431ebe7035e41e1f25dca3",
    "bytes": 54005807,
    "source_revision": "348e0b0cb2e79c5e51a2769e2d9f319c2af00983"
+  },
+  {
+   "name": "mp4-range-current-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-current-linux-arm64/48a28a728709ff0354a588a73e511ae6db3e0e3b01b362a352e407fd31da38aa.tar.zst",
+   "sha256": "48a28a728709ff0354a588a73e511ae6db3e0e3b01b362a352e407fd31da38aa",
+   "bytes": 4889147,
+   "source_revision": "a690f0f7fe7db02b64c2506e57e7a1526b3f092a"
   }
  ]
 }
