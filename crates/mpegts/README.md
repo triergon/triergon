@@ -360,49 +360,13 @@ Verification:
   a new source map for the same elementary stream. Folded positions use the
   sequence coordinate system. Source ranges and epochs remain physical
   source facts.
-  The 272 recorded requests are 97 compat-view operations. The AArch64 Linux
-  gate build at `5634f47d`, with Rust 1.99.1 and default flags, checks all 97
-  against the pinned FFmpeg formats worker and the unchanged recorded expected
-  folds: 81 match, including 15 control-only inputs. Full source and evidence
-  hashes are in [status](../../docs/status.md#measured-revisions).
-  The 168 requests for the strict source view, 64
-  of them for its native clock, are replayed as the compat-view operation on
-  their inputs: the strict source view and its native clock are not compared.
-  That archived comparison's 16 unmatched operations cover clock and format
-  boundaries, recovery of rejected and damaged carriers, input across media
-  entities, and malformed
-  transport or PES whose empty result the completion policy cannot prove. They
-  are `pcr-timeline-discontinuity`, `pcr-extension-invalid`, `transport-tei`,
-  `transport-scrambled`, `transport-afc-reserved`,
-  `transport-adaptation-overrun`, `transport-partial-final-packet`,
-  `transport-sync-loss`, `pes-timestamp-marker`, `pes-forbidden-time-flags`,
-  `pes-optional-header-overrun`, `pes-start-prefix-invalid`,
-  `hls-contiguous-pes-carry`, `hls-external-map`, `hls-explicit-discontinuity`,
-  `opcr-without-pcr-invalid`. These PES comparisons do not qualify source access
-  units. All 81 matching operations were measured with 30 paired samples on a
-  c8g.large pinned to CPU 1. Their worst runtime upper bound is 1.0315 of the
-  reference; peak heap is at most 0.073 and total resident RSS at most 0.980 of
-  it. Every measured case passes those numeric gates. The 16 parity failures
-  keep the feature unaccepted.
-
-A separate live comparison of the finite source-fault policies on macOS
-(`aarch64-apple-darwin`, source `f3f439b803e079208c9ab422270a77feb6281207`)
-checks all 97 operations and 272 requests against the pinned FFmpeg formats worker
-and unchanged recorded folds: 87 match and 10 remain failures. That source has no
-native timing or memory qualification; the native figures above apply to `5634f47d`.
-
-The source-boundary policies at `e7e1102c0afd466af24e9e8b969e823d5772a230`
-have a separate live macOS (`aarch64-apple-darwin`) comparison against the pinned
-FFmpeg formats worker and unchanged recorded folds: 90 of 97 operations match,
-with all 272 requests retained. The four malformed empty-reference operations
-remain refusals, and three operations across media entities lack a single-input
-reference equivalent. No timing or memory was collected for this source. These
-PES folds do not qualify the strict source clock or access units.
-
-The ordered-input PES comparison at `576cf0a0` matches all 97 operations
-on macOS AArch64 and preserves all 272 requests. This includes the three ordered
-inputs and four malformed completion cases. Runtime and memory on native
-AArch64 Linux remain open for this revision.
+  The 272 recorded requests map to 97 PES compatibility-view operations.
+  All 97 match the pinned FFmpeg formats worker on AArch64 Linux and macOS.
+  On the Linux gate build at `576cf0a0`, 96 pass the runtime ceiling and all
+  97 use less peak heap and total resident RSS. The remaining runtime case
+  is `pes-header-every-byte` at 1.4793. The strict source requests supply
+  input for this compatibility comparison. Full source and evidence hashes
+  are in [status](../../docs/status.md#measured-revisions).
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
