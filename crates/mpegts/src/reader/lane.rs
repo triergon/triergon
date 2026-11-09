@@ -1203,6 +1203,21 @@ impl Lane {
                         if !work.try_charge(1) {
                             return Ok(LaneStep::Yield);
                         }
+                        if let Framer::Eac3(reader) = framer
+                            && input.span == 0
+                            && input.offset == 0
+                            && reader.provide_complete(&request, pes, work, cancel)?
+                        {
+                            self.supplied = self
+                                .pieces
+                                .as_slice()
+                                .last()
+                                .expect("pending E-AC-3 PES")
+                                .range
+                                .end;
+                            self.input = None;
+                            continue;
+                        }
                         let bytes = span.payload_bytes()?;
                         let count = (bytes.len() - input.offset).min(request.maximum);
                         if count == 0 {

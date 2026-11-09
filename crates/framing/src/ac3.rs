@@ -555,6 +555,105 @@ impl Ac3FrameReader {
         }
         self.cursor.provide_owned(window)
     }
+
+    /// Try to read one complete aligned syncframe from a segmented response.
+    ///
+    /// The first segment must include the header prefix and the segments must
+    /// total exactly one frame. A declined response leaves the input position
+    /// unchanged and can be supplied through the ordinary streaming interface.
+    pub fn read_frame_parts<'a>(
+        &mut self,
+        request: &InputRequest,
+        length: usize,
+        mut parts: impl ExactSizeIterator<Item = &'a [u8]>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Ac3Frame>> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        if self.phase != Phase::Common
+            || self.used != 0
+            || self.completed >= self.limits.maximum_frames
+            || length > self.limits.maximum_frame_bytes
+        {
+            return Ok(None);
+        }
+        let prefix_len = length.min(MAX_PREFIX);
+        let cost = (length as u64)
+            .checked_add(parts.len() as u64)
+            .and_then(|units| units.checked_add(prefix_len as u64 + 3))
+            .ok_or(Error::Overflow)?;
+        if work.remaining() < cost {
+            return Ok(None);
+        }
+        let Some(current) = self.cursor.pending_request(cancel)? else {
+            return Ok(None);
+        };
+        if current.source != request.source
+            || current.token != request.token
+            || current.offset != request.offset
+            || length > current.maximum
+        {
+            return Ok(None);
+        }
+        let Some(first) = parts.next() else {
+            return Ok(None);
+        };
+        let Some(prefix) = first.get(..prefix_len) else {
+            return Ok(None);
+        };
+        let Ok(info) = layout(prefix) else {
+            return Ok(None);
+        };
+        if info.frame_bytes != length || self.check_layout(info).is_err() {
+            return Ok(None);
+        }
+        let Ok(header) = probe_with_layout(prefix, info) else {
+            return Ok(None);
+        };
+
+        work.take(cost);
+        let mut frame = BudgetVec::new(self.cursor.budget());
+        frame.try_reserve_exact(length)?;
+        for part in std::iter::once(first).chain(parts) {
+            if cancel.load(Ordering::Relaxed) {
+                self.stop(Error::Cancelled);
+                return Err(Error::Cancelled);
+            }
+            if part.len() > length - frame.len() {
+                return Ok(None);
+            }
+            frame.try_extend_from_slice(part)?;
+        }
+        if frame.len() != length {
+            return Ok(None);
+        }
+        let frame = frame.freeze().map_err(|rejected| rejected.error)?;
+        self.cursor.provide_owned(InputWindow::new(
+            current.source,
+            current.token,
+            current.offset,
+            frame,
+        )?)?;
+        // Use the copy's byte grant to retrieve the completed frame.
+        let mut prepaid = WorkBudget::new(length as u64);
+        let Step::Ready(bytes) = self.cursor.read_span(length, &mut prepaid, cancel)? else {
+            unreachable!("validated complete frame window");
+        };
+        self.completed += 1;
+        self.phase = Phase::Start;
+        Ok(Some(Ac3Frame {
+            bytes,
+            facts: Ac3FrameFacts {
+                source: current.source,
+                generation: self.cursor.generation(),
+                offset: current.offset,
+                header,
+            },
+        }))
+    }
+
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -612,6 +711,25 @@ impl Ac3FrameReader {
         self.buffer
             .as_mut()
             .ok_or(Error::Invalid("missing audio frame builder"))
+    }
+
+    fn check_layout(&self, info: Layout) -> Result<()> {
+        if matches!(
+            (self.selection, info.family),
+            (Ac3StreamSelection::Ac3Only, Ac3Family::Eac3)
+                | (Ac3StreamSelection::Eac3Only, Ac3Family::Ac3)
+        ) {
+            return Err(Error::Unsupported(
+                "audio frame family differs from declared stream selection",
+            ));
+        }
+        if info.frame_bytes > self.limits.maximum_frame_bytes {
+            return Err(Error::Limit {
+                requested: info.frame_bytes,
+                maximum: self.limits.maximum_frame_bytes,
+            });
+        }
+        Ok(())
     }
 
     fn step_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<Ac3Frame>> {
@@ -675,21 +793,7 @@ impl Ac3FrameReader {
                         });
                     }
                     let info = layout(&self.prefix[..6])?;
-                    if matches!(
-                        (self.selection, info.family),
-                        (Ac3StreamSelection::Ac3Only, Ac3Family::Eac3)
-                            | (Ac3StreamSelection::Eac3Only, Ac3Family::Ac3)
-                    ) {
-                        return Err(Error::Unsupported(
-                            "audio frame family differs from declared stream selection",
-                        ));
-                    }
-                    if info.frame_bytes > self.limits.maximum_frame_bytes {
-                        return Err(Error::Limit {
-                            requested: info.frame_bytes,
-                            maximum: self.limits.maximum_frame_bytes,
-                        });
-                    }
+                    self.check_layout(info)?;
                     let end = self
                         .offset
                         .checked_add(u64::try_from(info.frame_bytes).map_err(|_| Error::Overflow)?)

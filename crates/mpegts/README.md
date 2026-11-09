@@ -154,7 +154,7 @@ consecutive dependent syncframes with the same sample rate and block count.
 `Ac3AccessUnit::syncframes()` exposes each header in source order, and the
 primary supplies the packet's duration. DVB groups may cross PES boundaries.
 The ATSC reader admits groups headed by a six-block independent syncframe
-and requires the whole group in one PES. [ATSC A/52, Annexes E and G](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf)
+and requires the whole group in one PES. When a PES contains one complete syncframe, the reader copies its transport spans directly into the frame allocation. [ATSC A/52, Annexes E and G](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf)
 
 LATM streams with type `0x11` use audio PES stream IDs `0xc0` through `0xdf`.
 The default reader delimits complete byte-aligned LOAS envelopes across PES
