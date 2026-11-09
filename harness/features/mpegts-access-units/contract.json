@@ -10,6 +10,9 @@
     "The Annex B EOF policy reports an unframed run of validated AVC or HEVC PES bytes with no start code. The candidate folds the opaque observation separately from complete video access units.",
     "LATM controls wrap the pinned AAC-LC payload in independently authored LOAS envelopes and also carry opaque or truncated envelopes. The LATM compatibility policy reports one unsplit packet per validated nonempty PES, with its original clocks and position.",
     "A single entity can complete empty after a PSI diagnostic or an empty read only when the control-only proof classifies the original carriers through physical end and logical EOF.",
+    "DVB subtitle controls fold the complete segments of a validated PES and keep the position of its carrier. The explicit tail policy reports a proven prefix ahead of an overlong final segment.",
+    "Private-audio observations retain the payload, position and clock of one validated finite PES without a syncword. The reader reports them at logical EOF under its explicit compatibility policy.",
+    "The startup PSI controls put an out-of-range pointer before a clean PAT or PMT. A later validated map and media through physical EOF establish the selected program.",
     "Reference: the MPEG-TS demuxer with custom AVIO, NOFILLIN, parsers enabled, no stream discovery and no decoders; every parsed packet of the selected program in demux order, including EOF parser drain.",
     "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
     "Fold stream index, PID, signed PTS and DTS in 90kHz ticks (absent as INT64_MIN), duration, position, flags, payload length and every byte, then every side-data element's type, size and bytes.",
@@ -175,7 +178,9 @@
     "au-latm-aac-lc-coded-then-opaque",
     "au-latm-aac-lc-two-opaque-pes",
     "au-latm-aac-lc-truncated-envelope",
-    "au-latm-aac-lc-empty-envelope"
+    "au-latm-aac-lc-empty-envelope",
+    "au-adts-aac-lc-recover-pat-pointer",
+    "au-adts-aac-lc-recover-pmt-pointer"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"
