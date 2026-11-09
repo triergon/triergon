@@ -231,6 +231,15 @@ fn a_discontinuity_interrupts_partial_audio_and_rebuilds_tracks() {
 
 #[test]
 fn a_later_entity_pmt_interrupts_the_open_pes_from_the_previous_entity() {
+    open_pes_at_pmt_boundary(false);
+}
+
+#[test]
+fn clock_quarantine_preserves_the_interrupted_pes_at_a_pmt_boundary() {
+    open_pes_at_pmt_boundary(true);
+}
+
+fn open_pes_at_pmt_boundary(signal_drop: bool) {
     let mut transport = Transport::new();
     transport.tables(&[(0x0f, PID, &[])], 0);
     let mut body = Transport::new();
@@ -239,6 +248,13 @@ fn a_later_entity_pmt_interrupts_the_open_pes_from_the_previous_entity() {
     transport.bytes.extend_from_slice(&body.bytes[..188]);
     let split = transport.bytes.len();
     transport.tables(&[(0x0f, PID, &[])], 1);
+    if signal_drop {
+        let mut signal = [0xff; 188];
+        // The adaptation-only carrier raises a discontinuity without a PCR.
+        // The ordinary PES continuation then drops the pending clock signal.
+        signal[..6].copy_from_slice(&[0x47, (PID >> 8) as u8, PID as u8, 0x20, 183, 0x80]);
+        transport.bytes.extend_from_slice(&signal);
+    }
     transport.bytes.extend_from_slice(&body.bytes[188..]);
     transport.counters[usize::from(PID)] = body.counters[usize::from(PID)];
     let fresh = adts(b"fresh PES");
@@ -257,6 +273,7 @@ fn a_later_entity_pmt_interrupts_the_open_pes_from_the_previous_entity() {
     ]);
     let mut interrupted = 0;
     let mut packets = 0;
+    let mut quarantines = 0;
     for event in events {
         match event {
             Event::Other(ReaderEvent::InterruptedPes { source, boundary }) => {
@@ -274,8 +291,16 @@ fn a_later_entity_pmt_interrupts_the_open_pes_from_the_previous_entity() {
                 assert_eq!(packet.payload(), fresh);
                 packets += 1;
             }
+            Event::Other(ReaderEvent::Source(source)) => {
+                if matches!(source.event(), TraceEvent::Diagnostic(fault)
+                    if fault.error == Error::Invalid("PCR discontinuity signal dropped"))
+                {
+                    quarantines += 1;
+                }
+            }
             _ => (),
         }
     }
     assert_eq!((interrupted, packets), (1, 1));
+    assert_eq!(quarantines, usize::from(signal_drop));
 }

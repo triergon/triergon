@@ -557,16 +557,29 @@ impl Reader {
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
                         }
-                        let track = self.lanes.as_slice()[index].track.clone();
-                        let interrupted =
-                            self.lanes.as_slice()[index]
-                                .unpublished()
-                                .map(|elementary_range| ReaderEvent::Interrupted {
-                                    track: track.clone(),
-                                    elementary_range,
-                                    cause: self.pending.as_ref().expect("pending PES").clone(),
-                                });
-                        let lane = Lane::new(&self.pool, track, self.limits)?;
+                        let previous = &self.lanes.as_slice()[index];
+                        let track = previous.track.clone();
+                        let interrupted = previous.unpublished().map(|elementary_range| {
+                            ReaderEvent::Interrupted {
+                                track: track.clone(),
+                                elementary_range,
+                                cause: self.pending.as_ref().expect("pending PES").clone(),
+                            }
+                        });
+                        let mut lane = Lane::new(&self.pool, track, self.limits)?;
+                        // A clock fault can restart framing while the transport
+                        // still holds the PES that began before the program change.
+                        if let PesRun::BeforeBoundary(start) = previous.run
+                            && self
+                                .stream
+                                .as_ref()
+                                .and_then(|stream| {
+                                    stream.route_state(index, lane.track.stream().pid)
+                                })
+                                .is_some_and(|(_, pending)| pending == Some(start))
+                        {
+                            lane.run = previous.run;
+                        }
                         self.lanes.as_mut_slice()[index] = lane;
                         self.phase = if fault {
                             Phase::Publish
