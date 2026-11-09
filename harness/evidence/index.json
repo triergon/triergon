@@ -16941,6 +16941,15 @@
    "key": "evidence/ass-rendering-divergences-fedfb790/f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f.tar.gz",
    "sha256": "f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f",
    "bytes": 74838624
+  },
+  {
+   "name": "mp4-range-opus-aarch64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-opus-aarch64/1d64f438deca9655092d6b01d80730db4c34d05343c7152791bcef29296e4254.tar.gz",
+   "sha256": "1d64f438deca9655092d6b01d80730db4c34d05343c7152791bcef29296e4254",
+   "bytes": 69117613,
+   "source_revision": "af1b9b933480dbe44856bc54afcda636128b0702"
   }
  ]
 }
