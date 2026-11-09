@@ -525,6 +525,34 @@ impl InputCursor {
         self.advance(count, complete);
         Ok(Step::Ready(count))
     }
+
+    /// Copy a borrowed response into a charged builder and consume it in one
+    /// operation. The cursor never retains the caller's slice.
+    ///
+    /// A short grant returns false. Validation or allocation failure leaves the
+    /// input position and the destination contents unchanged.
+    #[inline]
+    pub fn append_response(
+        &mut self,
+        request: &InputRequest,
+        bytes: &[u8],
+        output: &mut BudgetVec<u8>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        self.verify(request.source, &request.token)?;
+        self.check_cancel(cancel)?;
+        self.validate_window(request.offset, bytes.len(), self.maximum_window)?;
+        let count = bytes.len() as u64;
+        if count == 0 || work.remaining() < count {
+            return Ok(false);
+        }
+        output.try_extend_from_slice(bytes)?;
+        work.take(count);
+        self.position += count;
+        Ok(true)
+    }
+
     pub fn read_span(
         &mut self,
         maximum: usize,

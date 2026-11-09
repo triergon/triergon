@@ -1370,48 +1370,68 @@ impl Lane {
                             continue;
                         };
                         let pes = piece.source.pes();
-                        let Some(span) = pes.spans().get(input.span) else {
-                            self.input = None;
-                            continue;
-                        };
-                        if !work.try_charge(1) {
-                            return Ok(LaneStep::Yield);
-                        }
-                        if let Framer::Eac3(reader) = framer
-                            && input.span == 0
-                            && input.offset == 0
-                            && reader.provide_complete(&request, pes, work, cancel)?
-                        {
-                            self.supplied = piece.range.end;
-                            self.input = None;
-                            continue;
-                        }
-                        let bytes = span.payload_bytes()?;
-                        let length = bytes.len();
-                        let count = (length - input.offset).min(request.maximum);
-                        if count == 0 {
-                            return Err(Error::Invalid("empty MPEG-TS payload span"));
-                        }
-                        let end = self
-                            .supplied
-                            .checked_add(count as u64)
-                            .ok_or(Error::Overflow)?;
-                        let bytes = if count == length {
-                            bytes
-                        } else {
-                            bytes.into_slice(input.offset..input.offset + count)?
-                        };
-                        framer.provide(InputWindow::new(
-                            request.source,
-                            request.token,
-                            request.offset,
-                            bytes,
-                        )?)?;
-                        self.supplied = end;
-                        input.offset += count;
-                        if input.offset == length {
-                            input.span += 1;
-                            input.offset = 0;
+                        let mut request = request;
+                        loop {
+                            let Some(span) = pes.spans().get(input.span) else {
+                                self.input = None;
+                                break;
+                            };
+                            if !work.try_charge(1) {
+                                return Ok(LaneStep::Yield);
+                            }
+                            if let Framer::Eac3(reader) = framer
+                                && input.span == 0
+                                && input.offset == 0
+                                && reader.provide_complete(&request, pes, work, cancel)?
+                            {
+                                self.supplied = piece.range.end;
+                                self.input = None;
+                                break;
+                            }
+                            let length = span.as_ref().len();
+                            let count = (length - input.offset).min(request.maximum);
+                            if count == 0 {
+                                return Err(Error::Invalid("empty MPEG-TS payload span"));
+                            }
+                            let end = self
+                                .supplied
+                                .checked_add(count as u64)
+                                .ok_or(Error::Overflow)?;
+                            let range = input.offset..input.offset + count;
+                            let appended = if let Framer::Video(reader) = framer {
+                                reader.append_payload(
+                                    &request,
+                                    &span.as_ref()[range.clone()],
+                                    work,
+                                    cancel,
+                                )?
+                            } else {
+                                false
+                            };
+                            if !appended {
+                                let bytes = span.payload_bytes()?;
+                                let bytes = if count == length {
+                                    bytes
+                                } else {
+                                    bytes.into_slice(range)?
+                                };
+                                framer.provide(InputWindow::new(
+                                    request.source,
+                                    request.token.clone(),
+                                    request.offset,
+                                    bytes,
+                                )?)?;
+                            }
+                            self.supplied = end;
+                            input.offset += count;
+                            if input.offset == length {
+                                input.span += 1;
+                                input.offset = 0;
+                            }
+                            if !appended {
+                                break;
+                            }
+                            request.offset = end;
                         }
                     } else if draining {
                         if self.eof {

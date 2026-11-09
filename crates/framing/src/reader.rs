@@ -262,6 +262,59 @@ impl NalReader {
         self.cursor.provide_owned(window)
     }
 
+    pub(crate) fn append_annex_payload(
+        &mut self,
+        request: &InputRequest,
+        bytes: &[u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        if !self.compact_annex_b
+            || self.phase != Phase::AnnexPayload
+            || self.zeroes != 0
+            || bytes.len() < 32
+            || bytes.len() > 4096
+            || bytes.last() == Some(&0)
+        {
+            return Ok(false);
+        }
+        let count = bytes.len() as u64;
+        let scan = count / 8 + count % 8;
+        if work.remaining() < count + scan {
+            return Ok(false);
+        }
+        work.take(scan);
+        if contains_zero_pair(bytes) {
+            return Ok(false);
+        }
+        let Some(current) = self.cursor.pending_request(cancel)? else {
+            return Ok(false);
+        };
+        if current.source != request.source
+            || current.token != request.token
+            || current.offset != request.offset
+            || bytes.len() > current.maximum
+        {
+            return Ok(false);
+        }
+        match self.reserve_compact_payload(bytes.len()) {
+            Ok(()) => (),
+            Err(Error::Backpressure { .. } | Error::Allocation | Error::Limit { .. }) => {
+                return Ok(false);
+            }
+            Err(error) => return Err(error),
+        }
+        let buffer = self
+            .buffer
+            .as_mut()
+            .ok_or(Error::Invalid("missing NAL builder"))?;
+        self.cursor
+            .append_response(request, bytes, buffer, work, cancel)
+    }
+
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -686,6 +739,55 @@ impl NalReader {
                     }));
                 }
             }
+        }
+    }
+}
+
+fn contains_zero_pair(bytes: &[u8]) -> bool {
+    let mut previous = 1;
+    let (words, tail) = bytes.as_chunks::<8>();
+    for bytes in words {
+        let word = u64::from_le_bytes(*bytes);
+        // Each low byte is the OR of a pair. Mark the high byte as occupied
+        // because its next byte belongs to the following word.
+        let pairs = word | (word >> 8) | 0xff00_0000_0000_0000;
+        let zero_pair = pairs.wrapping_sub(0x0101_0101_0101_0101) & !pairs & 0x8080_8080_8080_8080;
+        if zero_pair != 0 || (previous == 0 && bytes[0] == 0) {
+            return true;
+        }
+        previous = bytes[7];
+    }
+    for &byte in tail {
+        if previous == 0 && byte == 0 {
+            return true;
+        }
+        previous = byte;
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::contains_zero_pair;
+
+    #[test]
+    fn zero_pair_scan_matches_adjacent_bytes_at_word_boundaries() {
+        let mut bytes = [1; 48];
+        for first in 0..bytes.len() {
+            bytes[first] = 0;
+            for second in first..bytes.len() {
+                bytes[second] = 0;
+                for end in second + 1..=bytes.len() {
+                    let prefix = &bytes[..end];
+                    assert_eq!(
+                        contains_zero_pair(prefix),
+                        prefix.windows(2).any(|pair| pair == [0, 0])
+                    );
+                }
+                bytes[second] = 1;
+                bytes[first] = 0;
+            }
+            bytes[first] = 1;
         }
     }
 }

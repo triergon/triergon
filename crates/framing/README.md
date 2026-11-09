@@ -137,7 +137,8 @@ payload for passthrough packets.
   unknown versions. The `compat::nal` receiver parsers accept them for the packet
   session only.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
-  profiles. It adds no timestamps.
+  profiles. It adds no timestamps. `append_payload` can consume an interior NAL
+  slice while the reader is waiting for input.
 - AV1: LEB128 up to 8 bytes and `u32::MAX`. `OneObu` needs an external length;
   AV1 Annex-B (length-delimited) streams are not parsed. Sequence headers are not
   parsed. `Av1TemporalUnitJob` adds a missing temporal delimiter, inserts av1C
