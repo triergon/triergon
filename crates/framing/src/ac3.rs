@@ -642,8 +642,7 @@ impl Ac3FrameReader {
             current.offset,
             frame,
         )?)?;
-        // The copy already charged each byte. Transfer its owner using that
-        // same grant, with no second scan or copy.
+        // Use the copy's byte grant to retrieve the completed frame.
         let mut prepaid = WorkBudget::new(length as u64);
         let Step::Ready(bytes) = self.cursor.read_span(length, &mut prepaid, cancel)? else {
             unreachable!("validated complete frame window");
