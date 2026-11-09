@@ -1,4 +1,5 @@
 //! Group complete E-AC-3 syncframes in a single private audio stream.
+use crate::Pes;
 use crate::reader::model::{DependentSyncframe, Shared};
 use crate::reader::{Ac3AccessUnit, ReaderLimits, Track};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -123,6 +124,33 @@ impl Reader {
 
     pub(super) fn provide(&mut self, window: InputWindow) -> Result<()> {
         self.framer.provide_owned(window)
+    }
+
+    pub(super) fn provide_complete(
+        &mut self,
+        request: &InputRequest,
+        pes: &Pes,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        debug_assert!(self.pending.is_none() && !self.sealed);
+        match self.framer.read_frame_parts(
+            request,
+            pes.payload_len,
+            pes.spans().iter().map(AsRef::as_ref),
+            work,
+            cancel,
+        ) {
+            Ok(Some(frame)) => {
+                self.pending = Some(frame);
+                Ok(true)
+            }
+            Ok(None)
+            | Err(Error::Backpressure { .. } | Error::Allocation | Error::Limit { .. }) => {
+                Ok(false)
+            }
+            Err(error) => Err(error),
+        }
     }
 
     pub(super) fn finish(&mut self, request: InputRequest) -> Result<()> {
