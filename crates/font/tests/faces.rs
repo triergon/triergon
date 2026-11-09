@@ -301,7 +301,7 @@ fn collections_select_faces_and_matching_scores_styles() {
     };
     assert_eq!(select(&faces, &any_slant), Some(2));
     let needs_c = Request {
-        character: Some('C'),
+        character: Some(u32::from('C')),
         ..request("Test Sans", 0, 0)
     };
     assert_eq!(select(&faces[3..], &needs_c), None);

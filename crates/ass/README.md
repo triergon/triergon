@@ -209,7 +209,15 @@ selective style overrides), in the frame and storage size and margins of its
   faces it gathers: the one selected for it, then, for a character none of
   them maps, one selected for that character from the requested family, the
   default family or the default font file, so fallback depends on what was
-  drawn before, as in libass. The default font file's face gets an id of its
+  drawn before, as in libass. Each face reads characters through the charmap
+  libass selects on opening it; a face selected for a character it does not
+  map is tried through each of its charmaps in turn and keeps the one that
+  maps it, or the last, for every later lookup and for shaping until another
+  such lookup moves it (`ass_font_get_index`). That is how libass draws C1
+  controls (U+0080 to U+009F) through a Macintosh Roman charmap. The retry is
+  `Error::Unsupported` for a face with charmaps FreeType lists and
+  `triergon-font` does not read, as is any lookup through a charmap whose
+  codes libass converts (`Font::text_lookup`). The default font file's face gets an id of its
   own, so a font never takes it for a face it already has: libass leaves
   that id uninitialised, and this is its result whenever the id does not
   collide with a registered face's; the reference is built with locals

@@ -1181,7 +1181,7 @@ pub fn exercise(data: &[u8], limits: Limits) {
             family,
             weight: 700,
             slant: 100,
-            character: Some('A'),
+            character: Some(u32::from('A')),
         };
         let _ = select(&faces, &request);
     }

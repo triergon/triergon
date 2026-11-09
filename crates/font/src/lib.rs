@@ -26,7 +26,7 @@ mod synthesis;
 mod work;
 
 pub use cff::{CharstringBounds, CharstringOperator, OperatorSet};
-pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings};
+pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings, TextLookup};
 pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
@@ -171,6 +171,8 @@ pub struct Font {
     hmtx: Hmtx,
     names: Names,
     charmaps: BudgetVec<cmap::Subtable>,
+    /// `charmaps` is FreeType's list of the face's charmaps.
+    every_charmap: bool,
     outlines: Outlines,
     kern: Kern,
     /// `post` underline position and thickness.
@@ -209,10 +211,21 @@ impl Font {
             .unwrap_or_default();
         // Tables already on core's work budget share it.
         let mut work = WorkBudget::new(limits.work);
-        let charmaps = match tables.cmap {
+        let cmap = match tables.cmap {
             Some(t) => cmap::parse(bytes, t, budget, &mut work)?,
-            None => BudgetVec::new(budget),
+            None => cmap::Subtables {
+                list: BudgetVec::new(budget),
+                skipped: false,
+            },
         };
+        // FreeType gives a CFF face without a Windows BMP or Unicode-platform
+        // charmap one built from its glyph names (`cff_face_init`).
+        let synthesized = flavor == Flavor::Cff
+            && !cmap.list.iter().any(|s| {
+                s.platform() == Platform::Unicode
+                    || (s.platform() == Platform::Windows && s.encoding_id() == 1)
+            });
+        let every_charmap = !cmap.skipped && !synthesized;
         let (outlines, glyph_count) = match flavor {
             Flavor::TrueType => {
                 let (glyf, count) = Glyf::new(
@@ -251,7 +264,8 @@ impl Font {
             glyph_count,
             hmtx,
             names,
-            charmaps,
+            charmaps: cmap.list,
+            every_charmap,
             outlines,
             kern,
             underline,
@@ -452,19 +466,29 @@ impl Font {
 
     /// The supported cmap subtables, in directory order.
     pub fn charmaps(&self) -> impl Iterator<Item = Charmap<'_>> + '_ {
-        self.charmaps
-            .as_slice()
-            .iter()
-            .map(|&subtable| self.charmap(subtable))
+        (0..self.charmaps.len()).filter_map(|index| self.charmap(index))
     }
 
-    fn charmap(&self, subtable: cmap::Subtable) -> Charmap<'_> {
-        Charmap::new(
+    /// Charmap `index` of [`Self::charmaps`].
+    pub fn charmap(&self, index: usize) -> Option<Charmap<'_>> {
+        let &subtable = self.charmaps.get(index)?;
+        Some(Charmap::new(
             self.data.as_ref(),
             u32::from(self.glyph_count),
             subtable,
+            index,
             self.limits.work,
-        )
+        ))
+    }
+
+    /// Whether [`Self::charmaps`] are all the charmaps FreeType gives the face,
+    /// in its order. FreeType also lists format 2 and 8 subtables, which this
+    /// crate does not read, and adds a Unicode charmap built from glyph names
+    /// to a CFF face without a (3, 1) or Unicode-platform subtable (this check
+    /// assumes it does whenever it may). The format 14 subtables it lists
+    /// cannot be selected.
+    pub const fn lists_every_charmap(&self) -> bool {
+        self.every_charmap
     }
 
     /// The charmap libass 0.17.5 uses for text, as it selects one when it opens
@@ -481,20 +505,41 @@ impl Font {
     /// names to a CFF face without a (3, 1) or Unicode-platform subtable; libass
     /// may select either, which this selection does not reproduce.
     pub fn text_charmap(&self) -> Option<Charmap<'_>> {
-        cmap::text_subtable(self.charmaps.as_slice()).map(|&subtable| self.charmap(subtable))
+        cmap::text_subtable(self.charmaps.as_slice()).and_then(|index| self.charmap(index))
     }
 
-    /// The glyph for `c` through [`Self::text_charmap`]. A Windows Symbol charmap
-    /// is looked up at `0xF000 | c`, as libass does.
+    /// `charmap`, one of this face's, read as libass 0.17.5 reads text through
+    /// it (`ass_font_index_magic`).
+    ///
+    /// # Errors
+    ///
+    /// `Unsupported` where libass converts codes for the charmap and this
+    /// crate does not: through iconv for the Windows Shift-JIS, PRC, Big5,
+    /// Wansung and Johab charmaps (encodings 2 to 6), and by its legacy Arabic
+    /// tables for the Symbol charmap of a face declaring an Arabic character
+    /// set (`OS/2.fsSelection` high byte 178 or 179).
+    pub fn text_lookup<'f>(&'f self, charmap: Charmap<'f>) -> Result<TextLookup<'f>> {
+        if charmap.platform() != Platform::Windows {
+            return Ok(TextLookup::new(charmap, false));
+        }
+        match charmap.encoding_id() {
+            2..=6 => Err(Error::Unsupported("libass's multibyte charmap conversion")),
+            0 if self
+                .os2
+                .is_some_and(|os2| matches!(os2.selection.bits() >> 8, 178 | 179)) =>
+            {
+                Err(Error::Unsupported("libass's legacy Arabic charmaps"))
+            }
+            encoding => Ok(TextLookup::new(charmap, encoding == 0)),
+        }
+    }
+
+    /// The glyph for `c` through [`Self::text_charmap`], as libass looks it up
+    /// ([`Self::text_lookup`]); `None` also where libass would convert the
+    /// code and this crate does not.
     pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
-        let charmap = self.text_charmap()?;
-        let code = u32::from(c);
-        let code = if charmap.encoding() == CharEncoding::Symbol {
-            code | 0xf000
-        } else {
-            code
-        };
-        charmap.glyph(code)
+        let lookup = self.text_lookup(self.text_charmap()?).ok()?;
+        lookup.glyph(u32::from(c))
     }
 
     /// Every (left, right) pair the `kern` table lists, in table order, possibly

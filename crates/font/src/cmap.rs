@@ -173,6 +173,15 @@ pub(crate) struct Subtable {
     end: usize,
 }
 
+/// The subtables of a `cmap` table this crate reads.
+#[derive(Debug)]
+pub(crate) struct Subtables {
+    /// The supported subtables, in directory order.
+    pub(crate) list: BudgetVec<Subtable>,
+    /// A subtable of a format FreeType also reads (2 or 8) was passed over.
+    pub(crate) skipped: bool,
+}
+
 /// Reads the encoding records, keeping the supported subtables in directory order.
 /// As in FreeType, a table too short for its header has no subtables, records
 /// stop at the table's end, and a record at offset 0 is skipped.
@@ -181,9 +190,12 @@ pub(crate) fn parse(
     table: Table,
     budget: &Budget,
     work: &mut WorkBudget,
-) -> Result<BudgetVec<Subtable>> {
+) -> Result<Subtables> {
     let bytes = slice(data, table.offset, table.len)?;
-    let mut subtables = BudgetVec::new(budget);
+    let mut subtables = Subtables {
+        list: BudgetVec::new(budget),
+        skipped: false,
+    };
     // The version is ignored: the format allows newer subtables under 0.
     let Some(count) = u16_at(bytes, 2) else {
         return Ok(subtables);
@@ -198,7 +210,9 @@ pub(crate) fn parse(
         if offset == 0 {
             continue;
         }
-        let Some(format) = u16_at(bytes, offset).and_then(CmapFormat::from_number) else {
+        let number = u16_at(bytes, offset);
+        let Some(format) = number.and_then(CmapFormat::from_number) else {
+            subtables.skipped |= matches!(number, Some(2 | 8));
             continue;
         };
         if bytes.get(offset..).is_some_and(|sub| format.valid(sub)) {
@@ -209,7 +223,7 @@ pub(crate) fn parse(
                 offset: table.offset + offset,
                 end: table.offset + table.len,
             };
-            subtables.try_push(subtable).map_err(|e| e.error)?;
+            subtables.list.try_push(subtable).map_err(|e| e.error)?;
         }
     }
     Ok(subtables)
@@ -218,10 +232,10 @@ pub(crate) fn parse(
 /// The subtable libass selects for text when it opens a face
 /// (`ass_charmap_magic`): the first Windows (3, 10), else the first (3, 1),
 /// else the first Windows subtable of another encoding, else FreeType's
-/// default, else the first subtable.
-pub(crate) fn text_subtable(subtables: &[Subtable]) -> Option<&Subtable> {
+/// default, else the first subtable. Its index in `subtables`.
+pub(crate) fn text_subtable(subtables: &[Subtable]) -> Option<usize> {
     let windows = |encoding: Option<u16>| {
-        subtables.iter().find(move |s| {
+        subtables.iter().position(|s| {
             s.platform == Platform::Windows && encoding.is_none_or(|e| s.encoding == e)
         })
     };
@@ -229,26 +243,28 @@ pub(crate) fn text_subtable(subtables: &[Subtable]) -> Option<&Subtable> {
         .or_else(|| windows(Some(1)))
         .or_else(|| windows(None))
         .or_else(|| freetype_default(subtables))
-        .or_else(|| subtables.first())
+        .or_else(|| (!subtables.is_empty()).then_some(0))
 }
 
 /// The charmap FreeType selects when it opens a face (`find_unicode_charmap`):
 /// the last full-Unicode subtable, else the last of the encodings FreeType
 /// calls Unicode (every Unicode- and ISO-platform subtable, Windows 1 and 10).
-fn freetype_default(subtables: &[Subtable]) -> Option<&Subtable> {
-    let full = |s: &&Subtable| match (s.platform, s.encoding) {
+fn freetype_default(subtables: &[Subtable]) -> Option<usize> {
+    let full = |s: &Subtable| match (s.platform, s.encoding) {
         (Platform::Windows, 10) | (Platform::Unicode, 4) => true,
         (Platform::Unicode, 6) => s.format == CmapFormat::ManyToOne,
         _ => false,
     };
-    let unicode = |s: &&Subtable| match s.platform {
+    let unicode = |s: &Subtable| match s.platform {
         Platform::Unicode | Platform::Iso => true,
         Platform::Windows => matches!(s.encoding, 1 | 10),
         _ => false,
     };
     // FreeType skips formats 14 and 15 there, which are not listed.
-    let mut last = subtables.iter().rev();
-    last.clone().find(full).or_else(|| last.find(unicode))
+    subtables
+        .iter()
+        .rposition(full)
+        .or_else(|| subtables.iter().rposition(unicode))
 }
 
 impl Subtable {
@@ -329,6 +345,7 @@ pub struct Charmap<'f> {
     data: &'f [u8],
     glyph_count: u32,
     subtable: Subtable,
+    index: usize,
     work: u64,
 }
 
@@ -337,14 +354,21 @@ impl<'f> Charmap<'f> {
         data: &'f [u8],
         glyph_count: u32,
         subtable: Subtable,
+        index: usize,
         work: u64,
     ) -> Self {
         Self {
             data,
             glyph_count,
             subtable,
+            index,
             work,
         }
+    }
+
+    /// Its place among the face's charmaps ([`Font::charmaps`](crate::Font::charmaps)).
+    pub const fn index(&self) -> usize {
+        self.index
     }
 
     pub const fn platform(&self) -> Platform {
@@ -386,6 +410,39 @@ impl<'f> Charmap<'f> {
             work: WorkBudget::new(self.work),
             done: false,
         }
+    }
+}
+
+/// A charmap read as libass 0.17.5 reads text through it: a character is
+/// looked up at the code `ass_font_index_magic` gives it, as
+/// `FT_Get_Char_Index` looks codes up. [`Font::text_lookup`](crate::Font::text_lookup)
+/// makes one.
+#[derive(Clone, Copy, Debug)]
+pub struct TextLookup<'f> {
+    charmap: Charmap<'f>,
+    /// A Windows Symbol charmap, which maps codes at `0xF000 | c`.
+    symbol: bool,
+}
+
+impl<'f> TextLookup<'f> {
+    pub(crate) const fn new(charmap: Charmap<'f>, symbol: bool) -> Self {
+        Self { charmap, symbol }
+    }
+
+    pub const fn charmap(&self) -> Charmap<'f> {
+        self.charmap
+    }
+
+    /// The code `c` is looked up at: `0xF000 | c` in a Windows Symbol charmap,
+    /// `c` in any other; `None` for 0, which libass never looks up.
+    pub const fn code(&self, c: u32) -> Option<u32> {
+        let code = if self.symbol { c | 0xf000 } else { c };
+        if code == 0 { None } else { Some(code) }
+    }
+
+    /// The glyph `c` maps to.
+    pub fn glyph(&self, c: u32) -> Option<GlyphId> {
+        self.charmap.glyph(self.code(c)?)
     }
 }
 
@@ -533,9 +590,11 @@ mod tests {
         };
         let subtables = parse(data, table, &budget, &mut WorkBudget::new(100)).unwrap();
         subtables
+            .list
             .as_slice()
             .iter()
-            .map(|&s| Charmap::new(data, glyphs, s, work))
+            .enumerate()
+            .map(|(index, &s)| Charmap::new(data, glyphs, s, index, work))
             .collect()
     }
 
@@ -641,9 +700,7 @@ mod tests {
                 })
                 .collect()
         };
-        let chosen = |records: &[(u16, u16, CmapFormat)]| {
-            text_subtable(&subtables(records)).map(|s| s.offset)
-        };
+        let chosen = |records: &[(u16, u16, CmapFormat)]| text_subtable(&subtables(records));
         // (3, 10) anywhere, then the first (3, 1), then the first other Windows one.
         let windows = [
             (0, 3, SegmentDelta),

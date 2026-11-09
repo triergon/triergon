@@ -43,9 +43,10 @@ for (glyph, position) in buffer.glyphs() {
 `hb_buffer_add_utf32` does; clusters are indices into `text` and glyphs come in
 visual order, positioned in the units of the metrics' `Scale`. `Metrics` is the
 font-function interface. `SizedMetrics` answers as libass's FreeType-backed
-functions do over a face at a size (`triergon_font::SizedFont`): libass's
-character map choice, default-load advances and `FT_KERNING_DEFAULT` kerning, at
-the size's scale and pixels per em. `OtMetrics` answers as HarfBuzz's built-in
+functions do over a face at a size (`triergon_font::SizedFont`): the character
+map libass selects, or with `SizedMetrics::with_charmap` the one a face has been
+left on, read as libass reads it, default-load advances and `FT_KERNING_DEFAULT`
+kerning, at the size's scale and pixels per em. `OtMetrics` answers as HarfBuzz's built-in
 functions do at units per em (its character map choice, `cmap` format 14
 variation sequences, `hmtx` advances, `glyf` and CFF extents). A callback that
 cannot answer as its font would ends the shaping call with its error. `Scale` reproduces HarfBuzz's scaling arithmetic,

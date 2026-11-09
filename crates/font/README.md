@@ -23,7 +23,7 @@ let faces: Vec<Font> = (0..Font::face_count(&file)?)
 
 // \fnArimo\b1: the face libass's scoring would pick.
 let infos: Vec<FaceInfo<'_>> = faces.iter().map(FaceInfo::new).collect();
-let request = Request { family: "Arimo", weight: 700, slant: 0, character: Some('g') };
+let request = Request { family: "Arimo", weight: 700, slant: 0, character: Some(u32::from('g')) };
 let font = &faces[select(&infos, &request).ok_or("no matching face")?];
 
 let glyph = font.glyph_index('g').ok_or("unmapped")?;
@@ -87,8 +87,14 @@ when it opens a face (`ass_charmap_magic`): the first Windows full-Unicode subta
 Windows subtables, the one FreeType selects (the last (0, 4) or format 13 (0, 6),
 else the last Unicode- or ISO-platform subtable), else the first. Subtables
 FreeType lists in formats 2, 8 and 14, and the Unicode charmap it builds from
-glyph names for a CFF face without one, take no part. `glyph_index` looks a Windows
-Symbol charmap up at `0xF000 | c`.
+glyph names for a CFF face without one, take no part; `lists_every_charmap` says
+whether the face has any of those but format 14, which FreeType cannot select.
+`charmap` gives a subtable by its index in `charmaps`. `text_lookup` reads a
+charmap as libass reads text through it (`ass_font_index_magic`): a Windows
+Symbol charmap at `0xF000 | c`, any other unchanged, and `Unsupported` for the
+charmaps whose codes libass converts (Windows encodings 2 to 6 through iconv, and
+a Symbol charmap under a legacy Arabic character set); `glyph_index` looks `c` up
+that way through `text_charmap`.
 
 **TrueType outlines.** `glyf` with short or long `loca`: simple glyphs and
 composites with offsets, point matching, one scale, x and y scales or a 2×2
@@ -184,7 +190,8 @@ for an unwanted one, plus 73/256 of the weight difference, where a face not flag
 bold counts as 120 heavier when the request is more than 150 heavier. A full or
 PostScript name match scores 0 and ends the search; when only one of the two
 matches, CFF faces go by the PostScript name and others by the full name. A face
-whose text charmap lacks the requested character is skipped. Weights come from
+whose text charmap lacks the requested code, looked up unchanged and not
+necessarily a scalar value, is skipped. Weights come from
 `usWeightClass`, with classes 1 to 9 read as 100 to 900; the italic and bold flags
 from `fsSelection` bits 0 and 5. `FaceInfo::has_family_name` tells the faces
 libass registers at all.
