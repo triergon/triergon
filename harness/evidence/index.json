@@ -16629,14 +16629,14 @@
    "bytes": 11067898
   },
   {
-   "name": "subtitles-gate-efd61988-linux-arm64",
-   "path": "subtitles-gate-efd61988-linux-arm64",
+   "name": "subtitles-gate-2e0cbaef-linux-arm64",
+   "path": "subtitles-gate-2e0cbaef-linux-arm64",
    "retention": "retained",
-   "reason": "Subtitle status rows for PGS, DVB, DVD, closed captions and teletext, Linux AArch64: timing on CPU 1 (30 pairs), kernel-bound memory (30 pairs) and the graded reports at efd61988 on a c8g.xlarge, with the build logs, RSS proof, identity and platform. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
-   "key": "evidence/subtitles-gate-efd61988-linux-arm64/b9dc70bf9e2258cc1a6ce776ed2881212fd92eea2847e234d9d7df034cceec30.tar.zst",
-   "sha256": "b9dc70bf9e2258cc1a6ce776ed2881212fd92eea2847e234d9d7df034cceec30",
-   "bytes": 10735106,
-   "source_revision": "efd61988a7c0d354df0ad07ecf74ef6f9e303323"
+   "reason": "Subtitle status rows, Linux AArch64, on a c8g.xlarge: timing on CPU 1 (30 pairs), kernel-bound memory (30 pairs) and the graded reports for PGS, DVB, DVD, closed captions and teletext at 956c4296 (956c4296/), and for DVB again at 2e0cbaef (2e0cbaef/), with the build logs, RSS proof, identity and platform of each run. same-code.txt compares the two subtitle workers: the functions that differ are DVB's, and two teletext functions whose only differences are constant addresses. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitles-gate-2e0cbaef-linux-arm64/61b52a272e82eeee913c9c4b4d6331caea3283a99ebad4a897aba65dab3c891d.tar.zst",
+   "sha256": "61b52a272e82eeee913c9c4b4d6331caea3283a99ebad4a897aba65dab3c891d",
+   "bytes": 13190539,
+   "source_revision": "2e0cbaef49dae2af4174af13ab5c600b7cc00055"
   }
  ]
 }
