@@ -9,7 +9,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceLocation, TimeBase, WorkBudget};
 use triergon_matroska::typed::{Event, Packet};
 use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder, Status};
-use triergon_subtitles::{dvb, dvd, pgs::PacketClock};
+use triergon_subtitles::{dvb, pgs::PacketClock};
 
 const NS_PER_SECOND: u64 = 1_000_000_000;
 
@@ -169,22 +169,6 @@ impl MatroskaBitmapTrack {
 
     pub(super) fn pool(&self) -> &Budget {
         &self.pool
-    }
-
-    /// Read the effective VobSub palette and canvas under the caller's work
-    /// budget. The job owns a shared view of the original configuration.
-    pub fn vobsub_configuration(&self, limits: dvd::ConfigLimits) -> Result<dvd::ConfigJob> {
-        if !matches!(self.codec, Codec::VobSub) {
-            return Err(Error::Invalid(
-                "VobSub configuration requires a VobSub track",
-            ));
-        }
-        let raw = self
-            .association
-            .configuration
-            .initialization_bytes(self.association.track)
-            .ok_or(Error::Invalid("missing Matroska VobSub initialization"))?;
-        dvd::ConfigJob::new(raw, &self.pool, limits)
     }
 
     /// The selected service and the original five-byte CodecPrivate.
