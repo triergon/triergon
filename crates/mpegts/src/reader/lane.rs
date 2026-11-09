@@ -1365,17 +1365,26 @@ impl Lane {
                     if let Some(input) = &mut self.input {
                         // Retiring a consumed prefix leaves the current PES at
                         // the tail until its final byte has been handed off.
-                        let span = self
-                            .pieces
-                            .as_slice()
-                            .last()
-                            .and_then(|piece| piece.source.pes().spans().get(input.span));
-                        let Some(span) = span else {
+                        let Some(piece) = self.pieces.as_slice().last() else {
+                            self.input = None;
+                            continue;
+                        };
+                        let pes = piece.source.pes();
+                        let Some(span) = pes.spans().get(input.span) else {
                             self.input = None;
                             continue;
                         };
                         if !work.try_charge(1) {
                             return Ok(LaneStep::Yield);
+                        }
+                        if let Framer::Eac3(reader) = framer
+                            && input.span == 0
+                            && input.offset == 0
+                            && reader.provide_complete(&request, pes, work, cancel)?
+                        {
+                            self.supplied = piece.range.end;
+                            self.input = None;
+                            continue;
                         }
                         let bytes = span.payload_bytes()?;
                         let length = bytes.len();

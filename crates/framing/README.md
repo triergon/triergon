@@ -151,6 +151,8 @@ payload for passthrough packets.
   search, no word-swapped or IEC 61937 input, and no CRC or audio-block check.
   bsid 9/10 and E-AC-3 mixing definition 3 are refused. `sample_span()` is the
   coded duration of one frame, not a presentation time.
+  `Ac3FrameReader::read_frame_parts` can consume a complete aligned frame
+  from several slices when the first slice contains its header prefix.
 - DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no
   resync, termination frames or DTS-HD extension parsing. HCRC is reported, not
   checked.

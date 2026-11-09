@@ -184,6 +184,8 @@ syncframes carry no dependents. Additional independent services and mixed
 AC-3/E-AC-3 elementary streams are outside this lane. Each group ends at
 the next validated independent syncframe or clean logical EOF. An interrupted
 or truncated pending group follows the existing interruption or audio EOF policy.
+The reader can assemble a complete syncframe from the spans of one PES directly.
+Syncframes split across PES use the streaming frame reader.
 `Ac3AccessUnit::syncframes()` returns all syncframe facts in order and
 `Ac3AccessUnit::bytes()` returns the complete group. Its sample span and PES
 anchor use the primary syncframe. `maximum_audio_frame_bytes` bounds each
