@@ -9,7 +9,7 @@
  * returns AVERROR_EOF. FFmpeg probes the packet size itself, and its demuxer has no
  * caller-declared descriptor namespace, so the size and --dvb arguments describe
  * the candidate's request only. An operation over more than one media entity has
- * no single-input equivalent here and is refused. The ts-au modes enable codec
+ * no single-input equivalent in ts modes and is refused. The ts-au modes enable codec
  * parsing while retaining NOFILLIN and the same program filter and packet fold;
  * they observe access units separately from the unchanged PES operation. */
 #include <libavformat/avformat.h>
@@ -64,6 +64,31 @@ static int ts_in_program(const AVFormatContext *format, int index, int program)
     return 0;
 }
 
+static void ts_fold_packet(const AVFormatContext *format, const AVPacket *packet,
+                           int program, TsWork *work)
+{
+    if (!ts_in_program(format, packet->stream_index, program))
+        return;
+    const AVStream *stream = format->streams[packet->stream_index];
+    uint64_t fields[] = {
+        (uint64_t)packet->stream_index, (uint64_t)stream->id, (uint64_t)packet->pts,
+        (uint64_t)packet->dts, (uint64_t)packet->duration, (uint64_t)packet->pos,
+        (uint64_t)packet->flags, (uint64_t)packet->size,
+    };
+    for (size_t i = 0; i < sizeof(fields) / sizeof(*fields); ++i)
+        fold(&work->digest, fields[i]);
+    fold_bytes(&work->digest, packet->data, (size_t)packet->size);
+    fold(&work->digest, (uint64_t)packet->side_data_elems);
+    for (int i = 0; i < packet->side_data_elems; ++i) {
+        const AVPacketSideData *side = &packet->side_data[i];
+        fold(&work->digest, (uint64_t)side->type);
+        fold(&work->digest, (uint64_t)side->size);
+        fold_bytes(&work->digest, side->data, side->size);
+    }
+    work->packets++;
+    work->bytes += (uint64_t)packet->size;
+}
+
 /* One operation. Returns 1 at AVERROR_EOF, or the negative error that stopped the
  * demuxer before it. */
 static int ts_operation(const uint8_t *bytes, size_t size, int program,
@@ -97,26 +122,7 @@ static int ts_operation(const uint8_t *bytes, size_t size, int program,
         goto done;
     }
     while ((rc = av_read_frame(format, packet)) >= 0) {
-        if (ts_in_program(format, packet->stream_index, program)) {
-            const AVStream *stream = format->streams[packet->stream_index];
-            uint64_t fields[] = {
-                (uint64_t)packet->stream_index, (uint64_t)stream->id, (uint64_t)packet->pts,
-                (uint64_t)packet->dts, (uint64_t)packet->duration, (uint64_t)packet->pos,
-                (uint64_t)packet->flags, (uint64_t)packet->size,
-            };
-            for (size_t i = 0; i < sizeof(fields) / sizeof(*fields); ++i)
-                fold(&work->digest, fields[i]);
-            fold_bytes(&work->digest, packet->data, (size_t)packet->size);
-            fold(&work->digest, (uint64_t)packet->side_data_elems);
-            for (int i = 0; i < packet->side_data_elems; ++i) {
-                const AVPacketSideData *side = &packet->side_data[i];
-                fold(&work->digest, (uint64_t)side->type);
-                fold(&work->digest, (uint64_t)side->size);
-                fold_bytes(&work->digest, side->data, side->size);
-            }
-            work->packets++;
-            work->bytes += (uint64_t)packet->size;
-        }
+        ts_fold_packet(format, packet, program, work);
         av_packet_unref(packet);
     }
     rc = rc == AVERROR_EOF ? 1 : rc;
@@ -129,6 +135,8 @@ done:
     }
     return rc;
 }
+
+#include "reference_ts_sequence.h"
 
 /* ts-fold FILE SIZE PROGRAM [OPTIONS] | ts-bench FILE N SIZE PROGRAM [OPTIONS] |
  * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb and further entities.
@@ -162,14 +170,22 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
             continue;
         refusal = "no single-input reference operation for more than one media entity";
     }
+    TsEntities source = {0};
+    int result = 2;
+    if (access_units && refusal) {
+        if (ts_entities_load(&source, argc, argv, at, bytes, (size_t)size) < 0)
+            goto done;
+        refusal = NULL;
+    }
     if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18)
-        return 2;
+        goto done;
     TsWork total = {0, 0, 0};
     int eof = 0, rc = 0;
     const uint64_t start = bench ? now_ns() : 0;
     for (unsigned long i = 0; i < iterations && !refusal; ++i) {
         TsWork work = {0, 0, 0};
-        rc = ts_operation(bytes, (size_t)size, (int)program, access_units, &work);
+        rc = source.count ? ts_entities_operation(&source, (int)program, &work)
+            : ts_operation(bytes, (size_t)size, (int)program, access_units, &work);
         fold(&total.digest, work.digest);
         total.packets += work.packets;
         total.bytes += work.bytes;
@@ -181,7 +197,7 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     }
     const uint64_t elapsed = bench ? now_ns() - start : 0;
     if (memory && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16)
-        return 2;
+        goto done;
     printf("{\"schema\":1,\"operation\":\"%s\",\"iterations\":%lu,\"packets\":%" PRIu64
            ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 ",\"eof\":%s",
            access_units ? TS_AU_OPERATION : TS_OPERATION,
@@ -197,5 +213,8 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
         }
     }
     printf("}\n");
-    return 0;
+    result = 0;
+done:
+    ts_entities_free(&source);
+    return result;
 }

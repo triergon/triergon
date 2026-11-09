@@ -351,6 +351,9 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     if name == "isobmff-worker" {
         inputs.extend(crate::isobmff_bench::source_inputs(root)?);
     }
+    if name == "playback-worker" {
+        inputs.extend(crate::transport_fixtures::entity_inputs(root)?);
+    }
     if name == "framing-worker" {
         inputs.extend(
             [

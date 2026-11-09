@@ -78,6 +78,31 @@ fn cases(v: &Value) -> R<&[Value]> {
         .ok_or_else(|| "missing cases".into())
 }
 
+fn entities(row: &Value) -> &[Value] {
+    row.get("entities")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+}
+
+fn checked_input(root: &Path, record: &Value) -> R<String> {
+    let path = text(record, "file")?;
+    let raw = fs::read(root.join(path)).map_err(|e| format!("{path}: {e}"))?;
+    if sha256::hex(&raw) != text(record, "sha256")? {
+        return Err(format!("original input changed: {path}"));
+    }
+    Ok(path.to_owned())
+}
+
+/// Bind every entity consumed by the reference, including non-primary files.
+pub fn entity_inputs(root: &Path) -> R<Vec<String>> {
+    let manifest = read_json(&root.join(ORIGINAL))?;
+    cases(&manifest)?
+        .iter()
+        .flat_map(entities)
+        .map(|entity| checked_input(root, entity))
+        .collect()
+}
+
 fn put(v: &mut Value, key: &str, value: Value) -> R<()> {
     let Value::Object(fields) = v else {
         return Err("expected an object".into());
@@ -125,15 +150,22 @@ fn original(root: &Path) -> R<Vec<Case>> {
     }
     rows.iter()
         .map(|row| {
-            let raw = fs::read(root.join(text(row, "file")?)).map_err(|e| e.to_string())?;
-            if sha256::hex(&raw) != text(row, "sha256")? {
-                return Err(format!("original input changed: {}", text(row, "id")?));
+            for input in std::iter::once(row).chain(entities(row)) {
+                checked_input(root, input)?;
             }
+            let sequence = entities(row).len() > 1;
             let mut row = row.clone();
             let Value::Object(fields) = &mut row else {
                 return Err("invalid original case".into());
             };
             fields.retain(|(key, _)| key != "expected");
+            if sequence {
+                for (key, _) in fields {
+                    if key == "reference_refusal" {
+                        *key = "single_input_reference_refusal".into();
+                    }
+                }
+            }
             Ok(Case { row, bytes: None })
         })
         .collect()
@@ -660,8 +692,9 @@ fn contract(cases: &[Case]) -> R<Value> {
         (
             "contract",
             Value::strings([
-                "One preloaded TS188 or M2TS192 input, SIZE PROGRAM [--dvb] and the original media-entity arguments; forward input through the public MPEG-TS access-unit reader, with no PES-as-AU fallback.",
+                "Preloaded TS188 or M2TS192 input, SIZE PROGRAM [--dvb] and the original ordered media-entity arguments; the candidate uses the public MPEG-TS access-unit reader, with no PES-as-AU fallback.",
                 "Reference: the MPEG-TS demuxer with custom AVIO, NOFILLIN, parsers enabled, no stream discovery and no decoders; every parsed packet of the selected program in demux order, including EOF parser drain.",
+                "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
                 "Fold stream index, PID, signed PTS and DTS in 90kHz ticks (absent as INT64_MIN), duration, position, flags, payload length and every byte, then every side-data element's type, size and bytes.",
                 "Each complete operation reaches EOF and contributes its packet count, byte count and ordered digest. Both workers must match the independently recorded parser-enabled reference fold. All temporary operation storage is released before the memory END marker.",
                 "The 97 retained PES input/argument tuples preserve their 272 request associations and use parser-enabled AU expectations. Opaque, damaged and unsupported inputs remain observations that may fail; they are never reclassified as genuine access units or removed.",
@@ -702,16 +735,17 @@ fn reference(root: &Path, input: &Path, row: &Value, recording: Recording<'_>) -
         write_json(&recording.directory.join(format!("{id}.json")), &timeout)?;
         return Ok(timeout);
     };
-    fs::write(
-        recording.directory.join(format!("{id}.stdout")),
-        &done.stdout,
-    )
-    .map_err(|e| e.to_string())?;
-    fs::write(
-        recording.directory.join(format!("{id}.stderr")),
-        &done.stderr,
-    )
-    .map_err(|e| e.to_string())?;
+    save_reference_result(id, recording.directory, &argv, &done)
+}
+
+fn save_reference_result(
+    id: &str,
+    directory: &Path,
+    argv: &[OsString],
+    done: &worker::Finished,
+) -> R<Value> {
+    fs::write(directory.join(format!("{id}.stdout")), &done.stdout).map_err(|e| e.to_string())?;
+    fs::write(directory.join(format!("{id}.stderr")), &done.stderr).map_err(|e| e.to_string())?;
     let parsed = std::str::from_utf8(&done.stdout)
         .ok()
         .and_then(|s| json::parse(s).ok());
@@ -729,7 +763,7 @@ fn reference(root: &Path, input: &Path, row: &Value, recording: Recording<'_>) -
         ("stderr", Value::str(String::from_utf8_lossy(&done.stderr))),
         ("data", parsed.unwrap_or(Value::Null)),
     ]);
-    let observation = Value::object([
+    let raw = Value::object([
         (
             "argv",
             Value::strings(argv.iter().map(|a| a.to_string_lossy().into_owned())),
@@ -738,7 +772,7 @@ fn reference(root: &Path, input: &Path, row: &Value, recording: Recording<'_>) -
         ("stderr_sha256", Value::str(sha256::hex(&done.stderr))),
         ("observation", observation.clone()),
     ]);
-    write_json(&recording.directory.join(format!("{id}.json")), &observation)?;
+    write_json(&directory.join(format!("{id}.json")), &raw)?;
     if done.code == 0
         && observation
             .get("data")
@@ -829,8 +863,16 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
         };
         let (work, result_hash) = if let Some(recording) = recording {
             let observation = reference(&paths.root, &input, &case.row, recording)?;
-            let result_hash = observation_hash(&observation);
             let id = text(&case.row, "id")?;
+            if entities(&case.row).len() > 1
+                && observation.get("data").and_then(|data| data.get("eof"))
+                    != Some(&Value::Bool(true))
+            {
+                return Err(format!(
+                    "reference did not reach the final entity's EOF: {id}"
+                ));
+            }
+            let result_hash = observation_hash(&observation);
             let observation_path = recording.directory.join(format!("{id}.json"));
             private_observations.push(Value::object([
                 ("id", Value::str(id)),
@@ -1049,6 +1091,27 @@ mod tests {
     }
 
     #[test]
+    fn private_reference_archive_does_not_replace_the_result_used_for_pins() {
+        let out = crate::walk::scratch("transport-reference-result");
+        fs::create_dir_all(&out).unwrap();
+        let done = worker::Finished {
+            code: 0,
+            stdout: format!(
+                "{{\"operation\":\"{OPERATION}\",\"iterations\":1,\"packets\":2,\"bytes\":579,\"digest\":7,\"eof\":true}}\n"
+            ).into_bytes(),
+            stderr: b"[parser @ 0x1234] diagnostic\n".to_vec(),
+        };
+        let result = save_reference_result("sample", &out, &["worker".into()], &done).unwrap();
+        assert_eq!(expected(&result).get("packets"), Some(&Value::int(2)));
+        let raw = read_json(&out.join("sample.json")).unwrap();
+        assert_eq!(raw.get("observation"), Some(&result));
+        assert!(result.get("argv").is_none());
+        assert_eq!(fs::read(out.join("sample.stdout")).unwrap(), done.stdout);
+        assert_eq!(fs::read(out.join("sample.stderr")).unwrap(), done.stderr);
+        fs::remove_dir_all(out).unwrap();
+    }
+
+    #[test]
     fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
         let original = read_json(&root().join(ORIGINAL)).unwrap();
         let generated = all_cases(root()).unwrap();
@@ -1078,10 +1141,40 @@ mod tests {
     }
 
     #[test]
-    fn interleaved_controls_append_without_changing_the_previous141_pins() {
+    fn single_input_pins_stay_identical_when_sequence_reference_outputs_change() {
         let manifest = read_json(&root().join(format!("harness/{FEATURE}/corpus.json"))).unwrap();
         let rows = cases(&manifest).unwrap();
-        let prior = Value::Array(rows[..141].to_vec());
+        let mut prior = rows[..141].to_vec();
+        let mut sequences = 0;
+        for row in &mut prior {
+            if entities(row).len() > 1 {
+                sequences += 1;
+                assert!(row.get("reference_refusal").is_none());
+                let Value::Object(fields) = row else {
+                    unreachable!()
+                };
+                for (key, value) in fields {
+                    match key.as_str() {
+                        "single_input_reference_refusal" => *key = "reference_refusal".into(),
+                        "expected" => {
+                            *value = Value::object([
+                                ("packets", Value::int(0)),
+                                ("bytes", Value::int(0)),
+                                ("digest", Value::int(0)),
+                            ]);
+                        }
+                        "reference_result_sha256" => {
+                            *value = Value::str(
+                                "2345439b3fcd5eeec57a4a399ca8f944d7172120478247cbeb53500ff6eee257",
+                            );
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+        assert_eq!(sequences, 3);
+        let prior = Value::Array(prior);
         assert_eq!(
             sha256::hex(crate::harness::manifest::canonical(&prior).as_bytes()),
             "70a05f8e72322c9b4966bc0751397f7cc06a7088c6819800cd22d35f1901ad6e"

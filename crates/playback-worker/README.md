@@ -64,3 +64,8 @@ diagnostics carry their exact source location.
 
 The contracts are in `harness/features/<contract>/`. Packet-fold corpora record
 the repository root as their `directory` and name inputs relative to it.
+
+For ordered MPEG-TS entities, the access-unit reference carries parser state
+across contiguous input and initialization maps. An explicit discontinuity
+flushes the parser before the next entity. Only the final EOF drains it. The
+candidate access-unit reader currently requires one media entity.

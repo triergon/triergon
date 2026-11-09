@@ -219,7 +219,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
     if request.more_entities {
         return Ok(refused(
             totals,
-            &"no single-input reference operation for more than one media entity",
+            &"access-unit reader requires a single media entity",
             0,
         ));
     }
