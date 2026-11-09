@@ -321,7 +321,7 @@ pub(super) struct GlyphPlacement<'a> {
 }
 
 impl GlyphPlacement<'_> {
-    /// What [`Raster::render`](triergon_raster::Raster::render) draws for it.
+    /// What [`Run::place`](triergon_raster::Run::place) places.
     pub(super) fn request(&self, frame: &FrameScale) -> GlyphRequest<'_> {
         GlyphRequest {
             shape: &self.outline.shape,

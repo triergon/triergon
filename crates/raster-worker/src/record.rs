@@ -4,7 +4,7 @@
 
 use std::io::{self, Write};
 use triergon_harness_protocol::digest::{fold, signed};
-use triergon_raster::{Bitmap, Outline, SegmentKind};
+use triergon_raster::{Bitmap, Outline, PlacedBitmap, SegmentKind, Vector};
 
 /// The digest value of an absent outline or bitmap.
 const ABSENT: u64 = u64::MAX;
@@ -98,14 +98,31 @@ pub trait Sink {
     /// Position, size, stride and the FNV-1a hash of every row over the whole
     /// stride, the padding included, or absent.
     fn bitmap(&mut self, bitmap: Option<&Bitmap>) -> io::Result<()> {
+        self.bitmap_at(bitmap, Vector::default())
+    }
+
+    /// A glyph's bitmap with its position counted from `origin`, the glyph's.
+    fn placed_bitmap(&mut self, placed: Option<&PlacedBitmap>, origin: Vector) -> io::Result<()> {
+        let Some(placed) = placed else {
+            return self.absent();
+        };
+        let shift = Vector::new(
+            placed.origin.x.wrapping_sub(origin.x),
+            placed.origin.y.wrapping_sub(origin.y),
+        );
+        self.bitmap_at(Some(&placed.bitmap), shift)
+    }
+
+    /// A bitmap with its position moved by `shift`.
+    fn bitmap_at(&mut self, bitmap: Option<&Bitmap>, shift: Vector) -> io::Result<()> {
         let Some(b) = bitmap else {
             return self.absent();
         };
         let hash = fnv(FNV_INIT, b.data());
         self.count_bytes(b.width() * b.height());
         self.values(&[
-            b.position.x.into(),
-            b.position.y.into(),
+            b.position.x.wrapping_add(shift.x).into(),
+            b.position.y.wrapping_add(shift.y).into(),
             b.width() as i64,
             b.height() as i64,
             b.stride() as i64,

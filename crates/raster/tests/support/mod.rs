@@ -5,7 +5,7 @@ use triergon_core::{Budget, WorkBudget};
 use triergon_font::{OutlinePoint, Point, PointKind};
 use triergon_raster::{
     Bitmap, Border, Clip, ClipFrame, Effects, FrameScale, GlyphRequest, Limits, Matrix, Outline,
-    Pen, Placement, Projection, Raster, Rect, Run, Shadow, Shape, Vector,
+    Pen, Placement, Projection, Quantized, Raster, Rect, Run, Shadow, Shape, Vector,
 };
 
 /// xorshift64.
@@ -166,8 +166,10 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
     }
 
     let _ = raster.rasterize(&stroked, &mut work);
-    if let Ok(Some(drawn)) = raster.draw(&stroked, &matrix(rng), &mut work) {
-        assert!(drawn.glyph().is_some() && drawn.border().is_none());
+    if let Some(at) = Quantized::standalone(&stroked, &matrix(rng))
+        && let Ok(Some(drawn)) = raster.draw(&stroked, &at.transform, &mut work)
+    {
+        assert!(drawn.width() > 0 && drawn.height() > 0);
     }
 
     let shape = Shape::from_outlines(outline, Outline::new(&budget));
@@ -226,9 +228,9 @@ pub fn exercise(source: &Source, rng: &mut Rng, limits: Limits, work: u64) {
         }
     }
     if let Some(bitmaps) = rendered.first() {
-        let _ = (bitmaps.key(), bitmaps.origin());
+        let _ = (bitmaps.origin(), bitmaps.border_origin());
         if let Some(border) = bitmaps.border() {
-            assert!(border.width() > 0 && border.height() > 0);
+            assert!(border.bitmap.width() > 0 && border.bitmap.height() > 0);
         }
     }
 

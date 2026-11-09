@@ -32,9 +32,14 @@ impl Shape {
         shape
     }
 
-    /// The unit square (0, 0)–(64, 64), which a transform scales into the opaque
+    /// The unit square (0, 0)–(64, 64), which the transform of
+    /// [`PlacedBorder::Box`](crate::PlacedBorder::Box) scales into the opaque
     /// box of `\bord` style 3.
-    pub(crate) fn unit_box(budget: &Budget) -> Result<Self> {
+    ///
+    /// # Errors
+    ///
+    /// The budget's errors.
+    pub fn unit_box(budget: &Budget) -> Result<Self> {
         let mut outline = Outline::new(budget);
         outline.push_rect(Vector::new(0, 0), Vector::new(64, 64))?;
         Ok(Self::from_outlines(outline, Outline::new(budget)))

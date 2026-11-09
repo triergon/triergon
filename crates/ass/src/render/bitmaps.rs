@@ -7,11 +7,12 @@ use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::{
-    Bitmap, EffectsKey, FrameScale, GlyphBitmaps, Matrix, Raster, Run, Shape, ShapedKey, Vector,
+    Bitmap, BitmapTransform, BorderStroke, EffectsKey, FrameScale, GlyphBitmaps, Matrix,
+    PlacedBitmap, PlacedBorder, Quantized, Raster, Run, Shape, Vector,
 };
 
 use super::outlines::OutlineValue;
-use super::placement::{PlacedRun, Placer, Runs};
+use super::placement::{GlyphPlacement, PlacedRun, Placer, Runs};
 use super::units::d6_to_double;
 use crate::{Karaoke, Rgba};
 
@@ -45,13 +46,34 @@ impl PartialEq for OutlineId {
     }
 }
 
-/// One glyph of a run's composite key (libass's `BitmapRef`): its bitmaps,
-/// with the outline they are drawn from where they depend on it, and their
-/// origin in the run.
+/// What a bitmap is drawn from: the outline of libass's bitmap key.
+#[derive(Clone, Debug, PartialEq)]
+enum BitmapSource {
+    /// A glyph's or drawing's outline.
+    Outline(OutlineId),
+    /// The border stroked around an outline.
+    Border(OutlineId, BorderStroke),
+    /// The opaque box, the same for every glyph.
+    Box,
+}
+
+/// What identifies a bitmap (libass's `BitmapHashKey`): what it is drawn
+/// from and the quantised transform it is drawn under.
+#[derive(Clone, Debug, PartialEq)]
+struct BitmapKey {
+    source: BitmapSource,
+    transform: BitmapTransform,
+}
+
+/// One glyph of a run's composite key (libass's `BitmapRef`): its fill and
+/// border bitmaps, each `None` when it draws nothing, and their origins in
+/// the run.
 #[derive(Clone, Debug, PartialEq)]
 struct GlyphRef {
-    key: ShapedKey<OutlineId>,
-    offset: Vector,
+    fill: Option<BitmapKey>,
+    border: Option<BitmapKey>,
+    origin: Vector,
+    border_origin: Vector,
 }
 
 /// A run's composite key (libass's `CompositeHashKey`): its effects and every
@@ -68,38 +90,50 @@ impl PartialEq for RunKey {
     }
 }
 
-/// A glyph's bitmaps while its run is collected, with the outline they are
-/// drawn from.
+/// A glyph's bitmaps while its run is collected, with their keys.
 #[derive(Debug)]
 struct Drawn {
-    outline: Arc<OutlineValue>,
     bitmaps: GlyphBitmaps,
+    fill: Option<BitmapKey>,
+    border: Option<BitmapKey>,
 }
 
-/// The renderer's drawing state: the rasterising context.
+/// A bitmap drawn for a glyph, with its key.
+type Keyed = (BitmapKey, PlacedBitmap);
+
+/// The renderer's drawing state: the rasterising context and the unit
+/// square opaque boxes are drawn from.
 #[derive(Debug)]
 pub(super) struct Painter {
     budget: Budget,
     raster: Raster,
+    unit_box: Shape,
 }
 
 impl Painter {
-    pub(super) fn new(budget: &Budget, limits: triergon_raster::Limits) -> Self {
-        Self {
+    pub(super) fn new(budget: &Budget, limits: triergon_raster::Limits) -> Result<Self> {
+        Ok(Self {
             budget: budget.clone(),
             raster: Raster::new(budget, limits),
-        }
+            unit_box: Shape::unit_box(budget)?,
+        })
     }
 
     /// Draws `shape` under a plain matrix as a bitmap of its own: a vector
-    /// clip.
+    /// clip. `None` when nothing is drawn.
     pub(super) fn draw_shape(
         &mut self,
         shape: &Shape,
         matrix: &Matrix,
         work: &mut WorkBudget,
-    ) -> Result<Option<GlyphBitmaps>> {
-        self.raster.draw(shape, matrix, work)
+    ) -> Result<Option<PlacedBitmap>> {
+        let Some(at) = Quantized::standalone(shape, matrix) else {
+            return Ok(None);
+        };
+        Ok(self
+            .raster
+            .draw(shape, &at.transform, work)?
+            .map(|bitmap| placed(bitmap, at)))
     }
 
     /// Draws and combines an event's runs, in order, into `out`.
@@ -117,18 +151,78 @@ impl Painter {
             let mut run = Run::default();
             let mut drawn = BudgetVec::new(&self.budget);
             for glyph in glyphs.iter().filter_map(|g| placer.glyph(g)) {
-                if let Some(bitmaps) = self.raster.render(&glyph.request(frame), &mut run, work)? {
-                    drawn
-                        .try_push(Drawn {
-                            outline: Arc::clone(glyph.outline),
-                            bitmaps,
-                        })
-                        .map_err(|e| e.error)?;
+                if let Some(glyph) = self.draw_glyph(&glyph, frame, &mut run, work)? {
+                    drawn.try_push(glyph).map_err(|e| e.error)?;
                 }
             }
             self.finish(placed, &run, &drawn, frame, out, work)?;
         }
         Ok(())
+    }
+
+    /// Places one glyph in `run` and draws its fill and border, as libass's
+    /// `get_bitmap_glyph` does; `None` when it draws nothing.
+    fn draw_glyph(
+        &mut self,
+        glyph: &GlyphPlacement<'_>,
+        frame: &FrameScale,
+        run: &mut Run,
+        work: &mut WorkBudget,
+    ) -> Result<Option<Drawn>> {
+        let Some(placement) = run.place(&glyph.request(frame)) else {
+            return Ok(None);
+        };
+        let shape = &glyph.outline.shape;
+        let outline = || OutlineId(Arc::clone(glyph.outline));
+        let fill_at = placement.fill();
+        let fill = self
+            .raster
+            .draw(shape, &fill_at.transform, work)?
+            .map(|bitmap| {
+                let key = BitmapKey {
+                    source: BitmapSource::Outline(outline()),
+                    transform: fill_at.transform,
+                };
+                (key, placed(bitmap, fill_at))
+            });
+        let border: Option<Keyed> =
+            match placement.border() {
+                PlacedBorder::None => None,
+                PlacedBorder::Fill => fill.clone(),
+                PlacedBorder::Box(at) => self
+                    .raster
+                    .draw(&self.unit_box, &at.transform, work)?
+                    .map(|bitmap| {
+                        let key = BitmapKey {
+                            source: BitmapSource::Box,
+                            transform: at.transform,
+                        };
+                        (key, placed(bitmap, at))
+                    }),
+                PlacedBorder::Stroke(stroke) => {
+                    let stroked = self.raster.stroke_border(shape, &stroke, work)?;
+                    match stroked.and_then(|s| Some((placement.place_stroke(&s)?, s))) {
+                        Some((at, stroked)) => self
+                            .raster
+                            .draw(&stroked, &at.transform, work)?
+                            .map(|bitmap| {
+                                let key = BitmapKey {
+                                    source: BitmapSource::Border(outline(), stroke),
+                                    transform: at.transform,
+                                };
+                                (key, placed(bitmap, at))
+                            }),
+                        None => None,
+                    }
+                }
+            };
+        let (fill_key, fill) = fill.unzip();
+        let (border_key, border) = border.unzip();
+        Ok(run.add(fill, border).map(|bitmaps| Drawn {
+            bitmaps,
+            fill: fill_key,
+            border: border_key,
+        }))
     }
 
     /// Composites a drawn run.
@@ -161,18 +255,19 @@ impl Painter {
             glyphs: BudgetVec::new(&self.budget),
         };
         key.glyphs.try_reserve_exact(drawn.len())?;
+        let in_run = |at: Vector| {
+            Vector::new(
+                at.x.wrapping_sub(composite.origin.x),
+                at.y.wrapping_sub(composite.origin.y),
+            )
+        };
         for d in drawn {
-            let origin = d.bitmaps.origin();
             key.glyphs
                 .try_push(GlyphRef {
-                    key: d
-                        .bitmaps
-                        .key()
-                        .with_shape(OutlineId(Arc::clone(&d.outline))),
-                    offset: Vector::new(
-                        origin.x.wrapping_sub(composite.origin.x),
-                        origin.y.wrapping_sub(composite.origin.y),
-                    ),
+                    fill: d.fill.clone(),
+                    border: d.border.clone(),
+                    origin: in_run(d.bitmaps.origin()),
+                    border_origin: in_run(d.bitmaps.border_origin()),
                 })
                 .map_err(|e| e.error)?;
         }
@@ -188,5 +283,13 @@ impl Painter {
         })
         .map_err(|e| e.error)?;
         Ok(())
+    }
+}
+
+/// `bitmap` placed where `at` puts it.
+fn placed(bitmap: Bitmap, at: Quantized) -> PlacedBitmap {
+    PlacedBitmap {
+        bitmap: Arc::new(bitmap),
+        origin: at.position,
     }
 }

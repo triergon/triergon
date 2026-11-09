@@ -142,7 +142,7 @@ impl Renderer {
                 library: Library::new(budget, fonts)?,
                 outlines: Outlines::new(budget),
                 shaper: Shaper::new(budget),
-                painter: Painter::new(budget, triergon_raster::Limits::default()),
+                painter: Painter::new(budget, triergon_raster::Limits::default())?,
                 text: Text::new(budget),
                 shaped: Shaped::new(budget),
                 layout: Layout::new(budget),
@@ -472,8 +472,8 @@ impl Pipeline {
         Ok(self
             .painter
             .draw_shape(&outline.shape, &matrix, work)?
-            .map(|bitmaps| ClipMask {
-                bitmaps,
+            .map(|bitmap| ClipMask {
+                bitmap,
                 inverse: clip.inverse,
             }))
     }

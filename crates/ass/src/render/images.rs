@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, GlyphBitmaps, Limits, Rect};
+use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, Limits, PlacedBitmap, Rect};
 
 use super::bitmaps::{Combined, RunKey};
 use crate::{Karaoke, Rgba};
@@ -179,7 +179,7 @@ pub(super) struct Clipping {
 /// A vector clip drawn in the frame: its drawing's fill.
 #[derive(Debug)]
 pub(super) struct ClipMask {
-    pub bitmaps: GlyphBitmaps,
+    pub bitmap: PlacedBitmap,
     pub inverse: bool,
 }
 
@@ -284,11 +284,8 @@ pub(super) fn render_text(
 fn blend_vector_clip(image: &mut Image, mask: &ClipMask, budget: &Budget) -> Result<()> {
     let (ax, ay) = (image.x, image.y);
     let (aw, ah) = (image.width as i32, image.height as i32);
-    // `Raster::draw` returns the fill whenever it draws anything.
-    let Some(clip) = mask.bitmaps.glyph() else {
-        return Ok(());
-    };
-    let origin = mask.bitmaps.origin();
+    let clip = &*mask.bitmap.bitmap;
+    let origin = mask.bitmap.origin;
     let bx = origin.x.wrapping_add(clip.position.x);
     let by = origin.y.wrapping_add(clip.position.y);
     let (bw, bh) = (clip.width() as i32, clip.height() as i32);
