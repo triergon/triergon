@@ -348,7 +348,9 @@ composites and vector clips, charged as `triergon-raster` charges them) and
 collision handling (each event against those placed before it in its
 layer). The charge grows linearly with the events and their text. Where
 libass would go on drawing, running out is `Error::Policy`; a caller that
-wants libass's unbounded behaviour raises the setting. Shaping and bidi also
+wants libass's unbounded behaviour raises the setting. With the `work-probe`
+feature, a development aid, `Renderer::work_spent` gives what the last frame
+spent. Shaping and bidi also
 run under the limits of their crates.
 Malformed input is read as libass reads it, skipping what it skips, and never
 panics.
@@ -379,6 +381,13 @@ panics.
   glyphs and 24 MiB): 54/56 pass. The box behind a `BorderStyle` 4 event is
   compared without its kind, since libass leaves its type uninitialised. The
   two open cases are the fixture with an `@` font.
+- `cargo xtask ass equivalence --base REV` renders the `ass-render`
+  fixtures at their frames and every 40 ms, mutations of them with varied
+  settings and style overrides, and scripts generated from a seed, with the
+  renderer of REV and of the working tree (`examples/equivalence.rs`, built
+  with the `work-probe` feature), and requires the same change, images,
+  error and work for every frame; it prints the peak budget of each
+  workload for both.
 
 The comparison establishes agreement with libass on that corpus, not conformance
 with any specification of the format.

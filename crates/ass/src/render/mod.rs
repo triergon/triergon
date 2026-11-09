@@ -1,6 +1,12 @@
 //! Rendering a script's events at a time into positioned alpha images, as
 //! libass 0.17.5's `ass_render_frame` does with hinting off and complex
 //! shaping, its defaults.
+//!
+//! An event passes through stages, each reading the ones before it and
+//! filling its own storage, kept from event to event: its text evaluated
+//! ([`text`]), shaped into clusters ([`shaping`]), laid out in lines
+//! ([`layout`], [`wrap`]), placed in the frame ([`placement`]), and drawn
+//! ([`bitmaps`]) into images ([`images`]).
 
 mod bitmaps;
 mod collisions;
@@ -9,31 +15,32 @@ mod geometry;
 mod images;
 mod layout;
 mod outlines;
+mod placement;
 mod shaping;
 mod text;
+mod units;
+mod wrap;
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
-use triergon_raster::{Clip as ClipRect, ClipFrame, FrameScale, Matrix, Rect, Vector, pixels_26_6};
+use triergon_raster::{Clip as ClipRect, ClipFrame, FrameScale, Matrix, Rect};
 
-use crate::{
-    Context, EventState, GlyphState, HAlign, Justify, KaraokeGlyph, Placement as EventPlacement,
-    Script, ScrollDirection, VAlign, charge,
-};
-use bitmaps::{Combined, Painter, apply_fade};
+use crate::{Context, EventState, Script, charge};
+use bitmaps::{Combined, Painter};
 use collisions::EventBox;
 pub(crate) use collisions::Placed;
 pub use fonts::Fonts;
 use fonts::Library;
 pub use geometry::{CacheLimits, FrameMargins, Settings, Size};
-use geometry::{Canvas, Geometry};
+use geometry::{Canvas, Geometry, Scales};
 pub use images::{Change, Image, ImageKind};
 use images::{ClipMask, Clipping};
-use layout::{Lines, TextBox};
+use layout::{Input, Layout, Room, Sources};
 use outlines::Outlines;
-use shaping::{Shaper, Shaping};
-use text::Glyphs;
+use placement::{Anchor, Placer, Runs, apply_fade};
+use shaping::{Shaped, Shaper, Shaping};
+use text::{DrawingText, Evaluated, Text};
 
 /// One rendered frame.
 #[derive(Clone, Copy, Debug)]
@@ -43,6 +50,22 @@ pub struct Frame<'r> {
     /// How they differ from the previous frame's (`ass_render_frame`'s
     /// `detect_change`).
     pub change: Change,
+}
+
+/// The spare capacity, in bytes, a stage's store keeps after it is filled.
+const SPARE_BYTES: usize = 128;
+
+/// Fits a stage's store to what the event filled it with: storage is kept
+/// from event to event, but spare capacity beyond [`SPARE_BYTES`] is given
+/// back, so an event drawn after a larger one does not hold the larger
+/// one's storage, and events of about one size reallocate nothing.
+#[inline]
+pub(super) fn fit<T>(store: &mut BudgetVec<T>) -> Result<()> {
+    let spare = SPARE_BYTES / size_of::<T>().max(1);
+    if store.capacity() - store.len() > spare {
+        store.try_shrink_to(store.len() + spare)?;
+    }
+    Ok(())
 }
 
 /// Identities of renderers, which collision records are tied to.
@@ -68,30 +91,39 @@ static RENDERERS: AtomicU32 = AtomicU32::new(1);
 /// ```
 #[derive(Debug)]
 pub struct Renderer {
-    budget: Budget,
-    frame: Canvas,
+    canvas: Canvas,
     id: u32,
+    pipeline: Pipeline,
+    /// The images of the last frame rendered, which [`Frame`] shows.
+    last_frame: BudgetVec<Image>,
+    /// The frame being assembled, then the one before it.
+    next_frame: BudgetVec<Image>,
+    boxes: BudgetVec<EventBox>,
+    placed: BudgetVec<Placed>,
+    used: BudgetVec<collisions::Rect>,
+    /// The work the last call to [`Renderer::render`] spent.
+    #[cfg(feature = "work-probe")]
+    work_spent: u64,
+}
+
+/// What renders one event: the font library, the outline cache, the shaper
+/// and the painter, which keep their state between frames, and the storage
+/// of every stage, which each event fills again.
+#[derive(Debug)]
+struct Pipeline {
+    budget: Budget,
     library: Library,
     outlines: Outlines,
     shaper: Shaper,
     painter: Painter,
-    images: BudgetVec<Image>,
-    scratch: Scratch,
-}
-
-/// Storage reused from event to event.
-#[derive(Debug)]
-struct Scratch {
-    runs: BudgetVec<Combined>,
-    map: BudgetVec<usize>,
-    karaoke: BudgetVec<KaraokeGlyph>,
-    lines: Lines,
-    images: BudgetVec<Image>,
-    boxes: BudgetVec<EventBox>,
-    placed: BudgetVec<Placed>,
-    /// The frame being assembled.
-    frame: BudgetVec<Image>,
-    used: BudgetVec<collisions::Rect>,
+    text: Text,
+    shaped: Shaped,
+    layout: Layout,
+    runs: Runs,
+    /// The composited runs of the event being drawn.
+    combined: BudgetVec<Combined>,
+    /// The images of every event rendered in the frame, event by event.
+    event_images: BudgetVec<Image>,
 }
 
 impl Renderer {
@@ -103,31 +135,28 @@ impl Renderer {
     /// `Invalid` for a frame with a side of 0, which libass draws nothing in.
     pub fn new(budget: &Budget, settings: &Settings, fonts: &Fonts) -> Result<Self> {
         Ok(Self {
-            budget: budget.clone(),
-            frame: Canvas::new(settings)?,
+            canvas: Canvas::new(settings)?,
             id: RENDERERS.fetch_add(1, Ordering::Relaxed),
-            library: Library::new(budget, fonts)?,
-            outlines: Outlines::new(budget),
-            shaper: Shaper::new(budget),
-            painter: Painter::new(budget, triergon_raster::Limits::default()),
-            images: BudgetVec::new(budget),
-            scratch: Scratch {
-                runs: BudgetVec::new(budget),
-                map: BudgetVec::new(budget),
-                karaoke: BudgetVec::new(budget),
-                lines: Lines {
-                    lines: BudgetVec::new(budget),
-                    height: 0.0,
-                    border_top: 0,
-                    border_bottom: 0,
-                    border_x: 0,
-                },
-                images: BudgetVec::new(budget),
-                boxes: BudgetVec::new(budget),
-                placed: BudgetVec::new(budget),
-                frame: BudgetVec::new(budget),
-                used: BudgetVec::new(budget),
+            pipeline: Pipeline {
+                budget: budget.clone(),
+                library: Library::new(budget, fonts)?,
+                outlines: Outlines::new(budget),
+                shaper: Shaper::new(budget),
+                painter: Painter::new(budget, triergon_raster::Limits::default()),
+                text: Text::new(budget),
+                shaped: Shaped::new(budget),
+                layout: Layout::new(budget),
+                runs: Runs::new(budget),
+                combined: BudgetVec::new(budget),
+                event_images: BudgetVec::new(budget),
             },
+            last_frame: BudgetVec::new(budget),
+            next_frame: BudgetVec::new(budget),
+            boxes: BudgetVec::new(budget),
+            placed: BudgetVec::new(budget),
+            used: BudgetVec::new(budget),
+            #[cfg(feature = "work-probe")]
+            work_spent: 0,
         })
     }
 
@@ -150,25 +179,63 @@ impl Renderer {
     /// comparison.
     pub fn render(&mut self, script: &mut Script, now: i64) -> Result<Frame<'_>> {
         if script.events().is_empty() {
+            #[cfg(feature = "work-probe")]
+            {
+                self.work_spent = 0;
+            }
             return Ok(Frame {
                 images: &[],
                 change: Change::Content,
             });
         }
-        self.library
-            .register_embedded(script.id(), script.fonts())?;
-        self.library.begin_frame(self.frame.cache.fonts)?;
-        self.outlines.trim(self.frame.cache.outlines)?;
-        let geometry = self.frame.place(script);
-        self.scratch.images.clear();
         // One budget bounds the whole frame: every event's evaluation, font
         // selection, shaping, layout and drawing, and collision handling.
-        let mut work = WorkBudget::new(self.frame.work);
-        let mut boxes = std::mem::replace(&mut self.scratch.boxes, BudgetVec::new(&self.budget));
+        let mut work = WorkBudget::new(self.canvas.settings.work);
+        let change = self.render_frame(script, now, &mut work);
+        #[cfg(feature = "work-probe")]
+        {
+            self.work_spent = work.spent();
+        }
+        Ok(Frame {
+            images: &self.last_frame,
+            change: change?,
+        })
+    }
+
+    /// The work units the last call to [`Renderer::render`] spent: 0 for a
+    /// script without events, and for a frame refused past
+    /// [`Settings::work`] what it spent before the charge it refused. A
+    /// development aid, with the `work-probe` feature.
+    #[cfg(feature = "work-probe")]
+    pub fn work_spent(&self) -> u64 {
+        self.work_spent
+    }
+
+    /// Renders every shown event, handles collisions and makes the result
+    /// the last frame; how it differs from the one before.
+    fn render_frame(
+        &mut self,
+        script: &mut Script,
+        now: i64,
+        work: &mut WorkBudget,
+    ) -> Result<Change> {
+        let settings = &self.canvas.settings;
+        let pipeline = &mut self.pipeline;
+        pipeline
+            .library
+            .register_embedded(script.id(), script.fonts())?;
+        pipeline.library.begin_frame(settings.cache.fonts)?;
+        // The layout lets go of the outlines the last event used, so only
+        // the last frame's images keep theirs from the cut.
+        pipeline.layout.release();
+        pipeline.outlines.trim(settings.cache.outlines)?;
+        let geometry = self.canvas.place(script);
+        pipeline.event_images.clear();
+        let boxes = &mut self.boxes;
         boxes.clear();
         for index in 0..script.events().len() {
             if script.events()[index].is_shown_at(now)
-                && let Some(event) = self.render_event(script, index, now, &geometry, &mut work)?
+                && let Some(event) = pipeline.render_event(script, index, now, &geometry, work)?
             {
                 boxes.try_push(event).map_err(|e| e.error)?;
             }
@@ -184,7 +251,7 @@ impl Renderer {
         // Collision records are worked on in scratch and kept with the
         // events only once the whole frame has been made: a refused frame
         // leaves them as they were.
-        let placed = &mut self.scratch.placed;
+        let placed = &mut self.placed;
         placed.clear();
         placed.try_reserve_exact(boxes.len())?;
         for b in boxes.as_slice() {
@@ -198,48 +265,45 @@ impl Renderer {
             records = rest;
             // Each event that takes part is fitted against those before it.
             let taking_part = layer.iter().filter(|b| b.takes_part()).count();
-            charge(&mut work, taking_part.saturating_mul(taking_part))?;
+            charge(work, taking_part.saturating_mul(taking_part))?;
             collisions::fix(
                 layer,
                 group,
-                self.scratch.images.as_mut_slice(),
-                &mut self.scratch.used,
+                pipeline.event_images.as_mut_slice(),
+                &mut self.used,
                 self.id,
-                self.frame.height,
+                self.canvas.height,
             )?;
         }
-        let images = self.scratch.images.as_slice();
-        let next = &mut self.scratch.frame;
+        let next = &mut self.next_frame;
         next.clear();
         for b in boxes.as_slice() {
-            for image in &images[b.images.clone()] {
+            for image in &pipeline.event_images[b.images.clone()] {
                 next.try_push(image.clone()).map_err(|e| e.error)?;
             }
         }
-        for (b, record) in boxes.as_slice().iter().zip(self.scratch.placed.as_slice()) {
+        for (b, record) in boxes.as_slice().iter().zip(self.placed.as_slice()) {
             script.events_mut()[b.event].placed = *record;
         }
-        self.scratch.boxes = boxes;
         images::drop_transparent(next);
-        let change = Change::between(self.images.as_slice(), next.as_slice());
-        std::mem::swap(&mut self.images, next);
+        let change = Change::between(&self.last_frame, next);
+        std::mem::swap(&mut self.last_frame, next);
         // The previous frame's images go; what they were drawn from may now
         // leave the caches.
         next.clear();
-        Ok(Frame {
-            images: self.images.as_slice(),
-            change,
-        })
+        Ok(change)
     }
+}
 
-    /// `ass_render_event`: the event's images appended to the scratch list
-    /// and its box; `None` when libass renders nothing for it.
+impl Pipeline {
+    /// `ass_render_event`: the event's images appended to the frame's and
+    /// its box; `None` when libass renders nothing for it.
     fn render_event(
         &mut self,
         script: &Script,
         index: usize,
         now: i64,
-        geometry: &Geometry,
+        geometry: &Geometry<'_>,
         work: &mut WorkBudget,
     ) -> Result<Option<EventBox>> {
         let event = &script.events()[index];
@@ -255,11 +319,13 @@ impl Renderer {
                 .saturating_add(event.text().len()),
         )?;
         let mut context = Context::new(script, event, now, geometry.layout_res)?;
-        let explicit = context.state().explicit;
-        let scales = geometry.scales(explicit, script.info().scaled_border_and_shadow);
-        let Some(mut glyphs) = Glyphs::read(
-            &self.budget,
+        let scales = geometry.scales(
+            context.state().explicit,
+            script.info().scaled_border_and_shadow,
+        );
+        let Some(evaluated) = self.text.read(
             &mut context,
+            event.text(),
             &mut self.library,
             &scales,
             geometry.par,
@@ -268,255 +334,119 @@ impl Renderer {
         else {
             return Ok(None);
         };
-        if glyphs.len == 0 {
+        if self.text.chars().is_empty() {
             return Ok(None);
         }
-        let style = context.style();
-        let margin = |own: i32, from_style: i32| if own != 0 { own } else { from_style };
-        let laid = Laid {
-            state: *context.state(),
-            last: *context.glyph_state(),
-            scales,
-            explicit,
-            margins: [
-                margin(event.margins.left, style.margins.left),
-                margin(event.margins.right, style.margins.right),
-                margin(event.margins.vertical, style.margins.vertical),
-            ],
-        };
-        let bbox = self.lay_out(
-            script,
-            now.wrapping_sub(event.start),
+        let room = Room {
             geometry,
-            &laid,
-            &mut glyphs,
-            work,
-        )?;
-        let lines = &self.scratch.lines;
-        let device = device_position(geometry, &laid, &bbox, lines, self.frame.line_position);
-        set_shifts(&mut glyphs, geometry, &laid, &bbox, device);
-        let frame_scale = FrameScale {
-            blur: scales.blur,
-            border: scales.border,
+            scales: &scales,
+            margins: event.margins.or(evaluated.style.margins),
+            elapsed: now.wrapping_sub(event.start),
+        };
+        let area = self.draw(script, &evaluated, &room, work)?;
+        let begin = self.event_images.len();
+        self.event_images(script, &evaluated, &room, area, work)?;
+        Ok(Some(EventBox::new(
+            index,
+            event,
+            &evaluated.state,
+            area,
+            begin..self.event_images.len(),
+        )))
+    }
+
+    /// Shapes, lays out, places and draws the evaluated text into its
+    /// composited runs; its box for collision handling.
+    fn draw(
+        &mut self,
+        script: &Script,
+        evaluated: &Evaluated<'_>,
+        room: &Room<'_>,
+        work: &mut WorkBudget,
+    ) -> Result<Rect> {
+        let text = &self.text;
+        // Shaping and layout pass over the characters a fixed number of
+        // times; font fallback, shaping, outlines and the line rebalancing
+        // charge their own work.
+        charge(work, text.chars().len().saturating_mul(16))?;
+        let shaping = Shaping::new(evaluated.last.encoding, script.info());
+        self.shaper
+            .shape(text, &mut self.library, &shaping, work, &mut self.shaped)?;
+        let input = Input {
+            text,
+            evaluated,
+            shaped: &self.shaped,
+            shaping: &shaping,
+        };
+        let sources = Sources {
+            library: &self.library,
+            outlines: &mut self.outlines,
+            limits: script.limits(),
+        };
+        self.layout.lay_out(&input, sources, room, work)?;
+        let geometry = room.geometry;
+        let anchor = Anchor::new(geometry, &evaluated.state, room.margins, &self.layout);
+        self.runs.place(text, &self.shaped, &self.layout)?;
+        let placer = Placer::new(
+            text,
+            &self.shaped,
+            &self.layout,
+            &anchor,
+            geometry,
+            room.scales,
+        );
+        let frame = FrameScale {
+            blur: room.scales.blur,
+            border: room.scales.border,
             pixel_aspect: geometry.par,
         };
-        self.painter.render(
-            &mut glyphs,
-            device,
-            &frame_scale,
-            self.frame.margins.left,
-            &mut self.scratch.runs,
-            work,
-        )?;
+        self.painter
+            .draw(&self.runs, &placer, &frame, &mut self.combined, work)?;
+        Ok(anchor.event_box(&self.layout, geometry.par))
+    }
 
-        // The event's box for collisions: VSFilter's biased roundings.
-        let (device_x, device_y) = device;
-        let par = geometry.par;
-        let first_asc = lines.lines.as_slice()[0].asc;
-        let border = (lines.border_top, lines.border_bottom, lines.border_x);
-        let top = (device_y - first_asc - f64::from(border.0)) as i32;
-        let height = (lines.height + f64::from(border.1) + f64::from(border.0)) as i32;
-        let left = ((device_x + bbox.x_min) * par - f64::from(border.2) + 0.5) as i32;
-        let width = ((bbox.x_max - bbox.x_min) * par + 2.0 * f64::from(border.2) + 0.5) as i32;
-
-        let begin = self.scratch.images.len();
-        let opaque_background = laid.last.border_style.0 == 4;
-        if opaque_background {
-            self.background(
-                &laid,
-                Rect::new(
-                    left,
-                    top,
-                    left.wrapping_add(width),
-                    top.wrapping_add(height),
-                ),
-            )?;
+    /// The event's images from its composited runs: the box of a
+    /// `BorderStyle` 4 event, then its shadows, borders and fills, clipped.
+    fn event_images(
+        &mut self,
+        script: &Script,
+        evaluated: &Evaluated<'_>,
+        room: &Room<'_>,
+        area: Rect,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
+        let geometry = room.geometry;
+        let opaque_background = evaluated.last.border_style.0 == 4;
+        if opaque_background
+            && let Some(image) = background(geometry, evaluated, room.scales, area, &self.budget)?
+        {
+            self.event_images.try_push(image).map_err(|e| e.error)?;
         }
-        let clipping = self.clipping(geometry, &laid.state, explicit);
-        let mask = self.vector_clip(&laid.state, &scales, script, work)?;
+        let clipping = clipping(geometry, &evaluated.state);
+        let mask = self.vector_clip(geometry, &evaluated.state, room.scales, script, work)?;
         images::render_text(
-            self.scratch.runs.as_slice(),
+            &self.combined,
             &clipping,
             !opaque_background,
             mask.as_ref(),
             &self.budget,
-            &mut self.scratch.images,
-        )?;
-        Ok(Some(EventBox {
-            event: index,
-            layer: event.layer,
-            read_order: event.read_order,
-            top,
-            height,
-            left,
-            width,
-            detect_collisions: laid.state.detect_collisions,
-            moves_up: laid.state.alignment.vertical == VAlign::Bottom,
-            images: begin..self.scratch.images.len(),
-        }))
-    }
-
-    /// Shapes and lays out an event's glyphs, `elapsed` milliseconds into
-    /// the event, from its style runs to the baseline shear: the text box.
-    fn lay_out(
-        &mut self,
-        script: &Script,
-        elapsed: i64,
-        geometry: &Geometry,
-        laid: &Laid<'_>,
-        glyphs: &mut Glyphs<'_>,
-        work: &mut WorkBudget,
-    ) -> Result<TextBox> {
-        let info = script.info();
-        // Every stage below passes over the glyphs once; font fallback,
-        // shaping, outlines and the line rebalancing charge their own work.
-        charge(work, glyphs.list.len().saturating_mul(16))?;
-        glyphs.split_style_runs(&self.library);
-        let (base, whole_text) = Shaping::base_for(laid.last.encoding);
-        let shaping = Shaping {
-            base,
-            whole_text,
-            kerning: info.kerning,
-            language: info.language(),
-        };
-        self.shaper
-            .find_runs(glyphs, &mut self.library, shaping.whole_text, work)?;
-        let mut bidi = self.shaper.shape(glyphs, &self.library, &shaping, work)?;
-        layout::retrieve(
-            glyphs,
-            &self.library,
-            &mut self.outlines,
-            script.limits(),
-            &laid.scales,
-            geometry.par,
-            work,
-        )?;
-        layout::preliminary(glyphs);
-
-        let [margin_l, margin_r, _] = laid.margins;
-        let explicit = laid.explicit;
-        let max_text_width = geometry.x_right(
-            f64::from(geometry.play_res.0.wrapping_sub(margin_r)),
-            explicit,
-        ) - geometry.x_left(f64::from(margin_l), explicit);
-        let state = &laid.state;
-        let lines = &mut self.scratch.lines;
-        let spacing = self.frame.line_spacing;
-        layout::wrap(
-            glyphs,
-            max_text_width,
-            state.wrap_style,
-            spacing,
-            &laid.scales,
-            lines,
-            work,
-        )?;
-        layout::karaoke(glyphs, elapsed, &mut self.scratch.karaoke)?;
-        shaping::reorder(glyphs, &mut bidi, &shaping, &mut self.scratch.map)?;
-        let map = self.scratch.map.as_slice();
-        layout::reorder(glyphs, map, lines, spacing);
-        // A banner's lines start at the left and are justified as aligned.
-        let (halign, justify) = if state.scroll.is_some_and(|s| s.is_horizontal()) {
-            let justify = match state.alignment.horizontal {
-                HAlign::Left => Justify::Left,
-                HAlign::Center => Justify::Center,
-                HAlign::Right => Justify::Right,
-                HAlign::None => Justify::Auto,
-            };
-            (HAlign::Left, justify)
-        } else {
-            (state.alignment.horizontal, state.justify)
-        };
-        layout::align(glyphs, halign, justify, max_text_width);
-        let bbox = layout::text_box(glyphs, lines);
-        layout::shear(glyphs, map, false);
-        Ok(bbox)
-    }
-
-    /// `add_background`: the box of a `BorderStyle` 4 event around its
-    /// collision box and positive shadow, in the faded back colour.
-    fn background(&mut self, laid: &Laid<'_>, event: Rect) -> Result<()> {
-        let size = |shadow: f64, scale: f64| {
-            if shadow > 0.0 {
-                (shadow * scale).round() as i32
-            } else {
-                0
-            }
-        };
-        let (sx, sy) = (
-            size(laid.last.shadow_x, laid.scales.border[0]),
-            size(laid.last.shadow_y, laid.scales.border[1]),
-        );
-        let area = Rect::new(
-            event.x_min.wrapping_sub(sx),
-            event.y_min.wrapping_sub(sy),
-            event.x_max.wrapping_add(sx),
-            event.y_max.wrapping_add(sy),
-        );
-        let colour = apply_fade(laid.last.colours.back, laid.state.fade);
-        let frame = (self.frame.width, self.frame.height);
-        if let Some(image) = images::background(area, frame, colour, &self.budget)? {
-            self.scratch.images.try_push(image).map_err(|e| e.error)?;
-        }
-        Ok(())
-    }
-
-    /// The event's clip rectangle in the frame.
-    fn clipping(&self, geometry: &Geometry, state: &EventState<'_>, explicit: bool) -> Clipping {
-        let frame = &self.frame;
-        let clip = state.clip;
-        let mut rect = if explicit || !frame.use_margins {
-            let x = |v: i32| geometry.x_pos_scaled(f64::from(v)).round() as i32;
-            let y = |v: i32| geometry.y_pos(f64::from(v)).round() as i32;
-            let mut r = Rect::new(x(clip.x0), y(clip.y0), x(clip.x1), y(clip.y1));
-            if explicit {
-                let (zx, zy) = (frame.margins.left, frame.margins.top);
-                r.x_min = r.x_min.max(zx);
-                r.y_min = r.y_min.max(zy);
-                r.x_max = r.x_max.min(zx.wrapping_add(frame.content.0));
-                r.y_max = r.y_max.min(zy.wrapping_add(frame.content.1));
-            }
-            r
-        } else {
-            Rect::new(0, 0, frame.width, frame.height)
-        };
-        if let Some(scroll) = state.scroll
-            && let Some((y0, y1)) = scroll.band
-        {
-            rect.y_min = rect.y_min.max(geometry.y_pos(f64::from(y0)).round() as i32);
-            rect.y_max = rect.y_max.min(geometry.y_pos(f64::from(y1)).round() as i32);
-        }
-        let (px, py) = geometry.play_res;
-        Clipping {
-            clip: ClipRect {
-                rect,
-                inverse: clip.inverse,
-            },
-            frame: ClipFrame {
-                width: frame.width,
-                height: frame.height,
-                content: Rect::new(
-                    geometry.x_pos_scaled(0.0) as i32,
-                    geometry.y_pos(0.0) as i32,
-                    geometry.x_pos_scaled(f64::from(px)) as i32,
-                    geometry.y_pos(f64::from(py)) as i32,
-                ),
-            },
-        }
+            &mut self.event_images,
+        )
     }
 
     /// The vector clip drawn in the frame, if the event has one that draws.
     fn vector_clip(
         &mut self,
+        geometry: &Geometry<'_>,
         state: &EventState<'_>,
-        scales: &geometry::Scales,
+        scales: &Scales,
         script: &Script,
         work: &mut WorkBudget,
     ) -> Result<Option<ClipMask>> {
         let Some(clip) = state.vector_clip else {
             return Ok(None);
         };
-        let drawing = text::DrawingText {
+        let drawing = DrawingText {
             text: clip.drawing,
             scale: clip.scale,
             baseline: 0,
@@ -524,18 +454,18 @@ impl Renderer {
         let Some(outline) = self.outlines.drawing(&drawing, script.limits(), work)? else {
             return Ok(None);
         };
-        let base = 1_i32.wrapping_shl(clip.scale.wrapping_sub(1) as u32);
-        let w = if base > 0 { 1.0 / f64::from(base) } else { 0.0 };
+        let w = drawing.pixel_scale();
+        let margins = geometry.canvas.settings.margins;
         let matrix = Matrix([
             [
                 scales.screen[0] * w,
                 0.0,
-                f64::from(self.frame.margins.left.wrapping_mul(64)),
+                f64::from(margins.left.wrapping_mul(64)),
             ],
             [
                 0.0,
                 scales.screen[1] * w,
-                f64::from(self.frame.margins.top.wrapping_mul(64)),
+                f64::from(margins.top.wrapping_mul(64)),
             ],
             [0.0, 0.0, 1.0],
         ]);
@@ -549,127 +479,80 @@ impl Renderer {
     }
 }
 
-/// What an event's walk left and what follows from it.
-#[derive(Clone, Copy, Debug)]
-struct Laid<'s> {
-    /// The event-wide state after the text.
-    state: EventState<'s>,
-    /// The per-glyph state after the text: the last `\fe`, border style,
-    /// shadow and back colour apply to the whole event.
-    last: GlyphState<'s>,
-    scales: geometry::Scales,
-    explicit: bool,
-    /// The left, right and vertical margins: the event's, else its style's.
-    margins: [i32; 3],
+/// `add_background`: the box of a `BorderStyle` 4 event around its
+/// collision box and positive shadow, in the faded back colour.
+fn background(
+    geometry: &Geometry<'_>,
+    evaluated: &Evaluated<'_>,
+    scales: &Scales,
+    event: Rect,
+    budget: &Budget,
+) -> Result<Option<Image>> {
+    let size = |shadow: f64, scale: f64| {
+        if shadow > 0.0 {
+            (shadow * scale).round() as i32
+        } else {
+            0
+        }
+    };
+    let last = &evaluated.last;
+    let (sx, sy) = (
+        size(last.shadow_x, scales.border[0]),
+        size(last.shadow_y, scales.border[1]),
+    );
+    let area = Rect::new(
+        event.x_min.wrapping_sub(sx),
+        event.y_min.wrapping_sub(sy),
+        event.x_max.wrapping_add(sx),
+        event.y_max.wrapping_add(sy),
+    );
+    let colour = apply_fade(last.colours.back, evaluated.state.fade);
+    let canvas = geometry.canvas;
+    images::background(area, (canvas.width, canvas.height), colour, budget)
 }
 
-/// `calculate_rotation_params`: every glyph's offset from the rotation
-/// origin (`\org`, else the alignment point), displaced by its shadow.
-fn set_shifts(
-    glyphs: &mut Glyphs<'_>,
-    geometry: &Geometry,
-    laid: &Laid<'_>,
-    bbox: &TextBox,
-    (device_x, device_y): (f64, f64),
-) {
-    let state = &laid.state;
-    let center = if let Some((x, y)) = state.origin {
-        (geometry.x_pos(x), geometry.y_pos(y))
+/// The event's clip rectangle in the frame.
+fn clipping(geometry: &Geometry<'_>, state: &EventState<'_>) -> Clipping {
+    let canvas = geometry.canvas;
+    let explicit = state.explicit;
+    let clip = state.clip;
+    let mut rect = if explicit || !canvas.settings.use_margins {
+        let x = |v: i32| geometry.x_pos_scaled(f64::from(v)).round() as i32;
+        let y = |v: i32| geometry.y_pos(f64::from(v)).round() as i32;
+        let mut r = Rect::new(x(clip.x0), y(clip.y0), x(clip.x1), y(clip.y1));
+        if explicit {
+            let margins = canvas.settings.margins;
+            let (zx, zy) = (margins.left, margins.top);
+            r.x_min = r.x_min.max(zx);
+            r.y_min = r.y_min.max(zy);
+            r.x_max = r.x_max.min(zx.wrapping_add(canvas.content.0));
+            r.y_max = r.y_max.min(zy.wrapping_add(canvas.content.1));
+        }
+        r
     } else {
-        let (bx, by) = base_point(bbox, state.alignment.horizontal, state.alignment.vertical);
-        (device_x + bx, device_y + by)
+        Rect::new(0, 0, canvas.width, canvas.height)
     };
-    let (border, par) = (laid.scales.border, geometry.par);
-    for i in 0..glyphs.list.len() {
-        let g = glyphs.get_mut(i);
-        g.shift = Vector::new(
-            g.pos.x.wrapping_add(pixels_26_6(
-                device_x - center.0 + g.shadow[0] * border[0] / par,
-            )),
-            g.pos
-                .y
-                .wrapping_add(pixels_26_6(device_y - center.1 + g.shadow[1] * border[1])),
-        );
+    if let Some(scroll) = state.scroll
+        && let Some((y0, y1)) = scroll.band
+    {
+        rect.y_min = rect.y_min.max(geometry.y_pos(f64::from(y0)).round() as i32);
+        rect.y_max = rect.y_max.min(geometry.y_pos(f64::from(y1)).round() as i32);
     }
-}
-
-/// `get_base_point`: the point of the box the alignment anchors.
-fn base_point(bbox: &TextBox, halign: HAlign, valign: VAlign) -> (f64, f64) {
-    let x = match halign {
-        HAlign::Left => bbox.x_min,
-        HAlign::Center => (bbox.x_max + bbox.x_min) / 2.0,
-        HAlign::Right => bbox.x_max,
-        HAlign::None => 0.0,
-    };
-    let y = match valign {
-        VAlign::Top => bbox.y_min,
-        VAlign::Middle => (bbox.y_max + bbox.y_min) / 2.0,
-        VAlign::Bottom => bbox.y_max,
-        VAlign::TopAndMiddle => 0.0,
-    };
-    (x, y)
-}
-
-/// The event's position in pre-aspect frame pixels: by `\pos` or `\move`,
-/// by a scroll, or by its alignment and margins.
-fn device_position(
-    geometry: &Geometry,
-    laid: &Laid<'_>,
-    bbox: &TextBox,
-    lines: &Lines,
-    line_position: f64,
-) -> (f64, f64) {
-    let (state, explicit) = (&laid.state, laid.explicit);
-    let [margin_l, _, margin_v] = laid.margins;
-    let (mut x, mut y) = (0.0, 0.0);
-    let positioned = match state.placement {
-        EventPlacement::Positioned(px, py) => {
-            let (bx, by) = base_point(bbox, state.alignment.horizontal, state.alignment.vertical);
-            x = geometry.x_pos(px) - bx;
-            y = geometry.y_pos(py) - by;
-            true
-        }
-        EventPlacement::Margins => false,
-    };
-    let (play_x, play_y) = geometry.play_res;
-    match state.scroll {
-        Some(s) if s.direction == ScrollDirection::RightToLeft => {
-            x = geometry.x_pos(f64::from(play_x) - s.shift);
-        }
-        Some(s) if s.direction == ScrollDirection::LeftToRight => {
-            x = geometry.x_pos(s.shift) - (bbox.x_max - bbox.x_min);
-        }
-        _ if !positioned => x = geometry.x_left(f64::from(margin_l), explicit),
-        _ => {}
-    }
-    let first_asc = lines.lines.as_slice()[0].asc;
-    match state.scroll.and_then(|s| s.band.map(|band| (s, band))) {
-        Some((s, (y0, _))) if s.direction == ScrollDirection::TopToBottom => {
-            y = geometry.y_mid(f64::from(y0) + s.shift, explicit) - bbox.y_max;
-        }
-        Some((s, (_, y1))) if s.direction == ScrollDirection::BottomToTop => {
-            y = geometry.y_mid(f64::from(y1) - s.shift, explicit) - bbox.y_min;
-        }
-        _ if !positioned => match state.alignment.vertical {
-            VAlign::Top => y = geometry.y_top(f64::from(margin_v), explicit) + first_asc,
-            VAlign::Middle => {
-                let scr_y = geometry.y_mid(f64::from(play_y) / 2.0, explicit);
-                y = scr_y - (bbox.y_max + bbox.y_min) / 2.0;
-            }
-            VAlign::Bottom | VAlign::TopAndMiddle => {
-                let line_pos = if explicit { 0.0 } else { line_position };
-                let bottom = geometry.y_sub(f64::from(play_y.wrapping_sub(margin_v)), explicit);
-                let top = geometry.y_top(0.0, explicit);
-                y = bottom + (top - bottom) * line_pos / 100.0;
-                y -= lines.height;
-                y += first_asc;
-                let y0 = top + first_asc;
-                if y < y0 && line_pos > 0.0 {
-                    y = y0;
-                }
-            }
+    let (px, py) = geometry.play_res;
+    Clipping {
+        clip: ClipRect {
+            rect,
+            inverse: clip.inverse,
         },
-        _ => {}
+        frame: ClipFrame {
+            width: canvas.width,
+            height: canvas.height,
+            content: Rect::new(
+                geometry.x_pos_scaled(0.0) as i32,
+                geometry.y_pos(0.0) as i32,
+                geometry.x_pos_scaled(f64::from(px)) as i32,
+                geometry.y_pos(f64::from(py)) as i32,
+            ),
+        },
     }
-    (x, y)
 }

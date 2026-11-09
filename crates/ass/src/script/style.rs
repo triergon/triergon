@@ -285,6 +285,19 @@ pub struct Margins {
     pub vertical: i32,
 }
 
+impl Margins {
+    /// These margins, each 0 replaced by `style`'s: an event's margins as
+    /// libass applies them.
+    pub(crate) fn or(self, style: Self) -> Self {
+        let pick = |own: i32, from_style: i32| if own != 0 { own } else { from_style };
+        Self {
+            left: pick(self.left, style.left),
+            right: pick(self.right, style.right),
+            vertical: pick(self.vertical, style.vertical),
+        }
+    }
+}
+
 /// One style of a script.
 #[derive(Clone, Debug)]
 pub struct Style {

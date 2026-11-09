@@ -466,11 +466,24 @@ impl<T> BudgetVec<T> {
         if target <= self.capacity() {
             return Ok(());
         }
-        self.grow_allocation(target)
+        self.reallocate(target)
     }
+    /// Gives back the capacity beyond `min_capacity` elements, or beyond the
+    /// length if that is more: the elements move to an allocation of that
+    /// size, charged before the old one is returned. A refused charge or
+    /// allocation leaves the vector as it was.
+    pub fn try_shrink_to(&mut self, min_capacity: usize) -> Result<()> {
+        let target = min_capacity.max(self.len());
+        if target >= self.capacity() {
+            return Ok(());
+        }
+        self.reallocate(target)
+    }
+    /// Moves the elements to an allocation of exactly `target` elements, at
+    /// least the length.
     #[cold]
     #[inline(never)]
-    fn grow_allocation(&mut self, target: usize) -> Result<()> {
+    fn reallocate(&mut self, target: usize) -> Result<()> {
         let size = target.checked_mul(size_of::<T>()).ok_or(Error::Overflow)?;
         // The replacement is charged on top of the current allocation's charge
         // for the whole copy, and the old part is returned only after the old
@@ -698,8 +711,30 @@ pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{Bytes, BytesView, nonzero_prefix_len};
+    use super::{BudgetVec, Bytes, BytesView, nonzero_prefix_len};
     use crate::Budget;
+
+    #[test]
+    fn shrinking_keeps_the_elements_and_returns_the_charge() {
+        let pool = Budget::new(1 << 16).unwrap();
+        let mut vec = BudgetVec::new(&pool);
+        vec.try_reserve_exact(100).unwrap();
+        for i in 0..10_u64 {
+            vec.try_push(i).map_err(|e| e.error).unwrap();
+        }
+        let full = pool.used();
+        vec.try_shrink_to(16).unwrap();
+        assert_eq!(vec.capacity(), 16);
+        assert_eq!(vec.as_slice(), (0..10).collect::<Vec<_>>().as_slice());
+        assert_eq!(full - pool.used(), 84 * 8);
+        // Never below the length, and never growing.
+        vec.try_shrink_to(0).unwrap();
+        assert_eq!(vec.capacity(), 10);
+        vec.try_shrink_to(64).unwrap();
+        assert_eq!(vec.capacity(), 10);
+        drop(vec);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
 
     #[test]
     fn borrowed_ranges_do_not_clone_storage_and_owned_ranges_keep_the_full_charge() {

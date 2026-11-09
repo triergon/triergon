@@ -6,6 +6,7 @@
 //! through `cargo xtask report`, `trace-identities` and `fuzz --contract`
 //! like every other feature.
 
+mod equivalence;
 mod manifest;
 mod observed;
 
@@ -19,6 +20,7 @@ use crate::fetch;
 pub const USAGE: &str = "usage: cargo xtask ass prepare [--jobs N]
        cargo xtask ass manifest [--record] [--output DIR]
        cargo xtask ass compare [--all] [REPORT OPTION]...
+       cargo xtask ass equivalence --base REV [OPTION]...
 
   prepare   build the pinned libass, as `cargo xtask raster prepare` does: one
             build serves both lanes; and write the copy of its ass_parse.c the
@@ -36,7 +38,10 @@ pub const USAGE: &str = "usage: cargo xtask ass prepare [--jobs N]
             the command only on the targets its contract requires, and
             ass-render; --all adds none today); further report options pass
             through, and each report goes to OUTPUT/<feature> (OUTPUT:
-            --output, default .research/ass-report)";
+            --output, default .research/ass-report)
+  equivalence  the renderer of REV and of the working tree on the same
+            fixtures, mutations and generated scripts, frame by frame (see
+            `cargo xtask ass equivalence --help`)";
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {
@@ -58,6 +63,11 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             Ok(())
         }
         [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),
+        [command, help] if command == "equivalence" && (help == "--help" || help == "-h") => {
+            println!("{}", equivalence::USAGE);
+            Ok(())
+        }
+        [command, rest @ ..] if command == "equivalence" => equivalence::main(root, rest),
         _ => Err(USAGE.into()),
     }
 }

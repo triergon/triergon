@@ -6,7 +6,10 @@ use std::ops::Range;
 
 use triergon_core::{BudgetVec, Result};
 
+use triergon_raster as raster;
+
 use super::images::Image;
+use crate::{Event, EventState, VAlign};
 
 /// Where an event was placed by collision handling, kept with the event
 /// across frames (libass's `ASS_RenderPriv`). A record made by another
@@ -66,6 +69,29 @@ pub(super) struct EventBox {
 }
 
 impl EventBox {
+    /// The box of event `index`, `event` of its script, in its state after
+    /// its text, over `area`, with its `images`.
+    pub(super) fn new(
+        index: usize,
+        event: &Event,
+        state: &EventState<'_>,
+        area: raster::Rect,
+        images: Range<usize>,
+    ) -> Self {
+        Self {
+            event: index,
+            layer: event.layer,
+            read_order: event.read_order,
+            top: area.y_min,
+            height: area.y_max.wrapping_sub(area.y_min),
+            left: area.x_min,
+            width: area.x_max.wrapping_sub(area.x_min),
+            detect_collisions: state.detect_collisions,
+            moves_up: state.alignment.vertical == VAlign::Bottom,
+            images,
+        }
+    }
+
     /// Whether collision handling moves the event: it detects collisions and
     /// has an area.
     pub(super) fn takes_part(&self) -> bool {

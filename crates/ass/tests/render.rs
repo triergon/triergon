@@ -72,6 +72,30 @@ fn an_event_draws_its_shadows_then_borders_then_fills() {
 }
 
 #[test]
+fn margins_come_from_the_last_reset_style() {
+    // libass takes the margins an event leaves at 0 from the style in force
+    // after its text: a trailing `\r` style moves the event, not its glyphs.
+    let budget = Budget::new(64 << 20).unwrap();
+    let text = "[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\n\
+         [V4+ Styles]\nFormat: Name, Fontname, Fontsize, MarginV\n\
+         Style: Default,Test Sans,40,10\nStyle: Raised,Test Sans,40,100\n\
+         [Events]\nFormat: Layer, Start, End, Style, Text\n\
+         Dialogue: 0,0:00:00.00,0:00:02.00,Default,A\n\
+         Dialogue: 1,0:00:00.00,0:00:02.00,Default,A{\\rRaised}\n";
+    let mut script = Script::parse(&budget, text.as_bytes(), &Options::default()).unwrap();
+    let mut renderer = renderer(&budget);
+    let images = renderer.render(&mut script, 1000).unwrap().images;
+    let fills: Vec<i32> = images
+        .iter()
+        .filter(|i| i.kind == ImageKind::Fill)
+        .map(|i| i.y)
+        .collect();
+    // 90 script pixels higher, at 2 frame pixels each.
+    assert_eq!(fills.len(), 2);
+    assert_eq!(fills[0] - fills[1], 180);
+}
+
+#[test]
 fn colliding_events_stack_and_keep_their_place() {
     let budget = Budget::new(64 << 20).unwrap();
     let mut renderer = renderer(&budget);
