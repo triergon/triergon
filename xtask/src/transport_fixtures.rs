@@ -1083,7 +1083,7 @@ fn contract(cases: &[Case]) -> R<Value> {
         ("schema", Value::int(1)),
         ("id", Value::str("mpegts-access-units")),
         ("operation", Value::str(OPERATION)),
-        ("candidate", Value::str("playback-worker")),
+        ("candidate", Value::str("transport-worker")),
         ("worker_operation", Value::str("ts-au-")),
         ("reference", Value::str("ffmpeg-formats-native")),
         (
@@ -1772,6 +1772,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(au.prefix, "ts-au-");
+        assert_eq!(au.candidate, "transport-worker");
         assert_eq!(au.reference, "ffmpeg-formats-native");
         assert_eq!(au.cases.len(), 169);
         let contract = read_json(&au.contract).unwrap();
@@ -1790,6 +1791,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(old.prefix, "ts-");
+        assert_eq!(old.candidate, "transport-worker");
         assert_eq!(old.cases.len(), 97);
     }
 

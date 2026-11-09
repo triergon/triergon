@@ -502,7 +502,7 @@ Verification:
   FFmpeg reference; nonmatching cases are kept as failures, not normalised.
   `cargo xtask report` runs that comparison from
   [`harness/features/mpegts-pes/`](../../harness/features/mpegts-pes/contract.json)
-  through `playback-worker`'s `ts-` modes, which use the public API only:
+  through `transport-worker`'s `ts-` modes, which use the public API only:
   `TransportStream` selects the program, its first active PMT binds a
   `compat::pes::DemuxObserver` to the one elementary stream, wrapped by
   `TransportFaultRecovery`, and `DemuxClock` places the timestamps. A typed

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "mpegts-access-units",
   "operation": "mpegts-access-unit-packets",
-  "candidate": "playback-worker",
+  "candidate": "transport-worker",
   "worker_operation": "ts-au-",
   "reference": "ffmpeg-formats-native",
   "contract": [

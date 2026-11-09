@@ -36,8 +36,6 @@ and the input event it is attributed to.
 | `mp4-forward-` | `regular` or `progressive` | `Mp4Open` and `Mp4IndexJob` in the native MOV view; a seekable file through `Engine::mp4`, or a forward-only front-`moov` file through its native front plan and `Engine::mp4_native_terminal_v1`; every track, times in the track time base | `mp4-forward` |
 | `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE` | explicit PIDs of program 1 through `Engine::ts_native_program_v1`, or one M2TS192 PID through `NativeStartup::new_m2ts_prefix_v2`; native 90 kHz clocks | `ts-program` |
 | `raw-video-` | `avc` or `hevc` | `RawVideoProbe`, `RawVideoSource` and `RawVideoFeed` over forward-only Annex B; no container clock, the duration is the active SPS picture period in 1/1,200,000 s | `raw-annex-b` |
-| `ts-au-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` or `--atsc` | MPEG-TS access units and separate source observations through the public source reader and `compat::annex_b::ContinuityReader`. The comparison places original PES anchors through `compat::pes::DemuxClock` | `mpegts-access-units` |
-| `ts-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` and further media entities (`[--discontinuity] FILE`) | the FFmpeg-compatible packets of one program through the public API: `TransportStream` selects the program, its first active PMT binds a `compat::pes::DemuxObserver` to the one elementary stream, that PID's transport packets feed it and `DemuxClock` places the timestamps; a context the observer alone cannot take (more streams, a later PMT, clock or format boundaries, transport, PES-time and active PSI faults, rejected carriers, a second entity) and an operation without a packet end with their cause; the strict source view and its native clock are not compared | `mpegts-pes` |
 
 A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
 2 seek after reading to the end), the seek target in milliseconds as a big-endian
@@ -48,42 +46,9 @@ The `mkv-audio-`, `mp4-forward-`, `ts-program-` and `raw-video-` families share 
 packet fold (`src/packet_fold.rs`): track, PTS, DTS, duration, flags, size and every
 payload byte, with an unknown time folded as `i64::MIN` and an unknown duration as
 zero; `trace` prints one line per packet. The reference side is
-`harness/reference_packet_fold.h`. `ts-` folds stream index, PID, PTS, DTS, duration,
-position, flags, payload and the stream-ID side data, as `harness/reference_ts.h` does.
-The separate `ts-au-` operation enables reference codec parsing with `NOFILLIN`
-and no stream discovery. It preserves the original `ts-` operation and its corpus.
-Derived source sample durations remain available on the packet. The comparison
-keeps zero packet durations for video and AAC; AC-3 duration is confirmed by a
-second frame header, retaining one packet until that lookahead or EOF. This
-context and retention remain inside the measured operation. The bounded input bootstrap
-supplies the comparison's M2TS carrier or sync position. Incomplete audio is
-reported separately from complete units, with its original bytes and refusal
-reason; it never enters the neutral packet stream.
-The Annex B EOF policy also reports unframed video as an opaque source event.
-The comparison folds its original payload, clock anchor and PES position.
-The LATM packet policy folds each validated nonempty PES in source order, with
-zero packet flags and duration. Separate reader tests exercise LOAS framing.
-DVB subtitle segment groups keep their source PES positions. The prefix
-policy covers an overlong final segment. The private-audio EOF policy keeps
-one unframed PES as an opaque observation. A discarded startup PSI pointer
-can be followed by a validated map and media in the same entity.
-ADTS compatibility observations preserve opaque prefixes, EOF tails and
-packets derived from a length-zero ADTS PES. The video continuity and opaque
-replay policies require the original carrier order and logical EOF. Selected
-malformed-input discards can complete only after sequential coverage of the
-original entity and confirmation of the diagnostic.
-If a single entity ends without an access unit or stops at a PSI diagnostic,
-the comparison can complete empty after the control-only proof classifies the
-original carriers through physical end and logical EOF.
-Its generic refusal context records the last input-window offset; source
-diagnostics carry their exact source location.
+`harness/reference_packet_fold.h`.
+
+For PES and access-unit comparisons, see [transport-worker](../transport-worker/README.md).
 
 The contracts are in `harness/features/<contract>/`. Packet-fold corpora record
 the repository root as their `directory` and name inputs relative to it.
-
-For ordered MPEG-TS entities, the access-unit reference carries parser state
-across contiguous input and initialization maps. An explicit discontinuity
-flushes the parser before the next entity. The candidate supplies each entity
-through the same access-unit reader and preserves its physical source ranges.
-The comparison uses logical packet positions across the ordered bytes. Only
-the final EOF drains the parser.
