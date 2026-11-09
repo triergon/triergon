@@ -317,7 +317,14 @@ impl Shaper {
             self.push_clusters(text, item.clone(), base, out)?;
             i = item.end;
         }
-        Ok(())
+        super::fit(&mut out.bidi.classes)?;
+        super::fit(&mut out.bidi.levels)?;
+        super::fit(&mut out.bidi.directions)?;
+        super::fit(&mut out.clusters)?;
+        super::fit(&mut out.glyphs)?;
+        super::fit(&mut self.text)?;
+        super::fit(&mut self.items)?;
+        super::fit(&mut self.counts)
     }
 
     /// `ass_shaper_find_runs`: scripts, faces and shape runs.

@@ -217,7 +217,19 @@ impl Layout {
         self.align(text, shaped, alignment(state), max_width);
         self.text_box = self.measure_text_box(shaped);
         self.shear(text, shaped);
-        Ok(())
+        self.fit()
+    }
+
+    /// Gives back what the stores hold beyond this event's needs.
+    fn fit(&mut self) -> Result<()> {
+        super::fit(&mut self.chars)?;
+        super::fit(&mut self.glyphs)?;
+        super::fit(&mut self.advances)?;
+        super::fit(&mut self.pens)?;
+        super::fit(&mut self.karaoke)?;
+        super::fit(&mut self.levels)?;
+        super::fit(&mut self.order)?;
+        self.lines.fit()
     }
 
     /// `retrieve_glyphs`: every glyph's outline, box, advance (for drawings)

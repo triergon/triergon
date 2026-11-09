@@ -52,6 +52,22 @@ pub struct Frame<'r> {
     pub change: Change,
 }
 
+/// The spare capacity, in bytes, a stage's store keeps after it is filled.
+const SPARE_BYTES: usize = 128;
+
+/// Fits a stage's store to what the event filled it with: storage is kept
+/// from event to event, but spare capacity beyond [`SPARE_BYTES`] is given
+/// back, so an event drawn after a larger one does not hold the larger
+/// one's storage, and events of about one size reallocate nothing.
+#[inline]
+pub(super) fn fit<T>(store: &mut BudgetVec<T>) -> Result<()> {
+    let spare = SPARE_BYTES / size_of::<T>().max(1);
+    if store.capacity() - store.len() > spare {
+        store.try_shrink_to(store.len() + spare)?;
+    }
+    Ok(())
+}
+
 /// Identities of renderers, which collision records are tied to.
 static RENDERERS: AtomicU32 = AtomicU32::new(1);
 

@@ -117,7 +117,8 @@ impl Runs {
                 run.glyphs.end = self.glyphs.len();
             }
         }
-        Ok(())
+        super::fit(&mut self.runs)?;
+        super::fit(&mut self.glyphs)
     }
 }
 

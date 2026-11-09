@@ -103,6 +103,12 @@ impl Lines {
         }
     }
 
+    /// Gives back what the stores hold beyond this event's lines.
+    pub(super) fn fit(&mut self) -> Result<()> {
+        super::fit(&mut self.lines)?;
+        super::fit(&mut self.starts)
+    }
+
     pub(super) fn first(&self) -> &Line {
         &self.lines[0]
     }

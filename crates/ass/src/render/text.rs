@@ -299,6 +299,8 @@ impl Text {
             };
             self.chars.try_push(c).map_err(|e| e.error)?;
         }
+        super::fit(&mut self.chars)?;
+        super::fit(&mut self.styles)?;
         Ok(Some(Evaluated {
             source,
             state: *context.state(),
