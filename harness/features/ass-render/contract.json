@@ -27,7 +27,8 @@
     "triergon-font: vertical metrics (vhea/vmtx, linear vertical advance) for @ fonts, which libass draws rotated with them and with the typographic descender",
     "triergon-shape's open shape-libass cases, which block qualifying triergon-ass: the default-load advances FreeType's auto-hinter sets (DejaVuMathTeXGyre, authored-cmap-formats and six Noto Emoji variants)",
     "triergon-shape's open shape-libass case authored-cff-features-otf-latn-libass, which blocks qualifying triergon-ass: fallback mark positioning in a CFF font without GPOS reads FreeType's hinted glyph extents",
-    "triergon-ass: a vector clip whose drawing has no contour empties every image of its event, as blend_vector_clip does with the bitmap without pixels libass draws for it (ass_render.c:700-813)"
+    "triergon-ass: a vector clip whose drawing has no contour empties every image of its event, as blend_vector_clip does with the bitmap without pixels libass draws for it (ass_render.c:700-813)",
+    "triergon-shape: a language HarfBuzz does not register selects no language system (hb_ot_tags_from_language) instead of being refused"
   ],
   "open_cases": [
     {
@@ -45,6 +46,14 @@
     {
       "id": "clip-vector-empty-ass-720p",
       "requirement": "triergon-ass: a vector clip whose drawing has no contour empties every image of its event, as blend_vector_clip does with the bitmap without pixels libass draws for it (ass_render.c:700-813)"
+    },
+    {
+      "id": "language-unknown-ass-1080p",
+      "requirement": "triergon-shape: a language HarfBuzz does not register selects no language system (hb_ot_tags_from_language) instead of being refused"
+    },
+    {
+      "id": "language-unknown-ass-720p",
+      "requirement": "triergon-shape: a language HarfBuzz does not register selects no language system (hb_ot_tags_from_language) instead of being refused"
     }
   ]
 }
