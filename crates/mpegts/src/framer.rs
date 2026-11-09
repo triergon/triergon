@@ -533,24 +533,33 @@ impl TransportFramer {
                         Self::share_progressive_window(&mut self.progressive_windows, input)
                     }
                 };
-                if share || self.buffered_carrier == BufferedCarrier::Progressive {
-                    let start = input.position();
-                    let source = if share {
-                        let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
-                            return Err(Error::Invalid("buffered carrier span missing"));
-                        };
-                        source
-                    } else {
-                        // Preserve only the tight carrier if a shared window
-                        // cannot be replaced. Allocate before advancing input.
-                        let source =
-                            Bytes::copy_from_slice(&self.budget, &input.buffered()[..missing])?;
-                        if !matches!(input.read_discard(missing, work, cancel)?, Step::Ready(read) if read == missing)
-                        {
-                            return Err(Error::Invalid("buffered carrier extent changed"));
-                        }
-                        source
+                let start = input.position();
+                let source = if share {
+                    let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
+                        return Err(Error::Invalid("buffered carrier span missing"));
                     };
+                    Some(source)
+                } else {
+                    // Preserve only the tight carrier if a shared window
+                    // cannot be replaced. Allocate before advancing input.
+                    match Bytes::copy_from_slice(&self.budget, &input.buffered()[..missing]) {
+                        Ok(source) => {
+                            if !matches!(input.read_discard(missing, work, cancel)?, Step::Ready(read) if read == missing)
+                            {
+                                return Err(Error::Invalid("buffered carrier extent changed"));
+                            }
+                            Some(source)
+                        }
+                        Err(
+                            Error::Backpressure { .. } | Error::Allocation | Error::Limit { .. },
+                        ) if self.buffered_carrier == BufferedCarrier::Shared => {
+                            // The existing carry may already have room for the bytes.
+                            None
+                        }
+                        Err(error) => return Err(error),
+                    }
+                };
+                if let Some(source) = source {
                     self.next = Some(input.position());
                     if self.format == PacketFormat::Ts188
                         && !cancel.load(Ordering::Relaxed)
@@ -1154,6 +1163,51 @@ mod tests {
             Step::Ready(_)
         ));
         assert_eq!(budget.used(), Budget::control_storage_bytes());
+    }
+
+    #[test]
+    fn an_unshared_window_keeps_complete_carrier_inspection() {
+        let budget = Budget::new(4096).unwrap();
+        let mut input = InputCursor::new(
+            &budget,
+            SourceId(1),
+            SourceCapabilities {
+                length: Some(376),
+                random_access: false,
+            },
+            188,
+        )
+        .unwrap();
+        let mut framer = TransportFramer::new(budget.clone(), PacketFormat::Ts188);
+        framer.share_input();
+        let cancel = AtomicBool::new(false);
+        let mut wire = [0x55; 188];
+        wire[..4].copy_from_slice(&[0x47, 0x01, 0, 0x10]);
+        let mut carriers = Vec::new();
+        for counter in 0..2 {
+            wire[3] = 0x10 | counter;
+            let request = input.request();
+            let source = Bytes::copy_from_slice(&budget, &wire).unwrap();
+            let address = source.storage_address();
+            input
+                .provide_owned(
+                    InputWindow::new(request.source, request.token, request.offset, source)
+                        .unwrap(),
+                )
+                .unwrap();
+            framer.bind_input(&input).unwrap();
+            let Step::Ready(FramedCarrier::Plain(carrier)) = framer
+                .poll_bound_carrier::<false, true>(&mut input, &mut WorkBudget::new(4096), &cancel)
+                .unwrap()
+            else {
+                panic!("expected a complete continuation");
+            };
+            let packet = carrier.into_packet().unwrap();
+            assert_eq!(packet.source.as_ref(), &wire);
+            assert_eq!(packet.source_offset, u64::from(counter) * 188);
+            assert_eq!(packet.source.storage_address() == address, counter == 0);
+            carriers.push(packet);
+        }
     }
 
     #[test]
