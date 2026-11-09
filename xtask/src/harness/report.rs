@@ -88,9 +88,10 @@ fn entity_input_failure(
     let [_, _, args @ ..] = args.as_slice() else {
         return Err("ordered transport input needs packet size and program".into());
     };
-    let args = args
-        .strip_prefix(&[std::ffi::OsString::from("--dvb")])
-        .unwrap_or(args);
+    let args = match args {
+        [namespace, remaining @ ..] if namespace == "--dvb" || namespace == "--atsc" => remaining,
+        _ => args,
+    };
     let Some(entities) = entities else {
         return if args.is_empty() {
             Ok(None)
@@ -1055,6 +1056,17 @@ mod prefix_tests {
         );
         std::fs::write(root.join("next.ts"), input).unwrap();
         assert_eq!(entity_input_failure(&root, &case, true).unwrap(), None);
+        for namespace in ["--dvb", "--atsc"] {
+            let with_namespace = parse(&row.replace(
+                r#"["188","1","next.ts"]"#,
+                &format!(r#"["188","1","{namespace}","next.ts"]"#),
+            ))
+            .unwrap();
+            assert_eq!(
+                entity_input_failure(&root, &with_namespace, true).unwrap(),
+                None
+            );
+        }
         std::fs::remove_file(root.join("next.ts")).unwrap();
         std::fs::remove_dir(root).unwrap();
     }

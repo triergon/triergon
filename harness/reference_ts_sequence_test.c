@@ -45,11 +45,11 @@ static void test_no_eof_drain_at_discontinuity(const char *root)
     char *arguments[] = {"worker", "ts-au-fold", path, "188", "7",
                          "--discontinuity", "au-dvb-ac3-multiple-per-pes.ts"};
     TsEntities source = {0};
-    assert(ts_entities_load(&source, 7, arguments, 3, bytes, (size_t)size) == 0);
+    assert(ts_entities_load(&source, 7, arguments, 3, bytes, (size_t)size, 1) == 0);
     TsWork work = {0};
     /* The old lone frame is still awaiting lookahead. A manufactured EOF would
      * emit it; a real discontinuity discards it before the next entity's frames. */
-    assert(ts_entities_operation(&source, 7, &work) == 1);
+    assert(ts_entities_operation(&source, 7, 1, &work) == 1);
     assert(work.packets == 2 && work.bytes == 2 * 384);
     ts_entities_free(&source);
     free(bytes);

@@ -49,7 +49,7 @@ impl Request {
 }
 
 pub(crate) fn parse(pool: &Budget, path: &Path, arguments: &[String]) -> Result<Request> {
-    let usage = "expected SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...";
+    let usage = "expected SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]...";
     let [size, program, rest @ ..] = arguments else {
         return Err(usage.into());
     };
@@ -64,6 +64,7 @@ pub(crate) fn parse(pool: &Budget, path: &Path, arguments: &[String]) -> Result<
             DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile),
             rest,
         ),
+        [option, rest @ ..] if option == "--atsc" => (DescriptorNamespace::Atsc, rest),
         _ => (DescriptorNamespace::Unspecified, rest),
     };
     let input = load_entity(pool, path, MAX_INPUT)?;
