@@ -2,6 +2,8 @@
  * an explicit discontinuity blocks reads until buffered parse state is flushed. */
 #include <errno.h>
 
+enum { TS_MAX_PES_ENTITIES = 64, TS_MAX_PES_SEQUENCE_BYTES = 64 * 1024 * 1024 };
+
 typedef struct {
     const uint8_t *bytes;
     uint8_t *allocation;
@@ -34,9 +36,12 @@ static int ts_entity_name(const char *name)
 }
 
 static int ts_entities_load(TsEntities *source, int argc, char **argv, int at,
-                            const uint8_t *bytes, size_t size)
+                            const uint8_t *bytes, size_t size, int access_units)
 {
-    source->entities = calloc((size_t)argc, sizeof(*source->entities));
+    if (!access_units && (!size || size > TS_MAX_PES_SEQUENCE_BYTES))
+        return AVERROR(EINVAL);
+    size_t capacity = access_units ? (size_t)argc : TS_MAX_PES_ENTITIES;
+    source->entities = calloc(capacity, sizeof(*source->entities));
     if (!source->entities)
         return AVERROR(ENOMEM);
     source->entities[0] = (TsEntity){bytes, NULL, size, 0, 0};
@@ -52,7 +57,7 @@ static int ts_entities_load(TsEntities *source, int argc, char **argv, int at,
             discontinuity = 1;
             continue;
         }
-        if (!ts_entity_name(argv[i]))
+        if (source->count == capacity || !ts_entity_name(argv[i]))
             return AVERROR(EINVAL);
         size_t length = strlen(argv[i]);
         if (directory > SIZE_MAX - length - 1)
@@ -70,7 +75,8 @@ static int ts_entities_load(TsEntities *source, int argc, char **argv, int at,
         long extent = ok ? ftell(file) : -1;
         if (extent <= 0 || extent > 64 * 1024 * 1024
             || (uint64_t)extent > (uint64_t)SIZE_MAX - source->size
-            || (uint64_t)extent > (uint64_t)INT64_MAX - source->size) {
+            || (uint64_t)extent > (uint64_t)INT64_MAX - source->size
+            || (!access_units && (uint64_t)extent > TS_MAX_PES_SEQUENCE_BYTES - source->size)) {
             fclose(file);
             return AVERROR(EINVAL);
         }
@@ -186,7 +192,8 @@ static int ts_entity_resume(AVFormatContext *format, AVIOContext **io,
     return 0;
 }
 
-static int ts_entities_operation(const TsEntities *source, int program, TsWork *work)
+static int ts_entities_operation(const TsEntities *source, int program,
+                                 int access_units, TsWork *work)
 {
     TsEntityInput input = {source, 0, 0, ts_next_boundary(source, 1), 0};
     AVFormatContext *format = avformat_alloc_context();
@@ -206,6 +213,8 @@ static int ts_entities_operation(const TsEntities *source, int program, TsWork *
     }
     format->pb = io;
     format->flags |= AVFMT_FLAG_CUSTOM_IO | AVFMT_FLAG_NOFILLIN;
+    if (!access_units)
+        format->flags |= AVFMT_FLAG_NOPARSE;
     rc = avformat_open_input(&format, NULL, av_find_input_format("mpegts"), NULL);
     if (rc < 0)
         goto done;

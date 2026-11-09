@@ -7,11 +7,10 @@
  * demuxer order: stream index, PID, PTS, DTS, duration, position, flags, payload and
  * every side-data element. The operation reaches EOF only when av_read_frame
  * returns AVERROR_EOF. FFmpeg probes the packet size itself, and its demuxer has no
- * caller-declared descriptor namespace, so the size and namespace arguments describe
- * the candidate's request only. An operation over more than one media entity has
- * no single-input equivalent in ts modes and is refused. The ts-au modes enable codec
- * parsing while retaining NOFILLIN and the same program filter and packet fold;
- * they observe access units separately from the unchanged PES operation. */
+ * caller-declared descriptor namespace, so the size and --dvb arguments describe
+ * the candidate's request only. Both modes use the same AVIO adapter for ordered
+ * media entities and the same program filter and packet fold. The ts-au modes
+ * enable codec parsing and retain NOFILLIN. */
 #include <libavformat/avformat.h>
 
 #define TS_OPERATION "mpegts-pes-packets"
@@ -139,7 +138,7 @@ done:
 #include "reference_ts_sequence.h"
 
 /* ts-fold FILE SIZE PROGRAM [OPTIONS] | ts-bench FILE N SIZE PROGRAM [OPTIONS] |
- * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb or --atsc and further entities.
+ * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS include a namespace and further entities.
  * ts-au-fold, ts-au-bench and ts-au-memory use the same arguments with parsing. */
 static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
 {
@@ -164,27 +163,24 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     long program = strtol(argv[at + 1], &end, 10);
     if (*end || program < 1 || program > 65535)
         return 2;
-    const char *refusal = NULL;
-    for (int i = at + 2; i < argc; ++i) {
-        if (i == at + 2 && (!strcmp(argv[i], "--dvb") || !strcmp(argv[i], "--atsc")))
-            continue;
-        refusal = "no single-input reference operation for more than one media entity";
-    }
+    int first_entity = at + 2;
+    if (first_entity < argc && (!strcmp(argv[first_entity], "--dvb")
+                               || !strcmp(argv[first_entity], "--atsc")))
+        ++first_entity;
     TsEntities source = {0};
     int result = 2;
-    if (access_units && refusal) {
-        if (ts_entities_load(&source, argc, argv, at, bytes, (size_t)size) < 0)
-            goto done;
-        refusal = NULL;
-    }
+    if (first_entity < argc
+        && ts_entities_load(&source, argc, argv, at, bytes, (size_t)size, access_units) < 0)
+        goto done;
     if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18)
         goto done;
     TsWork total = {0, 0, 0};
+    const char *refusal = NULL;
     int eof = 0, rc = 0;
     const uint64_t start = bench ? now_ns() : 0;
-    for (unsigned long i = 0; i < iterations && !refusal; ++i) {
+    for (unsigned long i = 0; i < iterations; ++i) {
         TsWork work = {0, 0, 0};
-        rc = source.count ? ts_entities_operation(&source, (int)program, &work)
+        rc = source.count ? ts_entities_operation(&source, (int)program, access_units, &work)
             : ts_operation(bytes, (size_t)size, (int)program, access_units, &work);
         fold(&total.digest, work.digest);
         total.packets += work.packets;
