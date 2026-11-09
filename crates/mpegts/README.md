@@ -271,7 +271,13 @@ atomically with the corresponding source event. A PMT, clock or interrupted-byte
 boundary reports unpublished bytes through
 `ReaderEvent::Interrupted`, rather than treating a loss boundary as EOF.
 Logical EOF drains the framers before the original `Finished` event and final
-`Step::End`. Audio defaults to `AudioEofPolicy::RejectIncomplete`: an unfinished
+`Step::End`. When a split PES header needs a larger source-range table, the
+reader checks the allocations it must retain across that growth. If they cannot
+fit together, it reports a PES `Limit` diagnostic. Memory held by caller outputs
+can instead cause retryable `Backpressure`, with the original header and byte
+ranges preserved on retry.
+
+Audio defaults to `AudioEofPolicy::RejectIncomplete`: an unfinished
 frame still returns `Truncated`. With `AudioEofPolicy::ReportIncomplete`, only
 logical source EOF can instead produce `ReaderEvent::IncompleteAudio` carrying
 `AccessUnit::IncompleteAudio`. It keeps the exact unfinished audio bytes,

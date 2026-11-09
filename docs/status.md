@@ -78,6 +78,8 @@ The same nine control inputs miss the total resident peak gate in both views:
 `psi-pending-not-current`, `pat-network-pid-not-track`,
 `psi-pointer-finishes-old-starts-new`, `psi-two-sections-one-payload`,
 `psi-stuffing-tail-invalid` and `psi-truncated-eof`.
+Split PES headers report a limit when their required range-table growth cannot
+fit, including under strict parsing. Caller-held storage remains retryable.
 
 The progressive TS188 row uses the gate build at
 `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee`, with 30 timing pairs of 50 complete

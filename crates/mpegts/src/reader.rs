@@ -781,7 +781,7 @@ impl Reader {
                 .ok_or(Error::Invalid("MPEG-TS reader closed"))?;
             let step = match stream.poll(input, work, cancel) {
                 Err(error @ Error::Backpressure { .. }) => {
-                    self.audit_span_growth(error, work, cancel)?
+                    self.audit_pes_growth(error, work, cancel)?
                 }
                 result => {
                     // Any transport progress ends the snapshot used for the audit.
@@ -821,20 +821,20 @@ impl Reader {
     }
 
     #[cold]
-    fn audit_span_growth(
+    fn audit_pes_growth(
         &mut self,
         error: Error,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<TraceEvent>> {
         let stream = self.stream.as_ref().expect("blocked transport");
-        let Some(floor) = stream.blocked_adts_span_floor()? else {
+        let Some(floor) = stream.blocked_pes_growth_floor()? else {
             self.storage = None;
             return Err(error);
         };
         let mut scan = match self.storage.take() {
             Some(scan) => scan,
-            None => StorageScan::span_growth(self, floor)?,
+            None => StorageScan::pes_growth(self, floor)?,
         };
         if !scan.step(self, work, cancel)? {
             self.storage = Some(scan);
@@ -847,7 +847,7 @@ impl Reader {
             }
             let limit = crate::limit(scan.bytes(), self.pool.limit());
             let stream = self.stream.as_mut().expect("blocked transport");
-            return Ok(Step::Ready(stream.refuse_blocked_adts_span(limit)));
+            return Ok(Step::Ready(stream.refuse_blocked_pes_growth(limit)));
         }
         self.storage = Some(scan);
         Err(error)
