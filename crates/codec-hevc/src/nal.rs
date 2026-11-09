@@ -71,7 +71,9 @@ fn starts_new_au(nal: &[u8]) -> Option<(bool, bool)> {
         let first_slice = nal.len() > 2 && nal[2] & 0x80 != 0;
         return Some((true, first_slice));
     }
-    Some((false, hevc::begins_access_unit(t)))
+    // FFmpeg's parser looks at a NAL unit once a byte after its two-byte
+    // header is in, so a header-only unit that ends the stream begins nothing.
+    Some((false, nal.len() > 2 && hevc::begins_access_unit(t)))
 }
 
 impl<'a> Iterator for AccessUnitSplitter<'a> {
@@ -112,21 +114,6 @@ impl<'a> Iterator for AccessUnitSplitter<'a> {
                 if is_vcl {
                     seen_vcl = true;
                 }
-                if !seen_vcl && boundary > au_start && i == au_start {
-                    // nothing
-                }
-                // EOS / EOB end the AU after themselves.
-                let h = NalHeader::parse(nal);
-                if let Some(h) = h
-                    && seen_vcl
-                    && h.nuh_layer_id == 0
-                    && (h.nal_unit_type == hevc::EOS || h.nal_unit_type == hevc::EOB)
-                {
-                    // AU ends after this NAL.
-                    let end = start_code(self.data, nal_start).unwrap_or(self.data.len());
-                    self.pos = end;
-                    return Some(&self.data[au_start..end]);
-                }
             }
             i = nal_start;
         }
@@ -164,6 +151,30 @@ mod tests {
                 AccessUnitSplitter::new(&alone).count(),
                 1,
                 "type {reserved}"
+            );
+        }
+    }
+
+    /// An end of sequence or bitstream starts the next access unit, as in
+    /// FFmpeg's HEVC parser, which looks at a unit once a byte after its header
+    /// is in: one ending the stream stays in the last access unit unless a
+    /// trailing zero byte follows it.
+    #[test]
+    fn end_of_sequence_and_bitstream_start_access_units() {
+        let trail = [0, 0, 1, 0x02, 0x01, 0x80];
+        for end in [hevc::EOS, hevc::EOB] {
+            let mut stream = trail.to_vec();
+            stream.extend_from_slice(&[0, 0, 1, end << 1, 0x01]);
+            stream.extend_from_slice(&trail);
+            stream.extend_from_slice(&[0, 0, 1, end << 1, 0x01]);
+            let units: Vec<&[u8]> = AccessUnitSplitter::new(&stream).collect();
+            assert_eq!(units, [&stream[..6], &stream[6..]], "type {end}");
+            stream.push(0);
+            let units: Vec<&[u8]> = AccessUnitSplitter::new(&stream).collect();
+            assert_eq!(
+                units,
+                [&stream[..6], &stream[6..17], &stream[17..]],
+                "type {end}"
             );
         }
     }

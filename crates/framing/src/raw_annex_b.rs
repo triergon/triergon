@@ -98,7 +98,7 @@ struct Role {
     random_access: bool,
 }
 
-fn hevc_role(nal: &NalUnit) -> Result<Role> {
+fn hevc_role(nal: &NalUnit, reader: &NalReader) -> Result<Role> {
     let NalHeader::Hevc {
         nal_unit_type,
         layer_id,
@@ -111,7 +111,11 @@ fn hevc_role(nal: &NalUnit) -> Result<Role> {
     // boundary. Every other NAL retains its source bytes in order.
     let vcl = layer_id == 0 && hevc::is_slice(nal_unit_type);
     let first_slice = vcl && nal.bytes().get(2).ok_or(Error::Truncated)? & 0x80 != 0;
-    let leading = layer_id == 0 && hevc::begins_access_unit(nal_unit_type);
+    // FFmpeg's parser looks at a NAL unit once a byte after its two-byte
+    // header is in, so a header-only unit that ends the stream begins nothing.
+    let leading = layer_id == 0
+        && hevc::begins_access_unit(nal_unit_type)
+        && (nal.bytes().len() > 2 || nal.facts().trailing_zero_bytes > 0 || !reader.ended());
     Ok(Role {
         vcl,
         begins: first_slice || leading,
@@ -285,7 +289,7 @@ impl RawAnnexBReader {
                 }
                 let role = match &mut self.avc {
                     Some(pictures) => avc_role(pictures, &pending.nal, self.has_vcl)?,
-                    None => hevc_role(&pending.nal)?,
+                    None => hevc_role(&pending.nal, &self.nal)?,
                 };
                 pending.role = Some(role);
                 role

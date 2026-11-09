@@ -1307,7 +1307,7 @@ mod tests {
             ("matroska-audio-clocks", 10),
             ("mp4-forward", 38),
             ("ts-program", 35),
-            ("raw-annex-b", 6),
+            ("raw-annex-b", 7),
             ("mpegts-pes", 97),
             ("subtitle-pgs", 317),
             ("subtitle-dvb", 229),
