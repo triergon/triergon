@@ -128,6 +128,7 @@ fn source(root: &Path, path: &str) -> R<Vec<u8>> {
 struct Case {
     row: Value,
     bytes: Option<Vec<u8>>,
+    following: Vec<(String, Vec<u8>)>,
 }
 
 fn original(root: &Path) -> R<Vec<Case>> {
@@ -166,7 +167,11 @@ fn original(root: &Path) -> R<Vec<Case>> {
                     }
                 }
             }
-            Ok(Case { row, bytes: None })
+            Ok(Case {
+                row,
+                bytes: None,
+                following: Vec::new(),
+            })
         })
         .collect()
 }
@@ -405,6 +410,7 @@ fn authored_case(codec: &Codec, name: &str, parts: &[Part<'_>], m2ts: bool) -> R
             ],
         ),
         bytes: Some(bytes),
+        following: Vec::new(),
     })
 }
 
@@ -618,7 +624,115 @@ fn interleaved_audio_case(ac3: &Codec, aac: &Codec, second_ac3: bool) -> R<Case>
             ],
         ),
         bytes: Some(bytes),
+        following: Vec::new(),
     })
+}
+
+fn coded_input<'a>(cases: &'a [Case], id: &str) -> R<&'a [u8]> {
+    cases
+        .iter()
+        .find(|case| case.row.get("id").and_then(Value::as_str) == Some(id))
+        .and_then(|case| case.bytes.as_deref())
+        .ok_or_else(|| format!("missing coded input {id}"))
+}
+
+fn ordered_case(id: &str, stride: usize, dvb: bool, segments: &[(&[u8], bool)]) -> R<Case> {
+    let [(primary, false), rest @ ..] = segments else {
+        return Err("ordered case needs an initial entity".into());
+    };
+    let extension = match stride {
+        188 => "ts",
+        192 => "m2ts",
+        _ => return Err("unsupported ordered carrier size".into()),
+    };
+    if rest.is_empty()
+        || segments
+            .iter()
+            .any(|(bytes, _)| bytes.is_empty() || !bytes.len().is_multiple_of(stride))
+    {
+        return Err("ordered case needs complete carriers in every entity".into());
+    }
+    let primary_path = format!(".research/{DIRECTORY}/{id}-0.{extension}");
+    let mut args = vec![stride.to_string(), PROGRAM.to_string()];
+    if dvb {
+        args.push("--dvb".into());
+    }
+    let mut entity_records = vec![Value::object([
+        ("file", Value::str(&primary_path)),
+        ("sha256", Value::str(sha256::hex(primary))),
+        ("discontinuity", Value::Bool(false)),
+    ])];
+    let mut following = Vec::with_capacity(rest.len());
+    for (index, (bytes, discontinuity)) in rest.iter().enumerate() {
+        let file_name = format!("{id}-{}.{extension}", index + 1);
+        let path = format!(".research/{DIRECTORY}/{file_name}");
+        if *discontinuity {
+            args.push("--discontinuity".into());
+        }
+        args.push(file_name);
+        entity_records.push(Value::object([
+            ("file", Value::str(&path)),
+            ("sha256", Value::str(sha256::hex(bytes))),
+            ("discontinuity", Value::Bool(*discontinuity)),
+        ]));
+        following.push((path, bytes.to_vec()));
+    }
+    Ok(Case {
+        row: authored(
+            id,
+            &primary_path,
+            primary,
+            vec![
+                ("arguments", Value::strings(args)),
+                ("entities", Value::Array(entity_records)),
+            ],
+        ),
+        bytes: Some(primary.to_vec()),
+        following,
+    })
+}
+
+fn ordered_cases(cases: &[Case]) -> R<[Case; 4]> {
+    let adts = coded_input(cases, "au-adts-aac-lc-body-across-pes")?;
+    let m2ts = coded_input(cases, "au-adts-aac-lc-m2ts192")?;
+    let ac3_single = coded_input(cases, "au-dvb-ac3-one")?;
+    let ac3_multiple = coded_input(cases, "au-dvb-ac3-multiple-per-pes")?;
+    let ac3_next = coded_input(cases, "au-dvb-ac3-final-au-at-eof")?;
+    let (initialization, adts) = adts
+        .split_at_checked(2 * 188)
+        .ok_or("ADTS initialization missing")?;
+    let (start, end) = adts
+        .split_at_checked(188)
+        .ok_or("ADTS continuation missing")?;
+    let (map, media) = m2ts
+        .split_at_checked(2 * 192)
+        .ok_or("M2TS initialization missing")?;
+    Ok([
+        ordered_case(
+            "au-adts-across-entities",
+            188,
+            false,
+            &[(initialization, false), (start, false), (end, false)],
+        )?,
+        ordered_case(
+            "au-m2ts-initialization-entity",
+            192,
+            false,
+            &[(map, false), (media, false)],
+        )?,
+        ordered_case(
+            "au-dvb-ac3-discontinuity-single-frame",
+            188,
+            true,
+            &[(ac3_single, false), (ac3_next, true)],
+        )?,
+        ordered_case(
+            "au-dvb-ac3-discontinuity-two-frames",
+            188,
+            true,
+            &[(ac3_multiple, false), (ac3_next, true)],
+        )?,
+    ])
 }
 
 fn all_cases(root: &Path) -> R<Vec<Case>> {
@@ -678,6 +792,8 @@ fn all_cases(root: &Path) -> R<Vec<Case>> {
     for second_ac3 in [false, true] {
         cases.push(interleaved_audio_case(&ac3, &aac, second_ac3)?);
     }
+    let ordered = ordered_cases(&cases)?;
+    cases.extend(ordered);
     Ok(cases)
 }
 
@@ -698,7 +814,7 @@ fn contract(cases: &[Case]) -> R<Value> {
                 "Fold stream index, PID, signed PTS and DTS in 90kHz ticks (absent as INT64_MIN), duration, position, flags, payload length and every byte, then every side-data element's type, size and bytes.",
                 "Each complete operation reaches EOF and contributes its packet count, byte count and ordered digest. Both workers must match the independently recorded parser-enabled reference fold. All temporary operation storage is released before the memory END marker.",
                 "The 97 retained PES input/argument tuples preserve their 272 request associations and use parser-enabled AU expectations. Opaque, damaged and unsupported inputs remain observations that may fail; they are never reclassified as genuine access units or removed.",
-                "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, full33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. DVB AC-3 has explicit caller-declared descriptor namespace.",
+                "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, 33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. Ordered controls cover ADTS across entities, an M2TS initialization section and AC-3 lookahead at a discontinuity. DVB AC-3 has explicit caller-declared descriptor namespace.",
             ]),
         ),
         (
@@ -861,6 +977,9 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
         } else {
             paths.root.join(file)
         };
+        for (file, bytes) in &case.following {
+            fs::write(paths.out.join(file), bytes).map_err(|e| format!("{file}: {e}"))?;
+        }
         let (work, result_hash) = if let Some(recording) = recording {
             let observation = reference(&paths.root, &input, &case.row, recording)?;
             let id = text(&case.row, "id")?;
@@ -999,7 +1118,7 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
         )?;
     }
     Ok(format!(
-        "Generated {} MPEG-TS AU cases:97 original inputs/272 requests and{} coded controls",
+        "Generated {} MPEG-TS AU cases from 97 original inputs with 272 requests and {} coded controls",
         authored.len(),
         authored.len() - 97
     ))
@@ -1115,7 +1234,7 @@ mod tests {
     fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
         let original = read_json(&root().join(ORIGINAL)).unwrap();
         let generated = all_cases(root()).unwrap();
-        assert_eq!(generated.len(), 143);
+        assert_eq!(generated.len(), 147);
         for (old, new) in cases(&original).unwrap().iter().zip(&generated) {
             assert!(new.bytes.is_none());
             for key in [
@@ -1179,7 +1298,7 @@ mod tests {
             sha256::hex(crate::harness::manifest::canonical(&prior).as_bytes()),
             "70a05f8e72322c9b4966bc0751397f7cc06a7088c6819800cd22d35f1901ad6e"
         );
-        for (row, (suffix, packets)) in rows[141..].iter().zip([("eof", 2), ("lookahead", 3)]) {
+        for (row, (suffix, packets)) in rows[141..143].iter().zip([("eof", 2), ("lookahead", 3)]) {
             assert_eq!(
                 text(row, "id").unwrap(),
                 format!("au-dvb-ac3-aac-interleaved-{suffix}")
@@ -1360,7 +1479,7 @@ mod tests {
         .unwrap();
         assert_eq!(au.prefix, "ts-au-");
         assert_eq!(au.reference, "ffmpeg-formats-native");
-        assert_eq!(au.cases.len(), 143);
+        assert_eq!(au.cases.len(), 147);
         let contract = read_json(&au.contract).unwrap();
         assert_eq!(
             contract.get("required_profiles"),

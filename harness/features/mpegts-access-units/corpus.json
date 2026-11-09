@@ -4661,6 +4661,136 @@
         "digest": 17348808764204158952
       },
       "reference_result_sha256": "c0fb63edb70eb4a0ff664943c1a9721e2b3626e412773232a0f3ea0b4d69d5c6"
+    },
+    {
+      "id": "au-adts-across-entities",
+      "profile": "au-adts-across-entities",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-across-entities-0.ts",
+      "sha256": "7f64f44d710db2ac19e81d24aec6f63f6bcf6d77b05a6b17d495548d80275e25",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "au-adts-across-entities-1.ts",
+        "au-adts-across-entities-2.ts"
+      ],
+      "entities": [
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-adts-across-entities-0.ts",
+          "sha256": "7f64f44d710db2ac19e81d24aec6f63f6bcf6d77b05a6b17d495548d80275e25",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-adts-across-entities-1.ts",
+          "sha256": "6fdf908f8c30bfae58185cd18235ce39a879caf2728984e9b3dd6f9e116ce38f",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-adts-across-entities-2.ts",
+          "sha256": "d654e3b922a1700f25d08e88d0fa26c425dee093d502e2ee70c4070e8ca141c9",
+          "discontinuity": false
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 16555830350569948468
+      },
+      "reference_result_sha256": "2b111561f1e936bd201c62a3f4722d666294ff8239642c8243989d262c607fb5"
+    },
+    {
+      "id": "au-m2ts-initialization-entity",
+      "profile": "au-m2ts-initialization-entity",
+      "file": ".research/fixtures-mpegts-access-units/au-m2ts-initialization-entity-0.m2ts",
+      "sha256": "6dc31dd08cbca9374633652505d17548d095dad1209d3c04856296c817a65fa2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "au-m2ts-initialization-entity-1.m2ts"
+      ],
+      "entities": [
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-m2ts-initialization-entity-0.m2ts",
+          "sha256": "6dc31dd08cbca9374633652505d17548d095dad1209d3c04856296c817a65fa2",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-m2ts-initialization-entity-1.m2ts",
+          "sha256": "72b59825d1536313aa3084f1d6e497a5df5937aa6c037ece5f0d9b34ac29e5cf",
+          "discontinuity": false
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 10734489253454835941
+      },
+      "reference_result_sha256": "77214d371a1e69195f065bd2826fe982947a94ba8dc8fefb46d8885f6ee6e72e"
+    },
+    {
+      "id": "au-dvb-ac3-discontinuity-single-frame",
+      "profile": "au-dvb-ac3-discontinuity-single-frame",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-single-frame-0.ts",
+      "sha256": "62ab3f274edd017dd92be9e9983f19a2f28d77002a296657c039d1592c207498",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "--discontinuity",
+        "au-dvb-ac3-discontinuity-single-frame-1.ts"
+      ],
+      "entities": [
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-single-frame-0.ts",
+          "sha256": "62ab3f274edd017dd92be9e9983f19a2f28d77002a296657c039d1592c207498",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-single-frame-1.ts",
+          "sha256": "7fb4e23c7b2539f32f9723a84c877d2b5ff8230c0900f70905d398f9995fa701",
+          "discontinuity": true
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 768,
+        "digest": 12424789996683689576
+      },
+      "reference_result_sha256": "a34b21ff69ab7187d7cd679934dcb45101663df156459adb4293fe61f1b599f2"
+    },
+    {
+      "id": "au-dvb-ac3-discontinuity-two-frames",
+      "profile": "au-dvb-ac3-discontinuity-two-frames",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-two-frames-0.ts",
+      "sha256": "82c6e9500c90da3a4ba48da6947d7d804c923b8113e405b8f7bb7d051e3e71d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "--discontinuity",
+        "au-dvb-ac3-discontinuity-two-frames-1.ts"
+      ],
+      "entities": [
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-two-frames-0.ts",
+          "sha256": "82c6e9500c90da3a4ba48da6947d7d804c923b8113e405b8f7bb7d051e3e71d9",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-two-frames-1.ts",
+          "sha256": "7fb4e23c7b2539f32f9723a84c877d2b5ff8230c0900f70905d398f9995fa701",
+          "discontinuity": true
+        }
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1152,
+        "digest": 8470417084381956806
+      },
+      "reference_result_sha256": "b37eee81e2bd472806bdcbe939eda3fa9f5c7622a213ebd6f5e6c5c7f52b91fc"
     }
   ]
 }

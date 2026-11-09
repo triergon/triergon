@@ -12,7 +12,7 @@
     "Fold stream index, PID, signed PTS and DTS in 90kHz ticks (absent as INT64_MIN), duration, position, flags, payload length and every byte, then every side-data element's type, size and bytes.",
     "Each complete operation reaches EOF and contributes its packet count, byte count and ordered digest. Both workers must match the independently recorded parser-enabled reference fold. All temporary operation storage is released before the memory END marker.",
     "The 97 retained PES input/argument tuples preserve their 272 request associations and use parser-enabled AU expectations. Opaque, damaged and unsupported inputs remain observations that may fail; they are never reclassified as genuine access units or removed.",
-    "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, full33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. DVB AC-3 has explicit caller-declared descriptor namespace."
+    "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, 33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. Ordered controls cover ADTS across entities, an M2TS initialization section and AC-3 lookahead at a discontinuity. DVB AC-3 has explicit caller-declared descriptor namespace."
   ],
   "required_profiles": [
     "ts188-basic",
@@ -157,7 +157,11 @@
     "au-dvb-ac3-clock-wrap",
     "au-dvb-ac3-m2ts192",
     "au-dvb-ac3-aac-interleaved-eof",
-    "au-dvb-ac3-aac-interleaved-lookahead"
+    "au-dvb-ac3-aac-interleaved-lookahead",
+    "au-adts-across-entities",
+    "au-m2ts-initialization-entity",
+    "au-dvb-ac3-discontinuity-single-frame",
+    "au-dvb-ac3-discontinuity-two-frames"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"
