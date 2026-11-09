@@ -785,6 +785,101 @@ fn direct_eac3_case(root: &Path) -> R<Case> {
     )
 }
 
+fn loas_element(aac: &[u8], reuse_config: bool) -> R<Vec<u8>> {
+    // ISO/IEC 14496-3 §1.7.3: one stream, one subframe and a byte length.
+    let mut mux = Vec::new();
+    let mut used = 0;
+    let mut write = |value: u16, width: u8| {
+        for shift in (0..width).rev() {
+            if used == 0 {
+                mux.push(0);
+            }
+            *mux.last_mut().unwrap() |= ((value >> shift & 1) as u8) << (7 - used);
+            used = (used + 1) % 8;
+        }
+    };
+    write(u16::from(reuse_config), 1);
+    if !reuse_config {
+        write(0, 1); // audioMuxVersion
+        write(1, 1); // allStreamsSameTimeFraming
+        write(0, 6 + 4 + 3); // subframe, program and layer counts minus one
+        write(0x1188, 16); // AAC-LC, 48 kHz, mono, 1024 samples
+        write(0, 3); // frameLengthType
+        write(255, 8); // latmBufferFullness
+        write(0, 2); // no other data or CRC
+    }
+    let mut chunks = aac.chunks_exact(255);
+    for _ in &mut chunks {
+        write(255, 8);
+    }
+    write(chunks.remainder().len() as u16, 8);
+    for &byte in aac {
+        write(u16::from(byte), 8);
+    }
+    let length = u16::try_from(mux.len()).map_err(|_| "LOAS element too large")?;
+    if length > 0x1fff {
+        return Err("LOAS element too large".into());
+    }
+    let [high, low] = length.to_be_bytes();
+    let mut envelope = vec![0x56, 0xe0 | high, low];
+    envelope.extend(mux);
+    Ok(envelope)
+}
+
+fn latm_cases(aac: &Codec) -> R<[Case; 8]> {
+    let raw = &aac.bytes[aac.header..aac.first];
+    let first = loas_element(raw, false)?;
+    let next = loas_element(raw, true)?;
+    let codec = Codec {
+        name: "latm-aac-lc",
+        stream_type: 0x11,
+        stream_id: 0xc0,
+        dvb: false,
+        first: first.len(),
+        header: 3,
+        bytes: [&first[..], &next, &next].concat(),
+    };
+    let opaque = b"opaque multiplex bytes";
+    let prefix = [&opaque[..], &first].concat();
+    let start = |bytes| part(bytes, Some(90_000), None);
+    let later = |bytes| part(bytes, Some(180_000), Some(179_000));
+    Ok([
+        authored_case(&codec, "three-frames-in-pes", &[start(&codec.bytes)], false)?,
+        authored_case(
+            &codec,
+            "header-across-pes",
+            &[start(&codec.bytes[..2]), later(&codec.bytes[2..])],
+            false,
+        )?,
+        authored_case(&codec, "opaque-prefix-in-pes", &[start(&prefix)], false)?,
+        authored_case(
+            &codec,
+            "opaque-then-coded",
+            &[start(opaque), later(&first)],
+            false,
+        )?,
+        authored_case(
+            &codec,
+            "coded-then-opaque",
+            &[start(&first), later(opaque)],
+            false,
+        )?,
+        authored_case(
+            &codec,
+            "two-opaque-pes",
+            &[start(opaque), part(b"tail", None, None)],
+            false,
+        )?,
+        authored_case(
+            &codec,
+            "truncated-envelope",
+            &[start(&first[..first.len() - 1])],
+            false,
+        )?,
+        authored_case(&codec, "empty-envelope", &[start(&[0x56, 0xe0, 0])], false)?,
+    ])
+}
+
 fn all_cases(root: &Path) -> R<Vec<Case>> {
     let mut cases = original(root)?;
     for codec in [
@@ -868,6 +963,7 @@ fn all_cases(root: &Path) -> R<Vec<Case>> {
         following: Vec::new(),
     });
     cases.push(direct_eac3_case(root)?);
+    cases.extend(latm_cases(&aac)?);
     Ok(cases)
 }
 
@@ -884,6 +980,7 @@ fn contract(cases: &[Case]) -> R<Value> {
             Value::strings([
                 "Preloaded TS188 or M2TS192 input, SIZE PROGRAM [--dvb|--atsc] and the original ordered media-entity arguments; the candidate uses the public MPEG-TS access-unit reader, with no PES-as-AU fallback.",
                 "The Annex B EOF policy reports an unframed run of validated AVC or HEVC PES bytes with no start code. The candidate folds the opaque observation separately from complete video access units.",
+                "LATM controls wrap the pinned AAC-LC payload in independently authored LOAS envelopes and also carry opaque or truncated envelopes. The LATM compatibility policy reports one unsplit packet per validated nonempty PES, with its original clocks and position.",
                 "A single entity can complete empty after a PSI diagnostic or an empty read only when the control-only proof classifies the original carriers through physical end and logical EOF.",
                 "Reference: the MPEG-TS demuxer with custom AVIO, NOFILLIN, parsers enabled, no stream discovery and no decoders; every parsed packet of the selected program in demux order, including EOF parser drain.",
                 "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
@@ -1194,7 +1291,7 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
         )?;
     }
     Ok(format!(
-        "Generated {} MPEG-TS AU cases from 97 original inputs with 272 requests and {} coded controls",
+        "Generated {} MPEG-TS AU cases from 97 original inputs with 272 requests and {} authored controls",
         authored.len(),
         authored.len() - 97
     ))
@@ -1310,7 +1407,7 @@ mod tests {
     fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
         let original = read_json(&root().join(ORIGINAL)).unwrap();
         let generated = all_cases(root()).unwrap();
-        assert_eq!(generated.len(), 150);
+        assert_eq!(generated.len(), 158);
         for (old, new) in cases(&original).unwrap().iter().zip(&generated) {
             assert!(new.bytes.is_none());
             for key in [
@@ -1555,7 +1652,7 @@ mod tests {
         .unwrap();
         assert_eq!(au.prefix, "ts-au-");
         assert_eq!(au.reference, "ffmpeg-formats-native");
-        assert_eq!(au.cases.len(), 150);
+        assert_eq!(au.cases.len(), 158);
         let contract = read_json(&au.contract).unwrap();
         assert_eq!(
             contract.get("required_profiles"),

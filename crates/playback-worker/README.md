@@ -61,6 +61,8 @@ reported separately from complete units, with its original bytes and refusal
 reason; it never enters the neutral packet stream.
 The Annex B EOF policy also reports unframed video as an opaque source event.
 The comparison folds its original payload, clock anchor and PES position.
+The LATM packet policy folds each validated nonempty PES in source order, with
+zero packet flags and duration. Separate reader tests exercise LOAS framing.
 If a single entity ends without an access unit or stops at a PSI diagnostic,
 the comparison can complete empty after the control-only proof classifies the
 original carriers through physical end and logical EOF.

@@ -19,6 +19,7 @@ use triergon_framing::Ac3Family;
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::annex_b::VideoEofPolicy;
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
+use triergon_mpegts::compat::latm;
 use triergon_mpegts::compat::pes::DemuxClock;
 use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::{
@@ -170,12 +171,20 @@ fn refused(mut totals: Totals, error: &dyn std::fmt::Display, at: SourceLocation
     totals
 }
 
+#[derive(Clone, Copy)]
+enum Payload<'a> {
+    Framed {
+        sources: &'a [PayloadSource],
+        bytes: &'a [u8],
+    },
+    PreservedPes(&'a latm::PesPacket),
+}
+
 struct PacketProjection<'a> {
     pid: u16,
     clock: Option<&'a PacketClock>,
     epochs: SourceEpochs,
-    sources: &'a [PayloadSource],
-    payload: &'a [u8],
+    payload: Payload<'a>,
     flags: u64,
 }
 
@@ -183,14 +192,17 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
     fn from(packet: &'a Packet) -> Self {
         let flags = match packet.access_unit() {
             AccessUnit::Video(unit) => u64::from(unit.random_access),
+            AccessUnit::Loas(_) => 0,
             AccessUnit::Adts(_) | AccessUnit::Ac3(_) | AccessUnit::IncompleteAudio { .. } => 1,
         };
         Self {
             pid: packet.track_info().stream().pid,
             clock: packet.clock(),
             epochs: packet.epochs(),
-            sources: packet.sources(),
-            payload: packet.payload(),
+            payload: Payload::Framed {
+                sources: packet.sources(),
+                bytes: packet.payload(),
+            },
             flags,
         }
     }
@@ -202,8 +214,23 @@ impl<'a> From<&'a IncompleteVideo> for PacketProjection<'a> {
             pid: video.track_info().stream().pid,
             clock: video.clock(),
             epochs: video.epochs(),
-            sources: video.sources(),
-            payload: video.bytes().as_ref(),
+            payload: Payload::Framed {
+                sources: video.sources(),
+                bytes: video.bytes().as_ref(),
+            },
+            flags: 0,
+        }
+    }
+}
+
+impl<'a> From<&'a latm::PesPacket> for PacketProjection<'a> {
+    fn from(packet: &'a latm::PesPacket) -> Self {
+        let pes = packet.pes();
+        Self {
+            pid: pes.pid,
+            clock: None,
+            epochs: pes.epochs,
+            payload: Payload::PreservedPes(packet),
             flags: 0,
         }
     }
@@ -219,13 +246,17 @@ fn fold_packet(
     cancel: &AtomicBool,
 ) -> Result<()> {
     let mut work = WorkBudget::new(WORK);
-    let header = match packet.clock {
-        Some(anchor) if anchor.quarantined => return Err("unresolved source clock".into()),
-        Some(anchor) => match anchor.pes.event() {
+    let header = match (packet.payload, packet.clock) {
+        (Payload::PreservedPes(packet), _) if packet.clock_is_quarantined() => {
+            return Err("unresolved source clock".into());
+        }
+        (Payload::PreservedPes(packet), _) => Some(&packet.pes().header),
+        (_, Some(anchor)) if anchor.quarantined => return Err("unresolved source clock".into()),
+        (_, Some(anchor)) => match anchor.pes.event() {
             TraceEvent::Pes(pes) => Some(&pes.header),
             _ => return Err("packet clock has no PES".into()),
         },
-        None => None,
+        (_, None) => None,
     };
     let time = clock
         .project_header(packet.pid, packet.epochs, header, &mut work, cancel)?
@@ -233,14 +264,20 @@ fn fold_packet(
     let ticks = |value: Option<i128>| -> Result<i64> {
         Ok(value.map(i64::try_from).transpose()?.unwrap_or(i64::MIN))
     };
-    let first = packet.sources.first().ok_or("packet has no source PES")?;
-    let TraceEvent::Pes(pes) = first.pes.event() else {
-        return Err("packet payload has no PES".into());
+    let (pes, at_pes_start, length) = match packet.payload {
+        Payload::Framed { sources, bytes } => {
+            let first = sources.first().ok_or("packet has no source PES")?;
+            let TraceEvent::Pes(pes) = first.pes.event() else {
+                return Err("packet payload has no PES".into());
+            };
+            (pes, first.payload_range.start == 0, bytes.len())
+        }
+        Payload::PreservedPes(packet) => (packet.pes(), true, packet.pes().payload_len),
     };
     // The parser reports a PES carrier position once, at its first unit. Later
     // units from the same PES have no packet position, even though source byte
     // ranges remain available on every packet.
-    let position = if first.payload_range.start == 0 {
+    let position = if at_pes_start {
         let range = pes
             .header_source_ranges
             .as_slice()
@@ -258,17 +295,29 @@ fn fold_packet(
         signed(duration),
         signed(position),
         packet.flags,
-        packet.payload.len() as u64,
+        length as u64,
     ] {
         fold(&mut totals.digest, value);
     }
-    fold_bytes(&mut totals.digest, packet.payload);
+    match packet.payload {
+        Payload::Framed { bytes, .. } => fold_bytes(&mut totals.digest, bytes),
+        Payload::PreservedPes(_) => {
+            let mut seen = 0;
+            for span in pes.payload() {
+                fold_bytes(&mut totals.digest, span);
+                seen += span.len();
+            }
+            if seen != length {
+                return Err("packet payload does not match its length".into());
+            }
+        }
+    }
     // AV_PKT_DATA_MPEGTS_STREAM_ID, including every unit sharing a PES.
     for value in [1, 19, 1, u64::from(pes.header.stream_id)] {
         fold(&mut totals.digest, value);
     }
     totals.packets += 1;
-    totals.bytes += packet.payload.len() as u64;
+    totals.bytes += length as u64;
     Ok(())
 }
 
@@ -289,6 +338,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         descriptor_namespace: request.namespace,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
         video_eof_policy: VideoEofPolicy::ReportUnframed,
+        latm_packet_policy: latm::PacketPolicy::PreservePes,
         ..ReaderLimits::default()
     };
     let mut reader = AnyReader::MpegTs(Reader::new(
@@ -361,17 +411,23 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     return Ok(refused(totals, error.as_ref(), at));
                 }
             }
-            Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::IncompleteVideo(video)))) => {
+            Step::Ready(Event::Other(AnyOther::MpegTs(
+                event @ (ReaderEvent::IncompleteVideo(_) | ReaderEvent::LatmPes(_)),
+            ))) => {
                 observed_media = true;
-                let id = video.track_info().id();
+                let (id, projection) = match &event {
+                    ReaderEvent::IncompleteVideo(video) => (video.track_info().id(), video.into()),
+                    ReaderEvent::LatmPes(packet) => (packet.track_info().id(), packet.into()),
+                    _ => unreachable!("expected an opaque packet observation"),
+                };
                 let index = tracks
                     .as_slice()
                     .iter()
                     .position(|value| value.id == id)
-                    .ok_or("unframed video has no registered track")?;
+                    .ok_or("opaque packet has no registered track")?;
                 if let Err(error) = fold_packet(
                     &mut totals,
-                    (&video).into(),
+                    projection,
                     index,
                     position,
                     0,
