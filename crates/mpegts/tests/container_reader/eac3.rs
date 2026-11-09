@@ -100,7 +100,8 @@ fn coded_primary_and_dependents_share_one_span_and_keep_their_pes_anchors() {
     let last = &packets[1];
     drive.reader.close();
     assert_eq!(first.payload(), group);
-    assert_eq!(first.track_info().codec(), CodecId::Other(&[6]));
+    assert_eq!(first.track_info().codec(), CodecId::Eac3);
+    assert_eq!(first.track_info().codec_tag(), [6]);
     assert_eq!(
         first.track_info().stream().descriptor_bytes.as_ref(),
         descriptors
