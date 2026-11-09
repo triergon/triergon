@@ -132,6 +132,12 @@ contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol. Seeking
 returns `Error::Unsupported` without changing reader state.
 
+`Reader::step_with_carriers` delivers transport packets and ordinary
+continuity events to a borrowed callback in source order. It returns the
+same access units, other source events and progress steps under the caller's
+work grant. `compat::annex_b::ContinuityReader` also exposes this method and
+keeps the carriers its continuity proof needs.
+
 For an ordered stream, call `Reader::finish_entity` with the final input
 token and the next entity's distinct source ID and capabilities. The reader
 consumes the last supplied bytes and requests offset zero of the next entity

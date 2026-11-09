@@ -46,8 +46,8 @@ pub use reader::{
     ReaderEvent, ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 pub use stream::{
-    CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun,
-    TraceEvent, TraceFault, TransportStream,
+    CarrierObservation, CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem,
+    FeedPayloadRun, TraceEvent, TraceFault, TransportStream,
 };
 pub use transport::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};
 
