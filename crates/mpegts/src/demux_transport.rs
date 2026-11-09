@@ -12,7 +12,7 @@ pub use boundaries::TransportTailConfirmation;
 mod malformed;
 pub use malformed::{
     MalformedInputCompletion, MalformedInputFact, MalformedInputKind, MalformedSourceDisposition,
-    NoPacketsConfirmation,
+    MalformedSourceEvent, NoPacketsConfirmation,
 };
 
 /// The sole transport fault admitted by this compatibility policy.

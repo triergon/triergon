@@ -3,9 +3,10 @@
 //! and the original core operation's actual EOF, even when there were no carriers.
 use super::{SourceContext, TransportFaultRecovery};
 use crate::demux_pes::DemuxScope;
+use crate::psi::DescriptorNamespace;
 use crate::{
     AssemblyStep, FaultKind, MediaEntityEnd, PacketFormat, ParseLimits, TraceEvent, TraceFault,
-    TransportInspection, TransportInspector, TransportPacket,
+    TransportInspection, TransportInspector, TransportPacket, TransportStream,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -83,6 +84,53 @@ pub enum MalformedSourceDisposition {
     Reported(MalformedInputFact),
 }
 
+/// An event issued by the completion's source advance. It borrows that
+/// operation and its cursor until the caller has handled the event.
+#[derive(Debug)]
+pub struct MalformedSourceEvent<'a> {
+    completion: &'a mut MalformedInputCompletion,
+    input: &'a mut InputCursor,
+    event: TraceEvent,
+    context: SourceContext,
+}
+impl MalformedSourceEvent<'_> {
+    pub fn event(&self) -> &TraceEvent {
+        &self.event
+    }
+    pub fn context(&self) -> SourceContext {
+        self.context
+    }
+    pub fn input(&self) -> &InputCursor {
+        self.input
+    }
+    pub fn clock_is_quarantined(&self) -> bool {
+        self.completion.stream.clock_is_quarantined()
+    }
+    pub fn required_work(&self) -> Result<u64> {
+        MalformedInputCompletion::required_work(&self.event)
+    }
+    /// Apply the policy to this issued event. A short grant leaves it available
+    /// for retry. Forwarded events remain available through [`Self::event`].
+    pub fn observe(
+        &mut self,
+        observer: Option<&mut TransportFaultRecovery>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<MalformedSourceDisposition>> {
+        self.completion.observe_source(
+            &self.event,
+            self.context,
+            self.input,
+            observer,
+            work,
+            cancel,
+        )
+    }
+    pub fn into_event(self) -> TraceEvent {
+        self.event
+    }
+}
+
 /// Completion after fully accounted controls/discards, not absence of media.
 /// Malformed facts were delivered individually through `Reported`.
 #[derive(Debug)]
@@ -125,18 +173,20 @@ struct Pending {
 /// self-contained PAT/PMT control sections are admitted. Invalid transport and
 /// PES headers are discarded only with their actual source diagnostics. Other
 /// selected payload still goes to the observer; it prevents zero-packet proof.
-/// Construction binds the original core cursor before its first byte. Feed every
-/// source event in order, honor `required_work`, seal physical End, then observe
-/// source Finished. EOF confirmation requires this same original cursor again.
-/// Fixed inline state and aliases add no input-dependent allocation or copy.
+/// Construction binds the original core cursor before its first byte. Advance
+/// the source with [`Self::poll_source`] and observe each issued event before
+/// advancing again. Seal physical End and signal logical EOF on this operation,
+/// then observe its Finished event. EOF confirmation checks the original cursor.
 #[derive(Debug)]
 pub struct MalformedInputCompletion {
+    stream: TransportStream,
     pool: Budget,
     token: InputToken,
     source: triergon_core::SourceId,
     program: u16,
     format: PacketFormat,
     limits: ParseLimits,
+    next_ordinal: u64,
     next_offset: u64,
     last: Option<SourceContext>,
     carriers: u64,
@@ -158,19 +208,46 @@ impl MalformedInputCompletion {
         limits: ParseLimits,
         program: u16,
     ) -> Result<Self> {
-        if input.position() != 0 || program == 0 {
+        if program == 0 {
             return Err(Error::Invalid(
                 "malformed completion must bind before input",
             ));
         }
-        limits.validate()?;
+        Self::new_with_namespace(
+            input,
+            format,
+            limits,
+            program,
+            DescriptorNamespace::Unspecified,
+        )
+    }
+    pub fn new_with_namespace(
+        input: &InputCursor,
+        format: PacketFormat,
+        limits: ParseLimits,
+        program: u16,
+        namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        if input.position() != 0 {
+            return Err(Error::Invalid(
+                "malformed completion must bind before input",
+            ));
+        }
         Ok(Self {
+            stream: TransportStream::new_with_namespace(
+                input.budget().clone(),
+                format,
+                limits,
+                program,
+                namespace,
+            )?,
             pool: input.budget().clone(),
             token: input.token(),
             source: input.source(),
             program,
             format,
             limits,
+            next_ordinal: 0,
             next_offset: 0,
             last: None,
             carriers: 0,
@@ -189,7 +266,42 @@ impl MalformedInputCompletion {
     pub fn discarded_carriers(&self) -> u64 {
         self.discarded
     }
-    pub fn required_work(&self, event: &TraceEvent) -> Result<u64> {
+    pub fn source_epochs(&self) -> crate::SourceEpochs {
+        self.stream.source_epochs()
+    }
+    /// Advance the bound source and issue its original event with the context
+    /// captured by that advance.
+    pub fn poll_source<'a>(
+        &'a mut self,
+        input: &'a mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<MalformedSourceEvent<'a>>> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        self.identity(input)?;
+        Ok(match self.stream.poll(input, work, cancel)? {
+            Step::Ready(event) => {
+                let context = SourceContext {
+                    source_event_ordinal: self.next_ordinal,
+                    epochs: self.source_epochs(),
+                    byte_run_epoch: None,
+                };
+                self.next_ordinal = self.next_ordinal.checked_add(1).ok_or(Error::Overflow)?;
+                Step::Ready(MalformedSourceEvent {
+                    completion: self,
+                    input,
+                    event,
+                    context,
+                })
+            }
+            Step::NeedInput(request) => Step::NeedInput(request),
+            Step::Yield => Step::Yield,
+            Step::End(location) => Step::End(location),
+        })
+    }
+    fn required_work(event: &TraceEvent) -> Result<u64> {
         let entries = match event {
             TraceEvent::Pat(table) => table.programs.len(),
             _ => 0,
@@ -516,8 +628,7 @@ impl MalformedInputCompletion {
             diagnostic: context,
         }))
     }
-    /// `None` is a short grant; the original event remains unconsumed.
-    pub fn observe_source(
+    fn observe_source(
         &mut self,
         event: &TraceEvent,
         context: SourceContext,
@@ -529,8 +640,8 @@ impl MalformedInputCompletion {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        self.identity(input)?;
-        if let Some(observer) = observer.as_ref() {
+        let quarantined = self.stream.clock_is_quarantined();
+        if !quarantined && let Some(observer) = observer.as_ref() {
             if !observer.inner.recovery_budget().same_pool(input.budget()) {
                 return Err(Error::ForeignPool);
             }
@@ -549,8 +660,17 @@ impl MalformedInputCompletion {
         {
             return Err(Error::Invalid("malformed completion source event order"));
         }
-        if !work.try_charge(self.required_work(event)?) {
+        if !work.try_charge(Self::required_work(event)?) {
             return Ok(None);
+        }
+        if quarantined {
+            self.blocked = true;
+            self.last = Some(context);
+            return Ok(Some(MalformedSourceDisposition::Forward));
+        }
+        let expected = self.last.map_or(0, |last| last.source_event_ordinal + 1);
+        if context.source_event_ordinal != expected {
+            self.blocked = true;
         }
         let physical = match event {
             TraceEvent::Transport(packet) => Some((packet.source_offset, packet.source.len())),
@@ -653,44 +773,39 @@ impl MalformedInputCompletion {
     }
     pub fn seal_physical_end(
         &mut self,
-        end: &MediaEntityEnd,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<bool> {
+    ) -> Result<Option<MediaEntityEnd>> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
         self.identity(input)?;
-        if self.end.is_some()
-            || self.pending.is_some()
-            || end.token != self.token
-            || !end.budget.same_pool(&self.pool)
-            || end.format != self.format
-            || end.program != self.program
-            || end.location.source != self.source
-            || end.location.offset != input.position()
-            || (!self.blocked && end.location.offset != self.next_offset)
+        if self.end.is_some() || self.pending.is_some() {
+            return Err(Error::Invalid(
+                "malformed completion original physical End mismatch",
+            ));
+        }
+        let Some(end) = self.stream.media_entity_end(input, work, cancel)? else {
+            return Ok(None);
+        };
+        if (!self.blocked && end.location.offset != self.next_offset)
             || self.last.is_some_and(|c| c.epochs != end.epochs)
         {
             return Err(Error::Invalid(
                 "malformed completion original physical End mismatch",
             ));
         }
-        if !work.try_charge(1) {
-            return Ok(false);
-        }
-        match input.read_into(&mut [0; 1], &mut WorkBudget::new(1), cancel)? {
-            Step::End(actual) if actual == end.location => (),
-            _ => {
-                return Err(Error::Invalid(
-                    "malformed completion requires real core EOF",
-                ));
-            }
-        }
         self.retire_control();
         self.end = Some(end.clone());
-        Ok(true)
+        Ok(Some(end))
+    }
+    /// Start the logical drain after sealing this operation's physical End.
+    pub fn end_of_source(&mut self) -> Result<()> {
+        if self.end.is_none() {
+            return Err(Error::Invalid("malformed completion missing physical End"));
+        }
+        self.stream.end_of_source()
     }
     /// Complete only the explicitly classified zero-packet branch. A real empty
     /// physical source is allowed, without inventing a PAT, PMT or PES scope.

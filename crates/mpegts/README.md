@@ -109,10 +109,12 @@ source fault and event contexts. The source parser still reports the refusal.
 A later valid PES start is forwarded to the observer. Continuations after a
 discard require a new start before their packet disposition can be proved.
 
-The policy binds the original core cursor before the first byte, accounts for
-every physical carrier and admits only verified self-contained control sections
-or typed discards on its zero-packet branch. `NoPacketsConfirmation` requires
-physical End, actual source Finished and a fresh EOF check on that same cursor.
+The policy binds the original core cursor before the first byte and advances
+its `TransportStream` through `poll_source`. Each issued event borrows that
+operation and cursor. The zero-packet branch accounts for every event and
+admits only verified self-contained control sections or typed discards.
+`NoPacketsConfirmation` requires physical End and Finished from the same
+operation and a fresh EOF check on the original cursor.
 This receipt can describe zero physical carriers at actual EOF without creating
 a PAT, PMT or PES scope. It is separate from `NoMediaConfirmation`. Unexplained
 payload, incomplete coverage, I/O failure, cancellation and stale identities
