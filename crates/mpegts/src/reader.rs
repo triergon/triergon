@@ -2,11 +2,13 @@
 mod lane;
 mod model;
 use crate::clock::{ClockKey, SourceTimePolicy};
+use crate::compat::annex_b::VideoEofPolicy;
 use crate::psi::DescriptorNamespace;
 use crate::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
 use lane::{Lane, LaneStep, StorageScan};
 pub use model::{
-    Ac3AccessUnit, AccessUnit, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
+    Ac3AccessUnit, AccessUnit, IncompleteVideo, Packet, PacketClock, PayloadSource, ReaderEvent,
+    SourceEvent, Track,
 };
 use model::{ClockContext, Shared};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -39,6 +41,8 @@ pub struct ReaderLimits {
     pub video: RawAnnexBLimits,
     pub maximum_audio_frame_bytes: usize,
     pub audio_eof_policy: AudioEofPolicy,
+    /// Reporting policy for validated video PES payload without Annex B framing.
+    pub video_eof_policy: VideoEofPolicy,
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
@@ -57,6 +61,7 @@ impl Default for ReaderLimits {
             video: RawAnnexBLimits::default(),
             maximum_audio_frame_bytes: 8192,
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
+            video_eof_policy: VideoEofPolicy::RejectUnframed,
             maximum_access_units: 32_000_000,
             maximum_pes_per_access_unit: 4096,
             elementary_input_window: 64 * 1024,
@@ -108,7 +113,7 @@ pub struct Reader {
     end: Option<SourceLocation>,
     finished: bool,
     failure: Option<Error>,
-    deferred_audio: bool,
+    deferred_fragment: bool,
     storage: Option<StorageScan>,
 }
 
@@ -175,7 +180,7 @@ impl Reader {
             end: None,
             finished: false,
             failure: None,
-            deferred_audio: false,
+            deferred_fragment: false,
             storage: None,
         })
     }
@@ -298,9 +303,12 @@ impl Reader {
     ) -> Result<Option<ReaderStep<Self>>> {
         match self.lanes.as_mut_slice()[index].step(draining, work, cancel)? {
             LaneStep::Packet(packet) => Ok(Some(Step::Ready(Self::output(packet)))),
+            LaneStep::IncompleteVideo(video) => Ok(Some(Step::Ready(Event::Other(
+                ReaderEvent::IncompleteVideo(video),
+            )))),
             LaneStep::Yield => Ok(Some(Step::Yield)),
-            LaneStep::DeferredAudio => {
-                self.deferred_audio = true;
+            LaneStep::DeferredFragment => {
+                self.deferred_fragment = true;
                 Ok(None)
             }
             LaneStep::End | LaneStep::NeedPayload => Ok(None),
@@ -409,7 +417,7 @@ impl Reader {
                             }
                             self.phase = Phase::DrainAll(index + 1);
                         } else {
-                            if self.deferred_audio
+                            if self.deferred_fragment
                                 && matches!(
                                     self.pending.as_ref().expect("pending boundary").event(),
                                     TraceEvent::Finished

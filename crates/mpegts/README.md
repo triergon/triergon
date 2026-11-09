@@ -183,6 +183,14 @@ the remaining reader tables and distinct backing allocations against the storage
 limit; caller-held output and external reservations can still cause retryable
 backpressure.
 
+Video defaults to `compat::annex_b::VideoEofPolicy::RejectUnframed`. With
+`VideoEofPolicy::ReportUnframed`, a final AVC or HEVC byte run with invalid
+leading bytes and no Annex B start code produces `ReaderEvent::IncompleteVideo`
+at logical source EOF. It retains the validated PES spans and first source
+clock anchor. Its byte extent follows the video access-unit limit. The event
+is separate from the neutral packet stream. An interruption ends the run,
+and a later start code within a run preserves the leading-byte refusal.
+
 Annex-B groups without an admitted primary/base-layer picture
 remain `ReaderEvent::VideoHeaders`,
 outside the AU packet stream. Packets and events remain usable after close or reset.

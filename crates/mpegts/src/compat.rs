@@ -10,6 +10,23 @@
 //! Projections that exist only to compare traces with FFmpeg are not policies. They
 //! are compiled only with the `reference-trace` feature.
 
+pub mod annex_b {
+    //! Retain unframed AVC and HEVC PES payload through logical EOF. The policy
+    //! reports the source bytes separately from complete access units.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+
+    /// Reporting of an unframed AVC or HEVC byte run at logical EOF.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum VideoEofPolicy {
+        /// Keep the video framer's leading-byte error.
+        #[default]
+        RejectUnframed,
+        /// Report a nonempty run with invalid leading bytes and no Annex B start code.
+        ReportUnframed,
+    }
+}
+
 pub mod pes {
     //! The demuxer's PES packets and clock.
     //!
