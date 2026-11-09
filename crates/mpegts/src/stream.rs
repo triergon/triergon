@@ -943,16 +943,13 @@ impl TransportStream {
             return self.poll_map(work, cancel);
         }
         if let Some(section) = self.section.as_ref() {
-            if self.feed_omissions.is_some()
-                && matches!(self.route, Route::Pmt)
-                && section.crc_remainder() == Some(0)
+            if section.crc_remainder() == Some(0)
                 && self
-                    .pmt_source
-                    .as_ref()
+                    .accepted_table_source()
                     .is_some_and(|current| current.as_ref() == section.bytes().as_ref())
             {
-                // An identical CRC-checked section already passed the PMT
-                // parser in this program and descriptor namespace.
+                // The active table already passed validation in this route.
+                // Publish the repeat's section with its own source ranges.
                 let section = self
                     .section
                     .take()
@@ -1428,10 +1425,19 @@ impl TransportStream {
         self.clock_quarantined = true;
         self.diagnostic(FaultKind::Transport, Some(pid), Error::Invalid(reason))
     }
+
+    fn accepted_table_source(&self) -> Option<&Bytes> {
+        match self.route {
+            Route::Pat => self.collector.active_single_section(),
+            Route::Pmt => self.pmt_source.as_ref(),
+            _ => None,
+        }
+    }
+
     fn feed(&mut self, work: &mut WorkBudget) -> Result<()> {
         let packet = self
             .packet
-            .as_mut()
+            .as_ref()
             .ok_or(Error::Invalid("TS packet missing"))?;
         let Some(payload) = packet.payload.as_ref() else {
             self.phase = 7;
@@ -1441,31 +1447,38 @@ impl TransportStream {
         let pid = packet.pid;
         let pusi = packet.payload_unit_start;
         let offset = packet.payload_source_offset;
-        if self.feed_omissions.is_some()
-            && pusi
+        if pusi
             && work.remaining() >= payload.len() as u64
             && let [0, section_and_stuffing @ ..] = payload.as_ref()
-        {
-            let accepted = match self.route {
-                Route::Pat if self.pat.assembler.idle() => self.collector.active_single_section(),
-                Route::Pmt if self.pmt.as_ref().is_some_and(|pmt| pmt.assembler.idle()) => {
-                    self.pmt_source.as_ref()
-                }
-                _ => None,
-            };
-            if let Some(section) = accepted
-                && let Some(stuffing) = section_and_stuffing.strip_prefix(section.as_ref())
-                && stuffing.iter().all(|&byte| byte == 0xff)
-            {
-                // These exact section bytes already passed CRC and table
-                // validation. There is no other table in this carrier.
-                work.take(payload.len() as u64);
-                self.omit_feed_events(1)?;
-                self.phase = 7;
-                return Ok(());
+            && match self.route {
+                Route::Pat => self.pat.assembler.idle(),
+                Route::Pmt => self.pmt.as_ref().is_some_and(|pmt| pmt.assembler.idle()),
+                _ => false,
             }
+            && let Some(accepted) = self.accepted_table_source()
+            && let Some(stuffing) = section_and_stuffing.strip_prefix(accepted.as_ref())
+            && stuffing.iter().all(|&byte| byte == 0xff)
+        {
+            // Reuse immutable section bytes while recording this occurrence's
+            // position. The rest of the carrier is validated stuffing.
+            let length = payload.len() as u64;
+            if self.feed_omissions.is_some() {
+                self.omit_feed_events(1)?;
+            } else {
+                let start = offset.checked_add(1).ok_or(Error::Overflow)?;
+                self.section = Some(Section::repeated(
+                    &self.budget,
+                    pid,
+                    accepted,
+                    entity,
+                    start,
+                )?);
+            }
+            work.take(length);
+            self.phase = 7;
+            return Ok(());
         }
-        let payload = &mut packet.payload;
+        let payload = &mut self.packet.as_mut().expect("TS packet present").payload;
         let pushed = match self.route {
             Route::Pat => self.pat.assembler.push(
                 payload.take().ok_or(Error::Invalid("TS payload missing"))?,
