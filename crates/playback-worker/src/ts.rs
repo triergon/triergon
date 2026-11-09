@@ -453,6 +453,17 @@ impl Session {
         Ok(())
     }
 
+    fn drain_after_event(&mut self, event: &TraceEvent, cancel: &AtomicBool) -> Result<()> {
+        // Continuity and strict PES events leave the drained observer unchanged.
+        if !matches!(event, TraceEvent::Continuity { .. } | TraceEvent::Pes(_)) {
+            return self.drain(cancel);
+        }
+        if self.observer.is_some() && cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled.into());
+        }
+        Ok(())
+    }
+
     /// Fold every packet the observer has ready.
     fn drain(&mut self, cancel: &AtomicBool) -> Result<()> {
         let Some(observer) = self.observer.as_mut() else {
@@ -748,7 +759,7 @@ fn packet_operation(
                     let eligible = error == Error::Unsupported(UNROUTED);
                     return refused(session, &error, cause, eligible);
                 }
-                if let Err(error) = session.drain(cancel) {
+                if let Err(error) = session.drain_after_event(observed.event(), cancel) {
                     return refused(session, &error, cause, false);
                 }
                 if matches!(observed.event(), TraceEvent::Finished) {
@@ -861,7 +872,7 @@ fn sequence_operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> 
                 ) {
                     return Ok(session.refusal(&error, cause));
                 }
-                if let Err(error) = session.drain(cancel) {
+                if let Err(error) = session.drain_after_event(&event, cancel) {
                     return Ok(session.refusal(&error, cause));
                 }
                 if matches!(event, TraceEvent::Finished) {
