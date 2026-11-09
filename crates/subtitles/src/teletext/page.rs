@@ -14,13 +14,13 @@ const DESIGNATIONS: usize = 16;
 pub(super) const TRIPLETS: usize = DESIGNATIONS * 13;
 
 /// The seven-bit codes of one display row.
-pub type RowCodes = [u8; 40];
+pub(crate) type RowCodes = [u8; 40];
 /// The 13 Hamming 24/18 triplets of an X/26 or X/28 packet, as transmitted.
-pub type Triplets = [[u8; 3]; 13];
+pub(crate) type Triplets = [[u8; 3]; 13];
 
 /// One page: its header and the packets received for it.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Page {
+pub(crate) struct Page {
     pub header: Header,
     rows: [Option<RowCodes>; ROWS],
     enhancements: [Option<Triplets>; DESIGNATIONS],
@@ -43,20 +43,20 @@ impl Page {
 
     /// The codes of display row `row` (1 to 25), if it was received.
     #[must_use]
-    pub fn row(&self, row: u8) -> Option<&RowCodes> {
+    pub(crate) fn row(&self, row: u8) -> Option<&RowCodes> {
         self.rows.get(usize::from(row).checked_sub(1)?)?.as_ref()
     }
 
     /// Whether the X/26 packet with designation `designation` was received.
     #[must_use]
-    pub fn has_enhancement(&self, designation: u8) -> bool {
+    pub(crate) fn has_enhancement(&self, designation: u8) -> bool {
         self.enhancements
             .get(usize::from(designation))
             .is_some_and(Option::is_some)
     }
 
     /// The X/26 packets in designation order, up to the first one missing.
-    pub fn enhancements(&self) -> impl Iterator<Item = &Triplets> {
+    pub(crate) fn enhancements(&self) -> impl Iterator<Item = &Triplets> {
         self.enhancements.iter().map_while(Option::as_ref)
     }
 
@@ -64,7 +64,7 @@ impl Page {
     /// objects they define, triplet `t` of designation `d` the `13 d + t`th.
     /// A triplet Hamming 24/18 cannot correct ends them: the active position
     /// after it is unknown.
-    pub fn triplets(&self) -> impl Iterator<Item = Triplet> {
+    pub(crate) fn triplets(&self) -> impl Iterator<Item = Triplet> {
         self.enhancements()
             .flatten()
             .map_while(|triplet| hamming_24_18(*triplet).map(Triplet::new))
@@ -115,13 +115,13 @@ impl Page {
 
     /// The page number and subcode.
     #[must_use]
-    pub fn key(&self) -> (PageNumber, Subcode) {
+    pub(crate) fn key(&self) -> (PageNumber, Subcode) {
         (self.header.page, self.header.subcode)
     }
 
     /// Takes every packet this page did not receive from `previous`, as a
     /// page sent without C4 (erase) keeps the content it does not repeat.
-    pub fn complete_from(&mut self, previous: &Self) {
+    pub(crate) fn complete_from(&mut self, previous: &Self) {
         fill(&mut self.rows, &previous.rows);
         fill(&mut self.enhancements, &previous.enhancements);
         self.presentations = self.presentations.over(&previous.presentations);
@@ -146,7 +146,7 @@ fn fill<T: Copy, const N: usize>(slots: &mut [Option<T>; N], previous: &[Option<
 
 /// One X/26 triplet: an address, a mode of five bits and data of seven bits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Triplet {
+pub(crate) enum Triplet {
     /// Addresses 40 to 63: a row (address 40 is row 24) and a row mode.
     Row { row: u8, mode: u8, data: u8 },
     /// Addresses 0 to 39: a column and a column mode.
@@ -180,7 +180,7 @@ impl Triplet {
 
 /// What one packet brought.
 #[derive(Clone, Copy, Debug)]
-pub enum Reception<'a> {
+pub(crate) enum Reception<'a> {
     /// A page the packet completed, with the packets of this transmission,
     /// and the M/29 packets its magazine had then.
     Page {
@@ -207,20 +207,20 @@ pub enum Reception<'a> {
 /// receiver keeping page memory merges a page sent without C4 (erase) onto its
 /// previous copy with [`Page::complete_from`].
 #[derive(Clone, Debug, Default)]
-pub struct Assembler {
+pub(crate) struct Assembler {
     receiving: [Option<Page>; 8],
     magazines: [Presentations; 8],
 }
 
 impl Assembler {
     #[must_use]
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Receives one packet. `observe` sees every page the packet ends, in
     /// magazine order, and then the header; its error stops the packet.
-    pub fn push(
+    pub(crate) fn push(
         &mut self,
         packet: &[u8; 42],
         mut observe: impl FnMut(Reception<'_>) -> Result<()>,

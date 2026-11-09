@@ -16717,6 +16717,16 @@
    "sha256": "149b1cfa87eb6658f5396e6cd4c5d39bd95418f80307eb086046581319d6dcc4",
    "bytes": 19922,
    "source_revision": "5130d0e99222ba72419dc1adb357d1104d6f03bf"
+  },
+  {
+   "name": "subtitles-count-a75807ed-linux-arm64",
+   "path": "subtitles-count-a75807ed-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of keeping the caption and teletext spec code inside triergon-subtitles, on a c8g.xlarge (Linux AArch64): same-code against main at e973fbb6 for the subtitle, subtitle capsule and playback workers, the instruction count of every case of subtitle-teletext and subtitle-cc at both revisions, 50 operations on CPU 1, and the fold of every subtitle corpus case and PGS capsule. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-count-a75807ed-linux-arm64/4f83a3beb2adac4163d6e3a23556fbf306aa9aae7afc8e58eb4e1ba7f487fb4d.tar.zst",
+   "sha256": "4f83a3beb2adac4163d6e3a23556fbf306aa9aae7afc8e58eb4e1ba7f487fb4d",
+   "bytes": 4898,
+   "source_revision": "a75807ed3330ac3c7ee7105a94494e0b8303541c"
   }
  ]
 }

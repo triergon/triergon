@@ -8,7 +8,7 @@
 
 /// The start codes of `es` in order, each with its data up to the next one.
 #[must_use]
-pub fn start_codes(es: &[u8]) -> StartCodes<'_> {
+pub(crate) fn start_codes(es: &[u8]) -> StartCodes<'_> {
     StartCodes {
         es,
         next: find_prefix(es, 0),
@@ -17,7 +17,7 @@ pub fn start_codes(es: &[u8]) -> StartCodes<'_> {
 
 /// Iterator over start codes.
 #[derive(Clone, Debug)]
-pub struct StartCodes<'a> {
+pub(crate) struct StartCodes<'a> {
     es: &'a [u8],
     /// Where the next start code prefix begins.
     next: Option<usize>,
@@ -25,7 +25,7 @@ pub struct StartCodes<'a> {
 
 /// One start code and the data after it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct StartCode<'a> {
+pub(crate) struct StartCode<'a> {
     /// Where its `00 00 01` prefix begins in the stream.
     pub offset: usize,
     pub code: u8,
@@ -54,7 +54,7 @@ impl<'a> Iterator for StartCodes<'a> {
 /// The first whole start code at or after `from`: where its prefix begins and
 /// its code byte. Unlike [`start_codes`], this does not look for the next one.
 #[must_use]
-pub fn next_start_code(es: &[u8], from: usize) -> Option<(usize, u8)> {
+pub(crate) fn next_start_code(es: &[u8], from: usize) -> Option<(usize, u8)> {
     let offset = find_prefix(es, from)?;
     Some((offset, *es.get(offset + 3)?))
 }
@@ -75,22 +75,21 @@ fn find_prefix(es: &[u8], from: usize) -> Option<usize> {
     None
 }
 
-pub const PICTURE: u8 = 0x00;
-pub const USER_DATA: u8 = 0xb2;
-pub const SEQUENCE_HEADER: u8 = 0xb3;
-pub const EXTENSION: u8 = 0xb5;
-pub const SEQUENCE_END: u8 = 0xb7;
-pub const GROUP: u8 = 0xb8;
+pub(crate) const PICTURE: u8 = 0x00;
+pub(crate) const USER_DATA: u8 = 0xb2;
+pub(crate) const SEQUENCE_HEADER: u8 = 0xb3;
+pub(crate) const EXTENSION: u8 = 0xb5;
+pub(crate) const GROUP: u8 = 0xb8;
 
 /// True for a slice start code.
 #[must_use]
-pub const fn is_slice(code: u8) -> bool {
+pub(crate) const fn is_slice(code: u8) -> bool {
     matches!(code, 0x01..=0xaf)
 }
 
 /// `picture_coding_type`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum PictureType {
+pub(crate) enum PictureType {
     Intra,
     Predictive,
     Bidirectional,
@@ -102,14 +101,14 @@ pub enum PictureType {
 
 impl PictureType {
     #[must_use]
-    pub const fn is_reference(self) -> bool {
+    pub(crate) const fn is_reference(self) -> bool {
         matches!(self, Self::Intra | Self::Predictive)
     }
 }
 
 /// `picture_structure`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum PictureStructure {
+pub(crate) enum PictureStructure {
     TopField,
     BottomField,
     #[default]
@@ -118,7 +117,7 @@ pub enum PictureStructure {
 
 /// The fields of a picture header (§6.2.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PictureHeader {
+pub(crate) struct PictureHeader {
     pub temporal_reference: u16,
     pub picture_type: PictureType,
 }
@@ -126,7 +125,7 @@ pub struct PictureHeader {
 impl PictureHeader {
     /// Reads a picture header's data, `None` when cut short.
     #[must_use]
-    pub fn parse(data: &[u8]) -> Option<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Option<Self> {
         let &[a, b, ..] = data else { return None };
         Some(Self {
             temporal_reference: (u16::from(a) << 2) | u16::from(b >> 6),
@@ -144,7 +143,7 @@ impl PictureHeader {
 /// The fields of a picture coding extension (§6.2.3.1) that place a picture in
 /// time.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct PictureCoding {
+pub(crate) struct PictureCoding {
     pub structure: PictureStructure,
     pub top_field_first: bool,
     pub repeat_first_field: bool,
@@ -155,7 +154,7 @@ impl PictureCoding {
     /// Reads an extension's data, `None` unless it is a complete picture coding
     /// extension.
     #[must_use]
-    pub fn parse(data: &[u8]) -> Option<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Option<Self> {
         let &[id, _, structure, flags, progressive, ..] = data else {
             return None;
         };
@@ -178,14 +177,14 @@ impl PictureCoding {
 /// The frame rate of a sequence header (`frame_rate_code`, Table 6-4) with the
 /// sequence extension's `frame_rate_extension_n` and `_d`, as a ratio.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FrameRate {
+pub(crate) struct FrameRate {
     pub numerator: u32,
     pub denominator: u32,
 }
 
 /// The frame rate of a sequence header's data, `None` for a reserved code.
 #[must_use]
-pub fn sequence_frame_rate(data: &[u8]) -> Option<FrameRate> {
+pub(crate) fn sequence_frame_rate(data: &[u8]) -> Option<FrameRate> {
     let code = data.get(3)? & 0x0f;
     let (numerator, denominator) = match code {
         1 => (24_000, 1001),
@@ -206,7 +205,7 @@ pub fn sequence_frame_rate(data: &[u8]) -> Option<FrameRate> {
 
 /// The fields of a sequence extension (§6.2.2.3) that time pictures.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SequenceExtension {
+pub(crate) struct SequenceExtension {
     pub progressive_sequence: bool,
     pub frame_rate_extension_n: u8,
     pub frame_rate_extension_d: u8,
@@ -216,7 +215,7 @@ impl SequenceExtension {
     /// Reads an extension's data, `None` unless it is a complete sequence
     /// extension.
     #[must_use]
-    pub fn parse(data: &[u8]) -> Option<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Option<Self> {
         let &[id, flags, _, _, _, rate, ..] = data else {
             return None;
         };
@@ -229,7 +228,7 @@ impl SequenceExtension {
 
     /// The frame rate of a sequence header with this extension's factor.
     #[must_use]
-    pub fn frame_rate(&self, rate: FrameRate) -> FrameRate {
+    pub(crate) fn frame_rate(&self, rate: FrameRate) -> FrameRate {
         FrameRate {
             numerator: rate.numerator * (u32::from(self.frame_rate_extension_n) + 1),
             denominator: rate.denominator * (u32::from(self.frame_rate_extension_d) + 1),
@@ -243,7 +242,7 @@ impl PictureCoding {
     /// sequence, and in a progressive sequence four or, with the top field
     /// first, six for a repeated frame.
     #[must_use]
-    pub const fn display_fields(&self, progressive_sequence: bool) -> u32 {
+    pub(crate) const fn display_fields(&self, progressive_sequence: bool) -> u32 {
         match (self.repeat_first_field, progressive_sequence) {
             (false, _) => 2,
             (true, true) if self.top_field_first => 6,
@@ -252,25 +251,6 @@ impl PictureCoding {
             (true, false) => 2,
         }
     }
-}
-
-/// The user data payloads of one picture: the data of each user data start code
-/// after `picture` and before its first slice.
-pub fn picture_user_data<'a>(
-    mut after_picture: impl Iterator<Item = StartCode<'a>>,
-) -> impl Iterator<Item = &'a [u8]> {
-    std::iter::from_fn(move || {
-        loop {
-            let unit = after_picture.next()?;
-            match unit.code {
-                USER_DATA => return Some(unit.data),
-                code if is_slice(code) || matches!(code, PICTURE | SEQUENCE_HEADER | GROUP) => {
-                    return None;
-                }
-                _ => {}
-            }
-        }
-    })
 }
 
 #[cfg(test)]
@@ -287,13 +267,10 @@ mod tests {
         ];
         let codes: Vec<_> = start_codes(&es).map(|u| u.code).collect();
         assert_eq!(codes, [0x00, 0xb5, 0xb2, 0x01]);
-        let mut units = start_codes(&es);
-        let picture = units.next().expect("picture");
+        let picture = start_codes(&es).next().expect("picture");
         let header = PictureHeader::parse(picture.data).expect("header");
         assert_eq!(header.temporal_reference, 2);
         assert_eq!(header.picture_type, PictureType::Intra);
-        let user: Vec<_> = picture_user_data(units).collect();
-        assert_eq!(user, [&b"GA94"[..]]);
         let coding = PictureCoding::parse(&[0x8f, 0xff, 0xf3, 0x41, 0x80]).expect("coding");
         assert_eq!(coding.structure, PictureStructure::Frame);
         assert!(coding.progressive_frame && !coding.repeat_first_field);

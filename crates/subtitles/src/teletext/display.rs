@@ -9,13 +9,13 @@ use super::page::{Page, TRIPLETS, Triplet};
 use super::presentation::Remapping;
 
 /// Character rows of a page: the header row and rows 1 to 24.
-pub const ROWS: usize = 25;
+pub(crate) const ROWS: usize = 25;
 /// Character columns of a row.
-pub const COLUMNS: usize = 40;
+pub(crate) const COLUMNS: usize = 40;
 
 /// What a character position shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Glyph {
+pub(crate) enum Glyph {
     Char(char),
     /// A G1 block mosaic, code 0x20-0x3F or 0x60-0x7F.
     Mosaic {
@@ -29,22 +29,22 @@ pub enum Glyph {
 }
 
 impl Glyph {
-    pub const SPACE: Self = Self::Char(' ');
+    pub(crate) const SPACE: Self = Self::Char(' ');
 }
 
 /// A colour of the colour lookup tables 0 to 3, 0 to 31; the Level 1 colours
 /// are 0 (black) to 7 (white) in the order of the alphanumeric colour codes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Colour(pub u8);
+pub(crate) struct Colour(pub u8);
 
 impl Colour {
-    pub const BLACK: Self = Self(0);
-    pub const WHITE: Self = Self(7);
+    pub(crate) const BLACK: Self = Self(0);
+    pub(crate) const WHITE: Self = Self(7);
 }
 
 /// One dimension of a character's size.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Part {
+pub(crate) enum Part {
     #[default]
     Single,
     /// The upper (or left) half of a doubled character.
@@ -55,7 +55,7 @@ pub enum Part {
 
 /// The size of a character and the part of it a position shows.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Size {
+pub(crate) struct Size {
     pub width: Part,
     pub height: Part,
 }
@@ -73,7 +73,7 @@ impl Size {
 
 /// One character position.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Cell {
+pub(crate) struct Cell {
     pub glyph: Glyph,
     pub foreground: Colour,
     pub background: Colour,
@@ -89,7 +89,7 @@ pub struct Cell {
 
 impl Cell {
     /// A space, white on black.
-    pub const BLANK: Self = Self {
+    pub(crate) const BLANK: Self = Self {
         glyph: Glyph::SPACE,
         foreground: Colour::WHITE,
         background: Colour::BLACK,
@@ -102,7 +102,7 @@ impl Cell {
 
     /// The foreground and background colours the position shows.
     #[must_use]
-    pub fn shown_colours(&self) -> (Colour, Colour) {
+    pub(crate) fn shown_colours(&self) -> (Colour, Colour) {
         if self.inverted {
             (self.background, self.foreground)
         } else {
@@ -135,14 +135,14 @@ impl Cell {
 /// The character sets a page is presented with: the default set and the
 /// second G0 set the escape code switches to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Charsets {
+pub(crate) struct Charsets {
     pub primary: CharacterSet,
     pub secondary: CharacterSet,
 }
 
 /// How a page is presented.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Style {
+pub(crate) struct Style {
     pub charsets: Charsets,
     /// The tables the Level 1 colour codes select colours from.
     pub remapping: Remapping,
@@ -153,7 +153,7 @@ pub struct Style {
 
 /// A presented page.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Display {
+pub(crate) struct Display {
     pub rows: [[Cell; COLUMNS]; ROWS],
     pub control: Control,
     /// Whether the X/26 enhancements were presented: the style asked for
@@ -178,7 +178,7 @@ impl Display {
     /// libzvbi does. Only the triplets presented count: those of the page up
     /// to its first object definition, and those of the objects it invokes.
     #[must_use]
-    pub fn present(page: &Page, style: Style, header_start: &[u8; 8]) -> Self {
+    pub(crate) fn present(page: &Page, style: Style, header_start: &[u8; 8]) -> Self {
         let (mut display, mut codes) = Self::level_1(page, style, header_start);
         let mut placements = Placements::default();
         if style.enhanced {
@@ -288,7 +288,7 @@ impl Display {
     /// those pages neither hides the positions an enhancement box reaches, but
     /// C7 the header row of a subtitle page that is not a newsflash page.
     #[must_use]
-    pub fn is_visible(&self, row: usize, column: usize) -> bool {
+    pub(crate) fn is_visible(&self, row: usize, column: usize) -> bool {
         let control = self.control;
         let header = row == 0 && control.suppress_header;
         let hidden_row = control.inhibit_display || header;

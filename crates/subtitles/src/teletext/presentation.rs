@@ -11,7 +11,7 @@ use super::page::Triplets;
 
 /// The character set designations (table 32) of a format 1 packet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Designations {
+pub(crate) struct Designations {
     /// The default G0 and G2 set.
     pub default: u8,
     /// The second G0 set, which the escape code switches to.
@@ -20,7 +20,7 @@ pub struct Designations {
 
 /// A 12-bit colour lookup table entry, four bits for each component.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Rgb {
+pub(crate) struct Rgb {
     pub red: u8,
     pub green: u8,
     pub blue: u8,
@@ -29,7 +29,7 @@ pub struct Rgb {
 impl Rgb {
     /// The entry as 24-bit RGB.
     #[must_use]
-    pub const fn rgb24(self) -> u32 {
+    pub(crate) const fn rgb24(self) -> u32 {
         let (red, green, blue) = (self.red as u32, self.green as u32, self.blue as u32);
         (red * 0x11) << 16 | (green * 0x11) << 8 | (blue * 0x11)
     }
@@ -38,7 +38,7 @@ impl Rgb {
 /// The colour lookup tables Level 1 colour codes select from (table 34): the
 /// table of the foreground and the table of the background colour codes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Remapping {
+pub(crate) struct Remapping {
     foreground: u8,
     background: u8,
 }
@@ -46,7 +46,7 @@ pub struct Remapping {
 impl Remapping {
     /// The remapping a three-bit colour table remapping code selects.
     #[must_use]
-    pub const fn from_code(code: u8) -> Self {
+    pub(crate) const fn from_code(code: u8) -> Self {
         let (foreground, background) = match code & 7 {
             0 => (0, 0),
             1 => (0, 1),
@@ -65,13 +65,13 @@ impl Remapping {
 
     /// The colour of Level 1 foreground colour code `code` (0 to 7).
     #[must_use]
-    pub const fn foreground(self, code: u8) -> Colour {
+    pub(crate) const fn foreground(self, code: u8) -> Colour {
         Colour(self.foreground * 8 + (code & 7))
     }
 
     /// The colour of Level 1 background colour code `code` (0 to 7).
     #[must_use]
-    pub const fn background(self, code: u8) -> Colour {
+    pub(crate) const fn background(self, code: u8) -> Colour {
         Colour(self.background * 8 + (code & 7))
     }
 }
@@ -79,7 +79,7 @@ impl Remapping {
 /// The decoded content of a format 1 packet for a basic Level 1 page (page
 /// function 0).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Presentation {
+pub(crate) struct Presentation {
     pub designations: Designations,
     /// Entries for two colour lookup tables: tables 2 and 3 from designation
     /// 0, tables 0 and 1 from designation 4.
@@ -91,7 +91,7 @@ impl Presentation {
     /// Decodes a packet's triplets; a packet with a triplet Hamming 24/18
     /// cannot correct or for another page function is unusable.
     #[must_use]
-    pub fn parse(triplets: &Triplets) -> Option<Self> {
+    pub(crate) fn parse(triplets: &Triplets) -> Option<Self> {
         let mut values = [0; 13];
         for (value, triplet) in values.iter_mut().zip(triplets) {
             *value = hamming_24_18(*triplet)?;
@@ -127,7 +127,7 @@ impl Presentation {
 
 /// The format 1 packets of a page (X/28) or a magazine (M/29) received last.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Presentations {
+pub(crate) struct Presentations {
     pub designation_0: Option<Presentation>,
     pub designation_4: Option<Presentation>,
 }
@@ -136,7 +136,7 @@ impl Presentations {
     /// Receives the packet with designation `designation` and reports
     /// whether it was taken; an unusable packet, or one of another
     /// designation, leaves the last one.
-    pub fn receive(&mut self, designation: u8, triplets: &Triplets) -> bool {
+    pub(crate) fn receive(&mut self, designation: u8, triplets: &Triplets) -> bool {
         let slot = match designation {
             0 => &mut self.designation_0,
             4 => &mut self.designation_4,
@@ -152,16 +152,10 @@ impl Presentations {
     /// These packets over `defaults`: each designation of `defaults` counts
     /// where this has none.
     #[must_use]
-    pub fn over(self, defaults: &Self) -> Self {
+    pub(crate) fn over(self, defaults: &Self) -> Self {
         Self {
             designation_0: self.designation_0.or(defaults.designation_0),
             designation_4: self.designation_4.or(defaults.designation_4),
         }
-    }
-
-    /// Whether any packet was received.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.designation_0.is_none() && self.designation_4.is_none()
     }
 }

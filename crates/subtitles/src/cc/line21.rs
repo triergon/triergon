@@ -10,13 +10,13 @@
 
 /// True when `byte` has odd parity, as every transmitted line 21 byte must.
 #[must_use]
-pub const fn odd_parity(byte: u8) -> bool {
+pub(crate) const fn odd_parity(byte: u8) -> bool {
     byte.count_ones() % 2 == 1
 }
 
 /// The data channel a control code addresses within its field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Channel {
+pub(crate) enum Channel {
     /// CC1 on field 1, CC3 on field 2 (first byte `0x10` to `0x17`).
     First,
     /// CC2 on field 1, CC4 on field 2 (first byte `0x18` to `0x1F`).
@@ -25,7 +25,7 @@ pub enum Channel {
 
 /// One of the eight foreground colours.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum Color {
+pub(crate) enum Color {
     #[default]
     White,
     Green,
@@ -54,14 +54,14 @@ impl Color {
 
 /// The colour attribute of a preamble or mid-row code: a colour, or white italics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Ink {
+pub(crate) enum Ink {
     Color(Color),
     Italics,
 }
 
 /// What a preamble address code sets besides the row.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Preamble {
+pub(crate) enum Preamble {
     /// Cursor to column 0 with this ink.
     Ink(Ink),
     /// White text, cursor to this column (0, 4, ..., 28).
@@ -71,7 +71,7 @@ pub enum Preamble {
 /// A background attribute: colour and whether it is semi-transparent, or the
 /// transparent background.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Background {
+pub(crate) enum Background {
     Opaque(Color),
     SemiTransparent(Color),
     Transparent,
@@ -79,7 +79,7 @@ pub enum Background {
 
 /// Miscellaneous control codes (first byte `0x14`/`0x15`, second `0x20` to `0x2F`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Command {
+pub(crate) enum Command {
     /// Resume caption loading: pop-on.
     ResumeCaptionLoading,
     Backspace,
@@ -122,7 +122,7 @@ impl Command {
 
 /// A character set of the line 21 repertoire.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum Charset {
+pub(crate) enum Charset {
     /// The standard characters, `0x20` to `0x7F`.
     #[default]
     Basic,
@@ -138,25 +138,16 @@ pub enum Charset {
 /// character before them (decoders that cannot show them keep the basic
 /// fallback the caption author sent first).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Character {
+pub(crate) struct Character {
     pub charset: Charset,
     pub code: u8,
 }
 
 impl Character {
-    /// A basic character, `code` in `0x20..=0x7F`.
-    #[must_use]
-    pub const fn basic(code: u8) -> Self {
-        Self {
-            charset: Charset::Basic,
-            code,
-        }
-    }
-
     /// The character's Unicode scalar as CEA-608 defines it, `None` for a code
     /// outside its set.
     #[must_use]
-    pub const fn to_char(self) -> Option<char> {
+    pub(crate) const fn to_char(self) -> Option<char> {
         let index = self.code as usize;
         Some(match self.charset {
             Charset::Basic => match self.code {
@@ -201,14 +192,14 @@ const PORTUGUESE_GERMAN: [char; 32] = [
 /// The text attributes a mid-row code sets. A mid-row code occupies one column,
 /// shown as a space; a colour turns italics off and underline follows the code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct MidRow {
+pub(crate) struct MidRow {
     pub ink: Ink,
     pub underline: bool,
 }
 
 /// One decoded byte pair, parity bits removed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Pair {
+pub(crate) enum Pair {
     /// Both bytes zero after parity: filler.
     Null,
     /// One or two basic characters (`second` is 0 when only one was sent).
@@ -280,7 +271,7 @@ impl Pair {
     /// the caller's check ([`odd_parity`]); this only interprets the seven
     /// data bits of each byte.
     #[must_use]
-    pub const fn decode(first: u8, second: u8) -> Self {
+    pub(crate) const fn decode(first: u8, second: u8) -> Self {
         let (hi, lo) = (first & 0x7f, second & 0x7f);
         if hi == 0 && lo == 0 {
             return Self::Null;
@@ -451,7 +442,14 @@ mod tests {
 
     #[test]
     fn maps_the_character_sets() {
-        assert_eq!(Character::basic(0x2a).to_char(), Some('á'));
+        assert_eq!(
+            Character {
+                charset: Charset::Basic,
+                code: 0x2a
+            }
+            .to_char(),
+            Some('á')
+        );
         assert_eq!(
             Character {
                 charset: Charset::Special,
