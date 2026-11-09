@@ -2444,6 +2444,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     let mut dvb_clock = MatroskaBitmapClockProbe::new(&dvb_track, &outputs, outputs.len()).unwrap();
     while !dvb_clock.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
     let mut dvb_actions = Vec::new();
+    let mut dvb_inputs = Vec::new();
     for (index, output) in outputs.iter().enumerate() {
         let Some(mut input) = dvb_clock.dvb_packet(index, index as u64).unwrap() else {
             continue;
@@ -2496,8 +2497,31 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
             }
             step => panic!("DVB packet was not queued: {step:?}"),
         }
+        dvb_inputs.push(input);
     }
     assert_eq!(dvb_actions, ["show", "clear"]);
+    // A packet the decoder keeps after a cancellation is resumed only by
+    // itself: the next packet drops it and is decoded on its own.
+    let [shown, cleared] = &dvb_inputs[..] else {
+        panic!("two DVB packets")
+    };
+    let mut decoder = dvb_track.dvb_decoder().unwrap();
+    assert!(matches!(
+        shown.decode(
+            &mut decoder,
+            &mut WorkBudget::new(u64::MAX),
+            &AtomicBool::new(true)
+        ),
+        Err(Error::Cancelled)
+    ));
+    assert!(decoder.has_kept_packet());
+    assert!(matches!(
+        cleared
+            .decode(&mut decoder, &mut WorkBudget::new(u64::MAX), &off())
+            .unwrap(),
+        MatroskaDvbStep::Action(dvb_ts::DvbQueueAction::Clear { at_ns: 94_000_000 })
+    ));
+    assert!(!decoder.has_kept_packet());
 
     let select = Selection::Tracks {
         video: Some(TrackKey::Matroska(1)),

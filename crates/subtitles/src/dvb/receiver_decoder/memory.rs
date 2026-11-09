@@ -13,7 +13,7 @@ use super::epoch::{
     CLUT_BYTES, Epoch, Holdings, MAX_REGION_PIXELS, OBJECT_SET_BYTES, PLACEMENT_BYTES,
     REGION_BYTES, RegionHoldings,
 };
-use super::segment::{Placement, RegionComposition, Segments};
+use super::segment::{PageComposition, Placement, RegionComposition, Segments};
 use super::{AutomaticPalette, Parsed, ReceiverDecoder, Slot, push};
 use triergon_core::{BudgetVec, Result};
 
@@ -49,7 +49,12 @@ impl Tally {
 /// The decoder's holdings as the packet's segments change them.
 struct Plan<'a> {
     tally: Tally,
+    /// Units of work spent planning: one per byte read and per region
+    /// visited.
+    work: u64,
     epoch: &'a Epoch,
+    /// The number of regions the epoch holds.
+    epoch_regions: usize,
     /// The epoch's vectors.
     held: Holdings,
     /// A new epoch replaced the regions and CLUTs the epoch holds.
@@ -57,11 +62,15 @@ struct Plan<'a> {
     /// The regions the packet composed, in the decoder's reused vector:
     /// these replace the epoch's of the same id.
     changed: &'a mut BudgetVec<RegionHoldings>,
+    /// By region id: one more than its place in `changed`, or 0.
+    index: [u16; 256],
     /// The CLUTs the packet defined, one bit per id.
     defined: [u64; 4],
     version: Option<u8>,
-    /// The page's region list: its length and capacity.
+    /// The page's region list: its length and capacity, and its region ids,
+    /// one bit each.
     listed: (usize, usize),
+    listed_ids: [u64; 4],
     slots: (usize, usize),
     census: usize,
     automatic: bool,
@@ -71,19 +80,50 @@ struct Plan<'a> {
     shown: bool,
 }
 
+/// Whether bit `id` of a 256-bit set is set.
+fn has(set: &[u64; 4], id: u8) -> bool {
+    set[usize::from(id / 64)] & 1 << (id % 64) != 0
+}
+
+fn insert(set: &mut [u64; 4], id: u8) {
+    set[usize::from(id / 64)] |= 1 << (id % 64);
+}
+
 impl Plan<'_> {
     /// The regions held at this point of the packet.
     fn regions(&self) -> impl Iterator<Item = RegionHoldings> + '_ {
         let kept = (!self.cleared).then(|| self.epoch.region_holdings());
         kept.into_iter()
             .flatten()
-            .filter(|held| self.changed.iter().all(|r| r.id != held.id))
+            .filter(|held| self.index[usize::from(held.id)] == 0)
             .chain(self.changed.iter().copied())
+    }
+
+    /// The work of visiting every held region.
+    fn visit(&mut self) {
+        let kept = if self.cleared { 0 } else { self.epoch_regions };
+        self.work += (kept + self.changed.len()) as u64;
     }
 
     fn present(&mut self) {
         if self.version.is_none() || self.shown {
             return;
+        }
+        self.visit();
+        // Only the regions the page lists are presented.
+        let (pixels, values) = self
+            .regions()
+            .filter(|r| has(&self.listed_ids, r.id))
+            .fold((0, 0), |(pixels, values), r| {
+                (pixels + r.pixels.0, values.max(r.values))
+            });
+        // The census grows for each automatic palette between the slots
+        // added: hold its largest size, and its old one, while they grow.
+        // One count per pixel value and neighbour class.
+        let words = (values + 1) * values;
+        let census = self.automatic && words > self.census;
+        if census {
+            self.tally.allocate(words * size_of::<u32>());
         }
         // One slot per listed region at most, each added on its own.
         while self.slots.0 < self.listed.0 {
@@ -92,13 +132,7 @@ impl Plan<'_> {
                 .reserve(&mut self.slots, target, size_of::<Slot>());
             self.slots.0 = target;
         }
-        let (pixels, values) = self.regions().fold((0, 0), |(pixels, values), r| {
-            (pixels + r.pixels.0, values.max(r.values))
-        });
-        // One count per pixel value and neighbour class.
-        let words = (values + 1) * values;
-        if self.automatic && words > self.census {
-            self.tally.allocate(words * size_of::<u32>());
+        if census {
             self.tally.free(self.census * size_of::<u32>());
             self.census = words;
         }
@@ -113,7 +147,25 @@ impl Plan<'_> {
         }
     }
 
+    /// A new page version replaces the region list with `page`'s.
+    fn list(&mut self, page: &PageComposition<'_>) {
+        let mut ids = [0; 4];
+        let mut count = 0;
+        for placement in page.regions().take(256) {
+            insert(&mut ids, placement.region);
+            count += 1;
+        }
+        self.work += count as u64;
+        let distinct = ids.iter().map(|w| w.count_ones() as usize).sum();
+        let target = count.max(self.listed.0);
+        self.tally
+            .reserve(&mut self.listed, target, size_of::<Placement>());
+        self.listed.0 = distinct;
+        self.listed_ids = ids;
+    }
+
     fn start_epoch(&mut self) {
+        self.visit();
         let freed: usize = self
             .regions()
             .map(|r| r.pixels.1 + r.objects.1 * PLACEMENT_BYTES)
@@ -121,6 +173,7 @@ impl Plan<'_> {
         self.tally.free(freed);
         self.cleared = true;
         self.changed.clear();
+        self.index = [0; 256];
         self.held.region_slots.0 = 0;
         self.defined = [0; 4];
         self.held.clut_slots.0 = 0;
@@ -129,19 +182,26 @@ impl Plan<'_> {
     /// Where region `id` is in `changed`, copied there from the epoch on its
     /// first change; `None` for a region not held.
     fn change(&mut self, id: u8) -> Result<Option<usize>> {
-        if let Some(index) = self.changed.iter().position(|r| r.id == id) {
-            return Ok(Some(index));
+        if let Some(at) = usize::from(self.index[usize::from(id)]).checked_sub(1) {
+            return Ok(Some(at));
         }
-        let kept = if self.cleared {
-            None
-        } else {
-            self.epoch.region_holdings().find(|r| r.id == id)
-        };
-        let Some(kept) = kept else {
+        if self.cleared {
+            return Ok(None);
+        }
+        self.work += self.epoch_regions as u64;
+        let Some(kept) = self.epoch.region_holdings().find(|r| r.id == id) else {
             return Ok(None);
         };
-        push(self.changed, kept)?;
-        Ok(Some(self.changed.len() - 1))
+        Ok(Some(self.add(kept)?))
+    }
+
+    /// Add a region to `changed`: its place there.
+    fn add(&mut self, region: RegionHoldings) -> Result<usize> {
+        push(self.changed, region)?;
+        let at = self.changed.len() - 1;
+        // At most 256 regions, one per id, so the place fits.
+        self.index[usize::from(region.id)] = (at + 1) as u16;
+        Ok(at)
     }
 
     /// `false` where the composition stops the packet.
@@ -176,13 +236,12 @@ impl Plan<'_> {
             self.tally.reserve(slots, slots.0 + 1, REGION_BYTES);
             slots.0 += 1;
             self.tally.allocate(placements * PLACEMENT_BYTES + size);
-            let held = RegionHoldings {
+            self.add(RegionHoldings {
                 id: region.id,
                 pixels: (size, size),
                 objects: (placements, placements),
                 values,
-            };
-            push(self.changed, held)?;
+            })?;
         }
         Ok(true)
     }
@@ -199,34 +258,48 @@ impl Plan<'_> {
     }
 }
 
+/// What a packet may allocate, and the work of working it out.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct PacketPlan {
+    pub(super) bytes: usize,
+    pub(super) work: u64,
+}
+
 impl ReceiverDecoder {
     /// The most bytes decoding `packet` from its start may hold beyond what
-    /// the decoder holds now, with its copy for a suspension. The plan's
-    /// list of regions is charged to the budget and kept for the next packet.
-    pub(super) fn packet_memory(&mut self, packet: &[u8]) -> Result<usize> {
+    /// the decoder holds now. The plan's list of regions is charged to the
+    /// budget and kept for the next packet.
+    pub(super) fn packet_memory(&mut self, packet: &[u8]) -> Result<PacketPlan> {
         self.planned.clear();
+        let mut listed_ids = [0; 4];
+        for placement in self.page.placements.as_slice() {
+            insert(&mut listed_ids, placement.region);
+        }
+        let held = self.epoch.holdings();
         let mut plan = Plan {
             tally: Tally::default(),
+            work: self.page.placements.len() as u64,
             epoch: &self.epoch,
-            held: self.epoch.holdings(),
+            epoch_regions: held.region_slots.0,
+            held,
             cleared: false,
             changed: &mut self.planned,
+            index: [0; 256],
             defined: [0; 4],
             version: self.page.version,
             listed: (self.page.placements.len(), self.page.placements.capacity()),
+            listed_ids,
             slots: (self.slots.len(), self.slots.capacity()),
             census: self.census.capacity(),
             automatic: self.options.automatic_palette != AutomaticPalette::Never,
             presented: None,
             shown: false,
         };
-        if packet.len() > self.held_packet.capacity() {
-            plan.tally.allocate(packet.len());
-        }
         for segment in Segments::new(packet) {
             let Ok(segment) = segment else {
                 break;
             };
+            plan.work += 6 + segment.body.len() as u64;
             if !self.pages.admit(segment.page) {
                 continue;
             }
@@ -243,11 +316,7 @@ impl ReceiverDecoder {
                     if starts_epoch {
                         plan.detach();
                     }
-                    let count = page.regions().count().min(256);
-                    let target = count.max(plan.listed.0);
-                    plan.tally
-                        .reserve(&mut plan.listed, target, size_of::<Placement>());
-                    plan.listed.0 = count;
+                    plan.list(&page);
                     plan.version = Some(page.version);
                     if starts_epoch {
                         plan.start_epoch();
@@ -266,6 +335,9 @@ impl ReceiverDecoder {
         }
         // The presentation at the end of the packet, at most.
         plan.present();
-        Ok(usize::try_from(plan.tally.peak).unwrap_or(usize::MAX))
+        Ok(PacketPlan {
+            bytes: usize::try_from(plan.tally.peak).unwrap_or(usize::MAX),
+            work: plan.work,
+        })
     }
 }

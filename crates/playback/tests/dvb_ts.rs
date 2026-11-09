@@ -311,6 +311,41 @@ fn ts_bridge_accepts_a_continuation_after_a_refused_or_partial_pes() {
     }
 }
 
+/// A PES the pool cannot hold, at whatever point it runs short, waits in the
+/// bridge and is decoded once the pool has room.
+#[test]
+fn ts_bridge_retries_a_pes_refused_for_memory() {
+    let source = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.ts");
+    let indices =
+        include_bytes!("../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices");
+    let cancel = AtomicBool::new(false);
+    let mut refusals = 0;
+    for room in (0..8192).step_by(64) {
+        let pool = Budget::new(16 * 1024 * 1024).unwrap();
+        let (_player, map, mut inputs) =
+            play(&pool, source, 37, SourceTimePolicy::RelativeEpochZero);
+        let mut bridge = DvbTsBridge::new(&map.unwrap(), 256, PACKET_LIMIT, &cancel).unwrap();
+        assert!(bridge.push(&mut Some(inputs.remove(0))).unwrap());
+        let taken = pool.reserve(pool.available() - room).unwrap();
+        let mut taken = Some(taken);
+        let pixels = loop {
+            match bridge.poll(&mut WorkBudget::new(u64::MAX), &cancel) {
+                Ok(DvbStep::Action(DvbQueueAction::Show(picture))) => {
+                    break picture.rectangles().next().unwrap().pixels.to_vec();
+                }
+                Ok(DvbStep::Yield) => {}
+                Err(triergon_core::Error::Backpressure { .. }) => {
+                    assert!(taken.take().is_some(), "refused with room, at {room}");
+                    refusals += 1;
+                }
+                other => panic!("{other:?} at {room}"),
+            }
+        };
+        assert_eq!(pixels, indices);
+    }
+    assert!(refusals > 1);
+}
+
 fn pes_continuation(template: &[u8; 1504], pes: &[u8], cut: usize) -> [u8; 1504] {
     const TS: usize = 188;
     let mut result = replace_pes_data(template, &pes[..cut]);

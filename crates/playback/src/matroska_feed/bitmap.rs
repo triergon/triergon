@@ -47,16 +47,19 @@ impl MatroskaDvbPacket {
             .pts
             .map(|value| microseconds(value.ticks, facts.configuration().clock()))
             .transpose()?;
-        let status = if decoder.has_kept_packet() {
+        // The decoder keeps a packet it yielded, stalled or was cancelled on:
+        // this one continues it, and another drops the rest of it.
+        let status = if decoder.keeps(&self.packet.payload, pts) {
             decoder.resume(work, cancel)
         } else {
+            decoder.abandon();
             decoder.decode(&self.packet.payload, pts, work, cancel)
         };
         let subtitle = match status {
             Ok(Status::Subtitle(subtitle)) => subtitle,
             Ok(Status::Yield) => return Ok(MatroskaDvbStep::Yield),
             Ok(Status::Nothing) | Err(Error::Invalid(_)) => return Ok(MatroskaDvbStep::Decoded),
-            Err(error) => return Err(error),
+            Ok(Status::Stalled(error)) | Err(error) => return Err(error),
         };
         if matches!(
             self.source.delivery,
@@ -79,7 +82,9 @@ pub enum MatroskaDvbStep<'a> {
     Decoded,
     /// The work budget ran out. The decoder keeps the packet: decode the same
     /// packet again to resume it, or drop it with
-    /// [`ReceiverDecoder::abandon`].
+    /// [`ReceiverDecoder::abandon`]. A memory refusal after the packet was
+    /// admitted ([`Status::Stalled`]) is returned as its error and keeps the
+    /// packet the same way.
     Yield,
 }
 

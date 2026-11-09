@@ -332,7 +332,13 @@ fn mutated_packets() {
                     }
                 }
                 let mut work = WorkBudget::new(1 << 32);
-                let _ = decoder.decode(&bytes, *pts, &mut work, &cancel);
+                let status = decoder.decode(&bytes, *pts, &mut work, &cancel);
+                assert!(
+                    !matches!(status, Ok(Status::Yield | Status::Stalled(_))),
+                    "{}: {status:?}",
+                    case.id
+                );
+                assert!(!decoder.has_kept_packet(), "{}", case.id);
             }
         }
     }
@@ -437,8 +443,10 @@ fn decode_all(
         .iter()
         .map(|packet| {
             let mut work = WorkBudget::new(u64::MAX);
+            // One time for all, so that a packet's end does not depend on
+            // which came before it.
             decoder
-                .decode(packet, None, &mut work, &cancel)
+                .decode(packet, Some(0), &mut work, &cancel)
                 .map(|subtitle| {
                     subtitle.subtitle().map_or_else(Vec::new, |subtitle| {
                         subtitle
@@ -535,4 +543,136 @@ fn end_from_next_at_the_ends_of_the_time_range() {
         (subtitle.pts, subtitle.end_display_ms),
         (Some(i64::MIN), u32::MAX)
     );
+}
+
+/// A pool holding `bytes` for someone else.
+fn take(pool: &Budget, bytes: usize) -> triergon_core::Reservation {
+    pool.reserve(bytes).unwrap()
+}
+
+/// A segment refused memory after its packet was admitted stalls the packet:
+/// the decoder keeps it, and resumed once the pool has room it presents what
+/// it presents decoded in one call.
+#[test]
+fn a_stalled_packet_resumes_to_the_same_output() {
+    let drawn = packet(&[
+        segments::page(0, false, &[(0, 10, 10), (1, 300, 10)]),
+        segments::region(0, 640, 64, &[(1, 0, 0)]),
+        segments::region(1, 320, 64, &[(1, 0, 0)]),
+        segments::object(1),
+        segments::end(),
+    ]);
+    let cancel = AtomicBool::new(false);
+    let shown = |status: Status<'_>| -> Shown {
+        status
+            .subtitle()
+            .unwrap()
+            .rects()
+            .map(|r| {
+                (
+                    r.x,
+                    r.y,
+                    r.width,
+                    r.height,
+                    r.palette.to_vec(),
+                    r.pixels.to_vec(),
+                )
+            })
+            .collect()
+    };
+    let pool = Budget::new(1 << 22).unwrap();
+    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let whole = decoder
+        .decode(&drawn, Some(0), &mut WorkBudget::new(u64::MAX), &cancel)
+        .map(shown)
+        .unwrap();
+    let mut stalls = 0;
+    for quantum in (1..20_000).step_by(97) {
+        let pool = Budget::new(1 << 22).unwrap();
+        let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+        let status = decoder.decode(&drawn, Some(0), &mut WorkBudget::new(quantum), &cancel);
+        if !matches!(status, Ok(Status::Yield)) {
+            continue;
+        }
+        assert!(decoder.keeps(&drawn, Some(0)) && !decoder.keeps(&drawn, Some(1)));
+        // Someone else takes the pool while the packet waits.
+        let taken = take(&pool, pool.available());
+        let mut work = WorkBudget::new(u64::MAX);
+        let status = decoder.resume(&mut work, &cancel).unwrap();
+        if let Status::Stalled(error) = status {
+            assert!(matches!(error, Error::Backpressure { .. }), "{error:?}");
+            stalls += 1;
+            // Still no room: stalled again, at the same segment.
+            assert!(matches!(
+                decoder.resume(&mut work, &cancel),
+                Ok(Status::Stalled(_))
+            ));
+            drop(taken);
+            let status = decoder.resume(&mut work, &cancel).unwrap();
+            assert_eq!(shown(status), whole, "quantum {quantum}");
+        } else {
+            assert_eq!(shown(status), whole, "quantum {quantum}");
+        }
+        assert!(!decoder.has_kept_packet());
+    }
+    assert!(stalls > 0);
+}
+
+/// The memory a packet is checked for is at least what it takes: with the
+/// pool holding exactly that, no fixture packet, nor one mutated, stalls.
+#[test]
+fn admitted_packets_never_stall() {
+    let cancel = AtomicBool::new(false);
+    let mut state = 0x9e37_79b9_u32;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        state
+    };
+    let mut checked = 0;
+    for case in &cases() {
+        let pool = Budget::new(1 << 26).unwrap();
+        let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+        for (pts, packet) in &case.packets {
+            let mut variants = vec![packet.clone()];
+            for _ in 0..2 {
+                let mut bytes = packet.clone();
+                for _ in 0..1 + next() % 4 {
+                    if let Some(byte) = bytes.get_mut(next() as usize % packet.len().max(1)) {
+                        *byte ^= 1 << (next() % 8);
+                    }
+                }
+                variants.push(bytes);
+            }
+            // The packet itself last, to decode the case on.
+            variants.rotate_left(1);
+            for bytes in &variants {
+                let mut work = WorkBudget::new(u64::MAX);
+                // Give the packet no room, then each time the room it says it
+                // lacks, until it is admitted: then it must not stall.
+                let mut room = 0;
+                let status = loop {
+                    let taken = take(&pool, pool.available() - room);
+                    let status = decoder.decode(bytes, *pts, &mut work, &cancel);
+                    drop(taken);
+                    match status {
+                        Err(Error::Backpressure {
+                            requested,
+                            available,
+                        }) => room += requested - available,
+                        status => break status.map(|_| ()),
+                    }
+                };
+                assert!(
+                    !decoder.has_kept_packet()
+                        && !matches!(status, Err(e) if !matches!(e, Error::Invalid(_))),
+                    "{}: {room} bytes of room, {status:?}",
+                    case.id
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 500, "{checked} packets checked");
 }

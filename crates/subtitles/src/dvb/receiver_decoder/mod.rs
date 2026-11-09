@@ -68,9 +68,17 @@ pub enum Status<'a> {
     /// The packet is decoded and presented nothing.
     Nothing,
     /// The work budget ran out before the packet's next segment, which is
-    /// not decoded yet. The work counts towards the next attempt: decode the
-    /// same packet again.
+    /// not decoded yet. The decoder keeps the packet, and the work left over
+    /// counts towards its next segment:
+    /// [`resume`](ReceiverDecoder::resume) or
+    /// [`abandon`](ReceiverDecoder::abandon) it.
     Yield,
+    /// The pool refused memory a segment needed after the packet's check
+    /// admitted it: another user of the pool took it in between. The segments
+    /// before it stay decoded and the decoder keeps the packet from that
+    /// segment on, as for [`Yield`](Self::Yield): resume it once the pool has
+    /// room, or abandon it.
+    Stalled(Error),
 }
 
 impl<'a> Status<'a> {
@@ -78,7 +86,7 @@ impl<'a> Status<'a> {
     pub fn subtitle(self) -> Option<Subtitle<'a>> {
         match self {
             Self::Subtitle(subtitle) => Some(subtitle),
-            Self::Nothing | Self::Yield => None,
+            Self::Nothing | Self::Yield | Self::Stalled(_) => None,
         }
     }
 }
@@ -211,10 +219,12 @@ struct Suspended {
 enum Progress {
     Done,
     /// Stopped before the segment at `at` (the packet length for the
-    /// end-of-packet presentation).
+    /// end-of-packet presentation). `paid` is the work charged for that
+    /// segment, which it pays for again when resumed.
     Halted {
         at: usize,
         why: Halt,
+        paid: u64,
     },
 }
 
@@ -322,12 +332,16 @@ pub struct ReceiverDecoder {
     presented: Option<Presented>,
     /// Where the packet that yielded, was cancelled or refused continues.
     suspended: Option<Suspended>,
-    /// The suspended packet's bytes.
+    /// The suspended packet's bytes. Its capacity is reserved for each packet
+    /// before the packet changes anything, so keeping a packet cannot fail.
     held_packet: BudgetVec<u8>,
     /// The regions a packet's memory plan changes.
     planned: BudgetVec<RegionHoldings>,
     /// Work granted to calls on the current packet and left unspent.
     credit: u64,
+    /// The work of the current packet's memory plan, charged before its
+    /// first segment.
+    owed: u64,
     budget: Budget,
 }
 
@@ -355,6 +369,7 @@ impl ReceiverDecoder {
             held_packet: BudgetVec::new(budget),
             planned: BudgetVec::new(budget),
             credit: 0,
+            owed: 0,
             budget: budget.clone(),
         }
     }
@@ -363,19 +378,25 @@ impl ReceiverDecoder {
     /// A packet of a segment header or less, or one that does not start with
     /// a segment, is refused (`Error::Invalid`) and changes nothing.
     ///
-    /// The memory the packet's segments may allocate is reserved before any
-    /// of them is decoded: a packet the budget cannot hold is refused
-    /// (`Error::Backpressure`) and changes nothing. Each segment's work, one
-    /// unit per byte, per object placement it visits and per pixel it may
-    /// draw, copy or present, is charged to `work` before the segment is
-    /// decoded. When the budget cannot pay for the next one, the call yields
-    /// ([`Status::Yield`]) before it, and the decoder keeps the rest of the
-    /// packet: [`resume`](Self::resume) it, and the work left over counts
-    /// towards the next segment, or [`abandon`](Self::abandon) it.
+    /// The memory the packet's segments may allocate, and room to keep the
+    /// packet, are checked against the pool before any segment is decoded: a
+    /// packet the pool cannot hold is refused (`Error::Backpressure`) and
+    /// changes nothing. Each segment's work, one unit per byte, per object
+    /// placement it visits and per pixel it may draw, copy or present, is
+    /// charged to `work` before the segment is decoded, and the check's own
+    /// work before the first. When the budget cannot pay for the next one,
+    /// the call yields ([`Status::Yield`]) before it, and the decoder keeps
+    /// the rest of the packet: [`resume`](Self::resume) it, and the work left
+    /// over counts towards the next segment, or [`abandon`](Self::abandon) it.
     /// Cancellation is checked before each segment and each object placement,
-    /// and a cancelled packet is kept the same way, as is one whose memory is
-    /// refused after some of its segments were decoded. `decode` refuses
-    /// another packet while one is kept.
+    /// and a cancelled packet is kept the same way, as is one whose memory
+    /// another user of the pool took after the check ([`Status::Stalled`]).
+    /// `decode` refuses another packet while one is kept.
+    ///
+    /// The leftover work of a yielded call is banked whole, and a segment is
+    /// charged at once from what is banked: a DVB segment's work is bounded
+    /// by its region, unlike a DVD control sequence's, which the DVD receiver
+    /// pays for in parts.
     pub fn decode(
         &mut self,
         packet: &[u8],
@@ -391,17 +412,27 @@ impl ReceiverDecoder {
         if packet.len() <= 6 || packet[0] != 0x0f {
             return Err(Error::Invalid("DVB subtitle packet"));
         }
-        self.credit = 0;
         self.presented = None;
         self.held = Held::default();
-        let memory = self.packet_memory(packet)?;
+        let plan = self.packet_memory(packet)?;
+        // Room to keep the packet, while what the copy replaces is held.
+        let kept = if packet.len() > self.held_packet.capacity() {
+            packet.len()
+        } else {
+            0
+        };
+        let requested = plan.bytes.saturating_add(kept);
         let available = self.budget.available();
-        if memory > available {
+        if requested > available {
             return Err(Error::Backpressure {
-                requested: memory,
+                requested,
                 available,
             });
         }
+        self.held_packet.clear();
+        self.held_packet.try_reserve_exact(packet.len())?;
+        self.credit = 0;
+        self.owed = plan.work;
         self.step(Some(packet), 0, pts, work, cancel)
     }
 
@@ -419,11 +450,20 @@ impl ReceiverDecoder {
         self.suspended.is_some()
     }
 
+    /// Whether the kept packet is `packet` with time `pts`: for a caller that
+    /// offers each packet until it is decoded, to resume it rather than
+    /// decode another.
+    pub fn keeps(&self, packet: &[u8], pts: Option<i64>) -> bool {
+        self.suspended
+            .is_some_and(|kept| kept.pts == pts && self.held_packet.as_slice() == packet)
+    }
+
     /// Drop the rest of the kept packet. The segments decoded before it
     /// stopped stay decoded.
     pub fn abandon(&mut self) {
         self.suspended = None;
         self.credit = 0;
+        self.owed = 0;
     }
 
     /// Run `packet`, or the kept packet, from `start`, and keep it if it
@@ -446,41 +486,30 @@ impl ReceiverDecoder {
             self.held_packet = held;
             progress
         };
-        let halt = match progress {
-            Progress::Done => None,
-            Progress::Halted { at, why } => Some((at, why)),
-        };
-        if let Some((_, Halt::Yield | Halt::Cancelled)) = halt {
-            work.take(granted);
-            self.credit = banked.remaining();
-        } else {
+        let Progress::Halted { at, why, paid } = progress else {
             work.take(banked.spent().saturating_sub(self.credit));
             self.credit = 0;
-        }
-        // A packet keeps its place once any of it was decoded.
-        let kept = match halt {
-            Some((0, Halt::Refused(_))) => None,
-            Some((at, _)) => Some(at),
-            None => None,
+            self.owed = 0;
+            return Ok(self.status());
         };
-        let copied = match (kept, packet) {
-            (Some(_), Some(packet)) => {
-                self.held_packet.clear();
-                self.held_packet.try_extend_from_slice(packet)
-            }
-            _ => Ok(()),
-        };
-        if let Some(offset) = kept {
-            copied?;
-            self.suspended = Some(Suspended { pts, offset });
+        // The packet is kept, with the work left over and the work of the
+        // segment it stopped at, which that segment is charged again.
+        work.take(granted);
+        self.credit = banked.remaining().saturating_add(paid);
+        if let Some(packet) = packet {
+            self.held_packet.try_extend_from_slice(packet)?;
         }
-        match halt {
-            Some((_, Halt::Yield)) => return Ok(Status::Yield),
-            Some((_, Halt::Cancelled)) => return Err(Error::Cancelled),
-            Some((_, Halt::Refused(error))) => return Err(error),
-            None => {}
+        self.suspended = Some(Suspended { pts, offset: at });
+        match why {
+            Halt::Yield => Ok(Status::Yield),
+            Halt::Cancelled => Err(Error::Cancelled),
+            Halt::Refused(error) => Ok(Status::Stalled(error)),
         }
-        Ok(match self.presented {
+    }
+
+    /// What the packet presented, once it is decoded.
+    fn status(&self) -> Status<'_> {
+        match self.presented {
             Some(p) => Status::Subtitle(Subtitle {
                 pts: p.pts,
                 start_display_ms: 0,
@@ -490,7 +519,7 @@ impl ReceiverDecoder {
                 epoch: &self.epoch,
             }),
             None => Status::Nothing,
-        })
+        }
     }
 
     /// Decode the segments from `start` on, each once `work` pays for it,
@@ -503,7 +532,14 @@ impl ReceiverDecoder {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Progress {
-        let halt = |at, why| Progress::Halted { at, why };
+        let halt = |at, why, paid| Progress::Halted { at, why, paid };
+        if cancel.load(Ordering::Relaxed) {
+            return halt(start, Halt::Cancelled, 0);
+        }
+        if !work.try_charge(self.owed) {
+            return halt(start, Halt::Yield, 0);
+        }
+        self.owed = 0;
         let mut segments = Segments::new(&packet[start..]);
         loop {
             let at = packet.len() - segments.remaining();
@@ -511,7 +547,7 @@ impl ReceiverDecoder {
                 break;
             };
             if cancel.load(Ordering::Relaxed) {
-                return halt(at, Halt::Cancelled);
+                return halt(at, Halt::Cancelled, 0);
             }
             let Ok(segment) = segment else {
                 return Progress::Done;
@@ -520,7 +556,7 @@ impl ReceiverDecoder {
             let bytes = 6 + segment.body.len() as u64;
             let cost = bytes + parsed.as_ref().map_or(0, |parsed| self.work(parsed));
             if !work.try_charge(cost) {
-                return halt(at, Halt::Yield);
+                return halt(at, Halt::Yield, 0);
             }
             let Some(parsed) = parsed else {
                 continue;
@@ -528,19 +564,20 @@ impl ReceiverDecoder {
             match self.apply(parsed, pts, cancel) {
                 Ok(Flow::Continue) => {}
                 Ok(Flow::Stop) => return Progress::Done,
-                Err(Error::Cancelled) => return halt(at, Halt::Cancelled),
-                Err(error) => return halt(at, Halt::Refused(error)),
+                Err(Error::Cancelled) => return halt(at, Halt::Cancelled, cost),
+                Err(error) => return halt(at, Halt::Refused(error), cost),
             }
         }
         let presents = self.held.display_set() && !self.options.end_from_next;
-        if presents && !work.try_charge(self.present_work().0) {
-            return halt(packet.len(), Halt::Yield);
+        let cost = if presents { self.present_work().0 } else { 0 };
+        if !work.try_charge(cost) {
+            return halt(packet.len(), Halt::Yield, 0);
         }
         if self.held.display_set() {
             self.display_size.get_or_insert(DEFAULT_DISPLAY);
         }
         if presents && let Err(error) = self.present(pts, self.timeout_ms()) {
-            return halt(packet.len(), Halt::Refused(error));
+            return halt(packet.len(), Halt::Refused(error), cost);
         }
         self.previous_pts = pts;
         Progress::Done
@@ -774,10 +811,11 @@ impl ReceiverDecoder {
     fn detach(&mut self) -> Result<()> {
         let count = self.presented.map_or(0, |p| p.rects);
         for slot in &mut self.slots.as_mut_slice()[..count] {
-            if let Some(index) = slot.region.take() {
+            if let Some(index) = slot.region {
                 slot.pixels.clear();
                 slot.pixels
                     .try_extend_from_slice(self.epoch.region_at(index).pixels())?;
+                slot.region = None;
             }
         }
         Ok(())

@@ -105,7 +105,7 @@ impl Prepared for Dvb {
                     sink.refused(index, INVALID_DATA)?;
                     continue;
                 }
-                Err(error) => return Err(error).at(index),
+                Ok(Status::Stalled(error)) | Err(error) => return Err(error).at(index),
             };
             sink.begin(EventHead {
                 packet: index as u64,
