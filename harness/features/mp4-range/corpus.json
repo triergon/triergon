@@ -56,6 +56,90 @@
         "bytes": 62932,
         "digest": 1562922133773717379
       }
+    },
+    {
+      "id": "dvh1-open",
+      "profile": "dvh1-open",
+      "file": "dvh1.mp4",
+      "sha256": "b605e3873529a8bc857b7bdae9ce08184eba955a0000ca848c812900c92e0a84",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 3438,
+        "digest": 265368919262385015
+      }
+    },
+    {
+      "id": "dvh1-seek",
+      "profile": "dvh1-seek",
+      "file": "dvh1.mp4",
+      "sha256": "b605e3873529a8bc857b7bdae9ce08184eba955a0000ca848c812900c92e0a84",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "40"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3438,
+        "digest": 265368919262385015
+      }
+    },
+    {
+      "id": "dvhe-open",
+      "profile": "dvhe-open",
+      "file": "dvhe.mp4",
+      "sha256": "22b2a2b95d866df543f8c4d6172fbf1fb84f652ab7000931f5b97fb8366dc2cd",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 3438,
+        "digest": 6289861727786914679
+      }
+    },
+    {
+      "id": "dvhe-seek",
+      "profile": "dvhe-seek",
+      "file": "dvhe.mp4",
+      "sha256": "22b2a2b95d866df543f8c4d6172fbf1fb84f652ab7000931f5b97fb8366dc2cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "40"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3438,
+        "digest": 6289861727786914679
+      }
+    },
+    {
+      "id": "dav1-open",
+      "profile": "dav1-open",
+      "file": "dav1.mp4",
+      "sha256": "10442e57ff92c76c30ed0bcd8e6be708e986208193c65442c44b05377916f191",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 4097,
+        "digest": 1285709537707954380
+      }
+    },
+    {
+      "id": "dav1-seek",
+      "profile": "dav1-seek",
+      "file": "dav1.mp4",
+      "sha256": "10442e57ff92c76c30ed0bcd8e6be708e986208193c65442c44b05377916f191",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "16384"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2192,
+        "digest": 4884662521198875690
+      }
     }
   ]
 }
