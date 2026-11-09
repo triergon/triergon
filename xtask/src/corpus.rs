@@ -296,6 +296,41 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (33, 17_176, 15_900_364_185_324_428_767),
         ),
     ]);
+    let long_roll_file = "avc-opus-long-roll.mp4";
+    let mut long_roll = opus.clone();
+    // Request six preceding packets in the seed's Opus roll description.
+    long_roll[2872..2874].copy_from_slice(&(-6_i16).to_be_bytes());
+    write(&output.join(long_roll_file), &long_roll)?;
+    cases.extend([
+        mp4_range_case(
+            "opus-recovery-start",
+            opus_file,
+            &opus,
+            ["0", "opus-roll"],
+            (241, 65_677, 12_505_035_923_324_092_948),
+        ),
+        mp4_range_case(
+            "opus-recovery-seek",
+            opus_file,
+            &opus,
+            ["32000", "opus-roll"],
+            (95, 26_088, 230_186_244_915_985_021),
+        ),
+        mp4_range_case(
+            "opus-recovery-edit-boundary",
+            boundary_file,
+            &boundary,
+            ["32000", "opus-roll"],
+            (95, 26_088, 9_107_170_095_252_525_693),
+        ),
+        mp4_range_case(
+            "opus-recovery-long-roll",
+            long_roll_file,
+            &long_roll,
+            ["41000", "opus-roll"],
+            (97, 26_371, 2_219_999_170_451_168_846),
+        ),
+    ]);
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",
@@ -304,11 +339,11 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     Ok(format!("MP4 range corpus: {count} playback comparisons"))
 }
 
-fn mp4_range_case(
+fn mp4_range_case<'a>(
     id: &str,
     file: &str,
     data: &[u8],
-    seek: Option<&str>,
+    arguments: impl IntoIterator<Item = &'a str>,
     (packets, bytes, digest): (u32, u32, u64),
 ) -> Value {
     authored(
@@ -316,7 +351,7 @@ fn mp4_range_case(
         file,
         data,
         vec![
-            ("arguments", Value::strings(seek)),
+            ("arguments", Value::strings(arguments)),
             (
                 "expected",
                 Value::object([
