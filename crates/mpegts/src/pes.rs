@@ -825,22 +825,18 @@ impl PesAssembler {
                 if spans == self.limits.source_spans {
                     return Err(limit(spans.saturating_add(1), self.limits.source_spans));
                 }
-                if RETAIN {
-                    let rejected_adts = self.unbounded_adts
-                        && self.header.as_ref().is_some_and(|header| {
-                            header.declared_packet_length == 0
-                                && (0xc0..=0xdf).contains(&header.stream_id)
-                        });
-                    if rejected_adts {
-                        if !self.reserve_adts_span(work, cancel)? {
-                            return Ok(AssemblyStep::Yield);
-                        }
-                    } else {
-                        self.spans.try_reserve_exact(1)?;
-                    }
+                if RETAIN
+                    && self.unbounded_adts
+                    && self.header.as_ref().is_some_and(|header| {
+                        header.declared_packet_length == 0
+                            && (0xc0..=0xdf).contains(&header.stream_id)
+                    })
+                    && !self.reserve_adts_span(work, cancel)?
+                {
+                    return Ok(AssemblyStep::Yield);
                 }
             }
-            let count = work.take(maximum as u64) as usize;
+            let count = (maximum as u64).min(work.remaining()) as usize;
             if !RETAIN {
                 if !merge {
                     self.validated_spans += 1;
@@ -865,6 +861,8 @@ impl PesAssembler {
                 } else {
                     pending.bytes().clone()
                 };
+                // The charged table amortises ordinary growth. A rejected
+                // append keeps the input position and byte grant for retry.
                 if let Err(rejected) = self.spans.try_push(PesSpan {
                     bytes,
                     range: pending.position..pending.position + count,
@@ -881,6 +879,7 @@ impl PesAssembler {
                     return Err(rejected.error);
                 }
             }
+            work.take(count as u64);
             self.payload_len += count;
             self.seen += count;
             self.payload
