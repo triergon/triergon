@@ -1,4 +1,4 @@
-//! The transport owners pinned while a PES span replacement is refused.
+//! The transport storage pinned while a PES range or span replacement is refused.
 
 use super::{Route, TransportStream};
 use crate::{PesAssembler, table_storage};
@@ -7,7 +7,7 @@ use triergon_core::{Bytes, Error, Result};
 pub(crate) enum StorageItem<'a> {
     Fixed(usize),
     Bytes(&'a Bytes),
-    // These owners are already included in the blocked assembler's floor.
+    // These allocations are already included in the blocked assembler's floor.
     CountedBytes(&'a Bytes),
 }
 
@@ -45,7 +45,7 @@ impl TransportStorageCursor {
     ) -> Result<Option<StorageItem<'a>>> {
         debug_assert_eq!(stream.phase, 6);
         let Route::Pes(blocked) = stream.route else {
-            return Err(Error::Invalid("ADTS storage audit outside PES drain"));
+            return Err(Error::Invalid("PES storage audit outside drain"));
         };
         let routes = stream.routes.as_slice();
         let item = match *self {
