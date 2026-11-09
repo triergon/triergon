@@ -107,7 +107,7 @@ and `dolby-bad-first` 1.321, total RSS on all 10 (1.038 to 1.043); MP4 forward h
 the twelve `progressive-pending-*`, `progressive-f-*`, `progressive-unknown-clock-terminal`
 and `progressive-first-source-clock-unknown` cases (1.000 to 1.004).
 
-The MPEG-TS row uses the gate build at
+An earlier MPEG-TS PES comparison used the gate build at
 `5634f47d33ca2a9ba671c82e805398ce4eafd83e`, with tooling at
 `848bb14ced9fc5d1521a636965323ea08cd06265`, on a c8g.large pinned to CPU 1.
 All 97 operations and 272 requests are retained. The 81 matching operations have
