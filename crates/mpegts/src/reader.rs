@@ -383,6 +383,24 @@ impl Reader {
             _ => Event::Packet(packet),
         }
     }
+    fn is_inline_source(event: &TraceEvent) -> bool {
+        matches!(
+            event,
+            TraceEvent::Transport(_)
+                | TraceEvent::Continuity {
+                    outcome: ContinuityOutcome::First | ContinuityOutcome::Continuous,
+                    ..
+                }
+        )
+    }
+    fn inline_source(event: TraceEvent) -> ReaderStep<Self> {
+        let event = match event {
+            TraceEvent::Transport(packet) => ReaderEvent::Transport(packet),
+            TraceEvent::Continuity { pid, outcome } => ReaderEvent::Continuity { pid, outcome },
+            _ => unreachable!("expected an inline source event"),
+        };
+        Step::Ready(Event::Other(event))
+    }
     fn lane_step(
         &mut self,
         index: usize,
@@ -417,22 +435,12 @@ impl Reader {
             if work.remaining() == 0 {
                 return Ok(Step::Yield);
             }
-            if self.raw.is_some() {
+            if let Some(raw) = &self.raw {
                 if matches!(self.phase, Phase::Prepare) {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    if !matches!(
-                        self.raw,
-                        Some(
-                            TraceEvent::Transport(_)
-                                | TraceEvent::Continuity {
-                                    outcome: ContinuityOutcome::First
-                                        | ContinuityOutcome::Continuous,
-                                    ..
-                                }
-                        )
-                    ) {
+                    if !Self::is_inline_source(raw) {
                         let charge = Shared::<TraceEvent>::reserve(&self.pool)?;
                         let event = self.raw.take().expect("raw source");
                         self.pending = Some(SourceEvent(Shared::new(event, charge)));
@@ -449,14 +457,7 @@ impl Reader {
                         self.phase = Phase::Publish;
                         continue;
                     }
-                    let event = match self.raw.take() {
-                        Some(TraceEvent::Transport(packet)) => ReaderEvent::Transport(packet),
-                        Some(TraceEvent::Continuity { pid, outcome }) => {
-                            ReaderEvent::Continuity { pid, outcome }
-                        }
-                        _ => unreachable!("expected an inline source event"),
-                    };
-                    return Ok(Step::Ready(Event::Other(event)));
+                    return Ok(Self::inline_source(self.raw.take().expect("inline source")));
                 }
             }
             if self.pending.is_some() {
@@ -791,6 +792,16 @@ impl Reader {
             };
             match step {
                 Step::Ready(event) => {
+                    // Prepare, begin and publish can share a grant for events
+                    // that require no additional state or storage.
+                    if Self::is_inline_source(&event) && work.remaining() >= 3 {
+                        if cancel.load(Ordering::Relaxed) {
+                            return Err(Error::Cancelled);
+                        }
+                        work.take(3);
+                        self.phase = Phase::Publish;
+                        return Ok(Self::inline_source(event));
+                    }
                     self.raw = Some(event);
                     self.phase = Phase::Prepare;
                 }
