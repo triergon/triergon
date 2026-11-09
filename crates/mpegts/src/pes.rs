@@ -100,13 +100,26 @@ impl Pes {
 
 #[derive(Debug)]
 struct Payload {
-    bytes: Bytes,
+    // A final span can take the backing before this input slot is drained.
+    bytes: Option<Bytes>,
     pusi: bool,
     started: bool,
     position: usize,
     entity: SourceId,
     offset: u64,
     chunk: u64,
+}
+
+impl Payload {
+    fn bytes(&self) -> &Bytes {
+        self.bytes.as_ref().expect("PES payload not consumed")
+    }
+
+    fn remaining(&self) -> usize {
+        self.bytes
+            .as_ref()
+            .map_or(0, |bytes| bytes.len() - self.position)
+    }
 }
 
 #[derive(Debug)]
@@ -287,7 +300,7 @@ impl PesAssembler {
         let chunk = self.next_chunk;
         self.next_chunk += 1;
         self.payload = Some(Payload {
-            bytes,
+            bytes: Some(bytes),
             pusi,
             started: false,
             position: 0,
@@ -465,7 +478,7 @@ impl PesAssembler {
             .payload
             .as_ref()
             .ok_or(Error::Invalid("PES payload missing"))?;
-        let bytes = &pending.bytes.as_ref()[pending.position..];
+        let bytes = &pending.bytes().as_ref()[pending.position..];
         let Some((header, total)) = parse_timed_header(bytes, self.limits.pes_bytes, work) else {
             return Ok(false);
         };
@@ -513,7 +526,7 @@ impl PesAssembler {
     }
 
     pub(crate) fn pending_backing(&self) -> Option<&Bytes> {
-        self.payload.as_ref().map(|payload| &payload.bytes)
+        self.payload.as_ref()?.bytes.as_ref()
     }
 
     pub(crate) fn blocked_growth_floor(&self) -> Option<usize> {
@@ -571,7 +584,7 @@ impl PesAssembler {
         loop {
             if let SpanGrowth::Audit(audit) = &mut self.span_growth {
                 let pending = self.payload.as_ref().expect("pending PES span");
-                if !audit.step(self.spans.as_slice(), &pending.bytes, work, cancel)? {
+                if !audit.step(self.spans.as_slice(), pending.bytes(), work, cancel)? {
                     return Ok(false);
                 }
                 if cancel.load(Ordering::Relaxed) {
@@ -620,7 +633,7 @@ impl PesAssembler {
                 if self
                     .payload
                     .as_ref()
-                    .is_some_and(|payload| payload.position < payload.bytes.len())
+                    .is_some_and(|payload| payload.remaining() != 0)
                 {
                     return Err(Error::Invalid("bytes beyond finite PES"));
                 }
@@ -710,13 +723,13 @@ impl PesAssembler {
                     .started = true;
                 continue;
             }
-            if pending.position == pending.bytes.len() {
+            let available = pending.remaining();
+            if available == 0 {
                 self.payload = None;
                 continue;
             }
             if !self.active {
-                let remaining = pending.bytes.len() - pending.position;
-                let count = work.take(remaining as u64) as usize;
+                let count = work.take(available as u64) as usize;
                 if count == 0 {
                     return Ok(AssemblyStep::Yield);
                 }
@@ -748,7 +761,7 @@ impl PesAssembler {
                 }
                 let count = (self.header_target - self.header_used)
                     .min(self.limits.pes_bytes - self.seen)
-                    .min(pending.bytes.len() - pending.position)
+                    .min(available)
                     .min(grant.min(HEADER_MAX as u64) as usize);
                 let extent = SourceRange {
                     entity: pending.entity,
@@ -778,14 +791,13 @@ impl PesAssembler {
                     .payload
                     .as_mut()
                     .ok_or(Error::Invalid("PES payload missing"))?;
-                let bytes = &pending.bytes.as_ref()[pending.position..pending.position + count];
+                let bytes = &pending.bytes().as_ref()[pending.position..pending.position + count];
                 self.raw_header[self.header_used..self.header_used + count].copy_from_slice(bytes);
                 self.header_used += count;
                 self.seen += count;
                 pending.position += count;
                 continue;
             }
-            let available = pending.bytes.len() - pending.position;
             let remaining = self
                 .total
                 .map_or(self.limits.pes_bytes - self.seen, |total| total - self.seen);
@@ -843,23 +855,31 @@ impl PesAssembler {
                 span.range.end += count;
                 span.source.bytes += count;
             } else {
-                let pending = self.payload.as_ref().expect("pending PES span");
+                let pending = self.payload.as_mut().expect("pending PES span");
                 let physical = pending
                     .offset
                     .checked_add(pending.position as u64)
                     .ok_or(Error::Overflow)?;
-                self.spans
-                    .try_push(PesSpan {
-                        bytes: pending.bytes.clone(),
-                        range: pending.position..pending.position + count,
-                        source: SourceRange {
-                            entity: pending.entity,
-                            offset: physical,
-                            bytes: count,
-                        },
-                        chunk: pending.chunk,
-                    })
-                    .map_err(|error| error.error)?;
+                let bytes = if count == available {
+                    pending.bytes.take().expect("pending PES span")
+                } else {
+                    pending.bytes().clone()
+                };
+                if let Err(rejected) = self.spans.try_push(PesSpan {
+                    bytes,
+                    range: pending.position..pending.position + count,
+                    source: SourceRange {
+                        entity: pending.entity,
+                        offset: physical,
+                        bytes: count,
+                    },
+                    chunk: pending.chunk,
+                }) {
+                    if count == available {
+                        pending.bytes = Some(rejected.value.bytes);
+                    }
+                    return Err(rejected.error);
+                }
             }
             self.payload_len += count;
             self.seen += count;
