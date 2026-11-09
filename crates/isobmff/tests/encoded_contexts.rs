@@ -351,6 +351,29 @@ fn range_playback_refuses_an_extra_iso_aac_wave_path() {
     assert!(range_config(&Source::new(&raw)).is_err());
 }
 
+#[test]
+fn range_playback_keeps_the_base_config_for_dolby_vision_hevc_entries() {
+    let raw = include_bytes!("fixtures/encoded-v1/control-hevc-aac-front.mp4");
+    let source = Source::new(raw);
+    let control = range_config(&source).unwrap();
+    let entry = &source.table.descriptions()[0];
+    assert!(matches!(&entry.format, b"hvc1" | b"hev1"));
+    let code = usize::try_from(entry.raw().header().start).unwrap() + 4;
+    for format in [b"dvh1", b"dvhe"] {
+        let mut raw = raw.to_vec();
+        raw[code..code + 4].copy_from_slice(format);
+        let tagged = Source::new(&raw);
+        let config = range_config(&tagged).unwrap();
+        assert_eq!(config.source_description().format, *format);
+        assert_eq!(config.kind(), control.kind());
+        assert_eq!(
+            config.demux().extradata.as_ref(),
+            control.demux().extradata.as_ref()
+        );
+        assert_eq!(config.configuration_box().header().kind, *b"hvcC");
+    }
+}
+
 recovery_case!(recovery_dangling_description, "dangling-description");
 recovery_case!(recovery_empty_run, "empty-run");
 recovery_case!(recovery_coverage_over, "coverage-over");
