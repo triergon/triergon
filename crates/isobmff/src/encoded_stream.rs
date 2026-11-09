@@ -868,7 +868,10 @@ impl<'a> EncodedStreamJob<'a> {
         let (kind, config_kind, layout) = match (&header.handler, &entry.format) {
             (b"vide", b"avc1" | b"avc3") => (EncodedEntryKind::Avc, *b"avcC", EntryLayout::Visual),
             (b"vide", b"hvc1" | b"hev1") => (EncodedEntryKind::Hevc, *b"hvcC", EntryLayout::Visual),
-            (b"vide", b"av01") if view == DescriptionView::RangePlayback => {
+            (b"vide", b"dvh1" | b"dvhe") if view == DescriptionView::RangePlayback => {
+                (EncodedEntryKind::Hevc, *b"hvcC", EntryLayout::Visual)
+            }
+            (b"vide", b"av01" | b"dav1") if view == DescriptionView::RangePlayback => {
                 (EncodedEntryKind::Av1, *b"av1C", EntryLayout::Visual)
             }
             (b"vide", b"vp09") if view == DescriptionView::RangePlayback => {
