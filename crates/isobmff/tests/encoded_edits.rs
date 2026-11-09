@@ -530,6 +530,47 @@ fn range_playback_keeps_opus_preroll_and_stops_at_the_edit_end() {
 }
 
 #[test]
+fn opus_global_seek_aligns_audio_without_the_range_checkpoints() {
+    let raw = include_bytes!("fixtures/range-encoded-edits/avc-opus-edit.mp4");
+    let video = Source::new(raw, b"vide");
+    let audio = Source::in_pool(raw, b"soun", video.pool.clone());
+    let plans = [
+        Some(range_plan(&video, *b"isom").unwrap()),
+        Some(range_plan(&audio, *b"isom").unwrap()),
+    ];
+    let recovery = plans[1]
+        .as_ref()
+        .unwrap()
+        .recovery_observation()
+        .unwrap()
+        .source_result()
+        .unwrap()
+        .source_scope(triergon_isobmff::RecoveryKind::Roll);
+    assert!(recovery.track_descriptions.is_some());
+    assert!(recovery.mappings.is_some());
+    let tracks = [video.track(), audio.track()];
+    let cancel = AtomicBool::new(false);
+    let mut seek = GlobalSeekJob::new_encoded_regular_rescaled(
+        &video.pool,
+        &tracks,
+        &video.media,
+        (video.header.track_id, 32000),
+        triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+        &plans,
+    )
+    .unwrap();
+    while seek.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Yield {}
+    let seek = seek.finish().unwrap();
+    assert_eq!(seek.landing().selected.timestamp, 32000);
+    let mut cursor = seek.cursor().unwrap();
+    while cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() == CursorStatus::Yield {}
+    let first = cursor.take_occurrence().unwrap();
+    assert_eq!(first.track_id, audio.header.track_id);
+    assert_eq!(first.demux.pts, Some(94752));
+    assert_eq!(first.source.range.start, 42991);
+}
+
+#[test]
 fn dts_core_descriptions_agree_with_range_admission() {
     for (tag, version, config, major, configuration_box) in [
         (b"dtsc", 0, ddts(1, 48_000, 0), b"isom", b"ddts"),
