@@ -252,8 +252,20 @@ pub struct Decoder {
     last: Option<Undo>,
     /// The unit that yielded, if any.
     suspended: Option<Suspended>,
-    /// A copy of a yielded unit that came whole in its packet.
+    /// A copy of a yielded unit that came whole in its packet, released when
+    /// the unit completes or is abandoned.
     held: BudgetVec<u8>,
+}
+
+/// Where a run reads its unit.
+#[derive(Clone, Copy, Debug)]
+enum Source<'p> {
+    /// The packet that brought the whole unit, still the caller's.
+    Packet(&'p [u8]),
+    /// The reassembly buffer.
+    Pending,
+    /// The copy of a packet that brought the whole unit and yielded.
+    Held,
 }
 
 /// A unit that yielded: how far its run got and how to finish it.
@@ -311,8 +323,13 @@ impl Decoder {
 
     /// Undo the last [`decode`](Self::decode) that neither yielded nor
     /// failed, so that the same packet can be decoded again: for a consumer
-    /// that could not store its subtitle.
+    /// that could not store its subtitle. Refused while a unit is suspended.
     pub fn rewind(&mut self) -> Result<()> {
+        if self.suspended.is_some() {
+            return Err(Error::Invalid(
+                "DVD receiver: resume or abandon the yielded unit",
+            ));
+        }
         if let Some(undo) = self.last.take() {
             self.colours = undo.colours;
             self.pending.truncate(undo.pending);
@@ -374,7 +391,12 @@ impl Decoder {
             buffered: continues,
             undo,
         };
-        self.run(unit, (!continues).then_some(packet), work)
+        let source = if continues {
+            Source::Pending
+        } else {
+            Source::Packet(packet)
+        };
+        self.run(unit, source, work)
     }
 
     /// Continue the unit that yielded, from where it stopped.
@@ -383,30 +405,48 @@ impl Decoder {
             .suspended
             .take()
             .ok_or(Error::Invalid("DVD receiver: no yielded unit"))?;
-        self.run(unit, None, work)
+        let source = if unit.buffered {
+            Source::Pending
+        } else {
+            Source::Held
+        };
+        self.run(unit, source, work)
     }
 
     /// Drop the unit that yielded, as if its packet had never been sent.
     pub fn abandon(&mut self) {
-        if let Some(unit) = self.suspended.take()
-            && unit.buffered
-        {
-            self.pending.truncate(unit.undo.pending);
+        if let Some(unit) = self.suspended.take() {
+            if unit.buffered {
+                self.pending.truncate(unit.undo.pending);
+            } else {
+                self.release_held();
+            }
         }
     }
 
-    /// Run a complete unit on from its cursor: `packet` when the unit is a
-    /// fresh packet of its own, otherwise the buffered or held copy.
+    /// Free the copy of a yielded unit.
+    fn release_held(&mut self) {
+        let budget = self.held.budget().clone();
+        self.held = BudgetVec::new(&budget);
+    }
+
+    /// Run a complete unit on from its cursor.
+    ///
+    /// A unit that came whole in its packet and yields is copied, for the
+    /// packet goes back to its caller. A copy the pool refuses fails the call
+    /// with that error, and the receiver is as it was before the packet: its
+    /// colours and the reassembly buffer are only changed once a unit
+    /// completes.
     fn run(
         &mut self,
         mut unit: Suspended,
-        packet: Option<&[u8]>,
+        source: Source<'_>,
         work: &mut WorkBudget,
     ) -> Result<Status<'_>> {
-        let bytes = match packet {
-            Some(packet) => packet,
-            None if unit.buffered => self.pending.as_slice(),
-            None => self.held.as_slice(),
+        let bytes = match source {
+            Source::Packet(packet) => packet,
+            Source::Pending => self.pending.as_slice(),
+            Source::Held => self.held.as_slice(),
         };
         let outcome = Pass {
             settings: &self.settings,
@@ -417,6 +457,9 @@ impl Decoder {
             cursor: &mut unit.cursor,
         }
         .run(bytes, unit.header);
+        if matches!(source, Source::Held) && !matches!(outcome, Err(Halt::Yield)) {
+            self.release_held();
+        }
         match outcome {
             Ok(_) | Err(Halt::Malformed) => {
                 self.colours = unit.cursor.colours;
@@ -429,8 +472,7 @@ impl Decoder {
                 });
             }
             Err(Halt::Yield) => {
-                if let Some(packet) = packet {
-                    // The packet goes back to its caller: keep a copy.
+                if let Source::Packet(packet) = source {
                     self.held.clear();
                     self.held.try_extend_from_slice(packet)?;
                 }
@@ -659,9 +701,9 @@ impl Pass<'_, '_> {
                 self.commands(body, self.cursor.at + head_bytes, date)?;
                 self.cursor.ended = true;
             }
-            let cursor = *self.cursor;
-            if let (Some(area), Some(fields)) = (cursor.area, cursor.fields) {
-                match self.draw(unit, area, fields, &cursor.state) {
+            if let (Some(area), Some(fields)) = (self.cursor.area, self.cursor.fields) {
+                let state = self.cursor.state;
+                match self.draw(unit, area, fields, &state) {
                     Ok(Some(next)) => self.cursor.drawn = Some(next),
                     Ok(None) => {}
                     Err(Halt::Malformed) => self.cursor.failed = true,
@@ -675,13 +717,10 @@ impl Pass<'_, '_> {
             (cursor.at, cursor.read, cursor.ended) = (next, 0, false);
             (cursor.area, cursor.fields) = (None, None);
         }
-        let Cursor {
-            state,
-            drawn,
-            failed,
-            ..
-        } = *self.cursor;
-        let drawn = drawn.filter(|_| !failed).ok_or(Halt::Malformed)?;
+        let state = self.cursor.state;
+        let drawn = (self.cursor.drawn)
+            .filter(|_| !self.cursor.failed)
+            .ok_or(Halt::Malformed)?;
         if self.settings.forced_only && !drawn.forced {
             return Err(Halt::Malformed);
         }

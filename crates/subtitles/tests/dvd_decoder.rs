@@ -951,3 +951,129 @@ fn memory_the_budget_refuses_changes_nothing() {
         assert_eq!(presented[0], shows(&a));
     }
 }
+
+/// Decode each packet in slices of `quantum`, resuming until it is done; one
+/// entry per packet.
+fn decode_sliced(packets: &[&[u8]], quantum: u64) -> Vec<Option<Shown>> {
+    let budget = Budget::new(1 << 26).unwrap();
+    let mut decoder = Decoder::new(&budget, settings(), Limits::default());
+    packets
+        .iter()
+        .map(|packet| {
+            let mut status = decoder
+                .decode(packet, &mut WorkBudget::new(quantum))
+                .unwrap();
+            while status == Status::Yield {
+                status = decoder.resume(&mut WorkBudget::new(quantum)).unwrap();
+            }
+            match status {
+                Status::Subtitle(s) => Some(s.into()),
+                Status::Nothing => None,
+                Status::Yield => unreachable!(),
+            }
+        })
+        .collect()
+}
+
+/// Units that draw 2-bit and 8-bit pixels, set selectors, contrast and
+/// `0x83` colours, redraw, and carry their colours on, present the same in
+/// slices of any size, down to one unit of work, as in one call each.
+#[test]
+fn slices_present_what_one_call_does() {
+    let image = glyphs(16, 6, 1, 0);
+    let first = [
+        Cmd::Palette([7, 6, 5, 4]),
+        Cmd::Alpha([15, 8, 1, 0]),
+        Cmd::Area,
+        Cmd::Offsets,
+        Cmd::Start,
+    ];
+    let bare = [Cmd::Area, Cmd::Offsets, Cmd::Start];
+    let redraw = [Cmd::Palette([5, 6, 7, 8]), Cmd::Area, Cmd::Offsets];
+    let rows: Vec<Vec<u8>> = (0..2)
+        .map(|y| (0..16).map(|x| (x * 16 + y) as u8).collect())
+        .collect();
+    let mut palette = vec![0x83];
+    for i in 0..256 {
+        palette.extend([16 + (i % 220) as u8, 128, 128]);
+    }
+    let mut contrast = vec![0x84, 255];
+    contrast.extend([0; 255]);
+    let packets = [
+        unit(&image, 0, 0, &[(0, &first)]),
+        unit(&image, 0, 0, &[(0, &bare)]),
+        unit(&image, 0, 0, &[(0, &SHOW), (50, &redraw)]),
+        extended(&rows, &[palette.clone(), contrast.clone()].concat()),
+        extended(&rows, &contrast),
+        extended(&rows, &palette),
+    ];
+    let packets: Vec<&[u8]> = packets.iter().map(Vec::as_slice).collect();
+    let whole = decode_all(settings(), &packets);
+    assert_eq!(whole.iter().flatten().count(), 5);
+    for quantum in [1, 3, 64, 1000] {
+        assert_eq!(decode_sliced(&packets, quantum), whole, "quantum {quantum}");
+    }
+}
+
+/// A yielded unit that came whole in its packet is copied; a copy the pool
+/// refuses fails the decode and leaves the receiver as it was, and a copy is
+/// freed once its unit completes or is abandoned.
+#[test]
+fn the_copy_of_a_yielded_unit_is_refused_whole_and_freed() {
+    let image = glyphs(16, 6, 1, 0);
+    let first = [
+        Cmd::Palette([7, 6, 5, 4]),
+        Cmd::Alpha([15, 8, 1, 0]),
+        Cmd::Area,
+        Cmd::Offsets,
+        Cmd::Start,
+    ];
+    let a = unit(&image, 0, 0, &[(0, &first)]);
+    let b = unit(&image, 0, 0, &[(0, &[Cmd::Area, Cmd::Offsets, Cmd::Start])]);
+    let expected = decode_all(settings(), &[&a, &b]);
+    let budget = Budget::new(1 << 20).unwrap();
+    let mut decoder = Decoder::new(&budget, settings(), Limits::default());
+    // With no work the unit yields before it is read, and its copy finds no
+    // room.
+    let taken = budget.reserve(budget.available()).unwrap();
+    assert!(matches!(
+        decoder.decode(&a, &mut WorkBudget::new(0)),
+        Err(Error::Backpressure { .. })
+    ));
+    assert!(matches!(
+        decoder.resume(&mut WorkBudget::new(1)),
+        Err(Error::Invalid(_))
+    ));
+    drop(taken);
+    let shown: Vec<_> = [&a, &b]
+        .iter()
+        .map(
+            |packet| match decoder.decode(packet, &mut WorkBudget::new(u64::MAX)) {
+                Ok(Status::Subtitle(s)) => Some(Shown::from(s)),
+                other => panic!("{other:?}"),
+            },
+        )
+        .collect();
+    assert_eq!(shown, expected);
+    // Sliced or not, the decoder ends holding the same; abandoning frees the
+    // copy too, and a suspended unit cannot be rewound.
+    let held = |quantum: u64| {
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut decoder = Decoder::new(&budget, settings(), Limits::default());
+        let mut status = decoder.decode(&a, &mut WorkBudget::new(quantum)).unwrap();
+        while status == Status::Yield {
+            status = decoder.resume(&mut WorkBudget::new(quantum)).unwrap();
+        }
+        budget.used()
+    };
+    assert_eq!(held(1), held(u64::MAX));
+    let before = budget.used();
+    assert_eq!(
+        decoder.decode(&a, &mut WorkBudget::new(1)).unwrap(),
+        Status::Yield
+    );
+    assert_eq!(budget.used() - before, a.len());
+    assert!(matches!(decoder.rewind(), Err(Error::Invalid(_))));
+    decoder.abandon();
+    assert_eq!(budget.used(), before);
+}
