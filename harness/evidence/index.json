@@ -16902,6 +16902,24 @@
    "retention": "90 days",
    "key": "qualification/transport-access-unit-source-publication/8490248636e690d9416a96c74a35bb6f5208f71b2d9dc1203e6d6a6f4025b158.tar.zst",
    "sha256": "8490248636e690d9416a96c74a35bb6f5208f71b2d9dc1203e6d6a6f4025b158"
+  },
+  {
+   "name": "transport-access-unit-syncframes",
+   "retention": "90 days",
+   "key": "qualification/transport-access-unit-syncframes/7646c28939f4d088663867c2b3c78909ded35afb7e0e272909248d69500dbd54.tar.zst",
+   "sha256": "7646c28939f4d088663867c2b3c78909ded35afb7e0e272909248d69500dbd54"
+  },
+  {
+   "name": "transport-access-unit-borrowed-payload",
+   "retention": "90 days",
+   "key": "qualification/transport-access-unit-borrowed-payload/ba9f27d38ab9038e9f2aa95a54aa19b0937c6389850ccb6f845232517a6d9340.tar.zst",
+   "sha256": "ba9f27d38ab9038e9f2aa95a54aa19b0937c6389850ccb6f845232517a6d9340"
+  },
+  {
+   "name": "transport-access-unit-payload-scan",
+   "retention": "90 days",
+   "key": "qualification/transport-access-unit-payload-scan/2b1150d5d6ac757a91b3de6a2f916bb0c6a2d3ae15149704f898bd6df207bda5.tar.zst",
+   "sha256": "2b1150d5d6ac757a91b3de6a2f916bb0c6a2d3ae15149704f898bd6df207bda5"
   }
  ]
 }
