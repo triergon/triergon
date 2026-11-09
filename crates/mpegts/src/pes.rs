@@ -10,6 +10,27 @@ use triergon_core::{
 };
 
 pub(crate) const HEADER_MAX: usize = 264; // 9 fixed bytes plus 8-bit optional-header length
+const INLINE_HEADER_BYTES: usize = 19; // Fixed header plus PTS and DTS.
+
+#[derive(Clone, Debug)]
+enum HeaderBytes {
+    Inline {
+        data: [u8; INLINE_HEADER_BYTES],
+        length: u8,
+    },
+    Extended(Bytes),
+}
+
+impl HeaderBytes {
+    fn inline(bytes: &[u8]) -> Self {
+        let mut data = [0; INLINE_HEADER_BYTES];
+        data[..bytes.len()].copy_from_slice(bytes);
+        Self::Inline {
+            data,
+            length: u8::try_from(bytes.len()).expect("inline PES header length"),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct PesHeader {
@@ -19,12 +40,21 @@ pub struct PesHeader {
     pub dts_raw33: Option<u64>,
     pub data_alignment_indicator: bool,
     pub priority: bool,
-    raw: [u8; HEADER_MAX],
-    used: usize,
+    raw: HeaderBytes,
 }
 impl PesHeader {
     pub fn as_bytes(&self) -> &[u8] {
-        &self.raw[..self.used]
+        match &self.raw {
+            HeaderBytes::Inline { data, length } => &data[..usize::from(*length)],
+            HeaderBytes::Extended(bytes) => bytes.as_ref(),
+        }
+    }
+
+    pub(crate) fn retained_storage(&self) -> usize {
+        match &self.raw {
+            HeaderBytes::Inline { .. } => 0,
+            HeaderBytes::Extended(bytes) => bytes.retained_storage_bytes(),
+        }
     }
     /// Raw period-zero view only. Clock extension/epoch selection remains explicit.
     pub fn raw_pts_time(&self) -> Result<Option<Time>> {
@@ -83,6 +113,7 @@ impl Pes {
     pub(crate) fn table_storage(&self) -> Result<usize> {
         crate::table_storage(&self.spans)?
             .checked_add(crate::table_storage(&self.header_source_ranges)?)
+            .and_then(|bytes| bytes.checked_add(self.header.retained_storage()))
             .ok_or(Error::Overflow)
     }
 
@@ -137,7 +168,11 @@ struct SpanGrowthAudit {
 }
 
 impl SpanGrowthAudit {
-    fn new(spans: &BudgetVec<PesSpan>, headers: &BudgetVec<SourceRange>) -> Result<Self> {
+    fn new(
+        spans: &BudgetVec<PesSpan>,
+        headers: &BudgetVec<SourceRange>,
+        header_bytes: usize,
+    ) -> Result<Self> {
         let tables = spans
             .capacity()
             .checked_add(spans.len())
@@ -151,6 +186,7 @@ impl SpanGrowthAudit {
         let minimum = Budget::control_storage_bytes()
             .checked_add(tables)
             .and_then(|n| n.checked_add(headers))
+            .and_then(|n| n.checked_add(header_bytes))
             .ok_or(Error::Overflow)?;
         Ok(Self {
             minimum,
@@ -581,6 +617,9 @@ impl PesAssembler {
     pub(crate) fn table_storage(&self) -> Result<usize> {
         crate::table_storage(&self.spans)?
             .checked_add(crate::table_storage(&self.header_ranges)?)
+            .and_then(|bytes| {
+                bytes.checked_add(self.header.as_ref().map_or(0, PesHeader::retained_storage))
+            })
             .ok_or(Error::Overflow)
     }
 
@@ -602,22 +641,26 @@ impl PesAssembler {
 
     #[cold]
     fn record_blocked_header_growth(&mut self) -> Result<()> {
-        if matches!(self.span_growth, SpanGrowth::HeaderBlocked(_)) {
-            return Ok(());
-        }
         let replacement = self
             .header_ranges
             .len()
             .checked_add(1)
             .and_then(|len| len.checked_mul(size_of::<SourceRange>()))
             .ok_or(Error::Overflow)?;
-        // The header keeps previous physical extents and copies their bytes
-        // inline. The pending payload is the only assembler backing at this point.
+        self.record_blocked_header_storage(replacement)
+    }
+
+    #[cold]
+    fn record_blocked_header_storage(&mut self, additional: usize) -> Result<()> {
+        if matches!(self.span_growth, SpanGrowth::HeaderBlocked(_)) {
+            return Ok(());
+        }
+        // The pending carrier is the only retained backing during header assembly.
         debug_assert!(self.spans.is_empty());
         let pending = self.pending_backing().expect("pending PES header");
         let minimum = Budget::control_storage_bytes()
             .checked_add(self.table_storage()?)
-            .and_then(|bytes| bytes.checked_add(replacement))
+            .and_then(|bytes| bytes.checked_add(additional))
             .and_then(|bytes| bytes.checked_add(pending.retained_storage_bytes()))
             .ok_or(Error::Overflow)?;
         if minimum > self.budget.limit() {
@@ -675,8 +718,11 @@ impl PesAssembler {
                 Err(Error::Backpressure { .. })
                     if matches!(self.span_growth, SpanGrowth::Credit(_)) =>
                 {
-                    self.span_growth =
-                        SpanGrowth::Audit(SpanGrowthAudit::new(&self.spans, &self.header_ranges)?);
+                    self.span_growth = SpanGrowth::Audit(SpanGrowthAudit::new(
+                        &self.spans,
+                        &self.header_ranges,
+                        self.header.as_ref().map_or(0, PesHeader::retained_storage),
+                    )?);
                 }
                 Err(error) => return Err(error),
             }
@@ -706,9 +752,11 @@ impl PesAssembler {
                 return self.emit::<RETAIN>();
             }
             if self.active && self.header.is_none() && self.header_used == self.header_target {
-                if !work.try_charge(1) {
+                let retry = matches!(self.span_growth, SpanGrowth::HeaderBlocked(_));
+                if work.remaining() == 0 {
                     return Ok(AssemblyStep::Yield);
                 }
+                work.take(u64::from(!retry));
                 match self.header_used {
                     6 => {
                         if self.raw_header[..3] != [0, 0, 1] {
@@ -750,10 +798,25 @@ impl PesAssembler {
                             return Err(limit(self.header_target, self.limits.pes_bytes));
                         }
                         if self.header_target == 9 {
-                            self.header = Some(parse_header(&self.raw_header, 9)?);
+                            self.header = Some(parse_header(&self.budget, &self.raw_header[..9])?);
                         }
                     }
-                    _ => self.header = Some(parse_header(&self.raw_header, self.header_used)?),
+                    _ => {
+                        let parsed =
+                            parse_header(&self.budget, &self.raw_header[..self.header_used]);
+                        let header = match parsed {
+                            Err(error @ Error::Backpressure { requested, .. }) => {
+                                self.record_blocked_header_storage(requested)?;
+                                return Err(error);
+                            }
+                            result => result?,
+                        };
+                        if retry {
+                            work.take(1);
+                            self.span_growth = SpanGrowth::Credit(0);
+                        }
+                        self.header = Some(header);
+                    }
                 }
                 continue;
             }
@@ -1004,8 +1067,6 @@ pub(crate) fn parse_timed_header(
     } else {
         None
     };
-    let mut raw = [0; HEADER_MAX];
-    raw[..used].copy_from_slice(bytes);
     Some((
         PesHeader {
             stream_id: prefix[3],
@@ -1014,15 +1075,14 @@ pub(crate) fn parse_timed_header(
             dts_raw33,
             data_alignment_indicator: prefix[6] & 4 != 0,
             priority: prefix[6] & 8 != 0,
-            raw,
-            used,
+            raw: HeaderBytes::inline(bytes),
         },
         declared,
     ))
 }
 
-pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHeader> {
-    let bytes = &raw[..used];
+pub(crate) fn parse_header(budget: &Budget, bytes: &[u8]) -> Result<PesHeader> {
+    let used = bytes.len();
     if used < 9 || bytes[6] & 0xc0 != 0x80 || used != 9 + usize::from(bytes[8]) {
         return Err(Error::Invalid("PES optional-header prefix"));
     }
@@ -1118,6 +1178,11 @@ pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHea
     if bytes[position..].iter().any(|byte| *byte != 255) {
         return Err(Error::Invalid("PES header stuffing"));
     }
+    let raw = if used <= INLINE_HEADER_BYTES {
+        HeaderBytes::inline(bytes)
+    } else {
+        HeaderBytes::Extended(Bytes::copy_from_slice(budget, bytes)?)
+    };
     Ok(PesHeader {
         stream_id: bytes[3],
         declared_packet_length: u16::from_be_bytes([bytes[4], bytes[5]]),
@@ -1125,8 +1190,7 @@ pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHea
         dts_raw33,
         data_alignment_indicator: bytes[6] & 4 != 0,
         priority: bytes[6] & 8 != 0,
-        raw: *raw,
-        used,
+        raw,
     })
 }
 
@@ -1171,6 +1235,7 @@ mod timed_header_tests {
 
     #[test]
     fn complete_timestamps_match_general_headers_and_keep_admission_bounds() {
+        let pool = Budget::new(4096).unwrap();
         for pts in [0, 1, 0x0001_0000_0011, (1 << 33) - 1] {
             for dts in [None, Some(0), Some((1 << 33) - 1)] {
                 for control in 0x80..=0x8f {
@@ -1180,7 +1245,7 @@ mod timed_header_tests {
                         let work = WorkBudget::new(used as u64 + 3);
                         let (fast, total) =
                             parse_timed_header(&raw[..used], 1 << 20, &work).unwrap();
-                        let slow = parse_header(&raw, used).unwrap();
+                        let slow = parse_header(&pool, &raw[..used]).unwrap();
                         assert_eq!(format!("{fast:?}"), format!("{slow:?}"));
                         assert_eq!(fast.pts_raw33, Some(pts));
                         assert_eq!(fast.dts_raw33, dts);
@@ -1206,6 +1271,7 @@ mod timed_header_tests {
 
     #[test]
     fn invalid_and_incomplete_timestamps_fall_back_to_the_general_parser() {
+        let pool = Budget::new(4096).unwrap();
         for dts in [None, Some((1 << 33) - 1)] {
             let (raw, used) = header(0x0001_0000_0011, dts, 0x84);
             let work = WorkBudget::new(4096);
@@ -1217,7 +1283,7 @@ mod timed_header_tests {
                     let mut changed = raw;
                     changed[at] ^= 1 << bit;
                     let fast = parse_timed_header(&changed[..used], 1 << 20, &work);
-                    match parse_header(&changed, used) {
+                    match parse_header(&pool, &changed[..used]) {
                         Ok(slow) => {
                             assert_eq!(format!("{:?}", fast.unwrap().0), format!("{slow:?}"));
                         }
@@ -1237,7 +1303,66 @@ mod timed_header_tests {
         let (mut raw, used) = header(17, None, 0x84);
         raw[8] += 1;
         raw[used] = 0xff;
-        assert!(parse_header(&raw, used + 1).is_ok());
+        assert!(parse_header(&pool, &raw[..used + 1]).is_ok());
         assert!(parse_timed_header(&raw[..used + 1], 1 << 20, &WorkBudget::new(4096)).is_none());
+    }
+
+    #[test]
+    fn extended_header_retains_every_byte_after_a_pressure_retry() {
+        let pool = Budget::new(4096).unwrap();
+        let source = SourceId(1);
+        let mut raw = [0xff; HEADER_MAX + 1];
+        let length = u16::try_from(raw.len() - 6).unwrap().to_be_bytes();
+        raw[..9].copy_from_slice(&[0, 0, 1, 0xe0, length[0], length[1], 0x80, 0, 255]);
+        let mut assembler = PesAssembler::new(
+            256,
+            true,
+            pool.clone(),
+            ParseLimits::default(),
+            SourceEpochs::default(),
+        )
+        .unwrap();
+        assembler
+            .push(
+                Bytes::copy_from_slice(&pool, &raw).unwrap(),
+                true,
+                source,
+                0,
+            )
+            .unwrap();
+        let cancel = AtomicBool::new(false);
+        assert!(matches!(
+            assembler.poll(&mut WorkBudget::new(HEADER_MAX as u64 + 2), &cancel),
+            Ok(AssemblyStep::Yield)
+        ));
+        assert_eq!(assembler.partial_header(), &raw[..HEADER_MAX]);
+        let pressure = pool.reserve(pool.available()).unwrap();
+        let mut work = WorkBudget::new(1);
+        assert!(matches!(
+            assembler.poll(&mut work, &cancel),
+            Err(Error::Backpressure { .. })
+        ));
+        assert!(assembler.blocked_growth_floor().is_some());
+        assert!(matches!(
+            assembler.poll(&mut WorkBudget::new(1), &cancel),
+            Err(Error::Backpressure { .. })
+        ));
+        assert_eq!(assembler.partial_header(), &raw[..HEADER_MAX]);
+        drop(pressure);
+        let AssemblyStep::Output(pes) = assembler.poll(&mut WorkBudget::new(2), &cancel).unwrap()
+        else {
+            panic!("expected the completed PES");
+        };
+        assert_eq!(pes.header.as_bytes(), &raw[..HEADER_MAX]);
+        assert_eq!(pes.payload().next(), Some(&raw[HEADER_MAX..]));
+        assert_eq!(
+            pes.header_source_ranges.as_slice(),
+            &[SourceRange {
+                entity: source,
+                offset: 0,
+                bytes: HEADER_MAX,
+            }]
+        );
+        assert!(assembler.blocked_growth_floor().is_none());
     }
 }

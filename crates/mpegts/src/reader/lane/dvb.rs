@@ -232,6 +232,7 @@ impl Envelope {
                 .checked_add(table_storage(pieces)?)
                 .and_then(|n| n.checked_add(table_storage(&pes.header_source_ranges).ok()?))
                 .and_then(|n| n.checked_add(pes.spans().len().checked_mul(size_of::<PesSpan>())?))
+                .and_then(|n| n.checked_add(pes.header.retained_storage()))
                 .and_then(|n| n.checked_add(Shared::<TraceEvent>::allocation_bytes().ok()?))
                 .and_then(|n| n.checked_add(Shared::<PacketData>::allocation_bytes().ok()?))
                 .and_then(|n| n.checked_add(size_of::<PayloadSource>()))
