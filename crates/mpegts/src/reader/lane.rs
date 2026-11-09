@@ -9,6 +9,7 @@ use super::{
     Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, Packet, PacketClock, PayloadSource,
     ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
+use crate::SourceEpochs;
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
@@ -20,7 +21,7 @@ use std::{
 };
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
-    SourceId, Step, WorkBudget,
+    SourceId, SourceLocation, Step, WorkBudget,
 };
 use triergon_framing::{
     AacAdtsStreamLimits, AacAdtsStreamReader, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection,
@@ -813,6 +814,13 @@ pub(super) enum LaneStep {
     DeferredFragment,
 }
 
+#[derive(Clone, Copy)]
+pub(super) enum PesRun {
+    Idle,
+    BeforeBoundary(SourceLocation),
+    Active(SourceEpochs, u64),
+}
+
 pub(super) struct Lane {
     pub track: Track,
     pub unsupported: Option<Error>,
@@ -832,7 +840,7 @@ pub(super) struct Lane {
     eof: bool,
     completed: usize,
     published: u64,
-    pub run: Option<(u64, u64, u64)>,
+    pub run: PesRun,
 }
 
 impl Lane {
@@ -865,7 +873,7 @@ impl Lane {
             eof: false,
             completed: 0,
             published: 0,
-            run: None,
+            run: PesRun::Idle,
         })
     }
     pub(super) fn unpublished(&self) -> Option<Range<u64>> {
@@ -944,11 +952,7 @@ impl Lane {
             })
             .map_err(|e| e.error)?;
         self.serial = serial;
-        self.run = Some((
-            pes.epochs.configuration,
-            pes.epochs.clock,
-            pes.byte_run_epoch,
-        ));
+        self.run = PesRun::Active(pes.epochs, pes.byte_run_epoch);
         self.input = self
             .framer
             .as_ref()

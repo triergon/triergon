@@ -549,12 +549,22 @@ impl TransportStream {
     pub fn clock_is_quarantined(&self) -> bool {
         self.clock_quarantined
     }
-    pub(crate) fn route_epochs(&self, index: usize, pid: u16) -> Option<SourceEpochs> {
+    pub(crate) fn route_state(
+        &self,
+        index: usize,
+        pid: u16,
+    ) -> Option<(SourceEpochs, Option<SourceLocation>)> {
         self.routes
             .as_slice()
             .get(index)
             .filter(|route| route.pid == pid)
-            .map(|route| route.epochs)
+            .map(|route| {
+                let pending = route
+                    .assembler
+                    .as_ref()
+                    .and_then(PesAssembler::pending_header_location);
+                (route.epochs, pending)
+            })
     }
     fn location(&self) -> SourceLocation {
         self.packet.as_ref().map_or(
