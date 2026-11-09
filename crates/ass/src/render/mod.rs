@@ -234,7 +234,7 @@ impl Renderer {
         pipeline.combined.clear();
         pipeline.event_images.clear();
         pipeline.painter.cut(&settings.cache)?;
-        pipeline.outlines.trim(settings.cache.outlines)?;
+        pipeline.outlines.cut(settings.cache.outlines)?;
         let geometry = self.canvas.place(script);
         let boxes = &mut self.boxes;
         boxes.clear();

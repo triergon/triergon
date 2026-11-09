@@ -200,6 +200,50 @@ fn caches_without_room_keep_what_the_last_frame_shows() {
     assert_eq!(change(1000), Change::None);
 }
 
+/// The caches charge the budget for what they keep, and keep at most their
+/// limits beyond what a renderer without room in them holds for the same
+/// frame: the frame's working set and what its images show.
+#[test]
+fn caches_hold_at_most_their_limits_beyond_the_frame() {
+    let limits = CacheLimits {
+        bitmap_bytes: 64 << 10,
+        composite_bytes: 32 << 10,
+        ..CacheLimits::new(1000, 0)
+    };
+    let rendered = |limits: CacheLimits| {
+        let budget = Budget::new(64 << 20).unwrap();
+        let fonts = Fonts {
+            attached: vec![test_sans(&budget)],
+            ..Fonts::default()
+        };
+        let mut settings = Settings::new(Size::new(1280, 720));
+        settings.storage = Some(Size::new(640, 360));
+        settings.cache = limits;
+        let mut renderer = Renderer::new(&budget, &settings, &fonts).unwrap();
+        // Every frame turns the line further: new bitmaps and composites.
+        let mut script = script(
+            &budget,
+            "Dialogue: 0,0:00:00.00,0:00:09.00,Default,{\\t(0,8000,\\frz360)\\blur1}ABC CAB\n",
+        );
+        (0..80)
+            .map(|frame| {
+                renderer.render(&mut script, frame * 100).unwrap();
+                budget.used()
+            })
+            .collect::<Vec<_>>()
+    };
+    let bare = rendered(CacheLimits::new(1000, 0));
+    let bound = limits.bitmap_bytes + limits.composite_bytes;
+    let most = |kept: Vec<usize>| kept.iter().zip(&bare).map(|(k, b)| k - b).max();
+    // Kept whole, the frames' bitmaps and composites outgrow the limits;
+    // cut to them, they stay within them, a little scratch aside. libass
+    // counts its records with each entry, more than a kept entry is charged.
+    let unbounded = most(rendered(CacheLimits::new(1000, 24))).unwrap();
+    assert!(unbounded > 2 * bound, "{unbounded} {bound}");
+    let kept = most(rendered(limits)).unwrap();
+    assert!(kept > bound / 4 && kept <= bound + 4096, "{kept} {bound}");
+}
+
 fn steady_line(budget: &Budget) -> Script {
     script(budget, "Dialogue: 0,0:00:00.00,0:00:04.00,Default,CAB\n")
 }

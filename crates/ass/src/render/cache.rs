@@ -1,29 +1,25 @@
-//! What the renderer keeps between frames within a byte limit: glyph
-//! bitmaps and composited runs, as libass 0.17.5 keeps them
-//! (`ass_cache.c`).
+//! What the renderer keeps between frames within a limit: outlines by
+//! count, glyph bitmaps and composited runs by bytes, as libass 0.17.5
+//! keeps them (`ass_cache.c`).
 //!
 //! libass orders a cache's entries by their last use. Cutting it to a size
 //! (`ass_cache_cut`, `ass_cache.c:487-515`), which it does as each frame
 //! starts, walks that order from the oldest: an entry nothing else holds
-//! goes, and one still held, by the previous frame's images or by a
-//! composite that holds its glyphs' bitmaps, leaves the order but stays in
-//! the cache, findable and counted, until its last holder lets go
-//! (`ass_cache_dec_ref`, `:469-485`) or a lookup puts it back in the order
-//! (`ass_cache_get`, `:392-403`). The walk stops once the cache counts at
-//! most the limit. Whatever the previous frame's images show therefore
-//! survives the cut, so an equal key finds the same value in the next
-//! frame, and a value is identified by itself.
+//! goes, and one still held, by the previous frame's images, by a composite
+//! that holds its glyphs' bitmaps or by a bitmap or border that holds its
+//! outline, leaves the order but stays in the cache, findable and counted,
+//! until its last holder lets go (`ass_cache_dec_ref`, `:469-485`) or a
+//! lookup puts it back in the order (`ass_cache_get`, `:392-403`). The walk
+//! stops once the cache counts at most the limit. Whatever the previous
+//! frame's images show therefore survives the cut, so an equal key finds the
+//! same value in the next frame, and a value is identified by itself.
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
-
-/// The bytes the map's storage takes per entry beyond the key and value
-/// themselves, charged to the renderer's budget: the slot, the use record
-/// and the headers.
-const ENTRY_BYTES: usize = 64;
 
 /// What libass counts for an entry beyond its value: its item record
 /// (`CACHE_ITEM_SIZE`), six pointers and two sizes.
@@ -69,7 +65,10 @@ struct Use {
     held: bool,
 }
 
-/// Values `V` by key `K`, cut to a size as libass cuts its caches.
+/// Values `V` by key `K`, cut to a size as libass cuts its caches. Its map
+/// is charged to the renderer's budget by its entries, keys and values
+/// themselves; what a key or value holds beyond them is charged where it
+/// is allocated.
 #[derive(Debug)]
 pub(super) struct Cache<K, V> {
     entries: HashMap<K, Entry<V>>,
@@ -83,6 +82,10 @@ pub(super) struct Cache<K, V> {
 }
 
 impl<K: Eq + Hash, V: Shared> Cache<K, V> {
+    /// The bytes an entry takes in the map: its key, value and use record,
+    /// and the map's control byte.
+    const ENTRY_BYTES: usize = size_of::<(K, Entry<V>)>() + 1;
+
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
             entries: HashMap::new(),
@@ -94,7 +97,11 @@ impl<K: Eq + Hash, V: Shared> Cache<K, V> {
     }
 
     /// The value kept for `key`, which is now its latest use.
-    pub(super) fn get(&mut self, key: &K) -> Option<V> {
+    pub(super) fn get<Q>(&mut self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
         let entry = self.entries.get_mut(key)?;
         self.clock += 1;
         entry.used = self.clock;
@@ -102,17 +109,23 @@ impl<K: Eq + Hash, V: Shared> Cache<K, V> {
         Some(entry.value.clone())
     }
 
-    /// Keeps `value` for `key`, counted as `size` bytes and its item record.
+    /// Keeps `value` for `key`, counted as `size` and, unless it counts 1
+    /// as an outline does, its item record (`ass_cache.c:440`).
     ///
     /// # Errors
     ///
     /// The budget's errors; the value is then not kept.
     pub(super) fn insert(&mut self, key: K, value: V, size: usize) -> Result<V> {
         let len = self.entries.len().saturating_add(1);
-        self.charge.resize_to(len.saturating_mul(ENTRY_BYTES))?;
+        self.charge
+            .resize_to(len.saturating_mul(Self::ENTRY_BYTES))?;
         self.entries.try_reserve(1).map_err(|_| Error::Allocation)?;
         self.clock += 1;
-        let size = size.saturating_add(ITEM_BYTES);
+        let size = if size == 1 {
+            1
+        } else {
+            size.saturating_add(ITEM_BYTES)
+        };
         self.size = self.size.saturating_add(size);
         let entry = Entry {
             value: value.clone(),
@@ -147,7 +160,7 @@ impl<K: Eq + Hash, V: Shared> Cache<K, V> {
             self.cut_in_order(limit)?;
         }
         self.charge
-            .resize_to(self.entries.len().saturating_mul(ENTRY_BYTES))
+            .resize_to(self.entries.len().saturating_mul(Self::ENTRY_BYTES))
     }
 
     fn cut_in_order(&mut self, limit: usize) -> Result<()> {
@@ -183,8 +196,8 @@ impl<K: Eq + Hash, V: Shared> Cache<K, V> {
             entry.ordered = false;
             entry.value.is_held()
         });
-        order.clear();
-        Ok(())
+        self.order.clear();
+        super::fit(&mut self.order)
     }
 
     /// What libass counts for the entries kept.
@@ -281,6 +294,41 @@ mod tests {
         cache.cut(usize::MAX).unwrap();
         assert_eq!(cache.size(), 0);
         assert!(cache.get(&0).is_none());
+    }
+
+    #[test]
+    fn a_held_bitmap_stays_charged_until_it_is_let_go() {
+        use triergon_raster::{Bitmap, Limits};
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut cache: Cache<u32, Option<Arc<Bitmap>>> = Cache::new(&budget);
+        let empty = budget.used();
+        let bitmap = Bitmap::new(&budget, 64, 64, &Limits::default()).unwrap();
+        let held = cache.insert(0, Some(Arc::new(bitmap)), 64 * 64).unwrap();
+        let charged = budget.used();
+        assert!(charged >= empty + 64 * 64);
+        // Cut to nothing while held: it stays, counted and charged.
+        cache.cut(0).unwrap();
+        assert_eq!(cache.size(), 64 * 64 + ITEM);
+        let used = budget.used();
+        assert!((charged..charged + 128).contains(&used), "{used} {charged}");
+        // Let go, it goes at the next cut, and so do its pixels' charge
+        // and its entry's; the cut keeps a little scratch.
+        drop(held);
+        cache.cut(0).unwrap();
+        assert_eq!(cache.size(), 0);
+        assert!(budget.used() < empty + 128, "{} {empty}", budget.used());
+    }
+
+    #[test]
+    fn an_entry_counted_as_one_takes_no_item_record() {
+        let mut cache = cache();
+        for key in 0..3 {
+            cache.insert(key, Arc::new(key), 1).unwrap();
+        }
+        assert_eq!(cache.size(), 3);
+        cache.cut(2).unwrap();
+        assert!(cache.get(&0).is_none());
+        assert_eq!(cache.size(), 2);
     }
 
     #[test]
