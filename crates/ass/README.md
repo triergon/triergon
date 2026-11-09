@@ -429,4 +429,7 @@ Vertical text (`@` fonts), libass's simple shaping level and hinting modes,
 its selective style override (`ass_set_selective_style_override`; with libass's
 default settings it changes nothing), track features (`ass_track_set_feature`),
 `ass_step_sub`, `ass_configure_prune` (a player calls
-`prune_events`), reading files and charset conversion.
+`prune_events`), reading files and charset conversion. The charmap retry of a
+face selected for a character it does not map is `Error::Unsupported` for faces
+with format 2 or 8 `cmap` subtables and for CFF faces whose Unicode charmap
+FreeType synthesises, whose charmap order `triergon-font` does not reproduce.
