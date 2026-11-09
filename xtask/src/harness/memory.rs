@@ -22,17 +22,6 @@ use crate::stats;
 
 type R<T> = Result<T, String>;
 
-const ALLOCATORS_AND_WRITES: [&str; 8] = [
-    "malloc",
-    "calloc",
-    "realloc",
-    "free",
-    "aligned_alloc",
-    "posix_memalign",
-    "write",
-    "writev",
-];
-
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -573,8 +562,9 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
             .to_owned();
         exports = Value::str(&export_text);
         let names = linux::symbol_versions(&export_text)?;
-        let mut missing: Vec<&str> = ALLOCATORS_AND_WRITES
+        let mut missing: Vec<&str> = linux::ALLOCATORS
             .iter()
+            .chain(&["write", "writev"])
             .chain(&linux::GUARD_ORDER)
             .copied()
             .filter(|n| !names.contains_key(*n))

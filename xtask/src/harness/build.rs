@@ -140,7 +140,7 @@ fn strings(argv: &[String]) -> Value {
     Value::strings(argv.iter().cloned())
 }
 
-fn instrumentation_commands(
+pub(super) fn instrumentation_commands(
     compiler: &str,
     root: &Path,
     out: &Path,
@@ -183,6 +183,8 @@ fn instrumentation_commands(
             p(out.join("memory-check")),
             "-ldl".into(),
             "-pthread".into(),
+            // The probe calibrates libstdc++'s operator new and delete.
+            "-lstdc++".into(),
         ]);
         vec![observer, probe]
     } else {

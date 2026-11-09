@@ -69,7 +69,10 @@
  * pinned absolute path, or the reviewed libc soname in a rejected window.
  *
  * Selected scope: glibc dynamic ELF, one process/thread during the window,
- * six allocator entry points below plus malloc_usable_size for diagnostics.
+ * eight allocator entry points below plus malloc_usable_size for diagnostics.
+ * strdup and strndup are counted as allocations of their own. C++ operator
+ * new and delete are not hooked: the parent certificate admits them only from
+ * one sealed provider whose forwarding to these hooks the probe calibrated.
  * No other preload/allocator, static binary, fork/exec, signal-handler allocation,
  * unreviewed dlopen, custom arenas or unobserved allocation imports are admitted.
  * Inspect imports of BOTH workers and their selected loaded dependency closure;
@@ -179,7 +182,7 @@ enum {
     ERR_SCOPE = 1u << 12
 };
 enum { SYM_MALLOC, SYM_CALLOC, SYM_REALLOC, SYM_FREE,
-       SYM_POSIX, SYM_ALIGNED, SYM_COUNT };
+       SYM_POSIX, SYM_ALIGNED, SYM_STRDUP, SYM_STRNDUP, SYM_COUNT };
 enum { GUARD_MMAP, GUARD_MMAP64, GUARD_MUNMAP, GUARD_PTHREAD_CREATE,
        GUARD_DLOPEN, GUARD_DLMOPEN, GUARD_DLCLOSE, GUARD_COUNT };
 typedef struct { uintptr_t key; size_t size; } Entry;
@@ -753,6 +756,34 @@ void *aligned_alloc(size_t alignment, size_t size) {
     return out;
 }
 
+/* A duplicate is one counted allocation, made and recorded as malloc's are. */
+static char *duplicate(unsigned which, const char *text, size_t length) {
+    char *out;
+    if (resolving) out = boot_allocate(length + 1, _Alignof(max_align_t));
+    else {
+        resolve();
+        int observing = enter(which);
+        out = real_malloc(length + 1);
+        int saved = errno;
+        if (observing) add(out);
+        leave(which, observing, out != NULL);
+        errno = saved;
+    }
+    if (out) {
+        memcpy(out, text, length);
+        out[length] = 0;
+    }
+    return out;
+}
+
+char *strdup(const char *text) {
+    return duplicate(SYM_STRDUP, text, strlen(text));
+}
+
+char *strndup(const char *text, size_t limit) {
+    return duplicate(SYM_STRNDUP, text, strnlen(text, limit));
+}
+
 size_t malloc_usable_size(void *pointer) {
     if (!pointer) return 0;
     if (is_boot(pointer)) {
@@ -961,10 +992,11 @@ __attribute__((destructor)) static void report(void) {
         "\"guard_window_failures\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
         "\"bootstrap_bytes\":%zu,\"bootstrap_allocations\":%zu,"
         "\"entry_capacity\":%u,\"selected_thread_scope\":1,\"glibc\":\"%s\","
-        "\"symbol_order\":[\"malloc\",\"calloc\",\"realloc\",\"free\",\"posix_memalign\",\"aligned_alloc\"],"
-        "\"symbol_attempts\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
-        "\"symbol_successes\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
-        "\"symbol_failures\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "]}\n",
+        "\"symbol_order\":[\"malloc\",\"calloc\",\"realloc\",\"free\",\"posix_memalign\",\"aligned_alloc\","
+        "\"strdup\",\"strndup\"],"
+        "\"symbol_attempts\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
+        "\"symbol_successes\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
+        "\"symbol_failures\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "]}\n",
         mode == 1 ? "heap" : "rss", problems ? "invalid" : "measured",
         peak >= baseline ? peak - baseline : 0, baseline, end_live, window_calls, calls,
         rss_start, rss_peak, rss_end, hwm_start, hwm_end, page_size,
@@ -993,8 +1025,11 @@ __attribute__((destructor)) static void report(void) {
         guard_value(&guard_window_failures[6]),
         boot_used, boot_count, ENTRY_COUNT, gnu_get_libc_version(),
         attempts[0], attempts[1], attempts[2], attempts[3], attempts[4], attempts[5],
+        attempts[6], attempts[7],
         successes[0], successes[1], successes[2], successes[3], successes[4], successes[5],
-        failures[0], failures[1], failures[2], failures[3], failures[4], failures[5]);
+        successes[6], successes[7],
+        failures[0], failures[1], failures[2], failures[3], failures[4], failures[5],
+        failures[6], failures[7]);
     if (length < 0 || (size_t)length >= sizeof(report_buffer)) fatal();
     int fd = (int)syscall(SYS_openat, AT_FDCWD, destination,
                          O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
@@ -1077,7 +1112,26 @@ int main(void) {
         enabled = 0;
         atomic_store_explicit(&errors, saved_errors, memory_order_relaxed);
     }
-    static const char passed[] = "{\"source_selftest\":\"pass\",\"checks\":36}\n";
+    /* Each duplicate is counted at its usable size, raises the window peak and
+     * is released by free. */
+    memset(entries, 0, sizeof(entries));
+    window_tid = (pid_t)syscall(SYS_gettid);
+    enabled = 1;
+    active = 1;
+    baseline = peak = live;
+    char *copy = strdup("triergon");
+    char *prefix = strndup("triergon", 3);
+    uint64_t counted = copy && prefix ? real_usable_size(copy) + real_usable_size(prefix) : 0;
+    okay &= copy && !strcmp(copy, "triergon") && successes[SYM_STRDUP] == 1;
+    okay &= prefix && !strcmp(prefix, "tri") && successes[SYM_STRNDUP] == 1;
+    okay &= counted && live == baseline + counted && peak == live;
+    free(copy);
+    free(prefix);
+    okay &= live == baseline &&
+            atomic_load_explicit(&errors, memory_order_relaxed) == saved_errors;
+    active = 0;
+    enabled = 0;
+    static const char passed[] = "{\"source_selftest\":\"pass\",\"checks\":40}\n";
     static const char failed[] = "{\"source_selftest\":\"fail\"}\n";
     (void)write_all(STDOUT_FILENO, okay ? passed : failed,
                     okay ? sizeof(passed) - 1 : sizeof(failed) - 1);

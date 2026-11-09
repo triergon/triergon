@@ -309,7 +309,12 @@ Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
 (`harness/allocations*.c`), including the Linux link-closure and active-window guard
-certificates. The report records the build identity, source provenance digest and input
+certificates. The observers count `malloc`, `calloc`, `realloc`, `free`,
+`posix_memalign`, `aligned_alloc`, `strdup` and `strndup`. On Linux a worker is
+measured only if every allocation entry point it and its libraries import is one of
+these, a guarded one, an operator `new` or `delete` form that exactly one library of
+the closure defines and the probe called at the same version, or a weak import that
+nothing defines. The report records the build identity, source provenance digest and input
 hashes it was measured with; when a result is cited, its source revision and raw-sample
 SHA-256 go in the [measured revisions](status.md#measured-revisions) table. `cargo xtask compare` compares a single input, `cargo xtask external-vector`
 qualifies the mandatory external vector and `cargo xtask fate-run` runs one supported

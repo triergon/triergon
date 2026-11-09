@@ -19,13 +19,17 @@ use super::diff::equal;
 use crate::json::{self, Value};
 use crate::sha256;
 
-pub const ALLOCATORS: [&str; 6] = [
+/// The entry points the observer hooks, in its receipts' `symbol_order`.
+/// Receipts from before the two string hooks list the first six.
+pub const ALLOCATORS: [&str; 8] = [
     "malloc",
     "calloc",
     "realloc",
     "free",
-    "aligned_alloc",
     "posix_memalign",
+    "aligned_alloc",
+    "strdup",
+    "strndup",
 ];
 pub const GUARD_ORDER: [&str; 7] = [
     "mmap",
@@ -139,6 +143,33 @@ fn allocation_name(name: &str) -> bool {
         || ["_Zn", "_ZN", "_Zd", "_ZD"]
             .iter()
             .any(|p| name.starts_with(p))
+}
+
+/// C++'s replaceable allocation functions: every form of operator new and
+/// delete (`_Znw`, `_Zna`, `_Zdl`, `_Zda`).
+fn replaceable(name: &str) -> bool {
+    ["_Znw", "_Zna", "_Zdl", "_Zda"]
+        .iter()
+        .any(|p| name.starts_with(p))
+}
+
+/// Names a GNU nm listing imports only as weak (`w` or `v`) references.
+fn weak_only(listing: &str) -> BTreeSet<String> {
+    let (mut weak, mut strong) = (BTreeSet::new(), BTreeSet::new());
+    for fields in listing
+        .lines()
+        .map(|l| l.split_whitespace().collect::<Vec<_>>())
+    {
+        if let [symbol, kind, ..] = fields[..] {
+            let name = symbol.split('@').next().unwrap_or_default().to_owned();
+            if matches!(kind, "w" | "v") {
+                weak.insert(name);
+            } else {
+                strong.insert(name);
+            }
+        }
+    }
+    weak.difference(&strong).cloned().collect()
 }
 
 /// Raw undefined symbols and the allocator entry points among them; a name not
@@ -842,22 +873,15 @@ pub fn valid_receipt(data: &Value, mode: &str) -> bool {
             && n("recursive_calls") == Some(0)
             && n("selected_thread_scope") == Some(1)
             && data.get("glibc").is_some_and(Value::truthy)
-            && data.get("symbol_order").is_some_and(|o| {
-                equal(
-                    o,
-                    &Value::strings([
-                        "malloc",
-                        "calloc",
-                        "realloc",
-                        "free",
-                        "posix_memalign",
-                        "aligned_alloc",
-                    ]),
-                )
+            && [6, ALLOCATORS.len()].into_iter().any(|hooks| {
+                data.get("symbol_order")
+                    .is_some_and(|o| equal(o, &Value::strings(ALLOCATORS[..hooks].iter().copied())))
+                    && ["symbol_attempts", "symbol_successes", "symbol_failures"]
+                        .iter()
+                        .all(|k| {
+                            ints(data.get(k), hooks).is_some_and(|v| v.iter().all(|x| *x >= 0))
+                        })
             })
-            && ["symbol_attempts", "symbol_successes", "symbol_failures"]
-                .iter()
-                .all(|k| ints(data.get(k), 6).is_some_and(|v| v.iter().all(|x| *x >= 0)))
             && numeric.iter().all(|k| n(k).is_some_and(|v| v >= 0));
         if !ok {
             return Some(false);
@@ -1318,9 +1342,12 @@ pub fn certificate_valid(
         .is_ok_and(|again| equal(&again, certificate))
 }
 
-/// Coverage of otherwise uncovered imports by the certified guard (public
-/// guarded entry points at tested versions) or by the sealed libc's private
-/// TLS imports.
+/// Coverage of otherwise uncovered imports, from the certificate's sealed
+/// evidence: the guard (public guarded entry points at tested versions), the
+/// sealed libc's private TLS imports, an operator new or delete form defined
+/// by exactly one sealed object and calibrated by the probe at the imported
+/// versions (the probe's exact peak shows it reaches the hooks), and a weak
+/// import no sealed object defines, which resolves to null.
 pub fn conditional_coverage(
     parsed: &Value,
     owner: &Value,
@@ -1394,6 +1421,59 @@ pub fn conditional_coverage(
                         ]),
                     );
                 }
+            }
+        }
+        let evidence = certificate.get("binding_evidence").unwrap_or(&Value::Null);
+        let exports: Vec<(&str, BTreeMap<String, BTreeSet<String>>)> =
+            match evidence.get("defined_objects") {
+                Some(Value::Object(objects)) => objects
+                    .iter()
+                    .map(|(path, raw)| {
+                        let listing = raw.as_str().unwrap_or_default();
+                        (path.as_str(), symbol_versions(listing).unwrap_or_default())
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            };
+        let providers = |name: &str| -> Vec<(&str, &BTreeSet<String>)> {
+            exports
+                .iter()
+                .filter_map(|(path, symbols)| symbols.get(name).map(|v| (*path, v)))
+                .collect()
+        };
+        let calibrated =
+            symbol_versions(s(evidence, "probe_undefined").unwrap_or_default()).unwrap_or_default();
+        let observer = s(evidence, "observer_path").unwrap_or_default();
+        for name in uncovered.iter().filter(|n| replaceable(n)) {
+            let (Some(imported), Some(tested)) = (versions.get(name), calibrated.get(name)) else {
+                continue;
+            };
+            if let [(provider, defined)] = providers(name)[..]
+                && provider != observer
+                && !imported.is_empty()
+                && imported.is_subset(tested)
+                && tested.is_subset(defined)
+            {
+                covered.insert(
+                    name.clone(),
+                    Value::object([
+                        ("method", Value::str("calibrated-sole-provider")),
+                        ("provider", Value::str(provider)),
+                        ("certificate", sha.clone()),
+                    ]),
+                );
+            }
+        }
+        let weak = weak_only(s(parsed, "raw_listing").unwrap_or_default());
+        for name in uncovered.iter().filter(|n| weak.contains(*n)) {
+            if !covered.contains_key(name) && providers(name).is_empty() {
+                covered.insert(
+                    name.clone(),
+                    Value::object([
+                        ("method", Value::str("unresolved-weak-import")),
+                        ("certificate", sha.clone()),
+                    ]),
+                );
             }
         }
     }

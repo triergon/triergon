@@ -20,8 +20,11 @@
  * assertions apply only to admitted positive modes, not rejected private-TLS
  * guard windows. All original eleven mode definitions are preserved.
  * Positive heap cases: default/writev/failures/zero/transient. Check exact
- * expected_peak_bytes, window_allocation_calls, nonzero hits for all six
- * selected symbols in default, and live_end == live_start. Allocation sizes
+ * expected_peak_bytes, window_allocation_calls, nonzero hits for all eight
+ * selected symbols in default, and live_end == live_start. On Linux every mode
+ * also allocates through all eight C++ operator new forms and releases through
+ * all twelve operator delete forms, held live together, so each one's bytes
+ * must be in the exact peak: the calibration that admits them unhooked. Allocation sizes
  * use the native diagnostic API, not allocator rounding guesses. This probe
  * computes the caller-visible simultaneous live peak independently of the
  * observer's table. It never writes diagnostic usable-size slack.
@@ -74,6 +77,44 @@ static size_t usable(void *pointer) { return pointer ? malloc_size(pointer) : 0;
 static size_t usable(void *pointer) { return pointer ? malloc_usable_size(pointer) : 0; }
 #else
 #error "memory-check needs a reviewed native usable-size diagnostic API"
+#endif
+
+#if defined(__linux__)
+/* libstdc++'s replaceable allocation functions by their mangled names (Itanium
+ * ABI: a reference is a pointer, std::align_val_t a size_t, and size_t is 'm'
+ * on LP64 and 'j' on ILP32). The probe links libstdc++ for them. */
+#if SIZE_MAX == UINT64_MAX
+#define CXX_SIZE "m"
+#else
+#define CXX_SIZE "j"
+#endif
+typedef struct { char unused; } NoThrow;
+extern const NoThrow cxx_nothrow __asm__("_ZSt7nothrow");
+void *cxx_new(size_t) __asm__("_Znw" CXX_SIZE);
+void *cxx_new_array(size_t) __asm__("_Zna" CXX_SIZE);
+void *cxx_new_nothrow(size_t, const NoThrow *) __asm__("_Znw" CXX_SIZE "RKSt9nothrow_t");
+void *cxx_new_array_nothrow(size_t, const NoThrow *) __asm__("_Zna" CXX_SIZE "RKSt9nothrow_t");
+void *cxx_new_aligned(size_t, size_t) __asm__("_Znw" CXX_SIZE "St11align_val_t");
+void *cxx_new_array_aligned(size_t, size_t) __asm__("_Zna" CXX_SIZE "St11align_val_t");
+void *cxx_new_aligned_nothrow(size_t, size_t, const NoThrow *)
+    __asm__("_Znw" CXX_SIZE "St11align_val_tRKSt9nothrow_t");
+void *cxx_new_array_aligned_nothrow(size_t, size_t, const NoThrow *)
+    __asm__("_Zna" CXX_SIZE "St11align_val_tRKSt9nothrow_t");
+void cxx_delete(void *) __asm__("_ZdlPv");
+void cxx_delete_array(void *) __asm__("_ZdaPv");
+void cxx_delete_sized(void *, size_t) __asm__("_ZdlPv" CXX_SIZE);
+void cxx_delete_array_sized(void *, size_t) __asm__("_ZdaPv" CXX_SIZE);
+void cxx_delete_nothrow(void *, const NoThrow *) __asm__("_ZdlPvRKSt9nothrow_t");
+void cxx_delete_array_nothrow(void *, const NoThrow *) __asm__("_ZdaPvRKSt9nothrow_t");
+void cxx_delete_aligned(void *, size_t) __asm__("_ZdlPvSt11align_val_t");
+void cxx_delete_array_aligned(void *, size_t) __asm__("_ZdaPvSt11align_val_t");
+void cxx_delete_sized_aligned(void *, size_t, size_t) __asm__("_ZdlPv" CXX_SIZE "St11align_val_t");
+void cxx_delete_array_sized_aligned(void *, size_t, size_t)
+    __asm__("_ZdaPv" CXX_SIZE "St11align_val_t");
+void cxx_delete_aligned_nothrow(void *, size_t, const NoThrow *)
+    __asm__("_ZdlPvSt11align_val_tRKSt9nothrow_t");
+void cxx_delete_array_aligned_nothrow(void *, size_t, const NoThrow *)
+    __asm__("_ZdaPvSt11align_val_tRKSt9nothrow_t");
 #endif
 
 static uint64_t peak, live, allocation_calls;
@@ -246,10 +287,14 @@ static void add(void *pointer, size_t requested) {
     for (size_t n = 0; n < requested; ++n) bytes[n] = 1;
 }
 
-static void drop(void *pointer) {
+static void forget(void *pointer) {
     size_t size = usable(pointer);
     if (size > live) exit(3);
     live -= size;
+}
+
+static void drop(void *pointer) {
+    forget(pointer);
 #if defined(__linux__)
     int saved = errno;
 #endif
@@ -257,6 +302,65 @@ static void drop(void *pointer) {
 #if defined(__linux__)
     if (errno != saved) exit(5);
 #endif
+}
+
+/* strdup and strndup, hooked allocations with their own counters, and on
+ * Linux every operator new form. All are held live through the window's peak
+ * and released before END, the C++ ones through every operator delete form:
+ * an uncounted allocation lowers the observed peak and its release is an
+ * unknown pointer, so each must be counted for the receipt to match. */
+enum { BYTES = 4000, ALIGNMENT = 64 };
+static char *copy, *prefix;
+#if defined(__linux__)
+static void *cxx[16];
+#endif
+
+static void hold_other_forms(void) {
+    copy = strdup("triergon");
+    prefix = strndup("triergon", 3);
+    if (!copy || !prefix || strcmp(copy, "triergon") || strcmp(prefix, "tri")) exit(5);
+    add(copy, 9);
+    add(prefix, 4);
+#if defined(__linux__)
+    for (int n = 0; n < 3; ++n) {
+        cxx[n] = cxx_new(BYTES);
+        cxx[4 + n] = cxx_new_array(BYTES);
+        cxx[8 + n] = cxx_new_aligned(BYTES, ALIGNMENT);
+        cxx[12 + n] = cxx_new_array_aligned(BYTES, ALIGNMENT);
+    }
+    cxx[3] = cxx_new_nothrow(BYTES, &cxx_nothrow);
+    cxx[7] = cxx_new_array_nothrow(BYTES, &cxx_nothrow);
+    cxx[11] = cxx_new_aligned_nothrow(BYTES, ALIGNMENT, &cxx_nothrow);
+    cxx[15] = cxx_new_array_aligned_nothrow(BYTES, ALIGNMENT, &cxx_nothrow);
+    for (int n = 0; n < 16; ++n) {
+        if (n >= 8 && (uintptr_t)cxx[n] % ALIGNMENT) exit(5);
+        add(cxx[n], BYTES);
+    }
+#endif
+}
+
+static void release_other_forms(void) {
+#if defined(__linux__)
+    for (int n = 0; n < 16; ++n) forget(cxx[n]);
+    cxx_delete(cxx[0]);
+    cxx_delete_sized(cxx[1], BYTES);
+    cxx_delete_nothrow(cxx[2], &cxx_nothrow);
+    cxx_delete(cxx[3]);
+    cxx_delete_array(cxx[4]);
+    cxx_delete_array_sized(cxx[5], BYTES);
+    cxx_delete_array_nothrow(cxx[6], &cxx_nothrow);
+    cxx_delete_array(cxx[7]);
+    cxx_delete_aligned(cxx[8], ALIGNMENT);
+    cxx_delete_sized_aligned(cxx[9], BYTES, ALIGNMENT);
+    cxx_delete_aligned_nothrow(cxx[10], ALIGNMENT, &cxx_nothrow);
+    cxx_delete_aligned(cxx[11], ALIGNMENT);
+    cxx_delete_array_aligned(cxx[12], ALIGNMENT);
+    cxx_delete_array_sized_aligned(cxx[13], BYTES, ALIGNMENT);
+    cxx_delete_array_aligned_nothrow(cxx[14], ALIGNMENT, &cxx_nothrow);
+    cxx_delete_array_aligned(cxx[15], ALIGNMENT);
+#endif
+    drop(prefix);
+    drop(copy);
 }
 
 static int raw_write(const void *buffer, size_t count) {
@@ -373,6 +477,7 @@ int main(int argc, char **argv) {
     void *d = aligned_alloc(256, 131072);
     if ((uintptr_t)d % 256) return 3;
     add(d, 131072);
+    hold_other_forms();
 
     size_t temporary_size = selected == 4 ? 32u * 1024u * 1024u : 4u * 1024u * 1024u;
     void *temporary = malloc(temporary_size);
@@ -407,6 +512,7 @@ int main(int argc, char **argv) {
     if (selected >= MODE_MMAP && selected < MODE_SCOPE_STARTUP &&
         !guard_operation(selected, &scope_control)) return 5;
 #endif
+    release_other_forms();
     drop(d);
     drop(c);
     drop(b);

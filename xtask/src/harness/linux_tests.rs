@@ -522,11 +522,157 @@ fn allocator_imports_keep_raw_versions_and_flag_uncovered_entry_points() {
     );
     assert_eq!(
         parsed.get("uncovered"),
-        Some(&Value::strings(["_Znwm", "clone", "mmap64", "strdup"]))
+        Some(&Value::strings(["_Znwm", "clone", "mmap64"]))
     );
     assert!(linux::allocator_symbols("malloc X\n", true).is_err());
-    let darwin = linux::allocator_symbols("_malloc\n_free\n  _strdup  \n_read\n", false).unwrap();
-    assert_eq!(darwin.get("uncovered"), Some(&Value::strings(["strdup"])));
+    let darwin =
+        linux::allocator_symbols("_malloc\n_free\n  _strdup  \n_valloc\n_read\n", false).unwrap();
+    assert_eq!(darwin.get("uncovered"), Some(&Value::strings(["valloc"])));
+}
+
+/// What remains uncovered of a worker's `listing` under `certificate`.
+fn remaining(f: &Fixture, listing: &str, certificate: Option<&Value>) -> Value {
+    let parsed = linux::allocator_symbols(listing, true).unwrap();
+    linux::conditional_coverage(
+        &parsed,
+        &v("{}"),
+        certificate,
+        &f.linked,
+        Some(&f.observer),
+        Some(&f.probe),
+    )
+    .get("remaining_uncovered")
+    .cloned()
+    .unwrap()
+}
+
+/// Appends `lines` to the export or import transcript at `path` in the bindings.
+fn extend(f: &mut Fixture, path: &[&str], key: &str, lines: &str) {
+    let mut node = &f.bindings;
+    for step in path {
+        node = node.get(step).unwrap();
+    }
+    let text = format!(
+        "{}\n{lines}",
+        node.get(key).and_then(Value::as_str).unwrap()
+    );
+    set(&mut f.bindings, path, key, Value::str(text));
+}
+
+#[test]
+fn operator_new_and_delete_are_covered_from_one_calibrated_provider() {
+    let libc = "/sealed/libc.so.6";
+    let mut f = fixture();
+    extend(
+        &mut f,
+        &[],
+        "probe_undefined",
+        "_Znwm@GLIBCXX_3.4 U\n_ZdlPvm@CXXABI_1.3.9 U",
+    );
+    extend(
+        &mut f,
+        &["defined_objects"],
+        libc,
+        "_Znwm@@GLIBCXX_3.4 T 100 20\n_ZdlPvm@@CXXABI_1.3.9 T 100 20\n\
+         _ZnwmSt11align_val_t@@CXXABI_1.3.11 T 100 20",
+    );
+    let certificate = f.certify().unwrap();
+    let listing = "_Znwm@GLIBCXX_3.4 U\n_ZdlPvm@CXXABI_1.3.9 U\nmalloc@GLIBC_2.17 U\n";
+    assert_eq!(
+        remaining(&f, listing, Some(&certificate)),
+        Value::strings::<&str>([])
+    );
+    // Without a certificate, a form the probe never called, or a version it
+    // did not call, nothing is covered.
+    assert_eq!(
+        remaining(&f, listing, None),
+        Value::strings(["_ZdlPvm", "_Znwm"])
+    );
+    assert_eq!(
+        remaining(
+            &f,
+            "_ZnwmSt11align_val_t@CXXABI_1.3.11 U\n",
+            Some(&certificate)
+        ),
+        Value::strings(["_ZnwmSt11align_val_t"])
+    );
+    assert_eq!(
+        remaining(&f, "_Znwm@GLIBCXX_UNTESTED U\n", Some(&certificate)),
+        Value::strings(["_Znwm"])
+    );
+    // A second sealed definition could take the worker's binding.
+    extend(
+        &mut f,
+        &["defined_objects"],
+        "/sealed/ld-linux-aarch64.so.1",
+        "_Znwm@@GLIBCXX_3.4 T 100 20",
+    );
+    let certificate = f.certify().unwrap();
+    assert_eq!(
+        remaining(&f, listing, Some(&certificate)),
+        Value::strings(["_Znwm"])
+    );
+}
+
+#[test]
+fn only_a_weak_import_nothing_defines_is_covered() {
+    let hook = "_ZN9__gnu_cxx21zoneinfo_dir_overrideEv";
+    let mut f = fixture();
+    let certificate = f.certify().unwrap();
+    let weak = format!("{hook} w\nfree@GLIBC_2.17 U\n");
+    assert_eq!(
+        remaining(&f, &weak, Some(&certificate)),
+        Value::strings::<&str>([])
+    );
+    assert_eq!(remaining(&f, &weak, None), Value::strings([hook]));
+    assert_eq!(
+        remaining(&f, &format!("{hook} U\n"), Some(&certificate)),
+        Value::strings([hook])
+    );
+    assert_eq!(
+        remaining(&f, &format!("{hook} w\n{hook} U\n"), Some(&certificate)),
+        Value::strings([hook])
+    );
+    extend(
+        &mut f,
+        &["defined_objects"],
+        "/sealed/libc.so.6",
+        &format!("{hook} T 100 20"),
+    );
+    let certificate = f.certify().unwrap();
+    assert_eq!(
+        remaining(&f, &weak, Some(&certificate)),
+        Value::strings([hook])
+    );
+}
+
+#[test]
+fn receipts_list_eight_hooks_or_the_original_six() {
+    let eight = |data: &mut Value| {
+        set(data, &[], "symbol_order", Value::strings(linux::ALLOCATORS));
+        for key in ["symbol_attempts", "symbol_successes", "symbol_failures"] {
+            set(data, &[], key, Value::Array(vec![Value::int(1); 8]));
+        }
+    };
+    let mut data = receipt("heap");
+    assert!(linux::valid_receipt(&data, "heap"));
+    eight(&mut data);
+    assert!(linux::valid_receipt(&data, "heap"));
+    set(
+        &mut data,
+        &[],
+        "symbol_failures",
+        Value::Array(vec![Value::int(0); 6]),
+    );
+    assert!(!linux::valid_receipt(&data, "heap"));
+    let mut data = receipt("heap");
+    set(
+        &mut data,
+        &[],
+        "symbol_order",
+        Value::strings(linux::ALLOCATORS[..7].iter().copied()),
+    );
+    assert!(!linux::valid_receipt(&data, "heap"));
 }
 
 /// A Linux v2 observer receipt with every provenance field.
@@ -1119,5 +1265,69 @@ fn a_shared_object_resolves_with_the_given_interpreter() {
     assert!(linux::linked_libraries(&object, None).is_err());
     let linked = linux::linked_libraries(&object, Some(interpreter)).unwrap();
     assert_eq!(linked.get("interpreter"), Some(&Value::str(interpreter)));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// The observer and probe as `build-workers` builds them: the probe's exact
+/// heap peak, which every hook and all twenty operator new and delete forms
+/// contribute to while held live together, is the observer's.
+#[cfg(target_os = "linux")]
+#[test]
+fn the_built_observer_counts_every_hook_and_operator_new_form() {
+    use std::process::Command;
+    let dir = crate::walk::scratch("observer-probe");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap();
+    for argv in super::build::instrumentation_commands("cc", root, &dir, true) {
+        assert!(
+            Command::new(&argv[0])
+                .args(&argv[1..])
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    let imports = Command::new("nm")
+        .args(["-D", "--undefined-only", "--format=posix"])
+        .arg(dir.join("memory-check"))
+        .output()
+        .unwrap();
+    let forms = String::from_utf8(imports.stdout)
+        .unwrap()
+        .lines()
+        .filter(|l| {
+            ["_Znw", "_Zna", "_Zdl", "_Zda"]
+                .iter()
+                .any(|p| l.starts_with(p))
+        })
+        .count();
+    assert_eq!(forms, 20);
+    let receipt = dir.join("heap.json");
+    let run = Command::new(dir.join("memory-check"))
+        .env("LD_PRELOAD", dir.join("allocations.so"))
+        .env("TRIERGON_ALLOCATION_REPORT", &receipt)
+        .env("TRIERGON_MEMORY_MODE", "heap")
+        .output()
+        .unwrap();
+    assert!(run.status.success());
+    let stdout = String::from_utf8(run.stdout).unwrap();
+    let work = v(stdout.lines().last().unwrap());
+    let data = v(&std::fs::read_to_string(&receipt).unwrap());
+    assert!(linux::valid_receipt(&data, "heap"), "{stdout}");
+    assert_eq!(data.get("heap_peak_bytes"), work.get("expected_peak_bytes"));
+    assert_eq!(data.get("heap_live_end"), data.get("heap_live_start"));
+    assert_eq!(
+        data.get("symbol_order"),
+        Some(&Value::strings(linux::ALLOCATORS))
+    );
+    let hits = data
+        .get("symbol_successes")
+        .and_then(Value::as_array)
+        .unwrap();
+    assert!(
+        hits.iter()
+            .all(|n| linux::py_int(Some(n)).is_some_and(|n| n > 0))
+    );
     std::fs::remove_dir_all(dir).unwrap();
 }
