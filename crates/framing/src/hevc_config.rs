@@ -222,6 +222,7 @@ enum Phase {
     ReserveArrays,
     ReserveNals,
     Fill,
+    FillInline(u8),
     Complete,
 }
 
@@ -316,10 +317,11 @@ impl<T> DescriptorStorage<T> {
 }
 
 /// One externally framed, immutable, same-pool hvcC record without a box header.
-/// Two resumable grammar walks validate/count and then fill inline or charged
-/// heap descriptors. Source bytes, including unknown NAL bodies, all arrays and any
-/// suffix, are retained without rewriting. Fixed-header validity is distinct
-/// from array/type/reserved-pattern issues and from decoder validity.
+/// A resumable grammar walk validates the record and fills descriptors when both
+/// tables fit inline. A second walk fills the tables when either needs charged
+/// heap storage. Source bytes, including unknown NAL bodies, all arrays and any
+/// suffix, are retained without rewriting. Fixed-header validity is distinct from
+/// array/type/reserved-pattern issues and from decoder validity.
 pub struct HvcConfigParser {
     raw: Option<Bytes>,
     source: HvcConfigSource,
@@ -478,6 +480,10 @@ impl HvcConfigParser {
         result
     }
 
+    fn tables_fit_inline(&self) -> bool {
+        usize::from(self.scan.array_count) <= INLINE_DESCRIPTORS && self.total <= INLINE_DESCRIPTORS
+    }
+
     #[inline(never)]
     fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ConfigProgress> {
         loop {
@@ -512,16 +518,21 @@ impl HvcConfigParser {
                 }
                 Phase::Count | Phase::Fill => {
                     // Commit scan state only after the event's work succeeds.
+                    let filling = matches!(self.phase, Phase::Fill);
                     let mut next = self.scan;
                     let event = next.next(raw.as_ref(), self.limits)?;
                     match event {
                         Event::Array { header, count } => {
-                            if matches!(self.phase, Phase::Count) {
-                                let total = self.total.checked_add(count).ok_or(Error::Overflow)?;
+                            let first = if filling {
+                                self.nals.as_ref().map_or(0, DescriptorStorage::len)
+                            } else {
+                                let first = self.total;
+                                let total = first.checked_add(count).ok_or(Error::Overflow)?;
                                 check_limit(total, self.limits.maximum_nals)?;
                                 self.total = total;
-                            } else {
-                                let first = self.nals.as_ref().map_or(0, DescriptorStorage::len);
+                                first
+                            };
+                            if filling || self.tables_fit_inline() {
                                 self.arrays
                                     .as_mut()
                                     .ok_or(Error::Invalid("missing hvcC descriptors"))?
@@ -532,7 +543,7 @@ impl HvcConfigParser {
                             length,
                             payload,
                             header,
-                        } if matches!(self.phase, Phase::Fill) => {
+                        } if filling || self.tables_fit_inline() => {
                             self.nals
                                 .as_mut()
                                 .ok_or(Error::Invalid("missing hvcC descriptors"))?
@@ -544,7 +555,7 @@ impl HvcConfigParser {
                                     next.declared_type,
                                 ))?;
                         }
-                        Event::ArrayEnd(end) if matches!(self.phase, Phase::Fill) => {
+                        Event::ArrayEnd(end) if filling || self.tables_fit_inline() => {
                             let array = self
                                 .arrays
                                 .as_mut()
@@ -560,7 +571,7 @@ impl HvcConfigParser {
                             array.range.end = end;
                         }
                         Event::End(end) => {
-                            if matches!(self.phase, Phase::Count) {
+                            if !filling {
                                 self.understood_end = end;
                                 // Detect an intrinsically impossible live-set without
                                 // blaming caller retention. Capacity is charged by
@@ -598,10 +609,18 @@ impl HvcConfigParser {
                     self.scan = next;
                 }
                 Phase::ReserveArrays => {
-                    self.arrays
+                    let arrays = self
+                        .arrays
                         .as_mut()
-                        .ok_or(Error::Invalid("missing hvcC descriptors"))?
-                        .reserve(raw.budget(), usize::from(self.scan.array_count))?;
+                        .ok_or(Error::Invalid("missing hvcC descriptors"))?;
+                    arrays.reserve(raw.budget(), usize::from(self.scan.array_count))?;
+                    if self.total > INLINE_DESCRIPTORS
+                        && let DescriptorStorage::Inline { len, .. } = arrays
+                    {
+                        // Only NALs spill. The fill walk rebuilds any cached
+                        // array prefix, while NAL reservation replaces its cache.
+                        *len = 0;
+                    }
                     self.phase = Phase::ReserveNals;
                 }
                 Phase::ReserveNals => {
@@ -609,8 +628,21 @@ impl HvcConfigParser {
                         .as_mut()
                         .ok_or(Error::Invalid("missing hvcC descriptors"))?
                         .reserve(raw.budget(), self.total)?;
-                    self.scan = Scan::new(self.scan.array_count);
-                    self.phase = Phase::Fill;
+                    if self.tables_fit_inline() {
+                        // Retain one charged checkpoint per array start, NAL,
+                        // array end and record end, even across short steps.
+                        let events = 2 * usize::from(self.scan.array_count) + self.total + 1;
+                        self.phase = Phase::FillInline(events as u8);
+                    } else {
+                        self.scan = Scan::new(self.scan.array_count);
+                        self.phase = Phase::Fill;
+                    }
+                }
+                Phase::FillInline(ref mut remaining) => {
+                    *remaining -= 1;
+                    if *remaining == 0 {
+                        return Ok(ConfigProgress::Ready);
+                    }
                 }
                 Phase::Complete => return Ok(ConfigProgress::Complete),
             }

@@ -961,6 +961,55 @@ fn avc_cached_fill_boundary_matches_fallback_output_and_work() {
 }
 
 #[test]
+fn hevc_late_nal_spill_preserves_the_array_prefix_after_backpressure() {
+    let vps = hvc_nal(32, 9);
+    let sps = hvc_nal(33, 7);
+    let record = hvc_record(
+        4,
+        &[(32, vec![vps.clone(); 4]), (33, vec![sps.clone()])],
+        &[0xe7],
+    );
+    let pool = Budget::new(4096).unwrap();
+    let baseline = pool.used();
+    let mut parser =
+        HvcConfigParser::new(&pool, hvc_source(), bytes(&pool, &record), hvc_limits()).unwrap();
+    let blocker = bytes(
+        &pool,
+        &vec![0; pool.available() - Bytes::owner_overhead_bytes()],
+    );
+    assert_eq!(pool.available(), 0);
+
+    // Prefix, two array starts and ends, five NALs, record end, array reservation.
+    let mut work = WorkBudget::new(12);
+    assert!(matches!(parser.step(&mut work, &NO), Ok(BuildStep::Yield)));
+    assert_eq!(work.remaining(), 0);
+    let mut work = WorkBudget::new(1);
+    assert!(matches!(
+        parser.step(&mut work, &NO),
+        Err(Error::Backpressure { available: 0, .. })
+    ));
+    assert_eq!(work.remaining(), 0);
+    drop(blocker);
+
+    let (trace, result) = run(&mut parser, 11);
+    assert_eq!(trace, [("ready", 0)]);
+    let config = result.unwrap();
+    assert_eq!(config.array_count(), 2);
+    assert_eq!(config.array(0).unwrap().nal_indices(), 0..4);
+    assert_eq!(config.array(1).unwrap().nal_indices(), 4..5);
+    assert_eq!(config.nal_count(), 5);
+    assert!(config.nals().take(4).all(|n| n.source_bytes() == vps));
+    assert_eq!(config.nal(4).unwrap().source_bytes(), sps);
+    assert_eq!(config.opaque_suffix(), [0xe7]);
+    assert_eq!(
+        pool.used(),
+        baseline + config.retained_storage_bytes().unwrap()
+    );
+    drop(config);
+    assert_eq!(pool.used(), baseline);
+}
+
+#[test]
 fn permanent_failures_and_limits_latch_and_release() {
     let rich = avc_rich();
     // Late physical truncation, zero NAL length and a bad fixed NAL header.
