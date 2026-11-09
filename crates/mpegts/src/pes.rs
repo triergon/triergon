@@ -315,7 +315,9 @@ impl PesAssembler {
         self.ended = true;
     }
     pub fn partial_header(&self) -> &[u8] {
-        &self.raw_header[..self.header_used]
+        self.header
+            .as_ref()
+            .map_or(&self.raw_header[..self.header_used], PesHeader::as_bytes)
     }
     pub(crate) fn pending_header_location(&self) -> Option<SourceLocation> {
         self.header_ranges
@@ -497,11 +499,18 @@ impl PesAssembler {
                 .ok_or(Error::Overflow)?,
             bytes: used,
         };
-        let merge = prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
+        let merge = match prepare_range(&mut self.header_ranges, extent, self.limits.source_spans) {
+            Err(error @ Error::Backpressure { .. }) => {
+                self.record_blocked_header_growth()?;
+                return Err(error);
+            }
+            result => result?,
+        };
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
         commit_range(&mut self.header_ranges, extent, merge)?;
+        self.span_growth = SpanGrowth::Credit(0);
         work.take(used as u64 + 3);
         self.header_used = used;
         self.header_target = used;
@@ -740,7 +749,7 @@ impl PesAssembler {
                 continue;
             }
             if self.header.is_none() {
-                if !RETAIN && self.header_used == 0 && self.complete_timed_header(work, cancel)? {
+                if self.header_used == 0 && self.complete_timed_header(work, cancel)? {
                     continue;
                 }
                 let pending = self
