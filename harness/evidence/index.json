@@ -16776,6 +16776,16 @@
    "sha256": "e002f09354010e50a0f5d43fdd084bcc9f9306350f662c57f041462e9e8e8550",
    "bytes": 788,
    "source_revision": "5380ca22cd06eb1b9e12eaab126c7b762f04b8c1"
+  },
+  {
+   "name": "mp4-range-dedicated-sample-entries",
+   "path": "mp4-range-dedicated-sample-entries",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mp4-range-dedicated-sample-entries/46789d11f9768aef71eead36ce8f2acc05c820abc95e19b4a3ffb36a09e9e71f.tar.gz",
+   "sha256": "46789d11f9768aef71eead36ce8f2acc05c820abc95e19b4a3ffb36a09e9e71f",
+   "bytes": 14900870,
+   "source_revision": "668ecf58571fd19eb7e9aba4020606b409229625"
   }
  ]
 }
