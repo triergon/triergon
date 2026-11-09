@@ -16850,6 +16850,12 @@
    "sha256": "48a28a728709ff0354a588a73e511ae6db3e0e3b01b362a352e407fd31da38aa",
    "bytes": 4889147,
    "source_revision": "a690f0f7fe7db02b64c2506e57e7a1526b3f092a"
+  },
+  {
+   "name": "mp4-fragmented-range-rebased",
+   "retention": "90 days",
+   "key": "qualification/mp4-fragmented-range-rebased/824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da.tar.zst",
+   "sha256": "824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da"
   }
  ]
 }

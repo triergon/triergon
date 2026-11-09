@@ -167,6 +167,7 @@ the default font file during 12 cases' operations; those mappings count toward i
 | MP4 range playback, fragments | `a2f009026bc53be3757a9064247fb4e3ace80e0b` | `d95f142f73c0790d211f30d7de613f734f68409eb3015c7d48905c3c5e542105` |
 | MP4 range playback, fragments | `348e0b0cb2e79c5e51a2769e2d9f319c2af00983` | `25546feeeb50edf887dd0656502e5cca96b3d61f90431ebe7035e41e1f25dca3` |
 | MP4 range playback, fragments | `a690f0f7fe7db02b64c2506e57e7a1526b3f092a` | `48a28a728709ff0354a588a73e511ae6db3e0e3b01b362a352e407fd31da38aa` |
+| MP4 range playback, fragments | `777279863f4eb9909ae51a4c3f88fad344e01061` | `824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da` |
 | MP4 range playback, earlier comparison | `90ecdb3f85f92402df9d7ecbec17f023535a5bf5` | `78e5d64743203173b7dfd8beed2dc4ab750d137e6fe3b00df321536b15057f05` |
 | Codecs and decode sessions, runtime | `add6b272cb622bae0d921dc3fbbf0812958c2023` | `ab2a174847322658159e93b2cd9bb994cdd9f4f9438926191518897aff28d929` |
 | Audio codecs in files | `ccff5b5734c113c1d88160b84825157508c701c0` | `0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53` |
