@@ -13,6 +13,80 @@ use triergon_isobmff::{
     SourceCompositionLookup, SourceTrack,
 };
 
+#[test]
+fn complete_fragment_edit_offsets_the_packet_and_resume_clocks() {
+    use triergon_isobmff::compat::mov::packets::{
+        CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, ResumePoint,
+    };
+    let pool = Budget::new(65536).unwrap();
+    let boxes = common::roots(
+        &pool,
+        include_bytes!("fixtures/native-open-v6/tfdt-control-08.mp4"),
+    )
+    .unwrap();
+    let movie = boxes
+        .iter()
+        .find(|raw| raw.header().kind == *b"moov")
+        .unwrap();
+    let track = common::child(movie, b"trak").unwrap();
+    let media = common::child(&track, b"mdia").unwrap();
+    let info = common::child(&media, b"minf").unwrap();
+    let table = common::table(common::child(&info, b"stbl").unwrap(), &pool, 1).unwrap();
+    assert_eq!(table.sample_count(), 0);
+    let fragments = [fixture::fragment(
+        &pool,
+        1,
+        1000,
+        1,
+        Some(0),
+        &[0, 0x10000, 0],
+    )];
+    let edits = fixture::edits(&pool, &[(0, 4, 1, 0)]);
+    let base = TimeBase::new(1, 1000).unwrap();
+    let tracks = [DemuxTrack {
+        track_id: 7,
+        table: &table,
+        fragments: &fragments,
+        media_base: base,
+        edits: Some((&edits, base)),
+    }];
+    let extent = 1000..1006;
+    let cancel = AtomicBool::new(false);
+    for start in [0, 1] {
+        let mut cursor = PacketCursor::new_complete_source_at(
+            &pool,
+            &tracks,
+            std::slice::from_ref(&extent),
+            PacketLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+            &[ResumePoint {
+                track_id: 7,
+                occurrence: start,
+            }],
+        )
+        .unwrap();
+        let mut rows = Vec::new();
+        for _ in 0..512 {
+            match cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
+                CursorStatus::Yield => {}
+                CursorStatus::Ready => {
+                    let packet = cursor.take_occurrence().unwrap();
+                    rows.push((packet.source.dts_ticks, packet.demux.pts, packet.demux.dts));
+                    assert_eq!(packet.demux.duration, 10);
+                    assert_eq!(packet.edit.unwrap().edit_ordinal, 1);
+                }
+                CursorStatus::End => break,
+            }
+        }
+        let expected = [
+            (Some(0), Some(-4), Some(-4)),
+            (Some(10), Some(6), Some(6)),
+            (Some(20), Some(16), Some(16)),
+        ];
+        assert_eq!(rows, expected[usize::try_from(start).unwrap()..]);
+    }
+}
+
 fn time(n: i128, d: u128) -> Time {
     Time::new(n, d).unwrap()
 }
