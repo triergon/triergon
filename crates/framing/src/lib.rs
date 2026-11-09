@@ -39,6 +39,7 @@ mod eac3_bsi;
 mod flac_config;
 mod header;
 mod mpeg_audio;
+mod nal_units;
 mod opus_config;
 mod raw_annex_b;
 mod reader;
@@ -96,11 +97,12 @@ pub use flac_config::{
     FlacMetadataBlock, FlacStreamInfo, flac_configuration_from_dfla, flac_configuration_from_ogg,
     flac_metadata_blocks, flac_stream_info,
 };
-pub use header::{Codec, NalHeader, ParameterSetKind};
+pub use header::{Codec, NalHeader, ParameterSetKind, avc, hevc};
 pub use mpeg_audio::{
     LameTag, MpegAudioHeader, MpegChannelMode, MpegEmphasis, MpegInfoFrame, MpegInfoKind,
     MpegLayer, MpegVersion, mpeg_audio_crc_ok, mpeg_info_frame,
 };
+pub use nal_units::{AnnexBUnits, split_length_prefixed, start_code};
 pub use opus_config::{
     OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
 };

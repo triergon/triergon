@@ -5,7 +5,8 @@
 //! when the vectors are absent.
 
 use std::path::PathBuf;
-use triergon_codec_h264::{AnnexBNalIter, DecodeError, Decoder};
+use triergon_codec_h264::{DecodeError, Decoder};
+use triergon_framing::AnnexBUnits;
 use triergon_harness_protocol::md5::hex_digest;
 
 enum Edit {
@@ -197,7 +198,7 @@ fn fuzz_findings_decode_to_typed_errors() {
         assert_eq!(hex_digest(&input), case.input_md5, "{}", case.seed);
         let mut decoder = Decoder::new();
         let mut errors: Vec<DecodeError> = Vec::new();
-        for nal in AnnexBNalIter::new(&input) {
+        for nal in AnnexBUnits::new(&input) {
             errors.extend(decoder.send_nal(nal, None).err());
             while decoder.receive().is_some() {}
         }

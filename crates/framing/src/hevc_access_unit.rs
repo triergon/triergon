@@ -1,5 +1,8 @@
 //! A four-byte-start-code HEVC feed over complete length-prefixed samples.
-use crate::{AvcAnnexBLimits, BuildStep, Codec, HvcConfigNal, HvcConfiguration, NalHeader};
+use crate::{
+    AvcAnnexBLimits, BuildStep, Codec, HvcConfigNal, HvcConfiguration, NalHeader,
+    split_length_prefixed,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -200,14 +203,11 @@ impl<'a> HevcAnnexBJob<'a> {
 }
 
 fn next_nal(sample: &[u8], width: usize) -> Result<(&[u8], &[u8])> {
-    let (prefix, payload) = sample.split_at_checked(width).ok_or(Error::Truncated)?;
-    let size = prefix
-        .iter()
-        .fold(0usize, |size, &byte| (size << 8) | usize::from(byte));
-    if size == 0 {
+    let (nal, rest) = split_length_prefixed(sample, width).ok_or(Error::Truncated)?;
+    if nal.is_empty() {
         return Err(Error::Invalid("empty HEVC NAL"));
     }
-    payload.split_at_checked(size).ok_or(Error::Truncated)
+    Ok((nal, rest))
 }
 
 fn add_nal_bytes(bytes: usize, nal_bytes: usize) -> Result<usize> {

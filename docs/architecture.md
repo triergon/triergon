@@ -7,13 +7,15 @@ input, explicit resource bounds and exact timing over convenience.
 
 ## Layers
 
-Crates depend only on layers below them. Core never depends on a format.
+Crates depend only on layers below them. Core never depends on a format. The subtitle and
+H.264/HEVC decoder crates take NAL unit splitting, headers and type classes from
+`triergon-framing`.
 
 | Layer | Crates | Role |
 |---|---|---|
 | Foundation | [`triergon-core`](../crates/core), [`triergon-bitstream`](../crates/bitstream) | Budgets, shared byte storage, exact time, input windows, resumable steps, errors, the neutral container model (`ContainerReader`); bit reading, RBSP, CABAC and CRCs |
 | Formats | [`triergon-matroska`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts), [`triergon-ogg`](../crates/ogg), [`triergon-elementary`](../crates/elementary) (native FLAC, MPEG audio, ADTS, AC-3) | Container readers: tracks, packets, metadata, seeking |
-| Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, ADTS, AC-3, DTS core, AV1, VP9; FLAC, Opus, Vorbis and MPEG audio headers and their canonical configurations) |
+| Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, H.264 and HEVC NAL units and their type classes, ADTS, AC-3, DTS core, AV1, VP9; FLAC, Opus, Vorbis and MPEG audio headers and their canonical configurations) |
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
 | Fonts | [`triergon-font`](../crates/font) | OpenType and TrueType faces: tables, collections, cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | Shaping | [`triergon-shape`](../crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
