@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "mpegts-pes",
   "operation": "mpegts-pes-packets",
-  "candidate": "playback-worker",
+  "candidate": "transport-worker",
   "worker_operation": "ts-",
   "reference": "ffmpeg-formats-native",
   "contract": [
