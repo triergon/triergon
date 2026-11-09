@@ -1,7 +1,7 @@
 //! Ordinary AVC primary-picture comparison from H.264 (08/2024),
 //! §§7.3.2.1.1, 7.3.2.2, 7.3.3 and 7.4.1.2.4. This inspects the syntax
 //! needed for picture identity, leaving the rest of each RBSP opaque.
-use crate::{Codec, NalHeader};
+use crate::{Codec, NalHeader, SyntaxError, skip_avc_scaling_matrix};
 use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
 
@@ -213,13 +213,10 @@ fn parse_sps(payload: &[u8]) -> Result<(usize, Sps)> {
             bits.unsigned(6)?; // bit_depth_luma_minus8
             bits.unsigned(6)?; // bit_depth_chroma_minus8
             bits.flag()?; // qpprime_y_zero_transform_bypass_flag
-            if bits.flag()? {
-                for i in 0..if chroma == 3 { 12 } else { 8 } {
-                    if bits.flag()? {
-                        skip_scaling_list(&mut bits, if i < 6 { 16 } else { 64 })?;
-                    }
-                }
-            }
+            skip_avc_scaling_matrix(&mut bits.0, chroma).map_err(|error| match error {
+                SyntaxError::Bits(error) => rbsp_error(error),
+                SyntaxError::OutOfRange => Error::Invalid("AVC scaling list delta"),
+            })?;
             separate
         }
         _ => return Err(Error::Unsupported("AVC SPS profile for picture comparison")),
@@ -254,23 +251,6 @@ fn parse_sps(payload: &[u8]) -> Result<(usize, Sps)> {
             separate_colour_plane,
         },
     ))
-}
-
-fn skip_scaling_list(bits: &mut Rbsp<'_>, entries: usize) -> Result<()> {
-    let (mut last, mut next) = (8, 8);
-    for _ in 0..entries {
-        if next != 0 {
-            let delta = bits.signed()?;
-            if !(-128..=127).contains(&delta) {
-                return Err(Error::Invalid("AVC scaling list delta"));
-            }
-            next = (last + delta).rem_euclid(256);
-            if next != 0 {
-                last = next;
-            }
-        }
-    }
-    Ok(())
 }
 
 fn parse_pps(payload: &[u8]) -> Result<(usize, Pps)> {

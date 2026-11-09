@@ -1,5 +1,6 @@
 use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
+use triergon_framing::{Codec, SyntaxError, skip_avc_scaling_matrix, skip_vui_to_timing};
 
 /// Read RBSP prefixes without copying or decoding their uninspected suffixes.
 struct Rbsp<'a>(triergon_bitstream::Rbsp<'a>);
@@ -153,25 +154,10 @@ fn sps_prefix(r: &mut Rbsp<'_>) -> Result<(u8, AvcRaster, bool)> {
             r.bounded(6)?;
             r.bounded(6)?;
             r.bit()?;
-            if r.bit()? != 0 {
-                for index in 0..if chroma == 3 { 12 } else { 8 } {
-                    if r.bit()? != 0 {
-                        let (mut last, mut next) = (8, 8);
-                        for _ in 0..if index < 6 { 16 } else { 64 } {
-                            if next != 0 {
-                                let delta = r.se()?;
-                                if !(-128..=127).contains(&delta) {
-                                    return Err(Error::Invalid("AVC scaling list delta"));
-                                }
-                                next = (last + delta).rem_euclid(256);
-                            }
-                            if next != 0 {
-                                last = next;
-                            }
-                        }
-                    }
-                }
-            }
+            skip_avc_scaling_matrix(&mut r.0, chroma).map_err(|error| match error {
+                SyntaxError::Bits(error) => rbsp_error(error),
+                SyntaxError::OutOfRange => Error::Invalid("AVC scaling list delta"),
+            })?;
             if separate_plane { 0 } else { chroma }
         }
         _ => return Err(Error::Unsupported("AVC SPS profile for raster projection")),
@@ -236,23 +222,7 @@ fn sps_prefix(r: &mut Rbsp<'_>) -> Result<(u8, AvcRaster, bool)> {
 }
 
 fn vui_timing(r: &mut Rbsp<'_>) -> Result<Option<AvcVuiTiming>> {
-    if r.bit()? != 0 && r.fixed(8)? == 255 {
-        r.fixed(32)?; // Extended SAR width and height.
-    }
-    if r.bit()? != 0 {
-        r.bit()?; // Overscan.
-    }
-    if r.bit()? != 0 {
-        r.fixed(4)?; // Video format and full-range flag.
-        if r.bit()? != 0 {
-            r.fixed(24)?; // Colour primaries, transfer, and matrix.
-        }
-    }
-    if r.bit()? != 0 {
-        r.ue()?; // Top-field chroma sample location.
-        r.ue()?; // Bottom-field chroma sample location.
-    }
-    if r.bit()? == 0 {
+    if !skip_vui_to_timing(&mut r.0, Codec::Avc).map_err(rbsp_error)? {
         return Ok(None);
     }
     Ok(Some(AvcVuiTiming {
