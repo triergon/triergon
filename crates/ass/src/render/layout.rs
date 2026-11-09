@@ -16,7 +16,7 @@ use super::outlines::{GlyphKey, OutlineValue, Outlines};
 use super::shaping::{Shaped, ShapedGlyph, Shaping};
 use super::text::{Char, Evaluated, Text};
 use super::units::{d6_to_double, fmax};
-use super::wrap::{Lines, WrapChar, Wrapping};
+use super::wrap::{Lines, WrapText, Wrapping};
 use crate::{
     EventState, HAlign, Justify, Karaoke, KaraokeGlyph, KaraokeMark, Limits, Margins, Rgba,
     Syllables,
@@ -196,21 +196,13 @@ impl Layout {
             line_spacing,
             scales: room.scales,
         };
-        let (glyphs, pens) = (&self.glyphs, &self.pens);
-        let wrap_char = |i: usize| {
-            let c = &text.chars()[i];
-            let own = &glyphs[shaped.clusters[i].glyphs.start];
-            WrapChar {
-                symbol: c.symbol,
-                left: own.x_min.wrapping_add(pens[i]),
-                right: own.x_max.wrapping_add(pens[i]),
-                asc: own.asc,
-                desc: own.desc,
-                border: text.style(c).border,
-            }
+        let unbroken = Unbroken {
+            text,
+            shaped,
+            glyphs: &self.glyphs,
+            pens: &self.pens,
         };
-        self.lines
-            .wrap(text.chars().len(), wrap_char, &wrapping, work)?;
+        self.lines.wrap(&unbroken, &wrapping, work)?;
         self.lay_out_chars(text, shaped, room.elapsed)?;
         let chars = &self.chars;
         shaped.bidi.visual_order(
@@ -495,6 +487,42 @@ impl Layout {
                 }
             }
         }
+    }
+}
+
+/// An event's characters on one unbroken line, as wrapping reads them.
+struct Unbroken<'a> {
+    text: &'a Text,
+    shaped: &'a Shaped,
+    glyphs: &'a [LaidGlyph],
+    pens: &'a [i32],
+}
+
+impl Unbroken<'_> {
+    /// Character `i`'s own glyph: the first of its cluster.
+    fn own(&self, i: usize) -> &LaidGlyph {
+        &self.glyphs[self.shaped.clusters[i].glyphs.start]
+    }
+}
+
+impl WrapText for Unbroken<'_> {
+    fn len(&self) -> usize {
+        self.pens.len()
+    }
+
+    fn symbol(&self, i: usize) -> u32 {
+        self.text.chars()[i].symbol
+    }
+
+    fn extent(&self, i: usize) -> (i32, i32) {
+        let (own, pen) = (self.own(i), self.pens[i]);
+        (own.x_min.wrapping_add(pen), own.x_max.wrapping_add(pen))
+    }
+
+    fn metrics(&self, i: usize) -> (i32, i32, [f64; 2]) {
+        let own = self.own(i);
+        let border = self.text.style(&self.text.chars()[i]).border;
+        (own.asc, own.desc, border)
     }
 }
 

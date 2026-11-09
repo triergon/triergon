@@ -15,21 +15,34 @@ use crate::{WrapStyle, charge};
 const SPACE: u32 = b' ' as u32;
 const NEWLINE: u32 = b'\n' as u32;
 
-/// What wrapping reads of a character: its own glyph's horizontal extent on
-/// one unbroken line, 26.6, its ascent and descent, and its border.
-#[derive(Clone, Copy, Debug)]
-pub(super) struct WrapChar {
-    pub(super) symbol: u32,
-    pub(super) left: i32,
-    pub(super) right: i32,
-    pub(super) asc: i32,
-    pub(super) desc: i32,
-    pub(super) border: [f64; 2],
-}
+/// What wrapping reads of an event's characters, by index.
+pub(super) trait WrapText {
+    fn len(&self) -> usize;
+    fn symbol(&self, i: usize) -> u32;
+    /// The left and right of character `i`'s own glyph at its pen position
+    /// on one unbroken line, 26.6.
+    fn extent(&self, i: usize) -> (i32, i32);
+    /// Its own glyph's ascent and descent, 26.6, and its border.
+    fn metrics(&self, i: usize) -> (i32, i32, [f64; 2]);
 
-impl WrapChar {
-    fn is_space(&self) -> bool {
-        self.symbol == SPACE || self.symbol == NEWLINE
+    fn is_space(&self, i: usize) -> bool {
+        matches!(self.symbol(i), SPACE | NEWLINE)
+    }
+
+    /// The right end of character `e` minus the left end of `s`, in pixels.
+    fn width(&self, s: usize, e: usize) -> f64 {
+        d6_to_double(self.extent(e).1.wrapping_sub(self.extent(s).0))
+    }
+
+    /// The last character before `end` that is not a space, or `start`.
+    fn rewind_spaces(&self, start: usize, end: usize) -> usize {
+        let mut g = end;
+        loop {
+            g -= 1;
+            if !(g > start && self.symbol(g) == SPACE) {
+                return g;
+            }
+        }
     }
 }
 
@@ -78,34 +91,6 @@ pub(super) struct Wrapping<'a> {
     pub(super) scales: &'a Scales,
 }
 
-/// The characters being wrapped, read one at a time.
-struct Chars<F> {
-    len: usize,
-    at: F,
-}
-
-impl<F: Fn(usize) -> WrapChar> Chars<F> {
-    fn symbol(&self, i: usize) -> u32 {
-        (self.at)(i).symbol
-    }
-
-    /// The right end of character `e` minus the left end of `s`, in pixels.
-    fn width(&self, s: usize, e: usize) -> f64 {
-        d6_to_double((self.at)(e).right.wrapping_sub((self.at)(s).left))
-    }
-
-    /// The last character before `end` that is not a space, or `start`.
-    fn rewind_spaces(&self, start: usize, end: usize) -> usize {
-        let mut g = end;
-        loop {
-            g -= 1;
-            if !(g > start && self.symbol(g) == SPACE) {
-                return g;
-            }
-        }
-    }
-}
-
 impl Lines {
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
@@ -122,30 +107,24 @@ impl Lines {
         &self.lines[0]
     }
 
-    /// `wrap_lines_smart` over the `len` characters `at` gives, which are
-    /// not none: breaks, balanced unless `\q1`, then the lines trimmed and
-    /// measured.
+    /// `wrap_lines_smart` over `chars`, which are not none: breaks,
+    /// balanced unless `\q1`, then the lines trimmed and measured.
     pub(super) fn wrap(
         &mut self,
-        len: usize,
-        at: impl Fn(usize) -> WrapChar,
+        chars: &impl WrapText,
         wrapping: &Wrapping<'_>,
         work: &mut WorkBudget,
     ) -> Result<()> {
-        let chars = Chars { len, at };
-        self.break_naively(&chars, wrapping)?;
+        self.break_naively(chars, wrapping)?;
         if wrapping.style != WrapStyle::EndOfLine {
-            self.rebalance(&chars, work)?;
+            self.rebalance(chars, work)?;
         }
-        self.measure(&chars, wrapping)
+        self.measure(chars, wrapping)
     }
 
     /// `wrap_lines_naive`: a hard break after every `\N`, a soft one after
     /// the last space before a character that overflows.
-    fn break_naively<F>(&mut self, chars: &Chars<F>, wrapping: &Wrapping<'_>) -> Result<()>
-    where
-        F: Fn(usize) -> WrapChar,
-    {
+    fn break_naively(&mut self, chars: &impl WrapText, wrapping: &Wrapping<'_>) -> Result<()> {
         let starts = &mut self.starts;
         starts.clear();
         starts
@@ -153,7 +132,7 @@ impl Lines {
             .map_err(|e| e.error)?;
         let mut line = 0;
         let mut last_breakable: Option<usize> = None;
-        for i in 0..chars.len {
+        for i in 0..chars.len() {
             let symbol = chars.symbol(i);
             let break_after = if symbol == NEWLINE {
                 Some((i, false))
@@ -169,7 +148,7 @@ impl Lines {
                 last_breakable = Some(i);
             }
             if let Some((at, soft)) = break_after
-                && at + 1 < chars.len
+                && at + 1 < chars.len()
             {
                 line = at + 1;
                 starts
@@ -185,17 +164,14 @@ impl Lines {
     /// evens out the two lines around them; each pass over the text is
     /// charged, as breaks only move back and a pass may move each by one
     /// word.
-    fn rebalance<F>(&mut self, chars: &Chars<F>, work: &mut WorkBudget) -> Result<()>
-    where
-        F: Fn(usize) -> WrapChar,
-    {
+    fn rebalance(&mut self, chars: &impl WrapText, work: &mut WorkBudget) -> Result<()> {
         let starts = self.starts.as_mut_slice();
         loop {
-            charge(work, chars.len)?;
+            charge(work, chars.len())?;
             let mut changed = false;
             for k in 1..starts.len() {
                 let (a, b) = (starts[k - 1].at, starts[k].at);
-                let end = starts.get(k + 1).map_or(chars.len, |s| s.at);
+                let end = starts.get(k + 1).map_or(chars.len(), |s| s.at);
                 if !starts[k].soft {
                     continue;
                 }
@@ -234,10 +210,7 @@ impl Lines {
     /// `measure_text`: each line's ascent and descent, the height and the
     /// border extents. A line counts what trimming left of it, or, when
     /// that is nothing, all of it, at half height if it is only a `\n`.
-    fn measure<F>(&mut self, chars: &Chars<F>, wrapping: &Wrapping<'_>) -> Result<()>
-    where
-        F: Fn(usize) -> WrapChar,
-    {
+    fn measure(&mut self, chars: &impl WrapText, wrapping: &Wrapping<'_>) -> Result<()> {
         let scales = wrapping.scales;
         let starts = self.starts.as_slice();
         self.lines.clear();
@@ -249,7 +222,7 @@ impl Lines {
             self.border_x,
         ) = (0.0, 0, 0, 0);
         for (k, start) in starts.iter().enumerate() {
-            let end = starts.get(k + 1).map_or(chars.len, |s| s.at);
+            let end = starts.get(k + 1).map_or(chars.len(), |s| s.at);
             let line = start.at..end;
             let shown = shown(chars, line.clone());
             let measured = if shown.is_empty() {
@@ -259,12 +232,13 @@ impl Lines {
             };
             let (mut asc, mut desc, mut border_x, mut border_y) = (0, 0, 0.0, 0.0);
             let mut newlines = true;
-            for c in measured.map(&chars.at) {
-                asc = c.asc.max(asc);
-                desc = c.desc.max(desc);
-                border_y = fmax(border_y, c.border[1]);
-                border_x = fmax(border_x, c.border[0]);
-                newlines &= c.symbol == NEWLINE;
+            for i in measured {
+                let (a, d, border) = chars.metrics(i);
+                asc = a.max(asc);
+                desc = d.max(desc);
+                border_y = fmax(border_y, border[1]);
+                border_x = fmax(border_x, border[0]);
+                newlines &= chars.symbol(i) == NEWLINE;
             }
             let scale = if newlines { 0.5 / 64.0 } else { 1.0 / 64.0 };
             let (asc, desc) = (scale * f64::from(asc), scale * f64::from(desc));
@@ -292,8 +266,8 @@ impl Lines {
 
 /// `trim_whitespace` on one line: its leading spaces and `\n`s, and its
 /// trailing ones after its first character, are hidden.
-fn shown<F: Fn(usize) -> WrapChar>(chars: &Chars<F>, line: Range<usize>) -> Range<usize> {
-    let is_space = |&i: &usize| (chars.at)(i).is_space();
+fn shown(chars: &impl WrapText, line: Range<usize>) -> Range<usize> {
+    let is_space = |&i: &usize| chars.is_space(i);
     let lead = line.clone().take_while(is_space).count();
     if lead == line.len() {
         return line.end..line.end;

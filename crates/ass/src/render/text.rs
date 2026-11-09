@@ -266,21 +266,26 @@ impl Text {
                 rotate: desc.vertical && symbol >= VERTICAL_LOWER_BOUND,
             };
             let style = GlyphStyle::new(&glyph.state, decorations, drawing.is_some(), scales, par);
+            // The previous character's style is the last one kept: an equal
+            // style, or the same font, cannot start a run.
+            let same_style = self.styles.last() == Some(&style);
             let starts_run = self.chars.last().is_none_or(|previous| {
                 let effect = glyph.karaoke.kind;
-                let (a, b) = (library.get(previous.font), library.get(font));
+                let other_font = || {
+                    let (a, b) = (library.get(previous.font), library.get(font));
+                    a.family() != b.family() || a.vertical() != b.vertical()
+                };
                 glyph.karaoke.timing != 0
                     || (effect.is_some() && effect != last_effect)
                     || drawing.is_some()
                     || previous.drawing.is_some()
-                    || a.family() != b.family()
-                    || a.vertical() != b.vertical()
-                    || self.styles[previous.style].differs(&style)
+                    || (previous.font != font && other_font())
+                    || (!same_style && self.styles[previous.style].differs(&style))
             });
             if glyph.karaoke.kind.is_some() {
                 last_effect = glyph.karaoke.kind;
             }
-            if self.styles.last() != Some(&style) {
+            if !same_style {
                 self.styles.try_push(style).map_err(|e| e.error)?;
             }
             let c = Char {
