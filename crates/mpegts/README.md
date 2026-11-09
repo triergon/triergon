@@ -115,12 +115,11 @@ operation and cursor. The zero-packet branch accounts for every event and
 admits only verified self-contained control sections or typed discards.
 `NoPacketsConfirmation` requires physical End and Finished from the same
 operation and a fresh EOF check on the original cursor.
-This receipt can describe zero physical carriers at actual EOF without creating
-a PAT, PMT or PES scope. It is separate from `NoMediaConfirmation`. Unexplained
-payload, incomplete coverage, I/O failure, cancellation and stale identities
-cannot produce a receipt. `required_work` bounds per-event admission; a short
-grant leaves the event unconsumed. The policy uses fixed state and charged
-aliases, with no new input-dependent allocation or payload copy.
+The completion can account for an empty physical input at EOF and preserves
+the original PAT, PMT and PES scope. It requires contiguous input coverage and
+a healthy cursor. `required_work` bounds per-event admission. A short grant
+leaves the event available for retry. Fixed policy state and charged aliases
+reuse the parser's original bytes.
 
 ## Usage
 
