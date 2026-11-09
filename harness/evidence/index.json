@@ -16657,6 +16657,15 @@
    "sha256": "06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077",
    "bytes": 2332946,
    "source_revision": "0d70bebfc0799f65df14f170ed97e68c5a35daa7"
+  },
+  {
+   "name": "reader-classification-comparison",
+   "path": "reader-classification-comparison",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/reader-classification-comparison/a659624b656ce68586e0b90a73eb57c255a6b372839d94198f7a6a89d44ad9bc.tar.gz",
+   "sha256": "a659624b656ce68586e0b90a73eb57c255a6b372839d94198f7a6a89d44ad9bc",
+   "bytes": 49106104
   }
  ]
 }
