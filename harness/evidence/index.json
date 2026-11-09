@@ -16697,6 +16697,16 @@
    "sha256": "81c9bd14feced61e567abc733c0db9d83eea122e7cedb7d1c13f9516cf2208b6",
    "bytes": 15417,
    "source_revision": "a6e366d61ac06a37fe303cfd11ebe0b159b17579"
+  },
+  {
+   "name": "mp4-range-fragment-seek-linux-arm64",
+   "path": "mp4-range-fragment-seek-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-fragment-seek-linux-arm64/d95f142f73c0790d211f30d7de613f734f68409eb3015c7d48905c3c5e542105.tar.gz",
+   "sha256": "d95f142f73c0790d211f30d7de613f734f68409eb3015c7d48905c3c5e542105",
+   "bytes": 12721121,
+   "source_revision": "a2f009026bc53be3757a9064247fb4e3ace80e0b"
   }
  ]
 }
