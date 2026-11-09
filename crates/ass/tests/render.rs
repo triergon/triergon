@@ -7,7 +7,7 @@
 mod fonts;
 
 use triergon_ass::{
-    CacheLimits, Change, Fonts, ImageKind, Options, Renderer, Script, Settings, Size,
+    CacheLimits, Change, Fonts, Image, ImageKind, Options, Renderer, Script, Settings, Size,
 };
 use triergon_core::{Budget, Bytes, Error};
 
@@ -198,6 +198,49 @@ fn caches_without_room_keep_what_the_last_frame_shows() {
     assert_eq!(change(0), Change::Content);
     assert_eq!(change(500), Change::None);
     assert_eq!(change(1000), Change::None);
+}
+
+/// An image holds its pixels on its own: a clone may go on another thread
+/// while the renderer draws on, and one kept after the renderer is gone
+/// still shows its pixels.
+#[test]
+fn images_outlive_the_renderer_and_move_between_threads() {
+    let budget = Budget::new(64 << 20).unwrap();
+    let fonts = Fonts {
+        attached: vec![test_sans(&budget)],
+        ..Fonts::default()
+    };
+    let mut settings = Settings::new(Size::new(1280, 720));
+    settings.storage = Some(Size::new(640, 360));
+    settings.cache = CacheLimits::new(0, 0);
+    let mut renderer = Renderer::new(&budget, &settings, &fonts).unwrap();
+    let mut script = script(
+        &budget,
+        "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{\\t(\\frz90)\\bord2}ABC\n",
+    );
+    let images = renderer.render(&mut script, 0).unwrap().images.to_vec();
+    let rows = |images: &[Image]| -> Vec<Vec<u8>> {
+        images
+            .iter()
+            .flat_map(Image::rows)
+            .map(<[u8]>::to_vec)
+            .collect()
+    };
+    let shown = rows(&images);
+    assert!(shown.iter().flatten().any(|&a| a != 0));
+    let elsewhere = images.clone();
+    std::thread::spawn(move || drop(elsewhere)).join().unwrap();
+    // Later frames draw anew, and with no room the caches cut whatever is
+    // let go, the other thread's clones too.
+    for now in [500, 1000, 1500] {
+        renderer.render(&mut script, now).unwrap();
+    }
+    drop(renderer);
+    assert_eq!(rows(&images), shown);
+    // The pixels stay charged until the last image goes.
+    let held = budget.used();
+    drop(images);
+    assert!(budget.used() < held);
 }
 
 /// The caches charge the budget for what they keep, and keep at most their

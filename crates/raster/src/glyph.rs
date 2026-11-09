@@ -2,6 +2,7 @@
 //! its quantisation against the glyph's run, the border or opaque box, and their
 //! rasterisation, as libass's `get_bitmap_glyph` draws them.
 
+use std::ops::Deref;
 use std::sync::Arc;
 
 use triergon_core::{Error, Result, WorkBudget, round_ties_even_i32};
@@ -284,8 +285,9 @@ pub enum PlacedBorder {
     /// The border rounds to nothing, and the fill's bitmap stands in for it.
     Fill,
     /// The opaque box, which does not depend on the glyph's shape: the
-    /// [`Shape::unit_box`] under this transform.
-    Box(Quantized),
+    /// [`Shape::unit_box`] under this transform, `None` when the transform
+    /// leaves the coordinate range and no box is drawn.
+    Box(Option<Quantized>),
     /// The glyph's first outline stroked by [`Raster::stroke_border`], then
     /// placed by [`GlyphPlacement::place_stroke`].
     Stroke(BorderStroke),
@@ -367,9 +369,8 @@ impl Run {
             Border::OpaqueBox { size, shown } => {
                 if shown || effects.casts_shadow() {
                     let m = transform.opaque_box(placement, frame, size);
-                    if let Some(q) = BitmapTransform::quantize(&m, &UNIT_BOX, Some(self.offset)) {
-                        out.border = PlacedBorder::Box(q.placed);
-                    }
+                    let q = BitmapTransform::quantize(&m, &UNIT_BOX, Some(self.offset));
+                    out.border = PlacedBorder::Box(q.map(|q| q.placed));
                 }
             }
             Border::Outline { size, .. } => {
@@ -400,11 +401,11 @@ impl Run {
     /// none (`ass_render.c:1412-1414`, `1536-1541`), and
     /// `render_and_combine_glyphs` leaves a glyph without bitmaps out of the
     /// run (`2548-2549`), so the next glyph sets the run's sub-pixel origin.
-    pub fn add(
+    pub fn add<B>(
         &mut self,
-        fill: Option<PlacedBitmap>,
-        border: Option<PlacedBitmap>,
-    ) -> Option<GlyphBitmaps> {
+        fill: Option<PlacedBitmap<B>>,
+        border: Option<PlacedBitmap<B>>,
+    ) -> Option<GlyphBitmaps<B>> {
         if fill.is_none() && border.is_none() {
             return None;
         }
@@ -424,31 +425,32 @@ impl Run {
 const UNIT_BOX: Rect = Rect::new(0, 0, 64, 64);
 
 /// A bitmap placed in the frame: its [`position`](Bitmap::position) counts
-/// from `origin`. The bitmap may be shared with a renderer's caches.
+/// from `origin`. The bitmap is held through `B`, a shared handle: an `Arc`,
+/// or a renderer's handle to the bitmap it keeps.
 #[derive(Clone, Debug)]
-pub struct PlacedBitmap {
+pub struct PlacedBitmap<B = Arc<Bitmap>> {
     /// The bitmap.
-    pub bitmap: Arc<Bitmap>,
+    pub bitmap: B,
     /// The whole-pixel frame position the bitmap's position counts from.
     pub origin: Vector,
 }
 
 /// The bitmaps of one glyph of a run: a fill, a border, or both.
 #[derive(Clone, Debug)]
-pub struct GlyphBitmaps {
-    fill: Option<PlacedBitmap>,
-    border: Option<PlacedBitmap>,
+pub struct GlyphBitmaps<B = Arc<Bitmap>> {
+    fill: Option<PlacedBitmap<B>>,
+    border: Option<PlacedBitmap<B>>,
 }
 
-impl GlyphBitmaps {
+impl<B> GlyphBitmaps<B> {
     /// The glyph's fill, `None` when it draws nothing.
-    pub fn fill(&self) -> Option<&PlacedBitmap> {
+    pub fn fill(&self) -> Option<&PlacedBitmap<B>> {
         self.fill.as_ref()
     }
 
     /// The border: the stroked outline or the opaque box, or the fill's
     /// bitmap when the border rounds to nothing. `None` without a border.
-    pub fn border(&self) -> Option<&PlacedBitmap> {
+    pub fn border(&self) -> Option<&PlacedBitmap<B>> {
         self.border.as_ref()
     }
 
@@ -488,6 +490,10 @@ impl GlyphBitmaps {
 /// spot, as [`Raster::render`] draws them, or kept by a renderer between
 /// frames. Each is `None` when it draws nothing.
 pub trait GlyphSource {
+    /// The handle the bitmaps are held through; a border that rounds to
+    /// nothing holds the fill's again.
+    type Bitmap: Clone + Deref<Target = Bitmap>;
+
     /// The fill: the glyph's `shape` under `at`.
     ///
     /// # Errors
@@ -499,10 +505,12 @@ pub trait GlyphSource {
         shape: &Shape,
         at: Quantized,
         work: &mut WorkBudget,
-    ) -> Result<Option<PlacedBitmap>>;
+    ) -> Result<Option<PlacedBitmap<Self::Bitmap>>>;
 
     /// The opaque box: [`Shape::unit_box`] under `at`
-    /// ([`Raster::draw_box`]).
+    /// ([`Raster::draw_box`]), or nothing when `at` is `None`, the box's
+    /// transform being out of range. libass fetches the unit square before
+    /// it places the box, so it is asked for either way.
     ///
     /// # Errors
     ///
@@ -510,9 +518,9 @@ pub trait GlyphSource {
     fn opaque_box(
         &mut self,
         raster: &mut Raster,
-        at: Quantized,
+        at: Option<Quantized>,
         work: &mut WorkBudget,
-    ) -> Result<Option<PlacedBitmap>>;
+    ) -> Result<Option<PlacedBitmap<Self::Bitmap>>>;
 
     /// The border: `shape` stroked by `stroke` ([`Raster::stroke_border`]),
     /// placed by `placement` once stroked ([`GlyphPlacement::place_stroke`]).
@@ -528,7 +536,7 @@ pub trait GlyphSource {
         stroke: BorderStroke,
         placement: &GlyphPlacement,
         work: &mut WorkBudget,
-    ) -> Result<Option<PlacedBitmap>>;
+    ) -> Result<Option<PlacedBitmap<Self::Bitmap>>>;
 }
 
 /// The bitmaps of a glyph drawn as they are asked for.
@@ -544,6 +552,8 @@ impl Drawing {
 }
 
 impl GlyphSource for Drawing {
+    type Bitmap = Arc<Bitmap>;
+
     fn fill(
         &mut self,
         raster: &mut Raster,
@@ -557,9 +567,12 @@ impl GlyphSource for Drawing {
     fn opaque_box(
         &mut self,
         raster: &mut Raster,
-        at: Quantized,
+        at: Option<Quantized>,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap>> {
+        let Some(at) = at else {
+            return Ok(None);
+        };
         Ok(Self::placed(raster.draw_box(&at.transform, work)?, at))
     }
 
@@ -610,13 +623,13 @@ impl Raster {
     /// # Errors
     ///
     /// Those of [`Raster::render`] and of `source`.
-    pub fn render_with(
+    pub fn render_with<S: GlyphSource>(
         &mut self,
         request: &GlyphRequest<'_>,
         run: &mut Run,
-        source: &mut impl GlyphSource,
+        source: &mut S,
         work: &mut WorkBudget,
-    ) -> Result<Option<GlyphBitmaps>> {
+    ) -> Result<Option<GlyphBitmaps<S::Bitmap>>> {
         let Some(placement) = run.place(request) else {
             return Ok(None);
         };
@@ -785,7 +798,7 @@ mod tests {
             Run::default().place(&request).unwrap().border()
         };
         let boxed = border(&Shape::new(&budget));
-        assert!(matches!(boxed, PlacedBorder::Box(_)));
+        assert!(matches!(boxed, PlacedBorder::Box(Some(_))));
         assert_eq!(boxed, border(&square(&budget)));
     }
 

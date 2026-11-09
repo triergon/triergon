@@ -1,6 +1,8 @@
 //! Combining a run's glyph bitmaps into its fill, border and shadow bitmaps:
 //! blur, `\be`, the border's subtraction of the fill and the sub-pixel shadow.
 
+use std::ops::Deref;
+
 use triergon_core::{Error, Result, WorkBudget, round_ties_even_i32};
 
 use crate::bitmap::Bitmap;
@@ -247,7 +249,7 @@ impl Raster {
     /// # Errors
     ///
     /// `Policy` when `work` or the limits run out, and the budget's errors.
-    pub fn compose<'g, I>(
+    pub fn compose<'g, I, B>(
         &mut self,
         effects: &Effects,
         frame: &FrameScale,
@@ -255,8 +257,9 @@ impl Raster {
         work: &mut WorkBudget,
     ) -> Result<Composite>
     where
-        I: IntoIterator<Item = &'g GlyphBitmaps>,
+        I: IntoIterator<Item = &'g GlyphBitmaps<B>>,
         I::IntoIter: Clone,
+        B: Deref<Target = Bitmap> + 'g,
     {
         let glyphs = glyphs.into_iter();
         let Some(origin) = glyphs
@@ -268,7 +271,7 @@ impl Raster {
         };
         let filter = Filter::new(effects, frame);
         let pad = be_padding(filter.be);
-        let placed = |bitmap: fn(&GlyphBitmaps) -> Option<&PlacedBitmap>| {
+        let placed = |bitmap: fn(&GlyphBitmaps<B>) -> Option<&PlacedBitmap<B>>| {
             glyphs.clone().filter_map(move |g| {
                 let placed = bitmap(g)?;
                 let at = Vector::new(

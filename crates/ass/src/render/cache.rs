@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher, RandomState};
 use std::ops::Deref;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, PoisonError, Weak};
 
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 
@@ -90,14 +90,16 @@ impl<T> Drop for Node<T> {
             slot,
             generation,
         } = &self.released;
-        // A poisoned log only means a holder panicked while pushing.
-        let mut log = log
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // The cache keeps room for a record per entry, so this does not
         // allocate.
-        log.push((*slot, *generation));
+        lock(log).push((*slot, *generation));
     }
+}
+
+/// The release log, locked. A poisoned log only means a holder panicked
+/// while pushing, which leaves the records whole.
+fn lock(log: &ReleaseLog) -> std::sync::MutexGuard<'_, Vec<(u32, u32)>> {
+    log.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// A key of a cache, looked up through a borrowed view: a drawing by the
@@ -119,9 +121,10 @@ pub(super) trait CacheKey {
 pub(super) enum Lookup<T> {
     /// Nothing is kept for the key.
     Miss,
-    /// The value kept, `None` for an empty one (an outline that cannot be
-    /// built).
-    Hit(Option<Kept<T>>),
+    /// The key is kept without a value: an outline that cannot be built.
+    Empty,
+    /// The value kept.
+    Hit(Kept<T>),
 }
 
 /// An entry's value: kept by the cache, or, cut while held, kept only by its
@@ -175,9 +178,9 @@ impl Hasher for Prehashed {
 }
 
 /// Values of `T` by keys `K`, cut to a limit as libass cuts its caches, and
-/// charged to the renderer's budget: its slots, its index and the room
-/// its release records need. What a key or value holds beyond them is
-/// charged where it is allocated.
+/// charged to the renderer's budget: its slots, its index, each value's
+/// shared allocation and the room its release records need. What a key or
+/// value holds beyond them is charged where it is allocated.
 #[derive(Debug)]
 pub(super) struct Cache<K, T> {
     slots: BudgetVec<Slot<K, T>>,
@@ -191,16 +194,26 @@ pub(super) struct Cache<K, T> {
     newest: u32,
     released: ReleaseLog,
     len: usize,
+    /// The entries with a value, whose shared allocations live until the
+    /// entries go.
+    values: usize,
     /// libass's `cache_size`: what the entries kept count, held ones too.
     size: usize,
     limit: usize,
-    /// The index's and the release log's storage.
+    /// The index's, the values' and the release log's storage.
     charge: Reservation,
 }
 
 impl<K: CacheKey, T> Cache<K, T> {
     /// The bytes an index bucket takes: a hash, a slot and a control byte.
     const BUCKET_BYTES: usize = size_of::<(u64, u32)>() + 1;
+
+    /// The control bytes an index adds past its buckets, at most: a group
+    /// of the widest probe.
+    const INDEX_TAIL_BYTES: usize = 16;
+
+    /// A value's shared allocation: the node and its two reference counts.
+    const NODE_BYTES: usize = size_of::<Node<T>>() + 2 * size_of::<usize>();
 
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
@@ -212,6 +225,7 @@ impl<K: CacheKey, T> Cache<K, T> {
             newest: NONE,
             released: Arc::default(),
             len: 0,
+            values: 0,
             size: 0,
             limit: usize::MAX,
             charge: Reservation::empty(budget),
@@ -226,8 +240,8 @@ impl<K: CacheKey, T> Cache<K, T> {
         };
         let entry = self.entry_mut(at);
         let found = match &entry.value {
-            Value::Empty => None,
-            Value::Kept(node) => Some(Arc::clone(node)),
+            Value::Empty => Lookup::Empty,
+            Value::Kept(node) => Lookup::Hit(Kept(Arc::clone(node))),
             Value::Lent(node) => {
                 let Some(node) = node.upgrade() else {
                     // Let go but not yet taken out: as good as gone.
@@ -235,12 +249,12 @@ impl<K: CacheKey, T> Cache<K, T> {
                     return Lookup::Miss;
                 };
                 entry.value = Value::Kept(Arc::clone(&node));
-                Some(node)
+                Lookup::Hit(Kept(node))
             }
         };
         self.unqueue(at);
         self.queue(at);
-        Lookup::Hit(found.map(Kept))
+        found
     }
 
     /// Keeps `value` for `key`, absent before, counted as `size` and,
@@ -252,12 +266,31 @@ impl<K: CacheKey, T> Cache<K, T> {
     ///
     /// `Overflow` when the count would, and the budget's errors; the cache is
     /// then unchanged.
-    pub(super) fn insert(
-        &mut self,
-        key: K,
-        value: Option<T>,
-        size: usize,
-    ) -> Result<Option<Kept<T>>> {
+    pub(super) fn insert(&mut self, key: K, value: T, size: usize) -> Result<Kept<T>> {
+        let at = self.add(key, Some(value), size)?;
+        let Value::Kept(node) = &self.entry(at).value else {
+            unreachable!("a value just kept");
+        };
+        let kept = Kept(Arc::clone(node));
+        self.shrink();
+        Ok(kept)
+    }
+
+    /// Keeps `key` without a value, counted as [`insert`](Self::insert)
+    /// counts one.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`insert`](Self::insert).
+    pub(super) fn insert_empty(&mut self, key: K, size: usize) -> Result<()> {
+        self.add(key, None, size)?;
+        self.shrink();
+        Ok(())
+    }
+
+    /// Adds an entry for `key` as the newest in the queue, without cutting;
+    /// its slot.
+    fn add(&mut self, key: K, value: Option<T>, size: usize) -> Result<u32> {
         let hash = self.hash(&key.view());
         debug_assert!(self.find(&key.view()).is_none(), "a key kept twice");
         let size = if size == 1 {
@@ -271,23 +304,26 @@ impl<K: CacheKey, T> Cache<K, T> {
         self.reserve()?;
         let (size, total) = total;
         let (at, generation) = self.take_slot();
-        let value = value.map(|value| {
-            Arc::new(Node {
-                value,
-                released: Released {
-                    log: Arc::clone(&self.released),
-                    slot: at,
-                    generation,
-                },
-            })
-        });
-        let kept = value.as_ref().map(|node| Kept(Arc::clone(node)));
+        let value = match value {
+            Some(value) => {
+                self.values += 1;
+                Value::Kept(Arc::new(Node {
+                    value,
+                    released: Released {
+                        log: Arc::clone(&self.released),
+                        slot: at,
+                        generation,
+                    },
+                }))
+            }
+            None => Value::Empty,
+        };
         let chain = self.index.insert(hash, at).unwrap_or(NONE);
         let entry = Entry {
             key,
             hash,
             chain,
-            value: value.map_or(Value::Empty, Value::Kept),
+            value,
             size,
             older: NONE,
             newer: NONE,
@@ -296,8 +332,7 @@ impl<K: CacheKey, T> Cache<K, T> {
         self.len += 1;
         self.size = total;
         self.queue(at);
-        self.shrink();
-        Ok(kept)
+        Ok(at)
     }
 
     /// Cuts the cache to `limit` as `ass_cache_cut` does, and keeps it
@@ -353,13 +388,7 @@ impl<K: CacheKey, T> Cache<K, T> {
     /// Takes out the entries whose values were let go, cut while held.
     fn take_released(&mut self) {
         loop {
-            let record = {
-                let mut log = self
-                    .released
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                log.pop()
-            };
+            let record = lock(&self.released).pop();
             let Some((at, generation)) = record else {
                 break;
             };
@@ -375,37 +404,61 @@ impl<K: CacheKey, T> Cache<K, T> {
         }
     }
 
-    /// Room for one more entry: a slot, its index bucket and its release
-    /// record, charged before anything changes.
+    /// Room for one more entry: a slot, its index bucket, its value and its
+    /// release record, charged before anything changes.
+    ///
+    /// # Errors
+    ///
+    /// `Overflow` when every slot number is taken, and the budget's errors.
     fn reserve(&mut self) -> Result<()> {
-        if self.free == NONE && self.slots.len() == self.slots.capacity() {
-            self.slots.try_reserve_exact(self.slots.len().max(16))?;
+        if self.free == NONE {
+            // A new slot's number must not be `NONE`.
+            if u32::try_from(self.slots.len()).map_or(true, |len| len == NONE) {
+                return Err(Error::Overflow);
+            }
+            if self.slots.len() == self.slots.capacity() {
+                self.slots.try_reserve_exact(self.slots.len().max(16))?;
+            }
         }
         self.index.try_reserve(1).map_err(|_| Error::Allocation)?;
         let records = self.slots.capacity() + 1;
-        let mut log = self
-            .released
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut log = lock(&self.released);
         if log.capacity() < records {
             let len = log.len();
             log.try_reserve_exact(records - len)
                 .map_err(|_| Error::Allocation)?;
         }
         drop(log);
-        self.charge.resize_to(self.charged_bytes())
+        // One value more than kept.
+        let bytes = self.charged_bytes().saturating_add(Self::NODE_BYTES);
+        self.charge.resize_to(bytes)
     }
 
+    /// What the cache charges beyond its slots: its index, by buckets as
+    /// the map lays them out; its values' shared allocations; and its
+    /// release log.
     fn charged_bytes(&self) -> usize {
-        let log = self
-            .released
-            .lock()
-            .map_or(0, |log| log.capacity())
-            .saturating_mul(size_of::<(u32, u32)>());
-        self.index
+        let log = lock(&self.released)
             .capacity()
-            .saturating_mul(Self::BUCKET_BYTES)
-            .saturating_add(log)
+            .saturating_mul(size_of::<(u32, u32)>());
+        // The map's buckets are a power of two, all but an eighth of them
+        // usable past eight, all but one below.
+        let capacity = self.index.capacity();
+        let buckets = match capacity {
+            0 => 0,
+            1..=3 => 4,
+            4..=7 => 8,
+            _ => capacity / 7 * 8,
+        };
+        let index = if buckets == 0 {
+            0
+        } else {
+            buckets
+                .saturating_mul(Self::BUCKET_BYTES)
+                .saturating_add(Self::INDEX_TAIL_BYTES)
+        };
+        let values = self.values.saturating_mul(Self::NODE_BYTES);
+        index.saturating_add(values).saturating_add(log)
     }
 
     /// A free slot and its generation, from the free list or new.
@@ -516,22 +569,22 @@ impl<K: CacheKey, T> Cache<K, T> {
                 before = next;
             }
         }
-        let free = Slot::Free {
-            next: self.free,
-            generation: 0,
-        };
-        let Slot::Used { entry, generation } =
-            std::mem::replace(&mut self.slots[at as usize], free)
-        else {
-            return;
+        let Slot::Used { generation, .. } = &self.slots[at as usize] else {
+            unreachable!("a free slot linked");
         };
         // A record of the entry let go of before is stale from now on.
-        self.slots[at as usize] = Slot::Free {
+        let free = Slot::Free {
             next: self.free,
             generation: generation.wrapping_add(1),
         };
+        let Slot::Used { entry, .. } = std::mem::replace(&mut self.slots[at as usize], free) else {
+            unreachable!("a free slot linked");
+        };
         self.free = at;
         self.len -= 1;
+        if !matches!(entry.value, Value::Empty) {
+            self.values -= 1;
+        }
         debug_assert!(entry.size <= self.size);
         self.size = self.size.saturating_sub(entry.size);
         // Dropping the entry lets go of its key and value, which may log
@@ -689,7 +742,7 @@ mod tests {
 
     fn found<T: Copy>(cache: &mut Cache<T>, key: u32) -> Option<T> {
         match cache.get(key) {
-            Lookup::Hit(Some(value)) => Some(*value),
+            Lookup::Hit(value) => Some(*value),
             _ => None,
         }
     }
@@ -698,7 +751,7 @@ mod tests {
     fn a_cut_takes_the_least_recently_used_until_it_fits() {
         let mut cache = cache();
         for key in 0..4 {
-            cache.insert(key, Some(key), 100).unwrap();
+            cache.insert(key, key, 100).unwrap();
         }
         assert_eq!(found(&mut cache, 0), Some(0));
         // 1 and 2 go: the oldest uses, until two entries remain.
@@ -712,16 +765,16 @@ mod tests {
     fn an_insertion_past_the_limit_cuts_as_the_frame_cut_does() {
         let mut cache = cache();
         cache.cut(2 * (100 + ITEM_BYTES));
-        let held = cache.insert(0, Some(0), 100).unwrap().unwrap();
+        let held = cache.insert(0, 0, 100).unwrap();
         for key in 1..4 {
-            cache.insert(key, Some(key), 100).unwrap();
+            cache.insert(key, key, 100).unwrap();
         }
         // The oldest free entries went as the newer came; the held one stays,
         // out of the queue and counted.
         assert_eq!(cache.size(), 2 * (100 + ITEM_BYTES));
         assert!(found(&mut cache, 1).is_none() && found(&mut cache, 2).is_none());
         assert!(found(&mut cache, 3).is_some());
-        let Lookup::Hit(Some(again)) = cache.get(0) else {
+        let Lookup::Hit(again) = cache.get(0) else {
             panic!("the held entry went");
         };
         assert!(Kept::ptr_eq(&held, &again));
@@ -730,9 +783,9 @@ mod tests {
     #[test]
     fn a_held_entry_goes_when_its_last_holder_lets_go() {
         let mut cache = cache();
-        let held = cache.insert(0, Some(0), 100).unwrap().unwrap();
-        cache.insert(1, Some(1), 100).unwrap();
-        cache.insert(2, Some(2), 100).unwrap();
+        let held = cache.insert(0, 0, 100).unwrap();
+        cache.insert(1, 1, 100).unwrap();
+        cache.insert(2, 2, 100).unwrap();
         // The cut passes the held entry and takes the free ones after it
         // until the size fits, which the held one alone does not.
         cache.cut(0);
@@ -747,7 +800,7 @@ mod tests {
     #[test]
     fn a_lookup_queues_a_held_entry_again() {
         let mut cache = cache();
-        let held = cache.insert(0, Some(0), 100).unwrap().unwrap();
+        let held = cache.insert(0, 0, 100).unwrap();
         cache.cut(0);
         assert!(found(&mut cache, 0).is_some());
         // Queued again, it stays when let go until a cut takes it.
@@ -759,10 +812,61 @@ mod tests {
     }
 
     #[test]
+    fn a_lookup_of_a_held_entry_let_go_since_finds_nothing() {
+        let mut cache = cache();
+        let held = cache.insert(0, 0, 100).unwrap();
+        cache.cut(0);
+        // Let go, but not yet taken out: the lookup takes it out.
+        drop(held);
+        assert!(matches!(cache.get(0), Lookup::Miss));
+        assert_eq!((cache.len(), cache.size()), (0, 0));
+    }
+
+    #[test]
+    fn a_stale_release_record_leaves_the_slot_s_new_entry() {
+        let mut cache = cache();
+        let held = cache.insert(0, 0, 100).unwrap();
+        cache.cut(0);
+        // Its release is recorded, and the lookup frees its slot before the
+        // record is read.
+        drop(held);
+        assert!(matches!(cache.get(0), Lookup::Miss));
+        // The next entry takes the slot while the record is pending; held,
+        // it outlasts the cut that reads the record.
+        let next = cache.insert(1, 1, 100).unwrap();
+        cache.settle();
+        assert_eq!(cache.len(), 1);
+        let Lookup::Hit(found) = cache.get(1) else {
+            panic!("the stale record took the new entry");
+        };
+        assert!(Kept::ptr_eq(&found, &next));
+    }
+
+    #[test]
+    fn each_value_and_the_index_are_charged() {
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut cache: Cache = Cache::new(&budget);
+        cache.insert(0, 0, 10).unwrap();
+        let one = budget.used();
+        for key in 1..100 {
+            cache.insert(key, key, 10).unwrap();
+        }
+        let values = 99 * Cache::<u32>::NODE_BYTES;
+        assert!(budget.used() >= one + values, "{} {one}", budget.used());
+        // At least a bucket per entry besides.
+        let buckets = 100 * Cache::<u32>::BUCKET_BYTES;
+        let full = budget.used();
+        assert!(full >= values + buckets);
+        // The values' charges go with them.
+        cache.cut(0);
+        assert!(budget.used() + values <= full, "{} {full}", budget.used());
+    }
+
+    #[test]
     fn an_entry_counted_as_one_takes_no_item_record() {
         let mut cache = cache();
         for key in 0..3 {
-            cache.insert(key, Some(key), 1).unwrap();
+            cache.insert(key, key, 1).unwrap();
         }
         assert_eq!(cache.size(), 3);
         cache.cut(2);
@@ -773,8 +877,8 @@ mod tests {
     #[test]
     fn an_empty_value_is_kept_and_never_held() {
         let mut cache: Cache = cache();
-        assert!(cache.insert(0, None, 10).unwrap().is_none());
-        assert!(matches!(cache.get(0), Lookup::Hit(None)));
+        cache.insert_empty(0, 10).unwrap();
+        assert!(matches!(cache.get(0), Lookup::Empty));
         cache.cut(0);
         assert!(matches!(cache.get(0), Lookup::Miss));
     }
@@ -805,16 +909,13 @@ mod tests {
             }
         }
         let mut cache = Outlines::new(&Budget::new(1 << 20).unwrap());
-        let g = cache.insert(Key::Glyph(0), Some(0), 1).unwrap().unwrap();
-        cache.insert(Key::Border(g.clone()), Some(1), 1).unwrap();
+        let g = cache.insert(Key::Glyph(0), 0, 1).unwrap();
+        cache.insert(Key::Border(g.clone()), 1, 1).unwrap();
         drop(g);
-        cache.insert(Key::Glyph(2), Some(2), 1).unwrap();
+        cache.insert(Key::Glyph(2), 2, 1).unwrap();
         cache.cut(1);
         assert_eq!(cache.len(), 1);
-        assert!(matches!(
-            cache.get((2, std::ptr::null())),
-            Lookup::Hit(Some(_))
-        ));
+        assert!(matches!(cache.get((2, std::ptr::null())), Lookup::Hit(_)));
     }
 
     /// Lookups leave nothing behind that holds a value: an outline a
@@ -823,12 +924,12 @@ mod tests {
     #[test]
     fn lookups_do_not_hold_other_caches_values() {
         let mut outlines: Cache = cache();
-        let outline = outlines.insert(0, Some(0), 1).unwrap().unwrap();
+        let outline = outlines.insert(0, 0, 1).unwrap();
         let mut bitmaps: super::Cache<u32, Kept<u32>> =
             super::Cache::new(&Budget::new(1 << 20).unwrap());
-        bitmaps.insert(7, Some(outline), 100).unwrap();
+        bitmaps.insert(7, outline, 100).unwrap();
         for _ in 0..1000 {
-            assert!(matches!(bitmaps.get(7), Lookup::Hit(Some(_))));
+            assert!(matches!(bitmaps.get(7), Lookup::Hit(_)));
         }
         outlines.cut(0);
         assert_eq!(outlines.len(), 1);
@@ -842,7 +943,7 @@ mod tests {
         let budget = Budget::new(4096).unwrap();
         let mut cache: Cache = Cache::new(&budget);
         let mut kept = 0;
-        while cache.insert(kept, Some(kept), 10).is_ok() {
+        while cache.insert(kept, kept, 10).is_ok() {
             kept += 1;
             assert!(kept < 10_000, "the budget never ran out");
         }
@@ -853,20 +954,16 @@ mod tests {
         assert_eq!(found(&mut cache, 0), Some(0));
         cache.cut(0);
         assert_eq!(cache.len(), 0);
-        assert!(cache.insert(0, Some(0), 10).is_ok());
+        assert!(cache.insert(0, 0, 10).is_ok());
     }
 
     #[test]
     fn a_held_bitmap_stays_charged_until_it_is_let_go() {
-        use std::sync::Arc;
         use triergon_raster::{Bitmap, Limits};
         let budget = Budget::new(1 << 20).unwrap();
-        let mut cache: super::Cache<u32, Arc<Bitmap>> = super::Cache::new(&budget);
+        let mut cache: super::Cache<u32, Bitmap> = super::Cache::new(&budget);
         let bitmap = Bitmap::new(&budget, 64, 64, &Limits::default()).unwrap();
-        let held = cache
-            .insert(0, Some(Arc::new(bitmap)), 64 * 64)
-            .unwrap()
-            .unwrap();
+        let held = cache.insert(0, bitmap, 64 * 64).unwrap();
         let charged = budget.used();
         // Cut to nothing while held: it stays, counted and charged.
         cache.cut(0);

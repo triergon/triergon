@@ -3,12 +3,12 @@
 //! a composite cache: each glyph's fill and border, then each run's fill,
 //! border and shadow composited.
 
-use std::sync::Arc;
+use std::ops::Deref;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::{
     Bitmap, BitmapTransform, BorderStroke, EffectsKey, FrameScale, GlyphBitmaps, GlyphPlacement,
-    GlyphSource, Matrix, PlacedBitmap, Quantized, Raster, Run, Shape, Vector,
+    GlyphSource, Limits, Matrix, PlacedBitmap, Quantized, Raster, Run, Shape, Vector,
 };
 
 use super::CacheLimits;
@@ -52,13 +52,11 @@ pub(super) struct Combined {
 /// What a bitmap is drawn from.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum BitmapSource {
-    /// A glyph's or drawing's outline.
+    /// A glyph's or drawing's outline, or the unit square of opaque boxes.
     Outline(OutlineId),
     /// The border stroked around a glyph's outline by a stroke: libass's
     /// border outline, which is one outline for one glyph and stroke.
     Border(OutlineId, BorderStroke),
-    /// The unit square of opaque boxes.
-    UnitBox,
 }
 
 /// What identifies a bitmap (libass's `BitmapHashKey`): what it is drawn
@@ -82,13 +80,26 @@ impl CacheKey for BitmapKey {
     }
 }
 
-/// A bitmap kept, `None` when it draws nothing, with the stroked border it
-/// was drawn from, which libass's bitmap key holds as long as the bitmap is
-/// kept.
+/// A bitmap kept (libass's `Bitmap`), empty when it draws nothing, with
+/// the stroked border it was drawn from, which libass's bitmap key holds as
+/// long as the bitmap is kept.
 #[derive(Debug)]
 struct KeptBitmap {
-    bitmap: Option<Arc<Bitmap>>,
+    bitmap: Bitmap,
     _drawn_from: Option<Kept<OutlineValue>>,
+}
+
+/// A bitmap the bitmap cache keeps, which stays in the cache, counted, as
+/// long as a run being drawn or a vector clip holds it.
+#[derive(Clone, Debug)]
+pub(super) struct SharedBitmap(Kept<KeptBitmap>);
+
+impl Deref for SharedBitmap {
+    type Target = Bitmap;
+
+    fn deref(&self) -> &Bitmap {
+        &self.0.bitmap
+    }
 }
 
 /// One glyph of a run's composite key (libass's `BitmapRef`): the keys of
@@ -155,10 +166,11 @@ impl RunKey {
     }
 }
 
-/// A glyph's bitmaps while its run is drawn, with their keys.
+/// A glyph's bitmaps while its run is drawn, held as libass's run holds
+/// them, with their keys.
 #[derive(Debug)]
 struct Drawn {
-    bitmaps: GlyphBitmaps,
+    bitmaps: GlyphBitmaps<SharedBitmap>,
     fill: Option<BitmapKey>,
     border: Option<BitmapKey>,
 }
@@ -168,7 +180,7 @@ struct Drawn {
 #[derive(Debug)]
 pub(super) struct Painter {
     raster: Raster,
-    bitmaps: Cache<BitmapKey, KeptBitmap>,
+    bitmaps: Bitmaps,
     composites: Cache<RunKey, Composited>,
     /// The bitmaps of the run being drawn.
     drawn: BudgetVec<Drawn>,
@@ -178,10 +190,13 @@ pub(super) struct Painter {
 }
 
 impl Painter {
-    pub(super) fn new(budget: &Budget, limits: triergon_raster::Limits) -> Self {
+    pub(super) fn new(budget: &Budget, limits: Limits) -> Self {
         Self {
             raster: Raster::new(budget, limits),
-            bitmaps: Cache::new(budget),
+            bitmaps: Bitmaps {
+                budget: budget.clone(),
+                cache: Cache::new(budget),
+            },
             composites: Cache::new(budget),
             drawn: BudgetVec::new(budget),
             glyphs: BudgetVec::new(budget),
@@ -194,7 +209,7 @@ impl Painter {
     /// hold them then.
     pub(super) fn cut(&mut self, limits: &CacheLimits) {
         self.composites.cut(limits.composite_bytes);
-        self.bitmaps.cut(limits.bitmap_bytes);
+        self.bitmaps.cache.cut(limits.bitmap_bytes);
     }
 
     /// Cuts both caches to their limits again once an event's images are
@@ -202,18 +217,19 @@ impl Painter {
     /// or let go (see [`Cache::cut`]).
     pub(super) fn settle(&mut self) {
         self.composites.settle();
-        self.bitmaps.settle();
+        self.bitmaps.cache.settle();
     }
 
     /// The bitmap of `outline` under a plain matrix, placed on its own: a
     /// vector clip, which libass draws through its bitmap cache too
-    /// (`blend_vector_clip`). `None` when nothing is drawn.
+    /// (`blend_vector_clip`), and holds while it clips. `None` when nothing
+    /// is drawn.
     pub(super) fn draw_shape(
         &mut self,
         outline: &Kept<OutlineValue>,
         matrix: &Matrix,
         work: &mut WorkBudget,
-    ) -> Result<Option<PlacedBitmap>> {
+    ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
         let Some(at) = Quantized::standalone(&outline.shape, matrix) else {
             return Ok(None);
         };
@@ -221,16 +237,9 @@ impl Painter {
             source: BitmapSource::Outline(OutlineId(outline.clone())),
             transform: at.transform,
         };
-        let shape = Drawable::Shape(&outline.shape);
-        bitmap(
-            &mut self.bitmaps,
-            &mut self.raster,
-            key,
-            shape,
-            None,
-            at,
-            work,
-        )
+        let raster = &mut self.raster;
+        self.bitmaps
+            .get(raster, key, &outline.shape, None, at, work)
     }
 
     /// Draws and combines an event's runs, in order, into `out`.
@@ -274,7 +283,7 @@ impl Painter {
             self.finish(placed, &run, frame, out, work)?;
             // The run's glyph bitmaps are let go once it is composited.
             self.drawn.clear();
-            self.bitmaps.settle();
+            self.bitmaps.cache.settle();
         }
         Ok(())
     }
@@ -303,7 +312,7 @@ impl Painter {
         };
         // A border that rounds to nothing is the fill's own bitmap.
         let border = match (bitmaps.fill(), bitmaps.border()) {
-            (Some(fill), Some(border)) if Arc::ptr_eq(&fill.bitmap, &border.bitmap) => {
+            (Some(fill), Some(border)) if Kept::ptr_eq(&fill.bitmap.0, &border.bitmap.0) => {
                 source.fill.clone()
             }
             _ => source.border,
@@ -360,8 +369,10 @@ impl Painter {
             glyphs: &self.glyphs,
         };
         let composite = match self.composites.get(view) {
-            Lookup::Hit(Some(composite)) => composite,
-            Lookup::Hit(None) | Lookup::Miss => {
+            Lookup::Hit(composite) => composite,
+            // Never kept: a run is always composited.
+            Lookup::Empty => return Ok(()),
+            Lookup::Miss => {
                 let bitmaps = drawn.iter().map(|d| &d.bitmaps);
                 let composite = self.raster.compose(&placed.effects, frame, bitmaps, work)?;
                 let parts = [&composite.fill, &composite.border, &composite.shadow];
@@ -375,10 +386,7 @@ impl Painter {
                     border: composite.border,
                     shadow: composite.shadow,
                 };
-                match self.composites.insert(key, Some(composite), size)? {
-                    Some(composite) => composite,
-                    None => return Ok(()),
-                }
+                self.composites.insert(key, composite, size)?
             }
         };
         out.try_push(Combined {
@@ -396,7 +404,7 @@ impl Painter {
 /// A glyph's bitmaps from the bitmap cache, drawn and kept on a miss; the
 /// keys of its fill and border as they are found.
 struct CachedBitmaps<'a> {
-    bitmaps: &'a mut Cache<BitmapKey, KeptBitmap>,
+    bitmaps: &'a mut Bitmaps,
     outlines: &'a mut Outlines,
     glyph: &'a Kept<OutlineValue>,
     fill: Option<BitmapKey>,
@@ -404,19 +412,22 @@ struct CachedBitmaps<'a> {
 }
 
 impl GlyphSource for CachedBitmaps<'_> {
+    type Bitmap = SharedBitmap;
+
     fn fill(
         &mut self,
         raster: &mut Raster,
         shape: &Shape,
         at: Quantized,
         work: &mut WorkBudget,
-    ) -> Result<Option<PlacedBitmap>> {
+    ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
         let key = BitmapKey {
             source: BitmapSource::Outline(OutlineId(self.glyph.clone())),
             transform: at.transform,
         };
-        let shape = Drawable::Shape(shape);
-        let found = bitmap(self.bitmaps, raster, key.clone(), shape, None, at, work)?;
+        let found = self
+            .bitmaps
+            .get(raster, key.clone(), shape, None, at, work)?;
         self.fill = found.is_some().then_some(key);
         Ok(found)
     }
@@ -424,15 +435,23 @@ impl GlyphSource for CachedBitmaps<'_> {
     fn opaque_box(
         &mut self,
         raster: &mut Raster,
-        at: Quantized,
+        at: Option<Quantized>,
         work: &mut WorkBudget,
-    ) -> Result<Option<PlacedBitmap>> {
+    ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
+        // libass looks the unit square up before it places the box
+        // (`ass_render.c:1531`).
+        let unit_box = self.outlines.unit_box()?;
+        let Some(at) = at else {
+            return Ok(None);
+        };
         let key = BitmapKey {
-            source: BitmapSource::UnitBox,
+            source: BitmapSource::Outline(OutlineId(unit_box.clone())),
             transform: at.transform,
         };
-        let unit_box = Drawable::UnitBox;
-        let found = bitmap(self.bitmaps, raster, key.clone(), unit_box, None, at, work)?;
+        let shape = &unit_box.shape;
+        let found = self
+            .bitmaps
+            .get(raster, key.clone(), shape, None, at, work)?;
         self.border = found.is_some().then_some(key);
         Ok(found)
     }
@@ -444,7 +463,7 @@ impl GlyphSource for CachedBitmaps<'_> {
         stroke: BorderStroke,
         placement: &GlyphPlacement,
         work: &mut WorkBudget,
-    ) -> Result<Option<PlacedBitmap>> {
+    ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
         let Some(border) = self.outlines.border(self.glyph, stroke, raster, work)? else {
             return Ok(None);
         };
@@ -455,74 +474,66 @@ impl GlyphSource for CachedBitmaps<'_> {
             source: BitmapSource::Border(OutlineId(self.glyph.clone()), stroke),
             transform: at.transform,
         };
-        let shape = Drawable::Shape(&border.shape);
-        let found = bitmap(
-            self.bitmaps,
-            raster,
-            key.clone(),
-            shape,
-            Some(&border),
-            at,
-            work,
-        )?;
+        let shape = &border.shape;
+        let found = self
+            .bitmaps
+            .get(raster, key.clone(), shape, Some(&border), at, work)?;
         self.border = found.is_some().then_some(key);
         Ok(found)
     }
 }
 
-/// What a bitmap is drawn from: a shape, or the unit square the raster
-/// keeps.
-#[derive(Clone, Copy)]
-enum Drawable<'a> {
-    Shape(&'a Shape),
-    UnitBox,
+/// The bitmap cache (libass's `bitmap_cache`).
+#[derive(Debug)]
+struct Bitmaps {
+    budget: Budget,
+    cache: Cache<BitmapKey, KeptBitmap>,
 }
 
-/// The bitmap of `drawable` under `key`, placed at `at`: from the cache, or
-/// drawn and kept with `drawn_from`. `None` when it draws nothing, which is
-/// kept too.
-fn bitmap(
-    bitmaps: &mut Cache<BitmapKey, KeptBitmap>,
-    raster: &mut Raster,
-    key: BitmapKey,
-    drawable: Drawable<'_>,
-    drawn_from: Option<&Kept<OutlineValue>>,
-    at: Quantized,
-    work: &mut WorkBudget,
-) -> Result<Option<PlacedBitmap>> {
-    charge(work, LOOKUP_UNITS)?;
-    let bitmap = match bitmaps.get(&key) {
-        Lookup::Hit(found) => found.and_then(|kept| kept.bitmap.clone()),
-        Lookup::Miss => {
-            let (bitmap, points, segments) = match drawable {
-                Drawable::Shape(shape) => {
-                    let [first, second] = shape.outlines();
-                    (
-                        raster.draw(shape, &at.transform, work)?,
-                        first.points().len().saturating_add(second.points().len()),
-                        first
-                            .segments()
-                            .len()
-                            .saturating_add(second.segments().len()),
-                    )
-                }
-                // libass's box outline: four points and four segments.
-                Drawable::UnitBox => (raster.draw_box(&at.transform, work)?, 4, 4),
-            };
-            let bitmap = bitmap.map(Arc::new);
-            let size = sizes::bitmap(bitmap.as_deref().map_or(0, pixels), points, segments);
-            let kept = KeptBitmap {
-                bitmap: bitmap.clone(),
-                _drawn_from: drawn_from.cloned(),
-            };
-            bitmaps.insert(key, Some(kept), size)?;
-            bitmap
-        }
-    };
-    Ok(bitmap.map(|bitmap| PlacedBitmap {
-        bitmap,
-        origin: at.position,
-    }))
+impl Bitmaps {
+    /// The bitmap of `shape` under `key`, placed at `at`: from the cache, or
+    /// drawn and kept with `drawn_from`. `None` when it draws nothing, which
+    /// is kept too.
+    fn get(
+        &mut self,
+        raster: &mut Raster,
+        key: BitmapKey,
+        shape: &Shape,
+        drawn_from: Option<&Kept<OutlineValue>>,
+        at: Quantized,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
+        charge(work, LOOKUP_UNITS)?;
+        let kept = match self.cache.get(&key) {
+            Lookup::Hit(kept) => kept,
+            // Never kept: a bitmap that draws nothing is kept empty.
+            Lookup::Empty => return Ok(None),
+            Lookup::Miss => {
+                let bitmap = match raster.draw(shape, &at.transform, work)? {
+                    Some(bitmap) => bitmap,
+                    // libass keeps a bitmap without pixels.
+                    None => Bitmap::new(&self.budget, 0, 0, &Limits::default())?,
+                };
+                let [first, second] = shape.outlines();
+                let points = first.points().len().saturating_add(second.points().len());
+                let segments = first
+                    .segments()
+                    .len()
+                    .saturating_add(second.segments().len());
+                let size = sizes::bitmap(pixels(&bitmap), points, segments);
+                let kept = KeptBitmap {
+                    bitmap,
+                    _drawn_from: drawn_from.cloned(),
+                };
+                self.cache.insert(key, kept, size)?
+            }
+        };
+        // Drawn bitmaps are never empty.
+        Ok((kept.bitmap.width() != 0).then(|| PlacedBitmap {
+            bitmap: SharedBitmap(kept),
+            origin: at.position,
+        }))
+    }
 }
 
 /// The bytes libass counts for a bitmap's pixels: its stride times its

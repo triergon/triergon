@@ -75,7 +75,9 @@ and a run's composite from `Composite::origin`, the least origin of its glyphs.
 `Raster::render` draws a glyph in one call. A renderer that keeps the bitmaps it
 draws, as libass's caches do, renders through `Raster::render_with` and a
 `GlyphSource` of its own, which hands out the fill, the opaque box and the
-border it has and draws only the others. The steps are public too: `Run::place`
+border it has and draws only the others, held through a handle of its own
+(`GlyphSource::Bitmap`; `Raster::render` uses `Arc<Bitmap>`), which the run
+and `Raster::compose` hold them by. The steps are public too: `Run::place`
 quantises and places the glyph without drawing it, giving the `BitmapTransform`
 its fill and border are drawn under; `Raster::stroke_border` strokes the border
 and `Raster::draw` draws each, the opaque box from `Shape::unit_box`; and

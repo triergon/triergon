@@ -9,7 +9,7 @@ use std::sync::Arc;
 use triergon_core::{Budget, BudgetVec, Result};
 use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, Limits, PlacedBitmap, Rect};
 
-use super::bitmaps::{Combined, Composited};
+use super::bitmaps::{Combined, Composited, SharedBitmap};
 use super::cache::Kept;
 use crate::{Karaoke, Rgba};
 
@@ -189,10 +189,11 @@ pub(super) struct Clipping {
     pub frame: ClipFrame,
 }
 
-/// A vector clip drawn in the frame: its drawing's fill.
+/// A vector clip drawn in the frame: its drawing's fill, held in the bitmap
+/// cache while it clips.
 #[derive(Debug)]
 pub(super) struct ClipMask {
-    pub bitmap: PlacedBitmap,
+    pub bitmap: PlacedBitmap<SharedBitmap>,
     pub inverse: bool,
 }
 

@@ -90,6 +90,8 @@ enum OutlineKey {
     /// A drawing by its text.
     Drawing(BudgetVec<u8>),
     Border(BorderKey),
+    /// The unit square opaque boxes are drawn from.
+    UnitBox,
 }
 
 /// An outline's key as it is looked up, a drawing's text borrowed from the
@@ -99,6 +101,7 @@ enum KeyRef<'a> {
     Glyph(&'a GlyphKey),
     Drawing(&'a [u8]),
     Border(&'a BorderKey),
+    UnitBox,
 }
 
 impl CacheKey for OutlineKey {
@@ -109,6 +112,7 @@ impl CacheKey for OutlineKey {
             Self::Glyph(glyph) => KeyRef::Glyph(glyph),
             Self::Drawing(text) => KeyRef::Drawing(text),
             Self::Border(border) => KeyRef::Border(border),
+            Self::UnitBox => KeyRef::UnitBox,
         }
     }
 
@@ -117,10 +121,9 @@ impl CacheKey for OutlineKey {
     }
 }
 
-/// Outlines built so far: glyphs, drawings and borders, each counted as 1
-/// as libass counts its outline entries (libass also counts the unit
-/// square of opaque boxes, which the raster keeps here), and cut to the
-/// outline limit of the renderer's [`CacheLimits`](super::CacheLimits) as
+/// Outlines built so far: glyphs, drawings, borders and the unit square of
+/// opaque boxes, each counted as 1 as libass counts its outline entries,
+/// and cut to the outline limit of the renderer's [`CacheLimits`](super::CacheLimits) as
 /// libass cuts its outline cache (see [`Cache`]). Their storage is charged
 /// to the renderer's budget.
 #[derive(Debug)]
@@ -150,19 +153,27 @@ impl Outlines {
         self.cache.settle();
     }
 
-    /// The outline kept for `key`, if one is: `Some(None)` for one that
+    /// The outline kept for `key`, if one is: `Ok(None)` for one that
     /// cannot be built.
-    fn find(&mut self, key: KeyRef<'_>) -> Lookup<OutlineValue> {
-        self.cache.get(key)
+    fn find(&mut self, key: KeyRef<'_>) -> Option<Result<Option<Kept<OutlineValue>>>> {
+        match self.cache.get(key) {
+            Lookup::Miss => None,
+            Lookup::Empty => Some(Ok(None)),
+            Lookup::Hit(found) => Some(Ok(Some(found))),
+        }
     }
 
-    /// Keeps `value` for `key`, counted as 1.
+    /// Keeps `value` for `key`, counted as 1; `None` for an outline that
+    /// cannot be built.
     fn keep(
         &mut self,
         key: OutlineKey,
         value: Option<OutlineValue>,
     ) -> Result<Option<Kept<OutlineValue>>> {
-        self.cache.insert(key, value, 1)
+        match value {
+            Some(value) => self.cache.insert(key, value, 1).map(Some),
+            None => self.cache.insert_empty(key, 1).map(|()| None),
+        }
     }
 
     /// The outline of a glyph of `font`, `None` when its face cannot load it.
@@ -172,8 +183,8 @@ impl Outlines {
         font: &RequestedFont,
         work: &mut WorkBudget,
     ) -> Result<Option<Kept<OutlineValue>>> {
-        if let Lookup::Hit(found) = self.find(KeyRef::Glyph(&glyph)) {
-            return Ok(found);
+        if let Some(found) = self.find(KeyRef::Glyph(&glyph)) {
+            return found;
         }
         charge(work, OUTLINE_UNITS)?;
         let source = &font.faces()[glyph.face].font;
@@ -199,13 +210,23 @@ impl Outlines {
             glyph: OutlineId(glyph.clone()),
             stroke,
         };
-        if let Lookup::Hit(found) = self.find(KeyRef::Border(&key)) {
-            return Ok(found);
+        if let Some(found) = self.find(KeyRef::Border(&key)) {
+            return found;
         }
         let value = raster
             .stroke_border(&glyph.shape, &stroke, work)?
             .map(OutlineValue::of_shape);
         self.keep(OutlineKey::Border(key), value)
+    }
+
+    /// The unit square opaque boxes are drawn from, which libass keeps as
+    /// an outline (`ass_render.c:1294-1309`, `1423`).
+    pub(super) fn unit_box(&mut self) -> Result<Kept<OutlineValue>> {
+        if let Lookup::Hit(found) = self.cache.get(KeyRef::UnitBox) {
+            return Ok(found);
+        }
+        let value = OutlineValue::of_shape(Shape::unit_box(&self.budget)?);
+        self.cache.insert(OutlineKey::UnitBox, value, 1)
     }
 
     /// The outline of a drawing, `None` when libass discards it.
@@ -215,8 +236,8 @@ impl Outlines {
         limits: &Limits,
         work: &mut WorkBudget,
     ) -> Result<Option<Kept<OutlineValue>>> {
-        if let Lookup::Hit(found) = self.find(KeyRef::Drawing(drawing.text)) {
-            return Ok(found);
+        if let Some(found) = self.find(KeyRef::Drawing(drawing.text)) {
+            return found;
         }
         // The parser passes over the text once.
         charge(work, OUTLINE_UNITS.saturating_add(drawing.text.len()))?;
