@@ -112,7 +112,7 @@ impl TrackInfo for Track {
         self.stream().codec_tag()
     }
     fn codec(&self) -> CodecId<'_> {
-        self.stream().codec()
+        TrackInfo::codec(self.stream())
     }
     fn configuration(&self) -> &[u8] {
         self.stream().configuration()
