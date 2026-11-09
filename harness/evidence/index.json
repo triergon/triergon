@@ -16951,6 +16951,15 @@
    "sha256": "6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d",
    "bytes": 2261151,
    "source_revision": "03f3efd3a0fde0d558c68f5408c521d632802fb7"
+  },
+  {
+   "name": "mp4-range-opus-aarch64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-opus-aarch64/1d64f438deca9655092d6b01d80730db4c34d05343c7152791bcef29296e4254.tar.gz",
+   "sha256": "1d64f438deca9655092d6b01d80730db4c34d05343c7152791bcef29296e4254",
+   "bytes": 69117613,
+   "source_revision": "af1b9b933480dbe44856bc54afcda636128b0702"
   }
  ]
 }
