@@ -70,6 +70,11 @@ static void *observed_aligned_alloc(size_t a,size_t n){
     if(nested||!enabled)return aligned_alloc(a,n);nested=1;void *p=aligned_alloc(a,n);
     lock();add(p);sample();unlock();nested=0;return p;
 }
+static char *observed_duplicate(const char *text,size_t length){
+    char *out=observed_malloc(length+1);if(out){memcpy(out,text,length);out[length]=0;}return out;
+}
+static char *observed_strdup(const char *text){return observed_duplicate(text,strlen(text));}
+static char *observed_strndup(const char *text,size_t limit){return observed_duplicate(text,strnlen(text,limit));}
 static void control(const void *buffer,size_t size){
     if(!enabled||nested)return;
     int begin=size==18&&!memcmp(buffer,"TRIERGON_BEGIN_V1\n",18);
@@ -95,6 +100,8 @@ INTERPOSE(observed_free,free);
 INTERPOSE(observed_realloc,realloc);
 INTERPOSE(observed_posix_memalign,posix_memalign);
 INTERPOSE(observed_aligned_alloc,aligned_alloc);
+INTERPOSE(observed_strdup,strdup);
+INTERPOSE(observed_strndup,strndup);
 INTERPOSE(observed_write,write);
 INTERPOSE(observed_writev,writev);
 __attribute__((constructor)) static void initialize(void){
