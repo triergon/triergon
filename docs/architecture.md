@@ -108,8 +108,8 @@ unchanged, so worker traces stay byte-identical.
 
 A format whose only consumer need is FFmpeg's result has no specification decoder.
 The DVB, PGS and DVD bitmap subtitles in `triergon-subtitles` are decoded only by
-their receivers in `compat`; the crate root keeps what those receivers read
-(segments, packets and container configuration).
+their receivers in `compat`. The crate root keeps the segment, packet and container
+configuration types that playback binds its tracks with.
 
 ## Dispatch and errors
 

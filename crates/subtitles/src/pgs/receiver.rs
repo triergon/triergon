@@ -55,7 +55,6 @@ pub struct DisplayLimits {
     pub max_objects: usize,
     pub max_palettes: usize,
     pub max_references: usize,
-    pub max_segments: usize,
     pub max_packet_bytes: usize,
     /// Cumulative deterministic work until explicit reset, not wall time.
     pub max_work: usize,
@@ -71,7 +70,6 @@ impl Default for DisplayLimits {
             max_objects: 64,
             max_palettes: 8,
             max_references: 255,
-            max_segments: 256,
             max_packet_bytes: 16 * 1024 * 1024,
             max_work: 256 * 1024 * 1024,
         }
@@ -85,7 +83,6 @@ impl DisplayLimits {
             (self.max_objects, 64),
             (self.max_palettes, 8),
             (self.max_references, 255),
-            (self.max_segments, 4096),
         ] {
             if requested > maximum {
                 return Err(Error::Limit { requested, maximum });
@@ -389,10 +386,19 @@ impl ReceiverDecoder {
         self.displayed = false;
         self.refusal = None;
         self.observations = ReceiverObservations::default();
-        // `finish`, `poison` and `reset` leave no event behind.
+        // `finish`, `poison` and `reset` leave no event behind; release
+        // builds clear it anyway, out of line.
         debug_assert!(self.event.is_none());
+        if self.event.is_some() {
+            self.discard_event();
+        }
         self.done(Phase::Segment);
         Ok(())
+    }
+
+    #[cold]
+    fn discard_event(&mut self) {
+        self.event = None;
     }
 
     pub fn work_spent(&self) -> usize {

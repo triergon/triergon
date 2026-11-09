@@ -1365,9 +1365,9 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
     assert!(
         source
             .raw
-            .shares_storage_with(retained.observations.raw_packet())
+            .shares_storage_with(retained.decoded.raw_packet())
     );
-    let event = retained.observations.receiver_output().unwrap();
+    let event = retained.decoded.receiver_output().unwrap();
     assert_eq!(event.pts_microseconds, Some(100_000));
     assert_eq!(event.rectangles().len(), 1);
     assert_eq!(event.rectangles()[0].pixels().as_ref(), &[1, 2]);
@@ -1414,11 +1414,7 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
         "original caller packet metadata"
     );
     assert_eq!(
-        retained
-            .observations
-            .receiver_output()
-            .unwrap()
-            .rectangles()[0]
+        retained.decoded.receiver_output().unwrap().rectangles()[0]
             .pixels()
             .as_ref(),
         &[1, 2]
@@ -1559,7 +1555,7 @@ fn bitmap_reset_uses_new_source_fence_and_keeps_old_output() {
     };
     assert_eq!(old.packet.input().scope.generation, 7);
     assert_eq!(next.packet.input().scope.generation, 8);
-    let rectangles = old.observations.receiver_output().unwrap().rectangles();
+    let rectangles = old.decoded.receiver_output().unwrap().rectangles();
     assert_eq!(rectangles[0].pixels().as_ref(), &[1, 2]);
 }
 /// Step a DVD receiver until it outputs the pending packet.
@@ -1675,12 +1671,13 @@ fn dvd_presentation_preserves_precise_pts_and_explicit_clear() {
         let mut input = bitmap_input(&b, &raw);
         input.clock.pts = pts;
         input.clock.dts = dts;
-        let mut receiver =
-            DvdReceiver::new(&b, bitmap_scope(), DvdBridgeConfig::default()).unwrap();
+        let mut config = DvdBridgeConfig::default();
+        config.settings.canvas = Some([720, 480]);
+        let mut receiver = DvdReceiver::new(&b, bitmap_scope(), config).unwrap();
         receiver
             .provide(input)
             .unwrap_or_else(|e| panic!("{:?}", e.error));
-        let out = dvd_next(&mut receiver, 32).unwrap();
+        let mut out = dvd_next(&mut receiver, 32).unwrap();
         let presentation = out.presentation().unwrap().unwrap();
         let at = |ms: u32| {
             pts.map(|pts| Time::new(i128::from(pts) + i128::from(ms) * 90, 90_000).unwrap())
@@ -1702,19 +1699,13 @@ fn dvd_presentation_preserves_precise_pts_and_explicit_clear() {
         );
         assert!(!presentation.picture.forced);
         assert_eq!(presentation.picture.row(1).unwrap(), &[1]);
-        let canvas = [720, 480];
-        let queued = out.packet_clock_picture(Some(canvas)).unwrap().unwrap();
-        assert_eq!(queued.canvas, Some(canvas));
+        let queued = out.packet_clock_picture().unwrap().unwrap();
+        assert_eq!(queued.canvas, Some([720, 480]));
         assert_eq!(queued.start_ns, start_ns);
         assert_eq!(queued.picture.palette(), presentation.picture.palette());
-        let invalid_canvas = [159, 480];
-        assert_eq!(
-            out.packet_clock_picture(Some(invalid_canvas))
-                .unwrap()
-                .unwrap()
-                .canvas,
-            None
-        );
+        // The queue places nothing on a canvas it cannot use.
+        out.canvas = Some([159, 480]);
+        assert_eq!(out.packet_clock_picture().unwrap().unwrap().canvas, None);
         drop((out, receiver));
         assert_eq!(b.used(), Budget::control_storage_bytes());
     }
@@ -2302,8 +2293,10 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     }
     assert_eq!(pgs_count, pgs_segments.len());
 
-    let settings = triergon_subtitles::compat::dvd::Settings::from_configuration(palette);
+    assert!(pgs_track.vobsub_settings().is_err());
+    let settings = dvd_track.vobsub_settings().unwrap();
     assert_eq!(settings.palette.unwrap()[0], 0x112233);
+    assert_eq!(settings.canvas, Some([720, 480]));
     let mut dvd = DvdReceiver::new(
         &pool,
         dvd_track.scope(),
@@ -2316,10 +2309,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     dvd.provide(dvd_input)
         .unwrap_or_else(|e| panic!("{:?}", e.error));
     let dvd_output = dvd_next(&mut dvd, 1).unwrap();
-    let queued = dvd_output
-        .packet_clock_picture(Some([720, 480]))
-        .unwrap()
-        .unwrap();
+    let queued = dvd_output.packet_clock_picture().unwrap().unwrap();
     assert_eq!(queued.start_ns, 9_000_000);
     assert_eq!(queued.canvas, Some([720, 480]));
     assert_eq!(queued.picture.row(1).unwrap(), &[1]);
@@ -3110,7 +3100,7 @@ fn dvd_stop_only_packet_produces_no_packet_clock_picture() {
         .unwrap_or_else(|e| panic!("{:?}", e.error));
     let out = dvd_next(&mut receiver, 32).unwrap();
     assert!(out.picture.is_none());
-    assert!(out.packet_clock_picture(None).unwrap().is_none());
+    assert!(out.packet_clock_picture().unwrap().is_none());
 }
 
 #[test]

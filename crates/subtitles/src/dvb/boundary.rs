@@ -24,8 +24,8 @@ pub struct DvbPacket {
     pub generation: u64,
     pub sequence: u64,
     pub envelope: PacketEnvelope,
-    /// Original configuration, raw clock values and container locator when the
-    /// configured boundary is used. Manually declared legacy packets use None.
+    /// Original configuration, raw clock values and container locator, when
+    /// the packet was bound by [`SourceConfiguration::packet`].
     pub source: Option<PacketSourceFacts>,
 }
 
@@ -261,7 +261,7 @@ impl SourceConfiguration {
         })
     }
 
-    pub(crate) fn check_pool(&self, budget: &Budget) -> Result<()> {
+    fn check_pool(&self, budget: &Budget) -> Result<()> {
         if self.original.belongs_to(budget) {
             Ok(())
         } else {

@@ -97,4 +97,40 @@ mod tests {
             assert_eq!(rgb(y, 128, 128, ChannelRounding::Nearest), grey);
         }
     }
+
+    /// The conversion written out from the matrices' published coefficients.
+    fn direct(matrix: YcbcrMatrix, y: u8, cr: u8, cb: u8, alpha: u8) -> u32 {
+        let c = |n: i64, d: i64| (n * 1024 + d / 2) / d;
+        let chroma = if matrix == YcbcrMatrix::BT601 {
+            [140_200, 71_414, 34_414, 177_200].map(|v| c(v * 255, 100_000 * 224))
+        } else {
+            [15_747, 4_682, 1_873, 18_556].map(|v| c(v * 255, 10_000 * 224))
+        };
+        let luma = (i64::from(y) - 16) * c(255, 219);
+        let (r, b) = (i64::from(cr) - 128, i64::from(cb) - 128);
+        let sums = [
+            luma + chroma[0] * r,
+            luma - chroma[1] * r - chroma[2] * b,
+            luma + chroma[3] * b,
+        ];
+        let [red, green, blue] = sums.map(|v| ((v + 512).div_euclid(1024)).clamp(0, 255) as u32);
+        (u32::from(alpha) << 24) | (red << 16) | (green << 8) | blue
+    }
+
+    #[test]
+    fn argb_matches_the_direct_conversion_for_every_colour() {
+        for matrix in [YcbcrMatrix::BT601, YcbcrMatrix::BT709] {
+            for y in 0..=255 {
+                for cr in 0..=255 {
+                    for cb in 0..=255 {
+                        let alpha = y ^ cr ^ cb;
+                        assert_eq!(
+                            matrix.argb(y, cr, cb, alpha, ChannelRounding::Nearest),
+                            direct(matrix, y, cr, cb, alpha)
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

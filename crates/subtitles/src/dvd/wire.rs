@@ -53,12 +53,9 @@ pub(crate) enum Command<'a> {
         bottom: u32,
     },
     End,
-    /// Operand lengths for unsupported commands are not guessed. The bounded
-    /// remainder stays available, and no following bytes become fake commands.
-    Opaque {
-        opcode: u8,
-        remainder: &'a [u8],
-    },
+    /// Any other opcode. Its operands' length is unknown, so the control
+    /// sequence ends here.
+    Unknown,
 }
 
 /// A display area's 12-bit inclusive columns and rows.
@@ -75,18 +72,14 @@ fn area(b: &[u8]) -> DvdArea {
 pub(crate) struct Commands<'a> {
     input: &'a [u8],
     at: usize,
-    count: usize,
-    maximum: usize,
     done: bool,
 }
 
 impl<'a> Commands<'a> {
-    pub(super) fn resume(input: &'a [u8], at: usize, count: usize, maximum: usize) -> Self {
+    pub(super) fn resume(input: &'a [u8], at: usize) -> Self {
         Self {
             input,
             at,
-            count,
-            maximum,
             done: false,
         }
     }
@@ -107,13 +100,6 @@ impl<'a> Commands<'a> {
     }
 
     fn parse(&mut self) -> Result<Command<'a>> {
-        if self.count == self.maximum {
-            return Err(Error::Limit {
-                requested: self.count.saturating_add(1),
-                maximum: self.maximum,
-            });
-        }
-        self.count += 1;
         let opcode = self.take(1)?[0];
         Ok(match opcode {
             0 => Command::ForcedStart,
@@ -152,10 +138,7 @@ impl<'a> Commands<'a> {
             }
             _ => {
                 self.done = true;
-                Command::Opaque {
-                    opcode,
-                    remainder: &self.input[self.at..],
-                }
+                Command::Unknown
             }
         })
     }

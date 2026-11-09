@@ -41,8 +41,8 @@ struct Options {
 impl Options {
     /// The receiver's settings, as opening the reference decoder makes them:
     /// the configuration's palette, then the IFO file's, then the option's.
-    fn settings(&self, configuration: &[u8]) -> Settings {
-        let mut settings = Settings::from_configuration(configuration);
+    fn settings(&self, configuration: &[u8]) -> Result<Settings> {
+        let mut settings = Settings::from_configuration(configuration)?;
         if let Some(path) = &self.ifo_palette {
             settings.apply_ifo(std::fs::read(path).ok().as_deref());
         }
@@ -50,7 +50,7 @@ impl Options {
             settings.apply_palette_option(text.as_bytes());
         }
         settings.forced_only = self.forced_only;
-        settings
+        Ok(settings)
     }
 }
 
@@ -95,7 +95,7 @@ pub fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
 
 impl Prepared for Dvd {
     fn run(&self, sink: &mut Sink<'_>) -> Result<()> {
-        let settings = self.options.settings(&self.track.configuration);
+        let settings = self.options.settings(&self.track.configuration)?;
         let mut decoder = Decoder::new(&self.pool, settings, Limits::default());
         sink.header(self.track.packets.len(), None)?;
         for (index, packet) in self.track.packets.iter().enumerate() {

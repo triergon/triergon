@@ -140,10 +140,6 @@ fn constructor_refuses_limits_above_the_format_ceilings() {
             max_references: 256,
             ..DisplayLimits::default()
         },
-        DisplayLimits {
-            max_segments: 4097,
-            ..DisplayLimits::default()
-        },
     ] {
         assert!(matches!(
             ReceiverDecoder::new(&b, limits, DisplayConfig::default()),
@@ -397,7 +393,7 @@ fn retained_native_outputs_survive_reset_and_decoder_drop_with_all_charges() {
 }
 
 #[test]
-fn native_eof_does_not_validate_pending_strict_source_state_or_fabricate_output() {
+fn end_of_input_presents_nothing_pending() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d = decoder(&b, false);

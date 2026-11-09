@@ -57,9 +57,10 @@ impl Mp4DvdSetup {
         let settings = specific
             .as_deref()
             .and_then(compat::dvd::mp4_configuration)
-            .map_or_else(compat::dvd::Settings::default, |text| {
-                compat::dvd::Settings::from_configuration(&text)
-            });
+            .map_or_else(
+                || Ok(compat::dvd::Settings::default()),
+                |text| compat::dvd::Settings::from_configuration(&text),
+            )?;
         Ok(Some(Mp4DvdTrack {
             scope: self.scope,
             epoch: self.epoch,

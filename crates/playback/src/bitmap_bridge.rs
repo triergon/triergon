@@ -1,5 +1,5 @@
-//! Owned packet handoff to existing bitmap jobs. Source owners, unknown clocks,
-//! typed tails, strict errors and explicitly selected native views stay distinct.
+//! Owned packet handoff to the PGS and DVD receivers. Each output keeps its
+//! packet's owner, and unknown clocks stay unknown.
 use crate::Result;
 use std::sync::{
     Arc,
@@ -141,7 +141,7 @@ pub struct PgsBridge<M> {
 /// One decoded packet with the receiver's output for it.
 pub struct PgsOutput<M> {
     pub packet: BitmapOwner<M>,
-    pub observations: compat::pgs::ReceiverPacket,
+    pub decoded: compat::pgs::ReceiverPacket,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -176,7 +176,7 @@ impl<M> PgsOutput<M> {
     /// queue. A zero-rectangle event clears the track. An absent event or an
     /// event whose rectangles cannot be displayed leaves the queue unchanged.
     pub fn packet_clock_action(&self) -> Result<Option<PgsQueueAction<'_>>> {
-        let Some(event) = self.observations.receiver_output() else {
+        let Some(event) = self.decoded.receiver_output() else {
             return Ok(None);
         };
         let start_ns = packet_queue_start_ns(self.packet.input().clock)?;
@@ -184,7 +184,7 @@ impl<M> PgsOutput<M> {
         if rectangles.is_empty() {
             return Ok(Some(PgsQueueAction::Clear { at_ns: start_ns }));
         }
-        let [width, height] = self.observations.context_canvas;
+        let [width, height] = self.decoded.context_canvas;
         let canvas =
             queue_canvas_dimensions(u32::from(width), u32::from(height)).then_some([width, height]);
         let picture = PgsQueuePicture {
@@ -321,7 +321,7 @@ impl<M> PgsBridge<M> {
                     .as_ref()
                     .ok_or(Error::Invalid("PGS packet owner"))?
                     .clone(),
-                observations: self.decoder.take_output(c)?,
+                decoded: self.decoder.take_output(c)?,
             })),
         }
     }
@@ -407,7 +407,7 @@ pub struct DvdPresentation<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct DvdQueuePicture<'a> {
     pub start_ns: i64,
-    pub canvas: Option<[u16; 2]>,
+    pub canvas: Option<[u32; 2]>,
     pub picture: &'a DvdPicture,
 }
 
@@ -415,6 +415,8 @@ pub struct DvdQueuePicture<'a> {
 pub struct DvdOutput<M> {
     pub packet: BitmapOwner<M>,
     pub picture: Option<DvdPicture>,
+    /// The canvas of the decoder's settings (the configuration's `size:`).
+    pub canvas: Option<[u32; 2]>,
 }
 
 impl<M> DvdOutput<M> {
@@ -446,17 +448,15 @@ impl<M> DvdOutput<M> {
 
     /// Match the existing bitmap queue: start at packet PTS, fall back to DTS,
     /// then zero. The queue ends a picture when its track is superseded or
-    /// cleared. Use `presentation` for DVD's explicit display offsets.
-    pub fn packet_clock_picture(
-        &self,
-        canvas: Option<[u16; 2]>,
-    ) -> Result<Option<DvdQueuePicture<'_>>> {
+    /// cleared. Use `presentation` for DVD's explicit display offsets. The
+    /// canvas is the configuration's, when the queue can place pictures on it.
+    pub fn packet_clock_picture(&self) -> Result<Option<DvdQueuePicture<'_>>> {
         let Some(picture) = &self.picture else {
             return Ok(None);
         };
         Ok(Some(DvdQueuePicture {
             start_ns: packet_queue_start_ns(self.packet.input().clock)?,
-            canvas: canvas.filter(|&[w, h]| queue_canvas_dimensions(u32::from(w), u32::from(h))),
+            canvas: self.canvas.filter(|&[w, h]| queue_canvas_dimensions(w, h)),
             picture,
         }))
     }
@@ -477,6 +477,7 @@ pub struct DvdReceiver<M> {
     pool: Budget,
     scope: BitmapScope,
     decoder: compat::dvd::Decoder,
+    canvas: Option<[u32; 2]>,
     packet: Option<BitmapOwner<M>>,
     /// The last step yielded, so the next one resumes the decoder.
     yielded: bool,
@@ -489,6 +490,7 @@ impl<M> DvdReceiver<M> {
         Ok(Self {
             pool: pool.clone(),
             scope,
+            canvas: config.settings.canvas,
             decoder: compat::dvd::Decoder::new(pool, config.settings, config.limits),
             packet: None,
             yielded: false,
@@ -607,7 +609,11 @@ impl<M> DvdReceiver<M> {
             .packet
             .take()
             .ok_or(Error::Invalid("DVD packet absent"))?;
-        Ok(DvdReceiverStep::Output(DvdOutput { packet, picture }))
+        Ok(DvdReceiverStep::Output(DvdOutput {
+            packet,
+            picture,
+            canvas: self.canvas,
+        }))
     }
 }
 

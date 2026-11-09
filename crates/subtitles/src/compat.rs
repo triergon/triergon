@@ -6,8 +6,8 @@
 //! configuration. Each module's documentation names the FFmpeg build it
 //! reproduces.
 //!
-//! Projections that exist only to compare traces with FFmpeg are not policies.
-//! They are compiled only with the `reference-trace` feature.
+//! Projections that exist only to compare traces with FFmpeg are not here;
+//! they are compiled only with the `reference-trace` feature.
 
 pub mod dvb {
     //! The DVB receiver: FFmpeg's `dvbsub` decoder.
@@ -49,7 +49,8 @@ pub mod dvd {
     //! sequences, 2-bit and 8-bit pixels, colours carried between units,
     //! transparent-border crop and `forced_subs_only`, configured by
     //! [`Settings`] from the stream configuration and the `palette` and
-    //! `ifo_palette` options ([`ifo_palette`]). Its packets come from
+    //! `ifo_palette` options ([`ifo_palette`]). The configuration's `size:`
+    //! line sets the canvas the subpictures are placed on. Its packets come from
     //! [`VobSubIndex`] (the `vobsub` demuxer's `.idx`/`.sub` reading), from
     //! [`SubpictureParser`] over a program stream's subpicture packets (the
     //! `mpegps` demuxer and DVD subtitle parser, streams numbered by

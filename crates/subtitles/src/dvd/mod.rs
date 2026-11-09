@@ -8,4 +8,4 @@ pub(crate) mod demux;
 pub mod program_stream;
 pub(crate) mod receiver;
 pub mod vobsub;
-pub(crate) mod wire;
+mod wire;

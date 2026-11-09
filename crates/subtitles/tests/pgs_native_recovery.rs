@@ -88,7 +88,7 @@ fn run(raw: &[u8], quantum: u64) -> ReceiverPacket {
 }
 
 #[test]
-fn receiver_end_payload_is_explicit_and_strict_error_and_raw_survive() {
+fn an_end_segment_payload_is_ignored_and_the_raw_packet_kept() {
     let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false);
     let out = run(&raw, 1);
     assert_eq!(out.raw_packet().as_ref(), raw);
@@ -100,7 +100,7 @@ fn receiver_end_payload_is_explicit_and_strict_error_and_raw_survive() {
     );
 }
 #[test]
-fn receiver_end_without_presentation_is_not_an_invented_source_clear() {
+fn an_end_without_a_presentation_presents_no_clear() {
     let raw = segment(0x80, &[]);
     let out = run(&raw, 1);
     assert_eq!(out.context_canvas, [0, 0]);
@@ -139,7 +139,7 @@ fn receiver_fragment_version_tolerance_keeps_original_version_bytes() {
     );
 }
 #[test]
-fn receiver_crop_is_separate_from_the_strict_outside_crop_error() {
+fn a_crop_outside_the_object_is_ignored() {
     let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], true);
     let out = run(&raw, 1);
     let rect = &out.receiver_output().unwrap().rectangles()[0];
@@ -183,7 +183,7 @@ fn incomplete_physical_segment_is_retained_and_has_no_fabricated_end() {
     }
 }
 #[test]
-fn partial_receiver_palette_reads_physical_following_bytes_without_source_colour_claim() {
+fn a_partial_palette_reads_the_following_bytes() {
     let raw = [
         pcs(0x80, false),
         segment(0x14, &[0, 0, 1]),
@@ -200,7 +200,7 @@ fn partial_receiver_palette_reads_physical_following_bytes_without_source_colour
     assert_eq!(out.raw_packet().as_ref(), raw);
 }
 #[test]
-fn reset_missing_definitions_suppresses_receiver_event_but_retains_strict_failure() {
+fn an_epoch_start_without_definitions_presents_nothing() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
@@ -272,7 +272,7 @@ fn work_zero_preserves_every_observed_allocation_boundary_for_valid_and_recovery
     }
 }
 #[test]
-fn allocation_pressure_retry_retains_paid_work_and_complete_source_owners() {
+fn allocation_pressure_retry_keeps_paid_work_and_owners() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
@@ -350,7 +350,7 @@ fn cancellation_before_during_and_after_ready_releases_private_graph_and_is_stic
     }
 }
 #[test]
-fn receiver_limits_are_never_reclassified_as_recoverable_source_syntax() {
+fn exceeded_limits_are_errors_not_refusals() {
     for limits in [
         DisplayLimits {
             max_object_pixels: 1,
@@ -528,7 +528,7 @@ fn missing_receiver_object_has_zero_position_but_preserves_the_original_pcs_refe
     assert_eq!(out.raw_packet().as_ref(), raw);
 }
 #[test]
-fn shorter_than_declared_rle_can_fill_a_receiver_picture_without_validating_source_length() {
+fn rle_shorter_than_declared_can_fill_the_picture() {
     let raw = [
         pcs(0x80, false),
         palette(),
@@ -571,7 +571,7 @@ fn combined_work_and_outputs_are_invariant_across_quanta_for_valid_and_recovered
     }
 }
 #[test]
-fn source_refusal_does_not_disable_subsequent_receiver_pixel_reference_or_fragment_limits() {
+fn limits_still_apply_after_a_packet_without_a_display() {
     for limits in [
         DisplayLimits {
             max_object_pixels: 1,

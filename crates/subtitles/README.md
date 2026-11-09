@@ -152,7 +152,7 @@ bytes are errors; nothing is replaced with U+FFFD.
 | --- | --- | --- |
 | DVB (EN 300 743) | DDS, PCS, RCS, CDS and method-0 (pixel) ODS; 2/4/8-bit interlaced RLE with map tables; default CLUTs; page/region/CLUT/object state per epoch | FFmpeg's subtitles: indexed planes and ARGB palettes, with its display window, region order, automatic palette and `compute_edt`, `compute_clut`, `dvb_substream` |
 | PGS (Blu-ray) | PCS, PDS, ODS, END in packet or SUP framing; fragmented objects; palette updates; object cache; forced flags | Every packet FFmpeg decodes, malformed ones included: indexed planes and ARGB palettes, with its refusals and `forced_subs_only` |
-| DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette, and `forced_subs_only` |
+| DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette, the canvas of the configuration's `size:` line, and `forced_subs_only` |
 
 ### Closed captions and teletext
 
@@ -173,7 +173,8 @@ bytes are errors; nothing is replaced with U+FFFD.
   a valid but oversized input is an explicit failure, never silently truncated.
 - **Errors.** In the specification operations malformed syntax and resource
   failures are sticky until `reset`. The receivers recover as the reference
-  does: a packet it refuses is refused and the next one is decoded. Cancellation is resumable in the text operations and receivers.
+  does: a packet it refuses is refused and the next one is decoded.
+  Cancellation is resumable in the text operations and receivers.
 - **Time.** Raw PTS/DTS/duration ticks and their clock are kept next to exact
   rational `Time` values. Unknown time stays `None`; no duration is inferred from
   the next packet and nothing is rounded to microseconds except in named native
@@ -183,9 +184,11 @@ bytes are errors; nothing is replaced with U+FFFD.
   framing in a document and content in a demuxed packet.
 - **Not handled.** DVB character-coded and progressive objects, depth-reduction
   modes and disparity (FFmpeg drops them too, and the receiver does as it does);
-  DVD colour-change commands (retained as raw bytes); teletext's `bitmap` format,
-  which renders libzvbi's own font, and objects from POP and GPOP pages (pages invoking them are presented at Level 1, as the reference presents them); CEA-708 text; glyph rendering, ASS styling and
-  font loading; WebVTT browser recovery and CSS.
+  DVD colour-change commands (the control sequence ends there, as in FFmpeg);
+  teletext's `bitmap` format, which renders libzvbi's own font, and objects from
+  POP and GPOP pages (pages invoking them are presented at Level 1, as the
+  reference presents them); CEA-708 text; glyph rendering, ASS styling and font
+  loading; WebVTT browser recovery and CSS.
 
 The text profile names, default limits and timing rules are in
 [src/text/README.md](src/text/README.md).
@@ -205,8 +208,8 @@ The text profile names, default limits and timing rules are in
 
 The implementation is original safe Rust. Tests use independently authored
 fixtures whose expected values were specified from the standards, not produced
-by this code: `tests/text-fixtures/` (with a separate Python oracle) and the
-DVB regression sets. Receivers are checked against recorded output of the
+by this code: `tests/text-fixtures/` (with a separate Python oracle). Receivers
+are checked against recorded output of the
 pinned FFmpeg build, and case by case against the build itself through the
 subtitle runner (`crates/subtitle-worker`, `harness/features/subtitle-*`). Every operation is also exercised at several work quanta,
 under allocation pressure and with cancellation. Gates and the reference build
