@@ -4,7 +4,7 @@
 use super::Sps;
 use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
-use triergon_framing::{Codec, NalHeader};
+use triergon_framing::{Codec, NalHeader, skip_hevc_profile_tier_level, skip_vui_to_timing};
 
 pub(crate) fn vps(payload: &[u8]) -> Result<u8> {
     Ok(Rbsp::new(payload).fixed(4)? as u8)
@@ -266,29 +266,7 @@ fn skip_short_term_sets(bits: &mut Rbsp<'_>, max_references: u32) -> Result<()> 
 }
 
 fn vui_timing(bits: &mut Rbsp<'_>) -> Result<Option<HevcVuiTiming>> {
-    if bits.flag()? && bits.fixed(8)? == 255 {
-        bits.skip(32)?; // Extended SAR.
-    }
-    if bits.flag()? {
-        bits.bit()?; // Overscan.
-    }
-    if bits.flag()? {
-        bits.skip(4)?; // Video format and full range.
-        if bits.flag()? {
-            bits.skip(24)?; // Colour description.
-        }
-    }
-    if bits.flag()? {
-        bits.ue()?;
-        bits.ue()?;
-    }
-    bits.skip(3)?; // Neutral chroma, field sequence, frame-field info.
-    if bits.flag()? {
-        for _ in 0..4 {
-            bits.ue()?; // Default display window.
-        }
-    }
-    if !bits.flag()? {
+    if !skip_vui_to_timing(&mut bits.0, Codec::Hevc).map_err(rbsp_error)? {
         return Ok(None);
     }
     let num_units_in_tick = bits.fixed(32)?;
@@ -318,24 +296,8 @@ fn cropped(dimension: u32, first: u32, second: u32, unit: u32) -> Result<u32> {
 }
 
 fn skip_profile_tier_level(bits: &mut Rbsp<'_>, sublayers: u8) -> Result<()> {
-    // The profile-dependent constraints have a fixed extent (88 bits for
-    // the whole profile portion). Each level portion has another 8 bits.
-    bits.skip(96)?;
-    let mut presence = [0; 6];
-    let active = &mut presence[..usize::from(sublayers)];
-    for flags in &mut *active {
-        *flags = bits.fixed(2)?;
-    }
-    if sublayers != 0 && bits.fixed(2 * (8 - sublayers))? != 0 {
+    if skip_hevc_profile_tier_level(&mut bits.0, sublayers).map_err(rbsp_error)? != 0 {
         return Err(Error::Invalid("HEVC profile-tier-level reserved bits"));
-    }
-    for &flags in active.iter() {
-        if flags & 2 != 0 {
-            bits.skip(88)?;
-        }
-        if flags & 1 != 0 {
-            bits.skip(8)?;
-        }
     }
     Ok(())
 }

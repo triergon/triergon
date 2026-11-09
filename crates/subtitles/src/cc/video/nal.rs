@@ -9,7 +9,10 @@
 //! timing of a sequence parameter set.
 
 use triergon_bitstream::{BitError, BitSource, Rbsp};
-use triergon_framing::{AnnexBUnits, avc, hevc, split_length_prefixed};
+use triergon_framing::{
+    AnnexBUnits, Codec as Coding, avc, hevc, skip_avc_scaling_matrix, skip_hevc_profile_tier_level,
+    skip_vui_to_timing, split_length_prefixed,
+};
 
 /// How an access unit delimits its NAL units.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -128,23 +131,6 @@ impl From<BitError> for Invalid {
     }
 }
 
-/// Passes over a scaling list. A delta outside -128..=127 makes the parameter
-/// set invalid, as FFmpeg's decoder rejects it.
-fn skip_scaling_list(bits: &mut Bits<'_>, size: usize) -> Result<(), Invalid> {
-    let (mut last, mut next) = (8i32, 8i32);
-    for _ in 0..size {
-        if next != 0 {
-            let delta = bits.se()?;
-            if !(-128..=127).contains(&delta) {
-                return Err(Invalid);
-            }
-            next = (last + delta) & 0xff;
-        }
-        last = if next == 0 { last } else { next };
-    }
-    Ok(())
-}
-
 fn h264_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, Invalid> {
     let profile = bits.read(8)?;
     bits.read(16)?; // constraint flags, level_idc
@@ -160,14 +146,7 @@ fn h264_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, Invalid> {
         bits.ue()?;
         bits.ue()?;
         bits.flag()?;
-        if bits.flag()? {
-            let lists = if chroma_format_idc == 3 { 12 } else { 8 };
-            for i in 0..lists {
-                if bits.flag()? {
-                    skip_scaling_list(bits, if i < 6 { 16 } else { 64 })?;
-                }
-            }
-        }
+        skip_avc_scaling_matrix(bits, chroma_format_idc).map_err(|_| Invalid)?;
     }
     bits.ue()?; // log2_max_frame_num_minus4
     match bits.ue()? {
@@ -200,36 +179,12 @@ fn h264_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, Invalid> {
     if !bits.flag()? {
         return Ok(None);
     }
-    Ok(skip_vui_until_timing(bits, Codec::H264)?)
+    Ok(vui_timing(bits, Coding::Avc)?)
 }
 
-/// A VUI's fields before its timing information; then the timing.
-fn skip_vui_until_timing(bits: &mut Bits<'_>, codec: Codec) -> Result<Option<Timing>, BitError> {
-    if bits.flag()? && bits.read(8)? == 255 {
-        bits.read(32)?; // sar_width, sar_height
-    }
-    if bits.flag()? {
-        bits.flag()?; // overscan_appropriate_flag
-    }
-    if bits.flag()? {
-        bits.read(4)?; // video_format, video_full_range_flag
-        if bits.flag()? {
-            bits.read(24)?;
-        }
-    }
-    if bits.flag()? {
-        bits.ue()?;
-        bits.ue()?;
-    }
-    if codec == Codec::Hevc {
-        bits.read(3)?; // neutral_chroma, field_seq, frame_field_info_present
-        if bits.flag()? {
-            for _ in 0..4 {
-                bits.ue()?;
-            }
-        }
-    }
-    if !bits.flag()? {
+/// The VUI's timing, `None` without it or with a zero field.
+fn vui_timing(bits: &mut Bits<'_>, codec: Coding) -> Result<Option<Timing>, BitError> {
+    if !skip_vui_to_timing(bits, codec)? {
         return Ok(None);
     }
     let num_units_in_tick = bits.read(32)?;
@@ -244,30 +199,7 @@ fn hevc_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, Invalid> {
     bits.read(4)?; // sps_video_parameter_set_id
     let sub_layers = bits.read(3)? as usize; // sps_max_sub_layers_minus1
     bits.flag()?;
-    // profile_tier_level(1, sub_layers)
-    bits.read(32)?;
-    bits.read(32)?;
-    bits.read(24)?;
-    bits.read(8)?; // general_level_idc
-    let mut present = [(false, false); 8];
-    for flags in present.iter_mut().take(sub_layers) {
-        *flags = (bits.flag()?, bits.flag()?);
-    }
-    if sub_layers > 0 {
-        for _ in sub_layers..8 {
-            bits.read(2)?;
-        }
-    }
-    for &(profile, level) in present.iter().take(sub_layers) {
-        if profile {
-            bits.read(32)?;
-            bits.read(32)?;
-            bits.read(24)?;
-        }
-        if level {
-            bits.read(8)?;
-        }
-    }
+    skip_hevc_profile_tier_level(bits, sub_layers as u8)?;
     bits.ue()?; // sps_seq_parameter_set_id
     if bits.ue()? == 3 {
         bits.flag()?;
@@ -356,7 +288,7 @@ fn hevc_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, Invalid> {
     if !bits.flag()? {
         return Ok(None);
     }
-    Ok(skip_vui_until_timing(bits, Codec::Hevc)?)
+    Ok(vui_timing(bits, Coding::Hevc)?)
 }
 
 /// The NAL units of an access unit, each from its header byte on. A length

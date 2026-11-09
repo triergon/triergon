@@ -39,6 +39,7 @@ mod eac3_bsi;
 mod flac_config;
 mod header;
 mod mpeg_audio;
+mod nal_syntax;
 mod nal_units;
 mod opus_config;
 mod raw_annex_b;
@@ -101,6 +102,9 @@ pub use header::{Codec, NalHeader, ParameterSetKind, avc, hevc};
 pub use mpeg_audio::{
     LameTag, MpegAudioHeader, MpegChannelMode, MpegEmphasis, MpegInfoFrame, MpegInfoKind,
     MpegLayer, MpegVersion, mpeg_audio_crc_ok, mpeg_info_frame,
+};
+pub use nal_syntax::{
+    SyntaxError, skip_avc_scaling_matrix, skip_hevc_profile_tier_level, skip_vui_to_timing,
 };
 pub use nal_units::{AnnexBUnits, split_length_prefixed, start_code};
 pub use opus_config::{
