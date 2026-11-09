@@ -15,6 +15,7 @@ use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
 use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors, UnframedAudioPolicy};
 use crate::psi::{CodecIdentification, DescriptorNamespace};
+use crate::stream::{StorageItem, TransportStorageCursor};
 use crate::{SourceEpochs, table_storage};
 use std::{
     ops::Range,
@@ -44,6 +45,31 @@ enum Framer {
 }
 
 impl Framer {
+    fn input_wait_storage(&self) -> Result<usize> {
+        Ok(match self {
+            Self::Video(reader) => reader.input_wait_storage()?.0,
+            Self::Adts(reader) => reader.input_wait_buffer_capacity(),
+            Self::AdtsFragments(reader) => reader.input_wait_buffer_capacity(),
+            Self::Loas(reader) => reader.input_wait_buffer_capacity(),
+            Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
+            Self::Eac3(reader) => reader.input_wait_storage()?,
+            // Direct PES carriages do not keep a pending unit between inputs.
+            Self::LatmPes | Self::Dvb(_) => 0,
+        })
+    }
+
+    fn input_wait_backing(&self, index: usize) -> Result<Option<&Bytes>> {
+        Ok(match self {
+            Self::Video(reader) => reader
+                .input_wait_storage()?
+                .1
+                .get(index)
+                .map(triergon_framing::NalUnit::bytes),
+            Self::Eac3(reader) => reader.input_wait_backing(index),
+            _ => None,
+        })
+    }
+
     fn is_audio(&self) -> bool {
         matches!(
             self,
@@ -223,19 +249,23 @@ struct Piece {
 }
 
 struct Input {
-    source: SourceEvent,
     span: usize,
     offset: usize,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum StorageCursor {
+    Transport(TransportStorageCursor),
     Map,
     MapSource,
     MapProgram,
     MapStream(usize),
+    Boundary,
+    BoundaryBacking,
     Input,
     Lane(usize),
+    Framer(usize),
+    FramerBacking(usize, usize),
     Piece {
         lane: usize,
         piece: usize,
@@ -248,16 +278,21 @@ enum StorageCursor {
     End,
 }
 
-enum StorageItem<'a> {
-    Fixed(usize),
-    Bytes(&'a Bytes),
-}
-
 impl StorageCursor {
     // One structural edge per call, including empty tables. Checking earlier
     // entries for shared backing also consumes cooperative work.
     fn step<'a>(&mut self, reader: &'a super::Reader) -> Result<Option<StorageItem<'a>>> {
         let item = match *self {
+            Self::Transport(cursor) => {
+                let mut next = cursor;
+                let item = next.step(reader.stream.as_ref().expect("blocked transport"))?;
+                *self = if next == TransportStorageCursor::End {
+                    Self::Map
+                } else {
+                    Self::Transport(next)
+                };
+                item
+            }
             Self::Map => {
                 *self = Self::MapSource;
                 reader
@@ -296,9 +331,47 @@ impl StorageCursor {
                     *self = Self::MapStream(index + 1);
                     Some(StorageItem::Bytes(&stream.descriptor_bytes))
                 } else {
-                    *self = Self::Input;
+                    *self = if reader.stream.is_some() {
+                        Self::Boundary
+                    } else {
+                        Self::Input
+                    };
                     None
                 }
+            }
+            Self::Boundary => {
+                *self = Self::BoundaryBacking;
+                if let Some(boundary) = &reader.boundary {
+                    if let crate::TraceEvent::ProgramMap { .. } = boundary.event() {
+                        // Publishing the PMT commits the same event as the map.
+                        debug_assert!(
+                            reader
+                                .map
+                                .as_ref()
+                                .is_some_and(|map| { map.0.shares_storage_with(&boundary.0) })
+                        );
+                        None
+                    } else {
+                        Some(StorageItem::Fixed(
+                            Shared::<crate::TraceEvent>::allocation_bytes()?,
+                        ))
+                    }
+                } else {
+                    None
+                }
+            }
+            Self::BoundaryBacking => {
+                *self = Self::Input;
+                reader
+                    .boundary
+                    .as_ref()
+                    .and_then(|boundary| match boundary.event() {
+                        crate::TraceEvent::Diagnostic(fault) => fault
+                            .rejected
+                            .as_ref()
+                            .map(|rejected| StorageItem::Bytes(rejected.backing_bytes())),
+                        _ => None,
+                    })
             }
             Self::Input => {
                 *self = Self::Lane(0);
@@ -310,20 +383,24 @@ impl StorageCursor {
             }
             Self::Lane(index) => {
                 if let Some(lane) = reader.lanes.as_slice().get(index) {
-                    if lane.framer.is_some()
-                        || lane.residue.is_some()
-                        || lane.input.is_some()
+                    let live = reader.stream.is_some();
+                    if lane.input.is_some()
                         || lane.build.is_some()
+                        || (!live && (lane.framer.is_some() || lane.residue.is_some()))
                         || reader
                             .map
                             .as_ref()
                             .is_none_or(|map| !map.0.shares_storage_with(&lane.track.source.0))
                     {
-                        return Err(Error::Invalid("MPEG-TS fragment audit before framer drain"));
+                        return Err(Error::Invalid("MPEG-TS storage audit before lane drain"));
                     }
-                    *self = Self::Piece {
-                        lane: index,
-                        piece: 0,
+                    *self = if lane.framer.is_some() {
+                        Self::Framer(index)
+                    } else {
+                        Self::Piece {
+                            lane: index,
+                            piece: 0,
+                        }
                     };
                     Some(StorageItem::Fixed(table_storage(&lane.pieces)?))
                 } else {
@@ -331,18 +408,35 @@ impl StorageCursor {
                     None
                 }
             }
+            Self::Framer(lane) => {
+                *self = Self::FramerBacking(lane, 0);
+                let framer = reader.lanes.as_slice()[lane]
+                    .framer
+                    .as_ref()
+                    .expect("live framer");
+                Some(StorageItem::Fixed(framer.input_wait_storage()?))
+            }
+            Self::FramerBacking(lane, index) => {
+                let framer = reader.lanes.as_slice()[lane]
+                    .framer
+                    .as_ref()
+                    .expect("live framer");
+                if let Some(bytes) = framer.input_wait_backing(index)? {
+                    *self = Self::FramerBacking(lane, index + 1);
+                    Some(StorageItem::Bytes(bytes))
+                } else {
+                    *self = Self::Piece { lane, piece: 0 };
+                    None
+                }
+            }
             Self::Piece { lane, piece } => {
                 if let Some(source) = reader.lanes.as_slice()[lane].pieces.as_slice().get(piece) {
-                    let pes = source.source.pes();
-                    // Source PES storage grows exactly at each admitted span.
-                    let bytes = pes
-                        .spans()
-                        .len()
-                        .checked_mul(size_of::<crate::PesSpan>())
-                        .and_then(|n| n.checked_add(table_storage(&pes.header_source_ranges).ok()?))
-                        .and_then(|n| {
-                            n.checked_add(Shared::<crate::TraceEvent>::allocation_bytes().ok()?)
-                        })
+                    // One completed PES event is admitted once to its PID's lane.
+                    let bytes = source
+                        .source
+                        .pes()
+                        .table_storage()?
+                        .checked_add(Shared::<crate::TraceEvent>::allocation_bytes()?)
                         .ok_or(Error::Overflow)?;
                     *self = Self::Span {
                         lane,
@@ -384,9 +478,10 @@ impl StorageCursor {
 // earlier owners may take several steps; cursors survive yields and cancellation.
 // Caller-only reservations and output owners are never part of this graph.
 pub(super) struct StorageScan {
+    start: StorageCursor,
     cursor: StorageCursor,
     prior: StorageCursor,
-    candidate: Option<(StorageCursor, Bytes)>,
+    candidate: Option<StorageCursor>,
     total: usize,
 }
 
@@ -402,14 +497,29 @@ impl StorageScan {
             return Err(Error::Invalid("MPEG-TS fragment audit before source EOF"));
         }
         let total = Budget::control_storage_bytes()
+            .checked_add(Shared::<crate::TraceEvent>::allocation_bytes()?)
+            .ok_or(Error::Overflow)?;
+        Self::start(reader, StorageCursor::Map, total)
+    }
+
+    pub(super) fn pes_growth(reader: &super::Reader, floor: usize) -> Result<Self> {
+        Self::start(
+            reader,
+            StorageCursor::Transport(TransportStorageCursor::BlockedSpan(0)),
+            floor,
+        )
+    }
+
+    fn start(reader: &super::Reader, start: StorageCursor, total: usize) -> Result<Self> {
+        let total = total
             .checked_add(table_storage(&reader.lanes)?)
             .and_then(|n| n.checked_add(table_storage(&reader.tracks).ok()?))
             .and_then(|n| n.checked_add(table_storage(&reader.staged_tracks).ok()?))
-            .and_then(|n| n.checked_add(Shared::<crate::TraceEvent>::allocation_bytes().ok()?))
             .ok_or(Error::Overflow)?;
         Ok(Self {
-            cursor: StorageCursor::Map,
-            prior: StorageCursor::Map,
+            start,
+            cursor: start,
+            prior: start,
             candidate: None,
             total,
         })
@@ -433,15 +543,23 @@ impl StorageScan {
             if !work.try_charge(1) {
                 return Ok(false);
             }
-            if let Some((at, bytes)) = &self.candidate {
-                if self.prior == *at {
+            if let Some(at) = self.candidate {
+                // Reborrow the backing so a suspended scan cannot keep input charged.
+                let mut candidate = at;
+                let Some(StorageItem::Bytes(bytes)) = candidate.step(reader)? else {
+                    return Err(Error::Invalid("MPEG-TS storage audit changed during scan"));
+                };
+                if self.prior == at {
                     self.total = self
                         .total
                         .checked_add(bytes.retained_storage_bytes())
                         .ok_or(Error::Overflow)?;
                     self.candidate = None;
-                } else if let Some(StorageItem::Bytes(prior)) = self.prior.step(reader)?
-                    && prior.shares_storage_with(bytes)
+                } else if self
+                    .prior
+                    .step(reader)?
+                    .and_then(StorageItem::backing)
+                    .is_some_and(|prior| prior.shares_storage_with(bytes))
                 {
                     self.candidate = None;
                 }
@@ -451,11 +569,11 @@ impl StorageScan {
                     Some(StorageItem::Fixed(bytes)) => {
                         self.total = self.total.checked_add(bytes).ok_or(Error::Overflow)?;
                     }
-                    Some(StorageItem::Bytes(bytes)) => {
-                        self.candidate = Some((at, bytes.clone()));
-                        self.prior = StorageCursor::Map;
+                    Some(StorageItem::Bytes(_)) => {
+                        self.candidate = Some(at);
+                        self.prior = self.start;
                     }
-                    None => (),
+                    Some(StorageItem::CountedBytes(_)) | None => (),
                 }
             }
         }
@@ -907,7 +1025,7 @@ impl Lane {
     }
     pub(super) fn push(
         &mut self,
-        source: &SourceEvent,
+        pending: &mut Option<SourceEvent>,
         clock: ClockContext,
         work: &mut WorkBudget,
     ) -> Result<bool> {
@@ -926,7 +1044,7 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(false);
         }
-        let pes = source.pes();
+        let pes = pending.as_ref().expect("queued PES").pes();
         if self.track.stream().stream_type == 0x11 {
             if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
                 return Err(Error::Invalid("LATM audio PES stream ID"));
@@ -960,25 +1078,23 @@ impl Lane {
         }
         self.pieces.try_reserve_exact(1)?;
         let serial = self.serial.checked_add(1).ok_or(Error::Overflow)?;
-        self.pieces
-            .try_push(Piece {
-                range: self.supplied..end,
-                source: source.clone(),
-                clock,
-                serial,
-            })
-            .map_err(|e| e.error)?;
+        let run = PesRun::Active(pes.epochs, pes.byte_run_epoch);
+        if let Err(rejected) = self.pieces.try_push(Piece {
+            range: self.supplied..end,
+            source: pending.take().expect("admitted PES"),
+            clock,
+            serial,
+        }) {
+            *pending = Some(rejected.value.source);
+            return Err(rejected.error);
+        }
         self.serial = serial;
-        self.run = PesRun::Active(pes.epochs, pes.byte_run_epoch);
+        self.run = run;
         self.input = self
             .framer
             .as_ref()
             .filter(|framer| !matches!(framer, Framer::Dvb(_) | Framer::LatmPes))
-            .map(|_| Input {
-                source: source.clone(),
-                span: 0,
-                offset: 0,
-            });
+            .map(|_| Input { span: 0, offset: 0 });
         Ok(true)
     }
     fn check_unframed_video_extent(&self, end: u64) -> Result<()> {
@@ -1195,7 +1311,12 @@ impl Lane {
                         return Err(Error::Invalid("MPEG-TS elementary input offset"));
                     }
                     if let Some(input) = &mut self.input {
-                        let pes = input.source.pes();
+                        // Retiring a consumed prefix leaves the current PES at the tail.
+                        let Some(piece) = self.pieces.as_slice().last() else {
+                            self.input = None;
+                            continue;
+                        };
+                        let pes = piece.source.pes();
                         let mut request = request;
                         loop {
                             let Some(span) = pes.spans().get(input.span) else {
@@ -1210,13 +1331,7 @@ impl Lane {
                                 && input.offset == 0
                                 && reader.provide_complete(&request, pes, work, cancel)?
                             {
-                                self.supplied = self
-                                    .pieces
-                                    .as_slice()
-                                    .last()
-                                    .expect("pending E-AC-3 PES")
-                                    .range
-                                    .end;
+                                self.supplied = piece.range.end;
                                 self.input = None;
                                 break;
                             }

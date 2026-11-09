@@ -1,5 +1,12 @@
 //! Composed selected-program TS -> PSI -> PES source operation. No codec AU work.
-use crate::carrier::{PLAIN_PAYLOAD_BYTES, TS188_BYTES, payload_only_continuation};
+mod storage;
+
+pub(crate) use storage::{StorageItem, TransportStorageCursor};
+
+use crate::carrier::{
+    PLAIN_PAYLOAD_BYTES, PlainContinuation, TS188_BYTES, TransportObservation,
+    payload_only_continuation,
+};
 use crate::compat::adts::UnboundedPes;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
 use crate::framer::FramedCarrier;
@@ -34,6 +41,35 @@ pub struct TraceFault {
     /// Original owned rejected carrier; absent for non-carrier/operational faults.
     pub rejected: Option<crate::RejectedTransport>,
 }
+
+/// A carrier or ordinary continuity event that can be inspected in place.
+#[derive(Clone, Copy, Debug)]
+pub enum CarrierObservation<'a> {
+    /// The complete validated transport packet, including its original bytes.
+    Transport(TransportObservation<'a>),
+    /// The first packet on a route or its next continuous packet.
+    Continuity {
+        pid: u16,
+        outcome: ContinuityOutcome,
+    },
+}
+
+impl<'a> CarrierObservation<'a> {
+    pub(crate) fn from_event(event: &'a TraceEvent) -> Option<Self> {
+        match event {
+            TraceEvent::Transport(packet) => Some(Self::Transport(packet.into())),
+            TraceEvent::Continuity {
+                pid,
+                outcome: outcome @ (ContinuityOutcome::First | ContinuityOutcome::Continuous),
+            } => Some(Self::Continuity {
+                pid: *pid,
+                outcome: *outcome,
+            }),
+            _ => None,
+        }
+    }
+}
+
 /// One result at a time. Every dynamic member owns shared charged storage; there
 /// is no uncharged boxed variant or internal unbounded event queue.
 #[derive(Debug)]
@@ -133,6 +169,14 @@ pub enum FeedItem<'a> {
 
 // Per carrier: input, header inspection, source PES, native append and event.
 const PAYLOAD_RUN_WORK: u64 = TS188_BYTES as u64 + 2 + (PLAIN_PAYLOAD_BYTES as u64 + 1) + 2 + 1;
+// Preparing, beginning and publishing one source event.
+const OBSERVED_EVENT_WORK: u64 = 3;
+
+enum ObservedContinuation {
+    Fallback,
+    Retained,
+    Completed(Pes),
+}
 
 fn matches_payload_header(ts: &[u8], pid: u16, counter: u8) -> bool {
     let expected = 0x4700_0010 | (u32::from(pid) << 8) | u32::from(counter);
@@ -921,16 +965,13 @@ impl TransportStream {
             return self.poll_map(work, cancel);
         }
         if let Some(section) = self.section.as_ref() {
-            if self.feed_omissions.is_some()
-                && matches!(self.route, Route::Pmt)
-                && section.crc_remainder() == Some(0)
+            if section.crc_remainder() == Some(0)
                 && self
-                    .pmt_source
-                    .as_ref()
+                    .accepted_table_source()
                     .is_some_and(|current| current.as_ref() == section.bytes().as_ref())
             {
-                // An identical CRC-checked section already passed the PMT
-                // parser in this program and descriptor namespace.
+                // The active table already passed validation in this route.
+                // Publish the repeat's section with its own source ranges.
                 let section = self
                     .section
                     .take()
@@ -1136,6 +1177,77 @@ impl TransportStream {
         Ok(true)
     }
 
+    fn retain_observed_continuation(
+        &mut self,
+        carrier: &mut PlainContinuation,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        observe: &mut impl FnMut(CarrierObservation<'_>),
+    ) -> Result<ObservedContinuation> {
+        let Route::Pes(index) = self.route else {
+            return Ok(ObservedContinuation::Fallback);
+        };
+        let pid = carrier.pid();
+        let clock = self.pcr_pid == Some(pid);
+        if (clock && self.clock_pending) || self.collector.has_pending() {
+            return Ok(ObservedContinuation::Fallback);
+        }
+        let route = &mut self.routes.as_mut_slice()[index];
+        let continuity = route
+            .continuity
+            .as_mut()
+            .ok_or(Error::Invalid("PES continuity missing"))?;
+        if !continuity.expects_payload_counter(carrier.counter()) {
+            return Ok(ObservedContinuation::Fallback);
+        }
+        let assembler = route
+            .assembler
+            .as_mut()
+            .ok_or(Error::Invalid("PES route missing"))?;
+        let Some(bytes) = carrier.source.as_ref() else {
+            return Ok(ObservedContinuation::Fallback);
+        };
+        let start = carrier.payload_start();
+        let location = SourceLocation {
+            source: carrier.entity.ok_or(Error::SourceMismatch)?,
+            offset: carrier.offset + start as u64,
+        };
+        let grant = work.remaining().saturating_sub(2 * OBSERVED_EVENT_WORK + 1);
+        if !assembler.can_retain_body_carrier(bytes, start, location.offset, grant)
+            || cancel.load(Ordering::Relaxed)
+        {
+            return Ok(ObservedContinuation::Fallback);
+        }
+
+        work.take(OBSERVED_EVENT_WORK);
+        observe(CarrierObservation::Transport(
+            TransportObservation::continuation(carrier, bytes),
+        ));
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        work.take(1);
+        continuity.record_plain_continuation(bytes.as_ref(), carrier.counter());
+        work.take(OBSERVED_EVENT_WORK);
+        observe(CarrierObservation::Continuity {
+            pid,
+            outcome: ContinuityOutcome::Continuous,
+        });
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if clock {
+            self.clock_signal = false;
+        }
+        let bytes = carrier.source.take().expect("observed carrier source");
+        let len = bytes.len();
+        assembler.append_body_carrier(bytes.into_slice(start..len)?, location, work);
+        Ok(assembler.take_complete_body()?.map_or(
+            ObservedContinuation::Retained,
+            ObservedContinuation::Completed,
+        ))
+    }
+
     fn validate_feed_continuation(
         &mut self,
         carrier: &FramedCarrier,
@@ -1338,10 +1450,19 @@ impl TransportStream {
         self.clock_quarantined = true;
         self.diagnostic(FaultKind::Transport, Some(pid), Error::Invalid(reason))
     }
+
+    fn accepted_table_source(&self) -> Option<&Bytes> {
+        match self.route {
+            Route::Pat => self.collector.active_single_section(),
+            Route::Pmt => self.pmt_source.as_ref(),
+            _ => None,
+        }
+    }
+
     fn feed(&mut self, work: &mut WorkBudget) -> Result<()> {
         let packet = self
             .packet
-            .as_mut()
+            .as_ref()
             .ok_or(Error::Invalid("TS packet missing"))?;
         let Some(payload) = packet.payload.as_ref() else {
             self.phase = 7;
@@ -1351,31 +1472,38 @@ impl TransportStream {
         let pid = packet.pid;
         let pusi = packet.payload_unit_start;
         let offset = packet.payload_source_offset;
-        if self.feed_omissions.is_some()
-            && pusi
+        if pusi
             && work.remaining() >= payload.len() as u64
             && let [0, section_and_stuffing @ ..] = payload.as_ref()
-        {
-            let accepted = match self.route {
-                Route::Pat if self.pat.assembler.idle() => self.collector.active_single_section(),
-                Route::Pmt if self.pmt.as_ref().is_some_and(|pmt| pmt.assembler.idle()) => {
-                    self.pmt_source.as_ref()
-                }
-                _ => None,
-            };
-            if let Some(section) = accepted
-                && let Some(stuffing) = section_and_stuffing.strip_prefix(section.as_ref())
-                && stuffing.iter().all(|&byte| byte == 0xff)
-            {
-                // These exact section bytes already passed CRC and table
-                // validation. There is no other table in this carrier.
-                work.take(payload.len() as u64);
-                self.omit_feed_events(1)?;
-                self.phase = 7;
-                return Ok(());
+            && match self.route {
+                Route::Pat => self.pat.assembler.idle(),
+                Route::Pmt => self.pmt.as_ref().is_some_and(|pmt| pmt.assembler.idle()),
+                _ => false,
             }
+            && let Some(accepted) = self.accepted_table_source()
+            && let Some(stuffing) = section_and_stuffing.strip_prefix(accepted.as_ref())
+            && stuffing.iter().all(|&byte| byte == 0xff)
+        {
+            // Reuse immutable section bytes while recording this occurrence's
+            // position. The rest of the carrier is validated stuffing.
+            let length = payload.len() as u64;
+            if self.feed_omissions.is_some() {
+                self.omit_feed_events(1)?;
+            } else {
+                let start = offset.checked_add(1).ok_or(Error::Overflow)?;
+                self.section = Some(Section::repeated(
+                    &self.budget,
+                    pid,
+                    accepted,
+                    entity,
+                    start,
+                )?);
+            }
+            work.take(length);
+            self.phase = 7;
+            return Ok(());
         }
-        let payload = &mut packet.payload;
+        let payload = &mut self.packet.as_mut().expect("TS packet present").payload;
         let pushed = match self.route {
             Route::Pat => self.pat.assembler.push(
                 payload.take().ok_or(Error::Invalid("TS payload missing"))?,
@@ -1394,16 +1522,32 @@ impl TransportStream {
                     entity,
                     offset,
                 ),
-            Route::Pes(index) => self.routes.as_mut_slice()[index]
-                .assembler
-                .as_mut()
-                .ok_or(Error::Invalid("PES route missing"))?
-                .push(
+            Route::Pes(index) => {
+                let assembler = self.routes.as_mut_slice()[index]
+                    .assembler
+                    .as_mut()
+                    .ok_or(Error::Invalid("PES route missing"))?;
+                if !pusi
+                    && self.feed_omissions.is_none()
+                    && assembler.retain_body_carrier(
+                        payload,
+                        SourceLocation {
+                            source: entity,
+                            offset,
+                        },
+                        work,
+                    )
+                {
+                    self.phase = 7;
+                    return Ok(());
+                }
+                assembler.push(
                     payload.take().ok_or(Error::Invalid("TS payload missing"))?,
                     pusi,
                     entity,
                     offset,
-                ),
+                )
+            }
             Route::Clock | Route::Ignore => {
                 self.phase = 7;
                 return Ok(());
@@ -1436,7 +1580,7 @@ impl TransportStream {
         }
         Ok(())
     }
-    pub(crate) fn blocked_adts_span_floor(&self) -> Result<Option<usize>> {
+    pub(crate) fn blocked_pes_growth_floor(&self) -> Result<Option<usize>> {
         let Route::Pes(index) = self.route else {
             return Ok(None);
         };
@@ -1446,7 +1590,7 @@ impl TransportStream {
         let Some(span_floor) = self.routes.as_slice()[index]
             .assembler
             .as_ref()
-            .and_then(PesAssembler::blocked_span_growth_floor)
+            .and_then(PesAssembler::blocked_growth_floor)
         else {
             return Ok(None);
         };
@@ -1459,13 +1603,12 @@ impl TransportStream {
             .and_then(|n| n.checked_add(self.pat.assembler.table_storage().ok()?))
             .and_then(|n| n.checked_add(pmt))
             .and_then(|n| n.checked_add(self.framer.carry_storage().ok()?))
-            .and_then(|n| n.checked_add(self.collector.active_single_section_storage().ok()?))
             .ok_or(Error::Overflow)?;
         Ok(Some(floor))
     }
 
-    pub(crate) fn refuse_blocked_adts_span(&mut self, error: Error) -> TraceEvent {
-        debug_assert!(matches!(self.blocked_adts_span_floor(), Ok(Some(_))));
+    pub(crate) fn refuse_blocked_pes_growth(&mut self, error: Error) -> TraceEvent {
+        debug_assert!(matches!(self.blocked_pes_growth_floor(), Ok(Some(_))));
         self.discard_faulted_route(error)
     }
 
@@ -1479,6 +1622,21 @@ impl TransportStream {
         self.discard_route(self.route);
         self.phase = 7;
         self.diagnostic(kind, pid, error)
+    }
+
+    // Keep elementary assembly dispatch separate from PSI and empty EOF paths.
+    #[inline(never)]
+    fn poll_pes(
+        assembler: &mut PesAssembler,
+        retain: bool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<Option<Pes>>> {
+        if retain {
+            assembler.poll_source::<true>(work, cancel)
+        } else {
+            assembler.poll_source::<false>(work, cancel)
+        }
     }
 
     fn drain(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<TraceEvent>> {
@@ -1514,11 +1672,7 @@ impl TransportStream {
                     .assembler
                     .as_mut()
                     .ok_or(Error::Invalid("PES route missing"))?;
-                let step = if self.feed_omissions.is_some() {
-                    assembler.poll_source::<false>(work, cancel)
-                } else {
-                    assembler.poll_source::<true>(work, cancel)
-                };
+                let step = Self::poll_pes(assembler, self.feed_omissions.is_none(), work, cancel);
                 match step {
                     Ok(AssemblyStep::Output(Some(pes))) => {
                         return Ok(Some(TraceEvent::from_assembled_pes(pes)));
@@ -1591,11 +1745,7 @@ impl TransportStream {
                 .as_mut()
                 .ok_or(Error::Invalid("PES route missing at EOF"))?;
             assembler.end_of_source();
-            let step = if self.feed_omissions.is_some() {
-                assembler.poll_source::<false>(work, cancel)
-            } else {
-                assembler.poll_source::<true>(work, cancel)
-            };
+            let step = Self::poll_pes(assembler, self.feed_omissions.is_none(), work, cancel);
             match step {
                 Ok(AssemblyStep::Output(Some(pes))) => {
                     return Ok(Step::Ready(TraceEvent::from_assembled_pes(pes)));
@@ -1725,7 +1875,23 @@ impl TransportStream {
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
-        self.poll_inner::<TraceEvent, DIRECT, RUNS>(input, work, cancel, consume)
+        self.poll_inner::<TraceEvent, DIRECT, RUNS, false>(input, work, cancel, consume, |_| ())
+    }
+
+    pub(crate) fn poll_observing<const OBSERVING: bool>(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        observe: impl FnMut(CarrierObservation<'_>),
+    ) -> Result<Step<TraceEvent>> {
+        self.poll_inner::<TraceEvent, false, false, OBSERVING>(
+            input,
+            work,
+            cancel,
+            |_, _, _, _| Ok(FeedContinuation::Emit),
+            observe,
+        )
     }
 
     pub fn poll_compact(
@@ -1734,12 +1900,16 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<CompactTraceEvent>> {
-        self.poll_inner::<CompactTraceEvent, false, false>(input, work, cancel, |_, _, _, _| {
-            Ok(FeedContinuation::Emit)
-        })
+        self.poll_inner::<CompactTraceEvent, false, false, false>(
+            input,
+            work,
+            cancel,
+            |_, _, _, _| Ok(FeedContinuation::Emit),
+            |_| (),
+        )
     }
 
-    fn poll_inner<T: PollOutput, const DIRECT: bool, const RUNS: bool>(
+    fn poll_inner<T: PollOutput, const DIRECT: bool, const RUNS: bool, const OBSERVING: bool>(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
@@ -1750,6 +1920,7 @@ impl TransportStream {
             SourceEpochs,
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
+        mut observe: impl FnMut(CarrierObservation<'_>),
     ) -> Result<Step<T>> {
         let ready = |event| Step::Ready(T::event(event));
         if self.finished {
@@ -1838,14 +2009,21 @@ impl TransportStream {
                                 self.omit_feed_events(1)?;
                                 continue;
                             }
-                            return Ok(ready(TraceEvent::Continuity {
-                                pid: self
-                                    .packet
-                                    .as_ref()
-                                    .ok_or(Error::Invalid("TS packet missing"))?
-                                    .pid,
+                            let pid = self
+                                .packet
+                                .as_ref()
+                                .ok_or(Error::Invalid("TS packet missing"))?
+                                .pid;
+                            if !matches!(
                                 outcome,
-                            }));
+                                ContinuityOutcome::First | ContinuityOutcome::Continuous
+                            ) || !OBSERVING
+                                || cancel.load(Ordering::Relaxed)
+                                || !work.try_charge(OBSERVED_EVENT_WORK)
+                            {
+                                return Ok(ready(TraceEvent::Continuity { pid, outcome }));
+                            }
+                            observe(CarrierObservation::Continuity { pid, outcome });
                         }
                     }
                     2 => {
@@ -1895,7 +2073,7 @@ impl TransportStream {
                 }
                 match self
                     .framer
-                    .poll_bound_carrier::<DIRECT>(input, work, cancel)
+                    .poll_bound_carrier::<DIRECT, OBSERVING>(input, work, cancel)
                 {
                     Ok(Step::Ready(mut carrier)) => {
                         self.entity_end = None;
@@ -1904,6 +2082,20 @@ impl TransportStream {
                         } else {
                             self.find_route(carrier.pid())
                         };
+                        if OBSERVING && let FramedCarrier::Plain(plain) = &mut carrier {
+                            match self.retain_observed_continuation(
+                                plain,
+                                work,
+                                cancel,
+                                &mut observe,
+                            )? {
+                                ObservedContinuation::Fallback => {}
+                                ObservedContinuation::Retained => continue,
+                                ObservedContinuation::Completed(pes) => {
+                                    return Ok(ready(TraceEvent::from_assembled_pes(pes)));
+                                }
+                            }
+                        }
                         if self.validate_feed_continuation(&carrier, work)? {
                             match consume(
                                 FeedItem::Carrier(FeedCarrier(&mut carrier)),
@@ -1941,6 +2133,14 @@ impl TransportStream {
                         let packet = carrier.into_packet()?;
                         self.phase = 1;
                         if self.feed_validated_carriers {
+                            self.packet = Some(packet);
+                            continue 'events;
+                        }
+                        if OBSERVING
+                            && !cancel.load(Ordering::Relaxed)
+                            && work.try_charge(OBSERVED_EVENT_WORK)
+                        {
+                            observe(CarrierObservation::Transport((&packet).into()));
                             self.packet = Some(packet);
                             continue 'events;
                         }

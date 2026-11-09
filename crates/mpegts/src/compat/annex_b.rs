@@ -4,7 +4,10 @@
 
 mod continuity;
 
-use crate::{EntityTransition, Packet, Reader, ReaderEvent, ReaderLimits, TraceEvent, Track};
+use crate::{
+    CarrierObservation, EntityTransition, Packet, Reader, ReaderEvent, ReaderLimits, TraceEvent,
+    Track,
+};
 use continuity::{EofStep, Proof, SourceJob};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest};
@@ -128,7 +131,42 @@ impl ContinuityReader {
         result
     }
 
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
+    /// Borrow ordinary carrier observations while applying the same continuity proof.
+    pub fn step_with_carriers(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        mut observe: impl FnMut(CarrierObservation<'_>),
+    ) -> Result<ReaderStep<Self>> {
+        loop {
+            let step = self.advance(work, cancel, |reader, proving, work, cancel| {
+                if proving {
+                    reader.step(work, cancel)
+                } else {
+                    reader.step_with_carriers(work, cancel, &mut observe)
+                }
+            })?;
+            if let Step::Ready(Event::Other(ContinuityEvent::Source(event))) = &step
+                && let Some(carrier) = event.carrier_observation()
+            {
+                observe(carrier);
+            } else {
+                return Ok(step);
+            }
+        }
+    }
+
+    fn advance(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        mut read: impl FnMut(
+            &mut Reader,
+            bool,
+            &mut WorkBudget,
+            &AtomicBool,
+        ) -> Result<ReaderStep<Reader>>,
+    ) -> Result<ReaderStep<Self>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -172,7 +210,7 @@ impl ContinuityReader {
                     }
                 }
             }
-            let step = match self.reader.step(work, cancel) {
+            let step = match read(&mut self.reader, self.proof.enabled(), work, cancel) {
                 Ok(step) => step,
                 Err(error) => {
                     if error != Error::Allocation {
@@ -258,7 +296,9 @@ impl ContainerReader for ContinuityReader {
         Ok(request)
     }
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
-        self.advance(work, cancel)
+        self.advance(work, cancel, |reader, _, work, cancel| {
+            reader.step(work, cancel)
+        })
     }
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
         self.reader.request_seek(request)

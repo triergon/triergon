@@ -39,6 +39,11 @@ impl Reader {
         self.input.provide_owned(window)
     }
 
+    pub(super) fn input_wait_buffer_capacity(&self) -> usize {
+        debug_assert!(self.input.buffered_owner().is_none());
+        self.buffer.capacity()
+    }
+
     pub(super) fn finish(&mut self, request: InputRequest) -> Result<()> {
         self.input.finish(request.source, request.token)
     }

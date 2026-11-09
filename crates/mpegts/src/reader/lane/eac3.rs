@@ -92,6 +92,32 @@ impl Reader {
         })
     }
 
+    pub(super) fn input_wait_storage(&self) -> Result<usize> {
+        debug_assert!(!self.sealed && self.pending.is_none());
+        let frames = self
+            .group
+            .as_ref()
+            .and_then(|group| group.dependents.as_ref())
+            .map_or(Ok(0), crate::table_storage)?;
+        frames
+            .checked_add(self.framer.input_wait_buffer_capacity())
+            .ok_or(Error::Overflow)
+    }
+
+    pub(super) fn input_wait_backing(&self, index: usize) -> Option<&Bytes> {
+        let group = self.group.as_ref()?;
+        if index == 0 {
+            return group.primary.as_ref();
+        }
+        group
+            .dependents
+            .as_ref()?
+            .as_slice()
+            .get(index - 1)?
+            .pending_bytes
+            .as_ref()
+    }
+
     pub(super) fn maximum_incomplete_bytes(&self) -> usize {
         self.maximum_incomplete_bytes
     }

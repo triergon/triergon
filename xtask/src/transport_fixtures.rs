@@ -1090,6 +1090,7 @@ fn contract(cases: &[Case]) -> R<Value> {
             "contract",
             Value::strings([
                 "Preloaded TS188 or M2TS192 input, SIZE PROGRAM [--dvb|--atsc] and the original ordered media-entity arguments; the candidate uses the public MPEG-TS access-unit reader, with no PES-as-AU fallback.",
+                "The candidate visits ordinary carriers through the reader's borrowed callback. All original carrier, continuity, PES and source-boundary validation remains inside the operation.",
                 "The Annex B EOF policy reports an unframed run of validated AVC or HEVC PES bytes with no start code. The candidate folds the opaque observation separately from complete video access units.",
                 "LATM controls wrap the pinned AAC-LC payload in independently authored LOAS envelopes and also carry opaque or truncated envelopes. The LATM compatibility policy reports one unsplit packet per validated nonempty PES, with its original clocks and position.",
                 "A single entity can complete empty after a PSI diagnostic or an empty read only when the control-only proof classifies the original carriers through physical end and logical EOF.",

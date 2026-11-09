@@ -7,7 +7,7 @@ use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::pes::UnframedAudioPolicy;
 use crate::compat::{dvb, latm};
 use crate::psi::DescriptorNamespace;
-use crate::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
+use crate::{CarrierObservation, PacketFormat, ParseLimits, TraceEvent, TransportStream};
 use lane::{Lane, LaneStep, PesRun, StorageScan};
 pub use model::{
     Ac3AccessUnit, AccessUnit, DvbSubtitleUnit, IncompleteVideo, LoasFrame, Packet, PacketClock,
@@ -335,8 +335,38 @@ impl Reader {
         self.storage = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
+        self.step_observing::<false>(work, cancel, |_| ())
+    }
+
+    /// Visit validated carriers and ordinary continuity in source order.
+    /// The reader borrows each observation for the duration of the callback.
+    /// All other source events use the same step protocol as [Self::step].
+    pub fn step_with_carriers(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        mut observe: impl FnMut(CarrierObservation<'_>),
+    ) -> Result<ReaderStep<Self>> {
+        loop {
+            let step = self.step_observing::<true>(work, cancel, &mut observe)?;
+            if let Step::Ready(Event::Other(event)) = &step
+                && let Some(carrier) = event.carrier_observation()
+            {
+                observe(carrier);
+            } else {
+                return Ok(step);
+            }
+        }
+    }
+
+    fn step_observing<const OBSERVING: bool>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        observe: impl FnMut(CarrierObservation<'_>),
+    ) -> Result<ReaderStep<Self>> {
         self.healthy()?;
-        match self.advance(work, cancel) {
+        match self.advance::<OBSERVING>(work, cancel, observe) {
             Err(Error::Backpressure {
                 requested,
                 available,
@@ -397,7 +427,12 @@ impl Reader {
             LaneStep::End | LaneStep::NeedPayload => Ok(None),
         }
     }
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
+    fn advance<const OBSERVING: bool>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        mut observe: impl FnMut(CarrierObservation<'_>),
+    ) -> Result<ReaderStep<Self>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -609,30 +644,6 @@ impl Reader {
                             return Ok(Step::Ready(Event::Other(event)));
                         }
                     }
-                    Phase::Feed(index) => {
-                        if !work.try_charge(1) {
-                            return Ok(Step::Yield);
-                        }
-                        let source = self.pending.as_ref().expect("pending PES");
-                        let pes = source.pes();
-                        let track = &self.lanes.as_slice()[index].track;
-                        let key = ClockKey {
-                            tsid: self.tsid.ok_or(Error::Invalid("MPEG-TS PES before PAT"))?,
-                            program: track.program(),
-                            pcr_pid: track.program_map().pcr_pid,
-                            epoch: pes.epochs.clock,
-                        };
-                        let clock = ClockContext {
-                            key,
-                            quarantined: self
-                                .stream
-                                .as_ref()
-                                .expect("active transport")
-                                .clock_is_quarantined(),
-                        };
-                        self.queued_pes = Some((index, source.clone(), clock));
-                        self.phase = Phase::Publish;
-                    }
                     Phase::Fragments(index) => {
                         if index == self.lanes.len() {
                             self.phase = Phase::Publish;
@@ -660,40 +671,74 @@ impl Reader {
                         }
                         self.phase = Phase::Fragments(index + 1);
                     }
-                    Phase::Publish => {
-                        if !work.try_charge(1) {
-                            return Ok(Step::Yield);
-                        }
-                        if let Some(map) = self.rebuild.take() {
-                            self.map = Some(map);
-                            self.tracks = std::mem::replace(
-                                &mut self.staged_tracks,
-                                BudgetVec::new(&self.pool),
-                            );
-                        }
-                        let source = self.pending.take().expect("published source");
-                        match source.event() {
-                            TraceEvent::Discontinuity { .. } => {
-                                self.map = None;
-                                self.tracks.clear();
-                                self.tsid = None;
-                                self.boundary = None;
-                            }
-                            TraceEvent::Finished => self.finished = true,
-                            _ => (),
-                        }
-                        return Ok(Step::Ready(Event::Other(ReaderEvent::Source(source))));
+                    Phase::Feed(_) | Phase::Publish => {}
+                }
+                // Source admission can advance through queueing and publication
+                // under the same grant. Each phase remains resumable.
+                if let Phase::Feed(index) = self.phase {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
                     }
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    let source = self.pending.as_ref().expect("pending PES");
+                    let pes = source.pes();
+                    let track = &self.lanes.as_slice()[index].track;
+                    let key = ClockKey {
+                        tsid: self.tsid.ok_or(Error::Invalid("MPEG-TS PES before PAT"))?,
+                        program: track.program(),
+                        pcr_pid: track.program_map().pcr_pid,
+                        epoch: pes.epochs.clock,
+                    };
+                    let clock = ClockContext {
+                        key,
+                        quarantined: self
+                            .stream
+                            .as_ref()
+                            .expect("active transport")
+                            .clock_is_quarantined(),
+                    };
+                    self.queued_pes = Some((index, source.clone(), clock));
+                    self.phase = Phase::Publish;
+                }
+                if matches!(self.phase, Phase::Publish) {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    if let Some(map) = self.rebuild.take() {
+                        self.map = Some(map);
+                        self.tracks =
+                            std::mem::replace(&mut self.staged_tracks, BudgetVec::new(&self.pool));
+                    }
+                    let source = self.pending.take().expect("published source");
+                    match source.event() {
+                        TraceEvent::Discontinuity { .. } => {
+                            self.map = None;
+                            self.tracks.clear();
+                            self.tsid = None;
+                            self.boundary = None;
+                        }
+                        TraceEvent::Finished => self.finished = true,
+                        _ => (),
+                    }
+                    return Ok(Step::Ready(Event::Other(ReaderEvent::Source(source))));
                 }
                 continue;
             }
-            if let Some((index, source, key)) = &self.queued_pes {
-                let index = *index;
-                if !self.lanes.as_mut_slice()[index].push(source, *key, work)? {
-                    return Ok(Step::Yield);
+            if let Some((index, source, key)) = self.queued_pes.take() {
+                let mut source = Some(source);
+                match self.lanes.as_mut_slice()[index].push(&mut source, key, work) {
+                    Ok(true) => self.active = Some(index),
+                    retry => {
+                        self.queued_pes = Some((index, source.expect("queued PES on retry"), key));
+                        retry?;
+                        return Ok(Step::Yield);
+                    }
                 }
-                self.queued_pes = None;
-                self.active = Some(index);
                 continue;
             }
             if let Some(index) = self.unsupported_at {
@@ -732,32 +777,43 @@ impl Reader {
                 .input
                 .as_mut()
                 .ok_or(Error::Invalid("MPEG-TS reader closed"))?;
-            let step = match stream.poll(input, work, cancel) {
+            let mut observed = false;
+            let result = stream.poll_observing::<OBSERVING>(input, work, cancel, |event| {
+                observed = true;
+                observe(event);
+            });
+            if observed {
+                self.storage = None;
+            }
+            let step = match result {
                 Err(error @ Error::Backpressure { .. }) => {
-                    if let Some(span_floor) = stream.blocked_adts_span_floor()? {
-                        let requested = span_floor
-                            .checked_add(Self::catalogue_storage(
-                                &self.lanes,
-                                &self.tracks,
-                                &self.staged_tracks,
-                                self.map.as_ref(),
-                            )?)
-                            .ok_or(Error::Overflow)?;
-                        if requested > self.pool.limit() {
-                            let limit = crate::limit(requested, self.pool.limit());
-                            self.raw = Some(stream.refuse_blocked_adts_span(limit));
-                            continue;
-                        }
-                    }
-                    return Err(error);
+                    self.audit_pes_growth(error, work, cancel)?
                 }
-                result => result?,
+                result => {
+                    self.storage = None;
+                    result?
+                }
             };
             match step {
-                Step::Ready(event) => self.raw = Some(event),
+                Step::Ready(event) => {
+                    // Ordinary carrier events need only prepare, begin and publish.
+                    if OBSERVING
+                        && let Some(carrier) = CarrierObservation::from_event(&event)
+                        && work.try_charge(3)
+                    {
+                        if cancel.load(Ordering::Relaxed) {
+                            return Err(Error::Cancelled);
+                        }
+                        observe(carrier);
+                    } else {
+                        self.raw = Some(event);
+                    }
+                }
                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                 Step::Yield => return Ok(Step::Yield),
                 Step::End(location) => {
+                    let stream = self.stream.as_mut().expect("active transport");
+                    let input = self.input.as_mut().expect("active input");
                     if let Some(next) = self.next_entity {
                         let Some(end) = stream.media_entity_end(input, work, cancel)? else {
                             return Ok(Step::Yield);
@@ -779,28 +835,37 @@ impl Reader {
         }
     }
 
-    fn catalogue_storage(
-        lanes: &BudgetVec<Lane>,
-        tracks: &BudgetVec<Track>,
-        staged_tracks: &BudgetVec<Track>,
-        source: Option<&SourceEvent>,
-    ) -> Result<usize> {
-        let mut bytes = crate::table_storage(lanes)?
-            .checked_add(crate::table_storage(tracks)?)
-            .and_then(|n| n.checked_add(crate::table_storage(staged_tracks).ok()?))
-            .ok_or(Error::Overflow)?;
-        if let Some(source) = source {
-            let map = source.map();
-            // PSI section assembly owns a separate allocation from PES carriers.
-            // The descriptors and track handles share the retained program map.
-            bytes = bytes
-                .checked_add(Shared::<TraceEvent>::allocation_bytes()?)
-                .and_then(|n| n.checked_add(crate::table_storage(&map.streams).ok()?))
-                .and_then(|n| n.checked_add(crate::table_storage(&map.source_ranges).ok()?))
-                .and_then(|n| n.checked_add(map.source.retained_storage_bytes()))
-                .ok_or(Error::Overflow)?;
+    #[cold]
+    fn audit_pes_growth(
+        &mut self,
+        error: Error,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<TraceEvent>> {
+        let stream = self.stream.as_ref().expect("blocked transport");
+        let Some(floor) = stream.blocked_pes_growth_floor()? else {
+            self.storage = None;
+            return Err(error);
+        };
+        let mut scan = match self.storage.take() {
+            Some(scan) => scan,
+            None => StorageScan::pes_growth(self, floor)?,
+        };
+        if !scan.step(self, work, cancel)? {
+            self.storage = Some(scan);
+            return Ok(Step::Yield);
         }
-        Ok(bytes)
+        if scan.bytes() > self.pool.limit() {
+            if !work.try_charge(1) {
+                self.storage = Some(scan);
+                return Ok(Step::Yield);
+            }
+            let limit = crate::limit(scan.bytes(), self.pool.limit());
+            let stream = self.stream.as_mut().expect("blocked transport");
+            return Ok(Step::Ready(stream.refuse_blocked_pes_growth(limit)));
+        }
+        self.storage = Some(scan);
+        Err(error)
     }
 }
 

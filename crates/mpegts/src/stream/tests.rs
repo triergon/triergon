@@ -83,6 +83,75 @@ fn idle_psi_preserves_cancellation_and_zero_work_fault_delivery() {
 }
 
 #[test]
+fn repeated_tables_preserve_section_bytes_and_source_positions() {
+    fn table_carrier(pid: u16, counter: u8, prefix: &[u8]) -> [u8; TS188_BYTES] {
+        let [high, low] = pid.to_be_bytes();
+        let mut ts = [0xff; TS188_BYTES];
+        ts[..5].copy_from_slice(&[0x47, high | 0x40, low, 0x10 | counter, 0]);
+        let end = 5 + prefix.len();
+        ts[5..end].copy_from_slice(prefix);
+        ts[end..end + 4].copy_from_slice(&crate::psi::PsiCrc32::of(prefix).to_be_bytes());
+        ts
+    }
+
+    let pat = [0, 0xb0, 13, 0, 1, 0xc1, 0, 0, 0, 1, 0xf0, 0];
+    let pmt = [
+        2, 0xb0, 18, 0, 1, 0xc1, 0, 0, 0xe1, 0, 0xf0, 0, 0x1b, 0xe1, 0, 0xf0, 0,
+    ];
+    let mut corrupt = table_carrier(0x1000, 2, &pmt);
+    corrupt[5 + pmt.len()] ^= 1;
+    let wire = [
+        table_carrier(0, 0, &pat),
+        table_carrier(0x1000, 0, &pmt),
+        table_carrier(0, 1, &pat),
+        table_carrier(0x1000, 1, &pmt),
+        corrupt,
+    ]
+    .concat();
+    for grant in [1, 4096] {
+        let pool = Budget::new(64 * 1024).unwrap();
+        let mut input = InputCursor::new(
+            &pool,
+            SOURCE,
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            WINDOW,
+        )
+        .unwrap();
+        provide(&mut input, &wire);
+        let mut stream =
+            TransportStream::new(pool, PacketFormat::Ts188, ParseLimits::default(), 1).unwrap();
+        let cancel = AtomicBool::new(false);
+        let mut positions = Vec::new();
+        let (mut pats, mut pmts, mut faults) = (0, 0, 0);
+        loop {
+            match stream.poll(&mut input, &mut WorkBudget::new(grant), &cancel) {
+                Ok(Step::Ready(TraceEvent::Section(section))) => {
+                    let [range] = section.source_ranges() else {
+                        panic!("expected a single source range");
+                    };
+                    assert_eq!(range.entity, SOURCE);
+                    let start = usize::try_from(range.offset).unwrap();
+                    assert_eq!(section.bytes().as_ref(), &wire[start..start + range.bytes]);
+                    assert_eq!(section.crc_remainder() == Some(0), positions.len() < 4);
+                    positions.push(start);
+                }
+                Ok(Step::Ready(TraceEvent::Pat(_))) => pats += 1,
+                Ok(Step::Ready(TraceEvent::ProgramMap { .. })) => pmts += 1,
+                Ok(Step::Ready(TraceEvent::Diagnostic(_))) => faults += 1,
+                Ok(Step::Ready(_) | Step::Yield) => {}
+                Ok(Step::NeedInput(_)) => break,
+                other => panic!("unexpected transport result {other:?}"),
+            }
+        }
+        assert_eq!(positions, [5, 193, 381, 569, 757]);
+        assert_eq!((pats, pmts, faults), (1, 1, 1));
+    }
+}
+
+#[test]
 fn output_modes_preserve_null_carriers_faults_and_cancelled_partial_input() {
     fn collect(compact: bool, quantum: u64, window: usize) -> (Vec<(u64, u16, u8)>, usize, u64) {
         let pool = Budget::new(64 * 1024).unwrap();
@@ -492,6 +561,63 @@ fn compact_run_keeps_owned_records_work_and_charges_without_carrier_handles() {
     );
     drop(packet);
     assert_eq!(pool.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn retained_continuation_keeps_the_grant_and_original_storage() {
+    let pool = Budget::new(8192).unwrap();
+    let limits = ParseLimits::default();
+    let cancel = AtomicBool::new(false);
+    let mut assembler =
+        PesAssembler::new(PID, true, pool.clone(), limits, SourceEpochs::default()).unwrap();
+    let start = Bytes::copy_from_slice(&pool, &[0, 0, 1, 0xe0, 0, 6, 0x80, 0, 0, 42]).unwrap();
+    assembler.push(start, true, SOURCE, 4).unwrap();
+    assert!(matches!(
+        assembler.poll(&mut WorkBudget::new(64), &cancel).unwrap(),
+        AssemblyStep::NeedPayload
+    ));
+
+    let mut body = Some(Bytes::copy_from_slice(&pool, &[43]).unwrap());
+    let address = body.as_ref().unwrap().storage_address();
+    let location = SourceLocation {
+        source: SOURCE,
+        offset: 200,
+    };
+    let before = pool.used();
+    let mut work = WorkBudget::new(0);
+    assert!(!assembler.retain_body_carrier(&mut body, location, &mut work));
+    assert_eq!(body.as_ref().unwrap().storage_address(), address);
+    let mut work = WorkBudget::new(1);
+    assert!(assembler.retain_body_carrier(&mut body, location, &mut work));
+    assert_eq!(work.spent(), 1);
+    assert_eq!(pool.used(), before);
+    assert!(body.is_none());
+
+    let mut last = Some(Bytes::copy_from_slice(&pool, &[44]).unwrap());
+    let location = SourceLocation {
+        offset: 392,
+        ..location
+    };
+    let mut work = WorkBudget::new(1);
+    assert!(!assembler.retain_body_carrier(&mut last, location, &mut work));
+    assert_eq!(work.spent(), 0);
+    assembler
+        .push(last.unwrap(), false, SOURCE, location.offset)
+        .unwrap();
+    let AssemblyStep::Output(pes) = assembler.poll(&mut work, &cancel).unwrap() else {
+        panic!("expected the complete finite PES");
+    };
+    assert_eq!(
+        pes.payload().flatten().copied().collect::<Vec<_>>(),
+        [42, 43, 44]
+    );
+    assert_eq!(
+        pes.source_ranges()
+            .map(|span| span.offset)
+            .collect::<Vec<_>>(),
+        [13, 200, 392]
+    );
+    assert_eq!(pes.spans()[1].backing_bytes().storage_address(), address);
 }
 
 #[test]

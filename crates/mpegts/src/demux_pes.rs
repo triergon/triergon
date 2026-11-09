@@ -1560,7 +1560,7 @@ impl DemuxObserver {
     }
 
     fn finish_header(&mut self) -> Result<()> {
-        let header = parse_header(&self.raw_header, self.header_used)?;
+        let header = parse_header(&self.budget, &self.raw_header[..self.header_used])?;
         if header.stream_id != self.scope.stream_id {
             return Err(Error::Unsupported(
                 "native PES stream-id context unobserved",

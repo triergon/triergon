@@ -25,7 +25,7 @@ pub(crate) fn payload_only_continuation(ts: &[u8]) -> Option<(u16, u8)> {
     Some((pid, control & 15))
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct CarrierHeader {
     pid: u16,
     pusi: bool,
@@ -53,7 +53,7 @@ impl CarrierHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct PlainCarrier {
     header: CarrierHeader,
     payload_start: usize,
@@ -187,6 +187,70 @@ impl PlainContinuation {
             self.offset,
             self.entity,
         )
+    }
+}
+
+/// The validated transport carrier borrowed during an access-unit read.
+#[derive(Clone, Copy, Debug)]
+pub struct TransportObservation<'a>(ObservedTransport<'a>);
+
+#[derive(Clone, Copy, Debug)]
+enum ObservedTransport<'a> {
+    Packet(&'a TransportPacket),
+    Continuation(&'a PlainContinuation, &'a Bytes),
+}
+
+impl<'a> TransportObservation<'a> {
+    pub(crate) fn continuation(carrier: &'a PlainContinuation, source: &'a Bytes) -> Self {
+        Self(ObservedTransport::Continuation(carrier, source))
+    }
+
+    pub fn pid(self) -> u16 {
+        match self.0 {
+            ObservedTransport::Packet(packet) => packet.pid,
+            ObservedTransport::Continuation(carrier, _) => carrier.pid(),
+        }
+    }
+
+    pub fn source_location(self) -> Option<SourceLocation> {
+        match self.0 {
+            ObservedTransport::Packet(packet) => packet.source_id.map(|source| SourceLocation {
+                source,
+                offset: packet.source_offset,
+            }),
+            ObservedTransport::Continuation(carrier, _) => {
+                carrier.entity.map(|source| SourceLocation {
+                    source,
+                    offset: carrier.offset,
+                })
+            }
+        }
+    }
+
+    /// The entire wire carrier, including any format prefix and adaptation bytes.
+    pub fn source_bytes(self) -> &'a [u8] {
+        match self.0 {
+            ObservedTransport::Packet(packet) => packet.source.as_ref(),
+            ObservedTransport::Continuation(_, source) => source.as_ref(),
+        }
+    }
+
+    /// Keep a complete carrier with the original shared backing storage.
+    pub fn to_packet(self) -> Result<TransportPacket> {
+        match self.0 {
+            ObservedTransport::Packet(packet) => Ok(packet.clone()),
+            ObservedTransport::Continuation(carrier, source) => {
+                carrier
+                    .layout
+                    .into_packet(source.clone(), carrier.offset, carrier.entity)
+            }
+        }
+    }
+}
+
+impl<'a> From<&'a TransportPacket> for TransportObservation<'a> {
+    fn from(packet: &'a TransportPacket) -> Self {
+        Self(ObservedTransport::Packet(packet))
     }
 }
 

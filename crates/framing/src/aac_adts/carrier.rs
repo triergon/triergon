@@ -118,6 +118,12 @@ impl AacAdtsCarrierReader {
             )?,
         })
     }
+    /// Capacity of the mutable frame buffer, excluding buffered source bytes.
+    #[doc(hidden)]
+    pub fn input_wait_buffer_capacity(&self) -> usize {
+        self.inner.input_wait_buffer_capacity()
+    }
+
     pub fn request(&self) -> InputRequest {
         self.inner.request()
     }

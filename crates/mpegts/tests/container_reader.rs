@@ -1,6 +1,8 @@
 //! Access-unit composition with recorded boundaries and original source clocks.
 #[path = "container_reader/adts_fragments.rs"]
 mod adts_fragments;
+#[path = "container_reader/adts_header_growth.rs"]
+mod adts_header_growth;
 #[path = "container_reader/adts_unbounded.rs"]
 mod adts_unbounded;
 #[path = "container_reader/entities.rs"]

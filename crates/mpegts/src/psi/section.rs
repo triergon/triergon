@@ -27,6 +27,30 @@ impl Section {
     pub fn crc_remainder(&self) -> Option<u32> {
         self.crc
     }
+
+    pub(crate) fn repeated(
+        budget: &Budget,
+        pid: u16,
+        accepted: &Bytes,
+        entity: SourceId,
+        offset: u64,
+    ) -> Result<Self> {
+        let mut ranges = BudgetVec::new(budget);
+        ranges
+            .try_push(SourceRange {
+                entity,
+                offset,
+                bytes: accepted.len(),
+            })
+            .map_err(|rejected| rejected.error)?;
+        Ok(Self {
+            pid,
+            source: accepted.clone(),
+            ranges,
+            crc: Some(0),
+        })
+    }
+
     /// Internal fallible clone of the actual immutable source section. It adds
     /// no validation or acceptance and preserves the original storage and ranges.
     #[cfg(feature = "reference-trace")]

@@ -34,7 +34,9 @@ pub mod reference_trace;
 mod stream;
 mod transport;
 
-pub use carrier::{RejectedTransport, TransportInspection, TransportInspector};
+pub use carrier::{
+    RejectedTransport, TransportInspection, TransportInspector, TransportObservation,
+};
 pub use continuity::{Continuity, ContinuityOutcome};
 pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
 pub use media_entity::MediaEntityEnd;
@@ -46,8 +48,8 @@ pub use reader::{
     Track, UnframedAudio,
 };
 pub use stream::{
-    CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun,
-    TraceEvent, TraceFault, TransportStream,
+    CarrierObservation, CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem,
+    FeedPayloadRun, TraceEvent, TraceFault, TransportStream,
 };
 pub use transport::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};
 

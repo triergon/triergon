@@ -200,6 +200,16 @@ windows and views into oversized allocations use charged copies.
 Borrowed spans wholly inside an Annex B NAL append directly to its payload
 builder. The standard input path handles potential start codes.
 
+Common PES headers are stored inline. Longer optional headers retain their
+original bytes in charged storage. The span and header tables reserve within
+the work and storage limits, and their allocation checks account for backing
+shared by live framers and transport state.
+
+Use `Reader::step_with_carriers` to visit complete carriers and ordinary
+continuity observations by reference. The callback receives them in source
+order alongside the normal packet and source-event protocol. The same
+transport validation applies to both entry points.
+
 `Track::configuration_epoch()` comes from its elementary route, which can be
 reused across PMT versions and PCR binding changes. In-band SPS/PPS changes remain
 in the source NALs and do not advance it. Consumers track parsed codec-configuration

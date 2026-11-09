@@ -535,3 +535,12 @@ pub enum ReaderEvent {
     /// An opaque private-audio PES admitted by the explicit EOF policy.
     UnframedAudio(UnframedAudio),
 }
+
+impl ReaderEvent {
+    pub(crate) fn carrier_observation(&self) -> Option<crate::CarrierObservation<'_>> {
+        let Self::Source(source) = self else {
+            return None;
+        };
+        crate::CarrierObservation::from_event(source.event())
+    }
+}

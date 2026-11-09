@@ -440,7 +440,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
     let mut recovered = None;
     let mut observed_media = false;
     let (proof, reader_refusal) = loop {
-        let step = match reader.step(&mut WorkBudget::new(WORK), cancel) {
+        let step = match reader.step_with_carriers(&mut WorkBudget::new(WORK), cancel, |_| ()) {
             Ok(step) => step,
             Err(error) => {
                 return Ok(deferred_continuity.unwrap_or_else(|| refused(totals, &error, at)));
