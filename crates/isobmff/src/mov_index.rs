@@ -3,8 +3,9 @@
 //! Compact streaming metadata passes; no per-sample array or payload cache.
 //! Regression guards were observed failing before implementation activation.
 use crate::{
-    BuildStatus, ClockOrigin, CursorStatus, DemuxProfile, DemuxTrack, MediaClock, PacketCursor,
-    PacketLimits, PacketOccurrence, ResumePoint,
+    BuildStatus, ClockOrigin, CursorStatus, DemuxProfile, DemuxTrack, MediaClock,
+    OpusRecoveryLanding, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
+    opus_seek::OpusRecoverySeek,
 };
 use std::{
     ops::Range,
@@ -389,6 +390,8 @@ pub struct SeekLanding {
     pub selected: IndexEntry,
     pub scanned_entries: u64,
     pub used_first_fallback: bool,
+    /// Decoder preroll when the caller requests source Opus recovery.
+    pub opus_recovery: Option<OpusRecoveryLanding>,
 }
 #[derive(Debug, Clone)]
 struct Context<'a> {
@@ -581,6 +584,7 @@ impl<'a> SeekJob<'a> {
                 selected,
                 scanned_entries: self.scanned,
                 used_first_fallback,
+                opus_recovery: None,
             },
         })
     }
@@ -715,6 +719,8 @@ pub struct GlobalSeekJob<'a> {
     reference: Option<SeekLanding>,
     anchors: BudgetVec<ResumePoint>,
     child: Option<SeekJob<'a>>,
+    opus_track: Option<usize>,
+    opus_recovery: Option<Box<OpusRecoverySeek<'a>>>,
     at: usize,
     scanned: u64,
     ready: bool,
@@ -862,6 +868,8 @@ impl<'a> GlobalSeekJob<'a> {
             reference: None,
             anchors,
             child: None,
+            opus_track: None,
+            opus_recovery: None,
             at: 0,
             scanned: 0,
             ready: false,
@@ -883,6 +891,31 @@ impl<'a> GlobalSeekJob<'a> {
             encoded_edits: self.encoded_edits.map(|plans| &plans[at..at + 1]),
         }
     }
+    /// Use a secondary regular Opus track's source roll groups for decoder
+    /// recovery. Select this before the seek lands on the reference track.
+    pub fn with_opus_recovery(mut self, track_id: u32) -> Result<Self> {
+        if self.reference.is_some() || self.opus_track.is_some() || self.failed.is_some() {
+            return Err(Error::Invalid(
+                "Opus recovery must be selected before the seek",
+            ));
+        }
+        let at = self
+            .tracks
+            .as_slice()
+            .iter()
+            .position(|track| track.track_id == track_id)
+            .filter(|&at| at != self.reference_index)
+            .ok_or(Error::Invalid("missing secondary Opus track"))?;
+        self.opus_edit(at)?.opus_roll_scope()?;
+        self.opus_track = Some(at);
+        Ok(self)
+    }
+
+    fn opus_edit(&self, at: usize) -> Result<&'a crate::EncodedEditPlan> {
+        self.encoded_edits
+            .and_then(|plans| plans[at].as_ref())
+            .ok_or(Error::Unsupported("Opus recovery needs an Opus edit"))
+    }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -900,6 +933,19 @@ impl<'a> GlobalSeekJob<'a> {
             }
             if self.ready {
                 return Ok(BuildStatus::Ready);
+            }
+            if let Some(recovery) = &mut self.opus_recovery {
+                let Some(landing) = recovery.poll(work, cancel)? else {
+                    return Ok(BuildStatus::Yield);
+                };
+                self.anchors.as_mut_slice()[self.at].occurrence = landing.first_sample - 1;
+                self.reference
+                    .as_mut()
+                    .expect("Opus recovery follows the reference seek")
+                    .opus_recovery = Some(landing);
+                self.opus_recovery = None;
+                self.at += 1;
+                continue;
             }
             if let Some(child) = &mut self.child {
                 if child.poll(work, cancel)? == BuildStatus::Yield {
@@ -924,11 +970,24 @@ impl<'a> GlobalSeekJob<'a> {
                 } else {
                     self.at
                 };
-                self.anchors.as_mut_slice()[at].occurrence = landing.selected.ordinal;
-                if self.reference.is_none() {
-                    self.reference = Some(landing);
+                if self.opus_track == Some(at) {
+                    let sample = &landing.selected.occurrence.source;
+                    if landing.selected.ordinal + 1 != sample.ordinal {
+                        return Err(Error::Invalid("Opus seek occurrence order"));
+                    }
+                    self.opus_recovery = Some(OpusRecoverySeek::new(
+                        &self.pool,
+                        self.tracks.as_slice()[at],
+                        self.opus_edit(at)?.opus_roll_scope()?,
+                        sample,
+                    )?);
                 } else {
-                    self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
+                    self.anchors.as_mut_slice()[at].occurrence = landing.selected.ordinal;
+                    if self.reference.is_none() {
+                        self.reference = Some(landing);
+                    } else {
+                        self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
+                    }
                 }
                 continue;
             }
@@ -943,21 +1002,36 @@ impl<'a> GlobalSeekJob<'a> {
                 self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
                 continue;
             }
-            let timestamp = self
+            let selected = &self
                 .reference
                 .as_ref()
                 .ok_or(Error::Invalid("native reference selection absent"))?
-                .selected
-                .timestamp;
+                .selected;
+            let recovering_opus = self.opus_track == Some(self.at);
+            let (timestamp, rounding) = if recovering_opus {
+                (
+                    selected
+                        .occurrence
+                        .demux
+                        .pts
+                        .ok_or(Error::Invalid("missing video landing PTS"))?,
+                    Rounding::Floor,
+                )
+            } else {
+                (selected.timestamp, Rounding::NearestAway)
+            };
             let track = self.tracks.as_slice()[self.at];
             let base = MediaClock::from_source(track.media_base)?.demux_base;
             let timestamp = if self.reference_base == base {
                 timestamp
             } else {
-                self.reference_base
-                    .rescale(timestamp, base, Rounding::NearestAway)?
+                self.reference_base.rescale(timestamp, base, rounding)?
             };
-            let timestamp = match self.encoded_edits.and_then(|plans| plans[self.at].as_ref()) {
+            let timestamp = match self
+                .encoded_edits
+                .and_then(|plans| plans[self.at].as_ref())
+                .filter(|_| !recovering_opus)
+            {
                 Some(edit) => edit.align_seek_timestamp(timestamp, base)?,
                 None => timestamp,
             };
