@@ -82,9 +82,10 @@ Split PES headers report a limit when their required range-table growth cannot
 fit, including under strict parsing. Caller-held storage remains retryable.
 At the same revision all 71 HLS cases meet parity, runtime (1.1389), peak heap
 (0.0211) and total resident peak RSS (0.9081) with the contiguous feed copy.
-The first progressive collection matches all three packet folds and passes both
-memory checks on all three cases. The loaded RSS observer prevents timing in
-that collection.
+The progressive collection with separate timing and memory phases matches all
+three packet folds and all ten control outcomes. All three cases meet runtime
+(1.1833), peak heap (0.0161) and total resident peak RSS (0.9157). The earlier
+collection has memory samples only because timing requires the observer to be absent.
 
 The progressive TS188 row uses the gate build at
 `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee`, with 30 timing pairs of 50 complete
@@ -231,6 +232,7 @@ timing of the reference built with and without zeroed automatic variables.
 | MPEG-TS access units and PES, shared reader on AArch64 Linux | `d3a839911ad5d71c6d5bfb7943ab3f61c91113ca` | `fb254dfa5138c9383a865691da33180bcdea7c7c571119b29bf844069ee9ce86` |
 | MPEG-TS split PES header storage, macOS AArch64 | `72731b43b77841882917542889e7ebca0998241e` | `b2a9801019883347880756d8e725a8c51a03df15360e8639be8ae910d40100cd` |
 | MPEG-TS access units, PES, HLS and progressive, AArch64 Linux | `a829bc8ad051308d6ab3aebfcf15c42255bcb2f8` | `d69b37c719221f5813084d12191169fd783ba0e36277e1cac5889d923e044419` |
+| MPEG-TS progressive playback with the shared reader, AArch64 Linux | `a829bc8ad051308d6ab3aebfcf15c42255bcb2f8` | `afd9d85916d1bca164a2780583e1da36c7bf0d79a37e4f7d61a417bf008a02b7` |
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | ARMv7: ISO BMFF / MP4 | `f99d893196908d562c897bccb20c6a972cd25d11` | `bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1` |
 | ARMv7: packet framing, codec conformance, tests | `9621f6063a2e517fecc1c28757e6bed50b5228a8` | `9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e` |

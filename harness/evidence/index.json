@@ -16921,6 +16921,16 @@
    "sha256": "d69b37c719221f5813084d12191169fd783ba0e36277e1cac5889d923e044419",
    "bytes": 114509366,
    "source_revision": "a829bc8ad051308d6ab3aebfcf15c42255bcb2f8"
+  },
+  {
+   "name": "mpegts-progressive-shared-reader-linux-arm64",
+   "path": "mpegts-progressive-shared-reader-linux-arm64",
+   "retention": "retained",
+   "reason": "Progressive transport measurements cited in docs/status.md",
+   "key": "evidence/mpegts-progressive-shared-reader-linux-arm64/afd9d85916d1bca164a2780583e1da36c7bf0d79a37e4f7d61a417bf008a02b7.tar.gz",
+   "sha256": "afd9d85916d1bca164a2780583e1da36c7bf0d79a37e4f7d61a417bf008a02b7",
+   "bytes": 15383721,
+   "source_revision": "a829bc8ad051308d6ab3aebfcf15c42255bcb2f8"
   }
  ]
 }
