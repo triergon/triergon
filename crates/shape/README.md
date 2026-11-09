@@ -131,7 +131,8 @@ paragraph separator inside the text.
   fallback lookups.
 - What libass reads from FreeType's hinted load: `SizedMetrics` gives no glyph
   extents or contour points (`Unsupported`), so fallback mark positioning in a
-  font without GPOS marks fails, and no default-load advance that FreeType's
+  font without GPOS marks fails (which leaves `ass-render`'s two
+  `hinted-extents-ass-*` cases open), and no default-load advance that FreeType's
   auto-hinter sets. Faces whose character map libass would convert (Windows
   multibyte encodings) are refused. The vertical advances libass substitutes in
   an `@` font are not covered.

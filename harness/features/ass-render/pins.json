@@ -213,6 +213,16 @@
       "bytes": 2379936,
       "digest": 4329091821215781476
     },
+    "hinted-extents-ass-1080p": {
+      "packets": 6,
+      "bytes": 24480,
+      "digest": 2391728191937074710
+    },
+    "hinted-extents-ass-720p": {
+      "packets": 6,
+      "bytes": 15936,
+      "digest": 1385134206248753750
+    },
     "indic-ass-1080p": {
       "packets": 72,
       "bytes": 3249672,
