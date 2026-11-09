@@ -725,7 +725,7 @@ struct Build {
     last_anchor: u64,
     retire: usize,
     planned_origins: Option<usize>,
-    recovered_adts: bool,
+    recovered_adts_bytes: bool,
 }
 
 impl Build {
@@ -753,7 +753,7 @@ impl Build {
             last_anchor,
             retire: 0,
             planned_origins: None,
-            recovered_adts: false,
+            recovered_adts_bytes: false,
         }
     }
     fn copy(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
@@ -1303,7 +1303,6 @@ impl Lane {
             }
             let start = range.start.max(piece.range.start);
             let end = range.end.min(piece.range.end);
-            let recovered = matches!(piece.source.event(), crate::TraceEvent::UnboundedAdtsPes(_));
             if start < end {
                 if !build.origins.is_empty()
                     && self.track.stream().stream_type == 0x87
@@ -1323,7 +1322,8 @@ impl Lane {
                         pes: piece.source.clone(),
                     })
                     .map_err(|e| e.error)?;
-                build.recovered_adts |= recovered;
+                build.recovered_adts_bytes |=
+                    matches!(piece.source.event(), crate::TraceEvent::UnboundedAdtsPes(_));
             }
             if piece.range.start <= anchor_offset && piece.serial > build.last_anchor {
                 let pes = piece.source.pes();
@@ -1340,7 +1340,6 @@ impl Lane {
                     pes: piece.source.clone(),
                 });
                 build.last_anchor = piece.serial;
-                build.recovered_adts |= recovered;
             }
             build.origin += 1;
         }
@@ -1403,6 +1402,10 @@ impl Lane {
             .pes()
             .epochs;
         let build = self.build.take().expect("prepared publication");
+        let recovered_adts = build.recovered_adts_bytes
+            || build.clock.as_ref().is_some_and(|clock| {
+                matches!(clock.pes.event(), crate::TraceEvent::UnboundedAdtsPes(_))
+            });
         self.retire = build.retire;
         self.last_anchor = build.last_anchor;
         self.completed += 1;
@@ -1421,7 +1424,7 @@ impl Lane {
                     pts,
                     dts,
                     duration90,
-                    recovered_adts: build.recovered_adts,
+                    recovered_adts,
                 },
                 charge,
             )))),

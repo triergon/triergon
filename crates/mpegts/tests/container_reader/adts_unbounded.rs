@@ -129,6 +129,45 @@ fn unbounded_and_finite_pes_share_the_same_frame_parser() {
 }
 
 #[test]
+fn a_finite_pes_supersedes_an_empty_unbounded_clock() {
+    let frame = adts(&[0x31; 19]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    unbounded(&mut ts, PID, &[]);
+    ts.pes(PID, 0xc0, &frame, Some(180_000), Some(179_000));
+    let mut reader = Drive::new(&ts.bytes, recovery(), 1, 1);
+    let mut saw_empty = false;
+    let mut saw_packet = false;
+    while let Some(event) = reader.next().unwrap() {
+        match event {
+            Event::Other(ReaderEvent::Source(source)) => {
+                if let TraceEvent::UnboundedAdtsPes(rejected) = source.event() {
+                    assert_eq!(rejected.pes().payload_len, 0);
+                    saw_empty = true;
+                }
+            }
+            Event::Packet(packet) => {
+                assert!(!saw_packet);
+                assert_eq!(packet.payload(), frame);
+                assert_eq!(packet.pts(), Some(180_000));
+                assert_eq!(packet.dts(), Some(179_000));
+                assert_eq!(packet.sources().len(), 1);
+                assert!(matches!(
+                    packet.clock().unwrap().pes.event(),
+                    TraceEvent::Pes(_)
+                ));
+                saw_packet = true;
+            }
+            Event::Other(ReaderEvent::RecoveredAdts(_)) => {
+                panic!("a superseded clock marked the finite frame as recovered");
+            }
+            _ => (),
+        }
+    }
+    assert!(saw_empty && saw_packet);
+}
+
+#[test]
 fn adts_policy_does_not_admit_other_unbounded_audio() {
     let mut ts = Transport::new();
     ts.tables(&[(0x11, PID, &[])], 0);
