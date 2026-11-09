@@ -731,13 +731,16 @@ impl Reader {
                 }
                 continue;
             }
-            if let Some((index, source, key)) = &self.queued_pes {
-                let index = *index;
-                if !self.lanes.as_mut_slice()[index].push(source, *key, work)? {
-                    return Ok(Step::Yield);
+            if let Some((index, source, key)) = self.queued_pes.take() {
+                let mut source = Some(source);
+                match self.lanes.as_mut_slice()[index].push(&mut source, key, work) {
+                    Ok(true) => self.active = Some(index),
+                    retry => {
+                        self.queued_pes = Some((index, source.expect("queued PES on retry"), key));
+                        retry?;
+                        return Ok(Step::Yield);
+                    }
                 }
-                self.queued_pes = None;
-                self.active = Some(index);
                 continue;
             }
             if let Some(index) = self.unsupported_at {
