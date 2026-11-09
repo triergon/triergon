@@ -175,7 +175,9 @@ fn starts_new_au(nal: &[u8]) -> Option<(bool, bool)> {
     }
     let t = h.nal_unit_type;
     if t < 32 {
-        if t > 21 {
+        // Slices only: FFmpeg's HEVC parser splits access units on these types
+        // and its decoder skips the reserved ones (10 to 15, 22 to 31).
+        if !matches!(t, 0..=9 | 16..=21) {
             return Some((false, false));
         }
         let first_slice = nal.len() > 2 && nal[2] & 0x80 != 0;
@@ -258,6 +260,28 @@ mod tests {
         let mut d = BudgetVec::new(&budget);
         unescape_rbsp(&src, &mut d).unwrap();
         assert_eq!(&d[..], &[0, 0, 1, 0, 0]);
+    }
+
+    /// A reserved VCL type (10 to 15) neither starts an access unit nor counts
+    /// as its slice, as in FFmpeg's HEVC parser.
+    #[test]
+    fn reserved_vcl_types_do_not_split_access_units() {
+        // TRAIL_R (type 1) with first_slice_segment_in_pic_flag set.
+        let trail = [0, 0, 1, 0x02, 0x01, 0x80];
+        for reserved in 10..=15 {
+            let mut stream = trail.to_vec();
+            stream.extend_from_slice(&[0, 0, 1, reserved << 1, 0x01, 0x80]);
+            stream.extend_from_slice(&trail);
+            let units: Vec<&[u8]> = AccessUnitSplitter::new(&stream).collect();
+            assert_eq!(units, [&stream[..12], &stream[12..]], "type {reserved}");
+            // Alone, the reserved unit is not a picture to close.
+            let alone = [0, 0, 1, reserved << 1, 0x01, 0x80, 0, 0, 1, 0x40, 0x01, 0];
+            assert_eq!(
+                AccessUnitSplitter::new(&alone).count(),
+                1,
+                "type {reserved}"
+            );
+        }
     }
 
     #[test]
