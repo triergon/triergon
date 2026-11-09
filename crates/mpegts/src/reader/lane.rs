@@ -4,7 +4,7 @@ mod loas;
 mod unframed_audio;
 mod unframed_video;
 
-use super::model::{ClockContext, PacketData, Shared, UnframedData};
+use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
 use super::{
     Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, Packet, PacketClock, PayloadSource,
     ReaderLimits, SourceEvent, Track, UnframedAudio,
@@ -830,7 +830,7 @@ struct Build {
     nal: usize,
     part: u8,
     copied: usize,
-    origins: BudgetVec<PayloadSource>,
+    origins: PayloadSources,
     origin: usize,
     clock: Option<PacketClock>,
     last_anchor: u64,
@@ -851,6 +851,12 @@ impl Build {
     ) -> Self {
         let buffer =
             matches!(unit, BuildUnit::Packet(AccessUnit::Video(_))).then(|| BudgetVec::new(pool));
+        let origins = if matches!(unit, BuildUnit::Packet(AccessUnit::DvbSubtitle(_))) {
+            // The DVB storage floor includes a source table.
+            PayloadSources::Table(BudgetVec::new(pool))
+        } else {
+            PayloadSources::Inline(None)
+        };
         Self {
             unit,
             buffer,
@@ -858,7 +864,7 @@ impl Build {
             nal: 0,
             part: 0,
             copied: 0,
-            origins: BudgetVec::new(pool),
+            origins,
             origin: 0,
             clock: None,
             last_anchor,
@@ -1433,7 +1439,9 @@ impl Lane {
             if !work.try_charge(1) {
                 return Ok(LaneStep::Yield);
             }
-            build.origins.try_reserve_exact(count)?;
+            let mut sources = BudgetVec::new(&self.pool);
+            sources.try_reserve_exact(count)?;
+            build.origins = PayloadSources::Table(sources);
             build.planned_origins = None;
         }
         if !build.copy(work, cancel)? {
@@ -1454,24 +1462,23 @@ impl Lane {
             let start = range.start.max(piece.range.start);
             let end = range.end.min(piece.range.end);
             if start < end {
-                if !build.origins.is_empty()
+                if !build.origins.as_slice().is_empty()
                     && self.track.stream().stream_type == 0x87
                     && matches!(build.unit, BuildUnit::Packet(AccessUnit::Ac3(_)))
                 {
                     return Err(Error::Invalid("ATSC E-AC-3 access unit crosses PES"));
                 }
-                build.origins.try_reserve_exact(1)?;
-                build
-                    .origins
-                    .try_push(PayloadSource {
+                build.origins.try_push(
+                    &self.pool,
+                    PayloadSource {
                         elementary_range: start..end,
                         payload_range: usize::try_from(start - piece.range.start)
                             .map_err(|_| Error::Overflow)?
                             ..usize::try_from(end - piece.range.start)
                                 .map_err(|_| Error::Overflow)?,
                         pes: piece.source.clone(),
-                    })
-                    .map_err(|e| e.error)?;
+                    },
+                )?;
                 build.recovered_adts_bytes |=
                     matches!(piece.source.event(), crate::TraceEvent::UnboundedAdtsPes(_));
             }
@@ -1579,12 +1586,15 @@ impl Lane {
                 charge,
             )))),
             BuildUnit::Unframed(kind, range) => {
+                let PayloadSources::Table(sources) = build.origins else {
+                    unreachable!("unframed PES sources use a table");
+                };
                 let data = Shared::new(
                     UnframedData {
                         track,
                         range,
                         bytes: build.assembled_bytes.expect("copied unframed payload"),
-                        sources: build.origins,
+                        sources,
                         clock: build.clock,
                         epochs,
                     },

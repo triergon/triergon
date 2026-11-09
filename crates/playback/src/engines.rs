@@ -341,6 +341,10 @@ pub(crate) enum NativePacket {
 }
 
 #[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "keep transport events inline across polling steps"
+)]
 pub(crate) enum TsPayloadStep {
     Event(TsEvent),
     Configuration(TsNativeConfiguration),

@@ -131,6 +131,45 @@ pub struct PayloadSource {
     pub pes: SourceEvent,
 }
 
+#[derive(Debug)]
+pub(super) enum PayloadSources {
+    Inline(Option<PayloadSource>),
+    Table(BudgetVec<PayloadSource>),
+}
+
+impl PayloadSources {
+    pub(super) fn as_slice(&self) -> &[PayloadSource] {
+        match self {
+            Self::Inline(source) => source.as_slice(),
+            Self::Table(sources) => sources.as_slice(),
+        }
+    }
+
+    pub(super) fn try_push(&mut self, pool: &Budget, source: PayloadSource) -> Result<()> {
+        match self {
+            Self::Inline(first @ None) => *first = Some(source),
+            Self::Inline(first) => {
+                // Reserve both entries before moving the retained first source.
+                let mut table = BudgetVec::new(pool);
+                let mut second = Some(source);
+                table.try_extend_with(2, |index| {
+                    if index == 0 {
+                        first.take().expect("first PES source")
+                    } else {
+                        second.take().expect("second PES source")
+                    }
+                })?;
+                *self = Self::Table(table);
+            }
+            Self::Table(table) => {
+                table.try_reserve_exact(1)?;
+                table.try_push(source).map_err(|error| error.error)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// The most recent applicable PES anchor at an AU's first start-code byte
 /// (or audio sync byte). An anchor is used once; one inside a frame waits for
 /// the next frame start. Missing DTS is never inferred from PTS.
@@ -344,7 +383,7 @@ pub(super) struct PacketData {
     pub track: Track,
     pub unit: AccessUnit,
     pub video_bytes: Option<Bytes>,
-    pub sources: BudgetVec<PayloadSource>,
+    pub sources: PayloadSources,
     pub clock: Option<PacketClock>,
     pub epochs: SourceEpochs,
     pub duration: Option<Time>,

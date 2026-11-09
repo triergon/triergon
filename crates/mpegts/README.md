@@ -191,6 +191,8 @@ with original PMTs and PES available as source events.
 `Packet` implements `PacketInfo` and retains its exact PMT, source configuration epoch,
 framer syntax and intersecting PES events. `sources()` maps its elementary-byte
 extent to retained PES events, including all physical source and header ranges.
+A packet with one contributing PES keeps its source descriptor inline.
+Packets spanning multiple PES use a charged source table.
 Framer coordinates use a private concatenated elementary view (`SourceId(0)`),
 not physical file offsets. Video scatter payloads are coalesced cooperatively
 into charged immutable storage. Audio packets borrow their access unit's stored
