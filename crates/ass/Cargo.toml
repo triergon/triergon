@@ -8,6 +8,11 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+# Development aid: `Renderer::work_spent`, for comparing renderer revisions
+# (`cargo xtask ass equivalence`); never needed in production.
+work-probe = []
+
 [lints]
 workspace = true
 

@@ -85,6 +85,9 @@ pub struct Renderer {
     boxes: BudgetVec<EventBox>,
     placed: BudgetVec<Placed>,
     used: BudgetVec<collisions::Rect>,
+    /// The work the last call to [`Renderer::render`] spent.
+    #[cfg(feature = "work-probe")]
+    work_spent: u64,
 }
 
 /// What renders one event: the font library, the outline cache, the shaper
@@ -136,6 +139,8 @@ impl Renderer {
             boxes: BudgetVec::new(budget),
             placed: BudgetVec::new(budget),
             used: BudgetVec::new(budget),
+            #[cfg(feature = "work-probe")]
+            work_spent: 0,
         })
     }
 
@@ -158,6 +163,10 @@ impl Renderer {
     /// comparison.
     pub fn render(&mut self, script: &mut Script, now: i64) -> Result<Frame<'_>> {
         if script.events().is_empty() {
+            #[cfg(feature = "work-probe")]
+            {
+                self.work_spent = 0;
+            }
             return Ok(Frame {
                 images: &[],
                 change: Change::Content,
@@ -167,10 +176,23 @@ impl Renderer {
         // selection, shaping, layout and drawing, and collision handling.
         let mut work = WorkBudget::new(self.canvas.settings.work);
         let change = self.render_frame(script, now, &mut work);
+        #[cfg(feature = "work-probe")]
+        {
+            self.work_spent = work.spent();
+        }
         Ok(Frame {
             images: &self.last_frame,
             change: change?,
         })
+    }
+
+    /// The work units the last call to [`Renderer::render`] spent: 0 for a
+    /// script without events, and for a frame refused past
+    /// [`Settings::work`] what it spent before the charge it refused. A
+    /// development aid, with the `work-probe` feature.
+    #[cfg(feature = "work-probe")]
+    pub fn work_spent(&self) -> u64 {
+        self.work_spent
     }
 
     /// Renders every shown event, handles collisions and makes the result
