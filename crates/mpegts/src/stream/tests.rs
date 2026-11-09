@@ -495,6 +495,63 @@ fn compact_run_keeps_owned_records_work_and_charges_without_carrier_handles() {
 }
 
 #[test]
+fn retained_continuation_keeps_the_grant_and_original_storage() {
+    let pool = Budget::new(8192).unwrap();
+    let limits = ParseLimits::default();
+    let cancel = AtomicBool::new(false);
+    let mut assembler =
+        PesAssembler::new(PID, true, pool.clone(), limits, SourceEpochs::default()).unwrap();
+    let start = Bytes::copy_from_slice(&pool, &[0, 0, 1, 0xe0, 0, 6, 0x80, 0, 0, 42]).unwrap();
+    assembler.push(start, true, SOURCE, 4).unwrap();
+    assert!(matches!(
+        assembler.poll(&mut WorkBudget::new(64), &cancel).unwrap(),
+        AssemblyStep::NeedPayload
+    ));
+
+    let mut body = Some(Bytes::copy_from_slice(&pool, &[43]).unwrap());
+    let address = body.as_ref().unwrap().storage_address();
+    let location = SourceLocation {
+        source: SOURCE,
+        offset: 200,
+    };
+    let before = pool.used();
+    let mut work = WorkBudget::new(0);
+    assert!(!assembler.retain_body_carrier(&mut body, location, &mut work));
+    assert_eq!(body.as_ref().unwrap().storage_address(), address);
+    let mut work = WorkBudget::new(1);
+    assert!(assembler.retain_body_carrier(&mut body, location, &mut work));
+    assert_eq!(work.spent(), 1);
+    assert_eq!(pool.used(), before);
+    assert!(body.is_none());
+
+    let mut last = Some(Bytes::copy_from_slice(&pool, &[44]).unwrap());
+    let location = SourceLocation {
+        offset: 392,
+        ..location
+    };
+    let mut work = WorkBudget::new(1);
+    assert!(!assembler.retain_body_carrier(&mut last, location, &mut work));
+    assert_eq!(work.spent(), 0);
+    assembler
+        .push(last.unwrap(), false, SOURCE, location.offset)
+        .unwrap();
+    let AssemblyStep::Output(pes) = assembler.poll(&mut work, &cancel).unwrap() else {
+        panic!("expected the complete finite PES");
+    };
+    assert_eq!(
+        pes.payload().flatten().copied().collect::<Vec<_>>(),
+        [42, 43, 44]
+    );
+    assert_eq!(
+        pes.source_ranges()
+            .map(|span| span.offset)
+            .collect::<Vec<_>>(),
+        [13, 200, 392]
+    );
+    assert_eq!(pes.spans()[1].backing_bytes().storage_address(), address);
+}
+
+#[test]
 fn rejected_pes_payload_stays_available_for_a_drained_retry() {
     let mut feed = PayloadFeed::new(&carrier(0, true));
     let pool = feed.input.budget().clone();
