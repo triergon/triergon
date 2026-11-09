@@ -1,4 +1,4 @@
-//! AU composition against frozen raw-AU boundaries and literal source clocks.
+//! Access-unit composition with recorded boundaries and original source clocks.
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     CodecId, ContainerReader, Event, MediaKind, PacketInfo, TrackId, TrackInfo,
