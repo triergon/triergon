@@ -484,15 +484,116 @@ impl GlyphBitmaps {
     }
 }
 
+/// Where [`Raster::render_with`] gets a placed glyph's bitmaps: drawn on the
+/// spot, as [`Raster::render`] draws them, or kept by a renderer between
+/// frames. Each is `None` when it draws nothing.
+pub trait GlyphSource {
+    /// The fill: the glyph's `shape` under `at`.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::draw`], and the source's own.
+    fn fill(
+        &mut self,
+        raster: &mut Raster,
+        shape: &Shape,
+        at: Quantized,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap>>;
+
+    /// The opaque box: [`Shape::unit_box`] under `at`.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::draw`], and the source's own.
+    fn opaque_box(
+        &mut self,
+        raster: &mut Raster,
+        at: Quantized,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap>>;
+
+    /// The border: `shape` stroked by `stroke` ([`Raster::stroke_border`]),
+    /// placed by `placement` once stroked ([`GlyphPlacement::place_stroke`]).
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::stroke_border`] and [`Raster::draw`], and the
+    /// source's own.
+    fn border(
+        &mut self,
+        raster: &mut Raster,
+        shape: &Shape,
+        stroke: BorderStroke,
+        placement: &GlyphPlacement,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap>>;
+}
+
+/// The bitmaps of a glyph drawn as they are asked for.
+struct Drawing;
+
+impl Drawing {
+    fn placed(bitmap: Option<Bitmap>, at: Quantized) -> Option<PlacedBitmap> {
+        bitmap.map(|bitmap| PlacedBitmap {
+            bitmap: Arc::new(bitmap),
+            origin: at.position,
+        })
+    }
+}
+
+impl GlyphSource for Drawing {
+    fn fill(
+        &mut self,
+        raster: &mut Raster,
+        shape: &Shape,
+        at: Quantized,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap>> {
+        Ok(Self::placed(raster.draw(shape, &at.transform, work)?, at))
+    }
+
+    fn opaque_box(
+        &mut self,
+        raster: &mut Raster,
+        at: Quantized,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap>> {
+        let unit_box = Shape::unit_box(&raster.budget)?;
+        Ok(Self::placed(
+            raster.draw(&unit_box, &at.transform, work)?,
+            at,
+        ))
+    }
+
+    fn border(
+        &mut self,
+        raster: &mut Raster,
+        shape: &Shape,
+        stroke: BorderStroke,
+        placement: &GlyphPlacement,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap>> {
+        let Some(stroked) = raster.stroke_border(shape, &stroke, work)? else {
+            return Ok(None);
+        };
+        let Some(at) = placement.place_stroke(&stroked) else {
+            return Ok(None);
+        };
+        Ok(Self::placed(
+            raster.draw(&stroked, &at.transform, work)?,
+            at,
+        ))
+    }
+}
+
 impl Raster {
     /// Draws one glyph of `run` as libass does: places it
     /// ([`Run::place`]), draws its fill and its border outline or opaque box
-    /// ([`Raster::draw`], [`Raster::stroke_border`]),
-    /// and adds them to the run ([`Run::add`]). A glyph or border that leaves
-    /// the coordinate range under its transform is not drawn, as in libass;
-    /// `None` when nothing is drawn, and the glyph is then no part of the
-    /// run. A renderer that keeps the bitmaps it draws takes those steps
-    /// itself.
+    /// ([`Raster::draw`], [`Raster::stroke_border`]), and adds them to the
+    /// run ([`Run::add`]). A glyph or border that leaves the coordinate
+    /// range under its transform is not drawn, as in libass; `None` when
+    /// nothing is drawn, and the glyph is then no part of the run.
     ///
     /// # Errors
     ///
@@ -503,40 +604,32 @@ impl Raster {
         run: &mut Run,
         work: &mut WorkBudget,
     ) -> Result<Option<GlyphBitmaps>> {
+        self.render_with(request, run, &mut Drawing, work)
+    }
+
+    /// [`Raster::render`] with the bitmaps from `source`: a renderer that
+    /// keeps the bitmaps it draws hands out those it has.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::render`] and of `source`.
+    pub fn render_with(
+        &mut self,
+        request: &GlyphRequest<'_>,
+        run: &mut Run,
+        source: &mut impl GlyphSource,
+        work: &mut WorkBudget,
+    ) -> Result<Option<GlyphBitmaps>> {
         let Some(placement) = run.place(request) else {
             return Ok(None);
         };
-        let placed = |at: Quantized| {
-            move |bitmap| PlacedBitmap {
-                bitmap: Arc::new(bitmap),
-                origin: at.position,
-            }
-        };
-        let fill_at = placement.fill();
-        let fill = self
-            .draw(request.shape, &fill_at.transform, work)?
-            .map(placed(fill_at));
+        let shape = request.shape;
+        let fill = source.fill(self, shape, placement.fill(), work)?;
         let border = match placement.border() {
             PlacedBorder::None => None,
             PlacedBorder::Fill => fill.clone(),
-            PlacedBorder::Box(at) => {
-                let unit_box = match self.unit_box.take() {
-                    Some(unit_box) => unit_box,
-                    None => Shape::unit_box(&self.budget)?,
-                };
-                let drawn = self.draw(&unit_box, &at.transform, work);
-                self.unit_box = Some(unit_box);
-                drawn?.map(placed(at))
-            }
-            PlacedBorder::Stroke(stroke) => {
-                match self.stroke_border(request.shape, &stroke, work)? {
-                    Some(stroked) => match placement.place_stroke(&stroked) {
-                        Some(at) => self.draw(&stroked, &at.transform, work)?.map(placed(at)),
-                        None => None,
-                    },
-                    None => None,
-                }
-            }
+            PlacedBorder::Box(at) => source.opaque_box(self, at, work)?,
+            PlacedBorder::Stroke(stroke) => source.border(self, shape, stroke, &placement, work)?,
         };
         Ok(run.add(fill, border))
     }

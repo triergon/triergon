@@ -73,13 +73,16 @@ against: a glyph's fill and border each count from their `PlacedBitmap::origin`,
 and a run's composite from `Composite::origin`, the least origin of its glyphs.
 
 `Raster::render` draws a glyph in one call. A renderer that keeps the bitmaps it
-draws, as libass's caches do, takes its steps itself: `Run::place` quantises
-and places the glyph without drawing it, giving the `BitmapTransform` its fill
-and border are drawn under; `Raster::stroke_border` strokes the border and
-`Raster::draw` draws each, the opaque box from `Shape::unit_box`; and `Run::add` adds what was drawn to the
-run. A bitmap is then keyed by its shape and its transform, a stroked border
-by its glyph and its `BorderStroke`, and a composite by `Effects::key` and its
-glyphs' bitmaps and places, as libass keys them.
+draws, as libass's caches do, renders through `Raster::render_with` and a
+`GlyphSource` of its own, which hands out the fill, the opaque box and the
+border it has and draws only the others. The steps are public too: `Run::place`
+quantises and places the glyph without drawing it, giving the `BitmapTransform`
+its fill and border are drawn under; `Raster::stroke_border` strokes the border
+and `Raster::draw` draws each, the opaque box from `Shape::unit_box`; and
+`Run::add` adds what was drawn to the run. A bitmap is then keyed by its shape
+and its transform, a stroked border by its glyph and its `BorderStroke`, and a
+composite by `Effects::key` and its glyphs' bitmaps and places, as libass keys
+them.
 
 ## What it matches
 

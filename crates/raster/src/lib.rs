@@ -33,8 +33,8 @@ pub use clip::{Clip, ClipFrame, ClipPart, Colour};
 pub use compose::{Border, Composite, Effects, EffectsKey, Shadow};
 pub use geometry::{OUTLINE_MAX, Rect, Vector, pixels_26_6};
 pub use glyph::{
-    BorderStroke, FrameScale, GlyphBitmaps, GlyphPlacement, GlyphRequest, PlacedBitmap,
-    PlacedBorder, Placement, Run,
+    BorderStroke, FrameScale, GlyphBitmaps, GlyphPlacement, GlyphRequest, GlyphSource,
+    PlacedBitmap, PlacedBorder, Placement, Run,
 };
 pub use limits::{Limits, MAX_BITMAP_BYTES};
 pub use outline::{Outline, Segment, SegmentKind};

@@ -22,9 +22,6 @@ pub struct Raster {
     pub(crate) rasterizer: Rasterizer,
     pub(crate) transformed: Shape,
     pub(crate) blur: Blur,
-    /// The unit square [`Raster::render`] draws opaque boxes from, once it
-    /// has drawn one.
-    pub(crate) unit_box: Option<Shape>,
 }
 
 impl Raster {
@@ -36,7 +33,6 @@ impl Raster {
             rasterizer: Rasterizer::new(budget),
             transformed: Shape::new(budget),
             blur: Blur::new(budget),
-            unit_box: None,
         }
     }
 
@@ -45,7 +41,6 @@ impl Raster {
         self.rasterizer.retained_bytes()
             + self.transformed.retained_bytes()
             + self.blur.retained_bytes()
-            + self.unit_box.as_ref().map_or(0, Shape::retained_bytes)
     }
 
     /// Strokes `outline` with `pen`, as libass strokes borders
