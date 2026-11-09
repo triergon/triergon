@@ -5,8 +5,8 @@ use super::{SourceContext, TransportFaultRecovery};
 use crate::demux_pes::DemuxScope;
 use crate::psi::DescriptorNamespace;
 use crate::{
-    AssemblyStep, FaultKind, MediaEntityEnd, PacketFormat, ParseLimits, TraceEvent, TraceFault,
-    TransportInspection, TransportInspector, TransportPacket, TransportStream,
+    FaultKind, MediaEntityEnd, PacketFormat, ParseLimits, TraceEvent, TraceFault, TransportPacket,
+    TransportStream,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -355,48 +355,6 @@ impl MalformedInputCompletion {
             self.blocked = true;
         }
     }
-    fn inspect(
-        &self,
-        packet: &TransportPacket,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<TransportPacket> {
-        let mut inspector = TransportInspector::new(
-            packet.source.clone(),
-            self.format,
-            SourceLocation {
-                source: self.source,
-                offset: packet.source_offset,
-            },
-            &self.pool,
-        )
-        .map_err(|error| error.error)?;
-        let AssemblyStep::Output(TransportInspection::Accepted(actual)) =
-            inspector.poll(work, cancel)?
-        else {
-            return Err(Error::Invalid(
-                "malformed completion accepted carrier mismatch",
-            ));
-        };
-        if packet.source_id != Some(self.source)
-            || packet.pid != actual.pid
-            || packet.payload_unit_start != actual.payload_unit_start
-            || packet.prefix.as_ref().map(Bytes::as_ref)
-                != actual.prefix.as_ref().map(Bytes::as_ref)
-            || packet.continuity_counter != actual.continuity_counter
-            || packet.transport_error != actual.transport_error
-            || packet.scrambling != actual.scrambling
-            || packet.payload_source_offset != actual.payload_source_offset
-            || packet.payload.as_ref().map(Bytes::as_ref)
-                != actual.payload.as_ref().map(Bytes::as_ref)
-            || packet.discontinuity_indicator() != actual.discontinuity_indicator()
-        {
-            return Err(Error::Invalid(
-                "malformed completion raw/decoded carrier mismatch",
-            ));
-        }
-        Ok(actual)
-    }
     fn observer<'a>(
         &self,
         observer: Option<&'a mut TransportFaultRecovery>,
@@ -423,38 +381,40 @@ impl MalformedInputCompletion {
         packet: &TransportPacket,
         context: SourceContext,
         observer: Option<&mut TransportFaultRecovery>,
-        work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<MalformedSourceDisposition> {
         if self.pending.is_some() {
             return Err(Error::Invalid("malformed PES diagnostic missing"));
         }
-        let actual = self.inspect(packet, work, cancel)?;
-        let selected = self.scope.is_some_and(|scope| scope.pid == actual.pid);
-        if selected && self.after_discard && actual.payload.is_some() && !actual.payload_unit_start
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        // poll_source issues this carrier from the bound stream's strict decode.
+        let selected = self.scope.is_some_and(|scope| scope.pid == packet.pid);
+        if selected && self.after_discard && packet.payload.is_some() && !packet.payload_unit_start
         {
             return Err(Error::Unsupported(
                 "PES continuation after malformed discard",
             ));
         }
-        let control = !actual.transport_error
-            && actual.scrambling == 0
-            && (actual.payload.is_none() || (actual.is_null() && !actual.payload_unit_start));
-        let psi = actual.pid == 0 || self.pmt_pid == Some(actual.pid);
+        let control = !packet.transport_error
+            && packet.scrambling == 0
+            && (packet.payload.is_none() || (packet.is_null() && !packet.payload_unit_start));
+        let psi = packet.pid == 0 || self.pmt_pid == Some(packet.pid);
         let kind = if !control
             && !psi
             && selected
-            && !actual.transport_error
-            && actual.scrambling == 0
-            && actual.payload_unit_start
-            && actual.prefix.is_none()
-            && !actual.discontinuity_indicator()
-            && actual
+            && !packet.transport_error
+            && packet.scrambling == 0
+            && packet.payload_unit_start
+            && packet.prefix.is_none()
+            && !packet.discontinuity_indicator()
+            && packet
                 .adaptation
                 .as_ref()
                 .is_none_or(|a| a.pcr.is_none() && a.opcr.is_none())
         {
-            actual.payload.as_ref().and_then(|payload| {
+            packet.payload.as_ref().and_then(|payload| {
                 let raw = payload.as_ref();
                 if raw.len() < 6 || raw[3] != 0xe0 {
                     None
@@ -473,24 +433,24 @@ impl MalformedInputCompletion {
         };
         if let Some(kind) = kind {
             let inner = self.observer(observer, context)?;
-            inner.inner.transport_fault_input(&actual, context, None)?;
-            self.coverage(actual.source_offset)?;
+            inner.inner.transport_fault_input(packet, context, None)?;
+            self.coverage(packet.source_offset)?;
             self.retire_control();
             self.pending = Some(Pending {
-                packet: actual,
+                packet: packet.clone(),
                 context,
                 kind,
             });
             return Ok(MalformedSourceDisposition::AwaitDiagnostic);
         }
-        self.coverage(actual.source_offset)?;
+        self.coverage(packet.source_offset)?;
         self.retire_control();
-        if selected && actual.payload_unit_start && actual.payload.is_some() {
+        if selected && packet.payload_unit_start && packet.payload.is_some() {
             self.after_discard = false;
         }
         if !control && psi {
             self.control = Some(Control {
-                packet: actual,
+                packet: packet.clone(),
                 section: None,
             });
         } else if !control {
@@ -689,13 +649,7 @@ impl MalformedInputCompletion {
             ));
         }
         let result = match event {
-            TraceEvent::Transport(packet) => self.carrier(
-                packet,
-                context,
-                observer,
-                &mut WorkBudget::new(4096),
-                cancel,
-            )?,
+            TraceEvent::Transport(packet) => self.carrier(packet, context, observer, cancel)?,
             TraceEvent::Diagnostic(fault) => self.diagnostic(fault, context, observer)?,
             TraceEvent::Section(section) => {
                 self.section(section);
