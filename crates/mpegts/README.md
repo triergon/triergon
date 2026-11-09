@@ -399,6 +399,10 @@ remain refusals, and three operations across media entities lack a single-input
 reference equivalent. No timing or memory was collected for this source. These
 PES folds do not qualify the strict source clock or access units.
 
+The ordered-input PES comparison at `576cf0a0` matches all 97 operations
+on macOS AArch64 and preserves all 272 requests. This includes the three ordered
+inputs and four malformed completion cases. Runtime and memory on native
+AArch64 Linux remain open for this revision.
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
