@@ -16,7 +16,7 @@ type R<T> = Result<T, String>;
 const FEATURE: &str = "features/mpegts-access-units";
 const DIRECTORY: &str = "fixtures-mpegts-access-units";
 const ORIGINAL: &str = "harness/features/mpegts-pes/corpus.json";
-const ORIGINAL_SHA: &str = "acbb8a8e8c6d61239cf91f62f5a61438503b233bf11224166d202379210acd96";
+const ORIGINAL_SHA: &str = "ab169ae640e8e80610809a14329357c3d03994eb5bb37a9af7d3aaf9fb9fb0d8";
 const OPERATION: &str = "mpegts-access-unit-packets";
 const PROGRAM: u16 = 7;
 const PID: u16 = 256;
@@ -165,19 +165,11 @@ fn original(root: &Path) -> R<Vec<Case>> {
             for input in std::iter::once(row).chain(entities(row)) {
                 checked_input(root, input)?;
             }
-            let sequence = entities(row).len() > 1;
             let mut row = row.clone();
             let Value::Object(fields) = &mut row else {
                 return Err("invalid original case".into());
             };
             fields.retain(|(key, _)| key != "expected");
-            if sequence {
-                for (key, _) in fields {
-                    if key == "reference_refusal" {
-                        *key = "single_input_reference_refusal".into();
-                    }
-                }
-            }
             Ok(Case {
                 row,
                 bytes: None,
@@ -315,8 +307,11 @@ impl Transport {
                 ]);
             }
         }
-        let length =
-            u16::try_from(part.body.len() + optional.len() + 3).map_err(|e| e.to_string())?;
+        let length = if part.unbounded {
+            0
+        } else {
+            u16::try_from(part.body.len() + optional.len() + 3).map_err(|e| e.to_string())?
+        };
         let mut pes = vec![
             0,
             0,
@@ -367,10 +362,16 @@ struct Part<'a> {
     body: &'a [u8],
     pts: Option<u64>,
     dts: Option<u64>,
+    unbounded: bool,
 }
 
 fn part(body: &[u8], pts: Option<u64>, dts: Option<u64>) -> Part<'_> {
-    Part { body, pts, dts }
+    Part {
+        body,
+        pts,
+        dts,
+        unbounded: false,
+    }
 }
 
 fn authored_case(codec: &Codec, name: &str, parts: &[Part<'_>], m2ts: bool) -> R<Case> {
@@ -409,11 +410,15 @@ fn authored_case(codec: &Codec, name: &str, parts: &[Part<'_>], m2ts: bool) -> R
                 parts
                     .iter()
                     .map(|p| {
-                        Value::object([
-                            ("payload_bytes", Value::int(p.body.len() as u64)),
-                            ("pts_raw", p.pts.map_or(Value::Null, Value::int)),
-                            ("dts_raw", p.dts.map_or(Value::Null, Value::int)),
-                        ])
+                        Value::object(
+                            [
+                                ("payload_bytes", Value::int(p.body.len() as u64)),
+                                ("pts_raw", p.pts.map_or(Value::Null, Value::int)),
+                                ("dts_raw", p.dts.map_or(Value::Null, Value::int)),
+                            ]
+                            .into_iter()
+                            .chain(p.unbounded.then_some(("packet_length", Value::int(0)))),
+                        )
                     })
                     .collect(),
             ),
@@ -785,6 +790,69 @@ fn direct_eac3_case(root: &Path) -> R<Case> {
     )
 }
 
+fn adts_fragment_cases(codec: &Codec) -> R<[Case; 5]> {
+    let frame = &codec.bytes[..codec.first];
+    let before = b"opaque-before";
+    let after = b"opaque-after";
+    let prefix = [&before[..], frame].concat();
+    let suffix = [frame, &after[..]].concat();
+    let first = |bytes| part(bytes, Some(90_000), None);
+    let next = |bytes| part(bytes, Some(180_000), None);
+    Ok([
+        authored_case(
+            codec,
+            "two-opaque-pes",
+            &[first(before), next(after)],
+            false,
+        )?,
+        authored_case(
+            codec,
+            "opaque-then-coded",
+            &[first(before), next(frame)],
+            false,
+        )?,
+        authored_case(
+            codec,
+            "coded-then-opaque",
+            &[first(frame), next(after)],
+            false,
+        )?,
+        authored_case(codec, "opaque-prefix-in-pes", &[first(&prefix)], false)?,
+        authored_case(codec, "opaque-suffix-in-pes", &[first(&suffix)], false)?,
+    ])
+}
+
+fn adts_unbounded_cases(codec: &Codec) -> R<[Case; 4]> {
+    let frame = &codec.bytes[..codec.first];
+    let mixed = [b"opaque prefix".as_slice(), frame].concat();
+    let unbounded = |body| Part {
+        unbounded: true,
+        ..part(body, Some(90_000), None)
+    };
+    let finite = |body| part(body, Some(180_000), Some(179_000));
+    Ok([
+        authored_case(codec, "unbounded-at-eof", &[unbounded(frame)], false)?,
+        authored_case(
+            codec,
+            "unbounded-before-pes",
+            &[unbounded(frame), finite(frame)],
+            false,
+        )?,
+        authored_case(
+            codec,
+            "unbounded-split-frame",
+            &[unbounded(&frame[..3]), finite(&frame[3..])],
+            false,
+        )?,
+        authored_case(
+            codec,
+            "unbounded-opaque-prefix",
+            &[unbounded(&mixed)],
+            false,
+        )?,
+    ])
+}
+
 fn loas_element(aac: &[u8], reuse_config: bool) -> R<Vec<u8>> {
     // ISO/IEC 14496-3 §1.7.3: one stream, one subframe and a byte length.
     let mut mux = Vec::new();
@@ -1005,6 +1073,8 @@ fn all_cases(root: &Path) -> R<Vec<Case>> {
     cases.extend(latm_cases(&aac)?);
     cases.push(startup_pointer_case(&aac, "pat", 0)?);
     cases.push(startup_pointer_case(&aac, "pmt", 188)?);
+    cases.extend(adts_fragment_cases(&aac)?);
+    cases.extend(adts_unbounded_cases(&aac)?);
     Ok(cases)
 }
 
@@ -1025,6 +1095,8 @@ fn contract(cases: &[Case]) -> R<Value> {
                 "A single entity can complete empty after a PSI diagnostic or an empty read only when the control-only proof classifies the original carriers through physical end and logical EOF.",
                 "DVB subtitle controls fold the complete segments of a validated PES and keep the position of its carrier. The explicit tail policy reports a proven prefix ahead of an overlong final segment.",
                 "Private-audio observations retain the payload, position and clock of one validated finite PES without a syncword. The reader reports them at logical EOF under its explicit compatibility policy.",
+                "The ADTS packet policy preserves opaque prefixes and EOF tails with their original PES extents and clock. A separate opt-in policy reports length-zero ADTS PES and any derived packets after validating their headers and delimiting payload at the next PES start or logical EOF.",
+                "The video continuity policy and bounded fault replay require a nonempty opaque run, original carrier order and physical and logical EOF. Malformed-input completion keeps the original diagnostic and requires proof of coverage through EOF.",
                 "The startup PSI controls put an out-of-range pointer before a clean PAT or PMT. A later validated map and media through physical EOF establish the selected program.",
                 "Reference: the MPEG-TS demuxer with custom AVIO, NOFILLIN, parsers enabled, no stream discovery and no decoders; every parsed packet of the selected program in demux order, including EOF parser drain.",
                 "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
@@ -1451,7 +1523,7 @@ mod tests {
     fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
         let original = read_json(&root().join(ORIGINAL)).unwrap();
         let generated = all_cases(root()).unwrap();
-        assert_eq!(generated.len(), 160);
+        assert_eq!(generated.len(), 169);
         for (old, new) in cases(&original).unwrap().iter().zip(&generated) {
             assert!(new.bytes.is_none());
             for key in [
@@ -1489,9 +1561,14 @@ mod tests {
                 let Value::Object(fields) = row else {
                     unreachable!()
                 };
+                fields.push((
+                    "reference_refusal".into(),
+                    Value::str(
+                        "no single-input reference operation for more than one media entity",
+                    ),
+                ));
                 for (key, value) in fields {
                     match key.as_str() {
-                        "single_input_reference_refusal" => *key = "reference_refusal".into(),
                         "expected" => {
                             *value = Value::object([
                                 ("packets", Value::int(0)),
@@ -1696,7 +1773,7 @@ mod tests {
         .unwrap();
         assert_eq!(au.prefix, "ts-au-");
         assert_eq!(au.reference, "ffmpeg-formats-native");
-        assert_eq!(au.cases.len(), 160);
+        assert_eq!(au.cases.len(), 169);
         let contract = read_json(&au.contract).unwrap();
         assert_eq!(
             contract.get("required_profiles"),

@@ -107,6 +107,7 @@ struct Payload {
 pub struct PesAssembler {
     pid: u16,
     video: bool,
+    unbounded_adts: bool,
     budget: Budget,
     limits: ParseLimits,
     epochs: SourceEpochs,
@@ -130,6 +131,8 @@ pub struct PesAssembler {
     validated_chunk: Option<u64>,
 }
 
+pub(crate) const UNBOUNDED_NON_VIDEO: Error = Error::Invalid("unbounded non-video PES");
+
 impl PesAssembler {
     pub fn new(
         pid: u16,
@@ -143,6 +146,7 @@ impl PesAssembler {
         Ok(Self {
             pid,
             video,
+            unbounded_adts: false,
             header_ranges: BudgetVec::new(&budget),
             spans: BudgetVec::new(&budget),
             budget,
@@ -166,6 +170,11 @@ impl PesAssembler {
             validated_chunk: None,
         })
     }
+
+    pub(crate) fn allow_unbounded_adts(&mut self) {
+        self.unbounded_adts = true;
+    }
+
     /// One TS payload at a time. Drain poll before supplying another. A rejected
     /// input is returned intact; no bytes have been consumed from that input.
     pub fn push(
@@ -451,8 +460,11 @@ impl PesAssembler {
                             self.raw_header[5],
                         ]));
                         if length == 0 {
-                            if !self.video || !(0xe0..=0xef).contains(&id) {
-                                return Err(Error::Invalid("unbounded non-video PES"));
+                            // H.222.0 §2.4.3.7 reserves this syntax for TS video.
+                            let video = self.video && (0xe0..=0xef).contains(&id);
+                            let recovered_adts = self.unbounded_adts && (0xc0..=0xdf).contains(&id);
+                            if !video && !recovered_adts {
+                                return Err(UNBOUNDED_NON_VIDEO);
                             }
                         } else {
                             let total = 6 + length;

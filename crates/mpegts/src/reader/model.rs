@@ -7,7 +7,7 @@ use std::ops::{Deref, Range};
 use std::sync::{Arc, atomic::AtomicUsize};
 use triergon_core::container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, Time, TimeBase};
-use triergon_framing::{AacAdtsFrame, Ac3Frame, Ac3FrameFacts, RawAccessUnit};
+use triergon_framing::{AacAdtsCarrier, AacAdtsFrame, Ac3Frame, Ac3FrameFacts, RawAccessUnit};
 
 #[derive(Debug)]
 struct Owned<T> {
@@ -68,10 +68,9 @@ impl SourceEvent {
         }
     }
     pub(super) fn pes(&self) -> &crate::Pes {
-        match self.event() {
-            TraceEvent::Pes(pes) => pes,
-            _ => unreachable!("payload source owns a PES"),
-        }
+        self.event()
+            .pes_source()
+            .expect("payload source owns a PES")
     }
 }
 
@@ -263,6 +262,8 @@ pub enum AccessUnit {
     Video(RawAccessUnit),
     Adts(AacAdtsFrame),
     Loas(LoasFrame),
+    /// An opaque ADTS parser observation with its original source diagnostic.
+    AdtsFragment(AacAdtsCarrier),
     Ac3(Ac3AccessUnit),
     DvbSubtitle(DvbSubtitleUnit),
     /// Unfinished audio at logical EOF. This is a source fragment, not an AU.
@@ -277,6 +278,7 @@ impl AccessUnit {
     fn stored_bytes(&self) -> &Bytes {
         match self {
             Self::Adts(frame) => frame.source_bytes(),
+            Self::AdtsFragment(fragment) => fragment.source_bytes(),
             Self::Loas(frame) => frame.bytes(),
             Self::Ac3(frame) => frame.bytes(),
             Self::DvbSubtitle(unit) => unit.bytes(),
@@ -292,6 +294,10 @@ impl AccessUnit {
                 frame.source().offset..frame.source().offset + frame.source_bytes().len() as u64
             }
             Self::Loas(frame) => frame.elementary_range(),
+            Self::AdtsFragment(fragment) => {
+                let start = fragment.source().offset;
+                start..start + fragment.source_bytes().len() as u64
+            }
             Self::Ac3(frame) => {
                 frame.facts().offset..frame.facts().offset + frame.bytes().len() as u64
             }
@@ -319,6 +325,7 @@ impl AccessUnit {
             Self::Video(_)
             | Self::Loas(_)
             | Self::DvbSubtitle(_)
+            | Self::AdtsFragment(_)
             | Self::IncompleteAudio { .. } => Ok(None),
             Self::Adts(frame) => {
                 let rate = frame
@@ -344,6 +351,7 @@ pub(super) struct PacketData {
     pub pts: Option<i64>,
     pub dts: Option<i64>,
     pub duration90: Option<i64>,
+    pub recovered_adts: bool,
 }
 
 /// One retained framed source unit. The neutral packet stream contains only
@@ -516,6 +524,12 @@ pub enum ReaderEvent {
     IncompleteVideo(IncompleteVideo),
     /// Original LATM PES bytes under the explicit PES packet policy.
     LatmPes(crate::compat::latm::PesPacket),
+    /// Opaque ADTS bytes delimited by the compatibility parser. The packet
+    /// retains its PES extents and any one-use clock without a sample duration.
+    AdtsFragment(Packet),
+    /// ADTS parser output whose bytes or clock use a rejected unbounded PES.
+    /// The unit and its provenance remain outside the neutral packet stream.
+    RecoveredAdts(Packet),
     /// Complete segments before an overlong final segment in the source PES.
     DvbSubtitlePrefix(Packet),
     /// An opaque private-audio PES admitted by the explicit EOF policy.

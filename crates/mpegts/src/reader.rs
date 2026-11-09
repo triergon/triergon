@@ -2,6 +2,7 @@
 mod lane;
 mod model;
 use crate::clock::{ClockKey, SourceTimePolicy};
+use crate::compat::adts::{self, PacketPolicy};
 use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::pes::UnframedAudioPolicy;
 use crate::compat::{dvb, latm};
@@ -67,6 +68,10 @@ pub struct ReaderLimits {
     pub latm_packet_policy: latm::PacketPolicy,
     /// Reporting of a validated DVB subtitle prefix with an unfinished segment.
     pub dvb_subtitle_tail_policy: dvb::TailPolicy,
+    /// Framing policy for ADTS. The compatibility policy handles ADTS EOF itself.
+    pub adts_packet_policy: PacketPolicy,
+    /// Wire policy for ADTS PES with a zero packet-length field.
+    pub adts_pes_policy: adts::PesPolicy,
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
@@ -86,9 +91,11 @@ impl Default for ReaderLimits {
             maximum_audio_frame_bytes: 8192,
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             unframed_audio_policy: UnframedAudioPolicy::Strict,
+            adts_pes_policy: adts::PesPolicy::Strict,
             video_eof_policy: VideoEofPolicy::RejectUnframed,
             latm_packet_policy: latm::PacketPolicy::Strict,
             dvb_subtitle_tail_policy: dvb::TailPolicy::RejectTruncated,
+            adts_packet_policy: PacketPolicy::Strict,
             maximum_access_units: 32_000_000,
             maximum_pes_per_access_unit: 4096,
             elementary_input_window: 64 * 1024,
@@ -170,13 +177,16 @@ impl Reader {
         {
             return Err(Error::Invalid("MPEG-TS access-unit reader limits"));
         }
-        let stream = TransportStream::new_with_program(
+        let mut stream = TransportStream::new_with_program(
             pool.clone(),
             limits.format,
             limits.transport,
             limits.program,
             limits.descriptor_namespace,
         )?;
+        if limits.adts_pes_policy == adts::PesPolicy::ReportUnbounded {
+            stream.allow_unbounded_adts();
+        }
         let input = InputCursor::new(pool, source, caps, input_window)?;
         Ok(Self {
             pool: pool.clone(),
@@ -210,6 +220,10 @@ impl Reader {
     pub fn tracks(&self) -> &[Track] {
         self.tracks.as_slice()
     }
+    pub(crate) fn continuity_source(&self) -> Option<(&InputCursor, Option<&TransportStream>)> {
+        Some((self.input.as_ref()?, self.stream.as_ref()))
+    }
+
     pub fn request(&self) -> Result<InputRequest> {
         self.healthy()?;
         Ok(self
@@ -339,6 +353,9 @@ impl Reader {
         }
     }
     fn output(packet: Packet) -> Event<Packet, ReaderEvent> {
+        if packet.0.recovered_adts {
+            return Event::Other(ReaderEvent::RecoveredAdts(packet));
+        }
         match packet.access_unit() {
             AccessUnit::IncompleteAudio { .. } => {
                 Event::Other(ReaderEvent::IncompleteAudio(packet))
@@ -346,6 +363,7 @@ impl Reader {
             AccessUnit::DvbSubtitle(unit) if unit.truncated => {
                 Event::Other(ReaderEvent::DvbSubtitlePrefix(packet))
             }
+            AccessUnit::AdtsFragment(_) => Event::Other(ReaderEvent::AdtsFragment(packet)),
             AccessUnit::Video(unit) if !unit.has_vcl => {
                 Event::Other(ReaderEvent::VideoHeaders(packet))
             }
@@ -421,7 +439,7 @@ impl Reader {
                                     .position(|lane| lane.track.stream().pid == *pid)
                                     .map_or(Phase::Publish, Phase::FaultLane);
                             }
-                            TraceEvent::Pes(pes) => {
+                            TraceEvent::Pes(pes) | TraceEvent::UnboundedAdtsPes(adts::UnboundedPes(pes)) => {
                                 if let Some(index) = self.lanes.as_slice().iter().position(|lane| lane.track.stream().pid == pes.pid) {
                                     let lane = &mut self.lanes.as_mut_slice()[index];
                                     if let PesRun::BeforeBoundary(start) = lane.run {

@@ -12,6 +12,8 @@
     "A single entity can complete empty after a PSI diagnostic or an empty read only when the control-only proof classifies the original carriers through physical end and logical EOF.",
     "DVB subtitle controls fold the complete segments of a validated PES and keep the position of its carrier. The explicit tail policy reports a proven prefix ahead of an overlong final segment.",
     "Private-audio observations retain the payload, position and clock of one validated finite PES without a syncword. The reader reports them at logical EOF under its explicit compatibility policy.",
+    "The ADTS packet policy preserves opaque prefixes and EOF tails with their original PES extents and clock. A separate opt-in policy reports length-zero ADTS PES and any derived packets after validating their headers and delimiting payload at the next PES start or logical EOF.",
+    "The video continuity policy and bounded fault replay require a nonempty opaque run, original carrier order and physical and logical EOF. Malformed-input completion keeps the original diagnostic and requires proof of coverage through EOF.",
     "The startup PSI controls put an out-of-range pointer before a clean PAT or PMT. A later validated map and media through physical EOF establish the selected program.",
     "Reference: the MPEG-TS demuxer with custom AVIO, NOFILLIN, parsers enabled, no stream discovery and no decoders; every parsed packet of the selected program in demux order, including EOF parser drain.",
     "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
@@ -180,7 +182,16 @@
     "au-latm-aac-lc-truncated-envelope",
     "au-latm-aac-lc-empty-envelope",
     "au-adts-aac-lc-recover-pat-pointer",
-    "au-adts-aac-lc-recover-pmt-pointer"
+    "au-adts-aac-lc-recover-pmt-pointer",
+    "au-adts-aac-lc-two-opaque-pes",
+    "au-adts-aac-lc-opaque-then-coded",
+    "au-adts-aac-lc-coded-then-opaque",
+    "au-adts-aac-lc-opaque-prefix-in-pes",
+    "au-adts-aac-lc-opaque-suffix-in-pes",
+    "au-adts-aac-lc-unbounded-at-eof",
+    "au-adts-aac-lc-unbounded-before-pes",
+    "au-adts-aac-lc-unbounded-split-frame",
+    "au-adts-aac-lc-unbounded-opaque-prefix"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

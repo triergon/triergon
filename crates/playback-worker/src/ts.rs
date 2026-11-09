@@ -22,6 +22,8 @@
 //! payload and side data, the same fields in the same order as the reference
 //! worker (`harness/reference_ts.h`).
 
+pub(crate) mod au_recovery;
+
 use crate::runner::{Invocation, MAX_INPUT, Refusal, Result, Totals, measure};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -79,7 +81,7 @@ fn fold_packet(
     fold_payload(totals, fields, packet.stream_id, packet.payload())
 }
 
-fn fold_payload<'a>(
+pub(super) fn fold_payload<'a>(
     totals: &mut Totals,
     fields: [u64; 8],
     stream_id: u8,
@@ -148,6 +150,10 @@ impl Cause {
                 ("pmt", range(map.source_ranges.as_slice().first()))
             }
             TraceEvent::Pes(pes) => ("pes", range(pes.header_source_ranges.as_slice().first())),
+            TraceEvent::UnboundedAdtsPes(rejected) => (
+                "unbounded_adts_pes",
+                range(rejected.pes().header_source_ranges.as_slice().first()),
+            ),
             TraceEvent::Timeline { .. } => ("timeline", None),
             TraceEvent::Discontinuity { .. } => ("discontinuity", None),
             TraceEvent::Diagnostic(fault) => (

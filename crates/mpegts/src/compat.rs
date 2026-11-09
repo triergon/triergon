@@ -10,23 +10,53 @@
 //! Projections that exist only to compare traces with FFmpeg are not policies. They
 //! are compiled only with the `reference-trace` feature.
 
-pub mod annex_b {
-    //! Retain unframed AVC and HEVC PES payload through logical EOF. The policy
-    //! reports the source bytes separately from complete access units.
+pub mod adts {
+    //! Parser packet boundaries for ADTS carried in MPEG-TS. Original PES
+    //! timing and extents remain available on every result.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 
-    /// Reporting of an unframed AVC or HEVC byte run at logical EOF.
+    use crate::Pes;
+    use triergon_core::Error;
+
+    /// Select how a transport reader handles bytes outside complete ADTS frames.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-    pub enum VideoEofPolicy {
-        /// Keep the video framer's leading-byte error.
+    pub enum PacketPolicy {
+        /// Use the specification reader and the selected audio EOF policy.
         #[default]
-        RejectUnframed,
-        /// Report a nonempty run with invalid leading bytes and no Annex B start code.
-        ReportUnframed,
+        Strict,
+        /// Use bounded parser framing and report opaque prefixes and EOF tails
+        /// through `ReaderEvent::AdtsFragment`.
+        ReportFragments,
+    }
+
+    /// Admission of an ADTS PES with a zero packet-length field.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum PesPolicy {
+        #[default]
+        Strict,
+        /// Assemble the original bytes until a following PES start or logical
+        /// EOF, and report the wire violation with the assembled source.
+        ReportUnbounded,
+    }
+
+    /// Original header, bytes and source ranges of a length-zero ADTS PES.
+    #[derive(Debug)]
+    pub struct UnboundedPes(pub(crate) Pes);
+
+    impl UnboundedPes {
+        pub fn pes(&self) -> &Pes {
+            &self.0
+        }
+
+        pub fn rejection(&self) -> Error {
+            crate::pes::UNBOUNDED_NON_VIDEO
+        }
     }
 }
 
+pub mod annex_b;
+pub mod opaque_video;
 pub mod dvb {
     //! Reporting of complete DVB subtitle segments preceding an overlong final
     //! segment within a validated finite PES.

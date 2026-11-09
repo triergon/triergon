@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "directory": ".",
-  "original_pes_manifest_sha256": "acbb8a8e8c6d61239cf91f62f5a61438503b233bf11224166d202379210acd96",
+  "original_pes_manifest_sha256": "ab169ae640e8e80610809a14329357c3d03994eb5bb37a9af7d3aaf9fb9fb0d8",
   "source_inputs": [
     {
       "path": "crates/framing/fixtures/raw-annex-b/avc-aud0.h264",
@@ -42,7 +42,7 @@
   ],
   "recorded_reference": {
     "id": "ffmpeg-formats-native",
-    "worker_sha256": "9a6f027bf7d9430fd95a2de4a751e2974c80638aac4cef41cb9760999233b744",
+    "worker_sha256": "f6229df8503be0ad1888989c8697a9d3679399fcbfc9e791dccc741a14cdadc1",
     "mode": "ts-au-fold"
   },
   "cases": [
@@ -2228,7 +2228,6 @@
           "id": "hls-contiguous-pes-carry"
         }
       ],
-      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
       "expected": {
         "packets": 1,
         "bytes": 512,
@@ -2274,7 +2273,6 @@
           "id": "hls-external-map"
         }
       ],
-      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
       "expected": {
         "packets": 1,
         "bytes": 27,
@@ -2321,7 +2319,6 @@
           "id": "hls-explicit-discontinuity"
         }
       ],
-      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
       "expected": {
         "packets": 1,
         "bytes": 27,
@@ -5165,6 +5162,278 @@
         "digest": 18294072364400441336
       },
       "reference_result_sha256": "748d99f745942953269e5b65786bfbc2c4337028d5402f0faf075f8cd13825c2"
+    },
+    {
+      "id": "au-adts-aac-lc-two-opaque-pes",
+      "profile": "au-adts-aac-lc-two-opaque-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-two-opaque-pes.ts",
+      "sha256": "ad19642c04a5c8d8a020463dd34c8e470c1d16e18721b0c9d5365eb7887e6158",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 13,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 12,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 25,
+        "digest": 2031204361098929596
+      },
+      "reference_result_sha256": "ab6c561e3f4ff8efb5a33c357b660d8baa7cb81adb5ea15178cf703efdef3370"
+    },
+    {
+      "id": "au-adts-aac-lc-opaque-then-coded",
+      "profile": "au-adts-aac-lc-opaque-then-coded",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-opaque-then-coded.ts",
+      "sha256": "d9e64e34fe33f8a708f4f6b7b4d1db66e69751ec7d7cc91990ff1e32b432b70d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 13,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 195,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 208,
+        "digest": 507070727244423008
+      },
+      "reference_result_sha256": "36582a3308e2b59c420f48925af58177c635e178cf6b860334908ec5acacf491"
+    },
+    {
+      "id": "au-adts-aac-lc-coded-then-opaque",
+      "profile": "au-adts-aac-lc-coded-then-opaque",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-coded-then-opaque.ts",
+      "sha256": "8413c0db58be7a6cc33fc45af294ff5800f5c771e105bfc39cd5cf9b67951150",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 12,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 207,
+        "digest": 13352404034386126096
+      },
+      "reference_result_sha256": "60828197f8a89fac4c84bb07dee19053dd0821252929714a66fac6ac3c6d35fd"
+    },
+    {
+      "id": "au-adts-aac-lc-opaque-prefix-in-pes",
+      "profile": "au-adts-aac-lc-opaque-prefix-in-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-opaque-prefix-in-pes.ts",
+      "sha256": "209f6f48dad83ad85ca5b1d1e8f6d3136efd646dec305dc2e0d7fc3dc5a32253",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 208,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 208,
+        "digest": 2630892234460979701
+      },
+      "reference_result_sha256": "81c6b627eaf73f2b9f618593e2aa85ef30a53cb5febc46a91977d421df1c811d"
+    },
+    {
+      "id": "au-adts-aac-lc-opaque-suffix-in-pes",
+      "profile": "au-adts-aac-lc-opaque-suffix-in-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-opaque-suffix-in-pes.ts",
+      "sha256": "7684fe4bda4bdbac3be89850000296590d650fb790e73bf4bf1188a5c21c04c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 207,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 207,
+        "digest": 15947745093917374559
+      },
+      "reference_result_sha256": "05d6891e526c6c62f1ba139a13d559296b596bf33082d0ef0d2bfedf4800f14f"
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-at-eof",
+      "profile": "au-adts-aac-lc-unbounded-at-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-unbounded-at-eof.ts",
+      "sha256": "40f6eaf49cba6e017152410ed981551789a0c1fd363038a8ff9dff1a47c1b9d8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null,
+            "packet_length": 0
+          }
+        ]
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 16555830350569948468
+      },
+      "reference_result_sha256": "2b111561f1e936bd201c62a3f4722d666294ff8239642c8243989d262c607fb5"
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-before-pes",
+      "profile": "au-adts-aac-lc-unbounded-before-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-unbounded-before-pes.ts",
+      "sha256": "c87c971df238d4313cbb9aed73928979f435ff6a13bd42f3eb85af6ddd30b016",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null,
+            "packet_length": 0
+          },
+          {
+            "payload_bytes": 195,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 16773510934581463536
+      },
+      "reference_result_sha256": "2a61ea770aa345b2e7cb5edf80e872a157a495056c19b353fb03d5f605686612"
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-split-frame",
+      "profile": "au-adts-aac-lc-unbounded-split-frame",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-unbounded-split-frame.ts",
+      "sha256": "0ca6d4bc08c55180ea2a90744478ff6d8d4c712d77a9b25b111a8eb2fee3d46a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 3,
+            "pts_raw": 90000,
+            "dts_raw": null,
+            "packet_length": 0
+          },
+          {
+            "payload_bytes": 192,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 16555830350569948468
+      },
+      "reference_result_sha256": "2b111561f1e936bd201c62a3f4722d666294ff8239642c8243989d262c607fb5"
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-opaque-prefix",
+      "profile": "au-adts-aac-lc-unbounded-opaque-prefix",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-unbounded-opaque-prefix.ts",
+      "sha256": "efb62055d20430f48693afaa98e1872a3533d4d8c6386e80a5523e3e1492401f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 208,
+            "pts_raw": 90000,
+            "dts_raw": null,
+            "packet_length": 0
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 208,
+        "digest": 3856042665398456175
+      },
+      "reference_result_sha256": "94f8c6b823fc6f47254430ed3af3fc6c11c4faf35980649e5b44fc119d25903e"
     }
   ]
 }

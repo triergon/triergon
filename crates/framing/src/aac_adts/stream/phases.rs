@@ -494,27 +494,10 @@ impl AacAdtsStreamReader {
         let h = self
             .header
             .ok_or(Error::Invalid("missing ADTS stream header"))?;
-        let header_bytes = h
-            .single_block_header_bytes()
-            .ok_or(Error::Unsupported("ADTS block layout"))?;
-        let crc = if h.protection_absent() {
-            None
-        } else {
-            let bytes = raw.get(7..9).ok_or(Error::Truncated)?;
-            Some(u16::from_be_bytes([bytes[0], bytes[1]]))
-        };
-        let payload = raw.slice(header_bytes..raw.len())?;
+        let frame = AacAdtsFrame::from_envelope(raw, source, h)?;
         self.completed = self.completed.checked_add(1).ok_or(Error::Overflow)?;
         self.phase = Phase::Start;
-        Ok(Flow::Break(Step::Ready(StreamOutput::Selected(
-            AacAdtsFrame {
-                raw,
-                payload,
-                source,
-                header: h,
-                crc,
-            },
-        ))))
+        Ok(Flow::Break(Step::Ready(StreamOutput::Selected(frame))))
     }
 
     #[inline]

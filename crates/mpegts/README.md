@@ -219,6 +219,14 @@ the remaining reader tables and distinct backing allocations against the storage
 limit; caller-held output and external reservations can still cause retryable
 backpressure.
 
+With `compat::adts::PacketPolicy::ReportFragments`, the reader emits opaque
+ADTS prefixes and EOF tails through `ReaderEvent::AdtsFragment`. Each fragment
+keeps its bytes, PES extents and applicable one-use clock. Complete frames
+still yield packets. The separate `compat::adts::PesPolicy::ReportUnbounded`
+checks the remaining header of a length-zero ADTS PES and delimits its
+payload at the next start or logical EOF. It emits `TraceEvent::UnboundedAdtsPes`
+and reports any derived output separately as `ReaderEvent::RecoveredAdts`.
+
 Video defaults to `compat::annex_b::VideoEofPolicy::RejectUnframed`. With
 `VideoEofPolicy::ReportUnframed`, a final AVC or HEVC byte run with invalid
 leading bytes and no Annex B start code produces `ReaderEvent::IncompleteVideo`
@@ -226,6 +234,13 @@ at logical source EOF. It retains the validated PES spans and first source
 clock anchor. Its byte extent follows the video access-unit limit. The event
 is separate from the neutral packet stream. An interruption ends the run,
 and a later start code within a run preserves the leading-byte refusal.
+
+`compat::annex_b::ContinuityReader` keeps the source events and can report
+an additional opaque run after a proved continuity change in a single entity.
+`compat::opaque_video::OpaqueRecovery` accepts a replay of selected TS188 AVC
+transport or PES faults. The replay must reproduce the original diagnostic
+and reach physical and logical EOF. Both observations keep the original
+payload and clock facts and require the run to contain no Annex B start code.
 
 Annex-B groups without an admitted primary/base-layer picture
 remain `ReaderEvent::VideoHeaders`,

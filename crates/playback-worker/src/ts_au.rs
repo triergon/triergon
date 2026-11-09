@@ -1,23 +1,21 @@
-//! Complete transport units through the consumer facade and public source facts.
+//! Transport access units and observations through the public source reader.
 //!
 //! The separate demux-clock policy places source PES anchors for comparison. It
 //! never changes the source packet's timestamps or supplies a clock to later AUs.
-mod control_only;
-
 use crate::runner::{Invocation, Refusal, Result, Totals, measure};
+use crate::ts::{au_recovery, fold_payload};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
-use triergon::{
-    AnyOther, AnyPacket, AnyReader, ContainerReader, Event, PacketInfo, Step, TrackId, TrackInfo,
-};
+use triergon::{ContainerReader, Event, PacketInfo, Step, TrackId, TrackInfo};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
     SourceLocation, TimeBase, WorkBudget,
 };
 use triergon_framing::Ac3Family;
-use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
-use triergon_mpegts::compat::annex_b::VideoEofPolicy;
+use triergon_harness_protocol::digest::signed;
+use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
+use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, ContinuityResidue};
 use triergon_mpegts::compat::dvb::TailPolicy;
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::latm;
@@ -25,14 +23,23 @@ use triergon_mpegts::compat::pes::{DemuxClock, UnframedAudioPolicy};
 use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::{
     AccessUnit, AudioEofPolicy, EntityTransition, FaultKind, IncompleteVideo, Packet, PacketClock,
-    PacketFormat, PayloadSource, Reader, ReaderEvent, ReaderLimits, SourceEpochs, TraceEvent,
+    PacketFormat, PayloadSource, ReaderEvent, ReaderLimits, SourceEpochs, TraceEvent,
     UnframedAudio,
 };
+
+mod control_only;
+mod malformed;
 
 pub const PREFIX: &str = "ts-au-";
 const OPERATION: &str = "mpegts-access-unit-packets";
 const WINDOW: usize = 64 * 1024;
 const WORK: u64 = 4096;
+
+enum SourceProof {
+    ControlOnly,
+    ReportedMalformed(malformed::Diagnostic),
+    OpaqueRecovery(au_recovery::Trigger),
+}
 
 struct TrackProjection {
     id: TrackId,
@@ -70,8 +77,10 @@ impl PacketPosition<'_> {
 fn is_ac3(packet: &Packet) -> bool {
     match packet.access_unit() {
         AccessUnit::Ac3(_) => true,
-        // Incomplete private audio retains the DVB transport tag.
-        AccessUnit::IncompleteAudio { .. } => packet.track_info().stream().stream_type == 0x06,
+        // Unfinished private audio keeps the fragment projection.
+        AccessUnit::IncompleteAudio { .. } => {
+            matches!(packet.track_info().stream().stream_type, 0x06 | 0x81 | 0x87)
+        }
         _ => false,
     }
 }
@@ -175,7 +184,6 @@ fn refused(mut totals: Totals, error: &dyn std::fmt::Display, at: SourceLocation
     totals
 }
 
-#[derive(Clone, Copy)]
 enum Payload<'a> {
     Framed {
         sources: &'a [PayloadSource],
@@ -199,6 +207,7 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             AccessUnit::Video(unit) => u64::from(unit.random_access),
             AccessUnit::Loas(_) => 0,
             AccessUnit::Adts(_)
+            | AccessUnit::AdtsFragment(_)
             | AccessUnit::Ac3(_)
             | AccessUnit::DvbSubtitle(_)
             | AccessUnit::IncompleteAudio { .. } => 1,
@@ -210,7 +219,7 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             payload: Payload::Framed {
                 sources: packet.sources(),
                 bytes: packet.payload(),
-                // The subtitle payload starts after the two-byte PES wrapper.
+                // DVB subtitle bytes start after the two-byte PES wrapper.
                 pes_position: matches!(packet.access_unit(), AccessUnit::DvbSubtitle(_)),
             },
             flags,
@@ -234,6 +243,19 @@ impl<'a> From<&'a IncompleteVideo> for PacketProjection<'a> {
     }
 }
 
+impl<'a> From<&'a latm::PesPacket> for PacketProjection<'a> {
+    fn from(packet: &'a latm::PesPacket) -> Self {
+        let pes = packet.pes();
+        Self {
+            pid: pes.pid,
+            clock: None,
+            epochs: pes.epochs,
+            payload: Payload::PreservedPes(packet),
+            flags: 0,
+        }
+    }
+}
+
 impl<'a> From<&'a UnframedAudio> for PacketProjection<'a> {
     fn from(audio: &'a UnframedAudio) -> Self {
         Self {
@@ -250,19 +272,6 @@ impl<'a> From<&'a UnframedAudio> for PacketProjection<'a> {
     }
 }
 
-impl<'a> From<&'a latm::PesPacket> for PacketProjection<'a> {
-    fn from(packet: &'a latm::PesPacket) -> Self {
-        let pes = packet.pes();
-        Self {
-            pid: pes.pid,
-            clock: None,
-            epochs: pes.epochs,
-            payload: Payload::PreservedPes(packet),
-            flags: 0,
-        }
-    }
-}
-
 fn fold_packet(
     totals: &mut Totals,
     packet: PacketProjection<'_>,
@@ -273,16 +282,20 @@ fn fold_packet(
     cancel: &AtomicBool,
 ) -> Result<()> {
     let mut work = WorkBudget::new(WORK);
-    let header = match (packet.payload, packet.clock) {
+    let header = match (&packet.payload, packet.clock) {
         (Payload::PreservedPes(packet), _) if packet.clock_is_quarantined() => {
             return Err("unresolved source clock".into());
         }
         (Payload::PreservedPes(packet), _) => Some(&packet.pes().header),
         (_, Some(anchor)) if anchor.quarantined => return Err("unresolved source clock".into()),
-        (_, Some(anchor)) => match anchor.pes.event() {
-            TraceEvent::Pes(pes) => Some(&pes.header),
-            _ => return Err("packet clock has no PES".into()),
-        },
+        (_, Some(anchor)) => Some(
+            &anchor
+                .pes
+                .event()
+                .pes_source()
+                .ok_or("packet clock has no PES")?
+                .header,
+        ),
         (_, None) => None,
     };
     let time = clock
@@ -291,28 +304,30 @@ fn fold_packet(
     let ticks = |value: Option<i128>| -> Result<i64> {
         Ok(value.map(i64::try_from).transpose()?.unwrap_or(i64::MIN))
     };
-    let (pes, at_pes_start, length) = match packet.payload {
+    let (pes, at_start, bytes) = match packet.payload {
         Payload::Framed {
             sources,
             bytes,
             pes_position,
         } => {
             let first = sources.first().ok_or("packet has no source PES")?;
-            let TraceEvent::Pes(pes) = first.pes.event() else {
-                return Err("packet payload has no PES".into());
-            };
+            let pes = first
+                .pes
+                .event()
+                .pes_source()
+                .ok_or("packet payload has no PES")?;
             (
                 pes,
                 first.payload_range.start == 0 || pes_position,
                 bytes.len(),
             )
         }
-        Payload::PreservedPes(packet) => (packet.pes(), true, packet.pes().payload_len),
+        Payload::PreservedPes(packet) => {
+            let pes = packet.pes();
+            (pes, true, pes.payload_len)
+        }
     };
-    // The parser reports a PES carrier position once, at its first unit. Later
-    // units from the same PES have no packet position, even though source byte
-    // ranges remain available on every packet.
-    let position = if at_pes_start {
+    let position = if at_start {
         let range = pes
             .header_source_ranges
             .as_slice()
@@ -322,7 +337,7 @@ fn fold_packet(
     } else {
         -1
     };
-    for value in [
+    let fields = [
         index as u64,
         u64::from(pes.pid),
         signed(ticks(time.pts90)?),
@@ -330,30 +345,55 @@ fn fold_packet(
         signed(duration),
         signed(position),
         packet.flags,
-        length as u64,
-    ] {
-        fold(&mut totals.digest, value);
-    }
+        bytes as u64,
+    ];
+    let stream_id = pes.header.stream_id;
     match packet.payload {
-        Payload::Framed { bytes, .. } => fold_bytes(&mut totals.digest, bytes),
-        Payload::PreservedPes(_) => {
-            let mut seen = 0;
-            for span in pes.payload() {
-                fold_bytes(&mut totals.digest, span);
-                seen += span.len();
-            }
-            if seen != length {
-                return Err("packet payload does not match its length".into());
-            }
+        Payload::Framed { bytes, .. } => {
+            fold_payload(totals, fields, stream_id, std::iter::once(bytes))
         }
+        Payload::PreservedPes(_) => fold_payload(totals, fields, stream_id, pes.payload()),
     }
-    // AV_PKT_DATA_MPEGTS_STREAM_ID, including every unit sharing a PES.
-    for value in [1, 19, 1, u64::from(pes.header.stream_id)] {
-        fold(&mut totals.digest, value);
+}
+
+fn diagnostic_refusal(fault: &triergon_mpegts::TraceFault) -> Refusal {
+    Refusal {
+        reason: format!("source diagnostic: {:?}", fault.kind),
+        cause: format!(
+            "{{\"phase\":\"diagnostic\",\"source\":{},\"offset\":{}}}",
+            fault.location.source.0, fault.location.offset,
+        ),
     }
-    totals.packets += 1;
-    totals.bytes += length as u64;
-    Ok(())
+}
+
+fn fold_continuity(residue: &ContinuityResidue, position: PacketPosition<'_>) -> Result<Totals> {
+    let first = residue
+        .chunks()
+        .first()
+        .ok_or("unframed video has no carrier input")?;
+    let time = residue.clock();
+    let ticks = |value: Option<i128>| -> Result<u64> {
+        Ok(signed(
+            value.map(i64::try_from).transpose()?.unwrap_or(i64::MIN),
+        ))
+    };
+    let mut totals = Totals::default();
+    fold_payload(
+        &mut totals,
+        [
+            0,
+            u64::from(first.pid),
+            ticks(time.pts90)?,
+            ticks(time.dts90)?,
+            0,
+            signed(position.at(first.source_origin.source, first.source_origin.offset)?),
+            0,
+            residue.payload_len() as u64,
+        ],
+        first.stream_id,
+        residue.payload(),
+    )?;
+    Ok(totals)
 }
 
 fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
@@ -373,12 +413,13 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         descriptor_namespace: request.namespace,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
         unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
-        video_eof_policy: VideoEofPolicy::ReportUnframed,
+        adts_packet_policy: PacketPolicy::ReportFragments,
+        adts_pes_policy: PesPolicy::ReportUnbounded,
         latm_packet_policy: latm::PacketPolicy::PreservePes,
         dvb_subtitle_tail_policy: TailPolicy::ReportCompletePrefix,
         ..ReaderLimits::default()
     };
-    let mut reader = AnyReader::MpegTs(Reader::new(
+    let mut reader = ContinuityReader::new(
         pool,
         FIRST_SOURCE,
         SourceCapabilities {
@@ -387,28 +428,37 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         },
         limits,
         WINDOW,
-    )?);
+    )?;
     let mut clock = DemuxClock::new(request.program)?;
     let mut tracks = BudgetVec::<TrackProjection>::new(pool);
     let mut source = FIRST_SOURCE;
     let mut current = &request.input;
     let mut following = request.following.as_slice().iter();
     let single_entity = request.following.is_empty();
+    let mut deferred_continuity = None;
+    let mut recovered = None;
     let mut observed_media = false;
-    let refusal = loop {
+    let (proof, reader_refusal) = loop {
         let step = match reader.step(&mut WorkBudget::new(WORK), cancel) {
             Ok(step) => step,
-            Err(error) => return Ok(refused(totals, &error, at)),
+            Err(error) => {
+                return Ok(deferred_continuity.unwrap_or_else(|| refused(totals, &error, at)));
+            }
         };
         match step {
             Step::Ready(
-                Event::Packet(AnyPacket::MpegTs(packet))
-                | Event::Other(AnyOther::MpegTs(
+                Event::Packet(packet)
+                | Event::Other(ContinuityEvent::Source(
                     ReaderEvent::VideoHeaders(packet)
                     | ReaderEvent::IncompleteAudio(packet)
-                    | ReaderEvent::DvbSubtitlePrefix(packet),
+                    | ReaderEvent::DvbSubtitlePrefix(packet)
+                    | ReaderEvent::AdtsFragment(packet)
+                    | ReaderEvent::RecoveredAdts(packet),
                 )),
             ) => {
+                if let Some(original) = deferred_continuity {
+                    return Ok(original);
+                }
                 observed_media = true;
                 let pid = packet.track_info().id();
                 let index = tracks
@@ -421,7 +471,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     packet.access_unit(),
                     AccessUnit::Ac3(unit) if unit.facts().header.family == Ac3Family::Eac3
                 ) {
-                    // The reader has already used lookahead to seal the group.
+                    // The reader already used lookahead to seal the E-AC-3 group.
                     let duration = ac3_duration(&packet, true)?;
                     (packet, duration)
                 } else if is_ac3(&packet) {
@@ -451,23 +501,20 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     return Ok(refused(totals, error.as_ref(), at));
                 }
             }
-            Step::Ready(Event::Other(AnyOther::MpegTs(
-                event @ (ReaderEvent::IncompleteVideo(_)
-                | ReaderEvent::UnframedAudio(_)
-                | ReaderEvent::LatmPes(_)),
+            Step::Ready(Event::Other(ContinuityEvent::Source(
+                event @ (ReaderEvent::IncompleteVideo(_) | ReaderEvent::UnframedAudio(_)),
             ))) => {
                 observed_media = true;
                 let (id, projection) = match &event {
                     ReaderEvent::IncompleteVideo(video) => (video.track_info().id(), video.into()),
                     ReaderEvent::UnframedAudio(audio) => (audio.track_info().id(), audio.into()),
-                    ReaderEvent::LatmPes(packet) => (packet.track_info().id(), packet.into()),
-                    _ => unreachable!("expected an opaque packet observation"),
+                    _ => unreachable!("unframed observation"),
                 };
                 let index = tracks
                     .as_slice()
                     .iter()
                     .position(|value| value.id == id)
-                    .ok_or("opaque packet has no registered track")?;
+                    .ok_or("unframed observation has no registered track")?;
                 if let Err(error) = fold_packet(
                     &mut totals,
                     projection,
@@ -480,15 +527,61 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     return Ok(refused(totals, error.as_ref(), at));
                 }
             }
-            Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::Source(source)))) => {
-                match source.event() {
-                    TraceEvent::Pes(pes) => {
-                        // The demux interval belongs to source PES order, before
-                        // codec-parser lookahead delays individual packet output.
-                        clock
-                            .project(pes, &mut WorkBudget::new(WORK), cancel)?
-                            .ok_or("source clock projection exhausted its work")?;
+            Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::LatmPes(packet)))) => {
+                observed_media = true;
+                let id = packet.track_info().id();
+                let index = tracks
+                    .as_slice()
+                    .iter()
+                    .position(|value| value.id == id)
+                    .ok_or("LATM packet has no registered track")?;
+                if let Err(error) = fold_packet(
+                    &mut totals,
+                    (&packet).into(),
+                    index,
+                    position,
+                    0,
+                    &mut clock,
+                    cancel,
+                ) {
+                    return Ok(
+                        deferred_continuity.unwrap_or_else(|| refused(totals, error.as_ref(), at))
+                    );
+                }
+            }
+            Step::Ready(Event::Other(ContinuityEvent::Pending(event))) => {
+                if deferred_continuity.is_none() {
+                    let mut original = std::mem::take(&mut totals);
+                    if let ReaderEvent::Source(source) = &event
+                        && let TraceEvent::Diagnostic(fault) = source.event()
+                    {
+                        original
+                            .refusal
+                            .get_or_insert_with(|| Box::new(diagnostic_refusal(fault)));
+                    } else {
+                        original = refused(
+                            original,
+                            &format!("incomplete access-unit observation: {event:?}"),
+                            at,
+                        );
                     }
+                    deferred_continuity = Some(original);
+                }
+            }
+            Step::Ready(Event::Other(ContinuityEvent::Residue(residue))) => {
+                recovered = Some(fold_continuity(&residue, position)?);
+            }
+            Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Source(source)))) => {
+                if let Some(pes) = source.event().pes_source() {
+                    observed_media = true;
+                    // Place the demux interval in source PES order before
+                    // codec-parser lookahead delays individual packet output.
+                    clock
+                        .project(pes, &mut WorkBudget::new(WORK), cancel)?
+                        .ok_or("source clock projection exhausted its work")?;
+                    continue;
+                }
+                match source.event() {
                     TraceEvent::Diagnostic(fault) => {
                         let startup_pointer = single_entity
                             && !observed_media
@@ -496,22 +589,36 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                             && totals.refusal.is_none()
                             && fault.kind == FaultKind::Psi
                             && fault.error == Error::Invalid("PSI pointer");
-                        totals.refusal.get_or_insert_with(|| {
-                            Box::new(Refusal {
-                                reason: format!("source diagnostic: {:?}", fault.kind),
-                                cause: format!(
-                                    "{{\"phase\":\"diagnostic\",\"source\":{},\"offset\":{}}}",
-                                    fault.location.source.0, fault.location.offset,
-                                ),
-                            })
-                        });
-                        // The source reader discarded the invalid pointer. A
-                        // later map and media can establish the program.
+                        if let Some(original) = deferred_continuity {
+                            return Ok(original);
+                        }
+                        totals
+                            .refusal
+                            .get_or_insert_with(|| Box::new(diagnostic_refusal(fault)));
+                        // The section assembler discarded the invalid pointer.
+                        // A later clean map and a framed packet can still prove
+                        // the start of the selected program.
                         if startup_pointer {
                             continue;
                         }
-                        if fault.kind == FaultKind::Psi && !observed_media {
-                            break totals;
+                        if single_entity
+                            && request.format == PacketFormat::Ts188
+                            && totals.packets == 0
+                            && let Some(trigger) = au_recovery::Trigger::from_fault(fault)
+                        {
+                            break (SourceProof::OpaqueRecovery(trigger), totals);
+                        }
+                        if single_entity && !observed_media {
+                            match fault.kind {
+                                FaultKind::Psi => break (SourceProof::ControlOnly, totals),
+                                FaultKind::Transport | FaultKind::Pes
+                                    if request.format == PacketFormat::Ts188
+                                        && matches!(fault.error, Error::Invalid(_)) =>
+                                {
+                                    break (SourceProof::ReportedMalformed(fault.into()), totals);
+                                }
+                                _ => {}
+                            }
                         }
                         return Ok(totals);
                     }
@@ -541,15 +648,38 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     _ => (),
                 }
             }
-            Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::Interrupted {
-                cause, ..
+            Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Interrupted {
+                cause,
+                ..
             }))) if matches!(cause.event(), TraceEvent::Discontinuity { .. }) => (),
-            Step::Ready(Event::Other(AnyOther::MpegTs(event))) => {
-                return Ok(refused(
+            Step::Ready(Event::Other(ContinuityEvent::Source(event))) => {
+                if let Some(original) = deferred_continuity {
+                    return Ok(original);
+                }
+                let recovery = match &event {
+                    ReaderEvent::Interrupted { cause, .. }
+                        if single_entity
+                            && request.format == PacketFormat::Ts188
+                            && totals.packets == 0 =>
+                    {
+                        match cause.event() {
+                            TraceEvent::Diagnostic(fault) => {
+                                au_recovery::Trigger::from_fault(fault)
+                            }
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+                let refusal = refused(
                     totals,
                     &format!("incomplete access-unit observation: {event:?}"),
                     at,
-                ));
+                );
+                if let Some(trigger) = recovery {
+                    break (SourceProof::OpaqueRecovery(trigger), refusal);
+                }
+                return Ok(refusal);
             }
             Step::Ready(_) => return Err("unexpected container event".into()),
             Step::Yield => (),
@@ -567,15 +697,12 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 }
                 if start == current.len() {
                     if let Some(next) = following.next() {
-                        let AnyReader::MpegTs(transport) = &mut reader else {
-                            return Err("unexpected container reader".into());
-                        };
                         let transition = if next.discontinuity {
                             EntityTransition::Discontinuity
                         } else {
                             EntityTransition::Contiguous
                         };
-                        transport.finish_entity(
+                        reader.finish_entity(
                             input.source,
                             input.token,
                             next.source,
@@ -599,14 +726,16 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 }
             }
             Step::Backpressure(pressure) => {
-                return Ok(refused(
-                    totals,
-                    &Error::Backpressure {
-                        requested: pressure.requested,
-                        available: pressure.available,
-                    },
-                    at,
-                ));
+                return Ok(deferred_continuity.unwrap_or_else(|| {
+                    refused(
+                        totals,
+                        &Error::Backpressure {
+                            requested: pressure.requested,
+                            available: pressure.available,
+                        },
+                        at,
+                    )
+                }));
             }
             Step::End(end) => {
                 if end.source != source
@@ -614,6 +743,12 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     || following.len() != 0
                 {
                     return Err("reader ended before the physical input".into());
+                }
+                if let Some(recovered) = recovered {
+                    return Ok(recovered);
+                }
+                if let Some(original) = deferred_continuity {
+                    return Ok(original);
                 }
                 for (index, track) in tracks.as_mut_slice().iter_mut().enumerate() {
                     if let Some(packet) = track.pending_ac3.take() {
@@ -631,34 +766,44 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 }
                 if totals.packets == 0 {
                     let refusal = refused(totals, &"no framed packet was observed", end);
-                    if !observed_media {
-                        break refusal;
+                    if single_entity && !observed_media {
+                        break (SourceProof::ControlOnly, refusal);
                     }
                     return Ok(refusal);
                 }
-                // Physical EOF with admitted media confirms a deferred startup.
+                // The only deferred fault is a pointer discarded before track
+                // admission. Reaching physical EOF with framed media clears it.
                 totals.refusal = None;
                 return Ok(totals);
             }
         }
     };
-    // Release retained packets before replaying the original input.
+
+    // The compatibility proof examines the whole original entity. Release the
+    // completed reader attempt before reserving storage for the replay.
     drop(reader);
     drop(tracks);
-    match control_only::confirm(pool, request, cancel) {
-        Ok(true) => Ok(Totals::default()),
-        Ok(false) | Err(Error::Invalid(_) | Error::Unsupported(_) | Error::Truncated) => {
-            Ok(refusal)
+    let replacement = match proof {
+        SourceProof::ControlOnly => match control_only::confirm(pool, request, cancel) {
+            Ok(true) => Some(Totals::default()),
+            Ok(false) | Err(Error::Invalid(_) | Error::Unsupported(_) | Error::Truncated) => None,
+            Err(error) => return Err(error.into()),
+        },
+        SourceProof::ReportedMalformed(diagnostic) => {
+            malformed::confirm(pool, request, diagnostic, cancel)?.map(|_| Totals::default())
         }
-        Err(error) => Err(error.into()),
-    }
+        SourceProof::OpaqueRecovery(trigger) => {
+            au_recovery::project(pool, request, trigger, cancel)?
+        }
+    };
+    Ok(replacement.unwrap_or(reader_refusal))
 }
 
 pub fn run(args: &[String]) -> Result<()> {
     let invocation = Invocation::parse(
         args,
         PREFIX,
-        " SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...",
+        " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]...",
         2..=usize::MAX,
         false,
     )?;
@@ -675,11 +820,19 @@ pub fn run(args: &[String]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Request, Totals, operation};
+    use super::{Request, Totals, operation, ts_input};
+    use std::path::Path;
     use std::sync::atomic::AtomicBool;
     use triergon_core::{Budget, BudgetVec, Bytes};
     use triergon_mpegts::PacketFormat;
     use triergon_mpegts::psi::DescriptorNamespace;
+
+    const MALFORMED_ENTITIES: [&[u8]; 4] = [
+        include_bytes!("../../mpegts/tests/data/transport-afc-reserved.ts"),
+        include_bytes!("../../mpegts/tests/data/transport-adaptation-overrun.ts"),
+        include_bytes!("../../mpegts/tests/data/pes-optional-header-overrun.ts"),
+        include_bytes!("../../mpegts/tests/data/pes-start-prefix-invalid.ts"),
+    ];
 
     fn fold_single(input: &[u8]) -> Totals {
         let pool = Budget::new(1 << 20).unwrap();
@@ -697,7 +850,7 @@ mod tests {
     }
 
     #[test]
-    fn control_only_entity_completes_after_psi_diagnostic_or_empty_end() {
+    fn control_only_entity_completes_after_a_psi_diagnostic_or_empty_end() {
         for input in [
             &include_bytes!("../../mpegts/tests/data/psi-crc-invalid.ts")[..],
             &include_bytes!("../../mpegts/tests/data/pat-network-pid-not-track.ts")[..],
@@ -718,16 +871,109 @@ mod tests {
     }
 
     #[test]
-    fn rejected_pes_does_not_become_successful_empty_completion() {
-        for input in [
-            &include_bytes!("../../mpegts/tests/data/pes-start-prefix-invalid.ts")[..],
-            &include_bytes!("../../mpegts/tests/data/pes-optional-header-overrun.ts")[..],
-        ] {
+    fn control_only_completion_requires_one_entity() {
+        let pool = Budget::new(1 << 20).unwrap();
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../mpegts/tests/data/psi-crc-invalid.ts");
+        let request = ts_input::parse(
+            &pool,
+            &path,
+            &[
+                "188".into(),
+                "1".into(),
+                "pat-network-pid-not-track.ts".into(),
+            ],
+        )
+        .unwrap();
+        let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+        assert_eq!(totals.packets, 0);
+        assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Psi");
+    }
+
+    #[test]
+    fn reported_malformed_entity_completes_without_a_packet() {
+        for input in MALFORMED_ENTITIES {
             let totals = fold_single(input);
+            assert!(totals.refusal.is_none());
+            assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
+        }
+    }
+
+    #[test]
+    fn later_valid_pes_prevents_reported_malformed_completion() {
+        let valid = include_bytes!("../../mpegts/tests/data/ts188-basic.ts");
+        for input in MALFORMED_ENTITIES {
+            let mut raw = input.to_vec();
+            let mut packet = valid[376..564].to_vec();
+            packet[3] = packet[3] & 0xf0 | 1;
+            raw.extend_from_slice(&packet);
+            let totals = fold_single(&raw);
             assert_eq!(totals.packets, 0);
             let refusal = totals.refusal.unwrap();
             assert!(refusal.reason.starts_with("source diagnostic:"));
             assert!(refusal.cause.contains("\"phase\":\"diagnostic\""));
         }
+    }
+
+    #[test]
+    fn opaque_continuity_residue_keeps_copy_and_timeline_order_through_eof() {
+        let copy = fold_single(include_bytes!("../../mpegts/tests/data/cc-third-copy.ts"));
+        assert!(copy.refusal.is_none());
+        assert_eq!(
+            (copy.packets, copy.bytes, copy.digest),
+            (1, 81, 10_013_462_900_046_159_905)
+        );
+        let timeline = fold_single(include_bytes!(
+            "../../mpegts/tests/data/pcr-timeline-discontinuity.ts"
+        ));
+        assert!(timeline.refusal.is_none());
+        assert_eq!(
+            (timeline.packets, timeline.bytes, timeline.digest),
+            (1, 30, 1_602_270_805_323_916_750)
+        );
+    }
+
+    #[test]
+    fn start_code_across_compatibility_carriers_blocks_the_residue() {
+        let mut input = include_bytes!("../../mpegts/tests/data/cc-one-duplicate.ts").to_vec();
+        // Each payload alone is opaque. A start code straddles their
+        // compatibility join even though the strict stream deduplicates it.
+        for end in [564, 752] {
+            input[end - 27] = 1;
+            input[end - 2..end].fill(0);
+        }
+        let totals = fold_single(&input);
+        assert!(totals.refusal.is_none());
+        assert_eq!((totals.packets, totals.bytes), (1, 27));
+    }
+
+    #[test]
+    fn annex_b_prefix_with_a_recoverable_diagnostic_stays_refused() {
+        let mut raw = include_bytes!("../../mpegts/tests/data/pes-timestamp-marker.ts").to_vec();
+        let start = raw.len() - 4;
+        raw[start..].copy_from_slice(&[0, 0, 1, 0x65]);
+        let totals = fold_single(&raw);
+        assert_eq!(totals.packets, 0);
+        assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Pes");
+    }
+
+    #[test]
+    fn recovered_opaque_finite_continuation_uses_every_payload_byte() {
+        let input =
+            include_bytes!("../../../harness/fixtures/mpegts/finite-continuation-body-401.ts");
+        let totals = fold_single(input);
+        assert!(totals.refusal.is_none());
+        assert_eq!((totals.packets, totals.bytes), (1, 401));
+        assert_eq!(totals.digest, 16_203_249_262_521_375_477);
+
+        let mut raw = input.to_vec();
+        // Put a start code across the retained PES and its headerless continuation.
+        let next_carrier = 4 * 188;
+        let continuation = next_carrier + 5 + usize::from(raw[next_carrier + 4]);
+        raw[next_carrier - 2..next_carrier].fill(0);
+        raw[continuation..continuation + 2].copy_from_slice(&[1, 0x65]);
+        let totals = fold_single(&raw);
+        assert_eq!(totals.packets, 0);
+        assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Pes");
     }
 }

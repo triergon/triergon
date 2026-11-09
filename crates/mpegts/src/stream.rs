@@ -1,5 +1,6 @@
 //! Composed selected-program TS -> PSI -> PES source operation. No codec AU work.
 use crate::carrier::{PLAIN_PAYLOAD_BYTES, TS188_BYTES, payload_only_continuation};
+use crate::compat::adts::UnboundedPes;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
 use crate::framer::FramedCarrier;
 use crate::psi::{
@@ -54,6 +55,8 @@ pub enum TraceEvent {
         configuration_epoch: u64,
     },
     Pes(Pes),
+    /// A rejected length-zero ADTS PES retained by the explicit compatibility policy.
+    UnboundedAdtsPes(UnboundedPes),
     Timeline {
         program: u16,
         clock_epoch: u64,
@@ -63,6 +66,25 @@ pub enum TraceEvent {
     },
     Diagnostic(TraceFault),
     Finished,
+}
+
+impl TraceEvent {
+    /// Header and span facts of a validated PES or a reported unbounded ADTS PES.
+    /// The event variant identifies the source's wire validity.
+    pub fn pes_source(&self) -> Option<&Pes> {
+        match self {
+            Self::Pes(pes) | Self::UnboundedAdtsPes(UnboundedPes(pes)) => Some(pes),
+            _ => None,
+        }
+    }
+
+    fn from_assembled_pes(pes: Pes) -> Self {
+        if pes.header.declared_packet_length == 0 && (0xc0..=0xdf).contains(&pes.header.stream_id) {
+            Self::UnboundedAdtsPes(UnboundedPes(pes))
+        } else {
+            Self::Pes(pes)
+        }
+    }
 }
 
 /// Disposition of a validated PES body carrier offered directly to a feed.
@@ -347,6 +369,7 @@ pub struct TransportStream {
     discover_program: bool,
     feed_omissions: Option<u64>,
     feed_validated_carriers: bool,
+    unbounded_adts: bool,
     deferred_feed_events: u64,
     descriptor_namespace: DescriptorNamespace,
     framer: TransportFramer,
@@ -498,6 +521,7 @@ impl TransportStream {
             discover_program: program.is_none(),
             feed_omissions: None,
             feed_validated_carriers: false,
+            unbounded_adts: false,
             deferred_feed_events: 0,
             descriptor_namespace,
             pmt: None,
@@ -798,13 +822,17 @@ impl TransportStream {
             let assembler = if reuse.is_some() {
                 None
             } else {
-                Some(PesAssembler::new(
+                let mut assembler = PesAssembler::new(
                     stream.pid,
                     is_video_stream_type(stream.stream_type),
                     self.budget.clone(),
                     self.limits,
                     epochs,
-                )?)
+                )?;
+                if self.unbounded_adts && stream.stream_type == 0x0f {
+                    assembler.allow_unbounded_adts();
+                }
+                Some(assembler)
             };
             build
                 .routes
@@ -1447,7 +1475,9 @@ impl TransportStream {
                     assembler.poll_source::<true>(work, cancel)
                 };
                 match step {
-                    Ok(AssemblyStep::Output(Some(pes))) => return Ok(Some(TraceEvent::Pes(pes))),
+                    Ok(AssemblyStep::Output(Some(pes))) => {
+                        return Ok(Some(TraceEvent::from_assembled_pes(pes)));
+                    }
                     Ok(AssemblyStep::Output(None)) => {
                         self.omit_feed_events(1)?;
                         Ok(false)
@@ -1533,7 +1563,7 @@ impl TransportStream {
             };
             match step {
                 Ok(AssemblyStep::Output(Some(pes))) => {
-                    return Ok(Step::Ready(TraceEvent::Pes(pes)));
+                    return Ok(Step::Ready(TraceEvent::from_assembled_pes(pes)));
                 }
                 Ok(AssemblyStep::Output(None)) => self.omit_feed_events(1)?,
                 Ok(AssemblyStep::Yield) => return Ok(Step::Yield),
@@ -1560,6 +1590,10 @@ impl TransportStream {
         self.poll_feed(input, work, cancel, &mut |_, _, _, _| {
             Ok(FeedContinuation::Emit)
         })
+    }
+
+    pub(crate) fn allow_unbounded_adts(&mut self) {
+        self.unbounded_adts = true;
     }
 
     /// Offer stable PES continuations to a feed before publishing a trace event.

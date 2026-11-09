@@ -36,7 +36,7 @@ and the input event it is attributed to.
 | `mp4-forward-` | `regular` or `progressive` | `Mp4Open` and `Mp4IndexJob` in the native MOV view; a seekable file through `Engine::mp4`, or a forward-only front-`moov` file through its native front plan and `Engine::mp4_native_terminal_v1`; every track, times in the track time base | `mp4-forward` |
 | `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE` | explicit PIDs of program 1 through `Engine::ts_native_program_v1`, or one M2TS192 PID through `NativeStartup::new_m2ts_prefix_v2`; native 90 kHz clocks | `ts-program` |
 | `raw-video-` | `avc` or `hevc` | `RawVideoProbe`, `RawVideoSource` and `RawVideoFeed` over forward-only Annex B; no container clock, the duration is the active SPS picture period in 1/1,200,000 s | `raw-annex-b` |
-| `ts-au-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` or `--atsc` | the MPEG-TS source reader through `AnyReader`: complete AVC/HEVC, ADTS AAC-LC and explicitly signalled DVB or ATSC AC-3 and E-AC-3 units, plus separately reported video-header groups, incomplete audio and unframed video at logical EOF; the packet comparison uses original PES anchors through `compat::pes::DemuxClock`; empty completion requires a confirmed control-only input | `mpegts-access-units` |
+| `ts-au-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` or `--atsc` | MPEG-TS access units and separate source observations through the public source reader and `compat::annex_b::ContinuityReader`. The comparison places original PES anchors through `compat::pes::DemuxClock` | `mpegts-access-units` |
 | `ts-` | SIZE (`188`, `192`) and PROGRAM, optionally `--dvb` and further media entities (`[--discontinuity] FILE`) | the FFmpeg-compatible packets of one program through the public API: `TransportStream` selects the program, its first active PMT binds a `compat::pes::DemuxObserver` to the one elementary stream, that PID's transport packets feed it and `DemuxClock` places the timestamps; a context the observer alone cannot take (more streams, a later PMT, clock or format boundaries, transport, PES-time and active PSI faults, rejected carriers, a second entity) and an operation without a packet end with their cause; the strict source view and its native clock are not compared | `mpegts-pes` |
 
 A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
@@ -67,6 +67,11 @@ DVB subtitle segment groups keep their source PES positions. The prefix
 policy covers an overlong final segment. The private-audio EOF policy keeps
 one unframed PES as an opaque observation. A discarded startup PSI pointer
 can be followed by a validated map and media in the same entity.
+ADTS compatibility observations preserve opaque prefixes, EOF tails and
+packets derived from a length-zero ADTS PES. The video continuity and opaque
+replay policies require the original carrier order and logical EOF. Selected
+malformed-input discards can complete only after sequential coverage of the
+original entity and confirmation of the diagnostic.
 If a single entity ends without an access unit or stops at a PSI diagnostic,
 the comparison can complete empty after the control-only proof classifies the
 original carriers through physical end and logical EOF.
