@@ -132,6 +132,9 @@ contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol. Seeking
 returns `Error::Unsupported` without changing reader state.
 
+Repeated sections that match the active PAT or PMT retain each occurrence's
+source ranges. The reader reuses the accepted table when the bytes match.
+
 `Reader::step_with_carriers` delivers transport and ordinary continuity
 observations to a borrowed callback in source order. A `TransportObservation`
 exposes the original bytes and location. Call `to_packet` to retain the complete
