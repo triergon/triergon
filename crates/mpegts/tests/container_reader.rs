@@ -1140,6 +1140,64 @@ fn explicit_dvb_ac3_reports_the_signalled_codec_and_preserves_the_private_tag() 
 }
 
 #[test]
+fn explicit_atsc_ac3_preserves_syncframes_and_the_source_tag() {
+    use triergon_mpegts::psi::DescriptorNamespace;
+
+    let frame = audio_eof_frame(true);
+    let descriptors = [0x81, 3, 8, 8, 5];
+    let mut ts = Transport::new();
+    ts.tables(&[(0x81, PID, &descriptors)], 0);
+    ts.pes(PID, 0xbd, &frame.repeat(2), Some(90_000), None);
+
+    let mut declared = Drive::new(
+        &ts.bytes,
+        ReaderLimits {
+            descriptor_namespace: DescriptorNamespace::Atsc,
+            ..ReaderLimits::default()
+        },
+        1,
+        1,
+    );
+    let mut units = 0;
+    while let Some(event) = declared.next().unwrap() {
+        if let Event::Packet(packet) = event {
+            assert!(matches!(packet.access_unit(), AccessUnit::Ac3(_)));
+            let track = packet.track_info();
+            assert_eq!(track.kind(), MediaKind::Audio);
+            assert_eq!(track.codec(), CodecId::Ac3);
+            assert_eq!(track.codec_tag(), [0x81]);
+            assert_eq!(track.stream().descriptor_bytes.as_ref(), descriptors);
+            assert_eq!(packet.payload(), frame);
+            assert_eq!(packet.pts(), if units == 0 { Some(90_000) } else { None });
+            assert_eq!(packet.dts(), None);
+            assert_eq!(packet.duration(), Some(2880));
+            assert_eq!(packet.sources().len(), 1);
+            let start = units * frame.len();
+            assert_eq!(
+                packet.sources()[0].payload_range,
+                start..start + frame.len()
+            );
+            units += 1;
+        }
+    }
+    assert_eq!(units, 2);
+
+    let mut unspecified = Drive::new(&ts.bytes, ReaderLimits::default(), 188, 4096);
+    let mut unsupported = false;
+    while let Some(event) = unspecified.next().unwrap() {
+        match event {
+            Event::Other(ReaderEvent::Unsupported { track, .. }) => {
+                assert_eq!(track.codec(), CodecId::Other(&[0x81]));
+                unsupported = true;
+            }
+            Event::Packet(_) => panic!("ATSC code point without its namespace"),
+            _ => (),
+        }
+    }
+    assert!(unsupported);
+}
+
+#[test]
 fn fractional_audio_duration_and_unanchored_source_time_remain_explicit() {
     use triergon_mpegts::clock::{SourceTimePolicy, SourceTimeStatus};
     let mut frame = adts(b"44100");

@@ -75,22 +75,33 @@ impl Framer {
                         "MPEG-TS E-AC-3 access-unit grouping unavailable",
                     ));
                 }
-                Ok(Self::Ac3(Ac3FrameReader::new(
-                    pool,
-                    source,
-                    caps,
-                    Ac3StreamSelection::Ac3Only,
-                    Ac3FrameLimits {
-                        maximum_frame_bytes: limits.maximum_audio_frame_bytes,
-                        maximum_frames: limits.maximum_access_units,
-                        maximum_input_window: limits.elementary_input_window,
-                    },
-                )?))
+                Self::ac3(pool, limits, source, caps)
+            }
+            0x81 if track.stream().descriptor_namespace() == DescriptorNamespace::Atsc => {
+                Self::ac3(pool, limits, source, caps)
             }
             _ => Err(Error::Unsupported(
                 "MPEG-TS carriage has no admitted access-unit framer",
             )),
         }
+    }
+    fn ac3(
+        pool: &Budget,
+        limits: ReaderLimits,
+        source: SourceId,
+        caps: SourceCapabilities,
+    ) -> Result<Self> {
+        Ok(Self::Ac3(Ac3FrameReader::new(
+            pool,
+            source,
+            caps,
+            Ac3StreamSelection::Ac3Only,
+            Ac3FrameLimits {
+                maximum_frame_bytes: limits.maximum_audio_frame_bytes,
+                maximum_frames: limits.maximum_access_units,
+                maximum_input_window: limits.elementary_input_window,
+            },
+        )?))
     }
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<AccessUnit>> {
         fn map<T>(step: Step<T>, wrap: impl FnOnce(T) -> AccessUnit) -> Step<AccessUnit> {

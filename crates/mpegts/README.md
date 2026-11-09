@@ -36,9 +36,9 @@ input-window, work, cancellation, backpressure and reset protocol. Seeking
 returns `Error::Unsupported` without changing reader state.
 
 The admitted AU carriages are AVC and HEVC Annex B, single-block ADTS AAC-LC,
-and AC-3 in private PES with explicitly declared DVB namespace and unambiguous
-AC-3 descriptors. The track reports the signalled AC-3 codec and retains the
-private-data stream type as its codec tag.
+and AC-3 with unambiguous DVB descriptors in private PES or stream type
+`0x81` in the caller-declared ATSC namespace. The AC-3 track retains its
+original stream type as the codec tag. [ATSC A/53 Part 3, §5.7](https://www.atsc.org/wp-content/uploads/2023/02/A53-Part-3-2023-02.pdf)
 The framers delimit complete source bytes and preserve the original parameter
 sets and AAC or AC-3 envelopes. LATM,
 MPEG audio/video, E-AC-3 grouping, subtitles and ambiguous private streams
