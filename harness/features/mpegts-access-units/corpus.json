@@ -30,6 +30,14 @@
     {
       "path": "harness/fixtures/hls/replay-avc-ac3-00.ts",
       "sha256": "7efdc50ca87d044af2af8bfe5afd1e26c25daeca0e948193bc7e180db11a2510"
+    },
+    {
+      "path": "harness/fixtures/hls/dvb-hevc-eac3-32000.ts",
+      "sha256": "67fbe16dea5d0466b122b69d4d03c46f2740080c5fa176fb4a0c3e4709e87969"
+    },
+    {
+      "path": "harness/fixtures/hls/replay-avc-eac3-00.ts",
+      "sha256": "330ce3642fee3469a310400097b9889d751943d4185e754a160646eaf67ab133"
     }
   ],
   "recorded_reference": {
@@ -4819,6 +4827,52 @@
         "digest": 3703326326456868131
       },
       "reference_result_sha256": "2da60f8f2911f37a04571261ba43d55ca517099cdf15cd95bdb34c1331966c80"
+    },
+    {
+      "id": "au-dvb-eac3-32000",
+      "profile": "au-dvb-eac3-32000",
+      "file": "harness/fixtures/hls/dvb-hevc-eac3-32000.ts",
+      "sha256": "67fbe16dea5d0466b122b69d4d03c46f2740080c5fa176fb4a0c3e4709e87969",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 64208,
+        "digest": 5105941961744506611
+      },
+      "reference_result_sha256": "5cf7b80fce04206ffc4e4214310cdab64579707556380436eb89d2c7e41d8c29"
+    },
+    {
+      "id": "au-atsc-eac3-multiple-per-pes",
+      "profile": "au-atsc-eac3-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-atsc-eac3-multiple-per-pes.ts",
+      "sha256": "80c8a95089e88c686ce7c059c3d17fb8c8967141a11d39f9f7314bf82b4ac5a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 768,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 768,
+        "digest": 5644235614647431299
+      },
+      "reference_result_sha256": "27cf3383332fd062e63e835e83e1d487e0453e93928d80b9b851aa73bdac9b10"
     }
   ]
 }
