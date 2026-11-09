@@ -158,6 +158,7 @@ struct Slot<'a> {
     fragment_media_start: Option<i64>,
     previous_clock: Option<PreviousClock>,
     saw_fragment: bool,
+    starts_fragment_run: bool,
     ended: bool,
 }
 impl<'a> Slot<'a> {
@@ -178,6 +179,7 @@ impl<'a> Slot<'a> {
             fragment_media_start: None,
             previous_clock: None,
             saw_fragment: false,
+            starts_fragment_run: false,
             ended: false,
         })
     }
@@ -316,7 +318,8 @@ impl<'a> Slot<'a> {
                     .cursor
                     .active_fragment_run()
                     .ok_or(Error::Invalid("native fragment sample has no source run"))?;
-                if self.append_run != Some(run) {
+                self.starts_fragment_run = self.append_run != Some(run);
+                if self.starts_fragment_run {
                     // Actual reference-demux partition controls distinguish trun
                     // appends from a whole traf or lifetime peak. Snapshot the
                     // immediately preceding index tail once, even after rollback.
