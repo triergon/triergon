@@ -22,7 +22,10 @@ const PROGRAM: u16 = 7;
 const PID: u16 = 256;
 const CLOCK_MODULUS: u64 = 1 << 33;
 
-const SOURCES: [(&str, &str); 7] = [
+const DVB_EAC3: &str = "harness/fixtures/hls/dvb-hevc-eac3-32000.ts";
+const ATSC_EAC3_SEED: &str = "harness/fixtures/hls/replay-avc-eac3-00.ts";
+
+const SOURCES: [(&str, &str); 9] = [
     (
         "crates/framing/fixtures/raw-annex-b/avc-aud0.h264",
         "96d3d39385d7a86463410e0e4f00377062a815532134805e2a552549954b6796",
@@ -50,6 +53,14 @@ const SOURCES: [(&str, &str); 7] = [
     (
         "harness/fixtures/hls/replay-avc-ac3-00.ts",
         "7efdc50ca87d044af2af8bfe5afd1e26c25daeca0e948193bc7e180db11a2510",
+    ),
+    (
+        DVB_EAC3,
+        "67fbe16dea5d0466b122b69d4d03c46f2740080c5fa176fb4a0c3e4709e87969",
+    ),
+    (
+        ATSC_EAC3_SEED,
+        "330ce3642fee3469a310400097b9889d751943d4185e754a160646eaf67ab133",
     ),
 ];
 
@@ -367,8 +378,9 @@ fn authored_case(codec: &Codec, name: &str, parts: &[Part<'_>], m2ts: bool) -> R
     let mut ts = Transport::new();
     let descriptors: &[u8] = match codec.stream_type {
         0x06 if codec.dvb => &[0x6a, 1, 0],
-        // ATSC A/52 Annex A, Table A4.1.
+        // ATSC A/52 Annex A, Table A4.1 and Annex G, Table G.1.
         0x81 => &[0x81, 3, 8, 24, 5],
+        0x87 => &[0xcc, 2, 0x80, 0xc2],
         _ => &[],
     };
     ts.tables(codec, descriptors)?;
@@ -386,7 +398,7 @@ fn authored_case(codec: &Codec, name: &str, parts: &[Part<'_>], m2ts: bool) -> R
     ];
     if codec.dvb {
         args.push("--dvb".into());
-    } else if codec.stream_type == 0x81 {
+    } else if matches!(codec.stream_type, 0x81 | 0x87) {
         args.push("--atsc".into());
     }
     let construction = Value::object([
@@ -743,6 +755,36 @@ fn ordered_cases(cases: &[Case]) -> R<[Case; 4]> {
     ])
 }
 
+fn direct_eac3_case(root: &Path) -> R<Case> {
+    let pes = first_audio_pes(&source(root, ATSC_EAC3_SEED)?)?;
+    let [0x0b, 0x77, size_high, size_low, flags, ..] = pes.as_slice() else {
+        return Err("expected a coded E-AC-3 syncframe".into());
+    };
+    // Independent substream zero, 48 kHz, six blocks, stereo.
+    if *size_high & 0xf8 != 0 || *flags != 0x34 {
+        return Err("unexpected E-AC-3 syncframe format".into());
+    }
+    let frame_bytes = 2 * (1 + usize::from(u16::from_be_bytes([size_high & 7, *size_low])));
+    let frame = pes
+        .get(..frame_bytes)
+        .ok_or("incomplete E-AC-3 seed syncframe")?;
+    let codec = Codec {
+        name: "atsc-eac3",
+        stream_type: 0x87,
+        stream_id: 0xbd,
+        dvb: false,
+        bytes: frame.repeat(2),
+        first: frame_bytes,
+        header: 7,
+    };
+    authored_case(
+        &codec,
+        "multiple-per-pes",
+        &[part(&codec.bytes, Some(90_000), None)],
+        false,
+    )
+}
+
 fn all_cases(root: &Path) -> R<Vec<Case>> {
     let mut cases = original(root)?;
     for codec in [
@@ -814,6 +856,18 @@ fn all_cases(root: &Path) -> R<Vec<Case>> {
         &[part(&atsc.bytes, Some(90_000), None)],
         false,
     )?);
+    let dvb_eac3 = source(root, DVB_EAC3)?;
+    cases.push(Case {
+        row: authored(
+            "au-dvb-eac3-32000",
+            DVB_EAC3,
+            &dvb_eac3,
+            vec![("arguments", Value::strings(["188", "1", "--dvb"]))],
+        ),
+        bytes: None,
+        following: Vec::new(),
+    });
+    cases.push(direct_eac3_case(root)?);
     Ok(cases)
 }
 
@@ -834,7 +888,7 @@ fn contract(cases: &[Case]) -> R<Value> {
                 "Fold stream index, PID, signed PTS and DTS in 90kHz ticks (absent as INT64_MIN), duration, position, flags, payload length and every byte, then every side-data element's type, size and bytes.",
                 "Each complete operation reaches EOF and contributes its packet count, byte count and ordered digest. Both workers must match the independently recorded parser-enabled reference fold. All temporary operation storage is released before the memory END marker.",
                 "The 97 retained PES input/argument tuples preserve their 272 request associations and use parser-enabled AU expectations. Opaque, damaged and unsupported inputs remain observations that may fail; they are never reclassified as genuine access units or removed.",
-                "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, 33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. Ordered controls cover ADTS across entities, an M2TS initialization section and AC-3 lookahead at a discontinuity. DVB and ATSC AC-3 use explicit caller-declared descriptor namespaces.",
+                "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, 33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. Ordered controls cover ADTS across entities, an M2TS initialization section and AC-3 lookahead at a discontinuity. DVB and ATSC AC-3 and E-AC-3 use explicit caller-declared descriptor namespaces. E-AC-3 inputs include 32 kHz audio interleaved with HEVC and two 48 kHz access units in one PES.",
             ]),
         ),
         (
@@ -1254,7 +1308,7 @@ mod tests {
     fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
         let original = read_json(&root().join(ORIGINAL)).unwrap();
         let generated = all_cases(root()).unwrap();
-        assert_eq!(generated.len(), 148);
+        assert_eq!(generated.len(), 150);
         for (old, new) in cases(&original).unwrap().iter().zip(&generated) {
             assert!(new.bytes.is_none());
             for key in [
@@ -1499,7 +1553,7 @@ mod tests {
         .unwrap();
         assert_eq!(au.prefix, "ts-au-");
         assert_eq!(au.reference, "ffmpeg-formats-native");
-        assert_eq!(au.cases.len(), 148);
+        assert_eq!(au.cases.len(), 150);
         let contract = read_json(&au.contract).unwrap();
         assert_eq!(
             contract.get("required_profiles"),
