@@ -6,6 +6,7 @@
 //! tolerances at every step (see [`Decoder`]).
 use super::wire::{Command, Commands, DvdArea};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+use triergon_pixel::{ChannelRounding, YcbcrMatrix};
 
 /// The receiver's colour and selection settings: the decoder options and the
 /// `palette:` line of the stream configuration.
@@ -90,39 +91,9 @@ pub fn ifo_palette(ifo: &[u8]) -> Option<[u32; 16]> {
     let clut = ifo.get(first.checked_add(0xa4)?..first.checked_add(0xe4)?)?;
     let mut colours = [0; 16];
     for (colour, entry) in colours.iter_mut().zip(clut.chunks_exact(4)) {
-        *colour = YcbcrRounding::Nearest.rgb(entry[1], entry[2], entry[3]);
+        *colour = YcbcrMatrix::BT601.rgb(entry[1], entry[2], entry[3], ChannelRounding::Nearest);
     }
     Some(colours)
-}
-
-/// The rounding of the reference's two Y'CbCr-to-RGB conversions: BT.601
-/// studio range to full-range RGB in 10-bit fixed point.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum YcbcrRounding {
-    /// Round to nearest: the `ifo_palette` option.
-    Nearest,
-    /// Half a step below nearest: the MP4 demuxer's palette text.
-    HalfDown,
-}
-
-impl YcbcrRounding {
-    /// `0xRRGGBB` for one colour-table entry.
-    pub fn rgb(self, y: u8, cr: u8, cb: u8) -> u32 {
-        const fn fix(value: f64) -> i32 {
-            (value * 1024.0 + 0.5) as i32
-        }
-        let bias = match self {
-            Self::Nearest => 512,
-            Self::HalfDown => -512,
-        };
-        let luma = (i32::from(y) - 16) * fix(255.0 / 219.0) + bias;
-        let (cb, cr) = (i32::from(cb) - 128, i32::from(cr) - 128);
-        let channel = |chroma: i32| ((luma + chroma) >> 10).clamp(0, 255) as u32;
-        let r = channel(fix(1.402 * 255.0 / 224.0) * cr);
-        let g = channel(-fix(0.344136 * 255.0 / 224.0) * cb - fix(0.714136 * 255.0 / 224.0) * cr);
-        let b = channel(fix(1.772 * 255.0 / 224.0) * cb);
-        r << 16 | g << 8 | b
-    }
 }
 
 /// Bounds of one [`Decoder`].
@@ -226,7 +197,7 @@ pub enum Status<'a> {
 ///   automatic greys) with seventeen times the contrast as alpha; an
 ///   extended area (`0x85`) anywhere in the unit makes its bitmaps eight-bit,
 ///   with the unit's own `0x83` colours, converted with
-///   [`YcbcrRounding::Nearest`], and the contrast as alpha.
+///   BT.601 rounded to nearest, and the contrast as alpha.
 /// * **Pixels.** Two-bit fields are read from their offset to the end of the
 ///   unit, zero beyond it; an offset within four bytes of the end drops the
 ///   unit. An eight-bit code may run past the end, but must start before it.
@@ -862,7 +833,8 @@ impl Pass<'_, '_> {
                 .zip(table.chunks_exact(3))
                 .zip(self.cursor.colours.contrast)
             {
-                *argb = u32::from(alpha) << 24 | YcbcrRounding::Nearest.rgb(yuv[0], yuv[1], yuv[2]);
+                *argb = u32::from(alpha) << 24
+                    | YcbcrMatrix::BT601.rgb(yuv[0], yuv[1], yuv[2], ChannelRounding::Nearest);
             }
             256
         } else {

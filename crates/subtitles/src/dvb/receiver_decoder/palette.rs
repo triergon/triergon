@@ -2,6 +2,7 @@
 //! automatic palette the receiver builds for a region from its pixels.
 use crate::dvb::Depth;
 use triergon_core::{Budget, BudgetVec, Result};
+use triergon_pixel::{ChannelRounding, YcbcrMatrix};
 
 const fn argb(r: u8, g: u8, b: u8, a: u8) -> u32 {
     (a as u32) << 24 | (r as u32) << 16 | (g as u32) << 8 | b as u32
@@ -10,17 +11,9 @@ const fn argb(r: u8, g: u8, b: u8, a: u8) -> u32 {
 /// A Y/Cr/Cb/T entry as the receiver's ARGB word: the BT.601 studio inverse
 /// in 10-bit fixed point, and fully transparent when Y is zero.
 pub(super) fn ycrcbt(y: u8, cr: u8, cb: u8, t: u8) -> u32 {
-    let yy = 1192 * (i32::from(y) - 16);
-    let cr = i32::from(cr) - 128;
-    let cb = i32::from(cb) - 128;
-    let channel = |value: i32| ((value + 512) >> 10).clamp(0, 255) as u8;
-    let alpha = if y == 0 { 0 } else { 255 - t };
-    argb(
-        channel(yy + 1634 * cr),
-        channel(yy - 832 * cr - 401 * cb),
-        channel(yy + 2066 * cb),
-        alpha,
-    )
+    // Without a branch: one per entry costs more than the conversion.
+    let alpha = (255 - t) & u8::from(y != 0).wrapping_neg();
+    YcbcrMatrix::BT601.argb(y, cr, cb, alpha, ChannelRounding::Nearest)
 }
 
 const fn bit(index: u8, n: u8) -> bool {

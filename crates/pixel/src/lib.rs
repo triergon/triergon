@@ -14,8 +14,10 @@ mod error;
 pub mod letterbox;
 mod picture;
 mod view;
+mod ycbcr;
 
 pub use convert::{Converter, Orientation, rgba_to_yuv420};
 pub use error::{Error, Result};
 pub use picture::{Geometry, Picture};
 pub use view::{Colour, PictureView, Plane};
+pub use ycbcr::{ChannelRounding, YcbcrMatrix};

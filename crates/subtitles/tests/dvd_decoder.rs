@@ -5,9 +5,7 @@ mod support;
 
 use support::{Cmd, SHOW, field, glyphs, raw_unit, unit};
 use triergon_core::{Budget, BudgetVec, Error, WorkBudget};
-use triergon_subtitles::compat::dvd::{
-    Decoder, Limits, Settings, Status, Subtitle, YcbcrRounding, ifo_palette,
-};
+use triergon_subtitles::compat::dvd::{Decoder, Limits, Settings, Status, Subtitle, ifo_palette};
 
 const PALETTE: [u32; 16] = [
     0x000000, 0xf0f0f0, 0xcccccc, 0x999999, 0x3333fa, 0x1111bb, 0xfa3333, 0xbb1111, 0x33fa33,
@@ -534,24 +532,6 @@ fn ifo_colour_tables_convert_with_nearest_rounding() {
     assert_eq!(ifo_palette(&ifo[..0x810 + 0xa4 + 20]), None);
     ifo[11] = b'G';
     assert_eq!(ifo_palette(&ifo), None);
-}
-
-#[test]
-fn the_two_ycbcr_conversions_differ_by_their_rounding() {
-    for (y, cr, cb, half_down, nearest) in [
-        (200, 114, 128, 0xbfe1d5, 0xc0e2d6),
-        (144, 125, 5, 0x8fc700, 0x90c800),
-        (64, 128, 6, 0x376700, 0x386800),
-        (190, 128, 128, 0xcacaca, 0xcbcbcb),
-        (128, 128, 166, 0x8172ce, 0x8273cf),
-        (113, 141, 93, 0x857329, 0x86742a),
-        (218, 247, 46, 0xffaa45, 0xffab46),
-        (41, 82, 172, 0x003075, 0x003176),
-        (17, 128, 128, 0x000000, 0x010101),
-    ] {
-        assert_eq!(YcbcrRounding::HalfDown.rgb(y, cr, cb), half_down);
-        assert_eq!(YcbcrRounding::Nearest.rgb(y, cr, cb), nearest);
-    }
 }
 
 #[test]

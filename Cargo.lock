@@ -372,6 +372,7 @@ dependencies = [
  "triergon-bitstream",
  "triergon-core",
  "triergon-harness-protocol",
+ "triergon-pixel",
 ]
 
 [[package]]

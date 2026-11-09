@@ -16677,6 +16677,16 @@
    "sha256": "ea55d5b0a7d805beabd539e4d1f83d64d887c7943a60486b01d569a247b84b4a",
    "bytes": 284,
    "source_revision": "de454823a9b1549089455584ae5e781d1eea8bab"
+  },
+  {
+   "name": "subtitles-count-4caccc83-linux-arm64",
+   "path": "subtitles-count-4caccc83-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of the shared Y'CbCr converter on a c8g.xlarge (Linux AArch64): same-code against main at e7e8f860 for the subtitle, subtitle capsule, playback and capture workers (only DVD and PGS palette functions differ), and the instruction count of every case of subtitle-pgs, -dvb, -dvd, -cc, -teletext and subtitle-pgs-capsules at both revisions, 50 operations on CPU 1. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-count-4caccc83-linux-arm64/7acc14bd5f0eedac0613b978599a57fe48919497df370fb132b9519555ac7683.tar.zst",
+   "sha256": "7acc14bd5f0eedac0613b978599a57fe48919497df370fb132b9519555ac7683",
+   "bytes": 18326,
+   "source_revision": "4caccc83e1b86007b0ee7539a9f273e74a606a98"
   }
  ]
 }

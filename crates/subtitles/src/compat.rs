@@ -71,8 +71,10 @@ pub mod dvd {
     //! `mpegps` demuxer and DVD subtitle parser, streams numbered by
     //! [`SubpictureStreams`]), or from Matroska and MP4 tracks, whose
     //! colour table [`mp4_configuration`] turns into the configuration the MP4
-    //! demuxer hands the decoder. [`YcbcrRounding`] names the two Y'CbCr-to-RGB
-    //! conversions.
+    //! demuxer hands the decoder. Y'CbCr colours convert as BT.601
+    //! ([`triergon_pixel::YcbcrMatrix`]): rounded to nearest from IFO palettes
+    //! and the colours a unit carries, half a step down from the MP4 demuxer's
+    //! palette text.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::dvd::demux::{
@@ -80,7 +82,7 @@ pub mod dvd {
         mp4_configuration,
     };
     pub use crate::dvd::receiver::{
-        Bitmap, Decoder, Limits, Settings, Status, Subtitle, YcbcrRounding, ifo_palette,
+        Bitmap, Decoder, Limits, Settings, Status, Subtitle, ifo_palette,
     };
 }
 
