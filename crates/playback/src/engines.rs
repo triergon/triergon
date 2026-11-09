@@ -1211,14 +1211,24 @@ impl Mp4Engine {
             Some(cursor) => Some(cursor.take_occurrence()?),
             None => self.plan.native(self.row).cloned(),
         };
-        let encoded_skip_samples =
-            if let (Some(occurrence), Some(plans)) = (&native, &self.plan.encoded_edits) {
+        let encoded_skip_samples = if let Some(occurrence) = &native {
+            if occurrence.source.fragment_flags.is_some() && occurrence.source.ordinal == 1 {
+                let samples = self.plan.tracks.as_slice()[at_track].fragment_aac_trim;
+                (samples != 0).then(|| {
+                    let mut trim = [0; 10];
+                    trim[..4].copy_from_slice(&samples.to_le_bytes());
+                    trim
+                })
+            } else if let Some(plans) = &self.plan.encoded_edits {
                 plans.as_slice()[at_track]
                     .as_ref()
                     .map_or(Ok(None), |plan| plan.skip_samples(&occurrence.source))?
             } else {
                 None
-            };
+            }
+        } else {
+            None
+        };
         if native.is_some() && source.sample.range.is_empty() {
             self.native_boundary_observed =
                 self.plan
