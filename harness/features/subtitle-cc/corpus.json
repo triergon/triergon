@@ -2735,6 +2735,73 @@
       }
     },
     {
+      "id": "hevc-eos-ts",
+      "profile": "hevc-eos-ts",
+      "file": "cc/hevc-eos.ts",
+      "sha256": "8b0249cc544569bdaddd9f350adca632e7703ad279fdff9dbae6fa951f80fcc4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 954,
+        "digest": 10187541552085627735
+      }
+    },
+    {
+      "id": "hevc-eos-ts-realtime",
+      "profile": "hevc-eos-ts",
+      "file": "cc/hevc-eos.ts",
+      "sha256": "8b0249cc544569bdaddd9f350adca632e7703ad279fdff9dbae6fa951f80fcc4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1477,
+        "digest": 8714597114434718954
+      }
+    },
+    {
+      "id": "hevc-eos-ts-first",
+      "profile": "hevc-eos-ts",
+      "file": "cc/hevc-eos.ts",
+      "sha256": "8b0249cc544569bdaddd9f350adca632e7703ad279fdff9dbae6fa951f80fcc4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 954,
+        "digest": 10187541552085627735
+      }
+    },
+    {
+      "id": "hevc-eos-ts-second",
+      "profile": "hevc-eos-ts",
+      "file": "cc/hevc-eos.ts",
+      "sha256": "8b0249cc544569bdaddd9f350adca632e7703ad279fdff9dbae6fa951f80fcc4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1389,
+        "digest": 14589316368343567111
+      }
+    },
+    {
       "id": "hevc-trail-ts",
       "profile": "hevc-trail-ts",
       "file": "cc/hevc-trail.ts",

@@ -186,6 +186,13 @@ bytes are errors; nothing is replaced with U+FFFD.
   POP and GPOP pages (pages invoking them are presented at Level 1, as the
   reference presents them); CEA-708 text; glyph rendering, ASS styling and font
   loading; WebVTT browser recovery and CSS.
+- **Open: HEVC captions at a new sequence.** The caption extractor has no model of
+  the decoder's picture output (DPB). When a CRA picture follows an end of
+  sequence, FFmpeg discards the pictures still waiting for output
+  (`no_output_of_prior_pics_flag`) with their captions, and the extractor keeps
+  them. It also does not apply an end of bitstream, or an end of sequence first in
+  a packet, at the picture hevcdec does. This is the open `subtitle-cc` case
+  `hevc-eos-ts`.
 
 The text profile names, default limits and timing rules are in
 [src/text/README.md](src/text/README.md).

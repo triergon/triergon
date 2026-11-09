@@ -777,6 +777,13 @@ def build():
             cra = open(os.path.join(OUT, "hevc-cra.ts"), "rb").read()
             ts = ts_rewrite_video(cra, lambda n, au: au if n != 12 else reserved_before_slice(au))
             cases.append(("hevc-reserved-ts", write("hevc-reserved.ts", ts), ["cc"]))
+            # An end of sequence first in the second CRA access unit and an end
+            # of bitstream last in the one before the third: decoding starts
+            # again at both CRA pictures, and FFmpeg drops the pictures still
+            # waiting for output there (no_output_of_prior_pics_flag).
+            ends = {12: (b"\0\0\x01\x48\x01", b""), 23: (b"", b"\0\0\x01\x4a\x01")}
+            ts = ts_rewrite_video(cra, lambda n, au: ends.get(n, (b"", b""))[0] + au + ends.get(n, (b"", b""))[1])
+            cases.append(("hevc-eos-ts", write("hevc-eos.ts", ts), ["cc"]))
             cut_case("hevc-trail", 13)
             cut_case("hevc-suffix", 0, suffix=True, containers=(".ts", ".mp4"))
         else:
