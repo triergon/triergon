@@ -362,7 +362,7 @@ Verification:
   source facts.
   The 272 recorded requests map to 97 PES compatibility-view operations.
   All 97 match the pinned FFmpeg formats worker on AArch64 Linux and macOS.
-  On the Linux gate build at `2e28dbc7`, all 97 pass the runtime ceiling and
+  On the Linux gate build at `1b2ad742`, all 97 pass the runtime ceiling and
   use less peak heap and total resident RSS. The strict source requests
   supply input for this compatibility comparison. Full source and evidence
   hashes are in [status](../../docs/status.md#measured-revisions).
