@@ -1,9 +1,9 @@
-//! The lanes whose features commit only their pins: fonts, shaping, rasterising
+//! The generators whose features commit only their pins: fonts, shaping, rasterising
 //! and ASS parsing. Each generates its features' case rows from committed inputs
 //! and seeds (`harness/fonts/corpus.json`, authored texts and fixtures, seeded
 //! random cases), and
 //! takes each case's expected work from `harness/features/<id>/pins.json`: the
-//! reference's folds, written only by [`Lane::record`] and never edited by hand. The
+//! reference's folds, written only by [`Generator::record`] and never edited by hand. The
 //! harness reads a generated manifest at `harness/features/<id>/corpus.json`; its
 //! identity is the SHA-256 of the canonical JSON the generator writes. Each
 //! feature's contract names when it runs ([`Gate`]).
@@ -13,44 +13,21 @@ use std::process::Command;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::harness::features::{Gate, gate};
 use crate::harness::manifest::canonical;
 use crate::json::Value;
 
 type R<T> = Result<T, String>;
 
-/// When a feature runs: its contract's `gate`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Gate {
-    /// `"required"`: `cargo xtask check` requires it.
-    Required,
-    /// `"on-demand"`: run by `COMMAND compare --all`.
-    OnDemand,
-    /// `"diagnostic"`: records where another reference departs from the gated
-    /// one; run by `COMMAND compare --diagnostic`.
-    Diagnostic,
-}
-
-impl Gate {
-    /// The gate a contract's `gate` names.
-    fn named(name: &str) -> Option<Self> {
-        match name {
-            "required" => Some(Self::Required),
-            "on-demand" => Some(Self::OnDemand),
-            "diagnostic" => Some(Self::Diagnostic),
-            _ => None,
-        }
-    }
-}
-
-/// A lane of generated-manifest features.
-pub struct Lane {
-    /// The `cargo xtask` command of the lane.
+/// A generator of generated-manifest features.
+pub struct Generator {
+    /// The `cargo xtask` command of the generator.
     pub command: &'static str,
-    /// `cargo xtask COMMAND ARGS` for the lane's own subcommands: every one but
-    /// `compare`, which runs [`Lane::reports`].
+    /// `cargo xtask COMMAND ARGS` for the generator's own subcommands: every one but
+    /// `compare`, which runs [`Generator::reports`].
     pub main: fn(&Path, &[String]) -> R<()>,
-    /// Its features' ids; each feature's gate is in its contract.
-    pub features: &'static [&'static str],
+    /// Candidate worker named by this generator's feature contracts.
+    pub candidate: &'static str,
     /// The reference worker the pins are recorded from, by its identity record.
     pub reference: &'static str,
     /// The pin files' note.
@@ -68,17 +45,17 @@ pub struct Lane {
     pub directory: fn(&str) -> &'static str,
     /// Writes generated input files that differ from what is on disk.
     pub write_inputs: fn(&Path) -> R<()>,
-    /// Checks of the lane's generator inputs beyond the pins.
+    /// Checks of the generator's generator inputs beyond the pins.
     pub check_inputs: fn(&Path) -> Vec<String>,
     /// The cases `cargo xtask check` mutates for one fuzz round, by feature.
     pub smoke: &'static [(&'static str, &'static [&'static str])],
 }
 
-pub const LANES: [&Lane; 4] = [
-    &crate::fonts::LANE,
-    &crate::shape::LANE,
-    &crate::raster::LANE,
-    &crate::ass::LANE,
+pub const GENERATORS: [&Generator; 4] = [
+    &crate::fonts::GENERATOR,
+    &crate::shape::GENERATOR,
+    &crate::raster::GENERATOR,
+    &crate::ass::GENERATOR,
 ];
 
 /// No generated input files, or nothing more to check.
@@ -90,14 +67,19 @@ pub fn no_checks(_root: &Path) -> Vec<String> {
     Vec::new()
 }
 
-/// The lane of feature `id`.
-pub fn lane_of(id: &str) -> Option<&'static Lane> {
-    LANES.into_iter().find(|lane| lane.features.contains(&id))
+/// The generator selected by a registered feature's candidate worker.
+pub fn for_contract(contract: &Value) -> Option<&'static Generator> {
+    let candidate = contract.get("candidate").and_then(Value::as_str)?;
+    GENERATORS
+        .into_iter()
+        .find(|generator| generator.candidate == candidate)
 }
 
-/// The lane of a `cargo xtask` command.
-pub fn lane_named(command: &str) -> Option<&'static Lane> {
-    LANES.into_iter().find(|lane| lane.command == command)
+/// The generator for a `cargo xtask` command.
+pub fn named(command: &str) -> Option<&'static Generator> {
+    GENERATORS
+        .into_iter()
+        .find(|generator| generator.command == command)
 }
 
 fn pins_path(root: &Path, id: &str) -> PathBuf {
@@ -114,16 +96,8 @@ fn contract(root: &Path, id: &str) -> R<Value> {
     crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// When feature `id` runs: its contract's `gate`, one of `"required"`,
-/// `"on-demand"` and `"diagnostic"`.
-pub fn gate(root: &Path, id: &str) -> R<Gate> {
-    contract(root, id)?
-        .get("gate")
-        .and_then(Value::as_str)
-        .and_then(Gate::named)
-        .ok_or_else(|| {
-            format!("{id}: its contract's gate is not required, on-demand or diagnostic")
-        })
+fn required_gate(root: &Path, id: &str) -> R<Gate> {
+    gate(id, &contract(root, id)?)?.ok_or_else(|| format!("{id}: missing gate"))
 }
 
 /// The pins of `id`: case id to expected work.
@@ -137,16 +111,23 @@ fn pins(root: &Path, id: &str) -> R<Vec<(String, Value)>> {
     }
 }
 
-impl Lane {
-    /// The features whose rows and pins make feature `id`'s manifest: `id`
-    /// itself, or the features its contract's `cases_from` names, in order. Each
-    /// named feature is another of the lane's, with its own rows and pins in the
-    /// same case directory.
-    fn sources(&self, root: &Path, id: &str) -> R<Vec<&'static str>> {
+impl Generator {
+    pub fn features(&self, root: &Path) -> R<Vec<String>> {
+        Ok(crate::harness::features::discover(root)?
+            .into_iter()
+            .filter(|contract| contract.generated() && contract.candidate() == Some(self.candidate))
+            .map(|contract| contract.id)
+            .collect())
+    }
+
+    /// The feature's case and pin sources, in the order its contract gives.
+    fn sources(&self, root: &Path, id: &str) -> R<Vec<String>> {
         let document = contract(root, id)?;
+        if for_contract(&document).map(|generator| generator.candidate) != Some(self.candidate) {
+            return Err(format!("{id}: not a {} feature", self.command));
+        }
         let Some(named) = document.get("cases_from") else {
-            let own = self.features.iter().copied().find(|&feature| feature == id);
-            return Ok(Vec::from_iter(own));
+            return Ok(vec![id.to_owned()]);
         };
         let named = named
             .as_array()
@@ -155,19 +136,26 @@ impl Lane {
         named
             .iter()
             .map(|name| {
-                let name = name.as_str().unwrap_or_default();
-                let source = self
-                    .features
-                    .iter()
-                    .copied()
-                    .find(|&feature| feature == name && feature != id)
-                    .ok_or_else(|| {
-                        format!(
-                            "{id}: cases_from: {name} is not another {} feature",
-                            self.command
-                        )
-                    })?;
-                if contract(root, source)?.get("cases_from").is_some() {
+                let source = name
+                    .as_str()
+                    .filter(|name| {
+                        !name.is_empty()
+                            && name
+                                .bytes()
+                                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                    })
+                    .ok_or_else(|| format!("{id}: invalid cases_from feature"))?;
+                let document = contract(root, source)?;
+                if source == id
+                    || for_contract(&document).map(|generator| generator.candidate)
+                        != Some(self.candidate)
+                {
+                    return Err(format!(
+                        "{id}: cases_from: {source} is not another {} feature",
+                        self.command
+                    ));
+                }
+                if document.get("cases_from").is_some() {
                     return Err(format!(
                         "{id}: cases_from: {source} takes its cases from other features"
                     ));
@@ -177,17 +165,19 @@ impl Lane {
                         "{id}: cases_from: {source} has another case directory"
                     ));
                 }
-                Ok(source)
+                Ok(source.to_owned())
             })
             .collect()
     }
 
     /// The files feature `id`'s manifest is generated from besides its contract:
-    /// the pins it takes and the lane's row sources, relative to the root. A
+    /// the pins it takes and the generator's row sources, relative to the root. A
     /// feature whose contract cannot be read is listed with its own pins.
     pub fn inputs(&self, root: &Path, id: &str) -> Vec<String> {
-        let pinned = self.sources(root, id).unwrap_or_default();
-        let mut files: Vec<String> = if pinned.is_empty() { vec![id] } else { pinned }
+        let pinned = self
+            .sources(root, id)
+            .unwrap_or_else(|_| vec![id.to_owned()]);
+        let mut files: Vec<String> = pinned
             .into_iter()
             .map(|feature| format!("harness/features/{feature}/pins.json"))
             .collect();
@@ -196,7 +186,7 @@ impl Lane {
     }
 
     /// The generated manifest of feature `id`: the rows of its sources with their
-    /// pinned work (see [`Lane::sources`]). The case ids and the pinned ids must
+    /// pinned work (see [`Generator::sources`]). The case ids and the pinned ids must
     /// match exactly.
     pub fn manifest(&self, root: &Path, id: &str) -> R<Value> {
         let expected = if pinned_per_target(&contract(root, id)?) {
@@ -206,8 +196,8 @@ impl Lane {
         };
         let (mut rows, mut pinned) = (Vec::new(), Vec::new());
         for source in self.sources(root, id)? {
-            rows.extend((self.rows)(root, source)?);
-            pinned.extend(pins(root, source)?);
+            rows.extend((self.rows)(root, &source)?);
+            pinned.extend(pins(root, &source)?);
         }
         if rows.len() != pinned.len() {
             return Err(format!(
@@ -249,17 +239,20 @@ impl Lane {
     }
 
     /// Every registered feature has a gate and its generated manifest builds. A
-    /// feature with its own cases has a pin file exactly as [`Lane::record`]
+    /// feature with its own cases has a pin file exactly as [`Generator::record`]
     /// writes it; one that takes another's (`cases_from`) is diagnostic and has
     /// none. Pins are always recorded with the `worker_operation` the harness
     /// runs, so no contract names another operation for them.
     pub fn check(&self, root: &Path) -> Vec<String> {
+        let features = match self.features(root) {
+            Ok(features) if features.is_empty() => return Vec::new(),
+            Ok(features) => features,
+            Err(error) => return vec![error],
+        };
         let mut errors = (self.check_inputs)(root);
-        for &feature in self.features {
-            if !contract_path(root, feature).is_file() {
-                continue;
-            }
-            let gate = gate(root, feature);
+        for id in features {
+            let feature = id.as_str();
+            let gate = required_gate(root, feature);
             if let Err(error) = &gate {
                 errors.push(error.clone());
             }
@@ -339,7 +332,8 @@ impl Lane {
         per_target_only: bool,
     ) -> R<()> {
         (self.write_inputs)(root)?;
-        for &feature in self.features {
+        for id in self.features(root)? {
+            let feature = id.as_str();
             let sources = self.sources(root, feature)?;
             if sources != [feature] {
                 println!("{feature}: the pins of {}", sources.join(", "));
@@ -413,7 +407,8 @@ impl Lane {
     /// `directory/<id>/corpus.json` for reading.
     pub fn write(&self, root: &Path, directory: &Path) -> R<()> {
         (self.write_inputs)(root)?;
-        for &feature in self.features {
+        for id in self.features(root)? {
+            let feature = id.as_str();
             let path = directory.join(feature).join("corpus.json");
             let manifest = self.manifest(root, feature)?;
             let cases = manifest
@@ -477,8 +472,9 @@ impl Lane {
             Gate::Diagnostic => diagnostic,
         };
         let mut reports = Vec::new();
-        for &feature in self.features {
-            if !selected(gate(root, feature)?) {
+        for id in self.features(root)? {
+            let feature = id.as_str();
+            if !selected(required_gate(root, feature)?) {
                 continue;
             }
             let path = |file: &str| format!("harness/features/{feature}/{file}.json");
@@ -492,6 +488,9 @@ impl Lane {
             ];
             list.extend(options.iter().cloned());
             reports.push(list);
+        }
+        if reports.is_empty() && !diagnostic {
+            return Err(format!("{}: no required feature contracts", self.command));
         }
         Ok(reports)
     }
@@ -718,33 +717,16 @@ fn target_pins(root: &Path, feature: &str) -> Vec<String> {
     errors
 }
 
-/// Every generated feature's contract, the pins it takes and the files its rows
-/// come from, once each: the inputs a report's provenance covers.
-pub fn provenance_inputs() -> Vec<String> {
-    let root = crate::root();
-    let mut names: Vec<String> = Vec::new();
-    for lane in LANES {
-        for &feature in lane.features {
-            let contract = format!("harness/features/{feature}/contract.json");
-            for name in std::iter::once(contract).chain(lane.inputs(&root, feature)) {
-                if !names.contains(&name) {
-                    names.push(name);
-                }
-            }
-        }
-    }
-    names
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     /// The features `COMMAND compare ARGS` reports, in order.
-    fn compared(lane: &Lane, args: &[&str]) -> Vec<String> {
+    fn compared(generator: &Generator, args: &[&str]) -> Vec<String> {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let args: Vec<String> = args.iter().map(ToString::to_string).collect();
-        lane.reports(root, &args)
+        generator
+            .reports(root, &args)
             .unwrap()
             .iter()
             .map(|list| list[1].split('/').nth(2).unwrap().to_owned())
@@ -753,59 +735,79 @@ mod tests {
 
     #[test]
     fn compare_selects_features_by_their_contracts_gate() {
-        let [fonts, shape, raster, ass] = LANES;
-        assert_eq!(compared(fonts, &[]), ["font-outlines", "font-hinting-none"]);
-        assert_eq!(compared(fonts, &["--all"]), fonts.features);
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let [fonts, shape, raster, ass] = GENERATORS;
+        assert_eq!(compared(fonts, &[]), ["font-hinting-none", "font-outlines"]);
+        assert_eq!(compared(fonts, &["--all"]), fonts.features(root).unwrap());
         assert_eq!(
             compared(shape, &[]),
             [
-                "shape-text",
-                "shape-libass",
                 "shape-bidi",
+                "shape-libass",
                 "shape-simple",
+                "shape-text",
                 "shape-unicode"
             ]
         );
-        assert_eq!(compared(shape, &["--all"]), shape.features);
+        assert_eq!(compared(shape, &["--all"]), shape.features(root).unwrap());
         assert!(compared(shape, &["--diagnostic"]).is_empty());
-        let required = ["raster-glyphs", "raster-outlines", "raster-bitmaps"];
+        let required = ["raster-bitmaps", "raster-glyphs", "raster-outlines"];
         assert_eq!(compared(raster, &[]), required);
-        assert_eq!(compared(raster, &["--all"]), &raster.features[..4]);
+        assert_eq!(
+            compared(raster, &["--all"]),
+            [
+                "raster-bitmaps",
+                "raster-glyphs",
+                "raster-outlines",
+                "raster-sweep"
+            ]
+        );
         assert_eq!(compared(raster, &["--diagnostic"]), ["raster-simd"]);
         for flags in [["--all", "--diagnostic"], ["--diagnostic", "--all"]] {
-            assert_eq!(compared(raster, &flags), raster.features, "{flags:?}");
+            assert_eq!(
+                compared(raster, &flags),
+                raster.features(root).unwrap(),
+                "{flags:?}"
+            );
         }
-        assert_eq!(compared(ass, &[]), ass.features);
-        assert_eq!(compared(ass, &["--all"]), ass.features);
+        assert_eq!(compared(ass, &[]), ass.features(root).unwrap());
+        assert_eq!(compared(ass, &["--all"]), ass.features(root).unwrap());
     }
 
     #[test]
     fn a_feature_takes_its_cases_and_pins_from_cases_from() {
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let root = crate::walk::scratch("lane-cases-from");
+        let root = crate::walk::scratch("generator-cases-from");
         let features = root.join("harness/features");
         std::fs::create_dir_all(features.join("font-outlines")).unwrap();
         std::fs::create_dir_all(features.join("font-hinting-none")).unwrap();
+        std::fs::create_dir_all(features.join("shape-text")).unwrap();
         std::fs::create_dir_all(root.join("harness/fonts")).unwrap();
         for file in [
             "harness/fonts/corpus.json",
             "harness/features/font-outlines/contract.json",
             "harness/features/font-outlines/pins.json",
+            "harness/features/shape-text/contract.json",
         ] {
             std::fs::copy(source.join(file), root.join(file)).unwrap();
         }
-        let lane = &crate::fonts::LANE;
+        let generator = &crate::fonts::GENERATOR;
         let derived = features.join("font-hinting-none");
         let check = |contract: &str| {
+            let contract = contract.replacen(
+                '{',
+                r#"{"id":"font-hinting-none","candidate":"font-worker","#,
+                1,
+            );
             std::fs::write(derived.join("contract.json"), contract).unwrap();
-            lane.check(&root)
+            generator.check(&root)
         };
         let diagnostic = r#"{"gate": "diagnostic", "cases_from": ["font-outlines"]}"#;
         assert_eq!(check(diagnostic), Vec::<String>::new());
-        let cases = |id| lane.manifest(&root, id).unwrap().get("cases").cloned();
+        let cases = |id| generator.manifest(&root, id).unwrap().get("cases").cloned();
         assert_eq!(cases("font-hinting-none"), cases("font-outlines"));
         assert_eq!(
-            lane.inputs(&root, "font-hinting-none")[0],
+            generator.inputs(&root, "font-hinting-none")[0],
             "harness/features/font-outlines/pins.json"
         );
         for (contract, error) in [
@@ -845,7 +847,7 @@ mod tests {
     #[test]
     fn a_contract_without_a_known_gate_fails_the_check() {
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let root = crate::walk::scratch("lane-gate");
+        let root = crate::walk::scratch("generator-gate");
         let feature = root.join("harness/features/font-outlines");
         std::fs::create_dir_all(&feature).unwrap();
         std::fs::create_dir_all(root.join("harness/fonts")).unwrap();
@@ -858,11 +860,11 @@ mod tests {
         let contract =
             std::fs::read_to_string(source.join("harness/features/font-outlines/contract.json"))
                 .unwrap();
-        let lane = &crate::fonts::LANE;
+        let generator = &crate::fonts::GENERATOR;
         for (gate, errors) in [("\"required\"", 0), ("\"sometimes\"", 1), ("true", 1)] {
             let edited = contract.replace("\"required\"", gate);
             std::fs::write(feature.join("contract.json"), edited).unwrap();
-            let found = lane.check(&root);
+            let found = generator.check(&root);
             assert_eq!(found.len(), errors, "{gate}: {found:?}");
             assert!(found.iter().all(|e| e.contains("gate")), "{found:?}");
         }
@@ -873,18 +875,18 @@ mod tests {
     fn compare_passes_report_options_through() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let reports = crate::shape::LANE
+        let reports = crate::shape::GENERATOR
             .reports(root, &args(&["--output", "out", "--memory"]))
             .unwrap();
         assert_eq!(
             reports[0],
             args(&[
                 "--contract",
-                "harness/features/shape-text/contract.json",
+                "harness/features/shape-bidi/contract.json",
                 "--manifest",
-                "harness/features/shape-text/corpus.json",
+                "harness/features/shape-bidi/corpus.json",
                 "--output",
-                "out/shape-text",
+                "out/shape-bidi",
                 "--memory",
             ])
         );

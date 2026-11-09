@@ -69,6 +69,11 @@ benchmarks assume it.
    edited by hand. Put the
    per-case results in the pull request and update [docs/status.md](docs/status.md).
 
+Register comparisons in `harness/features/<id>/contract.json`. The contract
+selects the candidate, reference and operation. Set its `gate` to `required`
+to include the comparison in `cargo xtask check`. Worker identities bind the
+registered contracts and their corpus inputs.
+
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
 [docs/architecture.md](docs/architecture.md) for where code belongs.
 

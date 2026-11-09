@@ -4,13 +4,13 @@
 //! random outlines or random bitmaps (`.research/raster/inputs`). Every case's
 //! parameters come from a xorshift generator seeded by the case's name, so the
 //! rows are deterministic. The work each case must fold is pinned in
-//! `harness/features/<id>/pins.json`, libass's folds (see [`crate::lanes`]).
+//! `harness/features/<id>/pins.json`, libass's folds (see [`crate::generators`]).
 
 use std::fmt::Write as _;
 use std::path::Path;
 
+use crate::generators::Generator;
 use crate::json::Value;
-use crate::lanes::Lane;
 
 type R<T> = Result<T, String>;
 
@@ -87,18 +87,10 @@ const REQUIRED_OUTLINES: Load = Load::Outlines {
 };
 const REQUIRED_BITMAPS: Load = Load::Bitmaps { files: 2, sets: 40 };
 
-pub const FEATURES: [&str; 5] = [
-    "raster-glyphs",
-    "raster-outlines",
-    "raster-bitmaps",
-    "raster-sweep",
-    "raster-simd",
-];
-
-pub const LANE: Lane = Lane {
+pub const GENERATOR: Generator = Generator {
     command: "raster",
     main: super::main,
-    features: &FEATURES,
+    candidate: "raster-worker",
     reference: "libass-native",
     pin_note: "libass 0.17.5's folds, recorded by `cargo xtask raster manifest --record`; never edited by hand.",
     report_directory: ".research/raster-report",
@@ -108,7 +100,7 @@ pub const LANE: Lane = Lane {
     note,
     directory: |_| DIRECTORY,
     write_inputs,
-    check_inputs: crate::lanes::no_checks,
+    check_inputs: crate::generators::no_checks,
     smoke: &SMOKE_CASES,
 };
 

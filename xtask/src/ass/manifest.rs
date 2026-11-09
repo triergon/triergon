@@ -5,13 +5,13 @@
 //! [`PER_TARGET`] are `ass-parse-host`'s instead. Rendering renders every
 //! script and stream of `harness/fixtures/ass-render` in each of
 //! [`RENDER_SIZES`]. The work each case must fold is pinned in
-//! `harness/features/<id>/pins.json`, libass's folds (see [`crate::lanes`]),
+//! `harness/features/<id>/pins.json`, libass's folds (see [`crate::generators`]),
 //! per target in `ass-parse-host`.
 
 use std::path::Path;
 
+use crate::generators::Generator;
 use crate::json::Value;
-use crate::lanes::Lane;
 
 type R<T> = Result<T, String>;
 
@@ -103,18 +103,10 @@ pub const SMOKE_CASES: [(&str, &[&str]); 5] = [
     ),
 ];
 
-pub const FEATURES: [&str; 5] = [
-    "ass-parse-scripts",
-    "ass-parse-chunks",
-    "ass-parse-events",
-    "ass-parse-host",
-    "ass-render",
-];
-
-pub const LANE: Lane = Lane {
+pub const GENERATOR: Generator = Generator {
     command: "ass",
     main: super::main,
-    features: &FEATURES,
+    candidate: "ass-worker",
     reference: "libass-ass-native",
     pin_note: "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
     report_directory: ".research/ass-report",
@@ -123,7 +115,7 @@ pub const LANE: Lane = Lane {
     rows,
     note,
     directory,
-    write_inputs: crate::lanes::no_inputs,
+    write_inputs: crate::generators::no_inputs,
     check_inputs,
     smoke: &SMOKE_CASES,
 };
@@ -270,17 +262,8 @@ fn render_rows(root: &Path) -> R<Vec<Value>> {
 }
 
 /// Every file of the fixture directories is a script or a stream; a tree
-/// without the lane's features needs no fixtures.
+/// without these features needs no fixtures.
 fn check_inputs(root: &Path) -> Vec<String> {
-    let registered = FEATURES.iter().any(|feature| {
-        root.join("harness/features")
-            .join(feature)
-            .join("contract.json")
-            .is_file()
-    });
-    if !registered {
-        return Vec::new();
-    }
     let mut errors = Vec::new();
     let mut parsing = Vec::new();
     for directory in [FIXTURES, RENDER_FIXTURES] {

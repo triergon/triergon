@@ -532,7 +532,7 @@ pub fn compare(outcomes: &[(String, Value)]) -> R<Value> {
             // (the candidate cannot know it); the work is compared.
             let mut b = other.get("data").cloned().unwrap_or(Value::Null);
             if let Value::Object(members) = &mut b {
-                members.retain(|(key, _)| key != crate::lanes::HOST_DEPENDENT);
+                members.retain(|(key, _)| key != crate::generators::HOST_DEPENDENT);
             }
             let (a, b) = (candidate.get("data").unwrap_or(&Value::Null), &b);
             if let Err(error) = validate_shape(a).and_then(|()| validate_shape(b)) {

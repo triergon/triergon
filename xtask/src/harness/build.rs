@@ -8,7 +8,7 @@ use std::process::Command;
 
 use super::gate_build;
 use super::linux;
-use super::provenance::{cargo_metadata, matroska_inputs, selected_graph};
+use super::provenance::{cargo_metadata, selected_graph, shared_inputs};
 use crate::checks::read_json;
 use crate::corpus::write_json;
 use crate::json::Value;
@@ -347,7 +347,7 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
         .map(|feature| format!("{}/{feature}", spec.package))
         .collect();
     let metadata = super::provenance::cargo_metadata_with_features(root, &features)?;
-    let mut inputs = matroska_inputs();
+    let mut inputs = shared_inputs(root)?;
     if name == "isobmff-worker" {
         inputs.extend(crate::isobmff_bench::source_inputs(root)?);
     }
@@ -996,7 +996,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         return Err("worker identity is not an object".into());
     };
     let metadata = cargo_metadata(root)?;
-    let graph = selected_graph(root, &metadata, "media-worker", &matroska_inputs())?;
+    let graph = selected_graph(root, &metadata, "media-worker", &shared_inputs(root)?)?;
     let candidates = candidate_records(root, &additional)?;
     let pinned_build = if pinned.exists() {
         Some(read_json(&pinned)?)

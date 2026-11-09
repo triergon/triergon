@@ -10,7 +10,7 @@ mod equivalence;
 mod manifest;
 mod observed;
 
-pub use manifest::LANE;
+pub use manifest::GENERATOR;
 pub use observed::observed_sources;
 
 use std::path::Path;
@@ -62,7 +62,9 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             println!("{}", observed_sources(root)?.display());
             Ok(())
         }
-        [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),
+        [command, rest @ ..] if command == "manifest" => {
+            GENERATOR.manifest_command(root, rest, USAGE)
+        }
         [command, help] if command == "equivalence" && (help == "--help" || help == "-h") => {
             println!("{}", equivalence::USAGE);
             Ok(())

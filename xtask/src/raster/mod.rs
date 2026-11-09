@@ -7,7 +7,7 @@
 mod manifest;
 mod reference;
 
-pub use manifest::LANE;
+pub use manifest::GENERATOR;
 pub use reference::check_prepared;
 
 use std::path::{Path, PathBuf};
@@ -54,7 +54,9 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             println!("{}", built.display());
             Ok(())
         }
-        [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),
+        [command, rest @ ..] if command == "manifest" => {
+            GENERATOR.manifest_command(root, rest, USAGE)
+        }
         _ => Err(USAGE.into()),
     }
 }

@@ -245,7 +245,7 @@ fn bound_workers(root: &Path, identity: &Value) -> Result<(PathBuf, PathBuf, Val
         root,
         &provenance::cargo_metadata(root)?,
         "playback-worker",
-        &provenance::matroska_inputs(),
+        &provenance::shared_inputs(root)?,
     )?;
     if text(record, "sha256")? != digest(&candidate)?
         || !record
