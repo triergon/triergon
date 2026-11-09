@@ -1,5 +1,10 @@
 //! Composed selected-program TS -> PSI -> PES source operation. No codec AU work.
+mod storage;
+
+pub(crate) use storage::{StorageItem, TransportStorageCursor};
+
 use crate::carrier::{PLAIN_PAYLOAD_BYTES, TS188_BYTES, payload_only_continuation};
+use crate::compat::adts::UnboundedPes;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
 use crate::framer::FramedCarrier;
 use crate::psi::{
@@ -54,6 +59,8 @@ pub enum TraceEvent {
         configuration_epoch: u64,
     },
     Pes(Pes),
+    /// A rejected length-zero ADTS PES retained by the explicit compatibility policy.
+    UnboundedAdtsPes(UnboundedPes),
     Timeline {
         program: u16,
         clock_epoch: u64,
@@ -63,6 +70,25 @@ pub enum TraceEvent {
     },
     Diagnostic(TraceFault),
     Finished,
+}
+
+impl TraceEvent {
+    /// Header and span facts of a validated PES or a reported unbounded ADTS PES.
+    /// The event variant identifies the source's wire validity.
+    pub fn pes_source(&self) -> Option<&Pes> {
+        match self {
+            Self::Pes(pes) | Self::UnboundedAdtsPes(UnboundedPes(pes)) => Some(pes),
+            _ => None,
+        }
+    }
+
+    fn from_assembled_pes(pes: Pes) -> Self {
+        if pes.header.declared_packet_length == 0 && (0xc0..=0xdf).contains(&pes.header.stream_id) {
+            Self::UnboundedAdtsPes(UnboundedPes(pes))
+        } else {
+            Self::Pes(pes)
+        }
+    }
 }
 
 /// Disposition of a validated PES body carrier offered directly to a feed.
@@ -347,6 +373,7 @@ pub struct TransportStream {
     discover_program: bool,
     feed_omissions: Option<u64>,
     feed_validated_carriers: bool,
+    unbounded_adts: bool,
     deferred_feed_events: u64,
     descriptor_namespace: DescriptorNamespace,
     framer: TransportFramer,
@@ -498,6 +525,7 @@ impl TransportStream {
             discover_program: program.is_none(),
             feed_omissions: None,
             feed_validated_carriers: false,
+            unbounded_adts: false,
             deferred_feed_events: 0,
             descriptor_namespace,
             pmt: None,
@@ -542,12 +570,22 @@ impl TransportStream {
     pub fn clock_is_quarantined(&self) -> bool {
         self.clock_quarantined
     }
-    pub(crate) fn route_epochs(&self, index: usize, pid: u16) -> Option<SourceEpochs> {
+    pub(crate) fn route_state(
+        &self,
+        index: usize,
+        pid: u16,
+    ) -> Option<(SourceEpochs, Option<SourceLocation>)> {
         self.routes
             .as_slice()
             .get(index)
             .filter(|route| route.pid == pid)
-            .map(|route| route.epochs)
+            .map(|route| {
+                let pending = route
+                    .assembler
+                    .as_ref()
+                    .and_then(PesAssembler::pending_header_location);
+                (route.epochs, pending)
+            })
     }
     fn location(&self) -> SourceLocation {
         self.packet.as_ref().map_or(
@@ -788,13 +826,17 @@ impl TransportStream {
             let assembler = if reuse.is_some() {
                 None
             } else {
-                Some(PesAssembler::new(
+                let mut assembler = PesAssembler::new(
                     stream.pid,
                     is_video_stream_type(stream.stream_type),
                     self.budget.clone(),
                     self.limits,
                     epochs,
-                )?)
+                )?;
+                if self.unbounded_adts && stream.stream_type == 0x0f {
+                    assembler.allow_unbounded_adts();
+                }
+                Some(assembler)
             };
             build
                 .routes
@@ -1398,6 +1440,50 @@ impl TransportStream {
         }
         Ok(())
     }
+    pub(crate) fn blocked_adts_span_floor(&self) -> Result<Option<usize>> {
+        let Route::Pes(index) = self.route else {
+            return Ok(None);
+        };
+        if self.phase != 6 {
+            return Ok(None);
+        }
+        let Some(span_floor) = self.routes.as_slice()[index]
+            .assembler
+            .as_ref()
+            .and_then(PesAssembler::blocked_span_growth_floor)
+        else {
+            return Ok(None);
+        };
+        let pmt = self
+            .pmt
+            .as_ref()
+            .map_or(Ok(0), |route| route.assembler.table_storage())?;
+        let floor = span_floor
+            .checked_add(crate::table_storage(&self.routes)?)
+            .and_then(|n| n.checked_add(self.pat.assembler.table_storage().ok()?))
+            .and_then(|n| n.checked_add(pmt))
+            .and_then(|n| n.checked_add(self.framer.carry_storage().ok()?))
+            .ok_or(Error::Overflow)?;
+        Ok(Some(floor))
+    }
+
+    pub(crate) fn refuse_blocked_adts_span(&mut self, error: Error) -> TraceEvent {
+        debug_assert!(matches!(self.blocked_adts_span_floor(), Ok(Some(_))));
+        self.discard_faulted_route(error)
+    }
+
+    fn discard_faulted_route(&mut self, error: Error) -> TraceEvent {
+        let pid = self.packet.as_ref().map(|packet| packet.pid);
+        let kind = if matches!(self.route, Route::Pes(_)) {
+            FaultKind::Pes
+        } else {
+            FaultKind::Psi
+        };
+        self.discard_route(self.route);
+        self.phase = 7;
+        self.diagnostic(kind, pid, error)
+    }
+
     fn drain(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<TraceEvent>> {
         let result = match self.route {
             Route::Pat => self
@@ -1437,7 +1523,9 @@ impl TransportStream {
                     assembler.poll_source::<true>(work, cancel)
                 };
                 match step {
-                    Ok(AssemblyStep::Output(Some(pes))) => return Ok(Some(TraceEvent::Pes(pes))),
+                    Ok(AssemblyStep::Output(Some(pes))) => {
+                        return Ok(Some(TraceEvent::from_assembled_pes(pes)));
+                    }
                     Ok(AssemblyStep::Output(None)) => {
                         self.omit_feed_events(1)?;
                         Ok(false)
@@ -1456,17 +1544,7 @@ impl TransportStream {
             }
             Ok(false) => Ok(None),
             Err(error) if retryable(error) => Err(error),
-            Err(error) => {
-                let pid = self.packet.as_ref().map(|packet| packet.pid);
-                let kind = if matches!(self.route, Route::Pes(_)) {
-                    FaultKind::Pes
-                } else {
-                    FaultKind::Psi
-                };
-                self.discard_route(self.route);
-                self.phase = 7;
-                Ok(Some(self.diagnostic(kind, pid, error)))
-            }
+            Err(error) => Ok(Some(self.discard_faulted_route(error))),
         }
     }
     fn eof(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<TraceEvent>> {
@@ -1523,7 +1601,7 @@ impl TransportStream {
             };
             match step {
                 Ok(AssemblyStep::Output(Some(pes))) => {
-                    return Ok(Step::Ready(TraceEvent::Pes(pes)));
+                    return Ok(Step::Ready(TraceEvent::from_assembled_pes(pes)));
                 }
                 Ok(AssemblyStep::Output(None)) => self.omit_feed_events(1)?,
                 Ok(AssemblyStep::Yield) => return Ok(Step::Yield),
@@ -1550,6 +1628,14 @@ impl TransportStream {
         self.poll_feed(input, work, cancel, &mut |_, _, _, _| {
             Ok(FeedContinuation::Emit)
         })
+    }
+
+    pub(crate) fn allow_unbounded_adts(&mut self) {
+        self.unbounded_adts = true;
+    }
+
+    pub(crate) fn share_input(&mut self) {
+        self.framer.share_input();
     }
 
     /// Offer stable PES continuations to a feed before publishing a trace event.

@@ -235,6 +235,13 @@ impl NalReader {
     pub fn source(&self) -> SourceId {
         self.cursor.source()
     }
+    pub(crate) fn input_wait_buffer_capacity(&self) -> Result<usize> {
+        if self.cursor.buffered_owner().is_some() {
+            return Err(Error::Invalid("NAL reader has buffered input"));
+        }
+        Ok(self.buffer.as_ref().map_or(0, BudgetVec::capacity))
+    }
+
     pub fn budget(&self) -> &Budget {
         self.cursor.budget()
     }

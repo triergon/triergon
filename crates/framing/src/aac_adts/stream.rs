@@ -129,6 +129,12 @@ impl AacAdtsStreamReader {
             split_prefix,
         })
     }
+    /// Capacity of the mutable frame buffer, excluding buffered source bytes.
+    #[doc(hidden)]
+    pub fn input_wait_buffer_capacity(&self) -> usize {
+        self.buffer.as_ref().map_or(0, BudgetVec::capacity)
+    }
+
     pub fn request(&self) -> InputRequest {
         self.cursor
             .as_ref()
