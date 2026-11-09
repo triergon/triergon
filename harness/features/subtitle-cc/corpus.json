@@ -2668,6 +2668,73 @@
       }
     },
     {
+      "id": "hevc-reserved-ts",
+      "profile": "hevc-reserved-ts",
+      "file": "cc/hevc-reserved.ts",
+      "sha256": "5d8c329fb5502ca70670342ab49dd263e436c605c23615f39c25eb53f1404ace",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 972,
+        "digest": 5568590418042723163
+      }
+    },
+    {
+      "id": "hevc-reserved-ts-realtime",
+      "profile": "hevc-reserved-ts",
+      "file": "cc/hevc-reserved.ts",
+      "sha256": "5d8c329fb5502ca70670342ab49dd263e436c605c23615f39c25eb53f1404ace",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1614,
+        "digest": 6761147710808532501
+      }
+    },
+    {
+      "id": "hevc-reserved-ts-first",
+      "profile": "hevc-reserved-ts",
+      "file": "cc/hevc-reserved.ts",
+      "sha256": "5d8c329fb5502ca70670342ab49dd263e436c605c23615f39c25eb53f1404ace",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 972,
+        "digest": 5568590418042723163
+      }
+    },
+    {
+      "id": "hevc-reserved-ts-second",
+      "profile": "hevc-reserved-ts",
+      "file": "cc/hevc-reserved.ts",
+      "sha256": "5d8c329fb5502ca70670342ab49dd263e436c605c23615f39c25eb53f1404ace",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1401,
+        "digest": 3328821898514293489
+      }
+    },
+    {
       "id": "hevc-trail-ts",
       "profile": "hevc-trail-ts",
       "file": "cc/hevc-trail.ts",

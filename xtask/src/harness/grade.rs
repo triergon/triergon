@@ -1312,7 +1312,7 @@ mod tests {
             ("subtitle-pgs", 317),
             ("subtitle-dvb", 229),
             ("subtitle-dvd", 223),
-            ("subtitle-cc", 197),
+            ("subtitle-cc", 201),
             ("subtitle-teletext", 70),
             ("subtitle-pgs-capsules", 229),
             ("subtitle-text", 275),

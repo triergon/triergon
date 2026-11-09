@@ -309,6 +309,14 @@ def annexb_insert(es, seis, hevc):
     return bytes(out)
 
 
+def reserved_before_slice(au):
+    """`au` (HEVC) with a reserved VCL NAL unit (type 10) before its first slice."""
+    for begin, _, header in nal_units(au):
+        if (header >> 1) & 0x3F < 32:
+            return au[:begin] + b"\0\0\x01\x14\x01\x80" + au[begin:]
+    return au
+
+
 # --------------------------------------------------------------- encodes
 
 
@@ -763,6 +771,12 @@ def build():
 
         if hevc:
             cut_case("hevc-cra", 10, containers=(".ts", ".mkv"))
+            # A reserved VCL unit (type 10) before the slice of the second CRA
+            # picture: the decoder skips it, so the picture is still a CRA picture
+            # and its RASL pictures are output.
+            cra = open(os.path.join(OUT, "hevc-cra.ts"), "rb").read()
+            ts = ts_rewrite_video(cra, lambda n, au: au if n != 12 else reserved_before_slice(au))
+            cases.append(("hevc-reserved-ts", write("hevc-reserved.ts", ts), ["cc"]))
             cut_case("hevc-trail", 13)
             cut_case("hevc-suffix", 0, suffix=True, containers=(".ts", ".mp4"))
         else:
