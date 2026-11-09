@@ -1,7 +1,9 @@
+mod eac3;
+
 use super::model::{ClockContext, PacketData, Shared};
 use super::{
-    AccessUnit, AudioEofPolicy, Packet, PacketClock, PayloadSource, ReaderLimits, SourceEvent,
-    Track,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, Packet, PacketClock, PayloadSource, ReaderLimits,
+    SourceEvent, Track,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors};
@@ -22,11 +24,12 @@ enum Framer {
     Video(RawAnnexBReader),
     Adts(AacAdtsStreamReader),
     Ac3(Ac3FrameReader),
+    Eac3(eac3::Reader),
 }
 
 impl Framer {
     fn is_audio(&self) -> bool {
-        matches!(self, Self::Adts(_) | Self::Ac3(_))
+        matches!(self, Self::Adts(_) | Self::Ac3(_) | Self::Eac3(_))
     }
     fn new(pool: &Budget, track: &Track, limits: ReaderLimits) -> Result<Self> {
         // Private concatenated elementary view, never an external source request.
@@ -35,7 +38,9 @@ impl Framer {
             length: None,
             random_access: false,
         };
-        match track.stream().stream_type {
+        let stream = track.stream();
+        let namespace = stream.descriptor_namespace();
+        match stream.stream_type {
             kind @ (0x1b | 0x24) => Ok(Self::Video(RawAnnexBReader::new(
                 pool,
                 if kind == 0x1b {
@@ -57,29 +62,41 @@ impl Framer {
                     maximum_input_window: limits.elementary_input_window,
                 },
             )?)),
-            0x06 if matches!(
-                track.stream().descriptor_namespace(),
-                DescriptorNamespace::Dvb(_)
-            ) =>
-            {
-                let carriage = PrivateAudioCarriage::from_observed_pmt(
-                    6,
-                    PrivateAudioDescriptors {
-                        program: track.program_map().program_descriptors.as_ref(),
-                        elementary: track.stream().descriptor_bytes.as_ref(),
-                    },
-                    limits.transport,
-                )?;
-                if carriage != PrivateAudioCarriage::DvbAc3Tag {
-                    return Err(Error::Unsupported(
-                        "MPEG-TS E-AC-3 access-unit grouping unavailable",
-                    ));
+            0x06 if matches!(namespace, DescriptorNamespace::Dvb(_)) => {
+                let descriptors = PrivateAudioDescriptors {
+                    program: track.program_map().program_descriptors.as_ref(),
+                    elementary: stream.descriptor_bytes.as_ref(),
+                };
+                let carriage =
+                    match PrivateAudioCarriage::from_observed_pmt(6, descriptors, limits.transport)
+                    {
+                        // The elementary registration can corroborate a DVB descriptor.
+                        Err(Error::Unsupported(_))
+                            if matches!(
+                                PrivateAudioCarriage::from_hls_pmt(
+                                    6,
+                                    descriptors,
+                                    limits.transport
+                                ),
+                                Ok(PrivateAudioCarriage::DvbEac3Tag)
+                            ) =>
+                        {
+                            PrivateAudioCarriage::DvbEac3Tag
+                        }
+                        result => result?,
+                    };
+                match carriage {
+                    PrivateAudioCarriage::DvbAc3Tag => Self::ac3(pool, limits, source, caps),
+                    PrivateAudioCarriage::DvbEac3Tag => Ok(Self::Eac3(eac3::Reader::new(
+                        pool, track, limits, source, caps,
+                    )?)),
+                    _ => Err(Error::Unsupported("MPEG-TS private audio carriage")),
                 }
-                Self::ac3(pool, limits, source, caps)
             }
-            0x81 if track.stream().descriptor_namespace() == DescriptorNamespace::Atsc => {
-                Self::ac3(pool, limits, source, caps)
-            }
+            0x81 if namespace == DescriptorNamespace::Atsc => Self::ac3(pool, limits, source, caps),
+            0x87 if namespace == DescriptorNamespace::Atsc => Ok(Self::Eac3(eac3::Reader::new(
+                pool, track, limits, source, caps,
+            )?)),
             _ => Err(Error::Unsupported(
                 "MPEG-TS carriage has no admitted access-unit framer",
             )),
@@ -116,7 +133,10 @@ impl Framer {
         Ok(match self {
             Self::Video(reader) => map(reader.step(work, cancel)?, AccessUnit::Video),
             Self::Adts(reader) => map(reader.step(work, cancel)?, AccessUnit::Adts),
-            Self::Ac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
+            Self::Ac3(reader) => map(reader.step(work, cancel)?, |frame| {
+                AccessUnit::Ac3(Ac3AccessUnit::single(frame))
+            }),
+            Self::Eac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
         })
     }
     fn provide(&mut self, window: InputWindow) -> Result<()> {
@@ -124,6 +144,7 @@ impl Framer {
             Self::Video(reader) => reader.provide_owned(window),
             Self::Adts(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
+            Self::Eac3(reader) => reader.provide(window),
         }
     }
     fn finish(&mut self, request: InputRequest) -> Result<()> {
@@ -131,6 +152,7 @@ impl Framer {
             Self::Video(reader) => reader.finish(request.source, request.token),
             Self::Adts(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
+            Self::Eac3(reader) => reader.finish(request),
         }
     }
 }
@@ -785,8 +807,18 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(false);
         }
-        self.pieces.try_reserve_exact(1)?;
         let pes = source.pes();
+        if pes.header.stream_id != 0xbd {
+            if self.track.stream().descriptor_namespace() == DescriptorNamespace::Atsc
+                && matches!(self.track.stream().stream_type, 0x81 | 0x87)
+            {
+                return Err(Error::Invalid("ATSC private audio PES stream ID"));
+            }
+            if matches!(self.framer, Some(Framer::Eac3(_))) {
+                return Err(Error::Invalid("DVB E-AC-3 PES stream ID"));
+            }
+        }
+        self.pieces.try_reserve_exact(1)?;
         let end = self
             .supplied
             .checked_add(u64::try_from(pes.payload_len).map_err(|_| Error::Overflow)?)
@@ -878,6 +910,10 @@ impl Lane {
                         && framer.is_audio()
                         && self.limits.audio_eof_policy == AudioEofPolicy::ReportIncomplete =>
                 {
+                    let maximum = match framer {
+                        Framer::Eac3(reader) => reader.maximum_incomplete_bytes(),
+                        _ => self.limits.maximum_audio_frame_bytes,
+                    };
                     let range = self.unpublished().ok_or(Error::Truncated)?;
                     if self.completed == self.limits.maximum_access_units {
                         return Err(Error::Limit {
@@ -887,10 +923,10 @@ impl Lane {
                     }
                     let size =
                         usize::try_from(range.end - range.start).map_err(|_| Error::Overflow)?;
-                    if size > self.limits.maximum_audio_frame_bytes {
+                    if size > maximum {
                         return Err(Error::Limit {
                             requested: size,
-                            maximum: self.limits.maximum_audio_frame_bytes,
+                            maximum,
                         });
                     }
                     self.incomplete = Some(Incomplete::new(range, &self.pool));
@@ -992,6 +1028,12 @@ impl Lane {
             let start = range.start.max(piece.range.start);
             let end = range.end.min(piece.range.end);
             if start < end {
+                if !build.origins.is_empty()
+                    && self.track.stream().stream_type == 0x87
+                    && matches!(build.unit(), AccessUnit::Ac3(_))
+                {
+                    return Err(Error::Invalid("ATSC E-AC-3 access unit crosses PES"));
+                }
                 build.origins.try_reserve_exact(1)?;
                 build
                     .origins

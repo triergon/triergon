@@ -6,7 +6,7 @@ use std::ops::{Deref, Range};
 use std::sync::{Arc, atomic::AtomicUsize};
 use triergon_core::container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, Time, TimeBase};
-use triergon_framing::{AacAdtsFrame, Ac3Frame, RawAccessUnit};
+use triergon_framing::{AacAdtsFrame, Ac3Frame, Ac3FrameFacts, RawAccessUnit};
 
 #[derive(Debug)]
 struct Owned<T> {
@@ -151,6 +151,61 @@ pub(super) struct ClockContext {
     pub quarantined: bool,
 }
 
+#[derive(Debug)]
+pub(super) struct DependentSyncframe {
+    pub facts: Ac3FrameFacts,
+    // Released as soon as this syncframe is copied into the group.
+    pub pending_bytes: Option<Bytes>,
+}
+
+/// A complete AC-3 syncframe or one grouped E-AC-3 access unit.
+/// Clones share the charged bytes and syncframe facts.
+#[derive(Clone, Debug)]
+pub struct Ac3AccessUnit {
+    pub(super) first: Ac3FrameFacts,
+    pub(super) bytes: Bytes,
+    pub(super) dependents: Option<Shared<BudgetVec<DependentSyncframe>>>,
+}
+
+impl Ac3AccessUnit {
+    pub(super) fn single(frame: Ac3Frame) -> Self {
+        Self {
+            first: frame.facts(),
+            bytes: frame.into_bytes(),
+            dependents: None,
+        }
+    }
+
+    /// Exact source bytes of the complete unit, in syncframe order.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    pub fn into_bytes(self) -> Bytes {
+        self.bytes
+    }
+
+    /// Facts of the primary syncframe, which supplies the unit's sample span.
+    pub const fn facts(&self) -> Ac3FrameFacts {
+        self.first
+    }
+
+    /// Facts of every syncframe, including the primary, in source order.
+    pub fn syncframes(&self) -> impl Iterator<Item = Ac3FrameFacts> + '_ {
+        std::iter::once(self.first).chain(
+            self.dependents
+                .iter()
+                .flat_map(|frames| frames.as_slice().iter().map(|frame| frame.facts)),
+        )
+    }
+
+    /// The primary syncframe's raw trailing word.
+    pub fn crc2_word(&self) -> u16 {
+        let end = self.first.header.frame_bytes;
+        u16::from_be_bytes([self.bytes[end - 2], self.bytes[end - 1]])
+    }
+}
+
 /// Original framed bytes and syntax facts, before decoder-feed conversion.
 /// Framer offsets use a private concatenated elementary view (`SourceId(0)`);
 /// physical transport provenance is retained by [`Packet::sources`].
@@ -158,7 +213,7 @@ pub(super) struct ClockContext {
 pub enum AccessUnit {
     Video(RawAccessUnit),
     Adts(AacAdtsFrame),
-    Ac3(Ac3Frame),
+    Ac3(Ac3AccessUnit),
     /// Unfinished audio at logical EOF. This is a source fragment, not an AU.
     IncompleteAudio {
         range: Range<u64>,
