@@ -193,11 +193,51 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     })
     .collect();
     cases.extend(mp4_range_entries(paths, &output)?);
+    let opus_file = "avc-opus-edit.mp4";
+    let boundary_file = "avc-opus-seek-boundary.mp4";
+    let seed = paths
+        .root
+        .join("crates/isobmff/tests/fixtures/range-encoded-edits")
+        .join(opus_file);
+    let opus = fs::read(&seed).map_err(|e| format!("{}: {e}", seed.display()))?;
+    if sha256::hex(&opus) != "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a" {
+        return Err("MP4 Opus seed changed".into());
+    }
+    let mut boundary = opus.clone();
+    // At a two-second video landing this puts the second audio candidate
+    // exactly on the receiver's earlier search timestamp.
+    boundary[1512..1516].copy_from_slice(&528_i32.to_be_bytes());
+    write(&output.join(opus_file), &opus)?;
+    write(&output.join(boundary_file), &boundary)?;
+    cases.extend([
+        mp4_range_case(
+            "opus-open",
+            opus_file,
+            &opus,
+            None,
+            (241, 65_677, 4_193_873_898_465_376_234),
+        ),
+        mp4_range_case(
+            "opus-seek",
+            opus_file,
+            &opus,
+            Some("32000"),
+            (92, 25_673, 11_520_860_581_798_144_314),
+        ),
+        mp4_range_case(
+            "opus-seek-edit-boundary",
+            boundary_file,
+            &boundary,
+            Some("32000"),
+            (91, 25_535, 12_059_760_319_648_546_611),
+        ),
+    ]);
+    let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
     )?;
-    Ok("MP4 range corpus: fifteen playback comparisons".into())
+    Ok(format!("MP4 range corpus: {count} playback comparisons"))
 }
 
 fn mp4_range_case(

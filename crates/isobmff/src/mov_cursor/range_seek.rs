@@ -397,11 +397,16 @@ impl<'a> RangeSeekJob<'a> {
                 }
                 let reference_base = self.slots.as_slice()[0].clock.demux_base;
                 let target_base = points[0].slot.clock.demux_base;
-                reference_base.rescale(
+                let timestamp = reference_base.rescale(
                     landing.selected.timestamp,
                     target_base,
                     Rounding::NearestAway,
-                )?
+                )?;
+                if let Some(edit) = points[0].slot.encoded_edit {
+                    edit.align_seek_timestamp(timestamp, target_base)?
+                } else {
+                    timestamp
+                }
             } else {
                 self.timestamp
             };

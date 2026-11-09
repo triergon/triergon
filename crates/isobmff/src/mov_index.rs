@@ -964,6 +964,10 @@ impl<'a> GlobalSeekJob<'a> {
                 self.reference_base
                     .rescale(timestamp, base, Rounding::NearestAway)?
             };
+            let timestamp = match self.encoded_edits.and_then(|plans| plans[self.at].as_ref()) {
+                Some(edit) => edit.align_seek_timestamp(timestamp, base)?,
+                None => timestamp,
+            };
             self.child = Some(SeekJob::build(self.track_context(self.at), timestamp)?);
         }
     }

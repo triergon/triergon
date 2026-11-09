@@ -48,7 +48,7 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
         if (video < 0 && codec->codec_type == AVMEDIA_TYPE_VIDEO && video_codec)
             video = (int)i;
         else if (audio < 0 && codec->codec_type == AVMEDIA_TYPE_AUDIO &&
-                 codec->codec_id == AV_CODEC_ID_AAC)
+                 (codec->codec_id == AV_CODEC_ID_AAC || codec->codec_id == AV_CODEC_ID_OPUS))
             audio = (int)i;
         else
             goto done;
