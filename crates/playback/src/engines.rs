@@ -605,7 +605,8 @@ impl Engine {
             limits,
             program,
             namespace,
-        )?;
+        )?
+        .with_shared_carriers();
         TsEngine::from_stream(input, format, limits, policy, namespace, stream).map(Self::Ts)
     }
     pub fn ts_native(
@@ -1116,7 +1117,8 @@ impl Engine {
                     r.limits,
                     r.program,
                     r.namespace,
-                )?;
+                )?
+                .with_shared_carriers();
                 r.native = Some(DemuxClock::new(r.program)?);
                 r.tsid = None;
                 r.pcr_pid = None;
