@@ -122,9 +122,10 @@ Small records reuse the checked offsets from the validation pass when the
 remaining work budget covers publishing the descriptors. Array counts and the
 validated end offset are derived from those descriptors and the extension fields.
 HEVC configurations independently keep up to four array descriptors and four NAL
-descriptors inline. Larger tables use exact-capacity charged heap storage. Both
-validation and fill walks run for every HEVC configuration; inline tables do not
-retain extra pool handles or add descriptor heap charges.
+descriptors inline. The validation pass fills both tables when they fit inline.
+When either exceeds its inline capacity, a second pass fills the tables with
+exact-capacity charged storage for the larger tables. Both paths keep the same
+work checkpoints and retain the original record.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
