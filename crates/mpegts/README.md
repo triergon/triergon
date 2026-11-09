@@ -228,6 +228,10 @@ still yield packets. The separate `compat::adts::PesPolicy::ReportUnbounded`
 checks the remaining header of a length-zero ADTS PES and delimits its
 payload at the next start or logical EOF. It emits `TraceEvent::UnboundedAdtsPes`
 and reports any derived output separately as `ReaderEvent::RecoveredAdts`.
+The span table charges copy work before growing. If the new table and the
+source allocations already pinned by the reader exceed the shared limit, the
+reader reports a source limit. Caller-held outputs can instead cause retryable
+backpressure.
 
 Video defaults to `compat::annex_b::VideoEofPolicy::RejectUnframed`. With
 `VideoEofPolicy::ReportUnframed`, a final AVC or HEVC byte run with invalid

@@ -1436,6 +1436,51 @@ impl TransportStream {
         }
         Ok(())
     }
+    pub(crate) fn blocked_adts_span_floor(&self) -> Result<Option<usize>> {
+        let Route::Pes(index) = self.route else {
+            return Ok(None);
+        };
+        if self.phase != 6 {
+            return Ok(None);
+        }
+        let Some(span_floor) = self.routes.as_slice()[index]
+            .assembler
+            .as_ref()
+            .and_then(PesAssembler::blocked_span_growth_floor)
+        else {
+            return Ok(None);
+        };
+        let pmt = self
+            .pmt
+            .as_ref()
+            .map_or(Ok(0), |route| route.assembler.table_storage())?;
+        let floor = span_floor
+            .checked_add(crate::table_storage(&self.routes)?)
+            .and_then(|n| n.checked_add(self.pat.assembler.table_storage().ok()?))
+            .and_then(|n| n.checked_add(pmt))
+            .and_then(|n| n.checked_add(self.framer.carry_storage().ok()?))
+            .and_then(|n| n.checked_add(self.collector.active_single_section_storage().ok()?))
+            .ok_or(Error::Overflow)?;
+        Ok(Some(floor))
+    }
+
+    pub(crate) fn refuse_blocked_adts_span(&mut self, error: Error) -> TraceEvent {
+        debug_assert!(matches!(self.blocked_adts_span_floor(), Ok(Some(_))));
+        self.discard_faulted_route(error)
+    }
+
+    fn discard_faulted_route(&mut self, error: Error) -> TraceEvent {
+        let pid = self.packet.as_ref().map(|packet| packet.pid);
+        let kind = if matches!(self.route, Route::Pes(_)) {
+            FaultKind::Pes
+        } else {
+            FaultKind::Psi
+        };
+        self.discard_route(self.route);
+        self.phase = 7;
+        self.diagnostic(kind, pid, error)
+    }
+
     fn drain(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<TraceEvent>> {
         let result = match self.route {
             Route::Pat => self
@@ -1496,17 +1541,7 @@ impl TransportStream {
             }
             Ok(false) => Ok(None),
             Err(error) if retryable(error) => Err(error),
-            Err(error) => {
-                let pid = self.packet.as_ref().map(|packet| packet.pid);
-                let kind = if matches!(self.route, Route::Pes(_)) {
-                    FaultKind::Pes
-                } else {
-                    FaultKind::Psi
-                };
-                self.discard_route(self.route);
-                self.phase = 7;
-                Ok(Some(self.diagnostic(kind, pid, error)))
-            }
+            Err(error) => Ok(Some(self.discard_faulted_route(error))),
         }
     }
     fn eof(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<TraceEvent>> {

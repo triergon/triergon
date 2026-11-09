@@ -732,7 +732,28 @@ impl Reader {
                 .input
                 .as_mut()
                 .ok_or(Error::Invalid("MPEG-TS reader closed"))?;
-            match stream.poll(input, work, cancel)? {
+            let step = match stream.poll(input, work, cancel) {
+                Err(error @ Error::Backpressure { .. }) => {
+                    if let Some(span_floor) = stream.blocked_adts_span_floor()? {
+                        let requested = span_floor
+                            .checked_add(Self::catalogue_storage(
+                                &self.lanes,
+                                &self.tracks,
+                                &self.staged_tracks,
+                                self.map.as_ref(),
+                            )?)
+                            .ok_or(Error::Overflow)?;
+                        if requested > self.pool.limit() {
+                            let limit = crate::limit(requested, self.pool.limit());
+                            self.raw = Some(stream.refuse_blocked_adts_span(limit));
+                            continue;
+                        }
+                    }
+                    return Err(error);
+                }
+                result => result?,
+            };
+            match step {
                 Step::Ready(event) => self.raw = Some(event),
                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                 Step::Yield => return Ok(Step::Yield),
@@ -756,6 +777,30 @@ impl Reader {
                 }
             }
         }
+    }
+
+    fn catalogue_storage(
+        lanes: &BudgetVec<Lane>,
+        tracks: &BudgetVec<Track>,
+        staged_tracks: &BudgetVec<Track>,
+        source: Option<&SourceEvent>,
+    ) -> Result<usize> {
+        let mut bytes = crate::table_storage(lanes)?
+            .checked_add(crate::table_storage(tracks)?)
+            .and_then(|n| n.checked_add(crate::table_storage(staged_tracks).ok()?))
+            .ok_or(Error::Overflow)?;
+        if let Some(source) = source {
+            let map = source.map();
+            // PSI section assembly owns a separate allocation from PES carriers.
+            // The descriptors and track handles share the retained program map.
+            bytes = bytes
+                .checked_add(Shared::<TraceEvent>::allocation_bytes()?)
+                .and_then(|n| n.checked_add(crate::table_storage(&map.streams).ok()?))
+                .and_then(|n| n.checked_add(crate::table_storage(&map.source_ranges).ok()?))
+                .and_then(|n| n.checked_add(map.source.retained_storage_bytes()))
+                .ok_or(Error::Overflow)?;
+        }
+        Ok(bytes)
     }
 }
 

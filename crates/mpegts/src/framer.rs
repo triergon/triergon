@@ -164,6 +164,10 @@ impl TransportFramer {
         self.buffered_carrier = BufferedCarrier::Shared;
     }
 
+    pub(crate) fn carry_storage(&self) -> Result<usize> {
+        self.carry.as_ref().map_or(Ok(0), crate::table_storage)
+    }
+
     pub(crate) fn compact_progressive_input(&mut self) {
         self.buffered_carrier = BufferedCarrier::Progressive;
     }

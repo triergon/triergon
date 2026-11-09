@@ -60,6 +60,21 @@ impl PatCollector {
         self.input = None;
         self.building = None;
     }
+    pub(crate) fn active_single_section_storage(&self) -> Result<usize> {
+        let Some(version) = self.active.and_then(|index| self.versions[index].as_ref()) else {
+            return Ok(0);
+        };
+        let table = crate::table_storage(&version.sections)?;
+        let [section] = version.sections.as_slice() else {
+            return Ok(table);
+        };
+        table
+            .checked_add(crate::table_storage(&section.programs)?)
+            .and_then(|n| n.checked_add(crate::table_storage(&section.source_ranges).ok()?))
+            .and_then(|n| n.checked_add(section.source.retained_storage_bytes()))
+            .ok_or(Error::Overflow)
+    }
+
     pub(crate) fn active_single_section(&self) -> Option<&Bytes> {
         let version = self.versions[self.active?].as_ref()?;
         let [section] = version.sections.as_slice() else {

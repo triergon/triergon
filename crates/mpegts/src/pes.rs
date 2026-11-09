@@ -104,6 +104,77 @@ struct Payload {
 }
 
 #[derive(Debug)]
+enum SpanGrowth {
+    Credit(usize),
+    // The allocation was fully paid before the audit began.
+    Audit(SpanGrowthAudit),
+}
+
+// A refused span growth pins the source bytes and both table allocations.
+// Count whole backing allocations once, even when a window supplies many spans.
+#[derive(Debug)]
+struct SpanGrowthAudit {
+    minimum: usize,
+    span: usize,
+    prior: usize,
+}
+
+impl SpanGrowthAudit {
+    fn new(spans: &BudgetVec<PesSpan>, headers: &BudgetVec<SourceRange>) -> Result<Self> {
+        let tables = spans
+            .capacity()
+            .checked_add(spans.len())
+            .and_then(|n| n.checked_add(1))
+            .and_then(|n| n.checked_mul(size_of::<PesSpan>()))
+            .ok_or(Error::Overflow)?;
+        let headers = headers
+            .capacity()
+            .checked_mul(size_of::<SourceRange>())
+            .ok_or(Error::Overflow)?;
+        let minimum = Budget::control_storage_bytes()
+            .checked_add(tables)
+            .and_then(|n| n.checked_add(headers))
+            .ok_or(Error::Overflow)?;
+        Ok(Self {
+            minimum,
+            span: 0,
+            prior: 0,
+        })
+    }
+
+    fn step(
+        &mut self,
+        spans: &[PesSpan],
+        pending: &Bytes,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        // Treat the pending payload as the final span for deduplication.
+        while self.span <= spans.len() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(false);
+            }
+            let bytes = spans.get(self.span).map_or(pending, PesSpan::backing_bytes);
+            if self.prior == self.span {
+                self.minimum = self
+                    .minimum
+                    .checked_add(bytes.retained_storage_bytes())
+                    .ok_or(Error::Overflow)?;
+            } else if !bytes.shares_storage_with(spans[self.prior].backing_bytes()) {
+                self.prior += 1;
+                continue;
+            }
+            self.span += 1;
+            self.prior = 0;
+        }
+        Ok(true)
+    }
+}
+
+#[derive(Debug)]
 pub struct PesAssembler {
     pid: u16,
     video: bool,
@@ -127,6 +198,7 @@ pub struct PesAssembler {
     byte_run_epoch: u64,
     header_ranges: BudgetVec<SourceRange>,
     spans: BudgetVec<PesSpan>,
+    span_growth: SpanGrowth,
     validated_spans: usize,
     validated_chunk: Option<u64>,
 }
@@ -149,6 +221,7 @@ impl PesAssembler {
             unbounded_adts: false,
             header_ranges: BudgetVec::new(&budget),
             spans: BudgetVec::new(&budget),
+            span_growth: SpanGrowth::Credit(0),
             budget,
             limits,
             epochs,
@@ -306,6 +379,7 @@ impl PesAssembler {
         self.epochs = epochs;
         self.header_ranges = BudgetVec::new(&self.budget);
         self.spans = BudgetVec::new(&self.budget);
+        self.span_growth = SpanGrowth::Credit(0);
         self.validated_spans = 0;
         self.validated_chunk = None;
     }
@@ -418,6 +492,69 @@ impl PesAssembler {
             .ok_or(Error::Invalid("PES payload missing"))?
             .position += used;
         Ok(true)
+    }
+
+    pub(crate) fn blocked_span_growth_floor(&self) -> Option<usize> {
+        match &self.span_growth {
+            SpanGrowth::Audit(audit) if audit.span > self.spans.len() => Some(audit.minimum),
+            _ => None,
+        }
+    }
+
+    fn reserve_adts_span(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+        let spans = self.spans.len();
+        if spans < self.spans.capacity() {
+            return Ok(true);
+        }
+        if let SpanGrowth::Credit(credit) = &mut self.span_growth {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            // Pay for the allocation and each span moved before growing the table.
+            // The pending payload and table length are stable across retries.
+            let cost = spans + 1;
+            *credit += work.take((cost - *credit) as u64) as usize;
+            if *credit != cost {
+                return Ok(false);
+            }
+        }
+        loop {
+            if let SpanGrowth::Audit(audit) = &mut self.span_growth {
+                let pending = self.payload.as_ref().expect("pending PES span");
+                if !audit.step(self.spans.as_slice(), &pending.bytes, work, cancel)? {
+                    return Ok(false);
+                }
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(Error::Cancelled);
+                }
+                if audit.minimum > self.budget.limit() {
+                    return Err(limit(audit.minimum, self.budget.limit()));
+                }
+                if work.remaining() == 0 {
+                    return Ok(false);
+                }
+            } else if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            match self.spans.try_reserve_exact(1) {
+                Ok(()) => {
+                    self.span_growth = SpanGrowth::Credit(0);
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    // The grant can end at the reservation. Commit the new span
+                    // only when the caller can also charge its first byte.
+                    return Ok(work.remaining() != 0);
+                }
+                Err(Error::Backpressure { .. })
+                    if matches!(self.span_growth, SpanGrowth::Credit(_)) =>
+                {
+                    self.span_growth =
+                        SpanGrowth::Audit(SpanGrowthAudit::new(&self.spans, &self.header_ranges)?);
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
 
     fn poll_inner<const RETAIN: bool>(
@@ -592,32 +729,41 @@ impl PesAssembler {
             }
             // Validation-only feeds count exactly the same spans. Each chunk
             // is contiguous and consumed monotonically, so no owners are needed.
+            let chunk = pending.chunk;
             let (merge, spans) = if RETAIN {
                 (
                     self.spans.as_slice().last().is_some_and(|last| {
-                        last.chunk == pending.chunk && last.range.end == pending.position
+                        last.chunk == chunk && last.range.end == pending.position
                     }),
                     self.spans.len(),
                 )
             } else {
-                (
-                    self.validated_chunk == Some(pending.chunk),
-                    self.validated_spans,
-                )
+                (self.validated_chunk == Some(chunk), self.validated_spans)
             };
             if !merge {
                 if spans == self.limits.source_spans {
                     return Err(limit(spans.saturating_add(1), self.limits.source_spans));
                 }
                 if RETAIN {
-                    self.spans.try_reserve_exact(1)?;
+                    let rejected_adts = self.unbounded_adts
+                        && self.header.as_ref().is_some_and(|header| {
+                            header.declared_packet_length == 0
+                                && (0xc0..=0xdf).contains(&header.stream_id)
+                        });
+                    if rejected_adts {
+                        if !self.reserve_adts_span(work, cancel)? {
+                            return Ok(AssemblyStep::Yield);
+                        }
+                    } else {
+                        self.spans.try_reserve_exact(1)?;
+                    }
                 }
             }
             let count = work.take(maximum as u64) as usize;
             if !RETAIN {
                 if !merge {
                     self.validated_spans += 1;
-                    self.validated_chunk = Some(pending.chunk);
+                    self.validated_chunk = Some(chunk);
                 }
             } else if merge {
                 let span = self
@@ -628,6 +774,7 @@ impl PesAssembler {
                 span.range.end += count;
                 span.source.bytes += count;
             } else {
+                let pending = self.payload.as_ref().expect("pending PES span");
                 let physical = pending
                     .offset
                     .checked_add(pending.position as u64)
@@ -840,6 +987,10 @@ pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHea
         used,
     })
 }
+
+#[cfg(test)]
+#[path = "pes/adts_span_budget.rs"]
+mod adts_span_budget;
 
 #[cfg(test)]
 mod timed_header_tests {

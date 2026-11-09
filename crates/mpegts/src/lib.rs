@@ -133,6 +133,13 @@ pub(crate) fn checked_pid(pid: u16) -> Result<()> {
     }
 }
 
+pub(crate) fn table_storage<T>(table: &BudgetVec<T>) -> Result<usize> {
+    table
+        .capacity()
+        .checked_mul(size_of::<T>())
+        .ok_or(Error::Overflow)
+}
+
 pub(crate) fn limit(requested: usize, maximum: usize) -> Error {
     Error::Limit { requested, maximum }
 }

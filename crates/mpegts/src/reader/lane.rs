@@ -9,13 +9,13 @@ use super::{
     Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, Packet, PacketClock, PayloadSource,
     ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
-use crate::SourceEpochs;
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::adts::PacketPolicy;
 use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
 use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors, UnframedAudioPolicy};
 use crate::psi::{CodecIdentification, DescriptorNamespace};
+use crate::{SourceEpochs, table_storage};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
@@ -226,13 +226,6 @@ struct Input {
     source: SourceEvent,
     span: usize,
     offset: usize,
-}
-
-fn table_storage<T>(table: &BudgetVec<T>) -> Result<usize> {
-    table
-        .capacity()
-        .checked_mul(size_of::<T>())
-        .ok_or(Error::Overflow)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

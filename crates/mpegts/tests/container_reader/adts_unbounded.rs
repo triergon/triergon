@@ -1,9 +1,10 @@
 use super::{
-    AccessUnit, Drive, Error, Event, PID, PacketInfo, ReaderEvent, ReaderLimits, TraceEvent,
-    Transport, adts,
+    AccessUnit, Budget, Drive, Error, Event, ID, OFF, PID, PacketInfo, Reader, ReaderEvent,
+    ReaderLimits, SourceCapabilities, Step, TraceEvent, Transport, WorkBudget, adts,
 };
-use triergon_mpegts::FaultKind;
+use triergon_core::InputRequest;
 use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
+use triergon_mpegts::{FaultKind, SourceEvent};
 
 fn recovery() -> ReaderLimits {
     ReaderLimits {
@@ -189,4 +190,173 @@ fn adts_policy_does_not_admit_other_unbounded_audio() {
         }
     }
     assert!(diagnostic);
+}
+
+const SPAN_GROWTH_FRAMES: usize = 32;
+
+fn span_growth_source() -> (Vec<u8>, Vec<u8>) {
+    let frame = adts(&[0x31; 203]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    unbounded(&mut ts, PID, &frame.repeat(SPAN_GROWTH_FRAMES));
+    (ts.bytes, frame)
+}
+
+fn before_last_span(raw: &[u8], maximum: usize) -> (Drive<'_>, SourceEvent) {
+    let pool = Budget::new(maximum).unwrap();
+    let mut drive = Drive {
+        reader: Reader::new(
+            &pool,
+            ID,
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            recovery(),
+            188,
+        )
+        .unwrap(),
+        pool,
+        raw,
+        chunk: 188,
+        work: 1,
+        catalogue: Vec::new(),
+        catalogue_epoch_override: None,
+    };
+    let last_offset = (raw.len() - 188) as u64;
+    let mut last_carrier = None;
+    while let Some(event) = drive.next().unwrap() {
+        let Event::Other(ReaderEvent::Source(source)) = event else {
+            panic!("output before the final span: {event:?}");
+        };
+        match source.event() {
+            TraceEvent::Transport(packet) if packet.source_offset == last_offset => {
+                assert_eq!(packet.pid, PID);
+                last_carrier = Some(source);
+            }
+            TraceEvent::Continuity { pid, .. } if last_carrier.is_some() => {
+                assert_eq!(*pid, PID);
+                return (drive, last_carrier.unwrap());
+            }
+            TraceEvent::Diagnostic(fault) => panic!("unexpected source fault: {fault:?}"),
+            _ => (),
+        }
+    }
+    panic!("did not reach the last carrier");
+}
+
+fn grow_last_span(reader: &mut Reader) -> Result<InputRequest, Error> {
+    // Do not finish the source or offer another allocation while observing
+    // the growth transaction. A PES resource limit may surface as a diagnostic.
+    for _ in 0..10_000 {
+        let mut work = WorkBudget::new(1);
+        let step = reader.step(&mut work, &OFF)?;
+        assert!(work.spent() <= 1);
+        match step {
+            Step::NeedInput(request) => return Ok(request),
+            Step::Backpressure(pressure) => {
+                return Err(Error::Backpressure {
+                    requested: pressure.requested,
+                    available: pressure.available,
+                });
+            }
+            Step::Ready(Event::Other(ReaderEvent::Source(source))) => {
+                let TraceEvent::Diagnostic(fault) = source.event() else {
+                    panic!("unexpected source event: {source:?}");
+                };
+                assert_eq!(fault.kind, FaultKind::Pes);
+                assert_eq!(fault.pid, Some(PID));
+                return Err(fault.error);
+            }
+            Step::Yield => (),
+            other => panic!("unexpected span growth step: {other:?}"),
+        }
+    }
+    panic!("span growth did not settle with unit work grants");
+}
+
+fn span_growth_charges(raw: &[u8]) -> (usize, usize) {
+    let (mut drive, carrier) = before_last_span(raw, 1 << 20);
+    let with_carrier = drive.pool.used();
+    drop(carrier);
+    let carrier_charge = with_carrier - drive.pool.used();
+    let before = drive.pool.peak();
+    assert_eq!(
+        grow_last_span(&mut drive.reader).unwrap().offset,
+        raw.len() as u64
+    );
+    let minimum = drive.pool.peak();
+    assert!(minimum > before + 3, "final span must set a new peak");
+    (minimum, carrier_charge)
+}
+
+#[test]
+fn unbounded_span_growth_counts_pinned_reader_storage() {
+    let (raw, _) = span_growth_source();
+    let (minimum, _) = span_growth_charges(&raw);
+    let observed = [0, 1, 2, 3].map(|shortfall| {
+        let maximum = minimum - shortfall;
+        let (mut drive, carrier) = before_last_span(&raw, maximum);
+        drop(carrier);
+        let used = drive.pool.used();
+        let result = grow_last_span(&mut drive.reader).map(|request| {
+            assert_eq!(request.offset, raw.len() as u64);
+        });
+        if let Err(error @ Error::Backpressure { .. }) = result {
+            assert_eq!(grow_last_span(&mut drive.reader).unwrap_err(), error);
+            assert_eq!(drive.pool.used(), used);
+        }
+        (maximum, result)
+    });
+    assert_eq!(
+        observed,
+        [0, 1, 2, 3].map(|shortfall| {
+            let maximum = minimum - shortfall;
+            let result = if shortfall == 0 {
+                Ok(())
+            } else {
+                Err(Error::Limit {
+                    requested: minimum,
+                    maximum,
+                })
+            };
+            (maximum, result)
+        }),
+        "with every source event dropped, only a permanent limit can block the span"
+    );
+}
+
+#[test]
+fn unbounded_span_growth_retries_after_dropping_a_source_event() {
+    let (raw, frame) = span_growth_source();
+    let (minimum, carrier_charge) = span_growth_charges(&raw);
+    assert!(carrier_charge > 0);
+    let (mut drive, carrier) = before_last_span(&raw, minimum + carrier_charge - 1);
+    let before = drive.reader.request().unwrap();
+    assert!(matches!(
+        grow_last_span(&mut drive.reader),
+        Err(Error::Backpressure { requested, available }) if requested == available + 1
+    ));
+    drop(carrier);
+    let resumed = grow_last_span(&mut drive.reader).unwrap();
+    assert_eq!(
+        (resumed.source, resumed.token),
+        (before.source, before.token)
+    );
+    assert_eq!(resumed.offset, raw.len() as u64);
+
+    let mut recovered = 0;
+    while let Some(event) = drive.next().unwrap() {
+        match event {
+            Event::Other(ReaderEvent::RecoveredAdts(packet)) => {
+                assert_eq!(packet.payload(), frame);
+                recovered += 1;
+            }
+            Event::Other(ReaderEvent::Source(source)) => {
+                assert!(!matches!(source.event(), TraceEvent::Diagnostic(_)));
+            }
+            other => panic!("unexpected output after span retry: {other:?}"),
+        }
+    }
+    assert_eq!(recovered, SPAN_GROWTH_FRAMES);
 }

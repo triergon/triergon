@@ -89,6 +89,12 @@ impl SectionAssembler {
             fault: None,
         })
     }
+    pub(crate) fn table_storage(&self) -> Result<usize> {
+        let ranges = crate::table_storage(&self.ranges)?;
+        let data = self.buffer.as_ref().map_or(Ok(0), crate::table_storage)?;
+        ranges.checked_add(data).ok_or(Error::Overflow)
+    }
+
     /// Rejection returns the exact supplied charged span; no input was accepted.
     pub fn push(
         &mut self,
