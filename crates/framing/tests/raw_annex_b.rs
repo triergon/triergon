@@ -138,6 +138,13 @@ fn hevc_access_unit_wire_matches_the_raw_demuxer_with_and_without_aud() {
         include_bytes!("../fixtures/raw-annex-b/hevc-aud1.hevc"),
         include_str!("../fixtures/raw-annex-b/hevc-aud1.packets"),
     );
+    // An end of sequence starts the CRA access unit; the end of bitstream
+    // ending the stream stays in the last one.
+    compare(
+        Codec::Hevc,
+        include_bytes!("../fixtures/raw-annex-b/hevc-eos.hevc"),
+        include_str!("../fixtures/raw-annex-b/hevc-eos.packets"),
+    );
 }
 
 fn hevc_nal(out: &mut Vec<u8>, zeros: usize, kind: u8, layer: u8, body: u8) {
@@ -152,10 +159,10 @@ fn authored_hevc() -> (Vec<u8>, usize) {
     hevc_nal(&mut bytes, 2, 19, 0, 0x40); // another slice in the same picture
     hevc_nal(&mut bytes, 3, 40, 0, 0x33); // suffix SEI
     hevc_nal(&mut bytes, 2, 1, 1, 0x80); // a non-base NAL cannot split the AU
-    hevc_nal(&mut bytes, 3, 36, 0, 0x80); // EOS
-    hevc_nal(&mut bytes, 2, 37, 0, 0x80); // EOB
     let second = bytes.len();
-    hevc_nal(&mut bytes, 3, 39, 0, 0x55); // prefix SEI begins the next AU
+    hevc_nal(&mut bytes, 3, 36, 0, 0x80); // EOS begins the next AU, as in FFmpeg's parser
+    hevc_nal(&mut bytes, 2, 37, 0, 0x80); // EOB
+    hevc_nal(&mut bytes, 3, 39, 0, 0x55); // prefix SEI
     hevc_nal(&mut bytes, 2, 1, 0, 0x80);
     bytes.extend([0; 5]);
     (bytes, second)
@@ -174,7 +181,7 @@ fn hevc_retains_prefix_suffix_other_layer_and_padding_at_literal_boundaries() {
         false,
         RawAnnexBLimits::default(),
     );
-    for (range, nals, key) in [(0..second, 7, true), (second..input.len(), 2, false)] {
+    for (range, nals, key) in [(0..second, 5, true), (second..input.len(), 4, false)] {
         let unit = drive.next(1).unwrap().unwrap();
         assert_eq!(unit.range, range.start as u64..range.end as u64);
         assert_eq!(unit.nals().len(), nals);

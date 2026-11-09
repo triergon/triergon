@@ -243,6 +243,28 @@ fn hevc_skipped_pictures_pass_their_captions_on() {
     );
 }
 
+/// A reserved VCL type is not a slice, as in FFmpeg's decoder: the CRA slice
+/// after it decides the picture's fate.
+#[test]
+fn hevc_reserved_vcl_types_do_not_decide_a_picture() {
+    let sei = |n: u8| [&[39 << 1, 1][..], &caption(n)].concat();
+    for reserved in (10..=15).chain(22..=31) {
+        let units = [
+            (
+                annex_b(&[&[reserved << 1, 1, 0x80], &sei(0), &[21 << 1, 1, 0xaf]]),
+                0,
+            ),
+            (annex_b(&[&sei(1), &[1 << 1, 1, 0xaf]]), 1001),
+        ];
+        let frames = extract(
+            VideoCoding::Nal(Codec::Hevc, Framing::StartCodes),
+            timed(&units),
+        );
+        let pts: Vec<_> = frames.iter().map(|f| f.0).collect();
+        assert_eq!(pts, [Some(0), Some(1001)], "type {reserved}");
+    }
+}
+
 /// An MPEG-2 picture of `kind` (1 I, 2 P) with the user data `blocks`
 /// before its slice.
 fn mpeg2_picture(kind: u8, blocks: &[Vec<u8>]) -> Vec<u8> {

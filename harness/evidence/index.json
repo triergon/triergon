@@ -16756,6 +16756,26 @@
    "key": "evidence/ass-rendering-58a5c202-linux-arm64-memory-libass/799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3.tar.gz",
    "sha256": "799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3",
    "bytes": 210930417
+  },
+  {
+   "name": "hevc-eos-parity-feb3e34e-linux-arm64",
+   "path": "hevc-eos-parity-feb3e34e-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of starting HEVC access units at an end of sequence or bitstream and taking caption HEVC slices from framing's slice class, as FFmpeg does, on a c8g.2xlarge (Linux AArch64): the folds of the pinned FFmpeg formats and subtitles reference workers, main at 205db4d1 and the branch over the new raw-annex-b hevc-eos and subtitle-cc hevc-reserved-ts cases; the reference demuxer's hevc-eos packets; same-code of every worker; the HEVC (full) and H.264 conformance tests over the FATE vectors; both revisions' folds of the subtitle and playback corpora; and the instruction count of raw-annex-b, hls-segments, matroska-startup-seek, matroska-audio-clocks and subtitle-cc on CPU 1. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/hevc-eos-parity-feb3e34e-linux-arm64/3c547b6d4ffdf998eb2399e32df8a74998c28392c92321a67d8991eeb1b98f3d.tar.zst",
+   "sha256": "3c547b6d4ffdf998eb2399e32df8a74998c28392c92321a67d8991eeb1b98f3d",
+   "bytes": 10600,
+   "source_revision": "feb3e34ea40112b82a63d3550e3e3b8c85fa6bda"
+  },
+  {
+   "name": "hevc-eos-open-5380ca22-linux-arm64",
+   "path": "hevc-eos-open-5380ca22-linux-arm64",
+   "retention": "90 days",
+   "reason": "The subtitle-cc open case hevc-eos-ts in its four variants, on a c8g.2xlarge (Linux AArch64): folds of the pinned FFmpeg subtitles reference worker and of subtitle-worker, which differ in every variant because the caption extractor has no model of the decoder's picture output at a new sequence. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/hevc-eos-open-5380ca22-linux-arm64/e002f09354010e50a0f5d43fdd084bcc9f9306350f662c57f041462e9e8e8550.tar.zst",
+   "sha256": "e002f09354010e50a0f5d43fdd084bcc9f9306350f662c57f041462e9e8e8550",
+   "bytes": 788,
+   "source_revision": "5380ca22cd06eb1b9e12eaab126c7b762f04b8c1"
   }
  ]
 }
