@@ -119,6 +119,9 @@ reordering retains at most 32 KiB of media. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
+`Mp4RangePlayer::prepare_seek_with_opus_recovery` includes the regular
+Opus track's declared preroll. The caller decodes from the reported first
+sample and presents PCM from the video landing through the track's edited end.
 For a file with surplus timing entries, `Mp4Open::with_timing_policy` can
 use the timing prefix covered by the sample sizes for forward playback and
 `Mp4RangeOpen`. Each track's table reports the unused timing occurrences. The source playback view

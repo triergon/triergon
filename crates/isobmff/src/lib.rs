@@ -240,12 +240,14 @@ pub use tfra::{
 
 // Source-only movie targeting/recovery; reference demux views above stay separate.
 mod movie_seek;
+mod opus_seek;
 mod recovery;
 pub use movie_seek::{
     CompositionTarget, MovieEditLocator, MovieEmptyEdit, MoviePoint, MovieSeekClocks,
     MovieSeekLimits, MovieSeekResult, MovieSeekStatus, MovieSourcePoint, MovieSourceSeekContext,
     MovieSourceSeekPlanner, SourceCompositionLookup,
 };
+pub use opus_seek::OpusRecoveryLanding;
 pub use recovery::{
     RecoveryDefinitionOrigin, RecoveryDescription, RecoveryDescriptions, RecoveryKind,
     RecoveryLimits, RecoveryLookup, RecoveryMappingOrigin, RecoveryMappings, RecoveryScope,

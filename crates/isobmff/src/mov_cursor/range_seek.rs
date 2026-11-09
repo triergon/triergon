@@ -1,6 +1,9 @@
 //! Sparse restart states for regular tracks that passed the demux range scan.
 use super::{PacketCursor, Phase, Slot, count};
-use crate::{BuildStatus, CursorStatus, IndexEntry, SchedulingClock, SeekLanding, SeekLimits};
+use crate::{
+    BuildStatus, CursorStatus, IndexEntry, SchedulingClock, SeekLanding, SeekLimits,
+    opus_seek::OpusRecoverySeek,
+};
 use std::{
     ops::Range,
     sync::{
@@ -212,6 +215,8 @@ impl<'a> PacketCursor<'a> {
             landing: None,
             at: 0,
             scan: None,
+            opus_track: None,
+            opus_recovery: None,
             skipped: 0,
             maximum_skipped: limits.max_replayed_occurrences,
             failed: None,
@@ -262,12 +267,18 @@ impl<'a> TrackSeek<'a> {
         } else {
             // The target falls within a long non-key interval. The recorded
             // preceding sync may be in an earlier interval; restart there.
-            let at = points.partition_point(|point| point.ordinal <= self.previous_sync);
-            let point = &points[at - 1];
-            self.cursor = point.slot.clone();
-            self.next = point.ordinal;
-            self.search = Search::PreviousSync;
+            self.restart_at(points, self.previous_sync);
         }
+    }
+
+    fn restart_at(&mut self, points: &[Checkpoint<'a>], ordinal: u64) {
+        let at = points.partition_point(|point| point.ordinal <= ordinal);
+        let point = &points[at - 1];
+        self.cursor = point.slot.clone();
+        self.next = point.ordinal;
+        self.previous_sync = ordinal;
+        self.best = None;
+        self.search = Search::PreviousSync;
     }
 
     fn poll(
@@ -345,12 +356,43 @@ pub struct RangeSeekJob<'a> {
     landing: Option<SeekLanding>,
     at: usize,
     scan: Option<TrackSeek<'a>>,
+    opus_track: Option<usize>,
+    opus_recovery: Option<Box<OpusRecoverySeek<'a>>>,
     skipped: u64,
     maximum_skipped: u64,
     failed: Option<Error>,
 }
 
 impl<'a> RangeSeekJob<'a> {
+    /// Use a secondary regular Opus track's source roll groups for decoder
+    /// recovery. Select this before polling the seek.
+    pub fn with_opus_recovery(mut self, track_id: u32) -> Result<Self> {
+        if self.scan.is_some()
+            || self.landing.is_some()
+            || self.opus_track.is_some()
+            || self.failed.is_some()
+        {
+            return Err(Error::Invalid(
+                "Opus recovery must be selected before the seek",
+            ));
+        }
+        let at = self
+            .index
+            .tracks
+            .as_slice()
+            .iter()
+            .position(|track| track.points.as_slice()[0].slot.track.track_id == track_id)
+            .filter(|&at| at != self.reference)
+            .ok_or(Error::Invalid("missing secondary Opus track"))?;
+        self.index.tracks.as_slice()[at].points.as_slice()[0]
+            .slot
+            .encoded_edit
+            .ok_or(Error::Unsupported("Opus recovery needs an Opus edit"))?
+            .opus_roll_scope()?;
+        self.opus_track = Some(at);
+        Ok(self)
+    }
+
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -376,9 +418,51 @@ impl<'a> RangeSeekJob<'a> {
                 self.at
             };
             let points = self.index.tracks.as_slice()[at].points.as_slice();
+            if let Some(recovery) = &mut self.opus_recovery {
+                let Some(landing) = recovery.poll(work, cancel)? else {
+                    return Ok(BuildStatus::Yield);
+                };
+                self.scan
+                    .as_mut()
+                    .expect("Opus recovery follows the audio search")
+                    .restart_at(points, landing.first_sample - 1);
+                self.landing
+                    .as_mut()
+                    .expect("Opus recovery follows the reference seek")
+                    .opus_recovery = Some(landing);
+                self.opus_recovery = None;
+                self.opus_track = None;
+                continue;
+            }
             if let Some(scan) = self.scan.as_mut() {
                 if !scan.poll(points, work, cancel)? || !work.try_charge(1) {
                     return Ok(BuildStatus::Yield);
+                }
+                if self.opus_track == Some(at) {
+                    let best = scan
+                        .best
+                        .as_ref()
+                        .ok_or(Error::Invalid("missing Opus seek sample"))?;
+                    let sample = &best
+                        .slot
+                        .head
+                        .as_ref()
+                        .ok_or(Error::Invalid("missing Opus seek sample"))?
+                        .source;
+                    if best.ordinal + 1 != sample.ordinal {
+                        return Err(Error::Invalid("Opus seek occurrence order"));
+                    }
+                    let edit = best
+                        .slot
+                        .encoded_edit
+                        .ok_or(Error::Unsupported("Opus recovery needs an Opus edit"))?;
+                    self.opus_recovery = Some(OpusRecoverySeek::new(
+                        self.slots.budget(),
+                        best.slot.track,
+                        edit.opus_roll_scope()?,
+                        sample,
+                    )?);
+                    continue;
                 }
                 let scan = self.scan.take().expect("polled track seek");
                 self.finish_track(at, scan)?;
@@ -394,15 +478,25 @@ impl<'a> RangeSeekJob<'a> {
                 }
                 let reference_base = self.slots.as_slice()[0].clock.demux_base;
                 let target_base = points[0].slot.clock.demux_base;
-                let timestamp = reference_base.rescale(
-                    landing.selected.timestamp,
-                    target_base,
-                    Rounding::NearestAway,
-                )?;
-                if let Some(edit) = points[0].slot.encoded_edit {
-                    edit.align_seek_timestamp(timestamp, target_base)?
+                if self.opus_track == Some(at) {
+                    let pts = landing
+                        .selected
+                        .occurrence
+                        .demux
+                        .pts
+                        .ok_or(Error::Invalid("missing video landing PTS"))?;
+                    reference_base.rescale(pts, target_base, Rounding::Floor)?
                 } else {
-                    timestamp
+                    let timestamp = reference_base.rescale(
+                        landing.selected.timestamp,
+                        target_base,
+                        Rounding::NearestAway,
+                    )?;
+                    if let Some(edit) = points[0].slot.encoded_edit {
+                        edit.align_seek_timestamp(timestamp, target_base)?
+                    } else {
+                        timestamp
+                    }
                 }
             } else {
                 self.timestamp
@@ -447,6 +541,7 @@ impl<'a> RangeSeekJob<'a> {
                 },
                 scanned_entries: self.index.tracks.as_slice()[at].entries,
                 used_first_fallback: scan.fallback,
+                opus_recovery: None,
             });
         } else {
             self.at += 1;

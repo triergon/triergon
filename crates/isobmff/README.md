@@ -298,7 +298,10 @@ rejects boxes extending past the source.
   Regular Opus range playback retains the `dOps` record, exposes its canonical
   identification header, and uses the edit list for initial trim. The MOV
   seek policy searches the Opus track 10 ms before the video landing. The
-  source `roll` groups remain available for decoder preroll.
+  optional `with_opus_recovery` policy starts from the Opus track's source
+  `roll` group at the video presentation landing. It reports the first
+  source sample and available preroll, including when recovery starts at the
+  beginning of the track.
 - **Seek.** Seek planners select a preceding container sync sample, record
   available and missing preroll, and validate every media range before
   publishing a plan. A sync sample is a container fact, not proof of decoder
