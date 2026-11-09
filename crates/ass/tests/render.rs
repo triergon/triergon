@@ -6,7 +6,9 @@
 #[path = "../../font/tests/support/mod.rs"]
 mod fonts;
 
-use triergon_ass::{Change, Fonts, ImageKind, Options, Renderer, Script, Settings, Size};
+use triergon_ass::{
+    CacheLimits, Change, Fonts, ImageKind, Options, Renderer, Script, Settings, Size,
+};
 use triergon_core::{Budget, Bytes, Error};
 
 /// "Test Sans": A is a square, B a bump, C a composite of both. A font
@@ -174,6 +176,30 @@ fn frames_report_what_changed_since_the_last() {
     assert_eq!(change(&mut renderer, &mut again, 1000), Change::None);
 }
 
+/// The caches keep what the last frame shows however small their limits, so
+/// a frame drawn again finds the same bitmaps, as libass's caches keep what
+/// its last frame's images hold.
+#[test]
+fn caches_without_room_keep_what_the_last_frame_shows() {
+    let budget = Budget::new(64 << 20).unwrap();
+    let fonts = Fonts {
+        attached: vec![test_sans(&budget)],
+        ..Fonts::default()
+    };
+    let mut settings = Settings::new(Size::new(1280, 720));
+    settings.storage = Some(Size::new(640, 360));
+    settings.cache = CacheLimits::new(0, 0);
+    let mut renderer = Renderer::new(&budget, &settings, &fonts).unwrap();
+    let mut script = script(
+        &budget,
+        "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{\\blur2}ABC\n",
+    );
+    let mut change = |now| renderer.render(&mut script, now).unwrap().change;
+    assert_eq!(change(0), Change::Content);
+    assert_eq!(change(500), Change::None);
+    assert_eq!(change(1000), Change::None);
+}
+
 fn steady_line(budget: &Budget) -> Script {
     script(budget, "Dialogue: 0,0:00:00.00,0:00:04.00,Default,CAB\n")
 }
@@ -299,9 +325,11 @@ fn a_refused_frame_leaves_collision_records_unchanged() {
     let budget = Budget::new(256 << 20).unwrap();
     // B arrives on A at 1 s and moves up; once A ends, B keeps the place it
     // was given. Layer 1 collides too, so its collision handling is the last
-    // work of the frame, after layer 0's records are made.
+    // work of the frame, after layer 0's records are made. B's blurred line
+    // costs more than the frame at 0 s, whose glyphs later frames find
+    // drawn, so its frame is the one a bound can refuse.
     let events = "Dialogue: 0,0:00:00.00,0:00:02.00,Default,AB\n\
-                  Dialogue: 0,0:00:01.00,0:00:09.00,Default,BC\n\
+                  Dialogue: 0,0:00:01.00,0:00:09.00,Default,{\\blur6}BC DEFGH IJKLM\n\
                   Dialogue: 1,0:00:00.00,0:00:09.00,Default,CA\n\
                   Dialogue: 1,0:00:00.00,0:00:09.00,Default,AC\n";
     let run = |work: u64, times: &[i64]| {
@@ -330,7 +358,7 @@ fn a_refused_frame_leaves_collision_records_unchanged() {
     let (mut refused, mut made) = (0, Settings::DEFAULT_WORK);
     while made - refused > 1 {
         let mid = refused + (made - refused) / 2;
-        if run(mid, &[0, 1000])[1].is_ok() {
+        if run(mid, &[0, 1000]).iter().all(Result::is_ok) {
             made = mid;
         } else {
             refused = mid;

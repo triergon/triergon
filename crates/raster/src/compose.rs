@@ -96,8 +96,9 @@ impl Effects {
     }
 }
 
-/// What identifies a run's effects in a frame; see [`Effects::key`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// What identifies a run's effects in a frame; see [`Effects::key`]. The
+/// default is the key of no effects in an unscaled frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EffectsKey(Filter);
 
 /// libass's filter flags, from a run's effects as its renderer sets them.

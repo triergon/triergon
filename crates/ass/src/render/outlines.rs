@@ -1,14 +1,17 @@
-//! Glyph and drawing outlines as libass's outline cache builds them
-//! (`ass_outline_construct`): a glyph loaded at its drawn size without
-//! hinting, with libass's synthetic styles and decoration lines, or a
-//! drawing parsed; with its advance and the face's ascent and descent.
+//! Outlines as libass's outline cache builds them (`ass_outline_construct`):
+//! a glyph loaded at its drawn size without hinting, with libass's
+//! synthetic styles and decoration lines, or a drawing parsed, with its
+//! advance and the face's ascent and descent; a glyph's border stroked; and
+//! the unit square opaque boxes are drawn from.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use std::hash::{Hash, Hasher};
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result, WorkBudget};
 use triergon_font::{Font, GlyphId, Orientation};
-use triergon_raster::{Outline, Shape, Vector, pixels_26_6};
+
+use triergon_raster::{BorderStroke, Outline, Raster, Shape, Vector, pixels_26_6};
 
 use super::fonts::{FontId, RequestedFont};
 use super::text::{Decorations, DrawingText};
@@ -24,6 +27,44 @@ pub(super) struct OutlineValue {
     /// The ascent and descent, 26.6.
     pub asc: i32,
     pub desc: i32,
+}
+
+/// An outline as libass's caches identify it: by the value, which a key
+/// holds while it is kept, as libass's keys hold theirs.
+#[derive(Clone, Debug)]
+pub(super) struct OutlineId(pub(super) Arc<OutlineValue>);
+
+impl PartialEq for OutlineId {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for OutlineId {}
+
+impl Hash for OutlineId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.0).hash(state);
+    }
+}
+
+/// A border outline (libass's `BorderHashKey`): a glyph's outline stroked.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct BorderKey {
+    glyph: OutlineId,
+    stroke: BorderStroke,
+}
+
+impl OutlineValue {
+    /// A shape that is not laid out: a border or the unit square.
+    fn of_shape(shape: Shape) -> Self {
+        Self {
+            shape,
+            advance: 0,
+            asc: 0,
+            desc: 0,
+        }
+    }
 }
 
 /// A glyph outline: a glyph of a face of a requested font at a size, with
@@ -67,6 +108,9 @@ pub(super) struct Outlines {
     glyphs: HashMap<GlyphKey, Entry>,
     /// Drawings by their text, so a lookup borrows the text it is given.
     drawings: HashMap<Box<[u8]>, Entry>,
+    borders: HashMap<BorderKey, Entry>,
+    /// The unit square, once an opaque box is drawn.
+    unit_box: Option<Entry>,
     /// The bytes of the drawings' texts.
     text_bytes: usize,
     clock: u64,
@@ -80,6 +124,8 @@ impl Outlines {
             budget: budget.clone(),
             glyphs: HashMap::new(),
             drawings: HashMap::new(),
+            borders: HashMap::new(),
+            unit_box: None,
             text_bytes: 0,
             clock: 0,
             charge: Reservation::empty(budget),
@@ -88,7 +134,10 @@ impl Outlines {
     }
 
     fn len(&self) -> usize {
-        self.glyphs.len() + self.drawings.len()
+        self.glyphs.len()
+            + self.drawings.len()
+            + self.borders.len()
+            + usize::from(self.unit_box.is_some())
     }
 
     fn charge_entries(&mut self) -> Result<()> {
@@ -116,7 +165,8 @@ impl Outlines {
         };
         let mut stamps = BudgetVec::new(&self.budget);
         stamps.try_reserve_exact(self.len())?;
-        for entry in self.glyphs.values().chain(self.drawings.values()) {
+        let entries = self.glyphs.values().chain(self.drawings.values());
+        for entry in entries.chain(self.borders.values()).chain(&self.unit_box) {
             if free(entry) {
                 stamps.try_push(entry.used).map_err(|e| e.error)?;
             }
@@ -128,6 +178,10 @@ impl Outlines {
         let oldest = stamps.as_slice()[excess.min(stamps.len()) - 1];
         let stays = |entry: &Entry| entry.used > oldest || !free(entry);
         self.glyphs.retain(|_, entry| stays(entry));
+        self.borders.retain(|_, entry| stays(entry));
+        if self.unit_box.as_ref().is_some_and(|entry| !stays(entry)) {
+            self.unit_box = None;
+        }
         let mut freed = 0;
         self.drawings.retain(|text, entry| {
             let keep = stays(entry);
@@ -171,6 +225,55 @@ impl Outlines {
             used: self.clock,
         };
         self.glyphs.insert(glyph, entry);
+        self.charge_entries()?;
+        Ok(value)
+    }
+
+    /// The border of `glyph` stroked by `stroke` with `raster`, `None` when
+    /// it cannot be stroked.
+    pub(super) fn border(
+        &mut self,
+        glyph: &Arc<OutlineValue>,
+        stroke: BorderStroke,
+        raster: &mut Raster,
+        work: &mut WorkBudget,
+    ) -> Result<Option<Arc<OutlineValue>>> {
+        let key = BorderKey {
+            glyph: OutlineId(Arc::clone(glyph)),
+            stroke,
+        };
+        if let Some(entry) = self.borders.get_mut(&key) {
+            return Ok(Self::touch(&mut self.clock, entry));
+        }
+        let value = raster
+            .stroke_border(&glyph.shape, &stroke, work)?
+            .map(|shape| Arc::new(OutlineValue::of_shape(shape)));
+        self.clock += 1;
+        let entry = Entry {
+            value: value.clone(),
+            used: self.clock,
+        };
+        self.borders.insert(key, entry);
+        self.charge_entries()?;
+        Ok(value)
+    }
+
+    /// The unit square opaque boxes are drawn from.
+    pub(super) fn unit_box(&mut self) -> Result<Arc<OutlineValue>> {
+        self.clock += 1;
+        if let Some(Entry {
+            value: Some(value),
+            used,
+        }) = &mut self.unit_box
+        {
+            *used = self.clock;
+            return Ok(Arc::clone(value));
+        }
+        let value = Arc::new(OutlineValue::of_shape(Shape::unit_box(&self.budget)?));
+        self.unit_box = Some(Entry {
+            value: Some(Arc::clone(&value)),
+            used: self.clock,
+        });
         self.charge_entries()?;
         Ok(value)
     }

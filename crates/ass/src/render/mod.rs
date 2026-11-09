@@ -9,6 +9,7 @@
 //! ([`bitmaps`]) into images ([`images`]).
 
 mod bitmaps;
+mod cache;
 mod collisions;
 mod fonts;
 mod geometry;
@@ -142,7 +143,7 @@ impl Renderer {
                 library: Library::new(budget, fonts)?,
                 outlines: Outlines::new(budget),
                 shaper: Shaper::new(budget),
-                painter: Painter::new(budget, triergon_raster::Limits::default())?,
+                painter: Painter::new(budget, triergon_raster::Limits::default()),
                 text: Text::new(budget),
                 shaped: Shaped::new(budget),
                 layout: Layout::new(budget),
@@ -225,12 +226,16 @@ impl Renderer {
             .library
             .register_embedded(script.id(), script.fonts())?;
         pipeline.library.begin_frame(settings.cache.fonts)?;
-        // The layout lets go of the outlines the last event used, so only
-        // the last frame's images keep theirs from the cut.
+        // The stages let go of what the last event drew and the last frame
+        // was assembled from, so only the last frame's images keep the
+        // values they show from the cut: composites, then bitmaps, then
+        // outlines, as libass cuts its caches when a frame starts.
         pipeline.layout.release();
+        pipeline.combined.clear();
+        pipeline.event_images.clear();
+        pipeline.painter.cut(&settings.cache)?;
         pipeline.outlines.trim(settings.cache.outlines)?;
         let geometry = self.canvas.place(script);
-        pipeline.event_images.clear();
         let boxes = &mut self.boxes;
         boxes.clear();
         for index in 0..script.events().len() {
@@ -400,8 +405,14 @@ impl Pipeline {
             border: room.scales.border,
             pixel_aspect: geometry.par,
         };
-        self.painter
-            .draw(&self.runs, &placer, &frame, &mut self.combined, work)?;
+        self.painter.draw(
+            &self.runs,
+            &placer,
+            &frame,
+            &mut self.outlines,
+            &mut self.combined,
+            work,
+        )?;
         Ok(anchor.event_box(&self.layout, geometry.par))
     }
 
@@ -471,7 +482,7 @@ impl Pipeline {
         ]);
         Ok(self
             .painter
-            .draw_shape(&outline.shape, &matrix, work)?
+            .draw_shape(&outline, &matrix, work)?
             .map(|bitmap| ClipMask {
                 bitmap,
                 inverse: clip.inverse,

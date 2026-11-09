@@ -3,7 +3,7 @@
 //! the renderer can be compared (`cargo xtask ass equivalence`).
 //!
 //! ```text
-//! equivalence FONTS FIXTURES SEED RANDOM MUTATIONS JOBS OUTPUT
+//! equivalence FONTS FIXTURES SEED RANDOM MUTATIONS JOBS OUTPUT [CACHE]
 //! ```
 //!
 //! The cases are, for each fixture at 1920×1080 over 1280×720 storage and at
@@ -16,7 +16,9 @@
 //! scrolling. Each case's line of OUTPUT is followed by one line per frame:
 //! its change, its images' digest (kind, place, size, colour and pixels),
 //! and the work it spent with the `work-probe` feature, or its error; then
-//! the peak of the case's budget.
+//! the peak of the case's budget. CACHE, `OUTLINES,MEGABYTES`, gives every
+//! case those cache limits (`CacheLimits::new`) instead of its own, so that
+//! small limits make the caches cut on every frame.
 
 #[path = "../../ass-worker/src/fixture.rs"]
 #[allow(dead_code, reason = "the worker's directives; rendering reads some")]
@@ -34,11 +36,16 @@ use triergon_ass::{
 };
 use triergon_core::{Budget, Bytes};
 
-const USAGE: &str = "usage: equivalence FONTS FIXTURES SEED RANDOM MUTATIONS JOBS OUTPUT";
+const USAGE: &str = "usage: equivalence FONTS FIXTURES SEED RANDOM MUTATIONS JOBS OUTPUT [CACHE]";
 
 fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let [fonts, fixtures, seed, random, mutations, jobs, output] = args.as_slice() else {
+    let (fixed, cache) = match args.split_at_checked(7) {
+        Some((fixed, [])) => (fixed, None),
+        Some((fixed, [cache])) => (fixed, Some(cache)),
+        _ => return Err(USAGE.into()),
+    };
+    let [fonts, fixtures, seed, random, mutations, jobs, output] = fixed else {
         return Err(USAGE.into());
     };
     let number = |text: &str| text.parse::<u64>().map_err(|_| USAGE.to_string());
@@ -46,6 +53,15 @@ fn main() -> Result<(), String> {
     let mut rng = Rng(number(seed)?);
     let mut cases = fixture_cases(fonts, Path::new(fixtures), number(mutations)?, &mut rng)?;
     cases.extend(random_cases(fonts, number(random)?, &mut rng));
+    if let Some(cache) = cache {
+        let (outlines, megabytes) = cache
+            .split_once(',')
+            .and_then(|(o, m)| Some((o.parse().ok()?, m.parse().ok()?)))
+            .ok_or(USAGE)?;
+        for case in &mut cases {
+            (case.setup.cache.0, case.setup.cache.1) = (outlines, megabytes);
+        }
+    }
     let records: Vec<Mutex<String>> = cases.iter().map(|_| Mutex::default()).collect();
     let next = AtomicUsize::new(0);
     std::panic::set_hook(Box::new(|_| {}));

@@ -9,7 +9,12 @@
 //! feature gets an equivalent probe: its frame's work budget is wrapped in a
 //! guard that keeps what it spent. The records must agree line for line;
 //! the peak of each case's budget is reported for the `ass-render`
-//! workloads, not compared.
+//! workloads, not compared. With `--work any` the work each frame spent is
+//! not compared, for a change that does less work for the same frames,
+//! such as a cache: totals are reported instead, and a case whose frames
+//! part where one side runs out of work and the other does not is counted
+//! apart, since a refused frame changes what the next one is compared
+//! with.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -18,7 +23,8 @@ use std::process::Command;
 use crate::prepare::run;
 
 pub const USAGE: &str = "usage: cargo xtask ass equivalence --base REV [--seed N] [--random N]
-       [--mutations N] [--jobs N] [--output DIR] [--recorded]
+       [--mutations N] [--jobs N] [--output DIR] [--cache OUTLINES,MEGABYTES]
+       [--work equal|any] [--recorded]
 
   The renderer of REV and of the working tree render the ass-render fixtures
   (at their frames, every 40 ms, and --mutations N mutated with varied settings,
@@ -26,9 +32,13 @@ pub const USAGE: &str = "usage: cargo xtask ass equivalence --base REV [--seed N
   (default 1), on --jobs N threads (default 4), and must record the same
   change, images, error and work for every frame; a budget error is compared
   without what the budget had left, which depends on the storage each side
-  holds. Builds and records go to DIR (default target/ass-equivalence); the
-  peak budget of each workload is printed for both. --recorded compares the
-  records already in DIR without building or rendering.";
+  holds. --cache gives every case those cache limits instead of its own.
+  --work any leaves the work out of the comparison and reports both sides'
+  totals; a case is then counted apart from the first frame where one side
+  runs out of work and the other does not. Builds and records go to DIR
+  (default target/ass-equivalence); the peak budget of each workload is
+  printed for both. --recorded compares the records already in DIR without
+  building or rendering.";
 
 /// The sources a scratch workspace needs to build the renderer and the
 /// example, and the members it builds.
@@ -54,7 +64,16 @@ struct Options {
     mutations: u64,
     jobs: u64,
     output: PathBuf,
+    cache: Option<String>,
+    work: Work,
     recorded: bool,
+}
+
+/// Whether the work each frame spent must agree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Work {
+    Equal,
+    Any,
 }
 
 fn options(root: &Path, args: &[String]) -> Result<Options, String> {
@@ -65,6 +84,8 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
         mutations: 4,
         jobs: 4,
         output: root.join("target/ass-equivalence"),
+        cache: None,
+        work: Work::Equal,
         recorded: false,
     };
     let mut args = args.iter();
@@ -82,6 +103,14 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
             "--mutations" => options.mutations = number()?,
             "--jobs" => options.jobs = number()?.clamp(1, 64),
             "--output" => options.output = root.join(value),
+            "--cache" => options.cache = Some(value.clone()),
+            "--work" => {
+                options.work = match value.as_str() {
+                    "equal" => Work::Equal,
+                    "any" => Work::Any,
+                    _ => return Err(USAGE.into()),
+                }
+            }
             _ => return Err(USAGE.into()),
         }
     }
@@ -103,7 +132,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
         record(root, &options, &records)?;
     }
     let (base, candidate) = (read(&records[0])?, read(&records[1])?);
-    let summary = compare(&parse(&base), &parse(&candidate));
+    let summary = compare(&parse(&base), &parse(&candidate), options.work);
     print!("{}", summary.text);
     if summary.mismatches == 0 {
         Ok(())
@@ -134,7 +163,8 @@ fn record(root: &Path, options: &Options, records: &[PathBuf; 2]) -> Result<(), 
                 ]
                 .map(|n| n.to_string()),
             )
-            .arg(record);
+            .arg(record)
+            .args(&options.cache);
         println!("$ {command:?}");
         run(&mut command)?;
     }
@@ -289,9 +319,10 @@ fn build(workspace: &Path, target: &Path) -> Result<PathBuf, String> {
 
 /// `line` without what a budget error says the budget had left: the
 /// storage each side holds differs, and the error, its request and the
-/// work before it are what must agree.
-fn comparable(line: &str) -> String {
-    match line.split_once(", available: ") {
+/// work before it are what must agree. With [`Work::Any`], without the
+/// work the frame spent either.
+fn comparable(line: &str, work: Work) -> String {
+    let line = match line.split_once(", available: ") {
         Some((head, tail)) => {
             let rest = tail
                 .find(|c: char| !c.is_ascii_digit())
@@ -299,7 +330,18 @@ fn comparable(line: &str) -> String {
             format!("{head}{rest}")
         }
         None => line.to_owned(),
+    };
+    match (work, line.rsplit_once(" work ")) {
+        (Work::Any, Some((head, _))) => head.to_owned(),
+        _ => line,
     }
+}
+
+/// The work a frame line says it spent.
+fn spent(line: &str) -> u64 {
+    line.rsplit_once(" work ")
+        .and_then(|(_, n)| n.parse().ok())
+        .unwrap_or(0)
 }
 
 /// A record's cases: each case's name, its frame lines and its peak.
@@ -335,7 +377,7 @@ struct Summary {
 
 /// The candidate's totals, every case whose lines differ from the base's,
 /// and the peaks of the workloads.
-fn compare(base: &[Case<'_>], candidate: &[Case<'_>]) -> Summary {
+fn compare(base: &[Case<'_>], candidate: &[Case<'_>], work: Work) -> Summary {
     let mut text = String::new();
     let mut mismatches = 0;
     let (mut frames, mut images, mut errors, mut policy, mut panics) = (0, 0, 0, 0, 0);
@@ -363,16 +405,35 @@ fn compare(base: &[Case<'_>], candidate: &[Case<'_>]) -> Summary {
             candidate.len()
         );
     }
+    // With the work left out: the work both spent on the frames compared,
+    // the frames where the candidate spent more, and the cases that part
+    // where the base alone, both, or the candidate alone refuse a frame.
+    let (mut base_work, mut candidate_work, mut more) = (0_u64, 0_u64, 0);
+    let mut parted = [0; 3];
     for (b, c) in base.iter().zip(candidate) {
         let first = b
             .lines
             .iter()
             .zip(&c.lines)
-            .position(|(x, y)| comparable(x) != comparable(y));
+            .position(|(x, y)| comparable(x, work) != comparable(y, work));
+        let agreed = first.unwrap_or(b.lines.len().min(c.lines.len()));
+        for (x, y) in b.lines[..agreed].iter().zip(&c.lines[..agreed]) {
+            base_work += spent(x);
+            candidate_work += spent(y);
+            more += usize::from(spent(y) > spent(x));
+        }
+        let refused = |case: &Case<'_>, at: usize| case.lines[at].contains(" error Policy");
+        if let Some(at) = first
+            && work == Work::Any
+            && b.name == c.name
+            && (refused(b, at) || refused(c, at))
+        {
+            parted[usize::from(refused(c, at)) + usize::from(!refused(b, at))] += 1;
+            continue;
+        }
         if b.name != c.name || first.is_some() || b.lines.len() != c.lines.len() {
             mismatches += 1;
             if mismatches <= 20 {
-                let at = first.unwrap_or(b.lines.len().min(c.lines.len()));
                 fn line<'a>(case: &Case<'a>, at: usize) -> &'a str {
                     case.lines.get(at).copied().unwrap_or("(none)")
                 }
@@ -380,9 +441,9 @@ fn compare(base: &[Case<'_>], candidate: &[Case<'_>]) -> Summary {
                     text,
                     "{}: base   {}\n{}: change {}",
                     b.name,
-                    line(b, at),
+                    line(b, agreed),
                     c.name,
-                    line(c, at)
+                    line(c, agreed)
                 );
             }
         }
@@ -392,6 +453,16 @@ fn compare(base: &[Case<'_>], candidate: &[Case<'_>]) -> Summary {
         "{} cases, {frames} frames, {images} images, {errors} errors ({policy} Policy), {panics} panics; {mismatches} differ",
         candidate.len()
     );
+    if work == Work::Any {
+        let _ = writeln!(
+            text,
+            "work not compared: cases part where a frame is refused for work by the base \
+             alone in {}, by both in {}, by the candidate alone in {}; on the frames compared, \
+             base {base_work}, candidate {candidate_work} units, the candidate spending more \
+             on {more} frames",
+            parted[0], parted[1], parted[2]
+        );
+    }
     let _ = writeln!(text, "peak budget of each workload, base and candidate:");
     for (b, c) in base
         .iter()
@@ -410,7 +481,7 @@ fn compare(base: &[Case<'_>], candidate: &[Case<'_>]) -> Summary {
 
 #[cfg(test)]
 mod tests {
-    use super::{add_probe, compare, parse};
+    use super::{Work, add_probe, compare, parse};
     use crate::process::TempDir;
 
     const RECORD: &str = "case a\nframe 0 change 2 images 1 digest 00 work 5\npeak 10\n\
@@ -418,7 +489,7 @@ mod tests {
 
     #[test]
     fn equal_records_agree_and_are_counted() {
-        let summary = compare(&parse(RECORD), &parse(RECORD));
+        let summary = compare(&parse(RECORD), &parse(RECORD), Work::Equal);
         assert_eq!(summary.mismatches, 0);
         assert!(
             summary
@@ -434,10 +505,48 @@ mod tests {
         let other = RECORD
             .replace("work 5", "work 6")
             .replace("peak 3", "peak 4");
-        let summary = compare(&parse(RECORD), &parse(&other));
+        let summary = compare(&parse(RECORD), &parse(&other), Work::Equal);
         assert_eq!(summary.mismatches, 1);
         let missing = &RECORD[..RECORD.find("case b").unwrap()];
-        assert_eq!(compare(&parse(RECORD), &parse(missing)).mismatches, 1);
+        assert_eq!(
+            compare(&parse(RECORD), &parse(missing), Work::Equal).mismatches,
+            1
+        );
+    }
+
+    #[test]
+    fn work_may_differ_when_asked_and_a_refused_frame_parts_a_case() {
+        let less = RECORD.replace("work 5", "work 2");
+        let summary = compare(&parse(RECORD), &parse(&less), Work::Any);
+        assert_eq!(summary.mismatches, 0);
+        assert!(
+            summary.text.contains("base alone in 0,"),
+            "{}",
+            summary.text
+        );
+        assert!(
+            summary.text.contains("base 14, candidate 11 units"),
+            "{}",
+            summary.text
+        );
+        // Spending less, the candidate makes a frame the base refused.
+        let made = RECORD.replace(
+            "frame 0 error Policy(\"ass work\") work 9",
+            "frame 0 change 2 images 0 digest 00 work 4",
+        );
+        let summary = compare(&parse(RECORD), &parse(&made), Work::Any);
+        assert_eq!(summary.mismatches, 0);
+        assert!(
+            summary.text.contains("base alone in 1,"),
+            "{}",
+            summary.text
+        );
+        // Other images still differ.
+        let other = less.replace("images 1 digest 00", "images 1 digest 01");
+        assert_eq!(
+            compare(&parse(RECORD), &parse(&other), Work::Any).mismatches,
+            1
+        );
     }
 
     #[test]
@@ -448,9 +557,12 @@ mod tests {
             )
         };
         let (a, b) = (error(5), error(6));
-        assert_eq!(compare(&parse(&a), &parse(&b)).mismatches, 0);
+        assert_eq!(compare(&parse(&a), &parse(&b), Work::Equal).mismatches, 0);
         let other = a.replace("requested: 9", "requested: 8");
-        assert_eq!(compare(&parse(&a), &parse(&other)).mismatches, 1);
+        assert_eq!(
+            compare(&parse(&a), &parse(&other), Work::Equal).mismatches,
+            1
+        );
     }
 
     #[test]

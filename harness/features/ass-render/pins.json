@@ -83,6 +83,16 @@
       "bytes": 57728,
       "digest": 10340577310830423555
     },
+    "cache-eviction-ass-1080p": {
+      "packets": 89,
+      "bytes": 3376724,
+      "digest": 3273650535940878425
+    },
+    "cache-eviction-ass-720p": {
+      "packets": 89,
+      "bytes": 2304000,
+      "digest": 14744061389170201170
+    },
     "cjk-ass-1080p": {
       "packets": 192,
       "bytes": 7688776,

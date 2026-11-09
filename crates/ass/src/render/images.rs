@@ -9,7 +9,7 @@ use std::sync::Arc;
 use triergon_core::{Budget, BudgetVec, Result};
 use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, Limits, PlacedBitmap, Rect};
 
-use super::bitmaps::{Combined, RunKey};
+use super::bitmaps::{Combined, Composited};
 use crate::{Karaoke, Rgba};
 
 /// What an image draws.
@@ -63,12 +63,13 @@ enum Part {
     Shadow,
 }
 
-/// Where an image's pixels come from: a composited run, which libass's
-/// composite cache gives the same bitmap for an equal key, or pixels made
-/// for this image alone.
+/// Where an image's pixels come from: a part of a composited run, which
+/// the composite cache gives for an equal key as long as anything holds
+/// it, or pixels made for this image alone, which `blend_vector_clip`
+/// makes for every clipped image.
 #[derive(Clone, Debug)]
 enum Source {
-    Run(Arc<RunKey>, Part),
+    Run(Arc<Composited>, Part),
     Own,
 }
 
@@ -97,14 +98,13 @@ pub struct Image {
 
 impl Image {
     /// `ass_image_compare`: other content when the size, stride, colour or
-    /// bitmap differ, else other positions when the place differs.
+    /// bitmap differ, else other positions when the place differs. libass
+    /// compares the bitmap's address: the same pixels of the same cached
+    /// composite (`ass_render.c:3286-3306`).
     fn compare(&self, other: &Self) -> Change {
         let same_pixels = match (&self.source, &other.source) {
             (Source::Run(a, p), Source::Run(b, q)) => {
-                p == q
-                    && self.column == other.column
-                    && self.row == other.row
-                    && (Arc::ptr_eq(a, b) || **a == **b)
+                Arc::ptr_eq(a, b) && p == q && self.column == other.column && self.row == other.row
             }
             _ => false,
         };
@@ -219,7 +219,7 @@ pub(super) fn render_text(
                 column: part.source_x,
                 row: part.source_y,
                 stride: bitmap.stride(),
-                source: Source::Run(Arc::clone(&run.key), which),
+                source: Source::Run(Arc::clone(&run.composite), which),
             })
             .map_err(|e| e.error)?;
         }
@@ -228,7 +228,7 @@ pub(super) fn render_text(
     const WHOLE: i32 = 1_000_000;
     if with_shadows {
         for run in runs {
-            if let Some(shadow) = &run.shadow {
+            if let Some(shadow) = &run.composite.shadow {
                 emit(
                     run,
                     Part::Shadow,
@@ -241,7 +241,7 @@ pub(super) fn render_text(
         }
     }
     for run in runs {
-        if let Some(border) = &run.border
+        if let Some(border) = &run.composite.border
             && !(run.effect == Some(Karaoke::Outline) && run.effect_timing <= 0)
         {
             emit(
@@ -255,7 +255,9 @@ pub(super) fn render_text(
         }
     }
     for run in runs {
-        let Some(fill) = &run.fill else { continue };
+        let Some(fill) = &run.composite.fill else {
+            continue;
+        };
         let (colours, split) = match run.effect {
             Some(Karaoke::Switch | Karaoke::Outline) => {
                 let colour = if run.effect_timing > 0 {
