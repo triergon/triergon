@@ -244,6 +244,89 @@ fn caches_hold_at_most_their_limits_beyond_the_frame() {
     assert!(kept > bound / 4 && kept <= bound + 4096, "{kept} {bound}");
 }
 
+/// One renderer drawing two scripts by turns draws each as a renderer of
+/// its own does: what one keeps in the caches the other does not find
+/// under another's key.
+#[test]
+fn a_renderer_alternating_between_scripts_draws_each_as_alone() {
+    let budget = Budget::new(64 << 20).unwrap();
+    let first = "Dialogue: 0,0:00:00.00,0:00:04.00,Default,{\\blur1}ABC\n";
+    let second = "Dialogue: 0,0:00:00.00,0:00:04.00,Default,{\\be2\\an7\\pos(20,20)}CAB\n";
+    let frame = |renderer: &mut Renderer, script: &mut Script, now| {
+        let frame = renderer.render(script, now).unwrap();
+        let images: Vec<_> = frame
+            .images
+            .iter()
+            .map(|i| {
+                (
+                    i.kind,
+                    i.x,
+                    i.y,
+                    i.rows().flatten().copied().collect::<Vec<u8>>(),
+                )
+            })
+            .collect();
+        (frame.change, images)
+    };
+    let mut shared = renderer(&budget);
+    let (mut a, mut b) = (script(&budget, first), script(&budget, second));
+    let mut together = Vec::new();
+    for now in [0, 500, 1000] {
+        together.push(frame(&mut shared, &mut a, now).1);
+        together.push(frame(&mut shared, &mut b, now).1);
+    }
+    let alone = |text| {
+        let mut renderer = renderer(&budget);
+        let mut script = script(&budget, text);
+        [0, 500, 1000].map(|now| frame(&mut renderer, &mut script, now).1)
+    };
+    let (a_alone, b_alone) = (alone(first), alone(second));
+    for (i, images) in together.iter().enumerate() {
+        let expected = if i % 2 == 0 {
+            &a_alone[i / 2]
+        } else {
+            &b_alone[i / 2]
+        };
+        assert_eq!(images, expected, "frame {i}");
+    }
+    // Each frame differs from the one before, the other script's.
+    assert_eq!(frame(&mut shared, &mut a, 1500).0, Change::Content);
+}
+
+/// With no room in the caches a frame drawn again still finds what the
+/// frame before shows, as libass's held entries stay: it costs no more than
+/// the first, and a bound the first fits renders both.
+#[test]
+fn zero_limits_still_find_what_the_last_frame_shows() {
+    let budget = Budget::new(256 << 20).unwrap();
+    let events = coloured_lines(4, 30);
+    let run = |work: u64, frames: &[i64]| {
+        let mut settings = Settings::new(Size::new(1280, 720));
+        settings.storage = Some(Size::new(640, 360));
+        settings.cache = CacheLimits::new(0, 0);
+        settings.work = work;
+        let fonts = Fonts {
+            attached: vec![test_sans(&budget)],
+            ..Fonts::default()
+        };
+        let mut renderer = Renderer::new(&budget, &settings, &fonts).unwrap();
+        let mut script = script(&budget, &events);
+        frames
+            .iter()
+            .all(|&now| renderer.render(&mut script, now).is_ok())
+    };
+    let (mut refused, mut made) = (0, Settings::DEFAULT_WORK);
+    while made - refused > 1 {
+        let mid = refused + (made - refused) / 2;
+        if run(mid, &[1000]) {
+            made = mid;
+        } else {
+            refused = mid;
+        }
+    }
+    assert!(run(made, &[1000, 1000, 1000]));
+}
+
 fn steady_line(budget: &Budget) -> Script {
     script(budget, "Dialogue: 0,0:00:00.00,0:00:04.00,Default,CAB\n")
 }

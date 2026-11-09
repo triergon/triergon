@@ -4,12 +4,11 @@
 //! visual order (`reorder_text`), alignment (`align_lines`), the text box
 //! (`compute_string_bbox`) and the baseline shear (`apply_baseline_shear`).
 
-use std::sync::Arc;
-
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget, round_ties_even_i32};
 use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::Level;
 
+use super::cache::Kept;
 use super::fonts::Library;
 use super::geometry::{Geometry, Scales};
 use super::outlines::{GlyphKey, OutlineValue, Outlines};
@@ -25,7 +24,7 @@ use crate::{
 /// An outline and how it is scaled to the frame.
 #[derive(Clone, Debug)]
 pub(super) struct ScaledOutline {
-    pub(super) value: Arc<OutlineValue>,
+    pub(super) value: Kept<OutlineValue>,
     /// From outline units to 26.6.
     pub(super) scale: [f64; 2],
     /// Added to y after the scale, 26.6: a drawing's baseline offset.

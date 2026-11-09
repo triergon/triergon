@@ -6,13 +6,13 @@
 //! painter's.
 
 use std::ops::Range;
-use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Result};
 use triergon_raster::{
     Border, Effects, FrameScale, GlyphRequest, Placement, Rect, Shadow, Vector, pixels_26_6,
 };
 
+use super::cache::Kept;
 use super::geometry::{Geometry, Scales};
 use super::layout::{LaidChar, Layout, TextBox, Timing};
 use super::outlines::OutlineValue;
@@ -312,15 +312,15 @@ fn timing(c: &Char, laid: &LaidChar, first: bool) -> Timing {
 
 /// What a placed glyph is drawn with.
 #[derive(Debug)]
-pub(super) struct GlyphPlacement<'a> {
-    pub(super) outline: &'a Arc<OutlineValue>,
+pub(super) struct GlyphDrawing<'a> {
+    pub(super) outline: &'a Kept<OutlineValue>,
     placement: Placement,
     effects: Effects,
     /// It is timed by `\kf`, so its run tracks its leftmost x.
     karaoke: bool,
 }
 
-impl GlyphPlacement<'_> {
+impl GlyphDrawing<'_> {
     /// What [`Run::place`](triergon_raster::Run::place) places.
     pub(super) fn request(&self, frame: &FrameScale) -> GlyphRequest<'_> {
         GlyphRequest {
@@ -374,7 +374,7 @@ impl<'a> Placer<'a> {
     /// What `placed` is drawn with: its outline, its position in the frame
     /// and offset from the rotation origin displaced by its shadow
     /// (`calculate_rotation_params`), and the effects its state gives it.
-    pub(super) fn glyph(&self, placed: &PlacedGlyph) -> Option<GlyphPlacement<'a>> {
+    pub(super) fn glyph(&self, placed: &PlacedGlyph) -> Option<GlyphDrawing<'a>> {
         let c = &self.text.chars()[placed.char];
         let style = self.text.style(c);
         let laid = &self.layout.chars[placed.char];
@@ -408,7 +408,7 @@ impl<'a> Placer<'a> {
             outline_scale: outline.scale,
             outline_offset: [0.0, outline.offset_y],
         };
-        Some(GlyphPlacement {
+        Some(GlyphDrawing {
             outline: &outline.value,
             placement,
             effects: effects(style, &colours, c.fade, timing.effect),

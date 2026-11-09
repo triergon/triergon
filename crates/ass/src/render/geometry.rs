@@ -146,10 +146,12 @@ pub struct Settings {
     /// Work units bounding one frame as a whole, per frame and not per
     /// event: every shown event's evaluation, font selection and fallback,
     /// shaping, outlines, layout and drawing (glyph bitmaps, composites,
-    /// vector clips), and collision handling. A glyph bitmap or composite
-    /// found in the renderer's caches charges a lookup (a unit per bitmap,
-    /// and per glyph of a composite) instead of the work of drawing it, so
-    /// a frame drawn again from the caches spends little. Running out is
+    /// vector clips), and collision handling. Every lookup of a glyph bitmap
+    /// or composite in the renderer's caches charges a unit per bitmap, and
+    /// per glyph of a composite; one that finds it charges nothing more, so a
+    /// frame drawn again from the caches spends little, and one that does not
+    /// charges the drawing besides, so a frame drawn anew near the bound may
+    /// now be refused. Running out is
     /// `Error::Policy`, where libass would go on drawing;
     /// [`Settings::DEFAULT_WORK`] by default, and a caller that wants libass's
     /// unbounded behaviour raises it.

@@ -10,6 +10,7 @@ use triergon_core::{Budget, BudgetVec, Result};
 use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, Limits, PlacedBitmap, Rect};
 
 use super::bitmaps::{Combined, Composited};
+use super::cache::Kept;
 use crate::{Karaoke, Rgba};
 
 /// What an image draws.
@@ -69,8 +70,8 @@ enum Part {
 /// makes for every clipped image.
 #[derive(Clone, Debug)]
 enum Source {
-    Run(Arc<Composited>, Part),
-    Own,
+    Run(Kept<Composited>, Part),
+    Own(Arc<Bitmap>),
 }
 
 /// One image of a frame: an alpha bitmap to blend in one colour at a frame
@@ -88,7 +89,6 @@ pub struct Image {
     pub colour: Rgba,
     width: usize,
     height: usize,
-    bitmap: Arc<Bitmap>,
     column: usize,
     row: usize,
     /// libass's row stride, 0 for an image a vector clip emptied.
@@ -104,7 +104,7 @@ impl Image {
     fn compare(&self, other: &Self) -> Change {
         let same_pixels = match (&self.source, &other.source) {
             (Source::Run(a, p), Source::Run(b, q)) => {
-                Arc::ptr_eq(a, b) && p == q && self.column == other.column && self.row == other.row
+                Kept::ptr_eq(a, b) && p == q && self.column == other.column && self.row == other.row
             }
             _ => false,
         };
@@ -122,6 +122,18 @@ impl Image {
         }
     }
 
+    /// The bitmap the image shows a window of.
+    fn pixels(&self) -> Option<&Bitmap> {
+        match &self.source {
+            Source::Run(composite, part) => match part {
+                Part::Fill => composite.fill.as_ref(),
+                Part::Border => composite.border.as_ref(),
+                Part::Shadow => composite.shadow.as_ref(),
+            },
+            Source::Own(bitmap) => Some(bitmap),
+        }
+    }
+
     /// The width in pixels.
     pub const fn width(&self) -> usize {
         self.width
@@ -135,8 +147,9 @@ impl Image {
     /// The alpha rows, top to bottom, each [`Image::width`] bytes: 255 is
     /// fully covered.
     pub fn rows(&self) -> impl ExactSizeIterator<Item = &[u8]> + '_ {
-        let stride = self.bitmap.stride();
-        let data = self.bitmap.data();
+        let (stride, data) = self
+            .pixels()
+            .map_or((0, &[][..]), |b| (b.stride(), b.data()));
         (0..self.height).map(move |y| {
             let start = (self.row + y) * stride + self.column;
             &data[start..start + self.width]
@@ -196,7 +209,7 @@ pub(super) fn render_text(
     let start = out.len();
     let mut emit = |run: &Combined,
                     which: Part,
-                    bitmap: &Arc<Bitmap>,
+                    bitmap: &Bitmap,
                     colours: [Rgba; 2],
                     split: i32,
                     kind: ImageKind|
@@ -215,11 +228,10 @@ pub(super) fn render_text(
                 },
                 width: part.width,
                 height: part.height,
-                bitmap: Arc::clone(bitmap),
                 column: part.source_x,
                 row: part.source_y,
                 stride: bitmap.stride(),
-                source: Source::Run(Arc::clone(&run.composite), which),
+                source: Source::Run(run.composite.clone(), which),
             })
             .map_err(|e| e.error)?;
         }
@@ -303,9 +315,8 @@ fn blend_vector_clip(image: &mut Image, mask: &ClipMask, budget: &Budget) -> Res
         }
         let mut pixels = copy(image, 0, 0, image.width, image.height, budget)?;
         pixels.multiply_inverse(clip, bx - ax, by - ay);
-        image.bitmap = Arc::new(pixels);
+        image.source = Source::Own(Arc::new(pixels));
         (image.column, image.row) = (0, 0);
-        image.source = Source::Own;
     } else {
         if disjoint {
             image.width = 0;
@@ -316,14 +327,14 @@ fn blend_vector_clip(image: &mut Image, mask: &ClipMask, budget: &Budget) -> Res
         let (aleft, atop) = ((left - ax) as usize, (top - ay) as usize);
         let mut pixels = copy(image, aleft, atop, w as usize, h as usize, budget)?;
         pixels.multiply(clip, bx - left, by - top);
-        image.bitmap = Arc::new(pixels);
+        let stride = pixels.stride();
+        image.source = Source::Own(Arc::new(pixels));
         (image.column, image.row) = (0, 0);
         image.x = left;
         image.y = top;
         image.width = w as usize;
         image.height = h as usize;
-        image.stride = image.bitmap.stride();
-        image.source = Source::Own;
+        image.stride = stride;
     }
     Ok(())
 }
@@ -374,10 +385,9 @@ pub(super) fn background(
         width: w as usize,
         height: h as usize,
         stride: bitmap.stride(),
-        bitmap: Arc::new(bitmap),
         column: 0,
         row: 0,
-        source: Source::Own,
+        source: Source::Own(Arc::new(bitmap)),
     }))
 }
 

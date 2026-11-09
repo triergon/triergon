@@ -233,8 +233,8 @@ impl Renderer {
         pipeline.layout.release();
         pipeline.combined.clear();
         pipeline.event_images.clear();
-        pipeline.painter.cut(&settings.cache)?;
-        pipeline.outlines.cut(settings.cache.outlines)?;
+        pipeline.painter.cut(&settings.cache);
+        pipeline.outlines.cut(settings.cache.outlines);
         let geometry = self.canvas.place(script);
         let boxes = &mut self.boxes;
         boxes.clear();
@@ -353,8 +353,8 @@ impl Pipeline {
         self.event_images(script, &evaluated, &room, area, work)?;
         // The event's runs and clip are let go or held by its images.
         self.combined.clear();
-        self.painter.settle()?;
-        self.outlines.settle()?;
+        self.painter.settle();
+        self.outlines.settle();
         Ok(Some(EventBox::new(
             index,
             event,

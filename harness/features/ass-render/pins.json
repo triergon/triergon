@@ -93,6 +93,16 @@
       "bytes": 2304000,
       "digest": 14744061389170201170
     },
+    "cache-keys-ass-1080p": {
+      "packets": 336,
+      "bytes": 4605311,
+      "digest": 13166242121968323898
+    },
+    "cache-keys-ass-720p": {
+      "packets": 338,
+      "bytes": 3025856,
+      "digest": 12818660889771108916
+    },
     "cjk-ass-1080p": {
       "packets": 192,
       "bytes": 7688776,

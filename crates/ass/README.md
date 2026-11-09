@@ -269,7 +269,7 @@ cache, bounded by the outline count and the two byte limits. When a frame
 starts the composites, then the bitmaps, then the outlines are cut as libass
 cuts its caches (`ass_cache_cut`): least recently used first, until what is
 kept fits, never one the previous frame's images or another entry's key
-hold, which leaves the order but stays until nothing holds it. A cache is
+hold, which leaves the order and goes the moment nothing holds it. A cache is
 also cut the same way when an insertion takes it past its limit and when
 the renderer lets go of a run or an event, so it holds at most its limit
 beyond what is in use; libass keeps a frame's entries until the next frame,
@@ -286,8 +286,9 @@ starts over from its first face. A caller that wants libass's behaviour sets
 `CacheLimits::fonts` to `usize::MAX`. Shaping plans are kept up to 256. All of it
 is charged to the renderer's budget, family names and drawing texts by
 length, and looked up by the names and texts the script holds, without
-copying them. A bitmap or composite found in the cache charges a lookup to
-`Settings::work` instead of the work of drawing it.
+copying them. Every bitmap or composite lookup charges `Settings::work` a
+unit per bitmap and per glyph of a composite key; only a miss charges the
+drawing besides.
 
 ## Arithmetic
 
