@@ -301,6 +301,8 @@ rejects boxes extending past the source.
 - **Edits.** Source edit lists are parsed and mapped at rate one only.
   Non-unit rates and dwell edits are refused. The source view never repeats
   or shifts packets; the FFmpeg-compatible view does.
+  `SampleTable::has_composition_offsets` reports a regular table's `ctts`
+  presence before reading its samples.
   Range playback preserves AAC sample durations from `stts`, including
   durations longer than one coded frame. Trim counts use the coded frame length.
   The compatible view of a complete fragmented file supports one open-ended

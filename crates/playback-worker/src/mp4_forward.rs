@@ -14,7 +14,9 @@
 use crate::packet_fold::{Packet, Work, drive};
 use crate::runner::Result;
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
+use triergon_core::{
+    Budget, BudgetVec, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget,
+};
 use triergon_playback::{
     ByteSource, Engine, Format, Mp4Event, Player, PlayerPolicy, Progress, RawEvent, Selection,
     io::{SelectedInput, SourceOwner},
@@ -56,15 +58,36 @@ fn player(pool: &Budget, raw: &Bytes, layout: Layout) -> Result<Player<ByteSourc
         open.advance(&mut WorkBudget::new(WORK), &cancel)?,
         OpenProgress::Ready
     ) {}
-    let opened = open.finish()?;
-    let mut index = match layout {
-        Layout::Regular => Mp4IndexJob::new(
-            &opened.movie,
+    let mut opened = open.finish()?;
+    let movie = &opened.movie;
+    let edits = if layout == Layout::Regular
+        && movie.tracks().iter().any(|track| {
+            track.edits().is_some()
+                && track.table().has_composition_offsets()
+                && track.fragments().is_empty()
+        }) {
+        let mut plans = BudgetVec::new(pool);
+        plans.try_reserve_exact(movie.tracks().len())?;
+        for track in movie.tracks() {
+            let plan =
+                crate::mp4_range::prepare_edit(movie, track, &mut opened.input, WORK, &cancel)?;
+            plans.try_push(plan).map_err(|error| error.error)?;
+        }
+        Some(plans)
+    } else {
+        None
+    };
+    let mut index = match (layout, edits.as_ref()) {
+        (Layout::Regular, Some(plans)) => {
+            Mp4IndexJob::new_native_encoded_range(movie, plans.as_slice(), PlanLimits::default())?
+        }
+        (Layout::Regular, None) => Mp4IndexJob::new(
+            movie,
             Mp4View::PinnedMov9NoParseNoFillin,
             PlanLimits::default(),
         )?,
-        Layout::Progressive => {
-            Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default())?
+        (Layout::Progressive, _) => {
+            Mp4IndexJob::new_native_terminal_v1(movie, PlanLimits::default())?
         }
     };
     while !index.poll(&mut WorkBudget::new(WORK), &cancel)? {}
