@@ -4,7 +4,9 @@ Everything is experimental. No module has yet passed every gate on its complete 
 (see [quality](quality.md)). Runtime is the worst per-case upper bound of
 `T_triergon / T_reference`, graded against the [ceiling](quality.md#gates). Memory is peak
 heap and total resident peak RSS relative to the reference. Unless noted, measurements are native
-AArch64 Linux.
+AArch64 Linux. Linux memory measured from observer `linux-glibc-v4` on counts `strdup` and
+`strndup`, admits libstdc++'s operator `new` and `delete`, and counts read-only file mappings
+made during the operation toward total RSS ([harness](quality.md#harness)).
 Containers, framing, subtitles and playback are measured against FFmpeg git revision
 `d32b387f` on the 9.0 branch; codecs, decode sessions, capture and the playback MP4
 terminal-media matrix against the FFmpeg 9.0.2 release; fonts against FreeType 2.15.0;
