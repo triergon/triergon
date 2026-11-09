@@ -510,8 +510,10 @@ fn refused_packet_changes_nothing() {
     }
 }
 
-/// With the end taken from the next page, times at the ends of the 64-bit
-/// range subtract as the reference's do, in 64 bits, without overflow.
+/// With the end taken from the next page, times subtract as the reference's
+/// do: in 64 bits, wrapping, rounded to milliseconds in 128; and a packet
+/// without a time stands for `i64::MIN`. The ends come from the reference's
+/// trace of `edt-no-pts-middle`.
 #[test]
 fn end_from_next_at_the_ends_of_the_time_range() {
     let drawn = packet(&[
@@ -520,28 +522,55 @@ fn end_from_next_at_the_ends_of_the_time_range() {
         segments::object(1),
         segments::end(),
     ]);
-    let next = packet(&[segments::page(1, false, &[(0, 10, 10)]), segments::end()]);
+    let next = |version| {
+        packet(&[
+            segments::page(version, false, &[(0, 10, 10)]),
+            segments::end(),
+        ])
+    };
     let options = Options {
         end_from_next: true,
         ..Options::default()
     };
-    let pool = Budget::new(1 << 20).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = ReceiverDecoder::new(&pool, &[], options);
-    let mut work = WorkBudget::new(u64::MAX);
-    let first = decoder
-        .decode(&drawn, Some(i64::MIN), &mut work, &cancel)
-        .unwrap();
-    assert!(first.subtitle().is_none());
-    let shown = decoder
-        .decode(&next, Some(i64::MAX), &mut work, &cancel)
-        .unwrap();
-    let subtitle = shown.subtitle().unwrap();
-    // i64::MAX - i64::MIN wraps to -1 us, which rounds to 0 ms; one less is
-    // -1, kept to 32 bits.
+    let ends = |times: &[Option<i64>]| {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+        let mut work = WorkBudget::new(u64::MAX);
+        times
+            .iter()
+            .enumerate()
+            .map(|(i, &pts)| {
+                let packet = if i == 0 { drawn.clone() } else { next(i as u8) };
+                decoder
+                    .decode(&packet, pts, &mut work, &cancel)
+                    .unwrap()
+                    .subtitle()
+                    .map(|s| (s.pts, s.end_display_ms))
+            })
+            .collect::<Vec<_>>()
+    };
+    // 0 to i64::MAX microseconds is past 64 bits once rounded.
+    let end = ((i128::from(i64::MAX) + 500) / 1000 - 1) as u32;
     assert_eq!(
-        (subtitle.pts, subtitle.end_display_ms),
-        (Some(i64::MIN), u32::MAX)
+        ends(&[Some(0), Some(i64::MAX)]),
+        [None, Some((Some(0), end))]
+    );
+    // i64::MIN - i64::MAX wraps to 1 us, which rounds to 0 ms.
+    assert_eq!(
+        ends(&[Some(i64::MAX), Some(i64::MIN)]),
+        [None, Some((Some(i64::MAX), u32::MAX))]
+    );
+    // A packet without a time ends the one before it from i64::MIN, and the
+    // packet after it presents nothing.
+    assert_eq!(
+        ends(&[Some(1_000_000), None, Some(3_000_000), Some(4_000_000)]),
+        [
+            None,
+            Some((Some(1_000_000), 2_783_137_807)),
+            None,
+            Some((Some(3_000_000), 999)),
+        ]
     );
 }
 

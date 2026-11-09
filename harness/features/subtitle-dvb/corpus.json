@@ -1058,6 +1058,38 @@
       }
     },
     {
+      "id": "no-pts-between-ts",
+      "profile": "no-pts-between-ts",
+      "file": "dvb/no-pts-between.ts",
+      "sha256": "9b9d7678d4a76d124d7daa2312cc91d95a58dfdec47e522c05f41aa7176fa86c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 640,
+        "digest": 4853949453498874176
+      }
+    },
+    {
+      "id": "no-pts-first-ts",
+      "profile": "no-pts-first-ts",
+      "file": "dvb/no-pts-first.ts",
+      "sha256": "7cf35d01afaf2b110d11f5c64cd1a0c92bd16f9fa04516bc50ad96b0daeeb37d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 480,
+        "digest": 17791208421385472179
+      }
+    },
+    {
       "id": "nonmodifying-depth2-0-ts",
       "profile": "nonmodifying-depth2-0-ts",
       "file": "dvb/nonmodifying-depth2-0.ts",
@@ -2708,6 +2740,40 @@
         "packets": 1,
         "bytes": 160,
         "digest": 11789128705205370927
+      }
+    },
+    {
+      "id": "no-pts-between--compute_edt-1",
+      "profile": "no-pts-between--compute_edt-1",
+      "file": "dvb/no-pts-between.ts",
+      "sha256": "9b9d7678d4a76d124d7daa2312cc91d95a58dfdec47e522c05f41aa7176fa86c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 14416092885836362024
+      }
+    },
+    {
+      "id": "no-pts-first--compute_edt-1",
+      "profile": "no-pts-first--compute_edt-1",
+      "file": "dvb/no-pts-first.ts",
+      "sha256": "7cf35d01afaf2b110d11f5c64cd1a0c92bd16f9fa04516bc50ad96b0daeeb37d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 14845499066633325269
       }
     },
     {

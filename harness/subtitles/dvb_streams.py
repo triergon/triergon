@@ -752,6 +752,16 @@ def cases():
     # PES without a PTS between two with one, and unbounded PES length.
     out["pes-no-pts"] = single([(T0, pes_data(a)), (None, pes_data(b)), (T0 + 180000, pes_data([pcs(1, 5, 2, 0, []), eds()]))])
     out["pes-unbounded"] = single([(T0, pes_data(a), False), (T0 + 90000, pes_data(b), False)])
+    # A PES without a PTS reaches the decoder without a time when its data has
+    # no identifier and the PES before it ended at its end marker: between
+    # two with one, and first.
+    def numbered(version):
+        return pes_data([pcs(1, 5, version, 0, [(0, 10 + version, 10)]),
+                         rcs(0, 24, 4, depth=4, clut=1, objects=[(1, 0, 0)]), cds(1, four),
+                         obj(1, 4, r0, version=version), eds()], identifier=version != 1)
+    out["no-pts-between"] = single([(T0, numbered(0)), (None, numbered(1)), (T0 + 180000, numbered(2)),
+                                    (T0 + 270000, numbered(3))])
+    out["no-pts-first"] = single([(None, numbered(1)), (T0, numbered(2)), (T0 + 90000, numbered(3))])
 
     # Malformed segments.
     good = b"".join(a)
@@ -1083,6 +1093,8 @@ OPTION_CASES = [
     ("long-text", ["opt:compute_edt=1"]),
     ("no-end-of-display", ["opt:compute_edt=1"]),
     ("pes-no-pts", ["opt:compute_edt=1"]),
+    ("no-pts-between", ["opt:compute_edt=1"]),
+    ("no-pts-first", ["opt:compute_edt=1"]),
     ("edt-sequence", ["opt:compute_edt=1"]),
     ("edt-sequence", ["opt:compute_edt=1", "opt:compute_clut=1"]),
     ("region-resize-partial", ["opt:compute_clut=1"]),

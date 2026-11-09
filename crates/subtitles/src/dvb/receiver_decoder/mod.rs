@@ -674,15 +674,15 @@ impl ReceiverDecoder {
         if self.page.version == Some(page.version) {
             return Ok(());
         }
-        if self.options.end_from_next {
-            let previous = self.previous_pts;
-            let end = match (pts, previous) {
-                // The reference subtracts in 64 bits.
-                (Some(pts), Some(previous)) => millis(pts.wrapping_sub(previous)) - 1,
-                _ => -1,
-            };
+        // The reference ends the previous display set only when that packet
+        // had a time, and subtracts in 64 bits from its no-time value,
+        // `i64::MIN`, when this one has none.
+        if self.options.end_from_next
+            && let Some(previous) = self.previous_pts
+        {
+            let end = millis(pts.unwrap_or(i64::MIN).wrapping_sub(previous)) - 1;
             // The receiver's display time is 32 bits: a negative end wraps.
-            self.present(previous, end as u32)?;
+            self.present(Some(previous), end as u32)?;
         }
         let starts_epoch = page.state.starts_epoch();
         if starts_epoch {
