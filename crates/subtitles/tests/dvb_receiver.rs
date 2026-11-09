@@ -547,7 +547,7 @@ fn refusals_pay_for_the_check_and_say_whether_to_retry() {
 /// With the end taken from the next page, times subtract as the reference's
 /// do: in 64 bits, wrapping, rounded to milliseconds in 128; and a packet
 /// without a time stands for `i64::MIN`. The ends come from the reference's
-/// trace of `edt-no-pts-middle`.
+/// trace of `no-pts-between`.
 #[test]
 fn end_from_next_at_the_ends_of_the_time_range() {
     let drawn = packet(&[

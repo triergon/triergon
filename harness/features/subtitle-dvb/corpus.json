@@ -1090,6 +1090,22 @@
       }
     },
     {
+      "id": "no-pts-palette-then-fill-ts",
+      "profile": "no-pts-palette-then-fill-ts",
+      "file": "dvb/no-pts-palette-then-fill.ts",
+      "sha256": "01ebf4cb5deae25d3646d55e5b3bc1910963a28ca542e2b5fca9ed0baeb3f44f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 800,
+        "digest": 7033019029509415948
+      }
+    },
+    {
       "id": "nonmodifying-depth2-0-ts",
       "profile": "nonmodifying-depth2-0-ts",
       "file": "dvb/nonmodifying-depth2-0.ts",
@@ -2774,6 +2790,23 @@
         "packets": 1,
         "bytes": 160,
         "digest": 14845499066633325269
+      }
+    },
+    {
+      "id": "no-pts-palette-then-fill--compute_edt-1",
+      "profile": "no-pts-palette-then-fill--compute_edt-1",
+      "file": "dvb/no-pts-palette-then-fill.ts",
+      "sha256": "01ebf4cb5deae25d3646d55e5b3bc1910963a28ca542e2b5fca9ed0baeb3f44f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 480,
+        "digest": 1590957681747795616
       }
     },
     {

@@ -298,6 +298,9 @@ struct Presented {
     pts: Option<i64>,
     end_display_ms: u32,
     rects: usize,
+    /// The subtitle is output; one built only for its automatic palettes is
+    /// not.
+    output: bool,
 }
 
 /// The segment kinds a packet held, for the end-of-packet presentation.
@@ -520,7 +523,7 @@ impl ReceiverDecoder {
     /// What the packet presented, once it is decoded.
     fn status(&self) -> Status<'_> {
         match self.presented {
-            Some(p) => Status::Subtitle(Subtitle {
+            Some(p) if p.output => Status::Subtitle(Subtitle {
                 pts: p.pts,
                 start_display_ms: 0,
                 end_display_ms: p.end_display_ms,
@@ -528,7 +531,7 @@ impl ReceiverDecoder {
                 slots: &self.slots.as_slice()[..p.rects],
                 epoch: &self.epoch,
             }),
-            None => Status::Nothing,
+            _ => Status::Nothing,
         }
     }
 
@@ -586,7 +589,7 @@ impl ReceiverDecoder {
         if self.held.display_set() {
             self.display_size.get_or_insert(DEFAULT_DISPLAY);
         }
-        if presents && let Err(error) = self.present(pts, self.timeout_ms()) {
+        if presents && let Err(error) = self.present(pts, self.timeout_ms(), true) {
             return halt(packet.len(), Halt::Refused(error), cost);
         }
         self.previous_pts = pts;
@@ -670,7 +673,7 @@ impl ReceiverDecoder {
                 None => return Ok(Flow::Stop),
             },
             Parsed::End if !self.options.end_from_next => {
-                self.present(pts, self.timeout_ms())?;
+                self.present(pts, self.timeout_ms(), true)?;
             }
             Parsed::End | Parsed::Other => {}
         }
@@ -684,15 +687,17 @@ impl ReceiverDecoder {
         if self.page.version == Some(page.version) {
             return Ok(());
         }
-        // The reference ends the previous display set only when that packet
-        // had a time, and subtracts in 64 bits from its no-time value,
-        // `i64::MIN`, when this one has none.
-        if self.options.end_from_next
-            && let Some(previous) = self.previous_pts
-        {
-            let end = millis(pts.unwrap_or(i64::MIN).wrapping_sub(previous)) - 1;
+        // The reference builds the previous display set, automatic palettes
+        // included, and outputs it only when that packet had a time. It
+        // subtracts in 64 bits, from its no-time value, `i64::MIN`, when this
+        // packet has none.
+        if self.options.end_from_next {
+            let previous = self.previous_pts;
+            let end = previous.map_or(-1, |previous| {
+                millis(pts.unwrap_or(i64::MIN).wrapping_sub(previous)) - 1
+            });
             // The receiver's display time is 32 bits: a negative end wraps.
-            self.present(Some(previous), end as u32)?;
+            self.present(previous, end as u32, previous.is_some())?;
         }
         let starts_epoch = page.state.starts_epoch();
         if starts_epoch {
@@ -749,8 +754,9 @@ impl ReceiverDecoder {
     }
 
     /// Present the page as it stands, unless no page was composed yet or this
-    /// packet presented already.
-    fn present(&mut self, pts: Option<i64>, end_display_ms: u32) -> Result<()> {
+    /// packet presented already. Without `output` the subtitle is built, its
+    /// automatic palettes computed, but not output.
+    fn present(&mut self, pts: Option<i64>, end_display_ms: u32, output: bool) -> Result<()> {
         if self.page.version.is_none() || self.presented.is_some() {
             return Ok(());
         }
@@ -802,6 +808,7 @@ impl ReceiverDecoder {
             pts,
             end_display_ms,
             rects: count,
+            output,
         });
         Ok(())
     }

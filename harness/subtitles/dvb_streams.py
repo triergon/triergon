@@ -762,6 +762,19 @@ def cases():
     out["no-pts-between"] = single([(T0, numbered(0)), (None, numbered(1)), (T0 + 180000, numbered(2)),
                                     (T0 + 270000, numbered(3))])
     out["no-pts-first"] = single([(None, numbered(1)), (T0, numbered(2)), (T0 + 90000, numbered(3))])
+    # The page after a packet without a time builds the display set and its
+    # automatic palette without presenting it; a fill after that leaves the
+    # palette as computed.
+    drawn = pattern(24, 4, [1, 2, 3, 5], 23)
+    out["no-pts-palette-then-fill"] = single([
+        (T0, pes_data([pcs(1, 5, 0, 0, [(0, 10, 10)]), rcs(0, 24, 4, depth=4, clut=7, objects=[(1, 0, 0)]),
+                       obj(1, 4, r0), eds()])),
+        (None, pes_data([pcs(1, 5, 1, 0, [(0, 10, 10)]), obj(1, 4, drawn, version=1), eds()], identifier=False)),
+        (T0 + 180000, pes_data([pcs(1, 5, 2, 0, [(0, 10, 10)]),
+                                rcs(0, 24, 4, version=1, fill=True, depth=4, clut=7, bg=(0, 9, 0),
+                                    objects=[(1, 0, 0)]), eds()])),
+        (T0 + 270000, pes_data([pcs(1, 5, 3, 0, [(0, 10, 10)]), eds()])),
+        (T0 + 360000, pes_data([pcs(1, 5, 4, 0, [(0, 10, 10)]), eds()]))])
 
     # Malformed segments.
     good = b"".join(a)
@@ -1095,6 +1108,7 @@ OPTION_CASES = [
     ("pes-no-pts", ["opt:compute_edt=1"]),
     ("no-pts-between", ["opt:compute_edt=1"]),
     ("no-pts-first", ["opt:compute_edt=1"]),
+    ("no-pts-palette-then-fill", ["opt:compute_edt=1"]),
     ("edt-sequence", ["opt:compute_edt=1"]),
     ("edt-sequence", ["opt:compute_edt=1", "opt:compute_clut=1"]),
     ("region-resize-partial", ["opt:compute_clut=1"]),
