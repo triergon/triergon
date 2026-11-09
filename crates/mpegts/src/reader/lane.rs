@@ -1,14 +1,19 @@
 mod eac3;
+mod unframed_video;
 
-use super::model::{ClockContext, PacketData, Shared};
+use super::model::{ClockContext, IncompleteVideoData, PacketData, Shared};
 use super::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, Packet, PacketClock, PayloadSource, ReaderLimits,
-    SourceEvent, Track,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, Packet, PacketClock, PayloadSource,
+    ReaderLimits, SourceEvent, Track,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
+use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors};
 use crate::psi::DescriptorNamespace;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    ops::Range,
+    sync::atomic::{AtomicBool, Ordering},
+};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
     SourceId, Step, WorkBudget,
@@ -17,6 +22,7 @@ use triergon_framing::{
     AacAdtsStreamLimits, AacAdtsStreamReader, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection,
     Codec, RawAnnexBReader,
 };
+use unframed_video::{LEADING_VIDEO_BYTES, UnframedVideoScan};
 
 // Keep concrete readers inline; their containing BudgetVec charges the whole state.
 #[allow(clippy::large_enum_variant)]
@@ -158,7 +164,7 @@ impl Framer {
 }
 
 struct Piece {
-    range: std::ops::Range<u64>,
+    range: Range<u64>,
     source: SourceEvent,
     clock: ClockContext,
     serial: u64,
@@ -410,10 +416,26 @@ impl StorageScan {
     }
 }
 
-// Only validated PES spans enter this copy. The framer has already refused at
-// logical EOF; keeping the copy separate makes every allocation/yield retryable.
+#[derive(Clone, Copy)]
+enum FragmentKind {
+    Audio,
+    Video,
+}
+
+impl FragmentKind {
+    fn publication_bytes(self) -> Result<usize> {
+        match self {
+            Self::Audio => Shared::<PacketData>::allocation_bytes(),
+            Self::Video => Shared::<IncompleteVideoData>::allocation_bytes(),
+        }
+    }
+}
+
+// Only validated PES spans enter this copy, after logical EOF. Keeping the
+// copy separate makes every allocation and yield retryable.
 struct Incomplete {
-    range: std::ops::Range<u64>,
+    kind: FragmentKind,
+    range: Range<u64>,
     buffer: Option<BudgetVec<u8>>,
     bytes: Option<Bytes>,
     prepared: bool,
@@ -427,8 +449,9 @@ struct Incomplete {
 }
 
 impl Incomplete {
-    fn new(range: std::ops::Range<u64>, pool: &Budget) -> Self {
+    fn new(kind: FragmentKind, range: Range<u64>, pool: &Budget) -> Self {
         Self {
+            kind,
             range,
             buffer: Some(BudgetVec::new(pool)),
             bytes: None,
@@ -507,19 +530,20 @@ impl Incomplete {
         let size =
             usize::try_from(self.range.end - self.range.start).map_err(|_| Error::Overflow)?;
         if self.covered != size {
-            return Err(Error::Invalid("MPEG-TS incomplete audio source extent"));
+            return Err(Error::Invalid("MPEG-TS fragment source extent"));
         }
         // The EOF audit counted all remaining reader owners, without any
         // caller-only reservations. Add the complete publication peak here.
+        let publication = self.kind.publication_bytes()?;
         let minimum = self
             .origins
             .checked_mul(size_of::<PayloadSource>())
             .and_then(|n| n.checked_add(self.reader_storage.expect("audited reader storage")))
             .and_then(|n| n.checked_add(size))
             .and_then(|n| n.checked_add(Bytes::owner_overhead_bytes()))
-            .and_then(|n| n.checked_add(Shared::<PacketData>::allocation_bytes().ok()?))
+            .and_then(|n| n.checked_add(publication))
             .ok_or(Error::Overflow)?;
-        let buffer = self.buffer.as_mut().expect("incomplete audio buffer");
+        let buffer = self.buffer.as_mut().expect("incomplete fragment buffer");
         if minimum > buffer.budget().limit() {
             return Err(Error::Limit {
                 requested: minimum,
@@ -610,8 +634,22 @@ impl Incomplete {
     }
 }
 
+enum BuildUnit {
+    Packet(AccessUnit),
+    IncompleteVideo(Range<u64>),
+}
+
+impl BuildUnit {
+    fn range_and_anchor(&self) -> (Range<u64>, u64) {
+        match self {
+            Self::Packet(unit) => (unit.range(), unit.anchor_offset()),
+            Self::IncompleteVideo(range) => (range.clone(), range.start),
+        }
+    }
+}
+
 struct Build {
-    unit: Option<AccessUnit>,
+    unit: BuildUnit,
     buffer: Option<BudgetVec<u8>>,
     video_bytes: Option<Bytes>,
     nal: usize,
@@ -627,11 +665,20 @@ struct Build {
 
 impl Build {
     fn new(unit: AccessUnit, pool: &Budget, last_anchor: u64) -> Self {
-        let buffer = matches!(unit, AccessUnit::Video(_)).then(|| BudgetVec::new(pool));
+        Self::with_unit(BuildUnit::Packet(unit), None, pool, last_anchor)
+    }
+    fn with_unit(
+        unit: BuildUnit,
+        video_bytes: Option<Bytes>,
+        pool: &Budget,
+        last_anchor: u64,
+    ) -> Self {
+        let buffer =
+            matches!(unit, BuildUnit::Packet(AccessUnit::Video(_))).then(|| BudgetVec::new(pool));
         Self {
-            unit: Some(unit),
+            unit,
             buffer,
-            video_bytes: None,
+            video_bytes,
             nal: 0,
             part: 0,
             copied: 0,
@@ -643,14 +690,11 @@ impl Build {
             planned_origins: None,
         }
     }
-    fn unit(&self) -> &AccessUnit {
-        self.unit.as_ref().expect("pending access unit")
-    }
     fn copy(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if self.video_bytes.is_some() {
             return Ok(true);
         }
-        let AccessUnit::Video(unit) = self.unit.as_ref().expect("pending access unit") else {
+        let BuildUnit::Packet(AccessUnit::Video(unit)) = &self.unit else {
             return Ok(true);
         };
         let size =
@@ -719,10 +763,11 @@ impl Build {
 
 pub(super) enum LaneStep {
     Packet(Packet),
+    IncompleteVideo(IncompleteVideo),
     NeedPayload,
     Yield,
     End,
-    DeferredAudio,
+    DeferredFragment,
 }
 
 pub(super) struct Lane {
@@ -735,6 +780,7 @@ pub(super) struct Lane {
     pieces: BudgetVec<Piece>,
     build: Option<Build>,
     incomplete: Option<Incomplete>,
+    unframed_video: Option<UnframedVideoScan>,
     supplied: u64,
     serial: u64,
     last_anchor: u64,
@@ -763,6 +809,7 @@ impl Lane {
             pieces: BudgetVec::new(pool),
             build: None,
             incomplete: None,
+            unframed_video: None,
             supplied: 0,
             serial: 0,
             last_anchor: 0,
@@ -774,7 +821,7 @@ impl Lane {
             run: None,
         })
     }
-    pub(super) fn unpublished(&self) -> Option<std::ops::Range<u64>> {
+    pub(super) fn unpublished(&self) -> Option<Range<u64>> {
         (self.published < self.supplied).then_some(self.published..self.supplied)
     }
     pub(super) fn has_incomplete(&self) -> bool {
@@ -792,7 +839,7 @@ impl Lane {
         clock: ClockContext,
         work: &mut WorkBudget,
     ) -> Result<bool> {
-        if self.framer.is_none() {
+        if self.framer.is_none() && self.unframed_video.is_none() {
             return Ok(true);
         }
         if self.input.is_some() {
@@ -818,11 +865,14 @@ impl Lane {
                 return Err(Error::Invalid("DVB E-AC-3 PES stream ID"));
             }
         }
-        self.pieces.try_reserve_exact(1)?;
         let end = self
             .supplied
             .checked_add(u64::try_from(pes.payload_len).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
+        if self.unframed_video.is_some() {
+            self.check_unframed_video_extent(end)?;
+        }
+        self.pieces.try_reserve_exact(1)?;
         let serial = self.serial.checked_add(1).ok_or(Error::Overflow)?;
         self.pieces
             .try_push(Piece {
@@ -838,12 +888,20 @@ impl Lane {
             pes.epochs.clock,
             pes.byte_run_epoch,
         ));
-        self.input = Some(Input {
+        self.input = self.framer.as_ref().map(|_| Input {
             source: source.clone(),
             span: 0,
             offset: 0,
         });
         Ok(true)
+    }
+    fn check_unframed_video_extent(&self, end: u64) -> Result<()> {
+        let size = usize::try_from(end).map_err(|_| Error::Overflow)?;
+        let maximum = self.limits.video.maximum_access_unit_bytes;
+        if size > maximum {
+            return Err(crate::limit(size, maximum));
+        }
+        Ok(())
     }
     pub(super) fn step(
         &mut self,
@@ -876,20 +934,55 @@ impl Lane {
             }
             if let Some(incomplete) = self.incomplete.as_mut() {
                 if incomplete.reader_storage.is_none() {
-                    return Ok(LaneStep::DeferredAudio);
+                    return Ok(LaneStep::DeferredFragment);
                 }
                 if !incomplete.copy(self.pieces.as_slice(), work, cancel)? {
                     return Ok(LaneStep::Yield);
                 }
-                let incomplete = self.incomplete.take().expect("finished audio copy");
-                let unit = AccessUnit::IncompleteAudio {
-                    range: incomplete.range,
-                    bytes: incomplete.bytes.expect("copied audio bytes"),
-                    reason: Error::Truncated,
+                let incomplete = self.incomplete.take().expect("finished fragment copy");
+                let bytes = incomplete.bytes.expect("copied fragment bytes");
+                let mut build = match incomplete.kind {
+                    FragmentKind::Audio => Build::new(
+                        AccessUnit::IncompleteAudio {
+                            range: incomplete.range,
+                            bytes,
+                            reason: Error::Truncated,
+                        },
+                        &self.pool,
+                        self.last_anchor,
+                    ),
+                    FragmentKind::Video => Build::with_unit(
+                        BuildUnit::IncompleteVideo(incomplete.range),
+                        Some(bytes),
+                        &self.pool,
+                        self.last_anchor,
+                    ),
                 };
-                let mut build = Build::new(unit, &self.pool, self.last_anchor);
                 build.planned_origins = Some(incomplete.origins);
                 self.build = Some(build);
+                continue;
+            }
+            if let Some(scan) = &mut self.unframed_video {
+                if !scan.step(self.pieces.as_slice(), work, cancel)? {
+                    return Ok(LaneStep::Yield);
+                }
+                self.supplied = self
+                    .pieces
+                    .as_slice()
+                    .last()
+                    .expect("video residue PES")
+                    .range
+                    .end;
+                if !draining {
+                    return Ok(LaneStep::NeedPayload);
+                }
+                self.unframed_video = None;
+                self.eof = true;
+                self.incomplete = Some(Incomplete::new(
+                    FragmentKind::Video,
+                    0..self.supplied,
+                    &self.pool,
+                ));
                 continue;
             }
             let Some(framer) = &mut self.framer else {
@@ -903,6 +996,26 @@ impl Lane {
                 return Ok(LaneStep::End);
             };
             let step = match framer.step(work, cancel) {
+                Err(LEADING_VIDEO_BYTES)
+                    if matches!(framer, Framer::Video(_))
+                        && self.completed == 0
+                        && self.limits.video_eof_policy == VideoEofPolicy::ReportUnframed =>
+                {
+                    let end = self
+                        .pieces
+                        .as_slice()
+                        .last()
+                        .expect("video input PES")
+                        .range
+                        .end;
+                    self.check_unframed_video_extent(end)?;
+                    // Recheck all retained bytes, including the portion the
+                    // framer already read and any unsupplied part of this PES.
+                    self.unframed_video = Some(UnframedVideoScan::default());
+                    self.framer = None;
+                    self.input = None;
+                    continue;
+                }
                 Err(Error::Truncated)
                     if draining
                         && self.eof
@@ -929,7 +1042,7 @@ impl Lane {
                             maximum,
                         });
                     }
-                    self.incomplete = Some(Incomplete::new(range, &self.pool));
+                    self.incomplete = Some(Incomplete::new(FragmentKind::Audio, range, &self.pool));
                     self.framer = None;
                     continue;
                 }
@@ -947,7 +1060,9 @@ impl Lane {
                 }
                 Step::Yield => return Ok(LaneStep::Yield),
                 Step::End(_) => {
-                    if draining && self.limits.audio_eof_policy == AudioEofPolicy::ReportIncomplete
+                    if draining
+                        && (self.limits.audio_eof_policy == AudioEofPolicy::ReportIncomplete
+                            || self.limits.video_eof_policy == VideoEofPolicy::ReportUnframed)
                     {
                         self.framer = None;
                         continue;
@@ -1016,8 +1131,7 @@ impl Lane {
         if !build.copy(work, cancel)? {
             return Ok(LaneStep::Yield);
         }
-        let range = build.unit().range();
-        let anchor_offset = build.unit().anchor_offset();
+        let (range, anchor_offset) = build.unit.range_and_anchor();
         while let Some(piece) = self.pieces.as_slice().get(build.origin) {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -1030,7 +1144,7 @@ impl Lane {
             if start < end {
                 if !build.origins.is_empty()
                     && self.track.stream().stream_type == 0x87
-                    && matches!(build.unit(), AccessUnit::Ac3(_))
+                    && matches!(build.unit, BuildUnit::Packet(AccessUnit::Ac3(_)))
                 {
                     return Err(Error::Invalid("ATSC E-AC-3 access unit crosses PES"));
                 }
@@ -1080,8 +1194,14 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(LaneStep::Yield);
         }
-        let charge = Shared::<PacketData>::reserve(&self.pool)?;
-        let duration = build.unit().duration()?;
+        let (charge, duration) = match &build.unit {
+            BuildUnit::Packet(unit) => {
+                (Shared::<PacketData>::reserve(&self.pool)?, unit.duration()?)
+            }
+            BuildUnit::IncompleteVideo(_) => {
+                (Shared::<IncompleteVideoData>::reserve(&self.pool)?, None)
+            }
+        };
         let duration90 = duration
             .map(|time| -> Result<Option<i64>> {
                 let n = time
@@ -1097,16 +1217,16 @@ impl Lane {
             })
             .transpose()?
             .flatten();
-        let pts = build
-            .clock
-            .as_ref()
+        let packet_clock = match &build.unit {
+            BuildUnit::Packet(_) => build.clock.as_ref(),
+            BuildUnit::IncompleteVideo(_) => None,
+        };
+        let pts = packet_clock
             .and_then(|clock| clock.pts.ticks90)
             .map(i64::try_from)
             .transpose()
             .map_err(|_| Error::Overflow)?;
-        let dts = build
-            .clock
-            .as_ref()
+        let dts = packet_clock
             .and_then(|clock| clock.dts.ticks90)
             .map(i64::try_from)
             .transpose()
@@ -1124,21 +1244,37 @@ impl Lane {
         self.last_anchor = build.last_anchor;
         self.completed += 1;
         self.published = range.end;
-        Ok(LaneStep::Packet(Packet(Shared::new(
-            PacketData {
-                track: self.track.clone(),
-                unit: build.unit.expect("prepared unit"),
-                video_bytes: build.video_bytes,
-                sources: build.origins,
-                clock: build.clock,
-                epochs,
-                duration,
-                pts,
-                dts,
-                duration90,
-            },
-            charge,
-        ))))
+        let track = self.track.clone();
+        match build.unit {
+            BuildUnit::Packet(unit) => Ok(LaneStep::Packet(Packet(Shared::new(
+                PacketData {
+                    track,
+                    unit,
+                    video_bytes: build.video_bytes,
+                    sources: build.origins,
+                    clock: build.clock,
+                    epochs,
+                    duration,
+                    pts,
+                    dts,
+                    duration90,
+                },
+                charge,
+            )))),
+            BuildUnit::IncompleteVideo(range) => {
+                Ok(LaneStep::IncompleteVideo(IncompleteVideo(Shared::new(
+                    IncompleteVideoData {
+                        track,
+                        range,
+                        bytes: build.video_bytes.expect("copied unframed video"),
+                        sources: build.origins,
+                        clock: build.clock,
+                        epochs,
+                    },
+                    charge,
+                ))))
+            }
+        }
     }
 }
 
@@ -1217,7 +1353,10 @@ mod incomplete_audio_tests {
                 }
             }
             let build = lane.build.as_ref()?;
-            if !matches!(build.unit(), AccessUnit::IncompleteAudio { .. }) {
+            if !matches!(
+                build.unit,
+                BuildUnit::Packet(AccessUnit::IncompleteAudio { .. })
+            ) {
                 return None;
             }
             if build.planned_origins.is_some() {

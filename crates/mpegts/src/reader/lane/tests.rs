@@ -23,7 +23,7 @@ fn coalescing_freeze_and_packet_publication_retry_without_duplicate_bytes_or_ori
     for _ in 0..1_000_000 {
         let ready = reader.lanes.as_slice().iter().find_map(|lane| {
             let build = lane.build.as_ref()?;
-            let AccessUnit::Video(unit) = build.unit.as_ref()? else {
+            let BuildUnit::Packet(AccessUnit::Video(unit)) = &build.unit else {
                 return None;
             };
             let done = if checkpoints == 0 {

@@ -354,6 +354,43 @@ impl PacketInfo for Packet {
     }
 }
 
+#[derive(Debug)]
+pub(super) struct IncompleteVideoData {
+    pub track: Track,
+    pub range: Range<u64>,
+    pub bytes: Bytes,
+    pub sources: BudgetVec<PayloadSource>,
+    pub clock: Option<PacketClock>,
+    pub epochs: SourceEpochs,
+}
+
+/// A validated AVC or HEVC PES byte run with invalid leading bytes and no
+/// Annex B start code. Its original payload and first source anchor are
+/// retained at logical EOF. Clones share the charged storage.
+#[derive(Clone, Debug)]
+pub struct IncompleteVideo(pub(super) Shared<IncompleteVideoData>);
+
+impl IncompleteVideo {
+    pub fn track_info(&self) -> &Track {
+        &self.0.track
+    }
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.0.range.clone()
+    }
+    pub fn bytes(&self) -> &Bytes {
+        &self.0.bytes
+    }
+    pub fn sources(&self) -> &[PayloadSource] {
+        self.0.sources.as_slice()
+    }
+    pub fn clock(&self) -> Option<&PacketClock> {
+        self.0.clock.as_ref()
+    }
+    pub fn epochs(&self) -> SourceEpochs {
+        self.0.epochs
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ReaderEvent {
     Source(SourceEvent),
@@ -384,4 +421,6 @@ pub enum ReaderEvent {
     /// Original unfinished audio bytes at logical EOF, with validated PES
     /// provenance and an optional one-use source clock. No complete AU is asserted.
     IncompleteAudio(Packet),
+    /// The final unframed video run under the explicit EOF reporting policy.
+    IncompleteVideo(IncompleteVideo),
 }

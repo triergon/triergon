@@ -41,8 +41,8 @@ pub use media_entity::MediaEntityEnd;
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
 pub use reader::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, Packet, PacketClock, PayloadSource, Reader,
-    ReaderEvent, ReaderLimits, SourceEvent, Track,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, Packet, PacketClock, PayloadSource,
+    Reader, ReaderEvent, ReaderLimits, SourceEvent, Track,
 };
 pub use stream::{
     CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun,
