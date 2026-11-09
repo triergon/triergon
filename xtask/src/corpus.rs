@@ -72,6 +72,8 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
 fn mp4_range(paths: &Paths) -> Result<String, String> {
     const CONTROL: &str = "regular-avc-aac.mp4";
     const VARIABLE: &str = "variable-aac-duration.mp4";
+    const FRAGMENTED: &str = "fragmented-avc-aac.mp4";
+    const RESCALED: &str = "fragmented-aac-media-clock.mp4";
     let output = paths.fixtures("mp4-range-fixtures")?;
     let seed = paths
         .root
@@ -87,12 +89,27 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     variable[83_745..83_749].copy_from_slice(&272_u32.to_be_bytes());
     write(&output.join(CONTROL), &control)?;
     write(&output.join(VARIABLE), &variable)?;
+    let seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(FRAGMENTED);
+    let fragmented = fs::read(&seed).map_err(|e| format!("{}: {e}", seed.display()))?;
+    if sha256::hex(&fragmented)
+        != "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7"
+    {
+        return Err("fragmented MP4 range seed changed".into());
+    }
+    let mut rescaled = fragmented.clone();
+    // Use a 44.1 kHz mdhd clock with the original 48 kHz AAC configuration.
+    rescaled[833..837].copy_from_slice(&44_100_u32.to_be_bytes());
+    write(&output.join(FRAGMENTED), &fragmented)?;
+    write(&output.join(RESCALED), &rescaled)?;
     let cases = [
         (
             "regular-open",
             CONTROL,
             &control,
-            false,
+            None,
             237,
             81_478,
             994_214_068_017_485_484_u64,
@@ -101,7 +118,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "regular-seek",
             CONTROL,
             &control,
-            true,
+            Some("28000"),
             185,
             62_763,
             15_577_132_028_095_841_482,
@@ -110,7 +127,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "variable-open",
             VARIABLE,
             &variable,
-            false,
+            None,
             237,
             81_478,
             1_650_792_575_122_043_820,
@@ -119,10 +136,55 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "variable-seek",
             VARIABLE,
             &variable,
-            true,
+            Some("28000"),
             186,
             62_932,
             1_562_922_133_773_717_379,
+        ),
+        (
+            "fragmented-open",
+            FRAGMENTED,
+            &fragmented,
+            None,
+            93,
+            39_981,
+            7_927_680_340_045_287_421,
+        ),
+        (
+            "fragmented-before-sync",
+            FRAGMENTED,
+            &fragmented,
+            Some("4095"),
+            93,
+            39_981,
+            7_927_680_340_045_287_421,
+        ),
+        (
+            "fragmented-seek",
+            FRAGMENTED,
+            &fragmented,
+            Some("4096"),
+            74,
+            30_999,
+            2_297_253_848_353_618_229,
+        ),
+        (
+            "fragmented-rescaled-open",
+            RESCALED,
+            &rescaled,
+            None,
+            93,
+            39_981,
+            16_257_532_825_513_011_650,
+        ),
+        (
+            "fragmented-rescaled-seek",
+            RESCALED,
+            &rescaled,
+            Some("4096"),
+            75,
+            31_255,
+            16_684_294_720_659_653_080,
         ),
     ]
     .into_iter()
@@ -132,7 +194,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             file,
             data,
             vec![
-                ("arguments", Value::strings(seek.then_some("28000"))),
+                ("arguments", Value::strings(seek)),
                 (
                     "expected",
                     Value::object([
@@ -149,7 +211,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
         "features/mp4-range/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
     )?;
-    Ok("MP4 range corpus: four playback comparisons".into())
+    Ok("MP4 range corpus: nine playback comparisons".into())
 }
 
 /// One manifest row for an authored fixture.

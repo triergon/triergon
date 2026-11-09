@@ -1,4 +1,4 @@
-//! Compare every packet of a regular AVC/AAC file through range playback.
+//! Compare every packet of a seekable AVC/AAC file through range playback.
 
 use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
@@ -116,10 +116,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
             }
             _ => return Err("expected one AVC and one AAC track".into()),
         }
-        if !track.fragments().is_empty() {
-            return Err("expected regular sample tables".into());
-        }
-        let plan = if let Some(edits) = track.edits() {
+        let plan = if let Some(edits) = track.edits().filter(|_| track.fragments().is_empty()) {
             let mut config = ConfigurationJob::new_range_playback(
                 header,
                 table,

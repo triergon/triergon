@@ -21,6 +21,7 @@ use triergon_isobmff::{
     PhysicalSampleCursor, Sample, SampleCursor, SampleDescription, SampleStep, SourceTrack,
     compat::mov::{
         clock::{MediaClock, SourceTimeBase},
+        edits::FragmentAacTrimJob,
         packets::{
             CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence,
             StreamView,
@@ -109,6 +110,7 @@ pub struct Mp4Configuration {
 pub struct PlanTrack {
     pub(crate) trex: Option<iso::Trex>,
     pub(crate) next_ordinal: u64,
+    pub(crate) fragment_aac_trim: u32,
     pub snapshot: TrackSnapshot,
     pub descriptions: BudgetVec<SampleDescription>,
     pub edits: Option<EditList>,
@@ -298,6 +300,7 @@ pub struct Mp4IndexJob<'a> {
     phase: u8,
     track: usize,
     description: usize,
+    fragment_aac_trim: Option<FragmentAacTrimJob>,
     root: usize,
     extent: usize,
     ready: bool,
@@ -637,6 +640,7 @@ impl<'a> Mp4IndexJob<'a> {
             phase: 0,
             track: 0,
             description: 0,
+            fragment_aac_trim: None,
             root: 0,
             extent: 0,
             ready: false,
@@ -667,6 +671,11 @@ impl<'a> Mp4IndexJob<'a> {
                             return Ok(false);
                         }
                         let h = t.header();
+                        let fragment_aac_trim = if p.view == Mp4View::PinnedMov9NoParseNoFillin {
+                            FragmentAacTrimJob::new(self.movie, self.track)?
+                        } else {
+                            None
+                        };
                         let (base, native_catalogue) = if h.timescale == 0 {
                             (
                                 SourceTimeBase::UNAVAILABLE,
@@ -698,6 +707,7 @@ impl<'a> Mp4IndexJob<'a> {
                                     .find(|x| x.track_id == t.header().track_id)
                                     .copied(),
                                 next_ordinal: t.next_ordinal(),
+                                fragment_aac_trim: 0,
                                 snapshot: TrackSnapshot(Arc::new(TrackMetadata {
                                     track_id: h.track_id,
                                     base,
@@ -721,8 +731,16 @@ impl<'a> Mp4IndexJob<'a> {
                                     .transpose()?,
                             },
                         )?;
+                        self.fragment_aac_trim = fragment_aac_trim;
                         self.description = 1;
                         return Ok(false);
+                    }
+                    if let Some(job) = &mut self.fragment_aac_trim {
+                        let Some(samples) = job.poll(w, c)? else {
+                            return Ok(false);
+                        };
+                        p.tracks.as_mut_slice()[self.track].fragment_aac_trim = samples;
+                        self.fragment_aac_trim = None;
                     }
                     if let Some(d) = t.table().descriptions().get(self.description - 1) {
                         if !w.try_charge(1) {
