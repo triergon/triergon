@@ -159,6 +159,7 @@ mutations against libass on AArch64 that the open-case and unattributed counts c
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
 | ISO BMFF open and index runtime and memory | `f99d893196908d562c897bccb20c6a972cd25d11` | `806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b` |
 | MPEG-TS progressive playback | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
+| MPEG-TS program playback, earlier comparison | `3125c1e61d73a575419f7b653a1dae44a3269dae` | `beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a` |
 | HLS segments | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | Packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
 | MP4 range playback, earlier crop comparison | `63f6fe787b4f2976c339ee0548f032d21781dfb6` | `cfb8b1edc7592533b43cf1327be9cfd98a83598c90f3390cabd4770f147e1223` |
