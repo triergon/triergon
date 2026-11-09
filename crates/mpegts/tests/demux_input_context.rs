@@ -234,6 +234,23 @@ fn competing_grid_is_visible_refusal() {
     ));
 }
 #[test]
+fn adjacent_payload_bytes_do_not_create_a_competing_grid() {
+    let mut bytes = [0; 8 * 192];
+    for carrier in bytes.chunks_exact_mut(192) {
+        carrier[4] = 0x47;
+    }
+    for n in 0..8 {
+        let false_sync = 18 + n * 188;
+        let marker = false_sync - 1 - n % 2;
+        bytes[marker] = 0x47;
+        bytes[marker + 1..=false_sync].fill(0x46);
+    }
+    let (_, input, window) = setup(&bytes, true);
+    let context = complete(&input, &window, PacketFormat::M2ts192);
+    assert_eq!(context.inspected_bytes(), bytes.len());
+}
+
+#[test]
 fn damaged_sync_is_visible_refusal() {
     let bytes = include_bytes!("data/native-input-v1/seventh-sync-zero.bin");
     let (_, i, w) = setup(bytes, true);

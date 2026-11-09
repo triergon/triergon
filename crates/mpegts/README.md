@@ -87,6 +87,10 @@ file.
 | FFmpeg-compatible clock | `compat::pes::DemuxClock::{project_header, place}`, `compat::pes::pcr_bounded_pts` (teletext PTS) |
 | FFmpeg-compatible start position | `compat::input::InputBootstrap` |
 
+The startup probe scores sync bytes in groups while charging each inspected
+byte. When delivering full transport events, the PES observer can retain
+only the payload of a validated continuation that fits its existing arena.
+
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
 in both feed modes. `poll_feed_carriers` lets a progressive feed move a
