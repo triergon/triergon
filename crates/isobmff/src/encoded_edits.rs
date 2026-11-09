@@ -133,6 +133,36 @@ impl EncodedEditPlan {
     pub fn selected_end_ticks(&self) -> i128 {
         self.end
     }
+    /// End of the regular Opus presentation window on the edited timeline.
+    /// The final source duration can shorten the last coded packet.
+    pub fn opus_presentation_end(&self) -> Result<Time> {
+        if !matches!(self.timing, EditTiming::Opus) {
+            return Err(Error::Unsupported("Opus presentation needs an Opus edit"));
+        }
+        let end = self.end.min(self.source_end);
+        Time::from_ticks(
+            end.checked_sub(self.anchor).ok_or(Error::Overflow)?,
+            self.media_base,
+        )
+    }
+
+    pub(crate) fn opus_roll_scope(&self) -> Result<crate::RecoveryScope<'_>> {
+        if !matches!(self.timing, EditTiming::Opus) {
+            return Err(Error::Unsupported("Opus recovery needs an Opus edit"));
+        }
+        let facts = self
+            .recovery_observation
+            .as_ref()
+            .ok_or(Error::Invalid("missing Opus recovery observation"))?
+            .source_result()
+            .map_err(|fault| fault.error)?;
+        let scope = facts.source_scope(crate::RecoveryKind::Roll);
+        if scope.mappings.is_none() || scope.track_descriptions.is_none() {
+            return Err(Error::Unsupported("missing Opus roll group"));
+        }
+        Ok(scope)
+    }
+
     pub(crate) fn align_seek_timestamp(&self, timestamp: i64, base: TimeBase) -> Result<i64> {
         let Some(opus) = &self.opus_timing else {
             return Ok(timestamp);
