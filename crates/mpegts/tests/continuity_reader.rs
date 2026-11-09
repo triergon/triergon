@@ -149,6 +149,7 @@ fn borrowed_carriers_keep_the_owned_events_in_source_order() {
     let coded = include_bytes!("../../../harness/fixtures/hls/dvb-hevc-eac3-32000.ts");
     for (raw, grant) in [
         (THIRD, 1),
+        (coded.as_slice(), 193),
         (coded.as_slice(), 4096),
         (coded.as_slice(), 65536),
     ] {

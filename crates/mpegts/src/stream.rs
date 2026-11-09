@@ -156,6 +156,12 @@ const PAYLOAD_RUN_WORK: u64 = TS188_BYTES as u64 + 2 + (PLAIN_PAYLOAD_BYTES as u
 // Preparing, beginning and publishing one source event.
 const OBSERVED_EVENT_WORK: u64 = 3;
 
+enum ObservedContinuation {
+    Fallback,
+    Retained,
+    Completed(Pes),
+}
+
 fn matches_payload_header(ts: &[u8], pid: u16, counter: u8) -> bool {
     let expected = 0x4700_0010 | (u32::from(pid) << 8) | u32::from(counter);
     // Transport priority is the only bit ignored by the continuation check.
@@ -1161,14 +1167,14 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         observe: &mut impl FnMut(CarrierObservation<'_>),
-    ) -> Result<bool> {
+    ) -> Result<ObservedContinuation> {
         let Route::Pes(index) = self.route else {
-            return Ok(false);
+            return Ok(ObservedContinuation::Fallback);
         };
         let pid = carrier.pid();
         let clock = self.pcr_pid == Some(pid);
         if (clock && self.clock_pending) || self.collector.has_pending() {
-            return Ok(false);
+            return Ok(ObservedContinuation::Fallback);
         }
         let route = &mut self.routes.as_mut_slice()[index];
         let continuity = route
@@ -1176,14 +1182,14 @@ impl TransportStream {
             .as_mut()
             .ok_or(Error::Invalid("PES continuity missing"))?;
         if !continuity.expects_payload_counter(carrier.counter()) {
-            return Ok(false);
+            return Ok(ObservedContinuation::Fallback);
         }
         let assembler = route
             .assembler
             .as_mut()
             .ok_or(Error::Invalid("PES route missing"))?;
         let Some(bytes) = carrier.source.as_ref() else {
-            return Ok(false);
+            return Ok(ObservedContinuation::Fallback);
         };
         let start = carrier.payload_start();
         let location = SourceLocation {
@@ -1194,7 +1200,7 @@ impl TransportStream {
         if !assembler.can_retain_body_carrier(bytes, start, location.offset, grant)
             || cancel.load(Ordering::Relaxed)
         {
-            return Ok(false);
+            return Ok(ObservedContinuation::Fallback);
         }
 
         work.take(OBSERVED_EVENT_WORK);
@@ -1220,7 +1226,10 @@ impl TransportStream {
         let bytes = carrier.source.take().expect("observed carrier source");
         let len = bytes.len();
         assembler.append_body_carrier(bytes.into_slice(start..len)?, location, work);
-        Ok(true)
+        Ok(assembler.take_complete_body()?.map_or(
+            ObservedContinuation::Retained,
+            ObservedContinuation::Completed,
+        ))
     }
 
     fn validate_feed_continuation(
@@ -2057,16 +2066,19 @@ impl TransportStream {
                         } else {
                             self.find_route(carrier.pid())
                         };
-                        if OBSERVING
-                            && let FramedCarrier::Plain(plain) = &mut carrier
-                            && self.retain_observed_continuation(
+                        if OBSERVING && let FramedCarrier::Plain(plain) = &mut carrier {
+                            match self.retain_observed_continuation(
                                 plain,
                                 work,
                                 cancel,
                                 &mut observe,
-                            )?
-                        {
-                            continue;
+                            )? {
+                                ObservedContinuation::Fallback => {}
+                                ObservedContinuation::Retained => continue,
+                                ObservedContinuation::Completed(pes) => {
+                                    return Ok(ready(TraceEvent::from_assembled_pes(pes)));
+                                }
+                            }
                         }
                         if self.validate_feed_continuation(&carrier, work)? {
                             match consume(

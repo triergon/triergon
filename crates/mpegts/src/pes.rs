@@ -376,7 +376,9 @@ impl PesAssembler {
         let Some(bytes) = payload.as_ref() else {
             return false;
         };
-        if !self.can_retain_body_carrier(bytes, 0, source.offset, work.remaining()) {
+        if self.total == self.seen.checked_add(bytes.len())
+            || !self.can_retain_body_carrier(bytes, 0, source.offset, work.remaining())
+        {
             return false;
         }
         self.append_body_carrier(payload.take().expect("whole PES carrier"), source, work);
@@ -391,7 +393,7 @@ impl PesAssembler {
         grant: u64,
     ) -> bool {
         let count = bytes.len().saturating_sub(start);
-        let end = self.total.map_or(self.limits.pes_bytes, |end| end - 1);
+        let end = self.total.unwrap_or(self.limits.pes_bytes);
         let spans = self.spans.len();
         self.validating_body()
             && count != 0
@@ -402,6 +404,12 @@ impl PesAssembler {
             && offset.checked_add(count as u64).is_some()
             && bytes.belongs_to(&self.budget)
             && count as u64 <= grant
+            && (self.total != Some(self.seen + count)
+                || ((count as u64) < grant
+                    && self
+                        .elementary_offset
+                        .checked_add((self.payload_len + count) as u64)
+                        .is_some()))
     }
 
     /// Commit a carrier after the complete span and work grant were checked.
@@ -428,6 +436,16 @@ impl PesAssembler {
         self.next_chunk += 1;
         self.payload_len += count;
         self.seen += count;
+    }
+
+    pub(crate) fn take_complete_body(&mut self) -> Result<Option<Pes>> {
+        if self.total != Some(self.seen) {
+            return Ok(None);
+        }
+        let AssemblyStep::Output(pes) = self.emit::<true>()? else {
+            unreachable!("complete finite PES");
+        };
+        Ok(pes)
     }
 
     /// Capacity before a finite PES completes and needs ordinary publication.
