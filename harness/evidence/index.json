@@ -16970,6 +16970,15 @@
    "retention": "90 days",
    "key": "qualification/transport-access-unit-payload-scan/2b1150d5d6ac757a91b3de6a2f916bb0c6a2d3ae15149704f898bd6df207bda5.tar.zst",
    "sha256": "2b1150d5d6ac757a91b3de6a2f916bb0c6a2d3ae15149704f898bd6df207bda5"
+  },
+  {
+   "name": "transport-access-unit-gate",
+   "retention": "retained",
+   "reason": "MPEG-TS access-unit gate measurements in docs/status.md",
+   "key": "evidence/transport-access-unit-gate/381aee4861cc45ac1e5d6bd287f606f5cb7b8f731a3b688bbc204b61502e45ae.tar.zst",
+   "sha256": "381aee4861cc45ac1e5d6bd287f606f5cb7b8f731a3b688bbc204b61502e45ae",
+   "bytes": 20300910,
+   "source_revision": "e8f0053aa9ed0f196355f74d596ace48deae2c60"
   }
  ]
 }
