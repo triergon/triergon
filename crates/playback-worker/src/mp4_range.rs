@@ -1,4 +1,4 @@
-//! Compare regular MP4 range playback and dedicated video sample entries.
+//! Compare seekable MP4 range playback and dedicated video sample entries.
 
 use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
@@ -127,15 +127,13 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
             }
             _ => return Err("unexpected MP4 range track".into()),
         }
-        if !track.fragments().is_empty() {
-            return Err("expected regular sample tables".into());
-        }
         let codec = match &descriptions[0].format {
             b"dvh1" | b"dvhe" => Some("hevc"),
             b"dav1" => Some("av1"),
             _ => None,
         };
-        let config = if track.edits().is_some() || codec.is_some() {
+        let edits = track.edits().filter(|_| track.fragments().is_empty());
+        let config = if edits.is_some() || codec.is_some() {
             let mut config = ConfigurationJob::new_range_playback(
                 header,
                 table,
@@ -160,7 +158,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
         } else {
             None
         };
-        let plan = if let Some(edits) = track.edits() {
+        let plan = if let Some(edits) = edits {
             let configs = [config.ok_or("missing MP4 edit configuration")?];
             let mut edit = EditJob::new_range_playback(
                 EditContext {

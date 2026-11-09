@@ -1,4 +1,4 @@
-/* Regular MP4 playback and dedicated video sample entries through the public MOV API. */
+/* Seekable MP4 playback through the public MOV demuxer API. */
 #include <errno.h>
 
 typedef struct {

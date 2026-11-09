@@ -416,7 +416,7 @@ pub struct PacketCursor<'a> {
     seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
 }
 
-fn fragment_media_start(edits: &EditList) -> Result<i64> {
+pub(crate) fn fragment_media_start(edits: &EditList) -> Result<i64> {
     let unsupported = Error::Unsupported("fragment edit must be one open-ended rate-one entry");
     if edits.len() != 1 {
         return Err(unsupported);
@@ -443,6 +443,14 @@ fn count(value: u64, maximum: u64) -> Result<()> {
     Ok(())
 }
 impl<'a> PacketCursor<'a> {
+    pub(crate) fn index_edit_offset(&self) -> i64 {
+        self.slots
+            .as_slice()
+            .first()
+            .and_then(|slot| slot.fragment_media_start)
+            .unwrap_or_default()
+    }
+
     pub fn new(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],

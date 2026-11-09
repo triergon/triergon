@@ -6,19 +6,25 @@
   "worker_operation": "mp4-range-",
   "reference": "ffmpeg-formats-native",
   "contract": [
-    "open a preloaded regular MP4 file through 32 KiB random-access input",
-    "read AVC or HEVC with AAC, or an AV1 video track, through EOF in demux order",
+    "open a preloaded regular or complete fragmented MP4 file through 32 KiB random-access input",
+    "read AVC/AAC, regular dedicated HEVC/AAC entries or a regular dedicated AV1 entry through EOF in demux order",
     "dedicated dvh1, dvhe and dav1 sample entries preserve the original tag and exact base decoder configuration",
     "compare the reference container output when the MOV demuxer exposes dav1 without assigning an AV1 codec ID",
     "seek cases read one packet, seek backward using the video clock, then read the complete suffix",
     "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
-    "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame"
+    "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame",
+    "compare open-ended fragment edits, startup trim with unequal media and sample clocks, and backward seeks on both sides of a sync boundary"
   ],
   "required_profiles": [
     "regular-open",
     "regular-seek",
     "variable-open",
     "variable-seek",
+    "fragmented-open",
+    "fragmented-before-sync",
+    "fragmented-seek",
+    "fragmented-rescaled-open",
+    "fragmented-rescaled-seek",
     "dvh1-open",
     "dvh1-seek",
     "dvhe-open",
@@ -26,7 +32,9 @@
     "dav1-open",
     "dav1-seek"
   ],
-  "required_targets": ["aarch64-unknown-linux-gnu"],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95

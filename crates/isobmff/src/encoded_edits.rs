@@ -13,6 +13,8 @@ use triergon_framing::{
     Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration, BuildStep,
 };
 
+pub(crate) mod fragment_aac;
+
 // ETSI TS 102 366 Annex F.2: an AC-3 or E-AC-3 ISO media sample covers six blocks.
 const DOLBY_SAMPLE_TICKS: u32 = 1536;
 
