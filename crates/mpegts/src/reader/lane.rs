@@ -247,7 +247,6 @@ struct Piece {
 }
 
 struct Input {
-    source: SourceEvent,
     span: usize,
     offset: usize,
 }
@@ -1149,21 +1148,19 @@ impl Lane {
         }
         self.pieces.try_reserve_exact(1)?;
         let serial = self.serial.checked_add(1).ok_or(Error::Overflow)?;
-        self.pieces
-            .try_push(Piece {
-                range: self.supplied..end,
-                source: source.clone(),
-                clock,
-                serial,
-            })
-            .map_err(|e| e.error)?;
-        self.serial = serial;
-        self.run = PesRun::Active(pes.epochs, pes.byte_run_epoch);
-        self.input = self.framer.as_ref().map(|_| Input {
+        let run = PesRun::Active(pes.epochs, pes.byte_run_epoch);
+        if let Err(rejected) = self.pieces.try_push(Piece {
+            range: self.supplied..end,
             source: pending.take().expect("admitted PES"),
-            span: 0,
-            offset: 0,
-        });
+            clock,
+            serial,
+        }) {
+            *pending = Some(rejected.value.source);
+            return Err(rejected.error);
+        }
+        self.serial = serial;
+        self.run = run;
+        self.input = self.framer.as_ref().map(|_| Input { span: 0, offset: 0 });
         Ok(true)
     }
     fn check_video_residue_extent(&self, end: u64) -> Result<()> {
@@ -1373,8 +1370,14 @@ impl Lane {
                         return Err(Error::Invalid("MPEG-TS elementary input offset"));
                     }
                     if let Some(input) = &mut self.input {
-                        let pes = input.source.pes();
-                        let Some(span) = pes.spans().get(input.span) else {
+                        // Retiring a consumed prefix leaves the current PES at
+                        // the tail until its final byte has been handed off.
+                        let span = self
+                            .pieces
+                            .as_slice()
+                            .last()
+                            .and_then(|piece| piece.source.pes().spans().get(input.span));
+                        let Some(span) = span else {
                             self.input = None;
                             continue;
                         };
