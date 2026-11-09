@@ -4,7 +4,7 @@
 
 mod continuity;
 
-use crate::{EntityTransition, Packet, Reader, ReaderEvent, ReaderLimits, Track};
+use crate::{EntityTransition, Packet, Reader, ReaderEvent, ReaderLimits, TraceEvent, Track};
 use continuity::{EofStep, Proof, SourceJob};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest};
@@ -99,8 +99,10 @@ impl ContinuityReader {
         caps: SourceCapabilities,
         transition: EntityTransition,
     ) -> Result<()> {
-        self.reader
-            .finish_entity(source, token, next, caps, transition)?;
+        let result = self
+            .reader
+            .finish_entity(source, token, next, caps, transition);
+        self.finish_result(result)?;
         self.proof.disable();
         Ok(())
     }
@@ -115,6 +117,15 @@ impl ContinuityReader {
         self.proof.disable();
         self.pending = None;
         self.end = None;
+    }
+
+    fn finish_result(&mut self, result: Result<()>) -> Result<()> {
+        // Terminal completion errors release the cursor. Protocol errors leave
+        // the original request and pending proof available for a retry.
+        if result.is_err() && self.reader.continuity_source().is_none() {
+            self.discard();
+        }
+        result
     }
 
     fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
@@ -135,8 +146,11 @@ impl ContinuityReader {
                         false
                     }
                 };
-                let event =
-                    ReaderEvent::Source(self.pending.take().expect("processed source").source);
+                let job = self.pending.take().expect("processed source");
+                if job.published {
+                    continue;
+                }
+                let event = ReaderEvent::Source(job.source);
                 return Ok(Step::Ready(Event::Other(if pending {
                     ContinuityEvent::Pending(event)
                 } else {
@@ -169,7 +183,19 @@ impl ContinuityReader {
             };
             match step {
                 Step::Ready(Event::Other(ReaderEvent::Source(source))) if self.proof.enabled() => {
-                    self.pending = Some(SourceJob::new(source));
+                    // Catalogue changes must accompany their source event. The
+                    // proof observes that event before the next reader step.
+                    if matches!(
+                        source.event(),
+                        TraceEvent::ProgramMap { active: true, .. }
+                            | TraceEvent::Discontinuity { .. }
+                    ) {
+                        self.pending = Some(SourceJob::new(source.clone(), true));
+                        return Ok(Step::Ready(Event::Other(ContinuityEvent::Source(
+                            ReaderEvent::Source(source),
+                        ))));
+                    }
+                    self.pending = Some(SourceJob::new(source, false));
                 }
                 Step::Ready(Event::Other(event)) => {
                     let pending = match &event {
@@ -217,7 +243,8 @@ impl ContainerReader for ContinuityReader {
         self.reader.provide(window)
     }
     fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        self.reader.finish(source, token)
+        let result = self.reader.finish(source, token);
+        self.finish_result(result)
     }
     fn fail(&mut self, source: SourceId, token: InputToken, failure: SourceFailure) -> Result<()> {
         self.reader.fail(source, token, failure)?;

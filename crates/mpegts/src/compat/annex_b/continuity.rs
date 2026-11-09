@@ -94,14 +94,16 @@ struct Route {
 }
 
 pub(super) struct SourceJob {
-    pub source: SourceEvent,
+    pub(super) source: SourceEvent,
+    pub(super) published: bool,
     effect: Option<Effect>,
 }
 
 impl SourceJob {
-    pub(super) fn new(source: SourceEvent) -> Self {
+    pub(super) fn new(source: SourceEvent, published: bool) -> Self {
         Self {
             source,
+            published,
             effect: None,
         }
     }

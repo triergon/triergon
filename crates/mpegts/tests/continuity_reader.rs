@@ -1,11 +1,11 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{ContainerReader, Event};
 use triergon_core::{
-    Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceFailure, SourceId,
-    Step, WorkBudget,
+    Budget, Bytes, Error, InputRequest, InputToken, InputWindow, SourceCapabilities, SourceFailure,
+    SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader};
-use triergon_mpegts::{FaultKind, ReaderEvent, ReaderLimits, TraceEvent};
+use triergon_mpegts::{EntityTransition, FaultKind, ReaderEvent, ReaderLimits, TraceEvent};
 
 const ID: SourceId = SourceId(9);
 const THIRD: &[u8] = include_bytes!("data/cc-third-copy.ts");
@@ -13,11 +13,15 @@ const TIMELINE: &[u8] = include_bytes!("data/pcr-timeline-discontinuity.ts");
 static OFF: AtomicBool = AtomicBool::new(false);
 
 fn reader(pool: &Budget) -> ContinuityReader {
+    reader_with_length(pool, None)
+}
+
+fn reader_with_length(pool: &Budget, length: Option<u64>) -> ContinuityReader {
     ContinuityReader::new(
         pool,
         ID,
         SourceCapabilities {
-            length: None,
+            length,
             random_access: false,
         },
         ReaderLimits::default(),
@@ -188,4 +192,119 @@ fn source_failure_does_not_publish_a_continuity_residue() {
         }
     }
     panic!("source did not reach its final input request");
+}
+
+fn buffered_diagnostic(reader: &mut ContinuityReader, pool: &Budget) -> InputRequest {
+    for _ in 0..50_000 {
+        match reader.step(&mut WorkBudget::new(1), &OFF).unwrap() {
+            Step::NeedInput(request) => provide(reader, pool, THIRD, request),
+            Step::Ready(Event::Other(ContinuityEvent::Pending(ReaderEvent::Interrupted {
+                cause,
+                ..
+            }))) => {
+                let TraceEvent::Diagnostic(fault) = cause.event() else {
+                    panic!("missing continuity diagnostic");
+                };
+                assert_eq!(fault.error, Error::Invalid("TS excess duplicate"));
+                // The inner reader publishes that diagnostic with the next unit.
+                // The continuity proof still needs another grant to process it.
+                assert!(matches!(
+                    reader.step(&mut WorkBudget::new(1), &OFF).unwrap(),
+                    Step::Yield
+                ));
+                return reader.request().unwrap();
+            }
+            Step::Yield | Step::Ready(Event::Other(_)) => (),
+            other => panic!("unexpected step before continuity diagnostic: {other:?}"),
+        }
+    }
+    panic!("source did not buffer its continuity diagnostic");
+}
+
+fn finish_as(
+    reader: &mut ContinuityReader,
+    token: InputToken,
+    continues: bool,
+) -> Result<(), Error> {
+    if continues {
+        reader.finish_entity(
+            ID,
+            token,
+            SourceId(ID.0 + 1),
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            EntityTransition::Contiguous,
+        )
+    } else {
+        reader.finish(ID, token)
+    }
+}
+
+#[test]
+fn truncated_completion_drops_a_buffered_diagnostic() {
+    for continues in [false, true] {
+        let pool = Budget::new(8 << 20).unwrap();
+        let mut reader = reader_with_length(&pool, Some(THIRD.len() as u64 + 188));
+        let request = buffered_diagnostic(&mut reader, &pool);
+        assert_eq!(
+            finish_as(&mut reader, request.token, continues),
+            Err(Error::Truncated)
+        );
+        assert_eq!(reader.track_count(), 0);
+        assert!(reader.track(0).is_none());
+        assert_eq!(
+            reader.step(&mut WorkBudget::new(1), &OFF).unwrap_err(),
+            Error::Truncated
+        );
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[test]
+fn stale_completion_preserves_a_buffered_diagnostic_and_its_proof() {
+    for continues in [false, true] {
+        let pool = Budget::new(8 << 20).unwrap();
+        let mut reader = reader_with_length(&pool, Some(THIRD.len() as u64));
+        let stale = reader.request().unwrap().token;
+        reader.reset().unwrap();
+        let request = buffered_diagnostic(&mut reader, &pool);
+        assert!(matches!(
+            finish_as(&mut reader, stale, continues),
+            Err(Error::StaleGeneration { .. })
+        ));
+        reader.finish(request.source, request.token).unwrap();
+        let mut diagnostic = false;
+        let mut residue = false;
+        let mut ended = false;
+        for _ in 0..50_000 {
+            match reader.step(&mut WorkBudget::new(1), &OFF).unwrap() {
+                Step::Ready(Event::Other(ContinuityEvent::Pending(ReaderEvent::Source(
+                    source,
+                )))) => {
+                    let TraceEvent::Diagnostic(fault) = source.event() else {
+                        panic!("missing buffered diagnostic");
+                    };
+                    assert_eq!(fault.error, Error::Invalid("TS excess duplicate"));
+                    assert!(!diagnostic);
+                    diagnostic = true;
+                }
+                Step::Ready(Event::Other(ContinuityEvent::Residue(observation))) => {
+                    assert!(diagnostic && !residue);
+                    assert_eq!(observation.payload_len(), 81);
+                    residue = true;
+                }
+                Step::End(end) => {
+                    assert!(diagnostic && residue);
+                    assert_eq!((end.source, end.offset), (ID, THIRD.len() as u64));
+                    ended = true;
+                    break;
+                }
+                Step::Yield | Step::Ready(Event::Other(ContinuityEvent::Source(_))) => (),
+                other => panic!("unexpected step after retry: {other:?}"),
+            }
+        }
+        assert!(ended);
+    }
 }

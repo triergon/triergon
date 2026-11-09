@@ -241,6 +241,8 @@ an additional opaque run after a proved continuity change in a single entity.
 transport or PES faults. The replay must reproduce the original diagnostic
 and reach physical and logical EOF. Both observations keep the original
 payload and clock facts and require the run to contain no Annex B start code.
+The continuity reader publishes catalogue changes with their source events.
+A request protocol error leaves the pending continuity proof available for a retry.
 
 Annex-B groups without an admitted primary/base-layer picture
 remain `ReaderEvent::VideoHeaders`,

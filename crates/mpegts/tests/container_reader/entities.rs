@@ -3,7 +3,7 @@ use triergon_core::container::{ContainerReader, Event, PacketInfo};
 use triergon_core::{
     Budget, Bytes, Error, InputToken, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::compat::annex_b::VideoEofPolicy;
+use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, VideoEofPolicy};
 use triergon_mpegts::{
     AudioEofPolicy, EntityTransition, Packet, Reader, ReaderEvent, ReaderLimits, TraceEvent,
 };
@@ -411,5 +411,90 @@ fn opaque_video_waits_across_continuation_and_discards_on_discontinuity() {
             interrupted,
             usize::from(transition == EntityTransition::Discontinuity)
         );
+    }
+}
+
+#[test]
+fn continuity_catalogue_is_atomic_with_unit_work() {
+    for kind in [0x1b, 0x0f] {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut transport = Transport::new();
+        transport.tables(&[(kind, PID, &[])], 0);
+        transport.tables(&[], 1);
+        let raw = &transport.bytes;
+        let mut reader = ContinuityReader::new(
+            &pool,
+            ID,
+            SourceCapabilities {
+                length: Some(raw.len() as u64),
+                random_access: false,
+            },
+            ReaderLimits::default(),
+            64,
+        )
+        .unwrap();
+        let mut published = Vec::new();
+        let mut maps = 0;
+        let mut ended = false;
+        for _ in 0..20_000 {
+            match reader.step(&mut WorkBudget::new(1), &OFF).unwrap() {
+                Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Source(source)))) => {
+                    if let TraceEvent::ProgramMap {
+                        map, active: true, ..
+                    } = source.event()
+                    {
+                        maps += 1;
+                        published = map
+                            .streams
+                            .as_slice()
+                            .iter()
+                            .map(|stream| (stream.pid, stream.stream_type))
+                            .collect();
+                        if maps == 1 {
+                            assert_eq!(published, [(PID, kind)]);
+                        } else {
+                            assert!(published.is_empty());
+                        }
+                    }
+                }
+                Step::NeedInput(request) => {
+                    let start = usize::try_from(request.offset).unwrap();
+                    let end = raw.len().min(start + request.maximum);
+                    if start == end {
+                        reader.finish(request.source, request.token).unwrap();
+                    } else {
+                        let bytes = Bytes::copy_from_slice(&pool, &raw[start..end]).unwrap();
+                        reader
+                            .provide(
+                                &InputWindow::new(
+                                    request.source,
+                                    request.token,
+                                    request.offset,
+                                    bytes,
+                                )
+                                .unwrap(),
+                            )
+                            .unwrap();
+                    }
+                }
+                Step::Yield => (),
+                Step::End(end) => {
+                    assert_eq!((end.source, end.offset), (ID, raw.len() as u64));
+                    ended = true;
+                    break;
+                }
+                other => panic!("unexpected step: {other:?}"),
+            }
+            let actual = (0..reader.track_count())
+                .map(|index| {
+                    let stream = reader.track(index).unwrap().stream();
+                    (stream.pid, stream.stream_type)
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(actual, published);
+            assert!(reader.track(actual.len()).is_none());
+        }
+        assert!(ended);
+        assert_eq!(maps, 2);
     }
 }
