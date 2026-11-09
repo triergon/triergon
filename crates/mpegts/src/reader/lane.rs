@@ -1388,7 +1388,8 @@ impl Lane {
                                 self.input = None;
                                 break;
                             }
-                            let length = span.as_ref().len();
+                            let payload = span.as_ref();
+                            let length = payload.len();
                             let count = (length - input.offset).min(request.maximum);
                             if count == 0 {
                                 return Err(Error::Invalid("empty MPEG-TS payload span"));
@@ -1401,7 +1402,7 @@ impl Lane {
                             let appended = if let Framer::Video(reader) = framer {
                                 reader.append_payload(
                                     &request,
-                                    &span.as_ref()[range.clone()],
+                                    &payload[range.clone()],
                                     work,
                                     cancel,
                                 )?

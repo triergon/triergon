@@ -526,28 +526,28 @@ impl InputCursor {
         Ok(Step::Ready(count))
     }
 
-    /// Copy a borrowed response into a charged builder and consume it in one
-    /// operation. The cursor never retains the caller's slice.
+    /// Validate and consume a complete response without retaining a window.
+    /// The callback processes the response before the cursor advances.
     ///
-    /// A short grant returns false. Validation or allocation failure leaves the
-    /// input position and the destination contents unchanged.
+    /// An empty response or short grant returns false. Validation or callback
+    /// failure leaves the input position unchanged.
     #[inline]
-    pub fn append_response(
+    pub fn consume_response(
         &mut self,
         request: &InputRequest,
-        bytes: &[u8],
-        output: &mut BudgetVec<u8>,
+        length: usize,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
+        consume: impl FnOnce() -> Result<()>,
     ) -> Result<bool> {
         self.verify(request.source, &request.token)?;
         self.check_cancel(cancel)?;
-        self.validate_window(request.offset, bytes.len(), self.maximum_window)?;
-        let count = bytes.len() as u64;
+        self.validate_window(request.offset, length, self.maximum_window)?;
+        let count = length as u64;
         if count == 0 || work.remaining() < count {
             return Ok(false);
         }
-        output.try_extend_from_slice(bytes)?;
+        consume()?;
         work.take(count);
         self.position += count;
         Ok(true)
