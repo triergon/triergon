@@ -170,6 +170,14 @@ impl<K: Clone + Eq + Hash, V: Shared> Cache<K, V> {
     /// Cuts the cache to `limit` as `ass_cache_cut` does, and keeps it
     /// within `limit` until the next cut.
     ///
+    /// libass cuts only when a frame starts, so whatever a frame draws stays
+    /// until the next one. This cache is also cut, the same way, when an
+    /// insertion takes it past `limit` and when the renderer lets go of a run
+    /// or an event ([`settle`](Self::settle)), so it holds at most `limit`
+    /// beyond what is in use. Those cuts never take an entry something holds,
+    /// so nothing a frame shows goes, and an entry looked up again is drawn
+    /// the same under its key: images and change values stay libass's.
+    ///
     /// # Errors
     ///
     /// The budget's errors.
