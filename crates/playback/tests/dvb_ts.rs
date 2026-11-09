@@ -346,66 +346,115 @@ fn ts_bridge_retries_a_pes_refused_for_memory() {
     assert!(refusals > 1);
 }
 
-/// A PES whose regions the pool could never hold is refused with `Limit` and
-/// dropped, and the bridge decodes the next one.
-#[test]
-fn ts_bridge_drops_a_pes_larger_than_its_pool() {
+/// The fixture's PAT and PMT, a PES of each of `data`, 128 ticks apart, then
+/// the fixture's own PES: a PES with the same time as the one before would
+/// continue it.
+fn authored_stream(data: &[Vec<u8>]) -> Vec<u8> {
     const TS: usize = 188;
     let source = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.ts");
+    let mut stream = source[..2 * TS].to_vec();
+    for (index, data) in data.iter().enumerate() {
+        let mut packet = replace_pes_data(source, data)[2 * TS..3 * TS].to_vec();
+        let start = packet
+            .windows(4)
+            .position(|w| w == [0, 0, 1, 0xbd])
+            .unwrap();
+        packet[start + 12] -= (data.len() - index) as u8;
+        packet[3] = packet[3] & 0xf0 | index as u8 & 0x0f;
+        stream.extend(packet);
+    }
+    let mut own = source[2 * TS..3 * TS].to_vec();
+    own[3] = own[3] & 0xf0 | data.len() as u8 & 0x0f;
+    stream.extend(own);
+    stream.extend(&source[3 * TS..]);
+    stream
+}
+
+/// PES data of the fixture's page: page version `version` placing `regions`
+/// at the origin, a mode change for version 1 and a normal case after, a
+/// 1280 x 1024 4-bit region for each of `composed`, and the end. A region is
+/// held whether or not anything is drawn in it.
+fn large_regions(version: u8, regions: &[u8], composed: &[u8]) -> Vec<u8> {
     let pes = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.pes-data");
-    let indices =
-        include_bytes!("../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices");
-    let page = [pes[4], pes[5]];
     let segment = |kind: u8, body: &[u8]| {
-        let mut bytes = vec![0x0f, kind, page[0], page[1]];
+        let mut bytes = vec![0x0f, kind, pes[4], pes[5]];
         bytes.extend((body.len() as u16).to_be_bytes());
         bytes.extend(body);
         bytes
     };
-    // A page placing region 0, a 1280 x 1024 4-bit region, and the end.
+    let state = if version == 1 { 2 } else { 0 };
+    let mut page = vec![5, version << 4 | state << 2 | 3];
+    for &id in regions {
+        page.extend([id, 0, 0, 0, 0, 0]);
+    }
     let mut data = vec![0x20, 0x00];
-    data.extend(segment(0x10, &[5, 0x0b, 0, 0, 0, 0, 0, 0]));
-    data.extend(segment(0x11, &[0, 0, 5, 0, 4, 0, 2 << 5 | 2 << 2, 0, 0, 0]));
+    data.extend(segment(0x10, &page));
+    for &id in composed {
+        data.extend(segment(
+            0x11,
+            &[id, 0, 5, 0, 4, 0, 2 << 5 | 2 << 2, 0, 0, 0],
+        ));
+    }
     data.extend(segment(0x80, &[]));
     data.push(0xff);
-    let mut large = replace_pes_data(source, &data);
-    // An earlier time, 128 ticks before: a PES with the same time continues
-    // the one before.
-    let packet = &mut large[2 * TS..3 * TS];
-    let start = packet
-        .windows(4)
-        .position(|w| w == [0, 0, 1, 0xbd])
-        .unwrap();
-    packet[start + 12] -= 1;
-    // The large PES, then the original with the next continuity counter.
-    let mut next = source[2 * TS..3 * TS].to_vec();
-    next[3] = next[3] & 0xf0 | (next[3] + 1) & 0x0f;
-    let two = [
-        &source[..2 * TS],
-        &large[2 * TS..3 * TS],
-        &next,
-        &source[3 * TS..],
-    ]
-    .concat();
+    data
+}
+
+/// Poll the pushed PES until the bridge asks for the next one: whether it
+/// was refused with `Limit`.
+fn refused_with_limit(bridge: &mut DvbTsBridge) -> bool {
     let cancel = AtomicBool::new(false);
-    let pool = Budget::new(1 << 20).unwrap();
-    let (_player, map, mut inputs) = play(&pool, &two, 37, SourceTimePolicy::RelativeEpochZero);
-    let mut bridge = DvbTsBridge::new(&map.unwrap(), 256, PACKET_LIMIT, &cancel).unwrap();
-    assert_eq!(inputs.len(), 2);
-    assert!(bridge.push(&mut Some(inputs.remove(0))).unwrap());
     let mut refused = false;
-    loop {
+    for _ in 0..1000 {
         match bridge.poll(&mut WorkBudget::new(u64::MAX), &cancel) {
-            Ok(DvbStep::Yield) => {}
+            Ok(DvbStep::Yield | DvbStep::Action(_)) => {}
             Err(triergon_core::Error::Limit { .. }) => refused = true,
-            Ok(DvbStep::NeedPacket) => break,
+            Ok(DvbStep::NeedPacket) => return refused,
             other => panic!("{other:?}"),
         }
     }
-    assert!(refused);
-    match decode(&mut bridge, inputs.remove(0)) {
-        Seen::Show { pixels, .. } => assert_eq!(pixels, indices),
-        _ => panic!("the next PES presents nothing"),
+    panic!("the bridge kept the PES")
+}
+
+/// A PES the pool could never hold, alone or beside the regions the decoder
+/// holds, is refused with `Limit` and dropped, and the bridge decodes the
+/// next one.
+#[test]
+fn ts_bridge_drops_a_pes_that_never_fits() {
+    let indices =
+        include_bytes!("../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices");
+    let cancel = AtomicBool::new(false);
+    for (pool, data, refused) in [
+        // A region past a 1 MB pool.
+        (
+            1 << 20,
+            vec![large_regions(1, &[0], &[0])],
+            [true].as_slice(),
+        ),
+        // A region the decoder holds, then two more beside it in a 3 MB pool.
+        (
+            3 << 20,
+            vec![
+                large_regions(1, &[0], &[0]),
+                large_regions(2, &[0, 1, 2], &[1, 2]),
+            ],
+            &[false, true],
+        ),
+    ] {
+        let pool = Budget::new(pool).unwrap();
+        let stream = authored_stream(&data);
+        let (_player, map, mut inputs) =
+            play(&pool, &stream, 37, SourceTimePolicy::RelativeEpochZero);
+        let mut bridge = DvbTsBridge::new(&map.unwrap(), 256, PACKET_LIMIT, &cancel).unwrap();
+        assert_eq!(inputs.len(), data.len() + 1);
+        for &expected in refused {
+            assert!(bridge.push(&mut Some(inputs.remove(0))).unwrap());
+            assert_eq!(refused_with_limit(&mut bridge), expected);
+        }
+        match decode(&mut bridge, inputs.remove(0)) {
+            Seen::Show { pixels, .. } => assert_eq!(pixels, indices),
+            _ => panic!("the next PES presents nothing"),
+        }
     }
 }
 

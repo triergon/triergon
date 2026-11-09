@@ -194,6 +194,19 @@ impl Epoch {
             .filter(|(_, r)| r.drawn)
     }
 
+    /// The bytes the epoch holds.
+    pub(super) fn retained(&self) -> usize {
+        let regions: usize = self
+            .regions
+            .iter()
+            .map(|r| r.pixels.capacity() + r.objects.capacity() * PLACEMENT_BYTES)
+            .sum();
+        regions
+            + self.regions.capacity() * REGION_BYTES
+            + self.cluts.capacity() * CLUT_BYTES
+            + self.objects.words.capacity() * size_of::<u64>()
+    }
+
     pub(super) fn holdings(&self) -> Holdings {
         Holdings {
             region_slots: (self.regions.len(), self.regions.capacity()),

@@ -544,6 +544,47 @@ fn refusals_pay_for_the_check_and_say_whether_to_retry() {
     assert!(matches!(status, Ok(Status::Subtitle(_))));
 }
 
+/// A packet that fits the pool but never beside what the decoder holds is
+/// refused with `Limit`, so a caller that retries `Backpressure` moves on.
+#[test]
+fn a_packet_that_never_fits_beside_the_decoder_is_refused_with_limit() {
+    let drawn = packet(&[
+        segments::page(0, false, &[(0, 0, 0)]),
+        segments::region(0, 1280, 1024, &[(1, 0, 0)]),
+        segments::object(1),
+        segments::end(),
+    ]);
+    // Two more regions as large, in the same epoch.
+    let more = packet(&[
+        segments::page(1, false, &[(0, 0, 0), (1, 0, 0), (2, 0, 0)]),
+        segments::region(1, 1280, 1024, &[(1, 0, 0)]),
+        segments::region(2, 1280, 1024, &[(1, 0, 0)]),
+        segments::end(),
+    ]);
+    let cancel = AtomicBool::new(false);
+    let pool = Budget::new(3 << 20).unwrap();
+    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let mut work = WorkBudget::new(u64::MAX);
+    decoder.decode(&drawn, Some(0), &mut work, &cancel).unwrap();
+    let error = decoder
+        .decode(&more, Some(1), &mut work, &cancel)
+        .unwrap_err();
+    let Error::Limit { requested, maximum } = error else {
+        panic!("{error:?}")
+    };
+    // It would fit an empty pool of the same size.
+    assert!(requested < (3 << 20) - Budget::control_storage_bytes());
+    assert!(requested > maximum);
+    // A new epoch frees the region, and then the same regions fit.
+    let reset = packet(&[
+        segments::page(2, true, &[(1, 0, 0), (2, 0, 0)]),
+        segments::region(1, 1280, 1024, &[(1, 0, 0)]),
+        segments::region(2, 1280, 1024, &[(1, 0, 0)]),
+        segments::end(),
+    ]);
+    decoder.decode(&reset, Some(2), &mut work, &cancel).unwrap();
+}
+
 /// With the end taken from the next page, times subtract as the reference's
 /// do: in 64 bits, wrapping, rounded to milliseconds in 128; and a packet
 /// without a time stands for `i64::MIN`. The ends come from the reference's
