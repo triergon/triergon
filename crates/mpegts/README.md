@@ -139,7 +139,9 @@ source ranges. The reader reuses the accepted table when the bytes match.
 observations to a borrowed callback in source order. A `TransportObservation`
 exposes the original bytes and location. Call `to_packet` to retain the complete
 carrier and its parsed fields. Complete TS188 continuations can move their
-payload backing directly into a prepared PES span. The method returns the same
+payload backing directly into a prepared PES span. Complete carriers can also
+be inspected from a charged copy when the input window cannot be shared.
+The method returns the same
 access units, other source events and progress steps under the caller's work
 grant. `compat::annex_b::ContinuityReader` keeps the carriers its proof needs.
 
