@@ -146,8 +146,10 @@ metrics (`Font::gdi_metrics`: the signed Windows ascent and descent when their s
 is not zero, else FreeType's, else the typographic, else the `head` box, all
 16-bit). The scale is that height over ascender minus descender in `FT_DivFix`,
 for x and y; pixels per em, the grid-fitted size metrics and every product follow
-FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A
-`SizedFont` then gives:
+FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A size
+of zero pixels per em, such as height 0, keeps its scales and metrics, but
+glyphs then load unscaled and unhinted, in font units, as `FT_Load_Glyph` loads
+them when the scale is undefined. A `SizedFont` then gives:
 
 - `outline_into`: the outline libass draws with hinting off
   (`FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP`), in an `Outline` of 26.6 points,
@@ -169,7 +171,8 @@ FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A
   to a pixel. That is exact for CFF and for TrueType whose `fpgm`, `prep` and
   glyph programs can only issue `INSTCTRL` with a constant selector 1 or 2, so
   that FreeType's v40 interpreter keeps backward compatibility and hinting cannot
-  move an advance; other faces are `Unsupported` (see below).
+  move an advance; other faces are `Unsupported` (see below). At zero pixels per
+  em it is the unscaled advance.
 - `metrics` (`FT_Size_Metrics`), `ascent_descent` (libass's line ascent and
   descent), `harfbuzz_scale` (the scale libass sets on its HarfBuzz font),
   `kerning` (`FT_KERNING_DEFAULT`: scaled, reduced below 25 pixels per em,
@@ -221,9 +224,7 @@ report (they load glyphs hinted), and vertical advances and origins for `@` font
 `fpgm` and a `prep` of at most 7 bytes; the autohinter moves advances), tricky
 fonts known by family name, and programs that may leave backward compatibility;
 fonts FreeType finds tricky only by their table checksums are not recognised.
-Sizes whose
-pixels per em round to 0 or exceed 65535 are refused (FreeType loads the former
-unscaled). Coordinates are `i32`; a scaled coordinate beyond it is
+Sizes beyond 65535 pixels per em are refused. Coordinates are `i32`; a scaled coordinate beyond it is
 `Error::Overflow`, where FreeType's 64-bit `FT_Pos` goes on (libass rejects
 anything beyond 2^28 itself). The `random` operator does not follow FreeType's
 generator.

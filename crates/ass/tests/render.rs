@@ -598,6 +598,23 @@ fn a_face_keeps_the_charmap_a_lookup_left_it_on() {
     assert_eq!(shown(&mut renderer, &mut script, 4000), square);
 }
 
+#[test]
+fn a_style_font_size_of_zero_draws_glyphs_unscaled() {
+    let budget = Budget::new(64 << 20).unwrap();
+    let mut renderer = renderer(&budget);
+    // FreeType loads the glyphs in font units, which libass reads as 26.6
+    // pixels, and the size no longer scales them to the frame: the square's
+    // 200 units are 3.125 pixels tall, four rows.
+    let text = "[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\n\
+                [V4+ Styles]\nFormat: Name, Fontname, Fontsize\nStyle: Default,Test Sans,0\n\
+                [Events]\nFormat: Layer, Start, End, Style, Text\n\
+                Dialogue: 0,0:00:00.00,0:00:01.00,Default,A\n";
+    let mut script = Script::parse(&budget, text.as_bytes(), &Options::default()).unwrap();
+    let images = shown(&mut renderer, &mut script, 0);
+    let fill = images.iter().find(|i| i.0 == ImageKind::Fill).unwrap();
+    assert_eq!(fill.4, 4, "{images:?}");
+}
+
 /// A script embedding `font` in its `[Fonts]` section, with one event in
 /// the style of `family`.
 fn embedding(budget: &Budget, family: &str, font: &[u8]) -> Script {

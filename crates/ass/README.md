@@ -224,10 +224,12 @@ selective style overrides), in the frame and storage size and margins of its
   zeroed, so it never does.
 - **Shaping.** Scripts per character, HarfBuzz's ignorables, runs of one face,
   script and style, FriBidi levels per run (or per paragraph for `\fe-1`),
-  and OpenType shaping of each run at 256 pixels with libass's font functions
-  and features through `triergon-shape`.
+  and OpenType shaping of each run at the size its glyphs load at with
+  libass's font functions and features through `triergon-shape`.
 - **Layout.** Outlines at 256 pixels with libass's synthetic bold and oblique
-  and its underline and strike-out lines, scaled to the glyph's size; the
+  and its underline and strike-out lines, scaled to the glyph's size (a font
+  size of 0 keeps libass's size 0, at which FreeType loads glyphs and their
+  advances unscaled, in font units, with no line ascent or descent); the
   italic correction and letter spacing; wrapping (greedy, then rebalanced
   unless `\q1`), whitespace trimming and line metrics; karaoke; the visual
   order of each line; alignment and justification; the baseline shear; the
