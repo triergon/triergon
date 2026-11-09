@@ -200,6 +200,8 @@ audio, and 0x90 indicates presentation graphics in this view. MPEG-1 video
 The startup probe scores sync bytes in groups while charging each inspected
 byte. When delivering full transport events, the PES observer can retain
 only the payload of a validated continuation that fits its existing arena.
+Complete buffered TS188 and M2TS192 carriers share the validator for common
+payload and adaptation layouts, including PCR. M2TS prefixes stay opaque.
 
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
