@@ -22,7 +22,7 @@ mod pixels;
 mod segment;
 
 use crate::dvb::{Depth, Size};
-use epoch::{Epoch, Region};
+use epoch::{Epoch, Region, RegionHoldings};
 use palette::{Census, DEFAULT};
 use segment::{
     ClutDefinition, DisplayDefinition, Kind, ObjectData, PageComposition, Placement,
@@ -324,6 +324,8 @@ pub struct ReceiverDecoder {
     suspended: Option<Suspended>,
     /// The suspended packet's bytes.
     held_packet: BudgetVec<u8>,
+    /// The regions a packet's memory plan changes.
+    planned: BudgetVec<RegionHoldings>,
     /// Work granted to calls on the current packet and left unspent.
     credit: u64,
     budget: Budget,
@@ -351,6 +353,7 @@ impl ReceiverDecoder {
             presented: None,
             suspended: None,
             held_packet: BudgetVec::new(budget),
+            planned: BudgetVec::new(budget),
             credit: 0,
             budget: budget.clone(),
         }
@@ -391,7 +394,14 @@ impl ReceiverDecoder {
         self.credit = 0;
         self.presented = None;
         self.held = Held::default();
-        drop(self.budget.reserve(self.packet_memory(packet))?);
+        let memory = self.packet_memory(packet)?;
+        let available = self.budget.available();
+        if memory > available {
+            return Err(Error::Backpressure {
+                requested: memory,
+                available,
+            });
+        }
         self.step(Some(packet), 0, pts, work, cancel)
     }
 
@@ -426,16 +436,16 @@ impl ReceiverDecoder {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Status<'_>> {
-        let mut held = std::mem::replace(&mut self.held_packet, BudgetVec::new(&self.budget));
         let granted = work.remaining();
         let mut banked = WorkBudget::new(granted.saturating_add(self.credit));
-        let progress = self.run(
-            packet.unwrap_or(held.as_slice()),
-            start,
-            pts,
-            &mut banked,
-            cancel,
-        );
+        let progress = if let Some(packet) = packet {
+            self.run(packet, start, pts, &mut banked, cancel)
+        } else {
+            let held = std::mem::replace(&mut self.held_packet, BudgetVec::new(&self.budget));
+            let progress = self.run(held.as_slice(), start, pts, &mut banked, cancel);
+            self.held_packet = held;
+            progress
+        };
         let halt = match progress {
             Progress::Done => None,
             Progress::Halted { at, why } => Some((at, why)),
@@ -455,12 +465,11 @@ impl ReceiverDecoder {
         };
         let copied = match (kept, packet) {
             (Some(_), Some(packet)) => {
-                held.clear();
-                held.try_extend_from_slice(packet)
+                self.held_packet.clear();
+                self.held_packet.try_extend_from_slice(packet)
             }
             _ => Ok(()),
         };
-        self.held_packet = held;
         if let Some(offset) = kept {
             copied?;
             self.suspended = Some(Suspended { pts, offset });

@@ -84,15 +84,11 @@ impl Region {
     }
 }
 
-/// The allocations an epoch holds, for [`memory`](super::memory) to plan a
-/// packet's against.
+/// The vectors an epoch holds, for [`memory`](super::memory) to plan a
+/// packet's allocations against: each one's length and capacity.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Holdings {
-    /// By region id.
-    pub(super) regions: [Option<RegionHoldings>; 256],
     pub(super) region_slots: (usize, usize),
-    /// By CLUT id: whether it is defined.
-    pub(super) cluts: [bool; 256],
     pub(super) clut_slots: (usize, usize),
     pub(super) object_set: bool,
 }
@@ -101,6 +97,7 @@ pub(super) struct Holdings {
 /// placements' count and capacity, and the bound of its pixel values.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct RegionHoldings {
+    pub(super) id: u8,
     pub(super) pixels: (usize, usize),
     pub(super) objects: (usize, usize),
     /// Every pixel value is below this.
@@ -198,25 +195,24 @@ impl Epoch {
     }
 
     pub(super) fn holdings(&self) -> Holdings {
-        let mut regions = [None; 256];
-        for region in self.regions.as_slice() {
-            regions[usize::from(region.id)] = Some(RegionHoldings {
-                pixels: (region.pixels.len(), region.pixels.capacity()),
-                objects: (region.objects.len(), region.objects.capacity()),
-                values: region.values,
-            });
-        }
-        let mut cluts = [false; 256];
-        for clut in self.cluts.as_slice() {
-            cluts[usize::from(clut.id)] = true;
-        }
         Holdings {
-            regions,
             region_slots: (self.regions.len(), self.regions.capacity()),
-            cluts,
             clut_slots: (self.cluts.len(), self.cluts.capacity()),
             object_set: !self.objects.words.is_empty(),
         }
+    }
+
+    pub(super) fn region_holdings(&self) -> impl Iterator<Item = RegionHoldings> + '_ {
+        self.regions.iter().map(|region| RegionHoldings {
+            id: region.id,
+            pixels: (region.pixels.len(), region.pixels.capacity()),
+            objects: (region.objects.len(), region.objects.capacity()),
+            values: region.values,
+        })
+    }
+
+    pub(super) fn has_clut(&self, id: u8) -> bool {
+        self.cluts.iter().any(|clut| clut.id == id)
     }
 
     pub(super) fn region_at(&self, index: usize) -> &Region {
