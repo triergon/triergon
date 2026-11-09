@@ -1561,12 +1561,19 @@ mod tests {
                 let Value::Object(fields) = row else {
                     unreachable!()
                 };
-                fields.push((
-                    "reference_refusal".into(),
-                    Value::str(
-                        "no single-input reference operation for more than one media entity",
+                let expected = fields
+                    .iter()
+                    .position(|(key, _)| key == "expected")
+                    .unwrap();
+                fields.insert(
+                    expected,
+                    (
+                        "reference_refusal".into(),
+                        Value::str(
+                            "no single-input reference operation for more than one media entity",
+                        ),
                     ),
-                ));
+                );
                 for (key, value) in fields {
                     match key.as_str() {
                         "expected" => {
