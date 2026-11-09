@@ -133,6 +133,16 @@
       "bytes": 4578928,
       "digest": 3233143565032904036
     },
+    "clip-vector-empty-ass-1080p": {
+      "packets": 33,
+      "bytes": 301120,
+      "digest": 18444867028647299271
+    },
+    "clip-vector-empty-ass-720p": {
+      "packets": 33,
+      "bytes": 213984,
+      "digest": 1971397471732921091
+    },
     "clip-ass-1080p": {
       "packets": 168,
       "bytes": 8708704,
