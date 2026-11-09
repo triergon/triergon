@@ -3,13 +3,13 @@ mod lane;
 mod model;
 use crate::clock::{ClockKey, SourceTimePolicy};
 use crate::compat::annex_b::VideoEofPolicy;
-use crate::compat::latm;
+use crate::compat::{dvb, latm};
 use crate::psi::DescriptorNamespace;
 use crate::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
 use lane::{Lane, LaneStep, StorageScan};
 pub use model::{
-    Ac3AccessUnit, AccessUnit, IncompleteVideo, LoasFrame, Packet, PacketClock, PayloadSource,
-    ReaderEvent, SourceEvent, Track,
+    Ac3AccessUnit, AccessUnit, DvbSubtitleUnit, IncompleteVideo, LoasFrame, Packet, PacketClock,
+    PayloadSource, ReaderEvent, SourceEvent, Track,
 };
 use model::{ClockContext, Shared};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -47,6 +47,8 @@ pub struct ReaderLimits {
     pub video_eof_policy: VideoEofPolicy,
     /// LOAS framing by default. PES preservation emits source observations.
     pub latm_packet_policy: latm::PacketPolicy,
+    /// Reporting of a validated DVB subtitle prefix with an unfinished segment.
+    pub dvb_subtitle_tail_policy: dvb::TailPolicy,
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
@@ -67,6 +69,7 @@ impl Default for ReaderLimits {
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             video_eof_policy: VideoEofPolicy::RejectUnframed,
             latm_packet_policy: latm::PacketPolicy::Strict,
+            dvb_subtitle_tail_policy: dvb::TailPolicy::RejectTruncated,
             maximum_access_units: 32_000_000,
             maximum_pes_per_access_unit: 4096,
             elementary_input_window: 64 * 1024,
@@ -292,6 +295,9 @@ impl Reader {
         match packet.access_unit() {
             AccessUnit::IncompleteAudio { .. } => {
                 Event::Other(ReaderEvent::IncompleteAudio(packet))
+            }
+            AccessUnit::DvbSubtitle(unit) if unit.truncated => {
+                Event::Other(ReaderEvent::DvbSubtitlePrefix(packet))
             }
             AccessUnit::Video(unit) if !unit.has_vcl => {
                 Event::Other(ReaderEvent::VideoHeaders(packet))

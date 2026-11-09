@@ -153,8 +153,17 @@ opaque, so sample count, duration and decoder configuration are unspecified.
 LATM PES and its clock context as a separate `ReaderEvent::LatmPes` observation.
 [ITU-T H.222.0, §2.11.2](https://www.itu.int/rec/dologin_pub.asp?id=T-REC-H.222.0-202308-S%21%21PDF-E&lang=e&type=items)
 
+DVB subtitle streams in the declared DVB namespace yield complete segment
+groups from aligned private PES with a source PTS. The reader retains service
+descriptors, the exact PES and its byte ranges. The packet payload contains
+the original segment headers and bodies. The two-byte data-field header and
+the end marker remain in the PES. The explicit
+`compat::dvb::TailPolicy::ReportCompletePrefix` reports complete segments
+before an overlong final segment through `ReaderEvent::DvbSubtitlePrefix`.
+[ETSI EN 300 743 §§6.2 and 7.1](https://www.etsi.org/deliver/etsi_en/300700_300799/300743/01.06.01_60/en_300743v010601p.pdf)
+
 The framers preserve original parameter sets and coded audio envelopes.
-MPEG audio/video, subtitles, descriptors declaring additional independent
+MPEG audio/video, other subtitle carriages, descriptors declaring additional independent
 E-AC-3 services and ambiguous private streams report `ReaderEvent::Unsupported`
 with original PMTs and PES available as source events.
 

@@ -11,6 +11,8 @@ use triergon_mpegts::{
     AccessUnit, AudioEofPolicy, Packet, PacketFormat, Reader, ReaderEvent, ReaderLimits, TraceEvent,
 };
 
+#[path = "container_reader/dvb.rs"]
+mod dvb;
 #[path = "container_reader/eac3.rs"]
 mod eac3;
 #[path = "container_reader/latm.rs"]
