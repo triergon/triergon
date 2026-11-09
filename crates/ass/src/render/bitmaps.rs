@@ -82,9 +82,9 @@ impl CacheKey for BitmapKey {
     }
 }
 
-/// A bitmap kept, `None` when it draws nothing, with the stroked border or
-/// unit square it was drawn from, which libass's bitmap key holds as long as
-/// the bitmap is kept.
+/// A bitmap kept, `None` when it draws nothing, with the stroked border it
+/// was drawn from, which libass's bitmap key holds as long as the bitmap is
+/// kept.
 #[derive(Debug)]
 struct KeptBitmap {
     bitmap: Option<Arc<Bitmap>>,
@@ -221,7 +221,7 @@ impl Painter {
             source: BitmapSource::Outline(OutlineId(outline.clone())),
             transform: at.transform,
         };
-        let shape = &outline.shape;
+        let shape = Drawable::Shape(&outline.shape);
         bitmap(
             &mut self.bitmaps,
             &mut self.raster,
@@ -415,6 +415,7 @@ impl GlyphSource for CachedBitmaps<'_> {
             source: BitmapSource::Outline(OutlineId(self.glyph.clone())),
             transform: at.transform,
         };
+        let shape = Drawable::Shape(shape);
         let found = bitmap(self.bitmaps, raster, key.clone(), shape, None, at, work)?;
         self.fill = found.is_some().then_some(key);
         Ok(found)
@@ -426,21 +427,12 @@ impl GlyphSource for CachedBitmaps<'_> {
         at: Quantized,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap>> {
-        let unit_box = self.outlines.unit_box()?;
         let key = BitmapKey {
             source: BitmapSource::UnitBox,
             transform: at.transform,
         };
-        let shape = &unit_box.shape;
-        let found = bitmap(
-            self.bitmaps,
-            raster,
-            key.clone(),
-            shape,
-            Some(&unit_box),
-            at,
-            work,
-        )?;
+        let unit_box = Drawable::UnitBox;
+        let found = bitmap(self.bitmaps, raster, key.clone(), unit_box, None, at, work)?;
         self.border = found.is_some().then_some(key);
         Ok(found)
     }
@@ -463,7 +455,7 @@ impl GlyphSource for CachedBitmaps<'_> {
             source: BitmapSource::Border(OutlineId(self.glyph.clone()), stroke),
             transform: at.transform,
         };
-        let shape = &border.shape;
+        let shape = Drawable::Shape(&border.shape);
         let found = bitmap(
             self.bitmaps,
             raster,
@@ -478,14 +470,22 @@ impl GlyphSource for CachedBitmaps<'_> {
     }
 }
 
-/// The bitmap of `shape` under `key`, placed at `at`: from the cache, or
+/// What a bitmap is drawn from: a shape, or the unit square the raster
+/// keeps.
+#[derive(Clone, Copy)]
+enum Drawable<'a> {
+    Shape(&'a Shape),
+    UnitBox,
+}
+
+/// The bitmap of `drawable` under `key`, placed at `at`: from the cache, or
 /// drawn and kept with `drawn_from`. `None` when it draws nothing, which is
 /// kept too.
 fn bitmap(
     bitmaps: &mut Cache<BitmapKey, KeptBitmap>,
     raster: &mut Raster,
     key: BitmapKey,
-    shape: &Shape,
+    drawable: Drawable<'_>,
     drawn_from: Option<&Kept<OutlineValue>>,
     at: Quantized,
     work: &mut WorkBudget,
@@ -494,16 +494,23 @@ fn bitmap(
     let bitmap = match bitmaps.get(&key) {
         Lookup::Hit(found) => found.and_then(|kept| kept.bitmap.clone()),
         Lookup::Miss => {
-            let bitmap = raster.draw(shape, &at.transform, work)?.map(Arc::new);
-            let [first, second] = shape.outlines();
-            let size = sizes::bitmap(
-                bitmap.as_deref().map_or(0, pixels),
-                first.points().len().saturating_add(second.points().len()),
-                first
-                    .segments()
-                    .len()
-                    .saturating_add(second.segments().len()),
-            );
+            let (bitmap, points, segments) = match drawable {
+                Drawable::Shape(shape) => {
+                    let [first, second] = shape.outlines();
+                    (
+                        raster.draw(shape, &at.transform, work)?,
+                        first.points().len().saturating_add(second.points().len()),
+                        first
+                            .segments()
+                            .len()
+                            .saturating_add(second.segments().len()),
+                    )
+                }
+                // libass's box outline: four points and four segments.
+                Drawable::UnitBox => (raster.draw_box(&at.transform, work)?, 4, 4),
+            };
+            let bitmap = bitmap.map(Arc::new);
+            let size = sizes::bitmap(bitmap.as_deref().map_or(0, pixels), points, segments);
             let kept = KeptBitmap {
                 bitmap: bitmap.clone(),
                 _drawn_from: drawn_from.cloned(),

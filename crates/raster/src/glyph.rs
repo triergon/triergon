@@ -501,7 +501,8 @@ pub trait GlyphSource {
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap>>;
 
-    /// The opaque box: [`Shape::unit_box`] under `at`.
+    /// The opaque box: [`Shape::unit_box`] under `at`
+    /// ([`Raster::draw_box`]).
     ///
     /// # Errors
     ///
@@ -559,11 +560,7 @@ impl GlyphSource for Drawing {
         at: Quantized,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap>> {
-        let unit_box = Shape::unit_box(&raster.budget)?;
-        Ok(Self::placed(
-            raster.draw(&unit_box, &at.transform, work)?,
-            at,
-        ))
+        Ok(Self::placed(raster.draw_box(&at.transform, work)?, at))
     }
 
     fn border(
@@ -662,6 +659,27 @@ impl Raster {
         })?;
         self.rasterizer
             .rasterize(&self.transformed, &self.limits, work)
+    }
+
+    /// The bitmap of an opaque box: [`Shape::unit_box`] under the quantised
+    /// `transform` of [`PlacedBorder::Box`], drawn from the one unit square
+    /// the raster keeps; see [`Raster::draw`].
+    ///
+    /// # Errors
+    ///
+    /// Those of [`Raster::draw`].
+    pub fn draw_box(
+        &mut self,
+        transform: &BitmapTransform,
+        work: &mut WorkBudget,
+    ) -> Result<Option<Bitmap>> {
+        let unit_box = match self.unit_box.take() {
+            Some(unit_box) => unit_box,
+            None => Shape::unit_box(&self.budget)?,
+        };
+        let drawn = self.draw(&unit_box, transform, work);
+        self.unit_box = Some(unit_box);
+        drawn
     }
 
     /// The border of `glyph` for [`PlacedBorder::Stroke`]: its first outline

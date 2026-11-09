@@ -262,10 +262,11 @@ level, its hinting modes, selective style overrides and track features.
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
 default is libass's (10,000 outlines, 128 MiB of glyph bitmaps, 64 MiB of
 composites), and `CacheLimits::new(glyphs, megabytes)` gives what
-`ass_set_cache_limits` sets. Outlines (glyphs, drawings, stroked borders
-and the unit square of opaque boxes), glyph bitmaps (with a bitmap that
-draws nothing) and composited runs are kept between frames in one kind of
-cache, bounded by the outline count and the two byte limits. When a frame
+`ass_set_cache_limits` sets. Outlines (glyphs, drawings and stroked
+borders; libass also counts the unit square of opaque boxes, which the
+raster keeps), glyph bitmaps (with a bitmap that draws nothing) and
+composited runs are kept between frames in one kind of cache, bounded by
+the outline count and the two byte limits. When a frame
 starts the composites, then the bitmaps, then the outlines are cut as libass
 cuts its caches (`ass_cache_cut`): least recently used first, until what is
 kept fits, never one the previous frame's images or another entry's key

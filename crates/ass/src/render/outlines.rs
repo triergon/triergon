@@ -1,8 +1,8 @@
 //! Outlines as libass's outline cache builds them (`ass_outline_construct`):
 //! a glyph loaded at its drawn size without hinting, with libass's
 //! synthetic styles and decoration lines, or a drawing parsed, with its
-//! advance and the face's ascent and descent; a glyph's border stroked; and
-//! the unit square opaque boxes are drawn from.
+//! advance and the face's ascent and descent; and a glyph's border
+//! stroked.
 
 use std::hash::{Hash, Hasher};
 
@@ -90,7 +90,6 @@ enum OutlineKey {
     /// A drawing by its text.
     Drawing(BudgetVec<u8>),
     Border(BorderKey),
-    UnitBox,
 }
 
 /// An outline's key as it is looked up, a drawing's text borrowed from the
@@ -100,7 +99,6 @@ enum KeyRef<'a> {
     Glyph(&'a GlyphKey),
     Drawing(&'a [u8]),
     Border(&'a BorderKey),
-    UnitBox,
 }
 
 impl CacheKey for OutlineKey {
@@ -111,7 +109,6 @@ impl CacheKey for OutlineKey {
             Self::Glyph(glyph) => KeyRef::Glyph(glyph),
             Self::Drawing(text) => KeyRef::Drawing(text),
             Self::Border(border) => KeyRef::Border(border),
-            Self::UnitBox => KeyRef::UnitBox,
         }
     }
 
@@ -120,8 +117,9 @@ impl CacheKey for OutlineKey {
     }
 }
 
-/// Outlines built so far: glyphs, drawings, borders and the unit square,
-/// each counted as 1 as libass counts its outline entries, and cut to the
+/// Outlines built so far: glyphs, drawings and borders, each counted as 1
+/// as libass counts its outline entries (libass also counts the unit
+/// square of opaque boxes, which the raster keeps here), and cut to the
 /// outline limit of the renderer's [`CacheLimits`](super::CacheLimits) as
 /// libass cuts its outline cache (see [`Cache`]). Their storage is charged
 /// to the renderer's budget.
@@ -208,18 +206,6 @@ impl Outlines {
             .stroke_border(&glyph.shape, &stroke, work)?
             .map(OutlineValue::of_shape);
         self.keep(OutlineKey::Border(key), value)
-    }
-
-    /// The unit square opaque boxes are drawn from.
-    pub(super) fn unit_box(&mut self) -> Result<Kept<OutlineValue>> {
-        if let Lookup::Hit(Some(found)) = self.find(KeyRef::UnitBox) {
-            return Ok(found);
-        }
-        let value = OutlineValue::of_shape(Shape::unit_box(&self.budget)?);
-        match self.keep(OutlineKey::UnitBox, Some(value))? {
-            Some(kept) => Ok(kept),
-            None => Err(Error::Invalid("the unit square is kept")),
-        }
     }
 
     /// The outline of a drawing, `None` when libass discards it.
