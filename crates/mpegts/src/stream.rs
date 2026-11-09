@@ -1411,16 +1411,32 @@ impl TransportStream {
                     entity,
                     offset,
                 ),
-            Route::Pes(index) => self.routes.as_mut_slice()[index]
-                .assembler
-                .as_mut()
-                .ok_or(Error::Invalid("PES route missing"))?
-                .push(
+            Route::Pes(index) => {
+                let assembler = self.routes.as_mut_slice()[index]
+                    .assembler
+                    .as_mut()
+                    .ok_or(Error::Invalid("PES route missing"))?;
+                if !pusi
+                    && self.feed_omissions.is_none()
+                    && assembler.retain_body_carrier(
+                        payload,
+                        SourceLocation {
+                            source: entity,
+                            offset,
+                        },
+                        work,
+                    )
+                {
+                    self.phase = 7;
+                    return Ok(());
+                }
+                assembler.push(
                     payload.take().ok_or(Error::Invalid("TS payload missing"))?,
                     pusi,
                     entity,
                     offset,
-                ),
+                )
+            }
             Route::Clock | Route::Ignore => {
                 self.phase = 7;
                 return Ok(());

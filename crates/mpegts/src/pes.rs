@@ -337,6 +337,49 @@ impl PesAssembler {
             && self.header.is_some()
     }
 
+    /// Keep a whole continuation when no span growth or PES publication is due.
+    pub(crate) fn retain_body_carrier(
+        &mut self,
+        payload: &mut Option<Bytes>,
+        source: SourceLocation,
+        work: &mut WorkBudget,
+    ) -> bool {
+        let Some(bytes) = payload.as_ref() else {
+            return false;
+        };
+        let count = bytes.len();
+        let end = self.total.map_or(self.limits.pes_bytes, |end| end - 1);
+        let spans = self.spans.len();
+        if !self.validating_body()
+            || count == 0
+            || count > end.saturating_sub(self.seen)
+            || spans == self.spans.capacity()
+            || spans == self.limits.source_spans
+            || self.next_chunk == u64::MAX
+            || source.offset.checked_add(count as u64).is_none()
+            || !bytes.belongs_to(&self.budget)
+            || !work.try_charge(count as u64)
+        {
+            return false;
+        }
+        self.spans
+            .try_push(PesSpan {
+                bytes: payload.take().expect("whole PES carrier"),
+                range: 0..count,
+                source: SourceRange {
+                    entity: source.source,
+                    offset: source.offset,
+                    bytes: count,
+                },
+                chunk: self.next_chunk,
+            })
+            .expect("space for the PES span");
+        self.next_chunk += 1;
+        self.payload_len += count;
+        self.seen += count;
+        true
+    }
+
     /// Capacity before a finite PES completes and needs ordinary publication.
     pub(crate) fn body_run_capacity(&self, carrier_payload: usize) -> usize {
         if !self.validating_body() {
