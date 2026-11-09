@@ -134,13 +134,13 @@ struct Scan {
     position: usize,
     remaining: u8,
     kind: AvcConfigArrayKind,
-    extension: Option<[u8; 4]>,
 }
 
 enum Event {
     Group {
         kind: AvcConfigArrayKind,
         start: usize,
+        extension: Option<[u8; 4]>,
     },
     Nal {
         kind: AvcConfigArrayKind,
@@ -159,7 +159,6 @@ impl Scan {
             position: 6,
             remaining: 0,
             kind: AvcConfigArrayKind::Sequence,
-            extension: None,
         }
     }
 
@@ -172,6 +171,7 @@ impl Scan {
                 5,
                 raw[5] & 31,
                 ScanPhase::Picture,
+                None,
             ),
             ScanPhase::Picture => {
                 let count_offset = self.position;
@@ -182,6 +182,7 @@ impl Scan {
                     count_offset,
                     count,
                     ScanPhase::Extension,
+                    None,
                 )
             }
             ScanPhase::Extension => {
@@ -198,13 +199,13 @@ impl Scan {
                     .ok_or(Error::Truncated)?
                     .try_into()
                     .map_err(|_| Error::Truncated)?;
-                self.extension = Some(bytes);
                 self.position = end;
                 self.group(
                     AvcConfigArrayKind::SequenceExtension,
                     start,
                     bytes[3],
                     ScanPhase::End,
+                    Some(bytes),
                 )
             }
             ScanPhase::Nals => {
@@ -244,6 +245,7 @@ impl Scan {
         start: usize,
         count: u8,
         after: ScanPhase,
+        extension: Option<[u8; 4]>,
     ) -> Result<Event> {
         self.kind = kind;
         self.remaining = count;
@@ -253,7 +255,11 @@ impl Scan {
         } else {
             ScanPhase::Nals
         };
-        Ok(Event::Group { kind, start })
+        Ok(Event::Group {
+            kind,
+            start,
+            extension,
+        })
     }
 }
 
@@ -419,6 +425,22 @@ impl AvcConfigParser {
 
     #[inline(never)]
     fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ConfigProgress> {
+        // Keep the cursor local for a step and save it only when returning to
+        // the caller. Each event still commits only after its work succeeds.
+        let mut scan = self.scan;
+        let progress = self.advance_scan(&mut scan, work, cancel);
+        self.scan = scan;
+        progress
+    }
+
+    #[inline(always)]
+    fn advance_scan(
+        &mut self,
+        scan: &mut Scan,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ConfigProgress> {
+        let input = self.raw.as_ref().map(|raw| (raw.as_ref(), raw.budget()));
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -429,17 +451,13 @@ impl AvcConfigParser {
             if !work.try_charge(1) {
                 return Ok(ConfigProgress::Yield);
             }
-            let raw = self
-                .raw
-                .as_ref()
-                .ok_or(Error::Invalid("missing AVC record"))?;
+            let (raw, pool) = input.ok_or(Error::Invalid("missing AVC record"))?;
             match self.phase {
                 Phase::Prefix => {
-                    if raw.as_ref()[0] != 1 {
+                    if raw[0] != 1 {
                         return Err(Error::Unsupported("AVC configuration version"));
                     }
                     let prefix: [u8; 6] = raw
-                        .as_ref()
                         .get(..6)
                         .ok_or(Error::Truncated)?
                         .try_into()
@@ -455,10 +473,14 @@ impl AvcConfigParser {
                     self.phase = Phase::Count;
                 }
                 Phase::Count | Phase::Fill => {
-                    let mut next = self.scan;
-                    let event = next.next(raw.as_ref(), self.limits)?;
+                    let mut next = *scan;
+                    let event = next.next(raw, self.limits)?;
                     match event {
-                        Event::Group { kind, start } if matches!(self.phase, Phase::Count) => {
+                        Event::Group {
+                            kind,
+                            start,
+                            extension,
+                        } if matches!(self.phase, Phase::Count) => {
                             let start = u32::try_from(start).map_err(|_| Error::Overflow)?;
                             let slot = self
                                 .arrays
@@ -472,6 +494,12 @@ impl AvcConfigParser {
                                 nal_count: 0,
                             };
                             self.array_count += 1;
+                            if let Some(extension) = extension {
+                                self.fields
+                                    .as_mut()
+                                    .ok_or(Error::Invalid("missing AVC fields"))?
+                                    .extension = Some(extension);
+                            }
                         }
                         Event::GroupEnd(end) if matches!(self.phase, Phase::Count) => {
                             let slot = &mut self.arrays[self.array_count - 1];
@@ -505,10 +533,6 @@ impl AvcConfigParser {
                         Event::End(end) => {
                             if matches!(self.phase, Phase::Count) {
                                 self.understood_end = end;
-                                self.fields
-                                    .as_mut()
-                                    .ok_or(Error::Invalid("missing AVC fields"))?
-                                    .extension = next.extension;
                                 self.phase = Phase::Reserve;
                             } else {
                                 return self.publication_ready(end);
@@ -516,14 +540,14 @@ impl AvcConfigParser {
                         }
                         _ => {}
                     }
-                    self.scan = next;
+                    *scan = next;
                 }
                 Phase::Reserve => {
                     let nals = self
                         .nals
                         .as_mut()
                         .ok_or(Error::Invalid("missing AVC descriptors"))?;
-                    nals.reserve(raw.budget(), self.total)?;
+                    nals.reserve(pool, self.total)?;
 
                     // A complete small record can reuse the first walk's facts.
                     // Charge the group, NAL and end events of the usual fill.
@@ -536,7 +560,7 @@ impl AvcConfigParser {
                         }
                         return self.publication_ready(self.understood_end);
                     }
-                    self.scan = Scan::new();
+                    *scan = Scan::new();
                     self.phase = Phase::Fill;
                 }
                 Phase::Complete => return Ok(ConfigProgress::Complete),
