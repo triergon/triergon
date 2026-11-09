@@ -92,6 +92,16 @@ impl Outline {
         self.segments.clear();
     }
 
+    /// Gives back the storage beyond the points and segments it holds.
+    ///
+    /// # Errors
+    ///
+    /// The budget's errors; the outline is then unchanged.
+    pub fn shrink_to_fit(&mut self) -> Result<()> {
+        self.points.try_shrink_to(self.points.len())?;
+        self.segments.try_shrink_to(self.segments.len())
+    }
+
     /// Bytes of storage currently charged.
     pub fn retained_bytes(&self) -> usize {
         self.points.capacity() * size_of::<Vector>()
@@ -591,6 +601,22 @@ mod tests {
             point: Point::new(x, y),
             kind: PointKind::On,
         }
+    }
+
+    #[test]
+    fn a_fitted_outline_keeps_only_what_it_holds() {
+        let budget = Budget::new(1 << 16).unwrap();
+        let mut outline = Outline::new(&budget);
+        for x in 0..20 {
+            outline
+                .push_rect(Vector::new(x, 0), Vector::new(x + 1, 1))
+                .unwrap();
+        }
+        let points = outline.points().to_vec();
+        outline.shrink_to_fit().unwrap();
+        assert_eq!(outline.points(), points.as_slice());
+        let held = size_of_val(outline.points()) + size_of_val(outline.segments());
+        assert_eq!(outline.retained_bytes(), held);
     }
 
     #[test]

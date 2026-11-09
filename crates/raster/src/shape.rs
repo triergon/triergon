@@ -94,6 +94,18 @@ impl Shape {
         };
     }
 
+    /// Gives back the storage beyond what its outlines hold, for a shape
+    /// kept once built.
+    ///
+    /// # Errors
+    ///
+    /// The budget's errors.
+    pub fn shrink_to_fit(&mut self) -> Result<()> {
+        self.outlines
+            .iter_mut()
+            .try_for_each(Outline::shrink_to_fit)
+    }
+
     /// Bytes of outline storage currently charged.
     pub fn retained_bytes(&self) -> usize {
         self.outlines.iter().map(Outline::retained_bytes).sum()

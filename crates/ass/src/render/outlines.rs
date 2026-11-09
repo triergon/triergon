@@ -213,9 +213,15 @@ impl Outlines {
         if let Some(found) = self.find(KeyRef::Border(&key)) {
             return found;
         }
-        let value = raster
-            .stroke_border(&glyph.shape, &stroke, work)?
-            .map(OutlineValue::of_shape);
+        let value = match raster.stroke_border(&glyph.shape, &stroke, work)? {
+            Some(mut shape) => {
+                // The stroker grows its output as it goes; a kept border
+                // keeps only what it holds.
+                shape.shrink_to_fit()?;
+                Some(OutlineValue::of_shape(shape))
+            }
+            None => None,
+        };
         self.keep(OutlineKey::Border(key), value)
     }
 
