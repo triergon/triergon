@@ -2,10 +2,12 @@
 //! `subtitle-text-` operations of the formats build of `harness/reference.c`
 //! (`harness/reference_pgs.h`, `harness/reference_subtitle_text.h`).
 //!
-//! usage: subtitle-capsule-worker pgs-{fold,memory} CAPSULE
-//! | pgs-bench CAPSULE ITERATIONS
-//! | subtitle-text-{fold,memory} FILE KIND [ENCODING]
-//! | subtitle-text-bench FILE ITERATIONS KIND [ENCODING]
+//! ```text
+//! subtitle-capsule-worker pgs-{fold,memory} CAPSULE
+//! subtitle-capsule-worker pgs-bench CAPSULE ITERATIONS
+//! subtitle-capsule-worker subtitle-text-{fold,memory} FILE KIND [ENCODING]
+//! subtitle-capsule-worker subtitle-text-bench FILE ITERATIONS KIND [ENCODING]
+//! ```
 //!
 //! The `pgs-` modes ([`pgs`]) fold recorded PGS case capsules and the
 //! `subtitle-text-` modes ([`text`]) text subtitle sessions and documents, each

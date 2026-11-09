@@ -590,8 +590,9 @@ fn operation(pool: &Budget, prepared: &Prepared, cancel: &AtomicBool, quantum: u
     }
 }
 
-/// `subtitle-text-fold FILE KIND [ENCODING]`, `subtitle-text-bench FILE N KIND
-/// [ENCODING]` or `subtitle-text-memory FILE KIND [ENCODING]`; KIND is `packets`,
+/// `subtitle-text-fold FILE KIND [ENCODING]`,
+/// `subtitle-text-bench FILE N KIND [ENCODING]` or
+/// `subtitle-text-memory FILE KIND [ENCODING]`; KIND is `packets`,
 /// `srt` or `vtt`.
 pub fn run(args: &[String]) -> Result<()> {
     let invocation = Invocation::parse(args, PREFIX, " KIND [ENCODING]", 1..=2, false)?;
