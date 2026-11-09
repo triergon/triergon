@@ -56,7 +56,6 @@ pub const GENERATOR: Generator = Generator {
     command: "fonts",
     main: super::main,
     candidate: "font-worker",
-    reference: "freetype-native",
     pin_note: "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
     report_directory: ".research/font-report",
     manifest_directory: ".research/fonts/manifests",
@@ -206,6 +205,9 @@ mod tests {
         copy("pins.json");
         assert!(GENERATOR.check(&root).is_empty());
         let pins = std::fs::read_to_string(feature.join("pins.json")).unwrap();
+        let other_reference = pins.replacen("freetype-native", "other-reference", 1);
+        std::fs::write(feature.join("pins.json"), other_reference).unwrap();
+        assert!(GENERATOR.check(&root)[0].contains("pin reference differs"));
         std::fs::write(feature.join("pins.json"), pins.replace("\n  ", "\n ")).unwrap();
         assert!(
             GENERATOR.check(&root)[0].contains("not in the form"),

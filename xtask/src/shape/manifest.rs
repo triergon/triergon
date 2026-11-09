@@ -216,7 +216,6 @@ pub const GENERATOR: Generator = Generator {
     command: "shape",
     main: super::main,
     candidate: "shape-worker",
-    reference: "harfbuzz-native",
     pin_note: "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
     report_directory: ".research/shape-report",
     manifest_directory: ".research/shape/manifests",

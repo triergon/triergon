@@ -28,9 +28,7 @@ pub struct Generator {
     pub main: fn(&Path, &[String]) -> R<()>,
     /// Candidate worker named by this generator's feature contracts.
     pub candidate: &'static str,
-    /// The reference worker the pins are recorded from, by its identity record.
-    pub reference: &'static str,
-    /// The pin files' note.
+    /// The default note for this generator's pin files.
     pub pin_note: &'static str,
     /// Where `COMMAND compare` reports and `COMMAND manifest` writes by default.
     pub report_directory: &'static str,
@@ -100,11 +98,25 @@ fn required_gate(root: &Path, id: &str) -> R<Gate> {
     gate(id, &contract(root, id)?)?.ok_or_else(|| format!("{id}: missing gate"))
 }
 
+fn reference_name<'a>(document: &'a Value, feature: &str) -> R<&'a str> {
+    document
+        .get("reference")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{feature}: no reference worker"))
+}
+
 /// The pins of `id`: case id to expected work.
 fn pins(root: &Path, id: &str) -> R<Vec<(String, Value)>> {
     let path = pins_path(root, id);
     let document =
         crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let contract = contract(root, id)?;
+    if document.get("reference").and_then(Value::as_str) != Some(reference_name(&contract, id)?) {
+        return Err(format!(
+            "{}: pin reference differs from the feature contract",
+            path.display()
+        ));
+    }
     match document.get("pins") {
         Some(Value::Object(pins)) => Ok(pins.clone()),
         _ => Err(format!("{}: no pins", path.display())),
@@ -229,11 +241,15 @@ impl Generator {
     }
 
     /// The pin file holding `pins` in case order.
-    fn pin_file(&self, pins: Vec<(String, Value)>) -> Value {
+    fn pin_file(&self, reference: &str, document: &Value, pins: Vec<(String, Value)>) -> Value {
+        let note = document
+            .get("pin_note")
+            .and_then(Value::as_str)
+            .unwrap_or(self.pin_note);
         Value::object([
             ("schema", Value::int(1)),
-            ("reference", Value::str(self.reference)),
-            ("note", Value::str(self.pin_note)),
+            ("reference", Value::str(reference)),
+            ("note", Value::str(note)),
             ("pins", Value::Object(pins)),
         ])
     }
@@ -252,11 +268,19 @@ impl Generator {
         let mut errors = (self.check_inputs)(root);
         for id in features {
             let feature = id.as_str();
-            let gate = required_gate(root, feature);
+            let document = match contract(root, feature) {
+                Ok(document) => document,
+                Err(error) => {
+                    errors.push(error);
+                    continue;
+                }
+            };
+            let gate = gate(feature, &document)
+                .and_then(|value| value.ok_or_else(|| format!("{feature}: missing gate")));
             if let Err(error) = &gate {
                 errors.push(error.clone());
             }
-            if contract(root, feature).is_ok_and(|c| c.get("pin_operation").is_some()) {
+            if document.get("pin_operation").is_some() {
                 errors.push(format!(
                     "{feature}: pins are recorded with worker_operation; \
                      name the features whose pins apply in cases_from"
@@ -283,8 +307,17 @@ impl Generator {
                 }
                 continue;
             }
+            let reference = match reference_name(&document, feature) {
+                Ok(reference) => reference,
+                Err(error) => {
+                    errors.push(error);
+                    continue;
+                }
+            };
             let committed = std::fs::read_to_string(&path).unwrap_or_default();
-            match pins(root, feature).map(|pins| canonical(&self.pin_file(pins))) {
+            match pins(root, feature)
+                .map(|pins| canonical(&self.pin_file(reference, &document, pins)))
+            {
                 Ok(text) if text == committed => {}
                 _ => errors.push(format!(
                     "{}: not in the form `cargo xtask {} manifest --record` writes",
@@ -302,36 +335,39 @@ impl Generator {
     /// `required_targets`, and keeps the other targets'.
     pub fn record(&self, root: &Path) -> R<()> {
         let identity = crate::checks::read_json(&root.join("target/harness/identity.json"))?;
-        let reference = crate::harness::comparison::reference_named(&identity, self.reference)?;
-        let worker = root.join(
-            reference
-                .get("path")
-                .and_then(Value::as_str)
-                .unwrap_or_default(),
-        );
-        let built = crate::sha256::hex(
-            &std::fs::read(&worker).map_err(|e| format!("{}: {e}", worker.display()))?,
-        );
-        if reference.get("sha256").and_then(Value::as_str) != Some(built.as_str()) {
-            return Err(format!(
-                "the {} reference changed since build-workers; rebuild",
-                self.reference
-            ));
-        }
-        self.record_with(root, &worker, &crate::harness::report::host_target(), false)
+        self.record_with(
+            root,
+            &crate::harness::report::host_target(),
+            false,
+            |name| {
+                let reference = crate::harness::comparison::reference_named(&identity, name)?;
+                let path = reference
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| format!("{name}: no built reference path"))?;
+                let worker = root.join(path);
+                let built = crate::sha256::file_hex(&worker)
+                    .map_err(|e| format!("{}: {e}", worker.display()))?;
+                if reference.get("sha256").and_then(Value::as_str) != Some(built.as_str()) {
+                    return Err(format!(
+                        "the {name} reference changed since build-workers; rebuild"
+                    ));
+                }
+                Ok(worker)
+            },
+        )
     }
 
-    /// Records with `worker` as the reference on `target`; with `per_target_only`
-    /// only the features pinned per target, for a target where the workers'
-    /// build identity is not recorded.
+    /// Resolve each selected feature's reference before recording any pins.
     fn record_with(
         &self,
         root: &Path,
-        worker: &Path,
         target: &str,
         per_target_only: bool,
+        mut worker_for: impl FnMut(&str) -> R<PathBuf>,
     ) -> R<()> {
         (self.write_inputs)(root)?;
+        let mut selected = Vec::new();
         for id in self.features(root)? {
             let feature = id.as_str();
             let sources = self.sources(root, feature)?;
@@ -349,6 +385,12 @@ impl Generator {
                 println!("{feature}: pinned per target, and {target} is not one of its targets");
                 continue;
             }
+            let worker = worker_for(reference_name(&contract, feature)?)?;
+            selected.push((id, contract, per_target, worker));
+        }
+        for (id, contract, per_target, worker) in selected {
+            let feature = id.as_str();
+            let reference = reference_name(&contract, feature)?;
             let prefix = contract
                 .get("worker_operation")
                 .and_then(Value::as_str)
@@ -356,7 +398,7 @@ impl Generator {
                 .ok_or_else(|| format!("{feature}: no worker_operation"))?;
             let rows = (self.rows)(root, feature)?;
             let directory = root.join((self.directory)(feature));
-            let folds = fold_all(worker, &format!("{prefix}fold"), &directory, &rows)?;
+            let folds = fold_all(&worker, &format!("{prefix}fold"), &directory, &rows)?;
             // A feature pinned per target keeps the other targets' pins, so a
             // pin file it cannot read is an error, not an empty one.
             let earlier = if per_target && pins_path(root, feature).exists() {
@@ -392,7 +434,10 @@ impl Generator {
                 by_target.sort_by(|a, b| a.0.cmp(&b.0));
                 pinned.push((id.to_owned(), Value::Object(by_target)));
             }
-            crate::corpus::write_json(&pins_path(root, feature), &self.pin_file(pinned))?;
+            crate::corpus::write_json(
+                &pins_path(root, feature),
+                &self.pin_file(reference, &contract, pinned),
+            )?;
             let scope = if per_target {
                 format!(" for {target}")
             } else {
@@ -439,7 +484,15 @@ impl Generator {
         }
         match (record, target, worker) {
             (true, None, None) => self.record(root)?,
-            (true, Some(target), Some(worker)) => self.record_with(root, &worker, &target, true)?,
+            (true, Some(target), Some(worker)) => {
+                let mut reference = None;
+                self.record_with(root, &target, true, |name| {
+                    if reference.get_or_insert_with(|| name.to_owned()) != name {
+                        return Err("the selected features use different reference workers".into());
+                    }
+                    Ok(worker.clone())
+                })?;
+            }
             (false, None, None) => {}
             _ => return Err(usage.into()),
         }
@@ -868,6 +921,35 @@ mod tests {
             assert_eq!(found.len(), errors, "{gate}: {found:?}");
             assert!(found.iter().all(|e| e.contains("gate")), "{found:?}");
         }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn recording_resolves_each_reference_before_writing_any_pins() {
+        let root = crate::walk::scratch("generator-reference-selection");
+        let features = root.join("harness/features");
+        for (feature, reference) in [("font-one", "reference-one"), ("font-two", "reference-two")] {
+            let directory = features.join(feature);
+            std::fs::create_dir_all(&directory).unwrap();
+            std::fs::write(
+                directory.join("contract.json"),
+                format!(
+                    r#"{{"id":"{feature}","candidate":"font-worker","reference":"{reference}"}}"#
+                ),
+            )
+            .unwrap();
+        }
+        let mut requested = Vec::new();
+        let result = crate::fonts::GENERATOR.record_with(&root, "test-target", false, |name| {
+            requested.push(name.to_owned());
+            if name == "reference-two" {
+                return Err("missing worker".into());
+            }
+            Ok(root.join("first-worker"))
+        });
+        assert_eq!(requested, ["reference-one", "reference-two"]);
+        assert_eq!(result.unwrap_err(), "missing worker");
+        assert!(!features.join("font-one/pins.json").exists());
         std::fs::remove_dir_all(root).unwrap();
     }
 

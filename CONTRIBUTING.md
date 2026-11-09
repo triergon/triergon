@@ -72,7 +72,9 @@ benchmarks assume it.
 Register comparisons in `harness/features/<id>/contract.json`. The contract
 selects the candidate, reference and operation. Set its `gate` to `required`
 to include the comparison in `cargo xtask check`. Worker identities bind the
-registered contracts and their corpus inputs.
+registered contracts and their corpus inputs. Generated manifests record and
+verify their pins against the reference named in the contract. A generated
+feature can set `pin_note` to describe those pins.
 
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
 [docs/architecture.md](docs/architecture.md) for where code belongs.

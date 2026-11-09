@@ -91,7 +91,6 @@ pub const GENERATOR: Generator = Generator {
     command: "raster",
     main: super::main,
     candidate: "raster-worker",
-    reference: "libass-native",
     pin_note: "libass 0.17.5's folds, recorded by `cargo xtask raster manifest --record`; never edited by hand.",
     report_directory: ".research/raster-report",
     manifest_directory: ".research/raster/manifests",
