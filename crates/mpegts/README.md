@@ -366,6 +366,13 @@ Verification:
   original-cursor coverage and real EOF with `NoPacketsConfirmation`. That
   proof runs on the original source operation. The control-only replay runs
   inside the measured operation.
+  For an ordered sequence, each intermediate physical End is sealed before
+  the same cursor advances to its next request. Ordinary boundaries retain
+  PES assembly and the demux clock, including an initialization entity's
+  program map. A declared discontinuity requires drained PES assembly and
+  a new source map for the same elementary stream. Folded positions use the
+  sequence coordinate system. Source ranges and epochs remain physical
+  source facts.
   The 272 recorded requests are 97 compat-view operations. The AArch64 Linux
   gate build at `5634f47d`, with Rust 1.99.1 and default flags, checks all 97
   against the pinned FFmpeg formats worker and the unchanged recorded expected
