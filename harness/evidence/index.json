@@ -16999,6 +16999,15 @@
    "sha256": "ba09a896d810c6fbca384f2b47ae1b7b5981c9fbd36b9c4262caa36c3567d1e9",
    "bytes": 85733795,
    "source_revision": "7213bca65559deb8d87860afd9f74c8193a837d5"
+  },
+  {
+   "name": "mp4-range-opus-roll",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-opus-roll/fa73233358526ff6a4aad24e20467b1c1bcaaef772d86339b4df29ac5c300589.tar.gz",
+   "sha256": "fa73233358526ff6a4aad24e20467b1c1bcaaef772d86339b4df29ac5c300589",
+   "bytes": 87367200,
+   "source_revision": "a1bb29d99ef0573e40357e32d65f3dcec83249f7"
   }
  ]
 }
