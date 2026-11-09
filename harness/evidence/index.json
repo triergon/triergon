@@ -16794,6 +16794,16 @@
    "key": "evidence/mpegts-current-reader-comparison/e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a.tar.gz",
    "sha256": "e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a",
    "bytes": 84851549
+  },
+  {
+   "name": "mp4-range-dedicated-sample-entries",
+   "path": "mp4-range-dedicated-sample-entries",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mp4-range-dedicated-sample-entries/46789d11f9768aef71eead36ce8f2acc05c820abc95e19b4a3ffb36a09e9e71f.tar.gz",
+   "sha256": "46789d11f9768aef71eead36ce8f2acc05c820abc95e19b4a3ffb36a09e9e71f",
+   "bytes": 14900870,
+   "source_revision": "668ecf58571fd19eb7e9aba4020606b409229625"
   }
  ]
 }
