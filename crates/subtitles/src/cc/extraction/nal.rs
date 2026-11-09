@@ -7,10 +7,10 @@
 use super::captions::Gathered;
 use super::queue::{Entry, FrameQueue};
 use crate::cc::video::nal::{
-    self, Codec, Framing, SEI_RECOVERY_POINT, SEI_USER_DATA_REGISTERED, SliceType, Timing, h264,
-    hevc,
+    self, Codec, Framing, SEI_RECOVERY_POINT, SEI_USER_DATA_REGISTERED, SliceType, Timing,
 };
 use triergon_core::{Budget, Result};
+use triergon_framing::{avc, hevc};
 
 /// Frames wait for release until more than this many are decoded after them:
 /// deeper than any picture reordering the decoders allow.
@@ -110,13 +110,13 @@ impl NalDecode {
                         }
                     }
                 }
-                (Codec::H264, h264::SPS) | (Codec::Hevc, hevc::SPS) => {
+                (Codec::H264, avc::SPS) | (Codec::Hevc, hevc::SPS) => {
                     if let Some(found) = nal::sps_timing(codec, nal) {
                         progress.timing = Some(found);
                     }
                 }
                 (Codec::Hevc, hevc::EOS) => picture.end_of_sequence = true,
-                (Codec::H264, h264::SEI) | (Codec::Hevc, hevc::PREFIX_SEI) => {
+                (Codec::H264, avc::SEI) | (Codec::Hevc, hevc::PREFIX_SEI) => {
                     let gathered = &mut self.gathered;
                     let mut result = Ok(());
                     let mut buffer = [0; 256];
@@ -261,10 +261,10 @@ impl H264Output {
         };
         let intra = picture.slice_type.is_some_and(SliceType::is_intra);
         let Some(start) = self.start.as_mut() else {
-            if nal_type == h264::IDR || intra {
+            if nal_type == avc::IDR || intra {
                 self.start = Some(Start {
                     pts,
-                    heuristic: nal_type != h264::IDR && !picture.recovery_point,
+                    heuristic: nal_type != avc::IDR && !picture.recovery_point,
                     discard_next_p: false,
                 });
                 return Fate::Output;
@@ -301,7 +301,7 @@ impl HevcDecoding {
         let Some(nal_type) = picture.nal_type else {
             return Fate::Skip;
         };
-        let fate = if (hevc::BLA_W_LP..=hevc::IRAP_LAST).contains(&nal_type) {
+        let fate = if hevc::is_irap(nal_type) {
             self.skip_rasl =
                 !self.started || self.after_end_of_sequence || nal_type <= hevc::BLA_N_LP;
             self.started = true;

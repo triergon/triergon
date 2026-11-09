@@ -1,5 +1,5 @@
-//! Owned packet handoff to existing bitmap jobs. Source owners, unknown clocks,
-//! typed tails, strict errors and explicitly selected native views stay distinct.
+//! Owned packet handoff to the PGS and DVD receivers. Each output keeps its
+//! packet's owner, and unknown clocks stay unknown.
 use crate::Result;
 use std::sync::{
     Arc,
@@ -8,7 +8,7 @@ use std::sync::{
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Reservation, Rounding, SourceId, Time, TimeBase, WorkBudget,
 };
-use triergon_subtitles::{compat, dvd, pgs};
+use triergon_subtitles::{compat, pgs};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BitmapScope {
     pub source: SourceId,
@@ -129,42 +129,19 @@ fn allocate_owner<M>(
         _charge: charge,
     })))
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PgsMode {
-    StrictSource,
-    ExplicitNativeD32,
-    /// Select the pinned receiver's first public event and retained decoder context.
-    NativeCompatibility,
-}
-#[expect(
-    clippy::large_enum_variant,
-    reason = "bounded inline decoder state; no uncharged parser box"
-)]
-enum PgsDecoder {
-    Source(pgs::DisplayDecoder),
-    Native(compat::pgs::RecoveryDecoder),
-    Compatibility(compat::pgs::ReceiverDecoder),
-}
 pub struct PgsBridge<M> {
     pool: Budget,
     scope: BitmapScope,
-    decoder: PgsDecoder,
+    decoder: compat::pgs::ReceiverDecoder,
     pending: Option<BitmapOwner<M>>,
     pushed: bool,
     finished: bool,
     maximum_packet: usize,
 }
-pub struct PgsSourceOutput<M> {
+/// One decoded packet with the receiver's output for it.
+pub struct PgsOutput<M> {
     pub packet: BitmapOwner<M>,
-    pub display: pgs::DisplaySet,
-}
-pub struct PgsNativeOutput<M> {
-    pub packet: BitmapOwner<M>,
-    pub observations: pgs::RecoveredPacket,
-}
-pub struct PgsCompatibilityOutput<M> {
-    pub packet: BitmapOwner<M>,
-    pub observations: compat::pgs::ReceiverPacket,
+    pub decoded: compat::pgs::ReceiverPacket,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -194,12 +171,12 @@ impl<'a> PgsQueuePicture<'a> {
     }
 }
 
-impl<M> PgsCompatibilityOutput<M> {
+impl<M> PgsOutput<M> {
     /// Project the receiver's first native event to the packet-clock bitmap
     /// queue. A zero-rectangle event clears the track. An absent event or an
     /// event whose rectangles cannot be displayed leaves the queue unchanged.
     pub fn packet_clock_action(&self) -> Result<Option<PgsQueueAction<'_>>> {
-        let Some(event) = self.observations.receiver_output() else {
+        let Some(event) = self.decoded.receiver_output() else {
             return Ok(None);
         };
         let start_ns = packet_queue_start_ns(self.packet.input().clock)?;
@@ -207,7 +184,7 @@ impl<M> PgsCompatibilityOutput<M> {
         if rectangles.is_empty() {
             return Ok(Some(PgsQueueAction::Clear { at_ns: start_ns }));
         }
-        let [width, height] = self.observations.context_canvas;
+        let [width, height] = self.decoded.context_canvas;
         let canvas =
             queue_canvas_dimensions(u32::from(width), u32::from(height)).then_some([width, height]);
         let picture = PgsQueuePicture {
@@ -225,30 +202,17 @@ impl<M> PgsCompatibilityOutput<M> {
 pub enum PgsStep<M> {
     Yield,
     NeedPacket,
-    Source(PgsSourceOutput<M>),
-    Native(PgsNativeOutput<M>),
-    Compatibility(PgsCompatibilityOutput<M>),
+    Output(PgsOutput<M>),
     Finished,
 }
 impl<M> PgsBridge<M> {
     pub fn new(
         pool: &Budget,
         scope: BitmapScope,
-        mode: PgsMode,
         limits: pgs::DisplayLimits,
         config: pgs::DisplayConfig,
     ) -> Result<Self> {
-        let decoder = match mode {
-            PgsMode::StrictSource => {
-                PgsDecoder::Source(pgs::DisplayDecoder::new(pool, limits, config)?)
-            }
-            PgsMode::ExplicitNativeD32 => {
-                PgsDecoder::Native(compat::pgs::RecoveryDecoder::new(pool, limits, config)?)
-            }
-            PgsMode::NativeCompatibility => {
-                PgsDecoder::Compatibility(compat::pgs::ReceiverDecoder::new(pool, limits, config)?)
-            }
-        };
+        let decoder = compat::pgs::ReceiverDecoder::new(pool, limits, config)?;
         Ok(Self {
             pool: pool.clone(),
             scope,
@@ -307,11 +271,7 @@ impl<M> PgsBridge<M> {
         if !w.try_charge(1) {
             return Ok(false);
         }
-        match &mut self.decoder {
-            PgsDecoder::Source(d) => d.reset(c)?,
-            PgsDecoder::Native(d) => d.reset(c)?,
-            PgsDecoder::Compatibility(d) => d.reset(c)?,
-        }
+        self.decoder.reset(c)?;
         self.pending = None;
         self.pushed = false;
         self.finished = false;
@@ -331,19 +291,8 @@ impl<M> PgsBridge<M> {
                     return Ok(PgsStep::Yield);
                 }
                 let p = input.input();
-                match &mut self.decoder {
-                    PgsDecoder::Source(d) => d
-                        .push(p.raw.clone(), p.clock, pgs::Envelope::Packet, c)
-                        .map_err(|e| e.error)?,
-                    PgsDecoder::Native(d) => {
-                        let mut raw = Some(p.raw.clone());
-                        d.push(&mut raw, p.clock, c)?;
-                    }
-                    PgsDecoder::Compatibility(d) => {
-                        let mut raw = Some(p.raw.clone());
-                        d.push(&mut raw, p.clock, c)?;
-                    }
-                }
+                let mut raw = Some(p.raw.clone());
+                self.decoder.push(&mut raw, p.clock, c)?;
                 self.pushed = true;
                 return Ok(PgsStep::Yield);
             }
@@ -352,70 +301,28 @@ impl<M> PgsBridge<M> {
                 if !w.try_charge(1) {
                     return Ok(PgsStep::Yield);
                 }
-                match &mut self.decoder {
-                    PgsDecoder::Source(d) => d.finish_input(c)?,
-                    PgsDecoder::Native(d) => d.finish_input(c)?,
-                    PgsDecoder::Compatibility(d) => d.finish_input(c)?,
-                }
+                self.decoder.finish_input(c)?;
                 self.pushed = true;
             }
         } else {
             return Ok(PgsStep::NeedPacket);
         }
-        match &mut self.decoder {
-            PgsDecoder::Source(d) => match d.poll(w, c)? {
-                pgs::DisplayStatus::Yield => Ok(PgsStep::Yield),
-                pgs::DisplayStatus::Ended => Ok(PgsStep::Finished),
-                pgs::DisplayStatus::NeedPacket => {
-                    self.pending = None;
-                    self.pushed = false;
-                    Ok(PgsStep::NeedPacket)
-                }
-                pgs::DisplayStatus::OutputReady => Ok(PgsStep::Source(PgsSourceOutput {
-                    packet: self
-                        .pending
-                        .as_ref()
-                        .ok_or(Error::Invalid("PGS source packet owner"))?
-                        .clone(),
-                    display: d.take_output(c)?,
-                })),
-            },
-            PgsDecoder::Native(d) => match d.poll(w, c)? {
-                pgs::RecoveryStatus::Yield => Ok(PgsStep::Yield),
-                pgs::RecoveryStatus::Ended => Ok(PgsStep::Finished),
-                pgs::RecoveryStatus::NeedPacket => {
-                    self.pending = None;
-                    self.pushed = false;
-                    Ok(PgsStep::NeedPacket)
-                }
-                pgs::RecoveryStatus::OutputReady => Ok(PgsStep::Native(PgsNativeOutput {
-                    packet: self
-                        .pending
-                        .as_ref()
-                        .ok_or(Error::Invalid("PGS native packet owner"))?
-                        .clone(),
-                    observations: d.take_output(c)?,
-                })),
-            },
-            PgsDecoder::Compatibility(d) => match d.poll(w, c)? {
-                pgs::RecoveryStatus::Yield => Ok(PgsStep::Yield),
-                pgs::RecoveryStatus::Ended => Ok(PgsStep::Finished),
-                pgs::RecoveryStatus::NeedPacket => {
-                    self.pending = None;
-                    self.pushed = false;
-                    Ok(PgsStep::NeedPacket)
-                }
-                pgs::RecoveryStatus::OutputReady => {
-                    Ok(PgsStep::Compatibility(PgsCompatibilityOutput {
-                        packet: self
-                            .pending
-                            .as_ref()
-                            .ok_or(Error::Invalid("PGS compatibility packet owner"))?
-                            .clone(),
-                        observations: d.take_output(c)?,
-                    }))
-                }
-            },
+        match self.decoder.poll(w, c)? {
+            pgs::RecoveryStatus::Yield => Ok(PgsStep::Yield),
+            pgs::RecoveryStatus::Ended => Ok(PgsStep::Finished),
+            pgs::RecoveryStatus::NeedPacket => {
+                self.pending = None;
+                self.pushed = false;
+                Ok(PgsStep::NeedPacket)
+            }
+            pgs::RecoveryStatus::OutputReady => Ok(PgsStep::Output(PgsOutput {
+                packet: self
+                    .pending
+                    .as_ref()
+                    .ok_or(Error::Invalid("PGS packet owner"))?
+                    .clone(),
+                decoded: self.decoder.take_output(c)?,
+            })),
         }
     }
 }
@@ -500,7 +407,7 @@ pub struct DvdPresentation<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct DvdQueuePicture<'a> {
     pub start_ns: i64,
-    pub canvas: Option<dvd::Canvas>,
+    pub canvas: Option<[u32; 2]>,
     pub picture: &'a DvdPicture,
 }
 
@@ -508,6 +415,8 @@ pub struct DvdQueuePicture<'a> {
 pub struct DvdOutput<M> {
     pub packet: BitmapOwner<M>,
     pub picture: Option<DvdPicture>,
+    /// The canvas of the decoder's settings (the configuration's `size:`).
+    pub canvas: Option<[u32; 2]>,
 }
 
 impl<M> DvdOutput<M> {
@@ -539,17 +448,15 @@ impl<M> DvdOutput<M> {
 
     /// Match the existing bitmap queue: start at packet PTS, fall back to DTS,
     /// then zero. The queue ends a picture when its track is superseded or
-    /// cleared. Use `presentation` for DVD's explicit display offsets.
-    pub fn packet_clock_picture(
-        &self,
-        canvas: Option<dvd::Canvas>,
-    ) -> Result<Option<DvdQueuePicture<'_>>> {
+    /// cleared. Use `presentation` for DVD's explicit display offsets. The
+    /// canvas is the configuration's, when the queue can place pictures on it.
+    pub fn packet_clock_picture(&self) -> Result<Option<DvdQueuePicture<'_>>> {
         let Some(picture) = &self.picture else {
             return Ok(None);
         };
         Ok(Some(DvdQueuePicture {
             start_ns: packet_queue_start_ns(self.packet.input().clock)?,
-            canvas: canvas.filter(|c| queue_canvas_dimensions(c.width, c.height)),
+            canvas: self.canvas.filter(|&[w, h]| queue_canvas_dimensions(w, h)),
             picture,
         }))
     }
@@ -570,6 +477,7 @@ pub struct DvdReceiver<M> {
     pool: Budget,
     scope: BitmapScope,
     decoder: compat::dvd::Decoder,
+    canvas: Option<[u32; 2]>,
     packet: Option<BitmapOwner<M>>,
     /// The last step yielded, so the next one resumes the decoder.
     yielded: bool,
@@ -582,6 +490,7 @@ impl<M> DvdReceiver<M> {
         Ok(Self {
             pool: pool.clone(),
             scope,
+            canvas: config.settings.canvas,
             decoder: compat::dvd::Decoder::new(pool, config.settings, config.limits),
             packet: None,
             yielded: false,
@@ -700,7 +609,11 @@ impl<M> DvdReceiver<M> {
             .packet
             .take()
             .ok_or(Error::Invalid("DVD packet absent"))?;
-        Ok(DvdReceiverStep::Output(DvdOutput { packet, picture }))
+        Ok(DvdReceiverStep::Output(DvdOutput {
+            packet,
+            picture,
+            canvas: self.canvas,
+        }))
     }
 }
 

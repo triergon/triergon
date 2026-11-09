@@ -15,7 +15,7 @@ const PALETTE: [u32; 16] = [
 fn settings() -> Settings {
     Settings {
         palette: Some(PALETTE),
-        forced_only: false,
+        ..Settings::default()
     }
 }
 
@@ -484,19 +484,22 @@ fn forced_only_drops_ordinary_subtitles() {
 
 #[test]
 fn configuration_and_options_select_the_palette() {
+    let read = |text: &[u8]| Settings::from_configuration(text).unwrap();
     let text = b"size: 720x480\npalette: 111111, 222222\nPalette: 333333\n  palette: 444444\n";
-    let settings = Settings::from_configuration(text);
-    assert_eq!(settings.palette.unwrap()[..3], [0x111111, 0x222222, 0]);
-    let last = Settings::from_configuration(b"palette: 1, 2, 3, 4\r\npalette: 5\n");
+    assert_eq!(read(text).palette.unwrap()[..3], [0x111111, 0x222222, 0]);
+    let last = read(b"palette: 1, 2, 3, 4\r\npalette: 5\n");
     assert_eq!(last.palette.unwrap()[..2], [5, 0]);
-    assert_eq!(
-        Settings::from_configuration(b"size: 720x480\n").palette,
-        None
-    );
-    assert_eq!(
-        Settings::from_configuration(b"palette:").palette,
-        Some([0; 16])
-    );
+    assert_eq!(read(b"size: 720x480\n").palette, None);
+    assert_eq!(read(b"palette:").palette, Some([0; 16]));
+    // Lines end at CR as well as LF, and the text at its first NUL.
+    assert_eq!(read(b"x\rpalette: 7").palette.unwrap()[0], 7);
+    assert_eq!(read(b"x\0\npalette: 7").palette, None);
+    // A list continues on the next line; runs of commas and spaces separate
+    // entries, and an entry without digits is black.
+    let tolerant = read(b"palette: 1,,2\n3, ,4, -1, +5, 0x6, 0xg\n")
+        .palette
+        .unwrap();
+    assert_eq!(tolerant[..9], [1, 2, 3, 4, 0xffffff, 5, 6, 0, 0]);
 
     let mut options = Settings::default();
     options
@@ -512,6 +515,59 @@ fn configuration_and_options_select_the_palette() {
 
     options.apply_ifo(None);
     assert_eq!(options.palette, None);
+}
+
+/// The canvas of the `size:` line, read as the reference's `sscanf("%dx%d")`
+/// and refused where the reference cannot open its decoder.
+#[test]
+fn the_size_line_sets_the_canvas() {
+    let canvas = |text: &[u8]| Settings::from_configuration(text).map(|s| s.canvas);
+    assert_eq!(canvas(b"size: 720x480\n"), Ok(Some([720, 480])));
+    assert_eq!(canvas(b"size: 720x576\r\n"), Ok(Some([720, 576])));
+    assert_eq!(
+        canvas(b"size:1920x1080\npalette: 1\n"),
+        Ok(Some([1920, 1080]))
+    );
+    assert_eq!(canvas(b"# no size\npalette: 1\n"), Ok(None));
+    assert_eq!(canvas(b""), Ok(None));
+    // The last size wins; the numbers may follow on the next line.
+    assert_eq!(
+        canvas(b"size: 720x480\nsize: 1280x720\n"),
+        Ok(Some([1280, 720]))
+    );
+    assert_eq!(canvas(b"size:\n 720x480\n"), Ok(Some([720, 480])));
+    assert_eq!(canvas(b"size: +720x480junk\n"), Ok(Some([720, 480])));
+    // Without two numbers the line is ignored.
+    for malformed in [
+        &b"size: 720 x 480\n"[..],
+        b"size: 720*480\n",
+        b"size: x480\n",
+        b"size: 720x\n",
+        b"size: wide\n",
+        b"Size: 720x480\n",
+        b" size: 720x480\n",
+    ] {
+        assert_eq!(canvas(malformed), Ok(None), "{malformed:?}");
+    }
+    // Sizes the reference refuses to open a decoder with.
+    for refused in [
+        &b"size: 0x480\n"[..],
+        b"size: 720x0\n",
+        b"size: -720x480\n",
+        b"size: 268435456x1\n",
+        b"size: 16384x16384\n",
+    ] {
+        assert_eq!(
+            canvas(refused),
+            Err(Error::Invalid("DVD configuration size")),
+            "{refused:?}"
+        );
+    }
+    // The largest square the reference accepts, and one past it.
+    assert_eq!(canvas(b"size: 16255x16255"), Ok(Some([16255, 16255])));
+    assert!(canvas(b"size: 16256x16256").is_err());
+    // A number keeps its low 32 bits, as the reference stores it in an `int`.
+    assert_eq!(canvas(b"size: 4294968016x480"), Ok(Some([720, 480])));
 }
 
 #[test]

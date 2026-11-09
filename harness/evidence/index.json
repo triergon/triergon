@@ -16697,6 +16697,56 @@
    "sha256": "81c9bd14feced61e567abc733c0db9d83eea122e7cedb7d1c13f9516cf2208b6",
    "bytes": 15417,
    "source_revision": "a6e366d61ac06a37fe303cfd11ebe0b159b17579"
+  },
+  {
+   "name": "subtitles-count-9e3067b9-linux-arm64",
+   "path": "subtitles-count-9e3067b9-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of keeping only the FFmpeg receivers for DVB, PGS and DVD subtitles, on a c8g.xlarge (Linux AArch64): same-code against main at e86089da for the subtitle, subtitle capsule and playback workers, the instruction count of every case of subtitle-pgs, -dvb, -dvd, -cc, -teletext and subtitle-pgs-capsules at both revisions, 50 operations on CPU 1, and the fold of every subtitle corpus case and PGS capsule. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-count-9e3067b9-linux-arm64/168d07687cbeb2dc93ec997a01c368a0df162e3ec12a87576c8f0bde789c14e9.tar.zst",
+   "sha256": "168d07687cbeb2dc93ec997a01c368a0df162e3ec12a87576c8f0bde789c14e9",
+   "bytes": 19605,
+   "source_revision": "9e3067b98b955205aa1ddea155d60f312992abaf"
+  },
+  {
+   "name": "subtitles-count-5130d0e9-linux-arm64",
+   "path": "subtitles-count-5130d0e9-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of keeping only the FFmpeg receivers for DVB, PGS and DVD subtitles after review, with the VobSub canvas read from the configuration, on a c8g.xlarge (Linux AArch64): same-code against main at e86089da for the subtitle, subtitle capsule and playback workers, the instruction count of every case of subtitle-pgs, -dvb, -dvd, -cc, -teletext and subtitle-pgs-capsules at both revisions, 50 operations on CPU 1, and the fold of every subtitle corpus case and PGS capsule. The dvb, dvd, cc and teletext counts are of the parent build, whose subtitle worker differs only in the PGS run loop. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-count-5130d0e9-linux-arm64/149b1cfa87eb6658f5396e6cd4c5d39bd95418f80307eb086046581319d6dcc4.tar.zst",
+   "sha256": "149b1cfa87eb6658f5396e6cd4c5d39bd95418f80307eb086046581319d6dcc4",
+   "bytes": 19922,
+   "source_revision": "5130d0e99222ba72419dc1adb357d1104d6f03bf"
+  },
+  {
+   "name": "subtitles-count-a75807ed-linux-arm64",
+   "path": "subtitles-count-a75807ed-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of keeping the caption and teletext spec code inside triergon-subtitles, on a c8g.xlarge (Linux AArch64): same-code against main at e973fbb6 for the subtitle, subtitle capsule and playback workers, the instruction count of every case of subtitle-teletext and subtitle-cc at both revisions, 50 operations on CPU 1, and the fold of every subtitle corpus case and PGS capsule. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-count-a75807ed-linux-arm64/4f83a3beb2adac4163d6e3a23556fbf306aa9aae7afc8e58eb4e1ba7f487fb4d.tar.zst",
+   "sha256": "4f83a3beb2adac4163d6e3a23556fbf306aa9aae7afc8e58eb4e1ba7f487fb4d",
+   "bytes": 4898,
+   "source_revision": "a75807ed3330ac3c7ee7105a94494e0b8303541c"
+  },
+  {
+   "name": "nal-framing-count-b81e3ac7-linux-arm64",
+   "path": "nal-framing-count-b81e3ac7-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of splitting and classifying H.264/HEVC NAL units through triergon-framing, on a c8g.xlarge (Linux AArch64): same-code against main at 3e21668e for the media, playback, codec, subtitle, subtitle capsule, framing and isobmff workers; the HEVC (full) and H.264 conformance tests over the FATE vectors; and the instruction count of the 17 codec workloads, matroska-audio-clocks, matroska-startup-seek, subtitle-cc and subtitle-pgs-capsules at both revisions, on CPU 1. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/nal-framing-count-b81e3ac7-linux-arm64/adebff1997bdf11f96b15d2eb2ca825b910d7573a0340b3802f1e126c4a46964.tar.zst",
+   "sha256": "adebff1997bdf11f96b15d2eb2ca825b910d7573a0340b3802f1e126c4a46964",
+   "bytes": 9342,
+   "source_revision": "b81e3ac70b14881cb9e5c375d2005a9b309553aa"
+  },
+  {
+   "name": "nal-syntax-count-7b54b38a-linux-arm64",
+   "path": "nal-syntax-count-7b54b38a-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of sharing the H.264 scaling matrix, VUI-to-timing and HEVC profile-tier-level walks through triergon-framing, on a c8g.xlarge (Linux AArch64): same-code against main at 387ed818 for the media, playback, codec, subtitle, subtitle capsule, framing and isobmff workers; both revisions' folds of the subtitle and playback corpora; the instruction count of hls-segments, progressive-ts188, raw-annex-b, matroska-startup-seek, matroska-audio-clocks and the five subtitle corpora on CPU 1; and the raw-annex-b counts and callgrind line costs of the placements tried for hevc-aud0/1. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/nal-syntax-count-7b54b38a-linux-arm64/e4a19c36f2420ca6aa9f13860b74d2c0c8c069dffacce6e54610166e08b81d4d.tar.zst",
+   "sha256": "e4a19c36f2420ca6aa9f13860b74d2c0c8c069dffacce6e54610166e08b81d4d",
+   "bytes": 24266,
+   "source_revision": "7b54b38af04842bcfaa4dd9b4cc449c1169c4d24"
   }
  ]
 }

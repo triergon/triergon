@@ -3,17 +3,11 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "original-pcs12-rcs12",
         payload: include_bytes!("input/original-pcs12-rcs12.dvb"),
-        original_pcs: &[
-            15, 16, 0, 1, 0, 14, 2, 11, 1, 255, 0, 1, 0, 1, 2, 255, 0, 2, 0, 5,
-        ],
-        source_ids: &[1, 2],
-        conforming: true,
         pts_raw: 1000000,
         start_ms: 0,
         end_ms: 2000,
         rects: &[
             ExpectedRect {
-                source_id: 2,
                 geometry: [2, 5, 2, 2],
                 stride: 2,
                 indices: include_bytes!("input/original-pcs12-rcs12.0.indices"),
@@ -21,7 +15,6 @@ pub(super) static CASES: &[Case] = &[
                 words: &[34816, 4294967295, 4278190080, 4294967295],
             },
             ExpectedRect {
-                source_id: 1,
                 geometry: [1, 1, 4, 2],
                 stride: 4,
                 indices: include_bytes!("input/original-pcs12-rcs12.1.indices"),
@@ -33,17 +26,11 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "same-pcs12-swapped-rcs21",
         payload: include_bytes!("input/same-pcs12-swapped-rcs21.dvb"),
-        original_pcs: &[
-            15, 16, 0, 1, 0, 14, 2, 11, 1, 255, 0, 1, 0, 1, 2, 255, 0, 2, 0, 5,
-        ],
-        source_ids: &[1, 2],
-        conforming: true,
         pts_raw: 1000000,
         start_ms: 0,
         end_ms: 2000,
         rects: &[
             ExpectedRect {
-                source_id: 2,
                 geometry: [2, 5, 2, 2],
                 stride: 2,
                 indices: include_bytes!("input/same-pcs12-swapped-rcs21.0.indices"),
@@ -51,7 +38,6 @@ pub(super) static CASES: &[Case] = &[
                 words: &[34816, 4294967295, 4278190080, 4294967295],
             },
             ExpectedRect {
-                source_id: 1,
                 geometry: [1, 1, 4, 2],
                 stride: 4,
                 indices: include_bytes!("input/same-pcs12-swapped-rcs21.1.indices"),
@@ -63,17 +49,11 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "renamed-pcs92-rcs92",
         payload: include_bytes!("input/renamed-pcs92-rcs92.dvb"),
-        original_pcs: &[
-            15, 16, 0, 1, 0, 14, 2, 11, 9, 255, 0, 1, 0, 1, 2, 255, 0, 2, 0, 5,
-        ],
-        source_ids: &[9, 2],
-        conforming: true,
         pts_raw: 1000000,
         start_ms: 0,
         end_ms: 2000,
         rects: &[
             ExpectedRect {
-                source_id: 2,
                 geometry: [2, 5, 2, 2],
                 stride: 2,
                 indices: include_bytes!("input/renamed-pcs92-rcs92.0.indices"),
@@ -81,7 +61,6 @@ pub(super) static CASES: &[Case] = &[
                 words: &[34816, 4294967295, 4278190080, 4294967295],
             },
             ExpectedRect {
-                source_id: 9,
                 geometry: [1, 1, 4, 2],
                 stride: 4,
                 indices: include_bytes!("input/renamed-pcs92-rcs92.1.indices"),
@@ -93,17 +72,11 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "reversed-pcs21-rcs12",
         payload: include_bytes!("input/reversed-pcs21-rcs12.dvb"),
-        original_pcs: &[
-            15, 16, 0, 1, 0, 14, 2, 11, 2, 255, 0, 2, 0, 5, 1, 255, 0, 1, 0, 1,
-        ],
-        source_ids: &[2, 1],
-        conforming: false,
         pts_raw: 1000000,
         start_ms: 0,
         end_ms: 2000,
         rects: &[
             ExpectedRect {
-                source_id: 1,
                 geometry: [1, 1, 4, 2],
                 stride: 4,
                 indices: include_bytes!("input/reversed-pcs21-rcs12.0.indices"),
@@ -111,7 +84,6 @@ pub(super) static CASES: &[Case] = &[
                 words: &[34816, 4294967295, 4278190080, 4294967295],
             },
             ExpectedRect {
-                source_id: 2,
                 geometry: [2, 5, 2, 2],
                 stride: 2,
                 indices: include_bytes!("input/reversed-pcs21-rcs12.1.indices"),

@@ -1325,88 +1325,6 @@ fn bitmap_input(b: &Budget, raw: &[u8]) -> bitmap_bridge::BitmapInput<&'static s
     }
 }
 #[test]
-fn pgs_bitmap_bridge_keeps_source_plane_and_unknown_clock_after_teardown() {
-    use bitmap_bridge::*;
-    use triergon_subtitles::pgs;
-    let b = pool();
-    let raw = include_bytes!("fixtures/bitmap/original-pgs-two-pixel.packet");
-    let mut bridge = PgsBridge::new(
-        &b,
-        bitmap_scope(),
-        PgsMode::StrictSource,
-        pgs::DisplayLimits::default(),
-        pgs::DisplayConfig::default(),
-    )
-    .unwrap();
-    bridge
-        .provide(bitmap_input(&b, raw))
-        .unwrap_or_else(|e| panic!("{:?}", e.error));
-    bridge.finish();
-    let mut retained = None;
-    for _ in 0..100_000 {
-        match bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
-            PgsStep::Source(o) => {
-                assert!(retained.is_none());
-                retained = Some(o);
-            }
-            PgsStep::Finished => break,
-            _ => {}
-        }
-    }
-    let retained = retained.unwrap();
-    assert_eq!(retained.packet.input().raw.as_ref(), raw);
-    assert_eq!(retained.packet.input().clock.pts, None);
-    assert_eq!(retained.display.objects().len(), 1);
-    assert_eq!(retained.display.objects()[0].pixels().as_ref(), &[1, 2]);
-    assert_eq!(retained.display.receiver_pts_microseconds, None);
-    assert_eq!(
-        retained.display.objects()[0].palette().source(1).unwrap().y,
-        235
-    );
-    drop(bridge);
-    assert_eq!(
-        retained.packet.input().metadata,
-        "original caller packet metadata"
-    );
-    assert!(b.used() > Budget::control_storage_bytes());
-    drop(retained);
-    assert_eq!(b.used(), Budget::control_storage_bytes());
-}
-#[test]
-fn pgs_native_operation_retains_complete_strict_facts_without_native_gold_selection() {
-    use bitmap_bridge::*;
-    use triergon_subtitles::pgs;
-    let b = pool();
-    let raw = include_bytes!("fixtures/bitmap/original-pgs-two-pixel.packet");
-    let mut bridge = PgsBridge::new(
-        &b,
-        bitmap_scope(),
-        PgsMode::ExplicitNativeD32,
-        pgs::DisplayLimits::default(),
-        pgs::DisplayConfig::default(),
-    )
-    .unwrap();
-    bridge
-        .provide(bitmap_input(&b, raw))
-        .unwrap_or_else(|e| panic!("{:?}", e.error));
-    let result = loop {
-        if let PgsStep::Native(o) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
-            break o;
-        }
-    };
-    assert_eq!(result.observations.raw_packet().as_ref(), raw);
-    assert_eq!(result.observations.source_error(), None);
-    assert_eq!(result.observations.source_sets().len(), 1);
-    assert_eq!(
-        result.observations.source_sets()[0].objects()[0]
-            .pixels()
-            .as_ref(),
-        &[1, 2]
-    );
-    assert_eq!(result.packet.input().clock.pts, None);
-    assert_eq!(result.packet.input().sequence, 11);
-}
-#[test]
 fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
     use bitmap_bridge::*;
     use triergon_subtitles::pgs;
@@ -1415,7 +1333,6 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
     let mut bridge = PgsBridge::new(
         &b,
         bitmap_scope(),
-        PgsMode::NativeCompatibility,
         pgs::DisplayLimits::default(),
         pgs::DisplayConfig::default(),
     )
@@ -1436,7 +1353,7 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
         .find_map(
             |_| match bridge.step(&mut WorkBudget::new(1), &cancel).unwrap() {
                 PgsStep::Yield => None,
-                PgsStep::Compatibility(output) => Some(output),
+                PgsStep::Output(output) => Some(output),
                 _ => panic!("expected native-only packet output"),
             },
         )
@@ -1448,9 +1365,9 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
     assert!(
         source
             .raw
-            .shares_storage_with(retained.observations.raw_packet())
+            .shares_storage_with(retained.decoded.raw_packet())
     );
-    let event = retained.observations.receiver_output().unwrap();
+    let event = retained.decoded.receiver_output().unwrap();
     assert_eq!(event.pts_microseconds, Some(100_000));
     assert_eq!(event.rectangles().len(), 1);
     assert_eq!(event.rectangles()[0].pixels().as_ref(), &[1, 2]);
@@ -1497,11 +1414,7 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
         "original caller packet metadata"
     );
     assert_eq!(
-        retained
-            .observations
-            .receiver_output()
-            .unwrap()
-            .rectangles()[0]
+        retained.decoded.receiver_output().unwrap().rectangles()[0]
             .pixels()
             .as_ref(),
         &[1, 2]
@@ -1520,7 +1433,6 @@ fn pgs_packet_clock_queue_distinguishes_a_clear_from_no_output() {
     let mut bridge = PgsBridge::new(
         &b,
         bitmap_scope(),
-        PgsMode::NativeCompatibility,
         pgs::DisplayLimits::default(),
         pgs::DisplayConfig::default(),
     )
@@ -1536,7 +1448,7 @@ fn pgs_packet_clock_queue_distinguishes_a_clear_from_no_output() {
         let output = loop {
             match bridge.step(&mut WorkBudget::new(32), &cancel).unwrap() {
                 PgsStep::Yield => (),
-                PgsStep::Compatibility(output) => break output,
+                PgsStep::Output(output) => break output,
                 _ => panic!("expected native-only packet output"),
             }
         };
@@ -1566,7 +1478,6 @@ fn bitmap_foreign_pool_rejection_returns_original_packet_without_poisoning_sessi
     let mut bridge = PgsBridge::new(
         &b,
         bitmap_scope(),
-        PgsMode::StrictSource,
         pgs::DisplayLimits::default(),
         pgs::DisplayConfig::default(),
     )
@@ -1586,13 +1497,13 @@ fn bitmap_foreign_pool_rejection_returns_original_packet_without_poisoning_sessi
     ));
     assert_eq!(b.used(), before);
     loop {
-        if let PgsStep::Source(_) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
+        if let PgsStep::Output(_) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
             break;
         }
     }
 }
 #[test]
-fn bitmap_reset_uses_new_source_fence_and_keeps_retained_display_generation() {
+fn bitmap_reset_uses_new_source_fence_and_keeps_old_output() {
     use bitmap_bridge::*;
     use triergon_subtitles::pgs;
     let b = pool();
@@ -1600,7 +1511,6 @@ fn bitmap_reset_uses_new_source_fence_and_keeps_retained_display_generation() {
     let mut bridge = PgsBridge::new(
         &b,
         bitmap_scope(),
-        PgsMode::StrictSource,
         pgs::DisplayLimits::default(),
         pgs::DisplayConfig::default(),
     )
@@ -1609,7 +1519,7 @@ fn bitmap_reset_uses_new_source_fence_and_keeps_retained_display_generation() {
         .provide(bitmap_input(&b, raw))
         .unwrap_or_else(|e| panic!("{:?}", e.error));
     let old = loop {
-        if let PgsStep::Source(o) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
+        if let PgsStep::Output(o) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
             break o;
         }
     };
@@ -1639,14 +1549,14 @@ fn bitmap_reset_uses_new_source_fence_and_keeps_retained_display_generation() {
         .provide(input)
         .unwrap_or_else(|e| panic!("{:?}", e.error));
     let next = loop {
-        if let PgsStep::Source(o) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
+        if let PgsStep::Output(o) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
             break o;
         }
     };
-    assert_eq!(next.display.generation, old.display.generation + 1);
     assert_eq!(old.packet.input().scope.generation, 7);
     assert_eq!(next.packet.input().scope.generation, 8);
-    assert_eq!(old.display.objects()[0].pixels().as_ref(), &[1, 2]);
+    let rectangles = old.decoded.receiver_output().unwrap().rectangles();
+    assert_eq!(rectangles[0].pixels().as_ref(), &[1, 2]);
 }
 /// Step a DVD receiver until it outputs the pending packet.
 fn dvd_next<M>(
@@ -1761,12 +1671,13 @@ fn dvd_presentation_preserves_precise_pts_and_explicit_clear() {
         let mut input = bitmap_input(&b, &raw);
         input.clock.pts = pts;
         input.clock.dts = dts;
-        let mut receiver =
-            DvdReceiver::new(&b, bitmap_scope(), DvdBridgeConfig::default()).unwrap();
+        let mut config = DvdBridgeConfig::default();
+        config.settings.canvas = Some([720, 480]);
+        let mut receiver = DvdReceiver::new(&b, bitmap_scope(), config).unwrap();
         receiver
             .provide(input)
             .unwrap_or_else(|e| panic!("{:?}", e.error));
-        let out = dvd_next(&mut receiver, 32).unwrap();
+        let mut out = dvd_next(&mut receiver, 32).unwrap();
         let presentation = out.presentation().unwrap().unwrap();
         let at = |ms: u32| {
             pts.map(|pts| Time::new(i128::from(pts) + i128::from(ms) * 90, 90_000).unwrap())
@@ -1788,25 +1699,13 @@ fn dvd_presentation_preserves_precise_pts_and_explicit_clear() {
         );
         assert!(!presentation.picture.forced);
         assert_eq!(presentation.picture.row(1).unwrap(), &[1]);
-        let canvas = triergon_subtitles::dvd::Canvas {
-            width: 720,
-            height: 480,
-        };
-        let queued = out.packet_clock_picture(Some(canvas)).unwrap().unwrap();
-        assert_eq!(queued.canvas, Some(canvas));
+        let queued = out.packet_clock_picture().unwrap().unwrap();
+        assert_eq!(queued.canvas, Some([720, 480]));
         assert_eq!(queued.start_ns, start_ns);
         assert_eq!(queued.picture.palette(), presentation.picture.palette());
-        let invalid_canvas = triergon_subtitles::dvd::Canvas {
-            width: 159,
-            ..canvas
-        };
-        assert_eq!(
-            out.packet_clock_picture(Some(invalid_canvas))
-                .unwrap()
-                .unwrap()
-                .canvas,
-            None
-        );
+        // The queue places nothing on a canvas it cannot use.
+        out.canvas = Some([159, 480]);
+        assert_eq!(out.packet_clock_picture().unwrap().unwrap().canvas, None);
         drop((out, receiver));
         assert_eq!(b.used(), Budget::control_storage_bytes());
     }
@@ -2168,7 +2067,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         MatroskaBitmapClockProbe, MatroskaBitmapCodec, MatroskaBitmapTrack, MatroskaDvbStep,
     };
     use triergon_matroska::typed::Event;
-    use triergon_subtitles::{dvb, dvd, pgs};
+    use triergon_subtitles::{dvb, pgs};
 
     fn element(id: &[u8], data: &[u8]) -> Vec<u8> {
         let mut out = id.to_vec();
@@ -2326,11 +2225,6 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         MatroskaBitmapTrack::new(configuration, 9),
         Err(C::Truncated)
     ));
-    assert!(
-        pgs_track
-            .vobsub_configuration(dvd::ConfigLimits::default())
-            .is_err()
-    );
 
     let dvd_input = outputs
         .iter()
@@ -2358,7 +2252,6 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     let mut pgs = PgsBridge::new(
         &pool,
         pgs_track.scope(),
-        PgsMode::NativeCompatibility,
         pgs::DisplayLimits::default(),
         pgs::DisplayConfig::default(),
     )
@@ -2382,7 +2275,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         loop {
             match pgs.step(&mut WorkBudget::new(1), &off()).unwrap() {
                 PgsStep::Yield => {}
-                PgsStep::Compatibility(output) => {
+                PgsStep::Output(output) => {
                     if let Some(PgsQueueAction::Show(picture)) =
                         output.packet_clock_action().unwrap()
                     {
@@ -2393,28 +2286,22 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
                     }
                 }
                 PgsStep::NeedPacket => break,
-                _ => panic!("unexpected PGS receiver state"),
+                PgsStep::Finished => panic!("unexpected PGS receiver state"),
             }
         }
         assert_eq!(showed, pgs_count == pgs_segments.len());
     }
     assert_eq!(pgs_count, pgs_segments.len());
 
-    let mut config = dvd_track
-        .vobsub_configuration(dvd::ConfigLimits::default())
-        .unwrap();
-    while config.poll(&mut WorkBudget::new(1), &off()).unwrap() == dvd::ConfigStatus::Yield {}
-    let config = config.try_finish(&off()).unwrap();
-    assert_eq!(&**config.raw(), palette);
-    assert_eq!(config.palette.unwrap()[0], 0x112233);
+    assert!(pgs_track.vobsub_settings().is_err());
+    let settings = dvd_track.vobsub_settings().unwrap();
+    assert_eq!(settings.palette.unwrap()[0], 0x112233);
+    assert_eq!(settings.canvas, Some([720, 480]));
     let mut dvd = DvdReceiver::new(
         &pool,
         dvd_track.scope(),
         DvdBridgeConfig {
-            settings: triergon_subtitles::compat::dvd::Settings {
-                palette: config.palette,
-                forced_only: false,
-            },
+            settings,
             ..DvdBridgeConfig::default()
         },
     )
@@ -2422,18 +2309,9 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     dvd.provide(dvd_input)
         .unwrap_or_else(|e| panic!("{:?}", e.error));
     let dvd_output = dvd_next(&mut dvd, 1).unwrap();
-    let queued = dvd_output
-        .packet_clock_picture(config.canvas)
-        .unwrap()
-        .unwrap();
+    let queued = dvd_output.packet_clock_picture().unwrap().unwrap();
     assert_eq!(queued.start_ns, 9_000_000);
-    assert_eq!(
-        queued.canvas,
-        Some(dvd::Canvas {
-            width: 720,
-            height: 480
-        })
-    );
+    assert_eq!(queued.canvas, Some([720, 480]));
     assert_eq!(queued.picture.row(1).unwrap(), &[1]);
 
     let config = dvb_track.dvb_configuration().unwrap();
@@ -2573,7 +2451,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
 
 #[test]
 fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
-    use bitmap_bridge::{PgsBridge, PgsMode, PgsQueueAction, PgsStep};
+    use bitmap_bridge::{PgsBridge, PgsQueueAction, PgsStep};
     use matroska_feed::{MatroskaBitmapClockProbe, MatroskaBitmapTrack};
     use triergon_matroska::typed::Event;
     use triergon_subtitles::pgs;
@@ -2706,7 +2584,6 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
             PgsBridge::new(
                 &pool,
                 track.scope(),
-                PgsMode::NativeCompatibility,
                 pgs::DisplayLimits::default(),
                 pgs::DisplayConfig::default(),
             )
@@ -2731,7 +2608,7 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
                     loop {
                         match receiver.step(&mut WorkBudget::new(1), &off()).unwrap() {
                             PgsStep::Yield => {}
-                            PgsStep::Compatibility(event) => {
+                            PgsStep::Output(event) => {
                                 if let Some(PgsQueueAction::Show(picture)) =
                                     event.packet_clock_action().unwrap()
                                 {
@@ -2739,7 +2616,7 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
                                 }
                             }
                             PgsStep::NeedPacket => break,
-                            _ => panic!("unexpected PGS receiver state"),
+                            PgsStep::Finished => panic!("unexpected PGS receiver state"),
                         }
                     }
                 }
@@ -3223,7 +3100,7 @@ fn dvd_stop_only_packet_produces_no_packet_clock_picture() {
         .unwrap_or_else(|e| panic!("{:?}", e.error));
     let out = dvd_next(&mut receiver, 32).unwrap();
     assert!(out.picture.is_none());
-    assert!(out.packet_clock_picture(None).unwrap().is_none());
+    assert!(out.packet_clock_picture().unwrap().is_none());
 }
 
 #[test]

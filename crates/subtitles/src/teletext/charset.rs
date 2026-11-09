@@ -7,7 +7,7 @@
 
 /// A national option subset of the Latin G0 set (EN 300 706 table 36).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NationalSubset {
+pub(crate) enum NationalSubset {
     English,
     German,
     SwedishFinnishHungarian,
@@ -27,7 +27,7 @@ pub enum NationalSubset {
 
 /// A G0 primary character set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum G0 {
+pub(crate) enum G0 {
     Latin(NationalSubset),
     /// Serbian/Croatian.
     Cyrillic1,
@@ -42,7 +42,7 @@ pub enum G0 {
 
 /// A G2 supplementary character set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum G2 {
+pub(crate) enum G2 {
     Latin,
     Cyrillic,
     Greek,
@@ -51,14 +51,14 @@ pub enum G2 {
 
 /// A G0 and G2 pair, as one default character set designation selects them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CharacterSet {
+pub(crate) struct CharacterSet {
     pub g0: G0,
     pub g2: G2,
 }
 
 impl CharacterSet {
     /// The Latin G0 set without national option characters and the Latin G2 set.
-    pub const PLAIN_LATIN: Self = Self {
+    pub(crate) const PLAIN_LATIN: Self = Self {
         g0: G0::Latin(NationalSubset::Plain),
         g2: G2::Latin,
     };
@@ -66,7 +66,7 @@ impl CharacterSet {
     /// The set with the ISO 646 characters in place of a Latin national
     /// option subset.
     #[must_use]
-    pub const fn without_national_option(self) -> Self {
+    pub(crate) const fn without_national_option(self) -> Self {
         match self.g0 {
             G0::Latin(_) => Self {
                 g0: G0::Latin(NationalSubset::Plain),
@@ -80,7 +80,7 @@ impl CharacterSet {
     /// group in bits 3-6, the national option bits C12-C14 in bits 0-2), or
     /// `None` when the code designates nothing.
     #[must_use]
-    pub fn from_designation(code: u8) -> Option<Self> {
+    pub(crate) fn from_designation(code: u8) -> Option<Self> {
         use NationalSubset as N;
         let latin = |subset| Self {
             g0: G0::Latin(subset),
@@ -117,7 +117,7 @@ impl CharacterSet {
 
     /// The G0 character of a code 0x20 to 0x7F.
     #[must_use]
-    pub fn g0_char(self, code: u8) -> char {
+    pub(crate) fn g0_char(self, code: u8) -> char {
         let index = usize::from(code.clamp(0x20, 0x7F) - 0x20);
         match self.g0 {
             G0::Latin(subset) => NATIONAL_POSITIONS
@@ -135,7 +135,7 @@ impl CharacterSet {
 
     /// The G2 character of a code 0x20 to 0x7F.
     #[must_use]
-    pub fn g2_char(self, code: u8) -> char {
+    pub(crate) fn g2_char(self, code: u8) -> char {
         let index = usize::from(code.clamp(0x20, 0x7F) - 0x20);
         match self.g2 {
             G2::Latin => LATIN_G2[index],
@@ -155,7 +155,7 @@ impl NationalSubset {
 /// The precomposed character of `base` with diacritical mark `mark` (1 to 15,
 /// G2 column 4), if Unicode has one in the Latin-1 and Latin Extended-A blocks.
 #[must_use]
-pub fn compose(base: char, mark: u8) -> Option<char> {
+pub(crate) fn compose(base: char, mark: u8) -> Option<char> {
     let (bases, composed) = COMPOSITIONS.get(usize::from(mark).checked_sub(1)?)?;
     bases
         .chars()

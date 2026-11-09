@@ -3,12 +3,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb2-literal-flag0",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb2-literal-flag0.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb2-literal-flag0.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb2-literal-flag0.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb2-literal-flag0.native-indices"
         ),
@@ -23,12 +17,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb2-literal-flag1",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb2-literal-flag1.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb2-literal-flag1.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb2-literal-flag1.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb2-literal-flag1.native-indices"
         ),
@@ -43,12 +31,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb2-run-flag0",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb2-run-flag0.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb2-run-flag0.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb2-run-flag0.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb2-run-flag0.native-indices"
         ),
@@ -63,12 +45,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb2-run-flag1",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb2-run-flag1.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb2-run-flag1.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb2-run-flag1.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb2-run-flag1.native-indices"
         ),
@@ -83,12 +59,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb4-literal-flag0",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb4-literal-flag0.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb4-literal-flag0.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb4-literal-flag0.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb4-literal-flag0.native-indices"
         ),
@@ -107,12 +77,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb4-literal-flag1",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb4-literal-flag1.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb4-literal-flag1.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb4-literal-flag1.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb4-literal-flag1.native-indices"
         ),
@@ -131,12 +95,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb4-run-flag0",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb4-run-flag0.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb4-run-flag0.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb4-run-flag0.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb4-run-flag0.native-indices"
         ),
@@ -155,12 +113,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb4-run-flag1",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb4-run-flag1.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb4-run-flag1.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb4-run-flag1.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb4-run-flag1.native-indices"
         ),
@@ -179,12 +131,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb8-literal-flag0",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb8-literal-flag0.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb8-literal-flag0.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb8-literal-flag0.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb8-literal-flag0.native-indices"
         ),
@@ -237,12 +183,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb8-literal-flag1",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb8-literal-flag1.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb8-literal-flag1.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb8-literal-flag1.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb8-literal-flag1.native-indices"
         ),
@@ -295,12 +235,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb8-run-flag0",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb8-run-flag0.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb8-run-flag0.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb8-run-flag0.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb8-run-flag0.native-indices"
         ),
@@ -353,12 +287,6 @@ pub(super) static CASES: &[Case] = &[
     Case {
         id: "dvb8-run-flag1",
         payload: include_bytes!("../native-nonmodifying-fixtures/dvb8-run-flag1.source-dvb"),
-        source_indices: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb8-run-flag1.source-indices"
-        ),
-        source_palette: include_bytes!(
-            "../native-nonmodifying-fixtures/dvb8-run-flag1.source-palette"
-        ),
         native_indices: include_bytes!(
             "../native-nonmodifying-fixtures/dvb8-run-flag1.native-indices"
         ),

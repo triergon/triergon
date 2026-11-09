@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 triergon-bitstream = { path = "../bitstream" }
 triergon-core = { path = "../core" }
+triergon-framing = { path = "../framing" }
 triergon-pixel = { path = "../pixel" }
 
 [dev-dependencies]
@@ -19,10 +20,6 @@ triergon-harness-protocol = { path = "../harness-protocol" }
 # Comparison-only projections that tests compare with recorded reference output;
 # not shipped behaviour.
 reference-trace = []
-
-[[test]]
-name = "pgs_native_projection"
-required-features = ["reference-trace"]
 
 [[test]]
 name = "text_carriage"

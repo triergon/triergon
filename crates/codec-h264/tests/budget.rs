@@ -2,7 +2,8 @@
 //! is a typed error, and output pictures keep their frame buffers charged.
 
 use triergon_codec::{Budget, StorageError};
-use triergon_codec_h264::{AnnexBNalIter, DecodeError, Decoder, Limits, Picture};
+use triergon_codec_h264::{DecodeError, Decoder, Limits, Picture};
+use triergon_framing::AnnexBUnits;
 
 /// 80x48 (5x3 macroblocks), one IDR and one P picture.
 fn stream() -> Vec<u8> {
@@ -87,7 +88,7 @@ fn the_default_limit_holds_a_full_level_5_2_decoded_picture_buffer() {
     // The caller holds the latest picture, as a player does while it is shown.
     let mut shown = None;
     let mut pictures = 0;
-    for nal in AnnexBNalIter::new(&data) {
+    for nal in AnnexBUnits::new(&data) {
         decoder.send_nal(nal, None).unwrap();
         while let Some(picture) = decoder.receive() {
             pictures += 1;

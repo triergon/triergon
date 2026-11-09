@@ -179,6 +179,8 @@ from the transport packets offered to `TeletextTsBridge::observe`.
 `PgsTsTrack` hands each PES to `PgsBridge`. `Mp4DvdSetup` reads the colour
 table of an `mp4s` entry, and its `Mp4DvdTrack` hands each sample to
 `DvdReceiver`; a subpicture without a stop ends with its packet's duration.
+A Matroska VobSub track's `vobsub_settings` reads its palette and canvas; the
+DVD queue places pictures on that canvas.
 Teletext pages and closed captions become opaque ASS `TextSource`s, which
 `TextBridge` reports as it reports a Matroska ASS track's cues; an empty
 teletext page is a clear. A teletext decode needs the decoder's whole packet

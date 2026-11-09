@@ -2,8 +2,32 @@
 //! Codec mapping draft-ietf-cellar-codec-21 5.7.1; EN300468 6.2.41;
 //! exact shared Time conversion. The codec mapping is a numbered Internet-Draft.
 //! This module performs no I/O, container demux, envelope guessing or native call.
-use super::display_model::{DvbPacket, PacketEnvelope, Service};
 use triergon_core::{Budget, Bytes, Error, Result, SourceLocation, Time, TimeBase};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Service {
+    pub composition_page: u16,
+    pub ancillary_page: u16,
+    pub subtitling_type: u8,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PacketEnvelope {
+    Segments,
+    PesDataField,
+}
+
+#[derive(Clone, Debug)]
+pub struct DvbPacket {
+    pub payload: Bytes,
+    pub pts: Option<Time>,
+    pub generation: u64,
+    pub sequence: u64,
+    pub envelope: PacketEnvelope,
+    /// Original configuration, raw clock values and container locator, when
+    /// the packet was bound by [`SourceConfiguration::packet`].
+    pub source: Option<PacketSourceFacts>,
+}
 
 /// Keep the declared positive ratio as well as core's exact reduced conversion
 /// base. Equivalent ratios do not erase their original numeric representation.
@@ -237,20 +261,12 @@ impl SourceConfiguration {
         })
     }
 
-    pub(crate) fn check_pool(&self, budget: &Budget) -> Result<()> {
+    fn check_pool(&self, budget: &Budget) -> Result<()> {
         if self.original.belongs_to(budget) {
             Ok(())
         } else {
             Err(Error::ForeignPool)
         }
-    }
-
-    /// Raw declarations still travel with each packet. Metadata-only changes
-    /// need not clear pixels when service/envelope/exact clock are unchanged.
-    pub(crate) fn same_decode_boundary(&self, other: &Self) -> bool {
-        self.service == other.service
-            && self.envelope == other.envelope
-            && self.clock.time_base() == other.clock.time_base()
     }
 }
 
@@ -270,29 +286,5 @@ impl PacketSourceFacts {
     }
     pub fn container_position(&self) -> Option<SourceLocation> {
         self.container_position
-    }
-
-    pub(crate) fn validate(
-        &self,
-        budget: &Budget,
-        packet: &DvbPacket,
-        service: Service,
-    ) -> Result<()> {
-        self.configuration.check_pool(budget)?;
-        if self.configuration.service != service {
-            return Err(Error::Invalid("DVB configured packet service"));
-        }
-        if self.configuration.envelope != packet.envelope {
-            return Err(Error::Invalid("DVB configured packet envelope"));
-        }
-        let expected = self
-            .timing
-            .pts
-            .map(|value| value.to_time(self.configuration.clock))
-            .transpose()?;
-        if expected != packet.pts {
-            return Err(Error::Invalid("DVB configured packet PTS"));
-        }
-        Ok(())
     }
 }

@@ -4,9 +4,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{
-    IndexedRecoveryDecoder, ReceiverDecoder, ReceiverEof, ReceiverPacket,
-};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverEof, ReceiverPacket};
 use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
 
 fn segment(out: &mut Vec<u8>, kind: u8, body: &[u8]) {
@@ -126,7 +124,7 @@ fn native_application_output_has_literal_pixels_palette_geometry_and_raw_clock()
 }
 
 #[test]
-fn native_constructor_preserves_finite_policy_caps_without_strict_source_setup() {
+fn constructor_refuses_limits_above_the_format_ceilings() {
     let b = Budget::new(4096).unwrap();
     let baseline = b.used();
     for limits in [
@@ -140,14 +138,6 @@ fn native_constructor_preserves_finite_policy_caps_without_strict_source_setup()
         },
         DisplayLimits {
             max_references: 256,
-            ..DisplayLimits::default()
-        },
-        DisplayLimits {
-            max_windows: 256,
-            ..DisplayLimits::default()
-        },
-        DisplayLimits {
-            max_segments: 4097,
             ..DisplayLimits::default()
         },
     ] {
@@ -182,37 +172,6 @@ fn duplicate_display_keeps_later_hidden_caches_and_final_canvas_for_next_packet(
     assert_eq!((r.palette()[1], r.palette()[2]), (0xffff_ffff, 0x8000_0000));
     assert_eq!(restored.context_canvas, [32, 2]);
     assert_eq!(clear.raw_packet().as_ref(), raw);
-}
-
-#[test]
-fn full_api_still_retains_both_source_sets_and_additional_receiver_event() {
-    let b = Budget::new(4 * 1024 * 1024).unwrap();
-    let c = AtomicBool::new(false);
-    let mut full =
-        IndexedRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
-    let mut raw = pcs(16, 1, 0x80, &[]);
-    segment(&mut raw, 0x80, &[]);
-    let mut later = picture();
-    later[10] = 0;
-    raw.extend_from_slice(&later);
-    let mut owned = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
-    full.push(&mut owned, clock(), &c).unwrap();
-    let mut result = None;
-    for _ in 0..1_000_000 {
-        if full.poll(&mut WorkBudget::new(7), &c).unwrap() == RecoveryStatus::OutputReady {
-            result = Some(full.take_output(&c).unwrap());
-            break;
-        }
-    }
-    let out = result.expect("full Source+Receiver operation must finish");
-    assert_eq!(out.source_error(), None);
-    assert_eq!(out.source_sets().len(), 2);
-    assert!(out.source_sets()[0].is_clear());
-    assert_eq!(out.source_sets()[1].objects()[0].pixels().as_ref(), &[1, 2]);
-    assert_eq!(out.receiver_sets().len(), 2);
-    assert_eq!(out.omitted_receiver_events(), 1);
-    assert!(out.receiver_output().unwrap().rectangles().is_empty());
 }
 
 #[test]
@@ -434,7 +393,7 @@ fn retained_native_outputs_survive_reset_and_decoder_drop_with_all_charges() {
 }
 
 #[test]
-fn native_eof_does_not_validate_pending_strict_source_state_or_fabricate_output() {
+fn end_of_input_presents_nothing_pending() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d = decoder(&b, false);

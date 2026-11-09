@@ -14,6 +14,7 @@ inspect = []
 [dependencies]
 triergon-bitstream = { path = "../bitstream" }
 triergon-codec = { path = "../codec" }
+triergon-framing = { path = "../framing" }
 
 [dev-dependencies]
 triergon-harness-protocol = { path = "../harness-protocol" }

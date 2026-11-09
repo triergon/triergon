@@ -7,7 +7,7 @@
 
 /// What a construct carries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CcType {
+pub(crate) enum CcType {
     /// A CEA-608 byte pair of field 1 (CC1, CC2, T1, T2).
     Field1,
     /// A CEA-608 byte pair of field 2 (CC3, CC4, T3, T4, XDS).
@@ -21,7 +21,7 @@ pub enum CcType {
 impl CcType {
     /// The type of a flag byte.
     #[must_use]
-    pub const fn of(flags: u8) -> Self {
+    pub(crate) const fn of(flags: u8) -> Self {
         match flags & 3 {
             0 => Self::Field1,
             1 => Self::Field2,
@@ -29,17 +29,11 @@ impl CcType {
             _ => Self::DtvccStart,
         }
     }
-
-    /// The type's `cc_type` value.
-    #[must_use]
-    pub const fn code(self) -> u8 {
-        self as u8
-    }
 }
 
 /// One construct.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Triplet {
+pub(crate) struct Triplet {
     /// The flag byte as sent, marker bits included.
     pub flags: u8,
     pub data: [u8; 2],
@@ -47,24 +41,18 @@ pub struct Triplet {
 
 impl Triplet {
     #[must_use]
-    pub const fn valid(self) -> bool {
+    pub(crate) const fn valid(self) -> bool {
         self.flags & 4 != 0
     }
 
     #[must_use]
-    pub const fn kind(self) -> CcType {
+    pub(crate) const fn kind(self) -> CcType {
         CcType::of(self.flags)
-    }
-
-    /// The construct's three bytes.
-    #[must_use]
-    pub const fn bytes(self) -> [u8; 3] {
-        [self.flags, self.data[0], self.data[1]]
     }
 }
 
 /// The constructs of `cc_data`, in order; a trailing partial construct is not one.
-pub fn triplets(cc_data: &[u8]) -> impl ExactSizeIterator<Item = Triplet> + Clone + '_ {
+pub(crate) fn triplets(cc_data: &[u8]) -> impl ExactSizeIterator<Item = Triplet> + Clone + '_ {
     cc_data.chunks_exact(3).map(|c| Triplet {
         flags: c[0],
         data: [c[1], c[2]],

@@ -1,21 +1,14 @@
-//! Closed captions: CEA-608 and CEA-708 caption data carried in video (ATSC A/53,
-//! SCTE 20) and its decoding to timed text.
+//! Closed captions carried in video (ATSC A/53, SCTE 20, DVD user data and
+//! H.264/HEVC SEI).
 //!
-//! | Module | What it reads |
-//! | --- | --- |
-//! | [`cc_data`] | `cc_data()` constructs: field 1 and 2 byte pairs, DTVCC data |
-//! | [`line21`] | CEA-608 byte pairs: control codes and character sets |
-//! | [`dtvcc`] | CEA-708 caption channel packets and service blocks |
-//! | [`user_data`] | ATSC A/53 `GA94` caption data and SCTE 20 user data |
-//! | [`video`] | the caption data of MPEG-2 pictures and H.264/HEVC access units |
-//!
-//! [`compat::cc`](crate::compat::cc) reproduces FFmpeg: its `ccaption` decoder,
-//! its order and timing of caption data taken from video, and its `scc` demuxer.
+//! [`compat::cc`](crate::compat::cc) reproduces FFmpeg: its `ccaption` decoder
+//! of CEA-608, its order and timing of caption data taken from video, and its
+//! `scc` demuxer. CEA-708 data is passed through untouched, as in FFmpeg.
+//! [`video::nal`] names how a video stream carries its NAL units.
 
-pub mod cc_data;
-pub mod dtvcc;
-pub mod line21;
-pub mod user_data;
+pub(crate) mod cc_data;
+pub(crate) mod line21;
+pub(crate) mod user_data;
 pub mod video;
 
 pub(crate) mod extraction;

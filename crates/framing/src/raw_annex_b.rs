@@ -1,7 +1,7 @@
 //! Ordered access-unit bytes for an Annex B source, without a container clock.
 
 use crate::{
-    Codec, NalFraming, NalHeader, NalReader, NalUnit, ReaderLimits, avc_picture::AvcPictures,
+    Codec, NalFraming, NalHeader, NalReader, NalUnit, ReaderLimits, avc_picture::AvcPictures, hevc,
 };
 use std::{
     ops::Range,
@@ -109,13 +109,13 @@ fn hevc_role(nal: &NalUnit) -> Result<Role> {
     };
     // H.265 7.4.2.4.4. Only base-layer NALs choose the access-unit
     // boundary. Every other NAL retains its source bytes in order.
-    let vcl = layer_id == 0 && matches!(nal_unit_type, 0..=9 | 16..=21);
+    let vcl = layer_id == 0 && hevc::is_slice(nal_unit_type);
     let first_slice = vcl && nal.bytes().get(2).ok_or(Error::Truncated)? & 0x80 != 0;
-    let leading = layer_id == 0 && matches!(nal_unit_type, 32..=35 | 39 | 41..=44 | 48..=55);
+    let leading = layer_id == 0 && hevc::begins_access_unit(nal_unit_type);
     Ok(Role {
         vcl,
         begins: first_slice || leading,
-        random_access: first_slice && matches!(nal_unit_type, 16..=21),
+        random_access: first_slice && matches!(nal_unit_type, hevc::BLA_W_LP..=hevc::CRA),
     })
 }
 

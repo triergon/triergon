@@ -1,5 +1,8 @@
 //! A four-byte-start-code AVC feed, over complete length-prefixed samples.
-use crate::{AvcConfigArrayKind, AvcConfigNal, AvcConfiguration, BuildStep, Codec, NalHeader};
+use crate::{
+    AvcConfigArrayKind, AvcConfigNal, AvcConfiguration, BuildStep, Codec, NalHeader,
+    split_length_prefixed,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -240,15 +243,11 @@ impl<'a> AvcAnnexBJob<'a> {
 }
 
 fn next_nal(sample: &[u8], width: usize) -> Result<(&[u8], &[u8])> {
-    let (prefix, payload) = sample.split_at_checked(width).ok_or(Error::Truncated)?;
-    let mut size = 0usize;
-    for &byte in prefix {
-        size = (size << 8) | usize::from(byte);
-    }
-    if size == 0 {
+    let (nal, rest) = split_length_prefixed(sample, width).ok_or(Error::Truncated)?;
+    if nal.is_empty() {
         return Err(Error::Invalid("empty AVC NAL"));
     }
-    payload.split_at_checked(size).ok_or(Error::Truncated)
+    Ok((nal, rest))
 }
 
 fn check_limit(requested: usize, maximum: usize) -> Result<()> {

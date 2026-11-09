@@ -182,6 +182,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-bitstream",
  "triergon-codec",
+ "triergon-framing",
  "triergon-harness-protocol",
 ]
 
@@ -191,6 +192,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-bitstream",
  "triergon-codec",
+ "triergon-framing",
  "triergon-harness-protocol",
 ]
 
@@ -371,6 +373,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-bitstream",
  "triergon-core",
+ "triergon-framing",
  "triergon-harness-protocol",
  "triergon-pixel",
 ]
