@@ -176,6 +176,11 @@ and shares a sample's window where the whole sample fits in one.
 | `random_access` | `stss` or fragment sample flags |
 | `Event::Other` | `ReaderEvent::Box` for each root box, `ReaderEvent::Movie` once tracks are available |
 
+Dolby Vision sample entries `dvh1` and `dvhe` report HEVC and `dav1` reports AV1.
+The reader and range playback keep the source entry code and expose the base
+`hvcC` or `av1C` configuration. Dolby Vision boxes remain available through
+`SampleDescription::extensions`. See the [registered sample entries](https://mp4ra.org/registered-types/codecs).
+
 `request_seek` finds the latest stated sync sample presented at or before the target
 on the track's media clock, or the first one if none is, without reading media. It
 reports `SeekMethod::Index`. Other tracks resume at their first sample at or after
