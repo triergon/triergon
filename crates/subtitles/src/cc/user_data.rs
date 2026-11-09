@@ -5,13 +5,13 @@
 use triergon_bitstream::{BitCursor, BitSource};
 
 /// `user_data_identifier` of ATSC user data.
-pub const ATSC_IDENTIFIER: [u8; 4] = *b"GA94";
+pub(crate) const ATSC_IDENTIFIER: [u8; 4] = *b"GA94";
 /// `user_data_type_code` of `cc_data()`.
 const CC_DATA: u8 = 0x03;
 
 /// The `cc_data()` of one `ATSC_user_data()`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AtscCaptions<'a> {
+pub(crate) struct AtscCaptions<'a> {
     pub process_em_data: bool,
     pub process_cc_data: bool,
     pub additional_data: bool,
@@ -25,7 +25,7 @@ pub struct AtscCaptions<'a> {
 impl AtscCaptions<'_> {
     /// True when all `cc_count` constructs are present.
     #[must_use]
-    pub fn is_complete(&self) -> bool {
+    pub(crate) fn is_complete(&self) -> bool {
         self.cc_data.len() == usize::from(self.cc_count) * 3
     }
 }
@@ -33,7 +33,7 @@ impl AtscCaptions<'_> {
 /// The captions of `ATSC_user_data()` (from `user_data_identifier` on), `None`
 /// when it is not `GA94` `cc_data()`.
 #[must_use]
-pub fn atsc_captions(user_data: &[u8]) -> Option<AtscCaptions<'_>> {
+pub(crate) fn atsc_captions(user_data: &[u8]) -> Option<AtscCaptions<'_>> {
     let rest = user_data.strip_prefix(&ATSC_IDENTIFIER)?;
     let (&[kind, flags, em_data], rest) = rest.split_first_chunk::<3>()?;
     if kind != CC_DATA {
@@ -59,14 +59,14 @@ const T35_ATSC: [u8; 2] = [0x00, 0x31];
 /// The `ATSC_user_data()` of an ITU-T T.35 payload (`user_data_registered_itu_t_t35`
 /// SEI, H.264 D.1.6 and HEVC D.2.6), `None` for another country or provider.
 #[must_use]
-pub fn t35_atsc_user_data(payload: &[u8]) -> Option<&[u8]> {
+pub(crate) fn t35_atsc_user_data(payload: &[u8]) -> Option<&[u8]> {
     let rest = payload.strip_prefix(&[T35_UNITED_STATES])?;
     rest.strip_prefix(&T35_ATSC)
 }
 
 /// One caption pair of SCTE 20 user data.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Scte20Caption {
+pub(crate) struct Scte20Caption {
     pub priority: u8,
     /// `field_number`: 1 odd field, 2 even field, 3 the repeated field (0 is forbidden).
     pub field: u8,
@@ -85,7 +85,7 @@ pub struct Scte20Caption {
 /// `line_offset` (5), `cc_data_1` (8), `cc_data_2` (8) and a marker bit. The
 /// data bytes are sent least significant bit first.
 #[must_use]
-pub fn scte20_captions(user_data: &[u8]) -> Option<Scte20Captions<'_>> {
+pub(crate) fn scte20_captions(user_data: &[u8]) -> Option<Scte20Captions<'_>> {
     let (&[kind, flag], rest) = user_data.split_first_chunk::<2>()?;
     if kind != CC_DATA || flag & 0x7f != 0x01 {
         return None;
@@ -100,7 +100,7 @@ pub fn scte20_captions(user_data: &[u8]) -> Option<Scte20Captions<'_>> {
 
 /// Iterator over SCTE 20 caption pairs; a pair cut short ends it.
 #[derive(Clone, Debug)]
-pub struct Scte20Captions<'a> {
+pub(crate) struct Scte20Captions<'a> {
     bits: BitCursor<'a>,
     remaining: u8,
 }
@@ -108,7 +108,7 @@ pub struct Scte20Captions<'a> {
 impl Scte20Captions<'_> {
     /// The pairs announced and not yet read, present or not.
     #[must_use]
-    pub fn remaining(&self) -> usize {
+    pub(crate) fn remaining(&self) -> usize {
         usize::from(self.remaining)
     }
 }
@@ -145,7 +145,7 @@ impl Iterator for Scte20Captions<'_> {
 
 /// The identifier of DVD-Video line 21 user data: `CC`, `user_data_type_code`
 /// 0x01 and `caption_block_size` 0xF8.
-pub const DVD_IDENTIFIER: [u8; 4] = *b"CC\x01\xf8";
+pub(crate) const DVD_IDENTIFIER: [u8; 4] = *b"CC\x01\xf8";
 
 /// The line 21 user data of a DVD-Video GOP.
 ///
@@ -156,7 +156,7 @@ pub const DVD_IDENTIFIER: [u8; 4] = *b"CC\x01\xf8";
 /// (bit 0), and the two line 21 bytes of that field. Words alternate between
 /// the fields from the one `caption_odd_field_first` names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct DvdCaptions<'a> {
+pub(crate) struct DvdCaptions<'a> {
     pub odd_field_first: bool,
     pub block_count: u8,
     pub extra_field: bool,
@@ -164,28 +164,9 @@ pub struct DvdCaptions<'a> {
     pub words: &'a [u8],
 }
 
-/// One DVD caption word.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct DvdWord {
-    /// `caption_field_odd`: field 1 (CC1, CC2) data.
-    pub odd_field: bool,
-    pub data: [u8; 2],
-}
-
-impl DvdCaptions<'_> {
-    /// The words the header announces, as far as they are present.
-    pub fn words(&self) -> impl Iterator<Item = DvdWord> + '_ {
-        let count = 2 * usize::from(self.block_count) + usize::from(self.extra_field);
-        self.words.chunks_exact(3).take(count).map(|w| DvdWord {
-            odd_field: w[0] & 1 == 1,
-            data: [w[1], w[2]],
-        })
-    }
-}
-
 /// The DVD line 21 user data (from the identifier on), `None` for other data.
 #[must_use]
-pub fn dvd_captions(user_data: &[u8]) -> Option<DvdCaptions<'_>> {
+pub(crate) fn dvd_captions(user_data: &[u8]) -> Option<DvdCaptions<'_>> {
     let rest = user_data.strip_prefix(&DVD_IDENTIFIER)?;
     let (&header, words) = rest.split_first()?;
     Some(DvdCaptions {
@@ -224,18 +205,11 @@ mod tests {
     }
 
     #[test]
-    fn reads_dvd_words() {
+    fn reads_the_dvd_caption_header() {
         let data = b"CC\x01\xf8\x83\xff\x94\x20\xfe\x80\x80\xff\xc1\xc2";
         let captions = dvd_captions(data).expect("captions");
         assert!(captions.odd_field_first && captions.extra_field);
-        let words: Vec<_> = captions.words().map(|w| (w.odd_field, w.data)).collect();
-        assert_eq!(
-            words,
-            [
-                (true, [0x94, 0x20]),
-                (false, [0x80, 0x80]),
-                (true, [0xc1, 0xc2])
-            ]
-        );
+        assert_eq!(captions.block_count, 1);
+        assert_eq!(captions.words, &data[5..]);
     }
 }

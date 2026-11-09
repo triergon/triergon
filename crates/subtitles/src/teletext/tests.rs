@@ -1,13 +1,15 @@
-//! Page assembly and presentation (EN 300 706) through the specification view.
+//! Page assembly and presentation (EN 300 706).
 
+#[allow(unreachable_pub)]
+#[path = "../../tests/teletext_common/mod.rs"]
 mod teletext_common;
 
+use super::charset::CharacterSet;
+use super::display::{Charsets, Colour, Display, Glyph, Part, Style};
+use super::page::{Assembler, Page, Reception};
+use super::presentation::{Designations, Presentation, Remapping, Rgb};
 use teletext_common::{
     Flags, NORMAL, SUBTITLE, designated_enhancement, enhancement, header, row, triplet,
-};
-use triergon_subtitles::teletext::{
-    Assembler, CharacterSet, Charsets, Colour, Designations, Display, Glyph, Page, Part,
-    Presentation, Reception, Remapping, Rgb, Style,
 };
 
 /// The pages each packet completes.

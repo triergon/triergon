@@ -19,8 +19,8 @@
 //! FFmpeg's `libzvbi_teletextdec` decoder, which turns pages into text or ASS
 //! subtitles, is [`compat::teletext`](crate::compat::teletext).
 
-pub mod charset;
-pub mod coding;
+pub(crate) mod charset;
+pub(crate) mod coding;
 mod data_unit;
 mod display;
 mod packet;
@@ -28,12 +28,5 @@ mod page;
 mod presentation;
 pub(crate) mod receiver;
 
-pub use charset::{CharacterSet, G0, G2, NationalSubset};
-pub use data_unit::{
-    DATA_UNIT_BYTES, DataField, DataUnitHeader, DataUnitKind, TeletextUnit,
-    is_teletext_data_identifier,
-};
-pub use display::{COLUMNS, Cell, Charsets, Colour, Display, Glyph, Part, ROWS, Size, Style};
-pub use packet::{Address, Control, Header, Magazine, Packet, PageNumber, Subcode};
-pub use page::{Assembler, Page, Reception, RowCodes, Triplet, Triplets};
-pub use presentation::{Designations, Presentation, Presentations, Remapping, Rgb};
+#[cfg(test)]
+mod tests;

@@ -81,9 +81,7 @@ region depth's `palette`, as FFmpeg reports it, and `colours`, the colour of
 every pixel value: a region recomposed at a smaller depth without a fill keeps
 larger pixel values, which read as zero, or under the automatic palette as the
 level it ranks them at. The PGS receiver is polled: `push(&mut packet, clock,
-&cancel)`, then `poll` until `OutputReady` and `take_output`. Teletext and
-captions also have specification decoders: `teletext::Assembler` and
-`teletext::Display`; `cc::line21` and `cc::dtvcc`.
+&cancel)`, then `poll` until `OutputReady` and `take_output`.
 
 | Module | Entry points |
 | --- | --- |
@@ -91,8 +89,7 @@ captions also have specification decoders: `teletext::Assembler` and
 | `dvb` | `SourceConfiguration`, `DvbPacket`: a service's configuration and its packets with their original clocks |
 | `pgs` | `SegmentIter`: segments of a packet or SUP stream; `DisplayLimits`, `DisplayConfig` and the outputs of the PGS receiver |
 | `dvd` | `vobsub` (`.idx` text), `program_stream` (MPEG-2 program streams) |
-| `cc` | `cc_data`, `line21` (CEA-608), `dtvcc` (CEA-708 packets and service blocks), `user_data` (A/53, SCTE 20, DVD captions), `video` (MPEG-2 pictures, H.264/HEVC SEI) |
-| `teletext` | `DataField`, `Packet`, `Assembler`, `Presentation`, `Display`, `charset` |
+| `cc` | `video::nal::{Codec, Framing}`: how a video stream carries its NAL units, for `compat::cc::VideoCoding` |
 | `context` | `Builder`: track header, metadata and attachment bytes handed to a renderer |
 | `compat::dvb` | `ReceiverDecoder`, `Status`, `Options`, `AutomaticPalette`; `PesParser` (PES data field to codec packets) |
 | `compat::pgs` | `ReceiverDecoder`, `Refusal` |
@@ -106,8 +103,8 @@ captions also have specification decoders: `teletext::Assembler` and
 
 **Receivers.** One receiver per format in `compat` reproduces the output of the
 pinned FFmpeg build (git `d32b387f` on the 9.0 branch; teletext with libzvbi
-0.2.46), including its tolerances of malformed input. Text, teletext and captions
-also have operations that follow the specification and keep every original byte.
+0.2.46), including its tolerances of malformed input. Text also has operations that
+follow the specification and keep every original byte.
 
 **Comparison-only projections.** The non-default `reference-trace` feature adds
 `reference_trace`: the text `carriage` session that reproduces FFmpeg's demuxer
@@ -158,7 +155,7 @@ bytes are errors; nothing is replaced with U+FFFD.
 
 | Format | Decoded | Output |
 | --- | --- | --- |
-| CEA-608/708 in video | `cc_data` from ATSC A/53 (`GA94`) and DVD caption user data in MPEG-2 pictures, SCTE 20, Dish Network user data, and A/53 SEI in H.264 and HEVC; CEA-608 control codes, PACs, mid-row codes, special and extended characters, XDS; CEA-708 caption channel packets and service blocks | Receiver: the caption data of each frame in FFmpeg's output order and times (`CaptionExtractor`; at most 6000 bytes per MPEG-2 frame, as FFmpeg keeps), decoded to the ASS events of its `ccaption` decoder with `real_time` and `data_field`; SCC files read as its `scc` demuxer does. CEA-708 services are surfaced but, as in FFmpeg, not decoded to text |
+| CEA-608/708 in video | `cc_data` from ATSC A/53 (`GA94`) and DVD caption user data in MPEG-2 pictures, SCTE 20, Dish Network user data, and A/53 SEI in H.264 and HEVC; CEA-608 control codes, PACs, mid-row codes, special and extended characters, XDS; CEA-708 data passed through untouched, as in FFmpeg | Receiver: the caption data of each frame in FFmpeg's output order and times (`CaptionExtractor`; at most 6000 bytes per MPEG-2 frame, as FFmpeg keeps), decoded to the ASS events of its `ccaption` decoder with `real_time` and `data_field`; SCC files read as its `scc` demuxer does. CEA-708 data is passed through untouched and, as in FFmpeg, not decoded to text |
 | DVB teletext (EN 300 472, EN 300 706) | Data units, Hamming 8/4 and 24/18, parity, headers and rows, parallel and serial magazines, subpages, national option subsets and G0/G1/G2/G3 sets, X/26 enhancements and local objects (active, adaptive, passive), X/28 and M/29 designations and colour tables | Receiver: libzvbi's subtitle pages as FFmpeg's `libzvbi_teletextdec` presents them in its `text` and `ass` formats, with its page selection and options |
 
 ## Behaviour and limits
@@ -203,7 +200,7 @@ The text profile names, default limits and timing rules are in
 | Matroska carriage | RFC 9559; Matroska codec mapping Internet-Draft §§3.5.11–3.5.12, 5.2–5.4 |
 | Unicode | RFC 3629 (UTF-8), RFC 2781 (UTF-16) |
 | Teletext | ETSI EN 300 472 (data units); ETSI EN 300 706 (packets, pages, presentation) |
-| Closed captions | CEA-608 (line 21 data); CEA-708 (caption channel packets and service blocks); ATSC A/53 Part 4 (`GA94` caption data); SCTE 20 |
+| Closed captions | CEA-608 (line 21 data); ATSC A/53 Part 4 (`GA94` caption data); SCTE 20 |
 | PGS, DVD SPU, Dish captions | No normative specification is available; behaviour follows public documentation and the FFmpeg reference, with no conformance claim |
 
 The implementation is original safe Rust. Tests use independently authored

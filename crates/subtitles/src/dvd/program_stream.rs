@@ -4,11 +4,11 @@
 use std::ops::Range;
 
 /// `private_stream_1`, which carries subpictures, AC-3, DTS and LPCM.
-pub const PRIVATE_STREAM_1: u8 = 0xbd;
+pub(crate) const PRIVATE_STREAM_1: u8 = 0xbd;
 /// `padding_stream`.
-pub const PADDING_STREAM: u8 = 0xbe;
+pub(crate) const PADDING_STREAM: u8 = 0xbe;
 /// `private_stream_2`, which carries DVD navigation packets.
-pub const PRIVATE_STREAM_2: u8 = 0xbf;
+pub(crate) const PRIVATE_STREAM_2: u8 = 0xbf;
 
 /// One element of a program stream.
 #[derive(Clone, Debug, PartialEq, Eq)]

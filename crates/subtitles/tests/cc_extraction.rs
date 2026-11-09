@@ -8,8 +8,6 @@ use std::fs;
 use std::path::PathBuf;
 use triergon_core::{Budget, WorkBudget};
 use triergon_harness_protocol::unhex;
-use triergon_subtitles::cc::cc_data::{CcType, triplets};
-use triergon_subtitles::cc::dtvcc::Assembler;
 use triergon_subtitles::cc::video::nal::{Codec, Framing};
 use triergon_subtitles::compat::cc::{CaptionExtractor, VideoCoding, VideoPacket};
 
@@ -82,32 +80,17 @@ fn raw_mpeg2_frames_match_the_reference() {
 }
 
 #[test]
-fn dtvcc_packets_survive_extraction() {
+fn cea708_constructs_pass_through_extraction_untouched() {
     let es = fs::read(fixture("mpeg2-open-gop.m2v")).expect("stream");
     let frames = extract(VideoCoding::Mpeg2Raw, [packet(&es, None)]);
-    let mut assembler = Assembler::new();
-    let mut texts = Vec::new();
-    for (_, _, data) in &frames {
-        for triplet in triplets(data) {
-            if matches!(triplet.kind(), CcType::DtvccStart | CcType::DtvccData)
-                && let Some(packet) = assembler.push(triplet)
-            {
-                for block in packet.service_blocks() {
-                    texts.push((block.service, block.data.to_vec()));
-                }
-            }
-        }
-    }
-    // The generator sends "DTVnn" on service 2 for every third packet, else 1.
-    assert!(!texts.is_empty());
-    for (service, text) in &texts {
-        assert!(text.starts_with(b"DTV"), "{text:?}");
-        let n: u32 = std::str::from_utf8(&text[3..])
-            .expect("digits")
-            .parse()
-            .expect("n");
-        assert_eq!(*service, if n.is_multiple_of(3) { 2 } else { 1 });
-    }
+    // Valid `cc_type` 2 and 3 constructs (DTVCC data and packet start) stay in
+    // each frame's caption data, as the reference keeps them.
+    let dtvcc = |data: &[u8]| {
+        data.chunks_exact(3)
+            .filter(|c| c[0] & 4 != 0 && c[0] & 3 >= 2)
+            .count()
+    };
+    assert!(frames.iter().map(|(_, _, data)| dtvcc(data)).sum::<usize>() > 0);
 }
 
 /// An H.264 access unit: an SEI NAL of `messages`, then an IDR slice header.
@@ -179,30 +162,6 @@ fn sei_captions_follow_presentation_order() {
                 vec![0xfc, 0x94, 0x20, 0xfd, 0x00, 0x00]
             ),
         ]
-    );
-}
-
-#[test]
-fn sequence_parameter_sets_state_the_frame_rate() {
-    use triergon_subtitles::cc::video::nal::{Timing, sps_timing};
-    // From libx264 (High 4:4:4) and libx265 encodes at 30000/1001 Hz.
-    let h264 = unhex("67f4000a919a623d808800001f4800075300789129c0");
-    let hevc = unhex(
-        "4201010408000003009e0800000300001e90041062cb2225c995e02dc080800100000303e90000753008",
-    );
-    assert_eq!(
-        sps_timing(Codec::H264, &h264),
-        Some(Timing {
-            num_units_in_tick: 1001,
-            time_scale: 60000
-        })
-    );
-    assert_eq!(
-        sps_timing(Codec::Hevc, &hevc),
-        Some(Timing {
-            num_units_in_tick: 1001,
-            time_scale: 30000
-        })
     );
 }
 

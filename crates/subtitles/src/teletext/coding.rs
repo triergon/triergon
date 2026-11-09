@@ -27,7 +27,7 @@ const HAMMING_8_4_DECODE: [u8; 256] = {
 
 /// The nibble of a Hamming 8/4 byte, correcting a single bit error.
 #[must_use]
-pub fn hamming_8_4(byte: u8) -> Option<u8> {
+pub(crate) fn hamming_8_4(byte: u8) -> Option<u8> {
     match HAMMING_8_4_DECODE[usize::from(byte)] {
         0xFF => None,
         nibble => Some(nibble),
@@ -54,7 +54,7 @@ const PARITY_GROUPS: [u32; 5] = {
 
 /// The 18 data bits of a Hamming 24/18 triplet, correcting a single bit error.
 #[must_use]
-pub fn hamming_24_18(triplet: [u8; 3]) -> Option<u32> {
+pub(crate) fn hamming_24_18(triplet: [u8; 3]) -> Option<u32> {
     let word = u32::from(triplet[0]) | u32::from(triplet[1]) << 8 | u32::from(triplet[2]) << 16;
     // Bit n - 1 of `word` is transmission bit n. P1..P5 cover the bits whose
     // position has bit k set; P6 covers all 24; every group has odd parity.
@@ -81,7 +81,7 @@ pub fn hamming_24_18(triplet: [u8; 3]) -> Option<u32> {
 
 /// The seven-bit code of an odd-parity byte, or `None` on a parity error.
 #[must_use]
-pub fn odd_parity(byte: u8) -> Option<u8> {
+pub(crate) fn odd_parity(byte: u8) -> Option<u8> {
     (byte.count_ones() % 2 == 1).then_some(byte & 0x7F)
 }
 

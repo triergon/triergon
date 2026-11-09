@@ -4,12 +4,12 @@ use super::coding::hamming_8_4;
 
 /// A magazine, 1 to 8 (magazine 8 is transmitted as 0).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Magazine(u8);
+pub(crate) struct Magazine(u8);
 
 impl Magazine {
     /// The magazine of a transmitted three-bit magazine number.
     #[must_use]
-    pub fn from_transmitted(bits: u8) -> Self {
+    pub(crate) fn from_transmitted(bits: u8) -> Self {
         Self(match bits & 7 {
             0 => 8,
             m => m,
@@ -18,20 +18,20 @@ impl Magazine {
 
     /// The magazine number, 1 to 8.
     #[must_use]
-    pub fn number(self) -> u8 {
+    pub(crate) fn number(self) -> u8 {
         self.0
     }
 
     /// Zero-based index for per-magazine state.
     #[must_use]
-    pub fn index(self) -> usize {
+    pub(crate) fn index(self) -> usize {
         usize::from(self.0 - 1)
     }
 }
 
 /// A page number: its magazine and the two hexadecimal page digits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct PageNumber {
+pub(crate) struct PageNumber {
     pub magazine: Magazine,
     /// Tens digit in the high nibble, units digit in the low nibble.
     pub page: u8,
@@ -40,19 +40,19 @@ pub struct PageNumber {
 impl PageNumber {
     /// Whether both page digits are decimal, as on every displayable page.
     #[must_use]
-    pub fn is_decimal(self) -> bool {
+    pub(crate) fn is_decimal(self) -> bool {
         self.page >> 4 <= 9 && self.page & 0xF <= 9
     }
 
     /// Page `FF`, which only ends the previous page of its magazine.
     #[must_use]
-    pub fn is_time_filler(self) -> bool {
+    pub(crate) fn is_time_filler(self) -> bool {
         self.page == 0xFF
     }
 
     /// The page number as three hexadecimal digits, such as `0x888`.
     #[must_use]
-    pub fn hex(self) -> u16 {
+    pub(crate) fn hex(self) -> u16 {
         u16::from(self.magazine.number()) << 8 | u16::from(self.page)
     }
 }
@@ -60,11 +60,11 @@ impl PageNumber {
 /// A page subcode: S1 in bits 0-3, S2 in 4-6, S3 in 8-11 and S4 in 12-13.
 /// Pages without subpages carry 0000 or 3F7F.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Subcode(pub u16);
+pub(crate) struct Subcode(pub u16);
 
 /// The control bits of a page header (EN 300 706 table 2).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Control {
+pub(crate) struct Control {
     /// C4: erase the page before its rows are received.
     pub erase: bool,
     /// C5: newsflash, shown boxed into the picture.
@@ -87,7 +87,7 @@ pub struct Control {
 
 /// The page header packet X/0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Header {
+pub(crate) struct Header {
     pub page: PageNumber,
     pub subcode: Subcode,
     pub control: Control,
@@ -97,7 +97,7 @@ pub struct Header {
 
 /// A packet's magazine and packet number (row).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Address {
+pub(crate) struct Address {
     pub magazine: Magazine,
     /// Packet number, 0 to 31.
     pub row: u8,
@@ -105,7 +105,7 @@ pub struct Address {
 
 /// One teletext packet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Packet<'a> {
+pub(crate) enum Packet<'a> {
     /// X/0, the header of the next page of the magazine.
     Header(Header),
     /// X/0 whose page address or control bits could not be corrected.
@@ -130,7 +130,7 @@ impl<'a> Packet<'a> {
     /// The address and content of one 42-byte packet; `None` when its address
     /// cannot be corrected.
     #[must_use]
-    pub fn parse(packet: &'a [u8; 42]) -> Option<(Address, Self)> {
+    pub(crate) fn parse(packet: &'a [u8; 42]) -> Option<(Address, Self)> {
         let (address, data) = packet.split_first_chunk::<2>()?;
         let low = hamming_8_4(address[0])?;
         let high = hamming_8_4(address[1])?;
