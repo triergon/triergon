@@ -86,11 +86,11 @@ pub(super) struct GlyphKey {
 const OUTLINE_UNITS: usize = 64;
 
 /// An outline's key in the cache (libass's `OutlineHashKey`).
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum OutlineKey {
     Glyph(GlyphKey),
     /// A drawing by its text.
-    Drawing(BudgetVec<u8>),
+    Drawing(Arc<BudgetVec<u8>>),
     Border(BorderKey),
     UnitBox,
 }
@@ -187,6 +187,12 @@ impl Outlines {
         self.cache.cut(limit)
     }
 
+    /// Cuts the cache to its limit again once the renderer has let go of
+    /// outlines (see [`Cache::settle`]).
+    pub(super) fn settle(&mut self) -> Result<()> {
+        self.cache.settle()
+    }
+
     /// Keeps `value` for `key`, counted as 1.
     fn keep(
         &mut self,
@@ -203,7 +209,7 @@ impl Outlines {
         font: &RequestedFont,
         work: &mut WorkBudget,
     ) -> Result<Option<Arc<OutlineValue>>> {
-        if let Some(value) = self.cache.get(&KeyRef::Glyph(&glyph) as &dyn Lookup) {
+        if let Some(value) = self.cache.get(&KeyRef::Glyph(&glyph) as &dyn Lookup)? {
             return Ok(value);
         }
         charge(work, OUTLINE_UNITS)?;
@@ -230,7 +236,7 @@ impl Outlines {
             glyph: OutlineId(Arc::clone(glyph)),
             stroke,
         };
-        if let Some(value) = self.cache.get(&KeyRef::Border(&key) as &dyn Lookup) {
+        if let Some(value) = self.cache.get(&KeyRef::Border(&key) as &dyn Lookup)? {
             return Ok(value);
         }
         let value = raster
@@ -241,7 +247,7 @@ impl Outlines {
 
     /// The unit square opaque boxes are drawn from.
     pub(super) fn unit_box(&mut self) -> Result<Arc<OutlineValue>> {
-        if let Some(Some(value)) = self.cache.get(&KeyRef::UnitBox as &dyn Lookup) {
+        if let Some(Some(value)) = self.cache.get(&KeyRef::UnitBox as &dyn Lookup)? {
             return Ok(value);
         }
         let value = Arc::new(OutlineValue::of_shape(Shape::unit_box(&self.budget)?));
@@ -258,7 +264,7 @@ impl Outlines {
     ) -> Result<Option<Arc<OutlineValue>>> {
         if let Some(value) = self
             .cache
-            .get(&KeyRef::Drawing(drawing.text) as &dyn Lookup)
+            .get(&KeyRef::Drawing(drawing.text) as &dyn Lookup)?
         {
             return Ok(value);
         }
@@ -276,7 +282,7 @@ impl Outlines {
         });
         let mut text = BudgetVec::new(&self.budget);
         text.try_extend_from_slice(drawing.text)?;
-        self.keep(OutlineKey::Drawing(text), value)
+        self.keep(OutlineKey::Drawing(Arc::new(text)), value)
     }
 
     /// Loads a glyph as libass does with hinting off.

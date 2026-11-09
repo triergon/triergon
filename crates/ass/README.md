@@ -244,8 +244,8 @@ selective style overrides), in the frame and storage size and margins of its
   the cached composite they show: an image shows the same bitmap as one of
   the previous frame when it is the same part and window of the same
   composite. A run finds the composite of an equal key (its effects key, and
-  each glyph's fill and border bitmaps and origins in the run), and a glyph
-  the bitmap of an equal key (its outline and quantised transform), so
+  each glyph's fill and border bitmap keys and origins in the run), and a
+  glyph the bitmap of an equal key (its outline and quantised transform), so
   glyphs that draw nothing but an opaque box find the same composite
   whatever their outlines. Whatever the previous frame shows survives the
   caches' cut, so eviction changes no change value; pixels a vector clip or
@@ -262,18 +262,23 @@ level, its hinting modes, selective style overrides and track features.
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
 default is libass's (10,000 outlines, 128 MiB of glyph bitmaps, 64 MiB of
 composites), and `CacheLimits::new(glyphs, megabytes)` gives what
-`ass_set_cache_limits` sets. Glyph bitmaps (with a bitmap that draws
-nothing) and composited runs are kept between frames, and at each frame the
-composites, then the bitmaps, are cut to their bytes as libass cuts its
-caches (`ass_cache_cut`): least recently used first, until what is kept fits,
-and never one the previous frame's images hold, which leaves the order but
-stays until nothing holds it. Their sizes are counted as libass counts them:
-the pixels, libass's records in the target's words, and the points and
-segments of the outline a bitmap is drawn from. The outline count bounds the
-outline cache: glyph and drawing outlines, stroked borders and the unit
-square of opaque boxes are kept between frames and cut to it at each frame
-the same way, never one a kept bitmap or the previous frame's images were
-drawn from. Requested fonts and the faces
+`ass_set_cache_limits` sets. Outlines (glyphs, drawings, stroked borders
+and the unit square of opaque boxes), glyph bitmaps (with a bitmap that
+draws nothing) and composited runs are kept between frames in one kind of
+cache, bounded by the outline count and the two byte limits. When a frame
+starts the composites, then the bitmaps, then the outlines are cut as libass
+cuts its caches (`ass_cache_cut`): least recently used first, until what is
+kept fits, never one the previous frame's images or another entry's key
+hold, which leaves the order but stays until nothing holds it. A cache is
+also cut the same way when an insertion takes it past its limit and when
+the renderer lets go of a run or an event, so it holds at most its limit
+beyond what is in use; libass keeps a frame's entries until the next frame,
+and nothing it would show differs. Sizes are counted as libass counts them:
+an outline as 1; a bitmap's pixels, libass's records in the target's words
+and the points and segments of its outline; a composite's pixels and
+records. A composite is keyed by its glyphs' bitmap keys where libass holds
+the bitmaps, which finds the same composites and lets the bitmaps go.
+Requested fonts and the faces
 they gathered are kept up to `CacheLimits::fonts` font descriptions (10,000
 by default), cut at each frame the same way, never one the previous frame
 asked for; libass keeps them all, so a font asked for again after it left

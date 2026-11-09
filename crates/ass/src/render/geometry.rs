@@ -49,9 +49,10 @@ pub struct FrameMargins {
 /// How much a [`Renderer`](super::Renderer) keeps between frames: outlines
 /// and font descriptions by count, glyph bitmaps and composited runs by
 /// bytes. [`CacheLimits::LIBASS`], the default, is libass's;
-/// [`CacheLimits::new`] gives what `ass_set_cache_limits` sets. Each frame
-/// cuts the caches to them as libass does, never what the last frame's
-/// images were drawn from, which stays until nothing holds it.
+/// [`CacheLimits::new`] gives what `ass_set_cache_limits` sets. The caches
+/// are cut to them as libass cuts its caches, never what the last frame's
+/// images were drawn from, which stays until nothing holds it, and hold at
+/// most them beyond what a frame is using.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CacheLimits {
     /// Outlines kept, at most: glyphs, drawings, stroked borders and the
