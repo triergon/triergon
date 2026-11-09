@@ -27,6 +27,70 @@ pub mod annex_b {
     }
 }
 
+pub mod latm {
+    //! Packet boundaries for LATM in MPEG-TS, as observed with FFmpeg git
+    //! revision `d32b387f` on the 9.0 branch with parsers and NOFILLIN.
+    use crate::clock::ClockKey;
+    use crate::{Pes, SourceEvent, TraceEvent, Track};
+
+    /// Choose LOAS envelope framing or the demuxer's unsplit PES boundaries.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum PacketPolicy {
+        #[default]
+        Strict,
+        /// Emit each validated, nonempty LATM PES as a separate observation.
+        PreservePes,
+    }
+
+    /// An unsplit PES observation with its exact source and clock facts.
+    #[derive(Clone, Debug)]
+    pub struct PesPacket {
+        track: Track,
+        source: SourceEvent,
+        clock_key: ClockKey,
+        clock_quarantined: bool,
+    }
+
+    impl PesPacket {
+        pub(crate) fn new(
+            track: Track,
+            source: SourceEvent,
+            clock_key: ClockKey,
+            clock_quarantined: bool,
+        ) -> Self {
+            Self {
+                track,
+                source,
+                clock_key,
+                clock_quarantined,
+            }
+        }
+
+        pub fn track_info(&self) -> &Track {
+            &self.track
+        }
+
+        pub fn source(&self) -> &SourceEvent {
+            &self.source
+        }
+
+        pub fn clock_key(&self) -> ClockKey {
+            self.clock_key
+        }
+
+        pub fn clock_is_quarantined(&self) -> bool {
+            self.clock_quarantined
+        }
+
+        pub fn pes(&self) -> &Pes {
+            let TraceEvent::Pes(pes) = self.source.event() else {
+                unreachable!("LATM packet owns its source PES");
+            };
+            pes
+        }
+    }
+}
+
 pub mod pes {
     //! The demuxer's PES packets and clock.
     //!

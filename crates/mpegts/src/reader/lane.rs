@@ -1,4 +1,5 @@
 mod eac3;
+mod loas;
 mod unframed_video;
 
 use super::model::{ClockContext, IncompleteVideoData, PacketData, Shared};
@@ -8,6 +9,7 @@ use super::{
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::annex_b::VideoEofPolicy;
+use crate::compat::latm;
 use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors};
 use crate::psi::DescriptorNamespace;
 use std::{
@@ -29,13 +31,18 @@ use unframed_video::{LEADING_VIDEO_BYTES, UnframedVideoScan};
 enum Framer {
     Video(RawAnnexBReader),
     Adts(AacAdtsStreamReader),
+    Loas(loas::Reader),
+    LatmPes,
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
 }
 
 impl Framer {
     fn is_audio(&self) -> bool {
-        matches!(self, Self::Adts(_) | Self::Ac3(_) | Self::Eac3(_))
+        matches!(
+            self,
+            Self::Adts(_) | Self::Loas(_) | Self::Ac3(_) | Self::Eac3(_)
+        )
     }
     fn new(pool: &Budget, track: &Track, limits: ReaderLimits) -> Result<Self> {
         // Private concatenated elementary view, never an external source request.
@@ -67,6 +74,16 @@ impl Framer {
                     maximum_frames: limits.maximum_access_units,
                     maximum_input_window: limits.elementary_input_window,
                 },
+            )?)),
+            0x11 if limits.latm_packet_policy == latm::PacketPolicy::PreservePes => {
+                Ok(Self::LatmPes)
+            }
+            0x11 => Ok(Self::Loas(loas::Reader::new(
+                pool,
+                source,
+                caps,
+                limits.maximum_audio_frame_bytes,
+                limits.elementary_input_window,
             )?)),
             0x06 if matches!(namespace, DescriptorNamespace::Dvb(_)) => {
                 let descriptors = PrivateAudioDescriptors {
@@ -139,26 +156,32 @@ impl Framer {
         Ok(match self {
             Self::Video(reader) => map(reader.step(work, cancel)?, AccessUnit::Video),
             Self::Adts(reader) => map(reader.step(work, cancel)?, AccessUnit::Adts),
+            Self::Loas(reader) => map(reader.step(work, cancel)?, AccessUnit::Loas),
             Self::Ac3(reader) => map(reader.step(work, cancel)?, |frame| {
                 AccessUnit::Ac3(Ac3AccessUnit::single(frame))
             }),
             Self::Eac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
+            Self::LatmPes => unreachable!("LATM PES bypasses elementary framing"),
         })
     }
     fn provide(&mut self, window: InputWindow) -> Result<()> {
         match self {
             Self::Video(reader) => reader.provide_owned(window),
             Self::Adts(reader) => reader.provide_owned(window),
+            Self::Loas(reader) => reader.provide(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
+            Self::LatmPes => unreachable!("LATM PES bypasses elementary framing"),
         }
     }
     fn finish(&mut self, request: InputRequest) -> Result<()> {
         match self {
             Self::Video(reader) => reader.finish(request.source, request.token),
             Self::Adts(reader) => reader.finish(request.source, request.token),
+            Self::Loas(reader) => reader.finish(request),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
+            Self::LatmPes => unreachable!("LATM PES bypasses elementary framing"),
         }
     }
 }
@@ -764,6 +787,7 @@ impl Build {
 pub(super) enum LaneStep {
     Packet(Packet),
     IncompleteVideo(IncompleteVideo),
+    LatmPes(latm::PesPacket),
     NeedPayload,
     Yield,
     End,
@@ -855,6 +879,14 @@ impl Lane {
             return Ok(false);
         }
         let pes = source.pes();
+        if self.track.stream().stream_type == 0x11 {
+            if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
+                return Err(Error::Invalid("LATM audio PES stream ID"));
+            }
+            if pes.payload_len == 0 && matches!(self.framer, Some(Framer::LatmPes)) {
+                return Ok(true);
+            }
+        }
         if pes.header.stream_id != 0xbd {
             if self.track.stream().descriptor_namespace() == DescriptorNamespace::Atsc
                 && matches!(self.track.stream().stream_type, 0x81 | 0x87)
@@ -888,11 +920,15 @@ impl Lane {
             pes.epochs.clock,
             pes.byte_run_epoch,
         ));
-        self.input = self.framer.as_ref().map(|_| Input {
-            source: source.clone(),
-            span: 0,
-            offset: 0,
-        });
+        self.input = self
+            .framer
+            .as_ref()
+            .filter(|framer| !matches!(framer, Framer::LatmPes))
+            .map(|_| Input {
+                source: source.clone(),
+                span: 0,
+                offset: 0,
+            });
         Ok(true)
     }
     fn check_unframed_video_extent(&self, end: u64) -> Result<()> {
@@ -985,6 +1021,9 @@ impl Lane {
                 ));
                 continue;
             }
+            if matches!(self.framer, Some(Framer::LatmPes)) {
+                return self.preserve_latm_pes(draining, work);
+            }
             let Some(framer) = &mut self.framer else {
                 if draining && self.eof {
                     if !self.pieces.is_empty() {
@@ -1028,12 +1067,7 @@ impl Lane {
                         _ => self.limits.maximum_audio_frame_bytes,
                     };
                     let range = self.unpublished().ok_or(Error::Truncated)?;
-                    if self.completed == self.limits.maximum_access_units {
-                        return Err(Error::Limit {
-                            requested: self.completed.saturating_add(1),
-                            maximum: self.limits.maximum_access_units,
-                        });
-                    }
+                    self.check_output_limit()?;
                     let size =
                         usize::try_from(range.end - range.start).map_err(|_| Error::Overflow)?;
                     if size > maximum {
@@ -1050,12 +1084,7 @@ impl Lane {
             };
             match step {
                 Step::Ready(unit) => {
-                    if self.completed == self.limits.maximum_access_units {
-                        return Err(Error::Limit {
-                            requested: self.completed.saturating_add(1),
-                            maximum: self.limits.maximum_access_units,
-                        });
-                    }
+                    self.check_output_limit()?;
                     self.build = Some(Build::new(unit, &self.pool, self.last_anchor));
                 }
                 Step::Yield => return Ok(LaneStep::Yield),
@@ -1119,6 +1148,42 @@ impl Lane {
             }
         }
     }
+    fn check_output_limit(&self) -> Result<()> {
+        if self.completed == self.limits.maximum_access_units {
+            return Err(Error::Limit {
+                requested: self.completed.saturating_add(1),
+                maximum: self.limits.maximum_access_units,
+            });
+        }
+        Ok(())
+    }
+
+    fn preserve_latm_pes(&mut self, draining: bool, work: &mut WorkBudget) -> Result<LaneStep> {
+        let Some(piece) = self.pieces.as_slice().last() else {
+            return Ok(if draining {
+                LaneStep::End
+            } else {
+                LaneStep::NeedPayload
+            });
+        };
+        if !work.try_charge(1) {
+            return Ok(LaneStep::Yield);
+        }
+        self.check_output_limit()?;
+        let packet = latm::PesPacket::new(
+            self.track.clone(),
+            piece.source.clone(),
+            piece.clock.key,
+            piece.clock.quarantined,
+        );
+        self.supplied = piece.range.end;
+        self.published = piece.range.end;
+        self.last_anchor = piece.serial;
+        self.retire = self.pieces.len();
+        self.completed += 1;
+        Ok(LaneStep::LatmPes(packet))
+    }
+
     fn publish(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<LaneStep> {
         let build = self.build.as_mut().expect("pending publication");
         if let Some(count) = build.planned_origins {

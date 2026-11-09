@@ -206,6 +206,27 @@ impl Ac3AccessUnit {
     }
 }
 
+/// One byte-aligned LOAS AudioSyncStream envelope with an opaque LATM element.
+#[derive(Debug)]
+pub struct LoasFrame {
+    pub(super) bytes: Bytes,
+    pub(super) offset: u64,
+}
+
+impl LoasFrame {
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    pub fn multiplex_element(&self) -> &[u8] {
+        &self.bytes.as_ref()[3..]
+    }
+
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.offset..self.offset + self.bytes.len() as u64
+    }
+}
+
 /// Original framed bytes and syntax facts, before decoder-feed conversion.
 /// Framer offsets use a private concatenated elementary view (`SourceId(0)`);
 /// physical transport provenance is retained by [`Packet::sources`].
@@ -213,6 +234,7 @@ impl Ac3AccessUnit {
 pub enum AccessUnit {
     Video(RawAccessUnit),
     Adts(AacAdtsFrame),
+    Loas(LoasFrame),
     Ac3(Ac3AccessUnit),
     /// Unfinished audio at logical EOF. This is a source fragment, not an AU.
     IncompleteAudio {
@@ -226,6 +248,7 @@ impl AccessUnit {
     fn stored_bytes(&self) -> &Bytes {
         match self {
             Self::Adts(frame) => frame.source_bytes(),
+            Self::Loas(frame) => frame.bytes(),
             Self::Ac3(frame) => frame.bytes(),
             Self::IncompleteAudio { bytes, .. } => bytes,
             Self::Video(_) => unreachable!("video access units use assembled bytes"),
@@ -238,6 +261,7 @@ impl AccessUnit {
             Self::Adts(frame) => {
                 frame.source().offset..frame.source().offset + frame.source_bytes().len() as u64
             }
+            Self::Loas(frame) => frame.elementary_range(),
             Self::Ac3(frame) => {
                 frame.facts().offset..frame.facts().offset + frame.bytes().len() as u64
             }
@@ -261,7 +285,7 @@ impl AccessUnit {
     }
     pub(super) fn duration(&self) -> Result<Option<Time>> {
         match self {
-            Self::Video(_) | Self::IncompleteAudio { .. } => Ok(None),
+            Self::Video(_) | Self::Loas(_) | Self::IncompleteAudio { .. } => Ok(None),
             Self::Adts(frame) => {
                 let rate = frame
                     .header()
@@ -423,4 +447,6 @@ pub enum ReaderEvent {
     IncompleteAudio(Packet),
     /// The final unframed video run under the explicit EOF reporting policy.
     IncompleteVideo(IncompleteVideo),
+    /// Original LATM PES bytes under the explicit PES packet policy.
+    LatmPes(crate::compat::latm::PesPacket),
 }

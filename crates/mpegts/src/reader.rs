@@ -3,12 +3,13 @@ mod lane;
 mod model;
 use crate::clock::{ClockKey, SourceTimePolicy};
 use crate::compat::annex_b::VideoEofPolicy;
+use crate::compat::latm;
 use crate::psi::DescriptorNamespace;
 use crate::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
 use lane::{Lane, LaneStep, StorageScan};
 pub use model::{
-    Ac3AccessUnit, AccessUnit, IncompleteVideo, Packet, PacketClock, PayloadSource, ReaderEvent,
-    SourceEvent, Track,
+    Ac3AccessUnit, AccessUnit, IncompleteVideo, LoasFrame, Packet, PacketClock, PayloadSource,
+    ReaderEvent, SourceEvent, Track,
 };
 use model::{ClockContext, Shared};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -39,10 +40,13 @@ pub struct ReaderLimits {
     pub descriptor_namespace: DescriptorNamespace,
     pub transport: ParseLimits,
     pub video: RawAnnexBLimits,
+    /// Maximum bytes in one audio syncframe or LOAS envelope.
     pub maximum_audio_frame_bytes: usize,
     pub audio_eof_policy: AudioEofPolicy,
     /// Reporting policy for validated video PES payload without Annex B framing.
     pub video_eof_policy: VideoEofPolicy,
+    /// LOAS framing by default. PES preservation emits source observations.
+    pub latm_packet_policy: latm::PacketPolicy,
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
@@ -62,6 +66,7 @@ impl Default for ReaderLimits {
             maximum_audio_frame_bytes: 8192,
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             video_eof_policy: VideoEofPolicy::RejectUnframed,
+            latm_packet_policy: latm::PacketPolicy::Strict,
             maximum_access_units: 32_000_000,
             maximum_pes_per_access_unit: 4096,
             elementary_input_window: 64 * 1024,
@@ -306,6 +311,9 @@ impl Reader {
             LaneStep::IncompleteVideo(video) => Ok(Some(Step::Ready(Event::Other(
                 ReaderEvent::IncompleteVideo(video),
             )))),
+            LaneStep::LatmPes(packet) => Ok(Some(Step::Ready(Event::Other(ReaderEvent::LatmPes(
+                packet,
+            ))))),
             LaneStep::Yield => Ok(Some(Step::Yield)),
             LaneStep::DeferredFragment => {
                 self.deferred_fragment = true;
