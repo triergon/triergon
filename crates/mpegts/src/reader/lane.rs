@@ -1,19 +1,32 @@
-use super::model::{ClockContext, PacketData, Shared};
+mod dvb;
+mod eac3;
+mod loas;
+mod unframed_audio;
+
+use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
 use super::{
-    AccessUnit, AudioEofPolicy, Packet, PacketClock, PayloadSource, ReaderLimits, SourceEvent,
-    Track,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, Packet, PacketClock, PayloadSource,
+    ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
-use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors};
-use crate::psi::DescriptorNamespace;
-use std::sync::atomic::{AtomicBool, Ordering};
+use crate::compat::adts::PacketPolicy;
+use crate::compat::annex_b::VideoEofPolicy;
+use crate::compat::latm;
+use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors, UnframedAudioPolicy};
+use crate::psi::{CodecIdentification, DescriptorNamespace};
+use crate::stream::{StorageItem, TransportStorageCursor};
+use crate::{SourceEpochs, table_storage};
+use std::{
+    ops::Range,
+    sync::atomic::{AtomicBool, Ordering},
+};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
-    SourceId, Step, WorkBudget,
+    SourceId, SourceLocation, Step, WorkBudget,
 };
 use triergon_framing::{
-    AacAdtsStreamLimits, AacAdtsStreamReader, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection,
-    Codec, RawAnnexBReader,
+    AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader,
+    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader,
 };
 
 // Keep concrete readers inline; their containing BudgetVec charges the whole state.
@@ -21,12 +34,45 @@ use triergon_framing::{
 enum Framer {
     Video(RawAnnexBReader),
     Adts(AacAdtsStreamReader),
+    AdtsFragments(AacAdtsCarrierReader),
+    Loas(loas::Reader),
+    LatmPes,
     Ac3(Ac3FrameReader),
+    Eac3(eac3::Reader),
+    Dvb(dvb::Reader),
 }
 
 impl Framer {
+    fn input_wait_storage(&self) -> Result<usize> {
+        Ok(match self {
+            Self::Video(reader) => reader.input_wait_storage()?.0,
+            Self::Adts(reader) => reader.input_wait_buffer_capacity(),
+            Self::AdtsFragments(reader) => reader.input_wait_buffer_capacity(),
+            Self::Loas(reader) => reader.input_wait_buffer_capacity(),
+            Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
+            Self::Eac3(reader) => reader.input_wait_storage()?,
+            // Direct PES carriages do not keep a pending unit between inputs.
+            Self::LatmPes | Self::Dvb(_) => 0,
+        })
+    }
+
+    fn input_wait_backing(&self, index: usize) -> Result<Option<&Bytes>> {
+        Ok(match self {
+            Self::Video(reader) => reader
+                .input_wait_storage()?
+                .1
+                .get(index)
+                .map(triergon_framing::NalUnit::bytes),
+            Self::Eac3(reader) => reader.input_wait_backing(index),
+            _ => None,
+        })
+    }
+
     fn is_audio(&self) -> bool {
-        matches!(self, Self::Adts(_) | Self::Ac3(_))
+        matches!(
+            self,
+            Self::Adts(_) | Self::Loas(_) | Self::Ac3(_) | Self::Eac3(_)
+        )
     }
     fn new(pool: &Budget, track: &Track, limits: ReaderLimits) -> Result<Self> {
         // Private concatenated elementary view, never an external source request.
@@ -35,7 +81,9 @@ impl Framer {
             length: None,
             random_access: false,
         };
-        match track.stream().stream_type {
+        let stream = track.stream();
+        let namespace = stream.descriptor_namespace();
+        match stream.stream_type {
             kind @ (0x1b | 0x24) => Ok(Self::Video(RawAnnexBReader::new(
                 pool,
                 if kind == 0x1b {
@@ -47,6 +95,18 @@ impl Framer {
                 caps,
                 limits.video,
             )?)),
+            0x0f if limits.adts_packet_policy == PacketPolicy::ReportFragments => Ok(
+                Self::AdtsFragments(AacAdtsCarrierReader::for_parser_packets(
+                    pool,
+                    source,
+                    caps,
+                    AacAdtsCarrierLimits {
+                        maximum_packet_bytes: limits.maximum_audio_frame_bytes,
+                        maximum_packets: limits.maximum_access_units,
+                        maximum_input_window: limits.elementary_input_window,
+                    },
+                )?),
+            ),
             0x0f => Ok(Self::Adts(AacAdtsStreamReader::new(
                 pool,
                 source,
@@ -57,40 +117,76 @@ impl Framer {
                     maximum_input_window: limits.elementary_input_window,
                 },
             )?)),
-            0x06 if matches!(
-                track.stream().descriptor_namespace(),
-                DescriptorNamespace::Dvb(_)
-            ) =>
-            {
-                let carriage = PrivateAudioCarriage::from_observed_pmt(
-                    6,
-                    PrivateAudioDescriptors {
-                        program: track.program_map().program_descriptors.as_ref(),
-                        elementary: track.stream().descriptor_bytes.as_ref(),
-                    },
-                    limits.transport,
-                )?;
-                if carriage != PrivateAudioCarriage::DvbAc3Tag {
-                    return Err(Error::Unsupported(
-                        "MPEG-TS E-AC-3 access-unit grouping unavailable",
-                    ));
-                }
-                Ok(Self::Ac3(Ac3FrameReader::new(
-                    pool,
-                    source,
-                    caps,
-                    Ac3StreamSelection::Ac3Only,
-                    Ac3FrameLimits {
-                        maximum_frame_bytes: limits.maximum_audio_frame_bytes,
-                        maximum_frames: limits.maximum_access_units,
-                        maximum_input_window: limits.elementary_input_window,
-                    },
-                )?))
+            0x11 if limits.latm_packet_policy == latm::PacketPolicy::PreservePes => {
+                Ok(Self::LatmPes)
             }
+            0x11 => Ok(Self::Loas(loas::Reader::new(
+                pool,
+                source,
+                caps,
+                limits.maximum_audio_frame_bytes,
+                limits.elementary_input_window,
+            )?)),
+            0x06 if stream.codec_identification() == CodecIdentification::DvbSubtitles => {
+                Ok(Self::Dvb(dvb::Reader::new(limits.dvb_subtitle_tail_policy)))
+            }
+            0x06 if matches!(namespace, DescriptorNamespace::Dvb(_)) => {
+                let descriptors = PrivateAudioDescriptors {
+                    program: track.program_map().program_descriptors.as_ref(),
+                    elementary: stream.descriptor_bytes.as_ref(),
+                };
+                let carriage =
+                    match PrivateAudioCarriage::from_observed_pmt(6, descriptors, limits.transport)
+                    {
+                        // An elementary registration can corroborate the DVB descriptor.
+                        Err(Error::Unsupported(_))
+                            if matches!(
+                                PrivateAudioCarriage::from_hls_pmt(
+                                    6,
+                                    descriptors,
+                                    limits.transport
+                                ),
+                                Ok(PrivateAudioCarriage::DvbEac3Tag)
+                            ) =>
+                        {
+                            PrivateAudioCarriage::DvbEac3Tag
+                        }
+                        result => result?,
+                    };
+                if carriage == PrivateAudioCarriage::DvbEac3Tag {
+                    Ok(Self::Eac3(eac3::Reader::new(
+                        pool, track, limits, source, caps,
+                    )?))
+                } else {
+                    Self::ac3(pool, limits, source, caps)
+                }
+            }
+            0x81 if namespace == DescriptorNamespace::Atsc => Self::ac3(pool, limits, source, caps),
+            0x87 if namespace == DescriptorNamespace::Atsc => Ok(Self::Eac3(eac3::Reader::new(
+                pool, track, limits, source, caps,
+            )?)),
             _ => Err(Error::Unsupported(
                 "MPEG-TS carriage has no admitted access-unit framer",
             )),
         }
+    }
+    fn ac3(
+        pool: &Budget,
+        limits: ReaderLimits,
+        source: SourceId,
+        caps: SourceCapabilities,
+    ) -> Result<Self> {
+        Ok(Self::Ac3(Ac3FrameReader::new(
+            pool,
+            source,
+            caps,
+            Ac3StreamSelection::Ac3Only,
+            Ac3FrameLimits {
+                maximum_frame_bytes: limits.maximum_audio_frame_bytes,
+                maximum_frames: limits.maximum_access_units,
+                maximum_input_window: limits.elementary_input_window,
+            },
+        )?))
     }
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<AccessUnit>> {
         fn map<T>(step: Step<T>, wrap: impl FnOnce(T) -> AccessUnit) -> Step<AccessUnit> {
@@ -105,27 +201,46 @@ impl Framer {
         Ok(match self {
             Self::Video(reader) => map(reader.step(work, cancel)?, AccessUnit::Video),
             Self::Adts(reader) => map(reader.step(work, cancel)?, AccessUnit::Adts),
-            Self::Ac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
+            Self::Loas(reader) => map(reader.step(work, cancel)?, AccessUnit::Loas),
+            Self::AdtsFragments(reader) => map(reader.step(work, cancel)?, |carrier| match carrier
+                .into_selected_frame()
+            {
+                Ok(frame) => AccessUnit::Adts(frame),
+                Err(fragment) => AccessUnit::AdtsFragment(fragment),
+            }),
+            Self::Ac3(reader) => map(reader.step(work, cancel)?, |frame| {
+                AccessUnit::Ac3(Ac3AccessUnit::single(frame))
+            }),
+            Self::Eac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
+            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
         })
     }
     fn provide(&mut self, window: InputWindow) -> Result<()> {
         match self {
             Self::Video(reader) => reader.provide_owned(window),
             Self::Adts(reader) => reader.provide_owned(window),
+            Self::Loas(reader) => reader.provide(window),
+            Self::AdtsFragments(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
+            Self::Eac3(reader) => reader.provide(window),
+            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
         }
     }
     fn finish(&mut self, request: InputRequest) -> Result<()> {
         match self {
             Self::Video(reader) => reader.finish(request.source, request.token),
             Self::Adts(reader) => reader.finish(request.source, request.token),
+            Self::Loas(reader) => reader.finish(request),
+            Self::AdtsFragments(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
+            Self::Eac3(reader) => reader.finish(request),
+            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
         }
     }
 }
 
 struct Piece {
-    range: std::ops::Range<u64>,
+    range: Range<u64>,
     source: SourceEvent,
     clock: ClockContext,
     serial: u64,
@@ -137,21 +252,19 @@ struct Input {
     offset: usize,
 }
 
-fn table_storage<T>(table: &BudgetVec<T>) -> Result<usize> {
-    table
-        .capacity()
-        .checked_mul(size_of::<T>())
-        .ok_or(Error::Overflow)
-}
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum StorageCursor {
+    Transport(TransportStorageCursor),
     Map,
     MapSource,
     MapProgram,
     MapStream(usize),
+    Boundary,
+    BoundaryBacking,
     Input,
     Lane(usize),
+    Framer(usize),
+    FramerBacking(usize, usize),
     Piece {
         lane: usize,
         piece: usize,
@@ -164,16 +277,21 @@ enum StorageCursor {
     End,
 }
 
-enum StorageItem<'a> {
-    Fixed(usize),
-    Bytes(&'a Bytes),
-}
-
 impl StorageCursor {
     // One structural edge per call, including empty tables. Checking earlier
     // entries for shared backing also consumes cooperative work.
     fn step<'a>(&mut self, reader: &'a super::Reader) -> Result<Option<StorageItem<'a>>> {
         let item = match *self {
+            Self::Transport(cursor) => {
+                let mut next = cursor;
+                let item = next.step(reader.stream.as_ref().expect("blocked transport"))?;
+                *self = if next == TransportStorageCursor::End {
+                    Self::Map
+                } else {
+                    Self::Transport(next)
+                };
+                item
+            }
             Self::Map => {
                 *self = Self::MapSource;
                 reader
@@ -212,9 +330,47 @@ impl StorageCursor {
                     *self = Self::MapStream(index + 1);
                     Some(StorageItem::Bytes(&stream.descriptor_bytes))
                 } else {
-                    *self = Self::Input;
+                    *self = if reader.stream.is_some() {
+                        Self::Boundary
+                    } else {
+                        Self::Input
+                    };
                     None
                 }
+            }
+            Self::Boundary => {
+                *self = Self::BoundaryBacking;
+                if let Some(boundary) = &reader.boundary {
+                    if let crate::TraceEvent::ProgramMap { .. } = boundary.event() {
+                        // Publishing the PMT commits the same event as the map.
+                        debug_assert!(
+                            reader
+                                .map
+                                .as_ref()
+                                .is_some_and(|map| { map.0.shares_storage_with(&boundary.0) })
+                        );
+                        None
+                    } else {
+                        Some(StorageItem::Fixed(
+                            Shared::<crate::TraceEvent>::allocation_bytes()?,
+                        ))
+                    }
+                } else {
+                    None
+                }
+            }
+            Self::BoundaryBacking => {
+                *self = Self::Input;
+                reader
+                    .boundary
+                    .as_ref()
+                    .and_then(|boundary| match boundary.event() {
+                        crate::TraceEvent::Diagnostic(fault) => fault
+                            .rejected
+                            .as_ref()
+                            .map(|rejected| StorageItem::Bytes(rejected.backing_bytes())),
+                        _ => None,
+                    })
             }
             Self::Input => {
                 *self = Self::Lane(0);
@@ -226,19 +382,24 @@ impl StorageCursor {
             }
             Self::Lane(index) => {
                 if let Some(lane) = reader.lanes.as_slice().get(index) {
-                    if lane.framer.is_some()
-                        || lane.input.is_some()
+                    let live = reader.stream.is_some();
+                    if lane.input.is_some()
                         || lane.build.is_some()
+                        || (!live && (lane.framer.is_some() || lane.residue.is_some()))
                         || reader
                             .map
                             .as_ref()
                             .is_none_or(|map| !map.0.shares_storage_with(&lane.track.source.0))
                     {
-                        return Err(Error::Invalid("MPEG-TS fragment audit before framer drain"));
+                        return Err(Error::Invalid("MPEG-TS storage audit before lane drain"));
                     }
-                    *self = Self::Piece {
-                        lane: index,
-                        piece: 0,
+                    *self = if lane.framer.is_some() {
+                        Self::Framer(index)
+                    } else {
+                        Self::Piece {
+                            lane: index,
+                            piece: 0,
+                        }
                     };
                     Some(StorageItem::Fixed(table_storage(&lane.pieces)?))
                 } else {
@@ -246,18 +407,35 @@ impl StorageCursor {
                     None
                 }
             }
+            Self::Framer(lane) => {
+                *self = Self::FramerBacking(lane, 0);
+                let framer = reader.lanes.as_slice()[lane]
+                    .framer
+                    .as_ref()
+                    .expect("live framer");
+                Some(StorageItem::Fixed(framer.input_wait_storage()?))
+            }
+            Self::FramerBacking(lane, index) => {
+                let framer = reader.lanes.as_slice()[lane]
+                    .framer
+                    .as_ref()
+                    .expect("live framer");
+                if let Some(bytes) = framer.input_wait_backing(index)? {
+                    *self = Self::FramerBacking(lane, index + 1);
+                    Some(StorageItem::Bytes(bytes))
+                } else {
+                    *self = Self::Piece { lane, piece: 0 };
+                    None
+                }
+            }
             Self::Piece { lane, piece } => {
                 if let Some(source) = reader.lanes.as_slice()[lane].pieces.as_slice().get(piece) {
-                    let pes = source.source.pes();
-                    // Source PES storage grows exactly at each admitted span.
-                    let bytes = pes
-                        .spans()
-                        .len()
-                        .checked_mul(size_of::<crate::PesSpan>())
-                        .and_then(|n| n.checked_add(table_storage(&pes.header_source_ranges).ok()?))
-                        .and_then(|n| {
-                            n.checked_add(Shared::<crate::TraceEvent>::allocation_bytes().ok()?)
-                        })
+                    // One completed PES event is admitted once to its PID's lane.
+                    let bytes = source
+                        .source
+                        .pes()
+                        .table_storage()?
+                        .checked_add(Shared::<crate::TraceEvent>::allocation_bytes()?)
                         .ok_or(Error::Overflow)?;
                     *self = Self::Span {
                         lane,
@@ -299,9 +477,10 @@ impl StorageCursor {
 // earlier owners may take several steps; cursors survive yields and cancellation.
 // Caller-only reservations and output owners are never part of this graph.
 pub(super) struct StorageScan {
+    start: StorageCursor,
     cursor: StorageCursor,
     prior: StorageCursor,
-    candidate: Option<(StorageCursor, Bytes)>,
+    candidate: Option<StorageCursor>,
     total: usize,
 }
 
@@ -317,14 +496,29 @@ impl StorageScan {
             return Err(Error::Invalid("MPEG-TS fragment audit before source EOF"));
         }
         let total = Budget::control_storage_bytes()
+            .checked_add(Shared::<crate::TraceEvent>::allocation_bytes()?)
+            .ok_or(Error::Overflow)?;
+        Self::start(reader, StorageCursor::Map, total)
+    }
+
+    pub(super) fn span_growth(reader: &super::Reader, floor: usize) -> Result<Self> {
+        Self::start(
+            reader,
+            StorageCursor::Transport(TransportStorageCursor::BlockedSpan(0)),
+            floor,
+        )
+    }
+
+    fn start(reader: &super::Reader, start: StorageCursor, total: usize) -> Result<Self> {
+        let total = total
             .checked_add(table_storage(&reader.lanes)?)
             .and_then(|n| n.checked_add(table_storage(&reader.tracks).ok()?))
             .and_then(|n| n.checked_add(table_storage(&reader.staged_tracks).ok()?))
-            .and_then(|n| n.checked_add(Shared::<crate::TraceEvent>::allocation_bytes().ok()?))
             .ok_or(Error::Overflow)?;
         Ok(Self {
-            cursor: StorageCursor::Map,
-            prior: StorageCursor::Map,
+            start,
+            cursor: start,
+            prior: start,
             candidate: None,
             total,
         })
@@ -348,15 +542,23 @@ impl StorageScan {
             if !work.try_charge(1) {
                 return Ok(false);
             }
-            if let Some((at, bytes)) = &self.candidate {
-                if self.prior == *at {
+            if let Some(at) = self.candidate {
+                // Reborrow the backing so a suspended scan cannot keep input charged.
+                let mut candidate = at;
+                let Some(StorageItem::Bytes(bytes)) = candidate.step(reader)? else {
+                    return Err(Error::Invalid("MPEG-TS storage audit changed during scan"));
+                };
+                if self.prior == at {
                     self.total = self
                         .total
                         .checked_add(bytes.retained_storage_bytes())
                         .ok_or(Error::Overflow)?;
                     self.candidate = None;
-                } else if let Some(StorageItem::Bytes(prior)) = self.prior.step(reader)?
-                    && prior.shares_storage_with(bytes)
+                } else if self
+                    .prior
+                    .step(reader)?
+                    .and_then(StorageItem::backing)
+                    .is_some_and(|prior| prior.shares_storage_with(bytes))
                 {
                     self.candidate = None;
                 }
@@ -366,21 +568,106 @@ impl StorageScan {
                     Some(StorageItem::Fixed(bytes)) => {
                         self.total = self.total.checked_add(bytes).ok_or(Error::Overflow)?;
                     }
-                    Some(StorageItem::Bytes(bytes)) => {
-                        self.candidate = Some((at, bytes.clone()));
-                        self.prior = StorageCursor::Map;
+                    Some(StorageItem::Bytes(_)) => {
+                        self.candidate = Some(at);
+                        self.prior = self.start;
                     }
-                    None => (),
+                    Some(StorageItem::CountedBytes(_)) | None => (),
                 }
             }
         }
     }
 }
 
-// Only validated PES spans enter this copy. The framer has already refused at
-// logical EOF; keeping the copy separate makes every allocation/yield retryable.
+const LEADING_VIDEO_BYTES: Error = Error::Invalid("Annex B leading bytes");
+
+#[derive(Default)]
+struct VideoResidueScan {
+    piece: usize,
+    span: usize,
+    offset: usize,
+    zeroes: u8,
+}
+
+impl VideoResidueScan {
+    fn step(
+        &mut self,
+        pieces: &[Piece],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        while let Some(piece) = pieces.get(self.piece) {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            let Some(span) = piece.source.pes().spans().get(self.span) else {
+                if !work.try_charge(1) {
+                    return Ok(false);
+                }
+                self.piece += 1;
+                self.span = 0;
+                continue;
+            };
+            let bytes = span.as_ref();
+            if self.offset == bytes.len() {
+                if !work.try_charge(1) {
+                    return Ok(false);
+                }
+                self.span += 1;
+                self.offset = 0;
+                continue;
+            }
+            let count = work.take((bytes.len() - self.offset).min(4096) as u64) as usize;
+            if count == 0 {
+                return Ok(false);
+            }
+            for byte in &bytes[self.offset..self.offset + count] {
+                if *byte == 0 {
+                    self.zeroes = (self.zeroes + 1).min(2);
+                } else {
+                    if *byte == 1 && self.zeroes == 2 {
+                        return Err(LEADING_VIDEO_BYTES);
+                    }
+                    self.zeroes = 0;
+                }
+            }
+            self.offset += count;
+        }
+        Ok(true)
+    }
+}
+
+enum ResidueScan {
+    Video(VideoResidueScan),
+    Audio(unframed_audio::Scan),
+}
+
+#[derive(Clone, Copy)]
+enum UnframedKind {
+    Video,
+    Audio(PrivateAudioCarriage),
+}
+
+#[derive(Clone, Copy)]
+enum FragmentKind {
+    Audio,
+    Unframed(UnframedKind),
+}
+
+impl FragmentKind {
+    fn publication_bytes(self) -> Result<usize> {
+        match self {
+            Self::Audio => Shared::<PacketData>::allocation_bytes(),
+            Self::Unframed(_) => Shared::<UnframedData>::allocation_bytes(),
+        }
+    }
+}
+
+// Only validated PES spans enter this copy, after logical EOF. Keeping the
+// copy separate makes every allocation and yield retryable.
 struct Incomplete {
-    range: std::ops::Range<u64>,
+    kind: FragmentKind,
+    range: Range<u64>,
     buffer: Option<BudgetVec<u8>>,
     bytes: Option<Bytes>,
     prepared: bool,
@@ -394,8 +681,9 @@ struct Incomplete {
 }
 
 impl Incomplete {
-    fn new(range: std::ops::Range<u64>, pool: &Budget) -> Self {
+    fn new(kind: FragmentKind, range: Range<u64>, pool: &Budget) -> Self {
         Self {
+            kind,
             range,
             buffer: Some(BudgetVec::new(pool)),
             bytes: None,
@@ -474,19 +762,20 @@ impl Incomplete {
         let size =
             usize::try_from(self.range.end - self.range.start).map_err(|_| Error::Overflow)?;
         if self.covered != size {
-            return Err(Error::Invalid("MPEG-TS incomplete audio source extent"));
+            return Err(Error::Invalid("MPEG-TS fragment source extent"));
         }
         // The EOF audit counted all remaining reader owners, without any
         // caller-only reservations. Add the complete publication peak here.
+        let publication = self.kind.publication_bytes()?;
         let minimum = self
             .origins
             .checked_mul(size_of::<PayloadSource>())
             .and_then(|n| n.checked_add(self.reader_storage.expect("audited reader storage")))
             .and_then(|n| n.checked_add(size))
             .and_then(|n| n.checked_add(Bytes::owner_overhead_bytes()))
-            .and_then(|n| n.checked_add(Shared::<PacketData>::allocation_bytes().ok()?))
+            .and_then(|n| n.checked_add(publication))
             .ok_or(Error::Overflow)?;
-        let buffer = self.buffer.as_mut().expect("incomplete audio buffer");
+        let buffer = self.buffer.as_mut().expect("incomplete fragment buffer");
         if minimum > buffer.budget().limit() {
             return Err(Error::Limit {
                 requested: minimum,
@@ -577,52 +866,81 @@ impl Incomplete {
     }
 }
 
+enum BuildUnit {
+    Packet(AccessUnit),
+    Unframed(UnframedKind, Range<u64>),
+}
+
+impl BuildUnit {
+    fn range_and_anchor(&self) -> (Range<u64>, u64) {
+        match self {
+            Self::Packet(unit) => (unit.range(), unit.anchor_offset()),
+            Self::Unframed(_, range) => (range.clone(), range.start),
+        }
+    }
+}
+
+enum BuildOrigins {
+    ReserveTable(usize),
+    Ready(PayloadSources),
+}
+
 struct Build {
-    unit: Option<AccessUnit>,
+    unit: BuildUnit,
     buffer: Option<BudgetVec<u8>>,
     bytes: Option<Bytes>,
     nal: usize,
     part: u8,
     copied: usize,
-    origins: BudgetVec<PayloadSource>,
+    origins: BuildOrigins,
     origin: usize,
     clock: Option<PacketClock>,
     last_anchor: u64,
     retire: usize,
-    planned_origins: Option<usize>,
+    recovered_adts_bytes: bool,
 }
 
 impl Build {
     fn new(unit: AccessUnit, pool: &Budget, last_anchor: u64) -> Self {
         let bytes = match &unit {
             AccessUnit::Adts(frame) => Some(frame.source_bytes().clone()),
+            AccessUnit::AdtsFragment(fragment) => Some(fragment.source_bytes().clone()),
+            AccessUnit::Loas(frame) => Some(frame.bytes().clone()),
             AccessUnit::Ac3(frame) => Some(frame.bytes().clone()),
+            AccessUnit::DvbSubtitle(unit) => Some(unit.bytes().clone()),
             AccessUnit::Video(_) => None,
             AccessUnit::IncompleteAudio { bytes, .. } => Some(bytes.clone()),
         };
+        Self::with_unit(BuildUnit::Packet(unit), bytes, pool, last_anchor)
+    }
+    fn with_unit(unit: BuildUnit, bytes: Option<Bytes>, pool: &Budget, last_anchor: u64) -> Self {
+        let origins = match &unit {
+            // The DVB storage check already accounts for a separate table.
+            BuildUnit::Packet(AccessUnit::DvbSubtitle(_)) => {
+                PayloadSources::Table(BudgetVec::new(pool))
+            }
+            _ => PayloadSources::Inline(None),
+        };
         Self {
-            unit: Some(unit),
+            unit,
             buffer: Some(BudgetVec::new(pool)),
             bytes,
             nal: 0,
             part: 0,
             copied: 0,
-            origins: BudgetVec::new(pool),
+            origins: BuildOrigins::Ready(origins),
             origin: 0,
             clock: None,
             last_anchor,
             retire: 0,
-            planned_origins: None,
+            recovered_adts_bytes: false,
         }
-    }
-    fn unit(&self) -> &AccessUnit {
-        self.unit.as_ref().expect("pending access unit")
     }
     fn copy(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if self.bytes.is_some() {
             return Ok(true);
         }
-        let AccessUnit::Video(unit) = self.unit.as_ref().expect("pending video") else {
+        let BuildUnit::Packet(AccessUnit::Video(unit)) = &self.unit else {
             unreachable!()
         };
         let size =
@@ -691,10 +1009,20 @@ impl Build {
 
 pub(super) enum LaneStep {
     Packet(Packet),
+    IncompleteVideo(IncompleteVideo),
+    LatmPes(latm::PesPacket),
+    UnframedAudio(UnframedAudio),
     NeedPayload,
     Yield,
     End,
-    DeferredAudio,
+    DeferredFragment,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum PesRun {
+    Idle,
+    BeforeBoundary(SourceLocation),
+    Active(SourceEpochs, u64),
 }
 
 pub(super) struct Lane {
@@ -707,6 +1035,7 @@ pub(super) struct Lane {
     pieces: BudgetVec<Piece>,
     build: Option<Build>,
     incomplete: Option<Incomplete>,
+    residue: Option<ResidueScan>,
     supplied: u64,
     serial: u64,
     last_anchor: u64,
@@ -715,14 +1044,18 @@ pub(super) struct Lane {
     eof: bool,
     completed: usize,
     published: u64,
-    pub run: Option<(u64, u64, u64)>,
+    pub run: PesRun,
 }
 
 impl Lane {
     pub(super) fn new(pool: &Budget, track: Track, limits: ReaderLimits) -> Result<Self> {
-        let (framer, unsupported) = match Framer::new(pool, &track, limits) {
-            Ok(framer) => (Some(framer), None),
-            Err(error @ Error::Unsupported(_)) => (None, Some(error)),
+        let (framer, unsupported, residue) = match Framer::new(pool, &track, limits) {
+            Ok(framer) => (Some(framer), None, None),
+            Err(error @ Error::Unsupported(_)) => {
+                let residue =
+                    unframed_audio::Scan::for_track(&track, limits)?.map(ResidueScan::Audio);
+                (None, residue.is_none().then_some(error), residue)
+            }
             Err(error) => return Err(error),
         };
         Ok(Self {
@@ -735,6 +1068,7 @@ impl Lane {
             pieces: BudgetVec::new(pool),
             build: None,
             incomplete: None,
+            residue,
             supplied: 0,
             serial: 0,
             last_anchor: 0,
@@ -743,10 +1077,10 @@ impl Lane {
             eof: false,
             completed: 0,
             published: 0,
-            run: None,
+            run: PesRun::Idle,
         })
     }
-    pub(super) fn unpublished(&self) -> Option<std::ops::Range<u64>> {
+    pub(super) fn unpublished(&self) -> Option<Range<u64>> {
         (self.published < self.supplied).then_some(self.published..self.supplied)
     }
     pub(super) fn has_incomplete(&self) -> bool {
@@ -764,11 +1098,30 @@ impl Lane {
         clock: ClockContext,
         work: &mut WorkBudget,
     ) -> Result<bool> {
-        if self.framer.is_none() {
+        if self.framer.is_none() && self.residue.is_none() {
             return Ok(true);
         }
         if self.input.is_some() {
             return Err(Error::Invalid("MPEG-TS PES mailbox occupied"));
+        }
+        let pes = source.pes();
+        if self.track.stream().stream_type == 0x11 {
+            if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
+                return Err(Error::Invalid("LATM audio PES stream ID"));
+            }
+            if pes.payload_len == 0 && matches!(self.framer, Some(Framer::LatmPes)) {
+                return Ok(true);
+            }
+        }
+        if pes.header.stream_id != 0xbd {
+            if self.track.stream().descriptor_namespace() == DescriptorNamespace::Atsc
+                && matches!(self.track.stream().stream_type, 0x81 | 0x87)
+            {
+                return Err(Error::Invalid("ATSC private audio PES stream ID"));
+            }
+            if matches!(self.framer, Some(Framer::Eac3(_))) {
+                return Err(Error::Invalid("DVB E-AC-3 PES stream ID"));
+            }
         }
         if self.pieces.len() == self.limits.maximum_pes_per_access_unit {
             return Err(Error::Limit {
@@ -779,12 +1132,20 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(false);
         }
-        self.pieces.try_reserve_exact(1)?;
-        let pes = source.pes();
         let end = self
             .supplied
             .checked_add(u64::try_from(pes.payload_len).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
+        match &self.residue {
+            Some(ResidueScan::Video(_)) => self.check_video_residue_extent(end)?,
+            Some(ResidueScan::Audio(_)) => unframed_audio::Scan::check_pes(
+                pes,
+                self.pieces.is_empty(),
+                self.limits.maximum_audio_frame_bytes,
+            )?,
+            None => (),
+        }
+        self.pieces.try_reserve_exact(1)?;
         let serial = self.serial.checked_add(1).ok_or(Error::Overflow)?;
         self.pieces
             .try_push(Piece {
@@ -795,17 +1156,21 @@ impl Lane {
             })
             .map_err(|e| e.error)?;
         self.serial = serial;
-        self.run = Some((
-            pes.epochs.configuration,
-            pes.epochs.clock,
-            pes.byte_run_epoch,
-        ));
-        self.input = Some(Input {
+        self.run = PesRun::Active(pes.epochs, pes.byte_run_epoch);
+        self.input = self.framer.as_ref().map(|_| Input {
             source: source.clone(),
             span: 0,
             offset: 0,
         });
         Ok(true)
+    }
+    fn check_video_residue_extent(&self, end: u64) -> Result<()> {
+        let size = usize::try_from(end).map_err(|_| Error::Overflow)?;
+        let maximum = self.limits.video.maximum_access_unit_bytes;
+        if size > maximum {
+            return Err(crate::limit(size, maximum));
+        }
+        Ok(())
     }
     pub(super) fn step(
         &mut self,
@@ -838,21 +1203,68 @@ impl Lane {
             }
             if let Some(incomplete) = self.incomplete.as_mut() {
                 if incomplete.reader_storage.is_none() {
-                    return Ok(LaneStep::DeferredAudio);
+                    return Ok(LaneStep::DeferredFragment);
                 }
                 if !incomplete.copy(self.pieces.as_slice(), work, cancel)? {
                     return Ok(LaneStep::Yield);
                 }
-                let incomplete = self.incomplete.take().expect("finished audio copy");
-                let unit = AccessUnit::IncompleteAudio {
-                    range: incomplete.range,
-                    bytes: incomplete.bytes.expect("copied audio bytes"),
-                    reason: Error::Truncated,
+                let incomplete = self.incomplete.take().expect("finished fragment copy");
+                let bytes = incomplete.bytes.expect("copied fragment bytes");
+                let mut build = match incomplete.kind {
+                    FragmentKind::Audio => Build::new(
+                        AccessUnit::IncompleteAudio {
+                            range: incomplete.range,
+                            bytes,
+                            reason: Error::Truncated,
+                        },
+                        &self.pool,
+                        self.last_anchor,
+                    ),
+                    FragmentKind::Unframed(kind) => Build::with_unit(
+                        BuildUnit::Unframed(kind, incomplete.range),
+                        Some(bytes),
+                        &self.pool,
+                        self.last_anchor,
+                    ),
                 };
-                let mut build = Build::new(unit, &self.pool, self.last_anchor);
-                build.planned_origins = Some(incomplete.origins);
+                build.origins = BuildOrigins::ReserveTable(incomplete.origins);
                 self.build = Some(build);
                 continue;
+            }
+            if let Some(residue) = &mut self.residue {
+                let pieces = self.pieces.as_slice();
+                let (ready, kind) = match residue {
+                    ResidueScan::Video(scan) => {
+                        (scan.step(pieces, work, cancel)?, UnframedKind::Video)
+                    }
+                    ResidueScan::Audio(scan) => {
+                        let [piece] = pieces else {
+                            return Err(unframed_audio::NEED_PES);
+                        };
+                        (
+                            scan.step(piece.source.pes(), work, cancel)?,
+                            UnframedKind::Audio(scan.carriage),
+                        )
+                    }
+                };
+                if !ready {
+                    return Ok(LaneStep::Yield);
+                }
+                self.supplied = pieces.last().expect("unframed PES").range.end;
+                if !draining {
+                    return Ok(LaneStep::NeedPayload);
+                }
+                self.residue = None;
+                self.eof = true;
+                self.incomplete = Some(Incomplete::new(
+                    FragmentKind::Unframed(kind),
+                    0..self.supplied,
+                    &self.pool,
+                ));
+                continue;
+            }
+            if matches!(self.framer, Some(Framer::LatmPes)) {
+                return self.preserve_latm_pes(draining, work);
             }
             let Some(framer) = &mut self.framer else {
                 if draining && self.eof {
@@ -864,7 +1276,49 @@ impl Lane {
                 }
                 return Ok(LaneStep::End);
             };
+            if let Framer::Dvb(reader) = framer {
+                if self.input.is_some() {
+                    let Some(unit) = reader.step(&self.pieces, work, cancel)? else {
+                        return Ok(LaneStep::Yield);
+                    };
+                    let end = unit.pes_end;
+                    self.start_build(AccessUnit::DvbSubtitle(unit))?;
+                    self.supplied = end;
+                    self.input = None;
+                    continue;
+                }
+                if draining && self.limits.audio_eof_policy == AudioEofPolicy::ReportIncomplete {
+                    self.eof = true;
+                    self.framer = None;
+                    continue;
+                }
+                return Ok(if draining {
+                    LaneStep::End
+                } else {
+                    LaneStep::NeedPayload
+                });
+            }
             let step = match framer.step(work, cancel) {
+                Err(LEADING_VIDEO_BYTES)
+                    if matches!(framer, Framer::Video(_))
+                        && self.completed == 0
+                        && self.limits.video_eof_policy == VideoEofPolicy::ReportUnframed =>
+                {
+                    let end = self
+                        .pieces
+                        .as_slice()
+                        .last()
+                        .expect("video input PES")
+                        .range
+                        .end;
+                    self.check_video_residue_extent(end)?;
+                    // Recheck all retained bytes, including the portion the
+                    // framer already read and any unsupplied part of this PES.
+                    self.residue = Some(ResidueScan::Video(VideoResidueScan::default()));
+                    self.framer = None;
+                    self.input = None;
+                    continue;
+                }
                 Err(Error::Truncated)
                     if draining
                         && self.eof
@@ -872,6 +1326,10 @@ impl Lane {
                         && framer.is_audio()
                         && self.limits.audio_eof_policy == AudioEofPolicy::ReportIncomplete =>
                 {
+                    let maximum = match framer {
+                        Framer::Eac3(reader) => reader.maximum_incomplete_bytes(),
+                        _ => self.limits.maximum_audio_frame_bytes,
+                    };
                     let range = self.unpublished().ok_or(Error::Truncated)?;
                     if self.completed == self.limits.maximum_access_units {
                         return Err(Error::Limit {
@@ -881,31 +1339,27 @@ impl Lane {
                     }
                     let size =
                         usize::try_from(range.end - range.start).map_err(|_| Error::Overflow)?;
-                    if size > self.limits.maximum_audio_frame_bytes {
+                    if size > maximum {
                         return Err(Error::Limit {
                             requested: size,
-                            maximum: self.limits.maximum_audio_frame_bytes,
+                            maximum,
                         });
                     }
-                    self.incomplete = Some(Incomplete::new(range, &self.pool));
+                    self.incomplete = Some(Incomplete::new(FragmentKind::Audio, range, &self.pool));
                     self.framer = None;
                     continue;
                 }
                 result => result?,
             };
             match step {
-                Step::Ready(unit) => {
-                    if self.completed == self.limits.maximum_access_units {
-                        return Err(Error::Limit {
-                            requested: self.completed.saturating_add(1),
-                            maximum: self.limits.maximum_access_units,
-                        });
-                    }
-                    self.build = Some(Build::new(unit, &self.pool, self.last_anchor));
-                }
+                Step::Ready(unit) => self.start_build(unit)?,
                 Step::Yield => return Ok(LaneStep::Yield),
                 Step::End(_) => {
-                    if draining && self.limits.audio_eof_policy == AudioEofPolicy::ReportIncomplete
+                    if draining
+                        && (self.limits.audio_eof_policy == AudioEofPolicy::ReportIncomplete
+                            || self.limits.video_eof_policy == VideoEofPolicy::ReportUnframed
+                            || self.limits.unframed_audio_policy
+                                == UnframedAudioPolicy::ReportAtEof)
                     {
                         self.framer = None;
                         continue;
@@ -962,20 +1416,70 @@ impl Lane {
             }
         }
     }
+    fn check_output_limit(&self) -> Result<()> {
+        if self.completed == self.limits.maximum_access_units {
+            return Err(Error::Limit {
+                requested: self.completed.saturating_add(1),
+                maximum: self.limits.maximum_access_units,
+            });
+        }
+        Ok(())
+    }
+
+    fn preserve_latm_pes(&mut self, draining: bool, work: &mut WorkBudget) -> Result<LaneStep> {
+        let Some(piece) = self.pieces.as_slice().last() else {
+            return Ok(if draining {
+                LaneStep::End
+            } else {
+                LaneStep::NeedPayload
+            });
+        };
+        if !work.try_charge(1) {
+            return Ok(LaneStep::Yield);
+        }
+        self.check_output_limit()?;
+        let packet = latm::PesPacket::new(
+            self.track.clone(),
+            piece.source.clone(),
+            piece.clock.key,
+            piece.clock.quarantined,
+        );
+        self.supplied = piece.range.end;
+        self.published = piece.range.end;
+        self.last_anchor = piece.serial;
+        self.retire = self.pieces.len();
+        self.completed += 1;
+        self.input = None;
+        Ok(LaneStep::LatmPes(packet))
+    }
+
+    fn start_build(&mut self, unit: AccessUnit) -> Result<()> {
+        self.check_output_limit()?;
+        self.build = Some(Build::new(unit, &self.pool, self.last_anchor));
+        Ok(())
+    }
+
     fn publish(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<LaneStep> {
         let build = self.build.as_mut().expect("pending publication");
-        if let Some(count) = build.planned_origins {
+        if let BuildOrigins::ReserveTable(count) = build.origins {
             if !work.try_charge(1) {
                 return Ok(LaneStep::Yield);
             }
-            build.origins.try_reserve_exact(count)?;
-            build.planned_origins = None;
+            let mut origins = BudgetVec::new(&self.pool);
+            origins.try_reserve_exact(count)?;
+            build.origins = BuildOrigins::Ready(PayloadSources::Table(origins));
         }
         if !build.copy(work, cancel)? {
             return Ok(LaneStep::Yield);
         }
-        let range = build.unit().range();
-        let anchor_offset = build.unit().anchor_offset();
+        let BuildOrigins::Ready(origins) = &mut build.origins else {
+            unreachable!("prepared PES sources");
+        };
+        let (range, anchor_offset) = build.unit.range_and_anchor();
+        let consumed_end = match &build.unit {
+            BuildUnit::Packet(AccessUnit::DvbSubtitle(unit)) => unit.pes_end,
+            _ => range.end,
+        };
         while let Some(piece) = self.pieces.as_slice().get(build.origin) {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -986,18 +1490,25 @@ impl Lane {
             let start = range.start.max(piece.range.start);
             let end = range.end.min(piece.range.end);
             if start < end {
-                build.origins.try_reserve_exact(1)?;
-                build
-                    .origins
-                    .try_push(PayloadSource {
+                if !origins.as_slice().is_empty()
+                    && self.track.stream().stream_type == 0x87
+                    && matches!(&build.unit, BuildUnit::Packet(AccessUnit::Ac3(_)))
+                {
+                    return Err(Error::Invalid("ATSC E-AC-3 access unit crosses PES"));
+                }
+                origins.try_push(
+                    &self.pool,
+                    PayloadSource {
                         elementary_range: start..end,
                         payload_range: usize::try_from(start - piece.range.start)
                             .map_err(|_| Error::Overflow)?
                             ..usize::try_from(end - piece.range.start)
                                 .map_err(|_| Error::Overflow)?,
                         pes: piece.source.clone(),
-                    })
-                    .map_err(|e| e.error)?;
+                    },
+                )?;
+                build.recovered_adts_bytes |=
+                    matches!(piece.source.event(), crate::TraceEvent::UnboundedAdtsPes(_));
             }
             if piece.range.start <= anchor_offset && piece.serial > build.last_anchor {
                 let pes = piece.source.pes();
@@ -1018,7 +1529,7 @@ impl Lane {
             build.origin += 1;
         }
         while let Some(piece) = self.pieces.as_slice().get(build.retire) {
-            if piece.range.end > range.end || piece.serial > build.last_anchor {
+            if piece.range.end > consumed_end || piece.serial > build.last_anchor {
                 break;
             }
             if cancel.load(Ordering::Relaxed) {
@@ -1032,8 +1543,12 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(LaneStep::Yield);
         }
-        let charge = Shared::<PacketData>::reserve(&self.pool)?;
-        let duration = build.unit().duration()?;
+        let (charge, duration) = match &build.unit {
+            BuildUnit::Packet(unit) => {
+                (Shared::<PacketData>::reserve(&self.pool)?, unit.duration()?)
+            }
+            BuildUnit::Unframed(..) => (Shared::<UnframedData>::reserve(&self.pool)?, None),
+        };
         let duration90 = duration
             .map(|time| -> Result<Option<i64>> {
                 let n = time
@@ -1049,22 +1564,21 @@ impl Lane {
             })
             .transpose()?
             .flatten();
-        let pts = build
-            .clock
-            .as_ref()
+        let packet_clock = match &build.unit {
+            BuildUnit::Packet(_) => build.clock.as_ref(),
+            BuildUnit::Unframed(..) => None,
+        };
+        let pts = packet_clock
             .and_then(|clock| clock.pts.ticks90)
             .map(i64::try_from)
             .transpose()
             .map_err(|_| Error::Overflow)?;
-        let dts = build
-            .clock
-            .as_ref()
+        let dts = packet_clock
             .and_then(|clock| clock.dts.ticks90)
             .map(i64::try_from)
             .transpose()
             .map_err(|_| Error::Overflow)?;
-        let epochs = build
-            .origins
+        let epochs = origins
             .as_slice()
             .first()
             .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?
@@ -1072,25 +1586,59 @@ impl Lane {
             .pes()
             .epochs;
         let build = self.build.take().expect("prepared publication");
+        let recovered_adts = build.recovered_adts_bytes
+            || build.clock.as_ref().is_some_and(|clock| {
+                matches!(clock.pes.event(), crate::TraceEvent::UnboundedAdtsPes(_))
+            });
         self.retire = build.retire;
         self.last_anchor = build.last_anchor;
         self.completed += 1;
-        self.published = range.end;
-        Ok(LaneStep::Packet(Packet(Shared::new(
-            PacketData {
-                track: self.track.clone(),
-                unit: build.unit.expect("prepared unit"),
-                bytes: build.bytes.expect("prepared bytes"),
-                sources: build.origins,
-                clock: build.clock,
-                epochs,
-                duration,
-                pts,
-                dts,
-                duration90,
-            },
-            charge,
-        ))))
+        self.published = consumed_end;
+        let track = self.track.clone();
+        let bytes = build.bytes.expect("prepared bytes");
+        let BuildOrigins::Ready(origins) = build.origins else {
+            unreachable!("prepared PES sources");
+        };
+        match build.unit {
+            BuildUnit::Packet(unit) => Ok(LaneStep::Packet(Packet(Shared::new(
+                PacketData {
+                    track,
+                    unit,
+                    bytes,
+                    sources: origins,
+                    clock: build.clock,
+                    epochs,
+                    duration,
+                    pts,
+                    dts,
+                    duration90,
+                    recovered_adts,
+                },
+                charge,
+            )))),
+            BuildUnit::Unframed(kind, range) => {
+                let PayloadSources::Table(sources) = origins else {
+                    unreachable!("unframed PES sources use a table");
+                };
+                let data = Shared::new(
+                    UnframedData {
+                        track,
+                        range,
+                        bytes,
+                        sources,
+                        clock: build.clock,
+                        epochs,
+                    },
+                    charge,
+                );
+                Ok(match kind {
+                    UnframedKind::Video => LaneStep::IncompleteVideo(IncompleteVideo(data)),
+                    UnframedKind::Audio(carriage) => {
+                        LaneStep::UnframedAudio(UnframedAudio { data, carriage })
+                    }
+                })
+            }
+        }
     }
 }
 
@@ -1169,10 +1717,13 @@ mod incomplete_audio_tests {
                 }
             }
             let build = lane.build.as_ref()?;
-            if !matches!(build.unit(), AccessUnit::IncompleteAudio { .. }) {
+            if !matches!(
+                build.unit,
+                BuildUnit::Packet(AccessUnit::IncompleteAudio { .. })
+            ) {
                 return None;
             }
-            if build.planned_origins.is_some() {
+            if matches!(build.origins, BuildOrigins::ReserveTable(_)) {
                 return Some(2);
             }
             (build.origin == lane.pieces.len()).then_some(3)

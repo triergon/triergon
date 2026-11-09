@@ -53,6 +53,7 @@ dependencies = [
 name = "playback-worker"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-core",
  "triergon-framing",
  "triergon-harness-protocol",

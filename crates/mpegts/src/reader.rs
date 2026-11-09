@@ -2,10 +2,17 @@
 mod lane;
 mod model;
 use crate::clock::{ClockKey, SourceTimePolicy};
+use crate::compat::adts::{self, PacketPolicy};
+use crate::compat::annex_b::VideoEofPolicy;
+use crate::compat::latm;
+use crate::compat::pes::UnframedAudioPolicy;
 use crate::psi::DescriptorNamespace;
-use crate::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
-use lane::{Lane, LaneStep, StorageScan};
-pub use model::{AccessUnit, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track};
+use crate::{ContinuityOutcome, PacketFormat, ParseLimits, TraceEvent, TransportStream};
+use lane::{Lane, LaneStep, PesRun, StorageScan};
+pub use model::{
+    Ac3AccessUnit, AccessUnit, DvbSubtitleUnit, IncompleteVideo, LoasFrame, Packet, PacketClock,
+    PayloadSource, ReaderEvent, SourceEvent, Track, UnframedAudio,
+};
 use model::{ClockContext, Shared};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest};
@@ -25,6 +32,31 @@ pub enum AudioEofPolicy {
     ReportIncomplete,
 }
 
+/// Reporting of an overlong final DVB subtitle segment in a validated finite PES.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DvbSubtitleTailPolicy {
+    #[default]
+    RejectTruncated,
+    /// Report complete preceding segments as a source event with the original PES.
+    ReportCompletePrefix,
+}
+
+/// Interpretation of the next physical entity in a transport stream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EntityTransition {
+    /// Continue PSI, PES, clock and access-unit state across the boundary.
+    Contiguous,
+    /// Start a new configuration and clock epoch, reporting interrupted units.
+    Discontinuity,
+}
+
+#[derive(Clone, Copy)]
+struct NextEntity {
+    source: SourceId,
+    capabilities: SourceCapabilities,
+    transition: EntityTransition,
+}
+
 /// Bounds and source interpretation for the AU reader, independent of its live
 /// storage budget. An absent program selects the sole PAT media program;
 /// transports with several programs require an explicit selection.
@@ -35,8 +67,18 @@ pub struct ReaderLimits {
     pub descriptor_namespace: DescriptorNamespace,
     pub transport: ParseLimits,
     pub video: RawAnnexBLimits,
+    /// Maximum bytes in one audio syncframe. E-AC-3 groups have a derived bound.
     pub maximum_audio_frame_bytes: usize,
     pub audio_eof_policy: AudioEofPolicy,
+    pub unframed_audio_policy: UnframedAudioPolicy,
+    /// Framing policy for ADTS. The compatibility policy handles ADTS EOF itself.
+    pub adts_packet_policy: PacketPolicy,
+    /// Wire policy for ADTS PES with a zero packet-length field.
+    pub adts_pes_policy: adts::PesPolicy,
+    /// LOAS envelope framing by default. PES preservation emits source events.
+    pub latm_packet_policy: latm::PacketPolicy,
+    pub dvb_subtitle_tail_policy: DvbSubtitleTailPolicy,
+    pub video_eof_policy: VideoEofPolicy,
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
@@ -55,6 +97,12 @@ impl Default for ReaderLimits {
             video: RawAnnexBLimits::default(),
             maximum_audio_frame_bytes: 8192,
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
+            unframed_audio_policy: UnframedAudioPolicy::Strict,
+            adts_packet_policy: PacketPolicy::Strict,
+            adts_pes_policy: adts::PesPolicy::Strict,
+            latm_packet_policy: latm::PacketPolicy::Strict,
+            dvb_subtitle_tail_policy: DvbSubtitleTailPolicy::RejectTruncated,
+            video_eof_policy: VideoEofPolicy::RejectUnframed,
             maximum_access_units: 32_000_000,
             maximum_pes_per_access_unit: 4096,
             elementary_input_window: 64 * 1024,
@@ -65,6 +113,7 @@ impl Default for ReaderLimits {
 
 #[derive(Clone, Copy)]
 enum Phase {
+    Prepare,
     Begin,
     DrainAll(usize),
     Build(usize),
@@ -99,14 +148,12 @@ pub struct Reader {
     queued_pes: Option<(usize, SourceEvent, ClockContext)>,
     unsupported_at: Option<usize>,
     tsid: Option<u16>,
-    transport_end: u64,
-    transport_payload_start: u64,
-    boundary_offset: u64,
     boundary: Option<SourceEvent>,
+    next_entity: Option<NextEntity>,
     end: Option<SourceLocation>,
     finished: bool,
     failure: Option<Error>,
-    deferred_audio: bool,
+    deferred_fragment: bool,
     storage: Option<StorageScan>,
 }
 
@@ -138,13 +185,17 @@ impl Reader {
         {
             return Err(Error::Invalid("MPEG-TS access-unit reader limits"));
         }
-        let stream = TransportStream::new_with_program(
+        let mut stream = TransportStream::new_with_program(
             pool.clone(),
             limits.format,
             limits.transport,
             limits.program,
             limits.descriptor_namespace,
         )?;
+        stream.share_input();
+        if limits.adts_pes_policy == adts::PesPolicy::ReportUnbounded {
+            stream.allow_unbounded_adts();
+        }
         let input = InputCursor::new(pool, source, caps, input_window)?;
         Ok(Self {
             pool: pool.clone(),
@@ -166,16 +217,17 @@ impl Reader {
             queued_pes: None,
             unsupported_at: None,
             tsid: None,
-            transport_end: 0,
-            transport_payload_start: 0,
-            boundary_offset: 0,
             boundary: None,
+            next_entity: None,
             end: None,
             finished: false,
             failure: None,
-            deferred_audio: false,
+            deferred_fragment: false,
             storage: None,
         })
+    }
+    pub(crate) fn continuity_source(&self) -> Option<(&InputCursor, Option<&TransportStream>)> {
+        Some((self.input.as_ref()?, self.stream.as_ref()))
     }
     pub fn tracks(&self) -> &[Track] {
         self.tracks.as_slice()
@@ -193,7 +245,12 @@ impl Reader {
         self.input
             .as_mut()
             .ok_or(Error::Invalid("MPEG-TS reader closed"))?
-            .provide(window)
+            .provide(window)?;
+        if self.storage.is_some() && !window.bytes().is_empty() {
+            // An early reply can add backing storage while a growth audit yields.
+            self.storage = None;
+        }
+        Ok(())
     }
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
@@ -209,6 +266,36 @@ impl Reader {
             self.stop(error);
         }
         result
+    }
+    /// Complete one entity and queue its successor. The reader consumes the
+    /// final supplied bytes before requesting offset zero of the next entity.
+    /// The generation is preserved and the request number advances.
+    /// Use [Self::finish] for the last entity of the logical stream.
+    pub fn finish_entity(
+        &mut self,
+        source: SourceId,
+        token: InputToken,
+        next: SourceId,
+        capabilities: SourceCapabilities,
+        transition: EntityTransition,
+    ) -> Result<()> {
+        self.healthy()?;
+        if self.next_entity.is_some() || self.end.is_some() {
+            return Err(Error::Invalid(
+                "MPEG-TS entity completion already specified",
+            ));
+        }
+        if self.source == next {
+            return Err(Error::SourceMismatch);
+        }
+        token.request().checked_add(1).ok_or(Error::Overflow)?;
+        self.finish(source, token)?;
+        self.next_entity = Some(NextEntity {
+            source: next,
+            capabilities,
+            transition,
+        });
+        Ok(())
     }
     pub fn fail(
         &mut self,
@@ -231,6 +318,7 @@ impl Reader {
     pub fn close(&mut self) {
         self.stop(Error::Closed);
     }
+    /// Restart the current entity with fresh transport state and a new generation.
     pub fn reset(&mut self) -> Result<InputRequest> {
         let next = Self::new(&self.pool, self.source, self.caps, self.limits, self.window)?;
         let request = next.request()?;
@@ -255,6 +343,7 @@ impl Reader {
         self.queued_pes = None;
         self.unsupported_at = None;
         self.boundary = None;
+        self.next_entity = None;
         self.storage = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
@@ -277,10 +366,17 @@ impl Reader {
         }
     }
     fn output(packet: Packet) -> Event<Packet, ReaderEvent> {
+        if packet.0.recovered_adts {
+            return Event::Other(ReaderEvent::RecoveredAdts(packet));
+        }
         match packet.access_unit() {
+            AccessUnit::DvbSubtitle(unit) if unit.truncated => {
+                Event::Other(ReaderEvent::DvbSubtitlePrefix(packet))
+            }
             AccessUnit::IncompleteAudio { .. } => {
                 Event::Other(ReaderEvent::IncompleteAudio(packet))
             }
+            AccessUnit::AdtsFragment(_) => Event::Other(ReaderEvent::AdtsFragment(packet)),
             AccessUnit::Video(unit) if !unit.has_vcl => {
                 Event::Other(ReaderEvent::VideoHeaders(packet))
             }
@@ -296,9 +392,18 @@ impl Reader {
     ) -> Result<Option<ReaderStep<Self>>> {
         match self.lanes.as_mut_slice()[index].step(draining, work, cancel)? {
             LaneStep::Packet(packet) => Ok(Some(Step::Ready(Self::output(packet)))),
+            LaneStep::IncompleteVideo(video) => Ok(Some(Step::Ready(Event::Other(
+                ReaderEvent::IncompleteVideo(video),
+            )))),
+            LaneStep::LatmPes(packet) => Ok(Some(Step::Ready(Event::Other(ReaderEvent::LatmPes(
+                packet,
+            ))))),
+            LaneStep::UnframedAudio(audio) => Ok(Some(Step::Ready(Event::Other(
+                ReaderEvent::UnframedAudio(audio),
+            )))),
             LaneStep::Yield => Ok(Some(Step::Yield)),
-            LaneStep::DeferredAudio => {
-                self.deferred_audio = true;
+            LaneStep::DeferredFragment => {
+                self.deferred_fragment = true;
                 Ok(None)
             }
             LaneStep::End | LaneStep::NeedPayload => Ok(None),
@@ -313,61 +418,95 @@ impl Reader {
                 return Ok(Step::Yield);
             }
             if self.raw.is_some() {
-                if !work.try_charge(1) {
-                    return Ok(Step::Yield);
+                if matches!(self.phase, Phase::Prepare) {
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    if !matches!(
+                        self.raw,
+                        Some(
+                            TraceEvent::Transport(_)
+                                | TraceEvent::Continuity {
+                                    outcome: ContinuityOutcome::First
+                                        | ContinuityOutcome::Continuous,
+                                    ..
+                                }
+                        )
+                    ) {
+                        let charge = Shared::<TraceEvent>::reserve(&self.pool)?;
+                        let event = self.raw.take().expect("raw source");
+                        self.pending = Some(SourceEvent(Shared::new(event, charge)));
+                    }
+                    self.phase = Phase::Begin;
                 }
-                let charge = Shared::<TraceEvent>::reserve(&self.pool)?;
-                self.pending = self
-                    .raw
-                    .take()
-                    .map(|event| SourceEvent(Shared::new(event, charge)));
-                self.phase = Phase::Begin;
+                if self.raw.is_some() {
+                    // Inline source events keep the original begin and publish
+                    // work boundaries.
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    if matches!(self.phase, Phase::Begin) {
+                        self.phase = Phase::Publish;
+                        continue;
+                    }
+                    let event = match self.raw.take() {
+                        Some(TraceEvent::Transport(packet)) => ReaderEvent::Transport(packet),
+                        Some(TraceEvent::Continuity { pid, outcome }) => {
+                            ReaderEvent::Continuity { pid, outcome }
+                        }
+                        _ => unreachable!("expected an inline source event"),
+                    };
+                    return Ok(Step::Ready(Event::Other(event)));
+                }
             }
             if self.pending.is_some() {
                 match self.phase {
+                    Phase::Prepare => unreachable!("pending source is prepared"),
                     Phase::Begin => {
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
                         }
                         let source = self.pending.as_ref().expect("pending source");
                         match source.event() {
-                            TraceEvent::Transport(packet) => {
-                                self.transport_payload_start = packet.payload_source_offset;
-                                self.transport_end = packet.source_offset
-                                    .checked_add(u64::try_from(packet.source.len()).map_err(|_| Error::Overflow)?)
-                                    .ok_or(Error::Overflow)?;
-                                self.phase = Phase::Publish;
-                            }
                             TraceEvent::Pat(table) => { self.tsid = Some(table.header.extension); self.phase = Phase::Publish; }
                             TraceEvent::ProgramMap { active: true, configuration_epoch, .. }
                                 if self.map.as_ref().is_none_or(|map| !matches!(map.event(), TraceEvent::ProgramMap { configuration_epoch: old, .. } if old == configuration_epoch)) => {
                                     self.rebuild = Some(source.clone()); self.phase = Phase::DrainAll(0);
                                 }
-                            TraceEvent::Discontinuity { .. } | TraceEvent::Timeline { .. } => {
+                            TraceEvent::Discontinuity { .. } | TraceEvent::Finished => {
+                                self.rebuild = None; self.phase = Phase::DrainAll(0);
+                            }
+                            TraceEvent::Timeline { .. } => {
                                 self.rebuild = self.map.clone(); self.phase = Phase::DrainAll(0);
                             }
-                            TraceEvent::Continuity { pid, outcome: crate::ContinuityOutcome::SignalledDiscontinuity } => {
+                            TraceEvent::Continuity { pid, outcome: ContinuityOutcome::SignalledDiscontinuity } => {
                                 self.phase = self.lanes.as_slice().iter()
                                     .position(|lane| lane.track.stream().pid == *pid)
                                     .map_or(Phase::Publish, Phase::FaultLane);
                             }
-                            TraceEvent::Finished => { self.rebuild = None; self.phase = Phase::DrainAll(0); }
-                            TraceEvent::Pes(pes) => {
-                                if let Some(boundary) = &self.boundary
-                                    && pes.header_source_ranges.as_slice().first().is_some_and(|range| range.offset < self.boundary_offset)
-                                {
-                                    let event = ReaderEvent::InterruptedPes {
-                                        source: source.clone(),
-                                        boundary: boundary.clone(),
-                                    };
-                                    self.phase = Phase::Publish;
-                                    return Ok(Step::Ready(Event::Other(event)));
-                                }
+                            TraceEvent::Pes(pes) | TraceEvent::UnboundedAdtsPes(adts::UnboundedPes(pes)) => {
                                 if let Some(index) = self.lanes.as_slice().iter().position(|lane| lane.track.stream().pid == pes.pid) {
-                                    let run = (pes.epochs.configuration, pes.epochs.clock, pes.byte_run_epoch);
-                                    self.phase = if self.lanes.as_slice()[index].run.is_some_and(|old| old != run) {
-                                        Phase::DrainLane(index)
-                                    } else { Phase::Feed(index) };
+                                    let lane = &mut self.lanes.as_mut_slice()[index];
+                                    if let PesRun::BeforeBoundary(start) = lane.run {
+                                        lane.run = PesRun::Idle;
+                                        if let Some(boundary) = &self.boundary
+                                            && pes.header_source_ranges.as_slice().first().is_some_and(|range| {
+                                                range.entity == start.source && range.offset == start.offset
+                                            })
+                                        {
+                                            let event = ReaderEvent::InterruptedPes {
+                                                source: source.clone(),
+                                                boundary: boundary.clone(),
+                                            };
+                                            self.phase = Phase::Publish;
+                                            return Ok(Step::Ready(Event::Other(event)));
+                                        }
+                                    }
+                                    self.phase = match lane.run {
+                                        PesRun::Active(epochs, byte_run)
+                                            if epochs != pes.epochs || byte_run != pes.byte_run_epoch => Phase::DrainLane(index),
+                                        _ => Phase::Feed(index),
+                                    };
                                 } else { self.phase = Phase::Publish; }
                             }
                             TraceEvent::Diagnostic(fault) if matches!(fault.kind, crate::FaultKind::Pes | crate::FaultKind::Continuity | crate::FaultKind::Transport) => {
@@ -407,7 +546,7 @@ impl Reader {
                             }
                             self.phase = Phase::DrainAll(index + 1);
                         } else {
-                            if self.deferred_audio
+                            if self.deferred_fragment
                                 && matches!(
                                     self.pending.as_ref().expect("pending boundary").event(),
                                     TraceEvent::Finished
@@ -426,16 +565,6 @@ impl Reader {
                                 self.pending.as_ref().expect("pending boundary").event(),
                                 TraceEvent::Finished
                             ) {
-                                // Clock transitions precede the current carrier's
-                                // payload; a PMT is committed after its carrier.
-                                self.boundary_offset = if matches!(
-                                    self.pending.as_ref().expect("pending boundary").event(),
-                                    TraceEvent::Timeline { .. }
-                                ) {
-                                    self.transport_payload_start
-                                } else {
-                                    self.transport_end
-                                };
                                 self.boundary = self.pending.clone();
                                 self.lanes.clear();
                                 self.staged_tracks.clear();
@@ -459,19 +588,23 @@ impl Reader {
                             self.staged_tracks.try_reserve_exact(
                                 source.map().streams.len() - self.staged_tracks.len(),
                             )?;
-                            let epoch = self
+                            // Remember the exact open PES in a reused route.
+                            // Physical offsets can restart in every entity.
+                            let (epochs, pending_header) = self
                                 .stream
                                 .as_ref()
                                 .expect("active transport")
-                                .route_epochs(index, source.map().streams.as_slice()[index].pid)
-                                .ok_or(Error::Invalid("MPEG-TS track route missing"))?
-                                .configuration;
+                                .route_state(index, source.map().streams.as_slice()[index].pid)
+                                .ok_or(Error::Invalid("MPEG-TS track route missing"))?;
                             let track = Track {
                                 source: source.clone(),
                                 index,
-                                epoch,
+                                epoch: epochs.configuration,
                             };
-                            let lane = Lane::new(&self.pool, track, self.limits)?;
+                            let mut lane = Lane::new(&self.pool, track, self.limits)?;
+                            if let Some(start) = pending_header {
+                                lane.run = PesRun::BeforeBoundary(start);
+                            }
                             self.staged_tracks
                                 .try_push(lane.track.clone())
                                 .map_err(|e| e.error)?;
@@ -487,16 +620,29 @@ impl Reader {
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
                         }
-                        let track = self.lanes.as_slice()[index].track.clone();
-                        let interrupted =
-                            self.lanes.as_slice()[index]
-                                .unpublished()
-                                .map(|elementary_range| ReaderEvent::Interrupted {
-                                    track: track.clone(),
-                                    elementary_range,
-                                    cause: self.pending.as_ref().expect("pending PES").clone(),
-                                });
-                        let lane = Lane::new(&self.pool, track, self.limits)?;
+                        let previous = &self.lanes.as_slice()[index];
+                        let track = previous.track.clone();
+                        let interrupted = previous.unpublished().map(|elementary_range| {
+                            ReaderEvent::Interrupted {
+                                track: track.clone(),
+                                elementary_range,
+                                cause: self.pending.as_ref().expect("pending PES").clone(),
+                            }
+                        });
+                        let mut lane = Lane::new(&self.pool, track, self.limits)?;
+                        // A clock fault can restart framing while the transport
+                        // still holds the PES that began before the program change.
+                        if let PesRun::BeforeBoundary(start) = previous.run
+                            && self
+                                .stream
+                                .as_ref()
+                                .and_then(|stream| {
+                                    stream.route_state(index, lane.track.stream().pid)
+                                })
+                                .is_some_and(|(_, pending)| pending == Some(start))
+                        {
+                            lane.run = previous.run;
+                        }
                         self.lanes.as_mut_slice()[index] = lane;
                         self.phase = if fault {
                             Phase::Publish
@@ -570,8 +716,15 @@ impl Reader {
                             );
                         }
                         let source = self.pending.take().expect("published source");
-                        if matches!(source.event(), TraceEvent::Finished) {
-                            self.finished = true;
+                        match source.event() {
+                            TraceEvent::Discontinuity { .. } => {
+                                self.map = None;
+                                self.tracks.clear();
+                                self.tsid = None;
+                                self.boundary = None;
+                            }
+                            TraceEvent::Finished => self.finished = true,
+                            _ => (),
                         }
                         return Ok(Step::Ready(Event::Other(ReaderEvent::Source(source))));
                     }
@@ -623,16 +776,78 @@ impl Reader {
                 .input
                 .as_mut()
                 .ok_or(Error::Invalid("MPEG-TS reader closed"))?;
-            match stream.poll(input, work, cancel)? {
-                Step::Ready(event) => self.raw = Some(event),
+            let step = match stream.poll(input, work, cancel) {
+                Err(error @ Error::Backpressure { .. }) => {
+                    self.audit_span_growth(error, work, cancel)?
+                }
+                result => {
+                    // Any transport progress ends the snapshot used for the audit.
+                    self.storage = None;
+                    result?
+                }
+            };
+            match step {
+                Step::Ready(event) => {
+                    self.raw = Some(event);
+                    self.phase = Phase::Prepare;
+                }
                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                 Step::Yield => return Ok(Step::Yield),
                 Step::End(location) => {
-                    stream.end_of_source()?;
-                    self.end = Some(location);
+                    let stream = self.stream.as_mut().expect("active transport");
+                    let input = self.input.as_mut().expect("active input");
+                    if let Some(next) = self.next_entity {
+                        let Some(end) = stream.media_entity_end(input, work, cancel)? else {
+                            return Ok(Step::Yield);
+                        };
+                        if next.transition == EntityTransition::Discontinuity {
+                            stream.discontinuity()?;
+                        }
+                        input.continue_source(next.source, next.capabilities)?;
+                        end.validate_continuation(input)?;
+                        self.source = next.source;
+                        self.caps = next.capabilities;
+                        self.next_entity = None;
+                    } else {
+                        stream.end_of_source()?;
+                        self.end = Some(location);
+                    }
                 }
             }
         }
+    }
+
+    #[cold]
+    fn audit_span_growth(
+        &mut self,
+        error: Error,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<TraceEvent>> {
+        let stream = self.stream.as_ref().expect("blocked transport");
+        let Some(floor) = stream.blocked_adts_span_floor()? else {
+            self.storage = None;
+            return Err(error);
+        };
+        let mut scan = match self.storage.take() {
+            Some(scan) => scan,
+            None => StorageScan::span_growth(self, floor)?,
+        };
+        if !scan.step(self, work, cancel)? {
+            self.storage = Some(scan);
+            return Ok(Step::Yield);
+        }
+        if scan.bytes() > self.pool.limit() {
+            if !work.try_charge(1) {
+                self.storage = Some(scan);
+                return Ok(Step::Yield);
+            }
+            let limit = crate::limit(scan.bytes(), self.pool.limit());
+            let stream = self.stream.as_mut().expect("blocked transport");
+            return Ok(Step::Ready(stream.refuse_blocked_adts_span(limit)));
+        }
+        self.storage = Some(scan);
+        Err(error)
     }
 }
 

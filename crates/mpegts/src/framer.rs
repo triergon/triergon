@@ -164,6 +164,10 @@ impl TransportFramer {
         self.buffered_carrier = BufferedCarrier::Shared;
     }
 
+    pub(crate) fn carry_storage(&self) -> Result<usize> {
+        self.carry.as_ref().map_or(Ok(0), crate::table_storage)
+    }
+
     pub(crate) fn compact_progressive_input(&mut self) {
         self.buffered_carrier = BufferedCarrier::Progressive;
     }
@@ -223,6 +227,14 @@ impl TransportFramer {
                 .take()
                 .ok_or(Error::Invalid("missing packet start"))?;
             self.carry = Some(BudgetVec::new(&self.budget));
+            // A complete carry can use the same accepted layout as a shared window.
+            if self.format == PacketFormat::Ts188
+                && !cancel.load(Ordering::Relaxed)
+                && let Some(carrier) = PlainCarrier::inspect_ts188(&source, start, work)
+            {
+                self.last_packet_offset = Some(start);
+                return carrier.into_packet(source, start, self.entity).map(Some);
+            }
             self.inspect(source, start)?;
         }
         let result = self

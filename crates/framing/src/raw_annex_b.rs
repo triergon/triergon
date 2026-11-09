@@ -361,6 +361,24 @@ impl RawAnnexBReader {
         }
     }
 
+    /// Mutable buffers and completed NALs held while requesting more input.
+    ///
+    /// Returns an error if input or an unprocessed NAL is buffered.
+    #[doc(hidden)]
+    pub fn input_wait_storage(&self) -> Result<(usize, &[NalUnit])> {
+        if self.pending.is_some() {
+            return Err(Error::Invalid("Annex B reader has an unprocessed NAL"));
+        }
+        let nal_capacity = self.nal.input_wait_buffer_capacity()?;
+        let capacity = self
+            .unit
+            .capacity()
+            .checked_mul(size_of::<NalUnit>())
+            .and_then(|bytes| bytes.checked_add(nal_capacity))
+            .ok_or(Error::Overflow)?;
+        Ok((capacity, self.unit.as_slice()))
+    }
+
     pub fn request(&self) -> InputRequest {
         self.nal.request()
     }

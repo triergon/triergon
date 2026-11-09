@@ -73,6 +73,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/reference_ts_program.h",
         "harness/reference_raw_video.h",
         "harness/reference_ts.h",
+        "harness/reference_ts_sequence.h",
     ]
     .map(String::from)
     .to_vec();
@@ -99,6 +100,7 @@ pub fn matroska_inputs() -> Vec<String> {
     }
     // Features whose manifests are generated from their pins and committed inputs.
     names.extend(crate::lanes::provenance_inputs());
+    names.extend(crate::transport_fixtures::source_inputs());
     names
 }
 

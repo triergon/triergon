@@ -22,6 +22,7 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
     let mut audio_packets = Vec::new();
     let mut retained = None;
     let mut count = [0, 0];
+    let mut carrier_end = 0;
     for _ in 0..2_000_000 {
         match reader
             .step(&mut WorkBudget::new(31), &AtomicBool::new(false))
@@ -38,8 +39,10 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
                         count[1] += 1;
                         &mut audio_packets
                     }
-                    AccessUnit::Ac3(_) => panic!("authored AVC/AAC input"),
-                    AccessUnit::IncompleteAudio { .. } => {
+                    AccessUnit::Ac3(_) | AccessUnit::Loas(_) | AccessUnit::DvbSubtitle(_) => {
+                        panic!("authored AVC/AAC input")
+                    }
+                    AccessUnit::AdtsFragment(_) | AccessUnit::IncompleteAudio { .. } => {
                         panic!("default policy rejects fragments")
                     }
                 };
@@ -50,6 +53,13 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
                     assert_eq!(pool.used(), used);
                 }
             }
+            Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::Transport(packet)))) => {
+                assert_eq!(packet.source_offset, carrier_end as u64);
+                let end = carrier_end + packet.source.len();
+                assert_eq!(packet.source.as_ref(), &input[carrier_end..end]);
+                carrier_end = end;
+            }
+            Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::Continuity { .. }))) => (),
             Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::Source(source)))) => {
                 if let TraceEvent::Pes(pes) = source.event() {
                     let target = if pes.header.stream_id == 0xe0 {
@@ -84,6 +94,7 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
             Step::Backpressure(p) => panic!("{p:?}"),
             Step::End(_) => {
                 assert!(count.into_iter().all(|n| n > 0));
+                assert_eq!(carrier_end, input.len());
                 assert_eq!(video_source, video_packets);
                 assert_eq!(audio_source, audio_packets);
                 assert_eq!(reader.track_count(), 2);

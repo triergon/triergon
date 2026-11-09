@@ -92,6 +92,11 @@ assert_eq!(decoder_input, [
 
 ## Behaviour and limits
 
+`AacAdtsCarrier::into_selected_frame` shares the original bytes of a complete,
+aligned AAC-LC envelope with the typed frame. On an opaque or incomplete
+carrier it returns the original observation, including its boundary and
+selected-source diagnostic.
+
 **Reference compatibility.** The crate-root types follow the specifications.
 `compat::nal` reproduces FFmpeg where a consumer needs FFmpeg's result: it accepts
 configuration records as the `mp4toannexb` packet receiver does, and names the
