@@ -2,6 +2,8 @@
 //!
 //! The separate demux-clock policy places source PES anchors for comparison. It
 //! never changes the source packet's timestamps or supplies a clock to later AUs.
+mod control_only;
+
 use crate::runner::{Invocation, Refusal, Result, Totals, measure};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
 use std::path::Path;
@@ -20,7 +22,7 @@ use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::pes::DemuxClock;
 use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::{
-    AccessUnit, AudioEofPolicy, EntityTransition, IncompleteVideo, Packet, PacketClock,
+    AccessUnit, AudioEofPolicy, EntityTransition, FaultKind, IncompleteVideo, Packet, PacketClock,
     PacketFormat, PayloadSource, Reader, ReaderEvent, ReaderLimits, SourceEpochs, TraceEvent,
 };
 
@@ -304,7 +306,8 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
     let mut source = FIRST_SOURCE;
     let mut current = &request.input;
     let mut following = request.following.as_slice().iter();
-    loop {
+    let mut observed_media = false;
+    let refusal = loop {
         let step = match reader.step(&mut WorkBudget::new(WORK), cancel) {
             Ok(step) => step,
             Err(error) => return Ok(refused(totals, &error, at)),
@@ -316,6 +319,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     ReaderEvent::VideoHeaders(packet) | ReaderEvent::IncompleteAudio(packet),
                 )),
             ) => {
+                observed_media = true;
                 let pid = packet.track_info().id();
                 let index = tracks
                     .as_slice()
@@ -358,6 +362,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 }
             }
             Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::IncompleteVideo(video)))) => {
+                observed_media = true;
                 let id = video.track_info().id();
                 let index = tracks
                     .as_slice()
@@ -393,6 +398,9 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                                 fault.location.source.0, fault.location.offset,
                             ),
                         }));
+                        if fault.kind == FaultKind::Psi && !observed_media {
+                            break totals;
+                        }
                         return Ok(totals);
                     }
                     TraceEvent::ProgramMap {
@@ -510,11 +518,25 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     }
                 }
                 if totals.packets == 0 {
-                    return Ok(refused(totals, &"no framed packet was observed", end));
+                    let refusal = refused(totals, &"no framed packet was observed", end);
+                    if !observed_media {
+                        break refusal;
+                    }
+                    return Ok(refusal);
                 }
                 return Ok(totals);
             }
         }
+    };
+    // Release retained packets before replaying the original input.
+    drop(reader);
+    drop(tracks);
+    match control_only::confirm(pool, request, cancel) {
+        Ok(true) => Ok(Totals::default()),
+        Ok(false) | Err(Error::Invalid(_) | Error::Unsupported(_) | Error::Truncated) => {
+            Ok(refusal)
+        }
+        Err(error) => Err(error.into()),
     }
 }
 
@@ -539,11 +561,47 @@ pub fn run(args: &[String]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Request, operation};
+    use super::{Request, Totals, operation};
     use std::sync::atomic::AtomicBool;
     use triergon_core::{Budget, BudgetVec, Bytes};
     use triergon_mpegts::PacketFormat;
     use triergon_mpegts::psi::DescriptorNamespace;
+
+    fn fold_single(input: &[u8]) -> Totals {
+        let pool = Budget::new(1 << 20).unwrap();
+        let request = Request {
+            input: Bytes::copy_from_slice(&pool, input).unwrap(),
+            format: PacketFormat::Ts188,
+            program: 1,
+            namespace: DescriptorNamespace::Unspecified,
+            following: BudgetVec::new(&pool),
+        };
+        let baseline = pool.used();
+        let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+        assert_eq!(pool.used(), baseline);
+        totals
+    }
+
+    #[test]
+    fn control_only_entity_completes_after_psi_diagnostic_or_empty_end() {
+        for input in [
+            &include_bytes!("../../mpegts/tests/data/psi-crc-invalid.ts")[..],
+            &include_bytes!("../../mpegts/tests/data/pat-network-pid-not-track.ts")[..],
+        ] {
+            let totals = fold_single(input);
+            assert!(totals.refusal.is_none());
+            assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
+        }
+    }
+
+    #[test]
+    fn media_after_a_psi_diagnostic_prevents_control_only_completion() {
+        let totals = fold_single(include_bytes!(
+            "../../mpegts/tests/data/packet-completion-v1/crc-control-then-valid-pes.ts"
+        ));
+        assert_eq!(totals.packets, 0);
+        assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Psi");
+    }
 
     #[test]
     fn rejected_pes_does_not_become_successful_empty_completion() {
@@ -551,21 +609,11 @@ mod tests {
             &include_bytes!("../../mpegts/tests/data/pes-start-prefix-invalid.ts")[..],
             &include_bytes!("../../mpegts/tests/data/pes-optional-header-overrun.ts")[..],
         ] {
-            let pool = Budget::new(1 << 20).unwrap();
-            let request = Request {
-                input: Bytes::copy_from_slice(&pool, input).unwrap(),
-                format: PacketFormat::Ts188,
-                program: 1,
-                namespace: DescriptorNamespace::Unspecified,
-                following: BudgetVec::new(&pool),
-            };
-            let baseline = pool.used();
-            let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+            let totals = fold_single(input);
             assert_eq!(totals.packets, 0);
             let refusal = totals.refusal.unwrap();
             assert!(refusal.reason.starts_with("source diagnostic:"));
             assert!(refusal.cause.contains("\"phase\":\"diagnostic\""));
-            assert_eq!(pool.used(), baseline);
         }
     }
 }
