@@ -99,6 +99,10 @@ admitted observer for the active map. The private types 0x81 and 0x87 indicate
 audio, and 0x90 indicates presentation graphics in this view. MPEG-1 video
 (0x01) keeps its source kind and is unknown in the selected PES view.
 
+The startup probe scores sync bytes in groups while charging each inspected
+byte. When delivering full transport events, the PES observer can retain
+only the payload of a validated continuation that fits its existing arena.
+
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
 in both feed modes. `poll_feed_carriers` lets a progressive feed move a
