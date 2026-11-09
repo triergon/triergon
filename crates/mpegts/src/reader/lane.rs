@@ -901,16 +901,7 @@ struct Build {
 
 impl Build {
     fn new(unit: AccessUnit, pool: &Budget, last_anchor: u64) -> Self {
-        let bytes = match &unit {
-            AccessUnit::Adts(frame) => Some(frame.source_bytes().clone()),
-            AccessUnit::AdtsFragment(fragment) => Some(fragment.source_bytes().clone()),
-            AccessUnit::Loas(frame) => Some(frame.bytes().clone()),
-            AccessUnit::Ac3(frame) => Some(frame.bytes().clone()),
-            AccessUnit::DvbSubtitle(unit) => Some(unit.bytes().clone()),
-            AccessUnit::Video(_) => None,
-            AccessUnit::IncompleteAudio { bytes, .. } => Some(bytes.clone()),
-        };
-        Self::with_unit(BuildUnit::Packet(unit), bytes, pool, last_anchor)
+        Self::with_unit(BuildUnit::Packet(unit), None, pool, last_anchor)
     }
     fn with_unit(unit: BuildUnit, bytes: Option<Bytes>, pool: &Budget, last_anchor: u64) -> Self {
         let origins = match &unit {
@@ -920,9 +911,11 @@ impl Build {
             }
             _ => PayloadSources::Inline(None),
         };
+        let buffer =
+            matches!(unit, BuildUnit::Packet(AccessUnit::Video(_))).then(|| BudgetVec::new(pool));
         Self {
             unit,
-            buffer: Some(BudgetVec::new(pool)),
+            buffer,
             bytes,
             nal: 0,
             part: 0,
@@ -940,7 +933,7 @@ impl Build {
             return Ok(true);
         }
         let BuildUnit::Packet(AccessUnit::Video(unit)) = &self.unit else {
-            unreachable!()
+            return Ok(true);
         };
         let size =
             usize::try_from(unit.range.end - unit.range.start).map_err(|_| Error::Overflow)?;
@@ -1606,7 +1599,6 @@ impl Lane {
         self.completed += 1;
         self.published = consumed_end;
         let track = self.track.clone();
-        let bytes = build.bytes.expect("prepared bytes");
         let BuildOrigins::Ready(origins) = build.origins else {
             unreachable!("prepared PES sources");
         };
@@ -1615,7 +1607,7 @@ impl Lane {
                 PacketData {
                     track,
                     unit,
-                    bytes,
+                    video_bytes: build.bytes,
                     sources: origins,
                     clock: build.clock,
                     epochs,
@@ -1635,7 +1627,7 @@ impl Lane {
                     UnframedData {
                         track,
                         range,
-                        bytes,
+                        bytes: build.bytes.expect("prepared unframed bytes"),
                         sources,
                         clock: build.clock,
                         epochs,
