@@ -41,9 +41,10 @@ pub struct Band {
 /// How FreeType's default (hinted) loading treats the face's advances.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Hinting {
-    /// The unhinted advance rounded to a whole pixel: CFF, and TrueType whose
-    /// programs keep the v40 interpreter's backward compatibility.
-    Rounded,
+    /// The unhinted advance, fitted to the size's grid: CFF, TrueType whose
+    /// programs keep the v40 interpreter's backward compatibility, and any
+    /// face at zero pixels per em, which loads unhinted.
+    Unhinted,
     /// Advances that depend on what this crate does not run.
     Unsupported(&'static str),
 }
@@ -53,9 +54,16 @@ enum Hinting {
 pub struct SizedFont<'f> {
     font: &'f Font,
     metrics: SizeMetrics,
+    /// The scales glyphs load at: the size's, or none at all (font units) at
+    /// zero pixels per em.
+    scale: Scale,
     /// The x scale hinted loading uses: TrueType faces that ask for integer
     /// pixels per em (`head.flags` bit 3) scale by the rounded ppem there.
     hinted_scale: i64,
+    /// The grid hinted loading fits advances to, as the mask of a 26.6
+    /// value's fraction: whole pixels (63), or none (0) at zero pixels per
+    /// em.
+    grid: i64,
     hinting: Hinting,
 }
 
@@ -104,13 +112,17 @@ impl Font {
     /// (`FT_Request_Size`, `FT_SIZE_REQUEST_TYPE_REAL_DIM`): `height` is the
     /// 26.6 pixel height of [`Font::gdi_metrics`]' ascender to descender, and
     /// x scales as y. libass asks for 256 pixels (16384) unless hinting is
-    /// on, rounding pixels to 26.6 half to even.
+    /// on, rounding pixels to 26.6 half to even, and for 0 when a glyph's size
+    /// is 0.
+    ///
+    /// A size of zero pixels per em, such as height 0, keeps its scales and
+    /// metrics, but FreeType then loads glyphs unscaled, in font units, and
+    /// unhinted (`FT_Load_Glyph`: "undefined scale means no scale").
     ///
     /// # Errors
     ///
     /// `Invalid` for a negative height, a face whose ascender equals its
-    /// descender, and sizes FreeType refuses or loads unscaled: zero or more than
-    /// 65535 pixels per em.
+    /// descender, and sizes FreeType refuses: more than 65535 pixels per em.
     pub fn at_size(&self, height: i32) -> Result<SizedFont<'_>> {
         if height < 0 {
             return Err(Error::Invalid("negative size"));
@@ -123,10 +135,8 @@ impl Font {
         let scale = div_fix(i64::from(height), span);
         let upem = i64::from(self.units_per_em());
         let ppem = (mul_fix(upem, scale) + 32) >> 6;
-        let ppem = u16::try_from(ppem)
-            .ok()
-            .filter(|&p| p > 0)
-            .ok_or(Error::Invalid("pixels per em outside 1..65535"))?;
+        let ppem =
+            u16::try_from(ppem).map_err(|_| Error::Invalid("more than 65535 pixels per em"))?;
         let metrics = SizeMetrics {
             x_ppem: ppem,
             y_ppem: ppem,
@@ -140,6 +150,16 @@ impl Font {
                 scale,
             )),
         };
+        if ppem == 0 {
+            return Ok(SizedFont {
+                font: self,
+                metrics,
+                scale: Scale::UNITS,
+                hinted_scale: Scale::UNITS.x,
+                grid: 0,
+                hinting: Hinting::Unhinted,
+            });
+        }
         let integer_ppem = matches!(self.outlines, Outlines::Glyf(_)) && self.head.flags & 8 != 0;
         let hinted_scale = if integer_ppem {
             div_fix(i64::from(ppem) << 6, upem)
@@ -149,7 +169,9 @@ impl Font {
         Ok(SizedFont {
             font: self,
             metrics,
+            scale: Scale { x: scale, y: scale },
             hinted_scale,
+            grid: 63,
             hinting: self.hinting(),
         })
     }
@@ -157,7 +179,7 @@ impl Font {
     /// How FreeType's default loading treats this face's advances.
     fn hinting(&self) -> Hinting {
         if !matches!(self.outlines, Outlines::Glyf(_)) {
-            return Hinting::Rounded;
+            return Hinting::Unhinted;
         }
         if self.is_tricky() {
             return Hinting::Unsupported("hinted advances of a tricky TrueType font");
@@ -170,7 +192,7 @@ impl Font {
             return Hinting::Unsupported("hinted advances of an auto-hinted TrueType font");
         }
         if [fpgm, prep].into_iter().flatten().all(keeps_compatibility) {
-            Hinting::Rounded
+            Hinting::Unhinted
         } else {
             Hinting::Unsupported("hinted advances under a TrueType instruction control")
         }
@@ -295,9 +317,9 @@ impl<'f> SizedFont<'f> {
 
     /// Loads `glyph` into `outline` as libass loads it with hinting off
     /// (`FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP`): unhinted, scaled to 26.6
-    /// pixels, y up, the origin at the glyph's left side bearing as FreeType
-    /// places it, with the unhinted advance in 26.6 pixels (`advance.x` of the
-    /// glyph slot).
+    /// pixels (unscaled at zero pixels per em), y up, the origin at the
+    /// glyph's left side bearing as FreeType places it, with the unhinted
+    /// advance in 26.6 pixels (`advance.x` of the glyph slot).
     ///
     /// TrueType points scale with `FT_MulFix` by the size's scales (unhinted
     /// loading ignores `head`'s integer-ppem flag); composites transform and
@@ -309,14 +331,7 @@ impl<'f> SizedFont<'f> {
     /// Those of [`Font::outline_into`]; `Overflow` for coordinates beyond
     /// `i32`.
     pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
-        self.font.load(glyph, self.scale(), outline)
-    }
-
-    const fn scale(&self) -> Scale {
-        Scale {
-            x: self.metrics.x_scale,
-            y: self.metrics.y_scale,
-        }
+        self.font.load(glyph, self.scale, outline)
     }
 
     /// Applies libass's synthetic styles to an outline loaded by
@@ -338,7 +353,7 @@ impl<'f> SizedFont<'f> {
 
     /// The advance FreeType's default loading reports (`FT_LOAD_DEFAULT`, the
     /// one libass's HarfBuzz callbacks use): the unhinted advance rounded to a
-    /// whole pixel.
+    /// whole pixel; at zero pixels per em, the unscaled advance.
     ///
     /// # Errors
     ///
@@ -363,7 +378,8 @@ impl<'f> SizedFont<'f> {
                     compatible &= keeps_compatibility(program);
                     Ok(())
                 })?;
-                if !compatible {
+                // Unhinted loading runs no program.
+                if !compatible && self.grid != 0 {
                     return Err(Error::Unsupported(
                         "hinted advances under a TrueType instruction control",
                     ));
@@ -374,10 +390,10 @@ impl<'f> SizedFont<'f> {
                 mul_fix(origin + advance, x) - mul_fix(origin, x)
             }
             Outlines::Cff(cff) => {
-                cff.advance(data, glyph, font.hmtx.advance(data, index), self.scale())?
+                cff.advance(data, glyph, font.hmtx.advance(data, index), self.scale)?
             }
         };
-        glyf::narrow(pix_round(advance))
+        glyf::narrow((advance + (self.grid + 1) / 2) & !self.grid)
     }
 
     /// The `kern` value for the pair as libass's HarfBuzz callback reads it

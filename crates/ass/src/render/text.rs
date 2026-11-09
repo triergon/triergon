@@ -19,8 +19,8 @@ use crate::{
 /// (`VERTICAL_LOWER_BOUND`).
 const VERTICAL_LOWER_BOUND: u32 = 0x2f1;
 
-/// The font size libass draws every glyph at with hinting off: the glyph is
-/// then scaled to its size.
+/// The font size libass draws and shapes every glyph at with hinting off,
+/// unless its size is 0: the glyph is then scaled to its size.
 pub(super) const DRAWN_SIZE: f64 = 256.0;
 
 /// What decorates a glyph's outline.
@@ -63,8 +63,9 @@ pub(super) struct Drawing {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct GlyphStyle {
     pub(super) colours: [Rgba; 4],
-    /// The size the outline is loaded at: [`DRAWN_SIZE`] for text whose
-    /// size is not 0, the frame size of a drawing.
+    /// The size the outline is loaded and its run shaped at: [`DRAWN_SIZE`]
+    /// for text whose size is not 0, where FreeType loads it unscaled; the
+    /// frame size of a drawing.
     pub(super) size: f64,
     /// Horizontal and vertical scale, with the size's correction.
     pub(super) scale: [f64; 2],

@@ -18,8 +18,10 @@ pub struct Request<'a> {
     /// The requested slant: 100 for the ASS italic value 1, 0 for 0, any other
     /// value read as unsigned. Any slant but 0 asks for an italic face.
     pub slant: u32,
-    /// A character the face must map, or `None`.
-    pub character: Option<char>,
+    /// A code the face's text charmap must map as it is, or `None`. libass
+    /// checks any code its text decoding gives, so it need not be a scalar
+    /// value.
+    pub character: Option<u32>,
 }
 
 impl Request<'_> {
@@ -141,12 +143,12 @@ impl<'a> FaceInfo<'a> {
         slant + 73 * wanted.abs_diff(weight) / 256
     }
 
-    /// Whether the face maps `c` in its text charmap, looked up unchanged.
-    fn covers(&self, c: Option<char>) -> bool {
-        c.is_none_or(|c| {
+    /// Whether the face maps `code` in its text charmap, looked up unchanged.
+    fn covers(&self, code: Option<u32>) -> bool {
+        code.is_none_or(|code| {
             self.font
                 .text_charmap()
-                .is_some_and(|charmap| charmap.glyph(u32::from(c)).is_some())
+                .is_some_and(|charmap| charmap.glyph(code).is_some())
         })
     }
 }

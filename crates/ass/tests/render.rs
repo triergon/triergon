@@ -544,6 +544,77 @@ fn a_refused_frame_leaves_collision_records_unchanged() {
     assert_ne!(kept[2], skipped[1]);
 }
 
+/// The kind, place and size of each image a frame at `now` shows.
+fn shown(
+    renderer: &mut Renderer,
+    script: &mut Script,
+    now: i64,
+) -> Vec<(ImageKind, i32, i32, usize, usize)> {
+    let frame = renderer.render(script, now).unwrap();
+    frame
+        .images
+        .iter()
+        .map(|i| (i.kind, i.x, i.y, i.width(), i.height()))
+        .collect()
+}
+
+#[test]
+fn a_face_keeps_the_charmap_a_lookup_left_it_on() {
+    let budget = Budget::new(64 << 20).unwrap();
+    // "Test Sans" with a Macintosh Roman charmap after its Windows one, which
+    // maps U+0091 to the bump and A to the composite.
+    let mut tables = fonts::truetype_tables(400, 0x40, "Test Sans", "Regular");
+    tables.push((*b"fpgm", vec![0xb0, 0x01]));
+    let windows = fonts::cmap(&[(0x41, 1), (0x42, 2), (0x43, 3)])[12..].to_vec();
+    let mac = fonts::cmap_format0(&[(0x41, 3), (0x91, 2)]);
+    for table in &mut tables {
+        if &table.0 == b"cmap" {
+            table.1 = fonts::cmap_records(&[(3, 1, windows.clone()), (1, 0, mac.clone())]);
+        }
+    }
+    let file = Bytes::copy_from_slice(&budget, &fonts::font(b"\0\x01\0\0", &tables)).unwrap();
+    // Only the default font file draws the style's family.
+    let fonts = Fonts {
+        default_font: Some(file),
+        ..Fonts::default()
+    };
+    let mut renderer = Renderer::new(&budget, &Settings::new(Size::new(640, 360)), &fonts).unwrap();
+    let mut script = script(
+        &budget,
+        "Dialogue: 0,0:00:00.00,0:00:01.00,Default,A\n\
+         Dialogue: 0,0:00:01.00,0:00:02.00,Default,\u{91}\n\
+         Dialogue: 0,0:00:02.00,0:00:03.00,Default,A\n\
+         Dialogue: 0,0:00:03.00,0:00:04.00,Default,C\n\
+         Dialogue: 0,0:00:04.00,0:00:05.00,Default,A\n",
+    );
+    let square = shown(&mut renderer, &mut script, 0);
+    // No Windows mapping: the face is tried through each charmap and keeps
+    // the Macintosh one, through which A is the composite.
+    assert!(!shown(&mut renderer, &mut script, 1000).is_empty());
+    let composite = shown(&mut renderer, &mut script, 2000);
+    assert_ne!(composite, square);
+    // C maps through neither: the Windows charmap is selected again.
+    assert_eq!(shown(&mut renderer, &mut script, 3000), composite);
+    assert_eq!(shown(&mut renderer, &mut script, 4000), square);
+}
+
+#[test]
+fn a_style_font_size_of_zero_draws_glyphs_unscaled() {
+    let budget = Budget::new(64 << 20).unwrap();
+    let mut renderer = renderer(&budget);
+    // FreeType loads the glyphs in font units, which libass reads as 26.6
+    // pixels, and the size no longer scales them to the frame: the square's
+    // 200 units are 3.125 pixels tall, four rows.
+    let text = "[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\n\
+                [V4+ Styles]\nFormat: Name, Fontname, Fontsize\nStyle: Default,Test Sans,0\n\
+                [Events]\nFormat: Layer, Start, End, Style, Text\n\
+                Dialogue: 0,0:00:00.00,0:00:01.00,Default,A\n";
+    let mut script = Script::parse(&budget, text.as_bytes(), &Options::default()).unwrap();
+    let images = shown(&mut renderer, &mut script, 0);
+    let fill = images.iter().find(|i| i.0 == ImageKind::Fill).unwrap();
+    assert_eq!(fill.4, 4, "{images:?}");
+}
+
 /// A script embedding `font` in its `[Fonts]` section, with one event in
 /// the style of `family`.
 fn embedding(budget: &Budget, family: &str, font: &[u8]) -> Script {

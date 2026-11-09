@@ -103,6 +103,26 @@
       "bytes": 3025856,
       "digest": 12818660889771108916
     },
+    "charmap-c1-ass-1080p": {
+      "packets": 54,
+      "bytes": 940392,
+      "digest": 8713267050207929332
+    },
+    "charmap-c1-ass-720p": {
+      "packets": 54,
+      "bytes": 619012,
+      "digest": 16630156747280279572
+    },
+    "charmap-unicode-ass-1080p": {
+      "packets": 18,
+      "bytes": 252670,
+      "digest": 3199064009939540882
+    },
+    "charmap-unicode-ass-720p": {
+      "packets": 18,
+      "bytes": 176102,
+      "digest": 18101483967026029964
+    },
     "cjk-ass-1080p": {
       "packets": 192,
       "bytes": 7688776,
@@ -162,6 +182,16 @@
       "packets": 72,
       "bytes": 3451928,
       "digest": 8140909924374325772
+    },
+    "font-size-zero-ass-1080p": {
+      "packets": 264,
+      "bytes": 8824768,
+      "digest": 4644104211974687204
+    },
+    "font-size-zero-ass-720p": {
+      "packets": 384,
+      "bytes": 9068720,
+      "digest": 15324308410533832676
     },
     "hebrew-ass-1080p": {
       "packets": 72,

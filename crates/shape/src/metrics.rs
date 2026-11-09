@@ -4,7 +4,9 @@
 use crate::ot::data::{Data, bsearch};
 use std::cell::Cell;
 use triergon_core::{Error, Result};
-use triergon_font::{CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont};
+use triergon_font::{
+    CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont, TextLookup,
+};
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
 /// `hb_font_set_ppem` set it. The default is one unit per font unit and no ppem,
@@ -259,9 +261,9 @@ impl Metrics for OtMetrics<'_> {
 }
 
 /// The font functions libass 0.17.5 installs on the HarfBuzz font of a face at a
-/// size (`init_font_funcs` and `get_hb_font` in `ass_shaper.c`): the character
-/// map libass selects (`ass_charmap_magic`) looked up as it looks codes up
-/// (`ass_font_index_magic`), FreeType's variation sequences, default-load
+/// size (`init_font_funcs` and `get_hb_font` in `ass_shaper.c`): the face's
+/// character map looked up as libass looks codes up
+/// ([`Font::text_lookup`]), FreeType's variation sequences, default-load
 /// advances ([`SizedFont::hinted_advance`]) and `FT_KERNING_DEFAULT` kerning
 /// ([`SizedFont::kerning`]), in 26.6 pixels at the size's
 /// [`SizedFont::harfbuzz_scale`] and pixels per em, so that hinting device
@@ -274,9 +276,7 @@ impl Metrics for OtMetrics<'_> {
 #[derive(Debug)]
 pub struct SizedMetrics<'a> {
     sized: SizedFont<'a>,
-    charmap: Option<Charmap<'a>>,
-    /// A Windows Symbol charmap, looked up at `0xF000 | c`.
-    symbol: bool,
+    lookup: Option<TextLookup<'a>>,
     /// A Unicode charmap, which FreeType needs for variation sequences.
     unicode: bool,
     variations: Variations<'a>,
@@ -284,28 +284,28 @@ pub struct SizedMetrics<'a> {
 }
 
 impl<'a> SizedMetrics<'a> {
-    /// libass's font functions over `sized`.
+    /// libass's font functions over `sized`, through the charmap libass
+    /// selects when it opens the face ([`Font::text_charmap`]).
     ///
     /// # Errors
     ///
-    /// `Unsupported` when libass would convert codes for the charmap it selects,
-    /// which this crate does not: Windows Shift-JIS, PRC, Big5, Wansung and Johab
-    /// subtables, and the Symbol subtable of a face declaring a legacy Arabic
-    /// character set (`OS/2.fsSelection` high byte 178 or 179).
+    /// As [`Self::with_charmap`].
     pub fn new(sized: SizedFont<'a>) -> Result<Self> {
-        let font = sized.font();
-        let charmap = font.text_charmap();
-        let windows = charmap.filter(|c| c.platform() == Platform::Windows);
-        if windows.is_some_and(|c| (2..=6).contains(&c.encoding_id())) {
-            return Err(Error::Unsupported("libass's multibyte charmap conversion"));
-        }
-        let symbol = windows.is_some_and(|c| c.encoding() == CharEncoding::Symbol);
-        let arabic = font
-            .os2()
-            .is_some_and(|os2| matches!(os2.selection.bits() >> 8, 178 | 179));
-        if symbol && arabic {
-            return Err(Error::Unsupported("libass's legacy Arabic charmaps"));
-        }
+        Self::with_charmap(sized, sized.font().text_charmap())
+    }
+
+    /// libass's font functions over `sized`, through `charmap`, the one the
+    /// face has selected: libass leaves a face on another charmap when only
+    /// that one maps a character (`ass_font_get_index`).
+    ///
+    /// # Errors
+    ///
+    /// `Unsupported` when libass would convert codes for the charmap, which
+    /// this crate does not ([`Font::text_lookup`]).
+    pub fn with_charmap(sized: SizedFont<'a>, charmap: Option<Charmap<'a>>) -> Result<Self> {
+        let lookup = charmap
+            .map(|charmap| sized.font().text_lookup(charmap))
+            .transpose()?;
         let unicode = charmap.is_some_and(|c| {
             c.platform() == Platform::Unicode
                 || matches!(
@@ -317,10 +317,9 @@ impl<'a> SizedMetrics<'a> {
         let size = sized.metrics();
         Ok(Self {
             sized,
-            charmap,
-            symbol,
+            lookup,
             unicode,
-            variations: Variations::of(font),
+            variations: Variations::of(sized.font()),
             scale: Scale {
                 x,
                 y,
@@ -328,13 +327,6 @@ impl<'a> SizedMetrics<'a> {
                 y_ppem: u32::from(size.y_ppem),
             },
         })
-    }
-
-    /// The code libass looks `c` up at; it never looks up zero.
-    fn code(&self, c: char) -> Option<u32> {
-        let c = u32::from(c);
-        let code = if self.symbol { c | 0xf000 } else { c };
-        (code != 0).then_some(code)
     }
 
     /// `Unsupported` for a glyph of the face, which FreeType would hint; a glyph
@@ -354,13 +346,14 @@ impl Metrics for SizedMetrics<'_> {
     }
 
     fn nominal_glyph(&self, c: char) -> Option<GlyphId> {
-        self.charmap?.glyph(self.code(c)?)
+        self.lookup?.glyph(u32::from(c))
     }
 
     fn variation_glyph(&self, c: char, selector: char) -> Option<GlyphId> {
-        let code = self.code(c).filter(|_| self.unicode)?;
+        let lookup = self.lookup.filter(|_| self.unicode)?;
+        let code = lookup.code(u32::from(c))?;
         match self.variations.lookup(code, u32::from(selector)) {
-            Variation::Default => self.charmap?.glyph(code),
+            Variation::Default => lookup.charmap().glyph(code),
             Variation::Glyph(glyph) => Some(glyph),
             Variation::None => None,
         }

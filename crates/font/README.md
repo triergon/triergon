@@ -23,7 +23,7 @@ let faces: Vec<Font> = (0..Font::face_count(&file)?)
 
 // \fnArimo\b1: the face libass's scoring would pick.
 let infos: Vec<FaceInfo<'_>> = faces.iter().map(FaceInfo::new).collect();
-let request = Request { family: "Arimo", weight: 700, slant: 0, character: Some('g') };
+let request = Request { family: "Arimo", weight: 700, slant: 0, character: Some(u32::from('g')) };
 let font = &faces[select(&infos, &request).ok_or("no matching face")?];
 
 let glyph = font.glyph_index('g').ok_or("unmapped")?;
@@ -87,8 +87,15 @@ when it opens a face (`ass_charmap_magic`): the first Windows full-Unicode subta
 Windows subtables, the one FreeType selects (the last (0, 4) or format 13 (0, 6),
 else the last Unicode- or ISO-platform subtable), else the first. Subtables
 FreeType lists in formats 2, 8 and 14, and the Unicode charmap it builds from
-glyph names for a CFF face without one, take no part. `glyph_index` looks a Windows
-Symbol charmap up at `0xF000 | c`.
+glyph names for a CFF face without one, take no part; `lists_every_charmap` says
+whether the face has any of those but format 14, which FreeType cannot select.
+`charmap` gives a subtable by its index in `charmaps`, and `text_charmap_index`
+the index of `text_charmap`. `text_lookup` reads a
+charmap as libass reads text through it (`ass_font_index_magic`): a Windows
+Symbol charmap at `0xF000 | c`, any other unchanged, and `Unsupported` for the
+charmaps whose codes libass converts (Windows encodings 2 to 6 through iconv, and
+a Symbol charmap under a legacy Arabic character set); `glyph_index` looks `c` up
+that way through `text_charmap`.
 
 **TrueType outlines.** `glyf` with short or long `loca`: simple glyphs and
 composites with offsets, point matching, one scale, x and y scales or a 2×2
@@ -140,8 +147,10 @@ metrics (`Font::gdi_metrics`: the signed Windows ascent and descent when their s
 is not zero, else FreeType's, else the typographic, else the `head` box, all
 16-bit). The scale is that height over ascender minus descender in `FT_DivFix`,
 for x and y; pixels per em, the grid-fitted size metrics and every product follow
-FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A
-`SizedFont` then gives:
+FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A size
+of zero pixels per em, such as height 0, keeps its scales and metrics, but
+glyphs then load unscaled and unhinted, in font units, as `FT_Load_Glyph` loads
+them when the scale is undefined. A `SizedFont` then gives:
 
 - `outline_into`: the outline libass draws with hinting off
   (`FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP`), in an `Outline` of 26.6 points,
@@ -163,7 +172,8 @@ FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A
   to a pixel. That is exact for CFF and for TrueType whose `fpgm`, `prep` and
   glyph programs can only issue `INSTCTRL` with a constant selector 1 or 2, so
   that FreeType's v40 interpreter keeps backward compatibility and hinting cannot
-  move an advance; other faces are `Unsupported` (see below).
+  move an advance; other faces are `Unsupported` (see below). At zero pixels per
+  em it is the unscaled advance.
 - `metrics` (`FT_Size_Metrics`), `ascent_descent` (libass's line ascent and
   descent), `harfbuzz_scale` (the scale libass sets on its HarfBuzz font),
   `kerning` (`FT_KERNING_DEFAULT`: scaled, reduced below 25 pixels per em,
@@ -184,7 +194,8 @@ for an unwanted one, plus 73/256 of the weight difference, where a face not flag
 bold counts as 120 heavier when the request is more than 150 heavier. A full or
 PostScript name match scores 0 and ends the search; when only one of the two
 matches, CFF faces go by the PostScript name and others by the full name. A face
-whose text charmap lacks the requested character is skipped. Weights come from
+whose text charmap lacks the requested code, looked up unchanged and not
+necessarily a scalar value, is skipped. Weights come from
 `usWeightClass`, with classes 1 to 9 read as 100 to 900; the italic and bold flags
 from `fsSelection` bits 0 and 5. `FaceInfo::has_family_name` tells the faces
 libass registers at all.
@@ -214,9 +225,7 @@ report (they load glyphs hinted), and vertical advances and origins for `@` font
 `fpgm` and a `prep` of at most 7 bytes; the autohinter moves advances), tricky
 fonts known by family name, and programs that may leave backward compatibility;
 fonts FreeType finds tricky only by their table checksums are not recognised.
-Sizes whose
-pixels per em round to 0 or exceed 65535 are refused (FreeType loads the former
-unscaled). Coordinates are `i32`; a scaled coordinate beyond it is
+Sizes beyond 65535 pixels per em are refused. Coordinates are `i32`; a scaled coordinate beyond it is
 `Error::Overflow`, where FreeType's 64-bit `FT_Pos` goes on (libass rejects
 anything beyond 2^28 itself). The `random` operator does not follow FreeType's
 generator.

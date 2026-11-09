@@ -209,17 +209,27 @@ selective style overrides), in the frame and storage size and margins of its
   faces it gathers: the one selected for it, then, for a character none of
   them maps, one selected for that character from the requested family, the
   default family or the default font file, so fallback depends on what was
-  drawn before, as in libass. The default font file's face gets an id of its
+  drawn before, as in libass. Each face reads characters through the charmap
+  libass selects on opening it; a face selected for a character it does not
+  map is tried through each of its charmaps in turn and keeps the one that
+  maps it, or the last, for every later lookup and for shaping until another
+  such lookup moves it (`ass_font_get_index`). That is how libass draws C1
+  controls (U+0080 to U+009F) through a Macintosh Roman charmap. The retry is
+  `Error::Unsupported` for a face with charmaps FreeType lists and
+  `triergon-font` does not read, as is any lookup through a charmap whose
+  codes libass converts (`Font::text_lookup`). The default font file's face gets an id of its
   own, so a font never takes it for a face it already has: libass leaves
   that id uninitialised, and this is its result whenever the id does not
   collide with a registered face's; the reference is built with locals
   zeroed, so it never does.
 - **Shaping.** Scripts per character, HarfBuzz's ignorables, runs of one face,
   script and style, FriBidi levels per run (or per paragraph for `\fe-1`),
-  and OpenType shaping of each run at 256 pixels with libass's font functions
-  and features through `triergon-shape`.
+  and OpenType shaping of each run at the size its glyphs load at with
+  libass's font functions and features through `triergon-shape`.
 - **Layout.** Outlines at 256 pixels with libass's synthetic bold and oblique
-  and its underline and strike-out lines, scaled to the glyph's size; the
+  and its underline and strike-out lines, scaled to the glyph's size (a font
+  size of 0 keeps libass's size 0, at which FreeType loads glyphs and their
+  advances unscaled, in font units, with no line ascent or descent); the
   italic correction and letter spacing; wrapping (greedy, then rebalanced
   unless `\q1`), whitespace trimming and line metrics; karaoke; the visual
   order of each line; alignment and justification; the baseline shear; the
@@ -388,14 +398,14 @@ panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
-- `ass-render` renders the 26 scripts and 3 packet streams of
+- `ass-render` renders the 30 scripts and 3 packet streams of
   `harness/fixtures/ass-render` as a player configures libass (attached fonts,
   a default family and font file, no system font provider, no hinting) at
   1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 56/58 pass. The
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 64/66 pass. The
   box behind a `BorderStyle` 4 event is
   compared without its kind, since libass leaves its type uninitialised. The
   two open cases are the fixture with an `@` font.
@@ -419,4 +429,7 @@ Vertical text (`@` fonts), libass's simple shaping level and hinting modes,
 its selective style override (`ass_set_selective_style_override`; with libass's
 default settings it changes nothing), track features (`ass_track_set_feature`),
 `ass_step_sub`, `ass_configure_prune` (a player calls
-`prune_events`), reading files and charset conversion.
+`prune_events`), reading files and charset conversion. The charmap retry of a
+face selected for a character it does not map is `Error::Unsupported` for faces
+with format 2 or 8 `cmap` subtables and for CFF faces whose Unicode charmap
+FreeType synthesises, whose charmap order `triergon-font` does not reproduce.

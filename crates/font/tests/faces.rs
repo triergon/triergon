@@ -160,7 +160,16 @@ fn sizes_scale_as_freetype_does_for_libass() {
         ))
     );
     assert!(face.at_size(-1).is_err());
-    assert!(face.at_size(1).is_err());
+    // No pixels per em: FreeType loads glyphs unscaled and unhinted.
+    let unscaled = face.at_size(0).unwrap();
+    assert_eq!(unscaled.metrics().x_ppem, 0);
+    assert_eq!(unscaled.ascent_descent(), (0, 0));
+    assert_eq!(unscaled.harfbuzz_scale(), (0, 0));
+    let metrics = unscaled.outline_into(GlyphId(1), &mut outline).unwrap();
+    assert_eq!(outline.points()[2].point, Point::new(250, 200));
+    assert_eq!(metrics.advance, 400);
+    assert_eq!(unscaled.hinted_advance(GlyphId(1)), Ok(400));
+    assert_eq!(face.at_size(1).unwrap().metrics().x_ppem, 0);
 
     let cff = parse(&font(b"OTTO", &cff_tables()));
     let sized = cff.at_size(16384).unwrap();
@@ -301,7 +310,7 @@ fn collections_select_faces_and_matching_scores_styles() {
     };
     assert_eq!(select(&faces, &any_slant), Some(2));
     let needs_c = Request {
-        character: Some('C'),
+        character: Some(u32::from('C')),
         ..request("Test Sans", 0, 0)
     };
     assert_eq!(select(&faces[3..], &needs_c), None);

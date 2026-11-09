@@ -17,7 +17,7 @@ use triergon_shape::{
 };
 
 use super::fonts::Library;
-use super::text::{Char, DRAWN_SIZE, Text};
+use super::text::{Char, Text};
 use super::wrap::Line;
 use crate::{Info, charge};
 
@@ -486,8 +486,12 @@ impl Shaper {
             + (item.start - context.start).min(CONTEXT)
             + (context.end - item.end).min(CONTEXT);
         charge(work, read.saturating_add(RUN_UNITS))?;
-        let sized = face_font.font.at_size(pixels_26_6(DRAWN_SIZE))?;
-        let metrics = SizedMetrics::new(sized)?;
+        // The run's glyphs share the size their outlines load at, and the
+        // face reads them through the charmap it has selected.
+        let sized = face_font
+            .font
+            .at_size(pixels_26_6(text.style(first).size))?;
+        let metrics = SizedMetrics::with_charmap(sized, face_font.charmap())?;
         let shaper_face = Face::new(&face_font.font);
         let key = PlanKey {
             face: face_font.uid,
