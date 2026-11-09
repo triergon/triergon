@@ -27,6 +27,23 @@ pub mod annex_b {
     }
 }
 
+pub mod dvb {
+    //! Reporting of complete DVB subtitle segments preceding an overlong final
+    //! segment within a validated finite PES.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+
+    /// Interpretation of a truncated final segment.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum TailPolicy {
+        /// Require a complete segment sequence and its end marker.
+        #[default]
+        RejectTruncated,
+        /// Report the complete prefix as an observation with the original PES.
+        ReportCompletePrefix,
+    }
+}
+
 pub mod latm {
     //! Packet boundaries for LATM in MPEG-TS, as observed with FFmpeg git
     //! revision `d32b387f` on the 9.0 branch with parsers and NOFILLIN.

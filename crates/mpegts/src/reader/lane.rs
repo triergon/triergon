@@ -1,3 +1,4 @@
+mod dvb;
 mod eac3;
 mod loas;
 mod unframed_video;
@@ -11,7 +12,7 @@ use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
 use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors};
-use crate::psi::DescriptorNamespace;
+use crate::psi::{CodecIdentification, DescriptorNamespace};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
@@ -33,6 +34,7 @@ enum Framer {
     Adts(AacAdtsStreamReader),
     Loas(loas::Reader),
     LatmPes,
+    Dvb(dvb::Reader),
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
 }
@@ -85,6 +87,9 @@ impl Framer {
                 limits.maximum_audio_frame_bytes,
                 limits.elementary_input_window,
             )?)),
+            0x06 if stream.codec_identification() == CodecIdentification::DvbSubtitles => {
+                Ok(Self::Dvb(dvb::Reader::new(limits.dvb_subtitle_tail_policy)))
+            }
             0x06 if matches!(namespace, DescriptorNamespace::Dvb(_)) => {
                 let descriptors = PrivateAudioDescriptors {
                     program: track.program_map().program_descriptors.as_ref(),
@@ -161,7 +166,7 @@ impl Framer {
                 AccessUnit::Ac3(Ac3AccessUnit::single(frame))
             }),
             Self::Eac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
-            Self::LatmPes => unreachable!("LATM PES bypasses elementary framing"),
+            Self::Dvb(_) | Self::LatmPes => unreachable!("the framer uses complete PES input"),
         })
     }
     fn provide(&mut self, window: InputWindow) -> Result<()> {
@@ -171,7 +176,7 @@ impl Framer {
             Self::Loas(reader) => reader.provide(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
-            Self::LatmPes => unreachable!("LATM PES bypasses elementary framing"),
+            Self::Dvb(_) | Self::LatmPes => unreachable!("the framer uses complete PES input"),
         }
     }
     fn finish(&mut self, request: InputRequest) -> Result<()> {
@@ -181,7 +186,7 @@ impl Framer {
             Self::Loas(reader) => reader.finish(request),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
-            Self::LatmPes => unreachable!("LATM PES bypasses elementary framing"),
+            Self::Dvb(_) | Self::LatmPes => unreachable!("the framer uses complete PES input"),
         }
     }
 }
@@ -923,7 +928,7 @@ impl Lane {
         self.input = self
             .framer
             .as_ref()
-            .filter(|framer| !matches!(framer, Framer::LatmPes))
+            .filter(|framer| !matches!(framer, Framer::Dvb(_) | Framer::LatmPes))
             .map(|_| Input {
                 source: source.clone(),
                 span: 0,
@@ -1021,8 +1026,18 @@ impl Lane {
                 ));
                 continue;
             }
+            if matches!(self.framer, Some(Framer::Dvb(_) | Framer::LatmPes))
+                && self.pieces.is_empty()
+            {
+                if !draining {
+                    return Ok(LaneStep::NeedPayload);
+                }
+                self.framer = None;
+                self.eof = true;
+                continue;
+            }
             if matches!(self.framer, Some(Framer::LatmPes)) {
-                return self.preserve_latm_pes(draining, work);
+                return self.preserve_latm_pes(work);
             }
             let Some(framer) = &mut self.framer else {
                 if draining && self.eof {
@@ -1034,6 +1049,19 @@ impl Lane {
                 }
                 return Ok(LaneStep::End);
             };
+            if let Framer::Dvb(reader) = framer {
+                let Some(unit) = reader.step(&self.pieces, work, cancel)? else {
+                    return Ok(LaneStep::Yield);
+                };
+                self.check_output_limit()?;
+                self.supplied = unit.pes_end;
+                self.build = Some(Build::new(
+                    AccessUnit::DvbSubtitle(unit),
+                    &self.pool,
+                    self.last_anchor,
+                ));
+                continue;
+            }
             let step = match framer.step(work, cancel) {
                 Err(LEADING_VIDEO_BYTES)
                     if matches!(framer, Framer::Video(_))
@@ -1158,14 +1186,8 @@ impl Lane {
         Ok(())
     }
 
-    fn preserve_latm_pes(&mut self, draining: bool, work: &mut WorkBudget) -> Result<LaneStep> {
-        let Some(piece) = self.pieces.as_slice().last() else {
-            return Ok(if draining {
-                LaneStep::End
-            } else {
-                LaneStep::NeedPayload
-            });
-        };
+    fn preserve_latm_pes(&mut self, work: &mut WorkBudget) -> Result<LaneStep> {
+        let piece = self.pieces.as_slice().last().expect("pending LATM PES");
         if !work.try_charge(1) {
             return Ok(LaneStep::Yield);
         }
@@ -1197,6 +1219,10 @@ impl Lane {
             return Ok(LaneStep::Yield);
         }
         let (range, anchor_offset) = build.unit.range_and_anchor();
+        let consumed_end = match &build.unit {
+            BuildUnit::Packet(AccessUnit::DvbSubtitle(unit)) => unit.pes_end,
+            _ => range.end,
+        };
         while let Some(piece) = self.pieces.as_slice().get(build.origin) {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -1245,7 +1271,7 @@ impl Lane {
             build.origin += 1;
         }
         while let Some(piece) = self.pieces.as_slice().get(build.retire) {
-            if piece.range.end > range.end || piece.serial > build.last_anchor {
+            if piece.range.end > consumed_end || piece.serial > build.last_anchor {
                 break;
             }
             if cancel.load(Ordering::Relaxed) {
@@ -1308,7 +1334,7 @@ impl Lane {
         self.retire = build.retire;
         self.last_anchor = build.last_anchor;
         self.completed += 1;
-        self.published = range.end;
+        self.published = consumed_end;
         let track = self.track.clone();
         match build.unit {
             BuildUnit::Packet(unit) => Ok(LaneStep::Packet(Packet(Shared::new(

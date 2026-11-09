@@ -206,6 +206,33 @@ impl Ac3AccessUnit {
     }
 }
 
+/// Complete segment envelopes carried by one DVB subtitle PES.
+/// The packet's source ranges preserve the original PES, including its wrapper.
+#[derive(Clone, Debug)]
+pub struct DvbSubtitleUnit {
+    pub(super) bytes: Bytes,
+    pub(super) range: Range<u64>,
+    pub(super) pes_end: u64,
+    pub(super) segment_count: usize,
+    pub(super) truncated: bool,
+}
+
+impl DvbSubtitleUnit {
+    /// Segment headers and bodies in wire order.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    pub const fn segment_count(&self) -> usize {
+        self.segment_count
+    }
+
+    /// Range of the unfinished segment in the reader's elementary coordinates.
+    pub fn truncated_tail(&self) -> Option<Range<u64>> {
+        self.truncated.then_some(self.range.end..self.pes_end)
+    }
+}
+
 /// One byte-aligned LOAS AudioSyncStream envelope with an opaque LATM element.
 #[derive(Debug)]
 pub struct LoasFrame {
@@ -236,6 +263,7 @@ pub enum AccessUnit {
     Adts(AacAdtsFrame),
     Loas(LoasFrame),
     Ac3(Ac3AccessUnit),
+    DvbSubtitle(DvbSubtitleUnit),
     /// Unfinished audio at logical EOF. This is a source fragment, not an AU.
     IncompleteAudio {
         range: Range<u64>,
@@ -250,6 +278,7 @@ impl AccessUnit {
             Self::Adts(frame) => frame.source_bytes(),
             Self::Loas(frame) => frame.bytes(),
             Self::Ac3(frame) => frame.bytes(),
+            Self::DvbSubtitle(unit) => unit.bytes(),
             Self::IncompleteAudio { bytes, .. } => bytes,
             Self::Video(_) => unreachable!("video access units use assembled bytes"),
         }
@@ -265,6 +294,7 @@ impl AccessUnit {
             Self::Ac3(frame) => {
                 frame.facts().offset..frame.facts().offset + frame.bytes().len() as u64
             }
+            Self::DvbSubtitle(unit) => unit.range.clone(),
             Self::IncompleteAudio { range, .. } => range.clone(),
         }
     }
@@ -285,7 +315,10 @@ impl AccessUnit {
     }
     pub(super) fn duration(&self) -> Result<Option<Time>> {
         match self {
-            Self::Video(_) | Self::Loas(_) | Self::IncompleteAudio { .. } => Ok(None),
+            Self::Video(_)
+            | Self::Loas(_)
+            | Self::DvbSubtitle(_)
+            | Self::IncompleteAudio { .. } => Ok(None),
             Self::Adts(frame) => {
                 let rate = frame
                     .header()
@@ -449,4 +482,6 @@ pub enum ReaderEvent {
     IncompleteVideo(IncompleteVideo),
     /// Original LATM PES bytes under the explicit PES packet policy.
     LatmPes(crate::compat::latm::PesPacket),
+    /// Complete segments before an overlong final segment in the source PES.
+    DvbSubtitlePrefix(Packet),
 }
