@@ -1,6 +1,6 @@
 //! Explicit discards beside unchanged H.222.0 source refusals (2.4.3.3, 2.4.3.6).
-//! No packets are manufactured. A separate receipt accounts for every carrier
-//! and the original core operation's actual EOF, even when there were no carriers.
+//! The completion accounts for every carrier and the original cursor's EOF,
+//! including empty physical input.
 use super::{SourceContext, TransportFaultRecovery};
 use crate::demux_pes::DemuxScope;
 use crate::psi::DescriptorNamespace;

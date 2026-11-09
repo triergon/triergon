@@ -429,7 +429,7 @@ fn reset_and_failure_after_real_eof_cannot_publish_a_confirmation() {
 }
 
 #[test]
-fn omitted_physical_carrier_prevents_a_receipt_even_after_actual_eof() {
+fn omitted_physical_carrier_prevents_completion_even_after_actual_eof() {
     let pool = Budget::new(1 << 20).unwrap();
     let raw = CASES[3].0;
     let mut wire = raw[..376].to_vec();
