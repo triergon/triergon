@@ -66,6 +66,7 @@ fn complete_fragment_edit_offsets_the_packet_and_resume_clocks() {
             }],
         )
         .unwrap();
+        cursor.enable_range_seek_checkpoints();
         let mut rows = Vec::new();
         for _ in 0..512 {
             match cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
@@ -85,6 +86,25 @@ fn complete_fragment_edit_offsets_the_packet_and_resume_clocks() {
             (Some(20), Some(16), Some(16)),
         ];
         assert_eq!(rows, expected[usize::try_from(start).unwrap()..]);
+        if start == 0 {
+            cursor.rewind_at_end().unwrap();
+            for (target, selected) in [(19, -4), (20, 16)] {
+                let mut checked = cursor
+                    .prepare_checked_range_seek(7, target, SeekLimits::default())
+                    .unwrap()
+                    .expect("sync-starting fragment uses checked restarts");
+                assert!((0..512).any(|_| {
+                    checked.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Ready
+                }));
+                let (mut replay, landing) = checked.finish().unwrap();
+                assert_eq!(landing.requested_timestamp, target);
+                assert_eq!(landing.selected.timestamp, selected);
+                assert!((0..512).any(|_| {
+                    replay.poll(&mut WorkBudget::new(1), &cancel).unwrap() == CursorStatus::Ready
+                }));
+                assert_eq!(replay.take_occurrence().unwrap().demux.dts, Some(selected));
+            }
+        }
     }
     for (target, selected) in [(19, -4), (20, 16)] {
         let mut seek = SeekJob::new_complete_source(
