@@ -12,10 +12,10 @@
 //! workloads, not compared. With `--work any` the work each frame spent is
 //! not compared, for a change that does less work for the same frames,
 //! such as a cache: totals are reported instead. A frame both sides refuse
-//! for work agrees, and so does one the base refuses and the candidate
-//! makes, with the change value of the frame after it; a frame only the
-//! candidate refuses differs, and every later frame is compared all the
-//! same.
+//! for running out of work agrees, and so does one the base refuses for work
+//! and the candidate makes, with the change value of the frame after it; a
+//! frame only the candidate refuses differs, as does any other error, and
+//! every later frame is compared all the same.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -35,9 +35,10 @@ pub const USAGE: &str = "usage: cargo xtask ass equivalence --base REV [--seed N
   without what the budget had left, which depends on the storage each side
   holds. --cache gives every case those cache limits instead of its own.
   --work any leaves the work out of the comparison and reports both sides'
-  totals: a frame both refuse for work agrees, as does one only the base
-  refuses (with the change value after it), and one only the candidate
-  refuses differs. Builds and records go to DIR
+  totals: a frame both refuse for work (Policy(\"ass work\") or
+  Policy(\"raster work\")) agrees, as does one only the base refuses that the
+  candidate makes (with the change value after it); one only the candidate
+  refuses differs, as does any other error. Builds and records go to DIR
   (default target/ass-equivalence); the peak budget of each workload is
   printed for both. --recorded compares the records already in DIR without
   building or rendering.";
@@ -360,9 +361,21 @@ struct Tally {
     candidate_refused: (usize, usize),
 }
 
-/// Whether a frame line is a frame refused for work.
+/// Whether a frame line is a frame refused for running out of work: the
+/// renderer's or the rasteriser's work bound, not another policy limit.
 fn refused(line: &str) -> bool {
-    line.starts_with("frame ") && line.contains(" error Policy")
+    line.starts_with("frame ")
+        && [
+            " error Policy(\"ass work\")",
+            " error Policy(\"raster work\")",
+        ]
+        .iter()
+        .any(|refusal| line.contains(refusal))
+}
+
+/// Whether a frame line is a frame made: its change and images.
+fn made(line: &str) -> bool {
+    line.starts_with("frame ") && line.contains(" change ")
 }
 
 /// `line` without its change value.
@@ -376,10 +389,12 @@ fn without_change(line: &str) -> String {
 /// Compares a case's frames; the first line that differs. With
 /// [`Work::Equal`] every line must agree. With [`Work::Any`] the work is left
 /// out: a frame both sides refuse for work agrees, whichever stage ran out,
-/// and a frame the base refuses and the candidate makes agrees, as does the
-/// change value of the frame after it, which the two compare with different
-/// frames; a frame only the candidate refuses differs. Every later frame is
-/// compared all the same.
+/// and a frame the base refuses for work and the candidate makes agrees, as
+/// does the change value of the frame after it, which the two compare with
+/// different frames; a frame only the candidate refuses differs, and so does
+/// any other error. Only the work bounds count as work: another policy limit
+/// must agree like any other error. Every later frame is compared all the
+/// same.
 fn compare_case(
     base: &Case<'_>,
     candidate: &Case<'_>,
@@ -401,7 +416,7 @@ fn compare_case(
                 (true, false) => {
                     tally.base_refused.0 += 1;
                     seen[0] = true;
-                    c.starts_with("frame ")
+                    made(c)
                 }
                 (false, true) => {
                     tally.candidate_refused.0 += 1;
@@ -421,7 +436,7 @@ fn compare_case(
                 }
             },
         };
-        after_base_refusal = refused(b) && !refused(c);
+        after_base_refusal = refused(b) && made(c);
         if !agree && first.is_none() {
             first = Some(at);
         }
@@ -645,6 +660,40 @@ mod tests {
         assert_eq!(
             compare(&parse(RECORD), &parse(&other), Work::Any).mismatches,
             1
+        );
+    }
+
+    #[test]
+    fn a_base_refusal_agrees_only_with_a_frame_made() {
+        let base = "case a\nframe 0 error Policy(\"ass work\") work 9\npeak 1\n";
+        for other in [
+            "frame 0 error Allocation work 3",
+            "frame 0 error Unsupported(\"language\") work 3",
+            "frame 0 error Policy(\"bitmap size\") work 3",
+        ] {
+            let candidate = format!("case a\n{other}\npeak 1\n");
+            let summary = compare(&parse(base), &parse(&candidate), Work::Any);
+            assert_eq!(summary.mismatches, 1, "{other}");
+        }
+    }
+
+    #[test]
+    fn a_limit_is_not_a_work_refusal() {
+        let limit = "case a\nframe 0 error Policy(\"border outline points\") work 9\npeak 1\n";
+        let made = "case a\nframe 0 change 2 images 0 digest 00 work 4\npeak 1\n";
+        // A limit the base hits and the candidate does not, or the other way
+        // round, differs; both hitting it agrees.
+        assert_eq!(
+            compare(&parse(limit), &parse(made), Work::Any).mismatches,
+            1
+        );
+        assert_eq!(
+            compare(&parse(made), &parse(limit), Work::Any).mismatches,
+            1
+        );
+        assert_eq!(
+            compare(&parse(limit), &parse(limit), Work::Any).mismatches,
+            0
         );
     }
 
