@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
-use triergon_harness_protocol::hex;
 use triergon_subtitles::compat::charset::{AssPacketJob, Outcome, PacketStatus, receiver_charset};
 use triergon_subtitles::text::charset::{
     Charset, CharsetJob, CharsetStatus, multibyte::MultibyteCharset as M,
@@ -428,65 +427,6 @@ fn take_before_ready_and_repeated_take_are_explicit() {
         }
     }
     panic!("nonterminal")
-}
-#[path = "receiver-mapping-data/cases74.rs"]
-mod native74;
-#[test]
-fn original74_literal_native_payloads_and_refusals_keep_physical_geometry() {
-    let mut counts = [0; 4];
-    for &(id, label, raw, payloads, available) in native74::CASES {
-        for q in [1, 7, 4096] {
-            let p = Budget::new(1 << 20).unwrap();
-            let mut i = input(&p, label, b"");
-            i.payload = Bytes::copy_from_slice(&p, raw).unwrap();
-            let v = run(&p, i, q);
-            assert_eq!(v.source().input.payload.as_ref(), raw);
-            assert_eq!(
-                v.source().input.charset_label.as_ref().unwrap().as_ref(),
-                label
-            );
-            if !payloads.is_empty() {
-                assert_eq!(v.outcome(), Outcome::Converted, "{id}");
-                for expected in payloads {
-                    assert_eq!(v.visible().unwrap(), *expected, "{id}");
-                }
-                if q == 1 {
-                    counts[0] += 1;
-                }
-            } else if !available {
-                assert_eq!(v.outcome(), Outcome::UnsupportedLabel, "{id}");
-                if q == 1 {
-                    counts[1] += 1;
-                }
-            } else if raw.is_empty() {
-                assert_eq!(v.outcome(), Outcome::Converted, "{id}");
-                assert_eq!(v.visible(), Some(b"".as_slice()));
-                assert_eq!(v.text(), None);
-                if q == 1 {
-                    counts[2] += 1;
-                }
-            } else {
-                assert!(matches!(v.outcome(), Outcome::ConversionRefused(_)), "{id}");
-                if q == 1 {
-                    counts[3] += 1;
-                }
-            }
-            println!(
-                "receiver-row {{\"id\":\"{id}\",\"quantum\":{q},\"source_hex\":\"{}\",\"full_utf8_hex\":{},\"visible_hex\":{},\"text_hex\":{},\"outcome\":\"{}\"}}",
-                hex(raw),
-                v.converted()
-                    .map_or("null".into(), |c| format!("\"{}\"", hex(c.utf8.as_ref()))),
-                v.visible()
-                    .map_or("null".into(), |b| format!("\"{}\"", hex(b))),
-                v.text()
-                    .map_or("null".into(), |b| format!("\"{}\"", hex(b))),
-                format!("{:?}", v.outcome())
-                    .replace('\\', "\\\\")
-                    .replace('"', "\\\"")
-            );
-        }
-    }
-    assert_eq!(counts, [47, 4, 7, 16]);
 }
 #[test]
 fn signed_and_unknown_clock_facts_are_retained_without_inference() {

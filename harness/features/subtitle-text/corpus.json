@@ -1,0 +1,4462 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "mov-text-bad-two",
+      "profile": "mov-text-bad-two",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/bad-two.cap",
+      "sha256": "eddf18e426abb440d5b2de84aee6dc2c7b080d06a2860c13c66acd56bd78d3b9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-bom",
+      "profile": "mov-text-bom",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/bom.cap",
+      "sha256": "99397e5b9ad8879ae7100789e9780708591eb26a256d920ed88a6d436df40c08",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 16411640856026435931
+      }
+    },
+    {
+      "id": "mov-text-box-refusal-then-good",
+      "profile": "mov-text-box-refusal-then-good",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/box-refusal-then-good.cap",
+      "sha256": "324e231ca953681a279088d2551e6f6e22f30faa2387e81a6daf5c978e99e2ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 8041285385609017980
+      }
+    },
+    {
+      "id": "mov-text-clear-then-good",
+      "profile": "mov-text-clear-then-good",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/clear-then-good.cap",
+      "sha256": "070726d2f868fd5cb6bf96064bbf129d26acdbdaa1976b3c3ad4ea7931461a6d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 18178350073378741887
+      }
+    },
+    {
+      "id": "mov-text-clear",
+      "profile": "mov-text-clear",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/clear.cap",
+      "sha256": "1777c335cedcc86e8f319793b302ad6ad8c13e76a26ee84492f90aa621d38c8f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523184131285000
+      }
+    },
+    {
+      "id": "mov-text-config-invalid-font-size",
+      "profile": "mov-text-config-invalid-font-size",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/config-invalid-font-size.cap",
+      "sha256": "05c63306ffffd5ee0a13086fda65c282b4d562aa477bcce8b36f0912cfb81953",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 56,
+        "digest": 18032514896680424468
+      }
+    },
+    {
+      "id": "mov-text-config-one-dimension",
+      "profile": "mov-text-config-one-dimension",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/config-one-dimension.cap",
+      "sha256": "e5d5cf274609c3e6e53365c2a705cd9a745174cfc4806f6a0dbdd0dcebb8fc5a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 10297449233440646449
+      }
+    },
+    {
+      "id": "mov-text-config-too-short",
+      "profile": "mov-text-config-too-short",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/config-too-short.cap",
+      "sha256": "d58708c467fbf58eee861d3db7af3ea0b1af7cfcd62f1cc429bc9c7a76e59358",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 22,
+        "digest": 13826937650477895940
+      }
+    },
+    {
+      "id": "mov-text-config-valid-empty-fonts",
+      "profile": "mov-text-config-valid-empty-fonts",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/config-valid-empty-fonts.cap",
+      "sha256": "d072794668e64c30438c4ebc02d5a66bf6a2f55e378ec760df64d30e01953878",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 22,
+        "digest": 17561596013482410115
+      }
+    },
+    {
+      "id": "mov-text-configured-defaults",
+      "profile": "mov-text-configured-defaults",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/configured-defaults.cap",
+      "sha256": "84f66c11389088277c0039b602820f86d509ecb99d7a8296362918593a3ed7a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 5320997960962081224
+      }
+    },
+    {
+      "id": "mov-text-configured-style-font",
+      "profile": "mov-text-configured-style-font",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/configured-style-font.cap",
+      "sha256": "13d7e8146bc7b3a9db62ab04c3204806baa01603c8117b77c46298f970977fd0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 76,
+        "digest": 12040608920814794186
+      }
+    },
+    {
+      "id": "mov-text-cr-lf-markup",
+      "profile": "mov-text-cr-lf-markup",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/cr-lf-markup.cap",
+      "sha256": "80dc00ba415cdd9a01a36a7e82e4645583dd3575d28c7c9c76ff62073a1f1299",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 34,
+        "digest": 18023925533209720673
+      }
+    },
+    {
+      "id": "mov-text-duplicate-fonts",
+      "profile": "mov-text-duplicate-fonts",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/duplicate-fonts.cap",
+      "sha256": "df352afbbdf6291c366a7bbf89e7a01d1b180f22024623c3d151a61fe92ef047",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 65,
+        "digest": 3532745880986411358
+      }
+    },
+    {
+      "id": "mov-text-duplicate-wrap",
+      "profile": "mov-text-duplicate-wrap",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/duplicate-wrap.cap",
+      "sha256": "7afbf80adefaa45dbab67dd8f15fd4a25717f05e70cf26ce90eb6d8e6fa06431",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 29,
+        "digest": 12425610606419480406
+      }
+    },
+    {
+      "id": "mov-text-empty-event",
+      "profile": "mov-text-empty-event",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/empty-event.cap",
+      "sha256": "5a9a044fc824ef7d81fc1c2a48a9383a409859e6e9f2cc985d9853ddf95f6fce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 20,
+        "digest": 11919355941114189393
+      }
+    },
+    {
+      "id": "mov-text-empty-physical",
+      "profile": "mov-text-empty-physical",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/empty-physical.cap",
+      "sha256": "b62181fa2b17ac4303528bd22331346472ca8b80adf624b1bff14025109d1e1e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523184131285000
+      }
+    },
+    {
+      "id": "mov-text-extended-short",
+      "profile": "mov-text-extended-short",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/extended-short.cap",
+      "sha256": "18b3c03151769d1cc81ddd3a4428c36101015306d9d7a65171170fd3a92e1653",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 15879490643181700047
+      }
+    },
+    {
+      "id": "mov-text-extended-wrap",
+      "profile": "mov-text-extended-wrap",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/extended-wrap.cap",
+      "sha256": "67e6bbe930ec02e12987b2a351fa0c9865082221d96a1e87954aa58511878f90",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 29,
+        "digest": 18147871770564034551
+      }
+    },
+    {
+      "id": "mov-text-ffff",
+      "profile": "mov-text-ffff",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/ffff.cap",
+      "sha256": "ff46d758f8d2c02c3825a660d45a374af191d14dc8c1a3fd049bafe022de9b8a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 5419961921735544798
+      }
+    },
+    {
+      "id": "mov-text-flush-read-order",
+      "profile": "mov-text-flush-read-order",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/flush-read-order.cap",
+      "sha256": "ef987e42fb689016386eb317e4cbdd483177910e08567ec00c6cea5ebd95a9ab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 42,
+        "digest": 10243283315752949461
+      }
+    },
+    {
+      "id": "mov-text-font-nul",
+      "profile": "mov-text-font-nul",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/font-nul.cap",
+      "sha256": "e2e00d08a657bbe0031d4591fc360591f33c87ca7143da422192f1c6a83c244f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 14818857410634810470
+      }
+    },
+    {
+      "id": "mov-text-font-utf16",
+      "profile": "mov-text-font-utf16",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/font-utf16.cap",
+      "sha256": "b532cc45c5010b80c388b76604b1f3cc5e058d4c6e449cb03c9dff7d4d3df50e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 17426004565252902330
+      }
+    },
+    {
+      "id": "mov-text-highlight-color",
+      "profile": "mov-text-highlight-color",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/highlight-color.cap",
+      "sha256": "55e02f62d527c40bb7609a11d782240f617d7dc83938f9b3b551e3df0b48647b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 47,
+        "digest": 4420387866861943835
+      }
+    },
+    {
+      "id": "mov-text-highlight-empty",
+      "profile": "mov-text-highlight-empty",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/highlight-empty.cap",
+      "sha256": "69d5247968aed98a39e742d34fde853741bab8b8319412fbbbd3347ae9f2c0c7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 70,
+        "digest": 12633967781353108985
+      }
+    },
+    {
+      "id": "mov-text-highlight-inverse",
+      "profile": "mov-text-highlight-inverse",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/highlight-inverse.cap",
+      "sha256": "46695c07e479d38a9a6e223c52b3364942c1916b4e10ce412d023e5914f7dcfd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 70,
+        "digest": 10399456298976371705
+      }
+    },
+    {
+      "id": "mov-text-invalid-overlong",
+      "profile": "mov-text-invalid-overlong",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/invalid-overlong.cap",
+      "sha256": "30d8b5a600e07121afe17dbfe2d00a9e27011933061ef1f1c1d03503ae461f2b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-invalid-tail",
+      "profile": "mov-text-invalid-tail",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/invalid-tail.cap",
+      "sha256": "4af02085578f2860f4f608d299c4df334de29ae783ad9e4fbc1f98891373e781",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-known-zero-duration",
+      "profile": "mov-text-known-zero-duration",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/known-zero-duration.cap",
+      "sha256": "10c6e1ccc0a247c76121ee30d79622aaf9b9f9f48f453ea20416852573576a3b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 12317261247758077499
+      }
+    },
+    {
+      "id": "mov-text-negative-half",
+      "profile": "mov-text-negative-half",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/negative-half.cap",
+      "sha256": "ebdb7d49de0af7869d7f0f58aadb95e2211cc17dd46dea88a0f654c438a52e72",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5092071259770721805
+      }
+    },
+    {
+      "id": "mov-text-noncharacter-fffe",
+      "profile": "mov-text-noncharacter-fffe",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/noncharacter-fffe.cap",
+      "sha256": "8ad6b8e79049d1e30e278fd30dad81dbaa04bb51e0d7dfebd8f7becaa4fb7312",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-nul-invalid-tail",
+      "profile": "mov-text-nul-invalid-tail",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/nul-invalid-tail.cap",
+      "sha256": "b4100f3cca59d02bb3e373bb8f7f0cadae109fa91b641a155ec8eec8cc266a73",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 6401442976866114477
+      }
+    },
+    {
+      "id": "mov-text-one-byte",
+      "profile": "mov-text-one-byte",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/one-byte.cap",
+      "sha256": "3446a06332e7821577e5637b1a4b100156d46ca2a5eb705c12de7e26754e5e3f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-overflow-clock",
+      "profile": "mov-text-overflow-clock",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/overflow-clock.cap",
+      "sha256": "a4c2b142d733e5088b8446d4e9b3e4d659204a619fc7db5391eb881d481e0725",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 2799402926255104890
+      }
+    },
+    {
+      "id": "mov-text-overrun-box",
+      "profile": "mov-text-overrun-box",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/overrun-box.cap",
+      "sha256": "84b1b64a84f032975a8fbc437b9560f0c53d91b8d0b5c32886a297e31b3b4729",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 13507128857379149072
+      }
+    },
+    {
+      "id": "mov-text-overstated",
+      "profile": "mov-text-overstated",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/overstated.cap",
+      "sha256": "5c66353493987e34ce5a0f0e25dc38d8be7e93edfbd077bed88984664070e420",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 22,
+        "digest": 13826937650477895940
+      }
+    },
+    {
+      "id": "mov-text-positive-half",
+      "profile": "mov-text-positive-half",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/positive-half.cap",
+      "sha256": "fa827df5c22f0a1001744469866cade422796ce05ed5daf89d0a934d894a4f2e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 254807550225405543
+      }
+    },
+    {
+      "id": "mov-text-rational-clock",
+      "profile": "mov-text-rational-clock",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/rational-clock.cap",
+      "sha256": "a8e9a132840a1865bdc2e3e4d9d91d31ccdad1d0afe6700d3086de701d4eed03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 1053504976067961321
+      }
+    },
+    {
+      "id": "mov-text-short-body",
+      "profile": "mov-text-short-body",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/short-body.cap",
+      "sha256": "468581eac0486e01f0d3632388d768ccd93a91e49e715a0e7d2e945f2250c3c5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 13507128857379149072
+      }
+    },
+    {
+      "id": "mov-text-short-box",
+      "profile": "mov-text-short-box",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/short-box.cap",
+      "sha256": "33df7d2151e63b773590639699e137645305f73dcd001245f9bded0a43f0fe62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-size0",
+      "profile": "mov-text-size0",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/size0.cap",
+      "sha256": "0fd3069d26e66b6cb14806afc5dc1477e6f549baceaf189741ddffa9051fa2af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-style-adjacent-different",
+      "profile": "mov-text-style-adjacent-different",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-adjacent-different.cap",
+      "sha256": "158b16dbe1427fbd29beffe612d3c60e34ed15f33a81db010fc8da0b33b69843",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 3301085840690140282
+      }
+    },
+    {
+      "id": "mov-text-style-adjacent-equal",
+      "profile": "mov-text-style-adjacent-equal",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-adjacent-equal.cap",
+      "sha256": "ada9209daf00f2e36d49d9bbbb7eedc8fe953760b7d60f161670c963d1e33f1d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 33,
+        "digest": 2229830913894747517
+      }
+    },
+    {
+      "id": "mov-text-style-all",
+      "profile": "mov-text-style-all",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-all.cap",
+      "sha256": "066f245ba12298d349f4faa50047708bc7700cb0bc2325b70f3035e11448c5e6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 73,
+        "digest": 11448044040163252285
+      }
+    },
+    {
+      "id": "mov-text-style-empty",
+      "profile": "mov-text-style-empty",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-empty.cap",
+      "sha256": "070f715927a1d913b85c73232d79ae85bf2ebd502a8ef2afe35023ff81931c27",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 4331406592249074837
+      }
+    },
+    {
+      "id": "mov-text-style-malformed-after-good",
+      "profile": "mov-text-style-malformed-after-good",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-malformed-after-good.cap",
+      "sha256": "6d5279edb21e3049af0fb86bd4bc3cf9f8890d7ec557458f828125b8f33aa96b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 33,
+        "digest": 6466706851040678555
+      }
+    },
+    {
+      "id": "mov-text-style-outside",
+      "profile": "mov-text-style-outside",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-outside.cap",
+      "sha256": "0ae802b4690ec4a82de76c108242c537cea746b7cd3743ba31bbeb4689f6f4a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 1113169715655538013
+      }
+    },
+    {
+      "id": "mov-text-style-overlap",
+      "profile": "mov-text-style-overlap",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-overlap.cap",
+      "sha256": "f88f17e3cf6580b1ed089e72dc11ff337f41133907c4e5464b67cc269434b9c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 9538316433444029545
+      }
+    },
+    {
+      "id": "mov-text-style-repeated",
+      "profile": "mov-text-style-repeated",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-repeated.cap",
+      "sha256": "7d9c88c6b6cc34e0cce65d97ac38337a062666f473cd44bee823828d7b163aca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 33,
+        "digest": 4662066639687150330
+      }
+    },
+    {
+      "id": "mov-text-style-reversed",
+      "profile": "mov-text-style-reversed",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-reversed.cap",
+      "sha256": "500f2129efff581ed071fa073c9b1e51a573c2e245b4ad51ee077094b85861dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 1113169715655538013
+      }
+    },
+    {
+      "id": "mov-text-style-unicode",
+      "profile": "mov-text-style-unicode",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-unicode.cap",
+      "sha256": "74889099b3764d24bee21556d7023e487c925da90783fcec2df3871fd2271a53",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 35,
+        "digest": 9939806404601066201
+      }
+    },
+    {
+      "id": "mov-text-style-zero-after-good",
+      "profile": "mov-text-style-zero-after-good",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/style-zero-after-good.cap",
+      "sha256": "43e750944bedc9fb7d5e47bd00ca46cb71fd6e7d81755fc068cc04114d5d5afd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 14283040005049131495
+      }
+    },
+    {
+      "id": "mov-text-two-packets",
+      "profile": "mov-text-two-packets",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/two-packets.cap",
+      "sha256": "0498b997db98ba8d7116c3a72b6ea528822fe1ce4741bd291daaf4f0acb4e027",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 42,
+        "digest": 6214536366693049766
+      }
+    },
+    {
+      "id": "mov-text-tx3g-basic",
+      "profile": "mov-text-tx3g-basic",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-basic.cap",
+      "sha256": "cc44efd4935169541916dbae9206cf8db00fd3b2386a573cf4fe4fa863342f1c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 12999878569739763495
+      }
+    },
+    {
+      "id": "mov-text-tx3g-box-overrun",
+      "profile": "mov-text-tx3g-box-overrun",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-box-overrun.cap",
+      "sha256": "f36a7b8833b28d6ff7921b7fb15bff59cd904703a5df7e4e9a86c8a8f25ec839",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 18250334427690973082
+      }
+    },
+    {
+      "id": "mov-text-tx3g-byte-not-character-count",
+      "profile": "mov-text-tx3g-byte-not-character-count",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-byte-not-character-count.cap",
+      "sha256": "cd478eb842ec750d94cbfdba41b08ed5509be328978b361ab3cb96cbd26a2d1b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 12995008801788568311
+      }
+    },
+    {
+      "id": "mov-text-tx3g-embedded-nul",
+      "profile": "mov-text-tx3g-embedded-nul",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-embedded-nul.cap",
+      "sha256": "aa009a558ce4b7d8bf91862e1103336e4e93c36edc9858a47e20d1dcbebfa23f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 16982502192512941390
+      }
+    },
+    {
+      "id": "mov-text-tx3g-empty-sample",
+      "profile": "mov-text-tx3g-empty-sample",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-empty-sample.cap",
+      "sha256": "1777c335cedcc86e8f319793b302ad6ad8c13e76a26ee84492f90aa621d38c8f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523184131285000
+      }
+    },
+    {
+      "id": "mov-text-tx3g-empty-with-modifier",
+      "profile": "mov-text-tx3g-empty-with-modifier",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-empty-with-modifier.cap",
+      "sha256": "5a9a044fc824ef7d81fc1c2a48a9383a409859e6e9f2cc985d9853ddf95f6fce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 20,
+        "digest": 11919355941114189393
+      }
+    },
+    {
+      "id": "mov-text-tx3g-extended-box-gap",
+      "profile": "mov-text-tx3g-extended-box-gap",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-extended-box-gap.cap",
+      "sha256": "be41c2d876043a17216232a7c7a02d7067b8ab83001ecf936a200d3ecbd15b43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 17969896213001391155
+      }
+    },
+    {
+      "id": "mov-text-tx3g-line-codepoints-exact",
+      "profile": "mov-text-tx3g-line-codepoints-exact",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-line-codepoints-exact.cap",
+      "sha256": "5b6f26828c077d21485e7a863788ef129e1525e892ec2534517de945f5473a50",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 12999877848015736179
+      }
+    },
+    {
+      "id": "mov-text-tx3g-lone-surrogate",
+      "profile": "mov-text-tx3g-lone-surrogate",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-lone-surrogate.cap",
+      "sha256": "b7a042f0e172d4a64bf8abb4d1e50183a1ed29c924d917b35cc2faae6fc9c5e2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-tx3g-missing-length",
+      "profile": "mov-text-tx3g-missing-length",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-missing-length.cap",
+      "sha256": "352a36bba1d1e99bb154151505de26ad9f704dbc9486eacef72c02d1aab7423d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-tx3g-modifier-order",
+      "profile": "mov-text-tx3g-modifier-order",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-modifier-order.cap",
+      "sha256": "525b887bb3145f63a6bd580f458b35e5361df2f00b2998853f8576fc85311e58",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 7029904582668737720
+      }
+    },
+    {
+      "id": "mov-text-tx3g-short-box",
+      "profile": "mov-text-tx3g-short-box",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-short-box.cap",
+      "sha256": "6d87de2773419e57e7c3643a6c495ff4d2f5a18e458473ca26f7e7bb85e5c2b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-tx3g-style-highlight-raw",
+      "profile": "mov-text-tx3g-style-highlight-raw",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-style-highlight-raw.cap",
+      "sha256": "7861c74b8bf53b12ef78c98e37aa9385edc7da9648b46eb3b776c3ded8a6f504",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 73,
+        "digest": 7412850180881749788
+      }
+    },
+    {
+      "id": "mov-text-tx3g-text-overrun",
+      "profile": "mov-text-tx3g-text-overrun",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-text-overrun.cap",
+      "sha256": "a5e50ec51c82f89205c14b1e8b1927304809d7d28f98dc869481235191562ae5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 22,
+        "digest": 6483089375245263994
+      }
+    },
+    {
+      "id": "mov-text-tx3g-u16-byte-count-boundary",
+      "profile": "mov-text-tx3g-u16-byte-count-boundary",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-u16-byte-count-boundary.cap",
+      "sha256": "4acf7f0dffcbd4bd696e01115fdeab77b31ef28bac7f53e3e4a1546d17ff8271",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 65555,
+        "digest": 5943508441373594802
+      }
+    },
+    {
+      "id": "mov-text-tx3g-unknown-modifier",
+      "profile": "mov-text-tx3g-unknown-modifier",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-unknown-modifier.cap",
+      "sha256": "17e2f5ab49613fae78a2480146f4fa1e0c684a357ae2774d0e8ddf8064e7aa07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 16421625763133778249
+      }
+    },
+    {
+      "id": "mov-text-tx3g-utf16-odd",
+      "profile": "mov-text-tx3g-utf16-odd",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-utf16-odd.cap",
+      "sha256": "37eb426f92910a480c2aa39daba6d36c380d2009923942740f56cee1282c34d1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-tx3g-utf16be-bom",
+      "profile": "mov-text-tx3g-utf16be-bom",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-utf16be-bom.cap",
+      "sha256": "d855ccee903836e1128ef8f48ddf1e946b2cbb7dcdb4f7772cae76fdea1adeb7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-understated",
+      "profile": "mov-text-understated",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/understated.cap",
+      "sha256": "fc56469cdd6ea3c4fc5b1a6ec827fa97972288efc45d3caa507cdcb2dea08476",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 16982502192512941390
+      }
+    },
+    {
+      "id": "mov-text-unicode",
+      "profile": "mov-text-unicode",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/unicode.cap",
+      "sha256": "ddf0e8dd3cb12d082c8968bf47b47ed2eb98a569935c91112dffa6b8f714a4fe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 32,
+        "digest": 984951196997598416
+      }
+    },
+    {
+      "id": "mov-text-unknown-clock",
+      "profile": "mov-text-unknown-clock",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/unknown-clock.cap",
+      "sha256": "030c7a147fc36da77b6d57fa3b8f33b7f7f39e701a787dc4421bb76835150d1b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 2799402926255104890
+      }
+    },
+    {
+      "id": "mov-text-unknown",
+      "profile": "mov-text-unknown",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/unknown.cap",
+      "sha256": "75ab01ae8c7883b1f092b9eb14e5cf3f7c1fe0f21ea11abd23cc4fbb854b9726",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 8230255073063190938
+      }
+    },
+    {
+      "id": "mov-text-unset-clock",
+      "profile": "mov-text-unset-clock",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/unset-clock.cap",
+      "sha256": "4daa8578a5cd07591cd5271accd65325764653d8ed04ccec7e61de0f8492d268",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 2799402926255104890
+      }
+    },
+    {
+      "id": "mov-text-utf16be",
+      "profile": "mov-text-utf16be",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/utf16be.cap",
+      "sha256": "7011056f76010a979ceecdf396cdb41330d305942fab158a9ca4cb5b7db5dc3d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-utf16le",
+      "profile": "mov-text-utf16le",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/utf16le.cap",
+      "sha256": "dc8d6d30fe72bf17f60d4072e2ee71f16d28c81db76fb5e6e99e4d3f54ebf277",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-utf8-refusal-then-good",
+      "profile": "mov-text-utf8-refusal-then-good",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/utf8-refusal-then-good.cap",
+      "sha256": "b01307683e35eb2f7ab4ef3ca17abb2b2a514ad2a744be6ab5e8930a22d266f6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 13465971602613712155
+      }
+    },
+    {
+      "id": "mov-text-wrap-0",
+      "profile": "mov-text-wrap-0",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/wrap-0.cap",
+      "sha256": "484c23f0cbedffd75639bc6f359bb1e78f38666748e61f0d73f4a507254f7ec0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 29,
+        "digest": 8585728863479316544
+      }
+    },
+    {
+      "id": "mov-text-wrap-1",
+      "profile": "mov-text-wrap-1",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/wrap-1.cap",
+      "sha256": "e8ec169a327a96536e120a9434aa5c1a92a003b5545da0157a956b85a0102cc2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 29,
+        "digest": 8585728862591812863
+      }
+    },
+    {
+      "id": "mov-text-wrap-2",
+      "profile": "mov-text-wrap-2",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/wrap-2.cap",
+      "sha256": "b5d28657e9aa3178a832f932a6c675743ddf8a0e85611b93a78e6c05571528fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 29,
+        "digest": 8585728863479316544
+      }
+    },
+    {
+      "id": "mov-text-wrap-nul",
+      "profile": "mov-text-wrap-nul",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/wrap-nul.cap",
+      "sha256": "19ad13b0f17bee18b96c3de08cf32dd4fb3bbd3245a219cd791e7186ddb8e51b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 25,
+        "digest": 16989823502782981348
+      }
+    },
+    {
+      "id": "tx3g-adjacent_style_runs_remain_distinct_source_records",
+      "profile": "tx3g-adjacent_style_runs_remain_distinct_source_records",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/adjacent_style_runs_remain_distinct_source_records.cap",
+      "sha256": "9b2aa622a97e60949c61b186e944a412f0bb744f6201cc57ef57c2666681a5e2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 51,
+        "digest": 14612234136659823069
+      }
+    },
+    {
+      "id": "tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits",
+      "profile": "tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits.cap",
+      "sha256": "bcb7e75cfdf9b629641deec59226dcb51d895c3f640ca5a4af9730f82a7efed9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 84,
+        "digest": 14491986459356080538
+      }
+    },
+    {
+      "id": "tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets",
+      "profile": "tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/all_line_break_and_nonprinting_scalars_count_in_style_offsets.cap",
+      "sha256": "9622dc43462e8f0c9e796d185c46e7326b18899ac91517c53b93702a4ead3cd2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 63,
+        "digest": 1858980589764798910
+      }
+    },
+    {
+      "id": "tx3g-cancellation_at_every_initial_single_unit_boundary_is_resumable",
+      "profile": "tx3g-cancellation_at_every_initial_single_unit_boundary_is_resumable",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/cancellation_at_every_initial_single_unit_boundary_is_resumable.cap",
+      "sha256": "4b525784c9b114b6e0a97ce329565c0f431235eb5c41018d7e77d18bf5b09efd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 72,
+        "digest": 13481656703039131639
+      }
+    },
+    {
+      "id": "tx3g-continuous_karaoke_empty_character_range_keeps_the_requested_prefix_during_pause",
+      "profile": "tx3g-continuous_karaoke_empty_character_range_keeps_the_requested_prefix_during_pause",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/continuous_karaoke_empty_character_range_keeps_the_requested_prefix_during_pause.cap",
+      "sha256": "f519f15c47dccafa38b255827b7e69b6793ecffd2cb36a9c331cd38bef9ee4fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 9412239360410666900
+      }
+    },
+    {
+      "id": "tx3g-continuous_karaoke_resolves_prefix_from_source_display_flag",
+      "profile": "tx3g-continuous_karaoke_resolves_prefix_from_source_display_flag",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/continuous_karaoke_resolves_prefix_from_source_display_flag.cap",
+      "sha256": "3b502436a6bb6e47da547d8759c6916a9a39ff54bda96b6e918d02d6668f8104",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 12370354526727986316
+      }
+    },
+    {
+      "id": "tx3g-continuous_prefix_conflict_is_detected_even_outside_declared_start",
+      "profile": "tx3g-continuous_prefix_conflict_is_detected_even_outside_declared_start",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/continuous_prefix_conflict_is_detected_even_outside_declared_start.cap",
+      "sha256": "fa201ee93b60ea916be33880ad86dfa438abc5da6e811315858dcd4d28655b3d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 80,
+        "digest": 3857411150911501218
+      }
+    },
+    {
+      "id": "tx3g-default_style_and_all_rgba_bytes_stay_exact_without_renderer_substitution",
+      "profile": "tx3g-default_style_and_all_rgba_bytes_stay_exact_without_renderer_substitution",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/default_style_and_all_rgba_bytes_stay_exact_without_renderer_substitution.cap",
+      "sha256": "24b72b64a5deccc9562bf30381916d78b57ac465cea713243561020dd339c027",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 9599008923496001291
+      }
+    },
+    {
+      "id": "tx3g-derived_run_limit_preserves_real_boundaries_and_never_coalesces_to_pass",
+      "profile": "tx3g-derived_run_limit_preserves_real_boundaries_and_never_coalesces_to_pass",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/derived_run_limit_preserves_real_boundaries_and_never_coalesces_to_pass.cap",
+      "sha256": "f362ba6d0c4208c57d2536264c2df77a59cf4e338679be285ad2b108736d9c81",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 55,
+        "digest": 1729490342144190639
+      }
+    },
+    {
+      "id": "tx3g-disjoint_dynamic_static_and_link_ranges_remain_legal",
+      "profile": "tx3g-disjoint_dynamic_static_and_link_ranges_remain_legal",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/disjoint_dynamic_static_and_link_ranges_remain_legal.cap",
+      "sha256": "bb9202b58c7861bbdacc6cae54c403dc054f35311fbcf726d367678da787c8ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 80,
+        "digest": 1246527442136076477
+      }
+    },
+    {
+      "id": "tx3g-disparity_minimum_is_widened_before_negation",
+      "profile": "tx3g-disparity_minimum_is_widened_before_negation",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/disparity_minimum_is_widened_before_negation.cap",
+      "sha256": "a758b55eb67d962d85816683ca61c398c91ca7789b75c994d3ef47ca4adafcd4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 10594603693518868451
+      }
+    },
+    {
+      "id": "tx3g-duplicate_and_missing_font_ids_are_explicit_semantic_errors",
+      "profile": "tx3g-duplicate_and_missing_font_ids_are_explicit_semantic_errors",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/duplicate_and_missing_font_ids_are_explicit_semantic_errors.cap",
+      "sha256": "952d93410944544751abdd5a5e48446815a38f2085e480597c09ad9170dcee7b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 65,
+        "digest": 18036501527087825260
+      }
+    },
+    {
+      "id": "tx3g-duplicate_global_modifiers_never_silently_choose_last",
+      "profile": "tx3g-duplicate_global_modifiers_never_silently_choose_last",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/duplicate_global_modifiers_never_silently_choose_last.cap",
+      "sha256": "c19519c7cc058cda49cfd0f76a2fef781572fcd10b5c5ee1b8c5a4b3614bb309",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 110,
+        "digest": 2552394492068609656
+      }
+    },
+    {
+      "id": "tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse",
+      "profile": "tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/duplicate_karaoke_even_empty_and_unordered_times_refuse.cap",
+      "sha256": "df285c739351f6b15adb355e18c3bbce89bee7d6f62c0b720da4d54c8ecde24e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 69,
+        "digest": 3343499084608464965
+      }
+    },
+    {
+      "id": "tx3g-dynamic_colour_is_foreground_while_static_colour_is_background",
+      "profile": "tx3g-dynamic_colour_is_foreground_while_static_colour_is_background",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/dynamic_colour_is_foreground_while_static_colour_is_background.cap",
+      "sha256": "eb27f0cf354fa96843abb65288d8bd92a32f0d0615a05a28401123da8a2b4017",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 36,
+        "digest": 6782566532686808914
+      }
+    },
+    {
+      "id": "tx3g-empty_karaoke_header_start_obeys_known_sample_duration",
+      "profile": "tx3g-empty_karaoke_header_start_obeys_known_sample_duration",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/empty_karaoke_header_start_obeys_known_sample_duration.cap",
+      "sha256": "70008c3c795f07f553ad7133d6d14b15d2c004547267745d2f6a4a946d529ad5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 3901168734914318465
+      }
+    },
+    {
+      "id": "tx3g-empty_text_has_no_runs_and_no_queryable_character",
+      "profile": "tx3g-empty_text_has_no_runs_and_no_queryable_character",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/empty_text_has_no_runs_and_no_queryable_character.cap",
+      "sha256": "158e85c711e98f526c0103b756d0bcd71f25a4b830dae6f404ee7ddb493091fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 8553564553702353203
+      }
+    },
+    {
+      "id": "tx3g-explicit_clock_absence_keeps_relative_times_unknown_even_with_raw_input_clock",
+      "profile": "tx3g-explicit_clock_absence_keeps_relative_times_unknown_even_with_raw_input_clock",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/explicit_clock_absence_keeps_relative_times_unknown_even_with_raw_input_clock.cap",
+      "sha256": "fed0b83c3cb599489600093cd70d6d3e344807897d8469acd7443032bc4a3202",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 11486415378287461241
+      }
+    },
+    {
+      "id": "tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules",
+      "profile": "tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/extended_and_to_end_known_boxes_reuse_existing_physical_box_rules.cap",
+      "sha256": "b0a1eb65c271a09aeeabd298eabd43375b0da2d0cf5a6e7796e068420e38f1c9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "tx3g-font_names_are_decoded_from_source_utf8_or_utf16_bom_without_selecting_renderer_fallback",
+      "profile": "tx3g-font_names_are_decoded_from_source_utf8_or_utf16_bom_without_selecting_renderer_fallback",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/font_names_are_decoded_from_source_utf8_or_utf16_bom_without_selecting_renderer_fallback.cap",
+      "sha256": "3e0e9e16f1c0e0dd4ae1ad0c080190a0bbef7b8ae5e360317da9e89c6d162c93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 477244911117208967
+      }
+    },
+    {
+      "id": "tx3g-foreign_payload_configuration_and_label_owners_never_enter_the_job",
+      "profile": "tx3g-foreign_payload_configuration_and_label_owners_never_enter_the_job",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/foreign_payload_configuration_and_label_owners_never_enter_the_job.cap",
+      "sha256": "07b8d08bbf552a9d6dc41c4034fab8053bdd7fd5cb7d50dcff33ed71a89c968f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 4462045164293483032
+      }
+    },
+    {
+      "id": "tx3g-full_u16_byte_count_is_not_reduced_to_recommended_2048",
+      "profile": "tx3g-full_u16_byte_count_is_not_reduced_to_recommended_2048",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/full_u16_byte_count_is_not_reduced_to_recommended_2048.cap",
+      "sha256": "279f201ae8eff227b146c1da9d7b5f542ee31d7045fc4c3c39c6f7c79a4365a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 65555,
+        "digest": 7436932017646671471
+      }
+    },
+    {
+      "id": "tx3g-highlight_colour_order_does_not_change_semantic_authority",
+      "profile": "tx3g-highlight_colour_order_does_not_change_semantic_authority",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/highlight_colour_order_does_not_change_semantic_authority.cap",
+      "sha256": "47b1ff67a92b238974e7d9f17675de51fedb1d3eaa26f8b05d3d8a2d110dfebc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 102,
+        "digest": 6164251558547489882
+      }
+    },
+    {
+      "id": "tx3g-highlight_n_plus_one_sentinel_is_retained_as_a_derived_endpoint",
+      "profile": "tx3g-highlight_n_plus_one_sentinel_is_retained_as_a_derived_endpoint",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/highlight_n_plus_one_sentinel_is_retained_as_a_derived_endpoint.cap",
+      "sha256": "18896cd4dbafd31a15ebc0a98db6fbfc1c4466508f2bd5ecf0c90fd43a77b482",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 51,
+        "digest": 661209269643476267
+      }
+    },
+    {
+      "id": "tx3g-hyperlink_empty_strings_are_preserved_not_invented_absolute_urls",
+      "profile": "tx3g-hyperlink_empty_strings_are_preserved_not_invented_absolute_urls",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/hyperlink_empty_strings_are_preserved_not_invented_absolute_urls.cap",
+      "sha256": "1f6bb27bb8ca4425ead250210a9181c2c650e3568dc18997102f75238ccc1fbb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 3901168734914318465
+      }
+    },
+    {
+      "id": "tx3g-hyperlink_requests_terminal_style_over_base_and_static_highlight",
+      "profile": "tx3g-hyperlink_requests_terminal_style_over_base_and_static_highlight",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/hyperlink_requests_terminal_style_over_base_and_static_highlight.cap",
+      "sha256": "13e95f99bedcf4fefed8ae34f49be5ffcac8801ce9a8bc20968e98c72cf4ee37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 86,
+        "digest": 1025794814523713827
+      }
+    },
+    {
+      "id": "tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited",
+      "profile": "tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/hyperlink_utf8_url_alt_fields_are_strict_length_delimited.cap",
+      "sha256": "b3f199b24b8c93f3a1c8e2a84b9f6459033233b2213beaf19c9d5daaadf844f4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 63,
+        "digest": 14758406300518658822
+      }
+    },
+    {
+      "id": "tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping",
+      "profile": "tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/inverted_and_beyond_text_ranges_refuse_without_clamping.cap",
+      "sha256": "78971ffeb121e09b79c4eb0d1f92b55933162b849cbcf0c1bf5515130b5cd3c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 153,
+        "digest": 11126516736264722868
+      }
+    },
+    {
+      "id": "tx3g-karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds",
+      "profile": "tx3g-karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds.cap",
+      "sha256": "e4dd5e2e6d04c77f71c63ae0e09e0be34132a97a50115884dc03e11c9ee4af15",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 7307977610132659108
+      }
+    },
+    {
+      "id": "tx3g-karaoke_character_ranges_must_be_ordered_nonoverlapping",
+      "profile": "tx3g-karaoke_character_ranges_must_be_ordered_nonoverlapping",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/karaoke_character_ranges_must_be_ordered_nonoverlapping.cap",
+      "sha256": "4ee7633c48c16291c27e941e2f6c96a948edd5c04c34301c50d9cec3bc524a9c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 746809994371726228
+      }
+    },
+    {
+      "id": "tx3g-karaoke_events_have_half_open_time_intervals_and_zero_range_pauses",
+      "profile": "tx3g-karaoke_events_have_half_open_time_intervals_and_zero_range_pauses",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/karaoke_events_have_half_open_time_intervals_and_zero_range_pauses.cap",
+      "sha256": "afd84ee5bc077994d3ac76df5274cb9ea64f46d4e66dae914a05ea7dea7535cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 15328469693045305732
+      }
+    },
+    {
+      "id": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors",
+      "profile": "tx3g-known_box_trailing_bytes_and_short_bodies_are_errors",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/known_box_trailing_bytes_and_short_bodies_are_errors.cap",
+      "sha256": "7b0c5cb8f4fac90c27ca06d521bc4dfbfb16bbbfccb90088614587ceb1e111c5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 377,
+        "digest": 14002558502733982889
+      }
+    },
+    {
+      "id": "tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics",
+      "profile": "tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/malformed_advertised_record_counts_do_not_publish_partial_semantics.cap",
+      "sha256": "556a0ebe2f8891a845f0f3a1c63cd71ee51c8c01a8398ecedb5b493f0a6e9845",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 63,
+        "digest": 18078081097927808369
+      }
+    },
+    {
+      "id": "tx3g-malformed_late_modifier_never_publishes_partial_semantic_output",
+      "profile": "tx3g-malformed_late_modifier_never_publishes_partial_semantic_output",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/malformed_late_modifier_never_publishes_partial_semantic_output.cap",
+      "sha256": "5420e5c89452d20a2ce266b1b4107fa0d2c097c5dd3e716a4c77aefc50698b51",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 79,
+        "digest": 9461874052245192376
+      }
+    },
+    {
+      "id": "tx3g-missing_description_does_not_fake_complete_combination_validation",
+      "profile": "tx3g-missing_description_does_not_fake_complete_combination_validation",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/missing_description_does_not_fake_complete_combination_validation.cap",
+      "sha256": "2e723ee501b6e43c5ea1653fde3eb9db4e55caa4186162de10837025b31cd7e0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 70,
+        "digest": 6400127233177772589
+      }
+    },
+    {
+      "id": "tx3g-missing_description_does_not_invent_disparity_zero",
+      "profile": "tx3g-missing_description_does_not_invent_disparity_zero",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/missing_description_does_not_invent_disparity_zero.cap",
+      "sha256": "a12eb252647ffb8b38966f9bb1169d3e716cf4ce60009cd881d76c8d7058a4a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 42,
+        "digest": 11428434418702929125
+      }
+    },
+    {
+      "id": "tx3g-missing_description_keeps_unbound_font_id_and_base_style_unknown",
+      "profile": "tx3g-missing_description_keeps_unbound_font_id_and_base_style_unknown",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/missing_description_keeps_unbound_font_id_and_base_style_unknown.cap",
+      "sha256": "eeb1eed1e6b6476fecae895c3f4369a58e4ee23b5af0e3f037e0b45dbb384387",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 57,
+        "digest": 1634220394062380388
+      }
+    },
+    {
+      "id": "tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end",
+      "profile": "tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/missing_duration_does_not_invent_a_time_bound_or_next_packet_end.cap",
+      "sha256": "04415550f21eeba7fc67c850c11388ae4c658e3a0473e4a6fa1c878cac463b65",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 11486415378287461241
+      }
+    },
+    {
+      "id": "tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity",
+      "profile": "tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity.cap",
+      "sha256": "9c92fd51153b2cbb27c8de284b15f1c4944d832b13aae2d54803f8b4d9ef9d67",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 16730009643347063065
+      }
+    },
+    {
+      "id": "tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority",
+      "profile": "tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/original_style_highlight_fixture_resolves_requested_style_and_colour_authority.cap",
+      "sha256": "46da21430722888ec879071105f8691573252bdc75f14ac37a469a448d49e760",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 73,
+        "digest": 10764522255143103579
+      }
+    },
+    {
+      "id": "tx3g-output_is_taken_once_and_old_owners_survive_job_drop",
+      "profile": "tx3g-output_is_taken_once_and_old_owners_survive_job_drop",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/output_is_taken_once_and_old_owners_survive_job_drop.cap",
+      "sha256": "07b8d08bbf552a9d6dc41c4034fab8053bdd7fd5cb7d50dcff33ed71a89c968f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 4462045164293483032
+      }
+    },
+    {
+      "id": "tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors",
+      "profile": "tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/overlapping_and_out_of_order_style_records_are_explicit_errors.cap",
+      "sha256": "f5b11d93f288dc190e6827c4fcbd1ff13f3f77af0f5c0f4eddc329b56c3366fb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 69,
+        "digest": 11609263031716013039
+      }
+    },
+    {
+      "id": "tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins",
+      "profile": "tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/overlapping_styles_across_separate_boxes_are_not_last_wins.cap",
+      "sha256": "aa4463ef82b4b69d56ee73cb8495d3bf5e0c60b1b10b71adff4818d95cb863c9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 58,
+        "digest": 14275319729702216816
+      }
+    },
+    {
+      "id": "tx3g-overlaps_within_highlights_links_and_blinks_are_rejected",
+      "profile": "tx3g-overlaps_within_highlights_links_and_blinks_are_rejected",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/overlaps_within_highlights_links_and_blinks_are_rejected.cap",
+      "sha256": "c39f4af02d1ade468ad42050fa20cdf2a6d176eaa34c7a3edaacf7bd325f8776",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 97,
+        "digest": 6162898591683669332
+      }
+    },
+    {
+      "id": "tx3g-pool_pressure_and_repeated_zero_work_retry_do_not_duplicate_modifiers",
+      "profile": "tx3g-pool_pressure_and_repeated_zero_work_retry_do_not_duplicate_modifiers",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/pool_pressure_and_repeated_zero_work_retry_do_not_duplicate_modifiers.cap",
+      "sha256": "164d99443272d6316964d355ba7e478d261a9ef649fe1ae66a6bfdeaba6aa137",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 51,
+        "digest": 661209269643476267
+      }
+    },
+    {
+      "id": "tx3g-positive_event_after_zero_duration_still_conflicts_with_static_or_link",
+      "profile": "tx3g-positive_event_after_zero_duration_still_conflicts_with_static_or_link",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/positive_event_after_zero_duration_still_conflicts_with_static_or_link.cap",
+      "sha256": "1a8a58ff00fa666549b69ea078cbc56a8bd53968fdc06775dd96722165ddc11f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 112,
+        "digest": 9585585433487953206
+      }
+    },
+    {
+      "id": "tx3g-query_zero_work_and_cancel_preserve_search_progress",
+      "profile": "tx3g-query_zero_work_and_cancel_preserve_search_progress",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/query_zero_work_and_cancel_preserve_search_progress.cap",
+      "sha256": "7360426ff5f84e57f34d238dffb4bc8e2dcdadfd0b9090e9f55b074a160f3f0a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 62,
+        "digest": 8679204385099204713
+      }
+    },
+    {
+      "id": "tx3g-record_limit_failure_is_sticky_frees_construction_and_publishes_nothing",
+      "profile": "tx3g-record_limit_failure_is_sticky_frees_construction_and_publishes_nothing",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/record_limit_failure_is_sticky_frees_construction_and_publishes_nothing.cap",
+      "sha256": "3191c65799f8b3c1c3749806937d37780a055a2c5ad46163adb8f15172f0931b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 87,
+        "digest": 1166046748702437485
+      }
+    },
+    {
+      "id": "tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output",
+      "profile": "tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/retained_source_description_font_and_decoded_owners_release_only_after_output.cap",
+      "sha256": "2a38afcd26954e1ab83ab1530b75a2d818b6cb7f00253c0043a1ab968225f612",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 8553564559110704560
+      }
+    },
+    {
+      "id": "tx3g-sample_disparity_overrides_description_and_retains_sixteenth_pixels",
+      "profile": "tx3g-sample_disparity_overrides_description_and_retains_sixteenth_pixels",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/sample_disparity_overrides_description_and_retains_sixteenth_pixels.cap",
+      "sha256": "2c70dba06c17e9fed8d45b20bec284d9cac2dd45c4d647f9a649c6366d2d0a2a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 9331917450082523598
+      }
+    },
+    {
+      "id": "tx3g-sample_styles_override_description_only_on_the_declared_half_open_ranges",
+      "profile": "tx3g-sample_styles_override_description_only_on_the_declared_half_open_ranges",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/sample_styles_override_description_only_on_the_declared_half_open_ranges.cap",
+      "sha256": "460bb7ce018a112148d6ff1e381c85e3c46be8d4b1bd363037abecf36c198987",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 70,
+        "digest": 7337472194919380995
+      }
+    },
+    {
+      "id": "tx3g-sample_textbox_overrides_description_without_clamping_signed_geometry",
+      "profile": "tx3g-sample_textbox_overrides_description_without_clamping_signed_geometry",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/sample_textbox_overrides_description_without_clamping_signed_geometry.cap",
+      "sha256": "9a95668ecedf9eb56c3ff222d2316dbbcf798a37ca24e5e8d7fa929ac384651a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 1185794377330216968
+      }
+    },
+    {
+      "id": "tx3g-scroll_delay_uses_track_ticks_and_only_specified_zero_default",
+      "profile": "tx3g-scroll_delay_uses_track_ticks_and_only_specified_zero_default",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/scroll_delay_uses_track_ticks_and_only_specified_zero_default.cap",
+      "sha256": "9c27d00ecce28d3138a6144e493717b41a0f97fee52e44ca948645fd4e68b3e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 42,
+        "digest": 11040006926225025915
+      }
+    },
+    {
+      "id": "tx3g-stale_generation_is_rejected_while_original_caller_owners_remain",
+      "profile": "tx3g-stale_generation_is_rejected_while_original_caller_owners_remain",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/stale_generation_is_rejected_while_original_caller_owners_remain.cap",
+      "sha256": "90045632d2f2692fe77e5b6ab8fa1c6bce50ca73d5aeaef5ec91f53dda5e2424",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5724731407729827885
+      }
+    },
+    {
+      "id": "tx3g-static_dynamic_and_dynamic_link_conflicts_are_rejected",
+      "profile": "tx3g-static_dynamic_and_dynamic_link_conflicts_are_rejected",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/static_dynamic_and_dynamic_link_conflicts_are_rejected.cap",
+      "sha256": "4cba6afbd7ca77a087ee310bd3e6ec53a7076e7bcf67177e18e4cc26f76855ec",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 74,
+        "digest": 12935104409041866870
+      }
+    },
+    {
+      "id": "tx3g-static_highlight_without_colour_requests_terminal_inversion",
+      "profile": "tx3g-static_highlight_without_colour_requests_terminal_inversion",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/static_highlight_without_colour_requests_terminal_inversion.cap",
+      "sha256": "705d34bd2cf48fb155b7aae697b0e0bc204d03da2493c5d7e92bd9531edab234",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 79,
+        "digest": 14564142868616504980
+      }
+    },
+    {
+      "id": "tx3g-style_and_blink_ranges_do_not_adopt_the_highlight_sentinel",
+      "profile": "tx3g-style_and_blink_ranges_do_not_adopt_the_highlight_sentinel",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/style_and_blink_ranges_do_not_adopt_the_highlight_sentinel.cap",
+      "sha256": "eda757143f6e967c386792c99d36a680f5889412e8f11dfb386652f3a6caa108",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 69,
+        "digest": 15620606528153382347
+      }
+    },
+    {
+      "id": "tx3g-unicode_scalar_offsets_are_not_utf8_byte_or_rendered_glyph_offsets",
+      "profile": "tx3g-unicode_scalar_offsets_are_not_utf8_byte_or_rendered_glyph_offsets",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unicode_scalar_offsets_are_not_utf8_byte_or_rendered_glyph_offsets.cap",
+      "sha256": "d2af2d4af0192959309a730c6103864d17cda1d961f8e673ea8ae4fcc3496ef7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 71,
+        "digest": 10154973752720760073
+      }
+    },
+    {
+      "id": "tx3g-unknown_configuration_layout_does_not_infer_default_style_or_disparity",
+      "profile": "tx3g-unknown_configuration_layout_does_not_infer_default_style_or_disparity",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unknown_configuration_layout_does_not_infer_default_style_or_disparity.cap",
+      "sha256": "3cc502fe282e56c06a5d44ffb3386971947679b65bf6858bca6adf9392698b5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5724731407729827885
+      }
+    },
+    {
+      "id": "tx3g-unknown_description_keeps_continuous_extent_unresolved",
+      "profile": "tx3g-unknown_description_keeps_continuous_extent_unresolved",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unknown_description_keeps_continuous_extent_unresolved.cap",
+      "sha256": "2d0fdff27c841f084abc0f885d86e2339944033f620e1ddfae90c0d571b49e84",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 5368610437907663977
+      }
+    },
+    {
+      "id": "tx3g-unknown_modifiers_remain_full_source_ranges_without_semantic_effect",
+      "profile": "tx3g-unknown_modifiers_remain_full_source_ranges_without_semantic_effect",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unknown_modifiers_remain_full_source_ranges_without_semantic_effect.cap",
+      "sha256": "a91e949394cc80a50b1c2aabf692d690a3886c41e49b8e106e1410c75b3d822d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 1185794377330216968
+      }
+    },
+    {
+      "id": "tx3g-unknown_query_time_is_not_replaced_with_zero",
+      "profile": "tx3g-unknown_query_time_is_not_replaced_with_zero",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unknown_query_time_is_not_replaced_with_zero.cap",
+      "sha256": "fee4a45526ba5f5d0c4e24e474d163e00a8fa0cb2b5e0df5742947defedb721f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 11486415378287461241
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context",
+      "profile": "tx3g-unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context.cap",
+      "sha256": "af5a9c770b1e648bcbdd55f7885c068009db01554a10811364e3ed0a86a4a844",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 48,
+        "digest": 13444264506556833837
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_character_membership_is_logarithmic_resumable_and_allocation_free",
+      "profile": "tx3g-unknown_time_character_membership_is_logarithmic_resumable_and_allocation_free",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unknown_time_character_membership_is_logarithmic_resumable_and_allocation_free.cap",
+      "sha256": "0d369043213b688d85efb10b5277512a5e7f12c62f27437de3bb0584809dc177",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2069,
+        "digest": 9939453450948607665
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_hyperlink_authority",
+      "profile": "tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_hyperlink_authority",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unknown_time_outside_known_noncontinuous_karaoke_keeps_hyperlink_authority.cap",
+      "sha256": "0bd2a464cd9d54bbd1ccad17b55191402f73142dfad397d79d73b51fea8209cb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 14193305872461012436
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_static_highlight",
+      "profile": "tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_static_highlight",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unknown_time_outside_known_noncontinuous_karaoke_keeps_static_highlight.cap",
+      "sha256": "144a2e6cf0dda1e0d8b76d871aebb861019842bafea0840d6f03457c24b39d6b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 80,
+        "digest": 3857411150911501218
+      }
+    },
+    {
+      "id": "tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent",
+      "profile": "tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent.cap",
+      "sha256": "ec863de3f56ccfe3523738d4c7cfcbe18f04bdad612816211458080ba00f13f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 9412239360410666900
+      }
+    },
+    {
+      "id": "tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
+      "profile": "tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar.cap",
+      "sha256": "241d22a6067c42cf7017e401f6c2b38ed499aeda9f37f21ff6413d657e2d9b86",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 8553564559110704560
+      }
+    },
+    {
+      "id": "tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes",
+      "profile": "tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/wrap_known_modes_and_reserved_modes_have_distinct_outcomes.cap",
+      "sha256": "773560b8628a482c5fddacfbdd0797f0ed68cb3833091793b9ad2da1607a70f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 130,
+        "digest": 7752146066458332001
+      }
+    },
+    {
+      "id": "tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors",
+      "profile": "tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_clock_and_missing_explicit_description_source_are_constructor_errors.cap",
+      "sha256": "90045632d2f2692fe77e5b6ab8fa1c6bce50ca73d5aeaef5ec91f53dda5e2424",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 5724731407729827885
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges",
+      "profile": "tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_duration_applicability_does_not_relax_source_record_order_or_ranges.cap",
+      "sha256": "d0c44c6d82fe49d4d2b240ce302ee5a4a2289d93f803434967667dd3350e9e2c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 3084578839500539004
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_karaoke_events_are_source_records_but_never_active",
+      "profile": "tx3g-zero_duration_karaoke_events_are_source_records_but_never_active",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_duration_karaoke_events_are_source_records_but_never_active.cap",
+      "sha256": "b8c4a35be1756bd0a70fe578506e49280f6755d02f221e84b246390750871213",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 11486415378287461241
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts",
+      "profile": "tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_duration_only_events_need_no_invented_continuous_context_for_conflicts.cap",
+      "sha256": "2296739ef4950063cc2d7a824b3e2b4b08f3c76140c41e2c0e6d03f580fb1117",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 74,
+        "digest": 5152889617271571017
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_only_overlap_does_not_conflict_with_hyperlink",
+      "profile": "tx3g-zero_duration_only_overlap_does_not_conflict_with_hyperlink",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_duration_only_overlap_does_not_conflict_with_hyperlink.cap",
+      "sha256": "e70f53c3d399f9261062f96ae63db56e38d71dd2e17961a876235aca3ba48b36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 11131593611150943651
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_only_overlap_does_not_conflict_with_static_highlight",
+      "profile": "tx3g-zero_duration_only_overlap_does_not_conflict_with_static_highlight",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_duration_only_overlap_does_not_conflict_with_static_highlight.cap",
+      "sha256": "77ffcfd5f9b889202944f67931ca6f17f81f5754c6a1f0f33ed4ea6ae399c09d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 84,
+        "digest": 15786402203047898536
+      }
+    },
+    {
+      "id": "tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix",
+      "profile": "tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_duration_tail_never_extends_a_continuous_conflict_prefix.cap",
+      "sha256": "df927977407d7be61d16bbed7eddb1f97de701bf329751121f01527334fea50d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 84,
+        "digest": 9162591118738045872
+      }
+    },
+    {
+      "id": "tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness",
+      "profile": "tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness.cap",
+      "sha256": "763c69e956d9fcc2c56b8a023ecc9c4b9305176c3a314a369c9939f46a17b4be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 51,
+        "digest": 7220008962934063286
+      }
+    },
+    {
+      "id": "tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character",
+      "profile": "tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_length_style_records_are_preserved_and_apply_to_no_character.cap",
+      "sha256": "8dd12d2fa02f5d2ece688ce3503ed48f88ba1bc71f0145f319488eb884eb2025",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 9412239360410666900
+      }
+    },
+    {
+      "id": "tx3g-zero_work_semantics_performs_no_progress_or_allocation",
+      "profile": "tx3g-zero_work_semantics_performs_no_progress_or_allocation",
+      "group": "tx3g",
+      "file": "harness/fixtures/subtitle-text/tx3g/zero_work_semantics_performs_no_progress_or_allocation.cap",
+      "sha256": "705d34bd2cf48fb155b7aae697b0e0bc204d03da2493c5d7e92bd9531edab234",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 79,
+        "digest": 14564142868616504980
+      }
+    },
+    {
+      "id": "charset-big5-ascii",
+      "profile": "charset-big5-ascii",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-ascii.cap",
+      "sha256": "b4c82254516ee90f35df2a6c9f14fefcb5ebaa3aa3dea300f27a50a79fde09b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 2525969051809855219
+      }
+    },
+    {
+      "id": "charset-big5-empty",
+      "profile": "charset-big5-empty",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-empty.cap",
+      "sha256": "f765003e4a02330ad2afa713944bf6e2641f859d0f9996f9a09c0e8a0ef26f0f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+    },
+    {
+      "id": "charset-big5-invalid-trail",
+      "profile": "charset-big5-invalid-trail",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-invalid-trail.cap",
+      "sha256": "fe21cd94f8ebc2ce45eab68ddd3e872dfd6bb1d488f5c5ad2e919763d083095e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a15a",
+      "profile": "charset-big5-nomapping-a15a",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-nomapping-a15a.cap",
+      "sha256": "8ee10266c6b062105677486a2f01fdee5b881b1ff7e64e2e00638ba09f5b22aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236024593141
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a1c3",
+      "profile": "charset-big5-nomapping-a1c3",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-nomapping-a1c3.cap",
+      "sha256": "2108f3598dc655cffe6e206ec6e986fbfe4b71c5fedb6d731196cbfab6639290",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236025020259
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a1c5",
+      "profile": "charset-big5-nomapping-a1c5",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-nomapping-a1c5.cap",
+      "sha256": "ca3142c0acce09a618aa4db2a13af69635697e3634fe52f84c57315dc3a354dd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 22,
+        "digest": 4840464120994401691
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a1fe",
+      "profile": "charset-big5-nomapping-a1fe",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-nomapping-a1fe.cap",
+      "sha256": "932e0c1b7c591ce25aa8f777a326c8d553debdf3eaff3f5ab5c34703274c7c46",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236025016756
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a240",
+      "profile": "charset-big5-nomapping-a240",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-nomapping-a240.cap",
+      "sha256": "dabdbdc732fd5e7908b092191d7e12046e7e32e0dbdc0af50f1ff2198814c214",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236025018151
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a2cc",
+      "profile": "charset-big5-nomapping-a2cc",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-nomapping-a2cc.cap",
+      "sha256": "cdd6efa0ca78f3a3bb609facb15029a3d6a706de14fe95e47fb76c18a9eff069",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236024673245
+      }
+    },
+    {
+      "id": "charset-big5-nomapping-a2ce",
+      "profile": "charset-big5-nomapping-a2ce",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-nomapping-a2ce.cap",
+      "sha256": "62afd4d39681613c2bfda3de9cef2bc589654da859f14465763967cbb22e44e6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236024673369
+      }
+    },
+    {
+      "id": "charset-big5-nul",
+      "profile": "charset-big5-nul",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-nul.cap",
+      "sha256": "358299bf43c608fd533fae571652dab4c6e9eef3528c4ab1a51e5847b8dfc029",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 12992324914659353239
+      }
+    },
+    {
+      "id": "charset-big5-punctuation",
+      "profile": "charset-big5-punctuation",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-punctuation.cap",
+      "sha256": "10210fb8687619f5b6665da7912a2bc15038aa111b76a92864626671c93bfe62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 4349502501018151416
+      }
+    },
+    {
+      "id": "charset-big5-truncated",
+      "profile": "charset-big5-truncated",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/big5-truncated.cap",
+      "sha256": "dc522fa3c71bfeb223692ae3f891ef566a29ad34a7e37b0de1cfb98c2780a995",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-cp932-ascii",
+      "profile": "charset-cp932-ascii",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp932-ascii.cap",
+      "sha256": "a957873b46b398a0d439f7d40b42cf190c04d1975cd3243867be4b1ec0b7bb9a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 2525969051809855219
+      }
+    },
+    {
+      "id": "charset-cp932-empty",
+      "profile": "charset-cp932-empty",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp932-empty.cap",
+      "sha256": "27ec6259310b2840093bde3d872b224f916909162ad9cf35931121f201d7c70b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+    },
+    {
+      "id": "charset-cp932-extension-boundary",
+      "profile": "charset-cp932-extension-boundary",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp932-extension-boundary.cap",
+      "sha256": "698e25105d7ff6b14f8c1a19d2ccf60f0deb3fb56546139f94578e466dd4c371",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236024928840
+      }
+    },
+    {
+      "id": "charset-cp932-invalid-trail",
+      "profile": "charset-cp932-invalid-trail",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp932-invalid-trail.cap",
+      "sha256": "4756aadeb8ebb37ec837a3b6b18ac02cc37a78e12d819d5fd83c3eeb6c6988d8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-cp932-nul",
+      "profile": "charset-cp932-nul",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp932-nul.cap",
+      "sha256": "7eda33efa4503d2fd768b0d182ecbdc51f6677d6bc3a20a7394e84dda4449c8e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 12992324914659353239
+      }
+    },
+    {
+      "id": "charset-cp932-truncated",
+      "profile": "charset-cp932-truncated",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp932-truncated.cap",
+      "sha256": "2ba4e0972056a43b61be82ba8297999ad7149e7b07fedfd1cd314284489a39df",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-cp932-yen-overline-wave",
+      "profile": "charset-cp932-yen-overline-wave",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp932-yen-overline-wave.cap",
+      "sha256": "a8f064a2817367b6baaa208289b3d74b746018bd7bb15963621db4510d2c7254",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 25,
+        "digest": 15628517183292281382
+      }
+    },
+    {
+      "id": "charset-cp949-ascii",
+      "profile": "charset-cp949-ascii",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp949-ascii.cap",
+      "sha256": "f279cbc49649014a167d9010b23e37a41354a75c1de4bf871efe37c4e9a73f6d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 2525969051809855219
+      }
+    },
+    {
+      "id": "charset-cp949-empty",
+      "profile": "charset-cp949-empty",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp949-empty.cap",
+      "sha256": "55f0cef6d8cfa17da1c8c59c6484a763a9e6de9551d9277640f31f82b8a240c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+    },
+    {
+      "id": "charset-cp949-invalid-trail",
+      "profile": "charset-cp949-invalid-trail",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp949-invalid-trail.cap",
+      "sha256": "bf6b7ccbb0cad0beaa57e22d1717742a1d6b74bb0c0debf1386f547e35e50bd1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-cp949-nul",
+      "profile": "charset-cp949-nul",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp949-nul.cap",
+      "sha256": "856841b1b90e4a31bd0288d8fb2bfcc5b769581d08f696ea0c33436196de9914",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 12992324914659353239
+      }
+    },
+    {
+      "id": "charset-cp949-truncated",
+      "profile": "charset-cp949-truncated",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp949-truncated.cap",
+      "sha256": "3aded014aacf6872859b6bd30b1311d8765049e012b0aaf876d2a37cd760dba9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-cp949-uhc-extension",
+      "profile": "charset-cp949-uhc-extension",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp949-uhc-extension.cap",
+      "sha256": "6098e3ee0f439f1a4a3c95cf90ac3e334e5836399b2575d6b5d804ffd4401a85",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236024855866
+      }
+    },
+    {
+      "id": "charset-cp950-ascii",
+      "profile": "charset-cp950-ascii",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-ascii.cap",
+      "sha256": "978affa628353423cb33541ae6e6a7a4b131fdeb19522f6874394f7bb0a0d866",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 2525969051809855219
+      }
+    },
+    {
+      "id": "charset-cp950-empty",
+      "profile": "charset-cp950-empty",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-empty.cap",
+      "sha256": "50c1ee0cf775bdd8366bb4750e47fa74f4c486d3bc5e2fd28ef5d8223026261f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+    },
+    {
+      "id": "charset-cp950-extension-boundary",
+      "profile": "charset-cp950-extension-boundary",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-extension-boundary.cap",
+      "sha256": "f212232f5fc59631138c3df17edf22a4d72d0a405ac1dc126cf42f286f785781",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-cp950-invalid-trail",
+      "profile": "charset-cp950-invalid-trail",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-invalid-trail.cap",
+      "sha256": "6e8d4ee50076896946e658fa8f7aa22737991c0facdd37f1b9b008322c5811a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a15a",
+      "profile": "charset-cp950-nomapping-a15a",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-nomapping-a15a.cap",
+      "sha256": "3616db17f6787c8fa4e3f653ec5bbf29cfaf329281634f77e52209aaf819493c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236024593141
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a1c3",
+      "profile": "charset-cp950-nomapping-a1c3",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-nomapping-a1c3.cap",
+      "sha256": "deef51363d7a44c86682e65ce202c65813c0dc629d883d335c923f96e5d92d18",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236025020259
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a1c5",
+      "profile": "charset-cp950-nomapping-a1c5",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-nomapping-a1c5.cap",
+      "sha256": "e7d252f3e252853c8824f0dd8b0ba8fae627e99e76b30cdcf2c5087f6b95d895",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 22,
+        "digest": 4840464120994401691
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a1fe",
+      "profile": "charset-cp950-nomapping-a1fe",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-nomapping-a1fe.cap",
+      "sha256": "da6fda4ea9a38b13df48aaecd0b99a7ca9093dc5546361bebb2b547b312f6284",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236025016756
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a240",
+      "profile": "charset-cp950-nomapping-a240",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-nomapping-a240.cap",
+      "sha256": "0cf784e8077c4383101bf9c2fe1137302c4664e7a3c0a25d914234ce9be8b1c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236025018151
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a2cc",
+      "profile": "charset-cp950-nomapping-a2cc",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-nomapping-a2cc.cap",
+      "sha256": "6ce57069b07ce51330b5dfa03a47858eaa9423f3eadd5b5fef04ebcb041ca70f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236024673245
+      }
+    },
+    {
+      "id": "charset-cp950-nomapping-a2ce",
+      "profile": "charset-cp950-nomapping-a2ce",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-nomapping-a2ce.cap",
+      "sha256": "9f8f52f9d31ef1c4f26f1550cf1c8e5120d3f4d93a6d5ce40617614aa94e61ec",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236024673369
+      }
+    },
+    {
+      "id": "charset-cp950-nul",
+      "profile": "charset-cp950-nul",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-nul.cap",
+      "sha256": "8740115c620ffe0600f118165c9dc7d69e0c0deba7c4588ecbca34dc06360662",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 12992324914659353239
+      }
+    },
+    {
+      "id": "charset-cp950-punctuation",
+      "profile": "charset-cp950-punctuation",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-punctuation.cap",
+      "sha256": "3d7351170b74ee5ef1c324a9c5c325259f60e968e837e5455c06bb9c94a3a0e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 4349502501018151416
+      }
+    },
+    {
+      "id": "charset-cp950-truncated",
+      "profile": "charset-cp950-truncated",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/cp950-truncated.cap",
+      "sha256": "4444884d3ea4e87d3c03cbe88044070aa43dce4bc4f12f8afea089b71d5db346",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-euc-kr-ascii",
+      "profile": "charset-euc-kr-ascii",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/euc-kr-ascii.cap",
+      "sha256": "1ff3acdffe72f10dd3a7fcba1a59c119e58fe568aed959cf3896f731554bf2f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 2525969051809855219
+      }
+    },
+    {
+      "id": "charset-euc-kr-empty",
+      "profile": "charset-euc-kr-empty",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/euc-kr-empty.cap",
+      "sha256": "2eec5d85d2af33f085bca6427b7de52e475d866f5d939399453165c7676654bb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+    },
+    {
+      "id": "charset-euc-kr-invalid-trail",
+      "profile": "charset-euc-kr-invalid-trail",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/euc-kr-invalid-trail.cap",
+      "sha256": "acee2f853ec8f09c1051b7822d79886618338fdd265aaded2937d60b69bba9d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-euc-kr-nul",
+      "profile": "charset-euc-kr-nul",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/euc-kr-nul.cap",
+      "sha256": "950201e700b3e2a4988aac565ed2f92a4d560ca3f5f1b14f1c991d746c0ce516",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 12992324914659353239
+      }
+    },
+    {
+      "id": "charset-euc-kr-truncated",
+      "profile": "charset-euc-kr-truncated",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/euc-kr-truncated.cap",
+      "sha256": "7405944dfe36e5707d1e842abc80783a10afc26f83507d638e0d993005713050",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-euc-kr-uhc-extension",
+      "profile": "charset-euc-kr-uhc-extension",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/euc-kr-uhc-extension.cap",
+      "sha256": "5ca1280bf50c8f3bdf52e8844dca45cfe40d70eb902456144578c11ba4ea03a8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7782365236023617044
+      }
+    },
+    {
+      "id": "charset-gbk-ascii",
+      "profile": "charset-gbk-ascii",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/gbk-ascii.cap",
+      "sha256": "6d0666bf08d41dbdeaf68e37308facaf67710cbeda8446c10b1ea67b68d6df43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 2525969051809855219
+      }
+    },
+    {
+      "id": "charset-gbk-empty",
+      "profile": "charset-gbk-empty",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/gbk-empty.cap",
+      "sha256": "0ed1d9e2223153259f51a8ce3f58b68ee2b5ac39ce26abe6e6fd4cd313315610",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+    },
+    {
+      "id": "charset-gbk-extension-boundary",
+      "profile": "charset-gbk-extension-boundary",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/gbk-extension-boundary.cap",
+      "sha256": "6a51c6d5e9933939c31c853e284307dce2a2f4a69af307e4fc606775f4b55a9c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-gbk-invalid-trail",
+      "profile": "charset-gbk-invalid-trail",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/gbk-invalid-trail.cap",
+      "sha256": "a0f08f114cd0b335c359b3059a7c18c201054a808985554347d0c31f0e9a1d87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-gbk-nul",
+      "profile": "charset-gbk-nul",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/gbk-nul.cap",
+      "sha256": "74073c40e0bb06d75de8fda3b8f3f86a1de68650163a2f96cfde84dfa984536b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 12992324914659353239
+      }
+    },
+    {
+      "id": "charset-gbk-truncated",
+      "profile": "charset-gbk-truncated",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/gbk-truncated.cap",
+      "sha256": "fe5c24695a9197a53ccd0818c79769b75cf9b4c032d99876681491292c3df018",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-label-big-5",
+      "profile": "charset-label-big-5",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-big-5.cap",
+      "sha256": "cd3a49a20120163faec3c10e5a817355f2d2a1ef32dd60b54ae92ccc6eba7de0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788353833010467
+      }
+    },
+    {
+      "id": "charset-label-big5",
+      "profile": "charset-label-big5",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-big5.cap",
+      "sha256": "7c1b701c931f95fd1ba129f7d13147b35223b9d100ec78b1e6bbcb2b91552ba2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788353833010467
+      }
+    },
+    {
+      "id": "charset-label-cp932",
+      "profile": "charset-label-cp932",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-cp932.cap",
+      "sha256": "411d4e1baa940305ea6c8f14a6be976e6e3ee73fb50bedac24eaa9258cced770",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788354655874591
+      }
+    },
+    {
+      "id": "charset-label-cp936",
+      "profile": "charset-label-cp936",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-cp936.cap",
+      "sha256": "8ea2a93c718974352f834b1b4e5af15535205d2564faa8ffe4543a5bdba6eb03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788353833010467
+      }
+    },
+    {
+      "id": "charset-label-cp949",
+      "profile": "charset-label-cp949",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-cp949.cap",
+      "sha256": "60bb28c41329ff10910833ccbf0331ebdf42c63ef4032bb89a96394a4d5ad134",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788360802975075
+      }
+    },
+    {
+      "id": "charset-label-cp950",
+      "profile": "charset-label-cp950",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-cp950.cap",
+      "sha256": "a6fbb69d03e7607280ef070c06cc4bee731a0ad265d249357c620412d53c7e35",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788353833010467
+      }
+    },
+    {
+      "id": "charset-label-euc-kr",
+      "profile": "charset-label-euc-kr",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-euc-kr.cap",
+      "sha256": "f547e130e8422ef70a390fe36a118a0280c4260110a8e5109c14cf2db90769d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788360802975075
+      }
+    },
+    {
+      "id": "charset-label-euc_kr",
+      "profile": "charset-label-euc_kr",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-euc_kr.cap",
+      "sha256": "579a81c1b593ef97fd7558ec4700357d8439ee5ba0b181e4e494d3cf2c4eafc6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 2391610146056
+      }
+    },
+    {
+      "id": "charset-label-gbk",
+      "profile": "charset-label-gbk",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-gbk.cap",
+      "sha256": "253c352e717f2569df64581d047a1080019c8f65e2c7b72469ff2de307b428a6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788353833010467
+      }
+    },
+    {
+      "id": "charset-label-shift-jis",
+      "profile": "charset-label-shift-jis",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-shift-jis.cap",
+      "sha256": "e637d92c4c6fe84fb23ebb0169658121f66dd993593c0fc7a4c892abba64e170",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788354655874591
+      }
+    },
+    {
+      "id": "charset-label-shift_jis",
+      "profile": "charset-label-shift_jis",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-shift_jis.cap",
+      "sha256": "e4e6c683d816313f47e98d52ab8f92d7eabde3c76d30eda649441d155d23f1c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788354655874591
+      }
+    },
+    {
+      "id": "charset-label-sjis",
+      "profile": "charset-label-sjis",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-sjis.cap",
+      "sha256": "3ea3f4adc578fbdbbe0e890f783c8aa81f722313b8013a4326ce1f590ca6d242",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788354655874591
+      }
+    },
+    {
+      "id": "charset-label-windows-932",
+      "profile": "charset-label-windows-932",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-windows-932.cap",
+      "sha256": "0a3c5a8c82abdf90985bea26fe2b81eb20a0c564df64f9b69312ac0acb629ad4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 2391610146056
+      }
+    },
+    {
+      "id": "charset-label-windows-936",
+      "profile": "charset-label-windows-936",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-windows-936.cap",
+      "sha256": "63d2df01e6a920c8c053d096ef0b7a94a4412fd2b5117d368a7996d3101e109b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 13644788353833010467
+      }
+    },
+    {
+      "id": "charset-label-windows-949",
+      "profile": "charset-label-windows-949",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-windows-949.cap",
+      "sha256": "b7ae8d0d49ad7447616179a576fb1945fa70e587008103f809988f811083e3e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 2391610146056
+      }
+    },
+    {
+      "id": "charset-label-windows-950",
+      "profile": "charset-label-windows-950",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/label-windows-950.cap",
+      "sha256": "0328cdf27744bdf1300879f44476a36981f38ee5bbf1589ce35a3686d4c70e35",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 2391610146056
+      }
+    },
+    {
+      "id": "charset-shift_jis-ascii",
+      "profile": "charset-shift_jis-ascii",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/shift_jis-ascii.cap",
+      "sha256": "e15a2b9e39ffe75880b0ca8270a1a45a5c52a1c0e9c19b661e5846fb22e565fe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 2525969051809855219
+      }
+    },
+    {
+      "id": "charset-shift_jis-empty",
+      "profile": "charset-shift_jis-empty",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/shift_jis-empty.cap",
+      "sha256": "3546477e1a8106ac889c674066ba59cbafa1a12efbaac98c4e9fb32fbf492a8e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+    },
+    {
+      "id": "charset-shift_jis-invalid-trail",
+      "profile": "charset-shift_jis-invalid-trail",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/shift_jis-invalid-trail.cap",
+      "sha256": "e0a495b7beca6c879ba9098cb80f6d905b348455c0aa732d80d3fbfc6d235871",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-shift_jis-nul",
+      "profile": "charset-shift_jis-nul",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/shift_jis-nul.cap",
+      "sha256": "54b5f0e9dbfc3675e280272224784de2bb0db139161d70010e31b3c238255b93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 12992324914659353239
+      }
+    },
+    {
+      "id": "charset-shift_jis-truncated",
+      "profile": "charset-shift_jis-truncated",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/shift_jis-truncated.cap",
+      "sha256": "dd28b53b7f224c66bbe4dd48f80a3d406f87df04d471a04e53872d101595904d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-shift_jis-yen-overline-wave",
+      "profile": "charset-shift_jis-yen-overline-wave",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/shift_jis-yen-overline-wave.cap",
+      "sha256": "f1ee80e9e26dbc63f1a618150b8ac3e70fc96e1ad0cb8eb401e0f85603d6b445",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 4349476275663553281
+      }
+    },
+    {
+      "id": "ass-ass-empty-not-clear",
+      "profile": "ass-ass-empty-not-clear",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/ass-empty-not-clear.cap",
+      "sha256": "1fe149ee496fa7e0f29e7f999f3787ba589f1f892aff2491cc2e908cffd1c118",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+    },
+    {
+      "id": "ass-ass-invalid-utf8-unvalidated",
+      "profile": "ass-ass-invalid-utf8-unvalidated",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/ass-invalid-utf8-unvalidated.cap",
+      "sha256": "732dec3c6fe2a9ef7cea0ae65d78481c854d59f5adfd3abfcd5aa862bd073f5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "the opaque ASS profile (OpaqueAss1) carries the packet bytes unvalidated and unconverted; the reference refuses decoded text that is not UTF-8"
+    },
+    {
+      "id": "ass-ass-known-duration-unknown-start",
+      "profile": "ass-ass-known-duration-unknown-start",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/ass-known-duration-unknown-start.cap",
+      "sha256": "50fb908686d8ef9eb7d270bdbc34b2b52c72e21a969422e7a2bf31301d43cd7d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 11817632208933959123
+      }
+    },
+    {
+      "id": "ass-ass-private-present-empty",
+      "profile": "ass-ass-private-present-empty",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/ass-private-present-empty.cap",
+      "sha256": "08175b93804659c286694112f8e183461a01882a9e540eb9a52bb09657ddb4c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 32,
+        "digest": 6258457589348750069
+      }
+    },
+    {
+      "id": "ass-ass-private-verbatim",
+      "profile": "ass-ass-private-verbatim",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/ass-private-verbatim.cap",
+      "sha256": "dbbf236e14b2e3978b8e7fff771d39859a55d686b149b821778dce2d595e45d5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 10124588032083646950
+      }
+    },
+    {
+      "id": "ass-ass-raw-order-overrides",
+      "profile": "ass-ass-raw-order-overrides",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/ass-raw-order-overrides.cap",
+      "sha256": "b70302b47026250102d7ae63f8d100e6d203ca1eccf802bab06a03895da51824",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 59,
+        "digest": 3918208568050454699
+      }
+    },
+    {
+      "id": "ass-ass-ssa-empty-layer",
+      "profile": "ass-ass-ssa-empty-layer",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/ass-ssa-empty-layer.cap",
+      "sha256": "afb3c1d450ad8f9015dbc95f36577f2c58549b3e549ce676fb233e8f3f4b183e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 38,
+        "digest": 8766144138982399557
+      }
+    },
+    {
+      "id": "ass-ass-unknown-charset-opaque",
+      "profile": "ass-ass-unknown-charset-opaque",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/ass-unknown-charset-opaque.cap",
+      "sha256": "c8f9ae1a53acff184bd11b4d17561c9409567d52904543c3abbecee86d2afd94",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      },
+      "difference": "the opaque ASS profile (OpaqueAss1) carries the packet bytes unvalidated and unconverted; the reference refuses decoded text that is not UTF-8"
+    },
+    {
+      "id": "srt-basic",
+      "profile": "srt-basic",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-basic.srt",
+      "sha256": "eb76b517850126016cf5a62e374f7b3be51421d42566fb474019f5c61db464ee",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 19,
+        "digest": 14627081949817984804
+      }
+    },
+    {
+      "id": "srt-crlf-multiline",
+      "profile": "srt-crlf-multiline",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-crlf-multiline.srt",
+      "sha256": "d099500ba0c8f9172cb26dcfe047613de215954df81bd2c391484a1529358ed6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 29,
+        "digest": 11366091855304890572
+      },
+      "difference": "Triergon keeps CRLF line ends in cue text (no line-ending rewriting); the srt demuxer rewrites them to LF"
+    },
+    {
+      "id": "srt-unicode-no-normalization",
+      "profile": "srt-unicode-no-normalization",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-unicode-no-normalization.srt",
+      "sha256": "29b48fe08c5be739edd75953531faf6c8f3973a75f220b41a85f9c6b928ab1a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 29,
+        "digest": 1723077074209369946
+      }
+    },
+    {
+      "id": "srt-overlap-order",
+      "profile": "srt-overlap-order",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-overlap-order.srt",
+      "sha256": "49c46b05b0602426d5605a9ed79a53478e2ef92ed8a86fc43d30efa80ce4ff00",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 10514181721999102910
+      }
+    },
+    {
+      "id": "srt-wide-hours-profile",
+      "profile": "srt-wide-hours-profile",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-wide-hours-profile.srt",
+      "sha256": "2a56fdba61b89a9a88e75f671db30ac4661147f9500ee0ee5464c5b2118b2f01",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 13,
+        "digest": 11382735351342525750
+      }
+    },
+    {
+      "id": "srt-utf8-bom",
+      "profile": "srt-utf8-bom",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-utf8-bom.srt",
+      "sha256": "6573ba98370605bd4026eedd71e13e6d3b441bd0b4ab9ea36bffd21705d81328",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 1359364530563811312
+      }
+    },
+    {
+      "id": "srt-utf16be-bom",
+      "profile": "srt-utf16be-bom",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-utf16be-bom.srt",
+      "sha256": "b851cdf0dfbf9510728bd99620e17bd8ff5a0428d84cc8ffe546ca179060ba01",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf16-bom"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 11911668358411309887
+      },
+      "difference": "the reference's UTF-16 SubRip reader keeps one byte of the first character of the cue text (U+00C5 becomes 0xC3); Triergon decodes the character. Only the comparison-only reference_trace::carriage view reproduces the reference"
+    },
+    {
+      "id": "srt-utf16le-bom",
+      "profile": "srt-utf16le-bom",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-utf16le-bom.srt",
+      "sha256": "559208cd17429a3b5b205840c31ef8395a624300e4c98d2df688531a20ddac80",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf16-bom"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 20,
+        "digest": 12269512172106325341
+      }
+    },
+    {
+      "id": "srt-explicit-utf16be",
+      "profile": "srt-explicit-utf16be",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-explicit-utf16be.srt",
+      "sha256": "5578104f1a0ae5d7426e2e7ee6973e4b0ce0ab7a203a3a04bddc9f19c86f56df",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf16be"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      },
+      "difference": "the caller states UTF-16BE without a byte-order mark; the srt demuxer has no stated encoding and reads no cue"
+    },
+    {
+      "id": "srt-end-before-start",
+      "profile": "srt-end-before-start",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-end-before-start.srt",
+      "sha256": "8f0ae3c58538f52bf5c2e74b53f9c2e18bf879fb40cf994d7ad4fb1fe999ab33",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 2583582430350829759
+      },
+      "difference": "the strict SubRip profile (SubRipStrict1) refuses an end time before the start time; the srt demuxer accepts it"
+    },
+    {
+      "id": "srt-sequence-missing",
+      "profile": "srt-sequence-missing",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-sequence-missing.srt",
+      "sha256": "0b1cf8badb03223a3e6e063c046a589431bea7aa450c600b81fc1f792f8dfcc0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095530938
+      },
+      "difference": "the strict SubRip profile (SubRipStrict1) refuses a cue without its number; the srt demuxer accepts it"
+    },
+    {
+      "id": "srt-fraction-width",
+      "profile": "srt-fraction-width",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-fraction-width.srt",
+      "sha256": "ad720cec55eee37bf8b369376c34f61872d201e69ae3a9270b454ca84548a036",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095530938
+      },
+      "difference": "the strict SubRip profile (SubRipStrict1) refuses a two-digit millisecond field; the srt demuxer accepts it"
+    },
+    {
+      "id": "srt-overlong-utf8",
+      "profile": "srt-overlong-utf8",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-overlong-utf8.srt",
+      "sha256": "ba7c4b492405226c2314bc9851c4e0c4c811a01e6ebcc6aa4ebd48cfa070c6f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 3381086153043966900
+      },
+      "difference": "the strict SubRip profile (SubRipStrict1) refuses an overlong UTF-8 sequence; the srt demuxer accepts it"
+    },
+    {
+      "id": "srt-lone-surrogate",
+      "profile": "srt-lone-surrogate",
+      "group": "srt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/srt-lone-surrogate.srt",
+      "sha256": "8ffa30095970c40325afdca59ed8e227bfcb7571600ae8b11e3b7379199e0644",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt",
+        "utf16-bom"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      },
+      "difference": "Triergon refuses a lone UTF-16 surrogate; the srt demuxer reads no cue and reports success"
+    },
+    {
+      "id": "vtt-short-timestamps",
+      "profile": "vtt-short-timestamps",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-short-timestamps.vtt",
+      "sha256": "bda08cf15c66270919846f0c82320f0da7a8bf86b00d163756121daa9fa6113a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 15,
+        "digest": 4441451628745589191
+      }
+    },
+    {
+      "id": "vtt-id-settings",
+      "profile": "vtt-id-settings",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-id-settings.vtt",
+      "sha256": "9aa539e04fbb6ca7f90e4089de42493a129638f9d6d7e38bc6914717ea239e1a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 20,
+        "digest": 12537933666031789298
+      }
+    },
+    {
+      "id": "vtt-crlf-multiline",
+      "profile": "vtt-crlf-multiline",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-crlf-multiline.vtt",
+      "sha256": "c48fd31db91413808e701814a874d4f208f7e54b387daf99d9befe0b2b9dbc34",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4,
+        "digest": 18294031362278647836
+      }
+    },
+    {
+      "id": "vtt-cr-lines",
+      "profile": "vtt-cr-lines",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-cr-lines.vtt",
+      "sha256": "e4ebe7b2f6c566438221d6d3d6db70a9bfe8539e8ecd15b3273d72769e64606e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      },
+      "difference": "WebVTT allows CR line ends and Triergon reads the cue; the webvtt demuxer finds no cue"
+    },
+    {
+      "id": "vtt-utf8-bom",
+      "profile": "vtt-utf8-bom",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-utf8-bom.vtt",
+      "sha256": "7b4fcbf612a215073a61b9fa41e0de9f472fefbca80de091f63a0675a0e3c9b3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 17,
+        "digest": 4752502646793748811
+      }
+    },
+    {
+      "id": "vtt-payload-markup-exact",
+      "profile": "vtt-payload-markup-exact",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-payload-markup-exact.vtt",
+      "sha256": "d9511cd1f8ba58b388ec83d6c021d356f1c1e46b9e1ce17244e4c39d388338f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 53,
+        "digest": 15791958339838875629
+      }
+    },
+    {
+      "id": "vtt-metadata-order",
+      "profile": "vtt-metadata-order",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-metadata-order.vtt",
+      "sha256": "c1136c769ca77d9d99b097c671d018ea233f54f11bdfa15a3577a62fa296f58c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 10,
+        "digest": 10305449252641453927
+      }
+    },
+    {
+      "id": "vtt-note-between-cues",
+      "profile": "vtt-note-between-cues",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-note-between-cues.vtt",
+      "sha256": "e1c30f52405e94de9bc97b4ee0ac62abc6ef3778512b25ef05b95f8fb54a9989",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 11,
+        "digest": 1002273191660324891
+      }
+    },
+    {
+      "id": "vtt-tab-separators",
+      "profile": "vtt-tab-separators",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-tab-separators.vtt",
+      "sha256": "a4d69cff890e0fe6a5f11e0cf6d7bcf5aa286f7c53000c644607b421abfab2a8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 10573493917715506367
+      }
+    },
+    {
+      "id": "vtt-wide-hours",
+      "profile": "vtt-wide-hours",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-wide-hours.vtt",
+      "sha256": "357b50c1f70f4c3617449b56d2556084a56585014c82ec4d4f048d562f2a3ba8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 13,
+        "digest": 18007137297407988022
+      }
+    },
+    {
+      "id": "vtt-overlap-order",
+      "profile": "vtt-overlap-order",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-overlap-order.vtt",
+      "sha256": "2ea388faa253ed163075c518322bea519a49355c2683a7e2ec1142a835d237bb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 27,
+        "digest": 14972497587044752815
+      }
+    },
+    {
+      "id": "vtt-header-annotation",
+      "profile": "vtt-header-annotation",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-header-annotation.vtt",
+      "sha256": "075969584e6a73345184657e50bb371cb1cc65e88d42038c4c19057ab8a936ed",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 17,
+        "digest": 8900088848371086117
+      }
+    },
+    {
+      "id": "vtt-empty-document",
+      "profile": "vtt-empty-document",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-empty-document.vtt",
+      "sha256": "8eb5aec53542eaedb7502b22fb677161abba1e265b1338f1af1369a1f689837c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      }
+    },
+    {
+      "id": "vtt-bad-signature",
+      "profile": "vtt-bad-signature",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-bad-signature.vtt",
+      "sha256": "eff1f830c4b52eb0a99e82c2240fafec31baaf4397e0fb36ecf9cdc139faec94",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      },
+      "difference": "the strict WebVTT profile (WebVttSourceStrict1) refuses a signature line other than WEBVTT; the webvtt demuxer reports an empty document"
+    },
+    {
+      "id": "vtt-utf16-refused",
+      "profile": "vtt-utf16-refused",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-utf16-refused.vtt",
+      "sha256": "7ce21f5762f7297870b54a675997b1527c1896013d6d523b2e9f97a2e3c54cba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf16be"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      },
+      "difference": "the strict WebVTT profile (WebVttSourceStrict1) refuses a UTF-16 document; the webvtt demuxer reports an empty document"
+    },
+    {
+      "id": "vtt-zero-interval-strict",
+      "profile": "vtt-zero-interval-strict",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-zero-interval-strict.vtt",
+      "sha256": "a2fe71feaab7832f92c9e1c71e4421793b88a43f6413c68a728f9f8485a10ddb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 7248179777694232351
+      },
+      "difference": "the strict WebVTT profile refuses a zero-length cue; the webvtt demuxer keeps it"
+    },
+    {
+      "id": "vtt-surrogate-utf8",
+      "profile": "vtt-surrogate-utf8",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-surrogate-utf8.vtt",
+      "sha256": "d8c985f3e3e3eefc2307774a0c82b9e65e8ed21e4f5c55d04fbbb6c2aa1ec562",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 3,
+        "digest": 6492616397464317955
+      },
+      "difference": "Triergon refuses an encoded surrogate as invalid UTF-8; the webvtt demuxer passes the bytes through"
+    },
+    {
+      "id": "vtt-missing-fraction",
+      "profile": "vtt-missing-fraction",
+      "group": "vtt",
+      "file": "crates/subtitles/tests/text-fixtures/fixtures/input/vtt-missing-fraction.vtt",
+      "sha256": "5c05bd07053f44b5ff3496514c86ea26a84b6647538d0cfe4bf7d981f476aa18",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt",
+        "utf8"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      },
+      "difference": "the strict WebVTT profile (WebVttSourceStrict1) refuses a timestamp without milliseconds; the webvtt demuxer reports an empty document"
+    }
+  ]
+}

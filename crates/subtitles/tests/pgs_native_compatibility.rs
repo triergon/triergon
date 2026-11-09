@@ -1,4 +1,6 @@
-//! Public API guards plus every recorded native transcript, without native calls.
+//! Public API guards of the PGS receiver. The subtitle worker's `pgs-` modes
+//! fold every recorded case under `native-compatibility-gold/` and check it
+//! against the recorded transcript.
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
@@ -6,12 +8,6 @@ use triergon_subtitles::compat::pgs::{
     IndexedRecoveryDecoder, ReceiverDecoder, ReceiverEof, ReceiverPacket,
 };
 use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
-
-type Result<T> = std::result::Result<T, String>;
-#[path = "native-compatibility-gold/cases.rs"]
-mod gold;
-#[path = "native-compatibility-support/wire.rs"]
-mod wire;
 
 fn segment(out: &mut Vec<u8>, kind: u8, body: &[u8]) {
     out.push(kind);
@@ -486,140 +482,3 @@ fn unknown_pts_retains_raw_dts_without_inventing_native_presentation_time() {
 
 // This is functional transcript reproduction, not a benchmark adapter. Recorded
 // input/native expected bytes are read only by tests, never by production code.
-fn frozen_case(case: &wire::Case, quantum: u64) -> (wire::Sink, bool) {
-    let b = Budget::new(256 * 1024 * 1024).unwrap();
-    let baseline = b.used();
-    let cancel = AtomicBool::new(false);
-    let mut sink = wire::Sink::new(true);
-    sink.header(case);
-    for (i, record) in case.records.iter().enumerate() {
-        sink.input(i, record);
-    }
-    let outcome = (|| -> Result<()> {
-        if !case.private.is_empty() {
-            return Err("unexpected private configuration".into());
-        }
-        let config = DisplayConfig {
-            receiver_forced_only: case.flags & 1 != 0,
-        };
-        let mut d = ReceiverDecoder::new(&b, DisplayLimits::default(), config)
-            .map_err(|e| e.to_string())?;
-        let base = TimeBase::new(u64::from(case.numerator), u64::from(case.denominator))
-            .map_err(|e| e.to_string())?;
-        for (index, record) in case.records.iter().enumerate() {
-            if record.reset != 0 {
-                drop(d);
-                d = ReceiverDecoder::new(&b, DisplayLimits::default(), config)
-                    .map_err(|e| e.to_string())?;
-                continue;
-            }
-            let stamp = PacketClock {
-                pts: record.pts_known.then_some(record.pts_raw),
-                dts: record.dts_known.then_some(record.dts_raw),
-                timebase: base,
-            };
-            let mut owned =
-                Some(Bytes::copy_from_slice(&b, &record.payload).map_err(|e| e.to_string())?);
-            d.push(&mut owned, stamp, &cancel)
-                .map_err(|e| e.to_string())?;
-            let mut output = None;
-            for _ in 0..1_000_000 {
-                let mut work = WorkBudget::new(quantum);
-                let status = d.poll(&mut work, &cancel).map_err(|e| e.to_string())?;
-                assert!(work.spent() <= quantum);
-                if status == RecoveryStatus::OutputReady {
-                    output = Some(d.take_output(&cancel).map_err(|e| e.to_string())?);
-                    break;
-                }
-                assert_eq!(status, RecoveryStatus::Yield);
-            }
-            let out = output.ok_or("bounded native output progress")?;
-            if let Some(refusal) = out.refusal() {
-                return Err(format!("receiver refused the packet: {refusal:?}"));
-            }
-            if let Some(event) = out.receiver_output() {
-                sink.event(wire::EventHeader {
-                    packet: index,
-                    offset: 0,
-                    consumed: i32::try_from(record.payload.len()).unwrap(),
-                    flush: false,
-                    pts: event.pts_microseconds,
-                    start: 0,
-                    end: u32::MAX,
-                    canvas: [
-                        i32::from(out.context_canvas[0]),
-                        i32::from(out.context_canvas[1]),
-                    ],
-                    rectangles: event.rectangles().len(),
-                });
-                for (order, r) in event.rectangles().iter().enumerate() {
-                    sink.rect(
-                        order,
-                        [
-                            i32::from(r.x),
-                            i32::from(r.y),
-                            i32::from(r.width),
-                            i32::from(r.height),
-                            i32::from(r.forced),
-                            i32::from(r.stride),
-                        ],
-                        r.palette(),
-                        r.pixels().as_ref(),
-                    )?;
-                }
-            }
-        }
-        d.finish_input(&cancel).map_err(|e| e.to_string())?;
-        for _ in 0..1_000_000 {
-            if d.poll(&mut WorkBudget::new(quantum), &cancel)
-                .map_err(|e| e.to_string())?
-                == RecoveryStatus::Ended
-            {
-                return Ok(());
-            }
-        }
-        Err("bounded native EOF progress".into())
-    })();
-    sink.byte(if outcome.is_ok() { b'Z' } else { b'F' });
-    assert_eq!(
-        b.used(),
-        baseline,
-        "native decoder/output graph retained storage after operation"
-    );
-    (sink, outcome.is_ok())
-}
-
-fn all_native_gold(quantum: u64) {
-    assert_eq!(gold::CASES.len(), 229);
-    let mut refusals = 0;
-    for row in gold::CASES {
-        let case = wire::Case::parse(row.input).unwrap();
-        let (actual, succeeded) = frozen_case(&case, quantum);
-        assert_eq!(
-            succeeded, row.succeeded,
-            "{} quantum{quantum}: retained decoder outcome",
-            row.id
-        );
-        assert_eq!(
-            actual.transcript.as_deref().unwrap(),
-            row.expected,
-            "{} quantum{quantum}: every native transcript byte",
-            row.id
-        );
-        refusals += usize::from(!succeeded);
-    }
-    assert_eq!(refusals, 8);
-}
-
-#[test]
-fn every229_frozen_native_gold_and_eight_refusals_at_work1() {
-    all_native_gold(1);
-}
-#[test]
-fn every229_frozen_native_gold_and_eight_refusals_at_work7() {
-    all_native_gold(7);
-}
-#[test]
-fn every229_frozen_native_gold_and_eight_refusals_at_work4096() {
-    all_native_gold(4096);
-}
