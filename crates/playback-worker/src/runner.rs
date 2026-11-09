@@ -11,7 +11,7 @@ pub const MAX_INPUT: u64 = 64 * 1024 * 1024;
 
 type Run = fn(&[String]) -> Result<()>;
 
-const RUNNERS: [(&str, Run); 9] = [
+const RUNNERS: [(&str, Run); 10] = [
     (crate::matroska_video::PREFIX, crate::matroska_video::run),
     (crate::matroska_audio::PREFIX, crate::matroska_audio::run),
     (crate::hls::PREFIX, crate::hls::run),
@@ -19,6 +19,7 @@ const RUNNERS: [(&str, Run); 9] = [
     (crate::mp4_forward::PREFIX, crate::mp4_forward::run),
     (crate::progressive::PREFIX, crate::progressive::run),
     (crate::ts_program::PREFIX, crate::ts_program::run),
+    (crate::ts_au::PREFIX, crate::ts_au::run),
     (crate::ts::PREFIX, crate::ts::run),
     (crate::raw_video::PREFIX, crate::raw_video::run),
 ];

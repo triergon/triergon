@@ -75,6 +75,28 @@ impl<'a> Drive<'a> {
     }
 }
 
+#[test]
+fn storage_audit_refuses_buffered_input() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let source = Bytes::copy_from_slice(&pool, &[0, 0, 1, 9, 0xf0]).unwrap();
+    let mut drive = Drive::new(
+        &pool,
+        Codec::Avc,
+        &source,
+        source.len(),
+        true,
+        RawAnnexBLimits::default(),
+    );
+    assert!(drive.reader.input_wait_storage().is_ok());
+    let q = drive.reader.request();
+    let window = InputWindow::new(q.source, q.token, q.offset, source.clone()).unwrap();
+    drive.reader.provide(&window).unwrap();
+    assert!(matches!(
+        drive.reader.input_wait_storage(),
+        Err(Error::Invalid(_))
+    ));
+}
+
 fn compare(codec: Codec, input: &[u8], expected: &str) {
     for (quantum, work, known_length) in [(1, 1, false), (7, 31, true), (4096, 4096, true)] {
         let pool = Budget::new(1 << 20).unwrap();
