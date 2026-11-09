@@ -1,10 +1,10 @@
 //! Original extended-SPU wire facts and bounded eight-bit source raster.
 //! Inferred, pinned implementation evidence is not a normative DVD claim.
 //! Header width, field width, pixel mode and source colour are independent.
-use super::receiver::YcbcrRounding;
 use super::{DvdArea, DvdBitmap, DvdDate};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
+use triergon_pixel::{ChannelRounding, YcbcrMatrix};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HdSpan {
@@ -1005,7 +1005,8 @@ impl HdSpuJob {
 
 /// The ARGB word of one Y/Cr/Cb entry and its contrast byte.
 fn argb(ycrcb: [u8; 3], contrast: u8) -> u32 {
-    u32::from(255 - contrast) << 24 | YcbcrRounding::Nearest.rgb(ycrcb[0], ycrcb[1], ycrcb[2])
+    u32::from(255 - contrast) << 24
+        | YcbcrMatrix::BT601.rgb(ycrcb[0], ycrcb[1], ycrcb[2], ChannelRounding::Nearest)
 }
 #[derive(Debug)]
 pub struct HdPaletteJob<'a> {

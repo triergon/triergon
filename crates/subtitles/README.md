@@ -5,8 +5,9 @@ explicit charset conversion; bitmap decoding of DVB, PGS and DVD subpictures int
 indexed planes with their palettes; CEA-608 closed captions taken from MPEG-2,
 H.264 and HEVC video and decoded to timed text; and DVB teletext pages. It is a
 codec-layer crate that depends only on [`triergon-core`](../core) for budgets,
-`Bytes`, work accounting and exact time, and on
-[`triergon-bitstream`](../bitstream) for RBSP reading. It does not demux
+`Bytes`, work accounting and exact time, on
+[`triergon-bitstream`](../bitstream) for RBSP reading, and on
+[`triergon-pixel`](../pixel) for the Y'CbCr → RGB of palette entries. It does not demux
 containers (apart from the VobSub `.idx`/`.sub` pair and DVD program streams,
 which only carry subtitles), render glyphs, scale or composite bitmaps, or
 schedule presentation; those belong to the caller.

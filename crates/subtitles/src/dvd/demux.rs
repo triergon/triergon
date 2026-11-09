@@ -1,9 +1,9 @@
 //! The packets FFmpeg's demuxers hand its `dvdsub` decoder: VobSub
 //! `.idx`/`.sub` pairs, program streams and the MP4 palette configuration.
 use super::program_stream::{PADDING_STREAM, PRIVATE_STREAM_1, PRIVATE_STREAM_2, Pes, Unit, Units};
-use super::receiver::YcbcrRounding;
 use super::vobsub::{Line, Lines};
 use triergon_core::{Budget, BudgetVec, Error, Result};
+use triergon_pixel::{ChannelRounding, YcbcrMatrix};
 
 /// One subpicture unit an index names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -273,7 +273,7 @@ pub fn mp4_configuration(specific: &[u8]) -> Option<[u8; 136]> {
     let mut text = [b' '; 136];
     text[..9].copy_from_slice(b"palette: ");
     for (i, entry) in entries.chunks_exact(4).enumerate() {
-        let rgb = YcbcrRounding::HalfDown.rgb(entry[1], entry[2], entry[3]);
+        let rgb = YcbcrMatrix::BT601.rgb(entry[1], entry[2], entry[3], ChannelRounding::HalfDown);
         let at = 9 + i * 8;
         for (k, shift) in [20, 16, 12, 8, 4, 0].into_iter().enumerate() {
             text[at + k] = HEX[(rgb >> shift & 15) as usize];
