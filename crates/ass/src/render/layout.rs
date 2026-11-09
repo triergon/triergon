@@ -1,30 +1,26 @@
 //! The third stage: a shaped event laid out as libass does. Every glyph's
 //! outline and metrics (`retrieve_glyphs`), the pen positions on one line
-//! (`preliminary_layout`), the lines ([`super::wrap`]), karaoke timing,
-//! the visual order (`reorder_text`), alignment (`align_lines`), the text
-//! box (`compute_string_bbox`) and the baseline shear
-//! (`apply_baseline_shear`).
+//! (`preliminary_layout`), the lines ([`super::wrap`]), karaoke timing, the
+//! visual order (`reorder_text`), alignment (`align_lines`), the text box
+//! (`compute_string_bbox`) and the baseline shear (`apply_baseline_shear`).
 
 use std::sync::Arc;
 
-use triergon_core::{BudgetVec, Result, WorkBudget, round_ties_even_i32};
-use triergon_raster::{Rect, Vector, pixels_26_6};
+use triergon_core::{Budget, BudgetVec, Result, WorkBudget, round_ties_even_i32};
+use triergon_raster::{Vector, pixels_26_6};
+use triergon_shape::bidi::Level;
 
 use super::fonts::Library;
-use super::geometry::Scales;
+use super::geometry::{Geometry, Scales};
 use super::outlines::{GlyphKey, OutlineValue, Outlines};
-use super::shaping::{Bidi, Shaped, Shaping};
-use super::text::{Char, Text};
-use super::wrap::{self, Lines, WrapChar, Wrapping, fmax};
+use super::shaping::{Shaped, ShapedGlyph, Shaping};
+use super::text::{Char, Evaluated, Text};
+use super::units::{d6_to_double, fmax};
+use super::wrap::{Lines, WrapChar, Wrapping};
 use crate::{
     EventState, HAlign, Justify, Karaoke, KaraokeGlyph, KaraokeMark, Limits, Margins, Rgba,
     Syllables,
 };
-
-/// `d6_to_double`: 26.6 to pixels.
-pub(super) fn d6_to_double(x: i32) -> f64 {
-    f64::from(x) / 64.0
-}
 
 /// An outline and how it is scaled to the frame.
 #[derive(Clone, Debug)]
@@ -32,8 +28,8 @@ pub(super) struct ScaledOutline {
     pub(super) value: Arc<OutlineValue>,
     /// From outline units to 26.6.
     pub(super) scale: [f64; 2],
-    /// Added after the scale, 26.6: a drawing's baseline offset.
-    pub(super) offset: [f64; 2],
+    /// Added to y after the scale, 26.6: a drawing's baseline offset.
+    pub(super) offset_y: f64,
 }
 
 /// A glyph laid out.
@@ -41,11 +37,11 @@ pub(super) struct ScaledOutline {
 pub(super) struct LaidGlyph {
     /// What it draws; `None` when its outline cannot be built.
     pub(super) outline: Option<ScaledOutline>,
-    pub(super) bbox: Rect,
+    /// The left and right of its box, 26.6.
+    pub(super) x_min: i32,
+    pub(super) x_max: i32,
     pub(super) asc: i32,
     pub(super) desc: i32,
-    /// Shaping's offset from the pen.
-    pub(super) offset: Vector,
     /// Shaping's advance, or a drawing's width.
     pub(super) advance: Vector,
     /// Where it is drawn, 26.6 pre-aspect pixels from the first line's
@@ -86,8 +82,6 @@ impl Timing {
 /// A character laid out.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct LaidChar {
-    /// Its cluster's advance, with the italic correction and letter spacing.
-    pub(super) advance: Vector,
     /// Shaping gave it a glyph and trimming kept it: it takes space on its
     /// line.
     pub(super) shown: bool,
@@ -98,18 +92,6 @@ pub(super) struct LaidChar {
     pub(super) karaoke: Timing,
 }
 
-/// A laid-out event: what the next stage places in the frame.
-#[derive(Debug)]
-pub(super) struct Layout {
-    /// Each character's layout, in text order.
-    pub(super) chars: BudgetVec<LaidChar>,
-    /// Each glyph's, as [`Shaped::glyphs`] holds them.
-    pub(super) glyphs: BudgetVec<LaidGlyph>,
-    pub(super) lines: Lines,
-    /// The text box in pre-aspect pixels.
-    pub(super) text_box: TextBox,
-}
-
 /// The text box in pre-aspect pixels.
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct TextBox {
@@ -117,6 +99,15 @@ pub(super) struct TextBox {
     pub(super) y_min: f64,
     pub(super) x_max: f64,
     pub(super) y_max: f64,
+}
+
+/// What layout reads: an evaluated event and its shaping.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Input<'a, 's> {
+    pub(super) text: &'a Text,
+    pub(super) evaluated: &'a Evaluated<'s>,
+    pub(super) shaped: &'a Shaped,
+    pub(super) shaping: &'a Shaping<'s>,
 }
 
 /// Where glyphs come from: fonts, outlines and the script's limits.
@@ -130,70 +121,237 @@ pub(super) struct Sources<'a> {
 /// What an event is laid out in.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Room<'a> {
+    pub(super) geometry: &'a Geometry<'a>,
     pub(super) scales: &'a Scales,
-    pub(super) par: f64,
     /// The event's margins, else its style's.
     pub(super) margins: Margins,
-    /// The width lines wrap at and are aligned in, in pixels.
-    pub(super) max_width: f64,
-    pub(super) line_spacing: f64,
     /// Milliseconds since the event started.
     pub(super) elapsed: i64,
 }
 
+/// A laid-out event: what the next stage places in the frame. Laid out
+/// again for each event, into the same storage.
+#[derive(Debug)]
+pub(super) struct Layout {
+    /// Each character's layout, in text order.
+    pub(super) chars: BudgetVec<LaidChar>,
+    /// Each glyph's, as [`Shaped::glyphs`] holds them.
+    pub(super) glyphs: BudgetVec<LaidGlyph>,
+    pub(super) lines: Lines,
+    /// The text box in pre-aspect pixels.
+    pub(super) text_box: TextBox,
+    /// Each cluster's advance, with the italic correction and letter
+    /// spacing.
+    advances: BudgetVec<Vector>,
+    /// Each character's pen position on one unbroken line, 26.6.
+    pens: BudgetVec<i32>,
+    karaoke: BudgetVec<KaraokeGlyph>,
+    levels: BudgetVec<Level>,
+    /// The character shown at each position.
+    order: BudgetVec<u32>,
+}
+
 impl Layout {
-    /// Lays out `text` as shaped, from its outlines to the baseline shear.
-    pub(super) fn new(
-        text: &Text<'_>,
-        shaped: &Shaped,
-        bidi: Bidi,
-        shaping: &Shaping<'_>,
+    pub(super) fn new(budget: &Budget) -> Self {
+        Self {
+            chars: BudgetVec::new(budget),
+            glyphs: BudgetVec::new(budget),
+            lines: Lines::new(budget),
+            text_box: TextBox::default(),
+            advances: BudgetVec::new(budget),
+            pens: BudgetVec::new(budget),
+            karaoke: BudgetVec::new(budget),
+            levels: BudgetVec::new(budget),
+            order: BudgetVec::new(budget),
+        }
+    }
+
+    /// Lets go of the last event's outlines.
+    pub(super) fn release(&mut self) {
+        self.glyphs.clear();
+    }
+
+    /// Lays out `input`, from its outlines to the baseline shear.
+    pub(super) fn lay_out(
+        &mut self,
+        input: &Input<'_, '_>,
         sources: Sources<'_>,
         room: &Room<'_>,
         work: &mut WorkBudget,
-    ) -> Result<Self> {
-        let budget = text.chars.budget();
-        let glyphs = measure_glyphs(text, shaped, sources, room, work)?;
-        let advances = cluster_advances(text, shaped, &glyphs)?;
-        let pens = pen_positions(&advances)?;
+    ) -> Result<()> {
+        let Input {
+            text,
+            evaluated,
+            shaped,
+            shaping,
+        } = *input;
+        self.measure_glyphs(input, sources, room, work)?;
+        self.measure_clusters(text, shaped)?;
+        let state = &evaluated.state;
+        let max_width = room.geometry.text_width(room.margins, state.explicit);
+        let line_spacing = room.geometry.canvas.settings.line_spacing;
         let wrapping = Wrapping {
-            max_width: room.max_width,
-            style: text.state.wrap_style,
-            line_spacing: room.line_spacing,
+            max_width,
+            style: state.wrap_style,
+            line_spacing,
             scales: room.scales,
         };
-        let lines = wrap::wrap(
-            &wrap_chars(text, shaped, &glyphs, &pens)?,
-            &wrapping,
-            budget,
-            work,
-        )?;
-        let chars = lay_out_chars(
-            text,
-            shaped,
-            &glyphs,
-            &lines,
-            &advances,
-            &pens,
-            room.elapsed,
-        )?;
-        let order = bidi.visual_order(text, &lines.lines, |i| chars[i].starts_run, shaping)?;
-        let mut layout = Self {
-            chars,
-            glyphs,
-            lines,
-            text_box: TextBox::default(),
+        let (glyphs, pens) = (&self.glyphs, &self.pens);
+        let wrap_char = |i: usize| {
+            let c = &text.chars()[i];
+            let own = &glyphs[shaped.clusters[i].glyphs.start];
+            WrapChar {
+                symbol: c.symbol,
+                left: own.x_min.wrapping_add(pens[i]),
+                right: own.x_max.wrapping_add(pens[i]),
+                asc: own.asc,
+                desc: own.desc,
+                border: text.style(c).border,
+            }
         };
-        layout.reorder(shaped, &order, room.line_spacing);
-        layout.align(text, shaped, alignment(&text.state), room.max_width);
-        layout.text_box = layout.measure_text_box(shaped);
-        layout.shear(text, shaped, &order);
-        Ok(layout)
+        self.lines
+            .wrap(text.chars().len(), wrap_char, &wrapping, work)?;
+        self.lay_out_chars(text, shaped, room.elapsed)?;
+        let chars = &self.chars;
+        shaped.bidi.visual_order(
+            text,
+            &self.lines.lines,
+            |i| chars[i].starts_run,
+            shaping,
+            &mut self.levels,
+            &mut self.order,
+        )?;
+        self.reorder(shaped, line_spacing);
+        self.align(text, shaped, alignment(state), max_width);
+        self.text_box = self.measure_text_box(shaped);
+        self.shear(text, shaped);
+        Ok(())
+    }
+
+    /// `retrieve_glyphs`: every glyph's outline, box, advance (for drawings)
+    /// and ascent and descent at its scale, cluster by cluster.
+    fn measure_glyphs(
+        &mut self,
+        input: &Input<'_, '_>,
+        mut sources: Sources<'_>,
+        room: &Room<'_>,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
+        let (text, shaped) = (input.text, input.shaped);
+        self.glyphs.clear();
+        self.glyphs.try_reserve_exact(shaped.glyphs.len())?;
+        for (c, cluster) in text.chars().iter().zip(&*shaped.clusters) {
+            for glyph in shaped.glyphs(cluster) {
+                let face = usize::from(cluster.face);
+                let laid = measure_glyph(input, c, face, glyph, &mut sources, room, work)?;
+                self.glyphs.try_push(laid).map_err(|e| e.error)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Each cluster's advance: as shaped, or a drawing's width; widened
+    /// after italic text that gives way to upright text to the box of the
+    /// last glyph with a width (`retrieve_glyphs`'s italic correction); and
+    /// letter spacing. Then each character's pen position on one unbroken
+    /// line (`preliminary_layout`).
+    fn measure_clusters(&mut self, text: &Text, shaped: &Shaped) -> Result<()> {
+        let chars = text.chars();
+        let own = |i: usize| &self.glyphs[shaped.clusters[i].glyphs.start];
+        let italic = |i: usize| text.style(&chars[i]).italic.0 != 0;
+        self.advances.clear();
+        self.advances.try_reserve_exact(chars.len())?;
+        for (i, (c, cluster)) in chars.iter().zip(&*shaped.clusters).enumerate() {
+            let advance = if c.drawing.is_some() {
+                own(i).advance
+            } else {
+                cluster.advance
+            };
+            self.advances.try_push(advance).map_err(|e| e.error)?;
+        }
+        let advances = self.advances.as_mut_slice();
+        for i in 0..chars.len() {
+            if i > 0 && italic(i - 1) && !italic(i) {
+                let mut back = i - 1;
+                while back > 0 && own(back).x_max - own(back).x_min == 0 && italic(back) {
+                    back -= 1;
+                }
+                let x_max = own(back).x_max;
+                if x_max > advances[back].x {
+                    advances[back].x = x_max;
+                }
+            }
+            advances[i].x = advances[i]
+                .x
+                .wrapping_add(text.style(&chars[i]).spacing_scaled);
+        }
+        self.pens.clear();
+        self.pens.try_reserve_exact(chars.len())?;
+        let mut pen: i32 = 0;
+        for advance in self.advances.iter() {
+            self.pens.try_push(pen).map_err(|e| e.error)?;
+            pen = pen.wrapping_add(advance.x);
+        }
+        Ok(())
+    }
+
+    /// Each character's place in its line (shown, drawn, starting a run)
+    /// and its karaoke, timed by `ass_process_karaoke_effects` over its pen
+    /// position on one unbroken line.
+    fn lay_out_chars(&mut self, text: &Text, shaped: &Shaped, elapsed: i64) -> Result<()> {
+        let chars = text.chars();
+        self.karaoke.clear();
+        self.karaoke.try_reserve_exact(chars.len())?;
+        // A run also starts where a line's leading whitespace ends: within
+        // the line, or at the next one's start for a line of whitespace.
+        let mut previous_shown = None;
+        for line in self.lines.lines.iter() {
+            for i in line.chars.clone() {
+                let c = &chars[i];
+                self.karaoke
+                    .try_push(KaraokeGlyph {
+                        starts_new_run: c.starts_run
+                            || line.shown.start == i
+                            || previous_shown == Some(i),
+                        mark: c.karaoke,
+                        skip: !(shaped.clusters[i].visible && line.shown.contains(&i)),
+                        x: self.pens[i],
+                        advance: self.glyphs[shaped.clusters[i].glyphs.start].advance.x,
+                        rotate_z: text.style(c).rotation[2],
+                    })
+                    .map_err(|e| e.error)?;
+            }
+            previous_shown = Some(line.shown.start);
+        }
+        self.chars.clear();
+        self.chars.try_reserve_exact(chars.len())?;
+        let mut syllables = Syllables::new(&self.karaoke, elapsed).peekable();
+        for (i, (c, k)) in chars.iter().zip(self.karaoke.iter()).enumerate() {
+            while syllables.next_if(|s| s.glyphs.end <= i).is_some() {}
+            let karaoke = match syllables.peek() {
+                Some(s) if s.glyphs.contains(&i) => Timing {
+                    effect: Some(s.effect),
+                    timing: s.timing(k),
+                    swap_colours: s.swap_colours,
+                },
+                _ => Timing::untimed(c.karaoke),
+            };
+            let shown = !k.skip;
+            self.chars
+                .try_push(LaidChar {
+                    shown,
+                    drawn: shown && !text.style(c).is_flat(),
+                    starts_run: k.starts_new_run,
+                    karaoke,
+                })
+                .map_err(|e| e.error)?;
+        }
+        Ok(())
     }
 
     /// `reorder_text`: the glyphs of shown characters placed in visual
     /// order, line by line.
-    fn reorder(&mut self, shaped: &Shaped, order: &[usize], line_spacing: f64) {
+    fn reorder(&mut self, shaped: &Shaped, line_spacing: f64) {
         let mut pen = Vector::default();
         for (k, line) in self.lines.lines.iter().enumerate() {
             if k > 0 {
@@ -205,21 +363,26 @@ impl Layout {
                     .wrapping_add(pixels_26_6(line.asc))
                     .wrapping_add(pixels_26_6(line_spacing));
             }
-            for &i in &order[line.chars.clone()] {
-                let laid = &self.chars[i];
-                if !laid.shown {
+            for &i in &self.order[line.chars.clone()] {
+                let i = i as usize;
+                if !self.chars[i].shown {
                     continue;
                 }
                 let mut cluster = pen;
-                pen.x = pen.x.wrapping_add(laid.advance.x);
-                pen.y = pen.y.wrapping_add(laid.advance.y);
-                for glyph in &mut self.glyphs.as_mut_slice()[shaped.clusters[i].glyphs.clone()] {
-                    glyph.pos = Vector::new(
-                        glyph.offset.x.wrapping_add(cluster.x),
-                        glyph.offset.y.wrapping_add(cluster.y),
+                let advance = self.advances[i];
+                pen.x = pen.x.wrapping_add(advance.x);
+                pen.y = pen.y.wrapping_add(advance.y);
+                let range = shaped.clusters[i].glyphs.clone();
+                for (laid, shaped) in self.glyphs[range.clone()]
+                    .iter_mut()
+                    .zip(&shaped.glyphs[range])
+                {
+                    laid.pos = Vector::new(
+                        shaped.offset.x.wrapping_add(cluster.x),
+                        shaped.offset.y.wrapping_add(cluster.y),
                     );
-                    cluster.x = cluster.x.wrapping_add(glyph.advance.x);
-                    cluster.y = cluster.y.wrapping_add(glyph.advance.y);
+                    cluster.x = cluster.x.wrapping_add(laid.advance.x);
+                    cluster.y = cluster.y.wrapping_add(laid.advance.y);
                 }
             }
         }
@@ -227,12 +390,12 @@ impl Layout {
 
     /// The width in pixels of the characters of `range` that alignment
     /// counts: shown ones other than `\n` and drawings' placeholders.
-    fn line_width(&self, text: &Text<'_>, range: std::ops::Range<usize>) -> f64 {
+    fn line_width(&self, text: &Text, range: std::ops::Range<usize>) -> f64 {
         let mut width = 0.0;
         for i in range {
-            let symbol = text.chars[i].symbol;
+            let symbol = text.chars()[i].symbol;
             if self.chars[i].shown && symbol != u32::from(b'\n') && symbol != 0 {
-                width += d6_to_double(self.chars[i].advance.x);
+                width += d6_to_double(self.advances[i].x);
             }
         }
         width
@@ -241,7 +404,7 @@ impl Layout {
     /// `align_lines`: each line shifted for its alignment and justification.
     fn align(
         &mut self,
-        text: &Text<'_>,
+        text: &Text,
         shaped: &Shaped,
         (halign, justify): (HAlign, Justify),
         max_text_width: f64,
@@ -281,136 +444,58 @@ impl Layout {
     /// `compute_string_bbox`: the shown characters' extent, and the lines'.
     fn measure_text_box(&self, shaped: &Shaped) -> TextBox {
         let y_min = -self.lines.first().asc;
-        let mut b = TextBox {
-            x_min: 32000.0,
-            x_max: -32000.0,
-            y_min,
-            y_max: y_min + self.lines.height,
-        };
-        for (laid, cluster) in self.chars.iter().zip(shaped.clusters.iter()) {
+        let (mut x_min, mut x_max) = (32000.0_f64, -32000.0_f64);
+        for ((laid, cluster), advance) in self
+            .chars
+            .iter()
+            .zip(&*shaped.clusters)
+            .zip(&*self.advances)
+        {
             if laid.shown {
                 let s = d6_to_double(self.glyphs[cluster.glyphs.start].pos.x);
-                let e = s + d6_to_double(laid.advance.x);
-                b.x_min = b.x_min.min(s);
-                b.x_max = b.x_max.max(e);
+                x_min = x_min.min(s);
+                x_max = x_max.max(s + d6_to_double(advance.x));
             }
         }
-        b
+        TextBox {
+            x_min,
+            y_min,
+            x_max,
+            y_max: y_min + self.lines.height,
+        }
     }
 
     /// `apply_baseline_shear`: `\fay` raises each glyph by the advance before
     /// it on its line or run, in visual order. libass resets at a run only
     /// without the track's whole-text layout feature, which is never set
     /// here.
-    fn shear(&mut self, text: &Text<'_>, shaped: &Shaped, order: &[usize]) {
+    fn shear(&mut self, text: &Text, shaped: &Shaped) {
         for line in self.lines.lines.iter() {
             let mut shear: i32 = 0;
             for i in line.chars.clone() {
                 if self.chars[i].starts_run {
                     shear = 0;
                 }
-                let at = order[i];
+                let at = self.order[i] as usize;
                 if !self.chars[at].drawn {
                     continue;
                 }
-                let style = &text.chars[at].style;
+                let style = text.style(&text.chars()[at]);
                 let fay = style.shear[1] / style.scale[0] * style.scale[1];
-                for glyph in &mut self.glyphs.as_mut_slice()[shaped.clusters[at].glyphs.clone()] {
+                let range = shaped.clusters[at].glyphs.clone();
+                for (laid, shaped) in self.glyphs[range.clone()]
+                    .iter_mut()
+                    .zip(&shaped.glyphs[range])
+                {
                     // C's conversions of the double sums back to the int fields.
-                    glyph.pos.y = (f64::from(glyph.pos.y)
-                        + (f64::from(shear) + fay * f64::from(glyph.offset.x)))
+                    laid.pos.y = (f64::from(laid.pos.y)
+                        + (f64::from(shear) + fay * f64::from(shaped.offset.x)))
                         as i32;
-                    shear = (f64::from(shear) + fay * f64::from(glyph.advance.x)) as i32;
+                    shear = (f64::from(shear) + fay * f64::from(laid.advance.x)) as i32;
                 }
             }
         }
     }
-}
-
-/// What wrapping reads of each character: its own glyph's extent at its pen
-/// position on one unbroken line, its metrics and its border.
-fn wrap_chars(
-    text: &Text<'_>,
-    shaped: &Shaped,
-    glyphs: &[LaidGlyph],
-    pens: &[i32],
-) -> Result<BudgetVec<WrapChar>> {
-    let mut chars = BudgetVec::new(text.chars.budget());
-    chars.try_reserve_exact(text.chars.len())?;
-    for ((c, cluster), &pen) in text.chars.iter().zip(&*shaped.clusters).zip(pens) {
-        let own = &glyphs[cluster.glyphs.start];
-        chars
-            .try_push(WrapChar {
-                symbol: c.symbol,
-                left: own.bbox.x_min.wrapping_add(pen),
-                right: own.bbox.x_max.wrapping_add(pen),
-                asc: own.asc,
-                desc: own.desc,
-                border: c.style.border,
-            })
-            .map_err(|e| e.error)?;
-    }
-    Ok(chars)
-}
-
-/// Each character's place in its line (shown, drawn, starting a run), then
-/// timed by `ass_process_karaoke_effects` over its pen position on one
-/// unbroken line.
-fn lay_out_chars(
-    text: &Text<'_>,
-    shaped: &Shaped,
-    glyphs: &[LaidGlyph],
-    lines: &Lines,
-    advances: &[Vector],
-    pens: &[i32],
-    elapsed: i64,
-) -> Result<BudgetVec<LaidChar>> {
-    let budget = text.chars.budget();
-    let mut chars = BudgetVec::new(budget);
-    chars.try_reserve_exact(text.chars.len())?;
-    // A run also starts where a line's leading whitespace ends: within the
-    // line, or at the next one's start for a line of whitespace.
-    let mut previous_shown = None;
-    for line in lines.lines.iter() {
-        for i in line.chars.clone() {
-            let c = &text.chars[i];
-            let shown = shaped.clusters[i].visible && line.shown.contains(&i);
-            chars
-                .try_push(LaidChar {
-                    advance: advances[i],
-                    shown,
-                    drawn: shown && !c.style.is_flat(),
-                    starts_run: c.starts_run || line.shown.start == i || previous_shown == Some(i),
-                    karaoke: Timing::untimed(c.karaoke),
-                })
-                .map_err(|e| e.error)?;
-        }
-        previous_shown = Some(line.shown.start);
-    }
-    let mut karaoke = BudgetVec::new(budget);
-    karaoke.try_reserve_exact(chars.len())?;
-    for (i, (c, laid)) in text.chars.iter().zip(chars.iter()).enumerate() {
-        karaoke
-            .try_push(KaraokeGlyph {
-                starts_new_run: laid.starts_run,
-                mark: c.karaoke,
-                skip: !laid.shown,
-                x: pens[i],
-                advance: glyphs[shaped.clusters[i].glyphs.start].advance.x,
-                rotate_z: c.style.rotation[2],
-            })
-            .map_err(|e| e.error)?;
-    }
-    for syllable in Syllables::new(&karaoke, elapsed) {
-        for i in syllable.glyphs.clone() {
-            chars.as_mut_slice()[i].karaoke = Timing {
-                effect: Some(syllable.effect),
-                timing: syllable.timing(&karaoke[i]),
-                swap_colours: syllable.swap_colours,
-            };
-        }
-    }
-    Ok(chars)
 }
 
 /// The banner of a horizontal scroll starts its lines at the left and
@@ -429,162 +514,78 @@ fn alignment(state: &EventState<'_>) -> (HAlign, Justify) {
     }
 }
 
-/// Each cluster's advance: as shaped, or a drawing's width; widened after
-/// italic text that gives way to upright text to the box of the last glyph
-/// with a width (`retrieve_glyphs`'s italic correction); and letter spacing.
-fn cluster_advances(
-    text: &Text<'_>,
-    shaped: &Shaped,
-    glyphs: &[LaidGlyph],
-) -> Result<BudgetVec<Vector>> {
-    let chars = text.chars.as_slice();
-    let own = |i: usize| &glyphs[shaped.clusters[i].glyphs.start];
-    let italic = |i: usize| chars[i].style.italic.0 != 0;
-    let mut advances = BudgetVec::new(text.chars.budget());
-    advances.try_reserve_exact(chars.len())?;
-    for (i, (c, cluster)) in chars.iter().zip(shaped.clusters.iter()).enumerate() {
-        let advance = if c.drawing.is_some() {
-            own(i).advance
-        } else {
-            cluster.advance
-        };
-        advances.try_push(advance).map_err(|e| e.error)?;
-    }
-    let advances_mut = advances.as_mut_slice();
-    for i in 0..chars.len() {
-        if i > 0 && italic(i - 1) && !italic(i) {
-            let mut back = i - 1;
-            while back > 0 && own(back).bbox.x_max - own(back).bbox.x_min == 0 && italic(back) {
-                back -= 1;
-            }
-            let x_max = own(back).bbox.x_max;
-            if x_max > advances_mut[back].x {
-                advances_mut[back].x = x_max;
-            }
-        }
-        advances_mut[i].x = advances_mut[i]
-            .x
-            .wrapping_add(chars[i].style.spacing_scaled);
-    }
-    Ok(advances)
-}
-
-/// `preliminary_layout`: each character's pen position on one unbroken
-/// line, 26.6.
-fn pen_positions(advances: &BudgetVec<Vector>) -> Result<BudgetVec<i32>> {
-    let mut pens = BudgetVec::new(advances.budget());
-    pens.try_reserve_exact(advances.len())?;
-    let mut pen: i32 = 0;
-    for advance in advances.iter() {
-        pens.try_push(pen).map_err(|e| e.error)?;
-        pen = pen.wrapping_add(advance.x);
-    }
-    Ok(pens)
-}
-
-/// `retrieve_glyphs`: every glyph's outline, box, advance (for drawings) and
-/// ascent and descent at its scale, cluster by cluster.
-fn measure_glyphs(
-    text: &Text<'_>,
-    shaped: &Shaped,
-    mut sources: Sources<'_>,
-    room: &Room<'_>,
-    work: &mut WorkBudget,
-) -> Result<BudgetVec<LaidGlyph>> {
-    let mut glyphs = BudgetVec::new(text.chars.budget());
-    glyphs.try_reserve_exact(shaped.glyphs.len())?;
-    for (c, cluster) in text.chars.iter().zip(shaped.clusters.iter()) {
-        for glyph in shaped.glyphs(cluster) {
-            let mut laid = LaidGlyph {
-                outline: None,
-                bbox: Rect::new(0, 0, 0, 0),
-                asc: 0,
-                desc: 0,
-                offset: glyph.offset,
-                advance: glyph.advance,
-                pos: Vector::default(),
-            };
-            if let Some((outline, asc, desc)) =
-                outline(c, cluster.face, glyph.id, &mut sources, room, work)?
-            {
-                let cbox = *outline.value.shape.cbox();
-                let ([sx, sy], offset_y) = (outline.scale, outline.offset[1]);
-                laid.bbox = Rect::new(
-                    round_ties_even_i32(f64::from(cbox.x_min) * sx),
-                    round_ties_even_i32(f64::from(cbox.y_min) * sy + offset_y),
-                    round_ties_even_i32(f64::from(cbox.x_max) * sx),
-                    round_ties_even_i32(f64::from(cbox.y_max) * sy + offset_y),
-                );
-                if c.drawing.is_some() {
-                    laid.advance = Vector::new(
-                        round_ties_even_i32(f64::from(outline.value.advance) * sx),
-                        0,
-                    );
-                }
-                laid.asc = round_ties_even_i32(f64::from(asc) * sy);
-                laid.desc = round_ties_even_i32(f64::from(desc) * sy);
-                laid.outline = Some(outline);
-            }
-            glyphs.try_push(laid).map_err(|e| e.error)?;
-        }
-    }
-    Ok(glyphs)
-}
-
-/// The outline of glyph `id` of `c`, or of its drawing, scaled, with the
-/// unscaled ascent and descent; `None` when it cannot be built.
-fn outline(
-    c: &Char<'_>,
+/// `glyph` of `c`, or its drawing, with its outline scaled and its box,
+/// ascent and descent at that scale; a drawing's advance is its width.
+/// Without an outline it has neither, and shaping's advance.
+fn measure_glyph(
+    input: &Input<'_, '_>,
+    c: &Char,
     face: usize,
-    id: triergon_font::GlyphId,
+    glyph: &ShapedGlyph,
     sources: &mut Sources<'_>,
     room: &Room<'_>,
     work: &mut WorkBudget,
-) -> Result<Option<(ScaledOutline, i32, i32)>> {
-    let style = &c.style;
-    if let Some(drawing) = c.drawing {
+) -> Result<LaidGlyph> {
+    let style = input.text.style(c);
+    let unmeasured = LaidGlyph {
+        outline: None,
+        x_min: 0,
+        x_max: 0,
+        asc: 0,
+        desc: 0,
+        advance: glyph.advance,
+        pos: Vector::default(),
+    };
+    let (outline, asc, desc, advance) = if let Some(drawing) = input.evaluated.drawing(c) {
         let Some(value) = sources.outlines.drawing(&drawing, sources.limits, work)? else {
-            return Ok(None);
+            return Ok(unmeasured);
         };
-        let base = 1_i32.wrapping_shl(drawing.scale.wrapping_sub(1) as u32);
-        let w = if base > 0 { 1.0 / f64::from(base) } else { 0.0 };
+        let w = drawing.pixel_scale();
         let scale = [
-            style.scale[0] * w * room.scales.screen[0] / room.par,
+            style.scale[0] * w * room.scales.screen[0] / room.geometry.par,
             style.scale[1] * w * room.scales.screen[1],
         ];
         let desc = 64_i32.wrapping_mul(drawing.baseline);
         let asc = value.asc.wrapping_sub(desc);
-        let offset = [0.0, -f64::from(asc) * scale[1]];
-        return Ok(Some((
-            ScaledOutline {
-                value,
-                scale,
-                offset,
-            },
-            asc,
-            desc,
-        )));
-    }
-    let key = GlyphKey {
-        font: c.font,
-        face,
-        size: style.size.to_bits(),
-        glyph: id,
-        bold: style.bold,
-        italic: style.italic,
-        decorations: style.decorations,
-    };
-    let font = sources.library.get(c.font);
-    Ok(sources.outlines.glyph(key, font, work)?.map(|value| {
+        let advance = Vector::new(round_ties_even_i32(f64::from(value.advance) * scale[0]), 0);
+        let offset_y = -f64::from(asc) * scale[1];
+        let outline = ScaledOutline {
+            value,
+            scale,
+            offset_y,
+        };
+        (outline, asc, desc, advance)
+    } else {
+        let key = GlyphKey {
+            font: c.font,
+            face,
+            size: style.size.to_bits(),
+            glyph: glyph.id,
+            bold: style.bold,
+            italic: style.italic,
+            decorations: style.decorations,
+        };
+        let font = sources.library.get(c.font);
+        let Some(value) = sources.outlines.glyph(key, font, work)? else {
+            return Ok(unmeasured);
+        };
         let (asc, desc) = (value.asc, value.desc);
-        (
-            ScaledOutline {
-                value,
-                scale: style.scale,
-                offset: [0.0; 2],
-            },
-            asc,
-            desc,
-        )
-    }))
+        let outline = ScaledOutline {
+            value,
+            scale: style.scale,
+            offset_y: 0.0,
+        };
+        (outline, asc, desc, glyph.advance)
+    };
+    let cbox = *outline.value.shape.cbox();
+    let [sx, sy] = outline.scale;
+    Ok(LaidGlyph {
+        x_min: round_ties_even_i32(f64::from(cbox.x_min) * sx),
+        x_max: round_ties_even_i32(f64::from(cbox.x_max) * sx),
+        asc: round_ties_even_i32(f64::from(asc) * sy),
+        desc: round_ties_even_i32(f64::from(desc) * sy),
+        advance,
+        pos: Vector::default(),
+        outline: Some(outline),
+    })
 }

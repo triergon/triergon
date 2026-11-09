@@ -10,9 +10,9 @@ use triergon_raster::{
     Bitmap, EffectsKey, FrameScale, GlyphBitmaps, Matrix, Raster, Run, Shape, ShapedKey, Vector,
 };
 
-use super::layout::d6_to_double;
 use super::outlines::OutlineValue;
-use super::placement::{PlacedRun, Runs};
+use super::placement::{PlacedRun, Placer, Runs};
+use super::units::d6_to_double;
 use crate::{Karaoke, Rgba};
 
 /// One run of glyphs composited together (libass's `CombinedBitmapInfo`),
@@ -102,23 +102,25 @@ impl Painter {
         self.raster.draw(shape, matrix, work)
     }
 
-    /// Draws and combines an event's placed runs, in order.
+    /// Draws and combines an event's runs, in order, into `out`.
     pub(super) fn draw(
         &mut self,
         runs: &Runs,
+        placer: &Placer<'_>,
         frame: &FrameScale,
         out: &mut BudgetVec<Combined>,
         work: &mut WorkBudget,
     ) -> Result<()> {
         out.clear();
         for (placed, glyphs) in runs.iter() {
+            // A run's glyph bitmaps live until it is composited.
             let mut run = Run::default();
             let mut drawn = BudgetVec::new(&self.budget);
-            for glyph in glyphs {
+            for glyph in glyphs.iter().filter_map(|g| placer.glyph(g)) {
                 if let Some(bitmaps) = self.raster.render(&glyph.request(frame), &mut run, work)? {
                     drawn
                         .try_push(Drawn {
-                            outline: Arc::clone(&glyph.outline),
+                            outline: Arc::clone(glyph.outline),
                             bitmaps,
                         })
                         .map_err(|e| e.error)?;

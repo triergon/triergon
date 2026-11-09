@@ -3,9 +3,10 @@
 //! shaping, its defaults.
 //!
 //! An event passes through stages, each reading the ones before it and
-//! making its own: its text evaluated ([`text`]), shaped into clusters
-//! ([`shaping`]), laid out in lines ([`layout`], [`wrap`]), placed in the
-//! frame ([`placement`]), and drawn ([`bitmaps`]) into images ([`images`]).
+//! filling its own storage, kept from event to event: its text evaluated
+//! ([`text`]), shaped into clusters ([`shaping`]), laid out in lines
+//! ([`layout`], [`wrap`]), placed in the frame ([`placement`]), and drawn
+//! ([`bitmaps`]) into images ([`images`]).
 
 mod bitmaps;
 mod collisions;
@@ -17,6 +18,7 @@ mod outlines;
 mod placement;
 mod shaping;
 mod text;
+mod units;
 mod wrap;
 
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -34,11 +36,11 @@ pub use geometry::{CacheLimits, FrameMargins, Settings, Size};
 use geometry::{Canvas, Geometry, Scales};
 pub use images::{Change, Image, ImageKind};
 use images::{ClipMask, Clipping};
-use layout::{Layout, Room, Sources};
+use layout::{Input, Layout, Room, Sources};
 use outlines::Outlines;
-use placement::{Anchor, apply_fade};
-use shaping::{Shaper, Shaping};
-use text::{DrawingText, Text};
+use placement::{Anchor, Placer, Runs, apply_fade};
+use shaping::{Shaped, Shaper, Shaping};
+use text::{DrawingText, Evaluated, Text};
 
 /// One rendered frame.
 #[derive(Clone, Copy, Debug)]
@@ -76,13 +78,18 @@ pub struct Renderer {
     canvas: Canvas,
     id: u32,
     pipeline: Pipeline,
-    /// The previous frame's images.
-    images: BudgetVec<Image>,
-    scratch: Scratch,
+    /// The images of the last frame rendered, which [`Frame`] shows.
+    last_frame: BudgetVec<Image>,
+    /// The frame being assembled, then the one before it.
+    next_frame: BudgetVec<Image>,
+    boxes: BudgetVec<EventBox>,
+    placed: BudgetVec<Placed>,
+    used: BudgetVec<collisions::Rect>,
 }
 
 /// What renders one event: the font library, the outline cache, the shaper
-/// and the painter, which keep their state between frames.
+/// and the painter, which keep their state between frames, and the storage
+/// of every stage, which each event fills again.
 #[derive(Debug)]
 struct Pipeline {
     budget: Budget,
@@ -90,20 +97,14 @@ struct Pipeline {
     outlines: Outlines,
     shaper: Shaper,
     painter: Painter,
+    text: Text,
+    shaped: Shaped,
+    layout: Layout,
+    runs: Runs,
     /// The composited runs of the event being drawn.
-    runs: BudgetVec<Combined>,
+    combined: BudgetVec<Combined>,
     /// The images of every event rendered in the frame, event by event.
-    images: BudgetVec<Image>,
-}
-
-/// Storage reused from frame to frame.
-#[derive(Debug)]
-struct Scratch {
-    boxes: BudgetVec<EventBox>,
-    placed: BudgetVec<Placed>,
-    /// The frame being assembled.
-    frame: BudgetVec<Image>,
-    used: BudgetVec<collisions::Rect>,
+    event_images: BudgetVec<Image>,
 }
 
 impl Renderer {
@@ -123,16 +124,18 @@ impl Renderer {
                 outlines: Outlines::new(budget),
                 shaper: Shaper::new(budget),
                 painter: Painter::new(budget, triergon_raster::Limits::default()),
-                runs: BudgetVec::new(budget),
-                images: BudgetVec::new(budget),
+                text: Text::new(budget),
+                shaped: Shaped::new(budget),
+                layout: Layout::new(budget),
+                runs: Runs::new(budget),
+                combined: BudgetVec::new(budget),
+                event_images: BudgetVec::new(budget),
             },
-            images: BudgetVec::new(budget),
-            scratch: Scratch {
-                boxes: BudgetVec::new(budget),
-                placed: BudgetVec::new(budget),
-                frame: BudgetVec::new(budget),
-                used: BudgetVec::new(budget),
-            },
+            last_frame: BudgetVec::new(budget),
+            next_frame: BudgetVec::new(budget),
+            boxes: BudgetVec::new(budget),
+            placed: BudgetVec::new(budget),
+            used: BudgetVec::new(budget),
         })
     }
 
@@ -160,25 +163,41 @@ impl Renderer {
                 change: Change::Content,
             });
         }
+        // One budget bounds the whole frame: every event's evaluation, font
+        // selection, shaping, layout and drawing, and collision handling.
+        let mut work = WorkBudget::new(self.canvas.settings.work);
+        let change = self.render_frame(script, now, &mut work);
+        Ok(Frame {
+            images: &self.last_frame,
+            change: change?,
+        })
+    }
+
+    /// Renders every shown event, handles collisions and makes the result
+    /// the last frame; how it differs from the one before.
+    fn render_frame(
+        &mut self,
+        script: &mut Script,
+        now: i64,
+        work: &mut WorkBudget,
+    ) -> Result<Change> {
         let settings = &self.canvas.settings;
         let pipeline = &mut self.pipeline;
         pipeline
             .library
             .register_embedded(script.id(), script.fonts())?;
         pipeline.library.begin_frame(settings.cache.fonts)?;
+        // The layout lets go of the outlines the last event used, so only
+        // the last frame's images keep theirs from the cut.
+        pipeline.layout.release();
         pipeline.outlines.trim(settings.cache.outlines)?;
         let geometry = self.canvas.place(script);
-        let scratch = &mut self.scratch;
-        pipeline.images.clear();
-        // One budget bounds the whole frame: every event's evaluation, font
-        // selection, shaping, layout and drawing, and collision handling.
-        let mut work = WorkBudget::new(settings.work);
-        let boxes = &mut scratch.boxes;
+        pipeline.event_images.clear();
+        let boxes = &mut self.boxes;
         boxes.clear();
         for index in 0..script.events().len() {
             if script.events()[index].is_shown_at(now)
-                && let Some(event) =
-                    pipeline.render_event(script, index, now, &geometry, &mut work)?
+                && let Some(event) = pipeline.render_event(script, index, now, &geometry, work)?
             {
                 boxes.try_push(event).map_err(|e| e.error)?;
             }
@@ -194,7 +213,7 @@ impl Renderer {
         // Collision records are worked on in scratch and kept with the
         // events only once the whole frame has been made: a refused frame
         // leaves them as they were.
-        let placed = &mut scratch.placed;
+        let placed = &mut self.placed;
         placed.clear();
         placed.try_reserve_exact(boxes.len())?;
         for b in boxes.as_slice() {
@@ -208,37 +227,33 @@ impl Renderer {
             records = rest;
             // Each event that takes part is fitted against those before it.
             let taking_part = layer.iter().filter(|b| b.takes_part()).count();
-            charge(&mut work, taking_part.saturating_mul(taking_part))?;
+            charge(work, taking_part.saturating_mul(taking_part))?;
             collisions::fix(
                 layer,
                 group,
-                pipeline.images.as_mut_slice(),
-                &mut scratch.used,
+                pipeline.event_images.as_mut_slice(),
+                &mut self.used,
                 self.id,
                 self.canvas.height,
             )?;
         }
-        let images = pipeline.images.as_slice();
-        let next = &mut scratch.frame;
+        let next = &mut self.next_frame;
         next.clear();
         for b in boxes.as_slice() {
-            for image in &images[b.images.clone()] {
+            for image in &pipeline.event_images[b.images.clone()] {
                 next.try_push(image.clone()).map_err(|e| e.error)?;
             }
         }
-        for (b, record) in boxes.as_slice().iter().zip(scratch.placed.as_slice()) {
+        for (b, record) in boxes.as_slice().iter().zip(self.placed.as_slice()) {
             script.events_mut()[b.event].placed = *record;
         }
         images::drop_transparent(next);
-        let change = Change::between(self.images.as_slice(), next.as_slice());
-        std::mem::swap(&mut self.images, next);
+        let change = Change::between(&self.last_frame, next);
+        std::mem::swap(&mut self.last_frame, next);
         // The previous frame's images go; what they were drawn from may now
         // leave the caches.
         next.clear();
-        Ok(Frame {
-            images: self.images.as_slice(),
-            change,
-        })
+        Ok(change)
     }
 }
 
@@ -270,9 +285,9 @@ impl Pipeline {
             context.state().explicit,
             script.info().scaled_border_and_shadow,
         );
-        let Some(text) = Text::read(
-            &self.budget,
+        let Some(evaluated) = self.text.read(
             &mut context,
+            event.text(),
             &mut self.library,
             &scales,
             geometry.par,
@@ -281,69 +296,75 @@ impl Pipeline {
         else {
             return Ok(None);
         };
-        if text.chars.is_empty() {
+        if self.text.chars().is_empty() {
             return Ok(None);
         }
-        let margins = event.margins.or(text.style.margins);
         let room = Room {
+            geometry,
             scales: &scales,
-            par: geometry.par,
-            margins,
-            max_width: geometry.text_width(margins, text.state.explicit),
-            line_spacing: geometry.canvas.settings.line_spacing,
+            margins: event.margins.or(evaluated.style.margins),
             elapsed: now.wrapping_sub(event.start),
         };
-        let area = self.draw(script, &text, geometry, &room, work)?;
-        let begin = self.images.len();
-        self.event_images(script, &text, geometry, &scales, area, work)?;
+        let area = self.draw(script, &evaluated, &room, work)?;
+        let begin = self.event_images.len();
+        self.event_images(script, &evaluated, &room, area, work)?;
         Ok(Some(EventBox::new(
             index,
             event,
-            &text.state,
+            &evaluated.state,
             area,
-            begin..self.images.len(),
+            begin..self.event_images.len(),
         )))
     }
 
-    /// Shapes, lays out, places and draws `text` into its composited runs;
-    /// its box for collision handling.
+    /// Shapes, lays out, places and draws the evaluated text into its
+    /// composited runs; its box for collision handling.
     fn draw(
         &mut self,
         script: &Script,
-        text: &Text<'_>,
-        geometry: &Geometry<'_>,
+        evaluated: &Evaluated<'_>,
         room: &Room<'_>,
         work: &mut WorkBudget,
     ) -> Result<Rect> {
+        let text = &self.text;
         // Shaping and layout pass over the characters a fixed number of
         // times; font fallback, shaping, outlines and the line rebalancing
         // charge their own work.
-        charge(work, text.chars.len().saturating_mul(16))?;
-        let shaping = Shaping::new(text.last.encoding, script.info());
-        let (shaped, bidi) = self.shaper.shape(text, &mut self.library, &shaping, work)?;
+        charge(work, text.chars().len().saturating_mul(16))?;
+        let shaping = Shaping::new(evaluated.last.encoding, script.info());
+        self.shaper
+            .shape(text, &mut self.library, &shaping, work, &mut self.shaped)?;
+        let input = Input {
+            text,
+            evaluated,
+            shaped: &self.shaped,
+            shaping: &shaping,
+        };
         let sources = Sources {
             library: &self.library,
             outlines: &mut self.outlines,
             limits: script.limits(),
         };
-        let layout = Layout::new(text, &shaped, bidi, &shaping, sources, room, work)?;
-        let anchor = Anchor::new(geometry, &text.state, room.margins, &layout);
-        let runs = placement::place(
+        self.layout.lay_out(&input, sources, room, work)?;
+        let geometry = room.geometry;
+        let anchor = Anchor::new(geometry, &evaluated.state, room.margins, &self.layout);
+        self.runs.place(text, &self.shaped, &self.layout)?;
+        let placer = Placer::new(
             text,
-            &shaped,
-            &layout,
+            &self.shaped,
+            &self.layout,
             &anchor,
             geometry,
             room.scales,
-            &self.budget,
-        )?;
+        );
         let frame = FrameScale {
             blur: room.scales.blur,
             border: room.scales.border,
             pixel_aspect: geometry.par,
         };
-        self.painter.draw(&runs, &frame, &mut self.runs, work)?;
-        Ok(anchor.event_box(&layout, geometry.par))
+        self.painter
+            .draw(&self.runs, &placer, &frame, &mut self.combined, work)?;
+        Ok(anchor.event_box(&self.layout, geometry.par))
     }
 
     /// The event's images from its composited runs: the box of a
@@ -351,27 +372,27 @@ impl Pipeline {
     fn event_images(
         &mut self,
         script: &Script,
-        text: &Text<'_>,
-        geometry: &Geometry<'_>,
-        scales: &Scales,
+        evaluated: &Evaluated<'_>,
+        room: &Room<'_>,
         area: Rect,
         work: &mut WorkBudget,
     ) -> Result<()> {
-        let opaque_background = text.last.border_style.0 == 4;
+        let geometry = room.geometry;
+        let opaque_background = evaluated.last.border_style.0 == 4;
         if opaque_background
-            && let Some(image) = background(geometry, text, scales, area, &self.budget)?
+            && let Some(image) = background(geometry, evaluated, room.scales, area, &self.budget)?
         {
-            self.images.try_push(image).map_err(|e| e.error)?;
+            self.event_images.try_push(image).map_err(|e| e.error)?;
         }
-        let clipping = clipping(geometry, &text.state);
-        let mask = self.vector_clip(geometry, &text.state, scales, script, work)?;
+        let clipping = clipping(geometry, &evaluated.state);
+        let mask = self.vector_clip(geometry, &evaluated.state, room.scales, script, work)?;
         images::render_text(
-            self.runs.as_slice(),
+            &self.combined,
             &clipping,
             !opaque_background,
             mask.as_ref(),
             &self.budget,
-            &mut self.images,
+            &mut self.event_images,
         )
     }
 
@@ -395,8 +416,7 @@ impl Pipeline {
         let Some(outline) = self.outlines.drawing(&drawing, script.limits(), work)? else {
             return Ok(None);
         };
-        let base = 1_i32.wrapping_shl(clip.scale.wrapping_sub(1) as u32);
-        let w = if base > 0 { 1.0 / f64::from(base) } else { 0.0 };
+        let w = drawing.pixel_scale();
         let margins = geometry.canvas.settings.margins;
         let matrix = Matrix([
             [
@@ -425,7 +445,7 @@ impl Pipeline {
 /// collision box and positive shadow, in the faded back colour.
 fn background(
     geometry: &Geometry<'_>,
-    text: &Text<'_>,
+    evaluated: &Evaluated<'_>,
     scales: &Scales,
     event: Rect,
     budget: &Budget,
@@ -437,7 +457,7 @@ fn background(
             0
         }
     };
-    let last = &text.last;
+    let last = &evaluated.last;
     let (sx, sy) = (
         size(last.shadow_x, scales.border[0]),
         size(last.shadow_y, scales.border[1]),
@@ -448,7 +468,7 @@ fn background(
         event.x_max.wrapping_add(sx),
         event.y_max.wrapping_add(sy),
     );
-    let colour = apply_fade(last.colours.back, text.state.fade);
+    let colour = apply_fade(last.colours.back, evaluated.state.fade);
     let canvas = geometry.canvas;
     images::background(area, (canvas.width, canvas.height), colour, budget)
 }

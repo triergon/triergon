@@ -183,8 +183,6 @@ pub(super) struct Canvas {
     pub width: i32,
     pub height: i32,
     pub storage: Option<(i32, i32)>,
-    /// The pixel aspect set by hand, 0 for none: a negative one is none.
-    pub pixel_aspect: f64,
     /// `frame_content_width` and `frame_content_height`.
     pub content: (i32, i32),
     /// `fit_width` and `fit_height`.
@@ -227,12 +225,17 @@ impl Canvas {
             width,
             height,
             storage: settings.storage.and_then(Size::checked),
-            pixel_aspect: settings
-                .pixel_aspect
-                .map_or(0.0, |par| if par < 0.0 { 0.0 } else { par }),
             content,
             fit,
         })
+    }
+
+    /// The pixel aspect set by hand: libass clamps a negative one to 0 and
+    /// reads 0 as none; NaN passes its clamp.
+    fn pixel_aspect(&self) -> Option<f64> {
+        self.settings
+            .pixel_aspect
+            .filter(|&par| par > 0.0 || par.is_nan())
     }
 
     /// The geometry of `script` in this frame.
@@ -244,17 +247,14 @@ impl Canvas {
         // aspect and the layout resolution's whenever the script names a
         // layout resolution, or none is set and the storage size is known.
         let (cw, ch) = self.content;
-        let user = self.pixel_aspect;
-        let par = if user == 0.0 || info.layout_res().is_some() {
-            if cw != 0 && ch != 0 && (info.layout_res().is_some() || self.storage.is_some()) {
+        let par = match self.pixel_aspect() {
+            Some(par) if info.layout_res().is_none() => par,
+            _ if cw != 0 && ch != 0 && (info.layout_res().is_some() || self.storage.is_some()) => {
                 let dar = f64::from(cw) / f64::from(ch);
                 let sar = f64::from(layout_res.0) / f64::from(layout_res.1);
                 dar / sar
-            } else {
-                1.0
             }
-        } else {
-            user
+            _ => 1.0,
         };
         Geometry {
             canvas: self,
@@ -273,12 +273,14 @@ impl Canvas {
         if let Some(storage) = self.storage {
             return storage;
         }
-        let par = self.pixel_aspect;
         let (cw, ch) = self.content;
         #[allow(clippy::float_cmp)] // libass's test for exactly square pixels
-        if par <= 0.0 || par == 1.0 || cw == 0 || ch == 0 {
+        let Some(par) = self
+            .pixel_aspect()
+            .filter(|&par| par != 1.0 && cw != 0 && ch != 0)
+        else {
             return play_res;
-        }
+        };
         // Integer products and quotients first, as libass computes them.
         if par > 1.0 {
             let x = play_res.1.wrapping_mul(cw).wrapping_div(ch);

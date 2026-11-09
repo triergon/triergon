@@ -3,14 +3,16 @@
 //! state scaled to the frame, and where its style runs start
 //! (`split_style_runs`).
 
+use std::ops::Range;
+
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::pixels_26_6;
 
 use super::fonts::{FontId, Library};
 use super::geometry::Scales;
 use crate::{
-    Bold, BorderStyle, Context, EventState, Glyph, GlyphState, Italic, Karaoke, KaraokeMark, Rgba,
-    Style, Symbol,
+    Bold, BorderStyle, Context, EventState, Glyph, GlyphState, Italic, KaraokeMark, Rgba, Style,
+    Symbol,
 };
 
 /// Code points from which an `@` font draws glyphs rotated
@@ -34,13 +36,31 @@ pub(super) struct Decorations {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct DrawingText<'s> {
     pub(super) text: &'s [u8],
+    /// The `\p` level.
     pub(super) scale: i32,
     pub(super) baseline: i32,
 }
 
+impl DrawingText<'_> {
+    /// Pixels per drawing unit at its `\p` level: 1 / 2^(level - 1), and 0
+    /// where libass's shift gives no positive power of two.
+    pub(super) fn pixel_scale(&self) -> f64 {
+        let base = 1_i32.wrapping_shl(self.scale.wrapping_sub(1) as u32);
+        if base > 0 { 1.0 / f64::from(base) } else { 0.0 }
+    }
+}
+
+/// A drawing character's commands, as a range of the event text.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct Drawing {
+    text: Range<usize>,
+    scale: i32,
+    baseline: i32,
+}
+
 /// How a character is drawn: the glyph state its tags gave it, in frame
 /// units.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct GlyphStyle {
     pub(super) colours: [Rgba; 4],
     /// The size the outline is loaded at: [`DRAWN_SIZE`] for text whose
@@ -149,13 +169,15 @@ impl GlyphStyle {
 }
 
 /// One character of an evaluated event.
-#[derive(Clone, Copy, Debug)]
-pub(super) struct Char<'s> {
+#[derive(Clone, Debug)]
+pub(super) struct Char {
     /// The code point; U+FFFC for a drawing.
     pub(super) symbol: u32,
-    pub(super) drawing: Option<DrawingText<'s>>,
+    pub(super) drawing: Option<Drawing>,
     pub(super) font: FontId,
-    pub(super) style: GlyphStyle,
+    /// Its style in [`Text`]'s, which consecutive characters of one glyph
+    /// state share.
+    style: usize,
     /// The karaoke tags just before it.
     pub(super) karaoke: KaraokeMark,
     /// The event's fade alpha when it was read.
@@ -164,66 +186,20 @@ pub(super) struct Char<'s> {
     pub(super) starts_run: bool,
 }
 
-impl<'s> Char<'s> {
-    fn new(glyph: &Glyph<'s>, font: FontId, vertical: bool, scales: &Scales, par: f64) -> Self {
-        let state = &glyph.state;
-        let (symbol, drawing) = match glyph.symbol {
-            Symbol::Char(code) => (code, None),
-            Symbol::Drawing {
-                text,
-                scale,
-                baseline,
-            } => (
-                0xfffc,
-                Some(DrawingText {
-                    text,
-                    scale,
-                    baseline,
-                }),
-            ),
-        };
-        let decorations = Decorations {
-            underline: state.underline,
-            strike_out: state.strike_out,
-            rotate: vertical && symbol >= VERTICAL_LOWER_BOUND,
-        };
-        Self {
-            symbol,
-            drawing,
-            font,
-            style: GlyphStyle::new(state, decorations, drawing.is_some(), scales, par),
-            karaoke: glyph.karaoke,
-            fade: glyph.fade,
-            starts_run: true,
-        }
-    }
-
-    /// Whether the character starts a style run after `previous`
-    /// (`split_style_runs`): at karaoke timing, a change of karaoke effect
-    /// from the last one set, around drawings and wherever the style or the
-    /// font's family or orientation changes.
-    fn starts_run_after(
-        &self,
-        previous: &Self,
-        last_effect: Option<Karaoke>,
-        library: &Library,
-    ) -> bool {
-        let effect = self.karaoke.kind;
-        let (a, b) = (library.get(previous.font), library.get(self.font));
-        self.karaoke.timing != 0
-            || (effect.is_some() && effect != last_effect)
-            || self.drawing.is_some()
-            || previous.drawing.is_some()
-            || a.family() != b.family()
-            || a.vertical() != b.vertical()
-            || previous.style.differs(&self.style)
-    }
+/// An event's characters evaluated at a time: what the next stage shapes.
+/// Read again for each event, into the same storage.
+#[derive(Debug)]
+pub(super) struct Text {
+    chars: BudgetVec<Char>,
+    /// The glyph states of the characters, each once per change.
+    styles: BudgetVec<GlyphStyle>,
 }
 
-/// An event's text evaluated at a time: what the next stage shapes.
-#[derive(Debug)]
-pub(super) struct Text<'s> {
-    pub(super) chars: BudgetVec<Char<'s>>,
+/// What an event's evaluation leaves besides its characters.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Evaluated<'s> {
+    /// The event text, which drawings are ranges of.
+    source: &'s [u8],
     /// The event-wide state after the text.
     pub(super) state: EventState<'s>,
     /// The glyph state after the text: its last `\fe`, border style,
@@ -234,39 +210,115 @@ pub(super) struct Text<'s> {
     pub(super) style: &'s Style,
 }
 
-impl<'s> Text<'s> {
-    /// Reads the characters of `context`'s event (`parse_events`). `None`
-    /// when a character's font has no face, which libass treats as a failed
-    /// event.
-    pub(super) fn read(
-        budget: &Budget,
+impl<'s> Evaluated<'s> {
+    /// The commands of `c`, a drawing character.
+    pub(super) fn drawing(&self, c: &Char) -> Option<DrawingText<'s>> {
+        let drawing = c.drawing.as_ref()?;
+        Some(DrawingText {
+            text: self.source.get(drawing.text.clone())?,
+            scale: drawing.scale,
+            baseline: drawing.baseline,
+        })
+    }
+}
+
+impl Text {
+    pub(super) fn new(budget: &Budget) -> Self {
+        Self {
+            chars: BudgetVec::new(budget),
+            styles: BudgetVec::new(budget),
+        }
+    }
+
+    pub(super) fn chars(&self) -> &[Char] {
+        &self.chars
+    }
+
+    /// The glyph state of `c`.
+    pub(super) fn style(&self, c: &Char) -> &GlyphStyle {
+        &self.styles[c.style]
+    }
+
+    /// Reads the characters of `context`'s event, whose text is `source`
+    /// (`parse_events`). `None` when a character's font has no face, which
+    /// libass treats as a failed event.
+    pub(super) fn read<'s>(
+        &mut self,
         context: &mut Context<'s>,
+        source: &'s [u8],
         library: &mut Library,
         scales: &Scales,
         par: f64,
         work: &mut WorkBudget,
-    ) -> Result<Option<Self>> {
-        let mut chars: BudgetVec<Char<'s>> = BudgetVec::new(budget);
+    ) -> Result<Option<Evaluated<'s>>> {
+        self.chars.clear();
+        self.styles.clear();
         let mut last_effect = None;
         while let Some(glyph) = context.next_glyph()? {
             let desc = glyph.state.font();
             let Some(font) = library.font(&desc, work)? else {
                 return Ok(None);
             };
-            let mut c = Char::new(&glyph, font, desc.vertical, scales, par);
-            if let Some(previous) = chars.last() {
-                c.starts_run = c.starts_run_after(previous, last_effect, library);
+            let (symbol, drawing) = drawing(&glyph);
+            let decorations = Decorations {
+                underline: glyph.state.underline,
+                strike_out: glyph.state.strike_out,
+                rotate: desc.vertical && symbol >= VERTICAL_LOWER_BOUND,
+            };
+            let style = GlyphStyle::new(&glyph.state, decorations, drawing.is_some(), scales, par);
+            let starts_run = self.chars.last().is_none_or(|previous| {
+                let effect = glyph.karaoke.kind;
+                let (a, b) = (library.get(previous.font), library.get(font));
+                glyph.karaoke.timing != 0
+                    || (effect.is_some() && effect != last_effect)
+                    || drawing.is_some()
+                    || previous.drawing.is_some()
+                    || a.family() != b.family()
+                    || a.vertical() != b.vertical()
+                    || self.styles[previous.style].differs(&style)
+            });
+            if glyph.karaoke.kind.is_some() {
+                last_effect = glyph.karaoke.kind;
             }
-            if c.karaoke.kind.is_some() {
-                last_effect = c.karaoke.kind;
+            if self.styles.last() != Some(&style) {
+                self.styles.try_push(style).map_err(|e| e.error)?;
             }
-            chars.try_push(c).map_err(|e| e.error)?;
+            let c = Char {
+                symbol,
+                drawing,
+                font,
+                style: self.styles.len() - 1,
+                karaoke: glyph.karaoke,
+                fade: glyph.fade,
+                starts_run,
+            };
+            self.chars.try_push(c).map_err(|e| e.error)?;
         }
-        Ok(Some(Self {
-            chars,
+        Ok(Some(Evaluated {
+            source,
             state: *context.state(),
             last: *context.glyph_state(),
             style: context.style(),
         }))
+    }
+}
+
+/// The code point a glyph shapes as and, for a drawing, its commands as a
+/// range of the event text, where the walk found them.
+fn drawing(glyph: &Glyph<'_>) -> (u32, Option<Drawing>) {
+    match glyph.symbol {
+        Symbol::Char(code) => (code, None),
+        Symbol::Drawing {
+            text,
+            scale,
+            baseline,
+        } => (
+            0xfffc,
+            Some(Drawing {
+                text: glyph.offset..glyph.offset + text.len(),
+                scale,
+                baseline,
+            }),
+        ),
     }
 }

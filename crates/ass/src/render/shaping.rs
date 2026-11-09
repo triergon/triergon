@@ -17,7 +17,7 @@ use triergon_shape::{
 };
 
 use super::fonts::Library;
-use super::text::{DRAWN_SIZE, Text};
+use super::text::{Char, DRAWN_SIZE, Text};
 use super::wrap::Line;
 use crate::{Info, charge};
 
@@ -66,29 +66,43 @@ pub(super) struct ShapedGlyph {
 /// them.
 #[derive(Clone, Debug)]
 pub(super) struct Cluster {
-    /// The face of the character's font its glyphs come from.
-    pub(super) face: usize,
     /// Its glyphs in [`Shaped::glyphs`]: always one at least, its own glyph
     /// from the character map when shaping gave it none.
     pub(super) glyphs: Range<usize>,
     /// The sum of the glyphs' advances.
     pub(super) advance: Vector,
+    /// The face of the character's font its glyphs come from.
+    pub(super) face: u16,
     /// Shaping gave the character a glyph; a drawing always has one. A
     /// character a ligature took or HarfBuzz hid is not shown (libass's
     /// `skip`).
     pub(super) visible: bool,
 }
 
-/// An event shaped: what the next stage lays out.
+/// An event shaped: what the next stage lays out. Shaped again for each
+/// event, into the same storage.
 #[derive(Debug)]
 pub(super) struct Shaped {
     /// Each character's cluster, in text order.
     pub(super) clusters: BudgetVec<Cluster>,
     /// The glyphs of every cluster, cluster by cluster.
     pub(super) glyphs: BudgetVec<ShapedGlyph>,
+    pub(super) bidi: Bidi,
 }
 
 impl Shaped {
+    pub(super) fn new(budget: &Budget) -> Self {
+        Self {
+            clusters: BudgetVec::new(budget),
+            glyphs: BudgetVec::new(budget),
+            bidi: Bidi {
+                classes: BudgetVec::new(budget),
+                levels: BudgetVec::new(budget),
+                directions: BudgetVec::new(budget),
+            },
+        }
+    }
+
     /// The glyphs of `cluster`.
     pub(super) fn glyphs(&self, cluster: &Cluster) -> &[ShapedGlyph] {
         &self.glyphs[cluster.glyphs.clone()]
@@ -127,8 +141,8 @@ const MAX_PLANS: usize = 256;
 /// Bytes charged per plan beyond its own storage.
 const PLAN_ENTRY_BYTES: usize = 256;
 
-/// The shaper's reusable state: a buffer, a bidi resolver, the plans built
-/// so far, and storage for the event being shaped.
+/// The shaper's state: a buffer, a bidi resolver, the plans built so far,
+/// and storage for the event being shaped.
 #[derive(Debug)]
 pub(super) struct Shaper {
     budget: Budget,
@@ -140,29 +154,21 @@ pub(super) struct Shaper {
     text: BudgetVec<char>,
     /// What finding runs gave each character.
     items: BudgetVec<Itemised>,
-    /// The glyphs shaping gave, in the order it gave them.
-    output: BudgetVec<Output>,
+    /// The glyphs shaping gave each character of the item being shaped,
+    /// then where its cluster's next one goes.
+    counts: BudgetVec<usize>,
 }
 
 /// What finding runs gives a character (`ass_shaper_find_runs`).
 #[derive(Clone, Copy, Debug)]
 struct Itemised {
     script: WritingScript,
-    /// The face of its font it is shaped with.
-    face: usize,
-    /// Its glyph in that face, as the character map gives it.
+    /// Its glyph in its face, as the character map gives it.
     glyph: GlyphId,
+    /// The face of its font it is shaped with.
+    face: u16,
     /// The run of one face, script and style it is shaped in.
     run: u32,
-}
-
-/// One glyph shaping gave, for the character `char`.
-#[derive(Clone, Copy, Debug)]
-struct Output {
-    char: usize,
-    /// Its place in the output, which orders a cluster's glyphs.
-    order: usize,
-    glyph: ShapedGlyph,
 }
 
 /// Whether a code point affects the shaping of its neighbours across runs:
@@ -263,39 +269,66 @@ impl Shaper {
             charge: Reservation::empty(budget),
             text: BudgetVec::new(budget),
             items: BudgetVec::new(budget),
-            output: BudgetVec::new(budget),
+            counts: BudgetVec::new(budget),
         }
     }
 
-    /// Shapes `text`: its clusters, and the bidi levels its lines are later
-    /// reordered by.
+    /// Shapes `text` into `out`: its clusters, and the bidi levels its lines
+    /// are later reordered by.
     pub(super) fn shape(
         &mut self,
-        text: &Text<'_>,
+        text: &Text,
         library: &mut Library,
         shaping: &Shaping<'_>,
         work: &mut WorkBudget,
-    ) -> Result<(Shaped, Bidi)> {
+        out: &mut Shaped,
+    ) -> Result<()> {
         self.find_runs(text, library, shaping.whole_text, work)?;
         self.text.clear();
-        self.text.try_reserve_exact(text.chars.len())?;
-        for c in text.chars.iter() {
+        self.text.try_reserve_exact(text.chars().len())?;
+        for c in text.chars() {
             self.text.try_push(scalar(c.symbol)).map_err(|e| e.error)?;
         }
-        let bidi = self.resolve_levels(text, shaping)?;
-        self.shape_runs(text, library, shaping, &bidi.levels, work)?;
-        Ok((self.clusters(text)?, bidi))
+        self.resolve_levels(text, shaping, &mut out.bidi)?;
+        out.clusters.clear();
+        out.glyphs.clear();
+        out.clusters.try_reserve_exact(text.chars().len())?;
+        let chars = text.chars();
+        let mut i = 0;
+        while i < chars.len() {
+            if chars[i].drawing.is_some() {
+                // A drawing is drawn as itself: one glyph, sized by its outline.
+                out.glyphs
+                    .try_push(ShapedGlyph::default())
+                    .map_err(|e| e.error)?;
+                let cluster = Cluster {
+                    glyphs: out.glyphs.len() - 1..out.glyphs.len(),
+                    advance: Vector::default(),
+                    face: self.items[i].face,
+                    visible: true,
+                };
+                out.clusters.try_push(cluster).map_err(|e| e.error)?;
+                i += 1;
+                continue;
+            }
+            let item = self.item(chars, &out.bidi.levels, i);
+            let direction = out.bidi.levels[i].direction();
+            let base = self.shape_item(text, library, shaping, item.clone(), direction, work)?;
+            self.push_clusters(text, item.clone(), base, out)?;
+            i = item.end;
+        }
+        Ok(())
     }
 
     /// `ass_shaper_find_runs`: scripts, faces and shape runs.
     fn find_runs(
         &mut self,
-        text: &Text<'_>,
+        text: &Text,
         library: &mut Library,
         whole_text: bool,
         work: &mut WorkBudget,
     ) -> Result<()> {
-        let chars = text.chars.as_slice();
+        let chars = text.chars();
         let items = &mut self.items;
         items.clear();
         items.try_reserve_exact(chars.len())?;
@@ -305,8 +338,8 @@ impl Shaper {
             items
                 .try_push(Itemised {
                     script,
-                    face: 0,
                     glyph: GlyphId(0),
+                    face: 0,
                     run: 0,
                 })
                 .map_err(|e| e.error)?;
@@ -317,7 +350,10 @@ impl Shaper {
         for (i, c) in chars.iter().enumerate() {
             let ignorable = is_ignorable(c.symbol);
             if c.drawing.is_none() && !ignorable {
-                (items[i].face, items[i].glyph) = library.glyph(c.font, c.symbol, work)?;
+                let (face, glyph) = library.glyph(c.font, c.symbol, work)?;
+                // A font holds at most `MAX_FACES` faces.
+                items[i].face = face as u16;
+                items[i].glyph = glyph;
             }
             if i > 0 {
                 let (previous, last) = (&chars[i - 1], items[i - 1]);
@@ -325,8 +361,8 @@ impl Shaper {
                     || (!ignorable && last.face != items[i].face)
                     || last.script != items[i].script
                     || c.starts_run
-                    || (!whole_text && c.style.spacing != 0.0)
-                    || previous.style.decorations != c.style.decorations
+                    || (!whole_text && text.style(c).spacing != 0.0)
+                    || text.style(previous).decorations != text.style(c).decorations
                 {
                     run += 1;
                 } else if ignorable {
@@ -341,13 +377,16 @@ impl Shaper {
     /// The bidi classes, and the levels resolved one paragraph at a time;
     /// without whole-text layout, each style run and each letter-spaced
     /// character is a paragraph.
-    fn resolve_levels(&mut self, text: &Text<'_>, shaping: &Shaping<'_>) -> Result<Bidi> {
+    fn resolve_levels(
+        &mut self,
+        text: &Text,
+        shaping: &Shaping<'_>,
+        bidi: &mut Bidi,
+    ) -> Result<()> {
         let len = self.text.len();
-        let mut bidi = Bidi {
-            classes: BudgetVec::new(&self.budget),
-            levels: BudgetVec::new(&self.budget),
-            directions: BudgetVec::new(&self.budget),
-        };
+        bidi.classes.clear();
+        bidi.levels.clear();
+        bidi.directions.clear();
         bidi.classes.try_reserve_exact(len)?;
         bidi.levels.try_reserve_exact(len)?;
         for &c in self.text.as_slice() {
@@ -358,13 +397,13 @@ impl Shaper {
                 .try_push(Level::default())
                 .map_err(|e| e.error)?;
         }
-        let chars = text.chars.as_slice();
+        let chars = text.chars();
         let mut start = 0;
         for i in 0..len {
             let ends = i == len - 1
                 || bidi.classes[i] == BidiClass::B
                 || (!shaping.whole_text
-                    && (chars[i + 1].starts_run || chars[i].style.spacing != 0.0));
+                    && (chars[i + 1].starts_run || text.style(&chars[i]).spacing != 0.0));
             if ends {
                 let direction = self.resolver.resolve(
                     &bidi.classes[start..=i],
@@ -378,169 +417,184 @@ impl Shaper {
                 start = i + 1;
             }
         }
-        Ok(bidi)
-    }
-
-    /// `shape_harfbuzz`: each item of one shape run and bidi level shaped,
-    /// its glyphs kept in the order shaping gives them.
-    fn shape_runs(
-        &mut self,
-        text: &Text<'_>,
-        library: &Library,
-        shaping: &Shaping<'_>,
-        levels: &[Level],
-        work: &mut WorkBudget,
-    ) -> Result<()> {
-        let chars = text.chars.as_slice();
-        let len = chars.len();
-        self.output.clear();
-        let mut i = 0;
-        while i < len {
-            if chars[i].drawing.is_some() {
-                i += 1;
-                continue;
-            }
-            let offset = i;
-            let (run, level) = (self.items[offset].run, levels[offset]);
-            while i + 1 < len && self.items[i + 1].run == run && levels[i + 1] == level {
-                i += 1;
-            }
-            let item = offset..i + 1;
-            let first = &chars[offset];
-            let font = library.get(first.font);
-            let face_font = &font.faces()[self.items[offset].face];
-            let direction = level.direction();
-            let script = self.items[offset].script;
-            let language = language_code(shaping.language, script);
-            // Ligatures only without letter spacing, vertical forms for `@`
-            // fonts.
-            let features = [font.vertical(), shaping.kerning, first.style.spacing == 0.0];
-            let context = if shaping.whole_text {
-                0..len
-            } else {
-                let lead = usize::from(
-                    offset > 0
-                        && !chars[offset].starts_run
-                        && is_shaping_control(chars[offset - 1].symbol),
-                );
-                let trail = usize::from(
-                    i + 1 < len
-                        && !chars[i + 1].starts_run
-                        && is_shaping_control(chars[i + 1].symbol),
-                );
-                offset - lead..i + 1 + trail
-            };
-            // A call shapes the item and reads at most `CONTEXT` characters of
-            // the context on either side (HarfBuzz's buffer context), however
-            // much of the text is handed to it.
-            let read = item.len()
-                + (item.start - context.start).min(CONTEXT)
-                + (context.end - item.end).min(CONTEXT);
-            charge(work, read.saturating_add(RUN_UNITS))?;
-            let sized = face_font.font.at_size(pixels_26_6(DRAWN_SIZE))?;
-            let metrics = SizedMetrics::new(sized)?;
-            let shaper_face = Face::new(&face_font.font);
-            let key = PlanKey {
-                face: face_font.uid,
-                direction,
-                script,
-                language,
-                features,
-            };
-            if !self.plans.contains_key(&key) {
-                if self.plans.len() >= MAX_PLANS {
-                    self.plans.clear();
-                }
-                let code = language.split(|&b| b == 0).next().unwrap_or_default();
-                let plan = Plan::new(
-                    &shaper_face,
-                    direction,
-                    script,
-                    &Language::new(std::str::from_utf8(code).unwrap_or("c"))?,
-                    &plan_features(features),
-                    &self.budget,
-                )?;
-                self.plans.insert(key, plan);
-                self.charge
-                    .resize_to(self.plans.len().saturating_mul(PLAN_ENTRY_BYTES))?;
-            }
-            let base = context.start;
-            triergon_shape::shape(
-                &shaper_face,
-                &metrics,
-                &self.plans[&key],
-                &self.text[context],
-                item.start - base..item.end - base,
-                &mut self.buffer,
-            )?;
-            self.output.try_reserve_exact(self.buffer.len())?;
-            for (shaped, position) in self.buffer.glyphs() {
-                let char = base + shaped.cluster as usize;
-                let Some(c) = chars.get(char) else { continue };
-                let [sx, sy] = c.style.scale;
-                let glyph = ShapedGlyph {
-                    id: shaped.id,
-                    offset: Vector::new(
-                        round_ties_even_i32(f64::from(position.x_offset) * sx),
-                        round_ties_even_i32(f64::from(-position.y_offset) * sy),
-                    ),
-                    advance: Vector::new(
-                        round_ties_even_i32(f64::from(position.x_advance) * sx),
-                        round_ties_even_i32(f64::from(-position.y_advance) * sy),
-                    ),
-                };
-                let order = self.output.len();
-                self.output
-                    .try_push(Output { char, order, glyph })
-                    .map_err(|e| e.error)?;
-            }
-            i += 1;
-        }
         Ok(())
     }
 
-    /// Each character's cluster: the glyphs shaping gave it, in the order it
-    /// gave them, else its own glyph.
-    fn clusters(&mut self, text: &Text<'_>) -> Result<Shaped> {
-        let chars = text.chars.as_slice();
-        let output = self.output.as_mut_slice();
-        output.sort_unstable_by_key(|o| (o.char, o.order));
-        let mut shaped = Shaped {
-            clusters: BudgetVec::new(&self.budget),
-            glyphs: BudgetVec::new(&self.budget),
+    /// The item starting at character `start`: the characters after it of
+    /// its shape run and bidi level, up to a drawing (`shape_harfbuzz`).
+    fn item(&self, chars: &[Char], levels: &[Level], start: usize) -> Range<usize> {
+        let (run, level) = (self.items[start].run, levels[start]);
+        let mut end = start + 1;
+        while end < chars.len() && self.items[end].run == run && levels[end] == level {
+            end += 1;
+        }
+        start..end
+    }
+
+    /// Shapes the characters of `item` into the buffer, reading the context
+    /// libass hands HarfBuzz around it; the index in the text of the
+    /// buffer's character 0.
+    fn shape_item(
+        &mut self,
+        text: &Text,
+        library: &Library,
+        shaping: &Shaping<'_>,
+        item: Range<usize>,
+        direction: Direction,
+        work: &mut WorkBudget,
+    ) -> Result<usize> {
+        let chars = text.chars();
+        let len = chars.len();
+        let first = &chars[item.start];
+        let font = library.get(first.font);
+        let itemised = self.items[item.start];
+        let face_font = &font.faces()[usize::from(itemised.face)];
+        let script = itemised.script;
+        let language = language_code(shaping.language, script);
+        // Ligatures only without letter spacing, vertical forms for `@`
+        // fonts.
+        let features = [
+            font.vertical(),
+            shaping.kerning,
+            text.style(first).spacing == 0.0,
+        ];
+        let context = if shaping.whole_text {
+            0..len
+        } else {
+            let joins = |at: usize| !chars[at].starts_run;
+            let lead = usize::from(
+                item.start > 0
+                    && joins(item.start)
+                    && is_shaping_control(chars[item.start - 1].symbol),
+            );
+            let trail = usize::from(
+                item.end < len && joins(item.end) && is_shaping_control(chars[item.end].symbol),
+            );
+            item.start - lead..item.end + trail
         };
-        shaped.clusters.try_reserve_exact(chars.len())?;
-        shaped
-            .glyphs
-            .try_reserve_exact(chars.len().max(output.len()))?;
-        let mut output = output.iter().peekable();
-        for (i, (c, item)) in chars.iter().zip(self.items.iter()).enumerate() {
-            let start = shaped.glyphs.len();
-            let mut advance = Vector::default();
-            while let Some(o) = output.next_if(|o| o.char == i) {
-                advance.x = advance.x.wrapping_add(o.glyph.advance.x);
-                advance.y = advance.y.wrapping_add(o.glyph.advance.y);
-                shaped.glyphs.try_push(o.glyph).map_err(|e| e.error)?;
+        // A call shapes the item and reads at most `CONTEXT` characters of
+        // the context on either side (HarfBuzz's buffer context), however
+        // much of the text is handed to it.
+        let read = item.len()
+            + (item.start - context.start).min(CONTEXT)
+            + (context.end - item.end).min(CONTEXT);
+        charge(work, read.saturating_add(RUN_UNITS))?;
+        let sized = face_font.font.at_size(pixels_26_6(DRAWN_SIZE))?;
+        let metrics = SizedMetrics::new(sized)?;
+        let shaper_face = Face::new(&face_font.font);
+        let key = PlanKey {
+            face: face_font.uid,
+            direction,
+            script,
+            language,
+            features,
+        };
+        if !self.plans.contains_key(&key) {
+            if self.plans.len() >= MAX_PLANS {
+                self.plans.clear();
             }
-            let visible = c.drawing.is_some() || shaped.glyphs.len() > start;
-            if shaped.glyphs.len() == start {
-                let own = ShapedGlyph {
-                    id: item.glyph,
-                    ..ShapedGlyph::default()
-                };
-                shaped.glyphs.try_push(own).map_err(|e| e.error)?;
+            let code = language.split(|&b| b == 0).next().unwrap_or_default();
+            let plan = Plan::new(
+                &shaper_face,
+                direction,
+                script,
+                &Language::new(std::str::from_utf8(code).unwrap_or("c"))?,
+                &plan_features(features),
+                &self.budget,
+            )?;
+            self.plans.insert(key, plan);
+            self.charge
+                .resize_to(self.plans.len().saturating_mul(PLAN_ENTRY_BYTES))?;
+        }
+        let base = context.start;
+        triergon_shape::shape(
+            &shaper_face,
+            &metrics,
+            &self.plans[&key],
+            &self.text[context],
+            item.start - base..item.end - base,
+            &mut self.buffer,
+        )?;
+        Ok(base)
+    }
+
+    /// The clusters of `item`'s characters from the shaped buffer, whose
+    /// character 0 is the text's `base`: each character's glyphs in the
+    /// order shaping gave them, or its own glyph when it gave none.
+    fn push_clusters(
+        &mut self,
+        text: &Text,
+        item: Range<usize>,
+        base: usize,
+        out: &mut Shaped,
+    ) -> Result<()> {
+        let counts = &mut self.counts;
+        counts.clear();
+        counts.try_resize(item.len(), 0)?;
+        let in_item = |cluster: u32| {
+            (base + cluster as usize)
+                .checked_sub(item.start)
+                .filter(|&k| k < item.len())
+        };
+        for (glyph, _) in self.buffer.glyphs() {
+            if let Some(k) = in_item(glyph.cluster) {
+                counts[k] += 1;
             }
-            shaped
-                .clusters
+        }
+        // Each character's cluster starts where the last ended; `counts`
+        // then holds where its next glyph goes.
+        let first = out.glyphs.len();
+        let total: usize = counts.iter().map(|&n| n.max(1)).sum();
+        // The event's glyphs grow item by item: at least double, so the
+        // copies stay linear in them.
+        let needed = first + total;
+        if needed > out.glyphs.capacity() {
+            out.glyphs
+                .try_reserve_exact(needed.max(out.glyphs.capacity() * 2) - first)?;
+        }
+        out.glyphs.try_resize(needed, ShapedGlyph::default())?;
+        let mut at = first;
+        for (k, count) in counts.as_mut_slice().iter_mut().enumerate() {
+            let itemised = self.items[item.start + k];
+            let len = (*count).max(1);
+            out.glyphs[at] = ShapedGlyph {
+                id: itemised.glyph,
+                ..ShapedGlyph::default()
+            };
+            out.clusters
                 .try_push(Cluster {
-                    face: item.face,
-                    glyphs: start..shaped.glyphs.len(),
-                    advance,
-                    visible,
+                    glyphs: at..at + len,
+                    advance: Vector::default(),
+                    face: itemised.face,
+                    visible: *count > 0,
                 })
                 .map_err(|e| e.error)?;
+            *count = at;
+            at += len;
         }
-        Ok(shaped)
+        for (shaped, position) in self.buffer.glyphs() {
+            let Some(k) = in_item(shaped.cluster) else {
+                continue;
+            };
+            let [sx, sy] = text.style(&text.chars()[item.start + k]).scale;
+            let glyph = ShapedGlyph {
+                id: shaped.id,
+                offset: Vector::new(
+                    round_ties_even_i32(f64::from(position.x_offset) * sx),
+                    round_ties_even_i32(f64::from(-position.y_offset) * sy),
+                ),
+                advance: Vector::new(
+                    round_ties_even_i32(f64::from(position.x_advance) * sx),
+                    round_ties_even_i32(f64::from(-position.y_advance) * sy),
+                ),
+            };
+            let cluster = &mut out.clusters[item.start + k];
+            cluster.advance.x = cluster.advance.x.wrapping_add(glyph.advance.x);
+            cluster.advance.y = cluster.advance.y.wrapping_add(glyph.advance.y);
+            out.glyphs[counts[k]] = glyph;
+            counts[k] += 1;
+        }
+        Ok(())
     }
 }
 
@@ -593,20 +647,27 @@ fn inherit_scripts(items: &mut [Itemised]) {
 }
 
 impl Bidi {
-    /// `ass_shaper_reorder`: the character shown at each position, each line
-    /// reordered on its own and, without whole-text layout, each run and
-    /// letter-spaced character within it; `starts_run` tells where runs start
-    /// once lines are trimmed.
+    /// `ass_shaper_reorder`: the character shown at each position into
+    /// `order`, each line reordered on its own and, without whole-text
+    /// layout, each run and letter-spaced character within it; `starts_run`
+    /// tells where runs start once lines are trimmed. The levels are
+    /// reordered in `levels`, a copy.
     pub(super) fn visual_order(
-        mut self,
-        text: &Text<'_>,
+        &self,
+        text: &Text,
         lines: &[Line],
         starts_run: impl Fn(usize) -> bool,
         shaping: &Shaping<'_>,
-    ) -> Result<BudgetVec<usize>> {
-        let chars = text.chars.as_slice();
-        let mut order = BudgetVec::new(self.classes.budget());
-        order.try_extend_with(chars.len(), |i| i)?;
+        levels: &mut BudgetVec<Level>,
+        order: &mut BudgetVec<u32>,
+    ) -> Result<()> {
+        let chars = text.chars();
+        levels.clear();
+        levels.try_extend_from_slice(&self.levels)?;
+        order.clear();
+        // An event holds fewer characters than `u32` counts: each is
+        // charged to the budget as many bytes.
+        order.try_extend_with(chars.len(), |i| i as u32)?;
         let mut paragraph = 0;
         for line in lines {
             let mut start = line.chars.start;
@@ -615,7 +676,7 @@ impl Bidi {
                 let ends = i + 1 == line.chars.end
                     || class == BidiClass::B
                     || (!shaping.whole_text
-                        && (starts_run(i + 1) || chars[i].style.spacing != 0.0));
+                        && (starts_run(i + 1) || text.style(&chars[i]).spacing != 0.0));
                 if !ends {
                     continue;
                 }
@@ -633,7 +694,7 @@ impl Bidi {
                 reorder_line(
                     &self.classes[start..=i],
                     direction,
-                    &mut self.levels.as_mut_slice()[start..=i],
+                    &mut levels.as_mut_slice()[start..=i],
                     &mut order.as_mut_slice()[start..=i],
                 )?;
                 start = i + 1;
@@ -642,6 +703,6 @@ impl Bidi {
                 }
             }
         }
-        Ok(order)
+        Ok(())
     }
 }

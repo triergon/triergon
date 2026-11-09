@@ -1,7 +1,7 @@
 //! The fourth stage: a laid-out event placed in the frame. Its position by
 //! `\pos` or `\move`, a scroll, or its alignment and margins; its rotation
-//! origin (`calculate_rotation_params`); then each glyph's placement and
-//! effects, in the runs that are composited together
+//! origin (`calculate_rotation_params`); the runs its drawn glyphs are
+//! composited in; and each glyph's placement and effects as it is drawn
 //! (`render_and_combine_glyphs` up to drawing). Drawing them is the
 //! painter's.
 
@@ -14,38 +14,22 @@ use triergon_raster::{
 };
 
 use super::geometry::{Geometry, Scales};
-use super::layout::{LaidGlyph, Layout, ScaledOutline, TextBox, Timing, d6_to_double};
+use super::layout::{LaidChar, Layout, TextBox, Timing};
 use super::outlines::OutlineValue;
 use super::shaping::Shaped;
-use super::text::{GlyphStyle, Text};
+use super::text::{Char, GlyphStyle, Text};
+use super::units::d6_to_double;
 use crate::{
     EventState, HAlign, Karaoke, Margins, Placement as EventPlacement, Rgba, ScrollDirection,
     VAlign,
 };
 
-/// One glyph placed in the frame: what drawing it takes.
-#[derive(Debug)]
+/// A glyph placed in a run: glyph `glyph` of [`Layout::glyphs`], of
+/// character `char`.
+#[derive(Clone, Copy, Debug)]
 pub(super) struct PlacedGlyph {
-    pub(super) outline: Arc<OutlineValue>,
-    pub(super) placement: Placement,
-    /// The effects its state gives it, of which its border is drawn with
-    /// it.
-    pub(super) effects: Effects,
-    /// It is timed by `\kf`, so its run tracks its leftmost x.
-    pub(super) karaoke: bool,
-}
-
-impl PlacedGlyph {
-    /// What [`Raster::render`](triergon_raster::Raster::render) draws for it.
-    pub(super) fn request<'a>(&'a self, frame: &FrameScale) -> GlyphRequest<'a> {
-        GlyphRequest {
-            shape: &self.outline.shape,
-            placement: self.placement,
-            frame: *frame,
-            effects: &self.effects,
-            karaoke: self.karaoke,
-        }
-    }
+    char: usize,
+    glyph: usize,
 }
 
 /// A run of glyphs composited together (libass's `CombinedBitmapInfo`
@@ -59,12 +43,12 @@ pub(super) struct PlacedRun {
     pub(super) effect_timing: i32,
     /// The effects the run is composited with.
     pub(super) effects: Effects,
-    /// Its glyphs in [`Runs::glyphs`].
+    /// Its glyphs in [`Runs`].
     glyphs: Range<usize>,
 }
 
-/// An event's glyphs placed in the frame, in the runs that are composited
-/// together, in text order.
+/// An event's drawn glyphs in the runs that are composited together, in
+/// text order. Placed again for each event, into the same storage.
 #[derive(Debug)]
 pub(super) struct Runs {
     runs: BudgetVec<PlacedRun>,
@@ -72,11 +56,68 @@ pub(super) struct Runs {
 }
 
 impl Runs {
+    pub(super) fn new(budget: &Budget) -> Self {
+        Self {
+            runs: BudgetVec::new(budget),
+            glyphs: BudgetVec::new(budget),
+        }
+    }
+
     /// Each run with its glyphs.
     pub(super) fn iter(&self) -> impl Iterator<Item = (&PlacedRun, &[PlacedGlyph])> {
         self.runs
             .iter()
             .map(|run| (run, &self.glyphs[run.glyphs.clone()]))
+    }
+
+    /// Groups the drawn glyphs of a laid-out event into runs: a run starts
+    /// at a character that starts one and is set by the first drawn
+    /// character after it. A glyph without an outline, and the glyph of a
+    /// `\n` or a drawing's placeholder, joins none.
+    pub(super) fn place(&mut self, text: &Text, shaped: &Shaped, layout: &Layout) -> Result<()> {
+        self.runs.clear();
+        self.glyphs.clear();
+        let mut new_run = true;
+        let chars = text
+            .chars()
+            .iter()
+            .zip(&*shaped.clusters)
+            .zip(&*layout.chars);
+        for (char, ((c, cluster), laid)) in chars.enumerate() {
+            new_run |= laid.starts_run;
+            if !laid.drawn {
+                continue;
+            }
+            if new_run {
+                let style = text.style(c);
+                let colours = laid.karaoke.colours(style.colours);
+                let start = self.glyphs.len();
+                self.runs
+                    .try_push(PlacedRun {
+                        colours: colours.map(|colour| apply_fade(colour, c.fade)),
+                        effect: laid.karaoke.effect,
+                        effect_timing: laid.karaoke.timing,
+                        effects: effects(style, &colours, c.fade, laid.karaoke.effect),
+                        glyphs: start..start,
+                    })
+                    .map_err(|e| e.error)?;
+                new_run = false;
+            }
+            if c.symbol == u32::from(b'\n') || c.symbol == 0 {
+                continue;
+            }
+            for glyph in cluster.glyphs.clone() {
+                if layout.glyphs[glyph].outline.is_some() {
+                    self.glyphs
+                        .try_push(PlacedGlyph { char, glyph })
+                        .map_err(|e| e.error)?;
+                }
+            }
+            if let Some(run) = self.runs.as_mut_slice().last_mut() {
+                run.glyphs.end = self.glyphs.len();
+            }
+        }
+        Ok(())
     }
 }
 
@@ -258,80 +299,45 @@ fn effects(style: &GlyphStyle, colours: &[Rgba; 4], fade: i32, effect: Option<Ka
     }
 }
 
-/// Places the drawn glyphs of a laid-out event at `anchor`, run by run in
-/// text order; a run starts at a character that starts one and is set by
-/// the first drawn character after it.
-///
-/// libass times the first glyph of a cluster; shaping copied the others
-/// before karaoke timing, so they keep their tags' timing and colours.
-pub(super) fn place(
-    text: &Text<'_>,
-    shaped: &Shaped,
-    layout: &Layout,
-    anchor: &Anchor,
-    geometry: &Geometry<'_>,
-    scales: &Scales,
-    budget: &Budget,
-) -> Result<Runs> {
-    let frame = InFrame::new(anchor, geometry, scales);
-    let mut runs = Runs {
-        runs: BudgetVec::new(budget),
-        glyphs: BudgetVec::new(budget),
-    };
-    let mut new_run = true;
-    let chars = text.chars.iter().zip(&*shaped.clusters).zip(&*layout.chars);
-    for ((c, cluster), laid) in chars {
-        new_run |= laid.starts_run;
-        if !laid.drawn {
-            continue;
-        }
-        let style = &c.style;
-        for (k, glyph) in layout.glyphs[cluster.glyphs.clone()].iter().enumerate() {
-            let timing = if k == 0 {
-                laid.karaoke
-            } else {
-                Timing::untimed(c.karaoke)
-            };
-            let colours = timing.colours(style.colours);
-            let effects = effects(style, &colours, c.fade, timing.effect);
-            if new_run {
-                let start = runs.glyphs.len();
-                runs.runs
-                    .try_push(PlacedRun {
-                        colours: colours.map(|colour| apply_fade(colour, c.fade)),
-                        effect: timing.effect,
-                        effect_timing: timing.timing,
-                        effects,
-                        glyphs: start..start,
-                    })
-                    .map_err(|e| e.error)?;
-                new_run = false;
-            }
-            let Some(outline) = &glyph.outline else {
-                continue;
-            };
-            if c.symbol == u32::from(b'\n') || c.symbol == 0 {
-                continue;
-            }
-            runs.glyphs
-                .try_push(PlacedGlyph {
-                    outline: Arc::clone(&outline.value),
-                    placement: frame.placement(glyph, outline, style),
-                    effects,
-                    karaoke: timing.effect == Some(Karaoke::Fill),
-                })
-                .map_err(|e| e.error)?;
-            if let Some(run) = runs.runs.as_mut_slice().last_mut() {
-                run.glyphs.end = runs.glyphs.len();
-            }
-        }
+/// A glyph's karaoke: libass times the first glyph of a cluster; shaping
+/// copied the others before karaoke timing, so they keep their tags'.
+fn timing(c: &Char, laid: &LaidChar, first: bool) -> Timing {
+    if first {
+        laid.karaoke
+    } else {
+        Timing::untimed(c.karaoke)
     }
-    Ok(runs)
 }
 
-/// What places a laid-out glyph in the frame.
+/// What a placed glyph is drawn with.
+#[derive(Debug)]
+pub(super) struct GlyphPlacement<'a> {
+    pub(super) outline: &'a Arc<OutlineValue>,
+    placement: Placement,
+    effects: Effects,
+    /// It is timed by `\kf`, so its run tracks its leftmost x.
+    karaoke: bool,
+}
+
+impl GlyphPlacement<'_> {
+    /// What [`Raster::render`](triergon_raster::Raster::render) draws for it.
+    pub(super) fn request(&self, frame: &FrameScale) -> GlyphRequest<'_> {
+        GlyphRequest {
+            shape: &self.outline.shape,
+            placement: self.placement,
+            frame: *frame,
+            effects: &self.effects,
+            karaoke: self.karaoke,
+        }
+    }
+}
+
+/// What places an event's glyphs in the frame as they are drawn.
 #[derive(Clone, Copy, Debug)]
-struct InFrame {
+pub(super) struct Placer<'a> {
+    text: &'a Text,
+    shaped: &'a Shaped,
+    layout: &'a Layout,
     anchor: Anchor,
     /// The anchor in the frame, x stretched by the pixel aspect about the
     /// left margin, y in 26.6.
@@ -341,11 +347,21 @@ struct InFrame {
     border_scale: [f64; 2],
 }
 
-impl InFrame {
-    fn new(anchor: &Anchor, geometry: &Geometry<'_>, scales: &Scales) -> Self {
+impl<'a> Placer<'a> {
+    pub(super) fn new(
+        text: &'a Text,
+        shaped: &'a Shaped,
+        layout: &'a Layout,
+        anchor: &Anchor,
+        geometry: &Geometry<'_>,
+        scales: &Scales,
+    ) -> Self {
         let par = geometry.par;
         let left = f64::from(geometry.canvas.settings.margins.left);
         Self {
+            text,
+            shaped,
+            layout,
             anchor: *anchor,
             x: (anchor.x - left) * par + left,
             y: pixels_26_6(anchor.y),
@@ -354,15 +370,18 @@ impl InFrame {
         }
     }
 
-    /// The glyph's placement: its position in the frame and its offset from
-    /// the rotation origin, displaced by its shadow
-    /// (`calculate_rotation_params`).
-    fn placement(
-        &self,
-        glyph: &LaidGlyph,
-        outline: &ScaledOutline,
-        style: &GlyphStyle,
-    ) -> Placement {
+    /// What `placed` is drawn with: its outline, its position in the frame
+    /// and offset from the rotation origin displaced by its shadow
+    /// (`calculate_rotation_params`), and the effects its state gives it.
+    pub(super) fn glyph(&self, placed: &PlacedGlyph) -> Option<GlyphPlacement<'a>> {
+        let c = &self.text.chars()[placed.char];
+        let style = self.text.style(c);
+        let laid = &self.layout.chars[placed.char];
+        let glyph = &self.layout.glyphs[placed.glyph];
+        let outline = glyph.outline.as_ref()?;
+        let first = placed.glyph == self.shaped.clusters[placed.char].glyphs.start;
+        let timing = timing(c, laid, first);
+        let colours = timing.colours(style.colours);
         let (anchor, par, border) = (&self.anchor, self.par, self.border_scale);
         let shift = Vector::new(
             glyph.pos.x.wrapping_add(pixels_26_6(
@@ -372,7 +391,7 @@ impl InFrame {
                 anchor.y - anchor.origin.1 + style.shadow[1] * border[1],
             )),
         );
-        Placement {
+        let placement = Placement {
             rotation: style.rotation,
             shear: style.shear,
             scale: style.scale,
@@ -386,7 +405,13 @@ impl InFrame {
                 self.y.wrapping_add(glyph.pos.y),
             ),
             outline_scale: outline.scale,
-            outline_offset: outline.offset,
-        }
+            outline_offset: [0.0, outline.offset_y],
+        };
+        Some(GlyphPlacement {
+            outline: &outline.value,
+            placement,
+            effects: effects(style, &colours, c.fade, timing.effect),
+            karaoke: timing.effect == Some(Karaoke::Fill),
+        })
     }
 }
