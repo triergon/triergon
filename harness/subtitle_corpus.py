@@ -121,7 +121,9 @@ def mov_text():
                 ops.append(b"F")
             else:
                 ops.append(packet_op(clock(case["pts"]), clock(case["duration"]), local(packet).read_bytes()))
-        write("mov-text", name, capsule(1, b"", ops))
+        # Some fixture names carry the code of the run that captured them; the
+        # capsules leave it out.
+        write("mov-text", name.removeprefix("original177-"), capsule(1, b"", ops))
     return len(cases)
 
 

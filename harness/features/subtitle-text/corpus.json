@@ -515,294 +515,6 @@
       }
     },
     {
-      "id": "mov-text-original177-tx3g-basic",
-      "profile": "mov-text-original177-tx3g-basic",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-basic.cap",
-      "sha256": "cc44efd4935169541916dbae9206cf8db00fd3b2386a573cf4fe4fa863342f1c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 28,
-        "digest": 12999878569739763495
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-box-overrun",
-      "profile": "mov-text-original177-tx3g-box-overrun",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-box-overrun.cap",
-      "sha256": "f36a7b8833b28d6ff7921b7fb15bff59cd904703a5df7e4e9a86c8a8f25ec839",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 21,
-        "digest": 18250334427690973082
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-byte-not-character-count",
-      "profile": "mov-text-original177-tx3g-byte-not-character-count",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-byte-not-character-count.cap",
-      "sha256": "cd478eb842ec750d94cbfdba41b08ed5509be328978b361ab3cb96cbd26a2d1b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 12995008801788568311
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-embedded-nul",
-      "profile": "mov-text-original177-tx3g-embedded-nul",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-embedded-nul.cap",
-      "sha256": "aa009a558ce4b7d8bf91862e1103336e4e93c36edc9858a47e20d1dcbebfa23f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 21,
-        "digest": 16982502192512941390
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-empty-sample",
-      "profile": "mov-text-original177-tx3g-empty-sample",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-empty-sample.cap",
-      "sha256": "1777c335cedcc86e8f319793b302ad6ad8c13e76a26ee84492f90aa621d38c8f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 15798523184131285000
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-empty-with-modifier",
-      "profile": "mov-text-original177-tx3g-empty-with-modifier",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-empty-with-modifier.cap",
-      "sha256": "5a9a044fc824ef7d81fc1c2a48a9383a409859e6e9f2cc985d9853ddf95f6fce",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 20,
-        "digest": 11919355941114189393
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-extended-box-gap",
-      "profile": "mov-text-original177-tx3g-extended-box-gap",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-extended-box-gap.cap",
-      "sha256": "be41c2d876043a17216232a7c7a02d7067b8ab83001ecf936a200d3ecbd15b43",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 21,
-        "digest": 17969896213001391155
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-line-codepoints-exact",
-      "profile": "mov-text-original177-tx3g-line-codepoints-exact",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-line-codepoints-exact.cap",
-      "sha256": "5b6f26828c077d21485e7a863788ef129e1525e892ec2534517de945f5473a50",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 28,
-        "digest": 12999877848015736179
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-lone-surrogate",
-      "profile": "mov-text-original177-tx3g-lone-surrogate",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-lone-surrogate.cap",
-      "sha256": "b7a042f0e172d4a64bf8abb4d1e50183a1ed29c924d917b35cc2faae6fc9c5e2",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 15798523189539636357
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-missing-length",
-      "profile": "mov-text-original177-tx3g-missing-length",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-missing-length.cap",
-      "sha256": "352a36bba1d1e99bb154151505de26ad9f704dbc9486eacef72c02d1aab7423d",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 15798523189539636357
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-modifier-order",
-      "profile": "mov-text-original177-tx3g-modifier-order",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-modifier-order.cap",
-      "sha256": "525b887bb3145f63a6bd580f458b35e5361df2f00b2998853f8576fc85311e58",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 28,
-        "digest": 7029904582668737720
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-short-box",
-      "profile": "mov-text-original177-tx3g-short-box",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-short-box.cap",
-      "sha256": "6d87de2773419e57e7c3643a6c495ff4d2f5a18e458473ca26f7e7bb85e5c2b5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 15798523189539636357
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-style-highlight-raw",
-      "profile": "mov-text-original177-tx3g-style-highlight-raw",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-style-highlight-raw.cap",
-      "sha256": "7861c74b8bf53b12ef78c98e37aa9385edc7da9648b46eb3b776c3ded8a6f504",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 73,
-        "digest": 7412850180881749788
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-text-overrun",
-      "profile": "mov-text-original177-tx3g-text-overrun",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-text-overrun.cap",
-      "sha256": "a5e50ec51c82f89205c14b1e8b1927304809d7d28f98dc869481235191562ae5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 22,
-        "digest": 6483089375245263994
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-u16-byte-count-boundary",
-      "profile": "mov-text-original177-tx3g-u16-byte-count-boundary",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-u16-byte-count-boundary.cap",
-      "sha256": "4acf7f0dffcbd4bd696e01115fdeab77b31ef28bac7f53e3e4a1546d17ff8271",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 65555,
-        "digest": 5943508441373594802
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-unknown-modifier",
-      "profile": "mov-text-original177-tx3g-unknown-modifier",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-unknown-modifier.cap",
-      "sha256": "17e2f5ab49613fae78a2480146f4fa1e0c684a357ae2774d0e8ddf8064e7aa07",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 21,
-        "digest": 16421625763133778249
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-utf16-odd",
-      "profile": "mov-text-original177-tx3g-utf16-odd",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-utf16-odd.cap",
-      "sha256": "37eb426f92910a480c2aa39daba6d36c380d2009923942740f56cee1282c34d1",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 15798523189539636357
-      }
-    },
-    {
-      "id": "mov-text-original177-tx3g-utf16be-bom",
-      "profile": "mov-text-original177-tx3g-utf16be-bom",
-      "group": "mov-text",
-      "file": "harness/fixtures/subtitle-text/mov-text/original177-tx3g-utf16be-bom.cap",
-      "sha256": "d855ccee903836e1128ef8f48ddf1e946b2cbb7dcdb4f7772cae76fdea1adeb7",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "packets"
-      ],
-      "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 15798523189539636357
-      }
-    },
-    {
       "id": "mov-text-overflow-clock",
       "profile": "mov-text-overflow-clock",
       "group": "mov-text",
@@ -1120,6 +832,294 @@
         "packets": 2,
         "bytes": 42,
         "digest": 6214536366693049766
+      }
+    },
+    {
+      "id": "mov-text-tx3g-basic",
+      "profile": "mov-text-tx3g-basic",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-basic.cap",
+      "sha256": "cc44efd4935169541916dbae9206cf8db00fd3b2386a573cf4fe4fa863342f1c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 12999878569739763495
+      }
+    },
+    {
+      "id": "mov-text-tx3g-box-overrun",
+      "profile": "mov-text-tx3g-box-overrun",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-box-overrun.cap",
+      "sha256": "f36a7b8833b28d6ff7921b7fb15bff59cd904703a5df7e4e9a86c8a8f25ec839",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 18250334427690973082
+      }
+    },
+    {
+      "id": "mov-text-tx3g-byte-not-character-count",
+      "profile": "mov-text-tx3g-byte-not-character-count",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-byte-not-character-count.cap",
+      "sha256": "cd478eb842ec750d94cbfdba41b08ed5509be328978b361ab3cb96cbd26a2d1b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 12995008801788568311
+      }
+    },
+    {
+      "id": "mov-text-tx3g-embedded-nul",
+      "profile": "mov-text-tx3g-embedded-nul",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-embedded-nul.cap",
+      "sha256": "aa009a558ce4b7d8bf91862e1103336e4e93c36edc9858a47e20d1dcbebfa23f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 16982502192512941390
+      }
+    },
+    {
+      "id": "mov-text-tx3g-empty-sample",
+      "profile": "mov-text-tx3g-empty-sample",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-empty-sample.cap",
+      "sha256": "1777c335cedcc86e8f319793b302ad6ad8c13e76a26ee84492f90aa621d38c8f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523184131285000
+      }
+    },
+    {
+      "id": "mov-text-tx3g-empty-with-modifier",
+      "profile": "mov-text-tx3g-empty-with-modifier",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-empty-with-modifier.cap",
+      "sha256": "5a9a044fc824ef7d81fc1c2a48a9383a409859e6e9f2cc985d9853ddf95f6fce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 20,
+        "digest": 11919355941114189393
+      }
+    },
+    {
+      "id": "mov-text-tx3g-extended-box-gap",
+      "profile": "mov-text-tx3g-extended-box-gap",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-extended-box-gap.cap",
+      "sha256": "be41c2d876043a17216232a7c7a02d7067b8ab83001ecf936a200d3ecbd15b43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 17969896213001391155
+      }
+    },
+    {
+      "id": "mov-text-tx3g-line-codepoints-exact",
+      "profile": "mov-text-tx3g-line-codepoints-exact",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-line-codepoints-exact.cap",
+      "sha256": "5b6f26828c077d21485e7a863788ef129e1525e892ec2534517de945f5473a50",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 12999877848015736179
+      }
+    },
+    {
+      "id": "mov-text-tx3g-lone-surrogate",
+      "profile": "mov-text-tx3g-lone-surrogate",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-lone-surrogate.cap",
+      "sha256": "b7a042f0e172d4a64bf8abb4d1e50183a1ed29c924d917b35cc2faae6fc9c5e2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-tx3g-missing-length",
+      "profile": "mov-text-tx3g-missing-length",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-missing-length.cap",
+      "sha256": "352a36bba1d1e99bb154151505de26ad9f704dbc9486eacef72c02d1aab7423d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-tx3g-modifier-order",
+      "profile": "mov-text-tx3g-modifier-order",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-modifier-order.cap",
+      "sha256": "525b887bb3145f63a6bd580f458b35e5361df2f00b2998853f8576fc85311e58",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 7029904582668737720
+      }
+    },
+    {
+      "id": "mov-text-tx3g-short-box",
+      "profile": "mov-text-tx3g-short-box",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-short-box.cap",
+      "sha256": "6d87de2773419e57e7c3643a6c495ff4d2f5a18e458473ca26f7e7bb85e5c2b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-tx3g-style-highlight-raw",
+      "profile": "mov-text-tx3g-style-highlight-raw",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-style-highlight-raw.cap",
+      "sha256": "7861c74b8bf53b12ef78c98e37aa9385edc7da9648b46eb3b776c3ded8a6f504",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 73,
+        "digest": 7412850180881749788
+      }
+    },
+    {
+      "id": "mov-text-tx3g-text-overrun",
+      "profile": "mov-text-tx3g-text-overrun",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-text-overrun.cap",
+      "sha256": "a5e50ec51c82f89205c14b1e8b1927304809d7d28f98dc869481235191562ae5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 22,
+        "digest": 6483089375245263994
+      }
+    },
+    {
+      "id": "mov-text-tx3g-u16-byte-count-boundary",
+      "profile": "mov-text-tx3g-u16-byte-count-boundary",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-u16-byte-count-boundary.cap",
+      "sha256": "4acf7f0dffcbd4bd696e01115fdeab77b31ef28bac7f53e3e4a1546d17ff8271",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 65555,
+        "digest": 5943508441373594802
+      }
+    },
+    {
+      "id": "mov-text-tx3g-unknown-modifier",
+      "profile": "mov-text-tx3g-unknown-modifier",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-unknown-modifier.cap",
+      "sha256": "17e2f5ab49613fae78a2480146f4fa1e0c684a357ae2774d0e8ddf8064e7aa07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 16421625763133778249
+      }
+    },
+    {
+      "id": "mov-text-tx3g-utf16-odd",
+      "profile": "mov-text-tx3g-utf16-odd",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-utf16-odd.cap",
+      "sha256": "37eb426f92910a480c2aa39daba6d36c380d2009923942740f56cee1282c34d1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
+      }
+    },
+    {
+      "id": "mov-text-tx3g-utf16be-bom",
+      "profile": "mov-text-tx3g-utf16be-bom",
+      "group": "mov-text",
+      "file": "harness/fixtures/subtitle-text/mov-text/tx3g-utf16be-bom.cap",
+      "sha256": "d855ccee903836e1128ef8f48ddf1e946b2cbb7dcdb4f7772cae76fdea1adeb7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 15798523189539636357
       }
     },
     {
