@@ -16822,6 +16822,27 @@
    "key": "evidence/mp4-range-dedicated-entries-classified/632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e.tar.gz",
    "sha256": "632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e",
    "bytes": 8608934
+  },
+  {
+   "name": "ts-program-carrier-copy-comparison",
+   "retention": "90 days",
+   "key": "qualification/ts-program-carrier-copy-comparison/a857f2cc5e13b6a25f220c802eeb68ce8b70fcf483c2f3c4e282deacc4767e64.tar.zst",
+   "sha256": "a857f2cc5e13b6a25f220c802eeb68ce8b70fcf483c2f3c4e282deacc4767e64"
+  },
+  {
+   "name": "ts-program-buffered-carriers",
+   "retention": "90 days",
+   "key": "qualification/ts-program-buffered-carriers/5ce1b0cfd343c3a12c68c5ba0b4ca55607edd145a817d138a0ff72096e660ea4.tar.zst",
+   "sha256": "5ce1b0cfd343c3a12c68c5ba0b4ca55607edd145a817d138a0ff72096e660ea4"
+  },
+  {
+   "name": "ts-program-buffered-playback",
+   "retention": "retained",
+   "reason": "MPEG-TS program playback measurements in docs/status.md",
+   "key": "evidence/ts-program-buffered-playback/beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a.tar.zst",
+   "sha256": "beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a",
+   "bytes": 11567352,
+   "source_revision": "3125c1e61d73a575419f7b653a1dae44a3269dae"
   }
  ]
 }

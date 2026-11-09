@@ -34,7 +34,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 223/223 cases (`subtitle-dvd`) | 0.8592 (223/223 pass) | heap ≤0.959, total RSS ≤0.853 (223/223 lower) | FATE coverage |
 | Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 197/197 cases (`subtitle-cc`) | 0.9751 (197/197 pass) | heap ≤0.123, total RSS ≤0.956 (197/197 lower) | FATE coverage; HEVC picture output at a new sequence (open case `hevc-eos-ts`: no DPB output model, so `no_output_of_prior_pics` after an end of sequence is not applied) |
 | Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 70/70 cases (`subtitle-teletext`) | 0.4257 (70/70 pass) | heap ≤0.622, total RSS ≤0.676 (70/70 lower) | FATE coverage |
-| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 37/38 (`mp4-forward`), TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 1.6427 (35/37 pass), TS program 1.4695 (33/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤3.382 (36/37 lower), total RSS ≤1.025 (18/37 lower); TS program heap ≤0.102, total RSS ≤0.910 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower) | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC; `mp4-forward` open case `regular-encoded-avc-aac-indexed-seek`: the native MOV view refuses an edit list over reordered samples |
+| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 37/38 (`mp4-forward`), TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 1.6427 (35/37 pass), TS program 1.1551 (35/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤3.382 (36/37 lower), total RSS ≤1.025 (18/37 lower); TS program heap ≤0.1020, total RSS ≤0.8507 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower) | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC; `mp4-forward` open case `regular-encoded-avc-aac-indexed-seek`: the native MOV view refuses an edit list over reordered samples |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0551 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths; AAC charges in-band reconfiguration when it appears, and a refused access unit leaves the decoder unchanged unless an earlier raw data block or Main-prediction element of it was decoded |
 | Audio codecs in files | FLAC (RFC 9639, 4 to 32 bits, 1 to 8 channels); Opus (RFC 6716 and 8251: SILK, CELT, hybrid, families 0, 1 and 255); Vorbis I; MPEG-1, 2 and 2.5 audio Layer I, II and III | 315/321 pass through the container readers (FATE Vorbis, Opus and MP3 conformance, the IETF FLAC testbench, generated streams): FLAC bit-exact, the others within the [numeric rules](../harness/codecs/numeric-rules.json) | 1.0834 (10/10 pass) | heap ≤0.904, total RSS ≤0.966 (10/10) | FLAC `01 - changing samplerate`, `02 - increasing number of channels`, `03 - decreasing number of channels` and MP3 `he_mode` change format mid-stream, which the CLI converts; FLAC `flac_3ch_odd_mask`, whose layout FFmpeg refuses on its stereo output; MP3 `he_free` (free format: FFmpeg finds no two consecutive frames, and the decoder refuses free-format frames), refused by both; runtime toward the target for Opus music (1.0301) and 5.1 (1.0834), Vorbis 5.1 (0.9356) and stereo (0.8423) and Opus speech (0.8719); Opus families 2 and 3 |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix; container track decoding with trims and start delays | with the codecs | 1.0551 (17/17 pass) | with the codecs | — |
@@ -78,17 +78,21 @@ the reference and pass runtime, peak heap and total RSS. All five functional inp
 and ten outcomes pass. The same source passes every selected gate on all 74
 progressive and HLS cases; full module and FATE coverage remain pending.
 
-The Matroska audio clock and playback profile rows use the gate build at
+The Matroska audio clock, MP4 forward and raw Annex B rows use the gate build at
 `b3579f729494a37a4dbebe03c475f7b38484046e` on a c8g.2xlarge pinned to CPU 1, with 30 timing pairs and
 30 memory pairs under the kernel RSS proof. Cases whose parity fails are not timed or
-measured. The Matroska audio clock, TS program and raw Annex B rows are graded reports; the
-MP4 forward row comes from its complete timing and memory reports.
+measured. The Matroska audio clock and raw Annex B rows are graded reports. The MP4
+forward row comes from its complete timing and memory reports.
+
+The TS program results use the gate build at
+`3125c1e61d73a575419f7b653a1dae44a3269dae` on a c8g.large pinned to CPU 1, with 30 timing
+pairs of 50 operations and 30 memory pairs under the kernel RSS proof. The grade covers
+every selected PES packet through the full transport event path.
 
 Above the ceiling: Matroska audio clocks `laced-fractional-cadence` 1.4510,
 `laced-unknown-duration` 1.4089, `two-laced-before-first-known-pts` 1.3968,
 `damaged-lace-before-valid-anchor` 1.3878; MP4 forward `regular-encoded-avc-aac-native-seek`
-1.6427, `progressive-ten-sequential-batches` 1.5011; TS program
-`m2ts-entry-hevc-aac-44100-01-video` 1.4695, `entry-hevc-aac-44100-00` 1.3236.
+1.6427 and `progressive-ten-sequential-batches` 1.5011.
 
 Memory at or above the reference: Matroska audio clocks heap on `no-absolute-anchor` 1.822
 and `dolby-bad-first` 1.321, total RSS on all 10 (1.038 to 1.043); MP4 forward heap on
@@ -158,6 +162,7 @@ the default font file during 12 cases' operations; those mappings count toward i
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
 | ISO BMFF open and index runtime and memory | `f99d893196908d562c897bccb20c6a972cd25d11` | `806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b` |
 | MPEG-TS progressive playback | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
+| MPEG-TS program playback | `3125c1e61d73a575419f7b653a1dae44a3269dae` | `beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a` |
 | HLS segments | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | Packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
 | MP4 range playback | `17cad5c5bad576fe7102f53f78f3e150abbe24c8` | `632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e` |
