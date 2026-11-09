@@ -1092,9 +1092,10 @@ impl Lane {
             .expect("pending fragment")
             .reader_storage = Some(bytes);
     }
+    // Admission leaves the queued source available on yield or error.
     pub(super) fn push(
         &mut self,
-        source: &SourceEvent,
+        pending: &mut Option<SourceEvent>,
         clock: ClockContext,
         work: &mut WorkBudget,
     ) -> Result<bool> {
@@ -1104,6 +1105,7 @@ impl Lane {
         if self.input.is_some() {
             return Err(Error::Invalid("MPEG-TS PES mailbox occupied"));
         }
+        let source = pending.as_ref().expect("queued PES");
         let pes = source.pes();
         if self.track.stream().stream_type == 0x11 {
             if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
@@ -1158,7 +1160,7 @@ impl Lane {
         self.serial = serial;
         self.run = PesRun::Active(pes.epochs, pes.byte_run_epoch);
         self.input = self.framer.as_ref().map(|_| Input {
-            source: source.clone(),
+            source: pending.take().expect("admitted PES"),
             span: 0,
             offset: 0,
         });
@@ -1380,7 +1382,8 @@ impl Lane {
                             return Ok(LaneStep::Yield);
                         }
                         let bytes = span.payload_bytes()?;
-                        let count = (bytes.len() - input.offset).min(request.maximum);
+                        let length = bytes.len();
+                        let count = (length - input.offset).min(request.maximum);
                         if count == 0 {
                             return Err(Error::Invalid("empty MPEG-TS payload span"));
                         }
@@ -1388,15 +1391,20 @@ impl Lane {
                             .supplied
                             .checked_add(count as u64)
                             .ok_or(Error::Overflow)?;
+                        let bytes = if count == length {
+                            bytes
+                        } else {
+                            bytes.into_slice(input.offset..input.offset + count)?
+                        };
                         framer.provide(InputWindow::new(
                             request.source,
                             request.token,
                             request.offset,
-                            bytes.slice(input.offset..input.offset + count)?,
+                            bytes,
                         )?)?;
                         self.supplied = end;
                         input.offset += count;
-                        if input.offset == bytes.len() {
+                        if input.offset == length {
                             input.span += 1;
                             input.offset = 0;
                         }
