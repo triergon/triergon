@@ -5,7 +5,9 @@ use crate::clock::{ClockKey, SourceTimePolicy};
 use crate::psi::DescriptorNamespace;
 use crate::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
 use lane::{Lane, LaneStep, StorageScan};
-pub use model::{AccessUnit, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track};
+pub use model::{
+    Ac3AccessUnit, AccessUnit, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
+};
 use model::{ClockContext, Shared};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest};

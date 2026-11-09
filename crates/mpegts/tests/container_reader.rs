@@ -11,6 +11,9 @@ use triergon_mpegts::{
     AccessUnit, AudioEofPolicy, Packet, PacketFormat, Reader, ReaderEvent, ReaderLimits, TraceEvent,
 };
 
+#[path = "container_reader/eac3.rs"]
+mod eac3;
+
 const ID: SourceId = SourceId(77);
 const PROGRAM: u16 = 7;
 const PID: u16 = 256;

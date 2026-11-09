@@ -35,15 +35,22 @@ contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol. Seeking
 returns `Error::Unsupported` without changing reader state.
 
-The admitted AU carriages are AVC and HEVC Annex B, single-block ADTS AAC-LC,
-and AC-3 with unambiguous DVB descriptors in private PES or stream type
-`0x81` in the caller-declared ATSC namespace. The AC-3 track retains its
-original stream type as the codec tag. [ATSC A/53 Part 3, §5.7](https://www.atsc.org/wp-content/uploads/2023/02/A53-Part-3-2023-02.pdf)
-The framers delimit complete source bytes and preserve the original parameter
-sets and AAC or AC-3 envelopes. LATM,
-MPEG audio/video, E-AC-3 grouping, subtitles and ambiguous private streams
-currently emit `ReaderEvent::Unsupported`. Their original PMTs and PES remain
-available as source events; none is relabelled as an AU.
+The reader admits AVC and HEVC Annex B, single-block ADTS AAC-LC, and
+AC-3 or E-AC-3 with unambiguous DVB descriptors in private PES or stream
+types `0x81` and `0x87` in the caller-declared ATSC namespace. Tracks retain
+the original stream type as the codec tag. [ATSC A/53 Part 3, §5.7](https://www.atsc.org/wp-content/uploads/2023/02/A53-Part-3-2023-02.pdf)
+
+An E-AC-3 packet contains the primary independent syncframe and up to eight
+consecutive dependent syncframes with the same sample rate and block count.
+`Ac3AccessUnit::syncframes()` exposes each header in source order, and the
+primary supplies the packet's duration. DVB groups may cross PES boundaries.
+The ATSC reader admits groups headed by a six-block independent syncframe
+and requires the whole group in one PES. [ATSC A/52, Annexes E and G](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf)
+
+The framers preserve original parameter sets and coded audio envelopes. LATM,
+MPEG audio/video, subtitles, descriptors declaring additional independent
+E-AC-3 services and ambiguous private streams report `ReaderEvent::Unsupported`
+with original PMTs and PES available as source events.
 
 `Packet` implements `PacketInfo` and retains its exact PMT, source configuration epoch,
 framer syntax and intersecting PES events. `sources()` maps its elementary-byte
