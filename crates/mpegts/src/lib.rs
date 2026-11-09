@@ -34,6 +34,7 @@ pub mod reference_trace;
 mod stream;
 mod transport;
 
+pub use carrier::TransportObservation;
 pub use carrier::{RejectedTransport, TransportInspection, TransportInspector};
 pub use continuity::{Continuity, ContinuityOutcome};
 pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};

@@ -446,7 +446,7 @@ impl TransportFramer {
         cancel: &AtomicBool,
     ) -> Result<Step<FramedCarrier>> {
         self.bind_input(input)?;
-        self.poll_bound_carrier::<DIRECT>(input, work, cancel)
+        self.poll_bound_carrier::<DIRECT, false>(input, work, cancel)
     }
 
     pub(crate) fn bind_input(&mut self, input: &InputCursor) -> Result<()> {
@@ -481,7 +481,7 @@ impl TransportFramer {
     }
 
     /// The caller has bound this cursor and kept exclusive access since then.
-    pub(crate) fn poll_bound_carrier<const DIRECT: bool>(
+    pub(crate) fn poll_bound_carrier<const DIRECT: bool, const OBSERVING: bool>(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
@@ -557,8 +557,8 @@ impl TransportFramer {
                         && let Some(carrier) = PlainCarrier::inspect_ts188(&source, start, work)
                     {
                         self.last_packet_offset = Some(start);
-                        if DIRECT
-                            && self.buffered_carrier == BufferedCarrier::Progressive
+                        if (OBSERVING
+                            || DIRECT && self.buffered_carrier == BufferedCarrier::Progressive)
                             && carrier.is_plain_continuation()
                         {
                             return Ok(Step::Ready(FramedCarrier::Plain(PlainContinuation {

@@ -576,7 +576,7 @@ pub enum ReaderEvent {
 impl ReaderEvent {
     pub(crate) fn carrier_observation(&self) -> Option<CarrierObservation<'_>> {
         match self {
-            Self::Transport(packet) => Some(CarrierObservation::Transport(packet)),
+            Self::Transport(packet) => Some(CarrierObservation::Transport(packet.into())),
             Self::Continuity { pid, outcome } => Some(CarrierObservation::Continuity {
                 pid: *pid,
                 outcome: *outcome,
