@@ -1680,9 +1680,16 @@ mod tests {
             );
         }
         let manifest = read_json(&out.join(format!("harness/{FEATURE}/corpus.json"))).unwrap();
+        let generated = format!(".research/{DIRECTORY}");
         for case in &cases(&manifest).unwrap()[97..] {
+            let file = Path::new(text(case, "file").unwrap());
+            let base = if file.starts_with(&generated) {
+                &out
+            } else {
+                root()
+            };
             assert_eq!(
-                sha256::hex(&fs::read(out.join(text(case, "file").unwrap())).unwrap()),
+                sha256::hex(&fs::read(base.join(file)).unwrap()),
                 text(case, "sha256").unwrap()
             );
         }
