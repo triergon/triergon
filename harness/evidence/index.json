@@ -16756,6 +16756,15 @@
    "key": "evidence/ass-rendering-58a5c202-linux-arm64-memory-libass/799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3.tar.gz",
    "sha256": "799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3",
    "bytes": 210930417
+  },
+  {
+   "name": "reader-classification-comparison",
+   "path": "reader-classification-comparison",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/reader-classification-comparison/a659624b656ce68586e0b90a73eb57c255a6b372839d94198f7a6a89d44ad9bc.tar.gz",
+   "sha256": "a659624b656ce68586e0b90a73eb57c255a6b372839d94198f7a6a89d44ad9bc",
+   "bytes": 49106104
   }
  ]
 }
