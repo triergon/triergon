@@ -144,6 +144,8 @@ be inspected from a charged copy when the input window cannot be shared.
 The method returns the same
 access units, other source events and progress steps under the caller's work
 grant. `compat::annex_b::ContinuityReader` keeps the carriers its proof needs.
+The elementary video reader can append interior NAL bytes directly from a
+borrowed PES span. It uses the streaming path at possible NAL boundaries.
 
 For an ordered stream, call `Reader::finish_entity` with the final input
 token and the next entity's distinct source ID and capabilities. The reader
