@@ -58,7 +58,7 @@ pub mod pes {
     };
     pub use crate::demux_transport::{
         MalformedInputCompletion, MalformedInputFact, MalformedInputKind,
-        MalformedSourceDisposition, NoPacketsConfirmation,
+        MalformedSourceDisposition, MalformedSourceEvent, NoPacketsConfirmation,
     };
     pub use crate::demux_transport::{
         PesFaultCarrier, PesFaultHeader, PesFaultKind, PesFaultPacket, PesFaultPolicy,

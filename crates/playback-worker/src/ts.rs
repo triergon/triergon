@@ -541,8 +541,8 @@ fn packet_operation(
         },
         WINDOW,
     )?;
-    let mut demux = TransportStream::new_with_namespace(
-        pool.clone(),
+    let mut malformed = MalformedInputCompletion::new_with_namespace(
+        &input,
         request.format,
         ParseLimits::default(),
         request.program,
@@ -554,14 +554,7 @@ fn packet_operation(
         finished: false,
         totals: Totals::default(),
     };
-    let mut ordinal = 0_u64;
     let mut logical_eof = None;
-    let mut malformed = MalformedInputCompletion::new(
-        &input,
-        request.format,
-        ParseLimits::default(),
-        request.program,
-    )?;
     let mut no_packets = None;
     let refused = |mut session: Session,
                    error: &dyn std::fmt::Display,
@@ -574,40 +567,41 @@ fn packet_operation(
         })
     };
     loop {
-        let step = match demux.poll(&mut input, &mut WorkBudget::new(WORK), cancel) {
+        let step = match malformed.poll_source(&mut input, &mut WorkBudget::new(WORK), cancel) {
             Ok(step) => step,
             Err(error) => {
                 let cause = Cause::boundary(
                     "source_poll_error",
                     input.source(),
                     input.position(),
-                    demux.source_epochs(),
+                    malformed.source_epochs(),
                 );
                 return refused(session, &error, cause, false);
             }
         };
         match step {
-            Step::Ready(event) => {
-                let cause = Cause::event(&event, ordinal, input.source(), demux.source_epochs());
-                ordinal += 1;
-                let grant = malformed.required_work(&event)?;
-                let quarantined = demux.clock_is_quarantined();
-                let disposition = if quarantined {
-                    Ok(Some(MalformedSourceDisposition::Forward))
-                } else {
-                    malformed.observe_source(
-                        &event,
-                        cause.context()?,
-                        &mut input,
-                        session.observer.as_mut(),
-                        &mut WorkBudget::new(grant),
-                        cancel,
-                    )
-                };
+            Step::Ready(mut observed) => {
+                let context = observed.context();
+                let cause = Cause::event(
+                    observed.event(),
+                    context.source_event_ordinal,
+                    observed.input().source(),
+                    context.epochs,
+                );
+                let grant = observed.required_work()?;
+                let disposition = observed.observe(
+                    session.observer.as_mut(),
+                    &mut WorkBudget::new(grant),
+                    cancel,
+                );
                 let routed = match disposition {
-                    Ok(Some(MalformedSourceDisposition::Forward)) => {
-                        session.observe(&input, request.program, &event, cause, quarantined)
-                    }
+                    Ok(Some(MalformedSourceDisposition::Forward)) => session.observe(
+                        observed.input(),
+                        request.program,
+                        observed.event(),
+                        cause,
+                        observed.clock_is_quarantined(),
+                    ),
                     Ok(Some(
                         MalformedSourceDisposition::AwaitDiagnostic
                         | MalformedSourceDisposition::Reported(_),
@@ -624,7 +618,8 @@ fn packet_operation(
                 if let Err(error) = session.drain(cancel) {
                     return refused(session, &error, cause, false);
                 }
-                if matches!(event, TraceEvent::Finished) {
+                if matches!(observed.event(), TraceEvent::Finished) {
+                    let event = observed.into_event();
                     let Some(eof) = logical_eof else {
                         let error = Error::Invalid("source finished without logical EOF");
                         return refused(session, &error, cause, false);
@@ -688,14 +683,9 @@ fn packet_operation(
                 }
             }
             Step::End(location) => {
-                let boundary = |phase| {
-                    Cause::boundary(
-                        phase,
-                        location.source,
-                        location.offset,
-                        demux.source_epochs(),
-                    )
-                };
+                let epochs = malformed.source_epochs();
+                let boundary =
+                    |phase| Cause::boundary(phase, location.source, location.offset, epochs);
                 if request.more_entities {
                     let error = Error::Unsupported(UNROUTED);
                     return refused(
@@ -705,17 +695,9 @@ fn packet_operation(
                         false,
                     );
                 }
-                let physical_end = demux
-                    .media_entity_end(&mut input, &mut WorkBudget::new(WORK), cancel)?
+                let physical_end = malformed
+                    .seal_physical_end(&mut input, &mut WorkBudget::new(WORK), cancel)?
                     .ok_or("source End yielded on fixed grant")?;
-                if !malformed.seal_physical_end(
-                    &physical_end,
-                    &mut input,
-                    &mut WorkBudget::new(WORK),
-                    cancel,
-                )? {
-                    return Err("malformed completion physical End yielded on fixed grant".into());
-                }
                 if let Some(observer) = session.observer.as_mut()
                     && observer.awaiting_terminal_completion()
                     && !observer.seal_terminal_end(
@@ -728,7 +710,7 @@ fn packet_operation(
                     return Err("terminal End yielded on fixed grant".into());
                 }
                 logical_eof = Some(boundary("logical_eof"));
-                demux.end_of_source()?;
+                malformed.end_of_source()?;
             }
         }
     }
@@ -738,7 +720,7 @@ fn packet_operation(
             "logical_eof",
             input.source(),
             input.position(),
-            demux.source_epochs(),
+            malformed.source_epochs(),
         );
         return refused(session, &error, cause, true);
     }

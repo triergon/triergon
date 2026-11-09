@@ -7,11 +7,9 @@ use triergon_core::{
 use triergon_mpegts::compat::pes::{
     DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, MalformedInputCompletion,
     MalformedInputFact, MalformedInputKind, MalformedSourceDisposition, NoPacketsConfirmation,
-    SourceContext, TransportFaultRecovery, TransportObservation,
+    TransportFaultRecovery, TransportObservation,
 };
-use triergon_mpegts::{
-    AssemblyStep, MediaEntityEnd, PacketFormat, ParseLimits, TraceEvent, TransportStream,
-};
+use triergon_mpegts::{AssemblyStep, MediaEntityEnd, PacketFormat, ParseLimits, TraceEvent};
 
 static RUN: AtomicBool = AtomicBool::new(false);
 static CANCEL: AtomicBool = AtomicBool::new(true);
@@ -38,10 +36,8 @@ const VALID: &[u8] = include_bytes!("data/ts188-basic.ts");
 struct Run {
     raw: Bytes,
     input: InputCursor,
-    source: TransportStream,
     completion: MalformedInputCompletion,
     observer: Option<TransportFaultRecovery>,
-    ordinal: u64,
     facts: Vec<MalformedInputFact>,
     packets: Vec<DemuxPacket>,
     source_pes: usize,
@@ -70,15 +66,7 @@ impl Run {
             raw: Bytes::copy_from_slice(pool, raw).unwrap(),
             input,
             completion,
-            source: TransportStream::new(
-                pool.clone(),
-                PacketFormat::Ts188,
-                ParseLimits::default(),
-                1,
-            )
-            .unwrap(),
             observer: None,
-            ordinal: 0,
             facts: Vec::new(),
             packets: Vec::new(),
             source_pes: 0,
@@ -108,8 +96,8 @@ impl Run {
     fn next(&mut self, pool: &Budget, pressure: bool) {
         for _ in 0..100_000 {
             match self
-                .source
-                .poll(&mut self.input, &mut WorkBudget::new(1), &RUN)
+                .completion
+                .poll_source(&mut self.input, &mut WorkBudget::new(1), &RUN)
                 .unwrap()
             {
                 Step::NeedInput(request) => {
@@ -133,120 +121,71 @@ impl Run {
                 }
                 Step::Yield => (),
                 Step::End(_) => {
-                    let end = self
-                        .source
-                        .media_entity_end(&mut self.input, &mut WorkBudget::new(2), &RUN)
-                        .unwrap()
-                        .unwrap();
-                    assert!(
-                        !self
-                            .completion
-                            .seal_physical_end(&end, &mut self.input, &mut WorkBudget::new(0), &RUN)
-                            .unwrap()
-                    );
-                    assert_eq!(
-                        self.completion
-                            .seal_physical_end(
-                                &end,
-                                &mut self.input,
-                                &mut WorkBudget::new(0),
-                                &CANCEL
-                            )
-                            .unwrap_err(),
-                        Error::Cancelled
-                    );
-                    let blocker = pressure.then(|| pool.reserve(pool.available()).unwrap());
                     assert!(
                         self.completion
-                            .seal_physical_end(&end, &mut self.input, &mut WorkBudget::new(1), &RUN)
-                            .unwrap()
-                    );
-                    drop(blocker);
-                    self.end = Some(end);
-                    self.source.end_of_source().unwrap();
-                }
-                Step::Ready(event) => {
-                    let context = SourceContext {
-                        source_event_ordinal: self.ordinal,
-                        epochs: self.source.source_epochs(),
-                        byte_run_epoch: None,
-                    };
-                    if let TraceEvent::Transport(packet) = &event
-                        && self.omit_carrier == Some(packet.source_offset)
-                    {
-                        self.ordinal += 1;
-                        return;
-                    }
-                    let used = pool.used();
-                    assert!(
-                        self.completion
-                            .observe_source(
-                                &event,
-                                context,
-                                &mut self.input,
-                                self.observer.as_mut(),
-                                &mut WorkBudget::new(0),
-                                &RUN
-                            )
+                            .seal_physical_end(&mut self.input, &mut WorkBudget::new(0), &RUN)
                             .unwrap()
                             .is_none()
                     );
                     assert_eq!(
                         self.completion
-                            .observe_source(
-                                &event,
-                                context,
-                                &mut self.input,
-                                self.observer.as_mut(),
-                                &mut WorkBudget::new(0),
-                                &CANCEL
-                            )
+                            .seal_physical_end(&mut self.input, &mut WorkBudget::new(0), &CANCEL)
                             .unwrap_err(),
                         Error::Cancelled
                     );
                     let blocker = pressure.then(|| pool.reserve(pool.available()).unwrap());
-                    let work = self.completion.required_work(&event).unwrap();
-                    if pressure && let TraceEvent::Diagnostic(fault) = &event {
-                        let mut wrong = fault.clone();
-                        wrong.location.offset += 1;
-                        assert!(
-                            self.completion
-                                .observe_source(
-                                    &TraceEvent::Diagnostic(wrong),
-                                    context,
-                                    &mut self.input,
-                                    self.observer.as_mut(),
-                                    &mut WorkBudget::new(work),
-                                    &RUN,
-                                )
-                                .is_err()
-                        );
-                    }
-                    let disposition = self
+                    let end = self
                         .completion
-                        .observe_source(
-                            &event,
-                            context,
-                            &mut self.input,
-                            self.observer.as_mut(),
-                            &mut WorkBudget::new(work),
-                            &RUN,
-                        )
+                        .seal_physical_end(&mut self.input, &mut WorkBudget::new(1), &RUN)
+                        .unwrap()
+                        .unwrap();
+                    drop(blocker);
+                    self.end = Some(end);
+                    self.completion.end_of_source().unwrap();
+                }
+                Step::Ready(mut observed) => {
+                    let context = observed.context();
+                    if let TraceEvent::Transport(packet) = observed.event()
+                        && self.omit_carrier == Some(packet.source_offset)
+                    {
+                        return;
+                    }
+                    let used = pool.used();
+                    assert!(
+                        observed
+                            .observe(self.observer.as_mut(), &mut WorkBudget::new(0), &RUN)
+                            .unwrap()
+                            .is_none()
+                    );
+                    assert_eq!(
+                        observed
+                            .observe(self.observer.as_mut(), &mut WorkBudget::new(0), &CANCEL)
+                            .unwrap_err(),
+                        Error::Cancelled
+                    );
+                    let blocker = pressure.then(|| pool.reserve(pool.available()).unwrap());
+                    let work = observed.required_work().unwrap();
+                    let disposition = observed
+                        .observe(self.observer.as_mut(), &mut WorkBudget::new(work), &RUN)
                         .unwrap()
                         .unwrap();
                     drop(blocker);
                     assert!(pool.used() <= used);
-                    self.ordinal += 1;
-                    if matches!(event, TraceEvent::Pes(_)) {
+                    if matches!(observed.event(), TraceEvent::Pes(_)) {
                         self.source_pes += 1;
                     }
-                    if matches!(event, TraceEvent::Diagnostic(_)) {
+                    if matches!(observed.event(), TraceEvent::Diagnostic(_)) {
                         self.diagnostics += 1;
+                        assert!(
+                            observed
+                                .observe(self.observer.as_mut(), &mut WorkBudget::new(work), &RUN)
+                                .is_err()
+                        );
                     }
                     match disposition {
                         MalformedSourceDisposition::Reported(fact) => self.facts.push(fact),
                         MalformedSourceDisposition::AwaitDiagnostic => (),
-                        MalformedSourceDisposition::Forward => match &event {
+                        MalformedSourceDisposition::Forward => match observed.event() {
                             TraceEvent::ProgramMap {
                                 map, active: true, ..
                             } => {
@@ -268,7 +207,7 @@ impl Run {
                                     .unwrap(),
                                 )
                                 .unwrap();
-                                observer.bind_source_input(&self.input).unwrap();
+                                observer.bind_source_input(observed.input()).unwrap();
                                 self.observer = Some(observer);
                             }
                             TraceEvent::Transport(packet) => {
@@ -281,10 +220,10 @@ impl Run {
                             _ => (),
                         },
                     }
-                    self.drain();
-                    if matches!(event, TraceEvent::Finished) {
+                    if matches!(observed.event(), TraceEvent::Finished) {
                         self.finished = true;
                     }
+                    self.drain();
                     return;
                 }
             }
@@ -381,7 +320,7 @@ fn zero_carriers_still_need_the_original_cursors_actual_end_and_finished() {
 }
 
 #[test]
-fn replacement_cursor_receipt_and_sticky_original_failure_cannot_complete() {
+fn replacement_cursor_and_sticky_original_failure_cannot_complete() {
     let pool = Budget::new(1 << 20).unwrap();
     let mut a = Run::new(CASES[0].0, &pool, 1);
     while a.facts.is_empty() {
@@ -394,25 +333,82 @@ fn replacement_cursor_receipt_and_sticky_original_failure_cannot_complete() {
     b.all(&pool, false);
     assert!(
         a.completion
-            .seal_physical_end(
-                b.end.as_ref().unwrap(),
-                &mut b.input,
-                &mut WorkBudget::new(1),
-                &RUN
-            )
+            .seal_physical_end(&mut b.input, &mut WorkBudget::new(1), &RUN)
             .is_err()
     );
     assert!(a.confirm().is_err());
     assert!(
         a.completion
-            .seal_physical_end(
-                b.end.as_ref().unwrap(),
-                &mut a.input,
-                &mut WorkBudget::new(1),
-                &RUN
-            )
+            .seal_physical_end(&mut a.input, &mut WorkBudget::new(1), &RUN)
             .is_err()
     );
+}
+
+#[test]
+fn equal_length_inputs_cannot_exchange_source_events_or_eof() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut valid = Run::new(VALID, &pool, 4096);
+    let mut malformed = Run::new(CASES[3].0, &pool, 4096);
+    assert_eq!(valid.raw.len(), malformed.raw.len());
+    assert_ne!(valid.raw.as_ref(), malformed.raw.as_ref());
+    assert_eq!(valid.input.source(), malformed.input.source());
+    for run in [&mut valid, &mut malformed] {
+        while run.observer.is_none() {
+            run.next(&pool, false);
+        }
+    }
+    let foreign = Error::StaleGeneration {
+        expected: valid.input.generation(),
+        received: malformed.input.generation(),
+    };
+    assert_eq!(
+        valid
+            .completion
+            .poll_source(&mut malformed.input, &mut WorkBudget::new(4096), &RUN)
+            .unwrap_err(),
+        foreign
+    );
+    {
+        let Step::Ready(mut observed) = malformed
+            .completion
+            .poll_source(&mut malformed.input, &mut WorkBudget::new(4096), &RUN)
+            .unwrap()
+        else {
+            panic!("expected the malformed carrier")
+        };
+        assert!(
+            matches!(observed.event(), TraceEvent::Transport(packet) if packet.source_offset == 376)
+        );
+        let grant = observed.required_work().unwrap();
+        assert_eq!(
+            observed
+                .observe(valid.observer.as_mut(), &mut WorkBudget::new(grant), &RUN)
+                .unwrap_err(),
+            foreign
+        );
+        assert!(matches!(
+            observed
+                .observe(
+                    malformed.observer.as_mut(),
+                    &mut WorkBudget::new(grant),
+                    &RUN
+                )
+                .unwrap(),
+            Some(MalformedSourceDisposition::AwaitDiagnostic)
+        ));
+    }
+    malformed.all(&pool, false);
+    assert!(malformed.confirm().unwrap().is_some());
+    assert_eq!(
+        valid
+            .completion
+            .seal_physical_end(&mut malformed.input, &mut WorkBudget::new(1), &RUN)
+            .unwrap_err(),
+        foreign
+    );
+    valid.all(&pool, false);
+    assert_eq!(valid.packets.len(), 1);
+    assert!(valid.confirm().is_err());
 }
 
 #[test]
