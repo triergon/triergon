@@ -75,6 +75,58 @@ impl<'a> Drive<'a> {
     }
 }
 
+#[test]
+fn borrowed_payload_preserves_boundary_and_original_bytes() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let prefix = [0, 0, 1, 0x26, 1, 0x80, 0x42];
+    let mut interior = [0x55; 32];
+    interior[7] = 0;
+    let mut boundary = [0x55; 32];
+    boundary[7..9].fill(0);
+    let mut reader = RawAnnexBReader::new(
+        &pool,
+        Codec::Hevc,
+        ID,
+        SourceCapabilities {
+            length: Some((prefix.len() + interior.len()) as u64),
+            random_access: false,
+        },
+        RawAnnexBLimits::default(),
+    )
+    .unwrap();
+    let request = reader.request();
+    let bytes = Bytes::copy_from_slice(&pool, &prefix).unwrap();
+    reader
+        .provide_owned(InputWindow::new(request.source, request.token, 0, bytes).unwrap())
+        .unwrap();
+    let mut work = WorkBudget::new(4096);
+    let Step::NeedInput(request) = reader.step(&mut work, &OFF).unwrap() else {
+        panic!("expected NAL payload input");
+    };
+    assert_eq!(request.offset, prefix.len() as u64);
+    assert!(
+        !reader
+            .append_payload(&request, &boundary, &mut work, &OFF)
+            .unwrap()
+    );
+    assert_eq!(reader.request().offset, request.offset);
+    assert!(
+        reader
+            .append_payload(&request, &interior, &mut work, &OFF)
+            .unwrap()
+    );
+    let end = reader.request();
+    assert_eq!(end.offset, (prefix.len() + interior.len()) as u64);
+    reader.finish(end.source, end.token).unwrap();
+    let Step::Ready(unit) = reader.step(&mut work, &OFF).unwrap() else {
+        panic!("expected the final access unit");
+    };
+    assert_eq!(
+        unit.segments().flatten().copied().collect::<Vec<_>>(),
+        [prefix.as_slice(), interior.as_slice()].concat()
+    );
+}
+
 fn compare(codec: Codec, input: &[u8], expected: &str) {
     for (quantum, work, known_length) in [(1, 1, false), (7, 31, true), (4096, 4096, true)] {
         let pool = Budget::new(1 << 20).unwrap();

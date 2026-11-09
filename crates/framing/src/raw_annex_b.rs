@@ -193,6 +193,23 @@ impl RawAnnexBReader {
         self.nal.provide_owned(window)
     }
 
+    /// Consume a borrowed slice that fits wholly inside the current NAL
+    /// payload. If the reader needs to inspect a possible boundary, the caller
+    /// can provide the same slice as a regular input window.
+    pub fn append_payload(
+        &mut self,
+        request: &InputRequest,
+        bytes: &[u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        self.healthy()?;
+        if self.pending.is_some() || self.end.is_some() {
+            return Ok(false);
+        }
+        self.nal.append_annex_payload(request, bytes, work, cancel)
+    }
+
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         let result = self.nal.finish(source, token);
