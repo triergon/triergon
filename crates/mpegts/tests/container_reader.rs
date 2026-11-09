@@ -1089,7 +1089,7 @@ fn retained_pes_and_au_limits_are_enforced_without_pes_fallback() {
 }
 
 #[test]
-fn explicit_dvb_ac3_uses_the_syncframe_reader_without_backfilling_private_identity() {
+fn explicit_dvb_ac3_reports_the_signalled_codec_and_preserves_the_private_tag() {
     use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
     let mut frame = [0; 192];
     // Authored AC-3 envelope: 48 kHz, stereo, 48 kbit/s; opaque coded body.
@@ -1123,7 +1123,8 @@ fn explicit_dvb_ac3_uses_the_syncframe_reader_without_backfilling_private_identi
     assert_eq!(packet.dts(), None);
     assert_eq!(packet.duration(), Some(2880));
     assert_eq!(packet.track_info().codec_tag(), [6]);
-    assert_eq!(packet.track_info().codec(), CodecId::Other(&[6]));
+    assert_eq!(packet.track_info().codec(), CodecId::Ac3);
+    assert_eq!(packet.track_info().kind(), MediaKind::Audio);
     assert_eq!(packet.sources().len(), 2);
 
     let mut opaque = Drive::new(&ts.bytes, ReaderLimits::default(), 7, 7);
