@@ -1440,7 +1440,7 @@ impl TransportStream {
         }
         Ok(())
     }
-    pub(crate) fn blocked_adts_span_floor(&self) -> Result<Option<usize>> {
+    pub(crate) fn blocked_pes_growth_floor(&self) -> Result<Option<usize>> {
         let Route::Pes(index) = self.route else {
             return Ok(None);
         };
@@ -1450,7 +1450,7 @@ impl TransportStream {
         let Some(span_floor) = self.routes.as_slice()[index]
             .assembler
             .as_ref()
-            .and_then(PesAssembler::blocked_span_growth_floor)
+            .and_then(PesAssembler::blocked_growth_floor)
         else {
             return Ok(None);
         };
@@ -1467,8 +1467,8 @@ impl TransportStream {
         Ok(Some(floor))
     }
 
-    pub(crate) fn refuse_blocked_adts_span(&mut self, error: Error) -> TraceEvent {
-        debug_assert!(matches!(self.blocked_adts_span_floor(), Ok(Some(_))));
+    pub(crate) fn refuse_blocked_pes_growth(&mut self, error: Error) -> TraceEvent {
+        debug_assert!(matches!(self.blocked_pes_growth_floor(), Ok(Some(_))));
         self.discard_faulted_route(error)
     }
 
