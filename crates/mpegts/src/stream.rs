@@ -424,6 +424,15 @@ impl TransportStream {
         Self::new_with_program(budget, format, limits, Some(program), descriptor_namespace)
     }
 
+    /// Borrow complete carriers from the first suitable bounded allocation
+    /// and keep the full transport trace. Split carriers and other backing
+    /// allocations use the carry buffer.
+    #[must_use]
+    pub fn with_shared_carriers(mut self) -> Self {
+        self.framer.share_input();
+        self
+    }
+
     /// Read one TS188 segment with an in-band PAT and PMT. The complete PAT
     /// must identify exactly one media program. Program zero is a network PID.
     pub fn new_single_program_segment(
