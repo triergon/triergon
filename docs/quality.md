@@ -322,7 +322,8 @@ admits read-only file mappings, private or shared, and their exact `munmap`. The
 resident pages count toward total RSS, the kernel bound adds each one's whole length
 (`VmPeak` already includes it), and the receipt reports them as `file_mappings` and
 `file_mapped_bytes`. Any other mapping or unmapping voids the measurement, on either
-side. Receipts of this observer (`linux-glibc-v4`) list eight hooks in `symbol_order`,
+side. The observer does not guard `mprotect`: a private file mapping made writable with it
+holds memory the heap figure misses, though total RSS still counts it. Receipts of this observer (`linux-glibc-v4`) list eight hooks in `symbol_order`,
 so a worker's `strdup` and `strndup` move from the `malloc` counters to their own; v2
 and v3 receipts list six and still validate when re-graded. The report records the build identity, source provenance digest and input
 hashes it was measured with; when a result is cited, its source revision and raw-sample

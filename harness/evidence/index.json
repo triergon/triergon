@@ -16747,6 +16747,15 @@
    "sha256": "e4a19c36f2420ca6aa9f13860b74d2c0c8c069dffacce6e54610166e08b81d4d",
    "bytes": 24266,
    "source_revision": "7b54b38af04842bcfaa4dd9b4cc449c1169c4d24"
+  },
+  {
+   "name": "ass-rendering-58a5c202-linux-arm64-memory-libass",
+   "path": "ass-rendering-58a5c202-linux-arm64-memory-libass",
+   "retention": "retained",
+   "reason": "ASS rendering memory against libass in docs/status.md",
+   "key": "evidence/ass-rendering-58a5c202-linux-arm64-memory-libass/799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3.tar.gz",
+   "sha256": "799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3",
+   "bytes": 210930417
   }
  ]
 }
