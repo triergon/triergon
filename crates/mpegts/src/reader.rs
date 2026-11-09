@@ -7,7 +7,9 @@ use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
 use crate::compat::pes::UnframedAudioPolicy;
 use crate::psi::DescriptorNamespace;
-use crate::{ContinuityOutcome, PacketFormat, ParseLimits, TraceEvent, TransportStream};
+use crate::{
+    CarrierObservation, ContinuityOutcome, PacketFormat, ParseLimits, TraceEvent, TransportStream,
+};
 use lane::{Lane, LaneStep, PesRun, StorageScan};
 pub use model::{
     Ac3AccessUnit, AccessUnit, DvbSubtitleUnit, IncompleteVideo, LoasFrame, Packet, PacketClock,
@@ -347,8 +349,46 @@ impl Reader {
         self.storage = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
+        self.step_observing(work, cancel, |_, _| false)
+    }
+
+    /// Inspect carriers and ordinary continuity events in source order, then
+    /// return the next packet, other source event or progress step.
+    ///
+    /// The callback borrows each carrier within the caller's work grant. The
+    /// reader preserves the input, yield and backpressure protocol of [Self::step].
+    pub fn step_with_carriers(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        mut observe: impl FnMut(CarrierObservation<'_>),
+    ) -> Result<ReaderStep<Self>> {
+        loop {
+            let step = self.step_observing(work, cancel, |event, work| {
+                if cancel.load(Ordering::Relaxed) || !work.try_charge(3) {
+                    return false;
+                }
+                observe(event);
+                true
+            })?;
+            if let Step::Ready(Event::Other(event)) = &step
+                && let Some(event) = event.carrier_observation()
+            {
+                observe(event);
+            } else {
+                return Ok(step);
+            }
+        }
+    }
+
+    fn step_observing(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        observe: impl FnMut(CarrierObservation<'_>, &mut WorkBudget) -> bool,
+    ) -> Result<ReaderStep<Self>> {
         self.healthy()?;
-        match self.advance(work, cancel) {
+        match self.advance(work, cancel, observe) {
             Err(Error::Backpressure {
                 requested,
                 available,
@@ -427,7 +467,12 @@ impl Reader {
             LaneStep::End | LaneStep::NeedPayload => Ok(None),
         }
     }
-    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
+    fn advance(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        mut observe: impl FnMut(CarrierObservation<'_>, &mut WorkBudget) -> bool,
+    ) -> Result<ReaderStep<Self>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -780,7 +825,16 @@ impl Reader {
                 .input
                 .as_mut()
                 .ok_or(Error::Invalid("MPEG-TS reader closed"))?;
-            let step = match stream.poll(input, work, cancel) {
+            let mut observed = false;
+            let result = stream.poll_observing(input, work, cancel, |event, work| {
+                let accepted = observe(event, work);
+                observed |= accepted;
+                accepted
+            });
+            if observed {
+                self.storage = None;
+            }
+            let step = match result {
                 Err(error @ Error::Backpressure { .. }) => {
                     self.audit_pes_growth(error, work, cancel)?
                 }
