@@ -516,7 +516,7 @@ impl PesAssembler {
         self.payload.as_ref().map(|payload| &payload.bytes)
     }
 
-    pub(crate) fn blocked_span_growth_floor(&self) -> Option<usize> {
+    pub(crate) fn blocked_growth_floor(&self) -> Option<usize> {
         match &self.span_growth {
             SpanGrowth::Audit(audit) if audit.span > self.spans.len() => Some(audit.minimum),
             SpanGrowth::HeaderBlocked(minimum) => Some(*minimum),
@@ -763,7 +763,7 @@ impl PesAssembler {
                     extent,
                     self.limits.source_spans,
                 ) {
-                    Err(error @ Error::Backpressure { .. }) if self.unbounded_adts => {
+                    Err(error @ Error::Backpressure { .. }) => {
                         self.record_blocked_header_growth()?;
                         return Err(error);
                     }

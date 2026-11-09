@@ -501,7 +501,7 @@ impl StorageScan {
         Self::start(reader, StorageCursor::Map, total)
     }
 
-    pub(super) fn span_growth(reader: &super::Reader, floor: usize) -> Result<Self> {
+    pub(super) fn pes_growth(reader: &super::Reader, floor: usize) -> Result<Self> {
         Self::start(
             reader,
             StorageCursor::Transport(TransportStorageCursor::BlockedSpan(0)),
