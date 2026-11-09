@@ -32,7 +32,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 223/223 cases (`subtitle-dvd`) | 0.8592 (223/223 pass) | heap ≤0.959, total RSS ≤0.853 (223/223 lower) | FATE coverage |
 | Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 197/197 cases (`subtitle-cc`) | 0.9751 (197/197 pass) | heap ≤0.123, total RSS ≤0.956 (197/197 lower) | FATE coverage |
 | Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 70/70 cases (`subtitle-teletext`) | 0.4257 (70/70 pass) | heap ≤0.622, total RSS ≤0.676 (70/70 lower) | FATE coverage |
-| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 38/38 (`mp4-forward`, host AArch64), TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 1.6427 (35/37 pass), TS program 1.4695 (33/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤3.382 (36/37 lower), total RSS ≤1.025 (18/37 lower); TS program heap ≤0.102, total RSS ≤0.910 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower) | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC; MP4 forward runtime and memory |
+| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 38/38 (`mp4-forward`), TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 1.5579 (34/38 pass), TS program 1.4695 (33/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤3.382 (36/38 lower), total RSS ≤0.9443 (38/38 lower); TS program heap ≤0.102, total RSS ≤0.910 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower) | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC; MP4 forward runtime and memory |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0551 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths; AAC charges in-band reconfiguration when it appears, and a refused access unit leaves the decoder unchanged unless an earlier raw data block or Main-prediction element of it was decoded |
 | Audio codecs in files | FLAC (RFC 9639, 4 to 32 bits, 1 to 8 channels); Opus (RFC 6716 and 8251: SILK, CELT, hybrid, families 0, 1 and 255); Vorbis I; MPEG-1, 2 and 2.5 audio Layer I, II and III | 315/321 pass through the container readers (FATE Vorbis, Opus and MP3 conformance, the IETF FLAC testbench, generated streams): FLAC bit-exact, the others within the [numeric rules](../harness/codecs/numeric-rules.json) | 1.0834 (10/10 pass) | heap ≤0.904, total RSS ≤0.966 (10/10) | FLAC `01 - changing samplerate`, `02 - increasing number of channels`, `03 - decreasing number of channels` and MP3 `he_mode` change format mid-stream, which the CLI converts; FLAC `flac_3ch_odd_mask`, whose layout FFmpeg refuses on its stereo output; MP3 `he_free` (free format: FFmpeg finds no two consecutive frames, and the decoder refuses free-format frames), refused by both; runtime toward the target for Opus music (1.0301) and 5.1 (1.0834), Vorbis 5.1 (0.9356) and stereo (0.8423) and Opus speech (0.8719); Opus families 2 and 3 |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix; container track decoding with trims and start delays | with the codecs | 1.0551 (17/17 pass) | with the codecs | — |
@@ -76,26 +76,24 @@ the reference and pass runtime, peak heap and total RSS. All five functional inp
 and ten outcomes pass. The same source passes every selected gate on all 74
 progressive and HLS cases; full module and FATE coverage remain pending.
 
-The Matroska audio clock and playback profile rows use the gate build at
+The Matroska audio clock, TS program and raw Annex B rows use the gate build at
 `b3579f729494a37a4dbebe03c475f7b38484046e` on a c8g.2xlarge pinned to CPU 1, with 30 timing pairs and
-30 memory pairs under the kernel RSS proof. Cases whose parity fails are not timed or
-measured. The Matroska audio clock, TS program and raw Annex B rows are graded reports; the
-MP4 forward runtime and memory come from those reports for the 37 cases measured.
-The 38-case host comparison also covers the encoded AVC/AAC source with reordered
-video edits through the checked encoded edit planner.
+30 memory pairs under the kernel RSS proof.
+
+The MP4 forward gate build at `2a1b26347fee56f5506db63efbc8e3e3c66ad388` uses
+30 timing pairs of 50 operations and 30 memory pairs on a c8g.large pinned to CPU 1.
+The 38 cases include encoded AVC/AAC with reordered video edits and AAC preroll.
 
 Above the ceiling: Matroska audio clocks `laced-fractional-cadence` 1.4510,
 `laced-unknown-duration` 1.4089, `two-laced-before-first-known-pts` 1.3968,
 `damaged-lace-before-valid-anchor` 1.3878; MP4 forward `regular-encoded-avc-aac-native-seek`
-1.6427, `progressive-ten-sequential-batches` 1.5011; TS program
+1.4566, `regular-encoded-avc-aac-indexed-seek` 1.4579,
+`progressive-pending-reverse-ranges` 1.2263, `progressive-ten-sequential-batches` 1.5579; TS program
 `m2ts-entry-hevc-aac-44100-01-video` 1.4695, `entry-hevc-aac-44100-00` 1.3236.
 
 Memory at or above the reference: Matroska audio clocks heap on `no-absolute-anchor` 1.822
 and `dolby-bad-first` 1.321, total RSS on all 10 (1.038 to 1.043); MP4 forward heap on
-`regular-encoded-avc-aac-native-seek` 3.382, total RSS on that case (1.025),
-`regular-pending-terminal`, `regular-unknown-clock-terminal`, the four `regular-f-*` cases and
-the twelve `progressive-pending-*`, `progressive-f-*`, `progressive-unknown-clock-terminal`
-and `progressive-first-source-clock-unknown` cases (1.000 to 1.004).
+`regular-encoded-avc-aac-native-seek` 3.382 and `regular-encoded-avc-aac-indexed-seek` 3.175.
 
 The MPEG-TS row uses the gate build at `090c856df65f9247d24ea9f1c927e35cf5d528e8` on a
 c8g.2xlarge pinned to CPU 1, with 30 timing pairs of 50 operations and 30 memory pairs
@@ -160,6 +158,7 @@ timing of the reference built with and without zeroed automatic variables.
 | Audio codecs in files | `ccff5b5734c113c1d88160b84825157508c701c0` | `0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53` |
 | Ogg, audio elementary streams | `ccd3090572433e79d8ab65a377fcd9896d2839d9` | `8123e0f020a9c4ccedd83aea3e665d4486d55e26612e8bc29626e9a3026e2cd1` |
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |
+| MP4 forward and range, encoded edits | `2a1b26347fee56f5506db63efbc8e3e3c66ad388` | `fe95646449aa52a4a121aeecb3346308b270923aee9b0751b2125501abf36004` |
 | Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
 | Subtitles: PGS, closed captions, teletext | `956c42961f4a27d88f96d5800d59ff1eeb088018` | `61b52a272e82eeee913c9c4b4d6331caea3283a99ebad4a897aba65dab3c891d` |
 | Subtitles: DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
