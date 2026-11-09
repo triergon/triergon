@@ -140,6 +140,7 @@ timing of the reference built with and without zeroed automatic variables.
 | MPEG-TS progressive playback | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | HLS segments | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | Packet framing | `b5a59b546f554756389d999c86920e09bfcc5fb7` | `7b09d5ecab0b8752146e7e548668145cb9ba488bcfd55dc18eb70a8d8f035d84` |
+| Packet framing, allocation transfer comparison | `66ee4a28d3881b7e22873ab54ff1c4a0d45ff4d4` | `8ef50e430c7377e613aaa960bacb794e4de540cec032412c77cff77ed2a0ebaa` |
 | Packet framing, configuration lookup | `38c2b2121e201efac4222e6eee8ff8851e7bbfc4` | `f3c88cd969c581ebd803e860a0c52f5ee00285a99f85d563aa949862140cf33f` |
 | Packet framing, exact reservation | `953871543205cc59c7e8448e12439a165f6e3374` | `b058a0c47cc2e8e93e7b04f57b17a3a45cd0203aeb7ed6f81bdd614feded30dc` |
 | Packet framing, inline packet storage | `fc64e27d2fc6c4a1f6eed253d2e9f00c2ce1c4a4` | `297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600` |
