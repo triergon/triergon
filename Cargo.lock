@@ -53,7 +53,6 @@ dependencies = [
 name = "playback-worker"
 version = "0.0.0"
 dependencies = [
- "triergon",
  "triergon-core",
  "triergon-framing",
  "triergon-harness-protocol",
@@ -94,6 +93,17 @@ dependencies = [
  "triergon-harness-runner",
  "triergon-mpegts",
  "triergon-subtitles",
+]
+
+[[package]]
+name = "transport-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-framing",
+ "triergon-harness-protocol",
+ "triergon-harness-runner",
+ "triergon-mpegts",
 ]
 
 [[package]]
