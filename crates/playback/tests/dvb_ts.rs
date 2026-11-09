@@ -346,6 +346,69 @@ fn ts_bridge_retries_a_pes_refused_for_memory() {
     assert!(refusals > 1);
 }
 
+/// A PES whose regions the pool could never hold is refused with `Limit` and
+/// dropped, and the bridge decodes the next one.
+#[test]
+fn ts_bridge_drops_a_pes_larger_than_its_pool() {
+    const TS: usize = 188;
+    let source = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.ts");
+    let pes = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.pes-data");
+    let indices =
+        include_bytes!("../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices");
+    let page = [pes[4], pes[5]];
+    let segment = |kind: u8, body: &[u8]| {
+        let mut bytes = vec![0x0f, kind, page[0], page[1]];
+        bytes.extend((body.len() as u16).to_be_bytes());
+        bytes.extend(body);
+        bytes
+    };
+    // A page placing region 0, a 1280 x 1024 4-bit region, and the end.
+    let mut data = vec![0x20, 0x00];
+    data.extend(segment(0x10, &[5, 0x0b, 0, 0, 0, 0, 0, 0]));
+    data.extend(segment(0x11, &[0, 0, 5, 0, 4, 0, 2 << 5 | 2 << 2, 0, 0, 0]));
+    data.extend(segment(0x80, &[]));
+    data.push(0xff);
+    let mut large = replace_pes_data(source, &data);
+    // An earlier time, 128 ticks before: a PES with the same time continues
+    // the one before.
+    let packet = &mut large[2 * TS..3 * TS];
+    let start = packet
+        .windows(4)
+        .position(|w| w == [0, 0, 1, 0xbd])
+        .unwrap();
+    packet[start + 12] -= 1;
+    // The large PES, then the original with the next continuity counter.
+    let mut next = source[2 * TS..3 * TS].to_vec();
+    next[3] = next[3] & 0xf0 | (next[3] + 1) & 0x0f;
+    let two = [
+        &source[..2 * TS],
+        &large[2 * TS..3 * TS],
+        &next,
+        &source[3 * TS..],
+    ]
+    .concat();
+    let cancel = AtomicBool::new(false);
+    let pool = Budget::new(1 << 20).unwrap();
+    let (_player, map, mut inputs) = play(&pool, &two, 37, SourceTimePolicy::RelativeEpochZero);
+    let mut bridge = DvbTsBridge::new(&map.unwrap(), 256, PACKET_LIMIT, &cancel).unwrap();
+    assert_eq!(inputs.len(), 2);
+    assert!(bridge.push(&mut Some(inputs.remove(0))).unwrap());
+    let mut refused = false;
+    loop {
+        match bridge.poll(&mut WorkBudget::new(u64::MAX), &cancel) {
+            Ok(DvbStep::Yield) => {}
+            Err(triergon_core::Error::Limit { .. }) => refused = true,
+            Ok(DvbStep::NeedPacket) => break,
+            other => panic!("{other:?}"),
+        }
+    }
+    assert!(refused);
+    match decode(&mut bridge, inputs.remove(0)) {
+        Seen::Show { pixels, .. } => assert_eq!(pixels, indices),
+        _ => panic!("the next PES presents nothing"),
+    }
+}
+
 fn pes_continuation(template: &[u8; 1504], pes: &[u8], cut: usize) -> [u8; 1504] {
     const TS: usize = 188;
     let mut result = replace_pes_data(template, &pes[..cut]);

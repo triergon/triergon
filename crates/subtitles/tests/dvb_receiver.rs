@@ -510,6 +510,40 @@ fn refused_packet_changes_nothing() {
     }
 }
 
+/// A packet the pool could never hold is refused with `Limit`, one it cannot
+/// hold now with `Backpressure`; neither is kept, and both pay for the check.
+#[test]
+fn refusals_pay_for_the_check_and_say_whether_to_retry() {
+    let large = packet(&[
+        segments::page(0, false, &[(0, 0, 0)]),
+        segments::region(0, 1280, 1024, &[(1, 0, 0)]),
+        segments::end(),
+    ]);
+    let cancel = AtomicBool::new(false);
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let mut work = WorkBudget::new(u64::MAX);
+    assert!(matches!(
+        decoder.decode(&large, Some(0), &mut work, &cancel),
+        Err(Error::Limit { .. })
+    ));
+    assert!(work.spent() >= large.len() as u64);
+    assert!(!decoder.has_kept_packet());
+    let pool = Budget::new(1 << 22).unwrap();
+    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let taken = pool.reserve(pool.available() - (1 << 20)).unwrap();
+    let mut work = WorkBudget::new(u64::MAX);
+    assert!(matches!(
+        decoder.decode(&large, Some(0), &mut work, &cancel),
+        Err(Error::Backpressure { .. })
+    ));
+    assert!(work.spent() >= large.len() as u64);
+    drop(taken);
+    // Once the pool has room, it is decoded.
+    let status = decoder.decode(&large, Some(0), &mut WorkBudget::new(u64::MAX), &cancel);
+    assert!(matches!(status, Ok(Status::Subtitle(_))));
+}
+
 /// With the end taken from the next page, times subtract as the reference's
 /// do: in 64 bits, wrapping, rounded to milliseconds in 128; and a packet
 /// without a time stands for `i64::MIN`. The ends come from the reference's

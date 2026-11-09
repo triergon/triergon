@@ -380,11 +380,12 @@ impl ReceiverDecoder {
     ///
     /// The memory the packet's segments may allocate, and room to keep the
     /// packet, are checked against the pool before any segment is decoded: a
-    /// packet the pool cannot hold is refused (`Error::Backpressure`) and
-    /// changes nothing. Each segment's work, one unit per byte, per object
-    /// placement it visits and per pixel it may draw, copy or present, is
-    /// charged to `work` before the segment is decoded, and the check's own
-    /// work before the first. When the budget cannot pay for the next one,
+    /// packet the pool cannot hold now is refused (`Error::Backpressure`),
+    /// one it could never hold (`Error::Limit`), and either changes nothing
+    /// but the work of the check. Each segment's work, one unit per byte, per
+    /// object placement it visits and per pixel it may draw, copy or present,
+    /// is charged to `work` before the segment is decoded, and the check's
+    /// own work before the first. When the budget cannot pay for the next one,
     /// the call yields ([`Status::Yield`]) before it, and the decoder keeps
     /// the rest of the packet: [`resume`](Self::resume) it, and the work left
     /// over counts towards the next segment, or [`abandon`](Self::abandon) it.
@@ -422,15 +423,24 @@ impl ReceiverDecoder {
             0
         };
         let requested = plan.bytes.saturating_add(kept);
+        let maximum = self.budget.limit() - Budget::control_storage_bytes();
         let available = self.budget.available();
-        if requested > available {
-            return Err(Error::Backpressure {
+        let refusal = if requested > maximum {
+            Some(Error::Limit { requested, maximum })
+        } else if requested > available {
+            Some(Error::Backpressure {
                 requested,
                 available,
-            });
+            })
+        } else {
+            self.held_packet.clear();
+            self.held_packet.try_reserve_exact(packet.len()).err()
+        };
+        // The check's work is spent whether or not the packet is admitted.
+        if let Some(error) = refusal {
+            work.take(plan.work);
+            return Err(error);
         }
-        self.held_packet.clear();
-        self.held_packet.try_reserve_exact(packet.len())?;
         self.credit = 0;
         self.owed = plan.work;
         self.step(Some(packet), 0, pts, work, cancel)

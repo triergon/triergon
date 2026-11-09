@@ -34,7 +34,10 @@ impl MatroskaDvbPacket {
     /// Decode the packet with the track's receiver
     /// ([`MatroskaBitmapTrack::dvb_decoder`]) and project its subtitle onto
     /// the bitmap queue. A packet the decoder refuses or that presents
-    /// nothing, and a preroll or unselected one, has no action.
+    /// nothing, and a preroll or unselected one, has no action. A packet
+    /// refused for memory returns the error: `Error::Backpressure` may be
+    /// offered again once the pool has room, `Error::Limit` never fits the
+    /// pool and is dropped.
     pub fn decode<'d>(
         &self,
         decoder: &'d mut ReceiverDecoder,
