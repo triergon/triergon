@@ -18,13 +18,15 @@ use triergon_core::{
 use triergon_framing::Ac3Family;
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::annex_b::VideoEofPolicy;
+use triergon_mpegts::compat::dvb::TailPolicy;
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::latm;
-use triergon_mpegts::compat::pes::DemuxClock;
+use triergon_mpegts::compat::pes::{DemuxClock, UnframedAudioPolicy};
 use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::{
     AccessUnit, AudioEofPolicy, EntityTransition, FaultKind, IncompleteVideo, Packet, PacketClock,
     PacketFormat, PayloadSource, Reader, ReaderEvent, ReaderLimits, SourceEpochs, TraceEvent,
+    UnframedAudio,
 };
 
 pub const PREFIX: &str = "ts-au-";
@@ -161,13 +163,15 @@ fn position_basis(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Resu
 }
 
 fn refused(mut totals: Totals, error: &dyn std::fmt::Display, at: SourceLocation) -> Totals {
-    totals.refusal = Some(Box::new(Refusal {
-        reason: error.to_string(),
-        cause: format!(
-            "{{\"phase\":\"access_units\",\"source\":{},\"input_window_offset\":{}}}",
-            at.source.0, at.offset,
-        ),
-    }));
+    totals.refusal.get_or_insert_with(|| {
+        Box::new(Refusal {
+            reason: error.to_string(),
+            cause: format!(
+                "{{\"phase\":\"access_units\",\"source\":{},\"input_window_offset\":{}}}",
+                at.source.0, at.offset,
+            ),
+        })
+    });
     totals
 }
 
@@ -176,6 +180,7 @@ enum Payload<'a> {
     Framed {
         sources: &'a [PayloadSource],
         bytes: &'a [u8],
+        pes_position: bool,
     },
     PreservedPes(&'a latm::PesPacket),
 }
@@ -193,7 +198,10 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
         let flags = match packet.access_unit() {
             AccessUnit::Video(unit) => u64::from(unit.random_access),
             AccessUnit::Loas(_) => 0,
-            AccessUnit::Adts(_) | AccessUnit::Ac3(_) | AccessUnit::IncompleteAudio { .. } => 1,
+            AccessUnit::Adts(_)
+            | AccessUnit::Ac3(_)
+            | AccessUnit::DvbSubtitle(_)
+            | AccessUnit::IncompleteAudio { .. } => 1,
         };
         Self {
             pid: packet.track_info().stream().pid,
@@ -202,6 +210,8 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             payload: Payload::Framed {
                 sources: packet.sources(),
                 bytes: packet.payload(),
+                // The subtitle payload starts after the two-byte PES wrapper.
+                pes_position: matches!(packet.access_unit(), AccessUnit::DvbSubtitle(_)),
             },
             flags,
         }
@@ -217,8 +227,25 @@ impl<'a> From<&'a IncompleteVideo> for PacketProjection<'a> {
             payload: Payload::Framed {
                 sources: video.sources(),
                 bytes: video.bytes().as_ref(),
+                pes_position: false,
             },
             flags: 0,
+        }
+    }
+}
+
+impl<'a> From<&'a UnframedAudio> for PacketProjection<'a> {
+    fn from(audio: &'a UnframedAudio) -> Self {
+        Self {
+            pid: audio.track_info().stream().pid,
+            clock: audio.clock(),
+            epochs: audio.epochs(),
+            payload: Payload::Framed {
+                sources: audio.sources(),
+                bytes: audio.bytes().as_ref(),
+                pes_position: false,
+            },
+            flags: 1,
         }
     }
 }
@@ -265,12 +292,20 @@ fn fold_packet(
         Ok(value.map(i64::try_from).transpose()?.unwrap_or(i64::MIN))
     };
     let (pes, at_pes_start, length) = match packet.payload {
-        Payload::Framed { sources, bytes } => {
+        Payload::Framed {
+            sources,
+            bytes,
+            pes_position,
+        } => {
             let first = sources.first().ok_or("packet has no source PES")?;
             let TraceEvent::Pes(pes) = first.pes.event() else {
                 return Err("packet payload has no PES".into());
             };
-            (pes, first.payload_range.start == 0, bytes.len())
+            (
+                pes,
+                first.payload_range.start == 0 || pes_position,
+                bytes.len(),
+            )
         }
         Payload::PreservedPes(packet) => (packet.pes(), true, packet.pes().payload_len),
     };
@@ -337,8 +372,10 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         program: Some(request.program),
         descriptor_namespace: request.namespace,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
+        unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
         video_eof_policy: VideoEofPolicy::ReportUnframed,
         latm_packet_policy: latm::PacketPolicy::PreservePes,
+        dvb_subtitle_tail_policy: TailPolicy::ReportCompletePrefix,
         ..ReaderLimits::default()
     };
     let mut reader = AnyReader::MpegTs(Reader::new(
@@ -356,6 +393,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
     let mut source = FIRST_SOURCE;
     let mut current = &request.input;
     let mut following = request.following.as_slice().iter();
+    let single_entity = request.following.is_empty();
     let mut observed_media = false;
     let refusal = loop {
         let step = match reader.step(&mut WorkBudget::new(WORK), cancel) {
@@ -366,7 +404,9 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
             Step::Ready(
                 Event::Packet(AnyPacket::MpegTs(packet))
                 | Event::Other(AnyOther::MpegTs(
-                    ReaderEvent::VideoHeaders(packet) | ReaderEvent::IncompleteAudio(packet),
+                    ReaderEvent::VideoHeaders(packet)
+                    | ReaderEvent::IncompleteAudio(packet)
+                    | ReaderEvent::DvbSubtitlePrefix(packet),
                 )),
             ) => {
                 observed_media = true;
@@ -412,11 +452,14 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 }
             }
             Step::Ready(Event::Other(AnyOther::MpegTs(
-                event @ (ReaderEvent::IncompleteVideo(_) | ReaderEvent::LatmPes(_)),
+                event @ (ReaderEvent::IncompleteVideo(_)
+                | ReaderEvent::UnframedAudio(_)
+                | ReaderEvent::LatmPes(_)),
             ))) => {
                 observed_media = true;
                 let (id, projection) = match &event {
                     ReaderEvent::IncompleteVideo(video) => (video.track_info().id(), video.into()),
+                    ReaderEvent::UnframedAudio(audio) => (audio.track_info().id(), audio.into()),
                     ReaderEvent::LatmPes(packet) => (packet.track_info().id(), packet.into()),
                     _ => unreachable!("expected an opaque packet observation"),
                 };
@@ -447,13 +490,26 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                             .ok_or("source clock projection exhausted its work")?;
                     }
                     TraceEvent::Diagnostic(fault) => {
-                        totals.refusal = Some(Box::new(Refusal {
-                            reason: format!("source diagnostic: {:?}", fault.kind),
-                            cause: format!(
-                                "{{\"phase\":\"diagnostic\",\"source\":{},\"offset\":{}}}",
-                                fault.location.source.0, fault.location.offset,
-                            ),
-                        }));
+                        let startup_pointer = single_entity
+                            && !observed_media
+                            && tracks.is_empty()
+                            && totals.refusal.is_none()
+                            && fault.kind == FaultKind::Psi
+                            && fault.error == Error::Invalid("PSI pointer");
+                        totals.refusal.get_or_insert_with(|| {
+                            Box::new(Refusal {
+                                reason: format!("source diagnostic: {:?}", fault.kind),
+                                cause: format!(
+                                    "{{\"phase\":\"diagnostic\",\"source\":{},\"offset\":{}}}",
+                                    fault.location.source.0, fault.location.offset,
+                                ),
+                            })
+                        });
+                        // The source reader discarded the invalid pointer. A
+                        // later map and media can establish the program.
+                        if startup_pointer {
+                            continue;
+                        }
                         if fault.kind == FaultKind::Psi && !observed_media {
                             break totals;
                         }
@@ -580,6 +636,8 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     }
                     return Ok(refusal);
                 }
+                // Physical EOF with admitted media confirms a deferred startup.
+                totals.refusal = None;
                 return Ok(totals);
             }
         }

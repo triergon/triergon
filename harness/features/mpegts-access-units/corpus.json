@@ -5109,6 +5109,62 @@
         "digest": 14082017935433025708
       },
       "reference_result_sha256": "d9717741637f29f1a38c9787fb9791266d7aaa074f649b5989807f496820831b"
+    },
+    {
+      "id": "au-adts-aac-lc-recover-pat-pointer",
+      "profile": "au-adts-aac-lc-recover-pat-pointer",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-recover-pat-pointer.ts",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "sha256": "b54da1bcd218f01efaa6dbbda509e0249517e4e9fb2c0a89208e07814ca6ffc7",
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ],
+        "discarded_pointer_carrier": "pat"
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 18294072364400441336
+      },
+      "reference_result_sha256": "748d99f745942953269e5b65786bfbc2c4337028d5402f0faf075f8cd13825c2"
+    },
+    {
+      "id": "au-adts-aac-lc-recover-pmt-pointer",
+      "profile": "au-adts-aac-lc-recover-pmt-pointer",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-recover-pmt-pointer.ts",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "sha256": "f721644610eacc2e5a0c2fcc4909f058379a9f9376c2963795cd56ad8b8ef03f",
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ],
+        "discarded_pointer_carrier": "pmt"
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 18294072364400441336
+      },
+      "reference_result_sha256": "748d99f745942953269e5b65786bfbc2c4337028d5402f0faf075f8cd13825c2"
     }
   ]
 }

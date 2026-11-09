@@ -1,11 +1,14 @@
-use super::{Drive, OFF, PID, Transport, adts, audio_eof_frame, eac3};
+use super::{Drive, ID, OFF, PID, Transport, adts, audio_eof_frame, eac3};
 use triergon_core::container::{CodecId, Event, PacketInfo, TrackInfo};
 use triergon_core::{
-    Budget, Bytes, Error, InputRequest, InputWindow, SourceFailure, Step, WorkBudget,
+    Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceFailure, SourceId,
+    Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{PrivateAudioCarriage, UnframedAudioPolicy};
 use triergon_mpegts::psi::DescriptorNamespace;
-use triergon_mpegts::{AccessUnit, ReaderEvent, ReaderLimits, SourceEvent, TraceEvent};
+use triergon_mpegts::{
+    AccessUnit, EntityTransition, ReaderEvent, ReaderLimits, SourceEvent, TraceEvent,
+};
 
 const PAYLOAD: &[u8] = b"opaque private audio\0\x47\xff";
 const NEED_PES: Error = Error::Unsupported("unframed audio requires one finite PES");
@@ -279,4 +282,47 @@ fn the_observation_drains_beside_a_framed_track_and_a_conflicting_private_track(
         }
     }
     assert_eq!((packets, opaque, unsupported), (1, 1, 1));
+}
+
+#[test]
+fn a_contiguous_entity_end_and_later_transport_failure_emit_no_observation() {
+    let raw = include_bytes!("../data/carriage-ac3-direct.ts");
+    let mut drive = Drive::new(raw, limits(), 188, 1);
+    let (end, _) = input_end(&mut drive);
+    let next = SourceId(ID.0 + 1);
+    drive
+        .reader
+        .finish_entity(
+            end.source,
+            end.token,
+            next,
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            EntityTransition::Contiguous,
+        )
+        .unwrap();
+    loop {
+        match drive.reader.step(&mut WorkBudget::new(1), &OFF).unwrap() {
+            Step::Yield | Step::Ready(Event::Other(ReaderEvent::Source(_))) => (),
+            Step::NeedInput(request) => {
+                assert_eq!(request.source, next);
+                assert_eq!(request.offset, 0);
+                drive
+                    .reader
+                    .fail(next, request.token, SourceFailure::Transport)
+                    .unwrap();
+                break;
+            }
+            other => panic!("entity completion emitted {other:?}"),
+        }
+    }
+    assert_eq!(
+        drive
+            .reader
+            .step(&mut WorkBudget::new(1), &OFF)
+            .unwrap_err(),
+        Error::Transport
+    );
 }

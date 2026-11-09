@@ -63,6 +63,10 @@ The Annex B EOF policy also reports unframed video as an opaque source event.
 The comparison folds its original payload, clock anchor and PES position.
 The LATM packet policy folds each validated nonempty PES in source order, with
 zero packet flags and duration. Separate reader tests exercise LOAS framing.
+DVB subtitle segment groups keep their source PES positions. The prefix
+policy covers an overlong final segment. The private-audio EOF policy keeps
+one unframed PES as an opaque observation. A discarded startup PSI pointer
+can be followed by a validated map and media in the same entity.
 If a single entity ends without an access unit or stops at a PSI diagnostic,
 the comparison can complete empty after the control-only proof classifies the
 original carriers through physical end and logical EOF.

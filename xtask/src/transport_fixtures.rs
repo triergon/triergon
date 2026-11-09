@@ -880,6 +880,45 @@ fn latm_cases(aac: &Codec) -> R<[Case; 8]> {
     ])
 }
 
+fn startup_pointer_case(codec: &Codec, table: &str, offset: usize) -> R<Case> {
+    let frame = &codec.bytes[..codec.first];
+    let mut case = authored_case(
+        codec,
+        &format!("recover-{table}-pointer"),
+        &[part(frame, Some(90_000), None)],
+        false,
+    )?;
+    let bytes = case.bytes.as_mut().ok_or("missing authored transport")?;
+    let clean = bytes
+        .get_mut(offset..offset + 188)
+        .ok_or("missing PSI carrier")?;
+    let mut rejected = clean.to_vec();
+    if rejected[3] & 0x30 != 0x30 || rejected[1] & 0x40 == 0 {
+        return Err("expected an aligned PSI start with an adaptation field".into());
+    }
+    let pointer = 5 + usize::from(rejected[4]);
+    if rejected.get(pointer) != Some(&0) {
+        return Err("expected a zero PSI pointer".into());
+    }
+    rejected[pointer] = 255;
+    clean[3] = (clean[3] & 0xf0) | ((clean[3] + 1) & 15);
+    bytes.splice(offset..offset, rejected);
+    put(&mut case.row, "sha256", Value::str(sha256::hex(bytes)))?;
+    let construction = case
+        .row
+        .get("construction")
+        .cloned()
+        .ok_or("missing PES recipe")?;
+    let mut construction = construction;
+    put(
+        &mut construction,
+        "discarded_pointer_carrier",
+        Value::str(table),
+    )?;
+    put(&mut case.row, "construction", construction)?;
+    Ok(case)
+}
+
 fn all_cases(root: &Path) -> R<Vec<Case>> {
     let mut cases = original(root)?;
     for codec in [
@@ -964,6 +1003,8 @@ fn all_cases(root: &Path) -> R<Vec<Case>> {
     });
     cases.push(direct_eac3_case(root)?);
     cases.extend(latm_cases(&aac)?);
+    cases.push(startup_pointer_case(&aac, "pat", 0)?);
+    cases.push(startup_pointer_case(&aac, "pmt", 188)?);
     Ok(cases)
 }
 
@@ -982,6 +1023,9 @@ fn contract(cases: &[Case]) -> R<Value> {
                 "The Annex B EOF policy reports an unframed run of validated AVC or HEVC PES bytes with no start code. The candidate folds the opaque observation separately from complete video access units.",
                 "LATM controls wrap the pinned AAC-LC payload in independently authored LOAS envelopes and also carry opaque or truncated envelopes. The LATM compatibility policy reports one unsplit packet per validated nonempty PES, with its original clocks and position.",
                 "A single entity can complete empty after a PSI diagnostic or an empty read only when the control-only proof classifies the original carriers through physical end and logical EOF.",
+                "DVB subtitle controls fold the complete segments of a validated PES and keep the position of its carrier. The explicit tail policy reports a proven prefix ahead of an overlong final segment.",
+                "Private-audio observations retain the payload, position and clock of one validated finite PES without a syncword. The reader reports them at logical EOF under its explicit compatibility policy.",
+                "The startup PSI controls put an out-of-range pointer before a clean PAT or PMT. A later validated map and media through physical EOF establish the selected program.",
                 "Reference: the MPEG-TS demuxer with custom AVIO, NOFILLIN, parsers enabled, no stream discovery and no decoders; every parsed packet of the selected program in demux order, including EOF parser drain.",
                 "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
                 "Fold stream index, PID, signed PTS and DTS in 90kHz ticks (absent as INT64_MIN), duration, position, flags, payload length and every byte, then every side-data element's type, size and bytes.",
@@ -1407,7 +1451,7 @@ mod tests {
     fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
         let original = read_json(&root().join(ORIGINAL)).unwrap();
         let generated = all_cases(root()).unwrap();
-        assert_eq!(generated.len(), 158);
+        assert_eq!(generated.len(), 160);
         for (old, new) in cases(&original).unwrap().iter().zip(&generated) {
             assert!(new.bytes.is_none());
             for key in [
@@ -1652,7 +1696,7 @@ mod tests {
         .unwrap();
         assert_eq!(au.prefix, "ts-au-");
         assert_eq!(au.reference, "ffmpeg-formats-native");
-        assert_eq!(au.cases.len(), 158);
+        assert_eq!(au.cases.len(), 160);
         let contract = read_json(&au.contract).unwrap();
         assert_eq!(
             contract.get("required_profiles"),
