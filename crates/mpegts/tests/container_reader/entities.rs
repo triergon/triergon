@@ -3,6 +3,7 @@ use triergon_core::container::{ContainerReader, Event, PacketInfo};
 use triergon_core::{
     Budget, Bytes, Error, InputToken, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
+use triergon_mpegts::compat::annex_b::VideoEofPolicy;
 use triergon_mpegts::{
     AudioEofPolicy, EntityTransition, Packet, Reader, ReaderEvent, ReaderLimits, TraceEvent,
 };
@@ -23,15 +24,25 @@ impl Entity<'_> {
 }
 
 fn read(entities: &[Entity<'_>]) -> Vec<Event<Packet, ReaderEvent>> {
+    read_with_limits(
+        entities,
+        ReaderLimits {
+            audio_eof_policy: AudioEofPolicy::ReportIncomplete,
+            ..ReaderLimits::default()
+        },
+    )
+}
+
+fn read_with_limits(
+    entities: &[Entity<'_>],
+    limits: ReaderLimits,
+) -> Vec<Event<Packet, ReaderEvent>> {
     let pool = Budget::new(1 << 20).unwrap();
     let mut reader = Reader::new(
         &pool,
         entities[0].source,
         entities[0].capabilities(),
-        ReaderLimits {
-            audio_eof_policy: AudioEofPolicy::ReportIncomplete,
-            ..ReaderLimits::default()
-        },
+        limits,
         64,
     )
     .unwrap();
@@ -303,4 +314,102 @@ fn open_pes_at_pmt_boundary(signal_drop: bool) {
     }
     assert_eq!((interrupted, packets), (1, 1));
     assert_eq!(quarantines, usize::from(signal_drop));
+}
+
+#[test]
+fn opaque_video_waits_across_continuation_and_discards_on_discontinuity() {
+    let limits = ReaderLimits {
+        video_eof_policy: VideoEofPolicy::ReportUnframed,
+        ..ReaderLimits::default()
+    };
+    let mut transport = Transport::new();
+    transport.tables(&[(0x1b, PID, &[])], 0);
+    transport.pes(PID, 0xe0, b"old", Some(90_000), None);
+    let split = transport.bytes.len();
+    transport.pes(PID, 0xe0, b"new", Some(10), None);
+
+    let mut restart = Transport::new();
+    restart.tables(&[(0x1b, PID, &[])], 0);
+    restart.pes(PID, 0xe0, b"new", Some(10), None);
+    for (transition, raw, expected, pts) in [
+        (
+            EntityTransition::Contiguous,
+            &transport.bytes[split..],
+            b"oldnew".as_slice(),
+            90_000,
+        ),
+        (
+            EntityTransition::Discontinuity,
+            restart.bytes.as_slice(),
+            b"new".as_slice(),
+            10,
+        ),
+    ] {
+        let events = read_with_limits(
+            &[
+                Entity {
+                    source: ID,
+                    raw: &transport.bytes[..split],
+                    transition: EntityTransition::Contiguous,
+                },
+                Entity {
+                    source: SourceId(90),
+                    raw,
+                    transition,
+                },
+            ],
+            limits,
+        );
+        let mut observations = 0;
+        let mut pes = 0;
+        let mut interrupted = 0;
+        for event in events {
+            match event {
+                Event::Other(ReaderEvent::Source(source))
+                    if matches!(source.event(), TraceEvent::Pes(_)) =>
+                {
+                    pes += 1;
+                }
+                Event::Other(ReaderEvent::IncompleteVideo(video)) => {
+                    observations += 1;
+                    assert_eq!(pes, 2);
+                    assert_eq!(video.bytes().as_ref(), expected);
+                    assert_eq!(video.clock().unwrap().pts.ticks90, Some(pts));
+                    assert_eq!(video.clock().unwrap().dts.ticks90, None);
+                    let origins = video
+                        .sources()
+                        .iter()
+                        .map(|origin| {
+                            let TraceEvent::Pes(pes) = origin.pes.event() else {
+                                panic!("missing original PES");
+                            };
+                            pes.header_source_ranges.as_slice()[0].entity
+                        })
+                        .collect::<Vec<_>>();
+                    if transition == EntityTransition::Contiguous {
+                        assert_eq!(origins, [ID, SourceId(90)]);
+                    } else {
+                        assert_eq!(origins, [SourceId(90)]);
+                        assert_eq!(video.epochs().clock, 1);
+                    }
+                }
+                Event::Other(ReaderEvent::Interrupted {
+                    cause,
+                    elementary_range,
+                    ..
+                }) => {
+                    interrupted += 1;
+                    assert!(matches!(cause.event(), TraceEvent::Discontinuity { .. }));
+                    assert_eq!(elementary_range, 0..3);
+                }
+                Event::Other(ReaderEvent::Source(_)) => (),
+                other => panic!("unexpected opaque event: {other:?}"),
+            }
+        }
+        assert_eq!(observations, 1);
+        assert_eq!(
+            interrupted,
+            usize::from(transition == EntityTransition::Discontinuity)
+        );
+    }
 }

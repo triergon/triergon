@@ -7,6 +7,7 @@
   "reference": "ffmpeg-formats-native",
   "contract": [
     "Preloaded TS188 or M2TS192 input, SIZE PROGRAM [--dvb|--atsc] and the original ordered media-entity arguments; the candidate uses the public MPEG-TS access-unit reader, with no PES-as-AU fallback.",
+    "The Annex B EOF policy reports an unframed run of validated AVC or HEVC PES bytes with no start code. The candidate folds the opaque observation separately from complete video access units.",
     "Reference: the MPEG-TS demuxer with custom AVIO, NOFILLIN, parsers enabled, no stream discovery and no decoders; every parsed packet of the selected program in demux order, including EOF parser drain.",
     "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
     "Fold stream index, PID, signed PTS and DTS in 90kHz ticks (absent as INT64_MIN), duration, position, flags, payload length and every byte, then every side-data element's type, size and bytes.",
