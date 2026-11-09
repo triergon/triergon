@@ -384,8 +384,9 @@ impl ReceiverDecoder {
     /// The memory the packet's segments may allocate, and room to keep the
     /// packet, are checked against the pool before any segment is decoded: a
     /// packet the pool cannot hold now is refused (`Error::Backpressure`),
-    /// one it could never hold (`Error::Limit`), and either changes nothing
-    /// but the work of the check. Each segment's work, one unit per byte, per
+    /// one it could never hold beside what the decoder holds
+    /// (`Error::Limit`), and either changes nothing but the work of the
+    /// check. Each segment's work, one unit per byte, per
     /// object placement it visits and per pixel it may draw, copy or present,
     /// is charged to `work` before the segment is decoded, and the check's
     /// own work before the first. When the budget cannot pay for the next one,
@@ -426,14 +427,19 @@ impl ReceiverDecoder {
             0
         };
         let requested = plan.bytes.saturating_add(kept);
-        let maximum = self.budget.limit() - Budget::control_storage_bytes();
         let available = self.budget.available();
-        let refusal = if requested > maximum {
-            Some(Error::Limit { requested, maximum })
-        } else if requested > available {
-            Some(Error::Backpressure {
-                requested,
-                available,
+        let refusal = if requested > available {
+            // Beside what the decoder holds, a packet may never fit even
+            // with the pool otherwise empty: it is not worth retrying.
+            let maximum = (self.budget.limit() - Budget::control_storage_bytes())
+                .saturating_sub(self.retained());
+            Some(if requested > maximum {
+                Error::Limit { requested, maximum }
+            } else {
+                Error::Backpressure {
+                    requested,
+                    available,
+                }
             })
         } else {
             self.held_packet.clear();
@@ -518,6 +524,22 @@ impl ReceiverDecoder {
             Halt::Cancelled => Err(Error::Cancelled),
             Halt::Refused(error) => Ok(Status::Stalled(error)),
         }
+    }
+
+    /// The bytes the decoder holds, all of which stay held while a packet
+    /// waits to be decoded.
+    fn retained(&self) -> usize {
+        fn bytes<T>(vec: &BudgetVec<T>) -> usize {
+            vec.capacity() * size_of::<T>()
+        }
+        let slots: usize = self.slots.iter().map(|slot| slot.pixels.capacity()).sum();
+        self.epoch.retained()
+            + bytes(&self.page.placements)
+            + bytes(&self.slots)
+            + slots
+            + self.census.capacity() * size_of::<u32>()
+            + bytes(&self.held_packet)
+            + bytes(&self.planned)
     }
 
     /// What the packet presented, once it is decoded.
@@ -855,4 +877,108 @@ fn millis(us: i64) -> i64 {
     let us = i128::from(us);
     // Within 64 bits: a thousandth of a 64-bit value.
     ((us + if us < 0 { -500 } else { 500 }) / 1000) as i64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn segment(kind: u8, body: &[u8]) -> Vec<u8> {
+        let mut bytes = vec![0x0f, kind, 0, 1];
+        bytes.extend((body.len() as u16).to_be_bytes());
+        bytes.extend(body);
+        bytes
+    }
+
+    /// A page placing `regions`, a new epoch when `acquisition` is set.
+    fn page(version: u8, acquisition: bool, regions: &[u8]) -> Vec<u8> {
+        let mut body = vec![5, version << 4 | u8::from(acquisition) << 2];
+        for &id in regions {
+            body.extend([id, 0, 0, 10, 0, 10]);
+        }
+        segment(0x10, &body)
+    }
+
+    /// A 2-bit region of CLUT `clut`, placing object 1 `objects` times.
+    fn region(id: u8, version: u8, width: u16, height: u16, clut: u8, objects: usize) -> Vec<u8> {
+        let mut body = vec![id, version << 4];
+        body.extend(width.to_be_bytes());
+        body.extend(height.to_be_bytes());
+        body.extend([1 << 5 | 1 << 2, clut, 0, 0]);
+        for _ in 0..objects {
+            body.extend([0, 1, 0, 0, 0, 0]);
+        }
+        segment(0x11, &body)
+    }
+
+    fn object() -> Vec<u8> {
+        segment(0x13, &[0, 1, 0, 0, 4, 0, 0, 0x10, 0x6d, 0x00, 0xf0])
+    }
+
+    fn clut(id: u8) -> Vec<u8> {
+        segment(0x12, &[id, 0, 1, 0x41, 9, 9, 9, 9])
+    }
+
+    fn end() -> Vec<u8> {
+        segment(0x80, &[])
+    }
+
+    /// What the decoder counts as held is what it holds in its pool, through
+    /// regions growing and shrinking, CLUTs, presentations with and without
+    /// automatic palettes, a page presented from the next one, and a new
+    /// epoch.
+    #[test]
+    fn retained_bytes_are_the_bytes_held() {
+        let packets = [
+            [
+                page(0, true, &[0]),
+                region(0, 0, 64, 4, 0, 1),
+                object(),
+                end(),
+            ]
+            .concat(),
+            [
+                page(1, false, &[0, 1]),
+                region(1, 0, 320, 20, 2, 3),
+                clut(2),
+                object(),
+                end(),
+            ]
+            .concat(),
+            [
+                page(2, false, &[1, 0]),
+                region(0, 1, 128, 8, 0, 2),
+                object(),
+                end(),
+            ]
+            .concat(),
+            [
+                page(3, true, &[2]),
+                region(2, 0, 16, 2, 0, 1),
+                object(),
+                end(),
+            ]
+            .concat(),
+        ];
+        for options in [
+            Options::default(),
+            Options {
+                end_from_next: true,
+                automatic_palette: AutomaticPalette::Always,
+                service: None,
+            },
+        ] {
+            let pool = Budget::new(1 << 22).unwrap();
+            let cancel = AtomicBool::new(false);
+            let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+            for (i, packet) in packets.iter().enumerate() {
+                let mut work = WorkBudget::new(u64::MAX);
+                decoder
+                    .decode(packet, Some(i as i64 * 1_000_000), &mut work, &cancel)
+                    .unwrap();
+                let held = pool.used() - Budget::control_storage_bytes();
+                assert_eq!(decoder.retained(), held, "packet {i}, {options:?}");
+            }
+        }
+    }
 }
