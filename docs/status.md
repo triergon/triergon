@@ -224,6 +224,7 @@ timing of the reference built with and without zeroed automatic variables.
 | MPEG-TS access units, ADTS span limits | `a613a78dfa817b0ef4d5cca048f639b2e951f3c2` | `b45944d70c692f1fa5e4f700610897e9e6c055a1c2c62466969a21007e677294` |
 | MPEG-TS access units and PES, AArch64 Linux | `7f79fbed535293ebb31c2fea17d265a99cdd0260` | `7bfa7eda44cc81d40c69c626fab14e8f46fcb71934fd71e93d6a90899f4de306` |
 | MPEG-TS access units and PES, shared reader on AArch64 Linux | `d3a839911ad5d71c6d5bfb7943ab3f61c91113ca` | `fb254dfa5138c9383a865691da33180bcdea7c7c571119b29bf844069ee9ce86` |
+| MPEG-TS split PES header storage, macOS AArch64 | `72731b43b77841882917542889e7ebca0998241e` | `b2a9801019883347880756d8e725a8c51a03df15360e8639be8ae910d40100cd` |
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | ARMv7: ISO BMFF / MP4 | `f99d893196908d562c897bccb20c6a972cd25d11` | `bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1` |
 | ARMv7: packet framing, codec conformance, tests | `9621f6063a2e517fecc1c28757e6bed50b5228a8` | `9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e` |
