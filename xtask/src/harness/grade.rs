@@ -1309,6 +1309,11 @@ mod tests {
             ("ts-program", 35),
             ("raw-annex-b", 6),
             ("mpegts-pes", 97),
+            ("subtitle-pgs", 317),
+            ("subtitle-dvb", 229),
+            ("subtitle-dvd", 223),
+            ("subtitle-cc", 197),
+            ("subtitle-teletext", 70),
         ] {
             let (manifest, manifest_sha) = super::super::manifest::read(
                 root,

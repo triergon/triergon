@@ -291,9 +291,6 @@ impl<A: ArgbStorage> StoredDisplayDecoder<A> {
     pub fn generation(&self) -> u64 {
         self.generation
     }
-    pub(super) fn evidence_slots(&self) -> usize {
-        self.objects.len()
-    }
 
     /// Caller funds the bounded slot search. No source facts are changed by
     /// sharing immutable decoded bytes with an independently named receiver.

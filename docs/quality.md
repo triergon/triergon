@@ -42,9 +42,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   and records the baseline version from the prepared installation. Version
   discovery for an unpacked archive stops at the reference source boundary.
   Containers are measured against git revision `d32b387f` on the 9.0 branch: `matroska`
-  for the container harness, `formats` for MOV, TS, subtitles and the HLS segment
-  reference, and `video` (the Matroska build plus the H.264 and HEVC decoders that
-  stream discovery needs) for the playback startup and seek reference. Decoders and
+  for the container harness, `formats` for MOV, TS and the HLS segment reference,
+  `video` (the Matroska build plus the H.264 and HEVC decoders that stream discovery
+  needs) for the playback startup and seek reference, and `subtitles` (the PGS, DVB,
+  DVD, closed-caption and teletext decoders, the latter through a hash-checked
+  libzvbi 0.2.46, with the video decoders caption extraction needs) for the subtitle
+  decode comparison. Decoders and
   capture are measured against the FFmpeg 9.0.2 release tarball: `decode` (the default
   configuration) for the codec comparison, whose `ffmpeg` and `ffprobe` also decode
   capture output independently, and `capture` (gating) and `capture-small` for the
@@ -228,9 +231,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   as `shape-text` and `shape-text-all` for the shaper, keep their open cases listed
   without blocking it.
 - **Input rights.** A case is measured only when its `rights` are
-  `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
-  reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
-  Any other case fails as `rights-unreviewed`.
+  `authored-synthetic`, `reviewed-licence` with a `licence` under which a
+  reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash, or
+  `fetched-not-redistributed` for an upstream regression sample, or a local remux
+  of one, whose hash `harness/fate/samples.json` records: fetched into the ignored
+  corpus cache, compared locally and never redistributed, its redistribution
+  rights unreviewed. Any other case fails as `rights-unreviewed`.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).
@@ -294,10 +300,11 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, the three font features with `font-worker` and FreeType,
-the six shaping features with `shape-worker` and HarfBuzz and FriBidi, the
-five rasterising features with `raster-worker` and libass, and the four ASS
-parsing features and `ass-render` with `ass-worker` and libass.
+and `formats` references, the five `subtitle-*` features with `subtitle-worker` and the
+`subtitles` reference, the three font features with `font-worker` and FreeType, the six
+shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
+features with `raster-worker` and libass, and the four ASS parsing features and
+`ass-render` with `ass-worker` and libass.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers

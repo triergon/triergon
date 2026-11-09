@@ -1,0 +1,5185 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "basic-sup",
+      "profile": "basic-sup",
+      "file": "pgs/basic.sup",
+      "sha256": "41eb2ccb46326d60e9ecd5674a75532f4c4869cb05c06abf36e3b5d6a388345e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 11499831349205873284
+      }
+    },
+    {
+      "id": "basic-mkv",
+      "profile": "basic-mkv",
+      "file": "pgs/basic.mkv",
+      "sha256": "033a7c5cd0e5a2bcfff23d5cf1c7ab2869662352adf2575078b14fe04e438372",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 5938986068390291654
+      }
+    },
+    {
+      "id": "basic-ts",
+      "profile": "basic-ts",
+      "file": "pgs/basic.ts",
+      "sha256": "8ddcc5b11c7edbdff562982041ba08adc9c3f714d30a579758f29e1e0e43e84a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 5938986068390291654
+      }
+    },
+    {
+      "id": "basic-m2ts",
+      "profile": "basic-m2ts",
+      "file": "pgs/basic.m2ts",
+      "sha256": "92a2d25df2e6a322be96a67be382acc0a777815c04082f0dd11bc5abd96001d3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 5938986068390291654
+      }
+    },
+    {
+      "id": "two-objects-two-windows-sup",
+      "profile": "two-objects-two-windows-sup",
+      "file": "pgs/two-objects-two-windows.sup",
+      "sha256": "310d1a07e7080aa986b480ec60c8e112691ccb7a37bc1296787bd688b982c173",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 52048,
+        "digest": 17727993362432831160
+      }
+    },
+    {
+      "id": "two-objects-two-windows-mkv",
+      "profile": "two-objects-two-windows-mkv",
+      "file": "pgs/two-objects-two-windows.mkv",
+      "sha256": "b1b81b4ddf2291ee3d0a4cbde152723b42540f215a994331560658a0a1ab1137",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 52048,
+        "digest": 4194969589640607300
+      }
+    },
+    {
+      "id": "two-objects-two-windows-ts",
+      "profile": "two-objects-two-windows-ts",
+      "file": "pgs/two-objects-two-windows.ts",
+      "sha256": "3e1d9f2bcc998c2a12c223346fb27f47d4ac997e6ea3955da12762b98d108183",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 52048,
+        "digest": 4194969589640607300
+      }
+    },
+    {
+      "id": "two-objects-one-window-sup",
+      "profile": "two-objects-one-window-sup",
+      "file": "pgs/two-objects-one-window.sup",
+      "sha256": "228658e456714b33f1cac9386ad60fa8a17eb0de575146b4eb51a5d281c1a77a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 26048,
+        "digest": 8225980799976992519
+      }
+    },
+    {
+      "id": "three-objects-sup",
+      "profile": "three-objects-sup",
+      "file": "pgs/three-objects.sup",
+      "sha256": "a89a4dc3e0dde62ac921d400c1bc75e91601167513ad6fab5ea8ca6013056430",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 52048,
+        "digest": 9366551672754093302
+      }
+    },
+    {
+      "id": "same-object-twice-sup",
+      "profile": "same-object-twice-sup",
+      "file": "pgs/same-object-twice.sup",
+      "sha256": "704d42d0e13230fdd92583aa2d335ed8524afd99152ddc7bbf9c2476df7c34e7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 50048,
+        "digest": 14907059573482660394
+      }
+    },
+    {
+      "id": "cropped-sup",
+      "profile": "cropped-sup",
+      "file": "pgs/cropped.sup",
+      "sha256": "c41e4d82cc3d7818ed6666f07ff737931c25ce76cc9612ccc0fcdeaf80962e15",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 3937071836203902887
+      }
+    },
+    {
+      "id": "cropped-mkv",
+      "profile": "cropped-mkv",
+      "file": "pgs/cropped.mkv",
+      "sha256": "c15c81111f74bb05e7da7978c0d99bd1ef6b6701aabc0fa46dc37bd302c1e614",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 16822970629097872873
+      }
+    },
+    {
+      "id": "crop-outside-object-sup",
+      "profile": "crop-outside-object-sup",
+      "file": "pgs/crop-outside-object.sup",
+      "sha256": "01d0b7a3480dfe9d8ba83eb3bcc6ff1288ec2a1221b6298f85081d8fa6b3637e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 3937071836203902887
+      }
+    },
+    {
+      "id": "forced-mixed-only0-sup",
+      "profile": "forced-mixed-only0-sup",
+      "file": "pgs/forced-mixed-only0.sup",
+      "sha256": "4eb51780b7b8a0721b03f4e5a7bc5cf9814d12bea6a8aefc7d2a740ca248e576",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs",
+        "opt:forced_subs_only=0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 52048,
+        "digest": 17622145070437104197
+      }
+    },
+    {
+      "id": "forced-mixed-only0-mkv",
+      "profile": "forced-mixed-only0-mkv",
+      "file": "pgs/forced-mixed-only0.mkv",
+      "sha256": "bb0aa11bc4ef400b7b661f3e3d8ba7a0b05b38b608f78dded02378dcc3448027",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs",
+        "opt:forced_subs_only=0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 52048,
+        "digest": 4089121297644880337
+      }
+    },
+    {
+      "id": "forced-mixed-only1-sup",
+      "profile": "forced-mixed-only1-sup",
+      "file": "pgs/forced-mixed-only1.sup",
+      "sha256": "4eb51780b7b8a0721b03f4e5a7bc5cf9814d12bea6a8aefc7d2a740ca248e576",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs",
+        "opt:forced_subs_only=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 52048,
+        "digest": 2385533566689904567
+      }
+    },
+    {
+      "id": "forced-mixed-only1-mkv",
+      "profile": "forced-mixed-only1-mkv",
+      "file": "pgs/forced-mixed-only1.mkv",
+      "sha256": "bb0aa11bc4ef400b7b661f3e3d8ba7a0b05b38b608f78dded02378dcc3448027",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs",
+        "opt:forced_subs_only=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 52048,
+        "digest": 7299253867607232323
+      }
+    },
+    {
+      "id": "forced-none-only1-sup",
+      "profile": "forced-none-only1-sup",
+      "file": "pgs/forced-none-only1.sup",
+      "sha256": "310d1a07e7080aa986b480ec60c8e112691ccb7a37bc1296787bd688b982c173",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs",
+        "opt:forced_subs_only=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 52048,
+        "digest": 7871022316970804472
+      }
+    },
+    {
+      "id": "palette-only-update-sup",
+      "profile": "palette-only-update-sup",
+      "file": "pgs/palette-only-update.sup",
+      "sha256": "b24b4ccbadbce1a0216edc0191c1e5be66f0348e98080a0f7e50a51fa7797c0e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 75072,
+        "digest": 3705804636093834883
+      }
+    },
+    {
+      "id": "palette-only-update-mkv",
+      "profile": "palette-only-update-mkv",
+      "file": "pgs/palette-only-update.mkv",
+      "sha256": "384f8c156119da296838f3cbef00c1b1e96cbc7af67b5f7d15f99929c0e34554",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 75072,
+        "digest": 16025056267610176263
+      }
+    },
+    {
+      "id": "palette-only-update-ts",
+      "profile": "palette-only-update-ts",
+      "file": "pgs/palette-only-update.ts",
+      "sha256": "4625315daa543fdbd6262925985c9a32a29f8ac1852655eb13ff887767b15e58",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 75072,
+        "digest": 16025056267610176263
+      }
+    },
+    {
+      "id": "palette-update-flag-without-pds-sup",
+      "profile": "palette-update-flag-without-pds-sup",
+      "file": "pgs/palette-update-flag-without-pds.sup",
+      "sha256": "72fa7658cd009381e40c2be04ad3de97a938ecb787a0c63c00b9d82f6856ac0a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 50048,
+        "digest": 5845808673662120920
+      }
+    },
+    {
+      "id": "fragmented-3-sup",
+      "profile": "fragmented-3-sup",
+      "file": "pgs/fragmented-3.sup",
+      "sha256": "a3b680f74e64034731101088243c4a4f28062ab1e481de30081609292a48af12",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 381024,
+        "digest": 10506393742197045705
+      }
+    },
+    {
+      "id": "fragmented-3-mkv",
+      "profile": "fragmented-3-mkv",
+      "file": "pgs/fragmented-3.mkv",
+      "sha256": "89658a7dc8647fd1f00639bd5688e5ec452b528953681414d9c636ba0e6850c1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 381024,
+        "digest": 4834444114343017419
+      }
+    },
+    {
+      "id": "fragmented-3-ts",
+      "profile": "fragmented-3-ts",
+      "file": "pgs/fragmented-3.ts",
+      "sha256": "dff5df8958b11d6cffce6cbebfac937c36c3e2aece2b14ec1313a9ab104876f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 381024,
+        "digest": 4834444114343017419
+      }
+    },
+    {
+      "id": "fragmented-40-sup",
+      "profile": "fragmented-40-sup",
+      "file": "pgs/fragmented-40.sup",
+      "sha256": "f49000085cd0d1c5f4a70a38017803468dfbbae3288a96c37833e7eded1e757a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 381024,
+        "digest": 5515470953906432105
+      }
+    },
+    {
+      "id": "fragmented-40-ts",
+      "profile": "fragmented-40-ts",
+      "file": "pgs/fragmented-40.ts",
+      "sha256": "8259df9d3fb860b3b8bc3e23d166c85d65c0b2e4217864e41c631bfe46b034b6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 381024,
+        "digest": 4834444114343017419
+      }
+    },
+    {
+      "id": "fragments-interleaved-sup",
+      "profile": "fragments-interleaved-sup",
+      "file": "pgs/fragments-interleaved.sup",
+      "sha256": "151fa5704693485207f497ba3dbb84d978bde4eb66ee0e4fcc97e48605f48768",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 26048,
+        "digest": 4951393348659022019
+      }
+    },
+    {
+      "id": "epoch-acquisition-normal-sup",
+      "profile": "epoch-acquisition-normal-sup",
+      "file": "pgs/epoch-acquisition-normal.sup",
+      "sha256": "593811b8925a49d771bb774d40c518373ef40678a6107cb30cacdab00a3bd62b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 65216,
+        "digest": 2589025978202799913
+      }
+    },
+    {
+      "id": "epoch-acquisition-normal-mkv",
+      "profile": "epoch-acquisition-normal-mkv",
+      "file": "pgs/epoch-acquisition-normal.mkv",
+      "sha256": "546fdb6df45457ad5f9dc1ee5e2835faef8bb6d2708aac45a2add9e93fcaeb9c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 65216,
+        "digest": 17471856581792243479
+      }
+    },
+    {
+      "id": "epoch-acquisition-normal-ts",
+      "profile": "epoch-acquisition-normal-ts",
+      "file": "pgs/epoch-acquisition-normal.ts",
+      "sha256": "f0cab4b8a7a9cf7ee24a54879bcfe05e087e4c41006ad290ad687edb3ba623aa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 65216,
+        "digest": 17471856581792243479
+      }
+    },
+    {
+      "id": "state-c0-and-reserved-sup",
+      "profile": "state-c0-and-reserved-sup",
+      "file": "pgs/state-c0-and-reserved.sup",
+      "sha256": "b5f679f26830c287f151b3c76374e36a1d156a29d8343857bb61587f61c6e579",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 27072,
+        "digest": 11365410794636284940
+      }
+    },
+    {
+      "id": "pcs-short-sup",
+      "profile": "pcs-short-sup",
+      "file": "pgs/pcs-short.sup",
+      "sha256": "66eb29177ac040948d6f67102fdab42fbd134c65670e930c454ae0a217584e95",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 50048,
+        "digest": 203349785300482722
+      }
+    },
+    {
+      "id": "pcs-object-count-overrun-sup",
+      "profile": "pcs-object-count-overrun-sup",
+      "file": "pgs/pcs-object-count-overrun.sup",
+      "sha256": "d7d06b075cdf67a663d7e84b3d3a39aec378abd079cc62a4e30af1712b47196a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 6755584053165846840
+      }
+    },
+    {
+      "id": "pcs-trailing-bytes-sup",
+      "profile": "pcs-trailing-bytes-sup",
+      "file": "pgs/pcs-trailing-bytes.sup",
+      "sha256": "d549d8cbd97f8a74e8876b420a89728e9001ee0e0470e5d837ba1dd35455fa39",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 14721305123922680356
+      }
+    },
+    {
+      "id": "pcs-crop-truncated-sup",
+      "profile": "pcs-crop-truncated-sup",
+      "file": "pgs/pcs-crop-truncated.sup",
+      "sha256": "63040635d809722354fdd038b712761b0783f8553916fddff98be7d98b9ea0ee",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 7158546534441709959
+      }
+    },
+    {
+      "id": "pds-partial-entry-sup",
+      "profile": "pds-partial-entry-sup",
+      "file": "pgs/pds-partial-entry.sup",
+      "sha256": "b6aef29f91f6704bdf1209df84d366e5d7aea894a9607362acf266adcdb8346f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 3506596726459147158
+      }
+    },
+    {
+      "id": "pds-short-sup",
+      "profile": "pds-short-sup",
+      "file": "pgs/pds-short.sup",
+      "sha256": "72796472968abc8d0ea11c9896c0a41f59666001aea63722c7a79620a2741efd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 6469945414047913366
+      }
+    },
+    {
+      "id": "pds-entry-beyond-255-sup",
+      "profile": "pds-entry-beyond-255-sup",
+      "file": "pgs/pds-entry-beyond-255.sup",
+      "sha256": "d739519523c847ea5c14e8b48b280326c4b6e37e4c7e966af17b701a721084d4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 25024,
+        "digest": 2249715722378057148
+      }
+    },
+    {
+      "id": "palette-ids-nine-sup",
+      "profile": "palette-ids-nine-sup",
+      "file": "pgs/palette-ids-nine.sup",
+      "sha256": "0e64a6b88b992dd309ba8c12ec2794f9732b8aa6e5a95adec567b0a444eeccd2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 5974906378609
+      }
+    },
+    {
+      "id": "palette-id-missing-sup",
+      "profile": "palette-id-missing-sup",
+      "file": "pgs/palette-id-missing.sup",
+      "sha256": "3a9452e9486f937466066e493885232a04b20e51f5a00aa909ef18bf322ffcf9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 5974677345401
+      }
+    },
+    {
+      "id": "ods-zero-size-sup",
+      "profile": "ods-zero-size-sup",
+      "file": "pgs/ods-zero-size.sup",
+      "sha256": "c810a6b8b892c2afbcbfa896647f9db5ff76f6aeb48f3f89d664dcd50e53edcb",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1024,
+        "digest": 8971610622944644727
+      }
+    },
+    {
+      "id": "ods-larger-than-canvas-sup",
+      "profile": "ods-larger-than-canvas-sup",
+      "file": "pgs/ods-larger-than-canvas.sup",
+      "sha256": "a0a861c3283ef6202ea14435c71b2da9e67fa748ca50f2ad72d427b5ab252a84",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1024,
+        "digest": 10307862726180170250
+      }
+    },
+    {
+      "id": "ods-length-short-sup",
+      "profile": "ods-length-short-sup",
+      "file": "pgs/ods-length-short.sup",
+      "sha256": "901bffd1fee7d287099099682781baab16427033d40a17a0aefab8c48616b07b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1024,
+        "digest": 8971610622944644727
+      }
+    },
+    {
+      "id": "ods-length-long-sup",
+      "profile": "ods-length-long-sup",
+      "file": "pgs/ods-length-long.sup",
+      "sha256": "c80fa46fcf37516555de8f01458d68fd045ed23a2bea7390fa0471b9fc85d14f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 14721305123922680356
+      }
+    },
+    {
+      "id": "ods-continuation-without-first-sup",
+      "profile": "ods-continuation-without-first-sup",
+      "file": "pgs/ods-continuation-without-first.sup",
+      "sha256": "78b5dcf496d7c07c7fcf48eb8efcfd374348479c74c9c666b9b0dd9779cf880f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1024,
+        "digest": 8971610622944644727
+      }
+    },
+    {
+      "id": "ods-missing-last-sup",
+      "profile": "ods-missing-last-sup",
+      "file": "pgs/ods-missing-last.sup",
+      "sha256": "c4fadb59985384a4084f8377bda61e5479542b30a18957ce1431acd6d422b7a4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 14721305123922680356
+      }
+    },
+    {
+      "id": "ods-flags-zero-sup",
+      "profile": "ods-flags-zero-sup",
+      "file": "pgs/ods-flags-zero.sup",
+      "sha256": "9801c9b0b752d7e7ebd86b667c4be857abb1e9cb446066bada3725521dce2a92",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 11499830425684873284
+      }
+    },
+    {
+      "id": "rle-short-rows-sup",
+      "profile": "rle-short-rows-sup",
+      "file": "pgs/rle-short-rows.sup",
+      "sha256": "0466c3dd9c5bc600fa4a6a259a70825f7a964a3c5f5dd6130b5f3bb747d852da",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1024,
+        "digest": 6278773840446766231
+      }
+    },
+    {
+      "id": "rle-long-rows-sup",
+      "profile": "rle-long-rows-sup",
+      "file": "pgs/rle-long-rows.sup",
+      "sha256": "79dc3b643dd3f79bfcccdfe151486f7563d6cdf975b12b6f54a0054a4f4e42c8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 6526107486396580841
+      }
+    },
+    {
+      "id": "rle-too-few-rows-sup",
+      "profile": "rle-too-few-rows-sup",
+      "file": "pgs/rle-too-few-rows.sup",
+      "sha256": "38a6e541f64d57ec149a9211b851bc4763dca03ec1ce8c7d9fbd5b6a21c472a5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1024,
+        "digest": 6278773840446766231
+      }
+    },
+    {
+      "id": "rle-too-many-rows-sup",
+      "profile": "rle-too-many-rows-sup",
+      "file": "pgs/rle-too-many-rows.sup",
+      "sha256": "574ab2766112174302b09a2925d6655f0de9efd590a23bd0a931d3679f84aa39",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 11499830425684873284
+      }
+    },
+    {
+      "id": "rle-truncated-sup",
+      "profile": "rle-truncated-sup",
+      "file": "pgs/rle-truncated.sup",
+      "sha256": "f6b8ed966b6e1cef216cf4f59e3cbdf33d1034e15544c6a919590affddd819c0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1024,
+        "digest": 6278773840446766231
+      }
+    },
+    {
+      "id": "rle-no-final-eol-sup",
+      "profile": "rle-no-final-eol-sup",
+      "file": "pgs/rle-no-final-eol.sup",
+      "sha256": "482e8ae232684ec4c6399391a22f43061e1da185fd4c318847e8e196c1919881",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 11499830425684873284
+      }
+    },
+    {
+      "id": "rle-zero-length-runs-sup",
+      "profile": "rle-zero-length-runs-sup",
+      "file": "pgs/rle-zero-length-runs.sup",
+      "sha256": "ef9d9da2b904312f463c2a0b805c09e419632ada1fa2d7c5685158543e7d43ed",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1024,
+        "digest": 6278773840446766231
+      }
+    },
+    {
+      "id": "unknown-segment-sup",
+      "profile": "unknown-segment-sup",
+      "file": "pgs/unknown-segment.sup",
+      "sha256": "329f3932d1309073d2292a515d3fb740c3be7cc524ce0079db1959c4188cdbec",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 8278355727447066212
+      }
+    },
+    {
+      "id": "end-with-payload-sup",
+      "profile": "end-with-payload-sup",
+      "file": "pgs/end-with-payload.sup",
+      "sha256": "5cd6877fb651a8df70f9ddd29623ca56173f3f38f9922caead9d123243673c6d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 14721305123922680356
+      }
+    },
+    {
+      "id": "wds-truncated-sup",
+      "profile": "wds-truncated-sup",
+      "file": "pgs/wds-truncated.sup",
+      "sha256": "aacf8da8fa1c6502e49ff1b927489921d4e1d2c155940d96badf4950fd4eb9f9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 11499830425684873284
+      }
+    },
+    {
+      "id": "missing-end-sup",
+      "profile": "missing-end-sup",
+      "file": "pgs/missing-end.sup",
+      "sha256": "83ded9cb23c5dcaecc2e344578d399f238817223369ca9f5a1080c683f8e313c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 16488021389112071556
+      }
+    },
+    {
+      "id": "missing-end-mkv",
+      "profile": "missing-end-mkv",
+      "file": "pgs/missing-end.mkv",
+      "sha256": "1bb47290890a2ca3f229c15dcda40c7ce7c71b6d0095190ef4df519bbfcce10d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 15030754922251587814
+      }
+    },
+    {
+      "id": "missing-end-ts",
+      "profile": "missing-end-ts",
+      "file": "pgs/missing-end.ts",
+      "sha256": "908961cbf4ce8af9bbd75d7254e8766fc37d8379043c5ca137e229c017d41b75",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 15030754922251587814
+      }
+    },
+    {
+      "id": "end-without-pcs-sup",
+      "profile": "end-without-pcs-sup",
+      "file": "pgs/end-without-pcs.sup",
+      "sha256": "d798094777227f3079b1b7f826f5cc29a970816be4b633c7e01568e7d6b1ae60",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 25024,
+        "digest": 95676585054828392
+      }
+    },
+    {
+      "id": "end-twice-sup",
+      "profile": "end-twice-sup",
+      "file": "pgs/end-twice.sup",
+      "sha256": "ef36ce8005c07973d7dd24e3d69e508e7c4eda8c6cadcd20e428f914e4c2f051",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 50048,
+        "digest": 2291577081336307248
+      }
+    },
+    {
+      "id": "out-of-order-sup",
+      "profile": "out-of-order-sup",
+      "file": "pgs/out-of-order.sup",
+      "sha256": "c1cd58992c3f9733ba5ffb3beba8afe68b2f2c04e0a809e6f225b5fd000ed656",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 50048,
+        "digest": 290912942191130994
+      }
+    },
+    {
+      "id": "out-of-order-mkv",
+      "profile": "out-of-order-mkv",
+      "file": "pgs/out-of-order.mkv",
+      "sha256": "efd361c5d56769c5ef8f71d4243d93583fddb9f57fe80844cf0540f2a16a2b92",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 50048,
+        "digest": 12907889928117691388
+      }
+    },
+    {
+      "id": "out-of-order-ts",
+      "profile": "out-of-order-ts",
+      "file": "pgs/out-of-order.ts",
+      "sha256": "2501118ee587dcf5e7df75cc4123bb54da590241c01be4fbe30c9b8428ba7c0e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 50048,
+        "digest": 12907889928117691388
+      }
+    },
+    {
+      "id": "object-cache-across-epochs-sup",
+      "profile": "object-cache-across-epochs-sup",
+      "file": "pgs/object-cache-across-epochs.sup",
+      "sha256": "19641f17d6bff9bfc172c1ab0b5cff015325ba632d82378364b03b2a06eb985a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 27072,
+        "digest": 11718725047527398625
+      }
+    },
+    {
+      "id": "position-outside-canvas-sup",
+      "profile": "position-outside-canvas-sup",
+      "file": "pgs/position-outside-canvas.sup",
+      "sha256": "a3a17b48143078a16b9750976fc1b38fd6bb867f5614c2645ac6d305619ba0b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 27552,
+        "digest": 465439929435444360
+      }
+    },
+    {
+      "id": "canvas-sizes-sup",
+      "profile": "canvas-sizes-sup",
+      "file": "pgs/canvas-sizes.sup",
+      "sha256": "73e055533f6b72555468dc4de4ca70045a7c6773a856d4f2802b01af82f375e7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 12096,
+        "digest": 6155211206142296787
+      }
+    },
+    {
+      "id": "many-objects-sup",
+      "profile": "many-objects-sup",
+      "file": "pgs/many-objects.sup",
+      "sha256": "766131b4cc707036e2762fe9095862eac4c200ec64cd1d5060d9e2e2a4f862da",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 4120,
+        "digest": 18072388898369159126
+      }
+    },
+    {
+      "id": "pts-zero-and-wrap-sup",
+      "profile": "pts-zero-and-wrap-sup",
+      "file": "pgs/pts-zero-and-wrap.sup",
+      "sha256": "ab4369bcd6ef556a6af743e551cd24f808502c15880ba13e5802e1e23852cde7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 50048,
+        "digest": 15286068405434533962
+      }
+    },
+    {
+      "id": "dts-variants-sup",
+      "profile": "dts-variants-sup",
+      "file": "pgs/dts-variants.sup",
+      "sha256": "7f19e51b8e0a59fbaee0ebd3808dbc46881cba25333967ddf7eb67acdcb4d471",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 50048,
+        "digest": 10629125102689475199
+      }
+    },
+    {
+      "id": "sup-junk-while-probing-sup",
+      "profile": "sup-junk-while-probing-sup",
+      "file": "pgs/sup-junk-while-probing.sup",
+      "sha256": "376f9fe207fe998e5f28cc8cf9b26b3b1a97cd7410e673289d51e9c3adee392b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 8278355727447066212
+      }
+    },
+    {
+      "id": "sup-truncated-tail-sup",
+      "profile": "sup-truncated-tail-sup",
+      "file": "pgs/sup-truncated-tail.sup",
+      "sha256": "e5e2efc714ffc818c7897ce9ef6092728890f159c43a0c9371bc2030eed6a4ed",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "sup-truncated-header-sup",
+      "profile": "sup-truncated-header-sup",
+      "file": "pgs/sup-truncated-header.sup",
+      "sha256": "fa2b1602cbcbd1fb4361b69e72c009b8164092440b36698dfcb28e2385d1a9e5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 11499830425684873284
+      }
+    },
+    {
+      "id": "sup-partial-magic-tail-sup",
+      "profile": "sup-partial-magic-tail-sup",
+      "file": "pgs/sup-partial-magic-tail.sup",
+      "sha256": "c03603424d8826fa60ca370dce21b6d408d4a0598f9d3371380beaf0da4d794a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 11499830425684873284
+      }
+    },
+    {
+      "id": "sup-empty-body-tail-sup",
+      "profile": "sup-empty-body-tail-sup",
+      "file": "pgs/sup-empty-body-tail.sup",
+      "sha256": "bba33b42ba0ac4ac89e5f36501871a0ea4523851303b2491007479a84e2b451d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 11499830425684873284
+      }
+    },
+    {
+      "id": "sup-one-body-byte-tail-sup",
+      "profile": "sup-one-body-byte-tail-sup",
+      "file": "pgs/sup-one-body-byte-tail.sup",
+      "sha256": "a364469ad96fe9ef4d5e5b07d0c567cb2798b2aff45841d09ff415aa5c3669cc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 25024,
+        "digest": 11499830425684873284
+      }
+    },
+    {
+      "id": "rx-short-packets-ts",
+      "profile": "rx-short-packets-ts",
+      "file": "pgs/rx-short-packets.ts",
+      "sha256": "52a47bb477a5e42c56e81c1738453bc75c827ab2e5ffbb894a376907d3b5fb04",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 9610799650144927168
+      }
+    },
+    {
+      "id": "rx-tail-partial-header-ts",
+      "profile": "rx-tail-partial-header-ts",
+      "file": "pgs/rx-tail-partial-header.ts",
+      "sha256": "e2471a1a35eab404dc62ce2807ff54e83090b881334dd832ee064ca55d7eb9d3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 7604703182616200125
+      }
+    },
+    {
+      "id": "rx-tail-overrun-ts",
+      "profile": "rx-tail-overrun-ts",
+      "file": "pgs/rx-tail-overrun.ts",
+      "sha256": "f2212937e17e28c83a24a2bdb5e12d675e07f7094cf3e9ce3a31936f1278e09d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 5130,
+        "digest": 9847875478014685728
+      }
+    },
+    {
+      "id": "rx-pcs-reads-on-ts",
+      "profile": "rx-pcs-reads-on-ts",
+      "file": "pgs/rx-pcs-reads-on.ts",
+      "sha256": "b8933fa84c1dae0e0bda8f8419f483159916f37ce463196eab69468c6e21df78",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2050,
+        "digest": 6559346950764705867
+      }
+    },
+    {
+      "id": "rx-pcs-truncated-sizes-ts",
+      "profile": "rx-pcs-truncated-sizes-ts",
+      "file": "pgs/rx-pcs-truncated-sizes.ts",
+      "sha256": "48a30c5a5536fb17e2e9092cae3cfeab6636fc1765d148d4c464c9a7975b9f64",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 8194,
+        "digest": 12937620280802411278
+      }
+    },
+    {
+      "id": "rx-pds-reads-on-ts",
+      "profile": "rx-pds-reads-on-ts",
+      "file": "pgs/rx-pds-reads-on.ts",
+      "sha256": "49ec48128b3f3073db1850a0f31e2e84f12438c81b9d01d7df0c124dea303cd8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 4406482337139236737
+      }
+    },
+    {
+      "id": "rx-ods-headers-ts",
+      "profile": "rx-ods-headers-ts",
+      "file": "pgs/rx-ods-headers.ts",
+      "sha256": "8fcb0794ae197d67f5aba7d6d9444af196eb9eb984738587f68d2cec1aa8a706",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 6150,
+        "digest": 663528183344792003
+      }
+    },
+    {
+      "id": "rx-displays-ts",
+      "profile": "rx-displays-ts",
+      "file": "pgs/rx-displays.ts",
+      "sha256": "59a1b9ad11b54055d6ffa035dfcc321733fcb13f55b5867d099d1ece8a6ddff5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 5128,
+        "digest": 7484260511701209404
+      }
+    },
+    {
+      "id": "rx-forced-empty-rects-ts",
+      "profile": "rx-forced-empty-rects-ts",
+      "file": "pgs/rx-forced-empty-rects.ts",
+      "sha256": "b23fad38458a6edc8b2fb671109a40b7bf7fd178c4e54489e281976c5a5850a9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 1577093025994047360
+      }
+    },
+    {
+      "id": "rx-forced-empty-rects-only-ts",
+      "profile": "rx-forced-empty-rects-only-ts",
+      "file": "pgs/rx-forced-empty-rects-only.ts",
+      "sha256": "b23fad38458a6edc8b2fb671109a40b7bf7fd178c4e54489e281976c5a5850a9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs",
+        "opt:forced_subs_only=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 1577093025994047360
+      }
+    },
+    {
+      "id": "rx-presentation-after-display-ts",
+      "profile": "rx-presentation-after-display-ts",
+      "file": "pgs/rx-presentation-after-display.ts",
+      "sha256": "8e3856ff3b5df4575d2f19a22d9d5c90a19605b42d8f412492af721910fc587a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 2052,
+        "digest": 11604109808359656979
+      }
+    },
+    {
+      "id": "rx-epoch-states-ts",
+      "profile": "rx-epoch-states-ts",
+      "file": "pgs/rx-epoch-states.ts",
+      "sha256": "e506fc3baeeeb97bf23df7e9a460d4c673b78c7ba568efad59865d1541e14fc4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 12312,
+        "digest": 8937742996976136136
+      }
+    },
+    {
+      "id": "rx-rejected-canvas-ts",
+      "profile": "rx-rejected-canvas-ts",
+      "file": "pgs/rx-rejected-canvas.ts",
+      "sha256": "e0b55d64c39dc49c22288e35a7db3185e0e1a1b37c2178ee4348d767b2d55525",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 12208,
+        "digest": 9421053503802179446
+      }
+    },
+    {
+      "id": "rx-ods-declared-length-ts",
+      "profile": "rx-ods-declared-length-ts",
+      "file": "pgs/rx-ods-declared-length.ts",
+      "sha256": "9f02cb173f0be30516760e6f1374208645dde8dd31cfdb0db887666b65ad872f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 7168,
+        "digest": 15548568272151655258
+      }
+    },
+    {
+      "id": "rx-clock-before-composition-ts",
+      "profile": "rx-clock-before-composition-ts",
+      "file": "pgs/rx-clock-before-composition.ts",
+      "sha256": "c3a86ffdcc294b81c7b86548bae6cfba449ca32a8ff86336d40879a3d24e3ea6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 10683791387758471773
+      }
+    },
+    {
+      "id": "rx-rle-plane-ts",
+      "profile": "rx-rle-plane-ts",
+      "file": "pgs/rx-rle-plane.ts",
+      "sha256": "cb9879c2c9bfc7ba38e6c6facef576f8a931a92d0b4fe067ca42ad5b1a6556fb",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 14400,
+        "digest": 5899820830961426253
+      }
+    },
+    {
+      "id": "long-movie-sup",
+      "profile": "long-movie-sup",
+      "file": "pgs/long-movie.sup",
+      "sha256": "e8ef22c01071c1dbce6bc77cfcda1790a07b2de0ba470a336cfd197f705a8604",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 480,
+        "bytes": 23780280,
+        "digest": 13887811333145117725
+      }
+    },
+    {
+      "id": "long-movie-mkv",
+      "profile": "long-movie-mkv",
+      "file": "pgs/long-movie.mkv",
+      "sha256": "1de6217696fe3905999d87ae56283d41d187ce3927a9331cf304c4fc3c6fbe4e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 480,
+        "bytes": 23780280,
+        "digest": 16287838445886927789
+      }
+    },
+    {
+      "id": "long-movie-ts",
+      "profile": "long-movie-ts",
+      "file": "pgs/long-movie.ts",
+      "sha256": "c6b5f0c2d15bbe0360bcffda8b4296d79c60b840ec82d08d6e2abae91405512f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 480,
+        "bytes": 23780280,
+        "digest": 16287838445886927789
+      }
+    },
+    {
+      "id": "long-movie-forced-sup",
+      "profile": "long-movie-forced-sup",
+      "file": "pgs/long-movie-forced.sup",
+      "sha256": "e8ef22c01071c1dbce6bc77cfcda1790a07b2de0ba470a336cfd197f705a8604",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs",
+        "opt:forced_subs_only=1"
+      ],
+      "expected": {
+        "packets": 480,
+        "bytes": 23780280,
+        "digest": 8643878704482531320
+      }
+    },
+    {
+      "id": "gold-independent89--clock-unknown-nonzero-raw-ts",
+      "profile": "gold-independent89--clock-unknown-nonzero-raw-ts",
+      "file": "pgs/gold-independent89--clock-unknown-nonzero-raw.ts",
+      "sha256": "a4b31788400e185555ed358eb3d8439c6f9f8ceb129df24bfed83e2bede53b39",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-unknown-nonzero-raw/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 12817154986803759553
+      }
+    },
+    {
+      "id": "gold-independent89--clock-unknown-zero-ts",
+      "profile": "gold-independent89--clock-unknown-zero-ts",
+      "file": "pgs/gold-independent89--clock-unknown-zero.ts",
+      "sha256": "a4b31788400e185555ed358eb3d8439c6f9f8ceb129df24bfed83e2bede53b39",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-unknown-zero/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 12817154986803759553
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-early-17x3-ts",
+      "profile": "gold-independent89--fragment-early-17x3-ts",
+      "file": "pgs/gold-independent89--fragment-early-17x3.ts",
+      "sha256": "2d1c55a926885c8d1b68e4236d317a98414d2588e53c611cc756a651799818db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-17x3/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-early-1x1-ts",
+      "profile": "gold-independent89--fragment-early-1x1-ts",
+      "file": "pgs/gold-independent89--fragment-early-1x1.ts",
+      "sha256": "1b5fe52937e2aa5ba12b167bb6c4729a55889b9b6bb0de69eb930bc61310e64a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-1x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1025,
+        "digest": 9720339759432265952
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-early-2x1-ts",
+      "profile": "gold-independent89--fragment-early-2x1-ts",
+      "file": "pgs/gold-independent89--fragment-early-2x1.ts",
+      "sha256": "ec7a4dcd75bc6cdc917438f4d4148c98c0a9acc38c1cda1a18a615e32d87ef6e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-2x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-early-3x2-ts",
+      "profile": "gold-independent89--fragment-early-3x2-ts",
+      "file": "pgs/gold-independent89--fragment-early-3x2.ts",
+      "sha256": "43989bd6f4acf1577aa31690d35e3e0be72ef7c4619175544e59da9405815af1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-3x2/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-no-last-17x3-ts",
+      "profile": "gold-independent89--fragment-no-last-17x3-ts",
+      "file": "pgs/gold-independent89--fragment-no-last-17x3.ts",
+      "sha256": "f7e90f5f778dccbe9d213a0b96bdc82d0f0afb8f06c2f05a537ad098fd9dde86",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-17x3/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1075,
+        "digest": 2284592246566371629
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-no-last-1x1-ts",
+      "profile": "gold-independent89--fragment-no-last-1x1-ts",
+      "file": "pgs/gold-independent89--fragment-no-last-1x1.ts",
+      "sha256": "853093cbfdb0d0519b74a028bf40e299332a5c1bbdb63083963130139fa3dce2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-1x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1025,
+        "digest": 9720339759432265952
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-no-last-2x1-ts",
+      "profile": "gold-independent89--fragment-no-last-2x1-ts",
+      "file": "pgs/gold-independent89--fragment-no-last-2x1.ts",
+      "sha256": "6df3fa4a3debdf323cd065ab56878f96ed4f777e2d652c3da43f6708db87c40b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-2x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 5519269073354259392
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-no-last-3x2-ts",
+      "profile": "gold-independent89--fragment-no-last-3x2-ts",
+      "file": "pgs/gold-independent89--fragment-no-last-3x2.ts",
+      "sha256": "400920c57305112d2b9204dcea869846f310734c4a30a333c7db8640e43e8818",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-3x2/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1030,
+        "digest": 15774148941732703169
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-overshoot-17x3-ts",
+      "profile": "gold-independent89--fragment-overshoot-17x3-ts",
+      "file": "pgs/gold-independent89--fragment-overshoot-17x3.ts",
+      "sha256": "131c99302d658db659ca4dd3d48f9c3d9c190c00e1743e737d6d28342b22dea1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-17x3/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-overshoot-1x1-ts",
+      "profile": "gold-independent89--fragment-overshoot-1x1-ts",
+      "file": "pgs/gold-independent89--fragment-overshoot-1x1.ts",
+      "sha256": "15402795d86592e180ad94fe821bc0de3775d757b07803156b328a9d0a21e93c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-1x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-overshoot-2x1-ts",
+      "profile": "gold-independent89--fragment-overshoot-2x1-ts",
+      "file": "pgs/gold-independent89--fragment-overshoot-2x1.ts",
+      "sha256": "5ed695cd12933b64ee59057d5dbb2a9a61ed486c63fa19080df037ec5fa291bd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-2x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-overshoot-3x2-ts",
+      "profile": "gold-independent89--fragment-overshoot-3x2-ts",
+      "file": "pgs/gold-independent89--fragment-overshoot-3x2.ts",
+      "sha256": "291c58c73a51dc0d21ae6c3f94e25e887fcb231ab82fe486384bc7a21b3441fb",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-3x2/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-version-17x3-ts",
+      "profile": "gold-independent89--fragment-version-17x3-ts",
+      "file": "pgs/gold-independent89--fragment-version-17x3.ts",
+      "sha256": "c9fccdc500d963a0d80be364cc77bdd43992da62d31e00fd2974e61b8f267879",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-17x3/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1075,
+        "digest": 2284592246566371629
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-version-1x1-ts",
+      "profile": "gold-independent89--fragment-version-1x1-ts",
+      "file": "pgs/gold-independent89--fragment-version-1x1.ts",
+      "sha256": "cc626dc4e2f4e1215c25ef3156643f4c39cc6f17c1a0f91e38ee3bfd7e3560f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-1x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1025,
+        "digest": 9720339759432265952
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-version-2x1-ts",
+      "profile": "gold-independent89--fragment-version-2x1-ts",
+      "file": "pgs/gold-independent89--fragment-version-2x1.ts",
+      "sha256": "950f0fe1e6959d7bfc452980cfec64ba48f4320d858f60bfe3462a1d43de59f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-2x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 5519269073354259392
+      }
+    },
+    {
+      "id": "gold-independent89--fragment-version-3x2-ts",
+      "profile": "gold-independent89--fragment-version-3x2-ts",
+      "file": "pgs/gold-independent89--fragment-version-3x2.ts",
+      "sha256": "75fb9f6ca125c475d5e145d2d18d863d00b8977735cdb1663d90fd20175f4eba",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-3x2/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1030,
+        "digest": 15774148941732703169
+      }
+    },
+    {
+      "id": "gold-independent89--no-final-EOL-17x3-ts",
+      "profile": "gold-independent89--no-final-EOL-17x3-ts",
+      "file": "pgs/gold-independent89--no-final-EOL-17x3.ts",
+      "sha256": "aea60ae0a044dc01e9966604842374ec95ca25575232db8ca23df814a3ef89b2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-17x3/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1075,
+        "digest": 2284592246566371629
+      }
+    },
+    {
+      "id": "gold-independent89--no-final-EOL-1x1-ts",
+      "profile": "gold-independent89--no-final-EOL-1x1-ts",
+      "file": "pgs/gold-independent89--no-final-EOL-1x1.ts",
+      "sha256": "9923f65357e869a520570879c796814fd725d8f334130438005ea734fa7b1da9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-1x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1025,
+        "digest": 9720339759432265952
+      }
+    },
+    {
+      "id": "gold-independent89--no-final-EOL-2x1-ts",
+      "profile": "gold-independent89--no-final-EOL-2x1-ts",
+      "file": "pgs/gold-independent89--no-final-EOL-2x1.ts",
+      "sha256": "2094c47cd75d82982d323951cfcaf2f9a303ab7cf0ede1caf0b9a95c08a3fb44",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-2x1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 5519269073354259392
+      }
+    },
+    {
+      "id": "gold-independent89--no-final-EOL-3x2-ts",
+      "profile": "gold-independent89--no-final-EOL-3x2-ts",
+      "file": "pgs/gold-independent89--no-final-EOL-3x2.ts",
+      "sha256": "0d25c989dc4d864f3735243dae43ca4760d3e220e6b866f645aa2d2de6da2e04",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-3x2/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1030,
+        "digest": 15774148941732703169
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-1-END-ts",
+      "profile": "gold-independent89--palette-tail-1-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-1-END.ts",
+      "sha256": "c38ecd673f426b8ec6043e9cf88a96b26f10fffc3a36dfa71d053c1886fa66ba",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 6963058189822451329
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-1-PDS-before-END-ts",
+      "profile": "gold-independent89--palette-tail-1-PDS-before-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-1-PDS-before-END.ts",
+      "sha256": "fe869d91b91a372cc33c3538c1241f59e542b677c173995768052aca01b51ac4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-PDS-before-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 1577093025994047360
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-1-packet-end-ts",
+      "profile": "gold-independent89--palette-tail-1-packet-end-ts",
+      "file": "pgs/gold-independent89--palette-tail-1-packet-end.ts",
+      "sha256": "e3c661f886e33604ba0b6dcb5a7b4ed4cfc32813ab41b354e485fed78ec7e94e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-packet-end/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-1-unknown-before-END-ts",
+      "profile": "gold-independent89--palette-tail-1-unknown-before-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-1-unknown-before-END.ts",
+      "sha256": "d6580d070552d920ed7f3eceb5feef6628ae31affa911280514a19181bde1041",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-unknown-before-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 1093308080759627393
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-2-END-ts",
+      "profile": "gold-independent89--palette-tail-2-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-2-END.ts",
+      "sha256": "dd43d7b7282df9d1d21da89f56d1ec2402b6fea90ade16e0e17d5be91317da17",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 14378856437604702337
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-2-PDS-before-END-ts",
+      "profile": "gold-independent89--palette-tail-2-PDS-before-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-2-PDS-before-END.ts",
+      "sha256": "85031214540f4313db5df7f83dae16226478352811b91b86f864068682b56e21",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-PDS-before-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 1577093025994047360
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-2-packet-end-ts",
+      "profile": "gold-independent89--palette-tail-2-packet-end-ts",
+      "file": "pgs/gold-independent89--palette-tail-2-packet-end.ts",
+      "sha256": "d44e032bfc85e666888e949357792e944c1b392f0fe9913554e74c851f40fa8d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-packet-end/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-2-unknown-before-END-ts",
+      "profile": "gold-independent89--palette-tail-2-unknown-before-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-2-unknown-before-END.ts",
+      "sha256": "325c2b10be1bdadb86f13a588e385cc99294ed2f20cef5264e1530fbfad28ba7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-unknown-before-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 15319908016206272897
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-3-END-ts",
+      "profile": "gold-independent89--palette-tail-3-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-3-END.ts",
+      "sha256": "0a1159a21a11820b54ca484333cac591c4b523bfe39d634fe8fe68fbceaaf410",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 6961983717003140040
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-3-PDS-before-END-ts",
+      "profile": "gold-independent89--palette-tail-3-PDS-before-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-3-PDS-before-END.ts",
+      "sha256": "de2468d01bd759a74a28351b8e15dfa647aac5e6e3fd09dc486c5e96f77ae114",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-PDS-before-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 1577093025994047360
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-3-packet-end-ts",
+      "profile": "gold-independent89--palette-tail-3-packet-end-ts",
+      "file": "pgs/gold-independent89--palette-tail-3-packet-end.ts",
+      "sha256": "5c77a7189ec4993f87ece13d67821fa21c3de1a13284be9bdf8279536eee61d0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-packet-end/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-3-unknown-before-END-ts",
+      "profile": "gold-independent89--palette-tail-3-unknown-before-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-3-unknown-before-END.ts",
+      "sha256": "10434ab3713ffccea5d0dd0afb3fe848c91d39ae0c6dfd69c6227ed6182e8112",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-unknown-before-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 11133368803749715142
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-4-END-ts",
+      "profile": "gold-independent89--palette-tail-4-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-4-END.ts",
+      "sha256": "e2a5571555846d22184c79a14d3c18313732a1e9a931ef1217b1d884d219260d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 14850967488941623937
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-4-PDS-before-END-ts",
+      "profile": "gold-independent89--palette-tail-4-PDS-before-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-4-PDS-before-END.ts",
+      "sha256": "3ef7e4963536ca84b16dd124f81672f33064cda37c49c51e08df56ab06bebb88",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-PDS-before-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 1577093025994047360
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-4-packet-end-ts",
+      "profile": "gold-independent89--palette-tail-4-packet-end-ts",
+      "file": "pgs/gold-independent89--palette-tail-4-packet-end.ts",
+      "sha256": "aa82d24bbcc68c0559e0c856482cad8408213cdf033712ae0b6a572bc6df1e0a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-packet-end/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--palette-tail-4-unknown-before-END-ts",
+      "profile": "gold-independent89--palette-tail-4-unknown-before-END-ts",
+      "file": "pgs/gold-independent89--palette-tail-4-unknown-before-END.ts",
+      "sha256": "381a897417b7cb89589b4d1ea9f636505d0992d156a8546613f5bd6763cf1b35",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-unknown-before-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 12335568696012278401
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-19-actual-1-ts",
+      "profile": "gold-independent89--physical-tail-declared-19-actual-1-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-19-actual-1.ts",
+      "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-19-actual-11-ts",
+      "profile": "gold-independent89--physical-tail-declared-19-actual-11-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-19-actual-11.ts",
+      "sha256": "615746497e1118a104439ea787c2c57bcd0d4fafbb26675911fbfa2fb8757319",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-11/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-19-actual-13-ts",
+      "profile": "gold-independent89--physical-tail-declared-19-actual-13-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-19-actual-13.ts",
+      "sha256": "5e6d9d6282cb4fae56fecfa535e6a1f074ca6b5743a073a846d4007de31ec586",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-13/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-19-actual-2-ts",
+      "profile": "gold-independent89--physical-tail-declared-19-actual-2-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-19-actual-2.ts",
+      "sha256": "4b52ef24ce84effd8eb1d92d30264d918fac43a08689ef165c8b3634b08b0c11",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-2/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-19-actual-3-ts",
+      "profile": "gold-independent89--physical-tail-declared-19-actual-3-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-19-actual-3.ts",
+      "sha256": "7b26aaa9aa14a41f0b225e6d7113006b5722a56dd89a5e01b382c0720b4dbde9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-3/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-19-actual-4-ts",
+      "profile": "gold-independent89--physical-tail-declared-19-actual-4-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-19-actual-4.ts",
+      "sha256": "0881af5ebc1a20e5f021308f911c7396ddeed859e9fbbe7daa5c96a12ec06c96",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-4/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-19-actual-7-ts",
+      "profile": "gold-independent89--physical-tail-declared-19-actual-7-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-19-actual-7.ts",
+      "sha256": "6ac9c0f23c46f4a37b321aa9bc9de173b6cc1f518f81eedbf9cb80bba1fa4549",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-7/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-65535-actual-1-ts",
+      "profile": "gold-independent89--physical-tail-declared-65535-actual-1-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-1.ts",
+      "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-65535-actual-11-ts",
+      "profile": "gold-independent89--physical-tail-declared-65535-actual-11-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-11.ts",
+      "sha256": "547175613cf4119470637d4359799e34789e2ca749ff1ea691907012acc1296a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-11/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-65535-actual-13-ts",
+      "profile": "gold-independent89--physical-tail-declared-65535-actual-13-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-13.ts",
+      "sha256": "516415355e68445102ae0a67dd9ee73e093ee3d9bbc2e72f123e3d6d21f4b536",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-13/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-65535-actual-2-ts",
+      "profile": "gold-independent89--physical-tail-declared-65535-actual-2-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-2.ts",
+      "sha256": "c804193e565ea19fec5b00752349a1ab9e06b8ffab01184fd934b32f091055b7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-2/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-65535-actual-3-ts",
+      "profile": "gold-independent89--physical-tail-declared-65535-actual-3-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-3.ts",
+      "sha256": "b0a157d09c42afdf93b5509478dd6e25d9325995295fd511a76911dce323c471",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-3/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-65535-actual-4-ts",
+      "profile": "gold-independent89--physical-tail-declared-65535-actual-4-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-4.ts",
+      "sha256": "9b29e304a18fbc8aa51e358b6560266965e2aa1acd60394cdd4e9fb0270a3253",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-4/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-65535-actual-7-ts",
+      "profile": "gold-independent89--physical-tail-declared-65535-actual-7-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-7.ts",
+      "sha256": "bf5ec8dc6a83eb234e7717184366af8ba459bcdb39305584f1387570192cbf08",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-7/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-71-actual-1-ts",
+      "profile": "gold-independent89--physical-tail-declared-71-actual-1-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-71-actual-1.ts",
+      "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-71-actual-11-ts",
+      "profile": "gold-independent89--physical-tail-declared-71-actual-11-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-71-actual-11.ts",
+      "sha256": "85141ea626341ea8406a7a6151e5558aeeb2167a16a68bd06f918574543fdae6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-11/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-71-actual-13-ts",
+      "profile": "gold-independent89--physical-tail-declared-71-actual-13-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-71-actual-13.ts",
+      "sha256": "7bb402e4aa9b0843a2c3fbcfb677f4305523e1fd647848d563d13f6f01f6e96a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-13/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-71-actual-2-ts",
+      "profile": "gold-independent89--physical-tail-declared-71-actual-2-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-71-actual-2.ts",
+      "sha256": "4b52ef24ce84effd8eb1d92d30264d918fac43a08689ef165c8b3634b08b0c11",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-2/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-71-actual-3-ts",
+      "profile": "gold-independent89--physical-tail-declared-71-actual-3-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-71-actual-3.ts",
+      "sha256": "573b7f44477c91f07b27e48da720dd2ed014f31f52993d8970b53c274cd43dfa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-3/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-71-actual-4-ts",
+      "profile": "gold-independent89--physical-tail-declared-71-actual-4-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-71-actual-4.ts",
+      "sha256": "91982a61d9b901836c6c0dd94f050114e0d2dea122b7d8354e4fca9855478bfe",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-4/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--physical-tail-declared-71-actual-7-ts",
+      "profile": "gold-independent89--physical-tail-declared-71-actual-7-ts",
+      "file": "pgs/gold-independent89--physical-tail-declared-71-actual-7.ts",
+      "sha256": "b65249ef535ed7902d898ea0cf275dc82148797efb8d0a078469b882af906482",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-7/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-independent89--rle-17x3-complete-ts",
+      "profile": "gold-independent89--rle-17x3-complete-ts",
+      "file": "pgs/gold-independent89--rle-17x3-complete.ts",
+      "sha256": "0581daa02b6be3fd4f3170ad13e6e6468d1010d7b43a09e5df0d5dd8e007406b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-complete/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1075,
+        "digest": 2284592246566371629
+      }
+    },
+    {
+      "id": "gold-independent89--rle-17x3-run-crossing-ts",
+      "profile": "gold-independent89--rle-17x3-run-crossing-ts",
+      "file": "pgs/gold-independent89--rle-17x3-run-crossing.ts",
+      "sha256": "c1ef58e246af42a2268ed41f340ec261f9d029d6ac3c0731fe70ab327402ba62",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-run-crossing/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-17x3-short-line-ts",
+      "profile": "gold-independent89--rle-17x3-short-line-ts",
+      "file": "pgs/gold-independent89--rle-17x3-short-line.ts",
+      "sha256": "88a24dff744efd32192b2ecc72913260b956e9289d701e396eff3548b2f66c23",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-short-line/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-17x3-tail-after-EOL-ts",
+      "profile": "gold-independent89--rle-17x3-tail-after-EOL-ts",
+      "file": "pgs/gold-independent89--rle-17x3-tail-after-EOL.ts",
+      "sha256": "c63cb6dcb7a66959504db8e1820c68d20f961daf9a38c06d88e4130f6760ffd7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-tail-after-EOL/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1075,
+        "digest": 2284592246566371629
+      }
+    },
+    {
+      "id": "gold-independent89--rle-17x3-truncated-control-ts",
+      "profile": "gold-independent89--rle-17x3-truncated-control-ts",
+      "file": "pgs/gold-independent89--rle-17x3-truncated-control.ts",
+      "sha256": "b0f323c0a509427a45226c66189b3df17ad2fe5490bb7fae0461a8337e9d7637",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-truncated-control/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-17x3-truncated-long-colour-ts",
+      "profile": "gold-independent89--rle-17x3-truncated-long-colour-ts",
+      "file": "pgs/gold-independent89--rle-17x3-truncated-long-colour.ts",
+      "sha256": "4e6ba36db1c4e46c64744ad61af70bb03e87b31bb2110e23958a7da20d9c87ec",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-truncated-long-colour/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-17x3-zero-run-ts",
+      "profile": "gold-independent89--rle-17x3-zero-run-ts",
+      "file": "pgs/gold-independent89--rle-17x3-zero-run.ts",
+      "sha256": "9bb67371f2a03e5a64e6f5bed13e6f4c232ad8e375c4886c6526e712207cd920",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-zero-run/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-1x1-complete-ts",
+      "profile": "gold-independent89--rle-1x1-complete-ts",
+      "file": "pgs/gold-independent89--rle-1x1-complete.ts",
+      "sha256": "9b4cb3d31738394fb2a2961ddc1cbfb3331f033c945129d46a31c32d48af333a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-complete/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1025,
+        "digest": 9720339759432265952
+      }
+    },
+    {
+      "id": "gold-independent89--rle-1x1-run-crossing-ts",
+      "profile": "gold-independent89--rle-1x1-run-crossing-ts",
+      "file": "pgs/gold-independent89--rle-1x1-run-crossing.ts",
+      "sha256": "6925b5f2d63aa60926e20aac439aa1368c0a04c7105d527f3ec35621c6ddf99d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-run-crossing/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-1x1-short-line-ts",
+      "profile": "gold-independent89--rle-1x1-short-line-ts",
+      "file": "pgs/gold-independent89--rle-1x1-short-line.ts",
+      "sha256": "2387fd5b171a6d73119eb94c2a10c0eecf7a7da7e0ee8d2b158d11f54b69cbba",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-short-line/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-1x1-tail-after-EOL-ts",
+      "profile": "gold-independent89--rle-1x1-tail-after-EOL-ts",
+      "file": "pgs/gold-independent89--rle-1x1-tail-after-EOL.ts",
+      "sha256": "f60f2c33b4de5dd333b96409259d110aa3d4d947b7c9882e27fdfb9e383555a7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-tail-after-EOL/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1025,
+        "digest": 9720339759432265952
+      }
+    },
+    {
+      "id": "gold-independent89--rle-1x1-truncated-control-ts",
+      "profile": "gold-independent89--rle-1x1-truncated-control-ts",
+      "file": "pgs/gold-independent89--rle-1x1-truncated-control.ts",
+      "sha256": "978f071a6020371428ffce9465834ae9ac35e603ea2315428210b294d95f4d91",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-truncated-control/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-1x1-truncated-long-colour-ts",
+      "profile": "gold-independent89--rle-1x1-truncated-long-colour-ts",
+      "file": "pgs/gold-independent89--rle-1x1-truncated-long-colour.ts",
+      "sha256": "0fea6e26427c915152daa782757a58153c0cba9a00631c623305eb12a0a45573",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-truncated-long-colour/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-1x1-zero-run-ts",
+      "profile": "gold-independent89--rle-1x1-zero-run-ts",
+      "file": "pgs/gold-independent89--rle-1x1-zero-run.ts",
+      "sha256": "1d0d2ef2234cb10c5016aa7bf75e83f6b0aec9ad353a2cca7a828522afffcd21",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-zero-run/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-2x1-complete-ts",
+      "profile": "gold-independent89--rle-2x1-complete-ts",
+      "file": "pgs/gold-independent89--rle-2x1-complete.ts",
+      "sha256": "5b5e7bcf46f30fc7af6c41529d54af9517c2756b94443295f99d358d0f30e923",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-complete/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 5519269073354259392
+      }
+    },
+    {
+      "id": "gold-independent89--rle-2x1-run-crossing-ts",
+      "profile": "gold-independent89--rle-2x1-run-crossing-ts",
+      "file": "pgs/gold-independent89--rle-2x1-run-crossing.ts",
+      "sha256": "f7728f9c75b5ea29af399459655954179deca3bed960f4dea5cbf3281f5e835d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-run-crossing/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-2x1-short-line-ts",
+      "profile": "gold-independent89--rle-2x1-short-line-ts",
+      "file": "pgs/gold-independent89--rle-2x1-short-line.ts",
+      "sha256": "6131ac96c1a7bc6e92f119e8129400b361081dad5baff1b0669b8ed667e93388",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-short-line/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-2x1-tail-after-EOL-ts",
+      "profile": "gold-independent89--rle-2x1-tail-after-EOL-ts",
+      "file": "pgs/gold-independent89--rle-2x1-tail-after-EOL.ts",
+      "sha256": "3da6f7e36fc44720e068ea4ffffd3f193052beef09776d1cebd142b6a9285497",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-tail-after-EOL/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 5519269073354259392
+      }
+    },
+    {
+      "id": "gold-independent89--rle-2x1-truncated-control-ts",
+      "profile": "gold-independent89--rle-2x1-truncated-control-ts",
+      "file": "pgs/gold-independent89--rle-2x1-truncated-control.ts",
+      "sha256": "72c987f0ab3d08a3eb5b7c1e2e3ef59847082ff1934e9dd0e18fd064bb0a59f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-truncated-control/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-2x1-truncated-long-colour-ts",
+      "profile": "gold-independent89--rle-2x1-truncated-long-colour-ts",
+      "file": "pgs/gold-independent89--rle-2x1-truncated-long-colour.ts",
+      "sha256": "80f086b034d4592ef96bcaa7a896c2aed70094fc26ab908d9211a2e6c3f508e5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-truncated-long-colour/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-2x1-zero-run-ts",
+      "profile": "gold-independent89--rle-2x1-zero-run-ts",
+      "file": "pgs/gold-independent89--rle-2x1-zero-run.ts",
+      "sha256": "e4916b391436b3c2f6131104195d280d7e8dcd80e2c56b6735de45b7c79d2793",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-zero-run/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-3x2-complete-ts",
+      "profile": "gold-independent89--rle-3x2-complete-ts",
+      "file": "pgs/gold-independent89--rle-3x2-complete.ts",
+      "sha256": "c38c75b6bf1881c7b45882486c61df6375c7ee4626f88e0e45a849f4cd4c332c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-complete/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1030,
+        "digest": 15774148941732703169
+      }
+    },
+    {
+      "id": "gold-independent89--rle-3x2-run-crossing-ts",
+      "profile": "gold-independent89--rle-3x2-run-crossing-ts",
+      "file": "pgs/gold-independent89--rle-3x2-run-crossing.ts",
+      "sha256": "428b259288f36347337136004d19960312765b5cf8f1884c39a2746f21565ddc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-run-crossing/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-3x2-short-line-ts",
+      "profile": "gold-independent89--rle-3x2-short-line-ts",
+      "file": "pgs/gold-independent89--rle-3x2-short-line.ts",
+      "sha256": "78947f685a1216bd2abae33f566e998812f15459011fe29e82670ff44a3d4f4e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-short-line/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-3x2-tail-after-EOL-ts",
+      "profile": "gold-independent89--rle-3x2-tail-after-EOL-ts",
+      "file": "pgs/gold-independent89--rle-3x2-tail-after-EOL.ts",
+      "sha256": "9c5c87ea37382cf92a5209439898becbad83c832346b423c16a13541677f8222",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-tail-after-EOL/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1030,
+        "digest": 15774148941732703169
+      }
+    },
+    {
+      "id": "gold-independent89--rle-3x2-truncated-control-ts",
+      "profile": "gold-independent89--rle-3x2-truncated-control-ts",
+      "file": "pgs/gold-independent89--rle-3x2-truncated-control.ts",
+      "sha256": "16e8b7f46d64a0f923c00397639226f085ad436ac1751f2ead33de2a503032f6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-truncated-control/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-3x2-truncated-long-colour-ts",
+      "profile": "gold-independent89--rle-3x2-truncated-long-colour-ts",
+      "file": "pgs/gold-independent89--rle-3x2-truncated-long-colour.ts",
+      "sha256": "85b9d341ee339c281e08850b8417030395be1b2ee0c62b67fc40b87d0d5194c1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-truncated-long-colour/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-independent89--rle-3x2-zero-run-ts",
+      "profile": "gold-independent89--rle-3x2-zero-run-ts",
+      "file": "pgs/gold-independent89--rle-3x2-zero-run.ts",
+      "sha256": "2fb2afd2d4787a87c9312143e6cca14f7182c64227912bb15d075617df475faa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-zero-run/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 870937427288425185
+      }
+    },
+    {
+      "id": "gold-original140--cache-edge-complete-unused-object-preload-ts",
+      "profile": "gold-original140--cache-edge-complete-unused-object-preload-ts",
+      "file": "pgs/gold-original140--cache-edge-complete-unused-object-preload.ts",
+      "sha256": "b14e1f0a7c844927e35c4f8f748a70485245e0a65da2d44984f37086c24ac513",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-complete-unused-object-preload/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1026,
+        "digest": 7969791135366326376
+      }
+    },
+    {
+      "id": "gold-original140--cache-edge-pending-across-clear-END-ts",
+      "profile": "gold-original140--cache-edge-pending-across-clear-END-ts",
+      "file": "pgs/gold-original140--cache-edge-pending-across-clear-END.ts",
+      "sha256": "d2fd9c4c8a7f45735ab7484d93fd4288f9939849622773818b03931afb417d1a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-across-clear-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1026,
+        "digest": 7969791135366326376
+      }
+    },
+    {
+      "id": "gold-original140--cache-edge-pending-across-two-clear-ENDs-ts",
+      "profile": "gold-original140--cache-edge-pending-across-two-clear-ENDs-ts",
+      "file": "pgs/gold-original140--cache-edge-pending-across-two-clear-ENDs.ts",
+      "sha256": "ffdd855c9ab4e9dfbc2e9d2a636a5e74f31e791c2ad24f7eba84d54db1eab12d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-across-two-clear-ENDs/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1026,
+        "digest": 16728594611130523083
+      }
+    },
+    {
+      "id": "gold-original140--cache-edge-pending-at-explicit-EOF-ts",
+      "profile": "gold-original140--cache-edge-pending-at-explicit-EOF-ts",
+      "file": "pgs/gold-original140--cache-edge-pending-at-explicit-EOF.ts",
+      "sha256": "fa97207883e87d600c153fddf08487e547d5416d0bfca1851d7a8c1f5b51aced",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-at-explicit-EOF/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 5050984570495
+      }
+    },
+    {
+      "id": "gold-original140--cache-edge-pending-discarded-at-epoch-ts",
+      "profile": "gold-original140--cache-edge-pending-discarded-at-epoch-ts",
+      "file": "pgs/gold-original140--cache-edge-pending-discarded-at-epoch.ts",
+      "sha256": "fbcab11d6cb1e6ce054a252de3485ea9c113049945d1a2b0e04424e51832a4cc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-discarded-at-epoch/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 208595051629649053
+      }
+    },
+    {
+      "id": "gold-original140--clock-split-both-unknown-ts",
+      "profile": "gold-original140--clock-split-both-unknown-ts",
+      "file": "pgs/gold-original140--clock-split-both-unknown.ts",
+      "sha256": "d05c6c2558eb96cdc49d103daee053411060db0911b06cde351b1722b7f859cd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-both-unknown/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 10764198280876035463
+      }
+    },
+    {
+      "id": "gold-original140--clock-split-pcs-known-end-different-ts",
+      "profile": "gold-original140--clock-split-pcs-known-end-different-ts",
+      "file": "pgs/gold-original140--clock-split-pcs-known-end-different.ts",
+      "sha256": "fe2902cbf24cb292787d0655a6fb31e2e080f85f1d76327d2e0ab2ccddcfe840",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-pcs-known-end-different/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 3466312367426536263
+      }
+    },
+    {
+      "id": "gold-original140--clock-split-pcs-known-end-unknown-ts",
+      "profile": "gold-original140--clock-split-pcs-known-end-unknown-ts",
+      "file": "pgs/gold-original140--clock-split-pcs-known-end-unknown.ts",
+      "sha256": "83d7fa523bd423c7fff06c78d449b963aec8d6b9bc22d4891e7647e54d7fab33",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-pcs-known-end-unknown/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 3466312367426536263
+      }
+    },
+    {
+      "id": "gold-original140--clock-split-pcs-unknown-end-known-ts",
+      "profile": "gold-original140--clock-split-pcs-unknown-end-known-ts",
+      "file": "pgs/gold-original140--clock-split-pcs-unknown-end-known.ts",
+      "sha256": "0cbfaff52582c3915a3f0d8eb1af564bb9fbb14fdbdbf74ecd2b8683c338d520",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-pcs-unknown-end-known/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 7317284614237089479
+      }
+    },
+    {
+      "id": "gold-original140--compat-EOF-PCS-only-ts",
+      "profile": "gold-original140--compat-EOF-PCS-only-ts",
+      "file": "pgs/gold-original140--compat-EOF-PCS-only.ts",
+      "sha256": "a744be42ff082d47427269f1c879c237102942b368461491e23778b5fcfbc90b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-PCS-only/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--compat-EOF-complete-ODS-without-END-ts",
+      "profile": "gold-original140--compat-EOF-complete-ODS-without-END-ts",
+      "file": "pgs/gold-original140--compat-EOF-complete-ODS-without-END.ts",
+      "sha256": "993229664f587a016de12f745377e44e978a12e947f098a95cf271019580f2bb",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-complete-ODS-without-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--compat-EOF-complete-then-empty-first-pending-ts",
+      "profile": "gold-original140--compat-EOF-complete-then-empty-first-pending-ts",
+      "file": "pgs/gold-original140--compat-EOF-complete-then-empty-first-pending.ts",
+      "sha256": "9cd096be51c8f64887f041f6108105f5cc88e03328834ba8080ddd8f15030cfc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-complete-then-empty-first-pending/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 12072234272881265549
+      }
+    },
+    {
+      "id": "gold-original140--compat-EOF-palette-update-without-END-ts",
+      "profile": "gold-original140--compat-EOF-palette-update-without-END-ts",
+      "file": "pgs/gold-original140--compat-EOF-palette-update-without-END.ts",
+      "sha256": "0109c39947011b7c066e1afe89f513a3c743e929a5d3846f93ebd8a2c0bec575",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-palette-update-without-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 12072234272881265549
+      }
+    },
+    {
+      "id": "gold-original140--compat-cache-hidden-third-before-rejected-first-ts",
+      "profile": "gold-original140--compat-cache-hidden-third-before-rejected-first-ts",
+      "file": "pgs/gold-original140--compat-cache-hidden-third-before-rejected-first.ts",
+      "sha256": "9c37473b65afefc8b1dd3f046f20ee55f09d6458cf38d635b4c412da5ce1254c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-hidden-third-before-rejected-first/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3078,
+        "digest": 6968252004955470159
+      }
+    },
+    {
+      "id": "gold-original140--compat-cache-oversized-replacement-keeps-old-native-ts",
+      "profile": "gold-original140--compat-cache-oversized-replacement-keeps-old-native-ts",
+      "file": "pgs/gold-original140--compat-cache-oversized-replacement-keeps-old-native.ts",
+      "sha256": "c88eda38336f0b72d37356be2c9a76d9ea791144639e4df7bd67ac4487342622",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-oversized-replacement-keeps-old-native/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 13999247394200108897
+      }
+    },
+    {
+      "id": "gold-original140--compat-cache-rejected-first-then-valid-replacement-ts",
+      "profile": "gold-original140--compat-cache-rejected-first-then-valid-replacement-ts",
+      "file": "pgs/gold-original140--compat-cache-rejected-first-then-valid-replacement.ts",
+      "sha256": "a53d3849e121e9746c4a8c9ef05bb99316d4494b52c993fa6b3e9960349154f4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-rejected-first-then-valid-replacement/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 3078,
+        "digest": 12245985296418935310
+      }
+    },
+    {
+      "id": "gold-original140--compat-cache-unused-complete-before-rejected-first-ts",
+      "profile": "gold-original140--compat-cache-unused-complete-before-rejected-first-ts",
+      "file": "pgs/gold-original140--compat-cache-unused-complete-before-rejected-first.ts",
+      "sha256": "ddc958352dd7996ba4eba31eebafb14447641d6471732d6d94d41122059dabc8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-unused-complete-before-rejected-first/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1026,
+        "digest": 17244411863330631343
+      }
+    },
+    {
+      "id": "gold-original140--compat-cache-unused-fragments-before-rejected-first-ts",
+      "profile": "gold-original140--compat-cache-unused-fragments-before-rejected-first-ts",
+      "file": "pgs/gold-original140--compat-cache-unused-fragments-before-rejected-first.ts",
+      "sha256": "aedd0e30b9fd430ac7a5e49d310b4be35d34cfeacd62f3226a9cff01f0bfd748",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-unused-fragments-before-rejected-first/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1026,
+        "digest": 7556471265385276434
+      }
+    },
+    {
+      "id": "gold-original140--compat-cache-unused-preload-epoch-then-rejected-first-ts",
+      "profile": "gold-original140--compat-cache-unused-preload-epoch-then-rejected-first-ts",
+      "file": "pgs/gold-original140--compat-cache-unused-preload-epoch-then-rejected-first.ts",
+      "sha256": "ed39bfe265c4e8fd35723862d8d8e9aa8ff94c19a82d6ae0594aa2c2f9ef26d5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-unused-preload-epoch-then-rejected-first/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1024,
+        "digest": 17352760068321486223
+      }
+    },
+    {
+      "id": "gold-original140--compat-empty-first-partial-palette-recolours-old-image-ts",
+      "profile": "gold-original140--compat-empty-first-partial-palette-recolours-old-image-ts",
+      "file": "pgs/gold-original140--compat-empty-first-partial-palette-recolours-old-image.ts",
+      "sha256": "09e3dc916126be9553a72ba8dacc2c38830554fcb106b936a9daf3ab0071e958",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-partial-palette-recolours-old-image/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 4266341190475741002
+      }
+    },
+    {
+      "id": "gold-original140--compat-empty-first-replacement-00-ts",
+      "profile": "gold-original140--compat-empty-first-replacement-00-ts",
+      "file": "pgs/gold-original140--compat-empty-first-replacement-00.ts",
+      "sha256": "ed19f455beeab199b4c1b511e127bcd603bf0b469232ced49ab0fd577791a406",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-00/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 11529230247498886850
+      }
+    },
+    {
+      "id": "gold-original140--compat-empty-first-replacement-40-ts",
+      "profile": "gold-original140--compat-empty-first-replacement-40-ts",
+      "file": "pgs/gold-original140--compat-empty-first-replacement-40.ts",
+      "sha256": "122ef594ce4ed1579949b920aec12308efc77c0da31cf50fb260bccff6490e57",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-40/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2050,
+        "digest": 17519571218214882914
+      }
+    },
+    {
+      "id": "gold-original140--compat-empty-first-replacement-80-ts",
+      "profile": "gold-original140--compat-empty-first-replacement-80-ts",
+      "file": "pgs/gold-original140--compat-empty-first-replacement-80.ts",
+      "sha256": "4fa0cdaba74700284680598b62407379d5fbd4a4672a6bb5cd81de29b1f1948f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-80/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2050,
+        "digest": 17519571218214882914
+      }
+    },
+    {
+      "id": "gold-original140--compat-empty-first-replacement-c0-ts",
+      "profile": "gold-original140--compat-empty-first-replacement-c0-ts",
+      "file": "pgs/gold-original140--compat-empty-first-replacement-c0.ts",
+      "sha256": "f9cb78899aa0b4f687ad995892845421f38c23e52e630ee3f6d40a816733f7b4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-c0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2050,
+        "digest": 17519571218214882914
+      }
+    },
+    {
+      "id": "gold-original140--compat-empty-first-replacement-new-shape-ts",
+      "profile": "gold-original140--compat-empty-first-replacement-new-shape-ts",
+      "file": "pgs/gold-original140--compat-empty-first-replacement-new-shape.ts",
+      "sha256": "e82806393e905140fc0d4288aa744669e4518158a2025a9604ce422b50058638",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-new-shape/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 11529230247498886850
+      }
+    },
+    {
+      "id": "gold-original140--compat-first-clear-then-complete-in-one-packet-ts",
+      "profile": "gold-original140--compat-first-clear-then-complete-in-one-packet-ts",
+      "file": "pgs/gold-original140--compat-first-clear-then-complete-in-one-packet.ts",
+      "sha256": "f6ae3f83ebf9582fc9a1c01b6f2c94e4efe6dac703e28beac2e9520dec65b951",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-first-clear-then-complete-in-one-packet/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 5050984570495
+      }
+    },
+    {
+      "id": "gold-original140--compat-first-image-then-clear-new-context-ts",
+      "profile": "gold-original140--compat-first-image-then-clear-new-context-ts",
+      "file": "pgs/gold-original140--compat-first-image-then-clear-new-context.ts",
+      "sha256": "fad124f586edb023dec13c18998af75a8a994f7bb421c094859a047b7dbc6345",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-first-image-then-clear-new-context/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 12072234272881265549
+      }
+    },
+    {
+      "id": "gold-original140--compat-oversized-object-first-rejected-by-native-ts",
+      "profile": "gold-original140--compat-oversized-object-first-rejected-by-native-ts",
+      "file": "pgs/gold-original140--compat-oversized-object-first-rejected-by-native.ts",
+      "sha256": "6d8ea58fd1959a962c4fab3f6fbcab8e6fa45eb11ce7a20900e110761839c154",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-oversized-object-first-rejected-by-native/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 7788087096107327981
+      }
+    },
+    {
+      "id": "gold-original140--compat-packet-final-context-from-trailing-PCS-ts",
+      "profile": "gold-original140--compat-packet-final-context-from-trailing-PCS-ts",
+      "file": "pgs/gold-original140--compat-packet-final-context-from-trailing-PCS.ts",
+      "sha256": "baeed19bb57806dcd38ff9867a47b935b476455a13e74ff932a9ca8618562e82",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-packet-final-context-from-trailing-PCS/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 12072234272881265549
+      }
+    },
+    {
+      "id": "gold-original140--compat-three-references-forced-false-ts",
+      "profile": "gold-original140--compat-three-references-forced-false-ts",
+      "file": "pgs/gold-original140--compat-three-references-forced-false.ts",
+      "sha256": "50a9e13d43f068d714f1efaa70b73ae693285a6fc649381d45de4640493c3b47",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-three-references-forced-false/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2050,
+        "digest": 10349777293548403403
+      }
+    },
+    {
+      "id": "gold-original140--compat-three-references-forced-true-ts",
+      "profile": "gold-original140--compat-three-references-forced-true-ts",
+      "file": "pgs/gold-original140--compat-three-references-forced-true.ts",
+      "sha256": "50a9e13d43f068d714f1efaa70b73ae693285a6fc649381d45de4640493c3b47",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-three-references-forced-true/input.bin",
+      "arguments": [
+        "pgs",
+        "opt:forced_subs_only=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2050,
+        "digest": 4603075183619881143
+      }
+    },
+    {
+      "id": "gold-original140--duplicate-object-references-ts",
+      "profile": "gold-original140--duplicate-object-references-ts",
+      "file": "pgs/gold-original140--duplicate-object-references.ts",
+      "sha256": "6dd7273ee009b640174c1e97e27285d22789324a0e3f40acc446310731bc38ab",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--duplicate-object-references/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2052,
+        "digest": 2123765893891284651
+      }
+    },
+    {
+      "id": "gold-original140--empty-palette-version-update-ts",
+      "profile": "gold-original140--empty-palette-version-update-ts",
+      "file": "pgs/gold-original140--empty-palette-version-update.ts",
+      "sha256": "e6c1e0a9bee846778d33131d074147c83ebd52f5185cabeff8f94990a111d0ab",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--empty-palette-version-update/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 4951597510917286017
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-00-ts",
+      "profile": "gold-original140--every-ods-split-00-ts",
+      "file": "pgs/gold-original140--every-ods-split-00.ts",
+      "sha256": "af4e9cfa787c8b4c8ea4e9e09d7bffa456fe1d84e9ccd57e320c1afd9b90bbe9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-00/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 6033745540469445801
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-01-ts",
+      "profile": "gold-original140--every-ods-split-01-ts",
+      "file": "pgs/gold-original140--every-ods-split-01.ts",
+      "sha256": "faf93af94017bb7cedeef23a4c646997879c0b101f981b01f315c57e5947fec3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-01/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17105876152710531208
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-02-ts",
+      "profile": "gold-original140--every-ods-split-02-ts",
+      "file": "pgs/gold-original140--every-ods-split-02.ts",
+      "sha256": "310456346f460aab54481e55886cd2af077df710b4bd039c34b18566cc3a21ed",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-02/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17105876152710531208
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-03-ts",
+      "profile": "gold-original140--every-ods-split-03-ts",
+      "file": "pgs/gold-original140--every-ods-split-03.ts",
+      "sha256": "7ff9eb46a5428fa76421cba60e7b7adf037af9971f4b120dbfc77b5c4ed5cc66",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-03/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17105876152710531208
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-04-ts",
+      "profile": "gold-original140--every-ods-split-04-ts",
+      "file": "pgs/gold-original140--every-ods-split-04.ts",
+      "sha256": "83bc98c92e22f1acc96c656111021e1928b492ac1756c8d0569a1098b2cbebf1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-04/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17105876152710531208
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-05-ts",
+      "profile": "gold-original140--every-ods-split-05-ts",
+      "file": "pgs/gold-original140--every-ods-split-05.ts",
+      "sha256": "a2f5771cab79b78826e4a200d815e9444077bfddded48539eaeab4e0ef172e78",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-05/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17105876152710531208
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-06-ts",
+      "profile": "gold-original140--every-ods-split-06-ts",
+      "file": "pgs/gold-original140--every-ods-split-06.ts",
+      "sha256": "2913347275cf9dc016e2f096fabe6f7d0a1741913726d3202d52e7844e2d58da",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-06/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17105876152710531208
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-07-ts",
+      "profile": "gold-original140--every-ods-split-07-ts",
+      "file": "pgs/gold-original140--every-ods-split-07.ts",
+      "sha256": "7eb2cb4dcc8c83054bb1ae1abb4bc77c1d3e0663c67584220df68ba17c11bfbe",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-07/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17105876152710531208
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-08-ts",
+      "profile": "gold-original140--every-ods-split-08-ts",
+      "file": "pgs/gold-original140--every-ods-split-08.ts",
+      "sha256": "609e9053a6f7342ac2125e35fc61a55916942a36caee7e8544a4fa8c472999b1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-08/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17105876152710531208
+      }
+    },
+    {
+      "id": "gold-original140--every-ods-split-09-ts",
+      "profile": "gold-original140--every-ods-split-09-ts",
+      "file": "pgs/gold-original140--every-ods-split-09.ts",
+      "sha256": "7a52da0f15ce289c99c3df74c757b287c698608572cfc2198251c2d0124b131d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-09/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17105876152710531208
+      }
+    },
+    {
+      "id": "gold-original140--forced-only-false-ts",
+      "profile": "gold-original140--forced-only-false-ts",
+      "file": "pgs/gold-original140--forced-only-false.ts",
+      "sha256": "344cfa6dfeb82b0dbfcfae0ca2293eb1ff12cc190c502223698f973b2aca3930",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--forced-only-false/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2052,
+        "digest": 14871966358265442302
+      }
+    },
+    {
+      "id": "gold-original140--forced-only-true-ts",
+      "profile": "gold-original140--forced-only-true-ts",
+      "file": "pgs/gold-original140--forced-only-true.ts",
+      "sha256": "344cfa6dfeb82b0dbfcfae0ca2293eb1ff12cc190c502223698f973b2aca3930",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--forced-only-true/input.bin",
+      "arguments": [
+        "pgs",
+        "opt:forced_subs_only=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2052,
+        "digest": 11923923797533400793
+      }
+    },
+    {
+      "id": "gold-original140--interleaved-object-fragments-ts",
+      "profile": "gold-original140--interleaved-object-fragments-ts",
+      "file": "pgs/gold-original140--interleaved-object-fragments.ts",
+      "sha256": "76f89a669ac736faa0ce03f67ea670c71c97357886ddcddad99246d1bfd40946",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--interleaved-object-fragments/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2058,
+        "digest": 18044836119963106738
+      }
+    },
+    {
+      "id": "gold-original140--malformed-END-without-PCS-ts",
+      "profile": "gold-original140--malformed-END-without-PCS-ts",
+      "file": "pgs/gold-original140--malformed-END-without-PCS.ts",
+      "sha256": "2bc5e7f1191b094ac062d04f9e54873d365375d879ee02ef3ea44cfb360433e6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-END-without-PCS/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 4127463570495
+      }
+    },
+    {
+      "id": "gold-original140--malformed-crop-outside-object-ts",
+      "profile": "gold-original140--malformed-crop-outside-object-ts",
+      "file": "pgs/gold-original140--malformed-crop-outside-object.ts",
+      "sha256": "3845b2e8dc77e30600346e53ac06483e00c04b9ec0fc268488ba1bb98a1c1f5c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-crop-outside-object/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--malformed-early-last-ts",
+      "profile": "gold-original140--malformed-early-last-ts",
+      "file": "pgs/gold-original140--malformed-early-last.ts",
+      "sha256": "dbcb1297a1d8a2f3f13e5175c833b81a41232be0a1a5d442d099218955a17507",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-early-last/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 12807621254883538406
+      }
+    },
+    {
+      "id": "gold-original140--malformed-missing-END-ts",
+      "profile": "gold-original140--malformed-missing-END-ts",
+      "file": "pgs/gold-original140--malformed-missing-END.ts",
+      "sha256": "469c955cae5658cf99bee0aab12505169ac340b93fe5be14092d729a3276ec8e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-missing-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--malformed-missing-last-marker-ts",
+      "profile": "gold-original140--malformed-missing-last-marker-ts",
+      "file": "pgs/gold-original140--malformed-missing-last-marker.ts",
+      "sha256": "4f8712f77bd1278b91e491f544331b7ef3a4127acb89f16459a485ce267e8c8e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-missing-last-marker/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--malformed-nonempty-END-ts",
+      "profile": "gold-original140--malformed-nonempty-END-ts",
+      "file": "pgs/gold-original140--malformed-nonempty-END.ts",
+      "sha256": "d9f047f738bca2b57b79e727739989af025c7da0db26cf0f09f41c67b5b76e14",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-nonempty-END/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--malformed-overshoot-ts",
+      "profile": "gold-original140--malformed-overshoot-ts",
+      "file": "pgs/gold-original140--malformed-overshoot.ts",
+      "sha256": "73f40a47620c908280c97fa60209642b5b9d813f983c09a9bc3b440ff51233e2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-overshoot/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 12807621254883538406
+      }
+    },
+    {
+      "id": "gold-original140--malformed-palette-entry-truncated-ts",
+      "profile": "gold-original140--malformed-palette-entry-truncated-ts",
+      "file": "pgs/gold-original140--malformed-palette-entry-truncated.ts",
+      "sha256": "16765506e97bbafdc78e824c7b5e6ab6eb93e56105c232281d1f3e1c3fcdbdbd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-palette-entry-truncated/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 2402331965838442881
+      }
+    },
+    {
+      "id": "gold-original140--malformed-windows-truncated-ts",
+      "profile": "gold-original140--malformed-windows-truncated-ts",
+      "file": "pgs/gold-original140--malformed-windows-truncated.ts",
+      "sha256": "1d4d224f46d5891d9a1c66a8aa6401b17fe0392623e8e09629c596d3c01f68f5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-windows-truncated/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--malformed-wrong-fragment-version-ts",
+      "profile": "gold-original140--malformed-wrong-fragment-version-ts",
+      "file": "pgs/gold-original140--malformed-wrong-fragment-version.ts",
+      "sha256": "aa46792530c32cb7edbe98b0f7059f163d906c636900fc2f1e457e20fe951e8c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-wrong-fragment-version/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--matrix-height-1080-ts",
+      "profile": "gold-original140--matrix-height-1080-ts",
+      "file": "pgs/gold-original140--matrix-height-1080.ts",
+      "sha256": "94d6d6e01a9766e2a1b474fd79657e8e30bfb4cfbd1913f15711097b08ea65c2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-1080/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--matrix-height-480-ts",
+      "profile": "gold-original140--matrix-height-480-ts",
+      "file": "pgs/gold-original140--matrix-height-480.ts",
+      "sha256": "e1baf2b7dfd6bea09365e43ca2df14fd93ff35554efa7afed638764ffd0e0f85",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-480/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 12072234272881265549
+      }
+    },
+    {
+      "id": "gold-original140--matrix-height-576-ts",
+      "profile": "gold-original140--matrix-height-576-ts",
+      "file": "pgs/gold-original140--matrix-height-576.ts",
+      "sha256": "12904978991af17dd62a1712fececc8c5e33c0750bf7a193743cb9cec3207dbc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-576/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 12072234272881265549
+      }
+    },
+    {
+      "id": "gold-original140--matrix-height-577-ts",
+      "profile": "gold-original140--matrix-height-577-ts",
+      "file": "pgs/gold-original140--matrix-height-577.ts",
+      "sha256": "730bff413d0ca43664f46da1fa01cf6e12a25b2d0cdeeae7c998b499dd1cbd10",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-577/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--matrix-per-entry-at-update-time-ts",
+      "profile": "gold-original140--matrix-per-entry-at-update-time-ts",
+      "file": "pgs/gold-original140--matrix-per-entry-at-update-time.ts",
+      "sha256": "e7498e5afb1d6217c6528b66167b8adfa484dcfbf16f81c2f70df1bdf74bc3c5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-per-entry-at-update-time/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 4897936101609783624
+      }
+    },
+    {
+      "id": "gold-original140--multiple-displays-one-packet-ts",
+      "profile": "gold-original140--multiple-displays-one-packet-ts",
+      "file": "pgs/gold-original140--multiple-displays-one-packet.ts",
+      "sha256": "a1d6ddd0cea0da709606e93d5ba7bbfe3f2a9b67efcd75badd9af5683a6970d4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--multiple-displays-one-packet/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--multiple-objects-wire-order-ts",
+      "profile": "gold-original140--multiple-objects-wire-order-ts",
+      "file": "pgs/gold-original140--multiple-objects-wire-order.ts",
+      "sha256": "344cfa6dfeb82b0dbfcfae0ca2293eb1ff12cc190c502223698f973b2aca3930",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--multiple-objects-wire-order/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2052,
+        "digest": 14871966358265442302
+      }
+    },
+    {
+      "id": "gold-original140--normal-window-replacement-ts",
+      "profile": "gold-original140--normal-window-replacement-ts",
+      "file": "pgs/gold-original140--normal-window-replacement.ts",
+      "sha256": "3440951fd9cac33bf0eee3f6590b0add121ac053d6d2214557fe7a0d9df66f32",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--normal-window-replacement/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 4951597510917286017
+      }
+    },
+    {
+      "id": "gold-original140--object-replacement-version-0-ts",
+      "profile": "gold-original140--object-replacement-version-0-ts",
+      "file": "pgs/gold-original140--object-replacement-version-0.ts",
+      "sha256": "0427db79ba10ffb414ee10460aaf065f30e6d513d18e1dd592559c0f02be90e1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--object-replacement-version-0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 5593557146104276771
+      }
+    },
+    {
+      "id": "gold-original140--object-replacement-version-2-ts",
+      "profile": "gold-original140--object-replacement-version-2-ts",
+      "file": "pgs/gold-original140--object-replacement-version-2.ts",
+      "sha256": "8598e00b15e54819240d19b699cd28b8cc6b10b8f3e440859238918083cffa4d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--object-replacement-version-2/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 5593557146104276771
+      }
+    },
+    {
+      "id": "gold-original140--old34-cropped-ts",
+      "profile": "gold-original140--old34-cropped-ts",
+      "file": "pgs/gold-original140--old34-cropped.ts",
+      "sha256": "7124aa46eeeaecbfa1b81cf98fce4f5087cd5397ca78f374a680aad3d368777f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-cropped/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 6374802506457666749
+      }
+    },
+    {
+      "id": "gold-original140--old34-forced-ts",
+      "profile": "gold-original140--old34-forced-ts",
+      "file": "pgs/gold-original140--old34-forced.ts",
+      "sha256": "305399a02e2757e597dd943faaad26075a5d9256a840564a9f47c7327669a79a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-forced/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 4628002184540834878
+      }
+    },
+    {
+      "id": "gold-original140--old34-forced-and-cropped-ts",
+      "profile": "gold-original140--old34-forced-and-cropped-ts",
+      "file": "pgs/gold-original140--old34-forced-and-cropped.ts",
+      "sha256": "09ed4e2ea0bf9d5b500e1e3bb0ba781d8b8d99c06b4992db964e309ebb32c885",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-forced-and-cropped/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 4628002184540834878
+      }
+    },
+    {
+      "id": "gold-original140--old34-mixed-two-rows-ts",
+      "profile": "gold-original140--old34-mixed-two-rows-ts",
+      "file": "pgs/gold-original140--old34-mixed-two-rows.ts",
+      "sha256": "6b33ae98df7a362791587031d6eb5795ea92939178dc39ddb51bb886fcc5975b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-mixed-two-rows/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 618244898694362876
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-1-0-ts",
+      "profile": "gold-original140--old34-run-1-0-ts",
+      "file": "pgs/gold-original140--old34-run-1-0.ts",
+      "sha256": "0e613643a4c8c422cba5e4e10578bd35e8919f8e74fa6ad66cec9484a7386c22",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-1-0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1025,
+        "digest": 8557825091228532835
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-1-1-ts",
+      "profile": "gold-original140--old34-run-1-1-ts",
+      "file": "pgs/gold-original140--old34-run-1-1.ts",
+      "sha256": "1cfdfbb14a7cc162bbafe1516a77c5dfb535d4e66aeca5ba30a087cec140963d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-1-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1025,
+        "digest": 8557825091228533796
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-1-255-ts",
+      "profile": "gold-original140--old34-run-1-255-ts",
+      "file": "pgs/gold-original140--old34-run-1-255.ts",
+      "sha256": "2d5222d2eeb881557f369efb6e3356d03da13879fbb8fe7002dadc767e157afe",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-1-255/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1025,
+        "digest": 8557825091228777890
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-16383-0-ts",
+      "profile": "gold-original140--old34-run-16383-0-ts",
+      "file": "pgs/gold-original140--old34-run-16383-0.ts",
+      "sha256": "3a1852626c221c08d5553555d20172e67329e9ecd33cd15c4c8105738bc12cbc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-16383-0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 17407,
+        "digest": 9942634466007911969
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-16383-1-ts",
+      "profile": "gold-original140--old34-run-16383-1-ts",
+      "file": "pgs/gold-original140--old34-run-16383-1.ts",
+      "sha256": "c582335ce495731e31dfa92555d2f3f37c4a9ce2dd1d935ba5b87d9172dff41d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-16383-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 17407,
+        "digest": 5405764236732337666
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-16383-255-ts",
+      "profile": "gold-original140--old34-run-16383-255-ts",
+      "file": "pgs/gold-original140--old34-run-16383-255.ts",
+      "sha256": "b5666f376a4426168c65733dc328ff808bba1ee81eb244a2acfb2cdd5eca0d58",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-16383-255/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 17407,
+        "digest": 15185602644438216512
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-2-0-ts",
+      "profile": "gold-original140--old34-run-2-0-ts",
+      "file": "pgs/gold-original140--old34-run-2-0.ts",
+      "sha256": "044eae0be33cd13b335e58dc1f965c649a576ce8f412341e3c1afb7e97a163d2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-2-0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 6374802506457635036
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-2-1-ts",
+      "profile": "gold-original140--old34-run-2-1-ts",
+      "file": "pgs/gold-original140--old34-run-2-1.ts",
+      "sha256": "197314c9f20581ed4bc09f174c28a9985b1b8a818b60f17ec1bb119d14e6502a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-2-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 6374802506457665788
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-2-255-ts",
+      "profile": "gold-original140--old34-run-2-255-ts",
+      "file": "pgs/gold-original140--old34-run-2-255.ts",
+      "sha256": "4e3a636b3e29d1fa53abac72235fe1c3efee1712a82afd50fe880391590229b8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-2-255/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 6374802506465476796
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-255-0-ts",
+      "profile": "gold-original140--old34-run-255-0-ts",
+      "file": "pgs/gold-original140--old34-run-255-0.ts",
+      "sha256": "0d9fa21728e99fb60c1d28e66e691798b0376a6613a59a5ac8f41f9d43211a24",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-255-0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1279,
+        "digest": 2683547261403541281
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-255-1-ts",
+      "profile": "gold-original140--old34-run-255-1-ts",
+      "file": "pgs/gold-original140--old34-run-255-1.ts",
+      "sha256": "2b95aea21056d5323d232d1fac6ffcea3f37d6d818720178c228a5686cffcdf7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-255-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1279,
+        "digest": 13151251605746491138
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-255-255-ts",
+      "profile": "gold-original140--old34-run-255-255-ts",
+      "file": "pgs/gold-original140--old34-run-255-255.ts",
+      "sha256": "abaae110588813543a6a02e6eaf5e723ba266e39e539b047e8fef659afbc6b00",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-255-255/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1279,
+        "digest": 15617008454680322112
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-256-0-ts",
+      "profile": "gold-original140--old34-run-256-0-ts",
+      "file": "pgs/gold-original140--old34-run-256-0.ts",
+      "sha256": "eff12551b7199dc69c4b6a36a20f4a968418741b72b16d810c07b234e0062f5d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-256-0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1280,
+        "digest": 1555330952633830814
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-256-1-ts",
+      "profile": "gold-original140--old34-run-256-1-ts",
+      "file": "pgs/gold-original140--old34-run-256-1.ts",
+      "sha256": "cc1b13cc06913410f4f775e8f5b63d6b056aa6586c0e1dcede790b6bd8d36dec",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-256-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1280,
+        "digest": 12459516374202899870
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-256-255-ts",
+      "profile": "gold-original140--old34-run-256-255-ts",
+      "file": "pgs/gold-original140--old34-run-256-255.ts",
+      "sha256": "83735f4f0c223effa8c00a6e123264ef402d2c27ffd4dd18d1977598f064ffcf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-256-255/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1280,
+        "digest": 15111002396313697694
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-4096-0-ts",
+      "profile": "gold-original140--old34-run-4096-0-ts",
+      "file": "pgs/gold-original140--old34-run-4096-0.ts",
+      "sha256": "ab9ae1519f2f9c5ec2a88cba27842e86cd0e4a1eaf0d952298cd84791b0630a5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-4096-0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5120,
+        "digest": 11318161104316522142
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-4096-1-ts",
+      "profile": "gold-original140--old34-run-4096-1-ts",
+      "file": "pgs/gold-original140--old34-run-4096-1.ts",
+      "sha256": "8fe17e1ffc75a62f27d6c524b89def938e4fcc643104da52878858184c5225be",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-4096-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5120,
+        "digest": 11297240909878320798
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-4096-255-ts",
+      "profile": "gold-original140--old34-run-4096-255-ts",
+      "file": "pgs/gold-original140--old34-run-4096-255.ts",
+      "sha256": "543d0be2918ad0cb761ef6b439d5a61630a9684626ae201cb781647f7e19d8f3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-4096-255/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5120,
+        "digest": 5983511522575179422
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-63-0-ts",
+      "profile": "gold-original140--old34-run-63-0-ts",
+      "file": "pgs/gold-original140--old34-run-63-0.ts",
+      "sha256": "16e7174ef6cac8a8db689f8b0b10c75c0d30c162b599f5efd0c05cd3a5cb5afc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-63-0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1087,
+        "digest": 17712955090198275681
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-63-1-ts",
+      "profile": "gold-original140--old34-run-63-1-ts",
+      "file": "pgs/gold-original140--old34-run-63-1.ts",
+      "sha256": "09845ae5cba4d2b8ee813af7ad425d44f09778367afeb7e91123f768dd7b1a78",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-63-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1087,
+        "digest": 1744756496259818050
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-63-255-ts",
+      "profile": "gold-original140--old34-run-63-255-ts",
+      "file": "pgs/gold-original140--old34-run-63-255.ts",
+      "sha256": "89100c175b8d51a2f0d0f54c70f880d4126b78fb0c7bd2e8975b9ba44b314e20",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-63-255/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1087,
+        "digest": 4106009851992935296
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-64-0-ts",
+      "profile": "gold-original140--old34-run-64-0-ts",
+      "file": "pgs/gold-original140--old34-run-64-0.ts",
+      "sha256": "6c303a2463622949d63152c90e59d2c00b62519452e84fcdcf7d23c265d2dd94",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-64-0/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1088,
+        "digest": 2476224801547232862
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-64-1-ts",
+      "profile": "gold-original140--old34-run-64-1-ts",
+      "file": "pgs/gold-original140--old34-run-64-1.ts",
+      "sha256": "0cbe08ee0ea5f02bab82138d3832aa04d73cc0c20358d611b5a65bcb01f2ff38",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-64-1/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1088,
+        "digest": 5524158379612940894
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-64-255-ts",
+      "profile": "gold-original140--old34-run-64-255-ts",
+      "file": "pgs/gold-original140--old34-run-64-255.ts",
+      "sha256": "ebbd9f7d8318cc99a7b5ee8b2d2eb6b877f3d4ef3d98ade58c39709d2b0585fd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-64-255/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1088,
+        "digest": 4936036112501613150
+      }
+    },
+    {
+      "id": "gold-original140--old34-run-across-row-ts",
+      "profile": "gold-original140--old34-run-across-row-ts",
+      "file": "pgs/gold-original140--old34-run-across-row.ts",
+      "sha256": "0dd3d4602af0de3f64847496326c4cecf236815045a6ccc8f8756c3ee5351ded",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-across-row/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 4998830777216268061
+      }
+    },
+    {
+      "id": "gold-original140--old34-short-line-ts",
+      "profile": "gold-original140--old34-short-line-ts",
+      "file": "pgs/gold-original140--old34-short-line.ts",
+      "sha256": "16b5a264a58c9367c9ce39992a9527be836c70aa84bf36ebd0d2e0321169d05d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-short-line/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 4998830777216268061
+      }
+    },
+    {
+      "id": "gold-original140--old34-trailing-rle-ts",
+      "profile": "gold-original140--old34-trailing-rle-ts",
+      "file": "pgs/gold-original140--old34-trailing-rle.ts",
+      "sha256": "8e789e3963a10685df9cb25314e5418701508fe750f0925d54edee7381f5bdcb",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-trailing-rle/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 6374802506457666749
+      }
+    },
+    {
+      "id": "gold-original140--old34-truncated-control-ts",
+      "profile": "gold-original140--old34-truncated-control-ts",
+      "file": "pgs/gold-original140--old34-truncated-control.ts",
+      "sha256": "f357547e16baaeb7b319bc7f8ef5c0ccafba56cd21dc4e2d166c6a577d96c360",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-truncated-control/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 4998830777216268061
+      }
+    },
+    {
+      "id": "gold-original140--old34-truncated-long-colour-ts",
+      "profile": "gold-original140--old34-truncated-long-colour-ts",
+      "file": "pgs/gold-original140--old34-truncated-long-colour.ts",
+      "sha256": "74d7e7fe7cc9789f14808dc1db6f021f46331e85b574fc5310195dfc2d07ae3c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-truncated-long-colour/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 4998830777216268061
+      }
+    },
+    {
+      "id": "gold-original140--old34-zero-colour-run-ts",
+      "profile": "gold-original140--old34-zero-colour-run-ts",
+      "file": "pgs/gold-original140--old34-zero-colour-run.ts",
+      "sha256": "3b36d361b60157c23280015164feb2d16fde3cd63d2f0a9265e8f9a8ee50fea4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-zero-colour-run/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1024,
+        "digest": 4998830777216268061
+      }
+    },
+    {
+      "id": "gold-original140--one-rle-byte-per-fragment-ts",
+      "profile": "gold-original140--one-rle-byte-per-fragment-ts",
+      "file": "pgs/gold-original140--one-rle-byte-per-fragment.ts",
+      "sha256": "57b1acb2da8bb87f99c557c8497cd6529ac0ca0675c30985f9b84128431133b5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--one-rle-byte-per-fragment/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 17095520479673276751
+      }
+    },
+    {
+      "id": "gold-original140--partial-duplicate-palette-ts",
+      "profile": "gold-original140--partial-duplicate-palette-ts",
+      "file": "pgs/gold-original140--partial-duplicate-palette.ts",
+      "sha256": "622928e78be6158d1a8dc24b356da301da87ca519710ede9b0cbd9ad2b53c82f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--partial-duplicate-palette/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 1589943745912987015
+      }
+    },
+    {
+      "id": "gold-original140--reset-state-40-missing-definitions-ts",
+      "profile": "gold-original140--reset-state-40-missing-definitions-ts",
+      "file": "pgs/gold-original140--reset-state-40-missing-definitions.ts",
+      "sha256": "0cbe862f67d157e8c76d5bb68e3434849f1b7643808341ecdebf85a464d79cbc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-40-missing-definitions/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--reset-state-40-partial-palette-ts",
+      "profile": "gold-original140--reset-state-40-partial-palette-ts",
+      "file": "pgs/gold-original140--reset-state-40-partial-palette.ts",
+      "sha256": "bce94ad8d8983a93baa0e30d8c50b97ca86b4a76727848b41878e0950770f01e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-40-partial-palette/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 5131954060169039397
+      }
+    },
+    {
+      "id": "gold-original140--reset-state-80-missing-definitions-ts",
+      "profile": "gold-original140--reset-state-80-missing-definitions-ts",
+      "file": "pgs/gold-original140--reset-state-80-missing-definitions.ts",
+      "sha256": "79d73d3770750a3f50c08c6d5477f1b78e531966fb3f06fbaf7fe9763e2ed4f3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-80-missing-definitions/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--reset-state-80-partial-palette-ts",
+      "profile": "gold-original140--reset-state-80-partial-palette-ts",
+      "file": "pgs/gold-original140--reset-state-80-partial-palette.ts",
+      "sha256": "484e66df374fdb31528f04a07fade82a21251092c0c7e4ceb07c465bf2392446",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-80-partial-palette/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 5131954060169039397
+      }
+    },
+    {
+      "id": "gold-original140--reset-state-c0-missing-definitions-ts",
+      "profile": "gold-original140--reset-state-c0-missing-definitions-ts",
+      "file": "pgs/gold-original140--reset-state-c0-missing-definitions.ts",
+      "sha256": "b9e85b1b91d641e70c9be6c5d85ec3e32b520269d8f4b819996398750795cf2c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-c0-missing-definitions/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--reset-state-c0-partial-palette-ts",
+      "profile": "gold-original140--reset-state-c0-partial-palette-ts",
+      "file": "pgs/gold-original140--reset-state-c0-partial-palette.ts",
+      "sha256": "5249175ef7a69d6690d8fc367930b760fdd6f7168908939857b15cd37c187342",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-c0-partial-palette/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 5131954060169039397
+      }
+    },
+    {
+      "id": "gold-original140--reuse-clear-resume-ts",
+      "profile": "gold-original140--reuse-clear-resume-ts",
+      "file": "pgs/gold-original140--reuse-clear-resume.ts",
+      "sha256": "b357521a9ead54b9d192c939d4ff8dff10c11f521b804312a78c2d247c948ce6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reuse-clear-resume/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3078,
+        "digest": 13426819444314562512
+      }
+    },
+    {
+      "id": "gold-original140--same-palette-version-new-values-ts",
+      "profile": "gold-original140--same-palette-version-new-values-ts",
+      "file": "pgs/gold-original140--same-palette-version-new-values.ts",
+      "sha256": "60f43c3055fc3a55600c39af15386ad2bbc75e91e143dd0075edff52111fae84",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--same-palette-version-new-values/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2052,
+        "digest": 2217061789177175431
+      }
+    },
+    {
+      "id": "gold-original140--source-position-outside-canvas-ts",
+      "profile": "gold-original140--source-position-outside-canvas-ts",
+      "file": "pgs/gold-original140--source-position-outside-canvas.ts",
+      "sha256": "27b730041a1c3ab1448b9059361de5588e96357b4426feda1b7ae0286ebaba6d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--source-position-outside-canvas/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--three-source-objects-native-two-reference-limit-ts",
+      "profile": "gold-original140--three-source-objects-native-two-reference-limit-ts",
+      "file": "pgs/gold-original140--three-source-objects-native-two-reference-limit.ts",
+      "sha256": "d8993f3e0c8784c7fcab7e386304f98bb9040807bfb2a5c971a90be41a2ffb50",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--three-source-objects-native-two-reference-limit/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2050,
+        "digest": 3098140608381130746
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-01-ts",
+      "profile": "gold-original140--truncated-first-header-01-ts",
+      "file": "pgs/gold-original140--truncated-first-header-01.ts",
+      "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-01/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-02-ts",
+      "profile": "gold-original140--truncated-first-header-02-ts",
+      "file": "pgs/gold-original140--truncated-first-header-02.ts",
+      "sha256": "4b52ef24ce84effd8eb1d92d30264d918fac43a08689ef165c8b3634b08b0c11",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-02/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-03-ts",
+      "profile": "gold-original140--truncated-first-header-03-ts",
+      "file": "pgs/gold-original140--truncated-first-header-03.ts",
+      "sha256": "7b26aaa9aa14a41f0b225e6d7113006b5722a56dd89a5e01b382c0720b4dbde9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-03/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-04-ts",
+      "profile": "gold-original140--truncated-first-header-04-ts",
+      "file": "pgs/gold-original140--truncated-first-header-04.ts",
+      "sha256": "a08748575f56ab3194c8e4114094208a38dab62709e5243b9be1b1bc8f1b3a86",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-04/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-05-ts",
+      "profile": "gold-original140--truncated-first-header-05-ts",
+      "file": "pgs/gold-original140--truncated-first-header-05.ts",
+      "sha256": "a72ee3b346ea86cd1dbd58b2bcb86b9441788142f4aa7fea96ca164884b74db3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-05/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-06-ts",
+      "profile": "gold-original140--truncated-first-header-06-ts",
+      "file": "pgs/gold-original140--truncated-first-header-06.ts",
+      "sha256": "a40e115bc5f08ad8f2a463da96720fd70f9786c37846a511e31e072ca5f90139",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-06/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-07-ts",
+      "profile": "gold-original140--truncated-first-header-07-ts",
+      "file": "pgs/gold-original140--truncated-first-header-07.ts",
+      "sha256": "51a9d81cf263b668d0588eff6cd029c4c724e2bb9175a064e732fe89ebb46477",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-07/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-08-ts",
+      "profile": "gold-original140--truncated-first-header-08-ts",
+      "file": "pgs/gold-original140--truncated-first-header-08.ts",
+      "sha256": "238c33200069cfc84ce4236a4e0d46b8fa1707069dbf4c3022db279cb2ce68a2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-08/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-09-ts",
+      "profile": "gold-original140--truncated-first-header-09-ts",
+      "file": "pgs/gold-original140--truncated-first-header-09.ts",
+      "sha256": "af7dc0925e1c76ebe3dd915cbff98a8c7ca309cfd22c12ecb473bbacbecdc70c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-09/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-10-ts",
+      "profile": "gold-original140--truncated-first-header-10-ts",
+      "file": "pgs/gold-original140--truncated-first-header-10.ts",
+      "sha256": "745f96c3a940da29444cff4cce420bb7f53dcee9574a88cbfdbc783dabddd4f2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-10/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-11-ts",
+      "profile": "gold-original140--truncated-first-header-11-ts",
+      "file": "pgs/gold-original140--truncated-first-header-11.ts",
+      "sha256": "466f8874adeb89cdfab8c9a6a05ecc6b6ba7fa75971de560f5dda5ee0ac949d7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-11/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-12-ts",
+      "profile": "gold-original140--truncated-first-header-12-ts",
+      "file": "pgs/gold-original140--truncated-first-header-12.ts",
+      "sha256": "4517cdf7cec043c1e6d4089624b040808731bddfb591a20a161b59965e618297",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-12/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--truncated-first-header-13-ts",
+      "profile": "gold-original140--truncated-first-header-13-ts",
+      "file": "pgs/gold-original140--truncated-first-header-13.ts",
+      "sha256": "d41203c02663dd378222e7e836affe3f6ece493db5b3ae0a376d335d17c17214",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-13/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "gold-original140--unknown-segment-kept-ts",
+      "profile": "gold-original140--unknown-segment-kept-ts",
+      "file": "pgs/gold-original140--unknown-segment-kept.ts",
+      "sha256": "f88e3e75c4a4e3aa54354fd35aaeff5fded9f68253ef3e54c19f36fbec22b4a4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--unknown-segment-kept/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1026,
+        "digest": 2797613544916960582
+      }
+    },
+    {
+      "id": "gold-original140--window-crop-forced-real-pixels-ts",
+      "profile": "gold-original140--window-crop-forced-real-pixels-ts",
+      "file": "pgs/gold-original140--window-crop-forced-real-pixels.ts",
+      "sha256": "66342f42c0539dad0fd7472e583c70c9a958ae723c763b7489c0a50f2a626828",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--window-crop-forced-real-pixels/input.bin",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1036,
+        "digest": 2443656981098690772
+      }
+    },
+    {
+      "id": "two-streams-0-ts",
+      "profile": "two-streams-0-ts",
+      "file": "pgs/two-streams.ts",
+      "sha256": "facc8bdefe8e4db20aab5841f3915c6374c49b2bb1002f8a4eaa865c05baecad",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs",
+        "stream=0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 52096,
+        "digest": 8544918178413204849
+      }
+    },
+    {
+      "id": "two-streams-1-ts",
+      "profile": "two-streams-1-ts",
+      "file": "pgs/two-streams.ts",
+      "sha256": "facc8bdefe8e4db20aab5841f3915c6374c49b2bb1002f8a4eaa865c05baecad",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs",
+        "stream=1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 52096,
+        "digest": 7611996903438927795
+      }
+    },
+    {
+      "id": "fate-pgs_sub",
+      "profile": "fate-pgs_sub",
+      "file": "fate/sub/pgs_sub.sup",
+      "sha256": "ce6d8ed89cf557e34b90d49c5ce955731935c485b93892f69ab276cfe0c36c27",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite sub/pgs_sub.sup",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 87249,
+        "digest": 11585078272630630168
+      }
+    },
+    {
+      "id": "fate-pgs_sub-mkv",
+      "profile": "fate-pgs_sub-mkv",
+      "file": "pgs/fate-pgs_sub.mkv",
+      "sha256": "c928ea53e2acdf1cbaa3b0934510b65ca2f5381e2293c1067c20ff47eefa3918",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite sub/pgs_sub.sup, muxed by ffmpeg 9.0.2",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 87249,
+        "digest": 1125413663549545982
+      }
+    },
+    {
+      "id": "fate-pgs_sub-m2ts",
+      "profile": "fate-pgs_sub-m2ts",
+      "file": "pgs/fate-pgs_sub.m2ts",
+      "sha256": "e4e544c03d2a4a984456ca4460cc9638307a52ad5556c59b1a41a85481fc2d92",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite sub/pgs_sub.sup, muxed by ffmpeg 9.0.2",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 87249,
+        "digest": 3336192602683983939
+      }
+    }
+  ],
+  "refused": [
+    {
+      "id": "ods-short-first-sup",
+      "profile": "ods-short-first-sup",
+      "file": "pgs/ods-short-first.sup",
+      "sha256": "cbf49cff04112b1e8004ff1b429d64921913f5e7cc6cf42e724b57742f783d63",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ]
+    },
+    {
+      "id": "sup-junk-after-probing-sup",
+      "profile": "sup-junk-after-probing-sup",
+      "file": "pgs/sup-junk-after-probing.sup",
+      "sha256": "64fb678ee35d4721e5bbe0ed5b71148bde4c24a15c5ab1e55403532bcebc1b33",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ]
+    },
+    {
+      "id": "sup-junk-twice-sup",
+      "profile": "sup-junk-twice-sup",
+      "file": "pgs/sup-junk-twice.sup",
+      "sha256": "e8607c814e899105a8eb19e77e984c1b2b2655bd356d71dba26a50dbb41aeddf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ]
+    }
+  ],
+  "not_representable": [
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-known-native-sentinel/input.bin",
+      "reason": "clock outside 0..2^33"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-negative/input.bin",
+      "reason": "clock outside 0..2^33"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-large-exact/input.bin",
+      "reason": "time base 1/1000000"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-native-unrepresentable-overflow/input.bin",
+      "reason": "time base 2147483647/1"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-native-unrepresentable-sentinel/input.bin",
+      "reason": "time base 1/1000000"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-negative/input.bin",
+      "reason": "clock outside 0..2^33"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-one-tick/input.bin",
+      "reason": "clock outside 0..2^33"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-prime-base/input.bin",
+      "reason": "time base 19/1001"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-unknown/input.bin",
+      "reason": "clock outside 0..2^33"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-zero/input.bin",
+      "reason": "clock outside 0..2^33"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-clock-negative-half-microsecond/input.bin",
+      "reason": "time base 1/2000000"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-clock-sentinel-on-END-fallback/input.bin",
+      "reason": "time base 1/1000000"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-clock-unknown-PTS-sentinel-DTS/input.bin",
+      "reason": "clock outside 0..2^33"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-after-hard-reset/input.bin",
+      "reason": "decoder reopen record"
+    },
+    {
+      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--explicit-hard-context-reset/input.bin",
+      "reason": "decoder reopen record"
+    }
+  ]
+}

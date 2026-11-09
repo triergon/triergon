@@ -980,7 +980,7 @@ impl Engine {
                         kind: match &h.handler {
                             b"vide" => TrackKind::Video,
                             b"soun" => TrackKind::Audio,
-                            b"text" | b"subt" | b"sbtl" => TrackKind::Subtitle,
+                            b"text" | b"subt" | b"sbtl" | b"subp" => TrackKind::Subtitle,
                             _ => TrackKind::Other,
                         },
                         enabled: h.enabled,
@@ -2247,6 +2247,19 @@ impl TsEngine {
                     let kind = match e.stream_type {
                         0x1b | 0x24 | 0x02 => TrackKind::Video,
                         0x0f | 0x11 | 0x03 | 0x04 | 0x81 | 0x87 => TrackKind::Audio,
+                        // HDMV presentation graphics (PGS) in BDAV and TS.
+                        0x90 => TrackKind::Subtitle,
+                        // DVB subtitling or teletext descriptors in a DVB namespace.
+                        0x06 if matches!(
+                            e.codec(),
+                            Some(
+                                triergon_core::container::CodecId::DvbSubtitle
+                                    | triergon_core::container::CodecId::DvbTeletext
+                            )
+                        ) =>
+                        {
+                            TrackKind::Subtitle
+                        }
                         0x06 => self
                             .native_tracks
                             .index(e.pid)

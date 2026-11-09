@@ -1,7 +1,9 @@
 //! The receiver's application route, with no strict Source decoder.
 use super::display_model::PaletteSnapshot;
 use super::display_work::DisplayWork;
-use super::recovery::{Decoder, Phase, ReceiverObservations, RecoveredEvent, RecoveryStatus};
+use super::recovery::{
+    Decoder, Phase, ReceiverObservations, RecoveredEvent, RecoveryStatus, Refusal,
+};
 use super::recovery_role::RecoveryRole;
 use super::{DisplayConfig, DisplayLimits, PacketClock};
 use std::sync::atomic::AtomicBool;
@@ -21,6 +23,7 @@ pub struct ReceiverPacket {
     raw: Bytes,
     pub clock: PacketClock,
     event: Option<RecoveredEvent>,
+    refusal: Option<Refusal>,
     pub context_canvas: [u16; 2],
     pub receiver_observations: ReceiverObservations,
 }
@@ -29,8 +32,13 @@ impl ReceiverPacket {
     pub fn raw_packet(&self) -> &Bytes {
         &self.raw
     }
+    /// The subtitle the reference returns for this packet.
     pub fn receiver_output(&self) -> Option<&RecoveredEvent> {
         self.event.as_ref()
+    }
+    /// Set when the reference's decode call fails on this packet.
+    pub fn refusal(&self) -> Option<Refusal> {
+        self.refusal
     }
 }
 
@@ -110,13 +118,14 @@ impl ReceiverDecoder {
 // A compile-time role, not a flag that disables selected work in a full output.
 // Its only retained product is the native API's first public event.
 #[derive(Debug)]
-pub(super) struct NativeOnly {
+pub(crate) struct NativeOnly {
     event: Option<RecoveredEvent>,
 }
 
 impl RecoveryRole for NativeOnly {
     type Packet = ReceiverPacket;
     type Eof = ReceiverEof;
+    const BUILDS_IGNORED_DISPLAYS: bool = false;
 
     fn new(_budget: &Budget, limits: DisplayLimits, _config: DisplayConfig) -> Result<Self> {
         limits.validate()?;
@@ -148,22 +157,16 @@ impl RecoveryRole for NativeOnly {
         self.event = None;
         Ok(())
     }
-    fn index_slots(&self) -> Option<usize> {
-        None
-    }
     fn validated_indices(&self, _id: u16, _width: u16, _height: u16) -> Option<(Bytes, Bytes)> {
         None
     }
     fn palette_candidate(&self) -> Option<&PaletteSnapshot> {
         None
     }
-    fn display_already_returned(&self) -> bool {
-        self.event.is_some()
+    fn event_cost(&self) -> Result<usize> {
+        Ok(1)
     }
-    fn event_count(&self) -> Result<usize> {
-        Ok(usize::from(self.event.is_some()))
-    }
-    fn reserve_event(&mut self) -> Result<()> {
+    fn reserve_event(&mut self, _maximum: usize) -> Result<()> {
         Ok(())
     }
     fn store_event(&mut self, event: RecoveredEvent) -> Result<()> {
@@ -179,11 +182,13 @@ impl RecoveryRole for NativeOnly {
         clock: PacketClock,
         context_canvas: [u16; 2],
         receiver_observations: ReceiverObservations,
+        refusal: Option<Refusal>,
     ) -> Result<Self::Packet> {
         Ok(ReceiverPacket {
             raw,
             clock,
             event: self.event.take(),
+            refusal,
             context_canvas,
             receiver_observations,
         })

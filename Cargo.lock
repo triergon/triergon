@@ -56,6 +56,7 @@ dependencies = [
  "triergon-core",
  "triergon-framing",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
@@ -80,6 +81,18 @@ dependencies = [
  "triergon-font",
  "triergon-harness-protocol",
  "triergon-shape",
+]
+
+[[package]]
+name = "subtitle-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon",
+ "triergon-core",
+ "triergon-harness-protocol",
+ "triergon-harness-runner",
+ "triergon-mpegts",
+ "triergon-subtitles",
 ]
 
 [[package]]
@@ -255,6 +268,14 @@ name = "triergon-harness-protocol"
 version = "0.0.0"
 
 [[package]]
+name = "triergon-harness-runner"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-harness-protocol",
+]
+
+[[package]]
 name = "triergon-isobmff"
 version = "0.0.0"
 dependencies = [
@@ -348,6 +369,7 @@ dependencies = [
 name = "triergon-subtitles"
 version = "0.0.0"
 dependencies = [
+ "triergon-bitstream",
  "triergon-core",
  "triergon-harness-protocol",
 ]

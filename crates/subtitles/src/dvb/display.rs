@@ -1,48 +1,27 @@
 //! Complete-packet method-0 DVB service decoder. Format boundaries are explicit;
 //! an input entity End never synthesizes EOD, a clear cue or a codec reset.
 use super::bits::cancelled;
-use super::boundary::{ClockOrigin, ClockValue, PacketTiming, SourceClock, SourceConfiguration};
+use super::boundary::SourceConfiguration;
 use super::display_model::*;
 use super::display_render::Renderer;
 use super::display_state::{DecodeWork, Segment, SegmentResult, State, limit};
-use super::pes_parser::PesPacket;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
 
 #[derive(Debug)]
 struct PendingPacket {
     packet: DvbPacket,
-    native_pes: Option<PesPacket>,
     effective_pts: Option<Time>,
     offset: usize,
     end: usize,
     selected_display_ended: bool,
-    canvas_segments: u8,
 }
 
 impl PendingPacket {
     fn bytes(&self) -> &Bytes {
-        self.native_pes
-            .as_ref()
-            .map_or(&self.packet.payload, PesPacket::codec)
-    }
-
-    fn packet_clock(&self) -> Option<(SourceClock, PacketTiming)> {
-        let facts = self.packet.source.as_ref()?;
-        let mut timing = facts.timing();
-        if let Some(parsed) = &self.native_pes
-            && parsed.codec_pts() != parsed.source_pts()
-        {
-            timing.pts = parsed.codec_pts().map(|ticks| ClockValue {
-                ticks,
-                origin: ClockOrigin::Inferred,
-            });
-        }
-        Some((facts.configuration().clock(), timing))
+        &self.packet.payload
     }
 }
-
-const CANVAS_SEGMENTS: u8 = 0b111;
 
 #[derive(Debug)]
 pub struct Decoder {
@@ -63,9 +42,6 @@ pub struct Decoder {
     total_work: usize,
     input_finished: bool,
     failed: Option<Error>,
-    #[cfg(feature = "reference-trace")]
-    receiver_failure: Option<super::ReceiverFailure>,
-    native_fallback: bool,
 }
 
 impl Decoder {
@@ -116,9 +92,6 @@ impl Decoder {
             total_work: 0,
             input_finished: false,
             failed: None,
-            #[cfg(feature = "reference-trace")]
-            receiver_failure: None,
-            native_fallback: false,
         })
     }
 
@@ -163,64 +136,9 @@ impl Decoder {
         Ok(decoder)
     }
 
-    /// The receiver view is opt-in; `new_configured` stays source-only.
-    pub fn new_configured_with_receiver_view(
-        budget: &Budget,
-        configuration: &SourceConfiguration,
-        generation: u64,
-        limits: DisplayLimits,
-        view: super::ReceiverView,
-        cancel: &AtomicBool,
-    ) -> Result<Self> {
-        let mut decoder = Self::new_configured(budget, configuration, generation, limits, cancel)?;
-        decoder.state.receiver_view = view;
-        Ok(decoder)
-    }
-    /// Receiver view with the selected [`GeometryPolicy`](crate::compat::dvb::GeometryPolicy).
-    /// Both other constructors retain strict bounds validation, including empty
-    /// regions. No source packet is trimmed.
-    pub fn new_configured_with_geometry_policy(
-        budget: &Budget,
-        configuration: &SourceConfiguration,
-        generation: u64,
-        limits: DisplayLimits,
-        policy: super::GeometryPolicy,
-        cancel: &AtomicBool,
-    ) -> Result<Self> {
-        let mut decoder = Self::new_configured_with_receiver_view(
-            budget,
-            configuration,
-            generation,
-            limits,
-            super::ReceiverView::Receiver,
-            cancel,
-        )?;
-        decoder.state.geometry_policy = policy;
-        Ok(decoder)
-    }
-
-    /// The receiver's refusal of the last truncated packet, until reset.
-    /// Comparison-only.
-    #[cfg(feature = "reference-trace")]
-    pub fn receiver_failure(&self) -> Option<super::ReceiverFailure> {
-        self.receiver_failure
-    }
-
     /// Caller keeps its immutable packet on rejection. Whole codec packets are
     /// supplied after core InputCursor/demux validation, not a second I/O window.
     pub fn provide(&mut self, packet: &DvbPacket) -> Result<()> {
-        self.admit(packet, None)
-    }
-
-    /// Decode the codec packet a [`PesParser`](crate::compat::dvb::PesParser)
-    /// projected, retaining the original PES and its source declaration. A
-    /// pass-through keeps the same decoder syntax validation as any other codec
-    /// packet.
-    pub fn provide_pes(&mut self, packet: &DvbPacket, parsed: &PesPacket) -> Result<()> {
-        self.admit(packet, Some(parsed))
-    }
-
-    fn admit(&mut self, packet: &DvbPacket, parsed: Option<&PesPacket>) -> Result<()> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -266,62 +184,33 @@ impl Decoder {
             return Err(Error::Invalid("DVB configured packet source facts absent"));
         }
         limit(packet.payload.len(), self.state.limits.packet_bytes)?;
-        let (offset, end, effective_pts) = if let Some(parsed) = parsed {
-            if self.state.receiver_view != super::ReceiverView::Receiver
-                || packet.envelope != PacketEnvelope::PesDataField
-            {
-                return Err(Error::Unsupported("DVB native PES decoder boundary"));
-            }
-            let facts = packet.source.as_ref().ok_or(Error::SourceMismatch)?;
-            if !std::ptr::eq(packet.payload.as_ref(), parsed.pes().as_ref())
-                || facts.timing().pts.map(|value| value.ticks) != parsed.source_pts()
-            {
-                return Err(Error::SourceMismatch);
-            }
-            if !parsed.codec().belongs_to(&self.state.budget) {
-                return Err(Error::ForeignPool);
-            }
-            limit(parsed.codec().len(), self.state.limits.packet_bytes)?;
-            if parsed.codec().len() <= 6 || parsed.codec().first() != Some(&0x0f) {
-                return Err(Error::Invalid("DVB native codec packet header"));
-            }
-            let pts = parsed
-                .codec_pts()
-                .map(|ticks| Time::from_ticks(ticks, facts.configuration().clock().time_base()))
-                .transpose()?;
-            (0, parsed.codec().len(), pts)
-        } else {
-            let (offset, end) = match packet.envelope {
-                PacketEnvelope::Segments => {
-                    if packet.payload.is_empty() {
-                        return Err(Error::Invalid("DVB empty segment packet"));
-                    }
-                    (0, packet.payload.len())
+        let (offset, end) = match packet.envelope {
+            PacketEnvelope::Segments => {
+                if packet.payload.is_empty() {
+                    return Err(Error::Invalid("DVB empty segment packet"));
                 }
-                PacketEnvelope::PesDataField => {
-                    let bytes = packet.payload.as_ref();
-                    if bytes.len() < 3 {
-                        return Err(Error::Truncated);
-                    }
-                    if bytes[..2] != [0x20, 0] || bytes.last() != Some(&0xff) {
-                        return Err(Error::Invalid("DVB PES data-field envelope"));
-                    }
-                    if bytes.len() == 3 {
-                        return Err(Error::Invalid("DVB empty PES data field"));
-                    }
-                    (2, bytes.len() - 1)
+                (0, packet.payload.len())
+            }
+            PacketEnvelope::PesDataField => {
+                let bytes = packet.payload.as_ref();
+                if bytes.len() < 3 {
+                    return Err(Error::Truncated);
                 }
-            };
-            (offset, end, packet.pts)
+                if bytes[..2] != [0x20, 0] || bytes.last() != Some(&0xff) {
+                    return Err(Error::Invalid("DVB PES data-field envelope"));
+                }
+                if bytes.len() == 3 {
+                    return Err(Error::Invalid("DVB empty PES data field"));
+                }
+                (2, bytes.len() - 1)
+            }
         };
         self.packet = Some(PendingPacket {
             packet: packet.clone(),
-            native_pes: parsed.cloned(),
-            effective_pts,
+            effective_pts: packet.pts,
             offset,
             end,
             selected_display_ended: false,
-            canvas_segments: 0,
         });
         if self.configuration.is_none() {
             self.configuration = packet
@@ -344,21 +233,17 @@ impl Decoder {
 
     /// Logical generation changes require an explicit reset/acquisition. Range
     /// requests and successive source entities must not call this automatically.
-    /// Keep the caller-selected receiver view while discarding stream state.
     pub fn reset(&mut self, generation: u64, cancel: &AtomicBool) -> Result<()> {
         cancelled(cancel)?;
         if generation == self.generation {
             return Err(Error::Invalid("DVB reset requires a new generation"));
         }
-        let mut state = State::new(
+        self.state = State::new(
             &self.state.budget,
             self.state.service,
             self.state.limits,
             self.state.object_retention,
         );
-        state.receiver_view = self.state.receiver_view;
-        state.geometry_policy = self.state.geometry_policy;
-        self.state = state;
         self.generation = generation;
         self.sequence = 0;
         self.last_input_sequence = None;
@@ -374,17 +259,12 @@ impl Decoder {
         self.total_work = 0;
         self.input_finished = false;
         self.failed = None;
-        #[cfg(feature = "reference-trace")]
-        {
-            self.receiver_failure = None;
-        }
-        self.native_fallback = false;
         Ok(())
     }
 
     /// A changed decoding declaration requires an explicit generation reset.
     /// Retained output aliases keep their previous configuration and raw clock.
-    /// Receiver view, limits and object retention remain caller-selected policy.
+    /// Limits and object retention remain caller-selected policy.
     pub fn reset_with_configuration(
         &mut self,
         configuration: &SourceConfiguration,
@@ -395,7 +275,7 @@ impl Decoder {
         if generation == self.generation {
             return Err(Error::Invalid("DVB reset requires a new generation"));
         }
-        let mut next = Self::new_configured_with_object_retention(
+        *self = Self::new_configured_with_object_retention(
             &self.state.budget,
             configuration,
             generation,
@@ -403,9 +283,6 @@ impl Decoder {
             self.state.object_retention,
             cancel,
         )?;
-        next.state.receiver_view = self.state.receiver_view;
-        next.state.geometry_policy = self.state.geometry_policy;
-        *self = next;
         Ok(())
     }
 
@@ -415,16 +292,12 @@ impl Decoder {
         self.segment = None;
         self.renderer = None;
         self.packets = BudgetVec::new(&self.state.budget);
-        let view = self.state.receiver_view;
-        let geometry = self.state.geometry_policy;
         self.state = State::new(
             &self.state.budget,
             self.state.service,
             self.state.limits,
             self.state.object_retention,
         );
-        self.state.receiver_view = view;
-        self.state.geometry_policy = geometry;
     }
 
     fn progress(status: DecodeStatus) -> DisplayProgress {
@@ -466,25 +339,6 @@ impl Decoder {
             .checked_sub(packet.offset)
             .ok_or(Error::Overflow)?;
         if remaining < 6 {
-            if self.state.receiver_view == super::ReceiverView::Receiver {
-                if self.display_started && self.state.acquired {
-                    // Native observations establish publication of the
-                    // complete source prefix before the original tail error.
-                    // The packet and five tail bytes remain owned and intact.
-                    self.native_fallback = true;
-                    self.renderer = Some(Renderer::new(&self.state.budget));
-                    return Ok(true);
-                }
-                #[cfg(feature = "reference-trace")]
-                {
-                    self.receiver_failure = Some(super::ReceiverFailure {
-                        packet_sequence: packet.packet.sequence,
-                        packet_offset: packet.offset,
-                        unconsumed_bytes: remaining,
-                        code: -1094995529, // observed/public AVERROR_INVALIDDATA
-                    });
-                }
-            }
             return Err(Error::Truncated);
         }
         let mut charged = DecodeWork {
@@ -512,7 +366,6 @@ impl Decoder {
             return Err(Error::Truncated);
         }
         if packet.packet.envelope == PacketEnvelope::PesDataField
-            && packet.native_pes.is_none()
             && packet.selected_display_ended
             && page == self.state.service.composition_page
         {
@@ -537,14 +390,6 @@ impl Decoder {
             .as_mut()
             .ok_or(Error::Invalid("DVB packet absent"))?;
         packet.offset = end;
-        if selected && self.state.receiver_view == super::ReceiverView::Receiver {
-            packet.canvas_segments |= match kind {
-                0x10 => 0b001,
-                0x11 => 0b010,
-                0x13 => 0b100,
-                _ => 0,
-            };
-        }
         self.segment = Some(segment);
         self.segments += 1;
         self.header_credit = 0;
@@ -552,15 +397,11 @@ impl Decoder {
     }
 
     fn build_event(&mut self, renderer: Renderer) -> Result<DisplayEvent> {
-        self.establish_default_native_canvas();
         let expiry = self
             .pts
             .map(|time| time.checked_add(Time::new(i128::from(self.state.timeout), 1)?))
             .transpose()?;
-        let has_visible = match self.state.receiver_view {
-            super::ReceiverView::Source => !self.state.visible.is_empty(),
-            super::ReceiverView::Receiver => !renderer.output.is_empty(),
-        };
+        let has_visible = !self.state.visible.is_empty();
         let action = if !has_visible {
             DisplayAction::Clear
         } else if self.state.had_visible {
@@ -571,33 +412,7 @@ impl Decoder {
         self.state.had_visible = has_visible;
         let packets = std::mem::replace(&mut self.packets, BudgetVec::new(&self.state.budget));
         let opaque = std::mem::replace(&mut self.state.opaque, BudgetVec::new(&self.state.budget));
-        let receiver_publication = if self.state.receiver_view == super::ReceiverView::Receiver {
-            self.packet.as_ref().map(|packet| super::Publication {
-                packet_sequence: packet.packet.sequence,
-                consumed_prefix_bytes: packet.offset,
-                reason: if self.native_fallback {
-                    super::PublicationReason::CompletePrefix
-                } else {
-                    super::PublicationReason::EndOfDisplay
-                },
-                packet_clock: packet.packet_clock(),
-                context_canvas: self.state.native_canvas,
-                exact_pts_microseconds: super::receiver::exact_microseconds(self.pts),
-                start_display_ms: 0,
-                end_display_ms: u32::from(self.state.timeout) * 1000,
-            })
-        } else {
-            None
-        };
         let event = DisplayEvent {
-            receiver_view: self.state.receiver_view,
-            receiver_publication,
-            native_pes: self
-                .packet
-                .as_ref()
-                .and_then(|packet| packet.native_pes.clone()),
-            geometry_policy: self.state.geometry_policy,
-            omitted_regions: renderer.omitted,
             service: self.state.service,
             object_retention: self.state.object_retention,
             generation: self.generation,
@@ -618,23 +433,10 @@ impl Decoder {
         self.sequence = self.sequence.checked_add(1).ok_or(Error::Overflow)?;
         self.state.finish_display();
         self.display_started = false;
-        self.native_fallback = false;
         self.pts = None;
         self.segments = 0;
         self.total_work = 0;
         Ok(event)
-    }
-
-    fn establish_default_native_canvas(&mut self) {
-        if self
-            .packet
-            .as_ref()
-            .is_some_and(|p| p.canvas_segments == CANVAS_SEGMENTS)
-        {
-            self.state
-                .native_canvas
-                .get_or_insert_with(|| DisplayDefinition::default().size);
-        }
     }
 
     fn step_inner(
@@ -690,15 +492,6 @@ impl Decoder {
                 continue;
             }
             if self.packet.as_ref().is_some_and(|p| p.offset == p.end) {
-                self.establish_default_native_canvas();
-                if self.state.receiver_view == super::ReceiverView::Receiver
-                    && self.display_started
-                    && self.state.acquired
-                {
-                    self.native_fallback = true;
-                    self.renderer = Some(Renderer::new(&self.state.budget));
-                    continue;
-                }
                 self.packet = None;
             }
             if self.packet.is_none() {

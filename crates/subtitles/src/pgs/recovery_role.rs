@@ -4,10 +4,10 @@ use super::display::StoredDisplayDecoder;
 use super::display_model::{PaletteSnapshot, StoredDisplaySet};
 use super::display_work::DisplayWork;
 use super::indexed_argb::ArgbStorage;
-use super::recovery::{Phase, ReceiverObservations, RecoveredEvent, StoredRecoveredPacket};
-use super::{
-    DisplayConfig, DisplayLimits, DisplayStatus, Envelope, EofBehavior, PacketClock, RecoveryEof,
+use super::recovery::{
+    Phase, ReceiverObservations, RecoveredEvent, Refusal, StoredRecoveredPacket, reserve_amortised,
 };
+use super::{DisplayConfig, DisplayLimits, DisplayStatus, Envelope, PacketClock, RecoveryEof};
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -17,6 +17,9 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 pub trait RecoveryRole: Debug {
     type Packet: Debug;
     type Eof: Copy + Debug;
+    /// Whether the role also builds the displays of later ENDs in a packet,
+    /// which the reference ignores.
+    const BUILDS_IGNORED_DISPLAYS: bool;
 
     fn new(budget: &Budget, limits: DisplayLimits, config: DisplayConfig) -> Result<Self>
     where
@@ -34,12 +37,15 @@ pub trait RecoveryRole: Debug {
     ) -> Result<bool>;
     fn poison(&mut self, error: Error);
     fn reset(&mut self, cancel: &AtomicBool) -> Result<()>;
-    fn index_slots(&self) -> Option<usize>;
+    /// Strict source pixels for an object with this id and size, with the RLE
+    /// they were validated from, when the role shares them.
     fn validated_indices(&self, id: u16, width: u16, height: u16) -> Option<(Bytes, Bytes)>;
     fn palette_candidate(&self) -> Option<&PaletteSnapshot>;
-    fn display_already_returned(&self) -> bool;
-    fn event_count(&self) -> Result<usize>;
-    fn reserve_event(&mut self) -> Result<()>;
+    /// Work to store the next event: one, plus a move of every stored event
+    /// when their storage has to grow.
+    fn event_cost(&self) -> Result<usize>;
+    /// Room for the next event; a packet holds at most `maximum` events.
+    fn reserve_event(&mut self, maximum: usize) -> Result<()>;
     fn store_event(&mut self, event: RecoveredEvent) -> Result<()>;
     fn finish_packet(
         &mut self,
@@ -47,6 +53,7 @@ pub trait RecoveryRole: Debug {
         clock: PacketClock,
         canvas: [u16; 2],
         observations: ReceiverObservations,
+        refusal: Option<Refusal>,
     ) -> Result<Self::Packet>;
     fn finish_input(&mut self, cancel: &AtomicBool) -> Result<()>;
     fn poll_eof(
@@ -86,6 +93,7 @@ impl<A: ArgbStorage> FullRecovery<A> {
 impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
     type Packet = StoredRecoveredPacket<A>;
     type Eof = RecoveryEof;
+    const BUILDS_IGNORED_DISPLAYS: bool = true;
 
     fn new(budget: &Budget, limits: DisplayLimits, config: DisplayConfig) -> Result<Self> {
         Ok(Self {
@@ -241,19 +249,10 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
         Ok(())
     }
 
-    fn index_slots(&self) -> Option<usize> {
-        if A::MATERIALIZE {
-            None
-        } else {
-            Some(
-                self.strict
-                    .as_ref()
-                    .map_or(0, StoredDisplayDecoder::evidence_slots),
-            )
-        }
-    }
-
     fn validated_indices(&self, id: u16, width: u16, height: u16) -> Option<(Bytes, Bytes)> {
+        if A::MATERIALIZE {
+            return None;
+        }
         self.strict
             .as_ref()
             .and_then(|d| d.validated_indices(id, width, height))
@@ -268,23 +267,30 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
             .filter(|_| self.source_error.is_none())
     }
 
-    fn display_already_returned(&self) -> bool {
-        false
-    }
-
-    fn event_count(&self) -> Result<usize> {
-        Ok(self
+    fn event_cost(&self) -> Result<usize> {
+        let events = self
             .events
             .as_ref()
-            .ok_or(Error::Invalid("PGS receiver events absent"))?
-            .len())
+            .ok_or(Error::Invalid("PGS events absent"))?;
+        Ok(if events.len() == events.capacity() {
+            events.len() + 1
+        } else {
+            1
+        })
     }
 
-    fn reserve_event(&mut self) -> Result<()> {
-        self.events
+    fn reserve_event(&mut self, maximum: usize) -> Result<()> {
+        let events = self
+            .events
             .as_mut()
-            .ok_or(Error::Invalid("PGS events absent"))?
-            .try_reserve_exact(1)
+            .ok_or(Error::Invalid("PGS events absent"))?;
+        if events.len() >= maximum {
+            return Err(Error::Limit {
+                requested: events.len() + 1,
+                maximum,
+            });
+        }
+        reserve_amortised(events, 1, maximum)
     }
 
     fn store_event(&mut self, event: RecoveredEvent) -> Result<()> {
@@ -301,8 +307,10 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
         clock: PacketClock,
         context_canvas: [u16; 2],
         receiver_observations: ReceiverObservations,
+        refusal: Option<Refusal>,
     ) -> Result<Self::Packet> {
         Ok(StoredRecoveredPacket {
+            refusal,
             raw,
             clock,
             source_sets: self
@@ -354,8 +362,6 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
         if self.source_error.is_some() {
             return Ok(Some(RecoveryEof {
                 source_error: self.source_error,
-                receiver_error: None,
-                behavior: EofBehavior::NoDelayedSubtitle,
             }));
         }
         let cancel = work.cancel;
@@ -367,13 +373,11 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
         });
         match result {
             Ok(DisplayStatus::Yield) => Ok(None),
-            Ok(DisplayStatus::Ended) => Ok(Some(RecoveryEof::from_source_finalization(None))),
+            Ok(DisplayStatus::Ended) => Ok(Some(RecoveryEof { source_error: None })),
             Err(error @ (Error::Truncated | Error::Invalid(_) | Error::Unsupported(_))) => {
                 self.source_error = Some(error);
                 Ok(Some(RecoveryEof {
                     source_error: Some(error),
-                    receiver_error: None,
-                    behavior: EofBehavior::NoDelayedSubtitle,
                 }))
             }
             Err(error) => Err(error),

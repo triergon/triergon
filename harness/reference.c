@@ -20,7 +20,9 @@
  *                                 (TRIERGON_FEED_REFERENCE), HLS segment, MP4
  *                                 range, MP4 forward, TS program and raw Annex B
  *                                 (TRIERGON_HLS_REFERENCE) and combined-encoding
- *                                 (TRIERGON_COMBINED_REFERENCE) variants. */
+ *                                 (TRIERGON_COMBINED_REFERENCE) variants, and
+ *                                 the subtitle decoders (TRIERGON_SUBTITLE_REFERENCE,
+ *                                 reference_subtitles.h). */
 #if defined(TRIERGON_DECODE_REFERENCE)
 #include "reference_decode.h"
 #elif defined(TRIERGON_CAPTURE_REFERENCE)
@@ -230,6 +232,9 @@ static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t)
 #include "reference_raw_video.h"
 #include "reference_ts.h"
 #endif
+#ifdef TRIERGON_SUBTITLE_REFERENCE
+#include "reference_subtitles.h"
+#endif
 int main(int argc,char **argv){
     av_log_set_level(AV_LOG_ERROR);
     if(argc<3)return 2;
@@ -242,6 +247,9 @@ int main(int argc,char **argv){
         printf("}\n");return 0;}
 #ifdef TRIERGON_HLS_REFERENCE
     if(!strncmp(argv[1],"progressive-",12))return progressive_main(argc,argv);
+#endif
+#ifdef TRIERGON_SUBTITLE_REFERENCE
+    if(!strncmp(argv[1],"sub-",4))return sub_main(argc,argv);
 #endif
     FILE *file=fopen(argv[2],"rb");if(!file)return 2;
     if(fseek(file,0,SEEK_END)||ftell(file)<0){fclose(file);return 2;}

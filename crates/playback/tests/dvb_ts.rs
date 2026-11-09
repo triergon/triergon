@@ -1,33 +1,123 @@
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, Time, WorkBudget};
+use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_mpegts::{
     PacketFormat, ParseLimits, TraceEvent,
     clock::SourceTimePolicy,
     psi::{DescriptorNamespace, DvbNamespaceEvidence, PsiCrc32},
 };
 use triergon_playback::{
-    ByteSource, Engine, Player, PlayerPolicy, Progress, RawEvent, Selection, TsEvent,
-    dvb_ts::{DvbQueueAction, DvbServiceSelection, DvbTsBridge},
+    ByteSource, Engine, Output, Player, PlayerPolicy, Progress, RawEvent, Selection, TsEvent,
+    dvb_ts::{DvbQueueAction, DvbServiceSelection, DvbStep, DvbTsBridge},
     io::SourceOwner,
 };
-use triergon_subtitles::compat::dvb::PublicationReason;
-use triergon_subtitles::dvb::{
-    ClockOrigin, ClockValue, DecodeStatus, DisplayAction, DisplayLimits, ReceiverView, Size,
-};
+use triergon_subtitles::dvb::Size;
+
+const PACKET_LIMIT: usize = 1 << 20;
+
+/// A player over `source` and its outputs: the active PMT and the PES packets.
+fn play(
+    budget: &Budget,
+    source: &[u8],
+    read: usize,
+    policy: SourceTimePolicy,
+) -> (Player<ByteSource>, Option<Output>, Vec<Output>) {
+    let id = SourceId(331);
+    let input = InputCursor::new(
+        budget,
+        id,
+        SourceCapabilities {
+            length: Some(source.len() as u64),
+            random_access: true,
+        },
+        4096,
+    )
+    .unwrap();
+    let engine = Engine::ts_with_namespace(
+        input,
+        PacketFormat::Ts188,
+        1,
+        ParseLimits::default(),
+        policy,
+        DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile),
+    )
+    .unwrap();
+    let source =
+        ByteSource::new(id, Bytes::copy_from_slice(budget, source).unwrap(), read).unwrap();
+    let mut player = Player::new(
+        engine,
+        SourceOwner::new(source),
+        Selection::All,
+        PlayerPolicy::default(),
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    let (mut map, mut pes) = (None, Vec::new());
+    for _ in 0..100_000 {
+        let state = player.advance(&mut WorkBudget::new(17), &cancel).unwrap();
+        while let Some(output) = player.pop() {
+            match output.event() {
+                RawEvent::Ts(TsEvent {
+                    source: TraceEvent::ProgramMap { active: true, .. },
+                    ..
+                }) => map = Some(output),
+                RawEvent::Ts(TsEvent {
+                    source: TraceEvent::Pes(_),
+                    ..
+                }) => pes.push(output),
+                _ => {}
+            }
+        }
+        if matches!(state, Progress::Ended) {
+            break;
+        }
+    }
+    (player, map, pes)
+}
+
+/// What one PES produced, polled one work unit at a time.
+enum Seen {
+    Show {
+        start_ns: i64,
+        canvas: Option<Size>,
+        pixels: Vec<u8>,
+    },
+    Clear(i64),
+    Nothing,
+}
+
+fn decode(bridge: &mut DvbTsBridge, pes: Output) -> Seen {
+    let cancel = AtomicBool::new(false);
+    assert!(bridge.push(&mut Some(pes)).unwrap());
+    for polls in 0..100_000 {
+        match bridge.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
+            DvbStep::Yield => {}
+            DvbStep::NeedPacket => return Seen::Nothing,
+            DvbStep::Action(DvbQueueAction::Clear { at_ns }) => return Seen::Clear(at_ns),
+            DvbStep::Action(DvbQueueAction::Show(picture)) => {
+                let pixels = picture.rectangles().next().unwrap().pixels.to_vec();
+                // The decoder's work, at least a unit per region pixel, was
+                // spread over the polls.
+                assert!(polls >= pixels.len(), "{polls} polls");
+                return Seen::Show {
+                    start_ns: picture.start_ns,
+                    canvas: picture.canvas,
+                    pixels,
+                };
+            }
+            DvbStep::Finished => panic!("finished before the pushed PES"),
+        }
+    }
+    panic!("bounded PES decode")
+}
 
 #[test]
-fn selected_ts_service_reaches_the_dvb_renderer_with_source_bytes_and_clocks() {
+fn selected_ts_service_reaches_the_bitmap_queue() {
     let source = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.ts");
     let split = split_pes(source);
-    let (multiple, selected_descriptor) = multiple_services(source);
-    let pes = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.pes-data");
+    let (multiple, _) = multiple_services(source);
     let indices =
         include_bytes!("../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices");
-    let truncated_source = include_bytes!("../../mpegts/tests/data/dvb/dvb-truncated-segment.ts");
-    let truncated_pes =
-        include_bytes!("../../mpegts/tests/data/dvb/dvb-truncated-segment.pes-data");
-    let truncated_codec =
-        include_bytes!("../../subtitles/tests/native-dvb-fixtures/input/prefix101.dvb");
+    let truncated = include_bytes!("../../mpegts/tests/data/dvb/dvb-truncated-segment.ts");
     let empty_page = [
         0x20, 0x00, // PES data identifier and subtitle stream id
         0x0f, 0x10, 0, 1, 0, 2, 2, 0x0b, // acquisition page with no regions
@@ -35,304 +125,83 @@ fn selected_ts_service_reaches_the_dvb_renderer_with_source_bytes_and_clocks() {
         0xff,
     ];
     let clear = replace_pes_data(source, &empty_page);
+    let relative = SourceTimePolicy::RelativeEpochZero;
+    let selected = DvbServiceSelection {
+        descriptor: 1,
+        entry: 1,
+    };
     let cancel = AtomicBool::new(false);
-    let id = SourceId(331);
-    let cases = [
-        (
-            source.as_slice(),
-            1,
-            37,
-            SourceTimePolicy::RelativeEpochZero,
-            Some(Time::new(1, 1).unwrap()),
-            None,
-        ),
-        (&split, 2, 4096, SourceTimePolicy::Unanchored, None, None),
-        (
-            &multiple,
-            1,
-            37,
-            SourceTimePolicy::RelativeEpochZero,
-            Some(Time::new(1, 1).unwrap()),
-            Some(DvbServiceSelection {
-                descriptor: 1,
-                entry: 1,
-            }),
-        ),
-    ];
-    let clear_case = (
-        clear.as_slice(),
-        1,
-        37,
-        SourceTimePolicy::RelativeEpochZero,
-        Some(Time::new(1, 1).unwrap()),
-        None,
-    );
-    let truncated_case = (
-        truncated_source.as_slice(),
-        1,
-        37,
-        SourceTimePolicy::RelativeEpochZero,
-        Some(Time::new(1, 1).unwrap()),
-        None,
-    );
-    for ((source, spans, read, policy, time, service), view, expected_pes, expected_codec) in cases
-        .into_iter()
-        .flat_map(|case| {
-            [ReceiverView::Source, ReceiverView::Receiver]
-                .map(|view| (case, view, pes.as_slice(), None))
-        })
-        .chain([
-            (
-                clear_case,
-                ReceiverView::Receiver,
-                empty_page.as_slice(),
-                None,
-            ),
-            (
-                cases[0],
-                ReceiverView::Receiver,
-                pes.as_slice(),
-                Some(&pes[2..pes.len() - 1]),
-            ),
-            (
-                truncated_case,
-                ReceiverView::Receiver,
-                truncated_pes.as_slice(),
-                Some(truncated_codec.as_slice()),
-            ),
-        ])
-    {
+    for (source, read, policy, service, show) in [
+        (source.as_slice(), 37, relative, None, true),
+        (&split, 4096, SourceTimePolicy::Unanchored, None, true),
+        (&multiple, 37, relative, Some(selected), true),
+        (truncated.as_slice(), 37, relative, None, true),
+        (&clear, 37, relative, None, false),
+    ] {
         let budget = Budget::new(16 * 1024 * 1024).unwrap();
-        let input = InputCursor::new(
-            &budget,
-            id,
-            SourceCapabilities {
-                length: Some(source.len() as u64),
-                random_access: true,
-            },
-            4096,
-        )
-        .unwrap();
-        let engine = Engine::ts_with_namespace(
-            input,
-            PacketFormat::Ts188,
-            1,
-            ParseLimits::default(),
-            policy,
-            DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile),
-        )
-        .unwrap();
-        let source =
-            ByteSource::new(id, Bytes::copy_from_slice(&budget, source).unwrap(), read).unwrap();
-        let mut player = Player::new(
-            engine,
-            SourceOwner::new(source),
-            Selection::All,
-            PlayerPolicy::default(),
-        )
-        .unwrap();
-        let mut bridge = None;
-        let mut mailbox = None;
-        let mut backing = None;
-        let mut descriptor_backing = None;
-        for _ in 0..100_000 {
-            let state = player.advance(&mut WorkBudget::new(17), &cancel).unwrap();
-            while let Some(output) = player.pop() {
-                match output.event() {
-                    RawEvent::Ts(TsEvent {
-                        source:
-                            TraceEvent::ProgramMap {
-                                active: true, map, ..
-                            },
-                        ..
-                    }) => {
-                        descriptor_backing =
-                            Some(map.streams.as_slice()[0].descriptor_bytes.clone());
-                        let limits = DisplayLimits::default();
-                        let bridge_for = |service| {
-                            DvbTsBridge::new_for_service(
-                                &output, 256, service, limits, view, &cancel,
-                            )
-                        };
-                        bridge = Some(if expected_codec.is_some() {
-                            DvbTsBridge::new_with_native_pes_parser(
-                                &output, 256, service, limits, &cancel,
-                            )
-                            .unwrap()
-                        } else if let Some(service) = service {
-                            assert!(DvbTsBridge::new(&output, 256, limits, view, &cancel).is_err());
-                            assert!(
-                                bridge_for(DvbServiceSelection {
-                                    descriptor: 2,
-                                    entry: 0
-                                })
-                                .is_err()
-                            );
-                            assert!(
-                                bridge_for(DvbServiceSelection {
-                                    descriptor: 1,
-                                    entry: 2
-                                })
-                                .is_err()
-                            );
-                            bridge_for(service).unwrap()
-                        } else {
-                            DvbTsBridge::new(&output, 256, limits, view, &cancel).unwrap()
-                        });
-                    }
-                    RawEvent::Ts(TsEvent {
-                        source: TraceEvent::Pes(packet),
-                        ..
-                    }) => {
-                        assert_eq!(packet.spans().len(), spans);
-                        backing = Some(packet.spans()[0].backing_bytes().clone());
-                        assert!(mailbox.replace(output).is_none());
-                    }
-                    _ => {}
+        let (player, map, mut pes) = play(&budget, source, read, policy);
+        let map = map.expect("active DVB PMT");
+        let mut bridge = match service {
+            Some(service) => {
+                assert!(DvbTsBridge::new(&map, 256, PACKET_LIMIT, &cancel).is_err());
+                for wrong in [
+                    DvbServiceSelection {
+                        descriptor: 2,
+                        entry: 0,
+                    },
+                    DvbServiceSelection {
+                        descriptor: 1,
+                        entry: 2,
+                    },
+                ] {
+                    assert!(
+                        DvbTsBridge::new_for_service(&map, 256, wrong, PACKET_LIMIT, &cancel)
+                            .is_err()
+                    );
                 }
+                DvbTsBridge::new_for_service(&map, 256, service, PACKET_LIMIT, &cancel).unwrap()
             }
-            if matches!(state, Progress::Ended) {
-                break;
-            }
-        }
-        let mut bridge = bridge.expect("active DVB PMT");
-        assert!(bridge.push(&mut mailbox).unwrap());
-        assert!(mailbox.is_none());
+            None => DvbTsBridge::new(&map, 256, PACKET_LIMIT, &cancel).unwrap(),
+        };
         assert_eq!(
-            bridge
-                .poll(&mut WorkBudget::new(0), &cancel)
-                .unwrap()
-                .status,
-            DecodeStatus::Yield,
+            bridge.configuration().language_bytes(),
+            Some(b"eng".as_slice())
         );
-        bridge.finish_input();
-        let mut seen = 0;
-        let mut finished = false;
-        for _ in 0..100_000 {
-            let next = bridge.poll(&mut WorkBudget::new(1), &cancel).unwrap();
-            match next.status {
-                DecodeStatus::Yield => {}
-                DecodeStatus::Event => {
-                    let mut event = next.event.unwrap();
-                    assert_eq!(event.pts, time);
-                    let packet = &event.source_packets()[0];
-                    assert_eq!(packet.payload.as_ref(), expected_pes);
-                    assert_eq!(
-                        packet
-                            .payload
-                            .shares_storage_with(backing.as_ref().unwrap()),
-                        spans == 1,
-                    );
-                    let facts = packet.source.as_ref().unwrap();
-                    assert_eq!(
-                        facts.configuration().language_bytes(),
-                        Some(b"eng".as_slice())
-                    );
-                    let descriptor = facts.configuration().original();
-                    assert!(descriptor.shares_storage_with(descriptor_backing.as_ref().unwrap()));
-                    if service.is_some() {
-                        assert_eq!(descriptor.as_ref(), &selected_descriptor);
-                    }
-                    assert_eq!(facts.container_position().unwrap().source, id);
-                    assert_eq!(
-                        facts.timing().pts.map(|pts| pts.ticks),
-                        time.map(|_| 90_000)
-                    );
-                    assert!(facts.timing().dts.is_none());
-                    if let Some(codec) = expected_codec {
-                        let parsed = event.pes_packet().unwrap();
-                        assert_eq!(parsed.codec().as_ref(), codec);
-                        assert!(parsed.pes().shares_storage_with(&packet.payload));
-                        assert!(parsed.codec().shares_storage_with(&packet.payload));
-                        assert_eq!(parsed.codec_pts(), Some(90_000));
-                        let publication = event.receiver_publication.unwrap();
-                        assert_eq!(publication.consumed_prefix_bytes, codec.len());
-                        if expected_pes == truncated_pes {
-                            assert_eq!(publication.reason, PublicationReason::CompletePrefix);
-                            let Some(DvbQueueAction::Show(picture)) =
-                                bridge.packet_clock_action(&event).unwrap()
-                            else {
-                                panic!("expected native picture from the complete PES prefix");
-                            };
-                            assert_eq!(picture.start_ns, 1_000_000_000);
-                            assert!(picture.rectangles().next().is_some());
-                            seen += 1;
-                            continue;
-                        }
-                    } else {
-                        assert!(event.pes_packet().is_none());
-                    }
-                    if expected_pes == empty_page {
-                        assert_eq!(event.action, DisplayAction::Clear);
-                        assert!(event.regions().is_empty());
-                        assert!(matches!(
-                            bridge.packet_clock_action(&event).unwrap(),
-                            Some(DvbQueueAction::Clear {
-                                at_ns: 1_000_000_000
-                            })
-                        ));
-                        seen += 1;
-                        continue;
-                    }
-                    assert_eq!(event.action, DisplayAction::Present);
-                    assert_eq!(event.regions()[0].plane.pixels.as_ref(), indices);
-                    if view == ReceiverView::Receiver {
-                        let Some(DvbQueueAction::Show(picture)) =
-                            bridge.packet_clock_action(&event).unwrap()
-                        else {
-                            panic!("expected native queue picture");
-                        };
-                        assert_eq!(picture.start_ns, time.map_or(0, |_| 1_000_000_000));
-                        assert_eq!(
-                            picture.canvas,
-                            Some(Size {
-                                width: 1024,
-                                height: 768
-                            })
-                        );
-                        let region = picture.rectangles().next().unwrap();
-                        assert!(std::ptr::eq(region, &raw const event.regions()[0]));
-                        assert_eq!(region.plane.pixels.as_ref(), indices);
-                        assert!(region.palette.receiver.is_some());
-                        let (_, timing) = event
-                            .receiver_publication
-                            .as_mut()
-                            .unwrap()
-                            .packet_clock
-                            .as_mut()
-                            .unwrap();
-                        timing.dts = Some(ClockValue {
-                            ticks: -45_001,
-                            origin: ClockOrigin::Source,
-                        });
-                        timing.pts = None;
-                        let Some(DvbQueueAction::Show(picture)) =
-                            bridge.packet_clock_action(&event).unwrap()
-                        else {
-                            panic!("expected native queue picture with DTS");
-                        };
-                        assert_eq!(picture.start_ns, -500_011_111);
-                    } else {
-                        assert!(matches!(
-                            bridge.packet_clock_action(&event),
-                            Err(triergon_core::Error::Unsupported(_))
-                        ));
-                    }
-                    seen += 1;
+        assert_eq!(pes.len(), 1);
+        let unanchored = policy == SourceTimePolicy::Unanchored;
+        match decode(&mut bridge, pes.remove(0)) {
+            Seen::Show {
+                start_ns,
+                canvas,
+                pixels,
+            } => {
+                assert!(show);
+                assert_eq!(start_ns, if unanchored { 0 } else { 1_000_000_000 });
+                assert_eq!(
+                    canvas,
+                    Some(Size {
+                        width: 1024,
+                        height: 768
+                    })
+                );
+                if source != truncated.as_slice() {
+                    assert_eq!(pixels, indices);
                 }
-                DecodeStatus::Finished => {
-                    finished = true;
-                    break;
-                }
-                other => panic!("unexpected DVB output {other:?}"),
             }
+            Seen::Clear(at_ns) => {
+                assert!(!show);
+                assert_eq!(at_ns, 1_000_000_000);
+            }
+            Seen::Nothing => panic!("no subtitle"),
         }
-        assert!(finished);
-        assert_eq!(seen, 1);
+        bridge.finish_input();
+        assert!(matches!(
+            bridge.poll(&mut WorkBudget::new(1), &cancel).unwrap(),
+            DvbStep::Finished
+        ));
         drop(bridge);
+        drop(map);
         drop(player);
-        drop(backing);
-        drop(descriptor_backing);
         assert_eq!(budget.used(), Budget::control_storage_bytes());
     }
 }
@@ -407,132 +276,136 @@ fn multiple_services(source: &[u8; 1504]) -> ([u8; 1504], [u8; 18]) {
 }
 
 #[test]
-fn native_ts_decoder_accepts_a_continuation_after_a_rejected_or_partial_pes() {
-    use triergon_core::Error;
-
+fn ts_bridge_accepts_a_continuation_after_a_refused_or_partial_pes() {
     let template = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.ts");
     let pes = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.pes-data");
     let indices =
         include_bytes!("../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices");
     let cancel = AtomicBool::new(false);
-    for (cut, prefix) in [(4, 0), (25, 11)] {
+    for cut in [4, 25] {
         let source = pes_continuation(template, pes, cut);
         let pool = Budget::new(16 * 1024 * 1024).unwrap();
-        let id = SourceId(201);
-        let input = InputCursor::new(
-            &pool,
-            id,
-            SourceCapabilities {
-                length: Some(source.len() as u64),
-                random_access: true,
-            },
-            4096,
-        )
-        .unwrap();
-        let engine = Engine::ts_with_namespace(
-            input,
-            PacketFormat::Ts188,
-            1,
-            ParseLimits::default(),
-            SourceTimePolicy::RelativeEpochZero,
-            DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile),
-        )
-        .unwrap();
-        let owner =
-            ByteSource::new(id, Bytes::copy_from_slice(&pool, &source).unwrap(), 23).unwrap();
-        let mut player = Player::new(
-            engine,
-            SourceOwner::new(owner),
-            Selection::All,
-            PlayerPolicy::default(),
-        )
-        .unwrap();
-        let mut bridge = None;
-        let mut inputs = Vec::new();
-        for _ in 0..100_000 {
-            let progress = player.advance(&mut WorkBudget::new(17), &cancel).unwrap();
-            while let Some(output) = player.pop() {
-                match output.event() {
-                    RawEvent::Ts(TsEvent {
-                        source: TraceEvent::ProgramMap { active: true, .. },
-                        ..
-                    }) => {
-                        bridge = Some(
-                            DvbTsBridge::new_with_native_pes_parser(
-                                &output,
-                                256,
-                                None,
-                                DisplayLimits::default(),
-                                &cancel,
-                            )
-                            .unwrap(),
-                        );
-                    }
-                    RawEvent::Ts(TsEvent {
-                        source: TraceEvent::Pes(_),
-                        ..
-                    }) => inputs.push(output),
-                    _ => {}
-                }
-            }
-            if matches!(progress, Progress::Ended) {
-                break;
-            }
-        }
+        let (_player, map, inputs) = play(&pool, &source, 23, SourceTimePolicy::RelativeEpochZero);
+        let mut bridge = DvbTsBridge::new(&map.unwrap(), 256, PACKET_LIMIT, &cancel).unwrap();
         assert_eq!(inputs.len(), 2);
-        let mut bridge = bridge.unwrap();
-        let mut seen = 0;
-        for (index, input) in inputs.into_iter().enumerate() {
-            assert!(bridge.push(&mut Some(input)).unwrap());
-            for _ in 0..100_000 {
-                match bridge.poll(&mut WorkBudget::new(1), &cancel) {
-                    Err(Error::Invalid("DVB native codec packet header")) => {
-                        assert_eq!((prefix, index), (0, 0));
-                        let rejected = bridge.take_rejected_native_pes().unwrap();
-                        assert_eq!(rejected.pes().as_ref(), &pes[..cut]);
-                        assert_eq!(rejected.codec().as_ref(), &pes[..cut]);
-                        break;
-                    }
-                    Err(error) => panic!("unexpected native DVB error {error:?}"),
-                    Ok(next) => match next.status {
-                        DecodeStatus::Yield => continue,
-                        DecodeStatus::NeedPacket => break,
-                        DecodeStatus::Event => {
-                            assert_eq!(index, 1);
-                            let event = next.event.unwrap();
-                            let parsed = event.pes_packet().unwrap();
-                            assert_eq!(parsed.source_pts(), None);
-                            assert_eq!(parsed.codec_pts(), Some(90_000));
-                            assert_eq!(parsed.pes().as_ref(), &pes[cut..]);
-                            assert_eq!(parsed.codec().as_ref(), &pes[2 + prefix..pes.len() - 1]);
-                            assert_eq!(
-                                parsed.prior_tail().unwrap().as_ref(),
-                                &pes[2 + prefix..cut]
-                            );
-                            let Some(DvbQueueAction::Show(picture)) =
-                                bridge.packet_clock_action(&event).unwrap()
-                            else {
-                                panic!("expected a bitmap after the continuation");
-                            };
-                            assert_eq!(picture.start_ns, 1_000_000_000);
-                            let region = picture.rectangles().next().unwrap();
-                            assert_eq!(region.plane.pixels.as_ref(), indices);
-                            seen += 1;
-                        }
-                        other => panic!("unexpected native DVB progress {other:?}"),
-                    },
+        let mut shown = 0;
+        for input in inputs {
+            match decode(&mut bridge, input) {
+                Seen::Show {
+                    start_ns, pixels, ..
+                } => {
+                    assert_eq!(start_ns, 1_000_000_000);
+                    assert_eq!(pixels, indices);
+                    shown += 1;
                 }
+                Seen::Nothing => {}
+                Seen::Clear(_) => panic!("unexpected clear"),
             }
         }
-        assert_eq!(seen, 1);
+        assert_eq!(shown, 1);
         bridge.finish_input();
-        assert_eq!(
-            bridge
-                .poll(&mut WorkBudget::new(1), &cancel)
-                .unwrap()
-                .status,
-            DecodeStatus::Finished,
-        );
+        assert!(matches!(
+            bridge.poll(&mut WorkBudget::new(1), &cancel).unwrap(),
+            DvbStep::Finished
+        ));
+    }
+}
+
+/// A PES the pool cannot hold, at whatever point it runs short, waits in the
+/// bridge and is decoded once the pool has room.
+#[test]
+fn ts_bridge_retries_a_pes_refused_for_memory() {
+    let source = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.ts");
+    let indices =
+        include_bytes!("../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices");
+    let cancel = AtomicBool::new(false);
+    let mut refusals = 0;
+    for room in (0..8192).step_by(64) {
+        let pool = Budget::new(16 * 1024 * 1024).unwrap();
+        let (_player, map, mut inputs) =
+            play(&pool, source, 37, SourceTimePolicy::RelativeEpochZero);
+        let mut bridge = DvbTsBridge::new(&map.unwrap(), 256, PACKET_LIMIT, &cancel).unwrap();
+        assert!(bridge.push(&mut Some(inputs.remove(0))).unwrap());
+        let taken = pool.reserve(pool.available() - room).unwrap();
+        let mut taken = Some(taken);
+        let pixels = loop {
+            match bridge.poll(&mut WorkBudget::new(u64::MAX), &cancel) {
+                Ok(DvbStep::Action(DvbQueueAction::Show(picture))) => {
+                    break picture.rectangles().next().unwrap().pixels.to_vec();
+                }
+                Ok(DvbStep::Yield) => {}
+                Err(triergon_core::Error::Backpressure { .. }) => {
+                    assert!(taken.take().is_some(), "refused with room, at {room}");
+                    refusals += 1;
+                }
+                other => panic!("{other:?} at {room}"),
+            }
+        };
+        assert_eq!(pixels, indices);
+    }
+    assert!(refusals > 1);
+}
+
+/// A PES whose regions the pool could never hold is refused with `Limit` and
+/// dropped, and the bridge decodes the next one.
+#[test]
+fn ts_bridge_drops_a_pes_larger_than_its_pool() {
+    const TS: usize = 188;
+    let source = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.ts");
+    let pes = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.pes-data");
+    let indices =
+        include_bytes!("../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices");
+    let page = [pes[4], pes[5]];
+    let segment = |kind: u8, body: &[u8]| {
+        let mut bytes = vec![0x0f, kind, page[0], page[1]];
+        bytes.extend((body.len() as u16).to_be_bytes());
+        bytes.extend(body);
+        bytes
+    };
+    // A page placing region 0, a 1280 x 1024 4-bit region, and the end.
+    let mut data = vec![0x20, 0x00];
+    data.extend(segment(0x10, &[5, 0x0b, 0, 0, 0, 0, 0, 0]));
+    data.extend(segment(0x11, &[0, 0, 5, 0, 4, 0, 2 << 5 | 2 << 2, 0, 0, 0]));
+    data.extend(segment(0x80, &[]));
+    data.push(0xff);
+    let mut large = replace_pes_data(source, &data);
+    // An earlier time, 128 ticks before: a PES with the same time continues
+    // the one before.
+    let packet = &mut large[2 * TS..3 * TS];
+    let start = packet
+        .windows(4)
+        .position(|w| w == [0, 0, 1, 0xbd])
+        .unwrap();
+    packet[start + 12] -= 1;
+    // The large PES, then the original with the next continuity counter.
+    let mut next = source[2 * TS..3 * TS].to_vec();
+    next[3] = next[3] & 0xf0 | (next[3] + 1) & 0x0f;
+    let two = [
+        &source[..2 * TS],
+        &large[2 * TS..3 * TS],
+        &next,
+        &source[3 * TS..],
+    ]
+    .concat();
+    let cancel = AtomicBool::new(false);
+    let pool = Budget::new(1 << 20).unwrap();
+    let (_player, map, mut inputs) = play(&pool, &two, 37, SourceTimePolicy::RelativeEpochZero);
+    let mut bridge = DvbTsBridge::new(&map.unwrap(), 256, PACKET_LIMIT, &cancel).unwrap();
+    assert_eq!(inputs.len(), 2);
+    assert!(bridge.push(&mut Some(inputs.remove(0))).unwrap());
+    let mut refused = false;
+    loop {
+        match bridge.poll(&mut WorkBudget::new(u64::MAX), &cancel) {
+            Ok(DvbStep::Yield) => {}
+            Err(triergon_core::Error::Limit { .. }) => refused = true,
+            Ok(DvbStep::NeedPacket) => break,
+            other => panic!("{other:?}"),
+        }
+    }
+    assert!(refused);
+    match decode(&mut bridge, inputs.remove(0)) {
+        Seen::Show { pixels, .. } => assert_eq!(pixels, indices),
+        _ => panic!("the next PES presents nothing"),
     }
 }
 

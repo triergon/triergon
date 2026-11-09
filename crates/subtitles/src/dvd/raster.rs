@@ -1,6 +1,6 @@
 use super::{DvdArea, DvdPacket, FieldOffsets};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, BytesWriter, Error, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
 #[derive(Clone, Copy, Debug)]
 pub struct DvdRasterLimits {
@@ -25,7 +25,6 @@ pub struct DvdBitmap {
     pub width: u16,
     pub height: u16,
     pixels: Bytes,
-    index_upper_bound: u8,
 }
 
 impl DvdBitmap {
@@ -58,20 +57,11 @@ impl DvdBitmap {
             width,
             height,
             pixels,
-            index_upper_bound: u8::MAX,
         })
     }
 
     pub fn pixels(&self) -> &Bytes {
         &self.pixels
-    }
-
-    pub(super) fn into_pixels(self) -> Bytes {
-        self.pixels
-    }
-
-    pub(super) fn index_upper_bound(&self) -> u8 {
-        self.index_upper_bound
     }
 }
 
@@ -91,12 +81,6 @@ enum State {
     Finished,
 }
 
-#[derive(Debug)]
-enum RasterPixels {
-    Fresh(BudgetVec<u8>),
-    Reused(BytesWriter),
-}
-
 /// Two independently positioned field streams are expanded directly into one
 /// row-major output. Each pixel is written once; no full-plane zero fill or
 /// second interlace buffer is needed. A partial code/run survives every yield.
@@ -106,11 +90,10 @@ pub struct DvdRasterJob {
     decode: RasterDecode,
 }
 
-// The traditional receiver can borrow its control program's immutable SPU
-// for each poll. The public raster job owns the input for standalone use.
+/// The decode state; the job lends it the packet on each poll.
 #[derive(Debug)]
-pub(super) struct RasterDecode {
-    pixels: Option<RasterPixels>,
+struct RasterDecode {
+    pixels: Option<BudgetVec<u8>>,
     area: DvdArea,
     width: u16,
     height: u16,
@@ -139,15 +122,7 @@ impl DvdRasterJob {
         }
         let control_offset = DvdPacket::parse(&packet)?.control_offset();
         let dimensions = area.dimensions()?;
-        let decode = RasterDecode::new(
-            area,
-            fields,
-            dimensions,
-            budget,
-            limits,
-            None,
-            control_offset,
-        )?;
+        let decode = RasterDecode::new(area, fields, dimensions, budget, limits, control_offset)?;
         Ok(Self {
             packet: Some(packet),
             decode,
@@ -182,13 +157,12 @@ impl DvdRasterJob {
 }
 
 impl RasterDecode {
-    pub(super) fn new(
+    fn new(
         area: DvdArea,
         fields: FieldOffsets,
         dimensions: (u16, u16),
         budget: &Budget,
         limits: DvdRasterLimits,
-        storage: Option<BytesWriter>,
         control_offset: usize,
     ) -> Result<Self> {
         let bound = control_offset.checked_mul(2).ok_or(Error::Overflow)?;
@@ -223,12 +197,8 @@ impl RasterDecode {
                 return Err(Error::Invalid("DVD field offset outside pixel data"));
             }
         }
-        let pixels = match storage {
-            Some(writer) if writer.capacity() >= count => RasterPixels::Reused(writer),
-            _ => RasterPixels::Fresh(BudgetVec::new(budget)),
-        };
         Ok(Self {
-            pixels: Some(pixels),
+            pixels: Some(BudgetVec::new(budget)),
             area,
             width,
             height,
@@ -296,47 +266,6 @@ impl RasterDecode {
         }
     }
 
-    /// Process one row from each interlaced field when both aligned tokens
-    /// describe complete rows. Partial runs and small work budgets use the
-    /// regular decoder, including its precise limit and error reporting.
-    fn paired_rows(&mut self, packet: &[u8], work: &mut WorkBudget) -> Result<bool> {
-        if self.column != 0 || self.height - self.row < 2 {
-            return Ok(false);
-        }
-        let Some(RasterPixels::Reused(writer)) = self.pixels.as_mut() else {
-            return Ok(false);
-        };
-        let field = usize::from(self.row & 1);
-        let other = field ^ 1;
-        let Some((first, n)) = Self::aligned_short_token(packet, self.nibble_at[field], self.bound)
-        else {
-            return Ok(false);
-        };
-        let Some((second, m)) =
-            Self::aligned_short_token(packet, self.nibble_at[other], self.bound)
-        else {
-            return Ok(false);
-        };
-        if u16::from(first >> 2) != self.width || u16::from(second >> 2) != self.width {
-            return Ok(false);
-        }
-        let width = usize::from(self.width);
-        let units = n + m + 2 * width;
-        if units > self.limits.max_work - self.work || !work.try_charge(units as u64) {
-            return Ok(false);
-        }
-        writer.append_runs([(first & 3, width), (second & 3, width)])?;
-        self.nibble_at[field] += 2;
-        self.nibble_at[other] += 2;
-        self.nibbles_read += n + m;
-        self.work += units;
-        self.row += 2;
-        if self.row == self.height {
-            self.state = State::Ready;
-        }
-        Ok(true)
-    }
-
     fn short_token(&mut self, packet: &[u8], work: &mut WorkBudget) -> Option<u16> {
         let field = usize::from(self.row & 1);
         let at = self.nibble_at[field];
@@ -351,7 +280,7 @@ impl RasterDecode {
         Some(u16::from(value))
     }
 
-    pub(super) fn poll(
+    fn poll(
         &mut self,
         packet: &[u8],
         work: &mut WorkBudget,
@@ -399,9 +328,7 @@ impl RasterDecode {
                         .pixels
                         .as_mut()
                         .ok_or(Error::Invalid("DVD private pixels absent"))?;
-                    if let RasterPixels::Fresh(pixels) = pixels {
-                        pixels.try_reserve_exact(self.count)?;
-                    }
+                    pixels.try_reserve_exact(self.count)?;
                     self.state = State::Token {
                         value: 0,
                         nibbles: 0,
@@ -413,9 +340,6 @@ impl RasterDecode {
                     mut nibbles,
                 } => {
                     let short = if nibbles == 0 {
-                        if self.paired_rows(packet, work)? {
-                            continue;
-                        }
                         self.short_token(packet, work)
                     } else {
                         None
@@ -478,13 +402,8 @@ impl RasterDecode {
                 .ok_or(Error::Invalid("DVD private pixels absent"))?;
             // The full output capacity was reserved before decoding;
             // each run writes only its own pixels.
-            match pixels {
-                RasterPixels::Fresh(pixels) => {
-                    let next = pixels.len().checked_add(take).ok_or(Error::Overflow)?;
-                    pixels.try_resize(next, index)?;
-                }
-                RasterPixels::Reused(writer) => writer.append_repeated(index, take)?,
-            }
+            let next = pixels.len().checked_add(take).ok_or(Error::Overflow)?;
+            pixels.try_resize(next, index)?;
             let take = u16::try_from(take).map_err(|_| Error::Overflow)?;
             self.column += take;
             if take != count {
@@ -514,7 +433,7 @@ impl RasterDecode {
         }
     }
 
-    pub(super) fn try_finish(&mut self, cancel: &AtomicBool) -> Result<DvdBitmap> {
+    fn try_finish(&mut self, cancel: &AtomicBool) -> Result<DvdBitmap> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -528,19 +447,16 @@ impl RasterDecode {
             .pixels
             .take()
             .ok_or(Error::Invalid("DVD private pixels absent"))?;
-        let pixels = match pixels {
-            RasterPixels::Reused(writer) => writer.finish(),
-            RasterPixels::Fresh(buffer) => match buffer.freeze() {
-                Ok(value) => value,
-                Err(error) => {
-                    let reason = error.error;
-                    self.pixels = Some(RasterPixels::Fresh(error.buffer));
-                    return match reason {
-                        Error::Backpressure { .. } => Err(reason),
-                        _ => Err(self.poison(reason)),
-                    };
-                }
-            },
+        let pixels = match pixels.freeze() {
+            Ok(value) => value,
+            Err(error) => {
+                let reason = error.error;
+                self.pixels = Some(error.buffer);
+                return match reason {
+                    Error::Backpressure { .. } => Err(reason),
+                    _ => Err(self.poison(reason)),
+                };
+            }
         };
         self.state = State::Finished;
         Ok(DvdBitmap {
@@ -548,7 +464,6 @@ impl RasterDecode {
             width: self.width,
             height: self.height,
             pixels,
-            index_upper_bound: 3,
         })
     }
 }

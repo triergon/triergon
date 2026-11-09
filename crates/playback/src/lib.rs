@@ -40,7 +40,12 @@ pub mod matroska_feed;
 pub mod text_bridge;
 
 pub mod bitmap_bridge;
+pub mod caption_bridge;
 pub mod dvb_ts;
+pub mod mp4_dvd;
+pub mod pgs_ts;
+pub mod teletext_ts;
+mod ts_pes;
 
 pub mod input;
 pub use input::{ByteSource, Source, SourceReply};

@@ -3,10 +3,12 @@ use super::{Association, probe_clock::NativePacketTiming};
 use crate::{
     Delivery, Output, RawEvent, Result, TrackKey,
     bitmap_bridge::{BitmapInput, BitmapScope},
-    dvb_ts::DvbQueueAction,
+    dvb_ts::{DvbQueueAction, microseconds},
 };
-use triergon_core::{Budget, Bytes, Error, SourceLocation, TimeBase};
+use std::sync::atomic::AtomicBool;
+use triergon_core::{Budget, Bytes, Error, SourceLocation, TimeBase, WorkBudget};
 use triergon_matroska::typed::{Event, Packet};
+use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder, Status};
 use triergon_subtitles::{dvb, dvd, pgs::PacketClock};
 
 const NS_PER_SECOND: u64 = 1_000_000_000;
@@ -21,7 +23,6 @@ pub enum MatroskaBitmapCodec {
 pub struct MatroskaBitmapSource {
     pub packet: Packet,
     pub delivery: Delivery,
-    pub native_duration_ns: Option<u64>,
 }
 
 pub struct MatroskaDvbPacket {
@@ -30,37 +31,64 @@ pub struct MatroskaDvbPacket {
 }
 
 impl MatroskaDvbPacket {
-    /// Project the event triggered by this packet onto the existing bitmap
-    /// queue. A preroll packet can update the decoder without an action.
-    pub fn packet_clock_action<'a>(
+    /// Decode the packet with the track's receiver
+    /// ([`MatroskaBitmapTrack::dvb_decoder`]) and project its subtitle onto
+    /// the bitmap queue. A packet the decoder refuses or that presents
+    /// nothing, and a preroll or unselected one, has no action. A packet
+    /// refused for memory returns the error: `Error::Backpressure` may be
+    /// offered again once the pool has room, `Error::Limit` never fits the
+    /// pool and is dropped.
+    pub fn decode<'d>(
         &self,
-        event: &'a dvb::DisplayEvent,
-    ) -> Result<Option<DvbQueueAction<'a>>> {
-        if event.generation != self.packet.generation {
-            return Err(Error::StaleGeneration {
-                expected: self.packet.generation,
-                received: event.generation,
-            });
-        }
-        let publication = event
-            .receiver_publication
-            .ok_or(Error::Unsupported("DVB queue requires native publication"))?;
-        if publication.packet_sequence != self.packet.sequence
-            || !event.source_packets().iter().any(|packet| {
-                packet.sequence == self.packet.sequence
-                    && std::ptr::eq(packet.payload.as_ref(), self.packet.payload.as_ref())
-            })
-        {
-            return Err(Error::SourceMismatch);
-        }
+        decoder: &'d mut ReceiverDecoder,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<MatroskaDvbStep<'d>> {
+        let facts = self.packet.source.as_ref().ok_or(Error::SourceMismatch)?;
+        let pts = facts
+            .timing()
+            .pts
+            .map(|value| microseconds(value.ticks, facts.configuration().clock()))
+            .transpose()?;
+        // The decoder keeps a packet it yielded, stalled or was cancelled on:
+        // this one continues it, and another drops the rest of it.
+        let status = if decoder.keeps(&self.packet.payload, pts) {
+            decoder.resume(work, cancel)
+        } else {
+            decoder.abandon();
+            decoder.decode(&self.packet.payload, pts, work, cancel)
+        };
+        let subtitle = match status {
+            Ok(Status::Subtitle(subtitle)) => subtitle,
+            Ok(Status::Yield) => return Ok(MatroskaDvbStep::Yield),
+            Ok(Status::Nothing) | Err(Error::Invalid(_)) => return Ok(MatroskaDvbStep::Decoded),
+            Ok(Status::Stalled(error)) | Err(error) => return Err(error),
+        };
         if matches!(
             self.source.delivery,
             Delivery::DecodeOnly { .. } | Delivery::Unselected
         ) {
-            return Ok(None);
+            return Ok(MatroskaDvbStep::Decoded);
         }
-        DvbQueueAction::from_native_publication(event, publication)
+        Ok(MatroskaDvbStep::Action(DvbQueueAction::from_subtitle(
+            subtitle,
+        )))
     }
+}
+
+/// What decoding a [`MatroskaDvbPacket`] did.
+#[derive(Clone, Copy, Debug)]
+pub enum MatroskaDvbStep<'a> {
+    /// The packet is decoded and asks this of the bitmap queue.
+    Action(DvbQueueAction<'a>),
+    /// The packet is decoded with no action.
+    Decoded,
+    /// The work budget ran out. The decoder keeps the packet: decode the same
+    /// packet again to resume it, or drop it with
+    /// [`ReceiverDecoder::abandon`]. A memory refusal after the packet was
+    /// admitted ([`Status::Stalled`]) is returned as its error and keeps the
+    /// packet the same way.
+    Yield,
 }
 
 enum Codec {
@@ -159,8 +187,7 @@ impl MatroskaBitmapTrack {
         dvd::ConfigJob::new(raw, &self.pool, limits)
     }
 
-    /// The selected service and the original five-byte CodecPrivate. Pass this
-    /// configuration to a DVB decoder using the binding's generation.
+    /// The selected service and the original five-byte CodecPrivate.
     pub fn dvb_configuration(&self) -> Option<&dvb::SourceConfiguration> {
         match &self.codec {
             Codec::Dvb(config) => Some(config),
@@ -168,7 +195,18 @@ impl MatroskaBitmapTrack {
         }
     }
 
-    /// Bind bare Matroska segments to the DVB receiver and retain container
+    /// The receiver for this track's [`MatroskaDvbPacket`]s, charged to the
+    /// track's pool. Like FFmpeg's decoder it decodes every page.
+    pub fn dvb_decoder(&self) -> Result<ReceiverDecoder> {
+        let config = self.check_dvb()?;
+        Ok(ReceiverDecoder::new(
+            &self.pool,
+            config.original(),
+            Options::default(),
+        ))
+    }
+
+    /// Bind bare Matroska segments for the DVB receiver and retain container
     /// timing, selection, preroll classification and BlockGroup metadata.
     pub fn dvb_packet(&self, output: &Output, sequence: u64) -> Result<Option<MatroskaDvbPacket>> {
         self.check_dvb()?;
@@ -205,7 +243,7 @@ impl MatroskaBitmapTrack {
             dvb::PacketTiming {
                 pts: input.clock.pts.map(i128::from).map(clock),
                 dts: input.clock.dts.map(i128::from).map(clock),
-                duration: input.metadata.native_duration_ns.map(i128::from).map(clock),
+                duration: input.duration.map(i128::from).map(clock),
             },
             dvb::PacketIdentity {
                 generation: input.scope.generation,
@@ -291,10 +329,14 @@ impl MatroskaBitmapTrack {
                 dts: timing.dts,
                 timebase: TimeBase::new(1, NS_PER_SECOND)?,
             },
+            duration: timing
+                .duration_ns
+                .map(i64::try_from)
+                .transpose()
+                .map_err(|_| Error::Overflow)?,
             metadata: MatroskaBitmapSource {
                 packet: packet.clone(),
                 delivery,
-                native_duration_ns: timing.duration_ns,
             },
         })
     }

@@ -97,39 +97,66 @@ impl ColourMatrix {
         }
     }
 
-    /// Original integer matrix evaluator. Coefficients are rounded rational
-    /// receiver facts, independently tested through public native palettes.
-    /// This is not a declaration of source colour primaries/transfer metadata.
+    /// The receiver's integer conversion: Y/Cr/Cb scaled by rounded 10-bit
+    /// fixed-point coefficients of the matrix, each channel rounded and
+    /// clamped. This states how the receiver converts, not the source's
+    /// colour primaries or transfer.
     pub fn argb(self, y: u8, cr: u8, cb: u8, alpha: u8) -> u32 {
-        const fn coefficient(n: i64, d: i64) -> i64 {
-            (n * 1024 + d / 2) / d
-        }
-        let chroma = match self {
-            Self::Sd601 => [
-                coefficient(140200 * 255, 100000 * 224),
-                coefficient(71414 * 255, 100000 * 224),
-                coefficient(34414 * 255, 100000 * 224),
-                coefficient(177200 * 255, 100000 * 224),
-            ],
-            Self::Hd709 => [
-                coefficient(15747 * 255, 10000 * 224),
-                coefficient(4682 * 255, 10000 * 224),
-                coefficient(1873 * 255, 10000 * 224),
-                coefficient(18556 * 255, 10000 * 224),
-            ],
+        let terms = match self {
+            Self::Sd601 => &SD601_TERMS,
+            Self::Hd709 => &HD709_TERMS,
         };
-        let luma = (i64::from(y) - 16) * coefficient(255, 219);
-        let red_difference = i64::from(cr) - 128;
-        let blue_difference = i64::from(cb) - 128;
-        let sums = [
-            luma + chroma[0] * red_difference,
-            luma - chroma[1] * red_difference - chroma[2] * blue_difference,
-            luma + chroma[3] * blue_difference,
-        ];
-        let rgb = sums.map(|v| ((v + 512).div_euclid(1024)).clamp(0, 255) as u32);
-        (u32::from(alpha) << 24) | (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
+        let luma = terms.luma[usize::from(y)];
+        let (cr, cb) = (usize::from(cr), usize::from(cb));
+        let channel = |sum: i32| ((sum + 512) >> 10).clamp(0, 255).cast_unsigned();
+        let red = channel(luma + terms.red[cr]);
+        let green = channel(luma - terms.green_cr[cr] - terms.green_cb[cb]);
+        let blue = channel(luma + terms.blue[cb]);
+        (u32::from(alpha) << 24) | (red << 16) | (green << 8) | blue
     }
 }
+
+/// Each component's contribution to the channel sums, in 1/1024 units.
+struct MatrixTerms {
+    luma: [i32; 256],
+    red: [i32; 256],
+    green_cr: [i32; 256],
+    green_cb: [i32; 256],
+    blue: [i32; 256],
+}
+
+/// `n / d` in 1/1024 units, rounded.
+const fn coefficient(n: i32, d: i32) -> i32 {
+    ((n as i64 * 1024 + d as i64 / 2) / d as i64) as i32
+}
+
+/// `coefficient * (value - offset)` for every byte value.
+const fn term(coefficient: i32, offset: i32) -> [i32; 256] {
+    let mut out = [0; 256];
+    let mut value = 0;
+    while value < 256 {
+        out[value] = coefficient * (value as i32 - offset);
+        value += 1;
+    }
+    out
+}
+
+/// Chroma coefficients as `[Cr->R, Cr->G, Cb->G, Cb->B]` in units of 1/scale.
+const fn terms(chroma: [i32; 4], scale: i32) -> MatrixTerms {
+    // Chroma spans 224 codes and RGB 255.
+    let [red, green_cr, green_cb, blue] = chroma;
+    let d = scale * 224;
+    MatrixTerms {
+        luma: term(coefficient(255, 219), 16),
+        red: term(coefficient(red * 255, d), 128),
+        green_cr: term(coefficient(green_cr * 255, d), 128),
+        green_cb: term(coefficient(green_cb * 255, d), 128),
+        blue: term(coefficient(blue * 255, d), 128),
+    }
+}
+
+static SD601_TERMS: MatrixTerms = terms([140_200, 71_414, 34_414, 177_200], 100_000);
+static HD709_TERMS: MatrixTerms = terms([15_747, 4_682, 1_873, 18_556], 10_000);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceColour {
@@ -402,4 +429,46 @@ pub(crate) fn geometry(
         source_y: u16::try_from(source_y.min(usize::from(object.1)))
             .map_err(|_| Error::Overflow)?,
     })
+}
+
+#[cfg(test)]
+mod colour_tests {
+    use super::ColourMatrix;
+
+    /// The conversion written out per pixel, as the tables precompute it.
+    fn direct(matrix: ColourMatrix, y: u8, cr: u8, cb: u8, alpha: u8) -> u32 {
+        let c = |n: i64, d: i64| (n * 1024 + d / 2) / d;
+        let chroma = match matrix {
+            ColourMatrix::Sd601 => {
+                [140_200, 71_414, 34_414, 177_200].map(|v| c(v * 255, 100_000 * 224))
+            }
+            ColourMatrix::Hd709 => [15_747, 4_682, 1_873, 18_556].map(|v| c(v * 255, 10_000 * 224)),
+        };
+        let luma = (i64::from(y) - 16) * c(255, 219);
+        let (r, b) = (i64::from(cr) - 128, i64::from(cb) - 128);
+        let sums = [
+            luma + chroma[0] * r,
+            luma - chroma[1] * r - chroma[2] * b,
+            luma + chroma[3] * b,
+        ];
+        let [red, green, blue] = sums.map(|v| ((v + 512).div_euclid(1024)).clamp(0, 255) as u32);
+        (u32::from(alpha) << 24) | (red << 16) | (green << 8) | blue
+    }
+
+    #[test]
+    fn tables_match_the_direct_conversion_for_every_colour() {
+        for matrix in [ColourMatrix::Sd601, ColourMatrix::Hd709] {
+            for y in 0..=255 {
+                for cr in 0..=255 {
+                    for cb in 0..=255 {
+                        let alpha = y ^ cr ^ cb;
+                        assert_eq!(
+                            matrix.argb(y, cr, cb, alpha),
+                            direct(matrix, y, cr, cb, alpha)
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

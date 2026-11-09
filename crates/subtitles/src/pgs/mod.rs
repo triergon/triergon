@@ -30,7 +30,7 @@ pub use display_model::{
 pub use indexed_argb::{ArgbStorage, ArgbWrite, ArgbWriter, IndexedArgb};
 pub use object::{AssemblyLimits, AssemblyStatus, EncodedObject, ObjectAssembly, ObjectPushError};
 pub use raster::{IndexedObject, RasterJob, RasterLimits, RasterStatus};
-pub(crate) use recovery::{EofBehavior, RecoveryEof};
+pub(crate) use recovery::RecoveryEof;
 pub use recovery::{
     IndexedRecoveredPacket, ReceiverObservations, RecoveredEvent, RecoveredPacket, RecoveredRect,
     RecoveryStatus,

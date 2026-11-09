@@ -203,8 +203,7 @@ impl DemuxClock {
             (3, Some(_), Some(_)) => TimestampOrigin::SourceDts,
             _ => return Err(Error::Invalid("native clock source time flags")),
         };
-        let demux_dts = dts.or(pts);
-        let next_origin = self.origin.or_else(|| demux_dts.map(initial_interval));
+        let (next_origin, pts90, dts90) = self.placed(pts, dts)?;
         let result = DemuxTimeView {
             profile: DemuxProfile::PesPackets,
             program: self.program,
@@ -212,8 +211,8 @@ impl DemuxClock {
             source_epochs: epochs,
             source_pts_raw33: pts,
             source_dts_raw33: dts,
-            pts90: representative(pts, next_origin)?,
-            dts90: representative(demux_dts, next_origin)?,
+            pts90,
+            dts90,
             pts_origin: if pts.is_some() {
                 TimestampOrigin::SourcePts
             } else {
@@ -227,6 +226,33 @@ impl DemuxClock {
         }
         self.origin = next_origin;
         Ok(Some(result))
+    }
+    /// A packet's raw PTS and DTS in the demuxer's interval, the DTS falling
+    /// back to the PTS, as [`Self::project_header`] places them.
+    pub fn place(
+        &mut self,
+        pts: Option<u64>,
+        dts: Option<u64>,
+    ) -> Result<(Option<i128>, Option<i128>)> {
+        for raw in [pts, dts].into_iter().flatten() {
+            check_raw33(raw)?;
+        }
+        let (origin, pts90, dts90) = self.placed(pts, dts)?;
+        self.origin = origin;
+        Ok((pts90, dts90))
+    }
+    fn placed(
+        &self,
+        pts: Option<u64>,
+        dts: Option<u64>,
+    ) -> Result<(Option<ClockOrigin>, Option<i128>, Option<i128>)> {
+        let dts = dts.or(pts);
+        let origin = self.origin.or_else(|| dts.map(initial_interval));
+        Ok((
+            origin,
+            representative(pts, origin)?,
+            representative(dts, origin)?,
+        ))
     }
     /// None is a work yield; timestamp absence is represented inside the result.
     /// A fresh object represents a fresh demux context; source epochs do not reset it.

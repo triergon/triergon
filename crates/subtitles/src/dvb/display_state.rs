@@ -52,10 +52,6 @@ pub(crate) struct Family {
     pub id: u8,
     pub version: u8,
     pub entries: BudgetVec<PaletteEntry>,
-    // Native-only effective encoded/default source values. The original CDS
-    // facts above remain authoritative and independent. Required by observed
-    // final-reduced-entry update behavior, not a rendered palette cache.
-    pub native_entries: Option<BudgetVec<ColourSource>>,
     pub latest: Option<Bytes>,
     pub modified: bool,
 }
@@ -91,10 +87,7 @@ pub(crate) struct State {
     pub service: Service,
     pub limits: DisplayLimits,
     pub object_retention: ObjectRetention,
-    pub receiver_view: super::ReceiverView,
-    pub geometry_policy: super::GeometryPolicy,
     pub definition: DisplayDefinition,
-    pub native_canvas: Option<Size>,
     pub regions: BudgetVec<Region>,
     pub slots: [Option<usize>; 256],
     pub objects: BudgetVec<Object>,
@@ -127,10 +120,7 @@ impl State {
             service,
             limits,
             object_retention,
-            receiver_view: super::ReceiverView::Source,
-            geometry_policy: super::GeometryPolicy::ValidateSource,
             definition: DisplayDefinition::default(),
-            native_canvas: None,
             regions: BudgetVec::new(budget),
             slots: [None; 256],
             objects: BudgetVec::new(budget),
@@ -205,13 +195,6 @@ impl State {
         self.families.try_reserve_exact(1)?;
         let mut entries = BudgetVec::new(&self.budget);
         entries.try_reserve_exact(276)?;
-        let native_entries = if self.receiver_view == super::ReceiverView::Receiver {
-            let mut values = BudgetVec::new(&self.budget);
-            values.try_reserve_exact(276)?;
-            Some(values)
-        } else {
-            None
-        };
         let index = self.families.len();
         self.families
             .try_push(Family {
@@ -219,7 +202,6 @@ impl State {
                 id,
                 version: 0,
                 entries,
-                native_entries,
                 latest: None,
                 modified: false,
             })
@@ -240,12 +222,7 @@ impl State {
             .get_mut(index)
             .ok_or(Error::Invalid("DVB family index"))?;
         while family.entries.len() < 276 {
-            let amount = if family.native_entries.is_some() {
-                2
-            } else {
-                1
-            };
-            if !work.pay(credit, amount)? {
+            if !work.pay(credit, 1)? {
                 return Ok(false);
             }
             let n = family.entries.len();
@@ -261,12 +238,6 @@ impl State {
                 depth,
                 index: value,
             };
-            if let Some(values) = family.native_entries.as_mut() {
-                if values.len() != n || values.capacity() < 276 {
-                    return Err(Error::Invalid("DVB native CLUT initialization"));
-                }
-                values.try_push(source).map_err(|error| error.error)?;
-            }
             family
                 .entries
                 .try_push(PaletteEntry {
@@ -410,9 +381,6 @@ impl Segment {
                     version: Some(flags >> 4),
                     original: Some(self.original.clone()),
                 };
-                if state.receiver_view == super::ReceiverView::Receiver {
-                    state.native_canvas.get_or_insert(Size { width, height });
-                }
                 Ok(SegmentResult::Complete)
             }
             0x10 => self.page_composition(state, work, b),
@@ -420,7 +388,7 @@ impl Segment {
             0x12 => self.clut(state, work, b),
             0x13 => self.object(state, work, b),
             0x80 => {
-                if !b.is_empty() && state.receiver_view == super::ReceiverView::Source {
+                if !b.is_empty() {
                     return Err(Error::Invalid("DVB EOD payload"));
                 }
                 Ok(SegmentResult::EndDisplay)
@@ -521,12 +489,11 @@ impl Segment {
             if self.visible_ids[usize::from(item.id)] {
                 return Err(Error::Invalid("DVB duplicate visible region"));
             }
-            if state.receiver_view == super::ReceiverView::Source
-                && state
-                    .visible
-                    .as_slice()
-                    .last()
-                    .is_some_and(|r| r.address.y >= item.address.y)
+            if state
+                .visible
+                .as_slice()
+                .last()
+                .is_some_and(|r| r.address.y >= item.address.y)
             {
                 return Err(Error::Invalid("DVB visible region order"));
             }
@@ -584,17 +551,14 @@ impl Segment {
             };
             let old = state.slots[usize::from(id)].map(|i| &state.regions.as_slice()[i]);
             if let Some(old) = old {
-                if (old.size != size && state.receiver_view == super::ReceiverView::Source)
+                if old.size != size
                     || old.depth != depth
                     || old.compatibility != compatibility
                     || old.clut != b[7]
                 {
                     return Err(Error::Invalid("DVB region shape changed within epoch"));
                 }
-                // Both distinguished width-change controls discard the old
-                // native plane, including the unchanged-version control.
-                // Other footprint changes retain their original rejection.
-                self.duplicate = old.version == version && old.size == size;
+                self.duplicate = old.version == version;
             } else if !state.allow_new {
                 return Err(Error::Invalid("DVB new region within epoch"));
             }
@@ -777,10 +741,7 @@ impl Segment {
                     (raw & 3) as u8,
                 )
             };
-            if state.receiver_view == super::ReceiverView::Source
-                && y == 0
-                && (cr != 0 || cb != 0 || transparency != 0)
-            {
+            if y == 0 && (cr != 0 || cb != 0 || transparency != 0) {
                 return Err(Error::Invalid("DVB transparent source components"));
             }
             let family = &mut state.families.as_mut_slice()[index];
@@ -793,15 +754,6 @@ impl Segment {
                     transparency,
                     full_resolution: full,
                 };
-                if let Some(values) = family.native_entries.as_mut() {
-                    // Public-API controls: a reduced entry occupying the
-                    // final four CDS bytes leaves the previous native value.
-                    // Source still records every complete legal entry. Moving
-                    // this same entry before a full entry applies it natively.
-                    if full || self.at + count < b.len() {
-                        values.as_mut_slice()[position] = source;
-                    }
-                }
                 family.entries.as_mut_slice()[position] = PaletteEntry {
                     source,
                     original_segment: Some(self.original.clone()),

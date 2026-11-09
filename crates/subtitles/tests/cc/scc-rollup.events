@@ -1,0 +1,5 @@
+0	1000000	1132	0,0,Default,,0,0,0,,{\an7}{\pos(38,243)}ROLL ONE	1,0,Default,,0,0,0,,{\an7}{\pos(38,228)}ROLL ONE\N{\an7}{\pos(38,243)}ROLL TWO	2,0,Default,,0,0,0,,{\an7}{\pos(38,213)}ROLL ONE\N{\an7}{\pos(38,228)}ROLL TWO\N{\an7}{\pos(38,243)}ROLL THREE
+1	2132000	1000	3,0,Default,,0,0,0,,{\an7}{\pos(38,213)}ROLL TWO\N{\an7}{\pos(38,228)}ROLL THREE\N{\an7}{\pos(38,243)}ROLL FOUR	4,0,Default,,0,0,0,,{\an7}{\pos(38,228)}ROLL FOUR\N{\an7}{\pos(38,243)}TWO ROWS{\c&H0000FF&} RED	5,0,Default,,0,0,0,,{\an7}{\pos(38,213)}ROLL FOUR\N{\an7}{\pos(38,228)}TWO ROWS{\c&H0000FF&} RED\N{\an7}{\pos(38,243)}FOUR
+2	2132000	1000	6,0,Default,,0,0,0,,{\an7}{\pos(38,197)}ROLL FOUR\N{\an7}{\pos(38,213)}TWO ROWS{\c&H0000FF&} RED\N{\an7}{\pos(38,228)}FOUR\N{\an7}{\pos(57,243)}ROWS
+4	3132000	1165	7,0,Default,,0,0,0,,{\an7}{\pos(76,90)}\h\h\h\hPAINT ON\N{\an7}{\pos(76,105)}KEPTTEXT MODE
+5	4297000	429	8,0,Default,,0,0,0,,{\an7}{\pos(76,90)}\h\h\h\hPAINT ON\N{\an7}{\pos(76,105)}KEPTTEXT MODE

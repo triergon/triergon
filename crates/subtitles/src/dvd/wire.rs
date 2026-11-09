@@ -105,27 +105,6 @@ impl<'a> DvdPacket<'a> {
         }
         .parse(at)
     }
-
-    /// Receiver commands are bounded by the complete assembled SPU. A raw link
-    /// is retained even when the receiver stops rather than following it.
-    pub(super) fn receiver_control_at(self, at: usize, max_commands: usize) -> Result<Control<'a>> {
-        let raw = self
-            .raw
-            .get(at..)
-            .filter(|tail| at >= self.control && tail.len() > 4)
-            .ok_or(Error::Invalid("DVD receiver control offset"))?;
-        let [date_high, date_low, next_high, next_low, commands @ ..] = raw else {
-            return Err(Error::Invalid("DVD receiver control offset"));
-        };
-        Ok(Control {
-            offset: at,
-            date: DvdDate(u16::from_be_bytes([*date_high, *date_low])),
-            next_offset: u16::from_be_bytes([*next_high, *next_low]),
-            raw,
-            commands,
-            max_commands,
-        })
-    }
 }
 
 fn word(input: &[u8], at: usize) -> Result<u16> {
@@ -234,6 +213,17 @@ pub enum Command<'a> {
     Alpha(u16),
     Area(DvdArea),
     Fields(FieldOffsets),
+    /// `0x83`: 256 (Y, Cr, Cb) colours of an eight-bit subpicture.
+    ExtendedPalette(&'a [u8; 768]),
+    /// `0x84`: the contrast of each of the 256 colours.
+    ExtendedContrast(&'a [u8; 256]),
+    /// `0x85`: the display area of eight-bit pixels.
+    ExtendedArea(DvdArea),
+    /// `0x86`: 32-bit field offsets.
+    ExtendedFields {
+        top: u32,
+        bottom: u32,
+    },
     End,
     /// Operand lengths for unsupported commands are not guessed. The bounded
     /// remainder stays available, and no following bytes become fake commands.
@@ -241,6 +231,16 @@ pub enum Command<'a> {
         opcode: u8,
         remainder: &'a [u8],
     },
+}
+
+/// A display area's 12-bit inclusive columns and rows.
+fn area(b: &[u8]) -> DvdArea {
+    DvdArea {
+        left: u16::from(b[0]) << 4 | u16::from(b[1] >> 4),
+        right: u16::from(b[1] & 15) << 8 | u16::from(b[2]),
+        top: u16::from(b[3]) << 4 | u16::from(b[4] >> 4),
+        bottom: u16::from(b[4] & 15) << 8 | u16::from(b[5]),
+    }
 }
 
 #[derive(Debug)]
@@ -282,6 +282,10 @@ impl<'a> Commands<'a> {
         Ok((command, commands.at, commands.done))
     }
 
+    fn take_array<const N: usize>(&mut self) -> Result<&'a [u8; N]> {
+        self.take(N)?.try_into().map_err(|_| Error::Truncated)
+    }
+
     fn take(&mut self, n: usize) -> Result<&'a [u8]> {
         let end = self.at.checked_add(n).ok_or(Error::Overflow)?;
         let bytes = self.input.get(self.at..end).ok_or(Error::Truncated)?;
@@ -311,14 +315,16 @@ impl<'a> Commands<'a> {
                     Command::Alpha(value)
                 }
             }
-            5 => {
-                let b = self.take(6)?;
-                Command::Area(DvdArea {
-                    left: u16::from(b[0]) << 4 | u16::from(b[1] >> 4),
-                    right: u16::from(b[1] & 15) << 8 | u16::from(b[2]),
-                    top: u16::from(b[3]) << 4 | u16::from(b[4] >> 4),
-                    bottom: u16::from(b[4] & 15) << 8 | u16::from(b[5]),
-                })
+            5 => Command::Area(area(self.take(6)?)),
+            0x85 => Command::ExtendedArea(area(self.take(6)?)),
+            0x83 => Command::ExtendedPalette(self.take_array()?),
+            0x84 => Command::ExtendedContrast(self.take_array()?),
+            0x86 => {
+                let b = self.take(8)?;
+                Command::ExtendedFields {
+                    top: u32::from_be_bytes([b[0], b[1], b[2], b[3]]),
+                    bottom: u32::from_be_bytes([b[4], b[5], b[6], b[7]]),
+                }
             }
             6 => {
                 let b = self.take(4)?;

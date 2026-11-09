@@ -125,6 +125,8 @@ enum EsdsProfile {
     AacDescription,
     RangeAudio,
     ObjectType,
+    /// Any object type of any stream type: an `mp4s` system stream entry.
+    SystemStream,
 }
 
 #[derive(Debug)]
@@ -272,7 +274,7 @@ impl EsdsWalk {
                             let allowed = match self.profile {
                                 EsdsProfile::Aac | EsdsProfile::AacDescription => b == 0x40,
                                 EsdsProfile::RangeAudio => b == 0x40 || dts_object_type(b)?,
-                                EsdsProfile::ObjectType => true,
+                                EsdsProfile::ObjectType | EsdsProfile::SystemStream => true,
                             };
                             if !allowed {
                                 return Err(Error::Unsupported(
@@ -281,7 +283,10 @@ impl EsdsWalk {
                             }
                             self.object_type = Some(b);
                         }
-                        if index == 1 && (b >> 2 != 5 || b & 1 == 0) {
+                        if index == 1
+                            && !matches!(self.profile, EsdsProfile::SystemStream)
+                            && (b >> 2 != 5 || b & 1 == 0)
+                        {
                             return Err(Error::Unsupported(if self.object_type == Some(0x40) {
                                 "encoded AAC decoder stream-type"
                             } else {
@@ -463,16 +468,18 @@ impl EsdsDescriptionWalk {
         limits: ConfigurationLimits,
         profile: EsdsProfile,
     ) -> Result<Self> {
-        if entry.format != *b"mp4a" {
-            return Err(Error::Invalid(
-                "AAC configuration requires an mp4a description",
-            ));
-        }
         let child_limits = Limits {
             max_boxes: limits.max_child_boxes,
             ..Limits::default()
         };
-        let children = if fields::u16_at(entry.raw().payload(), 8)? == 1 {
+        let children = if entry.format == *b"mp4s" {
+            // MPEG-4 system streams (DVD subpictures) have a plain sample entry.
+            entry.raw().children(8, child_limits)?
+        } else if entry.format != *b"mp4a" {
+            return Err(Error::Invalid(
+                "AAC configuration requires an mp4a description",
+            ));
+        } else if fields::u16_at(entry.raw().payload(), 8)? == 1 {
             crate::SoundV1Source::parse_contexts(entry)?;
             entry.raw().children(44, child_limits)?
         } else {
@@ -1537,17 +1544,25 @@ fn metadata(
     ))
 }
 
-/// The object type and decoder-specific bytes an `mp4a` description states.
+/// The object type and decoder-specific bytes an `mp4a` or `mp4s` description
+/// states in its `esds` (ISO/IEC 14496-1 `DecoderConfigDescriptor`), read
+/// under a work budget.
 #[derive(Debug)]
-pub(crate) struct ObjectTypeScan(EsdsDescriptionWalk);
+pub struct ObjectTypeScan(EsdsDescriptionWalk);
 
 impl ObjectTypeScan {
-    pub(crate) fn new(entry: &SampleDescription, limits: ConfigurationLimits) -> Result<Self> {
-        EsdsDescriptionWalk::with_profile(entry, limits, EsdsProfile::ObjectType).map(Self)
+    pub fn new(entry: &SampleDescription, limits: ConfigurationLimits) -> Result<Self> {
+        let profile = if entry.format == *b"mp4s" {
+            EsdsProfile::SystemStream
+        } else {
+            EsdsProfile::ObjectType
+        };
+        EsdsDescriptionWalk::with_profile(entry, limits, profile).map(Self)
     }
 
-    /// `None` until the walk completes; yields by returning `None` with `work` spent.
-    pub(crate) fn poll(&mut self, work: &mut WorkBudget) -> Result<Option<(u8, Option<Bytes>)>> {
+    /// The object type and the decoder-specific information, if any; `None`
+    /// until the walk completes, yielding with `work` spent.
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Option<(u8, Option<Bytes>)>> {
         if !self.0.scan_configuration(work)? {
             return Ok(None);
         }

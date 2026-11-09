@@ -79,10 +79,12 @@ file.
 | Continuity | `Continuity::observe` → `ContinuityOutcome` |
 | PSI | `SectionAssembler`, `psi::{PatReader, PmtReader, PatCollector}` |
 | Descriptors | `psi::Descriptor::{registration, languages, avc_video, hevc_video, dvb_ac3, dvb_eac3, dvb_subtitling}` |
+| Stream codec | `psi::ElementaryStream::{codec, dvb_descriptor_codec}` → `triergon_core::CodecId` |
 | PES | `PesAssembler` → `Pes`, `PesHeader::{raw_pts_time, raw_dts_time}` |
 | Timestamps | `clock::source_timestamp` with `clock::SourceTimePolicy` |
-| FFmpeg-compatible PES | `compat::pes::DemuxObserver::{new_registered, new_private_audio, new_hls_private_audio, new_dvb_subtitles}` |
-| FFmpeg-compatible clock | `compat::pes::DemuxClock` |
+| FFmpeg-compatible PES | `compat::pes::DemuxObserver::{new_registered, new_private_audio, new_hls_private_audio, new_dvb_subtitles}`; `compat::pes::PesCutter` → `CutPes` for one PID of any stream type |
+| FFmpeg-compatible streams | `compat::stream::{ProgramReader, codec, configuration, is_video}`: programs, stream codecs (adds 0x81, 0x87, 0x90 and DVB tags outside a DVB namespace) and subtitle configuration |
+| FFmpeg-compatible clock | `compat::pes::DemuxClock::{project_header, place}`, `compat::pes::pcr_bounded_pts` (teletext PTS) |
 | FFmpeg-compatible start position | `compat::input::InputBootstrap` |
 
 The sequential feed keeps program tables, clock transitions and diagnostics.
@@ -148,7 +150,7 @@ assert_eq!(out.len() % 188, 0);
   adaptation field carries PCR = DTS·300 and, on key pictures, the
   random_access_indicator. Stuffing goes into the final packet's adaptation field.
   `TransportStream` does not read this output back: its source view accepts
-  unbounded PES only on AVC (0x1b) and HEVC (0x24) streams.
+  unbounded PES only on video streams (0x01, 0x02, 0x1b, 0x24).
 - `MuxConfig::default()`: transport_stream_id 1, original_network_id 0xFF01,
   program 1, PMT PID 0x1000, video PID 0x0100, stream type 0x01, provider
   "Triergon", service "Service01".
@@ -173,9 +175,9 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
 | Packets | TS188, M2TS192 (4-byte prefix kept opaque), adaptation field, PCR/OPCR, private data, extension bytes kept raw |
 | Continuity | per-PID counters, wrap, one duplicate packet (with the PCR exception), loss, signalled discontinuity |
 | PSI | pointer field, multi-section packets, CRC-32, PAT, PMT, program and ES descriptor loops |
-| Descriptors | registration, ISO 639 language, AVC, HEVC, DVB AC-3 (`0x6a`), E-AC-3 (`0x7a`), DVB subtitling (`0x59`) |
-| PES | split headers, finite lengths, unbounded lengths on AVC (0x1b) and HEVC (0x24) streams, PTS/DTS with marker checks, optional fields |
-| FFmpeg-compatible carriage | AVC, HEVC, AAC ADTS, AAC LATM (`RegisteredCarriage`); AC-3/E-AC-3 by DVB tag or stream type `0x81`/`0x87` (`PrivateAudioCarriage`); single-service DVB subtitles |
+| Descriptors | registration, ISO 639 language, AVC, HEVC, DVB AC-3 (`0x6a`), E-AC-3 (`0x7a`), DVB subtitling (`0x59`), teletext (`0x56`) |
+| PES | split headers, finite lengths, unbounded lengths on MPEG-1/2 video (0x01, 0x02), AVC (0x1b) and HEVC (0x24) streams, PTS/DTS with marker checks, optional fields |
+| FFmpeg-compatible carriage | AVC, HEVC, AAC ADTS, AAC LATM (`RegisteredCarriage`); AC-3/E-AC-3 by DVB tag or stream type `0x81`/`0x87` (`PrivateAudioCarriage`); single-service DVB subtitles; PES packets of any stream (`PesCutter`), including PGS (`0x90`), teletext and caption-carrying video |
 
 ## Behaviour and limits
 

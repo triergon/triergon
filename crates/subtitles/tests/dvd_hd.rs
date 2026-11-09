@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
-use triergon_subtitles::compat::dvd::hd_argb;
+use triergon_subtitles::compat::dvd::YcbcrRounding;
 use triergon_subtitles::dvd::{HdCommand, HdLimits, HdPacket, HdSpuJob, HdStatus};
 const RAW: &[u8] = include_bytes!("hd-source-fixtures/hd8-all-256-indices.spu");
 fn ready(job: &mut HdSpuJob, q: u64, cancel: &AtomicBool) {
@@ -352,11 +352,12 @@ fn palette_cancel_is_sticky_at_partial_and_ready() {
     }
 }
 #[test]
-fn contrast_alpha_endpoints_and_neutral_luma_are_separate_source_math() {
-    assert_eq!(hd_argb([16, 128, 128], 255), 0);
-    assert_eq!(hd_argb([235, 128, 128], 0), 0xffff_ffff);
-    assert_eq!(hd_argb([0, 128, 128], 0), 0xff00_0000);
-    assert_eq!(hd_argb([255, 128, 128], 0), 0xffff_ffff);
+fn neutral_luma_converts_to_grey_endpoints() {
+    let rgb = |y| YcbcrRounding::Nearest.rgb(y, 128, 128);
+    assert_eq!(rgb(16), 0);
+    assert_eq!(rgb(235), 0x00ff_ffff);
+    assert_eq!(rgb(0), 0);
+    assert_eq!(rgb(255), 0x00ff_ffff);
 }
 #[test]
 fn wide_header_does_not_imply_eight_bit_mode() {

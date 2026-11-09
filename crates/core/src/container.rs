@@ -38,6 +38,8 @@ pub enum MediaKind {
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CodecId<'a> {
+    /// ISO/IEC 13818-2 video, which includes ISO/IEC 11172-2 (MPEG-1) video.
+    Mpeg2Video,
     H264,
     Hevc,
     Av1,
@@ -68,6 +70,10 @@ pub enum CodecId<'a> {
     Tx3g,
     VobSub,
     DvbSubtitle,
+    /// EN 300 472 teletext, including its subtitle pages.
+    DvbTeletext,
+    /// CEA-608 byte pairs as their own track (QuickTime `c608`).
+    Eia608,
     Pgs,
     /// Not named above; the same bytes as [`TrackInfo::codec_tag`].
     Other(&'a [u8]),
