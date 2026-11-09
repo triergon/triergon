@@ -1,14 +1,13 @@
 //! Sequential MP4 continuation through real source box/fragment/sample jobs.
 //! A drained current MDAT is a batch boundary, never an invented media EOF.
 use crate::{
-    BackendStep, RawEvent, Result,
-    engines::Mp4Engine,
-    mp4_open::{box_reader, word},
+    BackendStep, Mp4NativeEmptyPacket, RawEvent, Result,
+    mp4_open::{PendingMedia, RETAINED_MEDIA_BYTES, box_reader, word},
     mp4_plan::{Mp4View, PreparedMp4, SourceRow},
     sample_sort::SampleSort,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{BudgetVec, Error, Step, WorkBudget};
+use triergon_core::{BudgetVec, Error, InputCursor, Step, WorkBudget};
 use triergon_isobmff::{
     self as iso, BoxChildren, BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, FragmentBuilder,
     FragmentContext, ImplicitBase, OwnedFragmentCursor, SampleStep,
@@ -66,6 +65,39 @@ enum Phase {
     SortSource,
     Admit,
 }
+/// Borrow the MP4 fields needed to continue reading the source.
+pub(crate) struct Continuation<'a> {
+    pub(crate) input: &'a mut InputCursor,
+    pub(crate) plan: &'a mut PreparedMp4,
+    pub(crate) row: &'a mut usize,
+    pub(crate) replay_media: &'a mut Option<PendingMedia>,
+    pub(crate) native_empty_run: &'a mut Option<(Mp4NativeEmptyPacket, u32)>,
+}
+
+pub(crate) fn prepare_media_replay(
+    input: &InputCursor,
+    plan: &mut PreparedMp4,
+) -> Result<PendingMedia> {
+    let [extent] = plan.media.as_slice() else {
+        return Err(Error::Unsupported(
+            "native replay needs a finite media extent",
+        ));
+    };
+    if input.position() != extent.start || input.capabilities().random_access {
+        return Err(Error::Invalid("native replay source position"));
+    }
+    let length = extent.end - extent.start;
+    if !(1..=RETAINED_MEDIA_BYTES as u64).contains(&length) {
+        return Err(Error::Unsupported(
+            "native replay exceeds media cache bound",
+        ));
+    }
+    let pending = PendingMedia::new(extent.start, length as usize, input.budget())?;
+    plan.media_cache.try_reserve_exact(1)?;
+    plan.replay_native_order = true;
+    Ok(pending)
+}
+
 pub(crate) struct ProgressiveState {
     limits: ProgressiveLimits,
     phase: Phase,
@@ -166,7 +198,7 @@ impl ProgressiveState {
     }
     pub(crate) fn poll(
         &mut self,
-        engine: &mut Mp4Engine,
+        engine: &mut Continuation<'_>,
         w: &mut WorkBudget,
         c: &AtomicBool,
     ) -> Result<BackendStep> {
@@ -202,7 +234,7 @@ impl ProgressiveState {
                     return Ok(BackendStep::Yield);
                 }
                 self.reader = Some(box_reader(
-                    &engine.input,
+                    engine.input,
                     self.limits.metadata_bytes,
                     engine.plan.native_recovery,
                 )?);
@@ -239,7 +271,7 @@ impl ProgressiveState {
                             h.size = None;
                         }
                         if let Some(maximum) = engine.plan.forward_regular_extents
-                            && engine.row < engine.plan.rows()
+                            && *engine.row < engine.plan.rows()
                         {
                             let next_root = h.end()?;
                             let seen = self
@@ -264,7 +296,7 @@ impl ProgressiveState {
                                 let terminal = iso::TerminalMdat::new(h)?;
                                 let row = engine
                                     .plan
-                                    .row(engine.row)
+                                    .row(*engine.row)
                                     .ok_or(Error::Invalid("pending forward regular sample"))?;
                                 terminal.require_sample(&row.sample)?;
                                 // The plan keeps all deferred rows. SampleReader
@@ -306,7 +338,7 @@ impl ProgressiveState {
                         engine.plan.terminal_mdat = self.terminal;
                         engine.plan.read_scope =
                             crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h);
-                        engine.row = 0;
+                        *engine.row = 0;
                         self.rows.clear();
                         self.row = 0;
                         self.fill = 0;
@@ -326,7 +358,7 @@ impl ProgressiveState {
                         }
                         self.phase = Phase::Merge;
                     } else {
-                        if let Some(row) = engine.plan.row(engine.row) {
+                        if let Some(row) = engine.plan.row(*engine.row) {
                             if h.end()?.is_some_and(|end| row.sample.range.start < end) {
                                 return Err(Error::Invalid("sample outside media extent"));
                             }
@@ -337,16 +369,16 @@ impl ProgressiveState {
                             }
                         }
                         // Keep the announced header until allocation succeeds.
-                        reader.read_metadata(&engine.input)?;
+                        reader.read_metadata(engine.input)?;
                     }
                     self.header = None;
                     return Ok(BackendStep::Yield);
                 }
-                match reader.poll(&mut engine.input, w, c)? {
+                match reader.poll(engine.input, w, c)? {
                     Step::Yield => {}
                     Step::NeedInput(r) => return Ok(BackendStep::NeedInput(r)),
                     Step::End(_) => {
-                        if engine.row != engine.plan.rows()
+                        if *engine.row != engine.plan.rows()
                             || self.row != self.rows.len()
                             || self.retained != 0
                         {
@@ -613,7 +645,7 @@ impl ProgressiveState {
                         if sample.range.start > extent.end
                             || (sample.range.start == extent.end && !sample.range.is_empty())
                         {
-                            self.finish_merge(engine)?;
+                            self.finish_merge(engine.plan)?;
                             return Ok(BackendStep::Yield);
                         }
                         sample.require_within(extent.clone())?;
@@ -671,11 +703,11 @@ impl ProgressiveState {
                     self.select = 0;
                 } else {
                     self.moof = None;
-                    self.finish_merge(engine)?;
+                    self.finish_merge(engine.plan)?;
                 }
             }
             Phase::PrepareReplay => {
-                engine.begin_media_replay()?;
+                *engine.replay_media = Some(prepare_media_replay(engine.input, engine.plan)?);
                 self.phase = Phase::CopySource;
             }
             Phase::CopySource => {
@@ -770,12 +802,19 @@ impl ProgressiveState {
                         if let (Some(boundary), Some(duration)) = (boundary, duration)
                             && head.remaining_in_run() != 0
                         {
-                            engine.stage_native_empty_run(
-                                boundary,
-                                base,
-                                duration,
+                            *engine.native_empty_run = Some((
+                                Mp4NativeEmptyPacket {
+                                    boundary,
+                                    time_base: base,
+                                    handler: *b"vide",
+                                    pts: 0,
+                                    dts: 0,
+                                    duration,
+                                    position: 0,
+                                    flags: 0,
+                                },
                                 head.remaining_in_run(),
-                            );
+                            ));
                         }
                     }
                     if !engine.plan.replay_native_order {
@@ -800,7 +839,7 @@ impl ProgressiveState {
         Ok(BackendStep::Yield)
     }
 
-    fn finish_merge(&mut self, engine: &Mp4Engine) -> Result<()> {
+    fn finish_merge(&mut self, plan: &PreparedMp4) -> Result<()> {
         if self.blocked_in_extent {
             return Err(Error::Unsupported(
                 "native continuation source ordinal gap or reorder",
@@ -808,7 +847,7 @@ impl ProgressiveState {
         }
         self.phase = if !self.needs_reorder {
             Phase::Admit
-        } else if engine.plan.native_front && engine.plan.native_front_boundary.is_none() {
+        } else if plan.native_front && plan.native_front_boundary.is_none() {
             Phase::PrepareReplay
         } else {
             self.sort = Some(SampleSort::new(self.rows.len()));

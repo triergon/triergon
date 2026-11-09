@@ -3,7 +3,7 @@ use crate::{
     Format, Result, SeekIntent, TrackKey, TrackKind,
     io::provide,
     mp4_native_replay::{NativeMp4Replay, NativeMp4ReplayStep},
-    mp4_open::{PendingMedia, RETAINED_MEDIA_BYTES},
+    mp4_open::PendingMedia,
     mp4_plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -529,7 +529,10 @@ impl Engine {
             maximum_packet,
         };
         if engine.plan.replay_native_order {
-            engine.begin_media_replay()?;
+            engine.replay_media = Some(crate::progressive::prepare_media_replay(
+                &engine.input,
+                &mut engine.plan,
+            )?);
         }
         Ok(Self::Mp4(engine))
     }
@@ -1149,50 +1152,6 @@ impl Mp4Engine {
             && self.input.capabilities().random_access
     }
 
-    pub(crate) fn stage_native_empty_run(
-        &mut self,
-        boundary: FrontReadBoundary,
-        time_base: TimeBase,
-        duration: i64,
-        remaining: u32,
-    ) {
-        self.native_empty_run = Some((
-            Mp4NativeEmptyPacket {
-                boundary,
-                time_base,
-                handler: *b"vide",
-                pts: 0,
-                dts: 0,
-                duration,
-                position: 0,
-                flags: 0,
-            },
-            remaining,
-        ));
-    }
-
-    pub(crate) fn begin_media_replay(&mut self) -> Result<()> {
-        let [extent] = self.plan.media.as_slice() else {
-            return Err(Error::Unsupported(
-                "native replay needs a finite media extent",
-            ));
-        };
-        if self.input.position() != extent.start || self.input.capabilities().random_access {
-            return Err(Error::Invalid("native replay source position"));
-        }
-        let length = extent.end - extent.start;
-        if !(1..=RETAINED_MEDIA_BYTES as u64).contains(&length) {
-            return Err(Error::Unsupported(
-                "native replay exceeds media cache bound",
-            ));
-        }
-        let pending = PendingMedia::new(extent.start, length as usize, self.input.budget())?;
-        self.plan.media_cache.try_reserve_exact(1)?;
-        self.replay_media = Some(pending);
-        self.plan.replay_native_order = true;
-        Ok(())
-    }
-
     fn packet_config(&self, at_track: usize, description: u32) -> Result<Mp4Configuration> {
         let revision = self.configs[at_track]
             .ok_or(Error::Invalid("configuration missing"))?
@@ -1246,12 +1205,17 @@ impl Mp4Engine {
     }
 
     fn poll_progressive(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
-        if let Some(mut state) = self.progressive.take() {
-            let result = state.poll(self, w, c);
-            self.progressive = Some(state);
-            return result;
-        }
-        Ok(BackendStep::End)
+        let Some(state) = self.progressive.as_mut() else {
+            return Ok(BackendStep::End);
+        };
+        let mut continuation = crate::progressive::Continuation {
+            input: &mut self.input,
+            plan: &mut self.plan,
+            row: &mut self.row,
+            replay_media: &mut self.replay_media,
+            native_empty_run: &mut self.native_empty_run,
+        };
+        state.poll(&mut continuation, w, c)
     }
 
     fn poll_unavailable_first(
