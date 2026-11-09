@@ -345,7 +345,6 @@ pub struct Charmap<'f> {
     data: &'f [u8],
     glyph_count: u32,
     subtable: Subtable,
-    index: usize,
     work: u64,
 }
 
@@ -354,21 +353,14 @@ impl<'f> Charmap<'f> {
         data: &'f [u8],
         glyph_count: u32,
         subtable: Subtable,
-        index: usize,
         work: u64,
     ) -> Self {
         Self {
             data,
             glyph_count,
             subtable,
-            index,
             work,
         }
-    }
-
-    /// Its place among the face's charmaps ([`Font::charmaps`](crate::Font::charmaps)).
-    pub const fn index(&self) -> usize {
-        self.index
     }
 
     pub const fn platform(&self) -> Platform {
@@ -420,13 +412,15 @@ impl<'f> Charmap<'f> {
 #[derive(Clone, Copy, Debug)]
 pub struct TextLookup<'f> {
     charmap: Charmap<'f>,
-    /// A Windows Symbol charmap, which maps codes at `0xF000 | c`.
-    symbol: bool,
+    /// The bits set in every code looked up: `0xF000` in a Windows Symbol
+    /// charmap, none in others.
+    prefix: u32,
 }
 
 impl<'f> TextLookup<'f> {
     pub(crate) const fn new(charmap: Charmap<'f>, symbol: bool) -> Self {
-        Self { charmap, symbol }
+        let prefix = if symbol { 0xf000 } else { 0 };
+        Self { charmap, prefix }
     }
 
     pub const fn charmap(&self) -> Charmap<'f> {
@@ -436,7 +430,7 @@ impl<'f> TextLookup<'f> {
     /// The code `c` is looked up at: `0xF000 | c` in a Windows Symbol charmap,
     /// `c` in any other; `None` for 0, which libass never looks up.
     pub const fn code(&self, c: u32) -> Option<u32> {
-        let code = if self.symbol { c | 0xf000 } else { c };
+        let code = c | self.prefix;
         if code == 0 { None } else { Some(code) }
     }
 
@@ -593,8 +587,7 @@ mod tests {
             .list
             .as_slice()
             .iter()
-            .enumerate()
-            .map(|(index, &s)| Charmap::new(data, glyphs, s, index, work))
+            .map(|&s| Charmap::new(data, glyphs, s, work))
             .collect()
     }
 

@@ -51,7 +51,7 @@ pub(super) struct Face {
 
 impl Face {
     fn new(font: Font, uid: u32) -> Self {
-        let charmap = font.text_charmap().map(|charmap| charmap.index());
+        let charmap = font.text_charmap_index();
         Self {
             font: Arc::new(font),
             uid,
@@ -87,9 +87,9 @@ impl Face {
                 "a charmap FreeType lists that this crate does not read",
             ));
         }
-        for charmap in self.font.charmaps() {
+        for (index, charmap) in self.font.charmaps().enumerate() {
             charge(work, 1)?;
-            self.charmap = Some(charmap.index());
+            self.charmap = Some(index);
             if let Some(glyph) = self.font.text_lookup(charmap)?.glyph(symbol) {
                 return Ok(Some(glyph));
             }

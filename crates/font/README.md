@@ -89,7 +89,8 @@ else the last Unicode- or ISO-platform subtable), else the first. Subtables
 FreeType lists in formats 2, 8 and 14, and the Unicode charmap it builds from
 glyph names for a CFF face without one, take no part; `lists_every_charmap` says
 whether the face has any of those but format 14, which FreeType cannot select.
-`charmap` gives a subtable by its index in `charmaps`. `text_lookup` reads a
+`charmap` gives a subtable by its index in `charmaps`, and `text_charmap_index`
+the index of `text_charmap`. `text_lookup` reads a
 charmap as libass reads text through it (`ass_font_index_magic`): a Windows
 Symbol charmap at `0xF000 | c`, any other unchanged, and `Unsupported` for the
 charmaps whose codes libass converts (Windows encodings 2 to 6 through iconv, and

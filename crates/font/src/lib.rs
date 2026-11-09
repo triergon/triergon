@@ -466,19 +466,26 @@ impl Font {
 
     /// The supported cmap subtables, in directory order.
     pub fn charmaps(&self) -> impl Iterator<Item = Charmap<'_>> + '_ {
-        (0..self.charmaps.len()).filter_map(|index| self.charmap(index))
+        self.charmaps
+            .as_slice()
+            .iter()
+            .map(|&subtable| self.charmap_of(subtable))
     }
 
     /// Charmap `index` of [`Self::charmaps`].
     pub fn charmap(&self, index: usize) -> Option<Charmap<'_>> {
-        let &subtable = self.charmaps.get(index)?;
-        Some(Charmap::new(
+        self.charmaps
+            .get(index)
+            .map(|&subtable| self.charmap_of(subtable))
+    }
+
+    fn charmap_of(&self, subtable: cmap::Subtable) -> Charmap<'_> {
+        Charmap::new(
             self.data.as_ref(),
             u32::from(self.glyph_count),
             subtable,
-            index,
             self.limits.work,
-        ))
+        )
     }
 
     /// Whether [`Self::charmaps`] are all the charmaps FreeType gives the face,
@@ -505,7 +512,13 @@ impl Font {
     /// names to a CFF face without a (3, 1) or Unicode-platform subtable; libass
     /// may select either, which this selection does not reproduce.
     pub fn text_charmap(&self) -> Option<Charmap<'_>> {
-        cmap::text_subtable(self.charmaps.as_slice()).and_then(|index| self.charmap(index))
+        self.text_charmap_index()
+            .and_then(|index| self.charmap(index))
+    }
+
+    /// The index of [`Self::text_charmap`] in [`Self::charmaps`].
+    pub fn text_charmap_index(&self) -> Option<usize> {
+        cmap::text_subtable(self.charmaps.as_slice())
     }
 
     /// `charmap`, one of this face's, read as libass 0.17.5 reads text through
