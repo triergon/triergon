@@ -417,7 +417,10 @@ impl<K: CacheKey, T> Cache<K, T> {
                 return Err(Error::Overflow);
             }
             if self.slots.len() == self.slots.capacity() {
-                self.slots.try_reserve_exact(self.slots.len().max(16))?;
+                // By half: a run holds its entries, so the slab grows to the
+                // longest run, and keeps the slack.
+                self.slots
+                    .try_reserve_exact((self.slots.len() / 2).max(16))?;
             }
         }
         self.index.try_reserve(1).map_err(|_| Error::Allocation)?;
