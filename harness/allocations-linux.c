@@ -49,6 +49,13 @@
  * v3 closed-window guards: every observed mmap/mmap64/munmap, pthread_create,
  * dlopen/dlmopen/dlclose attempt during an active window sets a sticky scope
  * error BEFORE forwarding the original call. Failed attempts invalidate too.
+ *
+ * v4 admits one kind of mapping in the window: a read-only mapping of a file
+ * (no PROT_WRITE, not MAP_ANONYMOUS or MAP_FIXED; private or shared), and its
+ * exact munmap. Its resident pages are in every RSS snapshot and its length in
+ * VmPeak; the kernel bound adds its whole length too. It never enters the
+ * heap ledger; the receipt reports file_mappings and file_mapped_bytes (whole
+ * pages). Any other mapping or unmapping in the window still invalidates.
  * No mapping bytes enter the heap ledger and nothing is counted twice. The
  * real API return, resulting errno and loader error state are preserved.
  * dlclose is guarded as well so a pre-window handle cannot be unloaded during
@@ -69,7 +76,11 @@
  * pinned absolute path, or the reviewed libc soname in a rejected window.
  *
  * Selected scope: glibc dynamic ELF, one process/thread during the window,
- * six allocator entry points below plus malloc_usable_size for diagnostics.
+ * eight allocator entry points below plus malloc_usable_size for diagnostics.
+ * strdup and strndup are counted as allocations of their own. C++ operator
+ * new and delete are not hooked: the parent certificate admits them only when
+ * one sealed object defines every form, and the probe ran all twenty forms
+ * through it and measured each one's bytes in its exact peak.
  * No other preload/allocator, static binary, fork/exec, signal-handler allocation,
  * unreviewed dlopen, custom arenas or unobserved allocation imports are admitted.
  * Inspect imports of BOTH workers and their selected loaded dependency closure;
@@ -168,6 +179,7 @@ static void *boot_mmap(void *address, size_t length, int protection, int flags, 
 #define PROC_BYTES 16384u
 #define OUTPUT_LIMIT UINT64_C(16777216)
 #define TOMBSTONE ((uintptr_t)1)
+#define FILE_MAPPINGS 256u
 
 enum {
     ERR_RECURSION = 1u << 0, ERR_TABLE = 1u << 1,
@@ -179,12 +191,13 @@ enum {
     ERR_SCOPE = 1u << 12
 };
 enum { SYM_MALLOC, SYM_CALLOC, SYM_REALLOC, SYM_FREE,
-       SYM_POSIX, SYM_ALIGNED, SYM_COUNT };
+       SYM_POSIX, SYM_ALIGNED, SYM_STRDUP, SYM_STRNDUP, SYM_COUNT };
 enum { GUARD_MMAP, GUARD_MMAP64, GUARD_MUNMAP, GUARD_PTHREAD_CREATE,
        GUARD_DLOPEN, GUARD_DLMOPEN, GUARD_DLCLOSE, GUARD_COUNT };
 typedef struct { uintptr_t key; size_t size; } Entry;
 typedef struct { uintptr_t key; size_t size; int released; } BootEntry;
 typedef struct { uint64_t rss, vm_peak, threads; } Snapshot;
+typedef struct { uintptr_t address; size_t length; } Mapping;
 
 static void *(*real_malloc)(size_t);
 static void *(*real_calloc)(size_t, size_t);
@@ -210,6 +223,10 @@ static atomic_int resolution;
 static atomic_uint errors;
 static atomic_flag guard = ATOMIC_FLAG_INIT;
 static atomic_flag boot_guard = ATOMIC_FLAG_INIT;
+static atomic_flag mapping_guard = ATOMIC_FLAG_INIT;
+static Mapping file_mappings[FILE_MAPPINGS];
+static size_t open_file_mappings;
+static uint64_t file_mapping_count, file_mapped_bytes;
 static _Thread_local unsigned depth __attribute__((tls_model("initial-exec")));
 static _Thread_local unsigned resolving __attribute__((tls_model("initial-exec")));
 static _Alignas(max_align_t) unsigned char boot_arena[BOOT_BYTES];
@@ -369,8 +386,57 @@ static void guard_result(unsigned which, int in_window, int successful) {
                                      &guard_window_failures[which]);
 }
 
-void *mmap(void *address, size_t length, int protection, int flags, int fd, off_t offset) {
-    int incoming = errno, in_window = guard_attempt(GUARD_MMAP);
+/* A mapping in the window admitted by v4: a read-only file mapping. */
+static int admitted_mapping(int protection, int flags, int fd) {
+    if (fd < 0 || (flags & (MAP_ANONYMOUS | MAP_FIXED)) || (protection & PROT_WRITE) ||
+        !atomic_load_explicit(&enabled, memory_order_acquire) ||
+        !atomic_load_explicit(&active, memory_order_acquire)) return 0;
+    if (getpid() != owner_pid) { fail(ERR_FORK); fatal(); }
+    return 1;
+}
+
+static size_t whole_pages(size_t length) {
+    size_t mask = (size_t)page_size - 1;
+    return length > SIZE_MAX - mask ? SIZE_MAX : (length + mask) & ~mask;
+}
+
+static void admit_mapping(void *address, size_t length) {
+    size_t pages = whole_pages(length);
+    acquire(&mapping_guard);
+    if (open_file_mappings == FILE_MAPPINGS || pages > UINT64_MAX - file_mapped_bytes) {
+        fail(ERR_LIMIT);
+    } else {
+        file_mappings[open_file_mappings++] = (Mapping){ (uintptr_t)address, pages };
+        ++file_mapping_count;
+        file_mapped_bytes += pages;
+    }
+    release(&mapping_guard);
+}
+
+/* The index of the admitted mapping an in-window munmap releases exactly. */
+static size_t admitted_unmapping(void *address, size_t length) {
+    if (!atomic_load_explicit(&enabled, memory_order_acquire) ||
+        !atomic_load_explicit(&active, memory_order_acquire)) return SIZE_MAX;
+    size_t found = SIZE_MAX, pages = whole_pages(length);
+    acquire(&mapping_guard);
+    for (size_t n = 0; n < open_file_mappings && found == SIZE_MAX; ++n)
+        if (file_mappings[n].address == (uintptr_t)address && file_mappings[n].length == pages)
+            found = n;
+    release(&mapping_guard);
+    return found;
+}
+
+static void forget_mapping(size_t at) {
+    acquire(&mapping_guard);
+    file_mappings[at] = file_mappings[--open_file_mappings];
+    release(&mapping_guard);
+}
+
+static void *mapped(unsigned which, void *address, size_t length, int protection, int flags,
+                    int fd, off64_t offset) {
+    int incoming = errno, admitted = admitted_mapping(protection, flags, fd), in_window = 0;
+    if (admitted) increment_guard(&guard_calls[which]);
+    else in_window = guard_attempt(which);
     void *out;
     if (resolving) {
         errno = incoming;
@@ -378,33 +444,30 @@ void *mmap(void *address, size_t length, int protection, int flags, int fd, off_
     } else {
         resolve();
         errno = incoming;
-        out = real_mmap(address, length, protection, flags, fd, offset);
+        out = which == GUARD_MMAP ?
+            real_mmap(address, length, protection, flags, fd, (off_t)offset) :
+            real_mmap64(address, length, protection, flags, fd, offset);
     }
     int saved = errno;
-    guard_result(GUARD_MMAP, in_window, out != MAP_FAILED);
+    if (admitted && out != MAP_FAILED) admit_mapping(out, length);
+    guard_result(which, in_window, out != MAP_FAILED);
     errno = saved;
     return out;
+}
+
+void *mmap(void *address, size_t length, int protection, int flags, int fd, off_t offset) {
+    return mapped(GUARD_MMAP, address, length, protection, flags, fd, offset);
 }
 
 void *mmap64(void *address, size_t length, int protection, int flags, int fd, off64_t offset) {
-    int incoming = errno, in_window = guard_attempt(GUARD_MMAP64);
-    void *out;
-    if (resolving) {
-        errno = incoming;
-        out = boot_mmap(address, length, protection, flags, fd, offset);
-    } else {
-        resolve();
-        errno = incoming;
-        out = real_mmap64(address, length, protection, flags, fd, offset);
-    }
-    int saved = errno;
-    guard_result(GUARD_MMAP64, in_window, out != MAP_FAILED);
-    errno = saved;
-    return out;
+    return mapped(GUARD_MMAP64, address, length, protection, flags, fd, offset);
 }
 
 int munmap(void *address, size_t length) {
-    int incoming = errno, in_window = guard_attempt(GUARD_MUNMAP);
+    int incoming = errno, in_window = 0;
+    size_t admitted = admitted_unmapping(address, length);
+    if (admitted != SIZE_MAX) increment_guard(&guard_calls[GUARD_MUNMAP]);
+    else in_window = guard_attempt(GUARD_MUNMAP);
     int result;
     if (resolving) {
         errno = incoming;
@@ -415,6 +478,7 @@ int munmap(void *address, size_t length) {
         result = real_munmap(address, length);
     }
     int saved = errno;
+    if (admitted != SIZE_MAX && result == 0) forget_mapping(admitted);
     guard_result(GUARD_MUNMAP, in_window, result == 0);
     errno = saved;
     return result;
@@ -753,6 +817,34 @@ void *aligned_alloc(size_t alignment, size_t size) {
     return out;
 }
 
+/* A duplicate is one counted allocation, made and recorded as malloc's are. */
+static char *duplicate(unsigned which, const char *text, size_t length) {
+    char *out;
+    if (resolving) out = boot_allocate(length + 1, _Alignof(max_align_t));
+    else {
+        resolve();
+        int observing = enter(which);
+        out = real_malloc(length + 1);
+        int saved = errno;
+        if (observing) add(out);
+        leave(which, observing, out != NULL);
+        errno = saved;
+    }
+    if (out) {
+        memcpy(out, text, length);
+        out[length] = 0;
+    }
+    return out;
+}
+
+char *strdup(const char *text) {
+    return duplicate(SYM_STRDUP, text, strlen(text));
+}
+
+char *strndup(const char *text, size_t limit) {
+    return duplicate(SYM_STRNDUP, text, strnlen(text, limit));
+}
+
 size_t malloc_usable_size(void *pointer) {
     if (!pointer) return 0;
     if (is_boot(pointer)) {
@@ -806,7 +898,9 @@ static void boundary(int begin) {
         if (kernel_rss_requested) {
             if (kernel_rss_fd < 0 || syscall(SYS_ioctl, kernel_rss_fd, TRIERGON_RSS_END, &kernel_rss) ||
                 kernel_rss.abi != 1 || kernel_rss.errors || kernel_rss.missed ||
-                kernel_rss.page_size != (uint64_t)page_size || kernel_rss.upper_bytes < rss_peak)
+                kernel_rss.page_size != (uint64_t)page_size ||
+                kernel_rss.upper_bytes > UINT64_MAX - file_mapped_bytes ||
+                kernel_rss.upper_bytes + file_mapped_bytes < rss_peak)
                 fail(ERR_CONFIG);
         }
         end_live = live;
@@ -924,9 +1018,11 @@ __attribute__((destructor)) static void report(void) {
         vm_peak_end < vm_peak_start || vm_peak_end < rss_peak) fail(ERR_MARKER);
     unsigned problems = atomic_load_explicit(&errors, memory_order_relaxed);
     uint64_t rss_upper = vm_peak_end;
-    if (kernel_rss_requested && kernel_rss.upper_bytes < rss_upper) rss_upper = kernel_rss.upper_bytes;
+    if (kernel_rss_requested && kernel_rss.upper_bytes <= UINT64_MAX - file_mapped_bytes &&
+        kernel_rss.upper_bytes + file_mapped_bytes < rss_upper)
+        rss_upper = kernel_rss.upper_bytes + file_mapped_bytes;
     int length = snprintf(report_buffer, sizeof(report_buffer),
-        "{\"schema\":2,\"observer\":\"linux-glibc-v3\",\"mode\":\"%s\",\"status\":\"%s\","
+        "{\"schema\":2,\"observer\":\"linux-glibc-v4\",\"mode\":\"%s\",\"status\":\"%s\","
         "\"heap_peak_bytes\":%" PRIu64 ",\"heap_live_start\":%" PRIu64 ",\"heap_live_end\":%" PRIu64 ","
         "\"window_allocation_calls\":%" PRIu64 ",\"calls\":%" PRIu64 ","
         "\"rss_start\":%" PRIu64 ",\"rss_peak_observed\":%" PRIu64 ",\"rss_end\":%" PRIu64 ","
@@ -946,6 +1042,7 @@ __attribute__((destructor)) static void report(void) {
         "\"kernel_rss_upper_bytes\":%" PRIu64 ",\"kernel_rss_events\":%" PRIu64 ","
         "\"kernel_rss_missed\":%" PRIu64 ",\"kernel_rss_errors\":%" PRIu64 ","
         "\"kernel_rss_page_size\":%" PRIu64 ","
+        "\"file_mappings\":%" PRIu64 ",\"file_mapped_bytes\":%" PRIu64 ","
         "\"rss_samples\":%" PRIu64 ",\"error_bits\":%u,\"begins\":%d,\"ends\":%d,"
         "\"unknown_releases\":%" PRIu64 ",\"recursive_calls\":%" PRIu64 ","
         "\"unknown_window_releases\":%" PRIu64 ","
@@ -961,10 +1058,11 @@ __attribute__((destructor)) static void report(void) {
         "\"guard_window_failures\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
         "\"bootstrap_bytes\":%zu,\"bootstrap_allocations\":%zu,"
         "\"entry_capacity\":%u,\"selected_thread_scope\":1,\"glibc\":\"%s\","
-        "\"symbol_order\":[\"malloc\",\"calloc\",\"realloc\",\"free\",\"posix_memalign\",\"aligned_alloc\"],"
-        "\"symbol_attempts\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
-        "\"symbol_successes\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
-        "\"symbol_failures\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "]}\n",
+        "\"symbol_order\":[\"malloc\",\"calloc\",\"realloc\",\"free\",\"posix_memalign\",\"aligned_alloc\","
+        "\"strdup\",\"strndup\"],"
+        "\"symbol_attempts\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
+        "\"symbol_successes\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "],"
+        "\"symbol_failures\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "]}\n",
         mode == 1 ? "heap" : "rss", problems ? "invalid" : "measured",
         peak >= baseline ? peak - baseline : 0, baseline, end_live, window_calls, calls,
         rss_start, rss_peak, rss_end, hwm_start, hwm_end, page_size,
@@ -973,7 +1071,7 @@ __attribute__((destructor)) static void report(void) {
         kernel_rss_requested, (uint64_t)kernel_rss.abi, (uint64_t)kernel_rss.initial_bytes,
         (uint64_t)kernel_rss.positive_pages, (uint64_t)kernel_rss.upper_bytes, (uint64_t)kernel_rss.events,
         (uint64_t)kernel_rss.missed, (uint64_t)kernel_rss.errors, (uint64_t)kernel_rss.page_size,
-        rss_samples, problems, begins, ends,
+        file_mapping_count, file_mapped_bytes, rss_samples, problems, begins, ends,
         unknown_releases, (uint64_t)atomic_load_explicit(&recursive_calls, memory_order_relaxed),
         unknown_window_releases, guard_resolved_mask,
         guard_value(&guard_calls[0]), guard_value(&guard_calls[1]), guard_value(&guard_calls[2]),
@@ -993,8 +1091,11 @@ __attribute__((destructor)) static void report(void) {
         guard_value(&guard_window_failures[6]),
         boot_used, boot_count, ENTRY_COUNT, gnu_get_libc_version(),
         attempts[0], attempts[1], attempts[2], attempts[3], attempts[4], attempts[5],
+        attempts[6], attempts[7],
         successes[0], successes[1], successes[2], successes[3], successes[4], successes[5],
-        failures[0], failures[1], failures[2], failures[3], failures[4], failures[5]);
+        successes[6], successes[7],
+        failures[0], failures[1], failures[2], failures[3], failures[4], failures[5],
+        failures[6], failures[7]);
     if (length < 0 || (size_t)length >= sizeof(report_buffer)) fatal();
     int fd = (int)syscall(SYS_openat, AT_FDCWD, destination,
                          O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
@@ -1011,7 +1112,7 @@ __attribute__((destructor)) static void report(void) {
 int main(void) {
     uint64_t value = 0;
     static const char valid[] = "Rss:\t 42 kB\nThreads: 1\n";
-    static const char duplicate[] = "Rss: 1 kB\nRss: 2 kB\n";
+    static const char repeated[] = "Rss: 1 kB\nRss: 2 kB\n";
     static const char overflow[] = "Rss: 18446744073709551615 kB\n";
     static const char malformed[] = "Rss: -1 kB\n";
     static const char truncated[] = "Rss: 1 kB";
@@ -1019,7 +1120,7 @@ int main(void) {
     int okay = field(valid, sizeof(valid) - 1, "Rss:", 1, &value) && value == 43008;
     okay &= field(valid, sizeof(valid) - 1, "Threads:", 0, &value) && value == 1;
     okay &= !field(valid, sizeof(valid) - 1, "Missing:", 1, &value);
-    okay &= !field(duplicate, sizeof(duplicate) - 1, "Rss:", 1, &value);
+    okay &= !field(repeated, sizeof(repeated) - 1, "Rss:", 1, &value);
     okay &= !field(overflow, sizeof(overflow) - 1, "Rss:", 1, &value);
     okay &= !field(malformed, sizeof(malformed) - 1, "Rss:", 1, &value);
     okay &= !field(truncated, sizeof(truncated) - 1, "Rss:", 1, &value);
@@ -1077,7 +1178,41 @@ int main(void) {
         enabled = 0;
         atomic_store_explicit(&errors, saved_errors, memory_order_relaxed);
     }
-    static const char passed[] = "{\"source_selftest\":\"pass\",\"checks\":36}\n";
+    /* Each duplicate is counted at its usable size, raises the window peak and
+     * is released by free. */
+    memset(entries, 0, sizeof(entries));
+    window_tid = (pid_t)syscall(SYS_gettid);
+    enabled = 1;
+    active = 1;
+    baseline = peak = live;
+    char *copy = strdup("triergon");
+    char *prefix = strndup("triergon", 3);
+    uint64_t counted = copy && prefix ? real_usable_size(copy) + real_usable_size(prefix) : 0;
+    okay &= copy && !strcmp(copy, "triergon") && successes[SYM_STRDUP] == 1;
+    okay &= prefix && !strcmp(prefix, "tri") && successes[SYM_STRNDUP] == 1;
+    okay &= counted && live == baseline + counted && peak == live;
+    free(copy);
+    free(prefix);
+    okay &= live == baseline &&
+            atomic_load_explicit(&errors, memory_order_relaxed) == saved_errors;
+    /* A read-only file mapping and its exact munmap are admitted in the window
+     * and reported in whole pages; an anonymous mapping still invalidates. */
+    page_size = sysconf(_SC_PAGESIZE);
+    int file = (int)syscall(SYS_openat, AT_FDCWD, "/proc/self/exe", O_RDONLY | O_CLOEXEC, 0);
+    void *mapping = file < 0 ? MAP_FAILED : mmap(NULL, 100, PROT_READ, MAP_PRIVATE, file, 0);
+    okay &= mapping != MAP_FAILED && file_mapping_count == 1 &&
+            file_mapped_bytes == (uint64_t)page_size && open_file_mappings == 1;
+    okay &= mapping != MAP_FAILED && munmap(mapping, 100) == 0 && open_file_mappings == 0 &&
+            atomic_load_explicit(&errors, memory_order_relaxed) == saved_errors;
+    if (file >= 0) (void)syscall(SYS_close, file);
+    void *anonymous = mmap(NULL, 100, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    okay &= anonymous != MAP_FAILED &&
+            (atomic_load_explicit(&errors, memory_order_relaxed) & ERR_SCOPE);
+    active = 0;
+    enabled = 0;
+    if (anonymous != MAP_FAILED) (void)munmap(anonymous, 100);
+    atomic_store_explicit(&errors, saved_errors, memory_order_relaxed);
+    static const char passed[] = "{\"source_selftest\":\"pass\",\"checks\":43}\n";
     static const char failed[] = "{\"source_selftest\":\"fail\"}\n";
     (void)write_all(STDOUT_FILENO, okay ? passed : failed,
                     okay ? sizeof(passed) - 1 : sizeof(failed) - 1);

@@ -22,17 +22,6 @@ use crate::stats;
 
 type R<T> = Result<T, String>;
 
-const ALLOCATORS_AND_WRITES: [&str; 8] = [
-    "malloc",
-    "calloc",
-    "realloc",
-    "free",
-    "aligned_alloc",
-    "posix_memalign",
-    "write",
-    "writev",
-];
-
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -301,7 +290,10 @@ fn observe(
             || py_int(data.get("schema")) != Some(2)
             || s(&data, "status") != Some("measured")
             || s(&data, "mode") != Some(mode)
-            || (linux && (!linux::valid_receipt(&data, mode) || requested != kernel));
+            || (linux
+                && (s(&data, "observer") != Some(linux::OBSERVER)
+                    || !linux::valid_receipt(&data, mode)
+                    || requested != kernel));
         if invalid {
             let mut fields = vec![
                 ("status", Value::str("observer-invalid")),
@@ -573,8 +565,9 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
             .to_owned();
         exports = Value::str(&export_text);
         let names = linux::symbol_versions(&export_text)?;
-        let mut missing: Vec<&str> = ALLOCATORS_AND_WRITES
+        let mut missing: Vec<&str> = linux::ALLOCATORS
             .iter()
+            .chain(&["write", "writev"])
             .chain(&linux::GUARD_ORDER)
             .copied()
             .filter(|n| !names.contains_key(*n))
@@ -649,13 +642,13 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
         let observer_sha = identities[0].1.as_str().unwrap_or_default().to_owned();
         let probe_sha = identities[1].1.as_str().unwrap_or_default().to_owned();
         guard = cached(&GUARD_CACHE, &key).unwrap_or(Value::Null);
-        let v3 =
-            |r: &Value| r.get("observer").and_then(|o| s(o, "observer")) == Some("linux-glibc-v3");
+        let current =
+            |r: &Value| r.get("observer").and_then(|o| s(o, "observer")) == Some(linux::OBSERVER);
         if guard == Value::Null
             && s(&heap, "status") == Some("measured")
             && s(&rss, "status") == Some("measured")
-            && v3(&heap)
-            && v3(&rss)
+            && current(&heap)
+            && current(&rss)
         {
             records = vec![
                 Value::object([
@@ -670,8 +663,9 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
                 ]),
             ];
             for mode in ["heap", "rss"] {
-                for case in
-                    std::iter::once("scope-startup").chain(linux::GUARD_CASES.iter().map(|c| c.0))
+                for case in linux::calibration_cases()
+                    .into_iter()
+                    .filter(|c| *c != "default")
                 {
                     let observed =
                         host.observe(&probe, None, None, mode, &[case.to_owned()], false);
@@ -699,15 +693,14 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
         ) {
             errors.push("Linux active-window guard certificate unproven".into());
         }
+        let admission = linux::Admission::new(
+            Some(&guard),
+            &linked_value,
+            Some(&observer_sha),
+            Some(&probe_sha),
+        );
         for (role, target, owner, parsed) in parsed_targets {
-            let reviewed = linux::conditional_coverage(
-                &parsed,
-                &owner,
-                Some(&guard),
-                &linked_value,
-                Some(&observer_sha),
-                Some(&probe_sha),
-            );
+            let reviewed = linux::conditional_coverage(&parsed, &owner, admission.as_ref());
             let remaining = reviewed
                 .get("remaining_uncovered")
                 .cloned()

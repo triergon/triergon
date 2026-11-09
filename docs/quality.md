@@ -309,7 +309,23 @@ Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
 (`harness/allocations*.c`), including the Linux link-closure and active-window guard
-certificates. The report records the build identity, source provenance digest and input
+certificates. The observers count `malloc`, `calloc`, `realloc`, `free`,
+`posix_memalign`, `aligned_alloc`, `strdup` and `strndup`. On Linux a worker is
+measured only if every allocation entry point it and its libraries import is one of
+these; a guarded one; an operator `new` or `delete` form, when one library of the
+closure, not the observer, defines every form and the probe ran this one at the same
+version; or a weak import that nothing in the closure defines, which assumes no library
+is loaded with `dlopen` before the operation. The probe links libstdc++ to run the
+twenty forms, so every Linux certificate's sealed closure includes libstdc++, libm and
+libgcc_s, and building it needs `-lstdc++`. Inside the operation, the Linux observer
+admits read-only file mappings, private or shared, and their exact `munmap`. Their
+resident pages count toward total RSS, the kernel bound adds each one's whole length
+(`VmPeak` already includes it), and the receipt reports them as `file_mappings` and
+`file_mapped_bytes`. Any other mapping or unmapping voids the measurement, on either
+side. The observer does not guard `mprotect`: a private file mapping made writable with it
+holds memory the heap figure misses, though total RSS still counts it. Receipts of this observer (`linux-glibc-v4`) list eight hooks in `symbol_order`,
+so a worker's `strdup` and `strndup` move from the `malloc` counters to their own; v2
+and v3 receipts list six and still validate when re-graded. The report records the build identity, source provenance digest and input
 hashes it was measured with; when a result is cited, its source revision and raw-sample
 SHA-256 go in the [measured revisions](status.md#measured-revisions) table. `cargo xtask compare` compares a single input, `cargo xtask external-vector`
 qualifies the mandatory external vector and `cargo xtask fate-run` runs one supported
