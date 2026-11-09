@@ -72,6 +72,45 @@ fn coded_dvb_transport_accepts_the_corroborating_elementary_registration() {
 }
 
 #[test]
+fn queued_eac3_pes_survives_lane_pressure_and_short_elementary_windows() {
+    let frame = coded_primary();
+    let mut ts = transport(EAC3_TAG);
+    ts.pes(PID, 0xbd, &frame, Some(90_000), Some(80_000));
+    let limits = ReaderLimits {
+        elementary_input_window: 7,
+        ..limits()
+    };
+    let mut drive = Drive::new(&ts.bytes, limits, 188, 1);
+    let original = loop {
+        let event = drive.next().unwrap().expect("source PES before EOF");
+        if let Event::Other(ReaderEvent::Source(source)) = event
+            && matches!(source.event(), TraceEvent::Pes(pes) if pes.pid == PID)
+        {
+            break source;
+        }
+    };
+    let pressure = drive.pool.reserve(drive.pool.available()).unwrap();
+    assert!(matches!(
+        drive.next(),
+        Err(Error::Backpressure { available: 0, .. })
+    ));
+    drop(pressure);
+    let packet = loop {
+        if let Event::Packet(packet) = drive.next().unwrap().expect("audio packet before EOF") {
+            break packet;
+        }
+    };
+    drive.reader.close();
+    assert_eq!(packet.payload(), frame);
+    assert_eq!((packet.pts(), packet.dts()), (Some(90_000), Some(80_000)));
+    let [source] = packet.sources() else {
+        panic!("one original PES");
+    };
+    assert_eq!(source.payload_range, 0..frame.len());
+    assert!(std::ptr::eq(source.pes.event(), original.event()));
+}
+
+#[test]
 fn coded_primary_and_dependents_share_one_span_and_keep_their_pes_anchors() {
     let primary = coded_primary();
     let dependent0 = dependent(0);
