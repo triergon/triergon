@@ -693,30 +693,6 @@ impl Reader {
                             return Ok(Step::Ready(Event::Other(event)));
                         }
                     }
-                    Phase::Feed(index) => {
-                        if !work.try_charge(1) {
-                            return Ok(Step::Yield);
-                        }
-                        let source = self.pending.as_ref().expect("pending PES");
-                        let pes = source.pes();
-                        let track = &self.lanes.as_slice()[index].track;
-                        let key = ClockKey {
-                            tsid: self.tsid.ok_or(Error::Invalid("MPEG-TS PES before PAT"))?,
-                            program: track.program(),
-                            pcr_pid: track.program_map().pcr_pid,
-                            epoch: pes.epochs.clock,
-                        };
-                        let clock = ClockContext {
-                            key,
-                            quarantined: self
-                                .stream
-                                .as_ref()
-                                .expect("active transport")
-                                .clock_is_quarantined(),
-                        };
-                        self.queued_pes = Some((index, source.clone(), clock));
-                        self.phase = Phase::Publish;
-                    }
                     Phase::Fragments(index) => {
                         if index == self.lanes.len() {
                             self.phase = Phase::Publish;
@@ -744,30 +720,61 @@ impl Reader {
                         }
                         self.phase = Phase::Fragments(index + 1);
                     }
-                    Phase::Publish => {
-                        if !work.try_charge(1) {
-                            return Ok(Step::Yield);
-                        }
-                        if let Some(map) = self.rebuild.take() {
-                            self.map = Some(map);
-                            self.tracks = std::mem::replace(
-                                &mut self.staged_tracks,
-                                BudgetVec::new(&self.pool),
-                            );
-                        }
-                        let source = self.pending.take().expect("published source");
-                        match source.event() {
-                            TraceEvent::Discontinuity { .. } => {
-                                self.map = None;
-                                self.tracks.clear();
-                                self.tsid = None;
-                                self.boundary = None;
-                            }
-                            TraceEvent::Finished => self.finished = true,
-                            _ => (),
-                        }
-                        return Ok(Step::Ready(Event::Other(ReaderEvent::Source(source))));
+                    Phase::Feed(_) | Phase::Publish => {}
+                }
+                // Source admission can advance through queueing and publication
+                // under the same grant. Each phase remains resumable.
+                if let Phase::Feed(index) = self.phase {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
                     }
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    let source = self.pending.as_ref().expect("pending PES");
+                    let pes = source.pes();
+                    let track = &self.lanes.as_slice()[index].track;
+                    let key = ClockKey {
+                        tsid: self.tsid.ok_or(Error::Invalid("MPEG-TS PES before PAT"))?,
+                        program: track.program(),
+                        pcr_pid: track.program_map().pcr_pid,
+                        epoch: pes.epochs.clock,
+                    };
+                    let clock = ClockContext {
+                        key,
+                        quarantined: self
+                            .stream
+                            .as_ref()
+                            .expect("active transport")
+                            .clock_is_quarantined(),
+                    };
+                    self.queued_pes = Some((index, source.clone(), clock));
+                    self.phase = Phase::Publish;
+                }
+                if matches!(self.phase, Phase::Publish) {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    if let Some(map) = self.rebuild.take() {
+                        self.map = Some(map);
+                        self.tracks =
+                            std::mem::replace(&mut self.staged_tracks, BudgetVec::new(&self.pool));
+                    }
+                    let source = self.pending.take().expect("published source");
+                    match source.event() {
+                        TraceEvent::Discontinuity { .. } => {
+                            self.map = None;
+                            self.tracks.clear();
+                            self.tsid = None;
+                            self.boundary = None;
+                        }
+                        TraceEvent::Finished => self.finished = true,
+                        _ => (),
+                    }
+                    return Ok(Step::Ready(Event::Other(ReaderEvent::Source(source))));
                 }
                 continue;
             }
