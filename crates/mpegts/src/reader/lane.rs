@@ -170,8 +170,8 @@ enum StorageItem<'a> {
 }
 
 impl StorageCursor {
-    // One structural edge per call, including empty tables. Both this walk and
-    // the preceding-owner deduplication walk consume cooperative work.
+    // One structural edge per call, including empty tables. Checking earlier
+    // entries for shared backing also consumes cooperative work.
     fn step<'a>(&mut self, reader: &'a super::Reader) -> Result<Option<StorageItem<'a>>> {
         let item = match *self {
             Self::Map => {
@@ -1307,16 +1307,16 @@ mod incomplete_audio_tests {
                     assert_eq!(bytes, pool.used() - external.bytes());
                     assert_eq!(lane.pieces.len(), 7);
                     if chunk == 7 {
-                        let owners: Vec<_> = lane
+                        let backings: Vec<_> = lane
                             .pieces
                             .as_slice()
                             .iter()
                             .map(|piece| piece.source.pes().spans()[0].backing_bytes())
                             .collect();
-                        assert!(owners.iter().enumerate().all(|(i, owner)| {
-                            owners[..i]
+                        assert!(backings.iter().enumerate().all(|(i, backing)| {
+                            backings[..i]
                                 .iter()
-                                .all(|prior| !prior.shares_storage_with(owner))
+                                .all(|prior| !prior.shares_storage_with(backing))
                         }));
                     }
                     reached = true;
