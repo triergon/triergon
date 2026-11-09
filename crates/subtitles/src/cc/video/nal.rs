@@ -9,6 +9,7 @@
 //! timing of a sequence parameter set.
 
 use triergon_bitstream::{BitError, BitSource, Rbsp};
+use triergon_framing::{AnnexBUnits, avc, hevc, split_length_prefixed};
 
 /// How an access unit delimits its NAL units.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,26 +25,6 @@ pub enum Framing {
 pub enum Codec {
     H264,
     Hevc,
-}
-
-/// H.264 NAL unit types (Table 7-1).
-pub(crate) mod h264 {
-    pub(crate) const IDR: u8 = 5;
-    pub(crate) const SEI: u8 = 6;
-    pub(crate) const SPS: u8 = 7;
-}
-
-/// HEVC NAL unit types (Table 7-1).
-pub(crate) mod hevc {
-    pub(crate) const RASL_N: u8 = 8;
-    pub(crate) const RASL_R: u8 = 9;
-    pub(crate) const BLA_W_LP: u8 = 16;
-    pub(crate) const BLA_N_LP: u8 = 18;
-    pub(crate) const IRAP_LAST: u8 = 23;
-    pub(crate) const SPS: u8 = 33;
-    pub(crate) const EOS: u8 = 36;
-    pub(crate) const PREFIX_SEI: u8 = 39;
-    pub(crate) const SUFFIX_SEI: u8 = 40;
 }
 
 impl Codec {
@@ -80,7 +61,7 @@ impl Codec {
     #[must_use]
     pub fn is_sei(self, nal_type: u8) -> bool {
         match self {
-            Self::H264 => nal_type == h264::SEI,
+            Self::H264 => nal_type == avc::SEI,
             Self::Hevc => matches!(nal_type, hevc::PREFIX_SEI | hevc::SUFFIX_SEI),
         }
     }
@@ -382,40 +363,18 @@ fn hevc_sps_timing(bits: &mut Bits<'_>) -> Result<Option<Timing>, Invalid> {
 /// running past the access unit ends it; lengths of other than 1 to 4 bytes
 /// frame nothing.
 pub(crate) fn nal_units(access_unit: &[u8], framing: Framing) -> impl Iterator<Item = &[u8]> {
+    let start_codes = (framing == Framing::StartCodes).then(|| AnnexBUnits::new(access_unit));
+    let width = match framing {
+        Framing::Lengths(size @ 1..=4) => usize::from(size),
+        _ => 0,
+    };
     let mut rest = access_unit;
-    std::iter::from_fn(move || match framing {
-        Framing::Lengths(size @ 1..=4) => {
-            let (prefix, tail) = rest.split_at_checked(usize::from(size))?;
-            let length = prefix
-                .iter()
-                .fold(0usize, |n, &b| (n << 8) | usize::from(b));
-            let (unit, tail) = tail.split_at_checked(length)?;
-            rest = tail;
-            Some(unit)
-        }
-        Framing::Lengths(_) => None,
-        Framing::StartCodes => loop {
-            let start = find_start_code(rest, 0)?;
-            let body = &rest[start + 3..];
-            let end = find_start_code(body, 0).unwrap_or(body.len());
-            // A zero byte before the next start code belongs to it.
-            let mut unit = &body[..end];
-            while let [head @ .., 0] = unit {
-                unit = head;
-            }
-            rest = &body[end..];
-            if !unit.is_empty() {
-                return Some(unit);
-            }
-        },
-    })
-}
-
-fn find_start_code(data: &[u8], from: usize) -> Option<usize> {
-    data.get(from..)?
-        .windows(3)
-        .position(|w| w == [0, 0, 1])
-        .map(|n| from + n)
+    let lengths = std::iter::from_fn(move || {
+        let (unit, tail) = split_length_prefixed(rest, width).filter(|_| width > 0)?;
+        rest = tail;
+        Some(unit)
+    });
+    start_codes.into_iter().flatten().chain(lengths)
 }
 
 /// `user_data_registered_itu_t_t35`.
@@ -518,7 +477,7 @@ mod tests {
             Some(hevc::PREFIX_SEI)
         );
         assert_eq!(Codec::Hevc.payload(&[0x4e, 0x01, 4]), [4]);
-        assert_eq!(Codec::H264.nal_type(&[0x65, 0]), Some(h264::IDR));
+        assert_eq!(Codec::H264.nal_type(&[0x65, 0]), Some(avc::IDR));
         // first_mb_in_slice 0, slice_type 7 (I).
         assert_eq!(h264_slice_type(&[0x65, 0b1000_1000]), Some(SliceType::I));
     }

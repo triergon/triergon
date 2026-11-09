@@ -1,12 +1,13 @@
 //! Stream feature inspection (parameter sets and slice headers only). Used to classify
 //! conformance vectors into the selected feature matrix; not part of the decoding path.
 
-use crate::nal::{NalIter, parse_header, unescape};
+use crate::nal::{parse_header, unescape};
 use crate::ps::{Pps, Sps, parse_pps, parse_sps};
 use crate::slice::{SliceType, parse_slice_header, peek_pps_id};
 use std::collections::BTreeSet;
 use triergon_bitstream::BitReader;
 use triergon_codec::{Budget, BudgetVec};
+use triergon_framing::AnnexBUnits;
 
 #[derive(Debug, Default, Clone)]
 pub struct StreamFeatures {
@@ -54,7 +55,7 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
     };
     let mut buf = BudgetVec::new(&pool);
     let mut slices_in_pic = 0u32;
-    for nal in NalIter::new(data) {
+    for nal in AnnexBUnits::new(data) {
         let Some(h) = parse_header(nal) else { continue };
         f.nal_types.insert(h.nal_unit_type);
         let Ok(len) = unescape(&nal[1..], &mut buf) else {

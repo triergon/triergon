@@ -1,7 +1,8 @@
 //! Decode an H.264 Annex-B elementary stream to raw yuv420p (8-bit) in output order.
 //! Usage: decode IN.264 OUT.yuv   (per-picture JSON lines on stderr)
 use std::io::{Read, Write};
-use triergon_codec_h264::{AnnexBNalIter, Decoder, Picture};
+use triergon_codec_h264::{Decoder, Picture};
+use triergon_framing::AnnexBUnits;
 
 /// Offset of the last 0x000001 start code (including a preceding zero byte), if any.
 fn last_start_code(b: &[u8]) -> Option<usize> {
@@ -84,7 +85,7 @@ fn main() {
         if cut == 0 {
             continue;
         }
-        for nal in AnnexBNalIter::new(&buf[..cut]) {
+        for nal in AnnexBUnits::new(&buf[..cut]) {
             let t = nal[0] & 31;
             if (t == 1 || t == 5) && first_mb_is_zero(nal) {
                 au += 1;

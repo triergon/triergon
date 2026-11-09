@@ -5,7 +5,8 @@
 //! `DecodeError::Unsupported`. Skips cleanly when the vectors are absent.
 
 use std::path::PathBuf;
-use triergon_codec_h264::{AnnexBNalIter, DecodeError, Decoder, Picture};
+use triergon_codec_h264::{DecodeError, Decoder, Picture};
+use triergon_framing::AnnexBUnits;
 
 fn vectors_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/h264-conformance")
@@ -42,7 +43,7 @@ fn decode_file(data: &[u8]) -> (Vec<String>, Option<DecodeError>) {
     let mut dec = Decoder::new();
     let mut md = Vec::new();
     let mut unsupported = None;
-    for nal in AnnexBNalIter::new(data) {
+    for nal in AnnexBUnits::new(data) {
         if let Err(e) = dec.send_nal(nal, None)
             && matches!(e, DecodeError::Unsupported(_))
             && unsupported.is_none()

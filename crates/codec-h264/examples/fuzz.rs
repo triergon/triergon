@@ -2,11 +2,12 @@
 //! files and report any panic (the decoder must return errors, never panic).
 //! Usage: fuzz [--iters N] FILE...
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use triergon_codec_h264::{AnnexBNalIter, Decoder};
+use triergon_codec_h264::Decoder;
+use triergon_framing::AnnexBUnits;
 
 fn decode(data: &[u8]) {
     let mut dec = Decoder::new();
-    for nal in AnnexBNalIter::new(data) {
+    for nal in AnnexBUnits::new(data) {
         let _ = dec.send_nal(nal, None);
         while dec.receive().is_some() {}
     }

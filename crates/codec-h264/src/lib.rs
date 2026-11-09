@@ -43,7 +43,7 @@ mod tables_vlc;
 
 use dpb::{PicNums, PocState};
 use mbinfo::{MbInfo, SliceDbk};
-use nal::{NalIter, parse_header, unescape};
+use nal::{parse_header, unescape};
 use picture::*;
 use ps::{Pps, Sps};
 use slice::{SliceHeader, SliceType};
@@ -54,8 +54,7 @@ use triergon_bitstream::BitReader;
 use triergon_codec::{
     Budget, BudgetVec, Colour, DecodeFailure, PictureView, StorageError, VideoDecoder,
 };
-
-pub use nal::NalIter as AnnexBNalIter;
+use triergon_framing::AnnexBUnits;
 
 /// Decoder error. The decoder never panics on bad input.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -383,7 +382,7 @@ impl Decoder {
     pub fn send_nals(&mut self, data: &[u8], pts: Option<i64>) -> Result<(), DecodeError> {
         self.pending_pts = pts;
         let mut first_err = None;
-        for nal in NalIter::new(data) {
+        for nal in AnnexBUnits::new(data) {
             if let Err(e) = self.decode_nal(nal) {
                 self.errors += 1;
                 if first_err.is_none() {

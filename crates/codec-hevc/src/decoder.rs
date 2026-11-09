@@ -16,6 +16,7 @@ use crate::{deblock, sao};
 use triergon_codec::{
     Budget, BudgetVec, Charged, Colour, DecodeFailure, PictureView, VideoDecoder,
 };
+use triergon_framing::{AnnexBUnits, hevc};
 
 /// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug)]
@@ -296,7 +297,7 @@ impl Decoder {
         self.ctx.pending_pts = pts;
         self.ctx.pts_used = false;
         let mut result = Ok(());
-        for nalu in nal::AnnexBIter::new(au) {
+        for nalu in AnnexBUnits::new(au) {
             if let Err(e) = self.decode_nal(nalu) {
                 // Abandon the current picture on error but keep the decoder usable.
                 if self.ctx.cur.is_some() {
@@ -346,13 +347,13 @@ impl Decoder {
             return Ok(());
         }
         match h.nal_unit_type {
-            nal::EOS_NUT | nal::EOB_NUT => {
+            hevc::EOS | hevc::EOB => {
                 if self.ctx.cur.is_some() {
                     self.ctx.finish_picture()?;
                 }
                 self.ctx.after_eos = true;
             }
-            0..=9 | 16..=21 | nal::VPS_NUT | nal::SPS_NUT | nal::PPS_NUT => {
+            0..=9 | 16..=21 | hevc::VPS | hevc::SPS | hevc::PPS => {
                 nal::unescape_rbsp(nalu, &mut self.rbsp)?;
                 self.ctx.decode_rbsp(&self.rbsp, h)?;
             }
@@ -408,17 +409,17 @@ impl Context {
 
     fn decode_rbsp(&mut self, rbsp: &[u8], h: NalHeader) -> Result<()> {
         match h.nal_unit_type {
-            nal::VPS_NUT => {
+            hevc::VPS => {
                 let v = ps::parse_vps(rbsp)?;
                 let id = v.id as usize;
                 self.vps[id] = Some(v);
             }
-            nal::SPS_NUT => {
+            hevc::SPS => {
                 let s = ps::parse_sps(rbsp)?;
                 let id = s.id as usize;
                 self.sps[id] = Some(Arc::new(Charged::boxed(&self.budget, s)?));
             }
-            nal::PPS_NUT => {
+            hevc::PPS => {
                 let p = ps::parse_pps(rbsp)?;
                 let id = p.id as usize;
                 self.pps[id] = Some(Arc::new(Charged::boxed(&self.budget, p)?));
@@ -436,14 +437,14 @@ impl Context {
         }
         if first {
             // RASL pictures associated with an IRAP with NoRaslOutputFlag = 1 are not decoded.
-            if nal::is_irap(t) {
+            if hevc::is_irap(t) {
                 self.seen_irap = true;
                 self.no_rasl_output =
-                    nal::is_idr(t) || nal::is_bla(t) || self.first_picture || self.after_eos;
+                    hevc::is_idr(t) || hevc::is_bla(t) || self.first_picture || self.after_eos;
             } else if !self.seen_irap {
                 return Ok(());
             }
-            if nal::is_rasl(t) && self.no_rasl_output {
+            if hevc::is_rasl(t) && self.no_rasl_output {
                 return Ok(());
             }
         } else if self.cur.is_none() {
@@ -584,7 +585,7 @@ impl Context {
         pps: Shared<Pps>,
     ) -> Result<()> {
         let t = h.nal_unit_type;
-        let irap = nal::is_irap(t);
+        let irap = hevc::is_irap(t);
         if let Some(tool) = pps.range_ext_tool
             && sps.profile.profile_idc >= 4
         {
@@ -631,7 +632,7 @@ impl Context {
         let mut st_foll_poc = Vec::new();
         let mut lt_curr_poc: Vec<(i32, bool)> = Vec::new();
         let mut lt_foll_poc: Vec<(i32, bool)> = Vec::new();
-        if !nal::is_idr(t) {
+        if !hevc::is_idr(t) {
             let rps = &sh.st_rps;
             for i in 0..rps.num_negative as usize {
                 let (d, u) = rps.s0(i);
@@ -733,7 +734,7 @@ impl Context {
         // C.5.2.2 output and removal of pictures before decoding the current picture.
         let highest = sps.max_sub_layers_minus1 as usize;
         if irap && self.no_rasl_output && !self.first_picture {
-            let no_output_of_prior = if t == nal::CRA_NUT {
+            let no_output_of_prior = if t == hevc::CRA {
                 true
             } else {
                 sh.no_output_of_prior_pics
@@ -841,9 +842,9 @@ impl Context {
             self.active_sps = Some(sps.clone());
         }
         if h.temporal_id == 0
-            && !nal::is_rasl(t)
-            && !nal::is_radl(t)
-            && !nal::is_sub_layer_non_ref(t)
+            && !hevc::is_rasl(t)
+            && !hevc::is_radl(t)
+            && !hevc::is_sub_layer_non_ref(t)
         {
             self.prev_tid0_poc = poc;
         }
