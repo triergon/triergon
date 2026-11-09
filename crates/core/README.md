@@ -122,7 +122,7 @@ source is the separate `finish` call, after which reads return
 Reads come in four forms: `read_into` (copy into a slice), `read_append` (copy
 into a `BudgetVec<u8>`), `read_discard` (skip without copy) and `read_span`
 (zero-copy `Bytes` alias of the window). `buffered()` peeks without consuming.
-`append_response` copies a complete borrowed response into a charged builder
+`consume_response` lets a parser process a complete borrowed response
 without retaining an input window.
 A parser that still needs bytes after a partial read can use `pending_request()`
 to ask for the next window once the current window is empty and the source is

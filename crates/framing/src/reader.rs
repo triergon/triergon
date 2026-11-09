@@ -290,29 +290,20 @@ impl NalReader {
         if contains_zero_pair(bytes) {
             return Ok(false);
         }
-        let Some(current) = self.cursor.pending_request(cancel)? else {
-            return Ok(false);
-        };
-        if current.source != request.source
-            || current.token != request.token
-            || current.offset != request.offset
-            || bytes.len() > current.maximum
-        {
-            return Ok(false);
-        }
-        match self.reserve_compact_payload(bytes.len()) {
-            Ok(()) => (),
-            Err(Error::Backpressure { .. } | Error::Allocation | Error::Limit { .. }) => {
-                return Ok(false);
-            }
-            Err(error) => return Err(error),
-        }
+        let maximum = self.limits.maximum_nal_bytes;
         let buffer = self
             .buffer
             .as_mut()
             .ok_or(Error::Invalid("missing NAL builder"))?;
-        self.cursor
-            .append_response(request, bytes, buffer, work, cancel)
+        match self
+            .cursor
+            .consume_response(request, bytes.len(), work, cancel, || {
+                reserve_nal_bytes(buffer, maximum, bytes.len())?;
+                buffer.try_extend_from_slice(bytes)
+            }) {
+            Err(Error::Backpressure { .. } | Error::Allocation | Error::Limit { .. }) => Ok(false),
+            result => result,
+        }
     }
 
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
@@ -431,33 +422,7 @@ impl NalReader {
             return Ok(());
         }
         let maximum = self.limits.maximum_nal_bytes;
-        let buffer = self.buffer()?;
-        let needed = buffer.len().checked_add(count).ok_or(Error::Overflow)?;
-        if needed > maximum {
-            return Err(Error::Limit {
-                requested: needed,
-                maximum,
-            });
-        }
-        if needed > buffer.capacity() {
-            let target = buffer
-                .capacity()
-                .saturating_mul(2)
-                .max(64)
-                .min(maximum)
-                .max(needed);
-            let length = buffer.len();
-            buffer.try_reserve_exact(target - length).or_else(|error| {
-                if target != needed
-                    && matches!(error, Error::Backpressure { .. } | Error::Limit { .. })
-                {
-                    buffer.try_reserve_exact(needed - length)
-                } else {
-                    Err(error)
-                }
-            })?;
-        }
-        Ok(())
+        reserve_nal_bytes(self.buffer()?, maximum, count)
     }
 
     fn observed_prefix(&self, leading_zero_bytes: usize) -> Result<NalFraming> {
@@ -743,27 +708,47 @@ impl NalReader {
     }
 }
 
+fn reserve_nal_bytes(buffer: &mut BudgetVec<u8>, maximum: usize, count: usize) -> Result<()> {
+    let needed = buffer.len().checked_add(count).ok_or(Error::Overflow)?;
+    if needed > maximum {
+        return Err(Error::Limit {
+            requested: needed,
+            maximum,
+        });
+    }
+    if needed > buffer.capacity() {
+        let target = buffer
+            .capacity()
+            .saturating_mul(2)
+            .max(64)
+            .min(maximum)
+            .max(needed);
+        let length = buffer.len();
+        buffer.try_reserve_exact(target - length).or_else(|error| {
+            if target != needed && matches!(error, Error::Backpressure { .. } | Error::Limit { .. })
+            {
+                buffer.try_reserve_exact(needed - length)
+            } else {
+                Err(error)
+            }
+        })?;
+    }
+    Ok(())
+}
+
 fn contains_zero_pair(bytes: &[u8]) -> bool {
-    let mut previous = 1;
-    let (words, tail) = bytes.as_chunks::<8>();
-    for bytes in words {
-        let word = u64::from_le_bytes(*bytes);
-        // Each low byte is the OR of a pair. Mark the high byte as occupied
-        // because its next byte belongs to the following word.
-        let pairs = word | (word >> 8) | 0xff00_0000_0000_0000;
-        let zero_pair = pairs.wrapping_sub(0x0101_0101_0101_0101) & !pairs & 0x8080_8080_8080_8080;
-        if zero_pair != 0 || (previous == 0 && bytes[0] == 0) {
-            return true;
-        }
-        previous = bytes[7];
+    let Some(right) = bytes.get(1..) else {
+        return false;
+    };
+    let (left_words, left_tail) = bytes[..right.len()].as_chunks::<8>();
+    let (right_words, right_tail) = right.as_chunks::<8>();
+    let mut zeroes = 0;
+    // The shifted slice includes pairs that straddle word boundaries.
+    for (&left, &right) in left_words.iter().zip(right_words) {
+        let pairs = u64::from_le_bytes(left) | u64::from_le_bytes(right);
+        zeroes |= pairs.wrapping_sub(0x0101_0101_0101_0101) & !pairs & 0x8080_8080_8080_8080;
     }
-    for &byte in tail {
-        if previous == 0 && byte == 0 {
-            return true;
-        }
-        previous = byte;
-    }
-    false
+    zeroes != 0 || left_tail.iter().zip(right_tail).any(|(&a, &b)| a | b == 0)
 }
 
 #[cfg(test)]
