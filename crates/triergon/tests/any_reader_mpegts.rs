@@ -38,7 +38,7 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
                         count[1] += 1;
                         &mut audio_packets
                     }
-                    AccessUnit::Ac3(_) => panic!("authored AVC/AAC input"),
+                    AccessUnit::Ac3(_) | AccessUnit::Loas(_) => panic!("authored AVC/ADTS input"),
                     AccessUnit::IncompleteAudio { .. } => {
                         panic!("default policy rejects fragments")
                     }

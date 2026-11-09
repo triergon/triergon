@@ -35,7 +35,7 @@ contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol. Seeking
 returns `Error::Unsupported` without changing reader state.
 
-The reader admits AVC and HEVC Annex B, single-block ADTS AAC-LC, and
+The reader admits AVC and HEVC Annex B, single-block ADTS AAC-LC, LATM in LOAS envelopes, and
 AC-3 or E-AC-3 with unambiguous DVB descriptors in private PES or stream
 types `0x81` and `0x87` in the caller-declared ATSC namespace. Tracks retain
 the original stream type as the codec tag. [ATSC A/53 Part 3, §5.7](https://www.atsc.org/wp-content/uploads/2023/02/A53-Part-3-2023-02.pdf)
@@ -47,7 +47,15 @@ primary supplies the packet's duration. DVB groups may cross PES boundaries.
 The ATSC reader admits groups headed by a six-block independent syncframe
 and requires the whole group in one PES. [ATSC A/52, Annexes E and G](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf)
 
-The framers preserve original parameter sets and coded audio envelopes. LATM,
+LATM streams with type `0x11` use audio PES stream IDs `0xc0` through `0xdf`.
+The default reader delimits complete byte-aligned LOAS envelopes across PES
+boundaries and preserves their original byte ranges. The multiplex element is
+opaque, so sample count, duration and decoder configuration are unspecified.
+`compat::latm::PacketPolicy::PreservePes` exposes each validated, nonempty
+LATM PES and its clock context as a separate `ReaderEvent::LatmPes` observation.
+[ITU-T H.222.0, §2.11.2](https://www.itu.int/rec/dologin_pub.asp?id=T-REC-H.222.0-202308-S%21%21PDF-E&lang=e&type=items)
+
+The framers preserve original parameter sets and coded audio envelopes.
 MPEG audio/video, subtitles, descriptors declaring additional independent
 E-AC-3 services and ambiguous private streams report `ReaderEvent::Unsupported`
 with original PMTs and PES available as source events.

@@ -13,6 +13,8 @@ use triergon_mpegts::{
 
 #[path = "container_reader/eac3.rs"]
 mod eac3;
+#[path = "container_reader/latm.rs"]
+mod latm;
 #[path = "container_reader/opaque_video.rs"]
 mod opaque_video;
 
