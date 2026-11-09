@@ -7,16 +7,20 @@
   "reference": "ffmpeg-formats-native",
   "contract": [
     "open a preloaded regular MP4 file through 32 KiB random-access input",
-    "read one AVC and one AAC stream through EOF in demux order",
+    "read one AVC video stream and one AAC or Opus audio stream through EOF in demux order",
     "seek cases read one packet, seek backward using the video clock, then read the complete suffix",
     "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
-    "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame"
+    "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame",
+    "compare Opus edit-list trim, unequal packet durations, and secondary-track alignment at a backward seek boundary"
   ],
   "required_profiles": [
     "regular-open",
     "regular-seek",
     "variable-open",
-    "variable-seek"
+    "variable-seek",
+    "opus-open",
+    "opus-seek",
+    "opus-seek-edit-boundary"
   ],
   "required_targets": ["aarch64-unknown-linux-gnu"],
   "iterations": 50,

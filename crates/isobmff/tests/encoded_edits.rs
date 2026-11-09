@@ -432,6 +432,103 @@ fn dts_fixture(
     raw
 }
 
+const OPUS_DURATIONS: [u32; 6] = [960, 480, 1920, 480, 960, 240];
+
+fn opus_fixture(config: &[u8], edit_start: i32, edit_duration: u32) -> Vec<u8> {
+    let mut raw = dts_fixture(
+        b"Opus",
+        0,
+        &atom(b"dOps", config),
+        48_000,
+        960,
+        240,
+        &[(edit_duration, edit_start)],
+    );
+    let entry = fixture_payload(&raw, b"Opus");
+    raw[entry + 16..entry + 20].copy_from_slice(&[0, 2, 0, 16]);
+    raw[entry + 24..entry + 28].copy_from_slice(&(48_000u32 << 16).to_be_bytes());
+    let mut stts = vec![0, 0, 0, 0, 0, 0, 0, 6];
+    for duration in OPUS_DURATIONS {
+        stts.extend_from_slice(&1u32.to_be_bytes());
+        stts.extend_from_slice(&duration.to_be_bytes());
+    }
+    replace_fixture_body(
+        &mut raw,
+        b"stts",
+        &[b"stbl", b"minf", b"mdia", b"trak", b"moov"],
+        &stts,
+    );
+    let duration = fixture_payload(&raw, b"mdhd") + 16;
+    raw[duration..duration + 4].copy_from_slice(&OPUS_DURATIONS.iter().sum::<u32>().to_be_bytes());
+    raw
+}
+
+#[test]
+fn range_playback_uses_the_opus_edit_and_keeps_variable_packet_durations() {
+    let dops = [0, 2, 1, 56, 0, 0, 187, 128, 0, 0, 0];
+    let raw = opus_fixture(&dops, 720, 4320);
+    let source = Source::new(&raw, b"soun");
+    let config = range_config(
+        &source,
+        *b"isom",
+        &mut source.input(),
+        ConfigurationLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(config.kind(), EncodedEntryKind::Opus);
+    assert_eq!(config.configuration_box().payload(), dops);
+    assert_eq!(
+        config.demux().extradata.as_ref(),
+        b"OpusHead\x01\x02\x38\x01\x80\xbb\x00\x00\x00\x00\x00"
+    );
+    let plan = range_plan(&source, *b"isom").unwrap();
+    assert_eq!(plan.anchor_ticks(), 720);
+    assert_eq!(plan.selected_end_ticks(), 5040);
+    let packets = rows(&source, plan);
+    assert_eq!(packets.len(), OPUS_DURATIONS.len());
+    for (i, ((packet, skip), (duration, pts))) in packets
+        .iter()
+        .zip(
+            OPUS_DURATIONS
+                .into_iter()
+                .zip([-720, 240, 720, 2640, 3120, 4080]),
+        )
+        .enumerate()
+    {
+        assert_eq!(packet.demux.pts, Some(pts));
+        assert_eq!(packet.demux.dts, Some(pts));
+        assert_eq!(packet.demux.duration, i64::from(duration));
+        assert_eq!(packet.demux.flags, 1);
+        assert_eq!(*skip, (i == 0).then_some([208, 2, 0, 0, 0, 0, 0, 0, 0, 0]));
+    }
+}
+
+#[test]
+fn range_playback_keeps_opus_preroll_and_stops_at_the_edit_end() {
+    let dops = [0, 2, 1, 56, 0, 0, 187, 128, 0, 0, 0];
+    let raw = opus_fixture(&dops, 1440, 2400);
+    let source = Source::new(&raw, b"soun");
+    let packets = rows(&source, range_plan(&source, *b"isom").unwrap());
+    assert_eq!(
+        packets
+            .iter()
+            .map(|(packet, _)| (packet.demux.pts, packet.demux.flags))
+            .collect::<Vec<_>>(),
+        [
+            (Some(-1440), 5),
+            (Some(-480), 5),
+            (Some(0), 1),
+            (Some(1920), 1)
+        ]
+    );
+    assert_eq!(packets[0].1, Some([160, 5, 0, 0, 0, 0, 0, 0, 0, 0]));
+    let after_end = opus_fixture(&dops, 5040, 100);
+    assert_eq!(
+        range_plan(&Source::new(&after_end, b"soun"), *b"isom").unwrap_err(),
+        Error::Invalid("Opus edit starts after the last sample")
+    );
+}
+
 #[test]
 fn dts_core_descriptions_agree_with_range_admission() {
     for (tag, version, config, major, configuration_box) in [

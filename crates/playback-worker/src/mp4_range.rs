@@ -1,4 +1,4 @@
-//! Compare every packet of a regular AVC/AAC file through range playback.
+//! Compare every packet of a regular AVC file with AAC or Opus through range playback.
 
 use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
@@ -111,10 +111,12 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
             (kind, [entry]) if kind == *b"vide" && entry.format == *b"avc1" && video.is_none() => {
                 video = Some(header.track_id);
             }
-            (kind, [entry]) if kind == *b"soun" && entry.format == *b"mp4a" && !audio => {
+            (kind, [entry])
+                if kind == *b"soun" && matches!(&entry.format, b"mp4a" | b"Opus") && !audio =>
+            {
                 audio = true;
             }
-            _ => return Err("expected one AVC and one AAC track".into()),
+            _ => return Err("expected one AVC track and one AAC or Opus track".into()),
         }
         if !track.fragments().is_empty() {
             return Err("expected regular sample tables".into());
@@ -151,7 +153,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
         };
         plans.try_push(plan).map_err(|error| error.error)?;
     }
-    let video = video.filter(|_| audio).ok_or("missing AVC/AAC pair")?;
+    let video = video.filter(|_| audio).ok_or("missing video or audio")?;
     let mut range = Mp4RangeOpen::new(movie, Some(plans.as_slice()), PlanLimits::default())?;
     while !range.poll(&mut work(), &cancel)? {}
     let mut player = range.finish(

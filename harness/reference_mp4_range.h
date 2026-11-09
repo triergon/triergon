@@ -1,4 +1,4 @@
-/* Regular AVC/AAC playback through the public MOV demuxer API. */
+/* Regular AVC playback with AAC or Opus through the public MOV demuxer API. */
 #include <errno.h>
 
 typedef struct {
@@ -39,7 +39,8 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
         const AVCodecParameters *codec = format->streams[i]->codecpar;
         if (codec->codec_type == AVMEDIA_TYPE_VIDEO && codec->codec_id == AV_CODEC_ID_H264)
             video = (int)i;
-        if (codec->codec_type == AVMEDIA_TYPE_AUDIO && codec->codec_id == AV_CODEC_ID_AAC)
+        if (codec->codec_type == AVMEDIA_TYPE_AUDIO &&
+            (codec->codec_id == AV_CODEC_ID_AAC || codec->codec_id == AV_CODEC_ID_OPUS))
             audio = (int)i;
     }
     if (video < 0 || audio < 0)
