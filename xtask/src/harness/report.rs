@@ -75,6 +75,30 @@ fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
 
+fn entity_input_failure(corpus: &Path, case: &Value) -> Result<Option<&'static str>, String> {
+    let Some(entities) = case.get("entities") else {
+        return Ok(None);
+    };
+    for entity in entities.as_array().ok_or("expected an entity list")? {
+        let file = Path::new(s(entity, "file").ok_or("entity without input path")?);
+        if file.as_os_str().is_empty()
+            || file
+                .components()
+                .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        {
+            return Err("entity input escapes corpus".into());
+        }
+        let path = corpus.join(file);
+        if !path.is_file() {
+            return Ok(Some("missing-entity"));
+        }
+        if digest(&path)? != s(entity, "sha256").ok_or("entity without input hash")? {
+            return Ok(Some("entity-hash-mismatch"));
+        }
+    }
+    Ok(None)
+}
+
 fn command_output(program: &str, args: &[&str]) -> String {
     Command::new(program)
         .args(args)
@@ -615,9 +639,14 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([("status", Value::str("input-hash-mismatch"))])
         } else if !rights_reviewed(&reviewed, case) {
             Value::object([("status", Value::str("rights-unreviewed"))])
+        } else if let Some(status) = entity_input_failure(&corpus, case)? {
+            Value::object([("status", Value::str(status))])
         } else if let Some(prefix) = &worker_operation {
             let arguments = case_arguments(case);
             row.push(("input_sha256", Value::str(sha)));
+            if let Some(entities) = case.get("entities") {
+                row.push(("input_entities", entities.clone()));
+            }
             row.push(("candidate_worker", Value::str(&candidate_name)));
             row.push(("operation", selected.operation));
             let run = Run {
@@ -924,10 +953,36 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
 #[cfg(test)]
 mod prefix_tests {
     use super::{
-        PrefixFeature, open_cases, ratchet, recorded_corpus, reviewed_inputs, rights_reviewed,
+        PrefixFeature, entity_input_failure, open_cases, ratchet, recorded_corpus, reviewed_inputs,
+        rights_reviewed,
     };
     use crate::json::{Value, parse};
     use std::path::Path;
+
+    #[test]
+    fn ordered_input_hashes_are_checked_before_running_the_workers() {
+        let root = crate::walk::scratch("ordered-input-hashes");
+        std::fs::create_dir_all(&root).unwrap();
+        let input = b"known entity bytes";
+        let hash = crate::sha256::hex(input);
+        let case = parse(&format!(
+            r#"{{"entities":[{{"file":"next.ts","sha256":"{hash}"}}]}}"#
+        ))
+        .unwrap();
+        assert_eq!(
+            entity_input_failure(&root, &case).unwrap(),
+            Some("missing-entity")
+        );
+        std::fs::write(root.join("next.ts"), b"other entity bytes").unwrap();
+        assert_eq!(
+            entity_input_failure(&root, &case).unwrap(),
+            Some("entity-hash-mismatch")
+        );
+        std::fs::write(root.join("next.ts"), input).unwrap();
+        assert_eq!(entity_input_failure(&root, &case).unwrap(), None);
+        std::fs::remove_file(root.join("next.ts")).unwrap();
+        std::fs::remove_dir(root).unwrap();
+    }
 
     #[test]
     fn rights_are_synthetic_or_a_recorded_reviewed_licence() {
