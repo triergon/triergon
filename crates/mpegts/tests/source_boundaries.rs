@@ -153,6 +153,105 @@ fn drain(
     }
     panic!("bounded observer did not drain");
 }
+
+#[test]
+fn recovery_continuation_preserves_active_pes_and_checks_the_original_cursor() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let idle = pool.used();
+    let mut source = Source::new(include_bytes!("data/hls-contiguous-part-a.ts"), &pool, 7, 1);
+    let mut observer = policy(&pool, options());
+    observer.bind_source_input(&source.input).unwrap();
+    let drive_entity = |source: &mut Source, observer: &mut TransportFaultRecovery| {
+        let mut packets = Vec::new();
+        while let Step::Ready(event) = source.next().unwrap() {
+            if let TraceEvent::Transport(packet) = event
+                && packet.pid == observer.scope().pid
+            {
+                observer.push(packet, source.context()).unwrap();
+                packets.extend(drain(observer, 1).unwrap());
+            }
+        }
+        packets
+    };
+    assert!(drive_entity(&mut source, &mut observer).is_empty());
+    assert!(!observer.discard_idle());
+    let end = source.end();
+    let original_token = source.input.token();
+    let capabilities = SourceCapabilities {
+        length: None,
+        random_access: false,
+    };
+    let mut replacement = InputCursor::new(&pool, SourceId(2), capabilities, 7).unwrap();
+    assert!(matches!(
+        observer.continue_media_entity(&end, &mut replacement, &mut WorkBudget::new(1), &RUN),
+        Err(Error::StaleGeneration { .. })
+    ));
+    assert!(matches!(
+        observer.continue_media_entity(&end, &mut source.input, &mut WorkBudget::new(1), &RUN),
+        Err(Error::StaleRequest { .. })
+    ));
+    source
+        .input
+        .continue_source(SourceId(2), capabilities)
+        .unwrap();
+    let used = pool.used();
+    let mut short = WorkBudget::new(0);
+    assert_eq!(
+        observer.continue_media_entity(&end, &mut source.input, &mut short, &CANCEL),
+        Err(Error::Cancelled)
+    );
+    assert_eq!(
+        observer.continue_media_entity(&end, &mut source.input, &mut short, &RUN),
+        Ok(false)
+    );
+    assert_eq!(observer.scope().entity, SourceId(1));
+    assert_eq!(pool.used(), used);
+    assert_eq!(
+        observer.continue_media_entity(&end, &mut source.input, &mut WorkBudget::new(1), &RUN),
+        Ok(true)
+    );
+    assert_eq!(observer.scope().entity, SourceId(2));
+    assert_eq!(
+        source.input.token().generation(),
+        original_token.generation()
+    );
+    assert_eq!(source.input.position(), 0);
+    assert!(matches!(
+        observer.continue_media_entity(&end, &mut source.input, &mut WorkBudget::new(1), &RUN),
+        Err(Error::StaleRequest { .. })
+    ));
+    source.bytes =
+        Bytes::copy_from_slice(&pool, include_bytes!("data/hls-contiguous-part-b.ts")).unwrap();
+    let packets = drive_entity(&mut source, &mut observer);
+    let [packet] = packets.as_slice() else {
+        panic!("expected one complete carried PES");
+    };
+    assert_eq!(packet.source_origin.source, end.location().source);
+    assert_eq!(packet.source_origin.offset, 376);
+    assert_eq!(packet.source_epochs, EPOCHS);
+    assert_eq!(packet.source_header.pts_raw33, Some(90_000));
+    assert_eq!(packet.position, 376);
+    assert_eq!(
+        packet
+            .spans
+            .as_slice()
+            .iter()
+            .map(|span| span.source.entity)
+            .collect::<Vec<_>>(),
+        [SourceId(1), SourceId(2), SourceId(2)]
+    );
+    drop((source, observer, end, replacement));
+    assert!(
+        packet
+            .payload()
+            .flatten()
+            .copied()
+            .eq((0_u8..=255).cycle().take(512))
+    );
+    drop(packets);
+    assert_eq!(pool.used(), idle);
+}
+
 fn tail(
     pool: &Budget,
     data: &[u8],
