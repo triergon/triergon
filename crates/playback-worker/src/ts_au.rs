@@ -15,12 +15,13 @@ use triergon_core::{
 };
 use triergon_framing::Ac3Family;
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
+use triergon_mpegts::compat::annex_b::VideoEofPolicy;
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::pes::DemuxClock;
 use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::{
-    AccessUnit, AudioEofPolicy, EntityTransition, Packet, PacketFormat, Reader, ReaderEvent,
-    ReaderLimits, TraceEvent,
+    AccessUnit, AudioEofPolicy, EntityTransition, IncompleteVideo, Packet, PacketClock,
+    PacketFormat, PayloadSource, Reader, ReaderEvent, ReaderLimits, SourceEpochs, TraceEvent,
 };
 
 pub const PREFIX: &str = "ts-au-";
@@ -167,9 +168,48 @@ fn refused(mut totals: Totals, error: &dyn std::fmt::Display, at: SourceLocation
     totals
 }
 
+struct PacketProjection<'a> {
+    pid: u16,
+    clock: Option<&'a PacketClock>,
+    epochs: SourceEpochs,
+    sources: &'a [PayloadSource],
+    payload: &'a [u8],
+    flags: u64,
+}
+
+impl<'a> From<&'a Packet> for PacketProjection<'a> {
+    fn from(packet: &'a Packet) -> Self {
+        let flags = match packet.access_unit() {
+            AccessUnit::Video(unit) => u64::from(unit.random_access),
+            AccessUnit::Adts(_) | AccessUnit::Ac3(_) | AccessUnit::IncompleteAudio { .. } => 1,
+        };
+        Self {
+            pid: packet.track_info().stream().pid,
+            clock: packet.clock(),
+            epochs: packet.epochs(),
+            sources: packet.sources(),
+            payload: packet.payload(),
+            flags,
+        }
+    }
+}
+
+impl<'a> From<&'a IncompleteVideo> for PacketProjection<'a> {
+    fn from(video: &'a IncompleteVideo) -> Self {
+        Self {
+            pid: video.track_info().stream().pid,
+            clock: video.clock(),
+            epochs: video.epochs(),
+            sources: video.sources(),
+            payload: video.bytes().as_ref(),
+            flags: 0,
+        }
+    }
+}
+
 fn fold_packet(
     totals: &mut Totals,
-    packet: &Packet,
+    packet: PacketProjection<'_>,
     index: usize,
     position: PacketPosition<'_>,
     duration: i64,
@@ -177,7 +217,7 @@ fn fold_packet(
     cancel: &AtomicBool,
 ) -> Result<()> {
     let mut work = WorkBudget::new(WORK);
-    let header = match packet.clock() {
+    let header = match packet.clock {
         Some(anchor) if anchor.quarantined => return Err("unresolved source clock".into()),
         Some(anchor) => match anchor.pes.event() {
             TraceEvent::Pes(pes) => Some(&pes.header),
@@ -186,18 +226,12 @@ fn fold_packet(
         None => None,
     };
     let time = clock
-        .project_header(
-            packet.track_info().stream().pid,
-            packet.epochs(),
-            header,
-            &mut work,
-            cancel,
-        )?
+        .project_header(packet.pid, packet.epochs, header, &mut work, cancel)?
         .ok_or("clock projection exhausted its work")?;
     let ticks = |value: Option<i128>| -> Result<i64> {
         Ok(value.map(i64::try_from).transpose()?.unwrap_or(i64::MIN))
     };
-    let first = packet.sources().first().ok_or("packet has no source PES")?;
+    let first = packet.sources.first().ok_or("packet has no source PES")?;
     let TraceEvent::Pes(pes) = first.pes.event() else {
         return Err("packet payload has no PES".into());
     };
@@ -214,10 +248,6 @@ fn fold_packet(
     } else {
         -1
     };
-    let flags = match packet.access_unit() {
-        AccessUnit::Video(unit) => u64::from(unit.random_access),
-        AccessUnit::Adts(_) | AccessUnit::Ac3(_) | AccessUnit::IncompleteAudio { .. } => 1,
-    };
     for value in [
         index as u64,
         u64::from(pes.pid),
@@ -225,18 +255,18 @@ fn fold_packet(
         signed(ticks(time.dts90)?),
         signed(duration),
         signed(position),
-        flags,
-        packet.payload().len() as u64,
+        packet.flags,
+        packet.payload.len() as u64,
     ] {
         fold(&mut totals.digest, value);
     }
-    fold_bytes(&mut totals.digest, packet.payload());
+    fold_bytes(&mut totals.digest, packet.payload);
     // AV_PKT_DATA_MPEGTS_STREAM_ID, including every unit sharing a PES.
     for value in [1, 19, 1, u64::from(pes.header.stream_id)] {
         fold(&mut totals.digest, value);
     }
     totals.packets += 1;
-    totals.bytes += packet.payload().len() as u64;
+    totals.bytes += packet.payload.len() as u64;
     Ok(())
 }
 
@@ -256,6 +286,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         program: Some(request.program),
         descriptor_namespace: request.namespace,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
+        video_eof_policy: VideoEofPolicy::ReportUnframed,
         ..ReaderLimits::default()
     };
     let mut reader = AnyReader::MpegTs(Reader::new(
@@ -316,10 +347,29 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                 };
                 if let Err(error) = fold_packet(
                     &mut totals,
-                    &packet,
+                    (&packet).into(),
                     index,
                     position,
                     duration,
+                    &mut clock,
+                    cancel,
+                ) {
+                    return Ok(refused(totals, error.as_ref(), at));
+                }
+            }
+            Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::IncompleteVideo(video)))) => {
+                let id = video.track_info().id();
+                let index = tracks
+                    .as_slice()
+                    .iter()
+                    .position(|value| value.id == id)
+                    .ok_or("unframed video has no registered track")?;
+                if let Err(error) = fold_packet(
+                    &mut totals,
+                    (&video).into(),
+                    index,
+                    position,
+                    0,
                     &mut clock,
                     cancel,
                 ) {
@@ -450,7 +500,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                         let duration = ac3_duration(&packet, track.ac3_duration_known)?;
                         fold_packet(
                             &mut totals,
-                            &packet,
+                            (&packet).into(),
                             index,
                             position,
                             duration,
