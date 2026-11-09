@@ -4,10 +4,7 @@ use crate::{
     AssemblyStep, ParseLimits, SourceEpochs, SourceRange, checked_pid, commit_range, limit,
     prepare_range,
 };
-use std::{
-    ops::Range,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, SourceLocation, Time, WorkBudget,
 };
@@ -45,19 +42,18 @@ impl PesHeader {
 #[derive(Debug)]
 pub struct PesSpan {
     bytes: Bytes,
-    range: Range<usize>,
+    start: usize,
     source: SourceRange,
-    chunk: u64,
 }
 impl AsRef<[u8]> for PesSpan {
     fn as_ref(&self) -> &[u8] {
-        &self.bytes.as_ref()[self.range.clone()]
+        &self.bytes.as_ref()[self.start..self.start + self.source.bytes]
     }
 }
 impl PesSpan {
     /// An exact charged alias of this elementary payload span.
     pub fn payload_bytes(&self) -> Result<Bytes> {
-        self.bytes.slice(self.range.clone())
+        self.bytes.slice(self.start..self.start + self.source.bytes)
     }
 
     pub fn source_range(&self) -> SourceRange {
@@ -104,10 +100,10 @@ struct Payload {
     bytes: Option<Bytes>,
     pusi: bool,
     started: bool,
+    body_span: bool,
     position: usize,
     entity: SourceId,
     offset: u64,
-    chunk: u64,
 }
 
 impl Payload {
@@ -221,7 +217,6 @@ pub struct PesAssembler {
     spans: BudgetVec<PesSpan>,
     span_growth: SpanGrowth,
     validated_spans: usize,
-    validated_chunk: Option<u64>,
 }
 
 pub(crate) const UNBOUNDED_NON_VIDEO: Error = Error::Invalid("unbounded non-video PES");
@@ -261,7 +256,6 @@ impl PesAssembler {
             elementary_offset: 0,
             byte_run_epoch: 0,
             validated_spans: 0,
-            validated_chunk: None,
         })
     }
 
@@ -297,16 +291,15 @@ impl PesAssembler {
                 value: bytes,
             });
         }
-        let chunk = self.next_chunk;
         self.next_chunk += 1;
         self.payload = Some(Payload {
             bytes: Some(bytes),
             pusi,
             started: false,
+            body_span: false,
             position: 0,
             entity,
             offset,
-            chunk,
         });
         Ok(())
     }
@@ -365,13 +358,12 @@ impl PesAssembler {
         self.spans
             .try_push(PesSpan {
                 bytes: payload.take().expect("whole PES carrier"),
-                range: 0..count,
+                start: 0,
                 source: SourceRange {
                     entity: source.source,
                     offset: source.offset,
                     bytes: count,
                 },
-                chunk: self.next_chunk,
             })
             .expect("space for the PES span");
         self.next_chunk += 1;
@@ -393,7 +385,6 @@ impl PesAssembler {
 
     pub(crate) fn record_body_carriers(&mut self, carriers: usize, payload: usize) {
         self.next_chunk += carriers as u64;
-        self.validated_chunk = Some(self.next_chunk - 1);
         self.validated_spans += carriers;
         self.payload_len += payload;
         self.seen += payload;
@@ -447,7 +438,6 @@ impl PesAssembler {
         self.spans = BudgetVec::new(&self.budget);
         self.span_growth = SpanGrowth::Credit(0);
         self.validated_spans = 0;
-        self.validated_chunk = None;
     }
     pub fn poll(
         &mut self,
@@ -503,7 +493,6 @@ impl PesAssembler {
         if !RETAIN {
             self.header_ranges.clear();
             self.validated_spans = 0;
-            self.validated_chunk = None;
         }
         self.elementary_offset = next;
         self.active = false;
@@ -860,18 +849,13 @@ impl PesAssembler {
             if work.remaining() == 0 {
                 return Ok(AssemblyStep::Yield);
             }
-            // Validation-only feeds count exactly the same spans. Each chunk
-            // is contiguous and consumed monotonically, so no owners are needed.
-            let chunk = pending.chunk;
-            let (merge, spans) = if RETAIN {
-                (
-                    self.spans.as_slice().last().is_some_and(|last| {
-                        last.chunk == chunk && last.range.end == pending.position
-                    }),
-                    self.spans.len(),
-                )
+            // A carrier's body is consumed monotonically. Its first byte
+            // opens one span, and later grants extend the same span.
+            let merge = pending.body_span;
+            let spans = if RETAIN {
+                self.spans.len()
             } else {
-                (self.validated_chunk == Some(chunk), self.validated_spans)
+                self.validated_spans
             };
             if !merge {
                 if spans == self.limits.source_spans {
@@ -892,7 +876,6 @@ impl PesAssembler {
             if !RETAIN {
                 if !merge {
                     self.validated_spans += 1;
-                    self.validated_chunk = Some(chunk);
                 }
             } else if merge {
                 let span = self
@@ -900,7 +883,6 @@ impl PesAssembler {
                     .as_mut_slice()
                     .last_mut()
                     .ok_or(Error::Invalid("missing PES span"))?;
-                span.range.end += count;
                 span.source.bytes += count;
             } else {
                 let pending = self.payload.as_mut().expect("pending PES span");
@@ -917,13 +899,12 @@ impl PesAssembler {
                 // append keeps the input position and byte grant for retry.
                 if let Err(rejected) = self.spans.try_push(PesSpan {
                     bytes,
-                    range: pending.position..pending.position + count,
+                    start: pending.position,
                     source: SourceRange {
                         entity: pending.entity,
                         offset: physical,
                         bytes: count,
                     },
-                    chunk: pending.chunk,
                 }) {
                     if count == available {
                         pending.bytes = Some(rejected.value.bytes);
@@ -934,10 +915,9 @@ impl PesAssembler {
             work.take(count as u64);
             self.payload_len += count;
             self.seen += count;
-            self.payload
-                .as_mut()
-                .ok_or(Error::Invalid("PES payload missing"))?
-                .position += count;
+            let pending = self.payload.as_mut().expect("pending PES body");
+            pending.body_span = true;
+            pending.position += count;
         }
     }
 }
