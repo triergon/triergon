@@ -16727,6 +16727,16 @@
    "sha256": "4f83a3beb2adac4163d6e3a23556fbf306aa9aae7afc8e58eb4e1ba7f487fb4d",
    "bytes": 4898,
    "source_revision": "a75807ed3330ac3c7ee7105a94494e0b8303541c"
+  },
+  {
+   "name": "nal-framing-count-b81e3ac7-linux-arm64",
+   "path": "nal-framing-count-b81e3ac7-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of splitting and classifying H.264/HEVC NAL units through triergon-framing, on a c8g.xlarge (Linux AArch64): same-code against main at 3e21668e for the media, playback, codec, subtitle, subtitle capsule, framing and isobmff workers; the HEVC (full) and H.264 conformance tests over the FATE vectors; and the instruction count of the 17 codec workloads, matroska-audio-clocks, matroska-startup-seek, subtitle-cc and subtitle-pgs-capsules at both revisions, on CPU 1. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/nal-framing-count-b81e3ac7-linux-arm64/adebff1997bdf11f96b15d2eb2ca825b910d7573a0340b3802f1e126c4a46964.tar.zst",
+   "sha256": "adebff1997bdf11f96b15d2eb2ca825b910d7573a0340b3802f1e126c4a46964",
+   "bytes": 9342,
+   "source_revision": "b81e3ac70b14881cb9e5c375d2005a9b309553aa"
   }
  ]
 }
