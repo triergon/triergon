@@ -16687,6 +16687,16 @@
    "sha256": "7acc14bd5f0eedac0613b978599a57fe48919497df370fb132b9519555ac7683",
    "bytes": 18326,
    "source_revision": "4caccc83e1b86007b0ee7539a9f273e74a606a98"
+  },
+  {
+   "name": "subtitles-count-a6e366d6-linux-arm64",
+   "path": "subtitles-count-a6e366d6-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of reading SCTE 20 caption bits through triergon-bitstream, on a c8g.xlarge (Linux AArch64): same-code against main at 75bbc6d5 for the subtitle, subtitle capsule and playback workers (only the caption extraction functions differ), and the instruction count of every case of subtitle-cc, -pgs, -dvb, -dvd and -teletext at both revisions, 50 operations on CPU 1. Measured at 9adb13de, whose code is that of a6e366d6. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-count-a6e366d6-linux-arm64/81c9bd14feced61e567abc733c0db9d83eea122e7cedb7d1c13f9516cf2208b6.tar.zst",
+   "sha256": "81c9bd14feced61e567abc733c0db9d83eea122e7cedb7d1c13f9516cf2208b6",
+   "bytes": 15417,
+   "source_revision": "a6e366d61ac06a37fe303cfd11ebe0b159b17579"
   }
  ]
 }

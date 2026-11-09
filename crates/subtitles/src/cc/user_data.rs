@@ -2,6 +2,8 @@
 //! carried in MPEG-2 picture user data and in ITU-T T.35 SEI messages of
 //! H.264 and HEVC), SCTE 20 user data and the line 21 user data of DVD-Video.
 
+use triergon_bitstream::{BitCursor, BitSource};
+
 /// `user_data_identifier` of ATSC user data.
 pub const ATSC_IDENTIFIER: [u8; 4] = *b"GA94";
 /// `user_data_type_code` of `cc_data()`.
@@ -88,8 +90,8 @@ pub fn scte20_captions(user_data: &[u8]) -> Option<Scte20Captions<'_>> {
     if kind != CC_DATA || flag & 0x7f != 0x01 {
         return None;
     }
-    let mut bits = Bits { data: rest, at: 0 };
-    let count = bits.read(5)?;
+    let mut bits = BitCursor::new(rest);
+    let count = bits.read(5).ok()?;
     Some(Scte20Captions {
         bits,
         remaining: count as u8,
@@ -99,7 +101,7 @@ pub fn scte20_captions(user_data: &[u8]) -> Option<Scte20Captions<'_>> {
 /// Iterator over SCTE 20 caption pairs; a pair cut short ends it.
 #[derive(Clone, Debug)]
 pub struct Scte20Captions<'a> {
-    bits: Bits<'a>,
+    bits: BitCursor<'a>,
     remaining: u8,
 }
 
@@ -121,12 +123,12 @@ impl Iterator for Scte20Captions<'_> {
         self.remaining -= 1;
         let bits = &mut self.bits;
         let caption = (|| {
-            let priority = bits.read(2)? as u8;
-            let field = bits.read(2)? as u8;
-            let line_offset = bits.read(5)? as u8;
-            let first = (bits.read(8)? as u8).reverse_bits();
-            let second = (bits.read(8)? as u8).reverse_bits();
-            bits.read(1)?;
+            let priority = bits.read(2).ok()? as u8;
+            let field = bits.read(2).ok()? as u8;
+            let line_offset = bits.read(5).ok()? as u8;
+            let first = (bits.read(8).ok()? as u8).reverse_bits();
+            let second = (bits.read(8).ok()? as u8).reverse_bits();
+            bits.read(1).ok()?;
             Some(Scte20Caption {
                 priority,
                 field,
@@ -192,28 +194,6 @@ pub fn dvd_captions(user_data: &[u8]) -> Option<DvdCaptions<'_>> {
         extra_field: header & 1 == 1,
         words,
     })
-}
-
-/// A most-significant-bit-first reader.
-#[derive(Clone, Debug)]
-struct Bits<'a> {
-    data: &'a [u8],
-    at: usize,
-}
-
-impl Bits<'_> {
-    fn read(&mut self, width: usize) -> Option<u32> {
-        if self.at + width > self.data.len() * 8 {
-            return None;
-        }
-        let mut value = 0;
-        for _ in 0..width {
-            let bit = (self.data[self.at / 8] >> (7 - self.at % 8)) & 1;
-            value = (value << 1) | u32::from(bit);
-            self.at += 1;
-        }
-        Some(value)
-    }
 }
 
 #[cfg(test)]
