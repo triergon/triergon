@@ -11,7 +11,7 @@ use triergon_isobmff::{
     compat::mov::{
         edits::{
             EncodedEditContext as EditContext, EncodedEditJob as EditJob,
-            EncodedEditLimits as EditLimits,
+            EncodedEditLimits as EditLimits, EncodedEditPlan,
         },
         encoded::{EncodedSelection as DescriptionSelection, EncodedStreamJob as ConfigurationJob},
         packets::CursorStatus,
@@ -22,13 +22,14 @@ use triergon_playback::{
     ByteSource, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen, PlayerPolicy,
     Progress, RawEvent, Selection,
     io::{SelectedInput, SourceOwner},
-    mp4_open::{Mp4Open, OpenLimits, OpenProgress},
+    mp4_open::{Movie, MovieTrack, Mp4Open, OpenLimits, OpenProgress},
     mp4_plan::PlanLimits,
 };
 
 pub const PREFIX: &str = "mp4-range-";
 const OPERATION: &str = "mp4-range-playback";
 const WINDOW: usize = 32 * 1024;
+const WORK: u64 = 4096;
 
 #[derive(Default)]
 struct Work {
@@ -76,6 +77,49 @@ impl Work {
     }
 }
 
+pub(crate) fn prepare_edit(
+    movie: &Movie,
+    track: &MovieTrack,
+    input: &mut InputCursor,
+    grant: u64,
+    cancel: &AtomicBool,
+) -> Result<Option<EncodedEditPlan>> {
+    let Some(edits) = track.edits() else {
+        return Ok(None);
+    };
+    let table = track.table();
+    let [description] = table.descriptions() else {
+        return Err("encoded edit requires one sample description".into());
+    };
+    let header = track.header();
+    let mut config = ConfigurationJob::new_range_playback(
+        header,
+        table,
+        input,
+        DescriptionSelection {
+            major_brand: movie.major_brand(),
+            description: description.index,
+            limits: ConfigurationLimits::default(),
+        },
+    )?;
+    while config.poll(input, &mut WorkBudget::new(grant), cancel)? != CursorStatus::Ready {}
+    let configs = [config.take(input, cancel)?];
+    let mut job = EditJob::new_range_playback(
+        EditContext {
+            table,
+            edits,
+            stream: &configs[0],
+            media_base: header.time_base()?,
+            movie_base: movie.header().time_base()?,
+        },
+        &configs,
+        input,
+        EditLimits::default(),
+    )?;
+    while job.poll(input, &mut WorkBudget::new(grant), cancel)? != CursorStatus::Ready {}
+    Ok(Some(job.take(input, cancel)?))
+}
+
 fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
     let id = SourceId(1);
     let input = InputCursor::new(
@@ -93,12 +137,11 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
         format: Format::Mp4,
     };
     let cancel = AtomicBool::new(false);
-    let work = || WorkBudget::new(4096);
+    let work = || WorkBudget::new(WORK);
     let mut open = Mp4Open::new(selected, OpenLimits::default())?;
     while !matches!(open.advance(&mut work(), &cancel)?, OpenProgress::Ready) {}
     let mut opened = open.finish()?;
     let movie = &opened.movie;
-    let movie_base = movie.header().time_base()?;
     let mut plans = BudgetVec::new(pool);
     plans.try_reserve_exact(movie.tracks().len())?;
     let mut video = None;
@@ -119,36 +162,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
         if !track.fragments().is_empty() {
             return Err("expected regular sample tables".into());
         }
-        let plan = if let Some(edits) = track.edits() {
-            let mut config = ConfigurationJob::new_range_playback(
-                header,
-                table,
-                &opened.input,
-                DescriptionSelection {
-                    major_brand: movie.major_brand(),
-                    description: descriptions[0].index,
-                    limits: ConfigurationLimits::default(),
-                },
-            )?;
-            while config.poll(&mut opened.input, &mut work(), &cancel)? != CursorStatus::Ready {}
-            let configs = [config.take(&mut opened.input, &cancel)?];
-            let mut edit = EditJob::new_range_playback(
-                EditContext {
-                    table,
-                    edits,
-                    stream: &configs[0],
-                    media_base: header.time_base()?,
-                    movie_base,
-                },
-                &configs,
-                &opened.input,
-                EditLimits::default(),
-            )?;
-            while edit.poll(&mut opened.input, &mut work(), &cancel)? != CursorStatus::Ready {}
-            Some(edit.take(&mut opened.input, &cancel)?)
-        } else {
-            None
-        };
+        let plan = prepare_edit(movie, track, &mut opened.input, WORK, &cancel)?;
         plans.try_push(plan).map_err(|error| error.error)?;
     }
     let video = video.filter(|_| audio).ok_or("missing AVC/AAC pair")?;
