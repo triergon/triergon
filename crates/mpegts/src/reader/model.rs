@@ -168,6 +168,15 @@ pub enum AccessUnit {
 }
 
 impl AccessUnit {
+    fn stored_bytes(&self) -> &Bytes {
+        match self {
+            Self::Adts(frame) => frame.source_bytes(),
+            Self::Ac3(frame) => frame.bytes(),
+            Self::IncompleteAudio { bytes, .. } => bytes,
+            Self::Video(_) => unreachable!("video access units use assembled bytes"),
+        }
+    }
+
     pub(super) fn range(&self) -> Range<u64> {
         match self {
             Self::Video(unit) => unit.range.clone(),
@@ -214,7 +223,7 @@ impl AccessUnit {
 pub(super) struct PacketData {
     pub track: Track,
     pub unit: AccessUnit,
-    pub bytes: Bytes,
+    pub video_bytes: Option<Bytes>,
     pub sources: BudgetVec<PayloadSource>,
     pub clock: Option<PacketClock>,
     pub epochs: SourceEpochs,
@@ -255,7 +264,10 @@ impl Packet {
         self.0.duration
     }
     pub fn bytes(&self) -> &Bytes {
-        &self.0.bytes
+        self.0
+            .video_bytes
+            .as_ref()
+            .unwrap_or_else(|| self.0.unit.stored_bytes())
     }
 }
 
@@ -264,7 +276,7 @@ impl PacketInfo for Packet {
         self.0.track.id()
     }
     fn payload(&self) -> &[u8] {
-        self.0.bytes.as_ref()
+        self.bytes().as_ref()
     }
     fn time_base(&self) -> TimeBase {
         TimeBase::new(1, 90_000).expect("nonzero TS clock")

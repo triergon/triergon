@@ -1161,7 +1161,10 @@ fn explicit_atsc_ac3_preserves_syncframes_and_the_source_tag() {
     let mut units = 0;
     while let Some(event) = declared.next().unwrap() {
         if let Event::Packet(packet) = event {
-            assert!(matches!(packet.access_unit(), AccessUnit::Ac3(_)));
+            let AccessUnit::Ac3(audio) = packet.access_unit() else {
+                panic!("expected an AC-3 syncframe");
+            };
+            assert!(std::ptr::eq(packet.bytes(), audio.bytes()));
             let track = packet.track_info();
             assert_eq!(track.kind(), MediaKind::Audio);
             assert_eq!(track.codec(), CodecId::Ac3);

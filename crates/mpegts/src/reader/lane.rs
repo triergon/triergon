@@ -591,7 +591,7 @@ impl Incomplete {
 struct Build {
     unit: Option<AccessUnit>,
     buffer: Option<BudgetVec<u8>>,
-    bytes: Option<Bytes>,
+    video_bytes: Option<Bytes>,
     nal: usize,
     part: u8,
     copied: usize,
@@ -605,16 +605,11 @@ struct Build {
 
 impl Build {
     fn new(unit: AccessUnit, pool: &Budget, last_anchor: u64) -> Self {
-        let bytes = match &unit {
-            AccessUnit::Adts(frame) => Some(frame.source_bytes().clone()),
-            AccessUnit::Ac3(frame) => Some(frame.bytes().clone()),
-            AccessUnit::Video(_) => None,
-            AccessUnit::IncompleteAudio { bytes, .. } => Some(bytes.clone()),
-        };
+        let buffer = matches!(unit, AccessUnit::Video(_)).then(|| BudgetVec::new(pool));
         Self {
             unit: Some(unit),
-            buffer: Some(BudgetVec::new(pool)),
-            bytes,
+            buffer,
+            video_bytes: None,
             nal: 0,
             part: 0,
             copied: 0,
@@ -630,11 +625,11 @@ impl Build {
         self.unit.as_ref().expect("pending access unit")
     }
     fn copy(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
-        if self.bytes.is_some() {
+        if self.video_bytes.is_some() {
             return Ok(true);
         }
-        let AccessUnit::Video(unit) = self.unit.as_ref().expect("pending video") else {
-            unreachable!()
+        let AccessUnit::Video(unit) = self.unit.as_ref().expect("pending access unit") else {
+            return Ok(true);
         };
         let size =
             usize::try_from(unit.range.end - unit.range.start).map_err(|_| Error::Overflow)?;
@@ -690,7 +685,7 @@ impl Build {
             return Ok(false);
         }
         match self.buffer.take().expect("coalescing storage").freeze() {
-            Ok(bytes) => self.bytes = Some(bytes),
+            Ok(bytes) => self.video_bytes = Some(bytes),
             Err(error) => {
                 self.buffer = Some(error.buffer);
                 return Err(error.error);
@@ -1091,7 +1086,7 @@ impl Lane {
             PacketData {
                 track: self.track.clone(),
                 unit: build.unit.expect("prepared unit"),
-                bytes: build.bytes.expect("prepared bytes"),
+                video_bytes: build.video_bytes,
                 sources: build.origins,
                 clock: build.clock,
                 epochs,

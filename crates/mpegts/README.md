@@ -50,8 +50,8 @@ framer syntax and intersecting PES events. `sources()` maps its elementary-byte
 extent to retained PES events, including all physical source and header ranges.
 Framer coordinates use a private concatenated elementary view (`SourceId(0)`),
 not physical file offsets. Video scatter payloads are coalesced cooperatively
-into charged immutable storage. Cloning a packet or `SourceEvent` shares its
-charged storage; it never performs an infallible vector clone.
+into charged immutable storage. Audio packets borrow their access unit's stored
+bytes. Cloning a packet or `SourceEvent` shares the charged storage.
 
 `Track::configuration_epoch()` comes from its elementary route, which can be
 reused across PMT versions and PCR binding changes. In-band SPS/PPS changes remain
