@@ -16667,6 +16667,16 @@
    "sha256": "bccf80c6522991d2091da329d784fba97b0988b248411c1b80c7408e506e69e0",
    "bytes": 3963,
    "source_revision": "434f2f8238d455424cc4d40648ec2acdd59884eb"
+  },
+  {
+   "name": "subtitles-same-code-de454823-linux-arm64",
+   "path": "subtitles-same-code-de454823-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of moving the recorded PGS and text subtitle runners into the subtitle-worker package, on a c8g.xlarge (Linux AArch64): same-code.txt compares the subtitle-worker binary at de454823 with main's at 9009c4c1; they are byte-identical. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/subtitles-same-code-de454823-linux-arm64/ea55d5b0a7d805beabd539e4d1f83d64d887c7943a60486b01d569a247b84b4a.tar.zst",
+   "sha256": "ea55d5b0a7d805beabd539e4d1f83d64d887c7943a60486b01d569a247b84b4a",
+   "bytes": 284,
+   "source_revision": "de454823a9b1549089455584ae5e781d1eea8bab"
   }
  ]
 }
