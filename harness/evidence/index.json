@@ -16841,6 +16841,16 @@
    "key": "evidence/mpegts-split-header-host/b2a9801019883347880756d8e725a8c51a03df15360e8639be8ae910d40100cd.tar.gz",
    "sha256": "b2a9801019883347880756d8e725a8c51a03df15360e8639be8ae910d40100cd",
    "bytes": 14010432
+  },
+  {
+   "name": "mpegts-reader-hotpath-linux-arm64",
+   "path": "mpegts-reader-hotpath-linux-arm64",
+   "retention": "retained",
+   "reason": "Transport access-unit, PES, progressive and HLS measurements cited in docs/status.md",
+   "key": "evidence/mpegts-reader-hotpath-linux-arm64/d69b37c719221f5813084d12191169fd783ba0e36277e1cac5889d923e044419.tar.gz",
+   "sha256": "d69b37c719221f5813084d12191169fd783ba0e36277e1cac5889d923e044419",
+   "bytes": 114509366,
+   "source_revision": "a829bc8ad051308d6ab3aebfcf15c42255bcb2f8"
   }
  ]
 }
