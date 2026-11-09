@@ -18,6 +18,7 @@ fn complete_fragment_edit_offsets_the_packet_and_resume_clocks() {
     use triergon_isobmff::compat::mov::packets::{
         CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, ResumePoint,
     };
+    use triergon_isobmff::compat::mov::seek::{SeekJob, SeekLimits};
     let pool = Budget::new(65536).unwrap();
     let boxes = common::roots(
         &pool,
@@ -84,6 +85,23 @@ fn complete_fragment_edit_offsets_the_packet_and_resume_clocks() {
             (Some(20), Some(16), Some(16)),
         ];
         assert_eq!(rows, expected[usize::try_from(start).unwrap()..]);
+    }
+    for (target, selected) in [(19, -4), (20, 16)] {
+        let mut seek = SeekJob::new_complete_source(
+            &pool,
+            tracks[0],
+            std::slice::from_ref(&extent),
+            target,
+            SeekLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+        )
+        .unwrap();
+        assert!((0..512).any(|_| {
+            seek.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Ready
+        }));
+        let seek = seek.finish().unwrap();
+        assert_eq!(seek.landing().requested_timestamp, target);
+        assert_eq!(seek.landing().selected.timestamp, selected);
     }
 }
 

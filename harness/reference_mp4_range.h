@@ -1,4 +1,4 @@
-/* Regular AVC/AAC playback through the public MOV demuxer API. */
+/* Seekable AVC/AAC playback through the public MOV demuxer API. */
 #include <errno.h>
 
 typedef struct {
