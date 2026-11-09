@@ -9,6 +9,9 @@ pub enum DescriptorNamespace {
     #[default]
     Unspecified,
     Dvb(DvbNamespaceEvidence),
+    /// The caller identified an ATSC transport. A/53 Part 3 assigns its
+    /// private audio stream types.
+    Atsc,
 }
 
 /// The coordinator must retain the actual service/profile evidence in its
