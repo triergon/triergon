@@ -1484,6 +1484,21 @@ impl TransportStream {
         self.diagnostic(kind, pid, error)
     }
 
+    // Keep elementary assembly dispatch separate from PSI and empty EOF paths.
+    #[inline(never)]
+    fn poll_pes(
+        assembler: &mut PesAssembler,
+        retain: bool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<Option<Pes>>> {
+        if retain {
+            assembler.poll_source::<true>(work, cancel)
+        } else {
+            assembler.poll_source::<false>(work, cancel)
+        }
+    }
+
     fn drain(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<TraceEvent>> {
         let result = match self.route {
             Route::Pat => self
@@ -1517,11 +1532,7 @@ impl TransportStream {
                     .assembler
                     .as_mut()
                     .ok_or(Error::Invalid("PES route missing"))?;
-                let step = if self.feed_omissions.is_some() {
-                    assembler.poll_source::<false>(work, cancel)
-                } else {
-                    assembler.poll_source::<true>(work, cancel)
-                };
+                let step = Self::poll_pes(assembler, self.feed_omissions.is_none(), work, cancel);
                 match step {
                     Ok(AssemblyStep::Output(Some(pes))) => {
                         return Ok(Some(TraceEvent::from_assembled_pes(pes)));
@@ -1594,11 +1605,7 @@ impl TransportStream {
                 .as_mut()
                 .ok_or(Error::Invalid("PES route missing at EOF"))?;
             assembler.end_of_source();
-            let step = if self.feed_omissions.is_some() {
-                assembler.poll_source::<false>(work, cancel)
-            } else {
-                assembler.poll_source::<true>(work, cancel)
-            };
+            let step = Self::poll_pes(assembler, self.feed_omissions.is_none(), work, cancel);
             match step {
                 Ok(AssemblyStep::Output(Some(pes))) => {
                     return Ok(Step::Ready(TraceEvent::from_assembled_pes(pes)));
