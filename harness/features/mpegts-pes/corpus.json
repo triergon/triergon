@@ -2123,8 +2123,11 @@
           "id": "hls-contiguous-pes-carry"
         }
       ],
-      "expected": null,
-      "reference_refusal": "no single-input reference operation for more than one media entity"
+      "expected": {
+        "packets": 1,
+        "bytes": 512,
+        "digest": 15463357684512389673
+      }
     },
     {
       "id": "hls-external-map",
@@ -2164,8 +2167,11 @@
           "id": "hls-external-map"
         }
       ],
-      "expected": null,
-      "reference_refusal": "no single-input reference operation for more than one media entity"
+      "expected": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
     },
     {
       "id": "hls-explicit-discontinuity",
@@ -2206,8 +2212,11 @@
           "id": "hls-explicit-discontinuity"
         }
       ],
-      "expected": null,
-      "reference_refusal": "no single-input reference operation for more than one media entity"
+      "expected": {
+        "packets": 2,
+        "bytes": 54,
+        "digest": 2150793539127356716
+      }
     },
     {
       "id": "dvb2-literals-fields",

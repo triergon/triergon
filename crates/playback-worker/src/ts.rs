@@ -7,11 +7,11 @@
 //! places each packet's timestamps. Faulted extraction retains the actual source
 //! diagnostic and never becomes a validated source PES.
 //!
-//! This packet operation binds one observer. Anything beyond that scope ends
-//! the operation with its cause instead of a fold: a program with more than one
-//! stream or a carriage the observer has no constructor for, a later PMT, an unconfirmed clock or format boundary, a
-//! quarantined clock, an unsupported transport, PES-time, program or active PSI fault, or a second
-//! media entity. A single-entity program-policy refusal with no emitted packets
+//! Ordinary entity boundaries preserve PES assembly and the demux clock. A
+//! declared discontinuity requires drained assembly and a fresh source map
+//! for the same stream. Other program, clock, format and recovery
+//! contexts outside this scope stop with a refusal. A single-entity
+//! program-policy refusal with no emitted packets
 //! can instead complete when `PacketCompletion` proves every physical carrier is
 //! control-only and the source reached actual EOF. The proof runs inside the
 //! operation and never changes source validation.
@@ -23,10 +23,12 @@
 //! worker (`harness/reference_ts.h`).
 
 use crate::runner::{Invocation, MAX_INPUT, Refusal, Result, Totals, measure};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
+    SourceId, Step, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::pes::{
@@ -37,8 +39,8 @@ use triergon_mpegts::compat::pes::{
 };
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, DvbNamespaceEvidence, ProgramMap};
 use triergon_mpegts::{
-    AssemblyStep, FaultKind, PacketFormat, ParseLimits, SourceEpochs, SourceRange, TraceEvent,
-    TransportStream,
+    AssemblyStep, FaultKind, MediaEntityEnd, PacketFormat, ParseLimits, SourceEpochs, SourceRange,
+    TraceEvent, TransportStream,
 };
 
 pub const PREFIX: &str = "ts-";
@@ -46,6 +48,8 @@ const OPERATION: &str = "mpegts-pes-packets";
 const PROFILE: DemuxProfile = DemuxProfile::PesPackets;
 const WINDOW: usize = 64 * 1024;
 const WORK: u64 = 4096;
+/// Matches the entity count limit of the public reference adapter.
+const MAX_ENTITIES: usize = 64;
 /// FFmpeg's `AV_NOPTS_VALUE`, folded for an absent timestamp on both sides.
 const NO_TIME: i64 = i64::MIN;
 /// FFmpeg's `AV_PKT_DATA_MPEGTS_STREAM_ID` side-data type.
@@ -59,6 +63,7 @@ fn fold_packet(
     packet: &DemuxPacket,
     pts90: Option<i64>,
     dts90: Option<i64>,
+    position: i64,
 ) -> Result<()> {
     // One elementary stream: stream index zero.
     let fields = [
@@ -67,7 +72,7 @@ fn fold_packet(
         signed(pts90.unwrap_or(NO_TIME)),
         signed(dts90.unwrap_or(NO_TIME)),
         signed(packet.duration90_raw),
-        signed(packet.position),
+        signed(position),
         u64::from(packet.flags),
         packet.payload_len as u64,
     ];
@@ -245,7 +250,7 @@ fn observer(
         pid: stream.pid,
         stream_type: stream.stream_type,
         stream_id,
-        entity: cause.source,
+        entity: input.source(),
         epochs: cause.epochs,
     };
     let (budget, limits) = (pool.clone(), ParseLimits::default());
@@ -288,11 +293,33 @@ fn observer(
 struct Session {
     clock: DemuxClock,
     observer: Option<TransportFaultRecovery>,
+    route: Option<DemuxScope>,
+    discontinuity: Option<SourceEpochs>,
+    entity_base: i64,
+    observer_base: i64,
     finished: bool,
     totals: Totals,
 }
 
 impl Session {
+    fn new(program: u16) -> Result<Self> {
+        Ok(Self {
+            clock: DemuxClock::new(program)?,
+            observer: None,
+            route: None,
+            discontinuity: None,
+            entity_base: 0,
+            observer_base: 0,
+            finished: false,
+            totals: Totals::default(),
+        })
+    }
+
+    fn refusal(mut self, error: &dyn std::fmt::Display, cause: Cause) -> Totals {
+        self.totals.refusal = Some(Box::new(cause.refusal(error)));
+        self.totals
+    }
+
     /// Route one source event: the first active PMT binds the observer, the
     /// selected PID's transport packets feed it, and every context the observer
     /// alone cannot take is refused.
@@ -309,9 +336,20 @@ impl Session {
             Error::Unsupported(_) => unrouted(),
             error => error,
         };
+        if let Some(expected) = self.discontinuity {
+            if !matches!(event, TraceEvent::Discontinuity { epochs } if *epochs == expected)
+                || input.position() != 0
+            {
+                return Err(Error::Invalid("source discontinuity not observed"));
+            }
+            self.discontinuity = None;
+            return Ok(());
+        }
         if let Some(observer) = &self.observer {
             let scope = observer.scope();
-            if scope.entity != cause.source || quarantined {
+            // A spanning PES or PSI event may report its origin in an older
+            // entity. The observer binds the current physical input.
+            if scope.entity != input.source() || quarantined {
                 return Err(unrouted());
             }
             if matches!(event, TraceEvent::Timeline { .. }) {
@@ -336,7 +374,17 @@ impl Session {
                 if self.observer.is_some() || quarantined {
                     return Err(unrouted());
                 }
-                self.observer = Some(observer(input, program, map, cause)?);
+                let observer = observer(input, program, map, cause)?;
+                let scope = observer.scope();
+                if self.route.is_some_and(|old| {
+                    (old.pid, old.stream_type, old.stream_id)
+                        != (scope.pid, scope.stream_type, scope.stream_id)
+                }) {
+                    return Err(unrouted());
+                }
+                self.route = Some(scope);
+                self.observer_base = self.entity_base;
+                self.observer = Some(observer);
             }
             TraceEvent::Transport(packet) => {
                 if let Some(observer) = self.observer.as_mut()
@@ -410,6 +458,10 @@ impl Session {
         let Some(observer) = self.observer.as_mut() else {
             return Ok(());
         };
+        // Observer positions are relative to its first entity. The reference
+        // AVIO sees sequence positions even after an observer is replaced.
+        let base = self.observer_base;
+        let position = |offset| base.checked_add(offset).ok_or(Error::Overflow);
         loop {
             match observer.poll(&mut WorkBudget::new(WORK), cancel)? {
                 AssemblyStep::Output(TransportObservation::Accepted(packet)) => {
@@ -428,6 +480,7 @@ impl Session {
                         &packet,
                         time64(time.pts90)?,
                         time64(time.dts90)?,
+                        position(packet.position)?,
                     )?;
                 }
                 AssemblyStep::Output(TransportObservation::Faulted(packet)) => {
@@ -443,7 +496,7 @@ impl Session {
                             signed(i64::try_from(time.pts90)?),
                             signed(i64::try_from(time.dts90)?),
                             signed(packet.duration90_raw),
-                            signed(packet.position),
+                            signed(position(packet.position)?),
                             u64::from(packet.flags),
                             packet.payload_len as u64,
                         ],
@@ -464,7 +517,7 @@ impl Session {
                             signed(time64(time.pts90)?.unwrap_or(NO_TIME)),
                             signed(time64(time.dts90)?.unwrap_or(NO_TIME)),
                             signed(packet.duration90_raw),
-                            signed(packet.position),
+                            signed(position(packet.position)?),
                             u64::from(packet.flags),
                             packet.payload_len as u64,
                         ],
@@ -482,6 +535,89 @@ impl Session {
         }
     }
 
+    fn continue_entity(
+        &mut self,
+        demux: &mut TransportStream,
+        end: &MediaEntityEnd,
+        input: &mut InputCursor,
+        next: &Entity,
+        cancel: &AtomicBool,
+    ) -> triergon_core::Result<()> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if demux.clock_is_quarantined() {
+            return Err(Error::Unsupported(UNROUTED));
+        }
+        if next.discontinuity
+            && self
+                .observer
+                .as_ref()
+                .is_some_and(|observer| !observer.discard_idle())
+        {
+            return Err(Error::Unsupported(
+                "discontinuity requires a drained PES observer",
+            ));
+        }
+        let base = self
+            .entity_base
+            .checked_add(i64::try_from(end.location().offset).map_err(|_| Error::Overflow)?)
+            .ok_or(Error::Overflow)?;
+        input.continue_source(next.source, capabilities(&next.input))?;
+        if let Some(observer) = self.observer.as_mut() {
+            if !observer.continue_media_entity(end, input, &mut WorkBudget::new(WORK), cancel)? {
+                return Err(Error::Invalid(
+                    "media entity continuation yielded on fixed grant",
+                ));
+            }
+        } else {
+            end.validate_continuation(input)?;
+        }
+        if next.discontinuity {
+            demux.discontinuity()?;
+            self.observer = None;
+            self.discontinuity = Some(demux.source_epochs());
+        }
+        self.entity_base = base;
+        Ok(())
+    }
+
+    fn seal_terminal_end(
+        &mut self,
+        end: &MediaEntityEnd,
+        input: &mut InputCursor,
+        cancel: &AtomicBool,
+    ) -> Result<()> {
+        if let Some(observer) = self.observer.as_mut()
+            && observer.awaiting_terminal_completion()
+            && !observer.seal_terminal_end(end, input, &mut WorkBudget::new(WORK), cancel)?
+        {
+            return Err("terminal End yielded on fixed grant".into());
+        }
+        Ok(())
+    }
+
+    fn confirm_terminal_finished(
+        &mut self,
+        event: &TraceEvent,
+        cause: Cause,
+        input: &mut InputCursor,
+        cancel: &AtomicBool,
+    ) -> triergon_core::Result<bool> {
+        if let Some(observer) = self.observer.as_mut()
+            && observer.awaiting_terminal_completion()
+        {
+            return observer.confirm_terminal_finished(
+                event,
+                cause.context()?,
+                input,
+                &mut WorkBudget::new(WORK),
+                cancel,
+            );
+        }
+        Ok(true)
+    }
+
     fn logical_end(&mut self, cancel: &AtomicBool) -> Result<()> {
         self.observer
             .as_mut()
@@ -495,15 +631,26 @@ impl Session {
     }
 }
 
-/// The parsed request: packet format, program, descriptor namespace, the first
-/// media entity and whether more follow. The observer refuses at the first entity
-/// boundary, so the later entities do not change the outcome.
+struct Entity {
+    source: SourceId,
+    input: Bytes,
+    discontinuity: bool,
+}
+
+fn capabilities(input: &Bytes) -> SourceCapabilities {
+    SourceCapabilities {
+        length: Some(input.len() as u64),
+        random_access: false,
+    }
+}
+
+/// A preloaded sequence of actual media entities, all charged to one pool.
 struct Request {
     format: PacketFormat,
     program: u16,
     namespace: DescriptorNamespace,
     input: Bytes,
-    more_entities: bool,
+    following: BudgetVec<Entity>,
 }
 
 struct PacketAttempt {
@@ -514,10 +661,12 @@ struct PacketAttempt {
 /// Keep the packet path's refusal unless a separate physical-source proof
 /// confirms this entire single entity contained no media.
 fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
+    if !request.following.is_empty() {
+        return sequence_operation(pool, request, cancel);
+    }
     let attempt = packet_operation(pool, request, cancel)?;
     if attempt.try_control_completion
         && attempt.totals.packets == 0
-        && !request.more_entities
         && control_completion(pool, request, cancel)?.is_some()
     {
         return Ok(Totals::default());
@@ -532,15 +681,7 @@ fn packet_operation(
     cancel: &AtomicBool,
 ) -> Result<PacketAttempt> {
     let raw = &request.input;
-    let mut input = InputCursor::new(
-        pool,
-        SourceId(1),
-        SourceCapabilities {
-            length: Some(raw.len() as u64),
-            random_access: false,
-        },
-        WINDOW,
-    )?;
+    let mut input = InputCursor::new(pool, SourceId(1), capabilities(raw), WINDOW)?;
     let mut malformed = MalformedInputCompletion::new_with_namespace(
         &input,
         request.format,
@@ -548,24 +689,16 @@ fn packet_operation(
         request.program,
         request.namespace,
     )?;
-    let mut session = Session {
-        clock: DemuxClock::new(request.program)?,
-        observer: None,
-        finished: false,
-        totals: Totals::default(),
-    };
+    let mut session = Session::new(request.program)?;
     let mut logical_eof = None;
     let mut no_packets = None;
-    let refused = |mut session: Session,
-                   error: &dyn std::fmt::Display,
-                   cause: Cause,
-                   try_control_completion| {
-        session.totals.refusal = Some(Box::new(cause.refusal(error)));
-        Ok(PacketAttempt {
-            totals: session.totals,
-            try_control_completion,
-        })
-    };
+    let refused =
+        |session: Session, error: &dyn std::fmt::Display, cause: Cause, try_control_completion| {
+            Ok(PacketAttempt {
+                totals: session.refusal(error, cause),
+                try_control_completion,
+            })
+        };
     loop {
         let step = match malformed.poll_source(&mut input, &mut WorkBudget::new(WORK), cancel) {
             Ok(step) => step,
@@ -624,22 +757,12 @@ fn packet_operation(
                         let error = Error::Invalid("source finished without logical EOF");
                         return refused(session, &error, cause, false);
                     };
-                    if let Some(observer) = session.observer.as_mut()
-                        && observer.awaiting_terminal_completion()
-                    {
-                        match observer.confirm_terminal_finished(
-                            &event,
-                            cause.context()?,
-                            &mut input,
-                            &mut WorkBudget::new(WORK),
-                            cancel,
-                        ) {
-                            Ok(true) => {}
-                            Ok(false) => {
-                                return Err("terminal confirmation yielded on fixed grant".into());
-                            }
-                            Err(error) => return refused(session, &error, cause, false),
+                    match session.confirm_terminal_finished(&event, cause, &mut input, cancel) {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            return Err("terminal confirmation yielded on fixed grant".into());
                         }
+                        Err(error) => return refused(session, &error, cause, false),
                     }
                     if malformed.discarded_carriers() != 0 && session.totals.packets == 0 {
                         match malformed.confirm_no_packets(
@@ -668,47 +791,15 @@ fn packet_operation(
                 }
             }
             Step::Yield => {}
-            Step::NeedInput(request) => {
-                let offset = usize::try_from(request.offset)?;
-                let end = raw.len().min(offset.saturating_add(request.maximum));
-                if offset < end {
-                    input.provide_owned(InputWindow::new(
-                        request.source,
-                        request.token,
-                        request.offset,
-                        raw.slice(offset..end)?,
-                    )?)?;
-                } else {
-                    input.finish(request.source, request.token)?;
-                }
-            }
+            Step::NeedInput(request) => provide_input(&mut input, raw, request)?,
             Step::End(location) => {
                 let epochs = malformed.source_epochs();
                 let boundary =
                     |phase| Cause::boundary(phase, location.source, location.offset, epochs);
-                if request.more_entities {
-                    let error = Error::Unsupported(UNROUTED);
-                    return refused(
-                        session,
-                        &error,
-                        boundary("entity_end_not_logical_eof"),
-                        false,
-                    );
-                }
                 let physical_end = malformed
                     .seal_physical_end(&mut input, &mut WorkBudget::new(WORK), cancel)?
                     .ok_or("source End yielded on fixed grant")?;
-                if let Some(observer) = session.observer.as_mut()
-                    && observer.awaiting_terminal_completion()
-                    && !observer.seal_terminal_end(
-                        &physical_end,
-                        &mut input,
-                        &mut WorkBudget::new(WORK),
-                        cancel,
-                    )?
-                {
-                    return Err("terminal End yielded on fixed grant".into());
-                }
+                session.seal_terminal_end(&physical_end, &mut input, cancel)?;
                 logical_eof = Some(boundary("logical_eof"));
                 malformed.end_of_source()?;
             }
@@ -728,6 +819,121 @@ fn packet_operation(
         totals: session.totals,
         try_control_completion: false,
     })
+}
+
+fn sequence_operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
+    let mut raw = &request.input;
+    let mut following = request.following.as_slice().iter();
+    let mut input = InputCursor::new(pool, SourceId(1), capabilities(raw), WINDOW)?;
+    let mut demux = TransportStream::new_with_namespace(
+        pool.clone(),
+        request.format,
+        ParseLimits::default(),
+        request.program,
+        request.namespace,
+    )?;
+    let mut session = Session::new(request.program)?;
+    let mut ordinal = 0_u64;
+    let mut logical_eof = None;
+    loop {
+        let step = match demux.poll(&mut input, &mut WorkBudget::new(WORK), cancel) {
+            Ok(step) => step,
+            Err(error) => {
+                let cause = Cause::boundary(
+                    "source_poll_error",
+                    input.source(),
+                    input.position(),
+                    demux.source_epochs(),
+                );
+                return Ok(session.refusal(&error, cause));
+            }
+        };
+        match step {
+            Step::Ready(event) => {
+                let cause = Cause::event(&event, ordinal, input.source(), demux.source_epochs());
+                ordinal += 1;
+                if let Err(error) = session.observe(
+                    &input,
+                    request.program,
+                    &event,
+                    cause,
+                    demux.clock_is_quarantined(),
+                ) {
+                    return Ok(session.refusal(&error, cause));
+                }
+                if let Err(error) = session.drain(cancel) {
+                    return Ok(session.refusal(&error, cause));
+                }
+                if matches!(event, TraceEvent::Finished) {
+                    let Some(eof) = logical_eof else {
+                        let error = Error::Invalid("source finished without logical EOF");
+                        return Ok(session.refusal(&error, cause));
+                    };
+                    match session.confirm_terminal_finished(&event, cause, &mut input, cancel) {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            return Err("terminal confirmation yielded on fixed grant".into());
+                        }
+                        Err(error) => return Ok(session.refusal(&error, cause)),
+                    }
+                    if let Err(error) = session.logical_end(cancel) {
+                        return Ok(session.refusal(&error, eof));
+                    }
+                    if session.totals.packets == 0 {
+                        let error = Error::Unsupported("empty observation is not acceptance");
+                        return Ok(session.refusal(&error, eof));
+                    }
+                    return Ok(session.totals);
+                }
+            }
+            Step::Yield => {}
+            Step::NeedInput(request) => provide_input(&mut input, raw, request)?,
+            Step::End(location) => {
+                let physical_end = demux
+                    .media_entity_end(&mut input, &mut WorkBudget::new(WORK), cancel)?
+                    .ok_or("source End yielded on fixed grant")?;
+                if let Some(next) = following.next() {
+                    let cause = Cause::boundary(
+                        "media_entity_continuation",
+                        location.source,
+                        location.offset,
+                        physical_end.epochs(),
+                    );
+                    if let Err(error) =
+                        session.continue_entity(&mut demux, &physical_end, &mut input, next, cancel)
+                    {
+                        return Ok(session.refusal(&error, cause));
+                    }
+                    raw = &next.input;
+                    continue;
+                }
+                session.seal_terminal_end(&physical_end, &mut input, cancel)?;
+                logical_eof = Some(Cause::boundary(
+                    "logical_eof",
+                    location.source,
+                    location.offset,
+                    physical_end.epochs(),
+                ));
+                demux.end_of_source()?;
+            }
+        }
+    }
+}
+
+fn provide_input(input: &mut InputCursor, raw: &Bytes, request: InputRequest) -> Result<()> {
+    let offset = usize::try_from(request.offset)?;
+    let end = raw.len().min(offset.saturating_add(request.maximum));
+    if offset < end {
+        input.provide_owned(InputWindow::new(
+            request.source,
+            request.token,
+            request.offset,
+            raw.slice(offset..end)?,
+        )?)?;
+    } else {
+        input.finish(request.source, request.token)?;
+    }
+    Ok(())
 }
 
 /// A bounded replay is needed because a program-policy refusal may precede
@@ -844,33 +1050,60 @@ fn parse(pool: &Budget, path: &Path, arguments: &[String]) -> Result<Request> {
         _ => return Err(usage.into()),
     };
     let program: u16 = program.parse()?;
-    let mut namespace = DescriptorNamespace::Unspecified;
-    let mut files = vec![path.to_path_buf()];
+    let (namespace, rest) = match rest {
+        [option, rest @ ..] if option == "--dvb" => (
+            DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile),
+            rest,
+        ),
+        _ => (DescriptorNamespace::Unspecified, rest),
+    };
+    let input = load_entity(pool, path, MAX_INPUT)?;
+    let mut remaining = MAX_INPUT - input.len() as u64;
+    let mut following = BudgetVec::new(pool);
     let mut rest = rest.iter();
     while let Some(argument) = rest.next() {
-        match argument.as_str() {
-            "--dvb" if files.len() == 1 => {
-                namespace =
-                    DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
-            }
-            "--discontinuity" => files.push(entity(path, rest.next().ok_or(usage)?)?),
-            name => files.push(entity(path, name)?),
+        if following.len() == MAX_ENTITIES - 1 {
+            return Err(Error::Policy("TS media entity count").into());
         }
+        let discontinuity = argument == "--discontinuity";
+        let name = if discontinuity {
+            rest.next().ok_or(usage)?
+        } else {
+            argument
+        };
+        let bytes = load_entity(pool, &entity(path, name)?, remaining)?;
+        remaining -= bytes.len() as u64;
+        let source = SourceId(2 + following.len() as u64);
+        following
+            .try_push(Entity {
+                source,
+                input: bytes,
+                discontinuity,
+            })
+            .map_err(|error| error.error)?;
     }
-    for path in &files {
-        let size = path.metadata()?.len();
-        if size == 0 || size > MAX_INPUT {
-            return Err("input must be a bounded nonempty file".into());
-        }
-    }
-    let input = Bytes::try_from_vec(pool, std::fs::read(path)?).map_err(|error| error.error())?;
     Ok(Request {
         format,
         program,
         namespace,
         input,
-        more_entities: files.len() > 1,
+        following,
     })
+}
+
+fn load_entity(pool: &Budget, path: &Path, remaining: u64) -> Result<Bytes> {
+    let metadata = path.metadata()?;
+    let size = metadata.len();
+    if !metadata.is_file() || size == 0 || size > remaining {
+        return Err("input must be a bounded nonempty file".into());
+    }
+    let mut file = std::fs::File::open(path)?;
+    let mut input = BudgetVec::try_filled(pool, 0, usize::try_from(size)?)?;
+    file.read_exact(input.as_mut_slice())?;
+    if file.read(&mut [0])? != 0 {
+        return Err("input grew beyond its declared extent".into());
+    }
+    Ok(input.freeze().map_err(|error| error.error)?)
 }
 
 /// A further media entity, named relative to the first input's directory.
@@ -905,7 +1138,7 @@ mod tests {
     use crate::runner::Totals;
     use std::path::Path;
     use std::sync::atomic::AtomicBool;
-    use triergon_core::{Budget, Bytes, Error};
+    use triergon_core::{Budget, BudgetVec, Bytes, Error};
     use triergon_mpegts::{PacketFormat, psi::DescriptorNamespace};
 
     fn run(file: &str, arguments: &[&str]) -> Totals {
@@ -986,7 +1219,7 @@ mod tests {
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
             input: Bytes::copy_from_slice(&pool, &data).unwrap(),
-            more_entities: false,
+            following: BudgetVec::new(&pool),
         };
         let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(
@@ -999,24 +1232,52 @@ mod tests {
     }
 
     #[test]
-    fn contexts_outside_the_observer_end_with_their_cause() {
-        for (file, arguments) in [
+    fn media_entities_fold_as_the_recorded_reference() {
+        for (file, arguments, expected) in [
             (
                 "hls-contiguous-part-a.ts",
                 &["188", "1", "hls-contiguous-part-b.ts"][..],
+                (1, 512, 15_463_357_684_512_389_673),
             ),
-            ("hls-map-init.ts", &["188", "1", "hls-map-media.ts"][..]),
+            (
+                "hls-map-init.ts",
+                &["188", "1", "hls-map-media.ts"][..],
+                (1, 27, 7_910_521_612_812_314_295),
+            ),
             (
                 "ts188-basic.ts",
                 &["188", "1", "--discontinuity", "hls-new-timeline.ts"][..],
+                (2, 54, 2_150_793_539_127_356_716),
             ),
         ] {
-            let refusal = run(file, arguments).refusal.expect(file);
+            let totals = run(file, arguments);
+            assert!(
+                totals.refusal.is_none(),
+                "{file}: {:?}",
+                totals.refusal.as_ref().map(|refusal| &refusal.reason)
+            );
             assert_eq!(
-                refusal.reason, "unsupported: needs a program-level reader",
+                (totals.packets, totals.bytes, totals.digest),
+                expected,
                 "{file}"
             );
         }
+    }
+
+    #[test]
+    fn discontinuity_with_unpublished_pes_is_a_refusal() {
+        let totals = run(
+            "hls-contiguous-part-a.ts",
+            &["188", "1", "--discontinuity", "hls-new-timeline.ts"],
+        );
+        let refusal = totals
+            .refusal
+            .expect("unfinished PES needs a boundary policy");
+        assert_eq!(
+            refusal.reason,
+            "unsupported: discontinuity requires a drained PES observer"
+        );
+        assert_eq!(totals.packets, 0);
     }
 
     #[test]

@@ -6,14 +6,14 @@
   "worker_operation": "ts-",
   "reference": "ffmpeg-formats-native",
   "contract": [
-    "one MPEG-TS input (TS188 or M2TS192) of authored synthetic streams, preloaded and read forward only, for one selected program",
+    "one MPEG-TS input (TS188 or M2TS192) of authored synthetic streams for one selected program, preloaded and supplied forward as one entity or an ordered sequence of entities, with at most 64 entities and 64 MiB of input",
     "candidate: the public API only. TransportStream parses the input and selects the program; its first active PMT binds a compat::pes::DemuxObserver to the program's one elementary stream with the constructor its carriage selects, the transport packets of that PID feed the observer, and compat::pes::DemuxClock places each packet's timestamps",
     "reference: FFmpeg's mpegts demuxer through custom AVIO (32 KiB buffer, reads of at most 64 KiB) with NOPARSE and NOFILLIN, no stream discovery and no decoders; every packet of the selected program in demuxer order",
     "each packet folds stream index, PID, PTS and DTS in 90 kHz units (absent as INT64_MIN), duration, position, flags, payload length and bytes, and every side-data element (type, size, bytes); program and stream metadata are not compared",
-    "a case passes only when both reach EOF and both folds equal the expected fold recorded from the reference worker on the pinned build; those expected folds also equal the folds of the archived reference observations of the same inputs",
+    "a case passes only when both reach EOF and both folds equal the expected fold recorded from the reference worker on the pinned build. Existing expected folds retain the archived reference observations. Sequence folds come from the pinned public AVIO sequence operation",
     "a context outside the observer and its explicit compatibility policies ends the operation with its cause and fails the case; source facts, diagnostics and refusals remain distinct from packets. A zero-packet fold requires proved control-only completion or a reported malformed-input completion with complete physical coverage and actual EOF on the original bound cursor. An unproved empty observation fails. No packet or source scope is created by either completion receipt",
     "the recorded 272-request set is replayed as these 97 compat-view operations (104 of the requests are compat-view requests): requests with the same inputs, packet size, program and declared descriptor namespace (--dvb) are one operation and share a case. The 168 requests for the strict source view, 64 of them for its native source-clock projection, are replayed as the compat-view operation on their inputs; the strict source view itself is not compared. corpus.json lists every request under its case",
-    "requests over two media entities (a second segment, optionally after a discontinuity) stay cases without an expected fold: the candidate refuses at the entity boundary and the reference has no single-input equivalent"
+    "at ordinary entity boundaries the candidate proves physical EOF and continues the same cursor, PES observer and clock; the reference AVIO supplies the next entity without reporting EOF. At a declared discontinuity the candidate requires drained PES assembly and a fresh source map for the same stream, and the reference flushes on a declared AVIO boundary. Positions in the fold are relative to the sequence. Logical EOF follows the final entity"
   ],
   "required_profiles": [
     "ts188-basic",
@@ -123,18 +123,5 @@
   "pending_module_requirements": [
     "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
   ],
-  "open_cases": [
-    {
-      "id": "hls-contiguous-pes-carry",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    },
-    {
-      "id": "hls-external-map",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    },
-    {
-      "id": "hls-explicit-discontinuity",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    }
-  ]
+  "open_cases": []
 }
