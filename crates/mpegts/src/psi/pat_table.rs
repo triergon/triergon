@@ -60,6 +60,12 @@ impl PatCollector {
         self.input = None;
         self.building = None;
     }
+    pub(crate) fn retained_sections(&self) -> [Option<&BudgetVec<PatSection>>; 2] {
+        self.versions
+            .each_ref()
+            .map(|version| version.as_ref().map(|version| &version.sections))
+    }
+
     pub(crate) fn active_single_section(&self) -> Option<&Bytes> {
         let version = self.versions[self.active?].as_ref()?;
         let [section] = version.sections.as_slice() else {

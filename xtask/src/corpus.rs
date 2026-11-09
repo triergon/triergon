@@ -29,13 +29,13 @@ pub struct Paths {
 }
 
 impl Paths {
-    fn fixtures(&self, dir: &str) -> Result<PathBuf, String> {
+    pub(crate) fn fixtures(&self, dir: &str) -> Result<PathBuf, String> {
         let path = self.out.join(".research").join(dir);
         fs::create_dir_all(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(path)
     }
 
-    fn manifest(&self, name: &str, value: &Value) -> Result<PathBuf, String> {
+    pub(crate) fn manifest(&self, name: &str, value: &Value) -> Result<PathBuf, String> {
         let path = self.out.join("harness").join(name);
         write_json(&path, value)?;
         Ok(path)
@@ -66,6 +66,7 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
         catalogue(paths, &source)?,
         playback_capsules(paths)?,
         mp4_range(paths)?,
+        crate::transport_fixtures::generate(paths)?,
     ])
 }
 
@@ -153,7 +154,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
 }
 
 /// One manifest row for an authored fixture.
-fn authored(name: &str, file: &str, data: &[u8], extra: Vec<(&str, Value)>) -> Value {
+pub(crate) fn authored(name: &str, file: &str, data: &[u8], extra: Vec<(&str, Value)>) -> Value {
     let mut row = vec![
         ("id", Value::str(name)),
         ("profile", Value::str(name)),
@@ -1918,6 +1919,7 @@ mod tests {
             "features/matroska-colour/corpus.json",
             "features/matroska-segment-metadata/corpus.json",
             "features/mp4-range/corpus.json",
+            "features/mpegts-access-units/corpus.json",
         ] {
             let ours = fs::read_to_string(out.join("harness").join(name)).unwrap();
             let committed = fs::read_to_string(root.join("harness").join(name)).unwrap();

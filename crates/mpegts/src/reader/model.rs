@@ -1,12 +1,13 @@
 use crate::clock::{ClockKey, SourceTimestamp};
+use crate::compat::pes::PrivateAudioCarriage;
 use crate::psi::{ElementaryStream, ProgramMap};
-use crate::{SourceEpochs, TraceEvent};
+use crate::{ContinuityOutcome, SourceEpochs, TraceEvent, TransportPacket};
 use std::alloc::Layout;
 use std::ops::{Deref, Range};
 use std::sync::{Arc, atomic::AtomicUsize};
 use triergon_core::container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, Time, TimeBase};
-use triergon_framing::{AacAdtsFrame, Ac3Frame, RawAccessUnit};
+use triergon_framing::{AacAdtsCarrier, AacAdtsFrame, Ac3Frame, Ac3FrameFacts, RawAccessUnit};
 
 #[derive(Debug)]
 struct Owned<T> {
@@ -51,7 +52,7 @@ impl<T> Shared<T> {
     }
 }
 
-/// An original transport event. Clones share its charged storage, including
+/// A shared original source event. Clones share its charged storage, including
 /// every ordered descriptor, source range, rejected carrier and PES span.
 #[derive(Clone, Debug)]
 pub struct SourceEvent(pub(super) Shared<TraceEvent>);
@@ -67,10 +68,9 @@ impl SourceEvent {
         }
     }
     pub(super) fn pes(&self) -> &crate::Pes {
-        match self.event() {
-            TraceEvent::Pes(pes) => pes,
-            _ => unreachable!("payload source owns a PES"),
-        }
+        self.event()
+            .pes_source()
+            .expect("payload source owns a PES")
     }
 }
 
@@ -131,8 +131,47 @@ pub struct PayloadSource {
     pub pes: SourceEvent,
 }
 
-/// The most recent applicable PES anchor at an AU's first start-code byte
-/// (or audio sync byte). An anchor is used once; one inside a frame waits for
+#[derive(Debug)]
+pub(super) enum PayloadSources {
+    Inline(Option<PayloadSource>),
+    Table(BudgetVec<PayloadSource>),
+}
+
+impl PayloadSources {
+    pub(super) fn as_slice(&self) -> &[PayloadSource] {
+        match self {
+            Self::Inline(source) => source.as_slice(),
+            Self::Table(sources) => sources.as_slice(),
+        }
+    }
+
+    pub(super) fn try_push(&mut self, pool: &Budget, source: PayloadSource) -> Result<()> {
+        match self {
+            Self::Inline(first @ None) => *first = Some(source),
+            Self::Inline(first) => {
+                // Reserve both entries before moving the retained first source.
+                let mut table = BudgetVec::new(pool);
+                let mut second = Some(source);
+                table.try_extend_with(2, |index| {
+                    if index == 0 {
+                        first.take().expect("first PES source")
+                    } else {
+                        second.take().expect("second PES source")
+                    }
+                })?;
+                *self = Self::Table(table);
+            }
+            Self::Table(table) => {
+                table.try_reserve_exact(1)?;
+                table.try_push(source).map_err(|error| error.error)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The most recent applicable PES anchor at the first byte of a source unit.
+/// An anchor is used once; one inside a frame waits for
 /// the next frame start. Missing DTS is never inferred from PTS.
 #[derive(Clone, Debug)]
 pub struct PacketClock {
@@ -151,6 +190,111 @@ pub(super) struct ClockContext {
     pub quarantined: bool,
 }
 
+#[derive(Debug)]
+pub(super) struct DependentSyncframe {
+    pub facts: Ac3FrameFacts,
+    // Released as soon as this syncframe is copied into the group.
+    pub pending_bytes: Option<Bytes>,
+}
+
+/// A complete AC-3 syncframe or a DVB E-AC-3 syncframe group.
+/// Clones share the charged bytes and syncframe facts.
+#[derive(Clone, Debug)]
+pub struct Ac3AccessUnit {
+    pub(super) first: Ac3FrameFacts,
+    pub(super) bytes: Bytes,
+    pub(super) dependents: Option<Shared<BudgetVec<DependentSyncframe>>>,
+}
+
+impl Ac3AccessUnit {
+    pub(super) fn single(frame: Ac3Frame) -> Self {
+        Self {
+            first: frame.facts(),
+            bytes: frame.into_bytes(),
+            dependents: None,
+        }
+    }
+
+    /// Exact source bytes of the complete unit, in syncframe order.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    pub fn into_bytes(self) -> Bytes {
+        self.bytes
+    }
+
+    /// Facts of the primary syncframe, which supplies the unit's sample span.
+    pub const fn facts(&self) -> Ac3FrameFacts {
+        self.first
+    }
+
+    /// Facts of every syncframe, including the primary, in source order.
+    pub fn syncframes(&self) -> impl Iterator<Item = Ac3FrameFacts> + '_ {
+        std::iter::once(self.first).chain(
+            self.dependents
+                .iter()
+                .flat_map(|frames| frames.as_slice().iter().map(|frame| frame.facts)),
+        )
+    }
+
+    /// The primary syncframe's raw trailing word.
+    pub fn crc2_word(&self) -> u16 {
+        let end = self.first.header.frame_bytes;
+        u16::from_be_bytes([self.bytes[end - 2], self.bytes[end - 1]])
+    }
+}
+
+/// The complete segment envelopes carried by one DVB subtitle PES.
+/// The original wrapper and any trailing bytes remain in the packet's PES source.
+#[derive(Clone, Debug)]
+pub struct DvbSubtitleUnit {
+    pub(super) bytes: Bytes,
+    pub(super) range: Range<u64>,
+    pub(super) pes_end: u64,
+    pub(super) segment_count: usize,
+    pub(super) truncated: bool,
+}
+
+impl DvbSubtitleUnit {
+    /// Complete segment headers and bodies in wire order.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    /// The number of complete segments in this unit.
+    pub const fn segment_count(&self) -> usize {
+        self.segment_count
+    }
+
+    /// The unfinished final segment's range in the lane's elementary coordinates.
+    pub fn truncated_tail(&self) -> Option<Range<u64>> {
+        self.truncated.then_some(self.range.end..self.pes_end)
+    }
+}
+
+/// One byte-aligned LOAS AudioSyncStream envelope. Its LATM multiplex element
+/// is opaque, so no decoder configuration, sample count or duration is inferred.
+#[derive(Debug)]
+pub struct LoasFrame {
+    pub(super) bytes: Bytes,
+    pub(super) offset: u64,
+}
+
+impl LoasFrame {
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    pub fn multiplex_element(&self) -> &[u8] {
+        &self.bytes.as_ref()[3..]
+    }
+
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.offset..self.offset + self.bytes.len() as u64
+    }
+}
+
 /// Original framed bytes and syntax facts, before decoder-feed conversion.
 /// Framer offsets use a private concatenated elementary view (`SourceId(0)`);
 /// physical transport provenance is retained by [`Packet::sources`].
@@ -158,7 +302,11 @@ pub(super) struct ClockContext {
 pub enum AccessUnit {
     Video(RawAccessUnit),
     Adts(AacAdtsFrame),
-    Ac3(Ac3Frame),
+    Loas(LoasFrame),
+    /// An opaque ADTS parser observation with its original source diagnostic.
+    AdtsFragment(AacAdtsCarrier),
+    Ac3(Ac3AccessUnit),
+    DvbSubtitle(DvbSubtitleUnit),
     /// Unfinished audio at logical EOF. This is a source fragment, not an AU.
     IncompleteAudio {
         range: Range<u64>,
@@ -174,9 +322,15 @@ impl AccessUnit {
             Self::Adts(frame) => {
                 frame.source().offset..frame.source().offset + frame.source_bytes().len() as u64
             }
+            Self::AdtsFragment(fragment) => {
+                let start = fragment.source().offset;
+                start..start + fragment.source_bytes().len() as u64
+            }
+            Self::Loas(frame) => frame.elementary_range(),
             Self::Ac3(frame) => {
                 frame.facts().offset..frame.facts().offset + frame.bytes().len() as u64
             }
+            Self::DvbSubtitle(unit) => unit.range.clone(),
             Self::IncompleteAudio { range, .. } => range.clone(),
         }
     }
@@ -197,7 +351,11 @@ impl AccessUnit {
     }
     pub(super) fn duration(&self) -> Result<Option<Time>> {
         match self {
-            Self::Video(_) | Self::IncompleteAudio { .. } => Ok(None),
+            Self::Video(_)
+            | Self::Loas(_)
+            | Self::DvbSubtitle(_)
+            | Self::IncompleteAudio { .. }
+            | Self::AdtsFragment(_) => Ok(None),
             Self::Adts(frame) => {
                 let rate = frame
                     .header()
@@ -215,18 +373,20 @@ pub(super) struct PacketData {
     pub track: Track,
     pub unit: AccessUnit,
     pub bytes: Bytes,
-    pub sources: BudgetVec<PayloadSource>,
+    pub sources: PayloadSources,
     pub clock: Option<PacketClock>,
     pub epochs: SourceEpochs,
     pub duration: Option<Time>,
     pub pts: Option<i64>,
     pub dts: Option<i64>,
     pub duration90: Option<i64>,
+    pub recovered_adts: bool,
 }
 
 /// One retained framed source unit. The neutral packet stream contains only
 /// complete AUs; header-only units use [`ReaderEvent::VideoHeaders`] and unfinished
-/// audio uses [`ReaderEvent::IncompleteAudio`]. Cloning
+/// audio and DVB subtitle prefixes use [`ReaderEvent::IncompleteAudio`] and
+/// [`ReaderEvent::DvbSubtitlePrefix`], respectively. Cloning
 /// shares charged storage, without cloning an input-sized vector or losing its charge.
 #[derive(Clone, Debug)]
 pub struct Packet(pub(super) Shared<PacketData>);
@@ -287,8 +447,91 @@ impl PacketInfo for Packet {
     }
 }
 
+#[derive(Debug)]
+pub(super) struct UnframedData {
+    pub track: Track,
+    pub range: Range<u64>,
+    pub bytes: Bytes,
+    pub sources: BudgetVec<PayloadSource>,
+    pub clock: Option<PacketClock>,
+    pub epochs: SourceEpochs,
+}
+
+/// A validated AVC or HEVC PES byte run with invalid leading bytes and no
+/// Annex B start code. Its original payload and first source anchor are
+/// retained at logical EOF. Clones share the charged storage.
 #[derive(Clone, Debug)]
+pub struct IncompleteVideo(pub(super) Shared<UnframedData>);
+
+impl IncompleteVideo {
+    pub fn track_info(&self) -> &Track {
+        &self.0.track
+    }
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.0.range.clone()
+    }
+    pub fn bytes(&self) -> &Bytes {
+        &self.0.bytes
+    }
+    pub fn sources(&self) -> &[PayloadSource] {
+        self.0.sources.as_slice()
+    }
+    pub fn clock(&self) -> Option<&PacketClock> {
+        self.0.clock.as_ref()
+    }
+    pub fn epochs(&self) -> SourceEpochs {
+        self.0.epochs
+    }
+}
+
+/// A validated private PES whose payload has no AC-3 or E-AC-3 syncword.
+/// The source track, PES and clock are retained at logical EOF. Clones share
+/// the charged storage.
+#[derive(Clone, Debug)]
+pub struct UnframedAudio {
+    pub(super) data: Shared<UnframedData>,
+    pub(super) carriage: PrivateAudioCarriage,
+}
+
+impl UnframedAudio {
+    /// Carriage selected by the compatibility policy.
+    pub fn carriage(&self) -> PrivateAudioCarriage {
+        self.carriage
+    }
+    pub fn track_info(&self) -> &Track {
+        &self.data.track
+    }
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.data.range.clone()
+    }
+    pub fn bytes(&self) -> &Bytes {
+        &self.data.bytes
+    }
+    pub fn sources(&self) -> &[PayloadSource] {
+        self.data.sources.as_slice()
+    }
+    pub fn clock(&self) -> Option<&PacketClock> {
+        self.data.clock.as_ref()
+    }
+    pub fn epochs(&self) -> SourceEpochs {
+        self.data.epochs
+    }
+}
+
+#[derive(Clone, Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "a carrier owns charged bytes and moves through without a separate allocation"
+)]
 pub enum ReaderEvent {
+    /// Complete original carrier, with its source bytes and parsed fields.
+    Transport(TransportPacket),
+    /// A source counter observation with a `First` or `Continuous` outcome.
+    Continuity {
+        pid: u16,
+        outcome: ContinuityOutcome,
+    },
+    /// Original source event with a shared budget charge.
     Source(SourceEvent),
     /// A completed PES whose source header predates a program boundary.
     /// Both source events remain available for recovery without asserting an AU
@@ -299,10 +542,7 @@ pub enum ReaderEvent {
     },
     /// No complete AU framer is admitted for this stream. Its PMT and PES
     /// still surface as source events; no PES is relabelled as an AU.
-    Unsupported {
-        track: Track,
-        error: Error,
-    },
+    Unsupported { track: Track, error: Error },
     /// A PMT, clock or byte-run boundary interrupted unpublished elementary
     /// bytes. Their original PES events were delivered unchanged. A loss
     /// boundary is not logical EOF and never certifies a partial AU.
@@ -317,4 +557,18 @@ pub enum ReaderEvent {
     /// Original unfinished audio bytes at logical EOF, with validated PES
     /// provenance and an optional one-use source clock. No complete AU is asserted.
     IncompleteAudio(Packet),
+    /// Opaque ADTS bytes delimited by the compatibility parser. The packet
+    /// retains its PES extents and any one-use clock without a sample duration.
+    AdtsFragment(Packet),
+    /// ADTS parser output whose bytes or clock use a rejected unbounded PES.
+    /// The unit and its provenance remain outside the neutral packet stream.
+    RecoveredAdts(Packet),
+    /// Original LATM PES bytes under the explicit PES packet policy.
+    LatmPes(crate::compat::latm::PesPacket),
+    /// A proven segment prefix with an unfinished final segment in the source PES.
+    DvbSubtitlePrefix(Packet),
+    /// The final unframed video run under the explicit EOF reporting policy.
+    IncompleteVideo(IncompleteVideo),
+    /// One opaque private-audio PES admitted by the explicit EOF reporting policy.
+    UnframedAudio(UnframedAudio),
 }

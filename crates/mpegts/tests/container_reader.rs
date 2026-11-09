@@ -1,4 +1,25 @@
 //! AU composition against frozen raw-AU boundaries and literal source clocks.
+#[path = "container_reader/adts_fragments.rs"]
+mod adts_fragments;
+#[path = "container_reader/adts_header_growth.rs"]
+mod adts_header_growth;
+#[path = "container_reader/adts_unbounded.rs"]
+mod adts_unbounded;
+#[path = "container_reader/direct_audio.rs"]
+mod direct_audio;
+#[path = "container_reader/dvb.rs"]
+mod dvb;
+#[path = "container_reader/eac3.rs"]
+mod eac3;
+#[path = "container_reader/entities.rs"]
+mod entities;
+#[path = "container_reader/latm.rs"]
+mod latm;
+#[path = "container_reader/opaque_video.rs"]
+mod opaque_video;
+#[path = "container_reader/unframed_audio.rs"]
+mod unframed_audio;
+
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     CodecId, ContainerReader, Event, MediaKind, PacketInfo, TrackId, TrackInfo,
@@ -328,8 +349,8 @@ fn avc_and_hevc_are_full_source_aus_across_pes_and_carriers() {
                         assert!(!finished);
                         packets.push(packet);
                     }
+                    Event::Other(ReaderEvent::Transport(_)) => transports += 1,
                     Event::Other(ReaderEvent::Source(source)) => match source.event() {
-                        TraceEvent::Transport(_) => transports += 1,
                         TraceEvent::Pes(_) => pes_count += 1,
                         TraceEvent::Finished => finished = true,
                         TraceEvent::Diagnostic(fault) => {
@@ -417,6 +438,58 @@ fn adts(body: &[u8]) -> Vec<u8> {
 }
 
 #[test]
+fn complete_carriers_share_only_bounded_input_storage() {
+    use triergon_core::BudgetVec;
+
+    let frame = adts(&[0x32; 321]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &frame, Some(90_000), None);
+    for (capacity, shares) in [(ts.bytes.len(), true), (129 * 1024, false)] {
+        let pool = Budget::new(8 << 20).unwrap();
+        let mut bytes = BudgetVec::new(&pool);
+        bytes.try_reserve_exact(capacity).unwrap();
+        bytes.try_extend_from_slice(&ts.bytes).unwrap();
+        let input = bytes.freeze().unwrap();
+        let mut reader = Reader::new(
+            &pool,
+            ID,
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            ReaderLimits::default(),
+            ts.bytes.len(),
+        )
+        .unwrap();
+        let request = reader.request().unwrap();
+        reader
+            .provide(&InputWindow::new(ID, request.token, 0, input.clone()).unwrap())
+            .unwrap();
+        let mut found = false;
+        for _ in 0..2_000 {
+            match reader.step(&mut WorkBudget::new(4096), &OFF).unwrap() {
+                Step::Ready(Event::Packet(packet)) => {
+                    assert_eq!(packet.payload(), frame);
+                    let TraceEvent::Pes(pes) = packet.sources()[0].pes.event() else {
+                        panic!("expected original PES");
+                    };
+                    assert!(pes.spans().len() > 1);
+                    for span in pes.spans() {
+                        assert_eq!(span.backing_bytes().shares_storage_with(&input), shares);
+                    }
+                    found = true;
+                }
+                Step::NeedInput(request) => reader.finish(ID, request.token).unwrap(),
+                Step::End(_) => break,
+                _ => (),
+            }
+        }
+        assert!(found);
+    }
+}
+
+#[test]
 fn audio_anchors_wait_for_the_next_frame_start_and_missing_dts_stays_absent() {
     let frames = [adts(b"first"), adts(b"second"), adts(b"third")];
     let body = frames.concat();
@@ -462,6 +535,35 @@ fn audio_anchors_wait_for_the_next_frame_start_and_missing_dts_stays_absent() {
         );
         assert_eq!(packet.duration(), Some(1920));
     }
+}
+
+#[test]
+fn retained_carrier_keeps_only_its_source_storage_after_close() {
+    let mut ts = Transport::new();
+    ts.payload(PID, b"payload");
+    let raw = ts.m2ts();
+    let limits = ReaderLimits {
+        format: PacketFormat::M2ts192,
+        ..ReaderLimits::default()
+    };
+    let mut drive = Drive::new(&raw, limits, 7, 1);
+    let Some(Event::Other(ReaderEvent::Transport(packet))) = drive.next().unwrap() else {
+        panic!("expected the complete carrier");
+    };
+    let charge = packet.source.retained_storage_bytes();
+    let retained = packet.clone();
+    drive.reader.close();
+    drop(packet);
+
+    let baseline = Budget::control_storage_bytes();
+    assert_eq!(drive.pool.used(), baseline + charge);
+    assert_eq!(retained.source_id, Some(ID));
+    assert_eq!(retained.source_offset, 0);
+    assert_eq!(retained.source.as_ref(), raw);
+    assert_eq!(retained.prefix.as_ref().unwrap().as_ref(), &raw[..4]);
+    assert_eq!(retained.payload.as_ref().unwrap().as_ref(), b"payload");
+    drop(retained);
+    assert_eq!(drive.pool.used(), baseline);
 }
 
 #[test]
@@ -1366,7 +1468,7 @@ fn signalled_counter_break_before_eof_interrupts_an_incomplete_avc_au() {
     ts.bytes.extend_from_slice(&boundary);
 
     let mut drive = Drive::new(&ts.bytes, ReaderLimits::default(), 7, 1);
-    let mut interrupted = 0;
+    let mut interruption = None;
     let mut counter_break = false;
     let mut finished = false;
     while let Some(event) = drive.next().unwrap() {
@@ -1384,7 +1486,7 @@ fn signalled_counter_break_before_eof_interrupts_an_incomplete_avc_au() {
                     if *pid == PID
                         && *outcome == triergon_mpegts::ContinuityOutcome::SignalledDiscontinuity)
                 );
-                interrupted += 1;
+                assert!(interruption.replace(cause).is_none());
             }
             Event::Other(ReaderEvent::Source(source)) => match source.event() {
                 TraceEvent::Continuity { pid, outcome }
@@ -1392,6 +1494,10 @@ fn signalled_counter_break_before_eof_interrupts_an_incomplete_avc_au() {
                         && *outcome
                             == triergon_mpegts::ContinuityOutcome::SignalledDiscontinuity =>
                 {
+                    let cause = interruption
+                        .as_ref()
+                        .expect("interruption before source event");
+                    assert!(std::ptr::eq(cause.event(), source.event()));
                     counter_break = true;
                 }
                 TraceEvent::Finished => finished = true,
@@ -1402,7 +1508,7 @@ fn signalled_counter_break_before_eof_interrupts_an_incomplete_avc_au() {
     }
     assert!(counter_break);
     assert!(finished);
-    assert_eq!(interrupted, 1);
+    assert!(interruption.is_some());
 }
 
 #[test]
@@ -1579,14 +1685,14 @@ fn pcr_discontinuity_with_pusi_admits_a_fresh_adts_pes_in_the_same_carrier() {
     let mut retained = None;
     while let Some(event) = drive.next().unwrap() {
         match event {
+            Event::Other(ReaderEvent::Transport(packet)) if packet.pid == PID => {
+                assert_eq!(packet.source_offset, carrier_offset as u64);
+                assert!(packet.payload_unit_start);
+                assert!(packet.discontinuity_indicator());
+                assert!(packet.adaptation.as_ref().unwrap().pcr.is_some());
+                assert_eq!(packet.payload_source_offset, header_offset);
+            }
             Event::Other(ReaderEvent::Source(source)) => match source.event() {
-                TraceEvent::Transport(packet) if packet.pid == PID => {
-                    assert_eq!(packet.source_offset, carrier_offset as u64);
-                    assert!(packet.payload_unit_start);
-                    assert!(packet.discontinuity_indicator());
-                    assert!(packet.adaptation.as_ref().unwrap().pcr.is_some());
-                    assert_eq!(packet.payload_source_offset, header_offset);
-                }
                 TraceEvent::Timeline {
                     program,
                     clock_epoch,

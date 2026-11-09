@@ -16747,6 +16747,152 @@
    "sha256": "e4a19c36f2420ca6aa9f13860b74d2c0c8c069dffacce6e54610166e08b81d4d",
    "bytes": 24266,
    "source_revision": "7b54b38af04842bcfaa4dd9b4cc449c1169c4d24"
+  },
+  {
+   "name": "mpegts-control-completion-linux-arm64",
+   "retention": "retained",
+   "key": "evidence/mpegts-control-completion-linux-arm64/1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2.tar.gz",
+   "sha256": "1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2",
+   "bytes": 80420878,
+   "reason": "MPEG-TS measurements cited by docs/status.md"
+  },
+  {
+   "name": "mpegts-control-completion-macos",
+   "retention": "retained",
+   "reason": "MPEG-TS control-only completion status row: the complete 97-case live macOS comparison, 81 matching operations, 16 explicit open cases, previous outputs and refusals, exact source and workers",
+   "key": "evidence/mpegts-control-completion-macos/d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b.tar.gz",
+   "sha256": "d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b",
+   "bytes": 52915620,
+   "source_revision": "65eeada0888bcd112d4cbd90e68795fea93fd864"
+  },
+  {
+   "name": "mpegts-current-reader-comparison",
+   "path": "mpegts-current-reader-comparison",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-current-reader-comparison/e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a.tar.gz",
+   "sha256": "e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a",
+   "bytes": 84851549
+  },
+  {
+   "name": "mpegts-finite-recovery",
+   "path": "mpegts-finite-recovery",
+   "retention": "retained",
+   "reason": "finite PES fault-recovery host comparisons cited by docs/status.md",
+   "key": "evidence/mpegts-finite-recovery/69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f.tar.gz",
+   "sha256": "69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f",
+   "bytes": 39685608
+  },
+  {
+   "name": "mpegts-source-boundaries",
+   "retention": "retained",
+   "key": "evidence/mpegts-source-boundaries/8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656.tar.gz",
+   "sha256": "8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656"
+  },
+  {
+   "name": "mpegts-ordered-pes",
+   "retention": "retained",
+   "key": "evidence/mpegts-ordered-pes/99ef872cb64a76ddb09036f432f3ccabc7b4ce02e6a2162020fd1303f3b58b33.tar.gz",
+   "sha256": "99ef872cb64a76ddb09036f432f3ccabc7b4ce02e6a2162020fd1303f3b58b33"
+  },
+  {
+   "name": "mpegts-access-unit-comparison",
+   "retention": "retained",
+   "key": "evidence/mpegts-access-unit-comparison/aa4a9d36158f7b92860780a03d8a7ab276cc7047c02077f76ff333ec879f8e00.tar.gz",
+   "sha256": "aa4a9d36158f7b92860780a03d8a7ab276cc7047c02077f76ff333ec879f8e00"
+  },
+  {
+   "name": "mpegts-access-unit-sequences",
+   "retention": "retained",
+   "key": "evidence/mpegts-access-unit-sequences/dfb235310cb79ff305523108ef8ead42f5b187c2aedc162b32e7568c119336b2.tar.gz",
+   "sha256": "dfb235310cb79ff305523108ef8ead42f5b187c2aedc162b32e7568c119336b2"
+  },
+  {
+   "name": "mpegts-ordered-access-units",
+   "retention": "retained",
+   "key": "evidence/mpegts-ordered-access-units/2cfb82274e17de49c85a98a6e36763796578f69d1b5ce2d3121d97cb44d83520.tar.gz",
+   "sha256": "2cfb82274e17de49c85a98a6e36763796578f69d1b5ce2d3121d97cb44d83520"
+  },
+  {
+   "name": "mpegts-reader-audio-subtitles-host",
+   "path": "mpegts-reader-audio-subtitles-host",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-reader-audio-subtitles-host/fcacbf4558055c0827b9f228a2444e51a37d9b3f3ba70cfa7f8434938fc70b69.tar.gz",
+   "sha256": "fcacbf4558055c0827b9f228a2444e51a37d9b3f3ba70cfa7f8434938fc70b69",
+   "bytes": 22902504
+  },
+  {
+   "name": "mpegts-adts-fragments-host",
+   "path": "mpegts-adts-fragments-host",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-adts-fragments-host/d814c217c950ad5b1a17a8b35c1f32c75d4cc0852d0240b9a795f2d2f150ade0.tar.gz",
+   "sha256": "d814c217c950ad5b1a17a8b35c1f32c75d4cc0852d0240b9a795f2d2f150ade0",
+   "bytes": 22883560
+  },
+  {
+   "name": "mpegts-unframed-video-host",
+   "path": "mpegts-unframed-video-host",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-unframed-video-host/826fc17fd8dd961104f87adcd528100c186aa631a4e05eca2529bbf32b535249.tar.gz",
+   "sha256": "826fc17fd8dd961104f87adcd528100c186aa631a4e05eca2529bbf32b535249",
+   "bytes": 22986989
+  },
+  {
+   "name": "mpegts-latm-host",
+   "path": "mpegts-latm-host",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-latm-host/72e26edbf65e57a05f38db9bbe648cc5abcec687ae521fb93d8673f6d0c32193.tar.gz",
+   "sha256": "72e26edbf65e57a05f38db9bbe648cc5abcec687ae521fb93d8673f6d0c32193",
+   "bytes": 22886632
+  },
+  {
+   "name": "mpegts-audio-recovery-host",
+   "path": "mpegts-audio-recovery-host",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-audio-recovery-host/5c5540f44e8d7dadddefc4e0a0ca3f2bb74a05afc27b41076e91ba92b6fa6b94.tar.gz",
+   "sha256": "5c5540f44e8d7dadddefc4e0a0ca3f2bb74a05afc27b41076e91ba92b6fa6b94",
+   "bytes": 42923229
+  },
+  {
+   "name": "mpegts-access-unit-parity-host",
+   "path": "mpegts-access-unit-parity-host",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-access-unit-parity-host/56c4e0cfe36192e719bb3deb7c54068fed0d78df11c747bf097aef9a0a31ab02.tar.gz",
+   "sha256": "56c4e0cfe36192e719bb3deb7c54068fed0d78df11c747bf097aef9a0a31ab02",
+   "bytes": 45797305
+  },
+  {
+   "name": "mpegts-reader-catalogue-and-adts-host",
+   "path": "mpegts-reader-catalogue-and-adts-host",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-reader-catalogue-and-adts-host/020e77f8d8eed1c8243d3f2d4f9f562e4f7058287f897fba60404cc5a2df5c5f.tar.gz",
+   "sha256": "020e77f8d8eed1c8243d3f2d4f9f562e4f7058287f897fba60404cc5a2df5c5f",
+   "bytes": 23065330
+  },
+  {
+   "name": "mpegts-access-units-linux-arm64",
+   "path": "mpegts-access-units-linux-arm64",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-access-units-linux-arm64/7bfa7eda44cc81d40c69c626fab14e8f46fcb71934fd71e93d6a90899f4de306.tar.gz",
+   "sha256": "7bfa7eda44cc81d40c69c626fab14e8f46fcb71934fd71e93d6a90899f4de306",
+   "bytes": 99160991
+  },
+  {
+   "name": "mpegts-adts-span-limits-host",
+   "path": "mpegts-adts-span-limits-host",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-adts-span-limits-host/b45944d70c692f1fa5e4f700610897e9e6c055a1c2c62466969a21007e677294.tar.gz",
+   "sha256": "b45944d70c692f1fa5e4f700610897e9e6c055a1c2c62466969a21007e677294",
+   "bytes": 23081207
   }
  ]
 }
