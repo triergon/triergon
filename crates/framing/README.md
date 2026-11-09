@@ -119,8 +119,9 @@ fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input; a
 retained view keeps the whole backing allocation charged. An AVC configuration
 keeps up to four NAL descriptors inline; larger records use charged heap storage.
 Small records reuse the checked offsets from the validation pass when the
-remaining work budget covers publishing the descriptors. Array counts and the
-validated end offset are derived from those descriptors and the extension fields.
+remaining work budget covers publishing the descriptors. Each scan step keeps
+its cursor local and saves it at a return to the caller. Array counts and the
+validated end offset are derived from the descriptors and the extension fields.
 HEVC configurations independently keep up to four array descriptors and four NAL
 descriptors inline. The validation pass fills both tables when they fit inline.
 When either exceeds its inline capacity, a second pass fills the tables with
