@@ -13,6 +13,7 @@ use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
     SourceLocation, TimeBase, WorkBudget,
 };
+use triergon_framing::Ac3Family;
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::pes::DemuxClock;
@@ -63,8 +64,7 @@ impl PacketPosition<'_> {
 fn is_ac3(packet: &Packet) -> bool {
     match packet.access_unit() {
         AccessUnit::Ac3(_) => true,
-        // The reader admits only ADTS and explicitly DVB-signalled AC-3 audio.
-        // Its private transport tag remains separate from neutral codec identity.
+        // Incomplete private audio retains the DVB transport tag.
         AccessUnit::IncompleteAudio { .. } => packet.track_info().stream().stream_type == 0x06,
         _ => false,
     }
@@ -292,7 +292,14 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     .position(|value| value.id == pid)
                     .ok_or("packet has no registered track")?;
                 let track = &mut tracks.as_mut_slice()[index];
-                let (packet, duration) = if is_ac3(&packet) {
+                let (packet, duration) = if matches!(
+                    packet.access_unit(),
+                    AccessUnit::Ac3(unit) if unit.facts().header.family == Ac3Family::Eac3
+                ) {
+                    // The reader has already used lookahead to seal the group.
+                    let duration = ac3_duration(&packet, true)?;
+                    (packet, duration)
+                } else if is_ac3(&packet) {
                     // The reference parser confirms AC-3 duration from another
                     // frame header. Keep the first packet until that lookahead
                     // or real EOF; a lone frame retains its zero packet duration.
