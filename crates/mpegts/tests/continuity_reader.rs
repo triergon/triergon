@@ -63,12 +63,32 @@ fn borrowed_carriers_keep_the_owned_events_in_source_order() {
         for _ in 0..500_000 {
             let mut record = |event: CarrierObservation<'_>| {
                 events.push(match event {
-                    CarrierObservation::Transport(packet) => format!(
-                        "carrier {:?} {} {:?}",
-                        packet.source_id,
-                        packet.source_offset,
-                        packet.source.as_ref()
-                    ),
+                    CarrierObservation::Transport(view) => {
+                        let packet = view.to_packet().unwrap();
+                        assert_eq!(view.pid(), packet.pid);
+                        assert_eq!(view.source_bytes(), packet.source.as_ref());
+                        assert_eq!(
+                            view.source_location(),
+                            packet
+                                .source_id
+                                .map(|source| triergon_core::SourceLocation {
+                                    source,
+                                    offset: packet.source_offset,
+                                })
+                        );
+                        format!(
+                            "carrier {:?} {} {:?} {:?} {:?} {:?}",
+                            packet.source_id,
+                            packet.source_offset,
+                            packet.source.as_ref(),
+                            packet.continuity_counter,
+                            packet.payload.as_ref().map(AsRef::as_ref),
+                            packet
+                                .adaptation
+                                .as_ref()
+                                .map(|field| field.source.as_ref())
+                        )
+                    }
                     CarrierObservation::Continuity { pid, outcome } => {
                         format!("counter {pid} {outcome:?}")
                     }
@@ -85,7 +105,7 @@ fn borrowed_carriers_keep_the_owned_events_in_source_order() {
                     packet,
                 )))) => {
                     assert!(!borrowed);
-                    record(CarrierObservation::Transport(&packet));
+                    record(CarrierObservation::Transport((&packet).into()));
                 }
                 Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Continuity {
                     pid,
@@ -127,7 +147,11 @@ fn borrowed_carriers_keep_the_owned_events_in_source_order() {
     }
 
     let coded = include_bytes!("../../../harness/fixtures/hls/dvb-hevc-eac3-32000.ts");
-    for (raw, grant) in [(THIRD, 1), (coded.as_slice(), 65536)] {
+    for (raw, grant) in [
+        (THIRD, 1),
+        (coded.as_slice(), 4096),
+        (coded.as_slice(), 65536),
+    ] {
         let owned = trace(raw, grant, false);
         assert!(owned.iter().any(|event| event.starts_with("carrier")));
         assert_eq!(trace(raw, grant, true), owned);

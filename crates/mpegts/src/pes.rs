@@ -340,24 +340,47 @@ impl PesAssembler {
         let Some(bytes) = payload.as_ref() else {
             return false;
         };
-        let count = bytes.len();
-        let end = self.total.map_or(self.limits.pes_bytes, |end| end - 1);
-        let spans = self.spans.len();
-        if !self.validating_body()
-            || count == 0
-            || count > end.saturating_sub(self.seen)
-            || spans == self.spans.capacity()
-            || spans == self.limits.source_spans
-            || self.next_chunk == u64::MAX
-            || source.offset.checked_add(count as u64).is_none()
-            || !bytes.belongs_to(&self.budget)
-            || !work.try_charge(count as u64)
-        {
+        if !self.can_retain_body_carrier(bytes, 0, source.offset, work.remaining()) {
             return false;
         }
+        self.append_body_carrier(payload.take().expect("whole PES carrier"), source, work);
+        true
+    }
+
+    pub(crate) fn can_retain_body_carrier(
+        &self,
+        bytes: &Bytes,
+        start: usize,
+        offset: u64,
+        grant: u64,
+    ) -> bool {
+        let count = bytes.len().saturating_sub(start);
+        let end = self.total.map_or(self.limits.pes_bytes, |end| end - 1);
+        let spans = self.spans.len();
+        self.validating_body()
+            && count != 0
+            && count <= end.saturating_sub(self.seen)
+            && spans < self.spans.capacity()
+            && spans < self.limits.source_spans
+            && self.next_chunk != u64::MAX
+            && offset.checked_add(count as u64).is_some()
+            && bytes.belongs_to(&self.budget)
+            && count as u64 <= grant
+    }
+
+    /// Commit a carrier after the complete span and work grant were checked.
+    pub(crate) fn append_body_carrier(
+        &mut self,
+        bytes: Bytes,
+        source: SourceLocation,
+        work: &mut WorkBudget,
+    ) {
+        let count = bytes.len();
+        debug_assert!(self.can_retain_body_carrier(&bytes, 0, source.offset, work.remaining()));
+        work.take(count as u64);
         self.spans
             .try_push(PesSpan {
-                bytes: payload.take().expect("whole PES carrier"),
+                bytes,
                 start: 0,
                 source: SourceRange {
                     entity: source.source,
@@ -369,7 +392,6 @@ impl PesAssembler {
         self.next_chunk += 1;
         self.payload_len += count;
         self.seen += count;
-        true
     }
 
     /// Capacity before a finite PES completes and needs ordinary publication.

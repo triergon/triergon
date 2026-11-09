@@ -132,11 +132,13 @@ contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol. Seeking
 returns `Error::Unsupported` without changing reader state.
 
-`Reader::step_with_carriers` delivers transport packets and ordinary
-continuity events to a borrowed callback in source order. It returns the
-same access units, other source events and progress steps under the caller's
-work grant. `compat::annex_b::ContinuityReader` also exposes this method and
-keeps the carriers its continuity proof needs.
+`Reader::step_with_carriers` delivers transport and ordinary continuity
+observations to a borrowed callback in source order. A `TransportObservation`
+exposes the original bytes and location. Call `to_packet` to retain the complete
+carrier and its parsed fields. Complete TS188 continuations can move their
+payload backing directly into a prepared PES span. The method returns the same
+access units, other source events and progress steps under the caller's work
+grant. `compat::annex_b::ContinuityReader` keeps the carriers its proof needs.
 
 For an ordered stream, call `Reader::finish_entity` with the final input
 token and the next entity's distinct source ID and capabilities. The reader

@@ -349,7 +349,7 @@ impl Reader {
         self.storage = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
-        self.step_observing(work, cancel, |_, _| false)
+        self.step_observing::<false>(work, cancel, |_| ())
     }
 
     /// Inspect carriers and ordinary continuity events in source order, then
@@ -364,13 +364,7 @@ impl Reader {
         mut observe: impl FnMut(CarrierObservation<'_>),
     ) -> Result<ReaderStep<Self>> {
         loop {
-            let step = self.step_observing(work, cancel, |event, work| {
-                if cancel.load(Ordering::Relaxed) || !work.try_charge(3) {
-                    return false;
-                }
-                observe(event);
-                true
-            })?;
+            let step = self.step_observing::<true>(work, cancel, &mut observe)?;
             if let Step::Ready(Event::Other(event)) = &step
                 && let Some(event) = event.carrier_observation()
             {
@@ -381,14 +375,14 @@ impl Reader {
         }
     }
 
-    fn step_observing(
+    fn step_observing<const OBSERVING: bool>(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        observe: impl FnMut(CarrierObservation<'_>, &mut WorkBudget) -> bool,
+        observe: impl FnMut(CarrierObservation<'_>),
     ) -> Result<ReaderStep<Self>> {
         self.healthy()?;
-        match self.advance(work, cancel, observe) {
+        match self.advance::<OBSERVING>(work, cancel, observe) {
             Err(Error::Backpressure {
                 requested,
                 available,
@@ -467,11 +461,11 @@ impl Reader {
             LaneStep::End | LaneStep::NeedPayload => Ok(None),
         }
     }
-    fn advance(
+    fn advance<const OBSERVING: bool>(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        mut observe: impl FnMut(CarrierObservation<'_>, &mut WorkBudget) -> bool,
+        mut observe: impl FnMut(CarrierObservation<'_>),
     ) -> Result<ReaderStep<Self>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -826,10 +820,9 @@ impl Reader {
                 .as_mut()
                 .ok_or(Error::Invalid("MPEG-TS reader closed"))?;
             let mut observed = false;
-            let result = stream.poll_observing(input, work, cancel, |event, work| {
-                let accepted = observe(event, work);
-                observed |= accepted;
-                accepted
+            let result = stream.poll_observing::<OBSERVING>(input, work, cancel, |event| {
+                observed = true;
+                observe(event);
             });
             if observed {
                 self.storage = None;
