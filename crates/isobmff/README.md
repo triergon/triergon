@@ -295,6 +295,10 @@ rejects boxes extending past the source.
   or shifts packets; the FFmpeg-compatible view does.
   Range playback preserves AAC sample durations from `stts`, including
   durations longer than one coded frame. Trim counts use the coded frame length.
+  Regular Opus range playback retains the `dOps` record, exposes its canonical
+  identification header, and uses the edit list for initial trim. The MOV
+  seek policy searches the Opus track 10 ms before the video landing. The
+  source `roll` groups remain available for decoder preroll.
 - **Seek.** Seek planners select a preceding container sync sample, record
   available and missing preroll, and validate every media range before
   publishing a plan. A sync sample is a container fact, not proof of decoder

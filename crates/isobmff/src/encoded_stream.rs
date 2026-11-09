@@ -1,5 +1,5 @@
-//! Explicit regular encoded catalogue view. Config records stay opaque; NAL,
-//! ASC/ADTS and decoder validation belong to their existing separate adapters.
+//! Explicit regular encoded catalogue view. Decoder configuration is retained
+//! alongside the catalogue projection.
 use crate::{
     BoxChildren, BoxStep, BoxView, CursorStatus, DtsCoreDescription, EntryLayout, Limits,
     MediaClock, SampleDescription, SampleTable, StreamView, TrackHeader,
@@ -10,6 +10,7 @@ use crate::{
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
+use triergon_framing::{OPUS_RATE, OpusHead};
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedStreamProfile;
@@ -40,6 +41,7 @@ pub enum EncodedEntryKind {
     Ac3,
     Eac3,
     Dts,
+    Opus,
 }
 
 impl EncodedEntryKind {
@@ -48,7 +50,7 @@ impl EncodedEntryKind {
     }
 
     pub(crate) fn require_regular_codec(self) -> Result<()> {
-        if matches!(self, Self::Av1 | Self::Vp9 | Self::Dts) {
+        if matches!(self, Self::Av1 | Self::Vp9 | Self::Dts | Self::Opus) {
             return Err(Error::Unsupported("encoded codec requires range playback"));
         }
         Ok(())
@@ -875,6 +877,9 @@ impl<'a> EncodedStreamJob<'a> {
             (b"soun", b"mp4a") => (EncodedEntryKind::Aac, *b"esds", EntryLayout::AudioV0),
             (b"soun", b"ac-3") => (EncodedEntryKind::Ac3, *b"dac3", EntryLayout::AudioV0),
             (b"soun", b"ec-3") => (EncodedEntryKind::Eac3, *b"dec3", EntryLayout::AudioV0),
+            (b"soun", b"Opus") if view == DescriptionView::RangePlayback => {
+                (EncodedEntryKind::Opus, *b"dOps", EntryLayout::AudioV0)
+            }
             (b"soun", b"dtsc" | b"dtsh" | b"dtsl") if view == DescriptionView::RangePlayback => {
                 (EncodedEntryKind::Dts, *b"ddts", EntryLayout::AudioV0)
             }
@@ -1323,6 +1328,7 @@ impl<'a> EncodedStreamJob<'a> {
                 EncodedEntryKind::Avc | EncodedEntryKind::Hevc | EncodedEntryKind::Av1 => cfg
                     .bytes()
                     .slice(usize::from(cfg.header().header_size)..cfg.bytes().len())?,
+                EncodedEntryKind::Opus => opus_configuration(&self.pool, &self.entry, cfg)?,
                 EncodedEntryKind::Ac3
                 | EncodedEntryKind::Eac3
                 | EncodedEntryKind::Vp9
@@ -1526,6 +1532,7 @@ fn metadata(
         EncodedEntryKind::Ac3 => "ac3",
         EncodedEntryKind::Eac3 => "eac3",
         EncodedEntryKind::Dts => "dts",
+        EncodedEntryKind::Opus => "opus",
     };
     Ok((
         StreamView {
@@ -1542,6 +1549,25 @@ fn metadata(
         encoder,
         metadata_source,
     ))
+}
+
+fn opus_configuration(pool: &Budget, entry: &SampleDescription, config: &BoxView) -> Result<Bytes> {
+    // Opus in ISO BMFF, sections 4.3.1 and 4.3.2.
+    let head = OpusHead::from_dops(config.payload())?;
+    let sample_entry = entry.raw().payload();
+    let coded_channels = u16::from(head.streams) + u16::from(head.coupled_streams);
+    if fields::u16_at(sample_entry, 16)? != coded_channels
+        || fields::u16_at(sample_entry, 18)? != 16
+        || fields::u32_at(sample_entry, 24)? != OPUS_RATE << 16
+    {
+        return Err(Error::Invalid("Opus sample entry audio fields"));
+    }
+    let mut packet = [0; OpusHead::MAX_BYTES];
+    let len = head.write(&mut packet);
+    if config.payload().len() != len - b"OpusHead".len() {
+        return Err(Error::Invalid("Opus specific box trailing bytes"));
+    }
+    Bytes::copy_from_slice(pool, &packet[..len])
 }
 
 /// The object type and decoder-specific bytes an `mp4a` or `mp4s` description
