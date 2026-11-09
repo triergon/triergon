@@ -34,7 +34,7 @@
   ],
   "recorded_reference": {
     "id": "ffmpeg-formats-native",
-    "worker_sha256": "eb54eac50388787c9c02cddca252b2d256a79ceaae52c0fb5f7a54f19deff463",
+    "worker_sha256": "d6e7ba3865d1effc3cd964ec214b9e464ed2028c6e0c322175a1e44540182316",
     "mode": "ts-au-fold"
   },
   "cases": [
@@ -2220,13 +2220,13 @@
           "id": "hls-contiguous-pes-carry"
         }
       ],
-      "reference_refusal": "no single-input reference operation for more than one media entity",
+      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
       "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
+        "packets": 1,
+        "bytes": 512,
+        "digest": 15463357684512389673
       },
-      "reference_result_sha256": "2345439b3fcd5eeec57a4a399ca8f944d7172120478247cbeb53500ff6eee257"
+      "reference_result_sha256": "bc9d0d2a2c2e2d6aa17f1f146827178b731f6f294874f10d512f136d16fe5c60"
     },
     {
       "id": "hls-external-map",
@@ -2266,13 +2266,13 @@
           "id": "hls-external-map"
         }
       ],
-      "reference_refusal": "no single-input reference operation for more than one media entity",
+      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
       "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
       },
-      "reference_result_sha256": "2345439b3fcd5eeec57a4a399ca8f944d7172120478247cbeb53500ff6eee257"
+      "reference_result_sha256": "81d663a023407a4df0bd0b43068e7e132120c0a6ccfb7c53db7f0c7563280e3f"
     },
     {
       "id": "hls-explicit-discontinuity",
@@ -2313,13 +2313,13 @@
           "id": "hls-explicit-discontinuity"
         }
       ],
-      "reference_refusal": "no single-input reference operation for more than one media entity",
+      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
       "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
+        "packets": 1,
+        "bytes": 27,
+        "digest": 18375936849836123075
       },
-      "reference_result_sha256": "2345439b3fcd5eeec57a4a399ca8f944d7172120478247cbeb53500ff6eee257"
+      "reference_result_sha256": "5d386efe5c2492320fc8cc77101040d6e6bab50fe9c2a1b6d5bc76f8273f0b95"
     },
     {
       "id": "dvb2-literals-fields",
