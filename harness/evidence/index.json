@@ -16929,6 +16929,15 @@
    "sha256": "381aee4861cc45ac1e5d6bd287f606f5cb7b8f731a3b688bbc204b61502e45ae",
    "bytes": 20300910,
    "source_revision": "e8f0053aa9ed0f196355f74d596ace48deae2c60"
+  },
+  {
+   "name": "transport-adjacent-playback-gate",
+   "retention": "retained",
+   "reason": "MPEG-TS PES, HLS and progressive gate measurements in docs/status.md",
+   "key": "evidence/transport-adjacent-playback-gate/985bf38491d24149e85ec6647eb7959c9888294f51d5f7136378c9da30778e8a.tar.zst",
+   "sha256": "985bf38491d24149e85ec6647eb7959c9888294f51d5f7136378c9da30778e8a",
+   "bytes": 17600872,
+   "source_revision": "e8f0053aa9ed0f196355f74d596ace48deae2c60"
   }
  ]
 }

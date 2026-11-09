@@ -22,10 +22,10 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | MP4 range playback | Regular AVC/AAC startup and backward seek with sample table durations and coded-frame trim | 4 complete open and backward-seek comparisons, 845 packets; AAC duration and trim regressions | 1.0466 (4/4 pass) | heap ≤0.556, total RSS ≤0.945 (4/4 lower) | other range playback profiles |
 | Ogg | Pages with CRC and resync, multiplexed and chained streams, Vorbis, Opus and FLAC mappings with canonical configurations, granule timing, pre-skip and end trims, bisection seeking | Packets against the pinned `ffprobe` (`cargo xtask codecs readers`) on 21 FATE Vorbis files and 13 generated Opus, Vorbis and FLAC files (multiplexed, chained, damaged, truncated), in two views: the FFmpeg-compatible `compat::clock` 31/34 pass, 3 differ only by reviewed FFmpeg behaviours; the reader's own timing 7/34 pass, 25 differ only where `compat::clock` reproduces FFmpeg, 2 by reviewed behaviours ([reader rules](../harness/codecs/reader-rules.json), [frozen differences](../harness/codecs/reader-differences.json)) | within the codec workloads | within the codec workloads | `b_vorbis.ogg`, `chain_vorbis.ogg`: a negative last duration FFmpeg prints modulo 2^32; `crc_bad.opus`: the first packet after a page that fails its CRC, which FFmpeg times from its own page and `compat::clock` from the stream start; Theora and Speex untimed; chained seeks not compared with FFmpeg |
 | Audio elementary streams | Native FLAC (with or without `fLaC`), MPEG audio with ID3v2/ID3v1/APE tags, Xing/Info/VBRI and LAME gapless trims, ADTS, AC-3/E-AC-3; one shared frame-stream engine | Packets as the readers emit them against the pinned `ffprobe` on 271 FLAC, MPEG audio, ADTS, AC-3 and E-AC-3 files (the IETF FLAC testbench, MP3 conformance, generated and crafted damaged streams): 253/271 pass, 16 differ only by reviewed FFmpeg behaviours, 2 refused by both (testbench faulty `06 - missing streaminfo metadata block`, `07 - other metadata blocks preceding streaminfo metadata block`) | within the codec workloads | within the codec workloads | FLAC `flac_s20_rate768k`, `06 - samplerate 768kHz` (no durations at 768 kHz), `01 - changing samplerate`, `27 - old format variable blocksize file created with Flake 0.11`, `11 - file starting with unparsable data`, `11 - incorrect metadata block length`, `08 - blocksize 65536`, `09 - blocksize 1`; crafted `ac3_tags`, `adts_mid_junk`, `flac_corrupt`, `flac_id3`, `flac_mid_junk`, `mp3_foreign_frame`, `mp3_mid_junk_falsesync`; MP3 `he_free` (free format, refused by FFmpeg); E-AC-3 dependent substreams on real files; ADTS and AC-3 seek cost |
-| MPEG-TS | PSI, continuity, PES assembly and ordered TS188/M2TS192 entities with control-only and bounded fault completion | 97/97 compatibility-view comparisons on AArch64 Linux across all 272 requests | 1.0671 (97/97 pass) | heap ≤0.0712, total RSS ≤0.8686 (97/97 lower) | strict source clocks |
+| MPEG-TS | PSI, continuity, PES assembly and ordered TS188/M2TS192 entities with control-only and bounded fault completion | 97/97 compatibility-view comparisons on AArch64 Linux across all 272 requests | 0.9956 (97/97 pass) | heap ≤0.0654, total RSS ≤0.8678 (97/97 lower) | strict source clocks |
 | MPEG-TS access units | `ContainerReader` and `AnyReader` over source AVC/HEVC, ADTS AAC-LC, LATM in LOAS envelopes, explicitly signalled DVB and ATSC AC-3 and E-AC-3 with one independent service and its dependent syncframes, and DVB subtitle segment groups. TS188 and M2TS192 with ordered entities and opt-in unframed continuity and fault observations, audio fragments, unbounded ADTS, LATM PES and DVB subtitle segment prefixes | 169/169 packet folds, including all 72 authored controls and all ordered inputs, on AArch64 Linux. The original 272 PES request associations are retained | 1.1839 (169/169 pass) | heap ≤0.0883, total RSS ≤0.8854 (169/169 lower) | LATM multiplex syntax, MPEG audio/video, additional E-AC-3 independent services, ATSC E-AC-3 access units requiring several independent syncframes, other subtitle carriages, ambiguous private carriages and seeking |
-| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.1818 (3/3 pass) | heap ≤0.0161, total RSS ≤0.6942 (3/3 lower) | broader transport and codec profiles |
-| HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1383 (71/71 pass) | heap ≤0.0211, total RSS ≤0.7919 (71/71 lower) | other profiles |
+| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.1306 (3/3 pass) | heap ≤0.0153, total RSS ≤0.6922 (3/3 lower) | broader transport and codec profiles |
+| HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.0883 (71/71 pass) | heap ≤0.0209, total RSS ≤0.7919 (71/71 lower) | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, PGS | Presentation, window, palette and object segments to display sets, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska) | 0.8564 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤1.010 (316/317 lower) | `long-movie-mkv` total RSS (plane storage that does not fault its pages in again for every display set); FATE coverage |
@@ -51,7 +51,7 @@ samples are archived, their SHA-256. Update the row in the same change as the re
 
 The Matroska and startup and seek rows use the [gate build](quality.md#measuring-performance)
 at `0e28298d038bea072629b3bad6389dcc806b4861` on a c8g.large pinned to CPU 1.
-The HLS row uses the gate build at `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee`
+An earlier HLS measurement used the gate build at `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee`
 on a c8g.large pinned to CPU 1. It covers all 71 cases in `corpus.json`, with
 100 timing pairs of 50 operations and 30 memory pairs. Every video unit passes through
 `contiguous_feed` inside the measured operation. Codec and decode-session runtime at
@@ -70,23 +70,17 @@ The packet-framing row uses the gate build at
 with 30 timing pairs of 50 complete operations and 30 memory pairs for all 125 cases.
 All memory observations are valid; lower total RSS remains unachieved on every case.
 
-The transport gate build at `e91b011b1eeedcc3dc6b9f166d81f81473e4c620` uses 30 timing pairs of
-50 operations and 30 memory pairs per case on a c8g.large pinned to CPU 1.
-The separate transport worker runs the unchanged access-unit and PES operations.
-All 266 packet comparisons match and use less peak heap and total resident peak
-RSS. The only runtime nonpass is `au-dvb-eac3-32000` (2.0447).
+The transport gate build at `e8f0053aa9ed0f196355f74d596ace48deae2c60` uses 30 timing pairs of
+50 operations and 30 memory pairs per case on c8g.large instances pinned to CPU 1.
+All 169 access-unit cases, 97 PES cases, 71 HLS cases and three progressive
+TS188 cases pass parity, runtime, peak heap and total resident peak RSS.
+HLS includes the contiguous feed copy. All ten progressive control outcomes
+match. Each group's timing and memory use identical worker binaries.
 
-The access-unit gate build at `e8f0053aa9ed0f196355f74d596ace48deae2c60` matches all
-169 cases and passes runtime, peak heap and total resident peak RSS with
-30 timing and memory pairs per case on a c8g.large pinned to CPU 1.
-The E-AC-3 medians are 190.329 µs and 161.374 µs,
-with a paired upper bound of 1.1839.
-Split PES headers report a limit when their required range-table growth cannot
-fit, including under strict parsing. Caller-held storage remains retryable.
-
-All 71 HLS cases pass with the contiguous feed copy. All three progressive
-TS188 cases and ten control outcomes match. Progressive timing and memory run
-separately with identical worker binaries.
+The E-AC-3 access-unit medians are 190.329 µs and 161.374 µs,
+with a paired upper bound of 1.1839. Split PES headers report
+a limit when their required range-table growth cannot fit, including under
+strict parsing. Caller-held storage remains retryable.
 
 An earlier progressive TS188 comparison used the gate build at
 `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee`, with 30 timing pairs of 50 complete
@@ -198,8 +192,8 @@ timing of the reference built with and without zeroed automatic variables.
 | ISO BMFF / MP4 | `f958c0b9624a8b7c7bd91b7d2a0c30299ae1dbed` | `fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c` |
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
 | ISO BMFF open and index runtime and memory | `f99d893196908d562c897bccb20c6a972cd25d11` | `806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b` |
-| MPEG-TS progressive playback | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
-| HLS segments | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
+| MPEG-TS progressive playback, earlier comparison | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
+| HLS segments, earlier comparison | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | Packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
 | MP4 range playback | `f58e444b72f94bb3962990dd515f28be1aaaa574` | `bb59fb61a667c1010a0a8e46604ca9b10d8cab6a3f99e05c2b68170c18d82755` |
 | MP4 range playback, earlier comparison | `90ecdb3f85f92402df9d7ecbec17f023535a5bf5` | `78e5d64743203173b7dfd8beed2dc4ab750d137e6fe3b00df321536b15057f05` |
@@ -237,6 +231,7 @@ timing of the reference built with and without zeroed automatic variables.
 | MPEG-TS access units, PES, HLS and progressive, separate transport worker | `e91b011b1eeedcc3dc6b9f166d81f81473e4c620` | `e77eede32d4ae0f578cb27a6d0724674a10845c14342235ee1a37b2da99a2c57` |
 | MPEG-TS access-unit timing, source events | `7e468e36df4bb4cecea621f6071d5a9c0353623a` | `8490248636e690d9416a96c74a35bb6f5208f71b2d9dc1203e6d6a6f4025b158` |
 | MPEG-TS access-unit timing | `e8f0053aa9ed0f196355f74d596ace48deae2c60` | `2b1150d5d6ac757a91b3de6a2f916bb0c6a2d3ae15149704f898bd6df207bda5` |
+| MPEG-TS PES, HLS and progressive gate | `e8f0053aa9ed0f196355f74d596ace48deae2c60` | `985bf38491d24149e85ec6647eb7959c9888294f51d5f7136378c9da30778e8a` |
 | MPEG-TS access-unit gate | `e8f0053aa9ed0f196355f74d596ace48deae2c60` | `381aee4861cc45ac1e5d6bd287f606f5cb7b8f731a3b688bbc204b61502e45ae` |
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | ARMv7: ISO BMFF / MP4 | `f99d893196908d562c897bccb20c6a972cd25d11` | `bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1` |
