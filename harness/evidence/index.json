@@ -16622,7 +16622,7 @@
   {
    "name": "subtitles-gate-c826a1cd-linux-arm64",
    "retention": "90 days",
-   "reason": "Gate-build pass of the five subtitle features (timing on CPU 1, kernel-bound memory, grading) at c826a1cd on a c8g.xlarge; superseded by subtitles-gate-efd61988-linux-arm64. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
+   "reason": "Gate-build pass of the five subtitle features (timing on CPU 1, kernel-bound memory, grading) at c826a1cd on a c8g.xlarge; superseded by subtitles-gate-2e0cbaef-linux-arm64. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
    "key": "qualification/repository/subtitles-gate-c826a1cd-linux-arm64/543a46b87e4a5b2fe3c0c16c10a224231949b13e75ef931adf7a013e02976f23.tar.zst",
    "sha256": "543a46b87e4a5b2fe3c0c16c10a224231949b13e75ef931adf7a013e02976f23",
    "source_revision": "c826a1cdd0a5a8e0ff9954adea4c638e1455687c",
