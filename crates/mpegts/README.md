@@ -35,6 +35,18 @@ contain exactly one media program. `ContainerReader` supplies the normal
 input-window, work, cancellation, backpressure and reset protocol. Seeking
 returns `Error::Unsupported` without changing reader state.
 
+For an ordered stream, call `Reader::finish_entity` with the final input
+token and the next entity's distinct source ID and capabilities. The reader
+consumes the last supplied bytes and requests offset zero of the next entity
+with the same generation and a new request number. `EntityTransition::Contiguous`
+carries the current tables, continuity counters, partial PES and access-unit
+state forward, including from an initialization section. An explicit
+`Discontinuity` reports unfinished access units and clears the track catalogue
+until the next entity's PAT and PMT arrive. Source ranges keep each entity's
+physical coordinates. Call `finish` on the last entity to drain the logical
+stream. A reset starts the current entity again with fresh transport state.
+The boundary semantics follow [RFC 8216 sections 3 and 4.3.2.3](https://www.rfc-editor.org/rfc/rfc8216#section-3).
+
 The reader admits AVC and HEVC Annex B, single-block ADTS AAC-LC, LATM in LOAS envelopes, and
 AC-3 or E-AC-3 with unambiguous DVB descriptors in private PES or stream
 types `0x81` and `0x87` in the caller-declared ATSC namespace. Tracks retain

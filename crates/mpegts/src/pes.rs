@@ -9,7 +9,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, Time, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, SourceLocation, Time, WorkBudget,
 };
 
 pub(crate) const HEADER_MAX: usize = 264; // 9 fixed bytes plus 8-bit optional-header length
@@ -213,6 +213,15 @@ impl PesAssembler {
     }
     pub fn partial_header(&self) -> &[u8] {
         &self.raw_header[..self.header_used]
+    }
+    pub(crate) fn pending_header_location(&self) -> Option<SourceLocation> {
+        self.header_ranges
+            .as_slice()
+            .first()
+            .map(|range| SourceLocation {
+                source: range.entity,
+                offset: range.offset,
+            })
     }
 
     fn validating_body(&self) -> bool {

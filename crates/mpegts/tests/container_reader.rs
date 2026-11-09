@@ -1,4 +1,7 @@
 //! Access-unit composition with recorded boundaries and original source clocks.
+#[path = "container_reader/entities.rs"]
+mod entities;
+
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     CodecId, ContainerReader, Event, MediaKind, PacketInfo, TrackId, TrackInfo,

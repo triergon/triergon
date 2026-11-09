@@ -67,5 +67,7 @@ the repository root as their `directory` and name inputs relative to it.
 
 For ordered MPEG-TS entities, the access-unit reference carries parser state
 across contiguous input and initialization maps. An explicit discontinuity
-flushes the parser before the next entity. Only the final EOF drains it. The
-candidate access-unit reader currently requires one media entity.
+flushes the parser before the next entity. The candidate supplies each entity
+through the same access-unit reader and preserves its physical source ranges.
+The comparison uses logical packet positions across the ordered bytes. Only
+the final EOF drains the parser.

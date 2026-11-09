@@ -7,7 +7,7 @@ use crate::compat::pes::UnframedAudioPolicy;
 use crate::compat::{dvb, latm};
 use crate::psi::DescriptorNamespace;
 use crate::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
-use lane::{Lane, LaneStep, StorageScan};
+use lane::{Lane, LaneStep, PesRun, StorageScan};
 pub use model::{
     Ac3AccessUnit, AccessUnit, DvbSubtitleUnit, IncompleteVideo, LoasFrame, Packet, PacketClock,
     PayloadSource, ReaderEvent, SourceEvent, Track, UnframedAudio,
@@ -29,6 +29,22 @@ pub enum AudioEofPolicy {
     RejectIncomplete,
     /// Report validated PES bytes as a source fragment, never as a complete AU.
     ReportIncomplete,
+}
+
+/// Interpretation of the next physical entity in a transport stream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EntityTransition {
+    /// Continue PSI, PES, clock and access-unit state across the boundary.
+    Contiguous,
+    /// Start a new configuration and clock epoch, reporting interrupted units.
+    Discontinuity,
+}
+
+#[derive(Clone, Copy)]
+struct NextEntity {
+    source: SourceId,
+    capabilities: SourceCapabilities,
+    transition: EntityTransition,
 }
 
 /// Bounds and source interpretation for the AU reader, independent of its live
@@ -117,10 +133,8 @@ pub struct Reader {
     queued_pes: Option<(usize, SourceEvent, ClockContext)>,
     unsupported_at: Option<usize>,
     tsid: Option<u16>,
-    transport_end: u64,
-    transport_payload_start: u64,
-    boundary_offset: u64,
     boundary: Option<SourceEvent>,
+    next_entity: Option<NextEntity>,
     end: Option<SourceLocation>,
     finished: bool,
     failure: Option<Error>,
@@ -184,10 +198,8 @@ impl Reader {
             queued_pes: None,
             unsupported_at: None,
             tsid: None,
-            transport_end: 0,
-            transport_payload_start: 0,
-            boundary_offset: 0,
             boundary: None,
+            next_entity: None,
             end: None,
             finished: false,
             failure: None,
@@ -228,6 +240,36 @@ impl Reader {
         }
         result
     }
+    /// Complete one entity and queue its successor. The reader consumes the
+    /// final supplied bytes before requesting offset zero of the next entity.
+    /// The generation is preserved and the request number advances.
+    /// Use [Self::finish] for the last entity of the logical stream.
+    pub fn finish_entity(
+        &mut self,
+        source: SourceId,
+        token: InputToken,
+        next: SourceId,
+        capabilities: SourceCapabilities,
+        transition: EntityTransition,
+    ) -> Result<()> {
+        self.healthy()?;
+        if self.next_entity.is_some() || self.end.is_some() {
+            return Err(Error::Invalid(
+                "MPEG-TS entity completion already specified",
+            ));
+        }
+        if self.source == next {
+            return Err(Error::SourceMismatch);
+        }
+        token.request().checked_add(1).ok_or(Error::Overflow)?;
+        self.finish(source, token)?;
+        self.next_entity = Some(NextEntity {
+            source: next,
+            capabilities,
+            transition,
+        });
+        Ok(())
+    }
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -249,6 +291,7 @@ impl Reader {
     pub fn close(&mut self) {
         self.stop(Error::Closed);
     }
+    /// Restart the current entity with fresh transport state and a new generation.
     pub fn reset(&mut self) -> Result<InputRequest> {
         let next = Self::new(&self.pool, self.source, self.caps, self.limits, self.window)?;
         let request = next.request()?;
@@ -273,6 +316,7 @@ impl Reader {
         self.queued_pes = None;
         self.unsupported_at = None;
         self.boundary = None;
+        self.next_entity = None;
         self.storage = None;
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
@@ -361,19 +405,15 @@ impl Reader {
                         }
                         let source = self.pending.as_ref().expect("pending source");
                         match source.event() {
-                            TraceEvent::Transport(packet) => {
-                                self.transport_payload_start = packet.payload_source_offset;
-                                self.transport_end = packet.source_offset
-                                    .checked_add(u64::try_from(packet.source.len()).map_err(|_| Error::Overflow)?)
-                                    .ok_or(Error::Overflow)?;
-                                self.phase = Phase::Publish;
-                            }
                             TraceEvent::Pat(table) => { self.tsid = Some(table.header.extension); self.phase = Phase::Publish; }
                             TraceEvent::ProgramMap { active: true, configuration_epoch, .. }
                                 if self.map.as_ref().is_none_or(|map| !matches!(map.event(), TraceEvent::ProgramMap { configuration_epoch: old, .. } if old == configuration_epoch)) => {
                                     self.rebuild = Some(source.clone()); self.phase = Phase::DrainAll(0);
                                 }
-                            TraceEvent::Discontinuity { .. } | TraceEvent::Timeline { .. } => {
+                            TraceEvent::Discontinuity { .. } | TraceEvent::Finished => {
+                                self.rebuild = None; self.phase = Phase::DrainAll(0);
+                            }
+                            TraceEvent::Timeline { .. } => {
                                 self.rebuild = self.map.clone(); self.phase = Phase::DrainAll(0);
                             }
                             TraceEvent::Continuity { pid, outcome: crate::ContinuityOutcome::SignalledDiscontinuity } => {
@@ -381,23 +421,29 @@ impl Reader {
                                     .position(|lane| lane.track.stream().pid == *pid)
                                     .map_or(Phase::Publish, Phase::FaultLane);
                             }
-                            TraceEvent::Finished => { self.rebuild = None; self.phase = Phase::DrainAll(0); }
                             TraceEvent::Pes(pes) => {
-                                if let Some(boundary) = &self.boundary
-                                    && pes.header_source_ranges.as_slice().first().is_some_and(|range| range.offset < self.boundary_offset)
-                                {
-                                    let event = ReaderEvent::InterruptedPes {
-                                        source: source.clone(),
-                                        boundary: boundary.clone(),
-                                    };
-                                    self.phase = Phase::Publish;
-                                    return Ok(Step::Ready(Event::Other(event)));
-                                }
                                 if let Some(index) = self.lanes.as_slice().iter().position(|lane| lane.track.stream().pid == pes.pid) {
-                                    let run = (pes.epochs.configuration, pes.epochs.clock, pes.byte_run_epoch);
-                                    self.phase = if self.lanes.as_slice()[index].run.is_some_and(|old| old != run) {
-                                        Phase::DrainLane(index)
-                                    } else { Phase::Feed(index) };
+                                    let lane = &mut self.lanes.as_mut_slice()[index];
+                                    if let PesRun::BeforeBoundary(start) = lane.run {
+                                        lane.run = PesRun::Idle;
+                                        if let Some(boundary) = &self.boundary
+                                            && pes.header_source_ranges.as_slice().first().is_some_and(|range| {
+                                                range.entity == start.source && range.offset == start.offset
+                                            })
+                                        {
+                                            let event = ReaderEvent::InterruptedPes {
+                                                source: source.clone(),
+                                                boundary: boundary.clone(),
+                                            };
+                                            self.phase = Phase::Publish;
+                                            return Ok(Step::Ready(Event::Other(event)));
+                                        }
+                                    }
+                                    self.phase = match lane.run {
+                                        PesRun::Active(epochs, byte_run)
+                                            if epochs != pes.epochs || byte_run != pes.byte_run_epoch => Phase::DrainLane(index),
+                                        _ => Phase::Feed(index),
+                                    };
                                 } else { self.phase = Phase::Publish; }
                             }
                             TraceEvent::Diagnostic(fault) if matches!(fault.kind, crate::FaultKind::Pes | crate::FaultKind::Continuity | crate::FaultKind::Transport) => {
@@ -456,16 +502,6 @@ impl Reader {
                                 self.pending.as_ref().expect("pending boundary").event(),
                                 TraceEvent::Finished
                             ) {
-                                // Clock transitions precede the current carrier's
-                                // payload; a PMT is committed after its carrier.
-                                self.boundary_offset = if matches!(
-                                    self.pending.as_ref().expect("pending boundary").event(),
-                                    TraceEvent::Timeline { .. }
-                                ) {
-                                    self.transport_payload_start
-                                } else {
-                                    self.transport_end
-                                };
                                 self.boundary = self.pending.clone();
                                 self.lanes.clear();
                                 self.staged_tracks.clear();
@@ -489,19 +525,23 @@ impl Reader {
                             self.staged_tracks.try_reserve_exact(
                                 source.map().streams.len() - self.staged_tracks.len(),
                             )?;
-                            let epoch = self
+                            // Remember the exact open PES in a reused route.
+                            // Physical offsets can restart in every entity.
+                            let (epochs, pending_header) = self
                                 .stream
                                 .as_ref()
                                 .expect("active transport")
-                                .route_epochs(index, source.map().streams.as_slice()[index].pid)
-                                .ok_or(Error::Invalid("MPEG-TS track route missing"))?
-                                .configuration;
+                                .route_state(index, source.map().streams.as_slice()[index].pid)
+                                .ok_or(Error::Invalid("MPEG-TS track route missing"))?;
                             let track = Track {
                                 source: source.clone(),
                                 index,
-                                epoch,
+                                epoch: epochs.configuration,
                             };
-                            let lane = Lane::new(&self.pool, track, self.limits)?;
+                            let mut lane = Lane::new(&self.pool, track, self.limits)?;
+                            if let Some(start) = pending_header {
+                                lane.run = PesRun::BeforeBoundary(start);
+                            }
                             self.staged_tracks
                                 .try_push(lane.track.clone())
                                 .map_err(|e| e.error)?;
@@ -600,8 +640,15 @@ impl Reader {
                             );
                         }
                         let source = self.pending.take().expect("published source");
-                        if matches!(source.event(), TraceEvent::Finished) {
-                            self.finished = true;
+                        match source.event() {
+                            TraceEvent::Discontinuity { .. } => {
+                                self.map = None;
+                                self.tracks.clear();
+                                self.tsid = None;
+                                self.boundary = None;
+                            }
+                            TraceEvent::Finished => self.finished = true,
+                            _ => (),
                         }
                         return Ok(Step::Ready(Event::Other(ReaderEvent::Source(source))));
                     }
@@ -658,8 +705,22 @@ impl Reader {
                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                 Step::Yield => return Ok(Step::Yield),
                 Step::End(location) => {
-                    stream.end_of_source()?;
-                    self.end = Some(location);
+                    if let Some(next) = self.next_entity {
+                        let Some(end) = stream.media_entity_end(input, work, cancel)? else {
+                            return Ok(Step::Yield);
+                        };
+                        if next.transition == EntityTransition::Discontinuity {
+                            stream.discontinuity()?;
+                        }
+                        input.continue_source(next.source, next.capabilities)?;
+                        end.validate_continuation(input)?;
+                        self.source = next.source;
+                        self.caps = next.capabilities;
+                        self.next_entity = None;
+                    } else {
+                        stream.end_of_source()?;
+                        self.end = Some(location);
+                    }
                 }
             }
         }

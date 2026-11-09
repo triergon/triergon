@@ -2,35 +2,30 @@
 //!
 //! The separate demux-clock policy places source PES anchors for comparison. It
 //! never changes the source packet's timestamps or supplies a clock to later AUs.
-use crate::runner::{Invocation, MAX_INPUT, Refusal, Result, Totals, measure};
+use crate::runner::{Invocation, Refusal, Result, Totals, measure};
+use crate::ts_input::{self, FIRST_SOURCE, Request};
+use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use triergon::{
     AnyOther, AnyPacket, AnyReader, ContainerReader, Event, PacketInfo, Step, TrackId, TrackInfo,
 };
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, InputCursor, InputWindow, Rounding, SourceCapabilities,
-    SourceId, TimeBase, WorkBudget,
+    Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
+    SourceLocation, TimeBase, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::pes::DemuxClock;
-use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
 use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::{
-    AccessUnit, AudioEofPolicy, Packet, PacketFormat, Reader, ReaderEvent, ReaderLimits, TraceEvent,
+    AccessUnit, AudioEofPolicy, EntityTransition, Packet, PacketFormat, Reader, ReaderEvent,
+    ReaderLimits, TraceEvent,
 };
 
 pub const PREFIX: &str = "ts-au-";
 const OPERATION: &str = "mpegts-access-unit-packets";
 const WINDOW: usize = 64 * 1024;
 const WORK: u64 = 4096;
-const SOURCE: SourceId = SourceId(1);
-
-struct Request {
-    bytes: Bytes,
-    limits: ReaderLimits,
-    more_entities: bool,
-}
 
 struct TrackProjection {
     id: TrackId,
@@ -39,23 +34,29 @@ struct TrackProjection {
 }
 
 #[derive(Clone, Copy)]
-struct PacketPosition {
-    format: PacketFormat,
+struct PacketPosition<'a> {
+    request: &'a Request,
     basis: PositionBasis,
 }
 
-impl PacketPosition {
-    fn at(self, offset: u64) -> Result<i64> {
-        let carrier = match self.format {
+impl PacketPosition<'_> {
+    fn at(self, entity: SourceId, offset: u64) -> Result<i64> {
+        let carrier = match self.request.format {
             PacketFormat::Ts188 => offset / 188 * 188,
             PacketFormat::M2ts192 => offset / 192 * 192,
         };
         let prefix = u64::from(
-            self.format == PacketFormat::M2ts192 && self.basis == PositionBasis::SyncStart,
+            self.request.format == PacketFormat::M2ts192 && self.basis == PositionBasis::SyncStart,
         ) * 4;
-        Ok(i64::try_from(
-            carrier.checked_add(prefix).ok_or(Error::Overflow)?,
-        )?)
+        let base = self
+            .request
+            .position_base(entity)
+            .ok_or(Error::SourceMismatch)?;
+        let offset = base
+            .checked_add(carrier)
+            .and_then(|at| at.checked_add(prefix))
+            .ok_or(Error::Overflow)?;
+        Ok(i64::try_from(offset)?)
     }
 }
 
@@ -93,26 +94,51 @@ fn ac3_duration(packet: &Packet, known: bool) -> Result<i64> {
 /// Apply the existing bounded input-position comparison to an M2TS prefix.
 /// This inspection remains inside each complete measured operation.
 fn position_basis(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<PositionBasis> {
-    if request.limits.format == PacketFormat::Ts188 {
+    if request.format == PacketFormat::Ts188 {
         return Ok(PositionBasis::CarrierStart);
     }
-    let finite = request.bytes.len() <= InputBootstrap::MAX_BORROWED_BYTES;
+    let following = request
+        .following
+        .as_slice()
+        .iter()
+        .take_while(|entity| !entity.discontinuity);
+    let length = request.input.len()
+        + following
+            .clone()
+            .map(|entity| entity.input.len())
+            .sum::<usize>();
+    let finite = length <= InputBootstrap::MAX_BORROWED_BYTES;
     let count = if finite {
-        request.bytes.len()
+        length
     } else {
         InputBootstrap::M2TS_PREFIX_BYTES
     };
+    let bytes = if count <= request.input.len() {
+        request.input.slice(0..count)?
+    } else {
+        let mut prefix = BudgetVec::new(pool);
+        prefix.try_reserve_exact(count)?;
+        prefix.try_extend_from_slice(request.input.as_ref())?;
+        for entity in following {
+            let take = (count - prefix.len()).min(entity.input.len());
+            prefix.try_extend_from_slice(&entity.input.as_ref()[..take])?;
+            if prefix.len() == count {
+                break;
+            }
+        }
+        prefix.freeze().map_err(|error| error.error)?
+    };
     let mut input = InputCursor::new(
         pool,
-        SOURCE,
+        FIRST_SOURCE,
         SourceCapabilities {
-            length: Some(request.bytes.len() as u64),
+            length: Some(length as u64),
             random_access: false,
         },
         count,
     )?;
     let need = input.request();
-    let window = InputWindow::new(need.source, need.token, 0, request.bytes.slice(0..count)?)?;
+    let window = InputWindow::new(need.source, need.token, 0, bytes)?;
     input.provide(&window)?;
     let mut bootstrap = if finite {
         let mut bootstrap = InputBootstrap::new(&input, &window, PacketFormat::M2ts192)?;
@@ -130,11 +156,12 @@ fn position_basis(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Resu
     }
 }
 
-fn refused(mut totals: Totals, error: &dyn std::fmt::Display, offset: u64) -> Totals {
+fn refused(mut totals: Totals, error: &dyn std::fmt::Display, at: SourceLocation) -> Totals {
     totals.refusal = Some(Box::new(Refusal {
         reason: error.to_string(),
         cause: format!(
-            "{{\"phase\":\"access_units\",\"source\":1,\"input_window_offset\":{offset}}}"
+            "{{\"phase\":\"access_units\",\"source\":{},\"input_window_offset\":{}}}",
+            at.source.0, at.offset,
         ),
     }));
     totals
@@ -144,7 +171,7 @@ fn fold_packet(
     totals: &mut Totals,
     packet: &Packet,
     index: usize,
-    position: PacketPosition,
+    position: PacketPosition<'_>,
     duration: i64,
     clock: &mut DemuxClock,
     cancel: &AtomicBool,
@@ -178,13 +205,12 @@ fn fold_packet(
     // units from the same PES have no packet position, even though source byte
     // ranges remain available on every packet.
     let position = if first.payload_range.start == 0 {
-        let offset = pes
+        let range = pes
             .header_source_ranges
             .as_slice()
             .first()
-            .ok_or("PES has no header range")?
-            .offset;
-        position.at(offset)?
+            .ok_or("PES has no header range")?;
+        position.at(range.entity, range.offset)?
     } else {
         -1
     };
@@ -216,38 +242,41 @@ fn fold_packet(
 
 fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
     let mut totals = Totals::default();
-    if request.more_entities {
-        return Ok(refused(
-            totals,
-            &"access-unit reader requires a single media entity",
-            0,
-        ));
-    }
+    let mut at = SourceLocation {
+        source: FIRST_SOURCE,
+        offset: 0,
+    };
     let basis = match position_basis(pool, request, cancel) {
         Ok(basis) => basis,
-        Err(error) => return Ok(refused(totals, error.as_ref(), 0)),
+        Err(error) => return Ok(refused(totals, error.as_ref(), at)),
     };
-    let position = PacketPosition {
-        format: request.limits.format,
-        basis,
+    let position = PacketPosition { request, basis };
+    let limits = ReaderLimits {
+        format: request.format,
+        program: Some(request.program),
+        descriptor_namespace: request.namespace,
+        audio_eof_policy: AudioEofPolicy::ReportIncomplete,
+        ..ReaderLimits::default()
     };
     let mut reader = AnyReader::MpegTs(Reader::new(
         pool,
-        SOURCE,
+        FIRST_SOURCE,
         SourceCapabilities {
             length: None,
             random_access: false,
         },
-        request.limits,
+        limits,
         WINDOW,
     )?);
-    let mut clock = DemuxClock::new(request.limits.program.ok_or("selected program missing")?)?;
+    let mut clock = DemuxClock::new(request.program)?;
     let mut tracks = BudgetVec::<TrackProjection>::new(pool);
-    let mut offset = 0;
+    let mut source = FIRST_SOURCE;
+    let mut current = &request.input;
+    let mut following = request.following.as_slice().iter();
     loop {
         let step = match reader.step(&mut WorkBudget::new(WORK), cancel) {
             Ok(step) => step,
-            Err(error) => return Ok(refused(totals, &error, offset)),
+            Err(error) => return Ok(refused(totals, &error, at)),
         };
         match step {
             Step::Ready(
@@ -287,7 +316,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     &mut clock,
                     cancel,
                 ) {
-                    return Ok(refused(totals, error.as_ref(), offset));
+                    return Ok(refused(totals, error.as_ref(), at));
                 }
             }
             Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::Source(source)))) => {
@@ -325,29 +354,65 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                             }
                         }
                     }
+                    TraceEvent::Discontinuity { .. } => {
+                        // The parser drops the frame still waiting for lookahead.
+                        for track in tracks.as_mut_slice() {
+                            track.pending_ac3 = None;
+                            track.ac3_duration_known = false;
+                        }
+                    }
                     _ => (),
                 }
             }
+            Step::Ready(Event::Other(AnyOther::MpegTs(ReaderEvent::Interrupted {
+                cause, ..
+            }))) if matches!(cause.event(), TraceEvent::Discontinuity { .. }) => (),
             Step::Ready(Event::Other(AnyOther::MpegTs(event))) => {
                 return Ok(refused(
                     totals,
                     &format!("incomplete access-unit observation: {event:?}"),
-                    offset,
+                    at,
                 ));
             }
             Step::Ready(_) => return Err("unexpected container event".into()),
             Step::Yield => (),
             Step::NeedInput(input) => {
-                let at = usize::try_from(input.offset)?;
-                if at > request.bytes.len() {
+                if input.source != source {
+                    return Err(Error::SourceMismatch.into());
+                }
+                at = SourceLocation {
+                    source,
+                    offset: input.offset,
+                };
+                let start = usize::try_from(input.offset)?;
+                if start > current.len() {
                     return Err("reader requested bytes beyond the input".into());
                 }
-                offset = input.offset;
-                if at == request.bytes.len() {
-                    reader.finish(input.source, input.token)?;
+                if start == current.len() {
+                    if let Some(next) = following.next() {
+                        let AnyReader::MpegTs(transport) = &mut reader else {
+                            return Err("unexpected container reader".into());
+                        };
+                        let transition = if next.discontinuity {
+                            EntityTransition::Discontinuity
+                        } else {
+                            EntityTransition::Contiguous
+                        };
+                        transport.finish_entity(
+                            input.source,
+                            input.token,
+                            next.source,
+                            ts_input::capabilities(&next.input),
+                            transition,
+                        )?;
+                        source = next.source;
+                        current = &next.input;
+                    } else {
+                        reader.finish(input.source, input.token)?;
+                    }
                 } else {
-                    let end = request.bytes.len().min(at + input.maximum);
-                    let bytes = request.bytes.slice(at..end)?;
+                    let end = current.len().min(start + input.maximum);
+                    let bytes = current.slice(start..end)?;
                     reader.provide(&InputWindow::new(
                         input.source,
                         input.token,
@@ -363,11 +428,14 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                         requested: pressure.requested,
                         available: pressure.available,
                     },
-                    offset,
+                    at,
                 ));
             }
             Step::End(end) => {
-                if end.source != SOURCE || end.offset != request.bytes.len() as u64 {
+                if end.source != source
+                    || end.offset != current.len() as u64
+                    || following.len() != 0
+                {
                     return Err("reader ended before the physical input".into());
                 }
                 for (index, track) in tracks.as_mut_slice().iter_mut().enumerate() {
@@ -385,11 +453,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     }
                 }
                 if totals.packets == 0 {
-                    return Ok(refused(
-                        totals,
-                        &"no framed packet was observed",
-                        end.offset,
-                    ));
+                    return Ok(refused(totals, &"no framed packet was observed", end));
                 }
                 return Ok(totals);
             }
@@ -405,37 +469,8 @@ pub fn run(args: &[String]) -> Result<()> {
         2..=usize::MAX,
         false,
     )?;
-    let [size, program, rest @ ..] = invocation.arguments else {
-        return Err("expected packet size and program".into());
-    };
-    let format = match size.as_str() {
-        "188" => PacketFormat::Ts188,
-        "192" => PacketFormat::M2ts192,
-        _ => return Err("packet size must be 188 or 192".into()),
-    };
-    let mut limits = ReaderLimits {
-        format,
-        program: Some(program.parse()?),
-        audio_eof_policy: AudioEofPolicy::ReportIncomplete,
-        ..ReaderLimits::default()
-    };
-    let rest = if rest.first().is_some_and(|value| value == "--dvb") {
-        limits.descriptor_namespace =
-            DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
-        &rest[1..]
-    } else {
-        rest
-    };
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let bytes = invocation.input(MAX_INPUT)?;
-    if bytes.is_empty() {
-        return Err("input must be a bounded nonempty file".into());
-    }
-    let request = Request {
-        bytes: Bytes::try_from_vec(&pool, bytes).map_err(|error| error.error())?,
-        limits,
-        more_entities: !rest.is_empty(),
-    };
+    let request = ts_input::parse(&pool, Path::new(invocation.path), invocation.arguments)?;
     measure(&invocation, OPERATION, Some(&pool), || {
         operation(
             &pool,
@@ -449,8 +484,9 @@ pub fn run(args: &[String]) -> Result<()> {
 mod tests {
     use super::{Request, operation};
     use std::sync::atomic::AtomicBool;
-    use triergon_core::{Budget, Bytes};
-    use triergon_mpegts::ReaderLimits;
+    use triergon_core::{Budget, BudgetVec, Bytes};
+    use triergon_mpegts::PacketFormat;
+    use triergon_mpegts::psi::DescriptorNamespace;
 
     #[test]
     fn rejected_pes_does_not_become_successful_empty_completion() {
@@ -460,12 +496,11 @@ mod tests {
         ] {
             let pool = Budget::new(1 << 20).unwrap();
             let request = Request {
-                bytes: Bytes::copy_from_slice(&pool, input).unwrap(),
-                limits: ReaderLimits {
-                    program: Some(1),
-                    ..ReaderLimits::default()
-                },
-                more_entities: false,
+                input: Bytes::copy_from_slice(&pool, input).unwrap(),
+                format: PacketFormat::Ts188,
+                program: 1,
+                namespace: DescriptorNamespace::Unspecified,
+                following: BudgetVec::new(&pool),
             };
             let baseline = pool.used();
             let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
