@@ -28,7 +28,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, PGS | Presentation, window, palette and object segments to display sets, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska) | 0.8564 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤1.010 (316/317 lower) | `long-movie-mkv` total RSS (plane storage that does not fault its pages in again for every display set); FATE coverage |
-| Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 227/227 cases (`subtitle-dvb`: TS and Matroska) | 0.8491 (227/227 pass) | heap ≤0.991, total RSS ≤0.813 (227/227 lower) | FATE coverage |
+| Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 229/229 cases (`subtitle-dvb`: TS and Matroska) | 0.8568 (229/229 pass) | heap ≤0.991, total RSS ≤0.813 (229/229 lower) | FATE coverage |
 | Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 223/223 cases (`subtitle-dvd`) | 0.8592 (223/223 pass) | heap ≤0.959, total RSS ≤0.853 (223/223 lower) | FATE coverage |
 | Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 197/197 cases (`subtitle-cc`) | 0.9751 (197/197 pass) | heap ≤0.123, total RSS ≤0.956 (197/197 lower) | FATE coverage |
 | Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 70/70 cases (`subtitle-teletext`) | 0.4257 (70/70 pass) | heap ≤0.622, total RSS ≤0.676 (70/70 lower) | FATE coverage |
@@ -104,10 +104,10 @@ timing and memory reports. Only `pes-header-every-byte` is above the runtime tar
 
 The subtitle rows use gate builds on a c8g.xlarge pinned to CPU 1, with 30 timing pairs
 of 50 operations and 30 memory pairs under the kernel RSS proof; every row is a graded
-report. DVB and DVD are from `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc`, PGS, closed
-captions and teletext from `956c42961f4a27d88f96d5800d59ff1eeb088018`. Between the two,
-the subtitle worker's functions differ only in the DVB and DVD receivers, apart from
-constant addresses. PGS `long-movie-mkv` total RSS is 1.010, a
+report. DVB is from `0d70bebfc0799f65df14f170ed97e68c5a35daa7`, DVD from
+`531e2d04ba7386513ff7afe7b44f53b2a93ca9dc`, PGS, closed captions and teletext from
+`956c42961f4a27d88f96d5800d59ff1eeb088018`. Between these builds, the subtitle worker's
+functions differ only in the DVB and DVD receivers, apart from constant addresses. PGS `long-movie-mkv` total RSS is 1.010, a
 median 70 KB (0.9%) over. Its observed resident peak is 390 KB lower than the
 reference's, but the proven ceiling grows 816 KB against 372 KB observed. A page-fault
 trace puts the difference in the first three object planes (143 to 184 KB), which glibc
@@ -160,7 +160,8 @@ timing of the reference built with and without zeroed automatic variables.
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |
 | Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
 | Subtitles: PGS, closed captions, teletext | `956c42961f4a27d88f96d5800d59ff1eeb088018` | `61b52a272e82eeee913c9c4b4d6331caea3283a99ebad4a897aba65dab3c891d` |
-| Subtitles: DVB, DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
+| Subtitles: DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
+| Subtitles: DVB | `0d70bebfc0799f65df14f170ed97e68c5a35daa7` | `06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077` |
 | MPEG-TS | `090c856df65f9247d24ea9f1c927e35cf5d528e8` | `6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1` |
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | ARMv7: ISO BMFF / MP4 | `f99d893196908d562c897bccb20c6a972cd25d11` | `bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1` |

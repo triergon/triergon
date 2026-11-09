@@ -16642,11 +16642,21 @@
    "name": "subtitles-gate-531e2d04-linux-arm64",
    "path": "subtitles-gate-531e2d04-linux-arm64",
    "retention": "retained",
-   "reason": "Subtitle status rows for DVB and DVD, Linux AArch64, on a c8g.xlarge: timing on CPU 1 (30 pairs), kernel-bound memory (30 pairs) and the graded reports at 531e2d04 (531e2d04/), with the build logs, RSS proof, identity and platform. same-code.txt compares its subtitle worker with f34c8aa2's: the functions that differ are DVB's and DVD's, and one shared input reader whose only differences are constant addresses. count.tsv holds each DVB and DVD case's instruction count at both revisions. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
+   "reason": "Subtitle status rows for DVD, Linux AArch64, on a c8g.xlarge: timing on CPU 1 (30 pairs), kernel-bound memory (30 pairs) and the graded reports for DVB and DVD at 531e2d04 (531e2d04/; DVB is superseded by subtitles-gate-0d70bebf-linux-arm64), with the build logs, RSS proof, identity and platform. same-code.txt compares its subtitle worker with f34c8aa2's: the functions that differ are DVB's and DVD's, and one shared input reader whose only differences are constant addresses. count.tsv holds each DVB and DVD case's instruction count at both revisions. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
    "key": "evidence/subtitles-gate-531e2d04-linux-arm64/01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391.tar.zst",
    "sha256": "01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391",
    "bytes": 4619874,
    "source_revision": "531e2d04ba7386513ff7afe7b44f53b2a93ca9dc"
+  },
+  {
+   "name": "subtitles-gate-0d70bebf-linux-arm64",
+   "path": "subtitles-gate-0d70bebf-linux-arm64",
+   "retention": "retained",
+   "reason": "Subtitle status row for DVB, Linux AArch64, on a c8g.xlarge: timing on CPU 1 (30 pairs), kernel-bound memory (30 pairs) and the graded report at 0d70bebf (0d70bebf/), with the build logs, RSS proof, identity and platform. same-code.txt compares its subtitle worker with 531e2d04's: the functions that differ are DVB's, and one shared input reader whose only differences are constant addresses. count.tsv holds each DVB case's instruction count at both revisions. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitles-gate-0d70bebf-linux-arm64/06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077.tar.zst",
+   "sha256": "06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077",
+   "bytes": 2332946,
+   "source_revision": "0d70bebfc0799f65df14f170ed97e68c5a35daa7"
   }
  ]
 }
