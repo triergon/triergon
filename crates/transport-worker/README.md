@@ -18,7 +18,8 @@ Input loading and result serialization are outside both measurement windows.
 The [PES contract](../../harness/features/mpegts-pes/contract.json) follows the
 selected program's PES and compatibility clock. The [access-unit contract](../../harness/features/mpegts-access-units/contract.json)
 uses `compat::annex_b::ContinuityReader` and covers complete access units and
-bounded EOF observations. The digest covers order, stream index, PID, clocks,
+bounded EOF observations. It inspects ordinary carrier events by reference.
+The digest covers order, stream index, PID, clocks,
 duration, position, flags, payload and side data. A contiguous entity carries
 parser state across its boundary. An explicit discontinuity resets it and the
 final EOF drains it.

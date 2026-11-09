@@ -38,6 +38,19 @@ pub struct TraceFault {
     /// Original owned rejected carrier; absent for non-carrier/operational faults.
     pub rejected: Option<crate::RejectedTransport>,
 }
+
+/// A carrier or ordinary continuity event that can be inspected in place.
+#[derive(Clone, Copy, Debug)]
+pub enum CarrierObservation<'a> {
+    /// The complete validated transport packet, including its original bytes.
+    Transport(&'a TransportPacket),
+    /// The first packet on a route or its next continuous packet.
+    Continuity {
+        pid: u16,
+        outcome: ContinuityOutcome,
+    },
+}
+
 /// One result at a time. Every dynamic member owns shared charged storage; there
 /// is no uncharged boxed variant or internal unbounded event queue.
 #[derive(Debug)]
@@ -1735,7 +1748,23 @@ impl TransportStream {
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
-        self.poll_inner::<TraceEvent, DIRECT, RUNS>(input, work, cancel, consume)
+        self.poll_inner::<TraceEvent, DIRECT, RUNS>(input, work, cancel, consume, |_, _| false)
+    }
+
+    pub(crate) fn poll_observing(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        observe: impl FnMut(CarrierObservation<'_>, &mut WorkBudget) -> bool,
+    ) -> Result<Step<TraceEvent>> {
+        self.poll_inner::<TraceEvent, false, false>(
+            input,
+            work,
+            cancel,
+            |_, _, _, _| Ok(FeedContinuation::Emit),
+            observe,
+        )
     }
 
     pub fn poll_compact(
@@ -1744,9 +1773,13 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<CompactTraceEvent>> {
-        self.poll_inner::<CompactTraceEvent, false, false>(input, work, cancel, |_, _, _, _| {
-            Ok(FeedContinuation::Emit)
-        })
+        self.poll_inner::<CompactTraceEvent, false, false>(
+            input,
+            work,
+            cancel,
+            |_, _, _, _| Ok(FeedContinuation::Emit),
+            |_, _| false,
+        )
     }
 
     fn poll_inner<T: PollOutput, const DIRECT: bool, const RUNS: bool>(
@@ -1760,6 +1793,7 @@ impl TransportStream {
             SourceEpochs,
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
+        mut observe: impl FnMut(CarrierObservation<'_>, &mut WorkBudget) -> bool,
     ) -> Result<Step<T>> {
         let ready = |event| Step::Ready(T::event(event));
         if self.finished {
@@ -1848,14 +1882,18 @@ impl TransportStream {
                                 self.omit_feed_events(1)?;
                                 continue;
                             }
-                            return Ok(ready(TraceEvent::Continuity {
-                                pid: self
-                                    .packet
-                                    .as_ref()
-                                    .ok_or(Error::Invalid("TS packet missing"))?
-                                    .pid,
+                            let pid = self
+                                .packet
+                                .as_ref()
+                                .ok_or(Error::Invalid("TS packet missing"))?
+                                .pid;
+                            if !matches!(
                                 outcome,
-                            }));
+                                ContinuityOutcome::First | ContinuityOutcome::Continuous
+                            ) || !observe(CarrierObservation::Continuity { pid, outcome }, work)
+                            {
+                                return Ok(ready(TraceEvent::Continuity { pid, outcome }));
+                            }
                         }
                     }
                     2 => {
@@ -1951,6 +1989,10 @@ impl TransportStream {
                         let packet = carrier.into_packet()?;
                         self.phase = 1;
                         if self.feed_validated_carriers {
+                            self.packet = Some(packet);
+                            continue 'events;
+                        }
+                        if observe(CarrierObservation::Transport(&packet), work) {
                             self.packet = Some(packet);
                             continue 'events;
                         }

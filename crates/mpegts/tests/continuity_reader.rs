@@ -1,12 +1,14 @@
 use std::sync::atomic::AtomicBool;
-use triergon_core::container::{ContainerReader, Event};
+use triergon_core::container::{ContainerReader, Event, PacketInfo};
 use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputToken, InputWindow, SourceCapabilities, SourceFailure,
     SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader};
+use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
 use triergon_mpegts::{
-    ContinuityOutcome, EntityTransition, FaultKind, ReaderEvent, ReaderLimits, TraceEvent,
+    CarrierObservation, ContinuityOutcome, EntityTransition, FaultKind, ReaderEvent, ReaderLimits,
+    TraceEvent,
 };
 
 const ID: SourceId = SourceId(9);
@@ -40,6 +42,96 @@ fn provide(reader: &mut ContinuityReader, pool: &Budget, raw: &[u8], request: In
     reader
         .provide(&InputWindow::new(request.source, request.token, request.offset, bytes).unwrap())
         .unwrap();
+}
+
+#[test]
+fn borrowed_carriers_keep_the_owned_events_in_source_order() {
+    fn trace(raw: &[u8], grant: u64, borrowed: bool) -> Vec<String> {
+        let pool = Budget::new(8 << 20).unwrap();
+        let limits = ReaderLimits {
+            descriptor_namespace: DescriptorNamespace::Dvb(
+                DvbNamespaceEvidence::CallerDeclaredTransportProfile,
+            ),
+            ..ReaderLimits::default()
+        };
+        let caps = SourceCapabilities {
+            length: None,
+            random_access: false,
+        };
+        let mut reader = ContinuityReader::new(&pool, ID, caps, limits, 65536).unwrap();
+        let mut events = Vec::new();
+        for _ in 0..500_000 {
+            let mut record = |event: CarrierObservation<'_>| {
+                events.push(match event {
+                    CarrierObservation::Transport(packet) => format!(
+                        "carrier {:?} {} {:?}",
+                        packet.source_id,
+                        packet.source_offset,
+                        packet.source.as_ref()
+                    ),
+                    CarrierObservation::Continuity { pid, outcome } => {
+                        format!("counter {pid} {outcome:?}")
+                    }
+                });
+            };
+            let mut work = WorkBudget::new(grant);
+            let step = if borrowed {
+                reader.step_with_carriers(&mut work, &OFF, &mut record)
+            } else {
+                reader.step(&mut work, &OFF)
+            };
+            match step.unwrap() {
+                Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Transport(
+                    packet,
+                )))) => {
+                    assert!(!borrowed);
+                    record(CarrierObservation::Transport(&packet));
+                }
+                Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Continuity {
+                    pid,
+                    outcome,
+                }))) => {
+                    assert!(!borrowed);
+                    record(CarrierObservation::Continuity { pid, outcome });
+                }
+                Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Source(source)))) => {
+                    events.push(format!(
+                        "source {:?}",
+                        std::mem::discriminant(source.event())
+                    ));
+                }
+                Step::Ready(Event::Other(event)) => {
+                    events.push(format!("other {:?}", std::mem::discriminant(&event)));
+                }
+                Step::Ready(Event::Packet(packet)) => {
+                    events.push(format!(
+                        "packet {:?} {:?} {:?}",
+                        packet.track(),
+                        packet.pts(),
+                        packet.payload()
+                    ));
+                }
+                Step::NeedInput(request) if request.offset == raw.len() as u64 => {
+                    reader.finish(request.source, request.token).unwrap();
+                }
+                Step::NeedInput(request) => provide(&mut reader, &pool, raw, request),
+                Step::Yield => {}
+                Step::End(end) => {
+                    assert_eq!(end.offset, raw.len() as u64);
+                    return events;
+                }
+                step => panic!("unexpected reader step: {step:?}"),
+            }
+        }
+        panic!("reader did not reach EOF");
+    }
+
+    let coded = include_bytes!("../../../harness/fixtures/hls/dvb-hevc-eac3-32000.ts");
+    for (raw, grant) in [(THIRD, 1), (coded.as_slice(), 65536)] {
+        let owned = trace(raw, grant, false);
+        assert!(owned.iter().any(|event| event.starts_with("carrier")));
+        assert_eq!(trace(raw, grant, true), owned);
+    }
 }
 
 #[test]

@@ -437,7 +437,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
     let mut recovered = None;
     let mut observed_media = false;
     let (proof, reader_refusal) = loop {
-        let step = match reader.step(&mut WorkBudget::new(WORK), cancel) {
+        let step = match reader.step_with_carriers(&mut WorkBudget::new(WORK), cancel, |_| ()) {
             Ok(step) => step,
             Err(error) => {
                 return Ok(deferred_continuity.unwrap_or_else(|| refused(totals, &error, at)));
@@ -569,9 +569,6 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
             Step::Ready(Event::Other(ContinuityEvent::Residue(residue))) => {
                 recovered = Some(fold_continuity(&residue, position)?);
             }
-            Step::Ready(Event::Other(ContinuityEvent::Source(
-                ReaderEvent::Transport(_) | ReaderEvent::Continuity { .. },
-            ))) => (),
             Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::Source(source)))) => {
                 if let Some(pes) = source.event().pes_source() {
                     observed_media = true;

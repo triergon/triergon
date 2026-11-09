@@ -1,7 +1,7 @@
 use crate::clock::{ClockKey, SourceTimestamp};
 use crate::compat::pes::PrivateAudioCarriage;
 use crate::psi::{ElementaryStream, ProgramMap};
-use crate::{ContinuityOutcome, SourceEpochs, TraceEvent, TransportPacket};
+use crate::{CarrierObservation, ContinuityOutcome, SourceEpochs, TraceEvent, TransportPacket};
 use std::alloc::Layout;
 use std::ops::{Deref, Range};
 use std::sync::{Arc, atomic::AtomicUsize};
@@ -571,4 +571,17 @@ pub enum ReaderEvent {
     IncompleteVideo(IncompleteVideo),
     /// One opaque private-audio PES admitted by the explicit EOF reporting policy.
     UnframedAudio(UnframedAudio),
+}
+
+impl ReaderEvent {
+    pub(crate) fn carrier_observation(&self) -> Option<CarrierObservation<'_>> {
+        match self {
+            Self::Transport(packet) => Some(CarrierObservation::Transport(packet)),
+            Self::Continuity { pid, outcome } => Some(CarrierObservation::Continuity {
+                pid: *pid,
+                outcome: *outcome,
+            }),
+            _ => None,
+        }
+    }
 }
