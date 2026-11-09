@@ -96,7 +96,8 @@ impl Reader {
         let frames = self
             .group
             .as_ref()
-            .map_or(Ok(0), |group| crate::table_storage(&group.dependents))?;
+            .and_then(|group| group.dependents.as_ref())
+            .map_or(Ok(0), crate::table_storage)?;
         frames
             .checked_add(self.framer.input_wait_buffer_capacity())
             .ok_or(Error::Overflow)
@@ -109,6 +110,7 @@ impl Reader {
         }
         group
             .dependents
+            .as_ref()?
             .as_slice()
             .get(index - 1)?
             .pending_bytes
@@ -140,12 +142,9 @@ impl Reader {
                 return Ok(Step::Yield);
             }
             if self.sealed {
-                let lookahead = self
-                    .pending
-                    .as_ref()
-                    .map_or(0, |frame| frame.bytes().retained_storage_bytes());
+                let lookahead = self.pending.as_ref().map(Ac3Frame::bytes);
                 let group = self.group.as_mut().expect("sealed E-AC-3 group");
-                let Some(unit) = group.materialize(lookahead, work, cancel)? else {
+                let Some(unit) = group.materialize(&self.pool, lookahead, work, cancel)? else {
                     return Ok(Step::Yield);
                 };
                 self.group = None;
@@ -203,7 +202,7 @@ impl Reader {
                             ));
                         }
                         let frame = self.pending.take().expect("E-AC-3 primary");
-                        self.group = Some(Group::new(frame, &self.pool));
+                        self.group = Some(Group::new(frame));
                     }
                 }
                 Ac3FrameDetails::Eac3 {
@@ -215,8 +214,12 @@ impl Reader {
                         .group
                         .as_mut()
                         .ok_or(Error::Invalid("DVB E-AC-3 dependent without primary"))?;
-                    group.append(frame, substream_id, self.maximum_group_bytes)?;
-                    self.pending = None;
+                    group.append(
+                        &self.pool,
+                        &mut self.pending,
+                        substream_id,
+                        self.maximum_group_bytes,
+                    )?;
                 }
                 Ac3FrameDetails::Eac3 {
                     stream_type: 0 | 2, ..
@@ -234,7 +237,8 @@ impl Reader {
 struct Group {
     first: Ac3FrameFacts,
     primary: Option<Bytes>,
-    dependents: BudgetVec<DependentSyncframe>,
+    // Create the table and its pool handle when the first dependent is admitted.
+    dependents: Option<BudgetVec<DependentSyncframe>>,
     length: usize,
     joined: Option<BudgetVec<u8>>,
     frame_index: usize,
@@ -242,12 +246,12 @@ struct Group {
 }
 
 impl Group {
-    fn new(frame: Ac3Frame, pool: &Budget) -> Self {
+    fn new(frame: Ac3Frame) -> Self {
         Self {
             first: frame.facts(),
             length: frame.bytes().len(),
             primary: Some(frame.into_bytes()),
-            dependents: BudgetVec::new(pool),
+            dependents: None,
             joined: None,
             frame_index: 0,
             copied: 0,
@@ -264,16 +268,16 @@ impl Group {
     fn storage(&self) -> Result<usize> {
         let capacity = self
             .dependents
-            .capacity()
-            .checked_mul(size_of::<DependentSyncframe>())
-            .and_then(|n| n.checked_add(self.joined.as_ref().map_or(0, BudgetVec::capacity)))
+            .as_ref()
+            .map_or(Ok(0), crate::table_storage)?
+            .checked_add(self.joined.as_ref().map_or(0, BudgetVec::capacity))
             .ok_or(Error::Overflow)?;
         self.primary
             .iter()
             .chain(
                 self.dependents
-                    .as_slice()
                     .iter()
+                    .flat_map(BudgetVec::as_slice)
                     .filter_map(|frame| frame.pending_bytes.as_ref()),
             )
             .try_fold(capacity, |total, bytes| {
@@ -283,11 +287,20 @@ impl Group {
             })
     }
 
-    fn append(&mut self, frame: &Ac3Frame, substream_id: u8, maximum_bytes: usize) -> Result<()> {
+    fn append(
+        &mut self,
+        pool: &Budget,
+        pending: &mut Option<Ac3Frame>,
+        substream_id: u8,
+        maximum_bytes: usize,
+    ) -> Result<()> {
+        let frame = pending.as_ref().expect("staged E-AC-3 dependent");
         let first = self.first.header;
-        let header = frame.facts().header;
+        let facts = frame.facts();
+        let header = facts.header;
+        let count = self.dependents.as_ref().map_or(0, BudgetVec::len);
         if !matches!(first.details, Ac3FrameDetails::Eac3 { stream_type: 0, .. })
-            || usize::from(substream_id) != self.dependents.len()
+            || usize::from(substream_id) != count
             || first.sample_rate_hz != header.sample_rate_hz
             || first.blocks != header.blocks
         {
@@ -305,13 +318,17 @@ impl Group {
         }
         // The wire ID bounds the table to eight entries. Growth temporarily
         // retains both capacities, as well as the staged syncframe.
-        let allocation = if self.dependents.len() == self.dependents.capacity() {
-            (self.dependents.len() + 1) * size_of::<DependentSyncframe>()
+        let allocation = if self
+            .dependents
+            .as_ref()
+            .is_none_or(|frames| count == frames.capacity())
+        {
+            (count + 1) * size_of::<DependentSyncframe>()
         } else {
             0
         };
         require(
-            self.dependents.budget(),
+            pool,
             self.storage()?,
             frame
                 .bytes()
@@ -319,53 +336,66 @@ impl Group {
                 .checked_add(allocation)
                 .ok_or(Error::Overflow)?,
         )?;
-        self.dependents.try_reserve_exact(1)?;
-        self.dependents
-            .try_push(DependentSyncframe {
-                facts: frame.facts(),
-                pending_bytes: Some(frame.bytes().clone()),
-            })
-            .map_err(|error| error.error)?;
+        // Reserve before moving the staged syncframe so a failed append can retry.
+        let make = |_| DependentSyncframe {
+            facts,
+            pending_bytes: Some(
+                pending
+                    .take()
+                    .expect("staged E-AC-3 dependent")
+                    .into_bytes(),
+            ),
+        };
+        if let Some(dependents) = &mut self.dependents {
+            dependents.try_extend_with(1, make)?;
+        } else {
+            let mut dependents = BudgetVec::new(pool);
+            dependents.try_extend_with(1, make)?;
+            self.dependents = Some(dependents);
+        }
         self.length = length;
         Ok(())
     }
 
     fn materialize(
         &mut self,
-        lookahead: usize,
+        pool: &Budget,
+        lookahead: Option<&Bytes>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<Ac3AccessUnit>> {
-        if self.dependents.is_empty() {
+        if self.dependents.is_none() {
             return Ok(work.try_charge(1).then(|| Ac3AccessUnit {
                 first: self.first,
                 bytes: self.primary.take().expect("E-AC-3 primary"),
                 dependents: None,
             }));
         }
+        let lookahead = lookahead.map_or(0, Bytes::retained_storage_bytes);
         if self.joined.is_none() {
             if !work.try_charge(1) {
                 return Ok(None);
             }
             require(
-                self.dependents.budget(),
+                pool,
                 self.storage()?
                     .checked_add(lookahead)
                     .ok_or(Error::Overflow)?,
                 self.length,
             )?;
-            let mut joined = BudgetVec::new(self.dependents.budget());
+            let mut joined = BudgetVec::new(pool);
             joined.try_reserve_exact(self.length)?;
             self.joined = Some(joined);
         }
-        while self.frame_index <= self.dependents.len() {
+        let dependents = self.dependents.as_mut().expect("E-AC-3 dependent table");
+        while self.frame_index <= dependents.len() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             let source = if self.frame_index == 0 {
                 &mut self.primary
             } else {
-                &mut self.dependents.as_mut_slice()[self.frame_index - 1].pending_bytes
+                &mut dependents.as_mut_slice()[self.frame_index - 1].pending_bytes
             };
             let bytes = source.as_ref().expect("pending E-AC-3 syncframe bytes");
             let count = work.take((bytes.len() - self.copied).min(4096) as u64) as usize;
@@ -390,7 +420,6 @@ impl Group {
         if !work.try_charge(1) {
             return Ok(None);
         }
-        let pool = self.dependents.budget();
         let metadata = Shared::<BudgetVec<DependentSyncframe>>::allocation_bytes()?;
         let overhead = metadata
             .checked_add(Bytes::owner_overhead_bytes())
@@ -405,8 +434,7 @@ impl Group {
         let charge = pool.reserve(metadata)?;
         match self.joined.take().expect("joined E-AC-3 group").freeze() {
             Ok(bytes) => {
-                let empty = BudgetVec::new(pool);
-                let frames = std::mem::replace(&mut self.dependents, empty);
+                let frames = self.dependents.take().expect("E-AC-3 dependent table");
                 Ok(Some(Ac3AccessUnit {
                     first: self.first,
                     bytes,
@@ -445,9 +473,17 @@ mod tests {
     const FRAME_BYTES: usize = 32;
     const GROUP_BYTES: usize = 2 * FRAME_BYTES;
 
-    fn group(pool: &Budget) -> Group {
+    fn syncframe(dependent: bool) -> [u8; FRAME_BYTES] {
         let mut frame = [0; FRAME_BYTES];
         frame[..8].copy_from_slice(&[0x0b, 0x77, 0, 15, 0xb5, 0x87, 0xc0, 0]);
+        if dependent {
+            frame[2] = 0x40;
+        }
+        frame
+    }
+
+    fn group(pool: &Budget) -> Group {
+        let frame = syncframe(false);
         let first = Ac3FrameFacts {
             source: SourceId(0),
             generation: 1,
@@ -455,7 +491,7 @@ mod tests {
             header: probe_ac3_header(&frame).unwrap(),
         };
         let primary = Bytes::copy_from_slice(pool, &frame).unwrap();
-        frame[2] = 0x40;
+        let frame = syncframe(true);
         let mut dependents = BudgetVec::new(pool);
         dependents.try_reserve_exact(1).unwrap();
         dependents
@@ -471,12 +507,76 @@ mod tests {
         Group {
             first,
             primary: Some(primary),
-            dependents,
+            dependents: Some(dependents),
             length: GROUP_BYTES,
             joined: None,
             frame_index: 0,
             copied: 0,
         }
+    }
+
+    #[test]
+    fn first_dependent_survives_table_reservation_backpressure() {
+        let pool = Budget::new(4096).unwrap();
+        let mut framer = Ac3FrameReader::new(
+            &pool,
+            SourceId(0),
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            Ac3StreamSelection::Eac3Only,
+            Ac3FrameLimits {
+                maximum_frame_bytes: FRAME_BYTES,
+                maximum_frames: 2,
+                maximum_input_window: GROUP_BYTES,
+            },
+        )
+        .unwrap();
+        let input = [syncframe(false), syncframe(true)].concat();
+        let request = framer.request();
+        let bytes = Bytes::copy_from_slice(&pool, &input).unwrap();
+        framer
+            .provide_owned(
+                InputWindow::new(request.source, request.token, request.offset, bytes).unwrap(),
+            )
+            .unwrap();
+        let mut work = WorkBudget::new(1024);
+        let cancel = AtomicBool::new(false);
+        let [first, dependent] = std::array::from_fn(|_| {
+            let Step::Ready(frame) = framer.step(&mut work, &cancel).unwrap() else {
+                panic!("complete syncframe");
+            };
+            frame
+        });
+        let mut group = Group::new(first);
+        let facts = dependent.facts();
+        let backing = dependent.bytes().as_ptr();
+        let mut pending = Some(dependent);
+        let before = pool.used();
+        let pressure = pool.reserve(pool.available()).unwrap();
+        assert_eq!(
+            group
+                .append(&pool, &mut pending, 0, GROUP_BYTES)
+                .unwrap_err(),
+            Error::Backpressure {
+                requested: size_of::<DependentSyncframe>(),
+                available: 0,
+            }
+        );
+        assert_eq!(pending.as_ref().unwrap().facts(), facts);
+        assert_eq!(pool.available(), 0);
+        drop(pressure);
+        assert_eq!(pool.used(), before);
+
+        group.append(&pool, &mut pending, 0, GROUP_BYTES).unwrap();
+        assert!(pending.is_none());
+        let frame = &group.dependents.as_ref().unwrap().as_slice()[0];
+        assert_eq!(frame.facts, facts);
+        assert_eq!(frame.pending_bytes.as_ref().unwrap().as_ptr(), backing);
+        assert_eq!(pool.used(), before + size_of::<DependentSyncframe>());
+        drop((group, framer));
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
 
     #[test]
@@ -488,11 +588,16 @@ mod tests {
             + 3 * lookahead
             + GROUP_BYTES;
         let small = Budget::new(minimum - 1).unwrap();
-        let _staged_small = small.reserve(lookahead).unwrap();
+        let staged_small = Bytes::copy_from_slice(&small, &[0; FRAME_BYTES]).unwrap();
         let mut short = group(&small);
         assert_eq!(
             short
-                .materialize(lookahead, &mut WorkBudget::new(1), &cancel)
+                .materialize(
+                    &small,
+                    Some(&staged_small),
+                    &mut WorkBudget::new(1),
+                    &cancel
+                )
                 .unwrap_err(),
             Error::Limit {
                 requested: minimum,
@@ -502,13 +607,13 @@ mod tests {
         assert!(short.joined.is_none());
 
         let pool = Budget::new(minimum).unwrap();
-        let staged = pool.reserve(lookahead).unwrap();
+        let staged = Bytes::copy_from_slice(&pool, &[0; FRAME_BYTES]).unwrap();
         let mut group = group(&pool);
         let pressure = pool.reserve(1).unwrap();
         for _ in 0..2 {
             assert_eq!(
                 group
-                    .materialize(lookahead, &mut WorkBudget::new(1), &cancel)
+                    .materialize(&pool, Some(&staged), &mut WorkBudget::new(1), &cancel)
                     .unwrap_err(),
                 Error::Backpressure {
                     requested: GROUP_BYTES,
@@ -520,13 +625,13 @@ mod tests {
         drop(pressure);
         assert!(
             group
-                .materialize(lookahead, &mut WorkBudget::new(1), &cancel)
+                .materialize(&pool, Some(&staged), &mut WorkBudget::new(1), &cancel)
                 .unwrap()
                 .is_none()
         );
         let expected = [
             group.primary.as_ref().unwrap().as_ref(),
-            group.dependents.as_slice()[0]
+            group.dependents.as_ref().unwrap().as_slice()[0]
                 .pending_bytes
                 .as_ref()
                 .unwrap()
@@ -535,16 +640,25 @@ mod tests {
         .concat();
         assert!(
             group
-                .materialize(lookahead, &mut WorkBudget::new(GROUP_BYTES as u64), &cancel)
+                .materialize(
+                    &pool,
+                    Some(&staged),
+                    &mut WorkBudget::new(GROUP_BYTES as u64),
+                    &cancel,
+                )
                 .unwrap()
                 .is_none()
         );
         assert!(group.primary.is_none());
-        assert!(group.dependents.as_slice()[0].pending_bytes.is_none());
+        assert!(
+            group.dependents.as_ref().unwrap().as_slice()[0]
+                .pending_bytes
+                .is_none()
+        );
         cancel.store(true, Ordering::Relaxed);
         assert_eq!(
             group
-                .materialize(lookahead, &mut WorkBudget::new(0), &cancel)
+                .materialize(&pool, Some(&staged), &mut WorkBudget::new(0), &cancel)
                 .unwrap_err(),
             Error::Cancelled
         );
@@ -553,7 +667,7 @@ mod tests {
         let pressure = pool.reserve(pool.available() - metadata).unwrap();
         assert_eq!(
             group
-                .materialize(lookahead, &mut WorkBudget::new(1), &cancel)
+                .materialize(&pool, Some(&staged), &mut WorkBudget::new(1), &cancel)
                 .unwrap_err(),
             Error::Backpressure {
                 requested: Bytes::owner_overhead_bytes(),
@@ -562,7 +676,7 @@ mod tests {
         );
         drop(pressure);
         let joined = group
-            .materialize(lookahead, &mut WorkBudget::new(1), &cancel)
+            .materialize(&pool, Some(&staged), &mut WorkBudget::new(1), &cancel)
             .unwrap()
             .unwrap();
         assert_eq!(joined.bytes().as_ref(), expected);
