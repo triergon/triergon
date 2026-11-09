@@ -7,7 +7,7 @@
  * demuxer order: stream index, PID, PTS, DTS, duration, position, flags, payload and
  * every side-data element. The operation reaches EOF only when av_read_frame
  * returns AVERROR_EOF. FFmpeg probes the packet size itself, and its demuxer has no
- * caller-declared descriptor namespace, so the size and --dvb arguments describe
+ * caller-declared descriptor namespace, so the size and namespace arguments describe
  * the candidate's request only. An operation over more than one media entity has
  * no single-input equivalent in ts modes and is refused. The ts-au modes enable codec
  * parsing while retaining NOFILLIN and the same program filter and packet fold;
@@ -139,7 +139,7 @@ done:
 #include "reference_ts_sequence.h"
 
 /* ts-fold FILE SIZE PROGRAM [OPTIONS] | ts-bench FILE N SIZE PROGRAM [OPTIONS] |
- * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb and further entities.
+ * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb or --atsc and further entities.
  * ts-au-fold, ts-au-bench and ts-au-memory use the same arguments with parsing. */
 static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
 {
@@ -166,7 +166,7 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
         return 2;
     const char *refusal = NULL;
     for (int i = at + 2; i < argc; ++i) {
-        if (!strcmp(argv[i], "--dvb") && i == at + 2)
+        if (i == at + 2 && (!strcmp(argv[i], "--dvb") || !strcmp(argv[i], "--atsc")))
             continue;
         refusal = "no single-input reference operation for more than one media entity";
     }

@@ -365,7 +365,13 @@ fn part(body: &[u8], pts: Option<u64>, dts: Option<u64>) -> Part<'_> {
 fn authored_case(codec: &Codec, name: &str, parts: &[Part<'_>], m2ts: bool) -> R<Case> {
     let id = format!("au-{}-{name}", codec.name);
     let mut ts = Transport::new();
-    ts.tables(codec, if codec.dvb { &[0x6a, 1, 0] } else { &[] })?;
+    let descriptors: &[u8] = match codec.stream_type {
+        0x06 if codec.dvb => &[0x6a, 1, 0],
+        // ATSC A/52 Annex A, Table A4.1.
+        0x81 => &[0x81, 3, 8, 24, 5],
+        _ => &[],
+    };
+    ts.tables(codec, descriptors)?;
     for p in parts {
         ts.pes(codec.stream_id, p)?;
     }
@@ -380,6 +386,8 @@ fn authored_case(codec: &Codec, name: &str, parts: &[Part<'_>], m2ts: bool) -> R
     ];
     if codec.dvb {
         args.push("--dvb".into());
+    } else if codec.stream_type == 0x81 {
+        args.push("--atsc".into());
     }
     let construction = Value::object([
         ("codec", Value::str(codec.name)),
@@ -794,6 +802,18 @@ fn all_cases(root: &Path) -> R<Vec<Case>> {
     }
     let ordered = ordered_cases(&cases)?;
     cases.extend(ordered);
+    let atsc = Codec {
+        name: "atsc-ac3",
+        stream_type: 0x81,
+        dvb: false,
+        ..ac3
+    };
+    cases.push(authored_case(
+        &atsc,
+        "multiple-per-pes",
+        &[part(&atsc.bytes, Some(90_000), None)],
+        false,
+    )?);
     Ok(cases)
 }
 
@@ -808,13 +828,13 @@ fn contract(cases: &[Case]) -> R<Value> {
         (
             "contract",
             Value::strings([
-                "Preloaded TS188 or M2TS192 input, SIZE PROGRAM [--dvb] and the original ordered media-entity arguments; the candidate uses the public MPEG-TS access-unit reader, with no PES-as-AU fallback.",
+                "Preloaded TS188 or M2TS192 input, SIZE PROGRAM [--dvb|--atsc] and the original ordered media-entity arguments; the candidate uses the public MPEG-TS access-unit reader, with no PES-as-AU fallback.",
                 "Reference: the MPEG-TS demuxer with custom AVIO, NOFILLIN, parsers enabled, no stream discovery and no decoders; every parsed packet of the selected program in demux order, including EOF parser drain.",
                 "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
                 "Fold stream index, PID, signed PTS and DTS in 90kHz ticks (absent as INT64_MIN), duration, position, flags, payload length and every byte, then every side-data element's type, size and bytes.",
                 "Each complete operation reaches EOF and contributes its packet count, byte count and ordered digest. Both workers must match the independently recorded parser-enabled reference fold. All temporary operation storage is released before the memory END marker.",
                 "The 97 retained PES input/argument tuples preserve their 272 request associations and use parser-enabled AU expectations. Opaque, damaged and unsupported inputs remain observations that may fail; they are never reclassified as genuine access units or removed.",
-                "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, 33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. Ordered controls cover ADTS across entities, an M2TS initialization section and AC-3 lookahead at a discontinuity. DVB AC-3 has explicit caller-declared descriptor namespace.",
+                "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, 33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. Ordered controls cover ADTS across entities, an M2TS initialization section and AC-3 lookahead at a discontinuity. DVB and ATSC AC-3 use explicit caller-declared descriptor namespaces.",
             ]),
         ),
         (
@@ -1234,7 +1254,7 @@ mod tests {
     fn original_inputs_arguments_and_all272_request_associations_are_unchanged() {
         let original = read_json(&root().join(ORIGINAL)).unwrap();
         let generated = all_cases(root()).unwrap();
-        assert_eq!(generated.len(), 147);
+        assert_eq!(generated.len(), 148);
         for (old, new) in cases(&original).unwrap().iter().zip(&generated) {
             assert!(new.bytes.is_none());
             for key in [
@@ -1479,7 +1499,7 @@ mod tests {
         .unwrap();
         assert_eq!(au.prefix, "ts-au-");
         assert_eq!(au.reference, "ffmpeg-formats-native");
-        assert_eq!(au.cases.len(), 147);
+        assert_eq!(au.cases.len(), 148);
         let contract = read_json(&au.contract).unwrap();
         assert_eq!(
             contract.get("required_profiles"),

@@ -34,7 +34,7 @@
   ],
   "recorded_reference": {
     "id": "ffmpeg-formats-native",
-    "worker_sha256": "d6e7ba3865d1effc3cd964ec214b9e464ed2028c6e0c322175a1e44540182316",
+    "worker_sha256": "9a6f027bf7d9430fd95a2de4a751e2974c80638aac4cef41cb9760999233b744",
     "mode": "ts-au-fold"
   },
   "cases": [
@@ -4791,6 +4791,34 @@
         "digest": 8470417084381956806
       },
       "reference_result_sha256": "b37eee81e2bd472806bdcbe939eda3fa9f5c7622a213ebd6f5e6c5c7f52b91fc"
+    },
+    {
+      "id": "au-atsc-ac3-multiple-per-pes",
+      "profile": "au-atsc-ac3-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-atsc-ac3-multiple-per-pes.ts",
+      "sha256": "d86cd51f03550e9e1163434e601d36b1d0d6285e5dbcbdcf411c3f39c4e617e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-ac3",
+        "pes": [
+          {
+            "payload_bytes": 768,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 768,
+        "digest": 3703326326456868131
+      },
+      "reference_result_sha256": "2da60f8f2911f37a04571261ba43d55ca517099cdf15cd95bdb34c1331966c80"
     }
   ]
 }
