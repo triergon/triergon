@@ -505,7 +505,7 @@ impl TransportFramer {
                     .complete(work, cancel)
                     .map(|value| value.map_or(Step::Yield, ready));
             }
-            // Inspect complete feed carriers directly for common flags/PCR
+            // Inspect complete buffered carriers directly for common flags/PCR
             // layouts. Other fields use the incremental inspector.
             if self.buffered_carrier != BufferedCarrier::Carry
                 && carry.is_empty()
@@ -540,12 +540,13 @@ impl TransportFramer {
                         source
                     };
                     self.next = Some(input.position());
-                    if self.format == PacketFormat::Ts188
-                        && !cancel.load(Ordering::Relaxed)
-                        && let Some(carrier) = PlainCarrier::inspect_ts188(&source, start, work)
+                    if !cancel.load(Ordering::Relaxed)
+                        && let Some(carrier) =
+                            PlainCarrier::inspect(&source, self.format, start, work)
                     {
                         self.last_packet_offset = Some(start);
                         if DIRECT
+                            && self.format == PacketFormat::Ts188
                             && self.buffered_carrier == BufferedCarrier::Progressive
                             && carrier.is_plain_continuation()
                         {
@@ -556,7 +557,12 @@ impl TransportFramer {
                                 entity: self.entity,
                             })));
                         }
-                        return Ok(ready(carrier.into_packet(source, start, self.entity)?));
+                        return Ok(ready(carrier.into_packet(
+                            source,
+                            self.format,
+                            start,
+                            self.entity,
+                        )?));
                     }
                     self.inspect(source, start)?;
                     continue;
