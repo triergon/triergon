@@ -19,6 +19,8 @@ mod eac3;
 mod latm;
 #[path = "container_reader/opaque_video.rs"]
 mod opaque_video;
+#[path = "container_reader/unframed_audio.rs"]
+mod unframed_audio;
 
 const ID: SourceId = SourceId(77);
 const PROGRAM: u16 = 7;

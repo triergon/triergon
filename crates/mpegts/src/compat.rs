@@ -143,6 +143,18 @@ pub mod pes {
         PrivateAudioDescriptors, ReadyContinuation, RegisteredCarriage, SourceContext,
         pcr_bounded_pts, selected_track_kind,
     };
+
+    /// Reporting of unframed payload in an observed private-audio carriage.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum UnframedAudioPolicy {
+        /// Require a declared source namespace for private-audio framing.
+        #[default]
+        Strict,
+        /// With unspecified namespace, report one finite private-audio PES per
+        /// uninterrupted run at logical EOF. Its payload must have no AC-3 or
+        /// E-AC-3 syncword or trailing syncword prefix.
+        ReportAtEof,
+    }
 }
 
 pub mod stream {

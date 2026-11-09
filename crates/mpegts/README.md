@@ -64,6 +64,14 @@ the end marker remain in the PES. The explicit
 before an overlong final segment through `ReaderEvent::DvbSubtitlePrefix`.
 [ETSI EN 300 743 §§6.2 and 7.1](https://www.etsi.org/deliver/etsi_en/300700_300799/300743/01.06.01_60/en_300743v010601p.pdf)
 
+With an unspecified namespace, the optional
+`compat::pes::UnframedAudioPolicy::ReportAtEof` can report a single finite
+private-audio PES whose signalling identifies a supported carriage. The
+payload must fit the audio byte limit and contain neither a syncword nor a
+trailing syncword prefix. The EOF event retains the source track, codec tag,
+clock and PES ranges. Its carriage classification is a separate compatibility
+fact. [ATSC A/52 §5.4.1.1 and Annex E](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf)
+
 The framers preserve original parameter sets and coded audio envelopes.
 MPEG audio/video, other subtitle carriages, descriptors declaring additional independent
 E-AC-3 services and ambiguous private streams report `ReaderEvent::Unsupported`
