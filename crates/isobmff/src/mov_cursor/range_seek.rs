@@ -27,7 +27,6 @@ struct Checkpoint<'a> {
 struct Track<'a> {
     points: BudgetVec<Checkpoint<'a>>,
     previous: Option<i64>,
-    fragment_run: Option<(usize, usize)>,
     previous_sync: u64,
     entries: u64,
 }
@@ -55,7 +54,6 @@ impl<'a> Checkpoints<'a> {
                 .try_push(Track {
                     points: BudgetVec::new(budget),
                     previous: None,
-                    fragment_run: None,
                     previous_sync: 0,
                     entries: 0,
                 })
@@ -87,8 +85,7 @@ impl<'a> Checkpoints<'a> {
         // A fragment run beginning at a key needs no distance from a
         // preceding run. Let the full index handle other append boundaries.
         if track.previous.is_some_and(|before| timestamp <= before)
-            || (track.entries == 0 && !key)
-            || (slot.append_run != track.fragment_run && !key)
+            || (!key && (track.entries == 0 || slot.starts_fragment_run))
             || flags & !admitted != 0
             || row.source.range.start > i64::MAX as u64
             || row.source.range.end.checked_sub(row.source.range.start)? > 0x1fff_ffff
@@ -107,6 +104,9 @@ impl<'a> Checkpoints<'a> {
             if self.stored == MAX_CHECKPOINTS {
                 return None;
             }
+            if slot.saw_fragment && track.points.is_empty() {
+                track.points.try_reserve_exact(1).ok()?;
+            }
             track
                 .points
                 .try_push(Checkpoint {
@@ -119,7 +119,6 @@ impl<'a> Checkpoints<'a> {
             self.stored += 1;
         }
         track.previous = Some(timestamp);
-        track.fragment_run = slot.append_run;
         track.entries += 1;
         self.total += 1;
         Some(())
