@@ -67,6 +67,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/features/progressive-ts188/inputs/duplicate-control-44100.ts",
         "harness/features/progressive-ts188/inputs/legal-duplicate-44100.ts",
         "harness/reference_mp4_range.h",
+        "harness/reference_mp4_roll.h",
         "harness/reference_packet_fold.h",
         "harness/reference_matroska_audio.h",
         "harness/reference_mp4_forward.h",

@@ -3,7 +3,8 @@
 use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, BudgetVec, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget,
+    Budget, BudgetVec, Bytes, InputCursor, Rounding, SourceCapabilities, SourceId, Time, TimeBase,
+    WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_isobmff::{
@@ -76,7 +77,13 @@ impl Work {
     }
 }
 
-fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
+#[derive(Clone, Copy)]
+enum Seek {
+    Mov(i64),
+    OpusRoll(i64),
+}
+
+fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
     let id = SourceId(1);
     let input = InputCursor::new(
         pool,
@@ -102,7 +109,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
     let mut plans = BudgetVec::new(pool);
     plans.try_reserve_exact(movie.tracks().len())?;
     let mut video = None;
-    let mut audio = false;
+    let mut audio = None;
     for track in movie.tracks() {
         let header = track.header();
         let table = track.table();
@@ -112,9 +119,11 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
                 video = Some(header.track_id);
             }
             (kind, [entry])
-                if kind == *b"soun" && matches!(&entry.format, b"mp4a" | b"Opus") && !audio =>
+                if kind == *b"soun"
+                    && matches!(&entry.format, b"mp4a" | b"Opus")
+                    && audio.is_none() =>
             {
-                audio = true;
+                audio = Some(header.track_id);
             }
             _ => return Err("expected one AVC track and one AAC or Opus track".into()),
         }
@@ -153,7 +162,9 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
         };
         plans.try_push(plan).map_err(|error| error.error)?;
     }
-    let video = video.filter(|_| audio).ok_or("missing video or audio")?;
+    let (Some(video), Some(audio)) = (video, audio) else {
+        return Err("missing video or audio".into());
+    };
     let mut range = Mp4RangeOpen::new(movie, Some(plans.as_slice()), PlanLimits::default())?;
     while !range.poll(&mut work(), &cancel)? {}
     let mut player = range.finish(
@@ -164,7 +175,8 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
         PlayerPolicy::default(),
     )?;
     let mut output = None;
-    if let Some(timestamp) = seek {
+    let mut result = Work::default();
+    if let Some(seek) = seek {
         loop {
             let progress = player.read_output(&mut output, &mut work(), &cancel)?;
             if output
@@ -181,16 +193,43 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
                 _ => {}
             }
         }
-        let mut job = player.prepare_seek(Mp4NativeSeekRequest {
+        let (timestamp, recovery) = match seek {
+            Seek::Mov(timestamp) => (timestamp, false),
+            Seek::OpusRoll(timestamp) => (timestamp, true),
+        };
+        let request = Mp4NativeSeekRequest {
             video,
             timestamp,
             limits: SeekLimits::default(),
-        })?;
+        };
+        let mut job = if recovery {
+            player.prepare_seek_with_opus_recovery(request, audio)?
+        } else {
+            player.prepare_seek(request)?
+        };
         while !job.poll(&mut work(), &cancel)? {}
         let mut command = job.finish()?;
+        if recovery {
+            let landing = command.receipt();
+            let opus = landing.opus_recovery.ok_or("missing Opus recovery")?;
+            let sample_clock = TimeBase::new(1, 48_000)?;
+            let samples = opus
+                .preroll
+                .to_i64_ticks(sample_clock, Rounding::TowardZero)?;
+            if Time::from_ticks(i128::from(samples), sample_clock)? != opus.preroll {
+                return Err("Opus preroll is off the sample clock".into());
+            }
+            for field in [
+                landing.selected.occurrence.source.range.start,
+                opus.sync_sample,
+                opus.first_sample,
+                signed(samples),
+            ] {
+                fold(&mut result.digest, field);
+            }
+        }
         while !player.apply_seek(&mut command, &mut work(), &cancel)? {}
     }
-    let mut result = Work::default();
     loop {
         let progress = player.read_output(&mut output, &mut work(), &cancel)?;
         if let Some(item) = output.take() {
@@ -208,15 +247,15 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
     }
 }
 
-/// `mp4-range-fold FILE [SEEK]`, `mp4-range-bench FILE ITERATIONS [SEEK]` or
-/// `mp4-range-memory FILE [SEEK]`; SEEK is a backward seek target in video ticks.
+/// Compare regular playback and optional backward seeking in video ticks.
 pub fn run(args: &[String]) -> Result<()> {
-    let invocation = Invocation::parse(args, PREFIX, " [SEEK]", 0..=1, false)?;
-    let seek = invocation
-        .arguments
-        .first()
-        .map(|timestamp| timestamp.parse())
-        .transpose()?;
+    let invocation = Invocation::parse(args, PREFIX, " [SEEK [opus-roll]]", 0..=2, false)?;
+    let seek = match invocation.arguments {
+        [] => None,
+        [timestamp] => Some(Seek::Mov(timestamp.parse()?)),
+        [timestamp, policy] if policy == "opus-roll" => Some(Seek::OpusRoll(timestamp.parse()?)),
+        _ => return Err("expected the opus-roll seek policy".into()),
+    };
     let pool = Budget::new(2 * usize::try_from(MAX_INPUT)?)?;
     let raw = Bytes::copy_from_slice(&pool, &invocation.input(MAX_INPUT)?)?;
     measure(&invocation, OPERATION, Some(&pool), || {

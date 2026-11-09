@@ -74,6 +74,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     const VARIABLE: &str = "variable-aac-duration.mp4";
     const OPUS: &str = "avc-opus-edit.mp4";
     const OPUS_BOUNDARY: &str = "avc-opus-seek-boundary.mp4";
+    const OPUS_LONG_ROLL: &str = "avc-opus-long-roll.mp4";
     let output = paths.fixtures("mp4-range-fixtures")?;
     let seed = paths
         .root
@@ -99,16 +100,21 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     // At a two-second video landing this puts the second audio candidate
     // exactly on the receiver's earlier search timestamp.
     boundary[1512..1516].copy_from_slice(&528_i32.to_be_bytes());
+    let mut long_roll = opus.clone();
+    // The audio roll description in the pinned seed uses four preceding packets.
+    // Request six, preserving the group mapping and all media bytes.
+    long_roll[2872..2874].copy_from_slice(&(-6_i16).to_be_bytes());
     write(&output.join(CONTROL), &control)?;
     write(&output.join(VARIABLE), &variable)?;
     write(&output.join(OPUS), &opus)?;
     write(&output.join(OPUS_BOUNDARY), &boundary)?;
+    write(&output.join(OPUS_LONG_ROLL), &long_roll)?;
     let cases = [
         (
             "regular-open",
             CONTROL,
             &control,
-            None,
+            &[] as &[&str],
             237,
             81_478,
             994_214_068_017_485_484_u64,
@@ -117,7 +123,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "regular-seek",
             CONTROL,
             &control,
-            Some("28000"),
+            &["28000"],
             185,
             62_763,
             15_577_132_028_095_841_482,
@@ -126,7 +132,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "variable-open",
             VARIABLE,
             &variable,
-            None,
+            &[] as &[&str],
             237,
             81_478,
             1_650_792_575_122_043_820,
@@ -135,7 +141,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "variable-seek",
             VARIABLE,
             &variable,
-            Some("28000"),
+            &["28000"],
             186,
             62_932,
             1_562_922_133_773_717_379,
@@ -144,7 +150,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "opus-open",
             OPUS,
             &opus,
-            None,
+            &[] as &[&str],
             241,
             65_677,
             4_193_873_898_465_376_234,
@@ -153,7 +159,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "opus-seek",
             OPUS,
             &opus,
-            Some("32000"),
+            &["32000"],
             92,
             25_673,
             11_520_860_581_798_144_314,
@@ -162,20 +168,56 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "opus-seek-edit-boundary",
             OPUS_BOUNDARY,
             &boundary,
-            Some("32000"),
+            &["32000"],
             91,
             25_535,
             12_059_760_319_648_546_611,
         ),
+        (
+            "opus-recovery-start",
+            OPUS,
+            &opus,
+            &["0", "opus-roll"],
+            241,
+            65_677,
+            12_505_035_923_324_092_948,
+        ),
+        (
+            "opus-recovery-seek",
+            OPUS,
+            &opus,
+            &["32000", "opus-roll"],
+            95,
+            26_088,
+            230_186_244_915_985_021,
+        ),
+        (
+            "opus-recovery-edit-boundary",
+            OPUS_BOUNDARY,
+            &boundary,
+            &["32000", "opus-roll"],
+            95,
+            26_088,
+            9_107_170_095_252_525_693,
+        ),
+        (
+            "opus-recovery-long-roll",
+            OPUS_LONG_ROLL,
+            &long_roll,
+            &["41000", "opus-roll"],
+            97,
+            26_371,
+            2_219_999_170_451_168_846,
+        ),
     ]
     .into_iter()
-    .map(|(id, file, data, seek, packets, bytes, digest)| {
+    .map(|(id, file, data, arguments, packets, bytes, digest)| {
         authored(
             id,
             file,
             data,
             vec![
-                ("arguments", Value::strings(seek)),
+                ("arguments", Value::strings(arguments.iter().copied())),
                 (
                     "expected",
                     Value::object([
@@ -192,7 +234,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
         "features/mp4-range/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
     )?;
-    Ok("MP4 range corpus: seven playback comparisons".into())
+    Ok("MP4 range corpus: eleven playback comparisons".into())
 }
 
 /// One manifest row for an authored fixture.
