@@ -21,8 +21,8 @@ use crate::json::{self, Value};
 use crate::python;
 
 pub const PAIRS: usize = 30;
-/// Timing uses 280 and its recollection 281.
-pub const SEED: u64 = 282;
+/// After timing's seed and its two retries (`super::timing::SEED` onwards).
+pub const SEED: u64 = super::timing::SEED + 3;
 const WORK_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// The arguments of `codecs memory`.

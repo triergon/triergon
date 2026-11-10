@@ -13,7 +13,7 @@ use super::gate_build;
 use super::parity::{self, Run};
 use super::provenance::source_identity_error;
 use super::report::{PrefixFeature, case_arguments, expected_for, host_target};
-use super::timing::{Operation, benchmark};
+use super::timing::{Operation, Work, benchmark};
 use crate::checks::read_json;
 use crate::corpus::write_json;
 use crate::json::Value;
@@ -132,7 +132,10 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         prefix: "catalogue-".into(),
         arguments: vec![],
         candidate_options: vec![],
-        work_fields: super::comparison::work_fields(&contract)?,
+        work: Work {
+            fields: super::comparison::work_fields(&contract)?,
+            own: vec![],
+        },
         timeout,
     };
     if s(&result, "status") == Some("pass") {

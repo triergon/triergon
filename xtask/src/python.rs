@@ -304,87 +304,6 @@ pub fn max(values: &[f64]) -> f64 {
     best
 }
 
-/// `hash(n)` of an integer on a 64-bit build.
-fn hash_int(n: i128) -> i64 {
-    const MODULUS: i128 = (1 << 61) - 1;
-    let h = (n.abs() % MODULUS) as i64;
-    let h = if n < 0 { -h } else { h };
-    if h == -1 { -2 } else { h }
-}
-
-/// `hash(t)` of a tuple of integers (CPython 3.8 and later, 64-bit).
-pub fn hash_tuple(items: &[i128]) -> i64 {
-    const PRIME_1: u64 = 11_400_714_785_074_694_791;
-    const PRIME_2: u64 = 14_029_467_366_897_019_727;
-    const PRIME_5: u64 = 2_870_177_450_012_600_261;
-    let mut acc = PRIME_5;
-    for &item in items {
-        acc = acc.wrapping_add((hash_int(item) as u64).wrapping_mul(PRIME_2));
-        acc = acc.rotate_left(31);
-        acc = acc.wrapping_mul(PRIME_1);
-    }
-    acc = acc.wrapping_add(items.len() as u64 ^ (PRIME_5 ^ 0x0035_d373));
-    if acc == u64::MAX {
-        1_546_275_796
-    } else {
-        acc as i64
-    }
-}
-
-/// The iteration order of a `set` built by adding `items` in order (CPython's
-/// open-addressing table: linear probes of 9, perturbation shift 5, growth to
-/// four times the used count once the table is three fifths full).
-pub fn set_order<T: Clone + PartialEq>(items: &[T], hash: impl Fn(&T) -> i64) -> Vec<T> {
-    const LINEAR_PROBES: usize = 9;
-    fn insert<T>(table: &mut [Option<(i64, T)>], hash: i64, item: T) {
-        let mask = table.len() - 1;
-        let mut perturb = hash as u64;
-        let mut i = (hash as u64 as usize) & mask;
-        loop {
-            let probes = if i + LINEAR_PROBES <= mask {
-                LINEAR_PROBES
-            } else {
-                0
-            };
-            for j in i..=i + probes {
-                if table[j].is_none() {
-                    table[j] = Some((hash, item));
-                    return;
-                }
-            }
-            perturb >>= 5;
-            i = (i
-                .wrapping_mul(5)
-                .wrapping_add(1)
-                .wrapping_add(perturb as usize))
-                & mask;
-        }
-    }
-    let mut table: Vec<Option<(i64, T)>> = vec![None; 8];
-    let mut used = 0usize;
-    for item in items {
-        let h = hash(item);
-        if table.iter().flatten().any(|(eh, e)| *eh == h && e == item) {
-            continue;
-        }
-        insert(&mut table, h, item.clone());
-        used += 1;
-        let mask = table.len() - 1;
-        if used * 5 >= mask * 3 {
-            let wanted = if used > 50_000 { used * 2 } else { used * 4 };
-            let mut size = 8;
-            while size <= wanted {
-                size <<= 1;
-            }
-            let old = std::mem::replace(&mut table, vec![None; size]);
-            for (h, e) in old.into_iter().flatten() {
-                insert(&mut table, h, e);
-            }
-        }
-    }
-    table.into_iter().flatten().map(|(_, e)| e).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -452,28 +371,6 @@ mod tests {
             "2026-07-02T13:46:40.250000+00:00"
         );
         assert_eq!(isoformat(0, 0), "1970-01-01T00:00:00+00:00");
-    }
-
-    #[test]
-    fn sets_iterate_in_cpython_order() {
-        // python3 -c "print(hash((120, 5000000, 120, 5000000)))"
-        assert_eq!(
-            hash_tuple(&[120, 5_000_000, 120, 5_000_000]),
-            -3743009442964967769
-        );
-        // python3 -c "print(list({(120, 5000000, 120, 5000000), (121, 5000000, 120, 5000000)}))"
-        let pair = [
-            [120, 5_000_000, 120, 5_000_000],
-            [121, 5_000_000, 120, 5_000_000],
-        ];
-        assert_eq!(set_order(&pair, |t| hash_tuple(t)), [pair[1], pair[0]]);
-        // python3 -c "s=set(); [s.add((i, 7, i*3, -1)) for i in range(12)]; print(list(s)[:6])"
-        let items: Vec<[i128; 4]> = (0..12).map(|i| [i, 7, i * 3, -1]).collect();
-        let firsts: Vec<i128> = set_order(&items, |t| hash_tuple(t))[..6]
-            .iter()
-            .map(|t| t[0])
-            .collect();
-        assert_eq!(firsts, [9, 1, 7, 8, 4, 6]);
     }
 
     #[test]

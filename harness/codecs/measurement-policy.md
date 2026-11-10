@@ -26,8 +26,8 @@ seeds, confidence bounds and gate thresholds are defined in
 - File loading and process start are outside the timed interval on both sides.
 - Both workers fold every output byte into the same 8-way word digest
   (`Digest` / `struct fold`). Every pair must produce identical output unit and byte
-  counts; digest equality is recorded (it differs where the rules allow a 1 LSB audio
-  difference).
+  counts, and each worker the same digest in every run; whether the two digests agree
+  is recorded (they differ where the rules allow a 1 LSB audio difference).
 - Memory runs report `{packets, bytes}` on stdout and the digest on stderr, so work
   records are identical on both sides. Output exactness is graded only by the
   correctness run under `NUMERIC-RULES.json`.
