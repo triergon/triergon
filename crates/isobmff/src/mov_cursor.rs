@@ -211,14 +211,22 @@ impl<'a> Slot<'a> {
                 .dts
                 .checked_add(i128::from(previous.duration))
                 .ok_or(Error::Overflow)?;
+            // Keep decode accumulation in media ticks. The index checks the
+            // witness against the projected DTS of the two adjacent packets.
+            let edit_start = i128::from(self.fragment_media_start.unwrap_or_default());
+            let predecessor_dts = previous
+                .dts
+                .checked_sub(edit_start)
+                .ok_or(Error::Overflow)?;
+            let derived_dts = dts.checked_sub(edit_start).ok_or(Error::Overflow)?;
             return Ok((
                 dts,
                 ClockOrigin::PredecessorEnd(PredecessorClock {
                     predecessor_sample: previous.sample,
-                    predecessor_demux_dts_ticks: previous.dts,
+                    predecessor_demux_dts_ticks: predecessor_dts,
                     predecessor_duration_ticks: previous.duration,
                     predecessor_source_dts_known: previous.source_known,
-                    derived_dts_ticks: dts,
+                    derived_dts_ticks: derived_dts,
                 }),
             ));
         }

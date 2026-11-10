@@ -81,6 +81,17 @@ pub fn fragment(
     origin: Option<u64>,
     flags: &[u32],
 ) -> FragmentIndex {
+    fragment_runs(pool, first, base, description, origin, &[flags])
+}
+
+pub fn fragment_runs(
+    pool: &Budget,
+    first: u64,
+    base: u64,
+    description: u32,
+    origin: Option<u64>,
+    runs: &[&[u32]],
+) -> FragmentIndex {
     let mut header = vec![0, 0, 0, 0x3b];
     header.extend(7u32.to_be_bytes());
     header.extend(base.to_be_bytes());
@@ -94,12 +105,14 @@ pub fn fragment(
         b.extend(time.to_be_bytes());
         body.extend(bytes(b"tfdt", &b));
     }
-    let mut run = vec![0, 0, 4, 0];
-    run.extend(u32::try_from(flags.len()).unwrap().to_be_bytes());
-    for flag in flags {
-        run.extend(flag.to_be_bytes());
+    for &flags in runs {
+        let mut run = vec![0, 0, 4, 0];
+        run.extend(u32::try_from(flags.len()).unwrap().to_be_bytes());
+        for flag in flags {
+            run.extend(flag.to_be_bytes());
+        }
+        body.extend(bytes(b"trun", &run));
     }
-    body.extend(bytes(b"trun", &run));
     let raw = BoxView::new(
         common::bytes(pool, &bytes(b"traf", &body)),
         512 + first * 128,
