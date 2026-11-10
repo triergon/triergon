@@ -140,6 +140,11 @@ const RUN_UNITS: usize = 16;
 const MAX_PLANS: usize = 256;
 /// Bytes charged per plan beyond its own storage.
 const PLAN_ENTRY_BYTES: usize = 256;
+/// Bytes charged per glyph of an `@` font in the rotation map.
+const ROTATION_ENTRY_BYTES: usize = 32;
+/// The code points from which an `@` font's glyph metrics are rotated
+/// (`VERTICAL_LOWER_BOUND`, as in `text.rs`).
+const VERTICAL_LOWER_BOUND: u32 = 0x2f1;
 
 /// The shaper's state: a buffer, a bidi resolver, the plans built so far,
 /// and storage for the event being shaped.
@@ -152,6 +157,7 @@ pub(super) struct Shaper {
     buffer: Buffer,
     resolver: Resolver,
     plans: HashMap<PlanKey, Plan>,
+    /// The plans' and rotation decisions' storage.
     charge: Reservation,
     /// The event's text as HarfBuzz reads it.
     text: BudgetVec<char>,
@@ -162,11 +168,19 @@ pub(super) struct Shaper {
     counts: BudgetVec<usize>,
 }
 
-/// The rotation decisions of libass's glyph metrics cache.
+/// The rotation decisions of libass's glyph metrics cache for `@` fonts, by
+/// face, size and glyph: libass never cuts that cache, so they last as long
+/// as the renderer. Their storage is charged after each shaping call.
 #[derive(Debug, Default)]
 struct Rotations(std::cell::RefCell<HashMap<(u32, u64, u16), bool>>);
 
-/// The metrics cache of one face at one size.
+impl Rotations {
+    fn len(&self) -> usize {
+        self.0.borrow().len()
+    }
+}
+
+/// The metrics cache of one face of an `@` font at one size.
 struct FaceRotations<'a> {
     rotations: &'a Rotations,
     face: u32,
@@ -180,8 +194,17 @@ impl triergon_shape::GlyphRotations for FaceRotations<'_> {
             .0
             .borrow_mut()
             .entry((self.face, self.size, glyph.0))
-            .or_insert_with(|| c.is_some_and(|c| u32::from(c) >= 0x2f1))
+            .or_insert_with(|| c.is_some_and(|c| u32::from(c) >= VERTICAL_LOWER_BOUND))
     }
+}
+
+/// Charges the plans and rotation decisions the shaper keeps.
+fn kept(charge: &mut Reservation, plans: usize, rotations: usize) -> Result<()> {
+    charge.resize_to(
+        plans
+            .saturating_mul(PLAN_ENTRY_BYTES)
+            .saturating_add(rotations.saturating_mul(ROTATION_ENTRY_BYTES)),
+    )
 }
 
 /// What finding runs gives a character (`ass_shaper_find_runs`).
@@ -540,8 +563,7 @@ impl Shaper {
                 &self.budget,
             )?;
             self.plans.insert(key, plan);
-            self.charge
-                .resize_to(self.plans.len().saturating_mul(PLAN_ENTRY_BYTES))?;
+            kept(&mut self.charge, self.plans.len(), self.rotations.len())?;
         }
         let base = context.start;
         triergon_shape::shape(
@@ -552,6 +574,9 @@ impl Shaper {
             item.start - base..item.end - base,
             &mut self.buffer,
         )?;
+        if font.vertical() {
+            kept(&mut self.charge, self.plans.len(), self.rotations.len())?;
+        }
         Ok(base)
     }
 

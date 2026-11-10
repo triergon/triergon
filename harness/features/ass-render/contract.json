@@ -25,20 +25,11 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "triergon-ass: the glyphs of @ fonts drawn rotated as libass draws them, with triergon-font's linear vertical advance and the typographic descender, and shaped with the default-load vertical advance of every glyph libass's metrics cache rotates (triergon-shape's GlyphRotations)",
     "triergon-shape's open shape-libass cases, which block qualifying triergon-ass: the default-load advances FreeType's auto-hinter sets (DejaVuMathTeXGyre, authored-cmap-formats and six Noto Emoji variants)",
     "triergon-shape's open shape-libass case authored-cff-features-otf-latn-libass, which blocks qualifying triergon-ass: fallback mark positioning in a CFF font without GPOS reads FreeType's hinted glyph extents",
     "triergon-ass: a vector clip whose drawing has no contour empties every image of its event, as blend_vector_clip does with the bitmap without pixels libass draws for it (ass_render.c:700-813)"
   ],
   "open_cases": [
-    {
-      "id": "cjk-ass-1080p",
-      "requirement": "triergon-ass: the glyphs of @ fonts drawn rotated as libass draws them, with triergon-font's linear vertical advance and the typographic descender, and shaped with the default-load vertical advance of every glyph libass's metrics cache rotates (triergon-shape's GlyphRotations)"
-    },
-    {
-      "id": "cjk-ass-720p",
-      "requirement": "triergon-ass: the glyphs of @ fonts drawn rotated as libass draws them, with triergon-font's linear vertical advance and the typographic descender, and shaped with the default-load vertical advance of every glyph libass's metrics cache rotates (triergon-shape's GlyphRotations)"
-    },
     {
       "id": "clip-vector-empty-ass-1080p",
       "requirement": "triergon-ass: a vector clip whose drawing has no contour empties every image of its event, as blend_vector_clip does with the bitmap without pixels libass draws for it (ass_render.c:700-813)"
