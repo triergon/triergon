@@ -144,7 +144,10 @@ arithmetic as at a size with a scale of one.
 CID-keyed (FDArray, FDSelect formats 0 and 3), and `CFF2` (FDSelect format 4 too)
 at the default instance of a variable font: `blend` applies region scalars at the
 origin, in charstrings and Private DICTs. Supported: all path operators, flex,
-hints and masks (counted and skipped), local and global subroutines (16 nested
+stem hints, `hintmask` and `cntrmask` (the stems are fixed by the first mask or
+move: later stem operators are ignored, as is a later mask operator with more
+than one operand, whose mask bytes then run as charstring, and a mask over more
+than 96 stems fails the glyph, all as in FreeType), local and global subroutines (16 nested
 calls, FreeType's limit; TN 5177 states 10), arithmetic, storage and `random` operators (CFF only, as in
 FreeType), and `seac` accents through StandardEncoding and the charset, the
 accent drawn first. The charset (formats 0, 1 and 2, or ISOAdobe, Expert and
@@ -163,6 +166,25 @@ matrix implies other units per em scales its glyphs by the ratio. Drawing
 operators read operand counts the format does not allow as FreeType's engine reads
 them, and a glyph whose operator reads past its operands fails; operand types are
 not tracked.
+
+**Hinted CFF outlines.** The crate also builds a CFF or CFF2 glyph as FreeType's
+default load (`FT_LOAD_DEFAULT`) leaves it in the glyph slot, before metrics are
+fitted to the grid; `SizedFont` does not return these outlines yet. The same
+interpreter and glyph path run with Adobe's hinter as FreeType 2.15's CFF driver
+runs it by default, without stem darkening: at a 64th of the size's 16.16 scale,
+rounded (adjusted first for a Font DICT with other units per em), the blue
+zones of the glyph's Private DICT (BlueValues, OtherBlues, FamilyBlues,
+FamilyOtherBlues, BlueScale, BlueShift, BlueFuzz, and LanguageGroup 1's
+synthetic em box hints, read with FreeType's defaults, number conversions and
+corrections) capture horizontal stem edges, and hint maps built from the masks
+move the other stems' edges onto pixel boundaries; each element of the path is
+mapped with the hint map in force when the next one is drawn, as in FreeType.
+The 26.6 points then go through the FontMatrix and are moved by its offset in
+font units, without further scaling. Sizes beyond 2000 pixels per em, which the
+hinter refuses, load unhinted and scaled, as FreeType retries them; a 16.16
+scale below 32 fails the glyph. The arithmetic is cf2's, 16.16 in 32 bits. In a
+CFF2 Private DICT, a blended value that is not a whole number may differ from
+FreeType's in its last 16.16 bit.
 
 **Control boxes.** `Font::control_box` reads a glyph's box without building its
 outline, within the caller's `WorkBudget`, so no point limit applies: a TrueType glyph's `glyf` header box as
@@ -252,16 +274,17 @@ WOFF and WOFF2, bare CFF, Type 1 and Type 42, bitmap and colour glyphs (`EBDT`,
 `CBDT`, `sbix`, `COLR`, `SVG `), variation instances other than the default (`fvar`,
 `gvar`, `HVAR`, `avar`), vertical origins and bearings (`VORG`, top side
 bearings beyond the advance), `post` beyond the
-underline, hinting (`cvt ` is not read, `fpgm`, `prep` and glyph programs are
-only scanned for `INSTCTRL`, CFF hints are skipped), Apple `kern` version 1 and
+underline, TrueType hinting (`cvt ` is not read, `fpgm`, `prep` and glyph
+programs are only scanned for `INSTCTRL`), CFF stem darkening, StdHW and StdVW
+(which only darkening reads), Apple `kern` version 1 and
 kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Type
 1 charstrings (CharstringType 1) and synthetic fonts.
 A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
 opens it and fails each glyph.
 
-At a size, what needs hinting is not reproduced: hinted outlines, hence the glyph
-extents and contour points libass's HarfBuzz callbacks report (they load glyphs
-hinted).
+At a size, `SizedFont` does not give what needs hinting: hinted outlines, hence
+the glyph extents and contour points libass's HarfBuzz callbacks report (they
+load glyphs hinted).
 `hinted_advance` is `Unsupported` for TrueType faces FreeType auto-hints (no
 `fpgm` and a `prep` of at most 7 bytes; the autohinter moves advances), tricky
 fonts known by family name, and programs that may leave backward compatibility;
@@ -280,8 +303,9 @@ cases are open: the advances and vertical cases of DejaVuMathTeXGyre and
 authored-cmap-formats, whose default-load advances FreeType's auto-hinter moves.
 For libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL), the unhinted outlines
 and default-load advances at nine other sizes are only measured
-(`font-hinting-modes`), and hinted outlines are not compared. This crate does not
-hint, so hinting-enabled output is unverified.
+(`font-hinting-modes`), and hinted outlines are not compared: the hinted CFF
+outlines above are checked by unit tests only, and TrueType outlines are not
+hinted, so hinting-enabled output is unverified.
 
 ## Behaviour and limits
 

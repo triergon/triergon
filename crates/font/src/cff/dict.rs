@@ -11,6 +11,14 @@ pub(crate) const CFF2_OPERANDS: usize = 513;
 
 /// A DICT operator: one byte, or 12 followed by a second byte as `0x0c00 | byte`.
 pub(crate) mod op {
+    pub(crate) const BLUE_VALUES: u16 = 6;
+    pub(crate) const OTHER_BLUES: u16 = 7;
+    pub(crate) const FAMILY_BLUES: u16 = 8;
+    pub(crate) const FAMILY_OTHER_BLUES: u16 = 9;
+    pub(crate) const BLUE_SCALE: u16 = 0x0c09;
+    pub(crate) const BLUE_SHIFT: u16 = 0x0c0a;
+    pub(crate) const BLUE_FUZZ: u16 = 0x0c0b;
+    pub(crate) const LANGUAGE_GROUP: u16 = 0x0c11;
     pub(crate) const PRIVATE: u16 = 18;
     pub(crate) const SUBRS: u16 = 19;
     pub(crate) const DEFAULT_WIDTH_X: u16 = 20;

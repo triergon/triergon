@@ -1,9 +1,13 @@
-//! Type 2 charstrings (Adobe Technical Note 5177) and CFF2 charstrings, unhinted,
-//! evaluated in 16.16 fixed point as FreeType's CFF engine evaluates them.
+//! Type 2 charstrings (Adobe Technical Note 5177) and CFF2 charstrings, evaluated
+//! in 16.16 fixed point as FreeType's CFF engine evaluates them.
 //!
-//! Hints are counted, so that mask lengths are known, and otherwise ignored. Drawing
-//! operators consume complete operand groups and drop a malformed remainder, and
-//! CFF2 charstrings may leave operands on the stack, as FreeType accepts both.
+//! Stem hints and masks go to the glyph path, which hints with them at a size
+//! and otherwise only needs the mask lengths. As in FreeType, the stems are
+//! fixed by the first hint mask or move: later stem operators are ignored, and
+//! so is a later mask operator with more than one operand, whose mask bytes then
+//! run as charstring. Drawing operators consume complete operand groups and
+//! drop a malformed remainder, and CFF2 charstrings may leave operands on the
+//! stack, as FreeType accepts both.
 //! Arithmetic wraps at 32 bits and rounds as FreeType's does; operands are not
 //! typed, so an integer operator accepts any number and rounds it.
 //!
@@ -11,7 +15,7 @@
 
 use super::dict::{CFF_OPERANDS, CFF2_OPERANDS, Stack};
 use super::number::shared_integer;
-use super::path::{Builder, Contours, Fixed, Path};
+use super::path::{Builder, Contours, Fixed, Path, Scaling};
 use super::{Cff, Private, Version};
 use crate::Limits;
 use crate::fixed::{div_fix, mul_fix, sqrt_fixed};
@@ -24,8 +28,7 @@ use triergon_core::{Error, Result, WorkBudget};
 /// Nested subroutine calls FreeType's CFF engine allows (`CF2_MAX_SUBR`). TN 5177
 /// Appendix B states 10, but real fonts nest deeper and FreeType renders them.
 const MAX_SUBR_DEPTH: u32 = 16;
-/// TN 5177 Appendix B: stem hints and transient slots.
-const MAX_STEM_HINTS: usize = 96;
+/// TN 5177 Appendix B: transient slots.
 const TRANSIENT_SLOTS: usize = 32;
 const ONE: Fixed = 0x1_0000;
 
@@ -410,17 +413,19 @@ fn token(r: &mut Reader<'_>, version: Version) -> Result<Token> {
         .ok_or(Error::Invalid("reserved charstring operator"))
 }
 
-/// Loads `glyph`'s charstring into `outline`, in whole font units.
+/// Loads `glyph`'s charstring into `outline` at `scaling`: whole font units
+/// unhinted ([`Scaling::UNHINTED`]), else hinted 26.6 pixels.
 pub(super) fn outline(
     cff: &Cff,
     table: &[u8],
     glyph: u32,
+    scaling: &Scaling,
     outline: &mut Outline,
     limits: &Limits,
     work: &mut WorkBudget,
 ) -> Result<()> {
     outline.begin(limits.points);
-    let mut run = Run::new(cff, table, work, limits, Builder::new(outline), ());
+    let mut run = Run::new(cff, table, work, limits, scaling, Builder::new(outline), ());
     run.top_glyph(glyph)?;
     run.builder.close()
 }
@@ -441,6 +446,7 @@ pub(super) fn operators(
         table,
         work,
         limits,
+        &Scaling::UNHINTED,
         Builder::new(outline),
         OperatorSet::default(),
     );
@@ -457,7 +463,15 @@ pub(super) fn bounds(
     limits: &Limits,
     work: &mut WorkBudget,
 ) -> Result<Option<CharstringBounds>> {
-    let mut run = Run::new(cff, table, work, limits, (), Bounds::default());
+    let mut run = Run::new(
+        cff,
+        table,
+        work,
+        limits,
+        &Scaling::UNHINTED,
+        (),
+        Bounds::default(),
+    );
     run.top_glyph(glyph)?;
     Ok(run.observer.bounds)
 }
@@ -467,6 +481,7 @@ struct Run<'a, C, O> {
     table: &'a [u8],
     work: &'a mut WorkBudget,
     depth: u32,
+    scaling: &'a Scaling,
     builder: C,
     observer: O,
 }
@@ -489,19 +504,18 @@ struct Seac {
 }
 
 /// The current point and the path under construction.
-struct Pen {
+struct Pen<'s> {
     x: Fixed,
     y: Fixed,
-    path: Path,
+    path: Path<'s>,
 }
 
 struct State<'p, const N: usize> {
     private: &'p Private,
     stack: Stack<Fixed, N>,
     transient: [Fixed; TRANSIENT_SLOTS],
-    pen: Pen,
+    pen: Pen<'p>,
     width_seen: bool,
-    stems: usize,
     seac: Option<Seac>,
     vsindex: usize,
     random: u32,
@@ -513,6 +527,7 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
         table: &'a [u8],
         work: &'a mut WorkBudget,
         limits: &Limits,
+        scaling: &'a Scaling,
         builder: C,
         observer: O,
     ) -> Self {
@@ -526,6 +541,7 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
             table,
             work,
             depth,
+            scaling,
             builder,
             observer,
         }
@@ -554,16 +570,15 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
             pen: Pen {
                 x: origin.0,
                 y: origin.1,
-                path: Path::new(),
+                path: Path::new(self.scaling, origin.1),
             },
             width_seen: self.cff.version == Version::Cff2,
-            stems: 0,
             seac: None,
             vsindex: private.vsindex,
             random: 0,
         };
         self.run(charstring, 0, &mut s)?;
-        s.pen.path.close(&mut self.builder)?;
+        s.pen.path.close(&mut self.builder, self.work)?;
         if let Some(seac) = s.seac {
             if !top || self.cff.is_cid_keyed() {
                 return Err(Error::Invalid("seac inside seac or in a CID-keyed font"));
@@ -626,16 +641,27 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
         use CharstringOperator as Op;
         match op {
             Op::HStem | Op::VStem | Op::HStemHm | Op::VStemHm => {
-                Self::width(s, s.stack.len() % 2 == 1);
-                Self::stems(s)?;
+                if s.pen.path.takes_stems() {
+                    Self::width(s, s.stack.len() % 2 == 1);
+                    let horizontal = matches!(op, Op::HStem | Op::HStemHm);
+                    s.pen.path.stems(horizontal, s.stack.as_slice());
+                }
+                s.stack.clear();
+            }
+            // With the stems fixed, FreeType skips a mask operator that has
+            // operands, but not the mask bytes after it.
+            Op::HintMask | Op::CntrMask if s.stack.len() > 1 && !s.pen.path.takes_stems() => {
+                s.stack.clear();
             }
             Op::HintMask | Op::CntrMask => {
                 // Operands before the first mask are vertical stems.
                 Self::width(s, s.stack.len() % 2 == 1);
-                Self::stems(s)?;
-                r.skip(s.stems.div_ceil(8))?;
+                s.pen.path.stems(false, s.stack.as_slice());
+                s.stack.clear();
                 if op == Op::HintMask {
-                    s.pen.path.hint_mask();
+                    s.pen.path.hint_mask(r)?;
+                } else {
+                    s.pen.path.counter_mask(r, self.work)?;
                 }
             }
             Op::RMoveTo | Op::HMoveTo | Op::VMoveTo => self.move_to(op, s)?,
@@ -693,15 +719,6 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
         }
     }
 
-    fn stems<const N: usize>(s: &mut State<'_, N>) -> Result<()> {
-        s.stems += s.stack.len() / 2;
-        s.stack.clear();
-        if s.stems > MAX_STEM_HINTS {
-            return Err(Error::Invalid("more than 96 stem hints"));
-        }
-        Ok(())
-    }
-
     fn move_to<const N: usize>(
         &mut self,
         op: CharstringOperator,
@@ -724,7 +741,8 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
         pen.x = pen.x.wrapping_add(dx);
         pen.y = pen.y.wrapping_add(dy);
         self.observer.move_to();
-        pen.path.move_to(&mut self.builder, (pen.x, pen.y))
+        pen.path
+            .move_to(&mut self.builder, (pen.x, pen.y), self.work)
     }
 
     /// `rlineto` takes pairs; `hlineto` and `vlineto` alternate the axis. A
@@ -880,21 +898,22 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
         })
     }
 
-    fn line_by(&mut self, pen: &mut Pen, dx: Fixed, dy: Fixed) -> Result<()> {
+    fn line_by(&mut self, pen: &mut Pen<'_>, dx: Fixed, dy: Fixed) -> Result<()> {
         let from = (pen.x, pen.y);
         pen.x = pen.x.wrapping_add(dx);
         pen.y = pen.y.wrapping_add(dy);
         self.observer.draw(from, &[(pen.x, pen.y)]);
-        pen.path.line_to(&mut self.builder, (pen.x, pen.y))
+        pen.path
+            .line_to(&mut self.builder, (pen.x, pen.y), self.work)
     }
 
-    fn curve_by(&mut self, pen: &mut Pen, d: [Fixed; 6]) -> Result<()> {
+    fn curve_by(&mut self, pen: &mut Pen<'_>, d: [Fixed; 6]) -> Result<()> {
         let c1 = (pen.x.wrapping_add(d[0]), pen.y.wrapping_add(d[1]));
         let c2 = (c1.0.wrapping_add(d[2]), c1.1.wrapping_add(d[3]));
         let end = (c2.0.wrapping_add(d[4]), c2.1.wrapping_add(d[5]));
         self.observer.draw((pen.x, pen.y), &[c1, c2, end]);
         (pen.x, pen.y) = end;
-        pen.path.curve_to(&mut self.builder, c1, c2, end)
+        pen.path.curve_to(&mut self.builder, c1, c2, end, self.work)
     }
 }
 
