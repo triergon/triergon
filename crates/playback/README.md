@@ -107,8 +107,9 @@ in order.
 **Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization
 record, `compat::matroska::legacy_aac_lc_initialization` derives AAC-LC
-configuration from the indexed sampling frequency and channel code. The
-feed uses any explicit initialization and preserves the source packet bytes.
+configuration from the indexed sampling frequency and a count of one to six
+channels. Larger layouts require explicit initialization. The feed preserves
+the source packet bytes.
 The legacy compatibility clock keeps a missing duration unknown.
 
 **Source protocol.** `Source::poll` must return promptly. `Pending` and empty

@@ -14,7 +14,10 @@ use crate::runner::Result;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId, WorkBudget};
-use triergon_matroska::typed::{Configuration, Event, Packet as MatroskaPacket};
+use triergon_matroska::{
+    matroska::LegacyAacProfile,
+    typed::{Configuration, Event, Packet as MatroskaPacket},
+};
 use triergon_playback::{
     ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection,
     io::SourceOwner,
@@ -45,11 +48,20 @@ enum Family {
 }
 
 impl Select {
-    /// The family of a selected track, by the codec the Matroska reader identifies
-    /// from its CodecID, so every CodecID the reader maps to a family is selected.
-    fn family(self, kind: MediaKind, codec: CodecId<'_>) -> Option<Family> {
+    /// Select the reader's codec family within the feed's supported profiles.
+    fn family(
+        self,
+        kind: MediaKind,
+        codec: CodecId<'_>,
+        legacy_aac: Option<LegacyAacProfile>,
+    ) -> Option<Family> {
         match (kind, codec) {
-            (MediaKind::Audio, CodecId::Aac) if self != Self::Dolby => Some(Family::Aac),
+            (MediaKind::Audio, CodecId::Aac)
+                if self != Self::Dolby
+                    && matches!(legacy_aac, None | Some(LegacyAacProfile::LowComplexity)) =>
+            {
+                Some(Family::Aac)
+            }
             (MediaKind::Audio, CodecId::Ac3 | CodecId::Eac3) if self != Self::Aac => {
                 Some(Family::Dolby)
             }
@@ -113,18 +125,25 @@ fn feeds(
     let cancel = AtomicBool::new(false);
     let mut feeds = Vec::with_capacity(tracks.len());
     for (track, descriptor) in tracks.iter().enumerate() {
-        feeds.push(match select.family(descriptor.kind(), descriptor.codec()) {
-            None => None,
-            Some(Family::Aac) => {
-                let mut setup = MatroskaFeedSetup::new(pool, id, configuration, track, AVC_AAC)?;
-                Some(Feed::Aac(ready(|work| setup.step(work, &cancel))?))
-            }
-            Some(Family::Dolby) => {
-                let mut setup =
-                    MatroskaHevcDolbySetup::new(pool, id, configuration, track, HEVC_DOLBY)?;
-                Some(Feed::Dolby(ready(|work| setup.step(work, &cancel))?))
-            }
-        });
+        feeds.push(
+            match select.family(
+                descriptor.kind(),
+                descriptor.codec(),
+                descriptor.legacy_aac_profile(),
+            ) {
+                None => None,
+                Some(Family::Aac) => {
+                    let mut setup =
+                        MatroskaFeedSetup::new(pool, id, configuration, track, AVC_AAC)?;
+                    Some(Feed::Aac(ready(|work| setup.step(work, &cancel))?))
+                }
+                Some(Family::Dolby) => {
+                    let mut setup =
+                        MatroskaHevcDolbySetup::new(pool, id, configuration, track, HEVC_DOLBY)?;
+                    Some(Feed::Dolby(ready(|work| setup.step(work, &cancel))?))
+                }
+            },
+        );
     }
     if feeds.iter().all(Option::is_none) {
         return Err("no selected audio track".into());
@@ -282,6 +301,7 @@ pub fn operate(pool: &Budget, raw: &Bytes, argument: &str, work: Work) -> Result
 mod tests {
     use super::{Family, Select};
     use triergon_core::container::{CodecId, MediaKind};
+    use triergon_matroska::matroska::LegacyAacProfile;
 
     #[test]
     fn selection_follows_the_codec_family_the_reader_identifies() {
@@ -291,14 +311,26 @@ mod tests {
             (Select::Dolby, None, Some(Family::Dolby)),
             (Select::All, Some(Family::Aac), Some(Family::Dolby)),
         ] {
-            assert_eq!(select.family(audio, CodecId::Aac), aac);
-            // A_AC3, A_AC3/BSID9 and A_AC3/BSID10 are all AC-3.
-            assert_eq!(select.family(audio, CodecId::Ac3), dolby);
-            assert_eq!(select.family(audio, CodecId::Eac3), dolby);
-            assert_eq!(select.family(MediaKind::Video, CodecId::Aac), None);
-            assert_eq!(select.family(audio, CodecId::Opus), None);
+            assert_eq!(select.family(audio, CodecId::Aac, None), aac);
             assert_eq!(
-                select.family(audio, CodecId::Other(b"A_AAC/MPEG4/LC/UNKNOWN")),
+                select.family(audio, CodecId::Aac, Some(LegacyAacProfile::LowComplexity)),
+                aac
+            );
+            for profile in [
+                LegacyAacProfile::Main,
+                LegacyAacProfile::ScalableSamplingRate,
+                LegacyAacProfile::LongTermPrediction,
+                LegacyAacProfile::LowComplexitySbr,
+            ] {
+                assert_eq!(select.family(audio, CodecId::Aac, Some(profile)), None);
+            }
+            // A_AC3, A_AC3/BSID9 and A_AC3/BSID10 are all AC-3.
+            assert_eq!(select.family(audio, CodecId::Ac3, None), dolby);
+            assert_eq!(select.family(audio, CodecId::Eac3, None), dolby);
+            assert_eq!(select.family(MediaKind::Video, CodecId::Aac, None), None);
+            assert_eq!(select.family(audio, CodecId::Opus, None), None);
+            assert_eq!(
+                select.family(audio, CodecId::Other(b"A_AAC/MPEG4/LC/UNKNOWN"), None),
                 None
             );
         }

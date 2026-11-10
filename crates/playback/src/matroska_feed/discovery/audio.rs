@@ -1,8 +1,8 @@
 //! Audio parameter observations for the admitted Matroska startup profiles.
-use crate::compat::matroska::legacy_aac_lc_initialization;
+use crate::compat::matroska::legacy_aac_lc_parameters;
 use crate::{Output, Result};
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Bytes, Error, WorkBudget};
+use triergon_core::{Error, WorkBudget};
 use triergon_framing::{
     AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource, Ac3Family, Ac3FrameDetails,
     BuildStep, probe_ac3_header,
@@ -76,15 +76,15 @@ impl AudioProbe {
             return Ok(Some(false));
         }
         let configuration = &packet.configuration;
-        let raw = if let Some(raw) = configuration.initialization_bytes(packet.packet.track) {
-            raw
-        } else {
-            let Ok(Some(record)) = legacy_aac_lc_initialization(configuration, packet.packet.track)
-            else {
+        let Some(raw) = configuration.initialization_bytes(packet.packet.track) else {
+            let ready = matches!(
+                legacy_aac_lc_parameters(configuration, packet.packet.track),
+                Ok(Some(_))
+            );
+            if !ready {
                 self.unavailable_aac |= bit;
-                return Ok(Some(false));
-            };
-            Bytes::copy_from_slice(output.pool(), &record)?
+            }
+            return Ok(Some(ready));
         };
         let source = AacSource {
             source: output.source_id(),

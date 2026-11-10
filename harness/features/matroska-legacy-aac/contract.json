@@ -8,7 +8,7 @@
   "gate": "required",
   "contract": [
     "Read MPEG-2 and MPEG-4 legacy AAC-LC Matroska tracks without CodecPrivate through playback discovery and the AAC feed",
-    "Use the declared indexed sampling frequency and channel code to build the AAC-LC initialization",
+    "Use the declared indexed sampling frequency and channel count to build the AAC-LC initialization",
     "Compare every packet through clean end of file with stream index, PTS, DTS, duration, key flag, size and payload",
     "Keep timestamps and durations unknown when the reference leaves them unset, including later frames in an untimed lace"
   ],

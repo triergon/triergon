@@ -10,7 +10,7 @@ use crate::{Error, Result};
 
 /// AAC profiles carried by deprecated Matroska CodecIDs.
 ///
-/// See sections 3.4.2–3.4.8 of the Matroska codec mapping.
+/// See sections 3.4.2–3.4.10 of the Matroska codec mapping.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LegacyAacProfile {
     Main,
@@ -23,9 +23,9 @@ pub enum LegacyAacProfile {
 impl LegacyAacProfile {
     pub(crate) fn from_codec_id(codec: &str) -> Option<Self> {
         Some(match codec {
-            "A_AAC/MPEG2/MAIN" => Self::Main,
+            "A_AAC/MPEG2/MAIN" | "A_AAC/MPEG4/MAIN" => Self::Main,
             "A_AAC/MPEG2/LC" | "A_AAC/MPEG4/LC" => Self::LowComplexity,
-            "A_AAC/MPEG2/SSR" => Self::ScalableSamplingRate,
+            "A_AAC/MPEG2/SSR" | "A_AAC/MPEG4/SSR" => Self::ScalableSamplingRate,
             "A_AAC/MPEG2/LC/SBR" | "A_AAC/MPEG4/LC/SBR" => Self::LowComplexitySbr,
             "A_AAC/MPEG4/LTP" => Self::LongTermPrediction,
             _ => return None,
@@ -37,6 +37,7 @@ impl LegacyAacProfile {
 pub struct Track {
     packet_prefix: SharedBytes,
     packet_decoder: Option<crate::content_encoding::Decoder>,
+    codec_private_present: bool,
     /// Complete bounded TrackEntry payload, retaining extensions not interpreted yet.
     pub source_metadata: SharedBytes,
     pub number: u64,
@@ -73,6 +74,11 @@ pub struct Track {
 impl Track {
     pub fn effective_language(&self) -> &str {
         self.language_bcp47.as_deref().unwrap_or(&self.language)
+    }
+
+    /// Whether the TrackEntry wrote a CodecPrivate element, including an empty one.
+    pub const fn has_codec_private(&self) -> bool {
+        self.codec_private_present
     }
 
     /// The profile signalled by a deprecated AAC CodecID on an audio track.

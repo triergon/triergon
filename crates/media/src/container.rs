@@ -293,6 +293,8 @@ mod tests {
             ("A_AAC/MPEG2/SSR", CodecId::Aac),
             ("A_AAC/MPEG2/LC/SBR", CodecId::Aac),
             ("A_AAC/MPEG4/LC", CodecId::Aac),
+            ("A_AAC/MPEG4/MAIN", CodecId::Aac),
+            ("A_AAC/MPEG4/SSR", CodecId::Aac),
             ("A_AAC/MPEG4/LTP", CodecId::Aac),
             ("A_AAC/MPEG4/LC/SBR", CodecId::Aac),
             ("A_AC3", CodecId::Ac3),

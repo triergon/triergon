@@ -226,7 +226,16 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
                     let track = &configuration.tracks()[0];
                     assert_eq!(track.codec(), CodecId::Aac);
                     assert_eq!(track.codec_tag(), codec);
+                    assert!(!track.has_codec_private());
                     assert!(track.configuration().is_empty());
+                    assert_eq!(
+                        triergon_playback::compat::matroska::legacy_aac_lc_initialization(
+                            configuration,
+                            0
+                        )
+                        .unwrap(),
+                        Some([0x11, 0x90])
+                    );
                     feed = Some(setup(&pool, configuration, 0));
                 }
                 RawEvent::Matroska(Event::Packet(packet)) => {
@@ -246,6 +255,54 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
         }
         assert_eq!(count, 8);
         assert!(gold.is_empty());
+    }
+}
+
+#[test]
+fn legacy_aac_lc_refuses_empty_initialization_and_ambiguous_channels() {
+    use triergon_playback::compat::matroska::legacy_aac_lc_initialization;
+
+    for (input, private_present) in [
+        (
+            include_bytes!("fixtures/mkv-feed/aac-mpeg4-lc-empty-private.mkv").as_slice(),
+            true,
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/aac-mpeg4-lc-ambiguous-layout.mkv").as_slice(),
+            false,
+        ),
+    ] {
+        let (mut player, pool) = player_with_input(input, 7);
+        let events = collect(&mut player);
+        let configuration = events
+            .iter()
+            .find_map(|output| match output.event() {
+                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            configuration.tracks()[0].has_codec_private(),
+            private_present
+        );
+        if private_present {
+            assert_eq!(
+                legacy_aac_lc_initialization(configuration, 0).unwrap(),
+                None
+            );
+        } else {
+            assert!(matches!(
+                legacy_aac_lc_initialization(configuration, 0),
+                Err(Error::Unsupported("legacy Matroska AAC channel layout"))
+            ));
+        }
+        if let Ok(mut setup) = MatroskaFeedSetup::new(&pool, ID, configuration, 0, LIMITS) {
+            assert!(
+                setup
+                    .step(&mut WorkBudget::new(1024), &AtomicBool::new(false))
+                    .is_err()
+            );
+        }
     }
 }
 

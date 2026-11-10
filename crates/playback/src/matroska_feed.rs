@@ -8,7 +8,7 @@ mod hevc_dolby;
 mod probe_clock;
 mod video_clock;
 mod video_seek;
-use crate::compat::matroska::legacy_aac_lc_initialization;
+use crate::compat::matroska::legacy_aac_lc_parameters;
 use crate::{Delivery, Output, RawEvent, Result};
 pub use bitmap::{
     MatroskaBitmapCodec, MatroskaBitmapSource, MatroskaBitmapTrack, MatroskaDvbPacket,
@@ -96,6 +96,7 @@ impl Association {
 
 enum Parser {
     Avc(AvcConfigParser),
+    DerivedAac(AacAdtsParameters),
     Aac {
         parser: AacAscParser,
         infer_duration: bool,
@@ -144,50 +145,54 @@ impl MatroskaFeedSetup {
             _ => return Err(Error::Unsupported("Matroska feed codec")),
         };
         let derived = if legacy_aac {
-            legacy_aac_lc_initialization(configuration, track)?
+            legacy_aac_lc_parameters(configuration, track)?
         } else {
             None
         };
         let init = configuration
             .initialization(track)
             .ok_or(Error::Invalid("missing Matroska initialization"))?;
-        let data = derived.as_ref().map_or(init.data, <[u8; 2]>::as_slice);
-        check_limit(data.len(), maximum_record_bytes)?;
-        let record = match derived {
-            Some(_) => Bytes::copy_from_slice(pool, data)?,
-            None => match configuration.initialization_bytes(track) {
-                Some(record) => record,
-                None => Bytes::copy_from_slice(pool, data)?,
-            },
-        };
-        let parser = if codec == "V_MPEG4/ISO/AVC" {
-            Parser::Avc(AvcConfigParser::new(
-                pool,
-                AvcConfigSource {
-                    source,
-                    generation: init.generation,
-                    offset: 0,
-                },
-                record,
-                limits.avc_config,
-            )?)
-        } else {
+        let parser = if let Some(params) = derived {
+            check_limit(2, maximum_record_bytes)?;
             if limits.aac_output_bytes < 7 {
                 return Err(Error::Invalid("Matroska AAC output limit"));
             }
-            Parser::Aac {
-                parser: AacAscParser::new(
+            Parser::DerivedAac(params)
+        } else {
+            check_limit(init.data.len(), maximum_record_bytes)?;
+            let record = match configuration.initialization_bytes(track) {
+                Some(record) => record,
+                None => Bytes::copy_from_slice(pool, init.data)?,
+            };
+            if codec == "V_MPEG4/ISO/AVC" {
+                Parser::Avc(AvcConfigParser::new(
                     pool,
-                    AacSource {
+                    AvcConfigSource {
                         source,
                         generation: init.generation,
                         offset: 0,
                     },
                     record,
-                    limits.aac_config,
-                )?,
-                // The reference leaves missing legacy durations unknown.
-                infer_duration: !legacy_aac,
+                    limits.avc_config,
+                )?)
+            } else {
+                if limits.aac_output_bytes < 7 {
+                    return Err(Error::Invalid("Matroska AAC output limit"));
+                }
+                Parser::Aac {
+                    parser: AacAscParser::new(
+                        pool,
+                        AacSource {
+                            source,
+                            generation: init.generation,
+                            offset: 0,
+                        },
+                        record,
+                        limits.aac_config,
+                    )?,
+                    // The reference leaves missing legacy durations unknown.
+                    infer_duration: !legacy_aac,
+                }
             }
         };
         Ok(Self {
@@ -248,6 +253,18 @@ fn parse(
             BuildStep::Yield => BuildStep::Yield,
             BuildStep::Complete => BuildStep::Complete,
         }),
+        Parser::DerivedAac(params) => {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(BuildStep::Yield);
+            }
+            Ok(BuildStep::Ready(FeedCodec::Aac {
+                params: *params,
+                infer_duration: false,
+            }))
+        }
         Parser::Aac {
             parser,
             infer_duration,

@@ -48,7 +48,7 @@ impl MatroskaTrackFeed {
             self.limits.aac_output_bytes,
         )?;
         let mut timing = NativePacketTiming::demux(packet.source)?;
-        if *infer_duration && timing.duration_ns.is_none() {
+        if timing.duration_ns.is_none() && *infer_duration {
             // Indexed AAC-LC cores admitted by this feed have 1024 samples.
             let rate = indexed_aac_frequency(params.frequency_index)
                 .ok_or(Error::Invalid("AAC clock frequency"))?;
