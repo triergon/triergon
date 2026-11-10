@@ -153,8 +153,8 @@ at `01ccb49792cf1d4d05b74addf35dc616763b88e0` with each target's libass build on
 natively on AArch64 and in the ARMv7 user space; the pins recorded on each target are identical.
 The frame-by-frame run of 5,722 generated scripts and fixture mutations, which the remaining
 counts and causes come from, renders them at `3469d84e360ac2217d603effa4d1a9fd70a87ea1` on both
-targets; `01ccb497` changes only a fixture, its pins and a test. No case reached libass's time
-limit, so none was rerun. The work-bound scripts' frames were timed on ARMv7 on one CPU of the
+targets; `01ccb497` changes only a fixture, its pins and a test. Every case finished within libass's
+time limit. The work-bound scripts' frames were timed on ARMv7 on one CPU of the
 idle host. Before these changes 1,497 generated scripts and 67 mutations differed against libass
 for AArch64 (`fedfb790bfb52131389cb7c5134bab7ab813b55f`), and 1,069 scripts and 38 mutations
 against libass for ARMv7 at `28e5ccf0ecb5419f7105d52c91ebe8d6c09f053c`, before the font work
