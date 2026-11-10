@@ -441,3 +441,100 @@ fn unknown_pts_retains_raw_dts_without_inventing_native_presentation_time() {
 
 // This is functional transcript reproduction, not a benchmark adapter. Recorded
 // input/native expected bytes are read only by tests, never by production code.
+
+/// One epoch display of the objects `(id, width, height, rle)` on a 16x4 canvas.
+fn display(objects: &[(u16, u16, u16, &[u8])]) -> Vec<u8> {
+    let ids: Vec<u16> = objects.iter().map(|o| o.0).collect();
+    let mut out = pcs(16, 4, 0x80, &ids);
+    segment(
+        &mut out,
+        0x14,
+        &[0, 0, 1, 235, 128, 128, 255, 2, 16, 128, 128, 128],
+    );
+    for &(id, width, height, rle) in objects {
+        let mut body = id.to_be_bytes().to_vec();
+        body.extend_from_slice(&[0, 0xc0]);
+        body.extend_from_slice(&u32::try_from(rle.len() + 4).unwrap().to_be_bytes()[1..]);
+        body.extend_from_slice(&width.to_be_bytes());
+        body.extend_from_slice(&height.to_be_bytes());
+        body.extend_from_slice(rle);
+        segment(&mut out, 0x15, &body);
+    }
+    segment(&mut out, 0x80, &[]);
+    out
+}
+
+/// A rectangle's width, height, stride and pixels.
+type Rect = (u16, u16, u16, Vec<u8>);
+
+/// Each rectangle's geometry and pixels.
+fn rects(out: &ReceiverPacket) -> Vec<Rect> {
+    out.receiver_output()
+        .unwrap()
+        .rectangles()
+        .iter()
+        .map(|r| (r.width, r.height, r.stride, r.pixels().as_ref().to_vec()))
+        .collect()
+}
+
+/// An 8x2 plane of colour 9 in every byte.
+const NINES: &[u8] = &[0, 0x88, 9, 0, 0, 0, 0x88, 9, 0, 0];
+
+/// As FFmpeg's `pgssubdec` does, an RLE that leaves pixels of its plane
+/// unwritten (cut short, or with lines too short to make up the area) outputs
+/// an empty rectangle: `decode_rle` fails and the display sets `w` and `h` to
+/// zero. A short line the following pixels make up only warns there, and the
+/// plane is output. A reused buffer still holding a larger plane's bytes gives
+/// exactly what a fresh one does.
+#[test]
+fn an_unfilled_rle_outputs_an_empty_rectangle_as_ffmpeg_does_even_from_a_reused_buffer() {
+    let filled: Vec<u8> = (1..=8).collect();
+    let cases: [(&[u8], Rect); 3] = [
+        (&[1, 2, 3], (0, 0, 4, vec![])),
+        (&[1, 0, 0, 2, 3, 0, 0], (0, 0, 4, vec![])),
+        (&[1, 0, 0, 2, 3, 4, 5, 6, 7, 8, 0, 0], (4, 2, 4, filled)),
+    ];
+    for (rle, expected) in cases {
+        let b = Budget::new(4 * 1024 * 1024).unwrap();
+        let mut d = decoder(&b, false);
+        push(&mut d, &b, &display(&[(7, 8, 2, NINES)]));
+        let dirty = ready(&mut d, 4096);
+        assert_eq!(rects(&dirty), [(8, 2, 8, vec![9; 16])]);
+        drop(dirty);
+        let second = display(&[(5, 1, 1, &[4]), (7, 4, 2, rle)]);
+        push(&mut d, &b, &second);
+        let reused = rects(&ready(&mut d, 4096));
+        assert_eq!(reused, [(1, 1, 1, vec![4]), expected], "{rle:?}");
+        let mut fresh = decoder(&b, false);
+        push(&mut fresh, &b, &second);
+        assert_eq!(reused, rects(&ready(&mut fresh, 4096)), "{rle:?}");
+    }
+}
+
+#[test]
+fn a_held_display_keeps_its_planes_and_a_released_one_is_written_again_in_place() {
+    let b = Budget::new(4 * 1024 * 1024).unwrap();
+    let mut d = decoder(&b, false);
+    push(&mut d, &b, &display(&[(7, 8, 2, NINES)]));
+    let held = ready(&mut d, 4096);
+    let held_plane = held.receiver_output().unwrap().rectangles()[0]
+        .pixels()
+        .clone();
+    push(&mut d, &b, &display(&[(7, 2, 1, &[1, 2, 0, 0])]));
+    let next = ready(&mut d, 4096);
+    // The held rectangles are untouched and share nothing with the new ones.
+    assert_eq!(rects(&held), [(8, 2, 8, vec![9; 16])]);
+    assert_eq!(rects(&next), [(2, 1, 2, vec![1, 2])]);
+    let next_plane = next.receiver_output().unwrap().rectangles()[0]
+        .pixels()
+        .clone();
+    assert!(!next_plane.shares_storage_with(&held_plane));
+    let address = next_plane.storage_address();
+    drop((held, held_plane, next, next_plane));
+    // Released, the last buffer is written again for the next display.
+    push(&mut d, &b, &display(&[(7, 3, 1, &[3, 4, 5, 0, 0])]));
+    let again = ready(&mut d, 4096);
+    assert_eq!(rects(&again), [(3, 1, 3, vec![3, 4, 5])]);
+    let plane = again.receiver_output().unwrap().rectangles()[0].pixels();
+    assert_eq!(plane.storage_address(), address);
+}
