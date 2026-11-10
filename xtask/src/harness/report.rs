@@ -15,7 +15,7 @@ use super::comparison::reference_summary;
 use super::gate_build;
 use super::parity::{self, Comparison, Run};
 use super::provenance::source_identity_error;
-use super::timing::{Operation, benchmark};
+use super::timing::{Operation, Work, benchmark};
 use super::validation::{self, selected_operation};
 use super::worker;
 use crate::checks::read_json;
@@ -766,7 +766,10 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     prefix: prefix.clone(),
                     arguments: arguments.clone(),
                     candidate_options: vec![],
-                    work_fields: work_fields.clone(),
+                    work: Work {
+                        fields: work_fields.clone(),
+                        own: vec![],
+                    },
                     timeout,
                 },
             ));
@@ -829,7 +832,10 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     prefix: prefix.into(),
                     arguments,
                     candidate_options: vec![],
-                    work_fields: work_fields.clone(),
+                    work: Work {
+                        fields: work_fields.clone(),
+                        own: vec![],
+                    },
                     timeout,
                 },
             ));

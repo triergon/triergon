@@ -67,6 +67,19 @@ decoding and mixing to stereo s16 on both sides (`cargo xtask codecs time`), 30 
 30 RSS pairs under the native observer (`cargo xtask codecs memory`), and the reader lane
 against the profile's `ffprobe`. The Ogg and audio elementary-stream rows rerun the reader
 lane with both Ogg views at `ccd3090572433e79d8ab65a377fcd9896d2839d9` on the same instance type.
+The codec, decode-session, file-audio and capture timing passes at `add6b27`, `ccff5b57`
+and `ceb5076`, and the ARMv7 codec timing and capture passes at `78a873dd`, predate the
+shared paired runner and keep their recorded results; the shared validator has not
+re-graded them, as their records hold no warm-ups or module observations. Their codec
+pairs were checked pair by pair rather than watched over the whole run, and each capture
+sample was the median of three in-process sessions after a discarded one. A diagnostic
+comparison on a c6g.2xlarge, with the codec workload timed twice by each runner:
+
+| Workload | Earlier runner, `642316cf`: median (upper 95%) | Shared runner, `c21176e0`: median (upper 95%) |
+|---|---|---|
+| `aac-lc-stereo` | 0.7350 (0.7357), 0.7339 (0.7361) | 0.7344 (0.7363), 0.7342 (0.7351) |
+| `c07-ui-static-480-bottomup` | 1.3026 (1.3047) | 1.2978 (1.3001) |
+
 The remaining rows retain their earlier measurements.
 The packet-framing row uses the gate build at
 `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` on a c8g.large pinned to CPU 1,
@@ -205,6 +218,7 @@ against libass for AArch64 where it runs out of memory.
 | Audio codecs in files | `ccff5b5734c113c1d88160b84825157508c701c0` | `0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53` |
 | Ogg, audio elementary streams | `ccd3090572433e79d8ab65a377fcd9896d2839d9` | `8123e0f020a9c4ccedd83aea3e665d4486d55e26612e8bc29626e9a3026e2cd1` |
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |
+| Codec and capture timing, earlier and shared runner | `c21176e03328f26e0f49d6870dad0a55dd7c5e76` | `9a2cb6808d49462ff33e0666a44773692c44e85414f5aa9b2a21ea27a11a6bcf` |
 | MP4 forward and range playback | `a41648dd4de2933d526415cce86a9ebbd1d4444b` | `32aa6f481afc5f6074dd14a683a110bc044b781b9c40b72c84876af9b812f977` |
 | MP4 forward and range playback, earlier RSS comparison | `733ee1582e4fce4af1d89c91171e29e41a16d294` | `23cf7cdb3de800c1ca0d03dfe937ce6fda6cc768bef5933370223a88cda78c87` |
 | MP4 forward and range playback, earlier comparison | `8bbf6eab798f3d58f62dce14915fb30acd14488e` | `a3e74e11216d7769b7b167ac57cb17c043e6d92b4feb39a8422879c27493eebe` |

@@ -10,7 +10,7 @@ use std::path::{Component, Path, PathBuf};
 use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
-use super::timing::validate_module_absence as timing_module_absent;
+use super::timing::{self, GATE_PAIRS};
 use super::validation::{
     self, array, external_contract, field, hash, members, put, require_same, selected_operation,
     text,
@@ -500,7 +500,7 @@ fn samples(measurement: &Value, minimum: i128, failed_memory: bool) -> R<&[Value
     } else {
         integer(measurement, "pairs")?
     };
-    if pairs < minimum.max(30) || pairs != raw.len() as i128 {
+    if pairs < minimum.max(GATE_PAIRS as i128) || pairs != raw.len() as i128 {
         return Err("missing paired samples or pair count mismatch".into());
     }
     Ok(raw)
@@ -595,7 +595,6 @@ fn join_case(
         require_same(previous, clock, "retained timing measurement")?;
     }
     let minimum = integer(contract, "minimum_pairs")?;
-    let timed_raw = samples(clock, minimum, false)?;
     let memory_raw = samples(memory, minimum, text(memory, "status")? != "qualified")?;
     if text(clock, "status")? != "measured" || integer(clock, "iterations")? < 1 {
         return Err("timing is not measured".into());
@@ -603,7 +602,6 @@ fn join_case(
     if !validation::iterations_valid(contract, field(clock, "iterations")?) {
         return Err("iterations do not match the contract".into());
     }
-    require_same(field(clock, "worker_hashes")?, &workers, "timing workers")?;
     for measurement in [clock, memory] {
         require_same(
             field(measurement, "input_sha256")?,
@@ -617,18 +615,27 @@ fn join_case(
             .and_then(|h| h.get("system"))
             .and_then(Value::as_str)
             == Some("Linux");
-    timing_module_absent(clock, timed_raw, linux)?;
+    timing::validate(
+        clock,
+        &timing::Expected {
+            worker_hashes: &workers,
+            input_sha256: Some(field(timed, "input_sha256")?),
+            minimum_pairs: minimum.max(GATE_PAIRS as i128),
+            work: &timing::Work {
+                fields: fields.clone(),
+                own: vec![],
+            },
+            require_linux: linux,
+            module_absence: true,
+        },
+    )
+    .map_err(|error| format!("timing: {error}"))?;
     memory_binding(memory, identity, &workers, linux)?;
-    let timed_output = work(field(field(&timed_raw[0], "reference")?, "data")?, &fields)?;
-    for sample in timed_raw {
-        for role in ["candidate", "reference"] {
-            require_same(
-                &work(field(field(sample, role)?, "data")?, &fields)?,
-                &timed_output,
-                "timed output",
-            )?;
-        }
-    }
+    // The validator has shown both workers do this work in every pair.
+    let timed_output = work(
+        field(field(&array(clock, "samples")?[0], "reference")?, "data")?,
+        &fields,
+    )?;
     let output = work(
         field(field(&memory_raw[0], "reference_heap")?, "work")?,
         &fields,
@@ -928,7 +935,6 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
 mod tests {
     use super::*;
     use crate::harness::comparison::reference_record;
-    use crate::harness::timing;
 
     #[test]
     fn ordinary_contracts_do_not_require_functional_control_reports() {
@@ -1066,6 +1072,17 @@ mod tests {
                 observe(format!("before-warmup:{role}"));
                 observe(format!("after-warmup:{role}"));
             }
+            // An idle host's CPU record, valid whether or not Linux evidence is required.
+            let cpu = object(&[(
+                super::super::acceptance::LINUX_CPU_KEY,
+                object(&[
+                    ("status", Value::str("recorded")),
+                    ("boot_id", Value::str("boot")),
+                    ("cpus", Value::strings(["cpu0"])),
+                    ("ticks_per_second", Value::int(100)),
+                    ("counters", Value::Array(vec![Value::int(0); 8])),
+                ]),
+            )]);
             let mut timed_raw = Vec::new();
             for pair in 0..30 {
                 let mut data = output.clone();
@@ -1080,8 +1097,8 @@ mod tests {
                     ("order", Value::strings(["candidate", "reference"])),
                     ("candidate", worker.clone()),
                     ("reference", worker),
-                    ("cpu_before", object(&[("raw", Value::str("before"))])),
-                    ("cpu_after", object(&[("raw", Value::str("after"))])),
+                    ("cpu_before", cpu.clone()),
+                    ("cpu_after", cpu.clone()),
                 ]));
                 for role in ["candidate", "reference"] {
                     observe(format!("before-pair:{pair}:{role}"));
@@ -1124,10 +1141,30 @@ mod tests {
                     ("status", Value::str("measured")),
                     ("pairs", Value::int(30)),
                     ("iterations", Value::int(200)),
+                    ("seed", Value::int(0)),
+                    (
+                        "ratio",
+                        timing::interval_value(
+                            &crate::stats::ratio_interval(&[(100.0, 100.0); 30], 0, 4000).unwrap(),
+                        ),
+                    ),
                     ("input_sha256", Value::str(digest('e'))),
                     (
                         "worker_hashes",
                         field(&identity, "binaries").unwrap().clone(),
+                    ),
+                    (
+                        "warmups",
+                        Value::Array(
+                            ["candidate", "reference"]
+                                .map(|role| {
+                                    object(&[
+                                        ("worker", Value::str(role)),
+                                        ("result", field(&timed_raw[0], role).unwrap().clone()),
+                                    ])
+                                })
+                                .into(),
+                        ),
                     ),
                     ("samples", Value::Array(timed_raw)),
                     ("timing_module_policy", Value::str(timing::MODULE_POLICY)),
@@ -1781,6 +1818,18 @@ mod tests {
             }
             change(row, &[section], "samples", Value::Array(samples));
         }
+        let mut warmups = array(field(&fixture.timed, "timing").unwrap(), "warmups")
+            .unwrap()
+            .to_vec();
+        for warmup in &mut warmups {
+            change(warmup, &["result", "data"], "digest_b", Value::int(17));
+        }
+        change(
+            &mut fixture.timed,
+            &["timing"],
+            "warmups",
+            Value::Array(warmups),
+        );
         put(
             &mut fixture.expected,
             "expected",
@@ -1938,7 +1987,7 @@ mod tests {
             Value::Array(observations.clone()),
         )
         .unwrap();
-        timing_module_absent(&clock, &raw, true).unwrap();
+        timing::validate_module_absence(&clock, &raw, true).unwrap();
         change(
             &mut observations[64],
             &["state"],
@@ -1951,7 +2000,7 @@ mod tests {
             Value::Array(observations.clone()),
         )
         .unwrap();
-        assert!(timing_module_absent(&clock, &raw, true).is_err());
+        assert!(timing::validate_module_absence(&clock, &raw, true).is_err());
         observations.pop();
         put(
             &mut clock,
@@ -1960,7 +2009,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            timing_module_absent(&clock, &raw, true)
+            timing::validate_module_absence(&clock, &raw, true)
                 .unwrap_err()
                 .contains("incomplete")
         );

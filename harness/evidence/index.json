@@ -17254,6 +17254,106 @@
    "source_revision": "8058a77c444958ba82dcf4b5783720fc9aafe66f"
   },
   {
+   "name": "paired-runner-c21176e0",
+   "path": "paired-runner-c21176e0",
+   "retention": "retained",
+   "reason": "Codec and capture timing rows of docs/status.md, earlier and shared runner, Linux AArch64 on a c6g.2xlarge: cargo xtask codecs time on aac-lc-stereo twice with the runner at 642316cf and twice at c21176e0 (old, new, new, old), and cargo xtask capture qualify on c07-ui-static-480-bottomup once with each, with both trees' build identities and the run log.",
+   "key": "evidence/paired-runner-c21176e0/9a2cb6808d49462ff33e0666a44773692c44e85414f5aa9b2a21ea27a11a6bcf.tar.gz",
+   "sha256": "9a2cb6808d49462ff33e0666a44773692c44e85414f5aa9b2a21ea27a11a6bcf",
+   "bytes": 10271011,
+   "source_revision": "c21176e03328f26e0f49d6870dad0a55dd7c5e76",
+   "files": [
+    {
+     "path": "capture-new/c07-ui-static-480-bottomup/correctness/report.json",
+     "sha256": "f516497921d9cd8d6147343ef1c42efbc76f0d24a37a5e341072067cebe13013"
+    },
+    {
+     "path": "capture-new/c07-ui-static-480-bottomup/result.json",
+     "sha256": "f59d51bb753c97f3aa40240bd9e27f94cca4024de094150fdb51637c67cf6965"
+    },
+    {
+     "path": "capture-new/identity.json",
+     "sha256": "a89216df587360ee16a1645d053cfd1eb82352343709b942dc3bba6650fdcac1"
+    },
+    {
+     "path": "capture-new/summary.json",
+     "sha256": "eb5fee208da272c0e20c638885e1cc75efd32643836f14475aa01f75b086b092"
+    },
+    {
+     "path": "capture-old/c07-ui-static-480-bottomup/correctness/report.json",
+     "sha256": "2f1f05d5f696447a6dc002cace72c422ad335e5b4916f757afa4aed681d1f302"
+    },
+    {
+     "path": "capture-old/c07-ui-static-480-bottomup/result.json",
+     "sha256": "c8e2de43630fdd2fbef9ee67d6b935e2ff186bdceedd04476a345500338ba601"
+    },
+    {
+     "path": "capture-old/identity.json",
+     "sha256": "4a194e0c426de71125e16a84a1d3a162e02759f8d88bd4dcb9cf2a1c5c32c1ce"
+    },
+    {
+     "path": "capture-old/summary.json",
+     "sha256": "f039789701fff24e8685a989d10c36e582fdbd9d73a44935429fe65d1b084cec"
+    },
+    {
+     "path": "codec-new-1.ledger.json",
+     "sha256": "55751a9b3ac91d96ce0e0baee3d363cdb8dd023cc2d80acef10db4a65be02f4f"
+    },
+    {
+     "path": "codec-new-1/aac-lc-stereo.json",
+     "sha256": "692e4ff59b184bbb3d0001c1817e00b510c6327a1ca8e69fd187ac0fc40ce604"
+    },
+    {
+     "path": "codec-new-2.ledger.json",
+     "sha256": "590d536f9e4aa6d21ad2ebcc2d4b311b0b358ea54953bc6ef12e800030ee5b2e"
+    },
+    {
+     "path": "codec-new-2/aac-lc-stereo.json",
+     "sha256": "0a71e6d10f30caef93fdf1ae673e7559027a17231cbe820517c2a0312b8c6aad"
+    },
+    {
+     "path": "codec-old-1.ledger.json",
+     "sha256": "d9e6d20a1edc6233b0df4e5e64bec4b6a6a40921ee00a5c42663bb3e9d1b3559"
+    },
+    {
+     "path": "codec-old-1/aac-lc-stereo.json",
+     "sha256": "a2618005255904059fed96e3fe380919e0db3f054937b68bbbd3bb35e5a0ebe7"
+    },
+    {
+     "path": "codec-old-2.ledger.json",
+     "sha256": "88c83f6e190b6c006f2799f5b286dcedb5feca7b3b735cd0c30d2db2770e0b19"
+    },
+    {
+     "path": "codec-old-2/aac-lc-stereo.json",
+     "sha256": "85aadc4e89e9d507f62f802ecb211ac27d3b5bb859db72263cd68cdfd4f93359"
+    },
+    {
+     "path": "host.txt",
+     "sha256": "ab41ee66fe02b70cb4015aa21c3b2f005222cecdc20d8234d6544391707025e3"
+    },
+    {
+     "path": "identity-new.json",
+     "sha256": "bbcbf03e6bf6b1af04a97f9f2ad89882ff5a97b421a861e9b109d7a173456ab4"
+    },
+    {
+     "path": "identity-old.json",
+     "sha256": "f779aefff1751223f4e4191bbda3e0ce10b7649cecbf50c9be70e71298949719"
+    },
+    {
+     "path": "retime-run.log",
+     "sha256": "26e1cf3a2731f74cb10dcfa5fa8a89da920636a7d847e751af74c8dcf257966d"
+    },
+    {
+     "path": "revision-new.txt",
+     "sha256": "605320d3ddf7733eb586e8b666abbc49392b6a65f313f6e35488f99a947e1867"
+    },
+    {
+     "path": "revision-old.txt",
+     "sha256": "3901f1a66ea5926e40a9266f34c6dbb894443748134730d85aebd5b6b78c6c37"
+    }
+   ]
+  },
+  {
    "name": "matroska-replay-budget",
    "path": "matroska-replay-budget",
    "retention": "retained",
@@ -17370,6 +17470,314 @@
     {
      "path": "matroska-replay-budget/preflight/guest.sh",
      "sha256": "150549f901a099d5adeb90e87afff6e511eb941a3e10203b5d71016d07a854de"
+    }
+   ]
+  },
+  {
+   "name": "paired-runner-gate-71f03273",
+   "path": "paired-runner-gate-71f03273",
+   "retention": "retained",
+   "reason": "Native check of the shared paired runner at 71f03273 on Linux AArch64 (c6g.2xlarge), with the earlier runner at 642316cf for comparison: cargo test -p xtask, cargo xtask codecs time on aac-lc-stereo, cargo xtask capture qualify and summarize on c07-ui-static-480-bottomup, cargo xtask capture equivalence at both revisions, and the raw-annex-b slice timed, measured and graded by each revision's own harness, with both build identities, the step log and the host description. Decoded YUV frames are left out; the correctness reports record their hashes.",
+   "key": "evidence/paired-runner-gate-71f03273/70020a03758c4c7032eed51c45dbdbe2e07d4f1cebcf9f6231dad67070ed6741.tar.gz",
+   "sha256": "70020a03758c4c7032eed51c45dbdbe2e07d4f1cebcf9f6231dad67070ed6741",
+   "bytes": 79643602,
+   "source_revision": "71f03273fd362b60683f4bfa9d489069cc600a9f",
+   "files": [
+    {
+     "path": "paired-runner-gate-71f03273/build-formats-new.log",
+     "sha256": "fbcd7c110846b5a4d68b13e260de1a90940d5474e3a314a1dcef9bbc075689b0"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/build-formats-old.log",
+     "sha256": "e8c1777c10ed523945673b22b01d2e94764701143b76d20f0e18118f14afe7e1"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/build.log",
+     "sha256": "d0ad3cbe21bb144f180449a96900d20fe8175ea524ced0d81d6d3a023a2e9b43"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture-equivalence-642316cf.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture-equivalence-71f03273.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture-qualify.log",
+     "sha256": "537aaa96914241b2e6a7307b99fc907e9bab9b2d944ec8be531ca447ef166929"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture-summarize.log",
+     "sha256": "ff65f96236eb00327e889689b271a9aff858b5bfd00471cd3bfcd10af386ba0e"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture/c07-ui-static-480-bottomup/correctness/candidate.ts",
+     "sha256": "0545934341e2dcfa28ddb87f3402ba75b122cba837f9474905726e72402aae7a"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture/c07-ui-static-480-bottomup/correctness/reference.ts",
+     "sha256": "89169d3f37f433847dab64d340d5ccef03556423b68206f3f185b51b0fdc60ec"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture/c07-ui-static-480-bottomup/correctness/report.json",
+     "sha256": "68f6399cff878402d86bbc778466f6b5d92becea75f6beba26fb7c1bfb25dcd3"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture/c07-ui-static-480-bottomup/result.json",
+     "sha256": "1ec345b5445a677dc2c5ecf6e0064eef697da354acbb620447104a04e6a0aedd"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture/identity.json",
+     "sha256": "b83f68f59c031e314078ce9b02859c72dd38e1f9f6ea0749987613278b0d3a06"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/capture/summary.json",
+     "sha256": "44acf77bab723868c37a1cdadfa7713745a1838e34f9659ba80048016cf41cc2"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/codec-time.log",
+     "sha256": "c5adc6f2c95b8748f5fa9a0a112c27bce1dc354a5429e7234ccafd5a7e113fbd"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/codec.ledger.json",
+     "sha256": "ed4980bb7e4f31e8ca50d732a9953777038ebb50451bed5dda5ef7a2c9b0b373"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/codec/aac-lc-stereo.json",
+     "sha256": "050b91bffe7212bfc0834d99b17e0b5b6b6b11b261caba43638a808a1aa3c466"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/equivalence-new.log",
+     "sha256": "713bf65aa05ab9de84619fd7b45c94c0fdec22665f00f3aa9bf446af826195e9"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/equivalence-old.log",
+     "sha256": "154ae1e76b792e0a62db92065ebf5cbef22f3b957112d243ea56c47af4b9df1f"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/grade-new.log",
+     "sha256": "f61f2d0cd7b4cb0a6050af51bacde8f5f72f37962649f8c6b27b16885998b54e"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/grade-old.log",
+     "sha256": "fcaad86ca82a44776be0e1e645bf74391c014c802073d9791c3317ec6ae158d4"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/benchmark/avc-80x48/raw-video-fold.json",
+     "sha256": "820f02480a7b2dd3e1d5017498ba27e09e1b6c2c19b7138605746c8fc54999fa"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/benchmark/avc-aud0/raw-video-fold.json",
+     "sha256": "5e4f3e080acb2703a4a0165a53a772191e6da56183d7818e8d042231a55e9cf8"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/benchmark/avc-aud1/raw-video-fold.json",
+     "sha256": "f493ac528c9aed66204515f79f935fe09129c0727edae5d856d73377c8a84cca"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/benchmark/avc-short/raw-video-fold.json",
+     "sha256": "d22c999bdcdf94756f5a4cd3fce8203c9673263df00e02f7f9530ef2f42fa5ad"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/benchmark/hevc-aud0/raw-video-fold.json",
+     "sha256": "21028153c2b58397fc411918a868135b35ab8f6ea44b2dd115fa186f765745f9"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/benchmark/hevc-aud1/raw-video-fold.json",
+     "sha256": "9b351fde3c491e70c5c679ac7c12f289650593dec26c35c92c49fecf2d8ecd27"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/benchmark/hevc-eos/raw-video-fold.json",
+     "sha256": "803d54ddb077aae3d9a48c9f53919db2438cae427b7e063df2ee7af4ff956e73"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/benchmark/report.json",
+     "sha256": "4eaaeb4b6c9b023b36d8655f17998a7afea0f550b633bbc194e3fe1b563dbba4"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/graded/report.json",
+     "sha256": "dd7ff49c4caffd43478cdd58a86908363be17542491ed8bf3c2fc24e835272a3"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/memory/avc-80x48/raw-video-fold.json",
+     "sha256": "141bcfab05c7eaa62b189925261e9b4cbe2d6bab9dc2566f56764882c9677ba9"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/memory/avc-aud0/raw-video-fold.json",
+     "sha256": "5e7a3ec6031dc791b34d527a713ed19be46cba239c5cd4127075bc7749534206"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/memory/avc-aud1/raw-video-fold.json",
+     "sha256": "8931a15d753e30fd0557e18339969b04098356cbc27cd7ec6fb38fa9d5e2b673"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/memory/avc-short/raw-video-fold.json",
+     "sha256": "10a3b60519c947a642e56f33a80e9308cd1894d34ac39ea7a7c5a7484fee91da"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/memory/hevc-aud0/raw-video-fold.json",
+     "sha256": "fedf7c31ee6908a694b54d9727038efb5c527d1bbec59a142834d59b2df57ca7"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/memory/hevc-aud1/raw-video-fold.json",
+     "sha256": "35b6f0f40191a989a61bd67a90c50c40c1423d187b1cb8986c22065e90f9824e"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/memory/hevc-eos/raw-video-fold.json",
+     "sha256": "367e4c123f4cf7fa43c4883a185b07984d1505d554c3e15cbfbb62dd790dee90"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-new/memory/report.json",
+     "sha256": "ff2f5dadf693ee0b95b6b0d438837efc489568d86f9ee114eb211a31e8592987"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/benchmark/avc-80x48/raw-video-fold.json",
+     "sha256": "93fcf96ad8fa62e950bcb523e8c91095930945545f918e85d1b58ced4499cb02"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/benchmark/avc-aud0/raw-video-fold.json",
+     "sha256": "070803584f15bc78543eaca23072d32ec336f32867e488c6562960a6c15891e8"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/benchmark/avc-aud1/raw-video-fold.json",
+     "sha256": "b77816fea033573789e59958647024387fcb7acb0928335b70a462900f3b8a30"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/benchmark/avc-short/raw-video-fold.json",
+     "sha256": "44840e037ab80cc379603f2ac26ee0f7d297d7df2ae84b9fd692d85b52fea860"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/benchmark/hevc-aud0/raw-video-fold.json",
+     "sha256": "f43662385c64315fa27bf9788837c3b2fb630072ef37a02a7999566efc55fe6a"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/benchmark/hevc-aud1/raw-video-fold.json",
+     "sha256": "b03285dae0db86f831bfb42b6522e85b544e79d21d46d43947e860de42577355"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/benchmark/hevc-eos/raw-video-fold.json",
+     "sha256": "66105225d47aef77acd4482007ce2343296f5cbc55e11387575e87cf7ed27988"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/benchmark/report.json",
+     "sha256": "82f37739dafb71b2e4461c64029d973b86eff5755717615af73086e4c5cd9727"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/graded/report.json",
+     "sha256": "150c04c5b5d23321902ec60f4fe7f1c77ea4660d4647369d958b83ec14edf49b"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/memory/avc-80x48/raw-video-fold.json",
+     "sha256": "593d4f44e305355754fafd9c55309e2b0e7ff3f2c32c359eb684a7502e90df88"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/memory/avc-aud0/raw-video-fold.json",
+     "sha256": "6f9c3aa29b1f211ad68a3f41e978a8c9ae80c7559a67bc67809891e5f1c989d0"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/memory/avc-aud1/raw-video-fold.json",
+     "sha256": "88c9da4e5dee01e7a4106c4e10b07ac0cebbfb3f33d8ea21eab6b75e11facc12"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/memory/avc-short/raw-video-fold.json",
+     "sha256": "ab434f17660d799a537e8191c4713e40de6dd5abab448b249e9179866545cb9a"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/memory/hevc-aud0/raw-video-fold.json",
+     "sha256": "395ac8ffa4376456169edb01fc19c3b71c69996f1f1066ead81c293e9733628c"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/memory/hevc-aud1/raw-video-fold.json",
+     "sha256": "5e437b39e74f104a404aad1825cff02ed64b66aa318be7f7fd5201d3fa6446cf"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/memory/hevc-eos/raw-video-fold.json",
+     "sha256": "5f66f139feb6d04b8e80601e731b0f60a46135b81fda7cd9beecd1018b23c8b3"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/harness-old/memory/report.json",
+     "sha256": "f9637f51375551ad2dd35ac3c77b30f64582ae4f2779d8642949fd0990accdea"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/host.txt",
+     "sha256": "ab41ee66fe02b70cb4015aa21c3b2f005222cecdc20d8234d6544391707025e3"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/identity-new.json",
+     "sha256": "caa980729fa33df16fa5fce7028012775f97c7d9a17c2d56a7e0b78ec497ad07"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/identity-old.json",
+     "sha256": "1866661638ca1a3995de4c08a44879e12c44ee2d0212c5c92f5f6583d08c3ef4"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/prepare-formats.log",
+     "sha256": "0bd05e88cefa194aa9e67c49718ec33ebb3da09401dd45f8bf019bbc303a3364"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/progressive-ts188/grade-new.log",
+     "sha256": "1f9ec080f7d0e94b8178d78d9c8d198633cffb6c7b76ad94438d1346777f7c60"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/progressive-ts188/grade-old.log",
+     "sha256": "1f9ec080f7d0e94b8178d78d9c8d198633cffb6c7b76ad94438d1346777f7c60"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/progressive-ts188/report-benchmark-new.log",
+     "sha256": "7c4c4b7bcccd07eec9d82dc4383f06ec2e1f85fe682b6526a1a59efc6dc019f5"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/progressive-ts188/report-benchmark-old.log",
+     "sha256": "7c4c4b7bcccd07eec9d82dc4383f06ec2e1f85fe682b6526a1a59efc6dc019f5"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/progressive-ts188/report-memory-new.log",
+     "sha256": "60af53f1aba7dc9f79d8a3f7da26d485934a5ea120c0b0675ed69bcdcd7fec35"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/progressive-ts188/report-memory-old.log",
+     "sha256": "60af53f1aba7dc9f79d8a3f7da26d485934a5ea120c0b0675ed69bcdcd7fec35"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/progressive-ts188/report-timing-new.log",
+     "sha256": "73418dca6d8c452b970de5fcbd5a0d4ed27dbbdd44ce3407edd9aacdc69bfe03"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/progressive-ts188/report-timing-old.log",
+     "sha256": "053e7eaf71a52e23897e22829111f9341c1e8cf17c1b8c8cdb876ca42b4ac61b"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/report-benchmark-new.log",
+     "sha256": "592952fa149c068a7d51b1e649a50dd01b17aa4a270d6152efec2adc20583aba"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/report-benchmark-old.log",
+     "sha256": "592952fa149c068a7d51b1e649a50dd01b17aa4a270d6152efec2adc20583aba"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/report-memory-new.log",
+     "sha256": "b139d125941fb75d16a2011a0c6cb28cfa0661a8907710a276c62754980f8dfb"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/report-memory-old.log",
+     "sha256": "b139d125941fb75d16a2011a0c6cb28cfa0661a8907710a276c62754980f8dfb"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/revision-new.txt",
+     "sha256": "b473280a9e68233456c4967ac6ac60ff757c72489efa1f03fb5f599b6a1b3859"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/revision-old.txt",
+     "sha256": "3901f1a66ea5926e40a9266f34c6dbb894443748134730d85aebd5b6b78c6c37"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/status.txt",
+     "sha256": "e2c4f6873843ed4ac4a38c6dcda3e47120c9ba97f34fb3d2faa457d1b49147a5"
+    },
+    {
+     "path": "paired-runner-gate-71f03273/tests.log",
+     "sha256": "5bc0b798e75f9fd56c3bbc83615cc9bb98abc0a5b2dd1795d5dd0e3b76589ba9"
     }
    ]
   }
