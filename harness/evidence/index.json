@@ -16756,6 +16756,116 @@
    "key": "evidence/ass-rendering-58a5c202-linux-arm64-memory-libass/799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3.tar.gz",
    "sha256": "799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3",
    "bytes": 210930417
+  },
+  {
+   "name": "hevc-eos-parity-feb3e34e-linux-arm64",
+   "path": "hevc-eos-parity-feb3e34e-linux-arm64",
+   "retention": "90 days",
+   "reason": "Screen of starting HEVC access units at an end of sequence or bitstream and taking caption HEVC slices from framing's slice class, as FFmpeg does, on a c8g.2xlarge (Linux AArch64): the folds of the pinned FFmpeg formats and subtitles reference workers, main at 205db4d1 and the branch over the new raw-annex-b hevc-eos and subtitle-cc hevc-reserved-ts cases; the reference demuxer's hevc-eos packets; same-code of every worker; the HEVC (full) and H.264 conformance tests over the FATE vectors; both revisions' folds of the subtitle and playback corpora; and the instruction count of raw-annex-b, hls-segments, matroska-startup-seek, matroska-audio-clocks and subtitle-cc on CPU 1. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/hevc-eos-parity-feb3e34e-linux-arm64/3c547b6d4ffdf998eb2399e32df8a74998c28392c92321a67d8991eeb1b98f3d.tar.zst",
+   "sha256": "3c547b6d4ffdf998eb2399e32df8a74998c28392c92321a67d8991eeb1b98f3d",
+   "bytes": 10600,
+   "source_revision": "feb3e34ea40112b82a63d3550e3e3b8c85fa6bda"
+  },
+  {
+   "name": "hevc-eos-open-5380ca22-linux-arm64",
+   "path": "hevc-eos-open-5380ca22-linux-arm64",
+   "retention": "90 days",
+   "reason": "The subtitle-cc open case hevc-eos-ts in its four variants, on a c8g.2xlarge (Linux AArch64): folds of the pinned FFmpeg subtitles reference worker and of subtitle-worker, which differ in every variant because the caption extractor has no model of the decoder's picture output at a new sequence. A zstd-compressed tar of the deterministic pack.",
+   "key": "qualification/hevc-eos-open-5380ca22-linux-arm64/e002f09354010e50a0f5d43fdd084bcc9f9306350f662c57f041462e9e8e8550.tar.zst",
+   "sha256": "e002f09354010e50a0f5d43fdd084bcc9f9306350f662c57f041462e9e8e8550",
+   "bytes": 788,
+   "source_revision": "5380ca22cd06eb1b9e12eaab126c7b762f04b8c1"
+  },
+  {
+   "name": "reader-classification-comparison",
+   "path": "reader-classification-comparison",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/reader-classification-comparison/a659624b656ce68586e0b90a73eb57c255a6b372839d94198f7a6a89d44ad9bc.tar.gz",
+   "sha256": "a659624b656ce68586e0b90a73eb57c255a6b372839d94198f7a6a89d44ad9bc",
+   "bytes": 49106104
+  },
+  {
+   "name": "mpegts-current-reader-comparison",
+   "path": "mpegts-current-reader-comparison",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mpegts-current-reader-comparison/e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a.tar.gz",
+   "sha256": "e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a",
+   "bytes": 84851549
+  },
+  {
+   "name": "mp4-range-dedicated-sample-entries",
+   "path": "mp4-range-dedicated-sample-entries",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mp4-range-dedicated-sample-entries/46789d11f9768aef71eead36ce8f2acc05c820abc95e19b4a3ffb36a09e9e71f.tar.gz",
+   "sha256": "46789d11f9768aef71eead36ce8f2acc05c820abc95e19b4a3ffb36a09e9e71f",
+   "bytes": 14900870,
+   "source_revision": "668ecf58571fd19eb7e9aba4020606b409229625"
+  },
+  {
+   "name": "mp4-range-dedicated-entries-rebased",
+   "path": "mp4-range-dedicated-entries-rebased",
+   "retention": "retained",
+   "reason": "Ten MP4 range comparisons for regular AVC/AAC and dedicated Dolby Vision entries on AArch64 Linux.",
+   "key": "evidence/mp4-range-dedicated-entries-rebased/dbdbdacc0d86df6eefacb0403c0bcc0b7f5ff1c480415112e4eca791724a55ba.tar.gz",
+   "sha256": "dbdbdacc0d86df6eefacb0403c0bcc0b7f5ff1c480415112e4eca791724a55ba",
+   "bytes": 8604326
+  },
+  {
+   "name": "mp4-range-dedicated-entries-classified",
+   "path": "mp4-range-dedicated-entries-classified",
+   "retention": "retained",
+   "reason": "Ten MP4 range comparisons on AArch64 Linux after the reader track-classification change.",
+   "key": "evidence/mp4-range-dedicated-entries-classified/632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e.tar.gz",
+   "sha256": "632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e",
+   "bytes": 8608934
+  },
+  {
+   "name": "mp4-range-fragment-seek-linux-arm64",
+   "path": "mp4-range-fragment-seek-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-fragment-seek-linux-arm64/d95f142f73c0790d211f30d7de613f734f68409eb3015c7d48905c3c5e542105.tar.gz",
+   "sha256": "d95f142f73c0790d211f30d7de613f734f68409eb3015c7d48905c3c5e542105",
+   "bytes": 12721121,
+   "source_revision": "a2f009026bc53be3757a9064247fb4e3ace80e0b"
+  },
+  {
+   "name": "mp4-range-fragment-rebase-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-fragment-rebase-linux-arm64/25546feeeb50edf887dd0656502e5cca96b3d61f90431ebe7035e41e1f25dca3.tar.gz",
+   "sha256": "25546feeeb50edf887dd0656502e5cca96b3d61f90431ebe7035e41e1f25dca3",
+   "bytes": 54005807,
+   "source_revision": "348e0b0cb2e79c5e51a2769e2d9f319c2af00983"
+  },
+  {
+   "name": "mp4-range-current-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-current-linux-arm64/48a28a728709ff0354a588a73e511ae6db3e0e3b01b362a352e407fd31da38aa.tar.zst",
+   "sha256": "48a28a728709ff0354a588a73e511ae6db3e0e3b01b362a352e407fd31da38aa",
+   "bytes": 4889147,
+   "source_revision": "a690f0f7fe7db02b64c2506e57e7a1526b3f092a"
+  },
+  {
+   "name": "mp4-fragmented-range-rebased",
+   "retention": "retained",
+   "key": "evidence/mp4-fragmented-range-rebased/824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da.tar.zst",
+   "sha256": "824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da"
+  },
+  {
+   "name": "mp4-range-fragment-edit-clocks",
+   "path": "mp4-range-fragment-edit-clocks",
+   "retention": "retained",
+   "reason": "Fifteen MP4 range comparisons covering regular and fragmented edits and dedicated sample entries on AArch64 Linux.",
+   "key": "evidence/mp4-range-fragment-edit-clocks/7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6.tar.gz",
+   "sha256": "7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6",
+   "bytes": 10883413,
+   "source_revision": "24f2299a8d12e120eabc7fc4a32e7eb8febc953e"
   }
  ]
 }

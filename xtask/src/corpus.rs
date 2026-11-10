@@ -72,6 +72,8 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
 fn mp4_range(paths: &Paths) -> Result<String, String> {
     const CONTROL: &str = "regular-avc-aac.mp4";
     const VARIABLE: &str = "variable-aac-duration.mp4";
+    const FRAGMENTED: &str = "fragmented-avc-aac.mp4";
+    const RESCALED: &str = "fragmented-aac-media-clock.mp4";
     let output = paths.fixtures("mp4-range-fixtures")?;
     let seed = paths
         .root
@@ -87,12 +89,27 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     variable[83_745..83_749].copy_from_slice(&272_u32.to_be_bytes());
     write(&output.join(CONTROL), &control)?;
     write(&output.join(VARIABLE), &variable)?;
-    let cases = [
+    let seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(FRAGMENTED);
+    let fragmented = fs::read(&seed).map_err(|e| format!("{}: {e}", seed.display()))?;
+    if sha256::hex(&fragmented)
+        != "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7"
+    {
+        return Err("fragmented MP4 range seed changed".into());
+    }
+    let mut rescaled = fragmented.clone();
+    // Use a 44.1 kHz mdhd clock with the original 48 kHz AAC configuration.
+    rescaled[833..837].copy_from_slice(&44_100_u32.to_be_bytes());
+    write(&output.join(FRAGMENTED), &fragmented)?;
+    write(&output.join(RESCALED), &rescaled)?;
+    let mut cases: Vec<_> = [
         (
             "regular-open",
             CONTROL,
             &control,
-            false,
+            None,
             237,
             81_478,
             994_214_068_017_485_484_u64,
@@ -101,7 +118,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "regular-seek",
             CONTROL,
             &control,
-            true,
+            Some("28000"),
             185,
             62_763,
             15_577_132_028_095_841_482,
@@ -110,7 +127,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "variable-open",
             VARIABLE,
             &variable,
-            false,
+            None,
             237,
             81_478,
             1_650_792_575_122_043_820,
@@ -119,37 +136,170 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "variable-seek",
             VARIABLE,
             &variable,
-            true,
+            Some("28000"),
             186,
             62_932,
             1_562_922_133_773_717_379,
         ),
+        (
+            "fragmented-open",
+            FRAGMENTED,
+            &fragmented,
+            None,
+            93,
+            39_981,
+            7_927_680_340_045_287_421,
+        ),
+        (
+            "fragmented-before-sync",
+            FRAGMENTED,
+            &fragmented,
+            Some("4095"),
+            93,
+            39_981,
+            7_927_680_340_045_287_421,
+        ),
+        (
+            "fragmented-seek",
+            FRAGMENTED,
+            &fragmented,
+            Some("4096"),
+            74,
+            30_999,
+            2_297_253_848_353_618_229,
+        ),
+        (
+            "fragmented-rescaled-open",
+            RESCALED,
+            &rescaled,
+            None,
+            93,
+            39_981,
+            16_257_532_825_513_011_650,
+        ),
+        (
+            "fragmented-rescaled-seek",
+            RESCALED,
+            &rescaled,
+            Some("4096"),
+            75,
+            31_255,
+            16_684_294_720_659_653_080,
+        ),
     ]
     .into_iter()
     .map(|(id, file, data, seek, packets, bytes, digest)| {
-        authored(
-            id,
-            file,
-            data,
-            vec![
-                ("arguments", Value::strings(seek.then_some("28000"))),
-                (
-                    "expected",
-                    Value::object([
-                        ("packets", Value::int(packets)),
-                        ("bytes", Value::int(bytes)),
-                        ("digest", Value::int(digest)),
-                    ]),
-                ),
-            ],
-        )
+        mp4_range_case(id, file, data, seek, (packets, bytes, digest))
     })
     .collect();
+    cases.extend(mp4_range_entries(paths, &output)?);
     paths.manifest(
         "features/mp4-range/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
     )?;
-    Ok("MP4 range corpus: four playback comparisons".into())
+    Ok("MP4 range corpus: fifteen playback comparisons".into())
+}
+
+fn mp4_range_case(
+    id: &str,
+    file: &str,
+    data: &[u8],
+    seek: Option<&str>,
+    (packets, bytes, digest): (u32, u32, u64),
+) -> Value {
+    authored(
+        id,
+        file,
+        data,
+        vec![
+            ("arguments", Value::strings(seek)),
+            (
+                "expected",
+                Value::object([
+                    ("packets", Value::int(packets)),
+                    ("bytes", Value::int(bytes)),
+                    ("digest", Value::int(digest)),
+                ]),
+            ),
+        ],
+    )
+}
+
+fn mp4_range_entries(paths: &Paths, output: &Path) -> Result<Vec<Value>, String> {
+    let seed = |name: &str, expected: &str| {
+        let file = paths.root.join("crates/playback/tests/fixtures").join(name);
+        let bytes = fs::read(&file).map_err(|error| format!("{}: {error}", file.display()))?;
+        if sha256::hex(&bytes) != expected {
+            return Err(format!("MP4 range seed changed: {name}"));
+        }
+        Ok(bytes)
+    };
+    let hevc = seed(
+        "mp4/encoded-hevc-aac-front.mp4",
+        "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+    )?;
+    let av1 = seed(
+        "av1/six-frames.mp4",
+        "76383e7d9d646a2873ed6e8af7e52b48903b7a9a1fc95f1d807575b90c66b9c6",
+    )?;
+    // Retag the sole video sample description in each pinned seed. The
+    // decoder configuration and samples are the original authored bytes.
+    let mut cases = Vec::new();
+    for (tag, source, offset, original, seek, open_fold, seek_fold) in [
+        (
+            "dvh1",
+            &hevc,
+            421,
+            b"hvc1",
+            "40",
+            (4, 3438, 265_368_919_262_385_015),
+            (4, 3438, 265_368_919_262_385_015),
+        ),
+        (
+            "dvhe",
+            &hevc,
+            421,
+            b"hvc1",
+            "40",
+            (4, 3438, 6_289_861_727_786_914_679),
+            (4, 3438, 6_289_861_727_786_914_679),
+        ),
+        (
+            "dav1",
+            &av1,
+            461,
+            b"av01",
+            "16384",
+            (6, 4097, 1_285_709_537_707_954_380),
+            (3, 2192, 4_884_662_521_198_875_690),
+        ),
+    ] {
+        let mut data = source.clone();
+        let entry = data
+            .get_mut(offset..offset + 4)
+            .ok_or("missing MP4 range sample entry")?;
+        if entry != original {
+            return Err("unexpected MP4 range sample entry".into());
+        }
+        entry.copy_from_slice(tag.as_bytes());
+        let file = format!("{tag}.mp4");
+        write(&output.join(&file), &data)?;
+        cases.push(mp4_range_case(
+            &format!("{tag}-open"),
+            &file,
+            &data,
+            None,
+            open_fold,
+        ));
+        cases.push(mp4_range_case(
+            &format!("{tag}-seek"),
+            &file,
+            &data,
+            Some(seek),
+            seek_fold,
+        ));
+    }
+    Ok(cases)
 }
 
 /// One manifest row for an authored fixture.

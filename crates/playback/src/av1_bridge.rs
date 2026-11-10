@@ -127,7 +127,7 @@ impl Av1BridgeSetup {
         config_limits: Av1ConfigLimits,
         packet_limits: Av1TemporalUnitLimits,
     ) -> Result<Self> {
-        if configuration.description.format != *b"av01" {
+        if !matches!(&configuration.description.format, b"av01" | b"dav1") {
             return Err(Error::Invalid("source entry is not AV1"));
         }
         let entry = configuration.description.raw().bytes();

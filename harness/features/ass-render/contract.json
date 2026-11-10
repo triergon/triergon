@@ -6,6 +6,7 @@
   "worker_operation": "ass-render-",
   "reference": "libass-ass-native",
   "gate": "required",
+  "compare_order": 4,
   "contract": [
     "one authored script read whole with ass_read_memory, or one stream fixture run on a track from ass_new_track as ass-parse-chunks runs it (codec private, packets through ass_process_chunk with ReadOrder deduplication, flushes and ass_prune_events), configured as a player embeds libass 0.17.5: a library with font extraction on and the fixture's font files given to ass_add_font in order, a renderer with frame and storage size set (the storage smaller than the frame: 1280x720 on 1920x1080, and 720x576 on 1280x720, whose pixel aspect is not 1), ASS_HINTING_NONE, ass_set_cache_limits(renderer, 1000, 24), libass's plain C bitmap engine on every host, and ass_set_fonts with the fixture's default font file and family and ASS_FONTPROVIDER_NONE",
     "frames rendered with ass_render_frame at the fixture's times: a whole script's ;@frames, a stream's @frames commands where they stand among its packets and prunes",

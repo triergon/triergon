@@ -13,6 +13,198 @@ use triergon_isobmff::{
     SourceCompositionLookup, SourceTrack,
 };
 
+#[test]
+fn complete_fragment_edit_offsets_the_packet_and_resume_clocks() {
+    use triergon_isobmff::compat::mov::packets::{
+        CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, ResumePoint,
+    };
+    use triergon_isobmff::compat::mov::seek::{SeekJob, SeekLimits};
+    let pool = Budget::new(65536).unwrap();
+    let table = fragment_sample_table(&pool);
+    assert_eq!(table.sample_count(), 0);
+    let fragments = [fixture::fragment(
+        &pool,
+        1,
+        1000,
+        1,
+        Some(0),
+        &[0, 0x10000, 0],
+    )];
+    let edits = fixture::edits(&pool, &[(0, 4, 1, 0)]);
+    let base = TimeBase::new(1, 1000).unwrap();
+    let tracks = [DemuxTrack {
+        track_id: 7,
+        table: &table,
+        fragments: &fragments,
+        media_base: base,
+        edits: Some((&edits, base)),
+    }];
+    let extent = 1000..1006;
+    let cancel = AtomicBool::new(false);
+    for start in [0, 1] {
+        let mut cursor = PacketCursor::new_complete_source_at(
+            &pool,
+            &tracks,
+            std::slice::from_ref(&extent),
+            PacketLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+            &[ResumePoint {
+                track_id: 7,
+                occurrence: start,
+            }],
+        )
+        .unwrap();
+        cursor.enable_range_seek_checkpoints();
+        let mut rows = Vec::new();
+        for _ in 0..512 {
+            match cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
+                CursorStatus::Yield => {}
+                CursorStatus::Ready => {
+                    let packet = cursor.take_occurrence().unwrap();
+                    rows.push((packet.source.dts_ticks, packet.demux.pts, packet.demux.dts));
+                    assert_eq!(packet.demux.duration, 10);
+                    assert_eq!(packet.edit.unwrap().edit_ordinal, 1);
+                }
+                CursorStatus::End => break,
+            }
+        }
+        let expected = [
+            (Some(0), Some(-4), Some(-4)),
+            (Some(10), Some(6), Some(6)),
+            (Some(20), Some(16), Some(16)),
+        ];
+        assert_eq!(rows, expected[usize::try_from(start).unwrap()..]);
+        if start == 0 {
+            cursor.rewind_at_end().unwrap();
+            for (target, selected) in [(19, -4), (20, 16)] {
+                let mut checked = cursor
+                    .prepare_checked_range_seek(7, target, SeekLimits::default())
+                    .unwrap()
+                    .expect("sync-starting fragment uses checked restarts");
+                assert!((0..512).any(|_| {
+                    checked.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Ready
+                }));
+                let (mut replay, landing) = checked.finish().unwrap();
+                assert_eq!(landing.requested_timestamp, target);
+                assert_eq!(landing.selected.timestamp, selected);
+                assert!((0..512).any(|_| {
+                    replay.poll(&mut WorkBudget::new(1), &cancel).unwrap() == CursorStatus::Ready
+                }));
+                assert_eq!(replay.take_occurrence().unwrap().demux.dts, Some(selected));
+            }
+        }
+    }
+    for (target, selected) in [(19, -4), (20, 16)] {
+        let mut seek = SeekJob::new_complete_source(
+            &pool,
+            tracks[0],
+            std::slice::from_ref(&extent),
+            target,
+            SeekLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+        )
+        .unwrap();
+        assert!((0..512).any(|_| {
+            seek.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Ready
+        }));
+        let seek = seek.finish().unwrap();
+        assert_eq!(seek.landing().requested_timestamp, target);
+        assert_eq!(seek.landing().selected.timestamp, selected);
+    }
+}
+
+fn fragment_sample_table(pool: &Budget) -> triergon_isobmff::SampleTable {
+    let boxes = common::roots(
+        pool,
+        include_bytes!("fixtures/native-open-v6/tfdt-control-08.mp4"),
+    )
+    .unwrap();
+    let movie = boxes
+        .iter()
+        .find(|raw| raw.header().kind == *b"moov")
+        .unwrap();
+    let track = common::child(movie, b"trak").unwrap();
+    let media = common::child(&track, b"mdia").unwrap();
+    let info = common::child(&media, b"minf").unwrap();
+    common::table(common::child(&info, b"stbl").unwrap(), pool, 1).unwrap()
+}
+
+#[test]
+fn complete_fragment_seek_preserves_the_edited_predecessor_clock_between_runs() {
+    use triergon_isobmff::compat::mov::packets::{
+        CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits,
+    };
+    use triergon_isobmff::compat::mov::seek::{SeekJob, SeekLimits};
+    let pool = Budget::new(65536).unwrap();
+    let table = fragment_sample_table(&pool);
+    let fragments = [fixture::fragment_runs(
+        &pool,
+        1,
+        1000,
+        1,
+        None,
+        &[&[0, 0x10000], &[0x10000, 0]],
+    )];
+    let edits = fixture::edits(&pool, &[(0, 4, 1, 0)]);
+    let base = TimeBase::new(1, 1000).unwrap();
+    let tracks = [DemuxTrack {
+        track_id: 7,
+        table: &table,
+        fragments: &fragments,
+        media_base: base,
+        edits: Some((&edits, base)),
+    }];
+    let extent = 1000..1008;
+    let media = std::slice::from_ref(&extent);
+    let cancel = AtomicBool::new(false);
+    let mut cursor = PacketCursor::new_complete_source(
+        &pool,
+        &tracks,
+        media,
+        PacketLimits::default(),
+        DemuxProfile::NoParseNoFillin,
+    )
+    .unwrap();
+    cursor.enable_range_seek_checkpoints();
+    let mut clocks = Vec::new();
+    for _ in 0..512 {
+        match cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
+            CursorStatus::Ready => {
+                let packet = cursor.take_occurrence().unwrap();
+                assert!(packet.source.dts_ticks.is_none());
+                clocks.push(packet.demux.dts);
+            }
+            CursorStatus::Yield => {}
+            CursorStatus::End => break,
+        }
+    }
+    assert_eq!(clocks, [Some(-4), Some(6), Some(16), Some(26)]);
+    assert!(
+        cursor
+            .prepare_checked_range_seek(7, 22, SeekLimits::default())
+            .unwrap()
+            .is_none()
+    );
+    for (target, expected) in [(22, -4), (30, 26)] {
+        let mut seek = SeekJob::new_complete_source(
+            &pool,
+            tracks[0],
+            media,
+            target,
+            SeekLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+        )
+        .unwrap();
+        assert!((0..512).any(|_| {
+            seek.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Ready
+        }));
+        assert_eq!(
+            seek.finish().unwrap().landing().selected.timestamp,
+            expected
+        );
+    }
+}
+
 fn time(n: i128, d: u128) -> Time {
     Time::new(n, d).unwrap()
 }

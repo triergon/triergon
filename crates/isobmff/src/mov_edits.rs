@@ -29,6 +29,8 @@ pub enum DurationBasis {
     TerminalEmptyEndpointObservation,
     /// Reference demux packet ordinal still consumes the original decode table.
     OriginalDecodeTableOrdinal,
+    /// A fragment clock offset keeps the duration declared by its run.
+    FragmentDecodeDelta,
     FollowingOccurrenceDts,
     SourceDeltaAtBackwardJump,
     SourceDeltaAtTerminal,

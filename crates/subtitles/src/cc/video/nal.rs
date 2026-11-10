@@ -56,7 +56,7 @@ impl Codec {
     pub fn is_slice(self, nal_type: u8) -> bool {
         match self {
             Self::H264 => matches!(nal_type, 1..=5),
-            Self::Hevc => nal_type < 32,
+            Self::Hevc => hevc::is_slice(nal_type),
         }
     }
 

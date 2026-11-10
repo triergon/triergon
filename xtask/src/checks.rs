@@ -103,8 +103,8 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     errors.extend(runtime_mentions(root));
     errors.extend(contract_fields(root));
     // Generated manifests: the case ids and the pins match, in the recorded form.
-    for lane in crate::lanes::LANES {
-        errors.extend(lane.check(root));
+    for generator in crate::generators::GENERATORS {
+        errors.extend(generator.check(root));
     }
     let modules = gates
         .get("modules")
@@ -513,6 +513,7 @@ mod tests {
         let root = walk::scratch("design");
         fs::create_dir_all(root.join("research/sub")).unwrap();
         fs::create_dir_all(root.join("harness/fate")).unwrap();
+        fs::create_dir_all(root.join("harness/features")).unwrap();
         let policy = r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8}}"#;
         let gates = r#"{"modules": [{"accepted": false}, {"accepted": false}]}"#;
         fs::write(root.join("harness/policy.json"), policy).unwrap();

@@ -91,6 +91,21 @@
         "bytes": 15854,
         "digest": 13496571037838508401
       }
+    },
+    {
+      "id": "hevc-eos",
+      "profile": "hevc-eos",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-eos.hevc",
+      "sha256": "efa769f8ba786e2a2d85a1fa697742898cc51822e73b81139d0e52164bdef765",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "hevc"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 15791,
+        "digest": 1015408520479092606
+      }
     }
   ]
 }

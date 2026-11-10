@@ -6,6 +6,7 @@
   "worker_operation": "font-",
   "reference": "freetype-native",
   "gate": "required",
+  "compare_order": 0,
   "contract": [
     "one font file read from memory; every face of a collection, each opened and read in turn",
     "per face: metrics and style flags; family, style and PostScript names; OS/2 weight; every name record",

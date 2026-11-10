@@ -42,10 +42,11 @@ pub mod hevc {
     }
 
     /// A non-VCL type that starts a new access unit once the current one has
-    /// a slice (H.265 7.4.2.4.4).
+    /// a slice: the H.265 7.4.2.4.4 types and, as in FFmpeg's parser, an end of
+    /// sequence or bitstream.
     #[inline]
     pub const fn begins_access_unit(t: u8) -> bool {
-        matches!(t, VPS..=AUD | PREFIX_SEI | 41..=44 | 48..=55)
+        matches!(t, VPS..=EOB | PREFIX_SEI | 41..=44 | 48..=55)
     }
 
     /// Intra random access point, reserved IRAP types included (7.4.2.2).

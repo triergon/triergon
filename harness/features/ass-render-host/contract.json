@@ -6,6 +6,7 @@
   "worker_operation": "ass-render-",
   "reference": "libass-ass-native",
   "gate": "required",
+  "compare_order": 5,
   "pinned_per_target": true,
   "contract": [
     "the rendering fixtures whose libass result C leaves to the target, rendered and folded as ass-render renders and folds them: libass's renderer overflows int or converts a double out of int's range on the way to the result (a horizontal border beyond 2^30 frame pixels doubled in int for the width of an event's box)",

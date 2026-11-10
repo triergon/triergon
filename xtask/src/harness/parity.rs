@@ -548,7 +548,7 @@ fn feed_result(
     work_fields: &[String],
     per_target: bool,
 ) -> Value {
-    use crate::lanes::{HOST_DEPENDENT, host_dependent as flagged};
+    use crate::generators::{HOST_DEPENDENT, host_dependent as flagged};
     let work = |outcome: &Value| super::comparison::work_summary(data(outcome), work_fields);
     let complete =
         |outcome: &Value| ok(outcome) && data(outcome).get("eof") == Some(&Value::Bool(true));

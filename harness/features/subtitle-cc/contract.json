@@ -17,5 +17,26 @@
   ],
   "iterations": 50,
   "minimum_pairs": 30,
-  "confidence": 0.95
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "an HEVC picture output model: FFmpeg's decoder outputs the pictures waiting in its DPB when a new sequence starts, and discards them with their captions when no_output_of_prior_pics_flag is set, as it is for a CRA picture after an end of sequence"
+  ],
+  "open_cases": [
+    {
+      "id": "hevc-eos-ts",
+      "requirement": "an HEVC picture output model: FFmpeg's decoder outputs the pictures waiting in its DPB when a new sequence starts, and discards them with their captions when no_output_of_prior_pics_flag is set, as it is for a CRA picture after an end of sequence"
+    },
+    {
+      "id": "hevc-eos-ts-realtime",
+      "requirement": "an HEVC picture output model: FFmpeg's decoder outputs the pictures waiting in its DPB when a new sequence starts, and discards them with their captions when no_output_of_prior_pics_flag is set, as it is for a CRA picture after an end of sequence"
+    },
+    {
+      "id": "hevc-eos-ts-first",
+      "requirement": "an HEVC picture output model: FFmpeg's decoder outputs the pictures waiting in its DPB when a new sequence starts, and discards them with their captions when no_output_of_prior_pics_flag is set, as it is for a CRA picture after an end of sequence"
+    },
+    {
+      "id": "hevc-eos-ts-second",
+      "requirement": "an HEVC picture output model: FFmpeg's decoder outputs the pictures waiting in its DPB when a new sequence starts, and discards them with their captions when no_output_of_prior_pics_flag is set, as it is for a CRA picture after an end of sequence"
+    }
+  ]
 }

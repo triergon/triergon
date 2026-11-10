@@ -6,6 +6,7 @@
   "worker_operation": "font-sized-",
   "reference": "freetype-native",
   "gate": "on-demand",
+  "compare_order": 2,
   "contract": [
     "the sizes libass requests when hinting is on (ASS_HINTING_NATIVE, LIGHT and NORMAL): every face of one font file read from memory and loaded at each of nine 26.6 pixel heights, after libass's GDI face metrics, with a REAL_DIM size request",
     "outlines cases: the size metrics, libass's ascent and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline and strikeout bands; the kerning at the size (FT_KERNING_DEFAULT) of every pair the kern table lists, nonzero values only; every glyph's FT_LOAD_NO_HINTING outline and advance, then that outline emboldened, slanted, and both",

@@ -2247,6 +2247,11 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
     use triergon_playback::av1_bridge::{Av1BridgeSetup, Av1Input};
 
     let mp4_raw = include_bytes!("fixtures/av1/six-frames.mp4");
+    let mut dolby_entry = mp4_raw.to_vec();
+    let table = mp4_raw.windows(4).position(|kind| kind == b"stsd").unwrap();
+    let entry = table + 16; // FullBox fields, entry count and sample entry size.
+    assert_eq!(&dolby_entry[entry..entry + 4], b"av01");
+    dolby_entry[entry..entry + 4].copy_from_slice(b"dav1");
     let webm_raw = include_bytes!("fixtures/av1/six-frames.webm");
     let expected = include_bytes!("fixtures/av1/six-frames.obu");
     let obu_limits = Av1ObuLimits {
@@ -2281,7 +2286,11 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
         panic!("bridge setup stalled");
     };
 
-    for quantum in [7, 4096] {
+    for (mp4_raw, quantum) in [
+        (mp4_raw.as_slice(), 7),
+        (mp4_raw.as_slice(), 4096),
+        (&dolby_entry, 7),
+    ] {
         let (mut mp4, mp4_pool) = mp4(mp4_raw, Mp4View::SourcePhysical, quantum, 3).unwrap();
         let (selected, mkv_pool, _) = probe(webm_raw, quantum, false);
         let engine = Engine::matroska(

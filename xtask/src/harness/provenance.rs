@@ -12,9 +12,9 @@ use std::process::Command;
 use crate::json::{self, Value};
 use crate::sha256;
 
-/// Explicit inputs shared by container and playback operations. Changing an
-/// operation's inputs requires a fresh build identity.
-pub fn matroska_inputs() -> Vec<String> {
+/// Shared harness sources and the inputs named by every registered contract.
+/// A change requires a fresh build identity.
+pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
     let mut names: Vec<String> = [
         "specs/sources.json",
         "harness/fate/index.json",
@@ -26,6 +26,8 @@ pub fn matroska_inputs() -> Vec<String> {
         "xtask/src/harness/gate_build.rs",
         "xtask/src/harness/grade.rs",
         "xtask/src/harness/diff.rs",
+        "xtask/src/harness/features.rs",
+        "xtask/src/generators.rs",
         "xtask/src/harness/linux.rs",
         "xtask/src/harness/memory.rs",
         "xtask/src/harness/oracle.rs",
@@ -79,32 +81,24 @@ pub fn matroska_inputs() -> Vec<String> {
     ]
     .map(String::from)
     .to_vec();
-    for feature in [
-        "matroska-demux",
-        "matroska-header-removal",
-        "matroska-zlib",
-        "matroska-cues-preroll",
-        "matroska-colour",
-        "matroska-segment-metadata",
-        "matroska-startup-seek",
-        "hls-segments",
-        "progressive-ts188",
-        "mp4-range",
-        "matroska-audio-clocks",
-        "mp4-forward",
-        "ts-program",
-        "raw-annex-b",
-        "mpegts-pes",
-        "subtitle-pgs-capsules",
-        "subtitle-text",
-    ] {
-        for file in ["contract", "corpus"] {
-            names.push(format!("harness/features/{feature}/{file}.json"));
+    for contract in super::features::discover(root)? {
+        let id = &contract.id;
+        names.push(format!("harness/features/{id}/contract.json"));
+        let generator =
+            crate::generators::for_contract(&contract.document).filter(|_| contract.generated());
+        let manifest = contract.manifest();
+        if manifest.is_file() {
+            names.push(format!("harness/features/{id}/corpus.json"));
+        } else if generator.is_none() {
+            return Err(format!("{}: no corpus manifest", manifest.display()));
+        }
+        if let Some(generator) = generator {
+            names.extend(generator.inputs(root, id));
         }
     }
-    // Features whose manifests are generated from their pins and committed inputs.
-    names.extend(crate::lanes::provenance_inputs());
-    names
+    names.sort_unstable();
+    names.dedup();
+    Ok(names)
 }
 
 /// `cargo metadata` for the host target, as the build ran it.
@@ -451,7 +445,7 @@ pub fn source_identity_error(root: &Path, identity: &Value) -> Option<String> {
                     root,
                     &cargo_metadata(root)?,
                     "media-worker",
-                    &matroska_inputs(),
+                    &shared_inputs(root)?,
                 )?;
                 let same = identity
                     .get("selected_graph")
@@ -514,7 +508,7 @@ mod tests {
             root,
             &cargo_metadata(root).unwrap(),
             "media-worker",
-            &matroska_inputs(),
+            &shared_inputs(root).unwrap(),
         )
         .unwrap();
         let packages = graph.get("packages").and_then(Value::as_array).unwrap();
@@ -551,9 +545,10 @@ mod tests {
                 "missing source binding: {name}"
             );
         }
-        for feature in crate::lanes::LANES.iter().flat_map(|lane| lane.features) {
-            for file in ["contract", "pins"] {
-                let name = format!("harness/features/{feature}/{file}.json");
+        for contract in crate::harness::features::discover(root).unwrap() {
+            let id = &contract.id;
+            for file in ["contract", "corpus", "pins"] {
+                let name = format!("harness/features/{id}/{file}.json");
                 assert!(
                     shared.get(&name).is_some() || !root.join(&name).exists(),
                     "missing source binding: {name}"

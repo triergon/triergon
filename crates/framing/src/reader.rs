@@ -232,6 +232,12 @@ impl NalReader {
     pub fn position(&self) -> u64 {
         self.cursor.position()
     }
+    /// True once the source ended after the last NAL unit read: that unit is
+    /// the final one.
+    pub(crate) const fn ended(&self) -> bool {
+        self.end_after_nal
+    }
+
     pub fn source(&self) -> SourceId {
         self.cursor.source()
     }

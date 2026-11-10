@@ -76,7 +76,7 @@ assert_eq!(decoder_input, [
 | NAL streams | `NalReader`, `Framing::{AnnexB, LengthPrefixed}`, `LengthSize` | Incremental AVC/HEVC NAL extraction from any chunking; 1–4 byte big-endian lengths or Annex-B start codes; fixed NAL header facts |
 | NAL units in memory | `AnnexBUnits`, `start_code`, `split_length_prefixed`; `NalHeader::parse`; `avc`, `hevc` | An access unit's or stream's NAL units without their start codes or length prefixes; validated fixed headers; H.264 and H.265 type values and the HEVC type classes (slice, access-unit start, IRAP, IDR, BLA, RASL, RADL) |
 | Parameter-set walks | `skip_avc_scaling_matrix`, `skip_vui_to_timing`, `skip_hevc_profile_tier_level` | Pass over an SPS's H.264 scaling matrix, VUI fields before the timing, or H.265 profile-tier-level, over any `BitSource`, so each caller keeps its own emulation-prevention strictness and errors |
-| Raw Annex-B access units | `RawAnnexBReader`, `RawAccessUnit` | Groups an elementary AVC/HEVC stream into access units (H.264 §7.4.1.2.3–4, H.265 §7.4.2.4.4); reports IDR/IRAP; keeps original start codes and padding |
+| Raw Annex-B access units | `RawAnnexBReader`, `RawAccessUnit` | Groups an elementary AVC/HEVC stream into access units (H.264 §7.4.1.2.3–4, H.265 §7.4.2.4.4; an HEVC end of sequence or bitstream starts the next one, as in FFmpeg's parser); reports IDR/IRAP; keeps original start codes and padding |
 | avcC | `AvcConfigParser` | Full record: fixed fields, SPS/PPS/SPS-ext arrays, high-profile extension, trailing bytes |
 | hvcC | `HvcConfigParser`, `inspect_hvc_config_prefix` | Version 1: 23-byte fixed prefix, all NAL arrays in order (unknown/duplicate/empty arrays kept) |
 | Sample to Annex-B | `AvcAnnexBJob`, `HevcAnnexBJob` | Four-byte start codes; prepends record SPS/PPS (VPS/SPS/PPS) before IDR/IRAP; zero-copy segments |
@@ -176,7 +176,9 @@ Verification:
   behaviour observed from pinned FFmpeg (`h264_mp4toannexb`, `hevc_mp4toannexb`,
   hvcC and AAC configuration handling).
 - `fixtures/raw-annex-b/*.packets` hold the packet extents and key flags FFmpeg's
-  raw H.264/HEVC demuxers produce for the paired streams.
+  raw H.264/HEVC demuxers produce for the paired streams. `hevc-eos.hevc` is
+  `hevc-aud0.hevc` with an end of sequence before its second VPS and an end of
+  bitstream at the end.
 
 From the repository root, `cargo xtask framing` compares all 125 AVC/HEVC
 packet-framing scripts with the pinned FFmpeg bitstream-filter API. The

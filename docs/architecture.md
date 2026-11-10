@@ -126,8 +126,8 @@ limit violation).
 Open structural work. Each step keeps worker traces byte-identical and re-runs the
 performance gates where it touches hot code.
 
-1. **Formats.** MPEG-TS implements `ContainerReader` and becomes an `AnyReader`
-   variant. Track classification moves out of playback into the readers.
+1. **Formats.** MPEG-TS needs a `ContainerReader` with full access-unit demux and
+   an `AnyReader` variant. Playback uses format-owned track classification.
 2. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
    `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
    in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves
