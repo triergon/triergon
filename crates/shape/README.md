@@ -235,8 +235,9 @@ characters.
     and extents, that load's outline for contour points, and
     `FT_KERNING_DEFAULT` kerning. The candidate shapes with `SizedMetrics` over
     `Font::at_size`. This compares device tables, contour-point anchors and
-    FreeType's advances. Eight cases are open, in fonts whose default-load
-    advances FreeType's auto-hinter sets.
+    FreeType's advances. Six cases are open: NotoEmoji's, whose fallback mark
+    positioning reads the extents of glyphs FreeType's auto-hinter gives a CJK
+    style.
   - `shape-text` and `shape-text-all`: the same cases, and every corpus face and
     script (1,768 cases, 103,031 runs; 1,746 and 101,691 before the charmap face
     joined them), with HarfBuzz's built-in font functions

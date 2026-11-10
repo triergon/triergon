@@ -17820,6 +17820,16 @@
    "sha256": "a6c0e18c8ad7a3dfc38c8d4144c55f364b32b8c4aa4bf63f37b71f0316fd24a8",
    "bytes": 110214380,
    "source_revision": "b531944603a96d8fad9a1bb50e99cd538528280e"
+  },
+  {
+   "name": "font-latin-cf5c7504",
+   "path": "font-latin-cf5c7504",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's auto-hinter (style coverage, the dummy and Latin writing systems, the accent adjustments) for TrueType faces without bytecode, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at cf5c7504 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64; the xtask tests, clippy and rustfmt at 50615186; and the test and quick comparison runs at 7ff5e1f2 and 60f4cc48 that set the open cases.",
+   "key": "evidence/font-latin-cf5c7504/64b022b36608f08b8609d128e0deaba3e7b37fe86c8ca94c312e41e411e7df79.tar.gz",
+   "sha256": "64b022b36608f08b8609d128e0deaba3e7b37fe86c8ca94c312e41e411e7df79",
+   "bytes": 193911261,
+   "source_revision": "cf5c7504c077ff47ab5da521261e5c7a04046f16"
   }
  ]
 }

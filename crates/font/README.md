@@ -356,16 +356,16 @@ generator.
 
 The gate covers libass's default configuration, hinting off: unhinted outlines at
 256 pixels and the default-load advances libass's HarfBuzz callbacks read at that
-size, with the vertical advances of `@` fonts (`font-hinting-none`). Four of its
-cases are open: the advances and vertical cases of DejaVuMathTeXGyre and
-authored-cmap-formats, whose default-load advances FreeType's auto-hinter moves.
-The default load itself, every glyph's metrics and hinted outline at that size,
-is gated too (`font-hinting-default`): every CFF, CFF2 and CID-keyed face matches
-FreeType, and the TrueType faces are open, two under the auto-hinter and the
-rest under the TrueType interpreter. For libass's default configuration that
-gap is in what HarfBuzz reads to position marks without GPOS anchors (glyph
-extents and contour points) in TrueType fonts; the outlines libass draws are
-unhinted and compared. For libass's hinting-enabled modes (NATIVE, LIGHT,
+size, with the vertical advances of `@` fonts (`font-hinting-none`), all of which
+match FreeType, the auto-hinted faces' included. The default load itself, every
+glyph's metrics and hinted outline at that size, is gated too
+(`font-hinting-default`): every CFF, CFF2 and CID-keyed face matches FreeType, and
+so does the auto-hinted authored-cmap-formats. DejaVuMathTeXGyre is open under the
+auto-hinter's CJK writing system, which styles most of its glyphs, and the
+instructed TrueType faces under the TrueType interpreter. For libass's default
+configuration that gap is in what HarfBuzz reads to position marks without GPOS
+anchors (glyph extents and contour points) in those fonts; the outlines libass
+draws are unhinted and compared. For libass's hinting-enabled modes (NATIVE, LIGHT,
 NORMAL), the unhinted outlines and default-load advances at nine other sizes are
 only measured (`font-hinting-modes`), and the hinted outlines those modes draw
 are not compared.
