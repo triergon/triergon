@@ -133,7 +133,9 @@ fn numbers(header: &str, opening: &str, count: usize) -> Result<Vec<String>, Str
     let mut values = Vec::new();
     for line in block(header, opening)? {
         for value in line.split(',').map(str::trim).filter(|v| !v.is_empty()) {
-            let n: u32 = value.parse().map_err(|_| format!("{opening}: unread value {value}"))?;
+            let n: u32 = value
+                .parse()
+                .map_err(|_| format!("{opening}: unread value {value}"))?;
             values.push(n.to_string());
         }
     }
