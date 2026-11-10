@@ -144,10 +144,6 @@ const RUN_UNITS: usize = 16;
 const MAX_PLANS: usize = 256;
 /// Bytes charged per plan beyond its own storage.
 const PLAN_ENTRY_BYTES: usize = 256;
-/// Bytes charged per `@` font description the rotation decisions are kept
-/// for, beyond its family name.
-const VERTICAL_FONT_BYTES: usize = 64;
-
 /// The shaper's state: a buffer, a bidi resolver, the plans built so far,
 /// and storage for the event being shaped.
 #[derive(Debug)]
@@ -178,17 +174,22 @@ pub(super) struct Shaper {
 type RotationKey = (u32, u32, u64);
 
 /// The descriptions of the `@` fonts asked for (family, weight and slant),
-/// numbered, as libass keys its glyph metrics cache by font.
+/// numbered, as libass keys its glyph metrics cache by font: sorted by
+/// description and found by binary search, in storage charged to the budget
+/// before it grows.
 #[derive(Debug)]
 struct VerticalFonts {
-    by_family: HashMap<Box<[u8]>, Vec<VerticalFont>>,
-    count: u32,
-    charge: Reservation,
+    /// By family name, weight and slant.
+    fonts: BudgetVec<VerticalFont>,
+    /// The family names, one after another.
+    names: BudgetVec<u8>,
 }
 
-/// The weight and slant of an `@` font description, and its number.
+/// An `@` font description: where its family name is in
+/// [`VerticalFonts::names`], its weight and slant, and its number.
 #[derive(Clone, Copy, Debug)]
 struct VerticalFont {
+    name: (usize, usize),
     weight: u32,
     slant: u32,
     id: u32,
@@ -197,40 +198,33 @@ struct VerticalFont {
 impl VerticalFonts {
     fn new(budget: &Budget) -> Self {
         Self {
-            by_family: HashMap::new(),
-            count: 0,
-            charge: Reservation::empty(budget),
+            fonts: BudgetVec::new(budget),
+            names: BudgetVec::new(budget),
         }
     }
 
-    /// The number of the description of `family`, `weight` and `slant`,
-    /// charged before it is kept.
+    /// The number of the description of `family`, `weight` and `slant`.
     fn id(&mut self, family: &[u8], weight: u32, slant: u32) -> Result<u32> {
-        let known = self.by_family.get(family);
-        if let Some(font) = known
-            .into_iter()
-            .flatten()
-            .find(|f| f.weight == weight && f.slant == slant)
-        {
-            return Ok(font.id);
-        }
-        let family_bytes = if known.is_some() { 0 } else { family.len() };
-        let id = self.count;
-        let next = id.checked_add(1).ok_or(Error::Overflow)?;
-        self.charge.resize_to(
-            self.charge
-                .bytes()
-                .saturating_add(family_bytes)
-                .saturating_add(VERTICAL_FONT_BYTES),
-        )?;
-        self.count = next;
-        let font = VerticalFont { weight, slant, id };
-        match self.by_family.get_mut(family) {
-            Some(fonts) => fonts.push(font),
-            None => {
-                self.by_family.insert(family.into(), vec![font]);
-            }
-        }
+        let names = self.names.as_slice();
+        let found = self.fonts.as_slice().binary_search_by(|f| {
+            let (start, len) = f.name;
+            (&names[start..start + len], f.weight, f.slant).cmp(&(family, weight, slant))
+        });
+        let at = match found {
+            Ok(i) => return Ok(self.fonts.as_slice()[i].id),
+            Err(at) => at,
+        };
+        let id = u32::try_from(self.fonts.len()).map_err(|_| Error::Overflow)?;
+        let name = (self.names.len(), family.len());
+        self.names.try_extend_from_slice(family)?;
+        let font = VerticalFont {
+            name,
+            weight,
+            slant,
+            id,
+        };
+        self.fonts.try_push(font).map_err(|e| e.error)?;
+        self.fonts.as_mut_slice()[at..].rotate_right(1);
         Ok(id)
     }
 }
