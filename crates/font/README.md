@@ -147,8 +147,12 @@ FreeType's `cff_blend_build_vector` builds at the origin, in charstrings and
 Private DICTs. A face whose `fvar` FreeType accepts has a design vector of its
 axes, all zero: a region weighs one unless an axis peaks away from zero, which
 scales it down where that axis's range spans zero and excludes it otherwise.
-Without `fvar` every region weighs zero, and a variation store with other
-axes than `fvar` fails each `blend`. Supported: all path operators, flex,
+Without `fvar` every region weighs zero. A variation store with other axes
+than `fvar` fails each charstring `blend`; in the Private DICT it does not stop
+the face from opening, as FreeType first reads that DICT without a design
+vector, and the hinter then takes what the DICT's second reading, with the
+vector, gives before its first `blend`, as FreeType ignores that reading's
+error. Supported: all path operators, flex,
 stem hints, `hintmask` and `cntrmask` (the stems are fixed by the first mask or
 move: later stem operators are ignored, as is a later mask operator with more
 than one operand, whose mask bytes then run as charstring, and a mask over more
@@ -189,16 +193,26 @@ The 26.6 points then go through the FontMatrix and are moved by its offset in
 font units, without further scaling. Sizes beyond 2000 pixels per em, which the
 hinter refuses, load unhinted and scaled, as FreeType retries them; a 16.16
 scale below 32 fails the glyph. The arithmetic is cf2's, 16.16 in 32 bits.
-DICTs are read as FreeType's `cff_parser_run` reads them: up to 96 operands
-in CFF and 513 in CFF2, 27 as a one-byte number, operators without a meaning
-skipped with their operands, and a number cut short at the end ending the DICT.
+DICTs are read as FreeType's `cff_parser_run` reads them: a Top or Font DICT
+entry takes up to 95 operands in CFF and 512 in CFF2, a Private DICT entry 96
+and 513 (the Top DICT's `maxstack`, which FreeType clamps to 513, plus one);
+27 is a one-byte number, operators FreeType does not know in a DICT are
+skipped with their operands, and a number cut short at the end ends the DICT.
 Operands are kept as encoded and converted where read, as FreeType's parser
-converts them. `vsindex` and `blend` apply only in a CFF2 Private DICT, where
-`blend` sums each default and its deltas times the region scalars in 16.16, as
-`cff_blend_doBlend` does, and `vsindex` may not follow it. A Private DICT that
+converts them on 32-bit ARM, the five-byte form signed; offsets and counts
+take the first operand, cast to 32 unsigned bits. `vsindex` and `blend` apply
+only in a CFF2 Private DICT, where `blend` sums each default and its deltas
+times the region scalars in 16.16, as `cff_blend_doBlend` does, and `vsindex`
+may not follow it; a charstring's `vsindex` ignores a negative index, and an
+index outside the variation store fails at its `blend`. A Private DICT that
 is missing, or at offset or size zero, is not read, as `cff_load_private_dict`
-skips it; an entry FreeType reads from its first operand, used here or not,
-fails the face without one.
+skips it; an entry FreeType reads in any DICT, used here or not, fails the
+face with fewer operands than FreeType reads (`cfftoken.h` and the field
+readers of `cffparse.c`), as does a MultipleMaster entry with other than 2 to
+16 designs, and a ROS entry with registry 0xFFFF marks no CID-keyed face. One
+difference remains: a CFF2 face whose `fvar` passes FreeType's header check
+but which `TT_Get_MM_Var` then refuses opens here, with the header's axes,
+where FreeType fails to open it (`cff_face_init` sets the default instance).
 
 **Control boxes.** `Font::control_box` reads a glyph's box without building its
 outline, within the caller's `WorkBudget`, so no point limit applies: a TrueType glyph's `glyf` header box as
@@ -348,8 +362,8 @@ the light mode's stem darkening.
 programs that may leave backward compatibility; fonts FreeType finds tricky only
 by their table checksums are not recognised.
 Sizes beyond 65535 pixels per em are refused. Coordinates are `i32`; a scaled coordinate beyond it is
-`Error::Overflow`, where FreeType's 64-bit `FT_Pos` goes on (libass rejects
-anything beyond 2^28 itself). The `random` operator does not follow FreeType's
+`Error::Overflow`, where FreeType's `FT_Pos` wraps at 32 bits on 32-bit ARM
+(libass rejects anything beyond 2^28 itself). The `random` operator does not follow FreeType's
 generator.
 
 ## Hinting

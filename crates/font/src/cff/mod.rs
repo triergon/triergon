@@ -17,7 +17,9 @@ use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
 use crate::work::charge;
 use crate::{GlyphId, Limits};
-use dict::{CFF_DICT_STACK, CFF2_DICT_STACK, Entry, op};
+use dict::{
+    CFF_PRIVATE_STACK, CFF_TOP_STACK, CFF2_PRIVATE_STACK, CFF2_TOP_STACK, Entry, Kind, Weights, op,
+};
 use hint::{Blues, HintDict};
 use index::Index;
 use matrix::FontMatrix;
@@ -222,7 +224,7 @@ impl Cff {
             for i in 0..fonts.len() {
                 let font = fonts.get(bytes, i)?;
                 let (mut location, mut matrix) = (None, None);
-                cff.dict(font, false, work, |entry| {
+                cff.dict(font, Kind::Font, None, work, |entry| {
                     match entry.operator {
                         op::PRIVATE => location = Some(private_location(entry.operands)?),
                         op::FONT_MATRIX => matrix = Some(FontMatrix::parse(entry.operands)?),
@@ -274,22 +276,33 @@ impl Cff {
         self.version
     }
 
-    /// Parses a Top or Font DICT, or with `private` a Private DICT, the only
-    /// one where a CFF2 `vsindex` and `blend` apply.
-    fn dict<'a>(
-        &self,
+    /// Parses a DICT of `kind` as `cff_parser_run` does: entries FreeType
+    /// does not know in it are skipped, and one with fewer operands than
+    /// FreeType reads fails the parse. `weights` gives the region scalars a
+    /// CFF2 Private DICT's `blend` applies.
+    fn dict<'a, 's>(
+        &'s self,
         bytes: &'a [u8],
-        private: bool,
+        kind: Kind,
+        weights: Option<&dyn Fn(usize) -> Result<Weights<'s>>>,
         work: &mut WorkBudget,
-        apply: impl FnMut(Entry<'a, '_>) -> Result<()>,
+        mut apply: impl FnMut(Entry<'a, '_>) -> Result<()>,
     ) -> Result<()> {
-        let scalars = |i| self.blend_scalars(i);
-        match self.version {
-            Version::Cff1 => dict::parse::<CFF_DICT_STACK>(bytes, work, None, apply),
-            Version::Cff2 => {
-                let variations = private.then_some(&scalars as &dyn Fn(usize) -> _);
-                dict::parse::<CFF2_DICT_STACK>(bytes, work, variations, apply)
+        let version = self.version;
+        let checked = |entry: Entry<'a, '_>| match op::min_operands(version, kind, entry.operator) {
+            None => Ok(()),
+            Some(n) if entry.operands.len() < n => Err(Error::Invalid("CFF DICT operand count")),
+            Some(_) => apply(entry),
+        };
+        match (version, kind) {
+            (Version::Cff1, Kind::Private) => {
+                dict::parse::<CFF_PRIVATE_STACK>(bytes, work, None, checked)
             }
+            (Version::Cff1, _) => dict::parse::<CFF_TOP_STACK>(bytes, work, None, checked),
+            (Version::Cff2, Kind::Private) => {
+                dict::parse::<CFF2_PRIVATE_STACK>(bytes, work, weights, checked)
+            }
+            (Version::Cff2, _) => dict::parse::<CFF2_TOP_STACK>(bytes, work, None, checked),
         }
     }
 
@@ -298,31 +311,52 @@ impl Cff {
             charstring_type: 2,
             ..Top::default()
         };
-        self.dict(bytes, false, work, |Entry { operator, operands }| {
-            match operator {
-                op::CHAR_STRINGS => top.charstrings = Some(dict::single(operands)?),
-                op::CHARSET => top.charset = dict::single(operands)?,
-                op::ENCODING => top.encoding = dict::single(operands)?,
-                op::PRIVATE => top.private = Some(private_location(operands)?),
-                op::FD_ARRAY => top.fd_array = Some(dict::single(operands)?),
-                op::FD_SELECT => top.fd_select = Some(dict::single(operands)?),
-                op::VSTORE => top.vstore = Some(dict::single(operands)?),
-                op::ROS => top.ros = true,
-                op::SYNTHETIC_BASE => top.synthetic = true,
-                op::CHARSTRING_TYPE => top.charstring_type = dict::single(operands)?,
-                op::FONT_MATRIX => top.matrix = Some(FontMatrix::parse(operands)?),
-                _ => {}
-            }
-            Ok(())
-        })?;
+        self.dict(
+            bytes,
+            Kind::Top,
+            None,
+            work,
+            |Entry { operator, operands }| {
+                // FreeType reads the first operand of each, offsets into unsigned
+                // fields; `min_operands` checked that there are enough.
+                let first = operands[0];
+                match operator {
+                    op::CHAR_STRINGS => top.charstrings = Some(first.unsigned()),
+                    op::CHARSET => top.charset = first.unsigned(),
+                    op::ENCODING => top.encoding = first.unsigned(),
+                    op::PRIVATE => top.private = Some(private_location(operands)?),
+                    op::FD_ARRAY => top.fd_array = Some(first.unsigned()),
+                    op::FD_SELECT => top.fd_select = Some(first.unsigned()),
+                    op::VSTORE => top.vstore = Some(first.unsigned()),
+                    // A registry of 0xFFFF marks no ROS (`cid_registry`).
+                    op::ROS => top.ros = first.integer() as u32 != 0xffff,
+                    op::SYNTHETIC_BASE => top.synthetic = true,
+                    op::CHARSTRING_TYPE => top.charstring_type = first.integer(),
+                    op::MULTIPLE_MASTER if !(2..=16).contains(&first.integer()) => {
+                        return Err(Error::Invalid("CFF MultipleMaster design count"));
+                    }
+                    op::FONT_MATRIX => top.matrix = Some(FontMatrix::parse(operands)?),
+                    // `maxstack` sizes the Private DICT's stack, but FreeType clamps
+                    // it to `CFF2_MAXSTACK` both ways.
+                    _ => {}
+                }
+                Ok(())
+            },
+        )?;
         Ok(top)
     }
 
     /// The Private DICT at `location` (size, offset), read as
     /// `cff_load_private_dict` reads it: none, or one at offset or size zero,
     /// leaves no local subroutines and zeros for the hinter's values; else the
-    /// DICT's entries over FreeType's defaults. An entry FreeType reads with
-    /// too few operands fails the face, as it fails FreeType's parser.
+    /// DICT's entries over FreeType's defaults.
+    ///
+    /// FreeType parses it when it opens the face without a design vector, so
+    /// that every `blend` weighs its deltas zero, and reads its local
+    /// subroutines and `vsindex` from that parse. Each glyph load of a face
+    /// with variations and `fvar` parses it again with the design vector, and
+    /// the hinter takes its values from that parse, unsanitised up to the
+    /// error should it fail (`cf2_font_setup` ignores the error).
     fn private_dict(
         &self,
         table: &[u8],
@@ -338,42 +372,62 @@ impl Cff {
             return Ok(private);
         };
         let bytes = slice(table, offset, size)?;
-        let mut subrs = None;
-        let mut hints = HintDict::DEFAULTS;
-        let version = self.version;
-        self.dict(bytes, true, work, |Entry { operator, operands }| {
+        let zero = |i| self.region_scalars(i).map(|s| Weights::Zero(s.len()));
+        let (opened, parsed) = self.read_private(bytes, &zero, work);
+        parsed?;
+        private.vsindex = opened.vsindex;
+        private.hints = opened.hints;
+        if self.fvar_axes != 0 && !self.variation_data.is_empty() {
+            let regions = |i| self.blend_scalars(i).map(Weights::Regions);
+            private.hints = self.read_private(bytes, &regions, work).0.hints;
+        }
+        if let Some(relative) = opened.subrs {
+            let at = offset.checked_add(relative).ok_or(Error::Overflow)?;
+            private.subrs = Index::parse(&mut Reader::at(table, at)?, self.version)?;
+        }
+        Ok(private)
+    }
+
+    /// One parse of a Private DICT's `bytes` with `weights` for its blends:
+    /// what it read, and how it ended. The hinter's values are corrected as
+    /// `cff_load_private_dict` corrects them only when the parse succeeds.
+    fn read_private<'s>(
+        &'s self,
+        bytes: &[u8],
+        weights: &dyn Fn(usize) -> Result<Weights<'s>>,
+        work: &mut WorkBudget,
+    ) -> (PrivateValues, Result<()>) {
+        let mut values = PrivateValues {
+            subrs: None,
+            vsindex: 0,
+            hints: HintDict::DEFAULTS,
+        };
+        let hints = &mut values.hints;
+        let parsed = self.dict(bytes, Kind::Private, Some(weights), work, |entry| {
+            let (operator, operands) = (entry.operator, entry.operands);
             let fixed = |o: &Operand<'_>| o.fixed(0);
             match operator {
-                op::SUBRS => subrs = Some(dict::single(operands)?),
-                op::VSINDEX => private.vsindex = dict::first(operands)?.index()?,
+                op::SUBRS => values.subrs = Some(operands[0].unsigned()),
+                op::VSINDEX => values.vsindex = operands[0].unsigned(),
                 op::BLUE_VALUES => hints.blue_values.set(operands.iter().map(fixed)),
                 op::OTHER_BLUES => hints.other_blues.set(operands.iter().map(fixed)),
                 op::FAMILY_BLUES => hints.family_blues.set(operands.iter().map(fixed)),
                 op::FAMILY_OTHER_BLUES => {
                     hints.family_other_blues.set(operands.iter().map(fixed));
                 }
-                op::BLUE_SCALE => hints.blue_scale = dict::first(operands)?.fixed(3),
-                op::BLUE_SHIFT => hints.blue_shift = dict::first(operands)?.integer(),
-                op::BLUE_FUZZ => hints.blue_fuzz = dict::first(operands)?.integer(),
+                op::BLUE_SCALE => hints.blue_scale = operands[0].fixed(3),
+                op::BLUE_SHIFT => hints.blue_shift = operands[0].integer(),
+                op::BLUE_FUZZ => hints.blue_fuzz = operands[0].integer(),
                 // FreeType stores LanguageGroup in an int.
-                op::LANGUAGE_GROUP => {
-                    hints.language_group = dict::first(operands)?.integer() as i32;
-                }
-                // Unused here, but read by FreeType, which needs their operand.
-                other if op::unused_private(version, other) => {
-                    dict::first(operands)?;
-                }
+                op::LANGUAGE_GROUP => hints.language_group = operands[0].integer() as i32,
                 _ => {}
             }
             Ok(())
-        })?;
-        hints.sanitize();
-        private.hints = hints;
-        if let Some(relative) = subrs {
-            let at = offset.checked_add(relative).ok_or(Error::Overflow)?;
-            private.subrs = Index::parse(&mut Reader::at(table, at)?, self.version)?;
+        });
+        if parsed.is_ok() {
+            values.hints.sanitize();
         }
-        Ok(private)
+        (values, parsed)
     }
 
     /// Checks the FDSelect header; entries are read per glyph.
@@ -825,6 +879,13 @@ impl Cff {
     }
 }
 
+/// What one parse of a Private DICT reads.
+struct PrivateValues {
+    subrs: Option<usize>,
+    vsindex: usize,
+    hints: HintDict,
+}
+
 /// The Top DICT entries this reader uses.
 #[derive(Debug, Default)]
 struct Top {
@@ -837,15 +898,17 @@ struct Top {
     vstore: Option<usize>,
     ros: bool,
     synthetic: bool,
-    charstring_type: usize,
+    charstring_type: i64,
     matrix: Option<FontMatrix>,
 }
 
+/// The size and offset of `Private`, which FreeType refuses negative.
 fn private_location(operands: &[Operand<'_>]) -> Result<(usize, usize)> {
-    match operands {
-        [size, offset] => Ok((size.index()?, offset.index()?)),
-        _ => Err(Error::Invalid("CFF Private operands")),
+    let [size, offset] = [operands[0], operands[1]].map(Operand::integer);
+    if size < 0 || offset < 0 {
+        return Err(Error::Invalid("CFF Private DICT size or offset"));
     }
+    Ok((size as usize, offset as usize))
 }
 
 /// `cff_blend_build_vector`'s factor for the region whose `axes` axes
@@ -1051,6 +1114,61 @@ mod tests {
     }
 
     #[test]
+    fn top_dict_entries_read_as_freetype_reads_them() {
+        let glyph = table(&rectangle(0, &[50]), Vec::new());
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+        let whole = Table {
+            offset: 0,
+            len: glyph.len(),
+        };
+        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let top = |bytes: &[u8]| cff.top_dict(bytes, &mut WorkBudget::new(100));
+        // An offset reads the first of its operands.
+        assert_eq!(top(&[239, 240, 17]).unwrap().charstrings, Some(100));
+        assert!(top(&[17]).is_err());
+        // A registry of 0xFFFF is no ROS; -1 in two bytes is 0xFFFFFFFF.
+        assert!(!top(&[29, 0, 0, 0xff, 0xff, 139, 139, 12, 30]).unwrap().ros);
+        assert!(top(&[28, 0xff, 0xff, 139, 139, 12, 30]).unwrap().ros);
+        assert!(top(&[139, 139, 139, 12, 30]).unwrap().ros);
+        assert!(top(&[139, 139, 12, 30]).is_err());
+        // MultipleMaster needs five operands and 2 to 16 designs; FontBBox four.
+        assert!(top(&[141, 139, 139, 139, 139, 12, 24]).is_ok());
+        assert!(top(&[140, 139, 139, 139, 139, 12, 24]).is_err());
+        assert!(top(&[139, 139, 139, 5]).is_err());
+        // A negative Private DICT size fails.
+        assert!(top(&[138, 139, 18]).is_err());
+        // Operators FreeType does not know are skipped with their operands.
+        assert!(top(&[14, 239, 17]).is_ok());
+    }
+
+    #[test]
+    fn a_failed_private_dict_reparse_keeps_what_it_read_unsanitised() {
+        let glyph = table(&rectangle(0, &[50]), Vec::new());
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+        let whole = Table {
+            offset: 0,
+            len: glyph.len(),
+        };
+        let mut cff =
+            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        cff.version = Version::Cff2;
+        // BlueShift 2000, then a blend whose blend vector cannot be built.
+        let bytes = [28, 0x07, 0xd0, 12, 10, 139, 139, 140, 23];
+        let failing = |_| {
+            Err(Error::Invalid(
+                "CFF2 variation store and fvar axis counts differ",
+            ))
+        };
+        let (values, parsed) = cff.read_private(&bytes, &failing, &mut work);
+        assert!(parsed.is_err());
+        assert_eq!(values.hints.blue_shift, 2000);
+        // A parse that succeeds corrects it to FreeType's default.
+        let (values, parsed) = cff.read_private(&bytes[..5], &failing, &mut work);
+        assert!(parsed.is_ok());
+        assert_eq!(values.hints.blue_shift, 7);
+    }
+
+    #[test]
     fn private_dict_entries_freetype_reads_need_their_operand() {
         let parse = |private: Vec<u8>| {
             let glyph = table(&rectangle(0, &[50]), private);
@@ -1081,17 +1199,20 @@ mod tests {
             );
         }
         // CFF2 has no widths, ForceBold, lenIV or seed: FreeType skips them.
-        let skipped = |op| !dict::op::unused_private(Version::Cff2, op);
+        let private = |op| dict::op::min_operands(Version::Cff2, dict::Kind::Private, op);
         assert!(
             [20, 21, 0x0c0e, 0x0c0f, 0x0c10, 0x0c13]
                 .into_iter()
-                .all(skipped)
+                .all(|op| private(op).is_none())
         );
         assert!(
-            [10, 11, 0x0c12]
+            [10, 11, 0x0c12, 22]
                 .into_iter()
-                .all(|op| dict::op::unused_private(Version::Cff2, op))
+                .all(|op| private(op) == Some(1))
         );
+        // Nor CFF2 Top DICTs the charset, Encoding or ROS of CFF.
+        let top = |op| dict::op::min_operands(Version::Cff2, dict::Kind::Top, op);
+        assert_eq!([15, 16, 0x0c1e].map(top), [None; 3]);
     }
 
     #[test]

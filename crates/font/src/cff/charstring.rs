@@ -518,6 +518,8 @@ struct State<'p, const N: usize> {
     width_seen: bool,
     seac: Option<Seac>,
     vsindex: usize,
+    /// Whether a `blend` ran, after which `vsindex` is refused.
+    blended: bool,
     random: u32,
 }
 
@@ -575,6 +577,7 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
             width_seen: self.cff.version == Version::Cff2,
             seac: None,
             vsindex: private.vsindex,
+            blended: false,
             random: 0,
         };
         self.run(charstring, 0, &mut s)?;
@@ -696,9 +699,15 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
                 s.stack.clear();
                 return Ok(Flow::End);
             }
+            // As FreeType's CFF2 interpreter: a negative index is ignored,
+            // and one outside the variation store fails at its `blend`.
             Op::VsIndex => {
-                s.vsindex = index(s.stack.pop()?)?;
-                self.cff.region_scalars(s.vsindex)?;
+                if s.blended {
+                    return Err(Error::Invalid("CFF2 vsindex after blend"));
+                }
+                if let Ok(vsindex) = usize::try_from(to_int(s.stack.pop()?)) {
+                    s.vsindex = vsindex;
+                }
                 s.stack.clear();
             }
             Op::Blend => self.blend(s)?,
@@ -893,7 +902,9 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
                 .fold(value, |sum, (&d, &weight)| {
                     sum.wrapping_add(mul_fix(i64::from(d), i64::from(weight)) as Fixed)
                 })
-        })
+        })?;
+        s.blended = true;
+        Ok(())
     }
 
     fn line_by(&mut self, pen: &mut Pen<'_>, dx: Fixed, dy: Fixed) -> Result<()> {

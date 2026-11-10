@@ -166,37 +166,6 @@ impl GlyphMetrics {
     }
 }
 
-/// The axis count of an `fvar` table FreeType accepts as it loads a face
-/// (`sfnt_load_face`), which then gives the face a design vector at the
-/// default instance; zero for none.
-fn fvar_axes(data: &[u8], fvar: Option<sfnt::Table>) -> u16 {
-    let Some(bytes) = fvar.map(|t| t.bytes(data)).filter(|b| b.len() >= 20) else {
-        return 0;
-    };
-    let mut r = read::Reader::new(bytes);
-    let header = (|| {
-        let version = r.u32()?;
-        let offset = r.u16()?;
-        r.skip(2)?;
-        Ok::<_, Error>((version, offset, r.u16()?, r.u16()?, r.u16()?, r.u16()?))
-    })();
-    let Ok((version, offset, axes, axis_size, instances, instance_size)) = header else {
-        return 0;
-    };
-    let [axes_n, instances_n, instance_size_n] = [axes, instances, instance_size].map(usize::from);
-    let fits =
-        usize::from(offset) + usize::from(axis_size) * axes_n + instance_size_n * instances_n
-            <= bytes.len();
-    let valid = version == 0x0001_0000
-        && axis_size == 20
-        && axes != 0
-        && axes <= 0x3ffe
-        && (instance_size_n == 4 + 4 * axes_n || instance_size_n == 6 + 4 * axes_n)
-        && instances <= 0x7eff
-        && fits;
-    if valid { axes } else { 0 }
-}
-
 /// `FT_Outline_Get_CBox`: the box of every point of `outline`, as `[x_min,
 /// y_min, x_max, y_max]`; zero for an outline without points.
 fn control_box(outline: &Outline) -> [i32; 4] {
@@ -366,7 +335,7 @@ impl Font {
                     (None, Some(t)) => (t, Version::Cff2),
                     (None, None) => return Err(Error::Invalid("missing CFF table")),
                 };
-                let axes = fvar_axes(bytes, tables.fvar);
+                let axes = sfnt::fvar_axes(bytes, tables.fvar);
                 let cff = Cff::parse(
                     bytes,
                     table,
@@ -972,41 +941,5 @@ impl Font {
     /// Whether the face is CID-keyed CFF.
     pub fn is_cid_keyed(&self) -> bool {
         matches!(&self.outlines, Outlines::Cff(cff) if cff.is_cid_keyed())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::fvar_axes;
-    use crate::sfnt::Table;
-
-    #[test]
-    fn fvar_gives_its_axes_only_with_a_header_freetype_accepts() {
-        // Version 1.0, axes at 16, two axes of 20 bytes, one instance of
-        // 4 + 4 × 2 bytes, then the arrays.
-        let header = |version: u32, axis_size: u16, instance_size: u16| {
-            let mut fvar = version.to_be_bytes().to_vec();
-            for v in [16_u16, 2, 2, axis_size, 1, instance_size] {
-                fvar.extend(v.to_be_bytes());
-            }
-            fvar.resize(16 + 40 + usize::from(instance_size), 0);
-            fvar
-        };
-        let axes = |fvar: &[u8]| {
-            let table = Table {
-                offset: 0,
-                len: fvar.len(),
-            };
-            fvar_axes(fvar, Some(table))
-        };
-        assert_eq!(axes(&header(0x0001_0000, 20, 12)), 2);
-        assert_eq!(axes(&header(0x0001_0000, 20, 14)), 2);
-        assert_eq!(axes(&header(0x0002_0000, 20, 12)), 0);
-        assert_eq!(axes(&header(0x0001_0000, 16, 12)), 0);
-        assert_eq!(axes(&header(0x0001_0000, 20, 13)), 0);
-        // Arrays past the table's end, and a table shorter than 20 bytes.
-        assert_eq!(axes(&header(0x0001_0000, 20, 12)[..60]), 0);
-        assert_eq!(axes(&header(0x0001_0000, 20, 12)[..19]), 0);
-        assert_eq!(fvar_axes(&[], None), 0);
     }
 }

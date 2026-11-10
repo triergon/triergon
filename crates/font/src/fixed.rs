@@ -1,9 +1,11 @@
 //! FreeType's fixed-point arithmetic, reproduced to the bit: scaled outlines and
 //! metrics are only identical when every product rounds the same way.
 //!
-//! `FT_Long` is 64 bits on the platforms the reference runs on, so products and
-//! sums are `i64` here; values FreeType keeps in 32 bits (`CF2_Fixed`) wrap as
-//! they do there.
+//! FreeType is followed as GCC builds it for 32-bit ARM, where `FT_Long` has
+//! 32 bits. Products and sums are `i64` here, which agrees wherever FreeType's
+//! values fit 32 bits; where they may not, the callers narrow or wrap them as
+//! a 32-bit `FT_Long` or `CF2_Fixed` does. `FT_MulFix`, `FT_MulDiv` and
+//! `FT_DivFix` take their intermediate products in 64 bits on every target.
 
 /// One in 16.16.
 pub(crate) const ONE: i64 = 0x1_0000;
