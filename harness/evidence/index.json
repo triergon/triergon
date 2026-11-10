@@ -19462,6 +19462,26 @@
    "sha256": "5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949",
    "bytes": 129922253,
    "source_revision": "3d422610316d79665c80b48ab8a27a8a57880efe"
+  },
+  {
+   "name": "matroska-legacy-aac",
+   "path": "matroska-legacy-aac",
+   "retention": "retained",
+   "reason": "Matroska legacy AAC-LC measurements in docs/status.md.",
+   "key": "evidence/matroska-legacy-aac/df02366d06af85e3ca8438bb0d43533af81d0831861591f1e5982e32735e5896.tar.gz",
+   "sha256": "df02366d06af85e3ca8438bb0d43533af81d0831861591f1e5982e32735e5896",
+   "bytes": 30110990,
+   "source_revision": "0a75c52c22f7a71017c2b60ef9dd9c6f2c8383e8"
+  },
+  {
+   "name": "matroska-legacy-aac-initial",
+   "path": "matroska-legacy-aac-initial",
+   "retention": "retained",
+   "reason": "Matroska legacy AAC-LC measurements in docs/status.md.",
+   "key": "evidence/matroska-legacy-aac-initial/ba57ce40639a9213f1f9a4e971e235018822522734ea6c3327b04ba72e643197.tar.gz",
+   "sha256": "ba57ce40639a9213f1f9a4e971e235018822522734ea6c3327b04ba72e643197",
+   "bytes": 26540027,
+   "source_revision": "8ab2594976cd4925230f84dfb55c331925d7414a"
   }
  ]
 }
