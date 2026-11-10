@@ -188,8 +188,11 @@ resource limit becomes an explicit, reviewed rule for that case.
   `report`, `grade` and the case evidence refuse runtime or memory against an
   instrumented reference, and `cargo xtask check-design` requires a
   `measurement_reference` to be an uninstrumented build of the same pinned
-  libraries. One timed operation runs from creating the library to the last
-  frame on both sides; the teardown that frees the caches is outside it.
+  libraries. The timed span is reading the script or running the stream and
+  rendering its frames, from the configured renderer to the last frame on both
+  sides: libass's renderer setters each empty its caches (`ass_reconfigure`),
+  and the teardown frees them, so neither is timed. The memory window holds the
+  whole operation.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   features commit no case rows. `cargo xtask fonts manifest`, `cargo
   xtask shape manifest`, `cargo xtask raster manifest` and `cargo xtask ass

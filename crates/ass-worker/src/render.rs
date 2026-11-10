@@ -5,10 +5,12 @@
 //! One operation does what a player embedding libass does: it hands the
 //! attached fonts it has read to the renderer (`ass_add_font`, which copies
 //! them), opens the default font file (which libass opens itself), creates
-//! the renderer, reads the script or runs the stream and renders every frame.
-//! The timed span ends there, before the renderer, the script and the fonts
-//! are freed, as the reference's ends before `ass_renderer_done`: neither
-//! side times the teardown that releases its caches.
+//! and configures the renderer, reads the script or runs the stream and
+//! renders every frame. The timed span is the reading and the rendering, as
+//! the reference's is: it starts once the renderer is configured, since
+//! every libass setter empties the renderer's caches (`ass_reconfigure`), and
+//! it ends before the renderer, the script and the fonts are freed, so
+//! neither side times a cache reset or the teardown.
 
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -177,11 +179,12 @@ impl<W: Write> Frames for Printed<W> {
 }
 
 /// What one operation rendered with, freed by its caller after the timed
-/// span.
+/// span, and how long its reading and rendering took.
 struct Rendered {
     _fonts: Fonts,
     _renderer: Renderer,
     _script: Option<Script>,
+    elapsed: Duration,
 }
 
 impl Case<'_> {
@@ -218,8 +221,9 @@ impl Case<'_> {
     }
 
     /// One operation: the fonts, a renderer, the script read or the stream
-    /// run, and every frame rendered; what it rendered with is returned, to
-    /// be freed outside the timed span.
+    /// run, and every frame rendered, timed from the configured renderer to
+    /// the last frame; what it rendered with is returned, to be freed outside
+    /// the timed span.
     fn render(&self, budget: &Budget, data: &[u8], out: &mut impl Frames) -> Result<Rendered> {
         let fonts = self.fonts(budget)?;
         let mut renderer = Renderer::new(budget, &self.settings(), &fonts)?;
@@ -227,6 +231,7 @@ impl Case<'_> {
             extract_fonts: true,
             ..Options::default()
         };
+        let start = Instant::now();
         let mut frames = |script: &mut Script, frames: Frames_| -> Result<()> {
             for now in frames.times() {
                 let frame = renderer.render(script, now)?;
@@ -247,10 +252,12 @@ impl Case<'_> {
             }
             script
         };
+        let elapsed = start.elapsed();
         Ok(Rendered {
             _fonts: fonts,
             _renderer: renderer,
             _script: script,
+            elapsed,
         })
     }
 
@@ -344,9 +351,8 @@ pub fn run(args: &[String]) -> Result<()> {
     let (mut total, mut elapsed) = (Work::default(), Duration::ZERO);
     for _ in 0..iterations {
         let mut folded = Folded::default();
-        let start = Instant::now();
         let rendered = case.render(&budget, std::hint::black_box(&data), &mut folded)?;
-        elapsed += start.elapsed();
+        elapsed += rendered.elapsed;
         drop(rendered);
         total.accumulate(&folded.0);
     }

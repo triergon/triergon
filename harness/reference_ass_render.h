@@ -42,8 +42,11 @@
  * it uninitialised): it is told by its buffer (assr_is_box) and has type 3,
  * ASSR_IMAGE_BOX, one past IMAGE_TYPE_SHADOW. The file and the attached fonts
  * are read before the operation; libass opens the default font file itself.
- * The timed span runs from ass_library_init to the last frame's fold; the
- * teardown after it, which frees the caches, is not timed.
+ * The timed span runs from the configured renderer to the last frame's fold:
+ * reading the script or running the stream, and rendering. The setup before
+ * it, whose setters each empty the renderer's caches (ass_reconfigure,
+ * ass_render_api.c:29-37), and the teardown after it, which frees them, are
+ * not timed.
  * `ass-render-dump` prints the same values as lines:
  *   frame TIME CHANGED IMAGES
  *   image TYPE X Y W H RRGGBBAA ROW-HEX...
@@ -173,14 +176,13 @@ static void assr_frames(AssImages *w, ASS_Renderer *r, ASS_Track *t, AssFrames f
     }
 }
 
-/* One operation; 0 when libass could not be set up. Its span up to the last
- * frame is added to *elapsed, and the teardown is left out. */
+/* One operation; 0 when libass could not be set up. Its span from the
+ * configured renderer to the last frame is added to *elapsed. */
 static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, size_t size, int stream,
                        const AssFixture *f, uint64_t *elapsed) {
     int ok = 0;
     ASS_Renderer *r = NULL;
     ASS_Track *track = NULL;
-    uint64_t start = assr_now_ns();
     ASS_Library *lib = ass_library_init();
     if (!lib) return 0;
     ass_set_message_cb(lib, assr_quiet, NULL);
@@ -208,6 +210,7 @@ static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, s
      * composites. */
     ass_set_cache_limits(r, 1000, 24);
     ass_set_fonts(r, c->default_font, c->default_family, ASS_FONTPROVIDER_NONE, NULL, 0);
+    uint64_t start = assr_now_ns();
     if (!stream) {
         /* libass may modify the buffer it reads. */
         char *copy = malloc(size + 1);
