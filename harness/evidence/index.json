@@ -16822,6 +16822,50 @@
    "key": "evidence/mp4-range-dedicated-entries-classified/632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e.tar.gz",
    "sha256": "632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e",
    "bytes": 8608934
+  },
+  {
+   "name": "mp4-range-fragment-seek-linux-arm64",
+   "path": "mp4-range-fragment-seek-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-fragment-seek-linux-arm64/d95f142f73c0790d211f30d7de613f734f68409eb3015c7d48905c3c5e542105.tar.gz",
+   "sha256": "d95f142f73c0790d211f30d7de613f734f68409eb3015c7d48905c3c5e542105",
+   "bytes": 12721121,
+   "source_revision": "a2f009026bc53be3757a9064247fb4e3ace80e0b"
+  },
+  {
+   "name": "mp4-range-fragment-rebase-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-fragment-rebase-linux-arm64/25546feeeb50edf887dd0656502e5cca96b3d61f90431ebe7035e41e1f25dca3.tar.gz",
+   "sha256": "25546feeeb50edf887dd0656502e5cca96b3d61f90431ebe7035e41e1f25dca3",
+   "bytes": 54005807,
+   "source_revision": "348e0b0cb2e79c5e51a2769e2d9f319c2af00983"
+  },
+  {
+   "name": "mp4-range-current-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-current-linux-arm64/48a28a728709ff0354a588a73e511ae6db3e0e3b01b362a352e407fd31da38aa.tar.zst",
+   "sha256": "48a28a728709ff0354a588a73e511ae6db3e0e3b01b362a352e407fd31da38aa",
+   "bytes": 4889147,
+   "source_revision": "a690f0f7fe7db02b64c2506e57e7a1526b3f092a"
+  },
+  {
+   "name": "mp4-fragmented-range-rebased",
+   "retention": "retained",
+   "key": "evidence/mp4-fragmented-range-rebased/824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da.tar.zst",
+   "sha256": "824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da"
+  },
+  {
+   "name": "mp4-range-fragment-edit-clocks",
+   "path": "mp4-range-fragment-edit-clocks",
+   "retention": "retained",
+   "reason": "Fifteen MP4 range comparisons covering regular and fragmented edits and dedicated sample entries on AArch64 Linux.",
+   "key": "evidence/mp4-range-fragment-edit-clocks/7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6.tar.gz",
+   "sha256": "7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6",
+   "bytes": 10883413,
+   "source_revision": "24f2299a8d12e120eabc7fc4a32e7eb8febc953e"
   }
  ]
 }

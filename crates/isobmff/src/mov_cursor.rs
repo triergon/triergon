@@ -155,8 +155,10 @@ struct Slot<'a> {
     append_run: Option<(usize, usize)>,
     discard_boundary: Option<i128>,
     fragment_cto_minimum: i64,
+    fragment_media_start: Option<i64>,
     previous_clock: Option<PreviousClock>,
     saw_fragment: bool,
+    starts_fragment_run: bool,
     ended: bool,
 }
 impl<'a> Slot<'a> {
@@ -174,8 +176,10 @@ impl<'a> Slot<'a> {
             append_run: None,
             discard_boundary: None,
             fragment_cto_minimum: 0,
+            fragment_media_start: None,
             previous_clock: None,
             saw_fragment: false,
+            starts_fragment_run: false,
             ended: false,
         })
     }
@@ -207,14 +211,22 @@ impl<'a> Slot<'a> {
                 .dts
                 .checked_add(i128::from(previous.duration))
                 .ok_or(Error::Overflow)?;
+            // Keep decode accumulation in media ticks. The index checks the
+            // witness against the projected DTS of the two adjacent packets.
+            let edit_start = i128::from(self.fragment_media_start.unwrap_or_default());
+            let predecessor_dts = previous
+                .dts
+                .checked_sub(edit_start)
+                .ok_or(Error::Overflow)?;
+            let derived_dts = dts.checked_sub(edit_start).ok_or(Error::Overflow)?;
             return Ok((
                 dts,
                 ClockOrigin::PredecessorEnd(PredecessorClock {
                     predecessor_sample: previous.sample,
-                    predecessor_demux_dts_ticks: previous.dts,
+                    predecessor_demux_dts_ticks: predecessor_dts,
                     predecessor_duration_ticks: previous.duration,
                     predecessor_source_dts_known: previous.source_known,
-                    derived_dts_ticks: dts,
+                    derived_dts_ticks: derived_dts,
                 }),
             ));
         }
@@ -303,7 +315,9 @@ impl<'a> Slot<'a> {
                 )
             };
             let mut demux = if sample.fragment_flags.is_some() {
-                view.project_fragment(&sample, dts, self.fragment_cto_minimum)?
+                let offset = i128::from(self.fragment_media_start.unwrap_or_default());
+                let presentation_dts = dts.checked_sub(offset).ok_or(Error::Overflow)?;
+                view.project_fragment(&sample, presentation_dts, self.fragment_cto_minimum)?
             } else {
                 view.project_regular(&sample, self.shift)?
             };
@@ -312,7 +326,8 @@ impl<'a> Slot<'a> {
                     .cursor
                     .active_fragment_run()
                     .ok_or(Error::Invalid("native fragment sample has no source run"))?;
-                if self.append_run != Some(run) {
+                self.starts_fragment_run = self.append_run != Some(run);
+                if self.starts_fragment_run {
                     // Actual reference-demux partition controls distinguish trun
                     // appends from a whole traf or lifetime peak. Snapshot the
                     // immediately preceding index tail once, even after rollback.
@@ -341,11 +356,16 @@ impl<'a> Slot<'a> {
                     source_known: sample.dts_ticks.is_some(),
                 });
             }
+            let edit = self.fragment_media_start.map(|_| EditIdentity {
+                sequence: sample.ordinal,
+                edit_ordinal: 1,
+                duration_basis: DurationBasis::FragmentDecodeDelta,
+            });
             PacketOccurrence {
                 track_id: self.track.track_id,
                 source: sample,
                 demux,
-                edit: None,
+                edit,
                 clock_origin,
                 media_clock: self.clock,
                 scheduling_clock: SchedulingClock::SingleTrack,
@@ -407,6 +427,23 @@ pub struct PacketCursor<'a> {
     seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
 }
 
+pub(crate) fn fragment_media_start(edits: &EditList) -> Result<i64> {
+    let unsupported = Error::Unsupported("fragment edit must be one open-ended rate-one entry");
+    if edits.len() != 1 {
+        return Err(unsupported);
+    }
+    let edit = edits.entry(0)?;
+    // An initialization edit with zero duration spans every later fragment.
+    if edit.segment_duration != 0
+        || edit.media_time < 0
+        || edit.rate_integer != 1
+        || edit.rate_fraction != 0
+    {
+        return Err(unsupported);
+    }
+    Ok(edit.media_time)
+}
+
 fn count(value: u64, maximum: u64) -> Result<()> {
     if value > maximum {
         return Err(Error::Limit {
@@ -417,6 +454,14 @@ fn count(value: u64, maximum: u64) -> Result<()> {
     Ok(())
 }
 impl<'a> PacketCursor<'a> {
+    pub(crate) fn index_edit_offset(&self) -> i64 {
+        self.slots
+            .as_slice()
+            .first()
+            .and_then(|slot| slot.fragment_media_start)
+            .unwrap_or_default()
+    }
+
     pub fn new(
         budget: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -1030,17 +1075,22 @@ impl<'a> PacketCursor<'a> {
                         None
                     } else if let Some((edits, movie_base)) = slot.track.edits {
                         if slot.saw_fragment {
-                            return Err(Error::Unsupported(
-                                "native edited fragment occurrence profile",
-                            ));
+                            if !self.complete_source || self.front_source {
+                                return Err(Error::Unsupported(
+                                    "fragment edit needs a complete source",
+                                ));
+                            }
+                            slot.fragment_media_start = Some(fragment_media_start(edits)?);
+                            None
+                        } else {
+                            Some(EditCursor::new(
+                                slot.track.table,
+                                edits,
+                                slot.track.media_base,
+                                movie_base,
+                                self.limits.edit,
+                            )?)
                         }
-                        Some(EditCursor::new(
-                            slot.track.table,
-                            edits,
-                            slot.track.media_base,
-                            movie_base,
-                            self.limits.edit,
-                        )?)
                     } else {
                         None
                     };

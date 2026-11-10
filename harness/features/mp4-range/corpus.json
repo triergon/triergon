@@ -58,6 +58,77 @@
       }
     },
     {
+      "id": "fragmented-open",
+      "profile": "fragmented-open",
+      "file": "fragmented-avc-aac.mp4",
+      "sha256": "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 93,
+        "bytes": 39981,
+        "digest": 7927680340045287421
+      }
+    },
+    {
+      "id": "fragmented-before-sync",
+      "profile": "fragmented-before-sync",
+      "file": "fragmented-avc-aac.mp4",
+      "sha256": "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4095"
+      ],
+      "expected": {
+        "packets": 93,
+        "bytes": 39981,
+        "digest": 7927680340045287421
+      }
+    },
+    {
+      "id": "fragmented-seek",
+      "profile": "fragmented-seek",
+      "file": "fragmented-avc-aac.mp4",
+      "sha256": "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 74,
+        "bytes": 30999,
+        "digest": 2297253848353618229
+      }
+    },
+    {
+      "id": "fragmented-rescaled-open",
+      "profile": "fragmented-rescaled-open",
+      "file": "fragmented-aac-media-clock.mp4",
+      "sha256": "07acb7a739b83a9597b462b561fb97db1767a2b3ccc2bba3b2bb219a985b563d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 93,
+        "bytes": 39981,
+        "digest": 16257532825513011650
+      }
+    },
+    {
+      "id": "fragmented-rescaled-seek",
+      "profile": "fragmented-rescaled-seek",
+      "file": "fragmented-aac-media-clock.mp4",
+      "sha256": "07acb7a739b83a9597b462b561fb97db1767a2b3ccc2bba3b2bb219a985b563d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 75,
+        "bytes": 31255,
+        "digest": 16684294720659653080
+      }
+    },
+    {
       "id": "dvh1-open",
       "profile": "dvh1-open",
       "file": "dvh1.mp4",

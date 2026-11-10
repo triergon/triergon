@@ -407,6 +407,7 @@ pub struct SeekJob<'a> {
     context: Context<'a>,
     index: IndexCursor<'a>,
     timestamp: i64,
+    index_timestamp: i128,
     first: Option<IndexEntry>,
     best: Option<IndexEntry>,
     previous: Option<i64>,
@@ -481,6 +482,7 @@ impl<'a> SeekJob<'a> {
             context,
             index,
             timestamp,
+            index_timestamp: i128::from(timestamp),
             first: None,
             best: None,
             previous: None,
@@ -518,6 +520,11 @@ impl<'a> SeekJob<'a> {
                     if entry.timestamp == i64::MIN {
                         return Err(Error::Unsupported("native seek null index clock"));
                     }
+                    if self.scanned == 0 {
+                        // A fragment edit shifts index entries at open. The seek
+                        // query receives the same shift before it searches them.
+                        self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
+                    }
                     if self.previous.is_some_and(|prior| entry.timestamp <= prior)
                         || self.unordered_minimum.is_some()
                     {
@@ -532,7 +539,7 @@ impl<'a> SeekJob<'a> {
                         if self.first.is_none() {
                             self.first = Some(entry.clone());
                         }
-                        if entry.timestamp <= self.timestamp {
+                        if i128::from(entry.timestamp) <= self.index_timestamp {
                             self.best = Some(entry);
                         }
                     }
@@ -546,7 +553,7 @@ impl<'a> SeekJob<'a> {
                     // searches stay refused until the demux search is established.
                     if self
                         .unordered_minimum
-                        .is_some_and(|minimum| self.timestamp >= minimum)
+                        .is_some_and(|minimum| self.index_timestamp >= i128::from(minimum))
                     {
                         return Err(Error::Unsupported(
                             "native seek overlapping index clock query",
