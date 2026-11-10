@@ -21,10 +21,10 @@ mod demux_pes;
 #[cfg(feature = "reference-trace")]
 mod demux_recovery;
 mod demux_stream;
+mod demux_transport;
 mod framer;
 mod media_entity;
 pub mod mux;
-#[cfg(feature = "reference-trace")]
 mod packet_completion;
 pub mod pes;
 pub mod psi;
@@ -36,7 +36,7 @@ mod transport;
 pub use carrier::{RejectedTransport, TransportInspection, TransportInspector};
 pub use continuity::{Continuity, ContinuityOutcome};
 pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
-pub use media_entity::MediaEntityEnd;
+pub use media_entity::{MediaEntityEnd, ObservedTrace};
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
 pub use stream::{

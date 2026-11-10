@@ -5,6 +5,7 @@ use crate::demux_pes::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, PrivateAudioCarriage,
     PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
 };
+use crate::demux_transport::TransportFaultJob;
 use crate::{
     AssemblyStep, PacketFormat, ParseLimits, RejectedTransport, SourceEpochs, SourceRange,
     TransportPacket,
@@ -99,6 +100,7 @@ struct Pending {
 enum RecoveryPending {
     Opcr(Pending),
     Selected(selected::SelectedPending),
+    TransportFault(TransportFaultJob),
 }
 
 /// Accepted inputs reuse the established assembly. A rejected complete finite
@@ -257,6 +259,7 @@ impl RecoveryObserver {
         self.pending.as_ref().and_then(|p| match p {
             RecoveryPending::Opcr(p) => Some(&p.rejection),
             RecoveryPending::Selected(p) => p.rejection(),
+            RecoveryPending::TransportFault(_) => None,
         })
     }
     #[allow(
@@ -312,7 +315,7 @@ impl RecoveryObserver {
             });
         }
         if self.selected_faults && selected::has_selected_hint(&packet) {
-            return self.stage_selected_input(packet, context);
+            return self.stage_selected_input(packet, context, input);
         }
         let offset = packet.source_offset;
         let boundary = self.selected_faults
@@ -492,6 +495,24 @@ impl RecoveryObserver {
         }
         if matches!(self.pending, Some(RecoveryPending::Selected(_))) {
             return self.poll_selected(work, cancel);
+        }
+        if let Some(RecoveryPending::TransportFault(job)) = self.pending.as_mut() {
+            return Ok(match job.poll(&self.inner, work, cancel)? {
+                AssemblyStep::Output(()) => {
+                    let Some(RecoveryPending::TransportFault(job)) = self.pending.take() else {
+                        unreachable!()
+                    };
+                    let packet = job.finish(&mut self.inner)?;
+                    AssemblyStep::Output(DemuxObservation::FromSelectedDiagnostic(
+                        DiagnosticPacket::from(packet),
+                    ))
+                }
+                AssemblyStep::Yield => AssemblyStep::Yield,
+                AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
+                AssemblyStep::Finished => {
+                    return Err(Error::Invalid("transport fault ended before output"));
+                }
+            });
         }
         loop {
             if cancel.load(Ordering::Relaxed) {
