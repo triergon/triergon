@@ -2054,13 +2054,15 @@ impl TsEngine {
                 match result {
                     Ok(ts::AssemblyStep::Output(packet)) => {
                         self.native_pending = Some(packet);
-                        if matches!(
-                            self.segment_discovery,
-                            Some(
-                                SegmentDiscovery::Progressive
-                                    | SegmentDiscovery::CompactProgressive
+                        if self.segment_discovery.is_none()
+                            || matches!(
+                                self.segment_discovery,
+                                Some(
+                                    SegmentDiscovery::Progressive
+                                        | SegmentDiscovery::CompactProgressive
+                                )
                             )
-                        ) {
+                        {
                             return self.project_pending_packet(w, c);
                         }
                         return T::project(TsPayloadStep::Yield);
@@ -2455,6 +2457,7 @@ impl RawEvent {
             _ => Ok(None),
         }
     }
+    #[inline]
     pub fn payload_bytes(&self) -> usize {
         match self {
             Self::NativeTs { packet, .. } => packet.payload_len,

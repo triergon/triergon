@@ -90,7 +90,8 @@ impl Continuity {
         let outcome = match self.counter {
             None => ContinuityOutcome::First,
             Some(previous)
-                if (previous + u8::from(has_payload)) & 15 == packet.continuity_counter =>
+                if previous.wrapping_add(u8::from(has_payload)) & 15
+                    == packet.continuity_counter =>
             {
                 ContinuityOutcome::Continuous
             }
@@ -120,7 +121,7 @@ impl Continuity {
                     ContinuityOutcome::SignalledDiscontinuity
                 } else {
                     ContinuityOutcome::Lost {
-                        expected: (previous + u8::from(has_payload)) & 15,
+                        expected: previous.wrapping_add(u8::from(has_payload)) & 15,
                         actual: packet.continuity_counter,
                     }
                 }
