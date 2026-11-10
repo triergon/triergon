@@ -244,6 +244,26 @@ impl MatroskaReplayPrefix {
         self.0.as_slice().iter().map(|output| &output.event)
     }
 
+    /// Prepare one retained replay event through the same feed checks as a live output.
+    pub fn feed_packet<'a>(
+        &'a self,
+        ordinal: usize,
+        feed: &'a super::MatroskaTrackFeed,
+    ) -> Result<Option<super::MatroskaFeedJob<'a>>> {
+        let output = self
+            .0
+            .as_slice()
+            .get(ordinal)
+            .ok_or(Error::Invalid("Matroska replay ordinal"))?;
+        let Event::Packet(packet) = &output.event else {
+            return Ok(None);
+        };
+        feed.association
+            .selected_source(packet, output.delivery)?
+            .map(|source| feed.prepare_packet(source))
+            .transpose()
+    }
+
     /// Move each output in original order, preserving scope and delivery.
     pub fn into_outputs(self) -> impl ExactSizeIterator<Item = Output> {
         self.0.into_iter().map(MatroskaReplayOutput::into_output)

@@ -200,7 +200,7 @@ pub(crate) struct MatroskaReplayOutput {
     // same explicit budget handle as their original output.
     scope: OutputScope<Option<Budget>>,
     pub event: triergon_matroska::typed::Event,
-    delivery: Delivery,
+    pub(crate) delivery: Delivery,
     bytes: usize,
 }
 

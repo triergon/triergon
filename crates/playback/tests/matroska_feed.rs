@@ -1368,3 +1368,74 @@ fn player_refuses_a_matroska_reader_that_has_read_input() {
         Err(Error::Invalid("Matroska engine needs an unstarted reader"))
     ));
 }
+
+#[test]
+fn compact_replay_prepares_the_same_aac_spans_as_the_output_feed() {
+    use triergon_playback::matroska_feed::{
+        MatroskaCompactDiscovery, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
+    };
+
+    let (engine, source, pool) = matroska_source(
+        INPUT,
+        4096,
+        triergon_matroska::typed::PayloadOwnership::OwnedExact,
+    );
+    let mut discovery = MatroskaCompactDiscovery::new(
+        engine,
+        source,
+        Selection::All,
+        PlayerPolicy::default(),
+        MatroskaDiscoveryLimits::default(),
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    assert!((0..100_000).any(|_| matches!(
+        discovery.poll(&mut WorkBudget::new(8192), &cancel).unwrap(),
+        MatroskaDiscoveryStep::Ready(_)
+    )));
+    let prefix = discovery.finish().unwrap().prefix;
+    let configuration = prefix
+        .events()
+        .find_map(|event| match event {
+            Event::Configuration(configuration) => Some(configuration),
+            _ => None,
+        })
+        .unwrap();
+    let track = configuration
+        .tracks()
+        .iter()
+        .position(|track| track.kind == 2)
+        .unwrap();
+    let feed = setup(&pool, configuration, track);
+    let ordinal = prefix
+        .events()
+        .position(|event| matches!(event, Event::Packet(packet) if packet.packet.track == track))
+        .unwrap();
+
+    let mut replay = prefix.feed_packet(ordinal, &feed).unwrap().unwrap();
+    let mut work = WorkBudget::new(1);
+    let BuildStep::Ready(packet) = replay.step(&mut work, &cancel).unwrap() else {
+        panic!("buffered AAC packet did not produce a feed");
+    };
+    let MatroskaFeedPayload::Aac { header, raw } = packet.payload else {
+        panic!("expected ADTS");
+    };
+    let buffered = (header, raw.to_vec());
+    assert_eq!(work.spent(), 1);
+    assert!(matches!(
+        prefix.feed_packet(prefix.events().len(), &feed),
+        Err(Error::Invalid("Matroska replay ordinal"))
+    ));
+
+    let output = prefix.into_outputs().nth(ordinal).unwrap();
+    let mut replay = feed.packet(&output).unwrap().unwrap();
+    let mut work = WorkBudget::new(1);
+    let BuildStep::Ready(packet) = replay.step(&mut work, &cancel).unwrap() else {
+        panic!("replayed AAC output did not produce a feed");
+    };
+    let MatroskaFeedPayload::Aac { header, raw } = packet.payload else {
+        panic!("expected ADTS");
+    };
+    assert_eq!(buffered, (header, raw.to_vec()));
+    assert_eq!(work.spent(), 1);
+}

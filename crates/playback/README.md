@@ -79,6 +79,11 @@ packet projections before merging the tracks for delivery.
 
 ## Behaviour and limits
 
+**Compact Matroska replay.** `MatroskaReplayPrefix::feed_packet` prepares a
+buffered AAC or AVC packet through the same selection and configuration checks
+as the live feed. A caller can inspect the prefix before delivering its events
+in order.
+
 **Source protocol.** `Source::poll` must return promptly. `Pending` and empty
 data never mean end of stream; only `SourceReply::End` does, and transport
 failure is a separate reply. `abort` wakes and quiesces any I/O producer
