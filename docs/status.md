@@ -175,7 +175,8 @@ The font, shaping and ASS rendering comparisons on Linux compare `cc09ffa8f270f0
 with FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 on a c6g.2xlarge:
 `cargo xtask fonts compare`, `shape compare` and `ass compare` natively on AArch64 and in the ARMv7
 user space, each target with its own reference builds, with the rasterising features and the crates'
-tests on AArch64. The commit after it changes only this file and the evidence index. The same
+tests on AArch64. The commits after it change only this file, the evidence index, and, merged
+from main, the check of the revisions this file cites. The same
 comparisons at `a1aa6f0e1981d07ce9d27efcdc5b6815839f5481`, before the FontMatrix was applied in
 32 bits and main's ASS renderer timing was merged, at
 `ec9a4f1627b2734efbd4134ceb86c3a71740815d`, before the linear advances and the FontMatrix's
