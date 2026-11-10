@@ -1122,9 +1122,9 @@ mod prefix_tests {
         assert_eq!(
             found,
             [
-                ("font-hinting-modes", "font-sized-", 918),
-                ("font-hinting-none", "font-sized-", 102),
-                ("font-outlines", "font-", 51),
+                ("font-hinting-modes", "font-sized-", 936),
+                ("font-hinting-none", "font-sized-", 156),
+                ("font-outlines", "font-", 52),
             ]
         );
         let reviewed = reviewed_inputs(root).unwrap();

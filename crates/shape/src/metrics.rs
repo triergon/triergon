@@ -2,8 +2,10 @@
 //! scaling arithmetic.
 
 use crate::ot::data::{Data, bsearch};
-use std::cell::Cell;
-use triergon_core::{Error, Result};
+use crate::rotations::{Decide, FaceRotations};
+use std::cell::{Cell, RefCell};
+use std::hash::Hash;
+use triergon_core::{Error, Result, WorkBudget};
 use triergon_font::{
     CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont, TextLookup,
 };
@@ -100,6 +102,15 @@ pub trait Metrics {
     fn h_kerning(&self, _left: GlyphId, _right: GlyphId) -> Result<i32> {
         Ok(0)
     }
+    /// An error a function met but could not return, such as the storage of a
+    /// lookup that could not be charged: it ends the shaping call.
+    ///
+    /// # Errors
+    ///
+    /// That error, given once.
+    fn finish(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// A glyph the font cannot load (`Invalid`) answers `otherwise`, as it does to
@@ -175,7 +186,10 @@ impl<'a> OtMetrics<'a> {
     /// CFF the charstring's control box, each side rounded as `roundf` rounds it
     /// after HarfBuzz narrows its double to a float.
     fn unscaled_extents(&self, glyph: GlyphId) -> Result<Option<[i32; 4]>> {
-        let Some(control) = unless_unloadable(self.font.control_box(glyph).map(Some), None)? else {
+        // HarfBuzz's own functions have no budget beyond the face's limits.
+        let mut work = WorkBudget::new(self.font.limits().work);
+        let control = self.font.control_box(glyph, &mut work).map(Some);
+        let Some(control) = unless_unloadable(control, None)? else {
             return Ok(None);
         };
         Ok(Some(match control {
@@ -269,11 +283,14 @@ impl Metrics for OtMetrics<'_> {
 /// [`SizedFont::harfbuzz_scale`] and pixels per em, so that hinting device
 /// tables apply.
 ///
+/// For a face of an `@` font ([`Self::rotating`]), the advance of a glyph
+/// libass's metrics cache keeps rotated ([`GlyphRotations`](crate::GlyphRotations)) is the default
+/// load's vertical advance ([`SizedFont::hinted_vertical_advance`]).
+///
 /// libass reads glyph extents and contour points from FreeType's hinted load,
 /// which this crate does not run: for a glyph of the face both are
-/// `Unsupported`, as is an advance `hinted_advance` cannot give. The vertical
-/// advances libass substitutes in an `@` font are not covered.
-#[derive(Debug)]
+/// `Unsupported`, but for the empty extents of a glyph without points, as is an
+/// advance `hinted_advance` cannot give.
 pub struct SizedMetrics<'a> {
     sized: SizedFont<'a>,
     lookup: Option<TextLookup<'a>>,
@@ -281,17 +298,33 @@ pub struct SizedMetrics<'a> {
     unicode: bool,
     variations: Variations<'a>,
     scale: Scale,
+    rotations: Option<&'a dyn Decide>,
+    /// The caller's budget for the charstrings the extents run.
+    work: RefCell<&'a mut WorkBudget>,
+}
+
+impl std::fmt::Debug for SizedMetrics<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SizedMetrics")
+            .field("sized", &self.sized)
+            .field("lookup", &self.lookup)
+            .field("unicode", &self.unicode)
+            .field("scale", &self.scale)
+            .field("rotating", &self.rotations.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a> SizedMetrics<'a> {
     /// libass's font functions over `sized`, through the charmap libass
-    /// selects when it opens the face ([`Font::text_charmap`]).
+    /// selects when it opens the face ([`Font::text_charmap`]), with `work`
+    /// bounding what they load.
     ///
     /// # Errors
     ///
     /// As [`Self::with_charmap`].
-    pub fn new(sized: SizedFont<'a>) -> Result<Self> {
-        Self::with_charmap(sized, sized.font().text_charmap())
+    pub fn new(sized: SizedFont<'a>, work: &'a mut WorkBudget) -> Result<Self> {
+        Self::with_charmap(sized, sized.font().text_charmap(), work)
     }
 
     /// libass's font functions over `sized`, through `charmap`, the one the
@@ -302,7 +335,11 @@ impl<'a> SizedMetrics<'a> {
     ///
     /// `Unsupported` when libass would convert codes for the charmap, which
     /// this crate does not ([`Font::text_lookup`]).
-    pub fn with_charmap(sized: SizedFont<'a>, charmap: Option<Charmap<'a>>) -> Result<Self> {
+    pub fn with_charmap(
+        sized: SizedFont<'a>,
+        charmap: Option<Charmap<'a>>,
+        work: &'a mut WorkBudget,
+    ) -> Result<Self> {
         let lookup = charmap
             .map(|charmap| sized.font().text_lookup(charmap))
             .transpose()?;
@@ -326,7 +363,35 @@ impl<'a> SizedMetrics<'a> {
                 x_ppem: u32::from(size.x_ppem),
                 y_ppem: u32::from(size.y_ppem),
             },
+            rotations: None,
+            work: RefCell::new(work),
         })
+    }
+
+    /// The font functions of a face of an `@` font, whose glyph metrics
+    /// cache keeps `rotations`: every glyph a lookup loads is recorded there,
+    /// and a glyph it keeps rotated advances by its vertical advance.
+    #[must_use]
+    pub fn rotating<K: Copy + Eq + Hash>(self, rotations: &'a FaceRotations<'a, K>) -> Self {
+        Self {
+            rotations: Some(rotations),
+            ..self
+        }
+    }
+
+    /// Records a glyph a lookup loads in the metrics cache: through the
+    /// character `c`, or `None` for an advance or extents. Whether its cached
+    /// metrics are rotated.
+    fn loaded(&self, glyph: GlyphId, c: Option<char>) -> bool {
+        self.rotations.is_some_and(|r| r.decide(glyph, c))
+    }
+
+    /// Records a glyph a character lookup returned in the metrics cache.
+    fn looked_up(&self, glyph: Option<GlyphId>, c: char) -> Option<GlyphId> {
+        if let Some(glyph) = glyph {
+            self.loaded(glyph, Some(c));
+        }
+        glyph
     }
 
     /// `Unsupported` for a glyph of the face, which FreeType would hint; a glyph
@@ -346,24 +411,40 @@ impl Metrics for SizedMetrics<'_> {
     }
 
     fn nominal_glyph(&self, c: char) -> Option<GlyphId> {
-        self.lookup?.glyph(u32::from(c))
+        self.looked_up(self.lookup?.glyph(u32::from(c)), c)
     }
 
     fn variation_glyph(&self, c: char, selector: char) -> Option<GlyphId> {
         let lookup = self.lookup.filter(|_| self.unicode)?;
         let code = lookup.code(u32::from(c))?;
-        match self.variations.lookup(code, u32::from(selector)) {
+        let glyph = match self.variations.lookup(code, u32::from(selector)) {
             Variation::Default => lookup.charmap().glyph(code),
             Variation::Glyph(glyph) => Some(glyph),
             Variation::None => None,
-        }
+        };
+        self.looked_up(glyph, c)
     }
 
     fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
-        unless_unloadable(self.sized.hinted_advance(glyph), 0)
+        let advance = if self.loaded(glyph, None) {
+            self.sized.hinted_vertical_advance(glyph)
+        } else {
+            self.sized.hinted_advance(glyph)
+        };
+        unless_unloadable(advance, 0)
     }
 
     fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>> {
+        // Rotated or not, the cached extents are the default load's.
+        self.loaded(glyph, None);
+        // A glyph without points has an empty box however FreeType loads it.
+        let control = self
+            .sized
+            .font()
+            .control_box(glyph, &mut self.work.borrow_mut());
+        if let Ok(ControlBox::Empty) = control {
+            return Ok(Some(Extents::default()));
+        }
         self.hinted(glyph, "glyph extents of FreeType's hinted load")
     }
 
@@ -377,6 +458,12 @@ impl Metrics for SizedMetrics<'_> {
 
     fn h_kerning(&self, left: GlyphId, right: GlyphId) -> Result<i32> {
         Ok(self.sized.kerning(left, right))
+    }
+
+    fn finish(&self) -> Result<()> {
+        self.rotations
+            .and_then(Decide::take_refusal)
+            .map_or(Ok(()), Err)
     }
 }
 
@@ -473,9 +560,11 @@ impl<'a> Scaled<'a> {
         }
     }
 
-    /// The first error a font function returned, if any.
+    /// The first error a font function returned, or one it met but could
+    /// not return ([`Metrics::finish`]).
     pub(crate) fn finish(&self) -> Result<()> {
-        self.error.get().map_or(Ok(()), Err)
+        let met = self.metrics.finish();
+        self.error.get().map_or(met, Err)
     }
 
     /// The answer of a fallible font function, or `otherwise` once one failed.

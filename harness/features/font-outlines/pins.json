@@ -257,6 +257,11 @@
       "packets": 24,
       "bytes": 84,
       "digest": 16144614645674543551
+    },
+    "authored-vertical-ttc": {
+      "packets": 20,
+      "bytes": 72,
+      "digest": 12342570846314127857
     }
   }
 }

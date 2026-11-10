@@ -491,7 +491,7 @@ impl Shaper {
         let sized = face_font
             .font
             .at_size(pixels_26_6(text.style(first).size))?;
-        let metrics = SizedMetrics::with_charmap(sized, face_font.charmap())?;
+        let metrics = SizedMetrics::with_charmap(sized, face_font.charmap(), work)?;
         let shaper_face = Face::new(&face_font.font);
         let key = PlanKey {
             face: face_font.uid,
@@ -509,7 +509,7 @@ impl Shaper {
                 &shaper_face,
                 direction,
                 script,
-                &Language::new(std::str::from_utf8(code).unwrap_or("c"))?,
+                &Language::new(std::str::from_utf8(code).unwrap_or("c")),
                 &plan_features(features),
                 &self.budget,
             )?;

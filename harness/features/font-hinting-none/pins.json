@@ -13,6 +13,11 @@
       "bytes": 0,
       "digest": 5299811292356809662
     },
+    "arimo-bold-ttf-vertical-16384": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 14740078519655525310
+    },
     "arimo-bolditalic-ttf-outlines-16384": {
       "packets": 13168,
       "bytes": 389988,
@@ -22,6 +27,11 @@
       "packets": 3292,
       "bytes": 0,
       "digest": 3246793694215726398
+    },
+    "arimo-bolditalic-ttf-vertical-16384": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 14740078519655525310
     },
     "arimo-italic-ttf-outlines-16384": {
       "packets": 13168,
@@ -33,6 +43,11 @@
       "bytes": 0,
       "digest": 17877363361939233982
     },
+    "arimo-italic-ttf-vertical-16384": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 16972843390351946494
+    },
     "arimo-regular-ttf-outlines-16384": {
       "packets": 13168,
       "bytes": 371580,
@@ -42,6 +57,11 @@
       "packets": 3292,
       "bytes": 0,
       "digest": 12850435522868236990
+    },
+    "arimo-regular-ttf-vertical-16384": {
+      "packets": 3292,
+      "bytes": 0,
+      "digest": 14740078519655525310
     },
     "cousine-bold-ttf-outlines-16384": {
       "packets": 9540,
@@ -53,6 +73,11 @@
       "bytes": 0,
       "digest": 8710863924457658949
     },
+    "cousine-bold-ttf-vertical-16384": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 9052269511996395581
+    },
     "cousine-bolditalic-ttf-outlines-16384": {
       "packets": 9540,
       "bytes": 291704,
@@ -62,6 +87,11 @@
       "packets": 2385,
       "bytes": 0,
       "digest": 8710863924457658949
+    },
+    "cousine-bolditalic-ttf-vertical-16384": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 9052269511996395581
     },
     "cousine-italic-ttf-outlines-16384": {
       "packets": 9540,
@@ -73,6 +103,11 @@
       "bytes": 0,
       "digest": 8710863924457658949
     },
+    "cousine-italic-ttf-vertical-16384": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 9326534295007970835
+    },
     "cousine-regular-ttf-outlines-16384": {
       "packets": 9540,
       "bytes": 272256,
@@ -82,6 +117,11 @@
       "packets": 2385,
       "bytes": 0,
       "digest": 8710863924457658949
+    },
+    "cousine-regular-ttf-vertical-16384": {
+      "packets": 2385,
+      "bytes": 0,
+      "digest": 9326534295007970835
     },
     "tinos-bold-ttf-outlines-16384": {
       "packets": 13116,
@@ -93,6 +133,11 @@
       "bytes": 0,
       "digest": 16464717198505187302
     },
+    "tinos-bold-ttf-vertical-16384": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 8220456107435761172
+    },
     "tinos-bolditalic-ttf-outlines-16384": {
       "packets": 13116,
       "bytes": 459668,
@@ -102,6 +147,11 @@
       "packets": 3279,
       "bytes": 0,
       "digest": 13742117827531378470
+    },
+    "tinos-bolditalic-ttf-vertical-16384": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 8220456107435761172
     },
     "tinos-italic-ttf-outlines-16384": {
       "packets": 13116,
@@ -113,6 +163,11 @@
       "bytes": 0,
       "digest": 4842342058489737190
     },
+    "tinos-italic-ttf-vertical-16384": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 9839686302071164531
+    },
     "tinos-regular-ttf-outlines-16384": {
       "packets": 13116,
       "bytes": 451444,
@@ -122,6 +177,11 @@
       "packets": 3279,
       "bytes": 0,
       "digest": 10259766806381084454
+    },
+    "tinos-regular-ttf-vertical-16384": {
+      "packets": 3279,
+      "bytes": 0,
+      "digest": 4936977643855141911
     },
     "dejavumathtexgyre-ttf-outlines-16384": {
       "packets": 17128,
@@ -133,6 +193,11 @@
       "bytes": 0,
       "digest": 7442558121991270671
     },
+    "dejavumathtexgyre-ttf-vertical-16384": {
+      "packets": 4282,
+      "bytes": 0,
+      "digest": 5922217232827541167
+    },
     "dejavusans-bold-ttf-outlines-16384": {
       "packets": 24784,
       "bytes": 801676,
@@ -142,6 +207,11 @@
       "packets": 6196,
       "bytes": 0,
       "digest": 2917141019285718226
+    },
+    "dejavusans-bold-ttf-vertical-16384": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 15099440378683366866
     },
     "dejavusans-boldoblique-ttf-outlines-16384": {
       "packets": 21652,
@@ -153,6 +223,11 @@
       "bytes": 0,
       "digest": 1662061650972444763
     },
+    "dejavusans-boldoblique-ttf-vertical-16384": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 8416712548001578273
+    },
     "dejavusans-extralight-ttf-outlines-16384": {
       "packets": 8128,
       "bytes": 236300,
@@ -162,6 +237,11 @@
       "packets": 2032,
       "bytes": 0,
       "digest": 7869918251775457524
+    },
+    "dejavusans-extralight-ttf-vertical-16384": {
+      "packets": 2032,
+      "bytes": 0,
+      "digest": 15303249843711543412
     },
     "dejavusans-oblique-ttf-outlines-16384": {
       "packets": 21420,
@@ -173,6 +253,11 @@
       "bytes": 0,
       "digest": 8452056479365178072
     },
+    "dejavusans-oblique-ttf-vertical-16384": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 6630861870546146142
+    },
     "dejavusans-ttf-outlines-16384": {
       "packets": 25012,
       "bytes": 813224,
@@ -182,6 +267,11 @@
       "packets": 6253,
       "bytes": 0,
       "digest": 7140861264819812727
+    },
+    "dejavusans-ttf-vertical-16384": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 4471974691745602813
     },
     "dejavusanscondensed-bold-ttf-outlines-16384": {
       "packets": 24784,
@@ -193,6 +283,11 @@
       "bytes": 0,
       "digest": 13987045307368672978
     },
+    "dejavusanscondensed-bold-ttf-vertical-16384": {
+      "packets": 6196,
+      "bytes": 0,
+      "digest": 15099440378683366866
+    },
     "dejavusanscondensed-boldoblique-ttf-outlines-16384": {
       "packets": 21652,
       "bytes": 707932,
@@ -202,6 +297,11 @@
       "packets": 5413,
       "bytes": 0,
       "digest": 693412434264497627
+    },
+    "dejavusanscondensed-boldoblique-ttf-vertical-16384": {
+      "packets": 5413,
+      "bytes": 0,
+      "digest": 8416712548001578273
     },
     "dejavusanscondensed-oblique-ttf-outlines-16384": {
       "packets": 21420,
@@ -213,6 +313,11 @@
       "bytes": 0,
       "digest": 5271709953611154136
     },
+    "dejavusanscondensed-oblique-ttf-vertical-16384": {
+      "packets": 5355,
+      "bytes": 0,
+      "digest": 6630861870546146142
+    },
     "dejavusanscondensed-ttf-outlines-16384": {
       "packets": 25012,
       "bytes": 813224,
@@ -222,6 +327,11 @@
       "packets": 6253,
       "bytes": 0,
       "digest": 2767219207342140727
+    },
+    "dejavusanscondensed-ttf-vertical-16384": {
+      "packets": 6253,
+      "bytes": 0,
+      "digest": 4471974691745602813
     },
     "dejavusansmono-bold-ttf-outlines-16384": {
       "packets": 13264,
@@ -233,6 +343,11 @@
       "bytes": 0,
       "digest": 10769136196632880114
     },
+    "dejavusansmono-bold-ttf-vertical-16384": {
+      "packets": 3316,
+      "bytes": 0,
+      "digest": 5764441121427467122
+    },
     "dejavusansmono-boldoblique-ttf-outlines-16384": {
       "packets": 10844,
       "bytes": 301064,
@@ -242,6 +357,11 @@
       "packets": 2711,
       "bytes": 0,
       "digest": 13478035233126137282
+    },
+    "dejavusansmono-boldoblique-ttf-vertical-16384": {
+      "packets": 2711,
+      "bytes": 0,
+      "digest": 7243674348515176136
     },
     "dejavusansmono-oblique-ttf-outlines-16384": {
       "packets": 10840,
@@ -253,6 +373,11 @@
       "bytes": 0,
       "digest": 1071058324281727393
     },
+    "dejavusansmono-oblique-ttf-vertical-16384": {
+      "packets": 2710,
+      "bytes": 0,
+      "digest": 5827677996384731489
+    },
     "dejavusansmono-ttf-outlines-16384": {
       "packets": 13508,
       "bytes": 412812,
@@ -262,6 +387,11 @@
       "packets": 3377,
       "bytes": 0,
       "digest": 18074706599279091797
+    },
+    "dejavusansmono-ttf-vertical-16384": {
+      "packets": 3377,
+      "bytes": 0,
+      "digest": 8062112004029333851
     },
     "dejavuserif-bold-ttf-outlines-16384": {
       "packets": 14024,
@@ -273,6 +403,11 @@
       "bytes": 0,
       "digest": 5124358126665255635
     },
+    "dejavuserif-bold-ttf-vertical-16384": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 12850533707125985779
+    },
     "dejavuserif-bolditalic-ttf-outlines-16384": {
       "packets": 14024,
       "bytes": 478956,
@@ -282,6 +417,11 @@
       "packets": 3506,
       "bytes": 0,
       "digest": 8211139489489160403
+    },
+    "dejavuserif-bolditalic-ttf-vertical-16384": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 12850533707125985779
     },
     "dejavuserif-italic-ttf-outlines-16384": {
       "packets": 14028,
@@ -293,6 +433,11 @@
       "bytes": 0,
       "digest": 11599478880544349492
     },
+    "dejavuserif-italic-ttf-vertical-16384": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 12494721491040866426
+    },
     "dejavuserif-ttf-outlines-16384": {
       "packets": 14112,
       "bytes": 485236,
@@ -302,6 +447,11 @@
       "packets": 3528,
       "bytes": 0,
       "digest": 14135625028852770120
+    },
+    "dejavuserif-ttf-vertical-16384": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 6201458123042782856
     },
     "dejavuserifcondensed-bold-ttf-outlines-16384": {
       "packets": 14024,
@@ -313,6 +463,11 @@
       "bytes": 0,
       "digest": 2909371594180152403
     },
+    "dejavuserifcondensed-bold-ttf-vertical-16384": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 12850533707125985779
+    },
     "dejavuserifcondensed-bolditalic-ttf-outlines-16384": {
       "packets": 14024,
       "bytes": 478956,
@@ -322,6 +477,11 @@
       "packets": 3506,
       "bytes": 0,
       "digest": 14038249587702244947
+    },
+    "dejavuserifcondensed-bolditalic-ttf-vertical-16384": {
+      "packets": 3506,
+      "bytes": 0,
+      "digest": 12850533707125985779
     },
     "dejavuserifcondensed-italic-ttf-outlines-16384": {
       "packets": 14028,
@@ -333,6 +493,11 @@
       "bytes": 0,
       "digest": 17725980902421320884
     },
+    "dejavuserifcondensed-italic-ttf-vertical-16384": {
+      "packets": 3507,
+      "bytes": 0,
+      "digest": 12494721491040866426
+    },
     "dejavuserifcondensed-ttf-outlines-16384": {
       "packets": 14112,
       "bytes": 485236,
@@ -342,6 +507,11 @@
       "packets": 3528,
       "bytes": 0,
       "digest": 14761974329008640392
+    },
+    "dejavuserifcondensed-ttf-vertical-16384": {
+      "packets": 3528,
+      "bytes": 0,
+      "digest": 6201458123042782856
     },
     "notosans-regular-ttf-outlines-16384": {
       "packets": 15536,
@@ -353,6 +523,11 @@
       "bytes": 0,
       "digest": 2861650922146115158
     },
+    "notosans-regular-ttf-vertical-16384": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 12052938021933412054
+    },
     "notosans-regular-otf-outlines-16384": {
       "packets": 15536,
       "bytes": 492700,
@@ -362,6 +537,11 @@
       "packets": 3884,
       "bytes": 0,
       "digest": 2861650922146115158
+    },
+    "notosans-regular-otf-vertical-16384": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 12052938021933412054
     },
     "notosans-bolditalic-otf-outlines-16384": {
       "packets": 15580,
@@ -373,6 +553,11 @@
       "bytes": 0,
       "digest": 1264963795363238898
     },
+    "notosans-bolditalic-otf-vertical-16384": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 10881470518286321738
+    },
     "notosansjp-regular-otf-outlines-16384": {
       "packets": 71744,
       "bytes": 6579344,
@@ -382,6 +567,11 @@
       "packets": 17936,
       "bytes": 0,
       "digest": 18025131598498724004
+    },
+    "notosansjp-regular-otf-vertical-16384": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 15257104431108328652
     },
     "notosansjp-vf-otf-outlines-16384": {
       "packets": 71744,
@@ -393,6 +583,11 @@
       "bytes": 0,
       "digest": 11806985750753462692
     },
+    "notosansjp-vf-otf-vertical-16384": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 15257104431108328652
+    },
     "notosanscjk-regular-ttc-outlines-16384": {
       "packets": 2621400,
       "bytes": 246262800,
@@ -402,6 +597,11 @@
       "packets": 655350,
       "bytes": 0,
       "digest": 12800923516534089051
+    },
+    "notosanscjk-regular-ttc-vertical-16384": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 6478053462819912187
     },
     "notosansarabic-regular-ttf-outlines-16384": {
       "packets": 5596,
@@ -413,6 +613,11 @@
       "bytes": 0,
       "digest": 4509479214031119058
     },
+    "notosansarabic-regular-ttf-vertical-16384": {
+      "packets": 1399,
+      "bytes": 0,
+      "digest": 10355127474677710754
+    },
     "notonaskharabic-regular-ttf-outlines-16384": {
       "packets": 5660,
       "bytes": 488912,
@@ -422,6 +627,11 @@
       "packets": 1415,
       "bytes": 0,
       "digest": 12940671289582405642
+    },
+    "notonaskharabic-regular-ttf-vertical-16384": {
+      "packets": 1415,
+      "bytes": 0,
+      "digest": 6240095139998796989
     },
     "notosanshebrew-regular-ttf-outlines-16384": {
       "packets": 604,
@@ -433,6 +643,11 @@
       "bytes": 0,
       "digest": 17544478805448098562
     },
+    "notosanshebrew-regular-ttf-vertical-16384": {
+      "packets": 151,
+      "bytes": 0,
+      "digest": 14951872855943921282
+    },
     "notosansdevanagari-regular-ttf-outlines-16384": {
       "packets": 3380,
       "bytes": 148400,
@@ -442,6 +657,11 @@
       "packets": 845,
       "bytes": 0,
       "digest": 11435734743908717767
+    },
+    "notosansdevanagari-regular-ttf-vertical-16384": {
+      "packets": 845,
+      "bytes": 0,
+      "digest": 17948626106778562855
     },
     "notosansbengali-regular-ttf-outlines-16384": {
       "packets": 1672,
@@ -453,6 +673,11 @@
       "bytes": 0,
       "digest": 15499234205633560731
     },
+    "notosansbengali-regular-ttf-vertical-16384": {
+      "packets": 418,
+      "bytes": 0,
+      "digest": 12675979616926266587
+    },
     "notosanstamil-regular-ttf-outlines-16384": {
       "packets": 976,
       "bytes": 58464,
@@ -462,6 +687,11 @@
       "packets": 244,
       "bytes": 0,
       "digest": 7193653629165022130
+    },
+    "notosanstamil-regular-ttf-vertical-16384": {
+      "packets": 244,
+      "bytes": 0,
+      "digest": 8210123760002308338
     },
     "notosansthai-regular-ttf-outlines-16384": {
       "packets": 560,
@@ -473,6 +703,11 @@
       "bytes": 0,
       "digest": 235032203970849190
     },
+    "notosansthai-regular-ttf-vertical-16384": {
+      "packets": 140,
+      "bytes": 0,
+      "digest": 10346543031578008102
+    },
     "authored-cff-features-otf-outlines-16384": {
       "packets": 32,
       "bytes": 332,
@@ -482,6 +717,11 @@
       "packets": 8,
       "bytes": 0,
       "digest": 995216688312846184
+    },
+    "authored-cff-features-otf-vertical-16384": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 8555422144496236648
     },
     "authored-cff-matrix-otf-outlines-16384": {
       "packets": 8,
@@ -493,6 +733,11 @@
       "bytes": 0,
       "digest": 551480937387
     },
+    "authored-cff-matrix-otf-vertical-16384": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 970456771504687659
+    },
     "authored-cmap-formats-ttf-outlines-16384": {
       "packets": 16,
       "bytes": 56,
@@ -503,6 +748,11 @@
       "bytes": 0,
       "digest": 9540031431330323050
     },
+    "authored-cmap-formats-ttf-vertical-16384": {
+      "packets": 4,
+      "bytes": 0,
+      "digest": 12023187562430289258
+    },
     "authored-cmap-order-ttc-outlines-16384": {
       "packets": 96,
       "bytes": 336,
@@ -512,6 +762,26 @@
       "packets": 24,
       "bytes": 0,
       "digest": 9198687805921699467
+    },
+    "authored-cmap-order-ttc-vertical-16384": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 4635033380776533899
+    },
+    "authored-vertical-ttc-outlines-16384": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 13220686048495630210
+    },
+    "authored-vertical-ttc-advances-16384": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 14939020331291268734
+    },
+    "authored-vertical-ttc-vertical-16384": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 13594493870156394144
     }
   }
 }

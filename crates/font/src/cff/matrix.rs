@@ -187,6 +187,17 @@ impl FontMatrix {
         };
         advance.wrapping_add(self.dx)
     }
+
+    /// The vertical advance through the matrix: scaled by `yy`, then moved by
+    /// the vertical offset.
+    pub(super) const fn vertical_advance(&self, advance: i64) -> i64 {
+        let advance = if self.is_linear_identity() {
+            advance
+        } else {
+            mul_fix(advance, self.yy)
+        };
+        advance.wrapping_add(self.dy)
+    }
 }
 
 /// `cff_parse_fixed_dynamic`: a DICT number as a 16.16 value and the power of

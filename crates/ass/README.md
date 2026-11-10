@@ -413,16 +413,13 @@ panics.
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 64/72 pass. The
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 68/72 pass. The
   box behind a `BorderStyle` 4 event is
   compared without its kind, since libass leaves its type uninitialised. The
-  eight open cases are four fixtures at both sizes: `cjk.ass`, with an `@` font;
-  `clip-vector-empty.ass`, vector clips whose drawings have no contour, which
+  four open cases are two fixtures at both sizes: `cjk.ass`, with an `@` font;
+  and `clip-vector-empty.ass`, vector clips whose drawings have no contour, which
   libass draws as a bitmap without pixels that empties every image of the event,
-  where the renderer leaves them unclipped; `language-unknown.ass`, a `Language`
-  HarfBuzz does not register, which `triergon-shape` refuses; and
-  `hinted-extents.ass`, fallback mark positioning, which reads FreeType's hinted
-  glyph extents.
+  where the renderer leaves them unclipped.
 - `ass-render-host` renders, as `ass-render` does, the fixtures whose libass
   result differs by target (`border-x-overflow.ass`), each pinned for
   `aarch64-unknown-linux-gnu` and `armv7-unknown-linux-gnueabihf` from that

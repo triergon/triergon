@@ -59,6 +59,13 @@ format: any value but 0 means long offsets), `hhea`, `maxp` (any version),
 `hmtx` (an advance or bearing cut off by the table's end reads as zero, as do all
 advances without records) and `OS/2` (version 0 and later, at least 78 bytes;
 shorter is treated as absent). `head`, `hhea`, `maxp` and `hmtx` are required.
+`vhea` and `vmtx` are read together: FreeType reads vertical metrics only when
+both load and `vhea` lists a record (`has_vertical_metrics`). As in FreeType,
+the extended `HHEA` and `VHEA`, with a 32-bit record count, and their `HMTX`
+and `VMTX` stand in for missing lower-case headers; a header's 36 bytes (38 for
+an extended one) are read from the file at its offset, so a short header reads
+on into the bytes after it and one cut off by the end of the file fails the
+face; and `vmtx` is cut as `hmtx` is when it runs past the file.
 As in FreeType, a `name` table that cannot be read counts as absent and the `cmap`
 version is not checked.
 
@@ -135,7 +142,7 @@ them, and a glyph whose operator reads past its operands fails; operand types ar
 not tracked.
 
 **Control boxes.** `Font::control_box` reads a glyph's box without building its
-outline, so no point limit applies: a TrueType glyph's `glyf` header box as
+outline, within the caller's `WorkBudget`, so no point limit applies: a TrueType glyph's `glyf` header box as
 stored, or the box of every point a charstring draws, control points included,
 in unrounded 16.16 before the FontMatrix (`ControlBox::Empty` when there are no
 points). HarfBuzz takes glyph extents from them.
@@ -174,6 +181,18 @@ them when the scale is undefined. A `SizedFont` then gives:
   that FreeType's v40 interpreter keeps backward compatibility and hinting cannot
   move an advance; other faces are `Unsupported` (see below). At zero pixels per
   em it is the unscaled advance.
+- The vertical advances libass uses for a glyph of an `@` font it draws
+  rotated: the outline's `GlyphMetrics` carry the unhinted load's
+  `metrics.vertAdvance` (26.6) and `linearVertAdvance` (16.16, scaled by the
+  size's y scale with `FT_MulDiv`), and `hinted_vertical_advance` gives the
+  default load's `metrics.vertAdvance`, which libass gives HarfBuzz, rounded to
+  a pixel at the hinting scale and `Unsupported` where `hinted_advance` is.
+  The advance in font units is the `vmtx` advance height with vertical metrics,
+  else the one FreeType makes up from the typographic ascender and descender
+  (`OS/2`, else `hhea`). A TrueType glyph measures it between its phantom
+  points (the header's `yMax` plus the top side bearing, down by the advance
+  height, of the glyph whose metrics apply), scaled and read back in font units
+  as a 16-bit value; a CFF glyph puts it through the FontMatrix.
 - `metrics` (`FT_Size_Metrics`), `ascent_descent` (libass's line ascent and
   descent), `harfbuzz_scale` (the scale libass sets on its HarfBuzz font),
   `kerning` (`FT_KERNING_DEFAULT`: scaled, reduced below 25 pixels per em,
@@ -208,8 +227,8 @@ the least recently used values that only the store holds are dropped.
 
 `cmap` format 14 (variation selectors, which shaping will need), WOFF and WOFF2, bare CFF, Type 1 and Type 42, bitmap and colour glyphs (`EBDT`,
 `CBDT`, `sbix`, `COLR`, `SVG `), variation instances other than the default (`fvar`,
-`gvar`, `HVAR`, `avar`), vertical metrics (`vhea`/`vmtx`, linear vertical advance)
-for `@` fonts, which leaves `ass-render`'s two `cjk-ass-*` cases open, `post` beyond the
+`gvar`, `HVAR`, `avar`), vertical origins and bearings (`VORG`, top side
+bearings beyond the advance), `post` beyond the
 underline, hinting (`cvt ` is not read, `fpgm`, `prep` and glyph programs are
 only scanned for `INSTCTRL`, CFF hints are skipped), Apple `kern` version 1 and
 kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Type
@@ -218,9 +237,9 @@ A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
 opens it and fails each glyph. A format 4 subtable whose segments overlap or are out
 of order is searched in order rather than with FreeType's overlap handling.
 
-At a size, what needs hinting or vertical layout is not reproduced: hinted
-outlines, hence the glyph extents and contour points libass's HarfBuzz callbacks
-report (they load glyphs hinted), and vertical advances and origins for `@` fonts.
+At a size, what needs hinting is not reproduced: hinted outlines, hence the glyph
+extents and contour points libass's HarfBuzz callbacks report (they load glyphs
+hinted).
 `hinted_advance` is `Unsupported` for TrueType faces FreeType auto-hints (no
 `fpgm` and a `prep` of at most 7 bytes; the autohinter moves advances), tricky
 fonts known by family name, and programs that may leave backward compatibility;
@@ -234,7 +253,8 @@ generator.
 
 The gate covers libass's default configuration, hinting off: unhinted outlines at
 256 pixels and the default-load advances libass's HarfBuzz callbacks read at that
-size (`font-hinting-none`). Two of its cases are open: DejaVuMathTeXGyre and
+size, with the vertical advances of `@` fonts (`font-hinting-none`). Four of its
+cases are open: the advances and vertical cases of DejaVuMathTeXGyre and
 authored-cmap-formats, whose default-load advances FreeType's auto-hinter moves.
 For libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL), the unhinted outlines
 and default-load advances at nine other sizes are only measured
@@ -273,14 +293,17 @@ composites) are
     pair the `kern` table lists, and for every glyph its `hmtx` and loaded advances
     and its unscaled outline in font units (`FT_LOAD_NO_SCALE`).
   - `font-hinting-none`, libass 0.17.5's default (ASS_HINTING_NONE) at 256 pixels
-    (16384 in 26.6), after libass's GDI face metrics, as two cases per file. The
+    (16384 in 26.6), after libass's GDI face metrics, as three cases per file. The
     outlines case folds the size metrics, ascent and descent, HarfBuzz scale,
     emboldening strength, PostScript flag, underline and strikeout bands and the
     kerning of every listed pair, and every glyph's unhinted outline and advance,
     plain, emboldened, slanted and both, every point. The advances case folds every
     glyph's default-load advance; one `hinted_advance` declares `Unsupported` ends
-    the candidate's operation with an error, so the case fails.
-  - `font-hinting-modes`, the same two cases at the nine other heights libass
+    the candidate's operation with an error, so the case fails. The vertical case
+    folds every glyph's `linearVertAdvance` and `metrics.vertAdvance` of the
+    unhinted load and `metrics.vertAdvance` of the default load, failing the same
+    way.
+  - `font-hinting-modes`, the outlines and advances cases at the nine other heights libass
     requests with hinting on: 75, 82.5, 50, 48, 37.5, 33.75, 13.33, 24.5 and 8.4
     pixels (common ASS sizes on 1080- and 720-line frames, below 25 pixels per em,
     and small).
@@ -294,16 +317,19 @@ composites) are
   its own and with `--benchmark` and `--memory` measures runtime and memory
   against FreeType. `font-dump` and `font-sized-dump` print the folded values as
   lines in both workers, for diffing a failing case.
-- The corpus includes four fonts the crate's test support writes
+- The corpus includes five fonts the crate's test support writes
   (`examples/authored-fonts.rs`): `seac`, the arithmetic, logic and storage operators,
   the flex forms, counter masks, subroutines nested twelve deep, curve operators with
   operand counts the format does not allow, a skewing FontMatrix with an offset,
-  one cmap subtable of each supported format, and a collection with a face for each
-  step of the text charmap selection. With them the
+  one cmap subtable of each supported format, a collection with a face for each
+  step of the text charmap selection, and a collection with a face for each way
+  FreeType reads vertical advances (long `vmtx` records with level phantom
+  points, an advance height of 65535 and `USE_MY_METRICS`, a `vhea` without
+  records, a short `vhea`, and `VHEA` with `VMTX`). With them the
   comparison exercises every charstring operator except `vsindex` (CFF2 fonts in the
-  corpus do not use it) and `random`, every supported cmap format and every step of
-  the text charmap selection; `examples/font-coverage.rs` reports the operators and
-  formats.
+  corpus do not use it) and `random`, every supported cmap format, every step of
+  the text charmap selection and every vertical-metrics path;
+  `examples/font-coverage.rs` reports the operators and formats.
 - `cargo xtask fuzz --contract harness/features/<feature>/contract.json` mutates
   every case's file through the release and dev builds of the worker (the dev build
   checks overflow), with a timeout per input, and with `--reference` compares each

@@ -11,6 +11,7 @@
 mod emit;
 mod fribidi;
 mod harfbuzz;
+mod language;
 mod pack;
 mod source;
 mod syllabic;
@@ -24,7 +25,8 @@ use crate::sha256;
 const USAGE: &str = "usage: cargo xtask shape ucd [--check]
 
   Fetch the hash-pinned Unicode Character Database files into .research/ucd and
-  regenerate the tables in crates/shape/src/unicode; --check regenerates them in
+  regenerate the tables in crates/shape/src/unicode, and the language tags in
+  crates/shape/src/language from HarfBuzz's tree; --check regenerates them in
   memory and fails if the committed files differ.";
 
 /// One file of a Unicode release, by its path under `Public/<version>/ucd/`.
@@ -149,7 +151,7 @@ const FRIBIDI: Release = Release {
 /// The largest file, UnicodeData.txt, is under 2.5 MiB.
 const FILE_LIMIT: usize = 8 << 20;
 
-const OUTPUT: &str = "crates/shape/src/unicode";
+const OUTPUT: &str = "crates/shape/src";
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     let check = match args {
@@ -167,13 +169,15 @@ fn run(root: &Path, check: bool, net: &dyn Transport) -> Result<String, String> 
     let shapers = Loaded::fetch(root, &SYLLABIC, net)?;
     let ignorables = Loaded::fetch(root, &USE_IGNORABLES, net)?;
     let tree = syllabic::TreeFiles::load(root)?;
+    let languages = language::load(root)?;
     let outputs = [
-        ("tables.rs", harfbuzz::generate(&harfbuzz)?),
-        ("fribidi/tables.rs", fribidi::generate(&fribidi)?),
+        ("unicode/tables.rs", harfbuzz::generate(&harfbuzz)?),
+        ("unicode/fribidi/tables.rs", fribidi::generate(&fribidi)?),
         (
-            "syllabic_tables.rs",
+            "unicode/syllabic_tables.rs",
             syllabic::generate(&shapers, &ignorables, &tree)?,
         ),
+        ("language/tables.rs", language::generate(&languages)?),
     ];
     let mut stale = Vec::new();
     for (name, generated) in &outputs {
