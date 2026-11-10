@@ -17840,6 +17840,16 @@
    "sha256": "cae121896f313cec3378f289f19b28fe1ddb73b8fcb5d0079f71247babb36010",
    "bytes": 110396155,
    "source_revision": "ec9a4f1627b2734efbd4134ceb86c3a71740815d"
+  },
+  {
+   "name": "font-latin-a1aa6f0e",
+   "path": "font-latin-a1aa6f0e",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's auto-hinter, 32-bit ARM arithmetic for it, the linear advances and the FontMatrix, and CFF DICTs read as FreeType reads them, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at a1aa6f0e against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' and xtask tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-latin-a1aa6f0e/a22a7f4312953485804e6d3bfd654261d959eca9903ea2d92822157b525d6af3.tar.gz",
+   "sha256": "a22a7f4312953485804e6d3bfd654261d959eca9903ea2d92822157b525d6af3",
+   "bytes": 110394107,
+   "source_revision": "a1aa6f0e1981d07ce9d27efcdc5b6815839f5481"
   }
  ]
 }
