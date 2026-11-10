@@ -41,7 +41,7 @@ pub struct Band {
 
 /// How FreeType's default (hinted) loading treats the face's advances.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Hinting {
+pub(crate) enum Hinting {
     /// The unhinted advance, fitted to the size's grid: CFF, TrueType whose
     /// programs keep the v40 interpreter's backward compatibility, and any
     /// face at zero pixels per em, which loads unhinted.
@@ -177,12 +177,14 @@ impl Font {
                 y: hinted_scale,
             },
             grid: 63,
-            hinting: self.hinting(),
+            hinting: self.default_load,
         })
     }
 
-    /// How FreeType's default loading treats this face's advances.
-    fn hinting(&self) -> Hinting {
+    /// How FreeType's default loading treats this face's advances, found
+    /// once when the face is opened: it reads every `fpgm` and `prep`
+    /// instruction and the family name.
+    pub(crate) fn hinting(&self) -> Hinting {
         if !matches!(self.outlines, Outlines::Glyf(_)) {
             return Hinting::Unhinted;
         }
