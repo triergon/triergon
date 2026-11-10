@@ -204,7 +204,8 @@ impl Work {
                 tag,
                 c.platform().id().into(),
                 c.encoding_id().into(),
-                c.format().number().into(),
+                // FreeType's `FT_Get_CMap_Format`: -1 for a charmap it adds.
+                signed(c.format().number().map_or(-1, i64::from)),
             ]),
             None => self.words(&[tag, ABSENT]),
         }
@@ -407,7 +408,7 @@ fn charmap_text(charmap: Option<Charmap<'_>>) -> String {
                 "{} {} {}",
                 c.platform().id(),
                 c.encoding_id(),
-                c.format().number()
+                c.format().number().map_or(-1, i32::from)
             )
         },
     )

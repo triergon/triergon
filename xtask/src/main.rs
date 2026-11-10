@@ -1124,9 +1124,11 @@ fn check(root: &Path) -> Task {
     check_simd(root)?;
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;
-    // The Unicode tables are what their generator writes.
+    // The Unicode and glyph-name tables are what their generators write.
     println!("$ cargo xtask shape ucd --check");
     shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
+    println!("$ cargo xtask fonts tables --check");
+    fonts::main(root, &["tables".to_owned(), "--check".to_owned()])?;
     check_features(root)?;
     check_safety(root)?;
     check_design(root)?;

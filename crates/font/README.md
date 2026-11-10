@@ -79,21 +79,32 @@ as Mac OS Roman; other encodings yield nothing. Empty records and records outsid
 the string storage are skipped. `family_name`, `style_name` and `postscript_name`
 select the record FreeType reports.
 
-**Character mapping.** `cmap` formats 0, 4, 6, 10, 12 and 13 on any platform, in
-directory order; other formats (2, 8, 14) are not listed. Records stop at the
-table's end, and a subtable is listed only when FreeType's default validation
-accepts it (lengths that fit, ascending non-overlapping groups for formats 12
-and 13, ordered segments and in-table glyph arrays for format 4). Lookups are bounded by the
-end of the `cmap` table rather than the declared subtable length. A glyph at or
-above the glyph count is unmapped. `text_charmap` is the subtable libass selects
-when it opens a face (`ass_charmap_magic`): the first Windows full-Unicode subtable
-(3, 10), else the first (3, 1), else the first other Windows subtable; without
-Windows subtables, the one FreeType selects (the last (0, 4) or format 13 (0, 6),
-else the last Unicode- or ISO-platform subtable), else the first. Subtables
-FreeType lists in formats 2, 8 and 14, and the Unicode charmap it builds from
-glyph names for a CFF face without one, take no part; `lists_every_charmap` says
-whether the face has any of those but format 14, which FreeType cannot select.
-`charmap` gives a subtable by its index in `charmaps`, and `text_charmap_index`
+**Character mapping.** FreeType's charmaps in its order (`charmaps`): `cmap`
+formats 0, 2, 4, 6, 8, 10, 12 and 13 on any platform, in directory order, each
+listed only when FreeType's default validation accepts it (lengths that fit,
+ascending non-overlapping groups for formats 8, 12 and 13, ordered segments and
+in-table glyph arrays for format 4, subheaders and glyph arrays inside the table
+for format 2); then for a CFF face without a Windows BMP or Unicode-platform
+subtable, the Unicode charmap FreeType builds from its glyph names
+(`CmapFormat::GlyphNames`, Windows platform, encoding 1): each name's code
+point through FreeType's compiled Adobe Glyph List, `uniXXXX` and `uXXXX` forms,
+suffixed names as variants after their base, and FreeType's second mappings for
+`space`, `hyphen`, `Delta` and seven more, looked up with FreeType's own probes
+(which on duplicate names differ between 32- and 64-bit targets as FreeType's
+pointer arithmetic does); then for a name-keyed CFF face, the charmap of its
+encoding (`CmapFormat::CffEncoding`, platform 7): a custom encoding of format 0
+or 1 with supplements, or the Standard or Expert encoding through the charset.
+Format 14 subtables, which FreeType lists but cannot select, are left out.
+Records stop at the table's end. Lookups are bounded by the end of the `cmap`
+table rather than the declared subtable length, and `mappings` steps through
+formats 2 and 8 and the added charmaps as `FT_Get_Next_Char` does. A glyph at or
+above the glyph count is unmapped. `text_charmap` is the charmap libass selects
+when it opens a face (`ass_charmap_magic`): the first Windows full-Unicode
+charmap (3, 10), else the first (3, 1), which may be the one built from glyph
+names, else the first other Windows charmap; without Windows charmaps, the one
+FreeType selects (the last (0, 4) or format 13 (0, 6), else the last Unicode- or
+ISO-platform charmap), else the first.
+`charmap` gives a charmap by its index in `charmaps`, and `text_charmap_index`
 the index of `text_charmap`. `text_lookup` reads a
 charmap as libass reads text through it (`ass_font_index_magic`): a Windows
 Symbol charmap at `0xF000 | c`, any other unchanged, and `Unsupported` for the
@@ -123,8 +134,11 @@ at the default instance of a variable font: `blend` applies region scalars at th
 origin, in charstrings and Private DICTs. Supported: all path operators, flex,
 hints and masks (counted and skipped), local and global subroutines (16 nested
 calls, FreeType's limit; TN 5177 states 10), arithmetic, storage and `random` operators (CFF only, as in
-FreeType), and `seac` accents through StandardEncoding and the ISOAdobe or a
-custom charset, the accent drawn first. Charstrings are evaluated in 16.16 fixed
+FreeType), and `seac` accents through StandardEncoding and the charset, the
+accent drawn first. The charset (formats 0, 1 and 2, or ISOAdobe, Expert and
+ExpertSubset, which must cover the glyphs) and a name-keyed face's encoding are
+read when the face is parsed, as FreeType reads them; one it cannot read makes
+the face `Error::Invalid`. Charstrings are evaluated in 16.16 fixed
 point as FreeType's CFF engine evaluates them: sums wrap at 32 bits, `mul`, `div`
 and `sqrt` round as FreeType's do, integer operands round. Outlines are built as
 that engine builds unhinted ones: points are whole font units (the 16.16 value at
@@ -229,7 +243,7 @@ bearings beyond the advance), `post` beyond the
 underline, hinting (`cvt ` is not read, `fpgm`, `prep` and glyph programs are
 only scanned for `INSTCTRL`, CFF hints are skipped), Apple `kern` version 1 and
 kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Type
-1 charstrings (CharstringType 1), synthetic fonts and Expert charsets for `seac`.
+1 charstrings (CharstringType 1) and synthetic fonts.
 A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
 opens it and fails each glyph. A format 4 subtable whose segments overlap or are out
 of order is searched in order rather than with FreeType's overlap handling.
