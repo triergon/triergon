@@ -30,5 +30,186 @@
     "the FreeType auto-hinter, for TrueType faces without bytecode",
     "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
   ],
-  "open_cases": []
+  "open_cases": [
+    {
+      "id": "arimo-bold-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "arimo-bolditalic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "arimo-italic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "arimo-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "authored-cmap-formats-ttf-default-16384",
+      "requirement": "the FreeType auto-hinter, for TrueType faces without bytecode"
+    },
+    {
+      "id": "authored-cmap-order-ttc-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "authored-vertical-ttc-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "cousine-bold-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "cousine-bolditalic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "cousine-italic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "cousine-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavumathtexgyre-ttf-default-16384",
+      "requirement": "the FreeType auto-hinter, for TrueType faces without bytecode"
+    },
+    {
+      "id": "dejavusans-bold-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusans-boldoblique-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusans-extralight-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusans-oblique-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusans-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusanscondensed-bold-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusanscondensed-boldoblique-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusanscondensed-oblique-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusanscondensed-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusansmono-bold-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusansmono-boldoblique-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusansmono-oblique-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavusansmono-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavuserif-bold-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavuserif-bolditalic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavuserif-italic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavuserif-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavuserifcondensed-bold-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavuserifcondensed-bolditalic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavuserifcondensed-italic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "dejavuserifcondensed-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "notonaskharabic-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "notosans-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "notosansarabic-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "notosansbengali-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "notosansdevanagari-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "notosanshebrew-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "notosanstamil-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "notosansthai-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "tinos-bold-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "tinos-bolditalic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "tinos-italic-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    },
+    {
+      "id": "tinos-regular-ttf-default-16384",
+      "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+    }
+  ]
 }
