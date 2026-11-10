@@ -519,7 +519,7 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
     feed.stream.phase = 5;
     let mut work = WorkBudget::new(limits.pes_bytes as u64);
     assert_eq!(
-        feed.stream.feed(&mut work),
+        feed.stream.feed::<true>(&mut work),
         Err(Error::Invalid("PES payload not drained"))
     );
     let payload = feed
@@ -542,7 +542,7 @@ fn rejected_pes_payload_stays_available_for_a_drained_retry() {
             .unwrap(),
         AssemblyStep::NeedPayload
     ));
-    feed.stream.feed(&mut work).unwrap();
+    feed.stream.feed::<true>(&mut work).unwrap();
     assert_eq!(feed.stream.phase, 6);
     assert!(feed.stream.packet.as_ref().unwrap().payload.is_none());
 }
@@ -566,7 +566,7 @@ fn invalid_psi_pointer_restores_payload_before_diagnostic_recovery() {
     stream.packet = Some(packet);
     stream.route = Route::Pat;
     stream.phase = 5;
-    stream.feed(&mut WorkBudget::new(1)).unwrap();
+    stream.feed::<false>(&mut WorkBudget::new(1)).unwrap();
     assert_eq!(stream.phase, 7);
     assert_eq!(
         stream.fault.as_ref().unwrap().error,
