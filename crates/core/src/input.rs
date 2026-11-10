@@ -196,22 +196,6 @@ impl InputCursor {
     pub fn buffered_owner(&self) -> Option<&Bytes> {
         self.window.as_ref()
     }
-    /// Check that these bytes are the exact span ending at the cursor within
-    /// the consumed portion of its current shared window.
-    pub fn matches_last_shared_span(&self, offset: u64, bytes: &Bytes) -> bool {
-        let len = bytes.len();
-        if len == 0 || self.position.checked_sub(len as u64) != Some(offset) {
-            return false;
-        }
-        let Some(start) = self.consumed.checked_sub(len) else {
-            return false;
-        };
-        self.window
-            .as_ref()
-            .and_then(|window| window.as_ref().get(start..self.consumed))
-            .is_some_and(|span| std::ptr::eq(span, bytes.as_ref()))
-    }
-
     pub fn source(&self) -> SourceId {
         self.source
     }
