@@ -15,10 +15,6 @@ use crate::{
     Symbol,
 };
 
-/// Code points from which an `@` font draws glyphs rotated
-/// (`VERTICAL_LOWER_BOUND`).
-pub(super) const VERTICAL_LOWER_BOUND: u32 = 0x2f1;
-
 /// The font size libass draws and shapes every glyph at with hinting off,
 /// unless its size is 0: the glyph is then scaled to its size.
 pub(super) const DRAWN_SIZE: f64 = 256.0;
@@ -264,7 +260,7 @@ impl Text {
             let decorations = Decorations {
                 underline: glyph.state.underline,
                 strike_out: glyph.state.strike_out,
-                rotate: desc.vertical && symbol >= VERTICAL_LOWER_BOUND,
+                rotate: desc.vertical && triergon_shape::rotates(symbol),
             };
             let style = GlyphStyle::new(&glyph.state, decorations, drawing.is_some(), scales, par);
             // The previous character's style is the last one kept: an equal

@@ -1,0 +1,27 @@
+;@attach NotoSansJP-Regular.otf
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500
+; Two styles of one `@` font that select the same face, one of them bold.
+; libass keeps whether a glyph's metrics are rotated by font, face, size and
+; glyph, decided by the first lookup: the vertical comma the vert feature
+; makes from 、 is first an advance lookup, so it stays horizontal in the
+; regular style, also when ︑ maps it later; the bold style is another font,
+; whose first lookup is through ︑, which rotates it.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Vertical,@Noto Sans JP,56,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,7,10,10,10,128
+Style: VerticalBold,@Noto Sans JP,56,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,7,10,10,10,128
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Vertical,,0,0,0,,{\pos(100,100)}縦、書き
+Dialogue: 0,0:00:00.00,0:00:01.00,VerticalBold,,0,0,0,,{\pos(100,300)}縦︑書き
+Dialogue: 0,0:00:00.00,0:00:01.00,Vertical,,0,0,0,,{\pos(100,500)}縦︑書き
+Dialogue: 0,0:00:00.00,0:00:01.00,Vertical,,0,0,0,,{\pos(700,100)}縦{\b1}︑{\b0}書き

@@ -5,19 +5,23 @@
 //! character a cluster of glyphs. The bidi levels give the visual order of
 //! each line once lines are known (`ass_shaper_reorder`).
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Range;
 
-use triergon_core::{Budget, BudgetVec, Reservation, Result, WorkBudget, round_ties_even_i32};
+use triergon_core::{
+    Budget, BudgetVec, Error, Reservation, Result, WorkBudget, round_ties_even_i32,
+};
 use triergon_font::GlyphId;
 use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::{BaseDirection, BidiClass, Level, Resolver, reorder_line};
 use triergon_shape::{
-    Buffer, Direction, Face, Feature, Language, Plan, Script as WritingScript, SizedMetrics, Tag,
+    Buffer, Direction, Face, FaceRotations, Feature, GlyphRotations, Language, Plan,
+    Script as WritingScript, SizedMetrics, Tag,
 };
 
 use super::fonts::Library;
-use super::text::{Char, Text, VERTICAL_LOWER_BOUND};
+use super::text::{Char, Text};
 use super::wrap::Line;
 use crate::{Info, charge};
 
@@ -140,21 +144,24 @@ const RUN_UNITS: usize = 16;
 const MAX_PLANS: usize = 256;
 /// Bytes charged per plan beyond its own storage.
 const PLAN_ENTRY_BYTES: usize = 256;
-/// Bytes charged per glyph of an `@` font in the rotation map.
-const ROTATION_ENTRY_BYTES: usize = 32;
+/// Bytes charged per `@` font description the rotation decisions are kept
+/// for, beyond its family name.
+const VERTICAL_FONT_BYTES: usize = 64;
 
 /// The shaper's state: a buffer, a bidi resolver, the plans built so far,
 /// and storage for the event being shaped.
 #[derive(Debug)]
 pub(super) struct Shaper {
     budget: Budget,
-    /// libass's glyph metrics cache for `@` fonts: whether each glyph's
-    /// metrics are rotated, by face, size and glyph, for the renderer's life.
-    rotations: Rotations,
+    /// libass's glyph metrics cache for `@` fonts, which it never cuts:
+    /// whether each glyph's metrics are rotated, for the renderer's life.
+    rotations: RefCell<GlyphRotations<RotationKey>>,
+    /// The `@` font descriptions the cache has decisions for.
+    vertical_fonts: VerticalFonts,
     buffer: Buffer,
     resolver: Resolver,
     plans: HashMap<PlanKey, Plan>,
-    /// The plans' and rotation decisions' storage.
+    /// The plans' storage.
     charge: Reservation,
     /// The event's text as HarfBuzz reads it.
     text: BudgetVec<char>,
@@ -165,43 +172,67 @@ pub(super) struct Shaper {
     counts: BudgetVec<usize>,
 }
 
-/// The rotation decisions of libass's glyph metrics cache for `@` fonts, by
-/// face, size and glyph: libass never cuts that cache, so they last as long
-/// as the renderer. Their storage is charged after each shaping call.
-#[derive(Debug, Default)]
-struct Rotations(std::cell::RefCell<HashMap<(u32, u64, u16), bool>>);
+/// What libass keys its glyph metrics cache by, besides the glyph: the font
+/// (the number of its description among [`VerticalFonts`]), the face and the
+/// size.
+type RotationKey = (u32, u32, u64);
 
-impl Rotations {
-    fn len(&self) -> usize {
-        self.0.borrow().len()
+/// The descriptions of the `@` fonts asked for (family, weight and slant),
+/// numbered, as libass keys its glyph metrics cache by font.
+#[derive(Debug)]
+struct VerticalFonts {
+    by_family: HashMap<Box<[u8]>, Vec<VerticalFont>>,
+    count: u32,
+    charge: Reservation,
+}
+
+/// The weight and slant of an `@` font description, and its number.
+#[derive(Clone, Copy, Debug)]
+struct VerticalFont {
+    weight: u32,
+    slant: u32,
+    id: u32,
+}
+
+impl VerticalFonts {
+    fn new(budget: &Budget) -> Self {
+        Self {
+            by_family: HashMap::new(),
+            count: 0,
+            charge: Reservation::empty(budget),
+        }
     }
-}
 
-/// The metrics cache of one face of an `@` font at one size.
-struct FaceRotations<'a> {
-    rotations: &'a Rotations,
-    face: u32,
-    size: u64,
-}
-
-impl triergon_shape::GlyphRotations for FaceRotations<'_> {
-    fn rotated(&self, glyph: GlyphId, c: Option<char>) -> bool {
-        *self
-            .rotations
-            .0
-            .borrow_mut()
-            .entry((self.face, self.size, glyph.0))
-            .or_insert_with(|| c.is_some_and(|c| u32::from(c) >= VERTICAL_LOWER_BOUND))
+    /// The number of the description of `family`, `weight` and `slant`,
+    /// charged before it is kept.
+    fn id(&mut self, family: &[u8], weight: u32, slant: u32) -> Result<u32> {
+        let known = self.by_family.get(family);
+        if let Some(font) = known
+            .into_iter()
+            .flatten()
+            .find(|f| f.weight == weight && f.slant == slant)
+        {
+            return Ok(font.id);
+        }
+        let family_bytes = if known.is_some() { 0 } else { family.len() };
+        let id = self.count;
+        let next = id.checked_add(1).ok_or(Error::Overflow)?;
+        self.charge.resize_to(
+            self.charge
+                .bytes()
+                .saturating_add(family_bytes)
+                .saturating_add(VERTICAL_FONT_BYTES),
+        )?;
+        self.count = next;
+        let font = VerticalFont { weight, slant, id };
+        match self.by_family.get_mut(family) {
+            Some(fonts) => fonts.push(font),
+            None => {
+                self.by_family.insert(family.into(), vec![font]);
+            }
+        }
+        Ok(id)
     }
-}
-
-/// Charges the plans and rotation decisions the shaper keeps.
-fn kept(charge: &mut Reservation, plans: usize, rotations: usize) -> Result<()> {
-    charge.resize_to(
-        plans
-            .saturating_mul(PLAN_ENTRY_BYTES)
-            .saturating_add(rotations.saturating_mul(ROTATION_ENTRY_BYTES)),
-    )
 }
 
 /// What finding runs gives a character (`ass_shaper_find_runs`).
@@ -308,7 +339,8 @@ impl Shaper {
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
             budget: budget.clone(),
-            rotations: Rotations::default(),
+            rotations: RefCell::new(GlyphRotations::new(budget)),
+            vertical_fonts: VerticalFonts::new(budget),
             buffer: Buffer::new(budget),
             resolver: Resolver::new(budget),
             plans: HashMap::new(),
@@ -537,7 +569,16 @@ impl Shaper {
         let sized = face_font
             .font
             .at_size(pixels_26_6(text.style(first).size))?;
-        let metrics = SizedMetrics::with_charmap(sized, face_font.charmap(), work)?;
+        let mut metrics = SizedMetrics::with_charmap(sized, face_font.charmap(), work)?;
+        let rotations;
+        if font.vertical() {
+            let id = self
+                .vertical_fonts
+                .id(font.family(), font.weight(), font.slant())?;
+            let size = text.style(first).size.to_bits();
+            rotations = FaceRotations::new(&self.rotations, (id, face_font.uid, size));
+            metrics = metrics.rotating(&rotations);
+        }
         let shaper_face = Face::new(&face_font.font);
         let key = PlanKey {
             face: face_font.uid,
@@ -550,6 +591,8 @@ impl Shaper {
             if self.plans.len() >= MAX_PLANS {
                 self.plans.clear();
             }
+            self.charge
+                .resize_to((self.plans.len() + 1).saturating_mul(PLAN_ENTRY_BYTES))?;
             let plan = Plan::new(
                 &shaper_face,
                 direction,
@@ -559,7 +602,6 @@ impl Shaper {
                 &self.budget,
             )?;
             self.plans.insert(key, plan);
-            kept(&mut self.charge, self.plans.len(), self.rotations.len())?;
         }
         let base = context.start;
         triergon_shape::shape(
@@ -570,9 +612,6 @@ impl Shaper {
             item.start - base..item.end - base,
             &mut self.buffer,
         )?;
-        if font.vertical() {
-            kept(&mut self.charge, self.plans.len(), self.rotations.len())?;
-        }
         Ok(base)
     }
 

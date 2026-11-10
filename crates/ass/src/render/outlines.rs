@@ -278,13 +278,10 @@ impl Outlines {
         sized.synthesize(scratch, source.synthesis(font.weight(), font.slant()))?;
         // A glyph an `@` font draws rotated advances by its linear vertical
         // advance (`d16_to_d6`, in `int`).
-        let vertical = decorations
-            .rotate
-            .then(|| sized.vertical_advance(glyph))
-            .transpose()?;
-        let advance = match vertical {
-            Some(v) => (v.linear as i32).wrapping_add(512) >> 10,
-            None => metrics.advance,
+        let advance = if decorations.rotate {
+            (metrics.linear_vertical_advance as i32).wrapping_add(512) >> 10
+        } else {
+            metrics.advance
         };
         let lines = [
             (decorations.underline, sized.underline()),
@@ -293,13 +290,16 @@ impl Outlines {
         .map(|(on, band)| band.filter(|_| on && advance > 0));
         let mut outline = Outline::new(&self.budget);
         outline.push_glyph(scratch.points(), scratch.contour_ends())?;
-        // Turned about the vertical advance and the typographic descender.
-        if let Some(v) = vertical {
+        // Turned about the vertical advance and the typographic descender,
+        // unless there is nothing to turn: libass returns an empty outline
+        // before it checks the range.
+        let empty = scratch.points().is_empty() && lines.iter().all(Option::is_none);
+        if decorations.rotate && !empty {
             let y_scale = sized.metrics().y_scale;
             let desc = source.os2().map_or(0, |os2| {
                 (i64::from(os2.typo_descender) * y_scale + 0x8000) >> 16
             });
-            let dv = v.advance + desc;
+            let dv = i64::from(metrics.vertical_advance) + desc;
             let limit = 2 * i64::from(OUTLINE_MAX);
             if desc.abs() > limit || dv.abs() > limit {
                 return Err(Error::Invalid("rotated outline out of range"));
