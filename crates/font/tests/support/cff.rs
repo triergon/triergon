@@ -2,7 +2,10 @@
 //! name-keyed font program. The crate's own tests include this file too, so it
 //! uses nothing from outside it.
 
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    reason = "each including test, example or unit test uses a part"
+)]
 
 /// A CFF number with a fixed five-byte encoding, so offsets do not move.
 pub(crate) fn long(value: i32) -> Vec<u8> {

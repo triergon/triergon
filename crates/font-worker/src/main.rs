@@ -247,7 +247,7 @@ fn scaled(
 /// ends the operation with an error: it is not a value to compare.
 fn hinted(font: &Font, sized: &SizedFont<'_>, sink: &mut impl Sink) -> Result<()> {
     for glyph in font.glyphs() {
-        let advance = match sized.hinted_advance(glyph) {
+        let advance = match sized.default_advance(glyph) {
             Ok(advance) => Some(advance),
             Err(triergon_core::Error::Unsupported(what)) => {
                 return Err(
@@ -275,7 +275,7 @@ fn vertical(
 ) -> Result<()> {
     for glyph in font.glyphs() {
         let unhinted = sized.outline_into(glyph, outline).ok();
-        let hinted = match sized.hinted_vertical_advance(glyph) {
+        let hinted = match sized.default_vertical_advance(glyph) {
             Ok(advance) => Some(advance),
             Err(triergon_core::Error::Unsupported(what)) => {
                 return Err(format!(

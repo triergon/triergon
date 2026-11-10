@@ -1218,7 +1218,7 @@ pub fn exercise(data: &[u8], limits: Limits) {
             let _ = outline.segments().count();
             let _ = font.kerning(glyph, GlyphId(1));
             for size in &sized {
-                let _ = size.hinted_advance(glyph);
+                let _ = size.default_advance(glyph);
                 let _ = size.kerning(glyph, GlyphId(1));
                 if size.outline_into(glyph, &mut scaled).is_ok() {
                     let _ = size.synthesize(&mut scaled, synthesis);

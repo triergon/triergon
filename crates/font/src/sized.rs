@@ -44,8 +44,11 @@ pub struct Band {
 /// `FT_LOAD_DEFAULT`, as its HarfBuzz callbacks load the metrics, extents and
 /// contour points they report.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Load {
+    /// `FT_LOAD_NO_HINTING` with libass's flags: the outline libass draws.
     Unhinted,
+    /// `FT_LOAD_DEFAULT`: the hinted outline and grid-fitted metrics.
     Default,
 }
 
@@ -379,7 +382,7 @@ impl<'f> SizedFont<'f> {
     ///
     /// For [`Load::Default`], `Unsupported` for TrueType glyphs, which need
     /// FreeType's auto-hinter or TrueType interpreter, and where
-    /// [`Self::hinted_advance`] is; otherwise those of [`Self::outline_into`].
+    /// [`Self::default_advance`] is; otherwise those of [`Self::outline_into`].
     pub fn load(
         &self,
         glyph: GlyphId,
@@ -466,7 +469,7 @@ impl<'f> SizedFont<'f> {
     /// backward compatibility (an `INSTCTRL` without a constant selector 1 or 2
     /// in `fpgm`, `prep` or the glyph's programs). Otherwise the errors of
     /// [`Self::outline_into`].
-    pub fn hinted_advance(&self, glyph: GlyphId) -> Result<i32> {
+    pub fn default_advance(&self, glyph: GlyphId) -> Result<i32> {
         self.fit(self.default_advances(glyph)?.horizontal)
     }
 
@@ -478,8 +481,8 @@ impl<'f> SizedFont<'f> {
     ///
     /// # Errors
     ///
-    /// As [`Self::hinted_advance`].
-    pub fn hinted_vertical_advance(&self, glyph: GlyphId) -> Result<i32> {
+    /// As [`Self::default_advance`].
+    pub fn default_vertical_advance(&self, glyph: GlyphId) -> Result<i32> {
         self.fit(self.default_advances(glyph)?.vertical)
     }
 

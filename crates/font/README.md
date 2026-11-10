@@ -41,7 +41,7 @@ let sized = font.at_size(16_384)?;
 let mut scaled = Outline::new(&pool); // reuse it too
 let glyph_metrics = sized.outline_into(glyph, &mut scaled)?; // 26.6 pixels, y up
 sized.synthesize(&mut scaled, font.synthesis(request.weight, request.slant))?;
-let _shaping_advance = sized.hinted_advance(glyph)?; // what HarfBuzz receives
+let _shaping_advance = sized.default_advance(glyph)?; // what HarfBuzz receives
 let _drawn_advance = glyph_metrics.advance;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
@@ -230,7 +230,7 @@ them when the scale is undefined. A `SizedFont` then gives:
   strength (`embolden_strength`, the em in 26.6 pixels over 64), including
   `FT_Vector_NormLen` and the orientation test. `Outline::transform`,
   `embolden` and `orientation` are public.
-- `hinted_advance`: the advance of FreeType's default load, which libass's
+- `default_advance`: the advance of FreeType's default load, which libass's
   HarfBuzz callbacks report: the unhinted advance at the hinting scale (TrueType
   faces with `head.flags` bit 3 scale by the integer pixels per em there) rounded
   to a pixel. That is exact for CFF and for TrueType whose `fpgm`, `prep` and
@@ -241,9 +241,9 @@ them when the scale is undefined. A `SizedFont` then gives:
 - The vertical advances libass uses for a glyph of an `@` font it draws
   rotated: the outline's `GlyphMetrics` carry the unhinted load's
   `metrics.vertAdvance` (26.6) and `linearVertAdvance` (16.16, scaled by the
-  size's y scale with `FT_MulDiv`), and `hinted_vertical_advance` gives the
+  size's y scale with `FT_MulDiv`), and `default_vertical_advance` gives the
   default load's `metrics.vertAdvance`, which libass gives HarfBuzz, rounded to
-  a pixel at the hinting scale and `Unsupported` where `hinted_advance` is.
+  a pixel at the hinting scale and `Unsupported` where `default_advance` is.
   The advance in font units is the `vmtx` advance height with vertical metrics,
   else the one FreeType makes up from the typographic ascender and descender
   (`OS/2`, else `hhea`). A TrueType glyph measures it between its phantom
@@ -298,7 +298,7 @@ At a size, the default load of a TrueType glyph is `Unsupported`, hence its
 glyph extents and contour points, which libass's HarfBuzz callbacks report: an
 auto-hinted face needs FreeType's auto-hinter, and an instructed one the
 TrueType interpreter, which this crate does not run.
-`hinted_advance` is `Unsupported` for TrueType faces FreeType auto-hints (no
+`default_advance` is `Unsupported` for TrueType faces FreeType auto-hints (no
 `fpgm` and a `prep` of at most 7 bytes; the autohinter moves advances), tricky
 fonts known by family name, and programs that may leave backward compatibility;
 fonts FreeType finds tricky only by their table checksums are not recognised.
@@ -362,7 +362,7 @@ composites) are
     emboldening strength, PostScript flag, underline and strikeout bands and the
     kerning of every listed pair, and every glyph's unhinted outline and advance,
     plain, emboldened, slanted and both, every point. The advances case folds every
-    glyph's default-load advance; one `hinted_advance` declares `Unsupported` ends
+    glyph's default-load advance; one `default_advance` declares `Unsupported` ends
     the candidate's operation with an error, so the case fails. The vertical case
     folds every glyph's `linearVertAdvance` and `metrics.vertAdvance` of the
     unhinted load and `metrics.vertAdvance` of the default load, failing the same

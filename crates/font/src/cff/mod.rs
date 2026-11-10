@@ -896,7 +896,7 @@ mod tests {
     use crate::outline::Outline;
     use crate::sfnt::Table;
     use crate::{GlyphId, Limits};
-    use triergon_core::{Budget, WorkBudget};
+    use triergon_core::{Budget, Error, Result, WorkBudget};
 
     /// A name-keyed CFF table whose glyph 1 is `glyph`, with `private` added
     /// to its Private DICT, at 1000 units per em.
@@ -917,6 +917,11 @@ mod tests {
 
     /// The points of glyph 1 at the 16.16 `scale`, hinted or not.
     fn points(table: &[u8], scale: i64, hinted: bool) -> Vec<(i32, i32)> {
+        try_points(table, scale, hinted).unwrap()
+    }
+
+    /// The points of glyph 1, or why it does not load.
+    fn try_points(table: &[u8], scale: i64, hinted: bool) -> Result<Vec<(i32, i32)>> {
         let budget = Budget::new(1 << 20).unwrap();
         let mut work = WorkBudget::new(1 << 20);
         let whole = Table {
@@ -931,14 +936,14 @@ mod tests {
             cff.load_hinted(table, glyph, scale, &mut outline, &limits, &mut work)
         } else {
             cff.load(table, glyph, scale, &mut outline, &limits, &mut work)
-        }
-        .unwrap();
-        assert_eq!(outline.contour_ends(), [outline.points().len() as u32]);
-        outline
+        }?;
+        let points = outline.points().len() as u32;
+        assert!(outline.contour_ends() == [points] || points == 0);
+        Ok(outline
             .points()
             .iter()
             .map(|p| (p.point.x, p.point.y))
-            .collect()
+            .collect())
     }
 
     use Part::{Byte, N, Op};
@@ -1057,6 +1062,73 @@ mod tests {
         let big = 8_388_672;
         assert_eq!(points(&glyph, big, true), points(&glyph, big, false));
         assert_eq!(points(&glyph, big, false)[1], (12800, 12800));
+    }
+
+    /// `count` horizontal stems 10 units high, 5 apart, declared by `hstem`
+    /// operators of at most 20 stems each.
+    fn many_stems(count: i16) -> Vec<Part> {
+        let mut parts = Vec::new();
+        for first in (0..count).step_by(20) {
+            for _ in first..(first + 20).min(count) {
+                parts.extend([N(5), N(10)]);
+            }
+            parts.push(Op(1));
+        }
+        parts
+    }
+
+    #[test]
+    fn stems_declared_after_the_first_move_are_ignored() {
+        // Eight stems take one mask byte. A ninth after the move would make
+        // the hint mask two bytes long and swallow the hlineto's operand.
+        let mut glyph = many_stems(8);
+        glyph.extend([
+            N(0),
+            N(100),
+            Op(21),
+            N(300),
+            N(50),
+            Op(1),
+            Op(19),
+            Byte(0xff),
+        ]);
+        glyph.extend([N(100), Op(6), N(50), Op(7), N(-100), Op(6), Op(14)]);
+        let glyph = table(&glyph, Vec::new());
+        let square = [(0, 200), (200, 200), (200, 300), (0, 300)];
+        assert_eq!(points(&glyph, TWO, false), square);
+        assert_eq!(points(&glyph, TWO, true).len(), 4);
+    }
+
+    #[test]
+    fn a_later_mask_with_operands_reads_no_mask_bytes() {
+        // After the first mask fixes the stems, `1 2 hintmask` is skipped and
+        // the bytes after it run as charstring: vlineto 50.
+        let mut glyph = vec![N(100), N(50), Op(18), Op(19), Byte(0x80)];
+        glyph.extend([N(0), N(100), Op(21), N(100), Op(6), N(1), N(2), Op(19)]);
+        glyph.extend([N(50), Op(7), N(-100), Op(6), Op(14)]);
+        let glyph = table(&glyph, Vec::new());
+        let square = [(0, 200), (200, 200), (200, 300), (0, 300)];
+        assert_eq!(points(&glyph, TWO, false), square);
+        assert_eq!(points(&glyph, TWO, true).len(), 4);
+    }
+
+    #[test]
+    fn more_than_96_stems_fail_only_once_a_mask_or_move_uses_them() {
+        let unused = [many_stems(100), vec![Op(14)]].concat();
+        assert_eq!(
+            try_points(&table(&unused, Vec::new()), TWO, false),
+            Ok(Vec::new())
+        );
+        let moved = [many_stems(100), rectangle(0, &[50])].concat();
+        for hinted in [false, true] {
+            assert_eq!(
+                try_points(&table(&moved, Vec::new()), TWO, hinted),
+                Err(Error::Invalid("more than 96 stem hints"))
+            );
+        }
+        // 96 stems still load.
+        let most = [many_stems(96), rectangle(0, &[50])].concat();
+        assert_eq!(points(&table(&most, Vec::new()), TWO, false).len(), 4);
     }
 
     #[test]

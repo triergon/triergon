@@ -249,21 +249,21 @@ impl Metrics for OtMetrics<'_> {
 /// character map looked up as libass looks codes up
 /// ([`Font::text_lookup`]), FreeType's variation sequences
 /// ([`Font::variation_sequences`]), default-load
-/// advances ([`SizedFont::hinted_advance`]) and `FT_KERNING_DEFAULT` kerning
+/// advances ([`SizedFont::default_advance`]) and `FT_KERNING_DEFAULT` kerning
 /// ([`SizedFont::kerning`]), in 26.6 pixels at the size's
 /// [`SizedFont::harfbuzz_scale`] and pixels per em, so that hinting device
 /// tables apply.
 ///
 /// For a face of an `@` font ([`Self::rotating`]), the advance of a glyph
 /// libass's metrics cache keeps rotated ([`GlyphRotations`](crate::GlyphRotations)) is the default
-/// load's vertical advance ([`SizedFont::hinted_vertical_advance`]).
+/// load's vertical advance ([`SizedFont::default_vertical_advance`]).
 ///
 /// libass reads glyph extents and contour points from FreeType's default load
 /// ([`SizedFont::load`] with [`Load::Default`]): the extents are its grid-fitted
 /// bearings and size, the contour points its outline's. A glyph without points
 /// has empty extents in every face; for other glyphs, the default load's
 /// `Unsupported` (TrueType faces, which need FreeType's auto-hinter or TrueType
-/// interpreter) is the functions', as is an advance `hinted_advance` cannot
+/// interpreter) is the functions', as is an advance `default_advance` cannot
 /// give.
 pub struct SizedMetrics<'a> {
     sized: SizedFont<'a>,
@@ -408,9 +408,9 @@ impl Metrics for SizedMetrics<'_> {
 
     fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
         let advance = if self.loaded(glyph, None) {
-            self.sized.hinted_vertical_advance(glyph)
+            self.sized.default_vertical_advance(glyph)
         } else {
-            self.sized.hinted_advance(glyph)
+            self.sized.default_advance(glyph)
         };
         unless_unloadable(advance, 0)
     }

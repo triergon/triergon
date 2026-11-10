@@ -108,11 +108,21 @@ pub struct VerticalMetrics {
 }
 
 /// What loading a glyph reports besides its outline, at the scale it loads
-/// at. A TrueType composite takes the metrics of its last `USE_MY_METRICS`
-/// component; a CFF FontMatrix scales and offsets the advances.
+/// at, as FreeType's glyph slot reports it. A TrueType composite takes the
+/// metrics of its last `USE_MY_METRICS` component; a CFF FontMatrix scales and
+/// offsets the advances.
+///
+/// Loaded unhinted ([`Font::load`] in font units, [`SizedFont::outline_into`]
+/// or [`SizedFont::load`] with [`Load::Unhinted`] at a size), the advances
+/// are scaled and the box is the outline's exact control box. With
+/// [`Load::Default`], FreeType's default load, the advances are rounded to
+/// whole pixels and the box is fitted outwards to the pixel grid
+/// (`ft_glyphslot_grid_fit_metrics`), unless the size has zero pixels per em,
+/// which loads as unhinted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GlyphMetrics {
-    /// The advance (`advance.x` of FreeType's glyph slot).
+    /// The advance: `advance.x` unhinted, `metrics.horiAdvance` of the
+    /// default load.
     pub advance: i32,
     /// The vertical advance (`metrics.vertAdvance`): the `vmtx` advance
     /// height where the face has vertical metrics
@@ -123,16 +133,18 @@ pub struct GlyphMetrics {
     /// back in font units as a 16-bit value before scaling it again.
     pub vertical_advance: i32,
     /// `linearVertAdvance`: the vertical advance in font units, scaled to
-    /// 16.16 pixels by the size's y scale for a glyph loaded at a size
-    /// ([`SizedFont::outline_into`]).
+    /// 16.16 pixels by the size's y scale for a glyph loaded at a size, by
+    /// either load.
     pub linear_vertical_advance: i64,
-    /// `horiBearingX`, `horiBearingY`, `width` and `height`: the control box
-    /// of the loaded outline (every point, off-curve ones too; zero for an
-    /// outline without points), fitted to the pixel grid by FreeType's
-    /// default load.
+    /// `horiBearingX`: from the origin to the left of the outline's control
+    /// box (every point, off-curve ones too; zero for an outline without
+    /// points).
     pub bearing_x: i32,
+    /// `horiBearingY`: from the origin up to the top of the control box.
     pub bearing_y: i32,
+    /// `width`: the control box's width.
     pub width: i32,
+    /// `height`: the control box's height, positive.
     pub height: i32,
 }
 
