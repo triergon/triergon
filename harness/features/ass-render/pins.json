@@ -113,6 +113,16 @@
       "bytes": 619012,
       "digest": 16630156747280279572
     },
+    "charmap-retry-ass-1080p": {
+      "packets": 12,
+      "bytes": 45620,
+      "digest": 3127853172692033868
+    },
+    "charmap-retry-ass-720p": {
+      "packets": 12,
+      "bytes": 38740,
+      "digest": 2647018896958249612
+    },
     "charmap-unicode-ass-1080p": {
       "packets": 18,
       "bytes": 252670,

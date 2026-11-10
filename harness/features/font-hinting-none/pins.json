@@ -782,6 +782,21 @@
       "packets": 20,
       "bytes": 0,
       "digest": 13594493870156394144
+    },
+    "authored-charmaps-otf-outlines-16384": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 1079347376463615192
+    },
+    "authored-charmaps-otf-advances-16384": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 17629773856606588263
+    },
+    "authored-charmaps-otf-vertical-16384": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 182279606851672039
     }
   }
 }
