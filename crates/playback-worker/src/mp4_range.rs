@@ -90,7 +90,7 @@ pub(crate) fn prepare_edit(
     grant: u64,
     cancel: &AtomicBool,
 ) -> Result<Option<EncodedEditPlan>> {
-    let Some(edits) = track.edits() else {
+    let Some(edits) = track.edits().filter(|_| track.fragments().is_empty()) else {
         return Ok(None);
     };
     let table = track.table();
@@ -148,6 +148,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
     while !matches!(open.advance(&mut work(), &cancel)?, OpenProgress::Ready) {}
     let mut opened = open.finish()?;
     let movie = &opened.movie;
+    let movie_base = movie.header().time_base()?;
     let mut plans = BudgetVec::new(pool);
     plans.try_reserve_exact(movie.tracks().len())?;
     let mut video = None;
