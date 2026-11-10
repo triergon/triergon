@@ -230,12 +230,13 @@ fn auto_hinted_glyphs_follow_freetypes_auto_hinter() {
     // square's stem.
     assert_eq!(sized.default_advance(GlyphId(3)), Ok(3840));
     // The empty notdef is no character's: the CJK fallback style, whose
-    // advance is the scaled one and whose outline is not hinted here.
+    // advance is the scaled one and which leaves an outline without points
+    // empty.
     assert_eq!(sized.default_advance(GlyphId(0)), Ok(6400));
     assert_eq!(sized.default_vertical_advance(GlyphId(0)), Ok(13440));
     assert_eq!(
         default_load(&sized, 0),
-        Err(Error::Unsupported("the CJK auto-hinter"))
+        Ok((Vec::new(), [6400, 13440, 0, 0, 0, 0]))
     );
 
     // At 7 pixels per em (scale 27546) the stem, 84/64 pixel, is centred
