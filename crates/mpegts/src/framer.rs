@@ -257,6 +257,7 @@ impl TransportFramer {
     fn share_buffered_owner(
         shared_owner: &mut Option<ByteStorageAddress>,
         input: &InputCursor,
+        carrier_bytes: usize,
     ) -> bool {
         let Some(window) = input.buffered_owner() else {
             return false;
@@ -264,7 +265,33 @@ impl TransportFramer {
         // One bounded owner per segment. A short read backed by an oversized
         // allocation must not keep that capacity alive through a PES span.
         let capacity = window.retained_capacity();
-        if capacity > MAX_SHARED_INPUT_CAPACITY || capacity > window.len().saturating_mul(8) {
+        // A pending PES can retain this window after the cursor drains it.
+        // Leave enough room for a fresh reply and one tight carrier.
+        let buffered = input.buffered().len();
+        let needs_reply = input
+            .capabilities()
+            .length
+            .is_none_or(|length| length.saturating_sub(input.position()) > buffered as u64);
+        let needs_carry = needs_reply || !buffered.is_multiple_of(carrier_bytes);
+        let headroom = if needs_carry {
+            let carry = carrier_bytes + Bytes::owner_overhead_bytes();
+            if needs_reply {
+                carry.saturating_add(
+                    input
+                        .request()
+                        .maximum
+                        .saturating_add(Bytes::owner_overhead_bytes()),
+                )
+            } else {
+                carry
+            }
+        } else {
+            0
+        };
+        if capacity > MAX_SHARED_INPUT_CAPACITY
+            || capacity > window.len().saturating_mul(8)
+            || input.budget().available() < headroom
+        {
             return false;
         }
         let address = window.storage_address();
@@ -514,9 +541,11 @@ impl TransportFramer {
             {
                 let share = match self.buffered_carrier {
                     BufferedCarrier::Carry => false,
-                    BufferedCarrier::Shared => {
-                        Self::share_buffered_owner(&mut self.shared_owner, input)
-                    }
+                    BufferedCarrier::Shared => Self::share_buffered_owner(
+                        &mut self.shared_owner,
+                        input,
+                        self.format.bytes(),
+                    ),
                     BufferedCarrier::Progressive => {
                         Self::share_progressive_window(&mut self.progressive_windows, input)
                     }
@@ -726,6 +755,72 @@ mod tests {
     use triergon_core::{InputWindow, SourceCapabilities};
 
     #[test]
+    fn a_pending_payload_leaves_room_for_a_fresh_split_window() {
+        let budget = Budget::new(8192).unwrap();
+        let width = PacketFormat::Ts188.bytes();
+        let mut data = vec![0x42; 16 * width];
+        for carrier in data.chunks_exact_mut(width) {
+            carrier[..4].copy_from_slice(&[0x47, 0, 7, 0x10]);
+        }
+        let split = 8 * width + 37;
+        let mut input = InputCursor::new(
+            &budget,
+            SourceId(7),
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            split,
+        )
+        .unwrap();
+        let request = input.request();
+        let first = Bytes::copy_from_slice(&budget, &data[..split]).unwrap();
+        let first_owner = first.storage_address();
+        input
+            .provide_owned(InputWindow::new(request.source, request.token, 0, first).unwrap())
+            .unwrap();
+        let credit = 3 * width + 4 * Bytes::owner_overhead_bytes();
+        let _pressure = budget.reserve(budget.available() - credit).unwrap();
+        let mut framer = TransportFramer::new(budget.clone(), PacketFormat::Ts188);
+        framer.share_input();
+        let cancel = AtomicBool::new(false);
+        let mut held = None;
+        for index in 0..8 {
+            let Step::Ready(packet) = framer
+                .poll(&mut input, &mut WorkBudget::new(4096), &cancel)
+                .unwrap()
+            else {
+                panic!("expected a complete carrier");
+            };
+            if index == 0 {
+                held = packet.payload;
+            }
+        }
+        assert_ne!(held.as_ref().unwrap().storage_address(), first_owner);
+        let Step::NeedInput(request) = framer
+            .poll(&mut input, &mut WorkBudget::new(4096), &cancel)
+            .unwrap()
+        else {
+            panic!("expected the next source window");
+        };
+        assert_eq!(request.offset, split as u64);
+        let next = Bytes::copy_from_slice(&budget, &data[split..]).unwrap();
+        input
+            .provide_owned(
+                InputWindow::new(request.source, request.token, request.offset, next).unwrap(),
+            )
+            .unwrap();
+        let Step::Ready(packet) = framer
+            .poll(&mut input, &mut WorkBudget::new(4096), &cancel)
+            .unwrap()
+        else {
+            panic!("expected a carrier spanning both replies");
+        };
+        assert_eq!(packet.source.as_ref(), &data[8 * width..9 * width]);
+        assert_eq!(held.unwrap().as_ref(), &data[4..width]);
+    }
+
+    #[test]
     fn pcr_carriers_keep_the_packet_route_after_budget_and_cancel_retries() {
         for (high, flags) in [(1, 0x10), (0x41, 0x50)] {
             for initial_work in [188, 197, 198] {
@@ -845,6 +940,9 @@ mod tests {
         };
         assert!(packet.source.shares_storage_with(&window));
         assert_eq!(input.position(), 188);
+        assert!(input.matches_last_shared_span(0, &packet.source));
+        assert!(!input.matches_last_shared_span(0, &window.slice(188..376).unwrap()));
+        assert!(!input.matches_last_shared_span(188, &packet.source));
         assert_eq!(
             framer.poll(&mut input, &mut work, &cancel).unwrap_err(),
             Error::Invalid("TS sync byte")
@@ -853,6 +951,7 @@ mod tests {
         assert_eq!(rejected.source_offset(), 188);
         assert_eq!(rejected.bytes().as_ref(), &wire[188..]);
         assert!(rejected.backing_bytes().shares_storage_with(&window));
+        assert!(!input.matches_last_shared_span(188, rejected.backing_bytes()));
     }
 
     #[test]

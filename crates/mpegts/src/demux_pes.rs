@@ -829,7 +829,9 @@ impl DemuxObserver {
     }
 
     /// Retain just the payload when the caller still needs the original event.
-    /// A bound observer checks the supplied cursor before admitting the carrier.
+    /// The bound cursor must still prove the exact carrier span. If its window
+    /// has been released or the carrier was assembled from copies, use the
+    /// ordinary path.
     pub fn append_ready_borrowed_continuation(
         &mut self,
         packet: &TransportPacket,
@@ -838,6 +840,11 @@ impl DemuxObserver {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ReadyContinuation> {
+        if self.demux_input.is_none()
+            || !input.matches_last_shared_span(packet.source_offset, &packet.source)
+        {
+            return Ok(ReadyContinuation::Unhandled);
+        }
         let Some(next) = self.ready_continuation(packet, context, Some(input), work, cancel)?
         else {
             return Ok(ReadyContinuation::Unhandled);
@@ -1172,10 +1179,16 @@ impl DemuxObserver {
                 .payload_source_offset
                 .checked_add(payload.len() as u64)
                 .ok_or(Error::Overflow)?;
-            if payload.len() > 184
-                || !payload.shares_storage_with(&packet.source)
-                || packet.payload_source_offset < start
-                || payload_end > end
+            if payload.len() > 184 || packet.payload_source_offset < start || payload_end > end {
+                return Err(Error::Invalid("native TS payload bounds"));
+            }
+            let relative = usize::try_from(packet.payload_source_offset - packet.source_offset)
+                .map_err(|_| Error::Overflow)?;
+            if !packet
+                .source
+                .as_ref()
+                .get(relative..relative + payload.len())
+                .is_some_and(|span| std::ptr::eq(span, payload.as_ref()))
             {
                 return Err(Error::Invalid("native TS payload bounds"));
             }
@@ -1983,6 +1996,36 @@ impl DemuxObserver {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn neighboring_payload_in_the_same_window_has_the_wrong_extent() {
+        let pool = Budget::new(4096).unwrap();
+        let width = crate::PacketFormat::Ts188.bytes();
+        let mut data = vec![0x42; 2 * width];
+        for carrier in data.chunks_exact_mut(width) {
+            carrier[..4].copy_from_slice(&[0x47, 0, 7, 0x10]);
+        }
+        let backing = Bytes::copy_from_slice(&pool, &data).unwrap();
+        let mut packet = crate::parse_transport(
+            backing.slice(0..width).unwrap(),
+            crate::PacketFormat::Ts188,
+            0,
+        )
+        .unwrap();
+        DemuxObserver::transport_bounds(&packet).unwrap();
+        packet.payload = Some(backing.slice(width + 4..2 * width).unwrap());
+        assert!(
+            packet
+                .payload
+                .as_ref()
+                .unwrap()
+                .shares_storage_with(&packet.source)
+        );
+        assert_eq!(
+            DemuxObserver::transport_bounds(&packet),
+            Err(Error::Invalid("native TS payload bounds"))
+        );
+    }
 
     #[test]
     fn compact_accounting_keeps_the_charged_observer_layout() {
