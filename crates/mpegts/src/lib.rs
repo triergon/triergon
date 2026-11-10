@@ -28,20 +28,27 @@ pub mod mux;
 mod packet_completion;
 pub mod pes;
 pub mod psi;
+mod reader;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;
 mod stream;
 mod transport;
 
+pub use carrier::TransportObservation;
 pub use carrier::{RejectedTransport, TransportInspection, TransportInspector};
 pub use continuity::{Continuity, ContinuityOutcome};
 pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
 pub use media_entity::{MediaEntityEnd, ObservedTrace};
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
+pub use reader::{
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DvbSubtitleTailPolicy, DvbSubtitleUnit,
+    EntityTransition, IncompleteVideo, LoasFrame, Packet, PacketClock, PayloadSource, Reader,
+    ReaderEvent, ReaderLimits, SourceEvent, Track, UnframedAudio,
+};
 pub use stream::{
-    CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun,
-    TraceEvent, TraceFault, TransportStream,
+    CarrierObservation, CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem,
+    FeedPayloadRun, TraceEvent, TraceFault, TransportStream,
 };
 pub use transport::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};
 
@@ -125,6 +132,13 @@ pub(crate) fn checked_pid(pid: u16) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+pub(crate) fn table_storage<T>(table: &BudgetVec<T>) -> Result<usize> {
+    table
+        .capacity()
+        .checked_mul(size_of::<T>())
+        .ok_or(Error::Overflow)
 }
 
 pub(crate) fn limit(requested: usize, maximum: usize) -> Error {

@@ -525,6 +525,34 @@ impl InputCursor {
         self.advance(count, complete);
         Ok(Step::Ready(count))
     }
+
+    /// Validate and consume a complete response without retaining a window.
+    /// The callback processes the response before the cursor advances.
+    ///
+    /// An empty response or short grant returns false. Validation or callback
+    /// failure leaves the input position unchanged.
+    #[inline]
+    pub fn consume_response(
+        &mut self,
+        request: &InputRequest,
+        length: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: impl FnOnce() -> Result<()>,
+    ) -> Result<bool> {
+        self.verify(request.source, &request.token)?;
+        self.check_cancel(cancel)?;
+        self.validate_window(request.offset, length, self.maximum_window)?;
+        let count = length as u64;
+        if count == 0 || work.remaining() < count {
+            return Ok(false);
+        }
+        consume()?;
+        work.take(count);
+        self.position += count;
+        Ok(true)
+    }
+
     pub fn read_span(
         &mut self,
         maximum: usize,

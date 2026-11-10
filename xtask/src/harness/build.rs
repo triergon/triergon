@@ -266,10 +266,16 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 11] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 12] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "transport-worker",
+        package: "transport-worker",
         example: None,
         features: &[],
     },
@@ -350,6 +356,9 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let mut inputs = shared_inputs(root)?;
     if name == "isobmff-worker" {
         inputs.extend(crate::isobmff_bench::source_inputs(root)?);
+    }
+    if name == "transport-worker" {
+        inputs.extend(crate::transport_fixtures::entity_inputs(root)?);
     }
     if name == "framing-worker" {
         inputs.extend(

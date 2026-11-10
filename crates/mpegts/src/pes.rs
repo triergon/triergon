@@ -4,15 +4,33 @@ use crate::{
     AssemblyStep, ParseLimits, SourceEpochs, SourceRange, checked_pid, commit_range, limit,
     prepare_range,
 };
-use std::{
-    ops::Range,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, Time, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, SourceLocation, Time, WorkBudget,
 };
 
 pub(crate) const HEADER_MAX: usize = 264; // 9 fixed bytes plus 8-bit optional-header length
+const INLINE_HEADER_BYTES: usize = 19; // Fixed header plus PTS and DTS.
+
+#[derive(Clone, Debug)]
+enum HeaderBytes {
+    Inline {
+        data: [u8; INLINE_HEADER_BYTES],
+        length: u8,
+    },
+    Extended(Bytes),
+}
+
+impl HeaderBytes {
+    fn inline(bytes: &[u8]) -> Self {
+        let mut data = [0; INLINE_HEADER_BYTES];
+        data[..bytes.len()].copy_from_slice(bytes);
+        Self::Inline {
+            data,
+            length: u8::try_from(bytes.len()).expect("inline PES header length"),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct PesHeader {
@@ -22,12 +40,21 @@ pub struct PesHeader {
     pub dts_raw33: Option<u64>,
     pub data_alignment_indicator: bool,
     pub priority: bool,
-    raw: [u8; HEADER_MAX],
-    used: usize,
+    raw: HeaderBytes,
 }
 impl PesHeader {
     pub fn as_bytes(&self) -> &[u8] {
-        &self.raw[..self.used]
+        match &self.raw {
+            HeaderBytes::Inline { data, length } => &data[..usize::from(*length)],
+            HeaderBytes::Extended(bytes) => bytes.as_ref(),
+        }
+    }
+
+    pub(crate) fn retained_storage(&self) -> usize {
+        match &self.raw {
+            HeaderBytes::Inline { .. } => 0,
+            HeaderBytes::Extended(bytes) => bytes.retained_storage_bytes(),
+        }
     }
     /// Raw period-zero view only. Clock extension/epoch selection remains explicit.
     pub fn raw_pts_time(&self) -> Result<Option<Time>> {
@@ -45,19 +72,18 @@ impl PesHeader {
 #[derive(Debug)]
 pub struct PesSpan {
     bytes: Bytes,
-    range: Range<usize>,
+    start: usize,
     source: SourceRange,
-    chunk: u64,
 }
 impl AsRef<[u8]> for PesSpan {
     fn as_ref(&self) -> &[u8] {
-        &self.bytes.as_ref()[self.range.clone()]
+        &self.bytes.as_ref()[self.start..self.start + self.source.bytes]
     }
 }
 impl PesSpan {
     /// An exact charged alias of this elementary payload span.
     pub fn payload_bytes(&self) -> Result<Bytes> {
-        self.bytes.slice(self.range.clone())
+        self.bytes.slice(self.start..self.start + self.source.bytes)
     }
 
     pub fn source_range(&self) -> SourceRange {
@@ -84,6 +110,13 @@ impl Pes {
     pub fn spans(&self) -> &[PesSpan] {
         self.spans.as_slice()
     }
+    pub(crate) fn table_storage(&self) -> Result<usize> {
+        crate::table_storage(&self.spans)?
+            .checked_add(crate::table_storage(&self.header_source_ranges)?)
+            .and_then(|bytes| bytes.checked_add(self.header.retained_storage()))
+            .ok_or(Error::Overflow)
+    }
+
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
@@ -94,19 +127,111 @@ impl Pes {
 
 #[derive(Debug)]
 struct Payload {
-    bytes: Bytes,
+    // A final span can take the backing before this input slot is drained.
+    bytes: Option<Bytes>,
     pusi: bool,
     started: bool,
+    body_span: bool,
     position: usize,
     entity: SourceId,
     offset: u64,
-    chunk: u64,
+}
+
+impl Payload {
+    fn bytes(&self) -> &Bytes {
+        self.bytes.as_ref().expect("PES payload not consumed")
+    }
+
+    fn remaining(&self) -> usize {
+        self.bytes
+            .as_ref()
+            .map_or(0, |bytes| bytes.len() - self.position)
+    }
+}
+
+#[derive(Debug)]
+enum SpanGrowth {
+    Credit(usize),
+    // The allocation was fully paid before the audit began.
+    Audit(SpanGrowthAudit),
+    // A refused header-range replacement, including the pending backing.
+    HeaderBlocked(usize),
+}
+
+// A refused span growth pins the source bytes and both table allocations.
+// Count whole backing allocations once, even when a window supplies many spans.
+#[derive(Debug)]
+struct SpanGrowthAudit {
+    minimum: usize,
+    span: usize,
+    prior: usize,
+}
+
+impl SpanGrowthAudit {
+    fn new(
+        spans: &BudgetVec<PesSpan>,
+        headers: &BudgetVec<SourceRange>,
+        header_bytes: usize,
+    ) -> Result<Self> {
+        let tables = spans
+            .capacity()
+            .checked_add(spans.len())
+            .and_then(|n| n.checked_add(1))
+            .and_then(|n| n.checked_mul(size_of::<PesSpan>()))
+            .ok_or(Error::Overflow)?;
+        let headers = headers
+            .capacity()
+            .checked_mul(size_of::<SourceRange>())
+            .ok_or(Error::Overflow)?;
+        let minimum = Budget::control_storage_bytes()
+            .checked_add(tables)
+            .and_then(|n| n.checked_add(headers))
+            .and_then(|n| n.checked_add(header_bytes))
+            .ok_or(Error::Overflow)?;
+        Ok(Self {
+            minimum,
+            span: 0,
+            prior: 0,
+        })
+    }
+
+    fn step(
+        &mut self,
+        spans: &[PesSpan],
+        pending: &Bytes,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        // Treat the pending payload as the final span for deduplication.
+        while self.span <= spans.len() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(false);
+            }
+            let bytes = spans.get(self.span).map_or(pending, PesSpan::backing_bytes);
+            if self.prior == self.span {
+                self.minimum = self
+                    .minimum
+                    .checked_add(bytes.retained_storage_bytes())
+                    .ok_or(Error::Overflow)?;
+            } else if !bytes.shares_storage_with(spans[self.prior].backing_bytes()) {
+                self.prior += 1;
+                continue;
+            }
+            self.span += 1;
+            self.prior = 0;
+        }
+        Ok(true)
+    }
 }
 
 #[derive(Debug)]
 pub struct PesAssembler {
     pid: u16,
     video: bool,
+    unbounded_adts: bool,
     budget: Budget,
     limits: ParseLimits,
     epochs: SourceEpochs,
@@ -126,9 +251,11 @@ pub struct PesAssembler {
     byte_run_epoch: u64,
     header_ranges: BudgetVec<SourceRange>,
     spans: BudgetVec<PesSpan>,
+    span_growth: SpanGrowth,
     validated_spans: usize,
-    validated_chunk: Option<u64>,
 }
+
+pub(crate) const UNBOUNDED_NON_VIDEO: Error = Error::Invalid("unbounded non-video PES");
 
 impl PesAssembler {
     pub fn new(
@@ -143,8 +270,10 @@ impl PesAssembler {
         Ok(Self {
             pid,
             video,
+            unbounded_adts: false,
             header_ranges: BudgetVec::new(&budget),
             spans: BudgetVec::new(&budget),
+            span_growth: SpanGrowth::Credit(0),
             budget,
             limits,
             epochs,
@@ -163,9 +292,13 @@ impl PesAssembler {
             elementary_offset: 0,
             byte_run_epoch: 0,
             validated_spans: 0,
-            validated_chunk: None,
         })
     }
+
+    pub(crate) fn allow_unbounded_adts(&mut self) {
+        self.unbounded_adts = true;
+    }
+
     /// One TS payload at a time. Drain poll before supplying another. A rejected
     /// input is returned intact; no bytes have been consumed from that input.
     pub fn push(
@@ -194,16 +327,15 @@ impl PesAssembler {
                 value: bytes,
             });
         }
-        let chunk = self.next_chunk;
         self.next_chunk += 1;
         self.payload = Some(Payload {
-            bytes,
+            bytes: Some(bytes),
             pusi,
             started: false,
+            body_span: false,
             position: 0,
             entity,
             offset,
-            chunk,
         });
         Ok(())
     }
@@ -212,7 +344,18 @@ impl PesAssembler {
         self.ended = true;
     }
     pub fn partial_header(&self) -> &[u8] {
-        &self.raw_header[..self.header_used]
+        self.header
+            .as_ref()
+            .map_or(&self.raw_header[..self.header_used], PesHeader::as_bytes)
+    }
+    pub(crate) fn pending_header_location(&self) -> Option<SourceLocation> {
+        self.header_ranges
+            .as_slice()
+            .first()
+            .map(|range| SourceLocation {
+                source: range.entity,
+                offset: range.offset,
+            })
     }
 
     fn validating_body(&self) -> bool {
@@ -221,6 +364,88 @@ impl PesAssembler {
             && self.fault.is_none()
             && self.active
             && self.header.is_some()
+    }
+
+    /// Keep a whole continuation when no span growth or PES publication is due.
+    pub(crate) fn retain_body_carrier(
+        &mut self,
+        payload: &mut Option<Bytes>,
+        source: SourceLocation,
+        work: &mut WorkBudget,
+    ) -> bool {
+        let Some(bytes) = payload.as_ref() else {
+            return false;
+        };
+        if self.total == self.seen.checked_add(bytes.len())
+            || !self.can_retain_body_carrier(bytes, 0, source.offset, work.remaining())
+        {
+            return false;
+        }
+        self.append_body_carrier(payload.take().expect("whole PES carrier"), source, work);
+        true
+    }
+
+    pub(crate) fn can_retain_body_carrier(
+        &self,
+        bytes: &Bytes,
+        start: usize,
+        offset: u64,
+        grant: u64,
+    ) -> bool {
+        let count = bytes.len().saturating_sub(start);
+        let end = self.total.unwrap_or(self.limits.pes_bytes);
+        let spans = self.spans.len();
+        self.validating_body()
+            && count != 0
+            && count <= end.saturating_sub(self.seen)
+            && spans < self.spans.capacity()
+            && spans < self.limits.source_spans
+            && self.next_chunk != u64::MAX
+            && offset.checked_add(count as u64).is_some()
+            && bytes.belongs_to(&self.budget)
+            && count as u64 <= grant
+            && (self.total != Some(self.seen + count)
+                || ((count as u64) < grant
+                    && self
+                        .elementary_offset
+                        .checked_add((self.payload_len + count) as u64)
+                        .is_some()))
+    }
+
+    /// Commit a carrier after the complete span and work grant were checked.
+    pub(crate) fn append_body_carrier(
+        &mut self,
+        bytes: Bytes,
+        source: SourceLocation,
+        work: &mut WorkBudget,
+    ) {
+        let count = bytes.len();
+        debug_assert!(self.can_retain_body_carrier(&bytes, 0, source.offset, work.remaining()));
+        work.take(count as u64);
+        self.spans
+            .try_push(PesSpan {
+                bytes,
+                start: 0,
+                source: SourceRange {
+                    entity: source.source,
+                    offset: source.offset,
+                    bytes: count,
+                },
+            })
+            .expect("space for the PES span");
+        self.next_chunk += 1;
+        self.payload_len += count;
+        self.seen += count;
+    }
+
+    pub(crate) fn take_complete_body(&mut self) -> Result<Option<Pes>> {
+        if self.total != Some(self.seen) {
+            return Ok(None);
+        }
+        let AssemblyStep::Output(pes) = self.emit::<true>()? else {
+            unreachable!("complete finite PES");
+        };
+        Ok(pes)
     }
 
     /// Capacity before a finite PES completes and needs ordinary publication.
@@ -236,7 +461,6 @@ impl PesAssembler {
 
     pub(crate) fn record_body_carriers(&mut self, carriers: usize, payload: usize) {
         self.next_chunk += carriers as u64;
-        self.validated_chunk = Some(self.next_chunk - 1);
         self.validated_spans += carriers;
         self.payload_len += payload;
         self.seen += payload;
@@ -288,8 +512,8 @@ impl PesAssembler {
         self.epochs = epochs;
         self.header_ranges = BudgetVec::new(&self.budget);
         self.spans = BudgetVec::new(&self.budget);
+        self.span_growth = SpanGrowth::Credit(0);
         self.validated_spans = 0;
-        self.validated_chunk = None;
     }
     pub fn poll(
         &mut self,
@@ -345,7 +569,6 @@ impl PesAssembler {
         if !RETAIN {
             self.header_ranges.clear();
             self.validated_spans = 0;
-            self.validated_chunk = None;
         }
         self.elementary_offset = next;
         self.active = false;
@@ -365,7 +588,7 @@ impl PesAssembler {
             .payload
             .as_ref()
             .ok_or(Error::Invalid("PES payload missing"))?;
-        let bytes = &pending.bytes.as_ref()[pending.position..];
+        let bytes = &pending.bytes().as_ref()[pending.position..];
         let Some((header, total)) = parse_timed_header(bytes, self.limits.pes_bytes, work) else {
             return Ok(false);
         };
@@ -384,11 +607,18 @@ impl PesAssembler {
                 .ok_or(Error::Overflow)?,
             bytes: used,
         };
-        let merge = prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
+        let merge = match prepare_range(&mut self.header_ranges, extent, self.limits.source_spans) {
+            Err(error @ Error::Backpressure { .. }) => {
+                self.record_blocked_header_growth()?;
+                return Err(error);
+            }
+            result => result?,
+        };
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
         commit_range(&mut self.header_ranges, extent, merge)?;
+        self.span_growth = SpanGrowth::Credit(0);
         work.take(used as u64 + 3);
         self.header_used = used;
         self.header_target = used;
@@ -400,6 +630,121 @@ impl PesAssembler {
             .ok_or(Error::Invalid("PES payload missing"))?
             .position += used;
         Ok(true)
+    }
+
+    pub(crate) fn table_storage(&self) -> Result<usize> {
+        crate::table_storage(&self.spans)?
+            .checked_add(crate::table_storage(&self.header_ranges)?)
+            .and_then(|bytes| {
+                bytes.checked_add(self.header.as_ref().map_or(0, PesHeader::retained_storage))
+            })
+            .ok_or(Error::Overflow)
+    }
+
+    pub(crate) fn span_backing(&self, index: usize) -> Option<&Bytes> {
+        self.spans.as_slice().get(index).map(PesSpan::backing_bytes)
+    }
+
+    pub(crate) fn pending_backing(&self) -> Option<&Bytes> {
+        self.payload.as_ref()?.bytes.as_ref()
+    }
+
+    pub(crate) fn blocked_growth_floor(&self) -> Option<usize> {
+        match &self.span_growth {
+            SpanGrowth::Audit(audit) if audit.span > self.spans.len() => Some(audit.minimum),
+            SpanGrowth::HeaderBlocked(minimum) => Some(*minimum),
+            _ => None,
+        }
+    }
+
+    #[cold]
+    fn record_blocked_header_growth(&mut self) -> Result<()> {
+        let replacement = self
+            .header_ranges
+            .len()
+            .checked_add(1)
+            .and_then(|len| len.checked_mul(size_of::<SourceRange>()))
+            .ok_or(Error::Overflow)?;
+        self.record_blocked_header_storage(replacement)
+    }
+
+    #[cold]
+    fn record_blocked_header_storage(&mut self, additional: usize) -> Result<()> {
+        if matches!(self.span_growth, SpanGrowth::HeaderBlocked(_)) {
+            return Ok(());
+        }
+        // The pending carrier is the only retained backing during header assembly.
+        debug_assert!(self.spans.is_empty());
+        let pending = self.pending_backing().expect("pending PES header");
+        let minimum = Budget::control_storage_bytes()
+            .checked_add(self.table_storage()?)
+            .and_then(|bytes| bytes.checked_add(additional))
+            .and_then(|bytes| bytes.checked_add(pending.retained_storage_bytes()))
+            .ok_or(Error::Overflow)?;
+        if minimum > self.budget.limit() {
+            return Err(limit(minimum, self.budget.limit()));
+        }
+        self.span_growth = SpanGrowth::HeaderBlocked(minimum);
+        Ok(())
+    }
+
+    fn reserve_adts_span(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+        let spans = self.spans.len();
+        if spans < self.spans.capacity() {
+            return Ok(true);
+        }
+        if let SpanGrowth::Credit(credit) = &mut self.span_growth {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            // Pay for the allocation and each span moved before growing the table.
+            // The pending payload and table length are stable across retries.
+            let cost = spans + 1;
+            *credit += work.take((cost - *credit) as u64) as usize;
+            if *credit != cost {
+                return Ok(false);
+            }
+        }
+        loop {
+            if let SpanGrowth::Audit(audit) = &mut self.span_growth {
+                let pending = self.payload.as_ref().expect("pending PES span");
+                if !audit.step(self.spans.as_slice(), pending.bytes(), work, cancel)? {
+                    return Ok(false);
+                }
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(Error::Cancelled);
+                }
+                if audit.minimum > self.budget.limit() {
+                    return Err(limit(audit.minimum, self.budget.limit()));
+                }
+                if work.remaining() == 0 {
+                    return Ok(false);
+                }
+            } else if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            match self.spans.try_reserve_exact(1) {
+                Ok(()) => {
+                    self.span_growth = SpanGrowth::Credit(0);
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    // The grant can end at the reservation. Commit the new span
+                    // only when the caller can also charge its first byte.
+                    return Ok(work.remaining() != 0);
+                }
+                Err(Error::Backpressure { .. })
+                    if matches!(self.span_growth, SpanGrowth::Credit(_)) =>
+                {
+                    self.span_growth = SpanGrowth::Audit(SpanGrowthAudit::new(
+                        &self.spans,
+                        &self.header_ranges,
+                        self.header.as_ref().map_or(0, PesHeader::retained_storage),
+                    )?);
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
 
     fn poll_inner<const RETAIN: bool>(
@@ -415,7 +760,7 @@ impl PesAssembler {
                 if self
                     .payload
                     .as_ref()
-                    .is_some_and(|payload| payload.position < payload.bytes.len())
+                    .is_some_and(|payload| payload.remaining() != 0)
                 {
                     return Err(Error::Invalid("bytes beyond finite PES"));
                 }
@@ -425,9 +770,11 @@ impl PesAssembler {
                 return self.emit::<RETAIN>();
             }
             if self.active && self.header.is_none() && self.header_used == self.header_target {
-                if !work.try_charge(1) {
+                let retry = matches!(self.span_growth, SpanGrowth::HeaderBlocked(_));
+                if work.remaining() == 0 {
                     return Ok(AssemblyStep::Yield);
                 }
+                work.take(u64::from(!retry));
                 match self.header_used {
                     6 => {
                         if self.raw_header[..3] != [0, 0, 1] {
@@ -442,8 +789,11 @@ impl PesAssembler {
                             self.raw_header[5],
                         ]));
                         if length == 0 {
-                            if !self.video || !(0xe0..=0xef).contains(&id) {
-                                return Err(Error::Invalid("unbounded non-video PES"));
+                            // H.222.0 §2.4.3.7 reserves this syntax for TS video.
+                            let video = self.video && (0xe0..=0xef).contains(&id);
+                            let recovered_adts = self.unbounded_adts && (0xc0..=0xdf).contains(&id);
+                            if !video && !recovered_adts {
+                                return Err(UNBOUNDED_NON_VIDEO);
                             }
                         } else {
                             let total = 6 + length;
@@ -466,10 +816,25 @@ impl PesAssembler {
                             return Err(limit(self.header_target, self.limits.pes_bytes));
                         }
                         if self.header_target == 9 {
-                            self.header = Some(parse_header(&self.raw_header, 9)?);
+                            self.header = Some(parse_header(&self.budget, &self.raw_header[..9])?);
                         }
                     }
-                    _ => self.header = Some(parse_header(&self.raw_header, self.header_used)?),
+                    _ => {
+                        let parsed =
+                            parse_header(&self.budget, &self.raw_header[..self.header_used]);
+                        let header = match parsed {
+                            Err(error @ Error::Backpressure { requested, .. }) => {
+                                self.record_blocked_header_storage(requested)?;
+                                return Err(error);
+                            }
+                            result => result?,
+                        };
+                        if retry {
+                            work.take(1);
+                            self.span_growth = SpanGrowth::Credit(0);
+                        }
+                        self.header = Some(header);
+                    }
                 }
                 continue;
             }
@@ -502,13 +867,13 @@ impl PesAssembler {
                     .started = true;
                 continue;
             }
-            if pending.position == pending.bytes.len() {
+            let available = pending.remaining();
+            if available == 0 {
                 self.payload = None;
                 continue;
             }
             if !self.active {
-                let remaining = pending.bytes.len() - pending.position;
-                let count = work.take(remaining as u64) as usize;
+                let count = work.take(available as u64) as usize;
                 if count == 0 {
                     return Ok(AssemblyStep::Yield);
                 }
@@ -519,24 +884,29 @@ impl PesAssembler {
                 continue;
             }
             if self.header.is_none() {
-                if !RETAIN && self.header_used == 0 && self.complete_timed_header(work, cancel)? {
+                if self.header_used == 0 && self.complete_timed_header(work, cancel)? {
                     continue;
                 }
                 let pending = self
                     .payload
                     .as_ref()
                     .ok_or(Error::Invalid("PES payload missing"))?;
-                if !work.try_charge(1) {
+                let grant = work.remaining();
+                if grant == 0 {
                     return Ok(AssemblyStep::Yield);
                 }
+                let retry = matches!(self.span_growth, SpanGrowth::HeaderBlocked(_));
+                // On a refused retry, leave the grant for the transport's
+                // retained-state audit. Charge the header bytes on success.
+                let prepaid = u64::from(!retry);
+                work.take(prepaid);
                 if self.seen == self.limits.pes_bytes {
                     return Err(limit(self.seen.saturating_add(1), self.limits.pes_bytes));
                 }
                 let count = (self.header_target - self.header_used)
                     .min(self.limits.pes_bytes - self.seen)
-                    .min(pending.bytes.len() - pending.position)
-                    .min(work.remaining().min(HEADER_MAX as u64) as usize + 1);
-                let bytes = &pending.bytes.as_ref()[pending.position..pending.position + count];
+                    .min(available)
+                    .min(grant.min(HEADER_MAX as u64) as usize);
                 let extent = SourceRange {
                     entity: pending.entity,
                     offset: pending
@@ -545,20 +915,33 @@ impl PesAssembler {
                         .ok_or(Error::Overflow)?,
                     bytes: count,
                 };
-                let merge =
-                    prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
+                let merge = match prepare_range(
+                    &mut self.header_ranges,
+                    extent,
+                    self.limits.source_spans,
+                ) {
+                    Err(error @ Error::Backpressure { .. }) => {
+                        self.record_blocked_header_growth()?;
+                        return Err(error);
+                    }
+                    result => result?,
+                };
+                if retry {
+                    self.span_growth = SpanGrowth::Credit(0);
+                }
+                work.take(count as u64 - prepaid);
                 commit_range(&mut self.header_ranges, extent, merge)?;
+                let pending = self
+                    .payload
+                    .as_mut()
+                    .ok_or(Error::Invalid("PES payload missing"))?;
+                let bytes = &pending.bytes().as_ref()[pending.position..pending.position + count];
                 self.raw_header[self.header_used..self.header_used + count].copy_from_slice(bytes);
-                work.take(count as u64 - 1);
                 self.header_used += count;
                 self.seen += count;
-                self.payload
-                    .as_mut()
-                    .ok_or(Error::Invalid("PES payload missing"))?
-                    .position += count;
+                pending.position += count;
                 continue;
             }
-            let available = pending.bytes.len() - pending.position;
             let remaining = self
                 .total
                 .map_or(self.limits.pes_bytes - self.seen, |total| total - self.seen);
@@ -569,34 +952,33 @@ impl PesAssembler {
             if work.remaining() == 0 {
                 return Ok(AssemblyStep::Yield);
             }
-            // Validation-only feeds count exactly the same spans. Each chunk
-            // is contiguous and consumed monotonically, so no owners are needed.
-            let (merge, spans) = if RETAIN {
-                (
-                    self.spans.as_slice().last().is_some_and(|last| {
-                        last.chunk == pending.chunk && last.range.end == pending.position
-                    }),
-                    self.spans.len(),
-                )
+            // A carrier's body is consumed monotonically. Its first byte
+            // opens one span, and later grants extend the same span.
+            let merge = pending.body_span;
+            let spans = if RETAIN {
+                self.spans.len()
             } else {
-                (
-                    self.validated_chunk == Some(pending.chunk),
-                    self.validated_spans,
-                )
+                self.validated_spans
             };
             if !merge {
                 if spans == self.limits.source_spans {
                     return Err(limit(spans.saturating_add(1), self.limits.source_spans));
                 }
-                if RETAIN {
-                    self.spans.try_reserve_exact(1)?;
+                if RETAIN
+                    && self.unbounded_adts
+                    && self.header.as_ref().is_some_and(|header| {
+                        header.declared_packet_length == 0
+                            && (0xc0..=0xdf).contains(&header.stream_id)
+                    })
+                    && !self.reserve_adts_span(work, cancel)?
+                {
+                    return Ok(AssemblyStep::Yield);
                 }
             }
-            let count = work.take(maximum as u64) as usize;
+            let count = (maximum as u64).min(work.remaining()) as usize;
             if !RETAIN {
                 if !merge {
                     self.validated_spans += 1;
-                    self.validated_chunk = Some(pending.chunk);
                 }
             } else if merge {
                 let span = self
@@ -604,32 +986,41 @@ impl PesAssembler {
                     .as_mut_slice()
                     .last_mut()
                     .ok_or(Error::Invalid("missing PES span"))?;
-                span.range.end += count;
                 span.source.bytes += count;
             } else {
+                let pending = self.payload.as_mut().expect("pending PES span");
                 let physical = pending
                     .offset
                     .checked_add(pending.position as u64)
                     .ok_or(Error::Overflow)?;
-                self.spans
-                    .try_push(PesSpan {
-                        bytes: pending.bytes.clone(),
-                        range: pending.position..pending.position + count,
-                        source: SourceRange {
-                            entity: pending.entity,
-                            offset: physical,
-                            bytes: count,
-                        },
-                        chunk: pending.chunk,
-                    })
-                    .map_err(|error| error.error)?;
+                let bytes = if count == available {
+                    pending.bytes.take().expect("pending PES span")
+                } else {
+                    pending.bytes().clone()
+                };
+                // The charged table amortises ordinary growth. A rejected
+                // append keeps the input position and byte grant for retry.
+                if let Err(rejected) = self.spans.try_push(PesSpan {
+                    bytes,
+                    start: pending.position,
+                    source: SourceRange {
+                        entity: pending.entity,
+                        offset: physical,
+                        bytes: count,
+                    },
+                }) {
+                    if count == available {
+                        pending.bytes = Some(rejected.value.bytes);
+                    }
+                    return Err(rejected.error);
+                }
             }
+            work.take(count as u64);
             self.payload_len += count;
             self.seen += count;
-            self.payload
-                .as_mut()
-                .ok_or(Error::Invalid("PES payload missing"))?
-                .position += count;
+            let pending = self.payload.as_mut().expect("pending PES body");
+            pending.body_span = true;
+            pending.position += count;
         }
     }
 }
@@ -694,8 +1085,6 @@ pub(crate) fn parse_timed_header(
     } else {
         None
     };
-    let mut raw = [0; HEADER_MAX];
-    raw[..used].copy_from_slice(bytes);
     Some((
         PesHeader {
             stream_id: prefix[3],
@@ -704,15 +1093,14 @@ pub(crate) fn parse_timed_header(
             dts_raw33,
             data_alignment_indicator: prefix[6] & 4 != 0,
             priority: prefix[6] & 8 != 0,
-            raw,
-            used,
+            raw: HeaderBytes::inline(bytes),
         },
         declared,
     ))
 }
 
-pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHeader> {
-    let bytes = &raw[..used];
+pub(crate) fn parse_header(budget: &Budget, bytes: &[u8]) -> Result<PesHeader> {
+    let used = bytes.len();
     if used < 9 || bytes[6] & 0xc0 != 0x80 || used != 9 + usize::from(bytes[8]) {
         return Err(Error::Invalid("PES optional-header prefix"));
     }
@@ -808,6 +1196,11 @@ pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHea
     if bytes[position..].iter().any(|byte| *byte != 255) {
         return Err(Error::Invalid("PES header stuffing"));
     }
+    let raw = if used <= INLINE_HEADER_BYTES {
+        HeaderBytes::inline(bytes)
+    } else {
+        HeaderBytes::Extended(Bytes::copy_from_slice(budget, bytes)?)
+    };
     Ok(PesHeader {
         stream_id: bytes[3],
         declared_packet_length: u16::from_be_bytes([bytes[4], bytes[5]]),
@@ -815,10 +1208,13 @@ pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHea
         dts_raw33,
         data_alignment_indicator: bytes[6] & 4 != 0,
         priority: bytes[6] & 8 != 0,
-        raw: *raw,
-        used,
+        raw,
     })
 }
+
+#[cfg(test)]
+#[path = "pes/adts_span_budget.rs"]
+mod adts_span_budget;
 
 #[cfg(test)]
 mod timed_header_tests {
@@ -857,6 +1253,7 @@ mod timed_header_tests {
 
     #[test]
     fn complete_timestamps_match_general_headers_and_keep_admission_bounds() {
+        let pool = Budget::new(4096).unwrap();
         for pts in [0, 1, 0x0001_0000_0011, (1 << 33) - 1] {
             for dts in [None, Some(0), Some((1 << 33) - 1)] {
                 for control in 0x80..=0x8f {
@@ -866,7 +1263,7 @@ mod timed_header_tests {
                         let work = WorkBudget::new(used as u64 + 3);
                         let (fast, total) =
                             parse_timed_header(&raw[..used], 1 << 20, &work).unwrap();
-                        let slow = parse_header(&raw, used).unwrap();
+                        let slow = parse_header(&pool, &raw[..used]).unwrap();
                         assert_eq!(format!("{fast:?}"), format!("{slow:?}"));
                         assert_eq!(fast.pts_raw33, Some(pts));
                         assert_eq!(fast.dts_raw33, dts);
@@ -892,6 +1289,7 @@ mod timed_header_tests {
 
     #[test]
     fn invalid_and_incomplete_timestamps_fall_back_to_the_general_parser() {
+        let pool = Budget::new(4096).unwrap();
         for dts in [None, Some((1 << 33) - 1)] {
             let (raw, used) = header(0x0001_0000_0011, dts, 0x84);
             let work = WorkBudget::new(4096);
@@ -903,7 +1301,7 @@ mod timed_header_tests {
                     let mut changed = raw;
                     changed[at] ^= 1 << bit;
                     let fast = parse_timed_header(&changed[..used], 1 << 20, &work);
-                    match parse_header(&changed, used) {
+                    match parse_header(&pool, &changed[..used]) {
                         Ok(slow) => {
                             assert_eq!(format!("{:?}", fast.unwrap().0), format!("{slow:?}"));
                         }
@@ -923,7 +1321,66 @@ mod timed_header_tests {
         let (mut raw, used) = header(17, None, 0x84);
         raw[8] += 1;
         raw[used] = 0xff;
-        assert!(parse_header(&raw, used + 1).is_ok());
+        assert!(parse_header(&pool, &raw[..used + 1]).is_ok());
         assert!(parse_timed_header(&raw[..used + 1], 1 << 20, &WorkBudget::new(4096)).is_none());
+    }
+
+    #[test]
+    fn extended_header_retains_every_byte_after_a_pressure_retry() {
+        let pool = Budget::new(4096).unwrap();
+        let source = SourceId(1);
+        let mut raw = [0xff; HEADER_MAX + 1];
+        let length = u16::try_from(raw.len() - 6).unwrap().to_be_bytes();
+        raw[..9].copy_from_slice(&[0, 0, 1, 0xe0, length[0], length[1], 0x80, 0, 255]);
+        let mut assembler = PesAssembler::new(
+            256,
+            true,
+            pool.clone(),
+            ParseLimits::default(),
+            SourceEpochs::default(),
+        )
+        .unwrap();
+        assembler
+            .push(
+                Bytes::copy_from_slice(&pool, &raw).unwrap(),
+                true,
+                source,
+                0,
+            )
+            .unwrap();
+        let cancel = AtomicBool::new(false);
+        assert!(matches!(
+            assembler.poll(&mut WorkBudget::new(HEADER_MAX as u64 + 2), &cancel),
+            Ok(AssemblyStep::Yield)
+        ));
+        assert_eq!(assembler.partial_header(), &raw[..HEADER_MAX]);
+        let pressure = pool.reserve(pool.available()).unwrap();
+        let mut work = WorkBudget::new(1);
+        assert!(matches!(
+            assembler.poll(&mut work, &cancel),
+            Err(Error::Backpressure { .. })
+        ));
+        assert!(assembler.blocked_growth_floor().is_some());
+        assert!(matches!(
+            assembler.poll(&mut WorkBudget::new(1), &cancel),
+            Err(Error::Backpressure { .. })
+        ));
+        assert_eq!(assembler.partial_header(), &raw[..HEADER_MAX]);
+        drop(pressure);
+        let AssemblyStep::Output(pes) = assembler.poll(&mut WorkBudget::new(2), &cancel).unwrap()
+        else {
+            panic!("expected the completed PES");
+        };
+        assert_eq!(pes.header.as_bytes(), &raw[..HEADER_MAX]);
+        assert_eq!(pes.payload().next(), Some(&raw[HEADER_MAX..]));
+        assert_eq!(
+            pes.header_source_ranges.as_slice(),
+            &[SourceRange {
+                entity: source,
+                offset: 0,
+                bytes: HEADER_MAX,
+            }]
+        );
+        assert!(assembler.blocked_growth_floor().is_none());
     }
 }

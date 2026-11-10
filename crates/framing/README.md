@@ -94,6 +94,11 @@ assert_eq!(decoder_input, [
 
 ## Behaviour and limits
 
+`AacAdtsCarrier::into_selected_frame` shares the original bytes of a complete,
+aligned AAC-LC envelope with the typed frame. On an opaque or incomplete
+carrier it returns the original observation, including its boundary and
+selected-source diagnostic.
+
 **Reference compatibility.** The crate-root types follow the specifications.
 `compat::nal` reproduces FFmpeg where a consumer needs FFmpeg's result: it accepts
 configuration records as the `mp4toannexb` packet receiver does, and names the
@@ -134,7 +139,8 @@ payload for passthrough packets.
   unknown versions. The `compat::nal` receiver parsers accept them for the packet
   session only.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
-  profiles. It adds no timestamps.
+  profiles. It adds no timestamps. `append_payload` can consume an interior NAL
+  slice while the reader is waiting for input.
 - AV1: LEB128 up to 8 bytes and `u32::MAX`. `OneObu` needs an external length;
   AV1 Annex-B (length-delimited) streams are not parsed. Sequence headers are not
   parsed. `Av1TemporalUnitJob` adds a missing temporal delimiter, inserts av1C
@@ -148,6 +154,8 @@ payload for passthrough packets.
   search, no word-swapped or IEC 61937 input, and no CRC or audio-block check.
   bsid 9/10 and E-AC-3 mixing definition 3 are refused. `sample_span()` is the
   coded duration of one frame, not a presentation time.
+  `Ac3FrameReader::read_frame_parts` can consume a complete aligned frame
+  from several slices when the first slice contains its header prefix.
 - DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no
   resync, termination frames or DTS-HD extension parsing. HCRC is reported, not
   checked.

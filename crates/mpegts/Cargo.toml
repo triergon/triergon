@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 triergon-bitstream = { path = "../bitstream" }
 triergon-core = { path = "../core" }
+triergon-framing = { path = "../framing" }
 
 [dev-dependencies]
 triergon-harness-protocol = { path = "../harness-protocol" }
