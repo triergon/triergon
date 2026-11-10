@@ -1,8 +1,7 @@
 use super::{FIRST_SOURCE, Request, WINDOW, WORK, ts_input};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, InputCursor, InputWindow, Result, Step, WorkBudget};
-use triergon_mpegts::compat::pes::SourceContext;
-use triergon_mpegts::reference_trace::packet_completion::PacketCompletion;
+use triergon_mpegts::compat::pes::{PacketCompletion, SourceContext};
 use triergon_mpegts::{ParseLimits, TraceEvent, TransportStream};
 
 /// Confirm a single control-only entity through physical End and logical EOF.
@@ -26,25 +25,19 @@ pub(super) fn confirm(pool: &Budget, request: &Request, cancel: &AtomicBool) -> 
         PacketCompletion::new_for_format(pool.clone(), limits, request.program, request.format)?;
     let mut ordinal = 0_u64;
     loop {
-        match transport.poll(&mut input, &mut WorkBudget::new(WORK), cancel)? {
+        match transport.poll_observed(&mut input, &mut WorkBudget::new(WORK), cancel)? {
             Step::Ready(event) => {
                 let context = SourceContext {
                     source_event_ordinal: ordinal,
                     epochs: transport.source_epochs(),
                     byte_run_epoch: None,
                 };
-                let grant = proof.required_work(&event)?;
-                if !proof.observe(
-                    &event,
-                    input.source(),
-                    context,
-                    &mut WorkBudget::new(grant),
-                    cancel,
-                )? {
+                let grant = proof.required_work(event.event())?;
+                if !proof.observe_issued(&event, context, &mut WorkBudget::new(grant), cancel)? {
                     return Err(Error::Invalid("control proof exhausted its work grant"));
                 }
                 ordinal = ordinal.checked_add(1).ok_or(Error::Overflow)?;
-                if matches!(event, TraceEvent::Finished) {
+                if matches!(event.event(), TraceEvent::Finished) {
                     let grant = proof.required_end_work()?;
                     return Ok(proof
                         .confirm_no_media(&mut input, &mut WorkBudget::new(grant), cancel)?

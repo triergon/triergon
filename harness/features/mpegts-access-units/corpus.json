@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "directory": ".",
-  "original_pes_manifest_sha256": "acbb8a8e8c6d61239cf91f62f5a61438503b233bf11224166d202379210acd96",
+  "original_pes_manifest_sha256": "ab169ae640e8e80610809a14329357c3d03994eb5bb37a9af7d3aaf9fb9fb0d8",
   "source_inputs": [
     {
       "path": "crates/framing/fixtures/raw-annex-b/avc-aud0.h264",
@@ -2228,7 +2228,6 @@
           "id": "hls-contiguous-pes-carry"
         }
       ],
-      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
       "expected": {
         "packets": 1,
         "bytes": 512,
@@ -2274,7 +2273,6 @@
           "id": "hls-external-map"
         }
       ],
-      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
       "expected": {
         "packets": 1,
         "bytes": 27,
@@ -2321,7 +2319,6 @@
           "id": "hls-explicit-discontinuity"
         }
       ],
-      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
       "expected": {
         "packets": 1,
         "bytes": 27,

@@ -16,7 +16,7 @@ type R<T> = Result<T, String>;
 const FEATURE: &str = "features/mpegts-access-units";
 const DIRECTORY: &str = "fixtures-mpegts-access-units";
 const ORIGINAL: &str = "harness/features/mpegts-pes/corpus.json";
-const ORIGINAL_SHA: &str = "acbb8a8e8c6d61239cf91f62f5a61438503b233bf11224166d202379210acd96";
+const ORIGINAL_SHA: &str = "ab169ae640e8e80610809a14329357c3d03994eb5bb37a9af7d3aaf9fb9fb0d8";
 const OPERATION: &str = "mpegts-access-unit-packets";
 const PROGRAM: u16 = 7;
 const PID: u16 = 256;
@@ -165,19 +165,11 @@ fn original(root: &Path) -> R<Vec<Case>> {
             for input in std::iter::once(row).chain(entities(row)) {
                 checked_input(root, input)?;
             }
-            let sequence = entities(row).len() > 1;
             let mut row = row.clone();
             let Value::Object(fields) = &mut row else {
                 return Err("invalid original case".into());
             };
             fields.retain(|(key, _)| key != "expected");
-            if sequence {
-                for (key, _) in fields {
-                    if key == "reference_refusal" {
-                        *key = "single_input_reference_refusal".into();
-                    }
-                }
-            }
             Ok(Case {
                 row,
                 bytes: None,
@@ -1489,9 +1481,21 @@ mod tests {
                 let Value::Object(fields) = row else {
                     unreachable!()
                 };
+                let expected_at = fields
+                    .iter()
+                    .position(|(key, _)| key == "expected")
+                    .unwrap();
+                fields.insert(
+                    expected_at,
+                    (
+                        "reference_refusal".into(),
+                        Value::str(
+                            "no single-input reference operation for more than one media entity",
+                        ),
+                    ),
+                );
                 for (key, value) in fields {
                     match key.as_str() {
-                        "single_input_reference_refusal" => *key = "reference_refusal".into(),
                         "expected" => {
                             *value = Value::object([
                                 ("packets", Value::int(0)),
