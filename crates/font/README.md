@@ -362,8 +362,9 @@ the light mode's stem darkening.
 programs that may leave backward compatibility; fonts FreeType finds tricky only
 by their table checksums are not recognised.
 Sizes beyond 65535 pixels per em are refused. Coordinates are `i32`; a scaled coordinate beyond it is
-`Error::Overflow`, where FreeType's `FT_Pos` wraps at 32 bits on 32-bit ARM
-(libass rejects anything beyond 2^28 itself). The `random` operator does not follow FreeType's
+`Error::Overflow` in an unhinted or CFF load, where FreeType's `FT_Pos` wraps at
+32 bits on 32-bit ARM (libass rejects anything beyond 2^28 itself); the
+auto-hinter wraps its `FT_Pos` and `FT_Fixed` arithmetic as FreeType does there. The `random` operator does not follow FreeType's
 generator.
 
 ## Hinting
