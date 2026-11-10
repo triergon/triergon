@@ -29,7 +29,7 @@ mod tables;
 
 use std::sync::{Mutex, OnceLock, PoisonError};
 
-use crate::long::{mul_fix, pix_ceil, pix_round, to_i32, wrap};
+use crate::long::{linear_advance, mul_fix, pix_ceil, pix_round, to_i32, wrap};
 use hints::GlyphHints;
 use latin::Scope;
 use style::{Coverage, DIGIT, WritingSystem};
@@ -322,10 +322,7 @@ impl Autofit {
             vertical_advance: to_i32(vertical),
             // `FT_Load_Glyph` scales the linear advance after any load, as
             // the unhinted loads do.
-            linear_vertical_advance: crate::long::linear_advance(
-                units.vertical_units,
-                scaler.y_scale,
-            ),
+            linear_vertical_advance: linear_advance(units.vertical_units, scaler.y_scale),
             bearing_x: to_i32(left),
             bearing_y: to_i32(top),
             width: to_i32(right - left),

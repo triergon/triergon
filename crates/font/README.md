@@ -214,9 +214,10 @@ face with fewer operands than FreeType reads (`cfftoken.h` and the field
 readers of `cffparse.c`), as does a MultipleMaster entry with other than 2 to
 16 designs, and a ROS entry with registry 0xFFFF marks no CID-keyed face. A
 CFF Font DICT is read as a Top DICT, as FreeType reads it, and one with its own
-ROS has no Private DICT. One difference remains: a CFF2 face whose `fvar` passes FreeType's header check
-but which `TT_Get_MM_Var` then refuses opens here, with the header's axes,
-where FreeType fails to open it (`cff_face_init` sets the default instance).
+ROS has no Private DICT. One difference remains: a CFF2 face whose `fvar`
+passes FreeType's header check but which `TT_Get_MM_Var` then refuses opens
+here, with the header's axes, where FreeType fails to open it (`cff_face_init`
+sets the default instance).
 
 **Control boxes.** `Font::control_box` reads a glyph's box without building its
 outline, within the caller's `WorkBudget`, so no point limit applies: a TrueType glyph's `glyf` header box as

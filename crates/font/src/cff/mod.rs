@@ -10,8 +10,9 @@ mod matrix;
 mod number;
 mod path;
 
-use crate::fixed::{Scale, div_fix, mul_div, mul_fix};
+use crate::fixed::{Scale, div_fix, mul_fix};
 use crate::glyf::narrow;
+use crate::long::mul_div;
 use crate::outline::{Outline, Point};
 use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;

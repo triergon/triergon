@@ -96,8 +96,9 @@ mod tests {
 
     #[test]
     fn linear_advances_wrap_as_on_32_bit_arm() {
-        // 65535 units at a y scale of 2^20 (16 pixels per unit): 2^36 / 64
-        // is 2^30, which fits; at 2^22 it is 2^32, whose low bits are zero.
+        // 65535 units at a y scale of 2^20 (a quarter pixel per unit): 2^36 /
+        // 64 is just under 2^30, which fits; at 2^22 the product's low 32
+        // bits are 0xFFFF0000, -65536.
         assert_eq!(linear_advance(65535, 1 << 20), 0x3fff_c000);
         assert_eq!(linear_advance(65535, 1 << 22), -0x1_0000);
         // A y scale of 2^31 is FT_LONG_MIN as a 32-bit FT_Fixed.
