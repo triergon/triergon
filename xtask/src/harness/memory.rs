@@ -1379,6 +1379,20 @@ pub(crate) fn collect_commands(
     )
 }
 
+fn prepare_workers(root: &Path, candidate: &Path, reference: &Path) -> R<[PathBuf; 2]> {
+    let expected = [file_sha(candidate)?, file_sha(reference)?];
+    // Grading rechecks the worker paths in the observer certificate. Keep the
+    // measured copies in the build tree and reuse their paths for these bytes.
+    let directory = root
+        .join("target/harness/.memory-workers")
+        .join(format!("{}-{}", expected[0], expected[1]));
+    let copies = worker::copy_pair(&directory, candidate, reference)?;
+    if [file_sha(&copies[0])?, file_sha(&copies[1])?] != expected {
+        return Err("worker changed during memory preparation".into());
+    }
+    Ok(copies)
+}
+
 fn collect_invocation(
     root: &Path,
     candidate: &Path,
@@ -1396,17 +1410,18 @@ fn collect_invocation(
             ("samples", Value::Array(vec![])),
         ]));
     }
+    let before = cpu_snapshot()?;
+    let [candidate, reference] = prepare_workers(root, candidate, reference)?;
     let host = Native {
         root,
         timeout: invocation.timeout,
     };
-    let before = cpu_snapshot()?;
-    let certificate = qualification(&host, root, candidate, reference);
+    let certificate = qualification(&host, root, &candidate, &reference);
     let mut result = measure(
         &host,
         root,
-        candidate,
-        reference,
+        &candidate,
+        &reference,
         pairs,
         seed,
         &certificate,
@@ -1545,6 +1560,35 @@ pub fn evidence_valid_with_outputs(
 #[cfg(test)]
 mod command_tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn memory_preparation_replaces_both_files_and_keeps_certificate_paths() {
+        use std::os::unix::fs::MetadataExt;
+
+        let root = crate::walk::scratch("memory-worker-copies");
+        fs::create_dir_all(&root).unwrap();
+        let candidate = root.join("candidate");
+        let reference = root.join("longer-reference-name");
+        fs::write(&candidate, b"candidate").unwrap();
+        fs::write(&reference, b"reference").unwrap();
+        let paths = prepare_workers(&root, &candidate, &reference).unwrap();
+        let first = paths.each_ref().map(|path| fs::File::open(path).unwrap());
+        assert_eq!(paths[0].as_os_str().len(), paths[1].as_os_str().len());
+        assert_eq!(
+            paths,
+            prepare_workers(&root, &candidate, &reference).unwrap()
+        );
+        for (path, before) in paths.iter().zip(first) {
+            assert_ne!(
+                fs::metadata(path).unwrap().ino(),
+                before.metadata().unwrap().ino()
+            );
+        }
+        assert_eq!(fs::read(&paths[0]).unwrap(), fs::read(candidate).unwrap());
+        assert_eq!(fs::read(&paths[1]).unwrap(), fs::read(reference).unwrap());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn unreadable_memory_input_returns_a_failed_row() {

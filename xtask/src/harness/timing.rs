@@ -651,20 +651,7 @@ pub struct TimedWorkers {
 impl TimedWorkers {
     pub fn new(candidate: &Path, reference: &Path) -> Result<Self, String> {
         let directory = candidate.with_file_name(format!(".timed-{}", std::process::id()));
-        let copy = |slot: &str, worker: &Path| -> Result<PathBuf, String> {
-            let target = directory.join(slot);
-            fs::create_dir_all(&target).map_err(|e| format!("{}: {e}", target.display()))?;
-            let target = target.join("worker");
-            let bytes = fs::read(worker).map_err(|e| format!("{}: {e}", worker.display()))?;
-            fs::write(&target, bytes).map_err(|e| format!("{}: {e}", target.display()))?;
-            let permissions = fs::metadata(worker)
-                .map_err(|e| format!("{}: {e}", worker.display()))?
-                .permissions();
-            fs::set_permissions(&target, permissions)
-                .map_err(|e| format!("{}: {e}", target.display()))?;
-            Ok(target)
-        };
-        let (candidate, reference) = (copy("a", candidate)?, copy("b", reference)?);
+        let [candidate, reference] = worker::copy_pair(&directory, candidate, reference)?;
         Ok(TimedWorkers {
             directory,
             candidate,

@@ -2,7 +2,9 @@
 //! recorded outcome; a successful result is never synthesised.
 
 use std::ffi::OsString;
-use std::io::Read;
+use std::fs;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -41,6 +43,36 @@ pub fn arg(value: impl ToString) -> OsString {
     OsString::from(value.to_string())
 }
 
+/// Give both workers fresh files with the same write pattern and path length.
+pub(super) fn copy_pair(
+    directory: &Path,
+    candidate: &Path,
+    reference: &Path,
+) -> Result<[PathBuf; 2], String> {
+    let copy = |slot: &str, source: &Path| -> Result<PathBuf, String> {
+        let slot = directory.join(slot);
+        fs::create_dir_all(&slot).map_err(|e| format!("{}: {e}", slot.display()))?;
+        let target = slot.join("worker");
+        let pending = slot.join(format!(".worker-{}", std::process::id()));
+        let bytes = fs::read(source).map_err(|e| format!("{}: {e}", source.display()))?;
+        let permissions = fs::metadata(source)
+            .map_err(|e| format!("{}: {e}", source.display()))?
+            .permissions();
+        let mut file =
+            fs::File::create_new(&pending).map_err(|e| format!("{}: {e}", pending.display()))?;
+        let written = file
+            .write_all(&bytes)
+            .and_then(|()| file.set_permissions(permissions));
+        drop(file);
+        if let Err(error) = written.and_then(|()| fs::rename(&pending, &target)) {
+            let _ = fs::remove_file(&pending);
+            return Err(format!("{}: {error}", target.display()));
+        }
+        Ok(target)
+    };
+    Ok([copy("a", candidate)?, copy("b", reference)?])
+}
+
 /// The exit code (negative signal number when killed), stdout and stderr of a
 /// finished process; `None` when it outlived `timeout` and was killed.
 pub struct Finished {
@@ -62,7 +94,7 @@ pub fn run(
 pub fn run_in(
     argv: &[OsString],
     env: &[(String, Option<String>)],
-    cwd: Option<&std::path::Path>,
+    cwd: Option<&Path>,
     timeout: Duration,
 ) -> Result<Option<Finished>, String> {
     let started = Instant::now();
@@ -121,11 +153,10 @@ pub fn run_in(
 
 /// Candidate invocations recorded for trace identities: the worker whose calls
 /// are recorded, and each call's arguments, exit code and stdout digest.
-static RECORDER: std::sync::Mutex<Option<(std::path::PathBuf, Vec<Value>)>> =
-    std::sync::Mutex::new(None);
+static RECORDER: std::sync::Mutex<Option<(PathBuf, Vec<Value>)>> = std::sync::Mutex::new(None);
 
 /// Record every later invocation of `worker` until [`stop_recording`].
-pub fn record_calls(worker: &std::path::Path) {
+pub fn record_calls(worker: &Path) {
     if let Ok(mut slot) = RECORDER.lock() {
         *slot = Some((worker.to_path_buf(), Vec::new()));
     }
@@ -144,7 +175,7 @@ pub fn stop_recording() -> Vec<Value> {
 fn recorded(argv: &[OsString]) -> Option<Value> {
     let mut slot = RECORDER.lock().ok()?;
     let (worker, calls) = slot.as_mut()?;
-    if std::fs::canonicalize(&argv[0]).ok().as_deref() != Some(worker.as_path()) {
+    if fs::canonicalize(&argv[0]).ok().as_deref() != Some(worker.as_path()) {
         return None;
     }
     let finished = match run(argv, &[], Duration::from_secs(u64::MAX / 4)) {
@@ -154,7 +185,7 @@ fn recorded(argv: &[OsString]) -> Option<Value> {
     };
     let shown = argv[1..].iter().enumerate().map(|(i, a)| {
         if i == 1 {
-            std::path::Path::new(a).file_name().map_or_else(
+            Path::new(a).file_name().map_or_else(
                 || a.to_string_lossy().into_owned(),
                 |n| n.to_string_lossy().into_owned(),
             )
