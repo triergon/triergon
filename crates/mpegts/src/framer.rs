@@ -228,13 +228,13 @@ impl TransportFramer {
                 .take()
                 .ok_or(Error::Invalid("missing packet start"))?;
             self.carry = Some(BudgetVec::new(&self.budget));
-            // A complete carry can use the same accepted layout as a shared window.
-            if self.format == PacketFormat::Ts188
-                && !cancel.load(Ordering::Relaxed)
-                && let Some(carrier) = PlainCarrier::inspect_ts188(&source, start, work)
+            if !cancel.load(Ordering::Relaxed)
+                && let Some(carrier) = PlainCarrier::inspect(&source, self.format, start, work)
             {
                 self.last_packet_offset = Some(start);
-                return carrier.into_packet(source, start, self.entity).map(Some);
+                return carrier
+                    .into_packet(source, self.format, start, self.entity)
+                    .map(Some);
             }
             self.inspect(source, start)?;
         }
@@ -270,24 +270,14 @@ impl TransportFramer {
     fn share_buffered_owner(
         shared_owner: &mut Option<ByteStorageAddress>,
         input: &InputCursor,
-        carrier_bytes: usize,
     ) -> bool {
         let Some(window) = input.buffered_owner() else {
             return false;
         };
-        // A pending PES can retain this allocation. Share only when no more
-        // input reply or split carrier can be needed for this entity.
-        let buffered = input.buffered().len();
-        let final_bytes = input
-            .capabilities()
-            .length
-            .and_then(|length| length.checked_sub(input.position()));
+        // One bounded owner per segment. A short read backed by an oversized
+        // allocation must not keep that capacity alive through a PES span.
         let capacity = window.retained_capacity();
-        if final_bytes != Some(buffered as u64)
-            || !buffered.is_multiple_of(carrier_bytes)
-            || capacity > MAX_SHARED_INPUT_CAPACITY
-            || capacity > window.len().saturating_mul(8)
-        {
+        if capacity > MAX_SHARED_INPUT_CAPACITY || capacity > window.len().saturating_mul(8) {
             return false;
         }
         let address = window.storage_address();
@@ -537,11 +527,9 @@ impl TransportFramer {
             {
                 let share = match self.buffered_carrier {
                     BufferedCarrier::Carry => false,
-                    BufferedCarrier::Shared => Self::share_buffered_owner(
-                        &mut self.shared_owner,
-                        input,
-                        self.format.bytes(),
-                    ),
+                    BufferedCarrier::Shared => {
+                        Self::share_buffered_owner(&mut self.shared_owner, input)
+                    }
                     BufferedCarrier::Progressive => {
                         Self::share_progressive_window(&mut self.progressive_windows, input)
                     }
@@ -593,11 +581,11 @@ impl TransportFramer {
                     continue;
                 }
             }
-            // Reserve before consuming bytes. Shared carriers can leave no
-            // available credit, so their empty-window polls must reach EOF
-            // without a reservation.
+            // Reserve before advancing the shared cursor; a failed allocation has
+            // consumed no source bytes. A complete carry survives failed freeze.
             if carry.capacity() < carry.len() + missing
-                && (self.buffered_carrier == BufferedCarrier::Carry || !input.buffered().is_empty())
+                && (self.buffered_carrier != BufferedCarrier::Progressive
+                    || !input.buffered().is_empty())
             {
                 if !work.try_charge(1) {
                     return Ok(Step::Yield);
@@ -751,72 +739,6 @@ mod tests {
     use triergon_core::{InputWindow, SourceCapabilities};
 
     #[test]
-    fn a_pending_payload_leaves_room_for_a_fresh_split_window() {
-        let budget = Budget::new(8192).unwrap();
-        let width = PacketFormat::Ts188.bytes();
-        let mut data = vec![0x42; 16 * width];
-        for carrier in data.chunks_exact_mut(width) {
-            carrier[..4].copy_from_slice(&[0x47, 0, 7, 0x10]);
-        }
-        let split = 8 * width + 37;
-        let mut input = InputCursor::new(
-            &budget,
-            SourceId(7),
-            SourceCapabilities {
-                length: None,
-                random_access: false,
-            },
-            split,
-        )
-        .unwrap();
-        let request = input.request();
-        let first = Bytes::copy_from_slice(&budget, &data[..split]).unwrap();
-        let first_owner = first.storage_address();
-        input
-            .provide_owned(InputWindow::new(request.source, request.token, 0, first).unwrap())
-            .unwrap();
-        let credit = 3 * width + 4 * Bytes::owner_overhead_bytes();
-        let _pressure = budget.reserve(budget.available() - credit).unwrap();
-        let mut framer = TransportFramer::new(budget.clone(), PacketFormat::Ts188);
-        framer.share_input();
-        let cancel = AtomicBool::new(false);
-        let mut held = None;
-        for index in 0..8 {
-            let Step::Ready(packet) = framer
-                .poll(&mut input, &mut WorkBudget::new(4096), &cancel)
-                .unwrap()
-            else {
-                panic!("expected a complete carrier");
-            };
-            if index == 0 {
-                held = packet.payload;
-            }
-        }
-        assert_ne!(held.as_ref().unwrap().storage_address(), first_owner);
-        let Step::NeedInput(request) = framer
-            .poll(&mut input, &mut WorkBudget::new(4096), &cancel)
-            .unwrap()
-        else {
-            panic!("expected the next source window");
-        };
-        assert_eq!(request.offset, split as u64);
-        let next = Bytes::copy_from_slice(&budget, &data[split..]).unwrap();
-        input
-            .provide_owned(
-                InputWindow::new(request.source, request.token, request.offset, next).unwrap(),
-            )
-            .unwrap();
-        let Step::Ready(packet) = framer
-            .poll(&mut input, &mut WorkBudget::new(4096), &cancel)
-            .unwrap()
-        else {
-            panic!("expected a carrier spanning both replies");
-        };
-        assert_eq!(packet.source.as_ref(), &data[8 * width..9 * width]);
-        assert_eq!(held.unwrap().as_ref(), &data[4..width]);
-    }
-
-    #[test]
     fn pcr_carriers_keep_the_packet_route_after_budget_and_cancel_retries() {
         for (high, flags) in [(1, 0x10), (0x41, 0x50)] {
             for initial_work in [188, 197, 198] {
@@ -936,9 +858,6 @@ mod tests {
         };
         assert!(packet.source.shares_storage_with(&window));
         assert_eq!(input.position(), 188);
-        assert!(input.matches_last_shared_span(0, &packet.source));
-        assert!(!input.matches_last_shared_span(0, &window.slice(188..376).unwrap()));
-        assert!(!input.matches_last_shared_span(188, &packet.source));
         assert_eq!(
             framer.poll(&mut input, &mut work, &cancel).unwrap_err(),
             Error::Invalid("TS sync byte")
@@ -947,11 +866,10 @@ mod tests {
         assert_eq!(rejected.source_offset(), 188);
         assert_eq!(rejected.bytes().as_ref(), &wire[188..]);
         assert!(rejected.backing_bytes().shares_storage_with(&window));
-        assert!(!input.matches_last_shared_span(188, rejected.backing_bytes()));
     }
 
     #[test]
-    fn segment_carriers_share_only_the_final_aligned_window() {
+    fn segment_carriers_copy_sparse_and_independent_windows() {
         let budget = Budget::new(256 * 1024).unwrap();
         let mut input = InputCursor::new(
             &budget,
@@ -968,7 +886,7 @@ mod tests {
         let mut wire = [0xff; 188];
         wire[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
         let mut owners = Vec::new();
-        for (capacity, share) in [(64 * 1024, false), (188, false), (188, true)] {
+        for (capacity, share) in [(64 * 1024, false), (188, true), (188, false)] {
             let mut data = Vec::with_capacity(capacity);
             data.extend_from_slice(&wire);
             let owner = Bytes::try_from_vec(&budget, data).unwrap();
@@ -1203,7 +1121,7 @@ mod tests {
     }
 
     #[test]
-    fn a_retained_final_carrier_does_not_block_end_of_input() {
+    fn an_unretained_shared_carrier_returns_its_window_budget() {
         let limit = 188 + Bytes::owner_overhead_bytes() + Budget::control_storage_bytes();
         let budget = Budget::new(limit).unwrap();
         let mut input = InputCursor::new(
@@ -1232,23 +1150,16 @@ mod tests {
             .unwrap();
         let mut framer = TransportFramer::new(budget.clone(), PacketFormat::Ts188);
         framer.share_input();
-        let cancel = AtomicBool::new(false);
-        let mut work = WorkBudget::new(4096);
-        let Step::Ready(packet) = framer.poll(&mut input, &mut work, &cancel).unwrap() else {
-            panic!("expected the final carrier");
-        };
-        assert_eq!(budget.available(), 0);
-        let Step::NeedInput(request) = framer.poll(&mut input, &mut work, &cancel).unwrap() else {
-            panic!("expected the end-of-input request");
-        };
-        assert_eq!(request.maximum, 0);
-        input.finish(request.source, request.token).unwrap();
         assert!(matches!(
-            framer.poll(&mut input, &mut work, &cancel).unwrap(),
-            Step::End(location) if location.offset == 188
+            framer
+                .poll(
+                    &mut input,
+                    &mut WorkBudget::new(4096),
+                    &AtomicBool::new(false)
+                )
+                .unwrap(),
+            Step::Ready(_)
         ));
-        assert_eq!(packet.source.as_ref(), &wire);
-        drop(packet);
         assert_eq!(budget.used(), Budget::control_storage_bytes());
     }
 

@@ -619,8 +619,7 @@ impl Engine {
             limits,
             program,
             namespace,
-        )?
-        .with_shared_carriers();
+        )?;
         TsEngine::from_stream(input, format, limits, policy, namespace, stream).map(Self::Ts)
     }
     pub fn ts_native(
@@ -1121,8 +1120,7 @@ impl Engine {
                     r.limits,
                     r.program,
                     r.namespace,
-                )?
-                .with_shared_carriers();
+                )?;
                 r.native = Some(DemuxClock::new(r.program)?);
                 r.tsid = None;
                 r.pcr_pid = None;
@@ -2334,33 +2332,16 @@ impl TsEngine {
                     return T::project(TsPayloadStep::Yield);
                 }
             }
-            if let TraceEvent::Transport(packet) = event
-                && let Some(index) = self.native_tracks.index(packet.pid)
-                && let Some(observer) = self.native_tracks.as_mut_slice()[index].observer.as_mut()
-            {
-                let context = SourceContext {
-                    source_event_ordinal: self.event_ordinal,
-                    epochs: self.stream.source_epochs(),
-                    byte_run_epoch: None,
-                };
-                match observer.append_ready_borrowed_continuation(
-                    packet,
-                    context,
-                    &self.input,
-                    w,
-                    c,
-                )? {
-                    ReadyContinuation::Buffered => {}
-                    ReadyContinuation::Complete => self.native_active = Some(index),
-                    ReadyContinuation::Unhandled => {
-                        self.offer_native_transport(index, packet.clone(), context, None)?;
-                    }
-                }
-            }
             let event = self
                 .pending
                 .take()
                 .ok_or(Error::Invalid("TS event missing"))?;
+            if let TraceEvent::Transport(packet) = &event
+                && let Some(index) = self.native_tracks.index(packet.pid)
+            {
+                let context = self.native_source_context();
+                self.offer_native_transport(index, packet.clone(), context, None)?;
+            }
             self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
             if matches!(event, TraceEvent::Finished) {
                 self.ended = true;

@@ -198,14 +198,11 @@ audio, and 0x90 indicates presentation graphics in this view. MPEG-1 video
 (0x01) keeps its source kind and is unknown in the selected PES view.
 
 The startup probe scores sync bytes in groups while charging each inspected
-byte. When delivering full transport events, the PES observer can retain
-only the payload of a validated continuation that fits its existing arena.
-Shared segment carriers use only a bounded, final aligned input window.
-Earlier windows use the carry buffer so a pending PES does not retain an input
-reply that still needs replacing. The borrowed continuation path requires an
-exact span still held by the bound cursor.
-Complete buffered TS188 and M2TS192 carriers share the validator for common
+byte. Complete TS188 and M2TS192 carriers use one validator for common
 payload and adaptation layouts, including PCR. M2TS prefixes stay opaque.
+Program playback keeps tight carrier storage so a packet cannot retain an
+entire input window. The PES observer checks that the payload is the exact
+span at its declared offset in that carrier.
 
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
