@@ -38,16 +38,17 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
         .ok_or("required manifest has no cases")?;
     let mut ids = BTreeSet::new();
     let mut profiles = BTreeSet::new();
-    let prefix = contract
+    let work_fields = contract
         .get("worker_operation")
         .and_then(Value::as_str)
-        .is_some();
+        .map(|_| super::comparison::work_fields(contract))
+        .transpose()?;
     let per_target = crate::generators::pinned_per_target(contract);
     let targets = contract
         .get("required_targets")
         .and_then(Value::as_array)
         .unwrap_or_default();
-    if prefix && per_target && targets.is_empty() {
+    if work_fields.is_some() && per_target && targets.is_empty() {
         return Err("per-target pins need required targets".into());
     }
     for case in cases {
@@ -62,26 +63,35 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
         if let Some(profile) = case.get("profile").and_then(Value::as_str) {
             profiles.insert(profile.to_owned());
         }
-        if prefix && per_target {
-            let pins = case.get(crate::generators::EXPECTED_BY_TARGET);
+        let Some(fields) = &work_fields else {
+            continue;
+        };
+        let expected = case.get("expected");
+        let pins = case.get(crate::generators::EXPECTED_BY_TARGET);
+        if per_target {
+            if expected.is_some() {
+                return Err(format!("{id}: expected must use per-target folds"));
+            }
             let unpinned = crate::generators::unpinned(contract, id);
             for target in targets {
                 let target = target.as_str().ok_or("invalid required target")?;
-                let expected = pins.and_then(|pins| pins.get(target));
-                if expected.is_none_or(|value| value == &Value::Null)
-                    && !unpinned
-                        .iter()
-                        .any(|&(name, reason)| name == target && !reason.is_empty())
+                if let Some(pin) = pins.and_then(|pins| pins.get(target)) {
+                    super::comparison::work_summary(pin, fields)
+                        .map_err(|error| format!("{id}: expected fold for {target}: {error}"))?;
+                } else if !unpinned
+                    .iter()
+                    .any(|&(name, reason)| name == target && !reason.is_empty())
                 {
                     return Err(format!("{id}: missing expected fold for {target}"));
                 }
             }
-        } else if prefix
-            && case
-                .get("expected")
-                .is_none_or(|value| value == &Value::Null)
-        {
-            return Err(format!("{id}: missing expected fold"));
+        } else {
+            if pins.is_some() {
+                return Err(format!("{id}: per-target folds require pinned_per_target"));
+            }
+            let expected = expected.ok_or_else(|| format!("{id}: missing expected fold"))?;
+            super::comparison::work_summary(expected, fields)
+                .map_err(|error| format!("{id}: expected fold: {error}"))?;
         }
     }
     let missing = super::acceptance::missing_profiles(contract, &profiles);
@@ -145,13 +155,13 @@ mod tests {
             json::parse(r#"{"worker_operation":"test-","required_profiles":["first","second"]}"#)
                 .unwrap();
         let without_profile =
-            json::parse(r#"{"cases":[{"id":"one","profile":"first","expected":{}}]}"#).unwrap();
+            json::parse(r#"{"cases":[{"id":"one","profile":"first","expected":{"packets":1,"bytes":1,"digest":1}}]}"#).unwrap();
         assert_eq!(
             validate_required(&contract, &without_profile).unwrap_err(),
             "missing required profiles: second"
         );
         let without_pin = json::parse(
-            r#"{"cases":[{"id":"one","profile":"first","expected":{}},
+            r#"{"cases":[{"id":"one","profile":"first","expected":{"packets":1,"bytes":1,"digest":1}},
                           {"id":"two","profile":"second"}]}"#,
         )
         .unwrap();
@@ -164,7 +174,7 @@ mod tests {
     #[test]
     fn required_manifest_accepts_declared_target_exceptions() {
         let manifest = json::parse(
-            r#"{"cases":[{"id":"one","profile":"sample","expected_by_target":{"first":{}}}]}"#,
+            r#"{"cases":[{"id":"one","profile":"sample","expected_by_target":{"first":{"packets":1,"bytes":1,"digest":1}}}]}"#,
         )
         .unwrap();
         let contract = |exceptions: &str| {
@@ -182,6 +192,24 @@ mod tests {
         let allowed =
             contract(r#"[{"id":"one","targets":["second"],"reason":"Host-dependent fold"}]"#);
         validate_required(&allowed, &manifest).unwrap();
+        let malformed = json::parse(
+            r#"{"cases":[{"id":"one","profile":"sample","expected_by_target":{"first":{}}}]}"#,
+        )
+        .unwrap();
+        assert!(
+            validate_required(&allowed, &malformed)
+                .unwrap_err()
+                .contains("expected fold for first")
+        );
+        let shadowed = json::parse(
+            r#"{"cases":[{"id":"one","profile":"sample","expected":{"packets":1,"bytes":1,"digest":1},
+                "expected_by_target":{"first":{"packets":1,"bytes":1,"digest":1}}}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            validate_required(&allowed, &shadowed).unwrap_err(),
+            "one: expected must use per-target folds"
+        );
     }
 
     #[test]
