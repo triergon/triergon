@@ -354,6 +354,13 @@ fn run(program: &str, args: &[&str], path: &Path) -> R<String> {
     String::from_utf8(output.stdout).map_err(|e| e.to_string())
 }
 
+/// Whether moving the executable can preserve its ELF loader search paths.
+pub(super) fn relocatable_worker(worker: &Path) -> bool {
+    let origin = |value: &str| value.contains("$ORIGIN") || value.contains("${ORIGIN}");
+    !std::env::var_os("LD_LIBRARY_PATH").is_some_and(|paths| origin(&paths.to_string_lossy()))
+        && run("readelf", &["--dynamic", "--wide"], worker).is_ok_and(|text| !origin(&text))
+}
+
 fn bracketed<'a>(text: &'a str, marker: &str) -> Vec<&'a str> {
     text.lines()
         .filter_map(|l| {
@@ -1945,6 +1952,34 @@ pub fn kernel_certificate_valid(
         .is_ok_and(|again| equal(&again, certificate))
 }
 
+fn artifact_current(link: &Value, expected: Option<&str>) -> bool {
+    let Some(artifact) = link.get("inspected_artifact") else {
+        return false;
+    };
+    let Some(path) = s(artifact, "path").map(Path::new) else {
+        return false;
+    };
+    path.is_absolute()
+        && expected.is_some()
+        && s(artifact, "sha256") == expected
+        && file_sha(path).ok().as_deref() == expected
+}
+
+/// The actual executables named by a memory certificate still match its digests.
+pub(super) fn measured_workers_current(certificate: &Value) -> bool {
+    let Some(linked) = certificate.get("linked_libraries") else {
+        return false;
+    };
+    let Some(hashes) = certificate.get("worker_hashes") else {
+        return false;
+    };
+    ["candidate", "reference"].into_iter().all(|role| {
+        linked
+            .get(role)
+            .is_some_and(|link| artifact_current(link, s(hashes, role)))
+    })
+}
+
 /// A Linux qualification certificate still describes the files on disk.
 pub fn certificate_current(root: &Path, certificate: &Value) -> bool {
     let linked = certificate
@@ -1990,16 +2025,7 @@ pub fn certificate_current(root: &Path, certificate: &Value) -> bool {
                 "observer" => observer,
                 _ => None,
             };
-            data.get("inspected_artifact")
-                .filter(|a| a.truthy())
-                .is_some_and(|a| {
-                    expected.is_some()
-                        && s(a, "sha256") == expected
-                        && file_sha(Path::new(s(a, "path").unwrap_or_default()))
-                            .ok()
-                            .as_deref()
-                            == expected
-                })
+            artifact_current(data, expected)
         });
         if !is_true(certificate.get("runtime_guard_required"))
             || !certificate_valid(
