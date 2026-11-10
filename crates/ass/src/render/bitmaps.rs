@@ -12,7 +12,7 @@ use triergon_raster::{
 };
 
 use super::CacheLimits;
-use super::cache::{Cache, CacheKey, Kept, Lookup, sizes};
+use super::cache::{CacheKey, Kept, Values, sizes};
 use super::outlines::{OutlineId, OutlineValue, Outlines};
 use super::placement::{GlyphDrawing, PlacedRun, Placer, Runs};
 use super::units::d6_to_double;
@@ -181,7 +181,7 @@ struct Drawn {
 pub(super) struct Painter {
     raster: Raster,
     bitmaps: Bitmaps,
-    composites: Cache<RunKey, Composited>,
+    composites: Values<RunKey, Composited>,
     /// The bitmaps of the run being drawn.
     drawn: BudgetVec<Drawn>,
     /// Its composite key's glyphs, made in this storage for every run; they
@@ -195,9 +195,9 @@ impl Painter {
             raster: Raster::new(budget, limits),
             bitmaps: Bitmaps {
                 budget: budget.clone(),
-                cache: Cache::new(budget),
+                cache: Values::new(budget),
             },
-            composites: Cache::new(budget),
+            composites: Values::new(budget),
             drawn: BudgetVec::new(budget),
             glyphs: BudgetVec::new(budget),
         }
@@ -370,26 +370,23 @@ impl Painter {
             effects,
             glyphs: &self.glyphs,
         };
-        let composite = match self.composites.get(view) {
-            Lookup::Hit(composite) => composite,
-            // Never kept: a run is always composited.
-            Lookup::Empty => return Ok(()),
-            Lookup::Miss => {
-                let bitmaps = drawn.iter().map(|d| &d.bitmaps);
-                let composite = self.raster.compose(&placed.effects, frame, bitmaps, work)?;
-                let parts = [&composite.fill, &composite.border, &composite.shadow];
-                let size = sizes::composite(
-                    drawn.len(),
-                    parts.iter().copied().flatten().map(pixels).sum(),
-                );
-                let key = RunKey::taking(effects, &mut self.glyphs)?;
-                let composite = Composited {
-                    fill: composite.fill,
-                    border: composite.border,
-                    shadow: composite.shadow,
-                };
-                self.composites.insert(key, composite, size)?
-            }
+        let composite = if let Some(composite) = self.composites.get(view) {
+            composite
+        } else {
+            let bitmaps = drawn.iter().map(|d| &d.bitmaps);
+            let composite = self.raster.compose(&placed.effects, frame, bitmaps, work)?;
+            let parts = [&composite.fill, &composite.border, &composite.shadow];
+            let size = sizes::composite(
+                drawn.len(),
+                parts.iter().copied().flatten().map(pixels).sum(),
+            );
+            let key = RunKey::taking(effects, &mut self.glyphs)?;
+            let composite = Composited {
+                fill: composite.fill,
+                border: composite.border,
+                shadow: composite.shadow,
+            };
+            self.composites.insert(key, composite, size)?
         };
         out.try_push(Combined {
             colours: placed.colours,
@@ -489,7 +486,7 @@ impl GlyphSource for CachedBitmaps<'_> {
 #[derive(Debug)]
 struct Bitmaps {
     budget: Budget,
-    cache: Cache<BitmapKey, KeptBitmap>,
+    cache: Values<BitmapKey, KeptBitmap>,
 }
 
 impl Bitmaps {
@@ -506,28 +503,26 @@ impl Bitmaps {
         work: &mut WorkBudget,
     ) -> Result<PlacedBitmap<SharedBitmap>> {
         charge(work, LOOKUP_UNITS)?;
-        let kept = match self.cache.get(&key) {
-            Lookup::Hit(kept) => kept,
-            Lookup::Empty => unreachable!("bitmaps are kept with a value"),
-            Lookup::Miss => {
-                let bitmap = match raster.draw(shape, &at.transform, work)? {
-                    Some(bitmap) => bitmap,
-                    // libass keeps a bitmap without pixels.
-                    None => Bitmap::new(&self.budget, 0, 0, &Limits::default())?,
-                };
-                let [first, second] = shape.outlines();
-                let points = first.points().len().saturating_add(second.points().len());
-                let segments = first
-                    .segments()
-                    .len()
-                    .saturating_add(second.segments().len());
-                let size = sizes::bitmap(pixels(&bitmap), points, segments);
-                let kept = KeptBitmap {
-                    bitmap,
-                    _drawn_from: drawn_from.cloned(),
-                };
-                self.cache.insert(key, kept, size)?
-            }
+        let kept = if let Some(kept) = self.cache.get(&key) {
+            kept
+        } else {
+            let bitmap = match raster.draw(shape, &at.transform, work)? {
+                Some(bitmap) => bitmap,
+                // libass keeps a bitmap without pixels.
+                None => Bitmap::new(&self.budget, 0, 0, &Limits::default())?,
+            };
+            let [first, second] = shape.outlines();
+            let points = first.points().len().saturating_add(second.points().len());
+            let segments = first
+                .segments()
+                .len()
+                .saturating_add(second.segments().len());
+            let size = sizes::bitmap(pixels(&bitmap), points, segments);
+            let kept = KeptBitmap {
+                bitmap,
+                _drawn_from: drawn_from.cloned(),
+            };
+            self.cache.insert(key, kept, size)?
         };
         Ok(PlacedBitmap {
             bitmap: SharedBitmap(kept),

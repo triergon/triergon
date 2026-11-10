@@ -388,7 +388,7 @@ outlines (each one built and its points), layout (a pass per stage over the
 glyphs, and one for every rebalancing pass), drawing (glyph bitmaps,
 composites and vector clips, charged as `triergon-raster` charges them) and
 collision handling (each event against those placed before it in its
-layer). The charge grows linearly with the events and their text. Where
+layer, and the merge sort of the placed boxes after each one joins them). The charge grows linearly with the events and their text. Where
 libass would go on drawing, running out is `Error::Policy`; a caller that
 wants libass's unbounded behaviour raises the setting. With the `work-probe`
 feature, a development aid, `Renderer::work_spent` gives what the last frame

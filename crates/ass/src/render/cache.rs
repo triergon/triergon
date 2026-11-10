@@ -719,6 +719,42 @@ pub(super) mod sizes {
     }
 }
 
+/// A cache that keeps only values, never a key without one: what a lookup
+/// finds is the value or nothing. The bitmap and composite caches are these;
+/// libass keeps an entry for everything it draws.
+#[derive(Debug)]
+pub(super) struct Values<K, T>(Cache<K, T>);
+
+impl<K: CacheKey, T> Values<K, T> {
+    pub(super) fn new(budget: &Budget) -> Self {
+        Self(Cache::new(budget))
+    }
+
+    /// The value kept for `key`, if one is ([`Cache::get`]).
+    pub(super) fn get(&mut self, key: K::View<'_>) -> Option<Kept<T>> {
+        match self.0.get(key) {
+            Lookup::Hit(kept) => Some(kept),
+            // Nothing here inserts an entry without a value.
+            Lookup::Miss | Lookup::Empty => None,
+        }
+    }
+
+    /// [`Cache::insert`].
+    pub(super) fn insert(&mut self, key: K, value: T, size: usize) -> Result<Kept<T>> {
+        self.0.insert(key, value, size)
+    }
+
+    /// [`Cache::cut`].
+    pub(super) fn cut(&mut self, limit: usize) {
+        self.0.cut(limit);
+    }
+
+    /// [`Cache::settle`].
+    pub(super) fn settle(&mut self) {
+        self.0.settle();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use triergon_core::Budget;

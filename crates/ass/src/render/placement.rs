@@ -9,10 +9,11 @@ use std::ops::Range;
 
 use triergon_core::{Budget, BudgetVec, Result};
 use triergon_raster::{
-    Border, Effects, FrameScale, GlyphRequest, Placement, Rect, Shadow, Vector, pixels_26_6,
+    Border, Effects, FrameScale, GlyphRequest, Placement, Shadow, Vector, pixels_26_6,
 };
 
 use super::cache::Kept;
+use super::collisions;
 use super::geometry::{Geometry, Scales};
 use super::layout::{LaidChar, Layout, TextBox, Timing};
 use super::outlines::OutlineValue;
@@ -160,7 +161,7 @@ impl Anchor {
     /// both sides is doubled in wrapping `int` arithmetic, as libass doubles
     /// it (`ass_render.c:3001-3003`), so a border beyond 2^30 pixels gives
     /// the box libass gives where `int` overflow wraps.
-    pub(super) fn event_box(&self, layout: &Layout, par: f64) -> Rect {
+    pub(super) fn event_box(&self, layout: &Layout, par: f64) -> collisions::Rect {
         let (lines, text_box) = (&layout.lines, &layout.text_box);
         let top = (self.y - lines.first().asc - f64::from(lines.border_top)) as i32;
         let height =
@@ -168,12 +169,7 @@ impl Anchor {
         let left = ((self.x + text_box.x_min) * par - f64::from(lines.border_x) + 0.5) as i32;
         let both_sides = f64::from(lines.border_x.wrapping_mul(2));
         let width = ((text_box.x_max - text_box.x_min) * par + both_sides + 0.5) as i32;
-        Rect::new(
-            left,
-            top,
-            left.wrapping_add(width),
-            top.wrapping_add(height),
-        )
+        collisions::Rect::new(top, height, left, width)
     }
 }
 

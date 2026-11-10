@@ -148,20 +148,27 @@ fn clips_and_karaoke_split_images() {
     let images = renderer.render(&mut events, 500).unwrap().images;
     // The clip misses the text: its image is kept, empty.
     assert!(images.iter().all(|i| i.width() == 0 && i.height() == 0));
-    // A clip drawing without a contour empties every image as well; its
-    // inverse leaves them whole.
-    for (clip, empty) in [("clip", true), ("iclip", false)] {
+    // A clip drawing without a contour empties every image as well, and so
+    // does one whose points leave the outline range once scaled to the
+    // frame, which libass then draws without pixels; an inverse clip leaves
+    // the images whole.
+    const BEYOND: &str = "m -4000000 -4000000 l 4000000 -4000000 4000000 4000000 -4000000 4000000";
+    for (clip, drawing, empty) in [
+        ("clip", "m 0 0 m 140 -24", true),
+        ("iclip", "m 0 0 m 140 -24", false),
+        ("clip", BEYOND, true),
+    ] {
         let mut events = script(
             &budget,
             &format!(
-                "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{{\\bord0\\shad0\\{clip}(m 0 0 m 140 -24)}}ABC\n"
+                "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{{\\bord0\\shad0\\{clip}({drawing})}}ABC\n"
             ),
         );
         let images = renderer.render(&mut events, 500).unwrap().images;
         assert!(!images.is_empty());
         assert!(
             images.iter().all(|i| (i.width() == 0) == empty),
-            "{clip}: {images:?}"
+            "{clip}({drawing}): {images:?}"
         );
     }
 }
