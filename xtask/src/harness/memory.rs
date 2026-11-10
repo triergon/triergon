@@ -1248,12 +1248,18 @@ pub fn admission(root: &Path, candidate: &Path, reference: &Path) -> R<()> {
     result
 }
 
+pub(crate) struct WorkerPaths<'a> {
+    pub candidate: &'a Path,
+    pub reference: &'a Path,
+    /// Both executables come from the runner's registered build.
+    pub registered: bool,
+}
+
 /// One memory collection under the measurement lock, rejected (but kept) when
 /// tracked processes used CPU meanwhile.
 pub fn collect(
     root: &Path,
-    candidate: &Path,
-    reference: &Path,
+    workers: WorkerPaths<'_>,
     input: &Path,
     pairs: usize,
     seed: u64,
@@ -1275,8 +1281,7 @@ pub fn collect(
         let reference_arguments = arguments(false)?;
         return collect_invocation(
             root,
-            candidate,
-            reference,
+            workers,
             pairs,
             seed,
             Invocation {
@@ -1298,8 +1303,7 @@ pub fn collect(
         .collect();
     collect_invocation(
         root,
-        candidate,
-        reference,
+        workers,
         pairs,
         seed,
         Invocation {
@@ -1328,8 +1332,11 @@ pub(crate) fn collect_command(
 ) -> R<Value> {
     collect_invocation(
         root,
-        candidate,
-        reference,
+        WorkerPaths {
+            candidate,
+            reference,
+            registered: false,
+        },
         pairs,
         seed,
         Invocation {
@@ -1363,8 +1370,11 @@ pub(crate) fn collect_commands(
 ) -> R<Value> {
     collect_invocation(
         root,
-        candidate,
-        reference,
+        WorkerPaths {
+            candidate,
+            reference,
+            registered: true,
+        },
         pairs,
         seed,
         Invocation {
@@ -1391,8 +1401,7 @@ fn prepare_workers(root: &Path, candidate: &Path, reference: &Path) -> R<[PathBu
 
 fn collect_invocation(
     root: &Path,
-    candidate: &Path,
-    reference: &Path,
+    workers: WorkerPaths<'_>,
     pairs: usize,
     seed: u64,
     invocation: Invocation<'_>,
@@ -1411,7 +1420,13 @@ fn collect_invocation(
         root,
         timeout: invocation.timeout,
     };
-    let prepared = host.linux()
+    let WorkerPaths {
+        candidate,
+        reference,
+        registered,
+    } = workers;
+    let prepared = registered
+        && host.linux()
         && linux::relocatable_worker(candidate)
         && linux::relocatable_worker(reference);
     let [candidate, reference] = if prepared {

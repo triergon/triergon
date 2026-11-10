@@ -159,8 +159,11 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
                 "memory",
                 super::memory::collect(
                     root,
-                    &candidate,
-                    comparison,
+                    super::memory::WorkerPaths {
+                        candidate: &candidate,
+                        reference: comparison,
+                        registered: options.baseline_worker.is_none(),
+                    },
                     &path,
                     options.pairs,
                     280,

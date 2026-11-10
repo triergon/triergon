@@ -448,8 +448,9 @@ may override that count for diagnostic comparisons.
   are against `W`. Such a report is never an acceptance run.
 - Prepare both workers with the same sequential write and paths of equal length.
   Linker output and a sequentially written copy can occupy the page cache differently.
-  Timing and Linux memory collection use freshly written copies. Linux memory collection
-  keeps both original paths when the loader resolves libraries relative to an executable.
+  Timing uses freshly written copies. Linux memory collection does the same for workers
+  selected by the report's build registration. It keeps both original paths for explicitly
+  supplied workers and when the loader resolves libraries relative to an executable.
   Keep the measured executables with the raw memory samples. Grading Linux memory
   results rehashes the worker paths in the observer certificate, including any copies
   in the build tree.
