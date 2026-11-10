@@ -148,8 +148,7 @@ fn run(args: &[String]) -> Result<()> {
     }
     let memory = matches!(action, Action::Memory);
     if memory {
-        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
-        out.flush()?;
+        record::mark(&mut out, record::WINDOW_BEGIN)?;
     }
     let start = matches!(action, Action::Bench(_)).then(Instant::now);
     let mut total = Work::default();
@@ -171,15 +170,9 @@ fn run(args: &[String]) -> Result<()> {
     }
     let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
     if memory {
-        out.write_all(b"TRIERGON_END_V1\n")?;
-        out.flush()?;
+        record::mark(&mut out, record::WINDOW_END)?;
     }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"ass-parse\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        total.packets, total.bytes, total.digest,
-    )?;
-    Ok(out.flush()?)
+    Ok(total.print(&mut out, "ass-parse", iterations, elapsed)?)
 }
 
 fn main() -> ExitCode {

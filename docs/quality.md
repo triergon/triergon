@@ -173,13 +173,29 @@ resource limit becomes an explicit, reviewed rule for that case.
   names, and compares every frame's change value (`ass_detect_change`) and
   every image's type, position, size, colour and alpha bytes in list order
   with `triergon_ass::Renderer`'s; the box behind a `BorderStyle` 4 event,
-  whose type libass leaves uninitialised, is told by its buffer and compared
-  without one. It is required by
+  whose type libass leaves uninitialised, is told by its own buffer and
+  compared as a type of its own. It is required by
   `cargo xtask check` and reported by `cargo xtask ass compare`. The fixtures
   whose libass result differs by target, because libass's renderer overflows
   `int` or converts out of its range on the way, are `ass-render-host`'s
   instead, pinned per target like `ass-parse-host`; the renderer follows
   libass built with GCC for `armv7-unknown-linux-gnueabihf`.
+  The parity reference is instrumented: it compiles libass's rendering,
+  drawing and parsing sources into itself with checks of its own, so it is
+  never timed or measured. Both rendering features name a
+  `measurement_reference`, `libass-player-native`
+  (`harness/reference_ass_player.h`), which renders and folds the same frames
+  with `libass.a` linked as a player links it, none of its sources compiled in;
+  `report`, `grade` and the case evidence refuse runtime or memory against an
+  instrumented reference, and `cargo xtask check-design` requires a
+  `measurement_reference` to be an uninstrumented build of the same pinned
+  libraries. The timed span is reading the script or running the stream and
+  rendering its frames, from the configured renderer to the last frame on both
+  sides: libass's renderer setters each empty its caches (`ass_reconfigure`),
+  and the teardown frees them, so neither is timed. The memory window holds the
+  whole operation. These cases are timed by the same paired runner as the
+  codecs and capture: one lock, the same pair loop, contamination watch,
+  retries and validator, and the same minimum of pairs.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   features commit no case rows. `cargo xtask fonts manifest`, `cargo
   xtask shape manifest`, `cargo xtask raster manifest` and `cargo xtask ass

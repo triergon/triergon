@@ -430,15 +430,35 @@ panics.
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
   glyphs and 24 MiB, which `cache-eviction.ass` overflows): all 76 pass. The
-  box behind a `BorderStyle` 4 event is told by its own buffer, also after a
-  collision shift has cut rows off its top, and compared without its kind,
-  since libass leaves its type uninitialised.
+  box behind a `BorderStyle` 4 event, whose type libass leaves uninitialised,
+  is told by its own buffer, also after a collision shift has cut rows off its
+  top, and compared as a kind of its own.
 - `ass-render-host` renders, as `ass-render` does, the fixtures whose libass
   result differs by target (`border-x-overflow.ass`, and `collision-far-tops.ass`,
   colliding events whose boxes end up 2³¹ or more rows apart), each pinned for
   `aarch64-unknown-linux-gnu` and `armv7-unknown-linux-gnueabihf` from that
   target's reference. All four cases pass on ARMv7; on AArch64 all four are
   open as a deliberate divergence.
+- Runtime and memory of both features are taken against `libass-player-native`
+  (`harness/reference_ass_player.h`: `libass.a` linked into the worker, none of
+  its sources compiled in) by `cargo xtask report`, 30 timing and 30 memory
+  pairs per case, and graded by `cargo xtask grade`. The reference replaces
+  libass's bitmap engine with its plain C one, and libass is built with `-O2
+  -ffp-contract=off -ftrivial-auto-var-init=zero`; a player's libass with its
+  NEON code on AArch64 is faster than this reference. The timed spans favour
+  the renderer slightly: in 12 cases libass opens the default font file inside
+  its span, which the renderer reads before its own, and libass's side copies
+  the script inside its span.
+- Measured at `5b3e03f0` on a c6g.2xlarge, before the later default glyph load
+  with CFF hinting and the harness's memory and worker change; the current code
+  has not been timed. At that revision every passing case was within the
+  runtime ceiling of [docs/quality.md](../../docs/quality.md) and lower than
+  libass in peak heap and total RSS. On Linux AArch64 the `ass-render` ratios
+  had a median of 0.813 and a highest upper bound of 1.066
+  (`cache-keys-ass-720p`), with peak heap ≤0.841 and total RSS ≤0.943. On
+  ARMv7, over all 80 cases, the highest upper bound was 0.943, peak heap
+  ≤0.928 and total RSS ≤0.961. [docs/status.md](../../docs/status.md) names
+  the evidence.
 - `cargo xtask ass equivalence --base REV` renders the `ass-render`
   fixtures at their frames and every 40 ms, mutations of them with varied
   settings and style overrides, and scripts generated from a seed, with the

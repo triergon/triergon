@@ -452,6 +452,9 @@ fn selected(row: &Value, expected: &Value, contract: &Value, identity: &Value) -
         &reference_summary(&resolved.reference),
         "reference",
     )?;
+    if row.get("measurement_worker").and_then(Value::as_str) != resolved.measurement_worker {
+        return Err("measurement reference differs from the contract".into());
+    }
     if row.get("candidate_worker").and_then(Value::as_str) != resolved.candidate_worker {
         return Err("candidate worker differs from the contract".into());
     }

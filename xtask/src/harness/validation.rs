@@ -115,6 +115,11 @@ pub(super) struct SelectedOperation<'a> {
     pub rule: Option<&'a Value>,
     pub reference: Value,
     pub reference_worker: Option<&'a str>,
+    /// The contract's `measurement_reference`, which its cases are timed and
+    /// their memory measured against instead of `reference`.
+    pub measurement_worker: Option<&'a str>,
+    /// The reference the cases are timed and measured against.
+    pub measured: Value,
     pub candidate_worker: Option<&'a str>,
     pub operation: Value,
 }
@@ -134,6 +139,13 @@ pub(super) fn selected_operation<'a>(
     let reference = match reference_worker {
         Some(name) => reference_named(identity, name)?,
         None => reference_record(identity, rule)?,
+    };
+    let measurement_worker = contract
+        .get("measurement_reference")
+        .and_then(Value::as_str);
+    let measured = match measurement_worker {
+        Some(name) => reference_named(identity, name)?,
+        None => reference.clone(),
     };
     let prefix = contract.get("worker_operation").and_then(Value::as_str);
     let case_operations = contract.get("case_operations") == Some(&Value::Bool(true));
@@ -186,6 +198,8 @@ pub(super) fn selected_operation<'a>(
         rule,
         reference,
         reference_worker,
+        measurement_worker,
+        measured,
         candidate_worker,
         operation,
     })
