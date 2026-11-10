@@ -565,7 +565,12 @@ impl DemuxObserver {
             && !self.ended
             && self.fault.is_none()
     }
-    #[cfg(feature = "reference-trace")]
+    pub(crate) fn recovery_pristine(&self) -> bool {
+        self.recovery_idle() && self.last_input.is_none()
+    }
+    pub(crate) fn recovery_budget(&self) -> &Budget {
+        &self.budget
+    }
     pub(crate) fn note_recovered(&mut self, counter: u8, offset: u64, ordinal: u64) {
         self.previous_counter = Some(counter);
         self.last_input = Some((ordinal, offset));
@@ -666,7 +671,6 @@ impl DemuxObserver {
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, false, None)
     }
-    #[cfg(feature = "reference-trace")]
     #[allow(
         clippy::result_large_err,
         reason = "return original charged transport input inline"
@@ -678,9 +682,12 @@ impl DemuxObserver {
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, true, None)
     }
-    #[cfg(feature = "reference-trace")]
-    pub(crate) fn commit_clock_epoch(&mut self, epochs: SourceEpochs) {
-        self.scope.epochs = epochs;
+    pub(crate) fn commit_clock_epoch(&mut self, context: SourceContext) {
+        self.scope.epochs = context.epochs;
+        // The Timeline consumes an ordinal, not another physical carrier.
+        if let Some((ordinal, _)) = self.last_input.as_mut() {
+            *ordinal = (*ordinal).max(context.source_event_ordinal);
+        }
     }
     /// A drained codec-map commit. Returned old packets keep their original
     /// headers/storage. Retire only the idle internal header alias; preserve wire
@@ -691,9 +698,78 @@ impl DemuxObserver {
         self.header = None;
         self.origin = None;
     }
-    #[cfg(feature = "reference-trace")]
     pub(crate) fn recovery_counter(&self) -> Option<u8> {
         self.previous_counter
+    }
+    pub(crate) fn transport_fault_input(
+        &self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> Result<&Budget> {
+        if let Some(error) = self.input_error(packet, context, false, input, true) {
+            return Err(error);
+        }
+        if !self.recovery_idle() {
+            return Err(Error::Invalid("selected diagnostic input not drained"));
+        }
+        if self.scope.stream_type != 0x1b
+            || self.scope.stream_id != 0xe0
+            || context.byte_run_epoch.is_some()
+        {
+            return Err(Error::Unsupported(
+                "selected diagnostic source context unobserved",
+            ));
+        }
+        Ok(&self.budget)
+    }
+    /// Idle assembly retains arena capacity, but all payload storage moved to
+    /// the emitted packet. External retained outputs are releasable pressure.
+    pub(crate) fn recovery_storage_bytes(&self) -> Result<usize> {
+        debug_assert!(self.recovery_idle());
+        debug_assert!(self.spans.is_empty());
+        self.header_ranges
+            .capacity()
+            .checked_add(self.output_header.capacity())
+            .and_then(|count| count.checked_mul(size_of::<SourceRange>()))
+            .and_then(|bytes| {
+                self.spans
+                    .capacity()
+                    .checked_mul(size_of::<DemuxSpan>())
+                    .and_then(|spans| bytes.checked_add(spans))
+            })
+            .ok_or(Error::Overflow)
+    }
+    pub(crate) fn rejected_fault_input(
+        &self,
+        packet: &crate::RejectedTransport,
+        context: SourceContext,
+    ) -> Result<&Budget> {
+        self.validate_input(None)?;
+        if !packet.bytes().belongs_to(&self.budget) {
+            return Err(Error::ForeignPool);
+        }
+        if !self.recovery_idle() {
+            return Err(Error::Invalid("selected diagnostic input not drained"));
+        }
+        if self.scope.stream_type != 0x1b
+            || self.scope.stream_id != 0xe0
+            || packet.source_id() != Some(self.scope.entity)
+            || context.epochs != self.scope.epochs
+            || context.byte_run_epoch.is_some()
+        {
+            return Err(Error::Unsupported(
+                "selected diagnostic source context unobserved",
+            ));
+        }
+        if !self.follows_input(context, packet.source_offset()) {
+            return Err(Error::Invalid("native PES source event order"));
+        }
+        packet
+            .source_offset()
+            .checked_add(u64::try_from(packet.bytes().len()).map_err(|_| Error::Overflow)?)
+            .ok_or(Error::Overflow)?;
+        Ok(&self.budget)
     }
     #[allow(
         clippy::result_large_err,
@@ -706,7 +782,7 @@ impl DemuxObserver {
         selected_boundary: bool,
         input: Option<&triergon_core::InputCursor>,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
-        if let Some(error) = self.input_error(&packet, context, selected_boundary, input) {
+        if let Some(error) = self.input_error(&packet, context, selected_boundary, input, false) {
             return Err(PushError {
                 error,
                 value: packet,
@@ -731,6 +807,7 @@ impl DemuxObserver {
         context: SourceContext,
         selected_boundary: bool,
         input: Option<&triergon_core::InputCursor>,
+        transport_fault: bool,
     ) -> Option<Error> {
         if let Err(error) = self.validate_input(input) {
             Some(error)
@@ -751,7 +828,7 @@ impl DemuxObserver {
             Some(Error::Unsupported(
                 "native PES source context transition unobserved",
             ))
-        } else if packet.transport_error || packet.scrambling != 0 {
+        } else if !transport_fault && (packet.transport_error || packet.scrambling != 0) {
             Some(Error::Unsupported(
                 "native PES damaged/opaque transport unobserved",
             ))
@@ -831,7 +908,9 @@ impl DemuxObserver {
             || packet.prefix.is_some()
             || count == 0
             || !self.ready_body(packet.continuity_counter, next)
-            || self.input_error(packet, context, false, None).is_some()
+            || self
+                .input_error(packet, context, false, None, false)
+                .is_some()
             || cancel.load(Ordering::Relaxed)
             || !work.try_charge(2)
         {

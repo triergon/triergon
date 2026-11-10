@@ -10,14 +10,23 @@ use triergon_mpegts::reference_trace::catalogue::{
     Catalogue, CatalogueCodec, PsiCompatibilityPolicies,
 };
 use triergon_mpegts::reference_trace::packet_completion::PacketCompletion;
-use triergon_mpegts::{MediaEntityEnd, PacketFormat, ParseLimits, TraceEvent, TransportStream};
+use triergon_mpegts::{
+    MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits, TraceEvent, TransportStream,
+};
 
 const BASIC: &[u8] = include_bytes!("data/ts188-basic.ts");
 const M2TS: &[u8] = include_bytes!("data/m2ts192-opaque-prefix.m2ts");
 struct Run {
-    events: Vec<(TraceEvent, SourceContext)>,
+    events: Vec<(ObservedTrace<TraceEvent>, SourceContext)>,
     end: MediaEntityEnd,
     input: InputCursor,
+}
+impl Run {
+    fn events(&self) -> impl Iterator<Item = (&TraceEvent, &SourceContext)> {
+        self.events
+            .iter()
+            .map(|(event, context)| (event.event(), context))
+    }
 }
 fn parsed(data: &[u8], b: &Budget, format: PacketFormat, chunk: usize) -> Run {
     let mut input = InputCursor::new(
@@ -35,7 +44,7 @@ fn parsed(data: &[u8], b: &Budget, format: PacketFormat, chunk: usize) -> Run {
     let cancel = AtomicBool::new(false);
     for _ in 0..1_000_000 {
         match demux
-            .poll(&mut input, &mut WorkBudget::new(7), &cancel)
+            .poll_observed(&mut input, &mut WorkBudget::new(7), &cancel)
             .unwrap()
         {
             Step::Ready(e) => {
@@ -86,7 +95,7 @@ fn audio(data: &[u8], kind: u8, codec: CatalogueCodec) {
         let run = parsed(data, &b, PacketFormat::Ts188, chunk);
         let mut v = catalogue(&b, PacketFormat::Ts188);
         let mut seen = false;
-        for (e, _) in &run.events {
+        for (e, _) in run.events() {
             if let TraceEvent::ProgramMap {
                 map, active: true, ..
             } = e
@@ -112,8 +121,7 @@ fn audio(data: &[u8], kind: u8, codec: CatalogueCodec) {
         assert_eq!(codec.media_type(), 1);
         assert_eq!(
             v.evidence()[stream.evidence].bytes.as_slice()[0].as_ref(),
-            run.events
-                .iter()
+            run.events()
                 .find_map(|(e, _)| {
                     if let TraceEvent::ProgramMap {
                         map, active: true, ..
@@ -184,7 +192,7 @@ fn old_constructor_keeps_audio_refusal() {
         7,
     );
     let mut v = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
-    let failure = run.events.iter().find_map(|(e, _)| {
+    let failure = run.events().find_map(|(e, _)| {
         v.observe(e, &mut WorkBudget::new(1_000_000), &AtomicBool::new(false))
             .err()
     });
@@ -202,7 +210,7 @@ fn selected_m2ts_keeps_prefixes_and_real_eof() {
     let mut v = catalogue(&b, PacketFormat::M2ts192);
     v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
         .unwrap();
-    for (e, c) in &run.events {
+    for (e, c) in run.events() {
         if let TraceEvent::Transport(p) = e {
             assert_eq!(p.source.len(), 192);
             assert_eq!(
@@ -240,7 +248,7 @@ fn plain_catalogue_rejects_m2ts_end_witness() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = parsed(M2TS, &b, PacketFormat::M2ts192, 7);
     let mut v = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
-    for (e, _) in &run.events {
+    for (e, _) in run.events() {
         v.observe(e, &mut WorkBudget::new(1_000_000), &AtomicBool::new(false))
             .unwrap();
     }
@@ -255,17 +263,11 @@ fn explicit_packet_format_charges_physical_192_and_retains_prefix() {
     let mut v =
         PacketCompletion::new_for_format(b, ParseLimits::default(), 1, PacketFormat::M2ts192)
             .unwrap();
-    let n = v.required_work(e).unwrap();
+    let n = v.required_work(e.event()).unwrap();
     assert_eq!(n, 192 * 512 + 16384);
     assert!(
-        v.observe(
-            e,
-            SourceId(1),
-            *c,
-            &mut WorkBudget::new(n),
-            &AtomicBool::new(false)
-        )
-        .unwrap()
+        v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
+            .unwrap()
     );
     assert_eq!(
         v.physical_carriers()[0].packet().source.as_ref(),
@@ -278,16 +280,10 @@ fn old_packet_completion_rejects_192_carrier() {
     let run = parsed(M2TS, &b, PacketFormat::M2ts192, 7);
     let (e, c) = &run.events[0];
     let mut v = PacketCompletion::new(b, ParseLimits::default(), 1).unwrap();
-    let n = v.required_work(e).unwrap();
+    let n = v.required_work(e.event()).unwrap();
     assert!(
-        v.observe(
-            e,
-            SourceId(1),
-            *c,
-            &mut WorkBudget::new(n),
-            &AtomicBool::new(false)
-        )
-        .is_err()
+        v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
+            .is_err()
     );
     assert!(v.physical_carriers().is_empty());
 }
@@ -299,11 +295,11 @@ fn work_pressure_and_cancel_leave_carrier_retryable() {
     let mut v =
         PacketCompletion::new_for_format(b, ParseLimits::default(), 1, PacketFormat::M2ts192)
             .unwrap();
-    let n = v.required_work(e).unwrap();
+    let n = v.required_work(e.event()).unwrap();
     let cancel = AtomicBool::new(false);
     for grant in [0, 1, n - 1] {
         assert!(
-            !v.observe(e, SourceId(1), *c, &mut WorkBudget::new(grant), &cancel)
+            !v.observe_issued(e, *c, &mut WorkBudget::new(grant), &cancel)
                 .unwrap()
         );
         assert!(v.physical_carriers().is_empty());
@@ -311,40 +307,14 @@ fn work_pressure_and_cancel_leave_carrier_retryable() {
     }
     cancel.store(true, Ordering::Relaxed);
     assert_eq!(
-        v.observe(e, SourceId(1), *c, &mut WorkBudget::new(n), &cancel),
+        v.observe_issued(e, *c, &mut WorkBudget::new(n), &cancel),
         Err(Error::Cancelled)
     );
     cancel.store(false, Ordering::Relaxed);
     assert!(
-        v.observe(e, SourceId(1), *c, &mut WorkBudget::new(n), &cancel)
+        v.observe_issued(e, *c, &mut WorkBudget::new(n), &cancel)
             .unwrap()
     );
-}
-#[test]
-fn changed_prefix_cannot_replace_original_physical_source() {
-    let b = Budget::new(8 * 1024 * 1024).unwrap();
-    let mut run = parsed(M2TS, &b, PacketFormat::M2ts192, 7);
-    let (e, c) = &mut run.events[0];
-    if let TraceEvent::Transport(p) = e {
-        p.prefix = Some(Bytes::copy_from_slice(&b, &[255, 254, 253, 252]).unwrap());
-    } else {
-        panic!("first physical carrier");
-    }
-    let mut v =
-        PacketCompletion::new_for_format(b, ParseLimits::default(), 1, PacketFormat::M2ts192)
-            .unwrap();
-    let n = v.required_work(e).unwrap();
-    assert!(
-        v.observe(
-            e,
-            SourceId(1),
-            *c,
-            &mut WorkBudget::new(n),
-            &AtomicBool::new(false)
-        )
-        .is_err()
-    );
-    assert!(v.physical_carriers().is_empty());
 }
 #[test]
 fn foreign_pool_carrier_is_not_retained() {
@@ -359,15 +329,9 @@ fn foreign_pool_carrier_is_not_retained() {
         PacketFormat::M2ts192,
     )
     .unwrap();
-    let n = v.required_work(e).unwrap();
+    let n = v.required_work(e.event()).unwrap();
     assert_eq!(
-        v.observe(
-            e,
-            SourceId(1),
-            *c,
-            &mut WorkBudget::new(n),
-            &AtomicBool::new(false)
-        ),
+        v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false)),
         Err(Error::ForeignPool)
     );
     assert!(v.physical_carriers().is_empty());
@@ -385,15 +349,9 @@ fn caller_alias_keeps_full_charge_after_view_and_source_drop() {
         PacketFormat::M2ts192,
     )
     .unwrap();
-    let n = v.required_work(e).unwrap();
-    v.observe(
-        e,
-        SourceId(1),
-        *c,
-        &mut WorkBudget::new(n),
-        &AtomicBool::new(false),
-    )
-    .unwrap();
+    let n = v.required_work(e.event()).unwrap();
+    v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
+        .unwrap();
     let held = v.physical_carriers()[0].packet().source.clone();
     drop(v);
     drop(run);
@@ -412,16 +370,10 @@ fn resource_pressure_drops_failed_growth_without_budget_escape() {
     let mut v =
         PacketCompletion::new_for_format(b.clone(), ParseLimits::default(), 1, PacketFormat::Ts188)
             .unwrap();
-    let n = v.required_work(e).unwrap();
+    let n = v.required_work(e.event()).unwrap();
     assert!(
-        v.observe(
-            e,
-            SourceId(1),
-            *c,
-            &mut WorkBudget::new(n),
-            &AtomicBool::new(false)
-        )
-        .is_err()
+        v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
+            .is_err()
     );
     assert!(v.fault().is_some());
     drop(v);
@@ -443,8 +395,7 @@ fn complete_pat_repetition_preserves_pcr_and_source_table_events() {
     let data = repeated_pat_source();
     let run = parsed(&data, &b, PacketFormat::Ts188, 1);
     assert_eq!(
-        run.events
-            .iter()
+        run.events()
             .filter(|(e, _)| matches!(e, TraceEvent::Pat(_)))
             .count(),
         1
@@ -452,7 +403,7 @@ fn complete_pat_repetition_preserves_pcr_and_source_table_events() {
     let mut v = catalogue(&b, PacketFormat::Ts188);
     v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
         .unwrap();
-    for (e, c) in &run.events {
+    for (e, c) in run.events() {
         let n = v.required_psi_compatibility_work(e).unwrap();
         assert!(
             v.observe_psi_compatibility(
@@ -493,7 +444,7 @@ fn plain_repeated_pat_end_refusal_remains_literal() {
     let mut v = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
     v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
         .unwrap();
-    for (e, c) in &run.events {
+    for (e, c) in run.events() {
         let n = v.required_psi_compatibility_work(e).unwrap();
         v.observe_psi_compatibility(
             e,

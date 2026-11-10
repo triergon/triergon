@@ -643,7 +643,7 @@ fn take<'a>(bytes: &'a [u8], position: &mut usize, count: usize) -> Result<&'a [
     Ok(value)
 }
 
-fn timestamp(bytes: &[u8], prefix: u8) -> Result<u64> {
+pub(crate) fn timestamp(bytes: &[u8], prefix: u8) -> Result<u64> {
     if bytes.len() != 5
         || bytes[0] >> 4 != prefix
         || bytes[0] & 1 == 0
@@ -652,11 +652,15 @@ fn timestamp(bytes: &[u8], prefix: u8) -> Result<u64> {
     {
         return Err(Error::Invalid("PES timestamp markers"));
     }
-    Ok((u64::from(bytes[0] & 0x0e) << 29)
+    Ok(timestamp_bits(bytes))
+}
+/// The caller independently checks the five-byte field's applicability.
+pub(crate) fn timestamp_bits(bytes: &[u8]) -> u64 {
+    (u64::from(bytes[0] & 0x0e) << 29)
         | (u64::from(bytes[1]) << 22)
         | (u64::from(bytes[2] & 0xfe) << 14)
         | (u64::from(bytes[3]) << 7)
-        | u64::from(bytes[4] >> 1))
+        | u64::from(bytes[4] >> 1)
 }
 
 /// Parse a complete timestamp-only header without stepping its three stages.

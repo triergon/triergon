@@ -75,6 +75,7 @@ pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
         "harness/reference_ts_program.h",
         "harness/reference_raw_video.h",
         "harness/reference_ts.h",
+        "harness/reference_ts_sequence.h",
         "harness/reference_pgs.h",
         "harness/reference_subtitle_text.h",
         "harness/subtitle_corpus.py",
