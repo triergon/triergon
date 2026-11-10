@@ -8,7 +8,7 @@
 #[rustfmt::skip] // Laid out by the generator.
 mod tables;
 
-use crate::Tag;
+use crate::{Script, Tag};
 use tables::{COMPLEX, LANGUAGES_2, LANGUAGES_3, LANGUAGES_3_BLOCKED, LANGUAGES_3_MULTI};
 
 /// As many language system tags as HarfBuzz asks for
@@ -101,10 +101,14 @@ impl Language {
         &self.tags[..usize::from(self.count)]
     }
 
-    /// The script tag a private-use `-hbsc` subtag selects instead of the
-    /// script's own tags.
-    pub(crate) const fn script_tag(&self) -> Option<Tag> {
-        self.script
+    /// The OpenType script tags to look for with `script`, in order of
+    /// preference: the one a private-use `-hbsc` subtag selects, else the
+    /// script's own ([`Script::ot_tags`]).
+    pub(crate) fn script_tags(&self, script: Script) -> ([Tag; 3], usize) {
+        match self.script {
+            Some(tag) => ([tag; 3], 1),
+            None => script.ot_tags(),
+        }
     }
 
     fn push(&mut self, tag: Tag) {
@@ -151,7 +155,6 @@ impl Language {
                         .take_while(|&&(language, _)| language == tag)
                         .map(|&(_, tag)| tag),
                 );
-                return;
             }
             3 => {
                 if let Ok(i) = LANGUAGES_3.binary_search_by_key(&tag, |&(language, _)| language) {
@@ -164,50 +167,64 @@ impl Language {
                     // Taken for an ISO 639-3 code and upper-cased.
                     self.push(Tag::from_u32(tag.to_u32() & !0x2020_2000));
                 }
-                return;
             }
             _ => {}
-        }
-        if dash.unwrap_or_else(|| text.end(0)) == 3 {
-            self.push(Tag::from_u32(text.tag(0, 3).to_u32() & !0x2020_2000));
         }
     }
 }
 
-/// A language string as HarfBuzz stores it, canonicalised byte by byte: the
-/// characters canonicalisation drops read as NUL, so the C string ends at the
-/// first of them, though HarfBuzz's scan for singleton subtags reads on past
-/// a NUL at the start. Positions past the end read as NUL.
+/// A language string as HarfBuzz stores it, canonicalised byte by byte as
+/// it is read (`canon_map`, one lookup a byte): the characters
+/// canonicalisation drops read as NUL, so the C string ends at the first of
+/// them, though HarfBuzz's scan for singleton subtags reads on past a NUL at
+/// the start. Positions past the end read as NUL.
 struct Text<'a> {
     bytes: &'a [u8],
+    /// Where the C string from the start ends, found once.
+    len: usize,
 }
 
 /// `canon_map`: the bytes a language string keeps, canonicalised; zero for
 /// the others.
-const fn canonical(byte: u8) -> u8 {
-    match byte {
-        b'a'..=b'z' | b'0'..=b'9' | b'-' => byte,
-        b'A'..=b'Z' => byte.to_ascii_lowercase(),
-        b'_' => b'-',
-        _ => 0,
+const CANONICAL: [u8; 256] = {
+    let mut map = [0; 256];
+    let mut byte = 0;
+    while byte < 256 {
+        let b = byte as u8;
+        map[byte] = match b {
+            b'a'..=b'z' | b'0'..=b'9' | b'-' => b,
+            b'A'..=b'Z' => b.to_ascii_lowercase(),
+            b'_' => b'-',
+            _ => 0,
+        };
+        byte += 1;
     }
-}
+    map
+};
 
 impl<'a> Text<'a> {
     /// The string up to its first NUL, as HarfBuzz copies it.
     fn new(bytes: &'a [u8]) -> Self {
         let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-        Self {
-            bytes: &bytes[..end],
-        }
+        let bytes = &bytes[..end];
+        let len = bytes
+            .iter()
+            .position(|&b| CANONICAL[usize::from(b)] == 0)
+            .unwrap_or(end);
+        Self { bytes, len }
     }
 
     fn at(&self, i: usize) -> u8 {
-        self.bytes.get(i).map_or(0, |&b| canonical(b))
+        self.bytes.get(i).map_or(0, |&b| CANONICAL[usize::from(b)])
     }
 
-    /// Where the C string from `from` ends (`from + strlen`).
+    /// Where the C string from `from` ends (`from + strlen`): the string's
+    /// end within it, else the next NUL after it, which only the private-use
+    /// subtags of a string without a first character read.
     fn end(&self, from: usize) -> usize {
+        if from <= self.len {
+            return self.len;
+        }
         (from..self.bytes.len())
             .find(|&i| self.at(i) == 0)
             .unwrap_or(self.bytes.len().max(from))
@@ -341,7 +358,7 @@ impl<'a> Text<'a> {
 #[cfg(test)]
 mod tests {
     use super::Language;
-    use crate::Tag;
+    use crate::{Script, Tag};
 
     fn tags(code: &str) -> Vec<Tag> {
         Language::new(code).ot_tags().to_vec()
@@ -542,27 +559,126 @@ mod tests {
         }
     }
 
+    /// The script tags `language` selects with `script`.
+    fn script_tags(script: &[u8; 4], language: &str) -> Vec<Tag> {
+        let (tags, count) = Language::new(language).script_tags(Script::from_code(*script));
+        tags[..count].to_vec()
+    }
+
     #[test]
     fn private_use_subtags_select_tags_directly() {
-        let language = Language::new("en-x-hbscdflt");
+        assert_eq!(script_tags(b"Latn", "en-x-hbscdflt"), [tag(b"DFLT")]);
+        assert_eq!(tags("en-x-hbscdflt"), [tag(b"ENG ")]);
         assert_eq!(
-            (language.ot_tags(), language.script_tag()),
-            (&[tag(b"ENG ")][..], Some(tag(b"DFLT")))
+            script_tags(b"Latn", "en-x-hbotabc-hbsclatn"),
+            [tag(b"latn")]
         );
-        let language = Language::new("x-hbsc5678-hbot1234");
-        assert_eq!(
-            (language.ot_tags(), language.script_tag()),
-            (&[tag(b"1234")][..], Some(tag(b"5678")))
-        );
-        let language = Language::new("en-x-hbotabc-hbsclatn");
-        assert_eq!(language.ot_tags(), [tag(b"ABC ")]);
-        assert_eq!(language.script_tag(), Some(tag(b"latn")));
+        assert_eq!(tags("en-x-hbotabc-hbsclatn"), [tag(b"ABC ")]);
         // After a `-`, only eight hexadecimal digits make a tag.
         assert_eq!(tags("en-x-hbot-abc"), [tag(b"ENG ")]);
-        assert_eq!(tags("x-hbot-41424344"), [tag(b"ABCD")]);
-        assert_eq!(Language::new("x-hbsc-dflt").script_tag(), None);
-        assert_eq!(Language::new("x-hbscDFLT").script_tag(), Some(tag(b"DFLT")));
+        assert_eq!(script_tags(b"Copt", "x-hbsc-dflt"), [tag(b"copt")]);
+        assert_eq!(script_tags(b"Copt", "x-hbscDFLT"), [tag(b"DFLT")]);
         assert!(tags("x-hbot").is_empty());
         assert!(tags("x-abc").is_empty());
+    }
+
+    /// HarfBuzz's script cases (`test_ot_tag_script_*`): the scripts' own
+    /// tags, Indic ones in three generations, and the script tag a language
+    /// selects instead. HarfBuzz's cases without a script are left out, as
+    /// every [`Script`] is one.
+    #[test]
+    fn scripts_select_their_tags_and_languages_replace_them() {
+        for (script, expected) in [
+            (b"Kana", b"kana"),
+            (b"Hira", b"kana"),
+            (b"Hrkt", b"kana"),
+            (b"Wwyz", b"wwyz"),
+            (b"Zyyy", b"zyyy"),
+            (b"Zinh", b"zinh"),
+            (b"Zzzz", b"zzzz"),
+            (b"Arab", b"arab"),
+            (b"Copt", b"copt"),
+            (b"Latn", b"latn"),
+            (b"Zmth", b"math"),
+            (b"Laoo", b"lao "),
+            (b"Yiii", b"yi  "),
+            (b"Nkoo", b"nko "),
+            (b"Vaii", b"vai "),
+            (b"Mtei", b"mtei"),
+            (b"Mand", b"mand"),
+        ] {
+            assert_eq!(script_tags(script, ""), [tag(expected)], "{script:?}");
+        }
+        for (script, [third, second, first]) in [
+            (b"Beng", [b"bng3", b"bng2", b"beng"]),
+            (b"Deva", [b"dev3", b"dev2", b"deva"]),
+            (b"Gujr", [b"gjr3", b"gjr2", b"gujr"]),
+            (b"Guru", [b"gur3", b"gur2", b"guru"]),
+            (b"Knda", [b"knd3", b"knd2", b"knda"]),
+            (b"Mlym", [b"mlm3", b"mlm2", b"mlym"]),
+            (b"Orya", [b"ory3", b"ory2", b"orya"]),
+            (b"Taml", [b"tml3", b"tml2", b"taml"]),
+            (b"Telu", [b"tel3", b"tel2", b"telu"]),
+        ] {
+            assert_eq!(
+                script_tags(script, ""),
+                [tag(third), tag(second), tag(first)]
+            );
+        }
+        for (expected, language) in [
+            (b"copt", "en"),
+            (b"copt", "x-hbsc"),
+            (b"2lon", "x-hbsc-326c6f6e67"),
+            (b"abc ", "x-hbscabc"),
+            (b"deva", "x-hbscdeva"),
+            (b"dev2", "x-hbscdev2"),
+            (b"dev3", "x-hbscdev3"),
+            (b"dev3", "x-hbsc-64657633"),
+            (b"copt", "x-hbotpap0-hbsccopt"),
+            (b"copt", "en-x-hbsc"),
+            (b"abc ", "en-x-hbscabc"),
+            (b"deva", "en-x-hbscdeva"),
+            (b"dev2", "en-x-hbscdev2"),
+            (b"dev3", "en-x-hbscdev3"),
+            (b"dev3", "en-x-hbsc-64657633"),
+            (b"copt", "en-x-hbotpap0-hbsccopt"),
+        ] {
+            assert_eq!(
+                script_tags(b"Copt", language),
+                [tag(expected)],
+                "{language}"
+            );
+        }
+        for language in ["x-hbsc-", "x-hbsc-1", "x-hbsc-1a", "x-hbsc-1a2b3c4x"] {
+            assert_eq!(script_tags(b"Copt", language), [tag(b"copt")], "{language}");
+        }
+    }
+
+    /// HarfBuzz's cases of every tag (`test_ot_tag_full`): the script tags
+    /// and then the language tags a script and language select. Those
+    /// without a script check the language tags only.
+    #[test]
+    fn scripts_and_languages_select_every_tag_harfbuzz_selects() {
+        let full = |script: &[u8; 4], language: &str| {
+            [script_tags(script, language), tags(language)].concat()
+        };
+        let tags_of = |names: &[&[u8; 4]]| names.iter().map(|&n| tag(n)).collect::<Vec<_>>();
+        assert_eq!(full(b"Latn", "en"), tags_of(&[b"latn", b"ENG "]));
+        // HarfBuzz asks for no language tags with `und`.
+        assert_eq!(script_tags(b"Hrkt", "und"), tags_of(&[b"kana"]));
+        assert_eq!(
+            full(b"Mlym", "ml"),
+            tags_of(&[b"mlm3", b"mlm2", b"mlym", b"MAL ", b"MLR "])
+        );
+        assert_eq!(script_tags(b"Mymr", "und"), tags_of(&[b"mym2", b"mymr"]));
+        assert_eq!(tags("en"), tags_of(&[b"ENG "]));
+        assert_eq!(full(b"Latn", "en-x-hbscdflt"), tags_of(&[b"DFLT", b"ENG "]));
+        assert_eq!(tags("und-fonnapa"), tags_of(&[b"APPH"]));
+        assert_eq!(tags("en-fonnapa"), tags_of(&[b"APPH"]));
+        for language in ["x-hbot1234-hbsc5678", "x-hbsc5678-hbot1234"] {
+            assert_eq!(full(b"Latn", language), tags_of(&[b"5678", b"1234"]));
+        }
+        assert_eq!(tags("xyz"), tags_of(&[b"XYZ "]));
+        assert!(tags("xy").is_empty());
     }
 }

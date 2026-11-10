@@ -102,11 +102,7 @@ impl<'a> Builder<'a> {
             tables[0].default_substitutions(&mut work)?,
             tables[1].default_substitutions(&mut work)?,
         ];
-        // A private-use script subtag replaces the script's own tags.
-        let (script_tags, script_count) = match language.script_tag() {
-            Some(tag) => ([tag; 3], 1),
-            None => script.ot_tags(),
-        };
+        let (script_tags, script_count) = language.script_tags(script);
         let mut builder = Self {
             tables,
             substitutions,
