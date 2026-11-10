@@ -60,7 +60,9 @@ impl Font {
 }
 
 impl Outline {
-    /// The orientation of the contours, by the shoelace sum over every point.
+    /// The orientation of the contours, by the shoelace sum over every point,
+    /// control points included, wrapping in 64 bits as FreeType's `FT_Int64`
+    /// sum does; a zero sum is [`Orientation::None`].
     pub fn orientation(&self) -> Orientation {
         if self.is_empty() {
             return Orientation::TrueType;

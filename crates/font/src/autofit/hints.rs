@@ -7,6 +7,7 @@
 //! fields FreeType keeps in 16 bits (`FT_Short`) are 16-bit here and wrap as
 //! they do there.
 
+use crate::Orientation;
 use crate::fixed::{div_fix, mul_fix};
 use crate::glyf::narrow;
 use crate::outline::{Outline, PointKind};
@@ -356,7 +357,7 @@ impl GlyphHints {
             axis.segments.clear();
             axis.edges.clear();
         }
-        let postscript = is_postscript(outline);
+        let postscript = outline.orientation() == Orientation::PostScript;
         self.axis[0].major_dir = if postscript {
             direction::DOWN
         } else {
@@ -804,31 +805,6 @@ fn corner_is_flat(in_x: i64, in_y: i64, out_x: i64, out_y: i64) -> bool {
     let d_out = length(out_x, out_y);
     let d_hypot = length(in_x + out_x, in_y + out_y);
     d_in + d_out - d_hypot < d_hypot >> 4
-}
-
-/// Whether `FT_Outline_Get_Orientation` finds `outline` in PostScript
-/// orientation: a positive area by the shoelace formula over every point,
-/// control points included, in 64 bits.
-fn is_postscript(outline: &Outline) -> bool {
-    let points = outline.points();
-    let mut area = 0_i64;
-    let mut first = 0;
-    for &end in outline.contour_ends() {
-        let end = (end as usize).min(points.len());
-        if end <= first {
-            continue;
-        }
-        let mut prev = points[end - 1].point;
-        for p in &points[first..end] {
-            let p = p.point;
-            let dy = i64::from(p.y) - i64::from(prev.y);
-            let sx = i64::from(p.x) + i64::from(prev.x);
-            area = area.wrapping_add(dy.wrapping_mul(sx));
-            prev = p;
-        }
-        first = end;
-    }
-    area > 0
 }
 
 #[cfg(test)]
