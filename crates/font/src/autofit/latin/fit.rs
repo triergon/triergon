@@ -4,11 +4,11 @@
 //! monochrome and LCD modes' variations.
 
 use super::super::hints::{Dimension, Edge, GlyphHints, Point, Segment, edge};
+use super::super::long::{abs, mul_div, pix_round, wrap};
 use super::super::style::NONBASE;
 use super::super::tables::{SCRIPTS, STYLES};
 use super::adjust;
 use super::{Axis, Metrics, analysis};
-use crate::fixed::{mul_div, pix_round};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
@@ -112,7 +112,8 @@ pub(in super::super) fn apply(
 /// others grow to 1 pixel (round edges under 1.25 pixel) or 7/8, snap to
 /// the standard width within 5/8 pixel, keep small fractions under three
 /// pixels, and round above, less part of the base edge's move at under 30
-/// pixels per em.
+/// pixels per em. A width of `FT_LONG_MIN` stays negative when made
+/// positive, as FreeType's does.
 fn stem_width(
     axis: &Axis,
     dim: Dimension,
@@ -126,7 +127,7 @@ fn stem_width(
         return width;
     }
     let vertical = dim == Dimension::Vertical;
-    let mut dist = width.abs();
+    let mut dist = abs(width);
     if !(stem_flags & edge::SERIF != 0 && vertical && dist < 3 * 64) {
         if base_flags & edge::ROUND != 0 {
             if dist < 80 {
@@ -136,12 +137,11 @@ fn stem_width(
             dist = 56;
         }
         if let Some(standard) = axis.widths().first() {
-            if (dist - standard.cur).abs() < 40 {
+            if abs(dist - standard.cur) < 40 {
                 dist = standard.cur.max(48);
             } else if dist < 3 * 64 {
                 let fraction = dist & 63;
-                dist &= !63;
-                dist += if fraction < 10 {
+                let kept = if fraction < 10 {
                     fraction
                 } else if fraction < 32 {
                     10
@@ -150,6 +150,7 @@ fn stem_width(
                 } else {
                     fraction
                 };
+                dist = wrap((dist & !63) + kept);
             } else {
                 // Rounding both the stem's start and its length can move its
                 // end far at small sizes: take back part of the start's move
@@ -160,15 +161,15 @@ fn stem_width(
                     if ppem < 10 {
                         bdelta = base_delta;
                     } else if ppem < 30 {
-                        bdelta = base_delta * (30 - ppem) / 20;
+                        bdelta = wrap(base_delta * (30 - ppem)) / 20;
                     }
-                    bdelta = bdelta.abs();
+                    bdelta = abs(bdelta);
                 }
-                dist = (dist - bdelta + 32) & !63;
+                dist = wrap((dist - bdelta + 32) & !63);
             }
         }
     }
-    if width < 0 { -dist } else { dist }
+    if width < 0 { wrap(-dist) } else { dist }
 }
 
 /// The edges of one dimension and what fitting them reads.
@@ -186,8 +187,8 @@ impl Fitter<'_> {
     /// width from edge `base`.
     fn align_linked(&mut self, base: usize, stem: usize) {
         let (base_edge, stem_edge) = (self.edges[base], self.edges[stem]);
-        let dist = stem_edge.opos - base_edge.opos;
-        let base_delta = base_edge.pos - base_edge.opos;
+        let dist = wrap(stem_edge.opos - base_edge.opos);
+        let base_delta = wrap(base_edge.pos - base_edge.opos);
         let fitted = stem_width(
             self.axis,
             self.dim,
@@ -197,7 +198,7 @@ impl Fitter<'_> {
             base_edge.flags,
             stem_edge.flags,
         );
-        self.edges[stem].pos = base_edge.pos + fitted;
+        self.edges[stem].pos = wrap(base_edge.pos + fitted);
     }
 
     /// `af_latin_compute_stem_width` between two edges, from nowhere.
@@ -207,7 +208,7 @@ impl Fitter<'_> {
             self.axis,
             self.dim,
             self.ppem,
-            b.opos - a.opos,
+            wrap(b.opos - a.opos),
             0,
             a.flags,
             b.flags,
@@ -329,27 +330,27 @@ fn hint_edges(
             continue;
         }
         let (edge, other) = (fit.edges[e], fit.edges[link]);
-        let org_len = other.opos - edge.opos;
+        let org_len = wrap(other.opos - edge.opos);
         let cur_len = fit.width(e, link);
         // Stems up to a pixel wide centre between pixels; up to 1.5 pixels,
         // off centre.
         let (u_off, d_off) = if cur_len <= 64 { (32, 32) } else { (38, 26) };
         let centred = |org_center: i64| {
             let pos = pix_round(org_center);
-            let error1 = (org_center - (pos - u_off)).abs();
-            let error2 = (org_center - (pos + d_off)).abs();
-            if error1 < error2 {
+            let error1 = abs(org_center - (pos - u_off));
+            let error2 = abs(org_center - (pos + d_off));
+            wrap(if error1 < error2 {
                 pos - u_off
             } else {
                 pos + d_off
-            }
+            })
         };
         let Some(a) = anchor else {
             // The first stem.
             if cur_len < 96 {
-                let center = centred(edge.opos + (org_len >> 1));
-                fit.edges[e].pos = center - cur_len / 2;
-                fit.edges[link].pos = fit.edges[e].pos + cur_len;
+                let center = centred(wrap(edge.opos + (org_len >> 1)));
+                fit.edges[e].pos = wrap(center - cur_len / 2);
+                fit.edges[link].pos = wrap(fit.edges[e].pos + cur_len);
             } else {
                 fit.edges[e].pos = pix_round(edge.opos);
             }
@@ -359,29 +360,29 @@ fn hint_edges(
             continue;
         };
         let anchor_edge = fit.edges[a];
-        let org_pos = anchor_edge.pos + (edge.opos - anchor_edge.opos);
-        let org_center = org_pos + (org_len >> 1);
+        let org_pos = wrap(anchor_edge.pos + (edge.opos - anchor_edge.opos));
+        let org_center = wrap(org_pos + (org_len >> 1));
         if other.flags & edge::DONE != 0 {
-            fit.edges[e].pos = other.pos - cur_len;
+            fit.edges[e].pos = wrap(other.pos - cur_len);
         } else if cur_len < 96 {
             let center = centred(org_center);
-            fit.edges[e].pos = center - cur_len / 2;
-            fit.edges[link].pos = center + cur_len / 2;
+            fit.edges[e].pos = wrap(center - cur_len / 2);
+            fit.edges[link].pos = wrap(center + cur_len / 2);
         } else {
             // Round the nearer end, keeping the width.
             let pos1 = pix_round(org_pos);
-            let delta1 = (pos1 + (cur_len >> 1) - org_center).abs();
-            let pos2 = pix_round(org_pos + org_len) - cur_len;
-            let delta2 = (pos2 + (cur_len >> 1) - org_center).abs();
+            let delta1 = abs(pos1 + (cur_len >> 1) - org_center);
+            let pos2 = wrap(pix_round(org_pos + org_len) - cur_len);
+            let delta2 = abs(pos2 + (cur_len >> 1) - org_center);
             fit.edges[e].pos = if delta1 < delta2 { pos1 } else { pos2 };
-            fit.edges[link].pos = fit.edges[e].pos + cur_len;
+            fit.edges[link].pos = wrap(fit.edges[e].pos + cur_len);
         }
         fit.edges[e].flags |= edge::DONE;
         fit.edges[link].flags |= edge::DONE;
         if e > 0 && before(fit.edges[e].pos, fit.edges[e - 1].pos) {
             // Unless the stem would (almost, by 1/4 pixel) disappear.
             let previous = fit.edges[e - 1].pos;
-            if (fit.edges[link].pos - previous).abs() > 16 {
+            if abs(fit.edges[link].pos - previous) > 16 {
                 fit.edges[e].pos = previous;
             }
         }
@@ -393,16 +394,17 @@ fn hint_edges(
         let (e1, e2, e3) = if count == 6 { (0, 2, 4) } else { (1, 5, 9) };
         let dist1 = fit.edges[e2].opos - fit.edges[e1].opos;
         let dist2 = fit.edges[e3].opos - fit.edges[e2].opos;
-        if (dist1 - dist2).abs() < 8 {
+        if abs(dist1 - dist2) < 8 {
             let delta = fit.edges[e3].pos - (2 * fit.edges[e2].pos - fit.edges[e1].pos);
-            fit.edges[e3].pos -= delta;
+            let shift = |edge: &mut Edge| edge.pos = wrap(edge.pos - delta);
+            shift(&mut fit.edges[e3]);
             if let Some(link) = fit.edges[e3].link {
-                fit.edges[link].pos -= delta;
+                shift(&mut fit.edges[link]);
             }
             // The serifs move with the stem.
             if count == 12 {
-                fit.edges[8].pos -= delta;
-                fit.edges[11].pos -= delta;
+                shift(&mut fit.edges[8]);
+                shift(&mut fit.edges[11]);
             }
             fit.edges[e3].flags |= edge::DONE;
             if let Some(link) = fit.edges[e3].link {
@@ -420,9 +422,9 @@ fn hint_edges(
             }
             let mut delta = 1000;
             if let Some(serif) = fit.edges[e].serif {
-                delta = fit.edges[serif].opos - fit.edges[e].opos;
+                delta = wrap(fit.edges[serif].opos - fit.edges[e].opos);
                 let (top, bottom) = if delta < 0 {
-                    delta = -delta;
+                    delta = wrap(-delta);
                     (e, serif)
                 } else {
                     (serif, e)
@@ -447,12 +449,12 @@ fn hint_edges(
             if delta < 64 + 16 {
                 // `af_latin_align_serif_edge`: follow the serif's base.
                 let base = fit.edges[fit.edges[e].serif.unwrap_or(e)];
-                fit.edges[e].pos = base.pos + (opos - base.opos);
+                fit.edges[e].pos = wrap(base.pos + (opos - base.opos));
             } else if let Some(a) = anchor {
                 let done = |i: &usize| fit.edges[*i].flags & edge::DONE != 0;
                 let previous = (0..e).rev().find(done);
                 let next = (e + 1..count).find(done);
-                fit.edges[e].pos = if let (Some(b), Some(n)) = (previous, next) {
+                fit.edges[e].pos = wrap(if let (Some(b), Some(n)) = (previous, next) {
                     // Between the fitted edges around it.
                     let (b, n) = (fit.edges[b], fit.edges[n]);
                     if n.opos == b.opos {
@@ -464,7 +466,7 @@ fn hint_edges(
                     // From the anchor, in half pixels.
                     let anchor = fit.edges[a];
                     anchor.pos + ((opos - anchor.opos + 16) & !31)
-                };
+                });
             } else {
                 fit.edges[e].pos = pix_round(opos);
                 anchor = Some(e);
@@ -520,5 +522,14 @@ mod tests {
         assert_eq!(stem_width(&axis(Some(100), true), h, 20, 30, 0, 0, 0), 30);
         let v = Dimension::Vertical;
         assert_eq!(stem_width(&standard, v, 20, 30, 0, 0, edge::SERIF), 30);
+    }
+
+    #[test]
+    fn a_width_of_ft_long_min_stays_negative() {
+        // FT_ABS leaves FT_LONG_MIN negative, under the 7/8 pixel minimum,
+        // which then applies: -56, where 64-bit arithmetic keeps the width.
+        let width = i64::from(i32::MIN);
+        let h = Dimension::Horizontal;
+        assert_eq!(stem_width(&axis(None, false), h, 20, width, 0, 0, 0), -56);
     }
 }

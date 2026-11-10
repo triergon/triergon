@@ -12,9 +12,9 @@ pub(super) use fit::{Glyph, Scope, apply};
 
 use super::Face;
 use super::hints::{Dimension, GlyphHints, Width, sort_and_quantize_widths};
+use super::long::{self, abs, mul_div, mul_fix, pix_round, wrap};
 use super::style::clusters;
 use super::tables::{SCRIPTS, STYLES};
-use crate::fixed::{mul_div, mul_fix, pix_round};
 use crate::outline::{Outline, OutlinePoint, PointKind};
 use triergon_core::{Result, WorkBudget};
 
@@ -284,7 +284,7 @@ impl Metrics {
             // An overshoot on the wrong side of its reference: the mean.
             let upward = properties & (property::TOP | property::SUB_TOP) != 0;
             if shoot != reference && upward != (shoot > reference) {
-                reference = (shoot + reference) / 2;
+                reference = wrap(shoot + reference) / 2;
                 shoot = reference;
             }
             let mut flags = 0;
@@ -378,11 +378,12 @@ impl Metrics {
     }
 
     /// `af_latin_metrics_scale`: the metrics at 16.16 scales `x_scale` and
-    /// `y_scale` (font units to 26.6 pixels).
+    /// `y_scale` (font units to 26.6 pixels), in the 32 bits of an
+    /// `FT_Fixed`.
     pub(super) fn scaled(&self, x_scale: i64, y_scale: i64) -> Self {
         let mut scaled = self.clone();
-        scaled.scale_dim(Dimension::Horizontal, x_scale);
-        scaled.scale_dim(Dimension::Vertical, y_scale);
+        scaled.scale_dim(Dimension::Horizontal, wrap(x_scale));
+        scaled.scale_dim(Dimension::Vertical, wrap(y_scale));
         scaled
     }
 
@@ -403,14 +404,14 @@ impl Metrics {
         {
             let scaled = mul_fix(x_height.shoot.org, scale);
             // The `increase-x-height` property is off.
-            let fitted = (scaled + 40) & !63;
+            let fitted = wrap((scaled + 40) & !63);
             if scaled != fitted {
                 let new_scale = mul_div(scale, fitted, scaled);
                 let max_height = vertical
                     .blues()
                     .iter()
                     .fold(i64::from(self.units_per_em), |height, b| {
-                        height.max(b.ascender).max(-b.descender)
+                        height.max(b.ascender).max(wrap(-b.descender))
                     });
                 let distance = mul_fix(max_height, new_scale - scale);
                 if -128 < distance && distance < 128 {
@@ -445,7 +446,7 @@ impl Metrics {
                 };
                 let step = if distance < 0 { -step } else { step };
                 zone.reference.fit = pix_round(zone.reference.cur);
-                zone.shoot.fit = zone.reference.fit - step;
+                zone.shoot.fit = wrap(zone.reference.fit - step);
                 zone.flags |= blue::ACTIVE;
             }
         }
@@ -488,7 +489,9 @@ impl Metrics {
 /// zone) or lowest of its contours of two or more points, and whether the
 /// segment around it is round. Every point also widens `ascender` and
 /// `descender`. `None` for a glyph FreeType skips: a degenerate one for a
-/// long zone, or a round extremum for a neutral one.
+/// long zone, a round extremum for a neutral one, and an extremum on
+/// `FT_LONG_MIN` or `FT_LONG_MAX`, which FreeType starts its search from and
+/// takes for none found.
 fn extremum(
     points: &[OutlinePoint],
     ends: &[u32],
@@ -554,8 +557,8 @@ fn extremum(
     };
     // Accept a small distance or a small angle (20 is about 2.9 degrees).
     let leaves = |from: i64, to: i64| {
-        let distance = (y(to) - y(from)).abs();
-        distance > 5 && (x(to) - x(from)).abs() <= 20 * distance
+        let distance = abs(y(to) - y(from));
+        distance > 5 && abs(x(to) - x(from)) <= wrap(20 * distance)
     };
     let best_x = x(best_point);
     let (mut segment_first, mut segment_last) = (best_point, best_point);
@@ -568,8 +571,8 @@ fn extremum(
     let mut prev = best_point;
     loop {
         prev = previous(prev);
-        let distance = (y(prev) - best_y).abs();
-        if distance > 5 && (x(prev) - best_x).abs() <= 20 * distance {
+        let distance = abs(y(prev) - best_y);
+        if distance > 5 && abs(x(prev) - best_x) <= wrap(20 * distance) {
             break;
         }
         segment_first = prev;
@@ -586,8 +589,8 @@ fn extremum(
     let mut next = best_point;
     loop {
         next = following(next);
-        let distance = (y(next) - best_y).abs();
-        if distance > 5 && (x(next) - best_x).abs() <= 20 * distance {
+        let distance = abs(y(next) - best_y);
+        if distance > 5 && abs(x(next) - best_x) <= wrap(20 * distance) {
             break;
         }
         segment_last = next;
@@ -605,7 +608,7 @@ fn extremum(
         // The segment must be long enough; else look along the contour for
         // one that is, in the same direction and not too far below.
         let length_threshold = units_per_em / 25;
-        let length = (x(segment_last) - x(segment_first)).abs();
+        let length = abs(x(segment_last) - x(segment_first));
         if length < length_threshold
             && segment_last - segment_first + 2 <= contour_last - contour_first
         {
@@ -631,10 +634,10 @@ fn extremum(
                     hit = true;
                 }
                 last = following(last);
-                if (best_y - y(first)).abs() > height_threshold || leaves(first, last) {
+                if abs(best_y - y(first)) > height_threshold || leaves(first, last) {
                     hit = false;
                 } else {
-                    let distance = (y(last) - y(first)).abs();
+                    let distance = abs(y(last) - y(first));
                     if on(last) {
                         p_last = last;
                         if p_first < 0 {
@@ -642,14 +645,14 @@ fn extremum(
                         }
                     }
                     if (x(first) < x(last)) == left_to_right
-                        && (x(last) - x(first)).abs() >= length_threshold
+                        && abs(x(last) - x(first)) >= length_threshold
                     {
                         // Extend the segment to its end. FreeType tests the
                         // x of `next` and the earlier distance here.
                         loop {
                             last = following(last);
-                            let d = (y(last) - y(first)).abs();
-                            if d > 5 && (x(next) - x(first)).abs() <= 20 * distance {
+                            let d = abs(y(last) - y(first));
+                            if d > 5 && abs(x(next) - x(first)) <= wrap(20 * distance) {
                                 last = previous(last);
                                 break;
                             }
@@ -678,14 +681,41 @@ fn extremum(
     // Flat if the on points span more than the flat threshold, else round
     // if the segment starts or ends off the curve.
     let flat_threshold = units_per_em / 14;
-    let round =
-        if on_first >= 0 && on_last >= 0 && (x(on_last) - x(on_first)).abs() > flat_threshold {
-            false
-        } else {
-            !on(segment_first) || !on(segment_last)
-        };
-    if round && properties & property::NEUTRAL != 0 {
+    let round = if on_first >= 0 && on_last >= 0 && abs(x(on_last) - x(on_first)) > flat_threshold {
+        false
+    } else {
+        !on(segment_first) || !on(segment_last)
+    };
+    if (round && properties & property::NEUTRAL != 0) || best_y == long::MIN || best_y == long::MAX
+    {
         return None;
     }
     Some((best_y, round))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{extremum, property};
+    use crate::outline::{OutlinePoint, Point, PointKind};
+
+    #[test]
+    fn extrema_on_the_32_bit_limits_are_skipped() {
+        let (mut ascender, mut descender) = (0, 0);
+        let mut top_of = |top: i32| {
+            let points = [(0, 0), (100, top), (200, 0)].map(|(x, y)| OutlinePoint {
+                point: Point::new(x, y),
+                kind: PointKind::On,
+            });
+            extremum(
+                &points,
+                &[3],
+                property::TOP,
+                2048,
+                &mut ascender,
+                &mut descender,
+            )
+        };
+        assert_eq!(top_of(1000), Some((1000, false)));
+        assert_eq!(top_of(i32::MAX), None);
+    }
 }

@@ -5,12 +5,15 @@
 //! diacritics kept a pixel away from the base after hinting.
 //!
 //! The adjustments work on whole contours: the database assumes one
-//! enclosing contour for the base glyph and one for each diacritic.
+//! enclosing contour for the base glyph and one for each diacritic. Their
+//! positions and heights are `FT_Pos` and wrap in 32 bits, as they do in
+//! FreeType on 32-bit ARMv7; so do the sentinels, `FT_LONG_MIN` and
+//! `FT_LONG_MAX`, that a contour of one or two points keeps as its extrema.
 
 use super::super::hints::{Dimension, GlyphHints, edge, point};
+use super::super::long::{self, mul_fix, pix_round, wrap};
 use super::super::tables::ADJUSTMENTS;
 use super::{Blue, Metrics, analysis, blue};
-use crate::fixed::{mul_fix, pix_round};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
@@ -86,12 +89,12 @@ pub(super) fn prepare(
         if has(flag::TILDE_TOP2) {
             let contour = second_highest_contour(hints);
             let offset = stretch_tilde(hints, contour, true) + align_tilde(hints, contour, true);
-            move_contours_up(hints, hints.y_minima[contour], offset);
+            move_contours_up(hints, hints.y_minima[contour], wrap(offset));
         }
         if has(flag::TILDE_BOTTOM2) {
             let contour = second_lowest_contour(hints);
             let offset = stretch_tilde(hints, contour, false) - align_tilde(hints, contour, false);
-            move_contours_down(hints, hints.y_maxima[contour], offset);
+            move_contours_down(hints, hints.y_maxima[contour], wrap(offset));
         }
         if has(flag::TILDE_TOP) {
             let contour = highest_contour(hints);
@@ -114,8 +117,8 @@ pub(super) fn prepare(
             // A heuristic height an accent stays under: 2/3 of the small
             // letters' zone, else half the capitals', else 0.4 em.
             accent_height_limit = match (small, capital) {
-                ((Some(top), Some(bottom)), _) => 2 * (top.shoot.cur - bottom.shoot.cur) / 3,
-                (_, (Some(top), Some(bottom))) => (top.shoot.cur - bottom.shoot.cur) / 2,
+                ((Some(top), Some(bottom)), _) => wrap(2 * (top.shoot.cur - bottom.shoot.cur)) / 3,
+                (_, (Some(top), Some(bottom))) => wrap(top.shoot.cur - bottom.shoot.cur) / 2,
                 _ => mul_fix(i64::from(metrics.units_per_em) * 4 / 10, metrics.y_scale()),
             };
         }
@@ -133,16 +136,16 @@ pub(super) fn prepare(
         };
         // Above or below the base by more than about 14% of its height
         // and a quarter pixel, edges take no blue zone.
-        let height = top.shoot.cur - bottom.shoot.cur;
+        let height = wrap(top.shoot.cur - bottom.shoot.cur);
         let axis = &mut hints.axis[Dimension::Vertical.index()];
         if has(ignore_top) {
-            let limit = top.shoot.cur + height / 7 + 16;
+            let limit = wrap(top.shoot.cur + height / 7 + 16);
             for e in axis.edges.iter_mut().filter(|e| e.pos > limit) {
                 e.flags |= edge::NO_BLUE;
             }
         }
         if has(ignore_bottom) {
-            let limit = bottom.shoot.cur - height / 7 - 16;
+            let limit = wrap(bottom.shoot.cur - height / 7 - 16);
             for e in axis.edges.iter_mut().filter(|e| e.pos < limit) {
                 e.flags |= edge::NO_BLUE;
             }
@@ -168,20 +171,20 @@ fn base_glyph_blues(metrics: &Metrics, capital: bool) -> (Option<Blue>, Option<B
 }
 
 /// `af_compute_vertical_extrema`: each contour's lowest and highest point;
-/// contours of one or two points keep extrema that compare as empty.
+/// contours of one or two points keep `FT_LONG_MAX` and `FT_LONG_MIN`.
 fn compute_vertical_extrema(hints: &mut GlyphHints, work: &mut WorkBudget) -> Result<()> {
     let count = hints.contours.len();
     charge(work, hints.points.len() + count)?;
     hints.y_minima.clear();
     hints.y_maxima.clear();
-    hints.y_minima.try_resize(count, i64::MAX)?;
-    hints.y_maxima.try_resize(count, i64::MIN)?;
+    hints.y_minima.try_resize(count, long::MAX)?;
+    hints.y_maxima.try_resize(count, long::MIN)?;
     let points = hints.points.as_slice();
     for (c, &first) in hints.contours.as_slice().iter().enumerate() {
         if points[points[first].next].next == first {
             continue;
         }
-        let (mut min, mut max) = (i64::MAX, i64::MIN);
+        let (mut min, mut max) = (long::MAX, long::MIN);
         let mut p = first;
         loop {
             min = min.min(points[p].y);
@@ -205,7 +208,7 @@ fn extrema(hints: &GlyphHints, c: usize) -> (i64, i64) {
 /// `af_find_highest_contour`: the contour reaching highest, of two the
 /// shorter one.
 fn highest_contour(hints: &GlyphHints) -> usize {
-    let (mut best, mut best_min, mut best_max) = (0, i64::MAX, i64::MIN);
+    let (mut best, mut best_min, mut best_max) = (0, long::MAX, long::MIN);
     for c in 0..hints.contours.len() {
         let (min, max) = extrema(hints, c);
         if max > best_max || (max == best_max && min > best_min) {
@@ -224,7 +227,7 @@ fn second_highest_contour(hints: &GlyphHints) -> usize {
     }
     let highest = highest_contour(hints);
     let highest_min = hints.y_minima[highest];
-    let (mut best, mut best_max) = (0, i64::MIN);
+    let (mut best, mut best_max) = (0, long::MIN);
     for c in (0..hints.contours.len()).filter(|&c| c != highest) {
         let (min, max) = extrema(hints, c);
         if max > best_max && min < highest_min {
@@ -237,7 +240,7 @@ fn second_highest_contour(hints: &GlyphHints) -> usize {
 /// `af_find_lowest_contour`: the contour reaching lowest, of two the
 /// shorter one.
 fn lowest_contour(hints: &GlyphHints) -> usize {
-    let (mut best, mut best_min, mut best_max) = (0, i64::MAX, i64::MIN);
+    let (mut best, mut best_min, mut best_max) = (0, long::MAX, long::MIN);
     for c in 0..hints.contours.len() {
         let (min, max) = extrema(hints, c);
         if min < best_min || (min == best_min && max < best_max) {
@@ -255,7 +258,7 @@ fn second_lowest_contour(hints: &GlyphHints) -> usize {
     }
     let lowest = lowest_contour(hints);
     let lowest_max = hints.y_maxima[lowest];
-    let (mut best, mut best_min) = (0, i64::MAX);
+    let (mut best, mut best_min) = (0, long::MAX);
     for c in (0..hints.contours.len()).filter(|&c| c != lowest) {
         let (min, max) = extrema(hints, c);
         if min < best_min && max > lowest_max {
@@ -271,7 +274,7 @@ fn move_contour(hints: &mut GlyphHints, c: usize, by: i64) {
     let points = hints.points.as_mut_slice();
     let mut p = first;
     loop {
-        points[p].y = points[p].y.wrapping_add(by);
+        points[p].y = wrap(points[p].y + by);
         p = points[p].next;
         if p == first {
             break;
@@ -295,7 +298,7 @@ fn move_contours_down(hints: &mut GlyphHints, limit: i64, delta: i64) {
     for c in 0..hints.contours.len() {
         let (min, max) = extrema(hints, c);
         if min < max && max < limit {
-            move_contour(hints, c, delta.wrapping_neg());
+            move_contour(hints, c, -delta);
         }
     }
 }
@@ -331,12 +334,16 @@ fn touch_contours(hints: &mut GlyphHints, tilde: usize, top: bool) {
 /// a round on-curve extremum from the far side, at least an eighth of the
 /// height) spans more than a pixel, and protects it and the contours beyond
 /// it from hinting. Returns how much taller it got.
+///
+/// As in FreeType, the scaling multiplies and divides in 32 bits, wrapping
+/// where it overflows, and a contour of one or two points measures from its
+/// `FT_LONG_MAX` minimum and `FT_LONG_MIN` maximum (a height of 1).
 fn stretch_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
     let (min_y, max_y) = extrema(hints, tilde);
     if min_y == max_y {
         return 0;
     }
-    let height = max_y.wrapping_sub(min_y);
+    let height = wrap(max_y - min_y);
     let extremum_threshold = height / 8;
     let first = hints.contours[tilde];
     let points = hints.points.as_slice();
@@ -364,9 +371,9 @@ fn stretch_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
                 next_on = points[next_on].next;
             }
             let found = if points[next_on].y > y && points[prev_on].y > y {
-                Some(y.wrapping_sub(min_y))
+                Some(wrap(y - min_y))
             } else if points[next_on].y < y && points[prev_on].y < y {
-                Some(max_y.wrapping_sub(y))
+                Some(wrap(max_y - y))
             } else {
                 None
             };
@@ -381,7 +388,7 @@ fn stretch_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
         }
     }
     touch_contours(hints, tilde, top);
-    let target_height = measurement.unwrap_or(0).wrapping_add(64);
+    let target_height = wrap(measurement.unwrap_or(0) + 64);
     if height >= target_height {
         return 0;
     }
@@ -391,14 +398,15 @@ fn stretch_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
     let mut p = first;
     loop {
         p = points[p].next;
-        // `height` is positive: the contour's extrema differ.
-        let scaled = points[p].y.wrapping_sub(base).wrapping_mul(target_height);
-        points[p].y = scaled.wrapping_div(height).wrapping_add(base);
+        // `height` is not zero: the extrema differ in 32 bits. ARMv7 divides
+        // `FT_LONG_MIN` by -1 to `FT_LONG_MIN`, as the wrap does.
+        let scaled = wrap(wrap(points[p].y - base) * target_height);
+        points[p].y = wrap(scaled / height + base);
         if p == first {
             break;
         }
     }
-    target_height.wrapping_sub(height)
+    wrap(target_height - height)
 }
 
 /// `af_latin_align_top_tilde` and `af_latin_align_bottom_tilde`: moves the
@@ -417,17 +425,17 @@ fn align_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
             break;
         }
     }
-    let height = max_y.wrapping_sub(min_y);
+    let height = wrap(max_y - min_y);
     let centring = if height < 64 * 3 {
-        (pix_round(height) - height) / 2
+        wrap(pix_round(height) - height) / 2
     } else {
         0
     };
-    let delta = if top {
-        pix_round(min_y).wrapping_sub(min_y) + centring
+    let delta = wrap(if top {
+        pix_round(min_y) - min_y + centring
     } else {
-        pix_round(max_y).wrapping_sub(max_y) - centring
-    };
+        pix_round(max_y) - max_y - centring
+    });
     move_contour(hints, tilde, delta);
     delta
 }
@@ -436,8 +444,8 @@ fn align_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
 /// horizontal extent of the other contours of three or more points.
 fn overlaps_horizontally(hints: &GlyphHints, c: usize) -> bool {
     let points = hints.points.as_slice();
-    let (mut own_min, mut own_max) = (i64::MAX, i64::MIN);
-    let (mut other_min, mut other_max) = (i64::MAX, i64::MIN);
+    let (mut own_min, mut own_max) = (long::MAX, long::MIN);
+    let (mut other_min, mut other_max) = (long::MAX, long::MIN);
     for (i, &first) in hints.contours.as_slice().iter().enumerate() {
         if points[points[first].next].next == first {
             continue;
@@ -500,7 +508,7 @@ pub(super) fn separate_vertically(
             return Ok(());
         }
         let (high_min, high_max) = extrema(hints, high);
-        let high_height = high_max.wrapping_sub(high_min);
+        let high_height = wrap(high_max - high_min);
         if high_height > accent_height_limit {
             return Ok(());
         }
@@ -508,12 +516,12 @@ pub(super) fn separate_vertically(
         let mut min_distance = 64;
         for c in (0..contours).filter(|&c| c != high) {
             let (min, max) = extrema(hints, c);
-            let distance = high_min.wrapping_sub(max);
+            let distance = wrap(high_min - max);
             if distance < 64 && distance < min_distance && min < high_min {
                 min_distance = distance;
             }
         }
-        let adjustment_amount = 64 - min_distance;
+        let adjustment_amount = wrap(64 - min_distance);
         let (tilde, tilde2) = (has(flag::TILDE_TOP), has(flag::TILDE_TOP2));
         let mut centring = 0;
         if tilde || tilde2 {
@@ -523,26 +531,26 @@ pub(super) fn separate_vertically(
                 highest_contour(hints)
             };
             let (tilde_min, tilde_max) = extrema(hints, contour);
-            let tilde_height = tilde_max.wrapping_sub(tilde_min);
-            let mut pos = high_min.wrapping_add(adjustment_amount);
+            let tilde_height = wrap(tilde_max - tilde_min);
+            let mut pos = wrap(high_min + adjustment_amount);
             if up2 && tilde {
-                pos = pos.wrapping_add(high_height);
+                pos = wrap(pos + high_height);
             }
             if pos % 64 == 0 && tilde_height < 3 * 64 {
-                centring = (pix_round(tilde_height) - tilde_height) / 2;
+                centring = wrap(pix_round(tilde_height) - tilde_height) / 2;
             }
         }
         let calculated = if (up && tilde) || (up2 && tilde2) {
-            adjustment_amount + centring
+            wrap(adjustment_amount + centring)
         } else {
             adjustment_amount
         };
         // A delta of 2/64 pixel allows for rounding.
         if calculated != 0 && calculated >= -2 && (calculated <= 66 || adjustment_amount <= 66) {
-            let min_y_limit = high_min.wrapping_sub(high_height / 8);
+            let min_y_limit = wrap(high_min - high_height / 8);
             move_contours_up(hints, min_y_limit, adjustment_amount);
             if up2 && tilde {
-                move_contours_up(hints, min_y_limit.wrapping_add(high_height), centring);
+                move_contours_up(hints, wrap(min_y_limit + high_height), centring);
             }
         }
     }
@@ -556,19 +564,19 @@ pub(super) fn separate_vertically(
             return Ok(());
         }
         let (low_min, low_max) = extrema(hints, low);
-        let low_height = low_max.wrapping_sub(low_min);
+        let low_height = wrap(low_max - low_min);
         if low_height > accent_height_limit {
             return Ok(());
         }
         let mut min_distance = 64;
         for c in (0..contours).filter(|&c| c != low) {
             let (min, max) = extrema(hints, c);
-            let distance = min.wrapping_sub(low_max);
+            let distance = wrap(min - low_max);
             if distance < 64 && distance < min_distance && max > low_max {
                 min_distance = distance;
             }
         }
-        let adjustment_amount = 64 - min_distance;
+        let adjustment_amount = wrap(64 - min_distance);
         let (tilde, tilde2) = (has(flag::TILDE_BOTTOM), has(flag::TILDE_BOTTOM2));
         let mut centring = 0;
         if tilde || tilde2 {
@@ -578,25 +586,25 @@ pub(super) fn separate_vertically(
                 lowest_contour(hints)
             };
             let (tilde_min, tilde_max) = extrema(hints, contour);
-            let tilde_height = tilde_max.wrapping_sub(tilde_min);
-            let mut pos = low_max.wrapping_sub(adjustment_amount);
+            let tilde_height = wrap(tilde_max - tilde_min);
+            let mut pos = wrap(low_max - adjustment_amount);
             if down2 && tilde {
-                pos = pos.wrapping_sub(low_height);
+                pos = wrap(pos - low_height);
             }
             if pos % 64 == 0 && tilde_height < 3 * 64 {
-                centring = (pix_round(tilde_height) - tilde_height) / 2;
+                centring = wrap(pix_round(tilde_height) - tilde_height) / 2;
             }
         }
         let calculated = if (down && tilde) || (down2 && tilde2) {
-            adjustment_amount + centring
+            wrap(adjustment_amount + centring)
         } else {
             adjustment_amount
         };
         if calculated != 0 && calculated >= -2 && (calculated <= 66 || adjustment_amount <= 66) {
-            let max_y_limit = low_max.wrapping_add(low_height / 8);
+            let max_y_limit = wrap(low_max + low_height / 8);
             move_contours_down(hints, max_y_limit, adjustment_amount);
             if down2 && tilde {
-                move_contours_down(hints, max_y_limit.wrapping_sub(low_height), centring);
+                move_contours_down(hints, wrap(max_y_limit - low_height), centring);
             }
         }
     }
@@ -605,7 +613,56 @@ pub(super) fn separate_vertically(
 
 #[cfg(test)]
 mod tests {
-    use super::adjustment;
+    use super::super::super::hints::{GlyphHints, Point};
+    use super::{adjustment, compute_vertical_extrema, highest_contour, stretch_tilde};
+    use triergon_core::{Budget, WorkBudget};
+
+    /// Hints of closed contours with the given y coordinates, all on the
+    /// curve, with their vertical extrema computed.
+    fn hints(budget: &Budget, contours: &[&[i64]]) -> GlyphHints {
+        let mut hints = GlyphHints::new(budget);
+        for ys in contours {
+            let start = hints.points.len();
+            let end = start + ys.len();
+            hints.contours.try_push(start).unwrap();
+            for (i, &y) in (start..).zip(ys.iter()) {
+                let point = Point {
+                    y,
+                    next: if i + 1 == end { start } else { i + 1 },
+                    prev: if i == start { end - 1 } else { i - 1 },
+                    ..Point::default()
+                };
+                hints.points.try_push(point).unwrap();
+            }
+        }
+        compute_vertical_extrema(&mut hints, &mut WorkBudget::new(1 << 20)).unwrap();
+        hints
+    }
+
+    #[test]
+    fn short_contours_keep_32_bit_sentinels() {
+        let budget = Budget::new(1 << 20).unwrap();
+        let min = i64::from(i32::MIN);
+        // A contour of two points, then a flat one on FT_LONG_MIN.
+        let hints = hints(&budget, &[&[0, 10], &[min, min, min]]);
+        assert_eq!(hints.y_minima.as_slice(), [i64::from(i32::MAX), min]);
+        assert_eq!(hints.y_maxima.as_slice(), [min, min]);
+        // The flat contour ties with the initial FT_LONG_MIN maximum and is
+        // not taken; the first contour stays the highest.
+        assert_eq!(highest_contour(&hints), 0);
+    }
+
+    #[test]
+    fn a_tilde_stretch_wraps_in_32_bits() {
+        let budget = Budget::new(1 << 20).unwrap();
+        // A tilde of two points measures from FT_LONG_MAX to FT_LONG_MIN, a
+        // height of 1, and stretches to 64: each y becomes
+        // (y - FT_LONG_MAX) × 64 + FT_LONG_MAX, in 32 bits.
+        let mut hints = hints(&budget, &[&[0, 10]]);
+        assert_eq!(stretch_tilde(&mut hints, 0, true), 63);
+        let ys: Vec<i64> = hints.points.iter().map(|p| p.y).collect();
+        assert_eq!(ys, [-2_147_483_585, -2_147_482_945]);
+    }
 
     #[test]
     fn the_database_is_searched_in_freetypes_order() {

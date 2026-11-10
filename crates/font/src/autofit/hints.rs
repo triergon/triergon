@@ -5,11 +5,11 @@
 //!
 //! Points, segments and edges refer to each other by index. Segment and edge
 //! fields FreeType keeps in 16 bits (`FT_Short`) are 16-bit here and wrap as
-//! they do there.
+//! they do there; positions, as `FT_Pos`, wrap in 32 bits (see
+//! [`long`](super::long)).
 
+use super::long::{div_fix, mul_fix, to_i32, wrap};
 use crate::Orientation;
-use crate::fixed::{div_fix, mul_fix};
-use crate::glyf::narrow;
 use crate::outline::{Outline, PointKind};
 use crate::work::charge;
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
@@ -374,8 +374,8 @@ impl GlyphHints {
                     PointKind::Quadratic => point::CONIC,
                     PointKind::Cubic => point::CUBIC,
                 };
-                let ox = mul_fix(x, self.x_scale) + self.x_delta;
-                let oy = mul_fix(y, self.y_scale) + self.y_delta;
+                let ox = wrap(mul_fix(x, self.x_scale) + self.x_delta);
+                let oy = wrap(mul_fix(y, self.y_scale) + self.y_delta);
                 let point = Point {
                     flags,
                     in_dir: direction::NONE,
@@ -516,12 +516,11 @@ impl GlyphHints {
 
     /// `af_glyph_hints_save`: writes the hinted positions back to
     /// `outline`, whose points the hints were loaded from.
-    pub(super) fn save(&self, outline: &mut Outline) -> Result<()> {
+    pub(super) fn save(&self, outline: &mut Outline) {
         for (target, point) in outline.points_mut().iter_mut().zip(self.points.as_slice()) {
-            target.point.x = narrow(point.x)?;
-            target.point.y = narrow(point.y)?;
+            target.point.x = to_i32(point.x);
+            target.point.y = to_i32(point.y);
         }
-        Ok(())
     }
 
     /// `af_glyph_hints_align_edge_points`: moves the points of each segment
@@ -587,9 +586,9 @@ impl GlyphHints {
                 Dimension::Horizontal => (i64::from(p.fx), p.ox),
             };
             let position = if i64::from(first.fpos) - u >= 0 {
-                first.pos - (first.opos - ou)
+                wrap(first.pos - (first.opos - ou))
             } else if u - i64::from(last.fpos) >= 0 {
-                last.pos + (ou - last.opos)
+                wrap(last.pos + (ou - last.opos))
             } else {
                 match enclosing(edges, u) {
                     Ok(on) => edges[on].pos,
@@ -604,7 +603,7 @@ impl GlyphHints {
                                 i64::from(next.fpos) - i64::from(before.fpos),
                             );
                         }
-                        before.pos + mul_fix(u - i64::from(before.fpos), before.scale)
+                        wrap(before.pos + mul_fix(u - i64::from(before.fpos), before.scale))
                     }
                 }
             };
@@ -729,13 +728,13 @@ fn enclosing(edges: &[Edge], u: i64) -> std::result::Result<usize, usize> {
 /// `af_iup_shift`: moves points `p1..=p2` but `reference` by the move of
 /// `reference` (`u` hinted, `v` original).
 fn shift(points: &mut [Point], p1: usize, p2: usize, reference: usize) {
-    let delta = points[reference].u - points[reference].v;
+    let delta = wrap(points[reference].u - points[reference].v);
     if delta == 0 {
         return;
     }
     for (i, p) in points[p1..=p2].iter_mut().enumerate() {
         if p1 + i != reference {
-            p.u = p.v + delta;
+            p.u = wrap(p.v + delta);
         }
     }
 }
@@ -760,7 +759,7 @@ fn interpolate(points: &mut [Point], p1: usize, p2: usize, ref1: usize, ref2: us
     };
     for p in &mut points[p1..=p2] {
         let u = p.v;
-        p.u = if u <= v1 {
+        p.u = wrap(if u <= v1 {
             u + d1
         } else if u >= v2 {
             u + d2
@@ -769,7 +768,7 @@ fn interpolate(points: &mut [Point], p1: usize, p2: usize, ref1: usize, ref2: us
                 None => u1,
                 Some(scale) => u1 + mul_fix(u - v1, scale),
             }
-        };
+        });
     }
 }
 
@@ -795,7 +794,8 @@ fn corner_is_flat(in_x: i64, in_y: i64, out_x: i64, out_y: i64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        GlyphHints, Width, corner_is_flat, direction, direction_of, point, sort_and_quantize_widths,
+        GlyphHints, Point as HintPoint, Width, corner_is_flat, direction, direction_of,
+        interpolate, point, sort_and_quantize_widths,
     };
     use crate::outline::{Outline, Point, PointKind};
     use triergon_core::{Budget, WorkBudget};
@@ -833,6 +833,17 @@ mod tests {
         let mut empty = [Width::default(); 16];
         assert_eq!(sort_and_quantize_widths(&mut empty, 0, 10), 1);
         assert_eq!(empty[0].org, 0);
+    }
+
+    #[test]
+    fn interpolation_wraps_as_ft_pos_does() {
+        let mut points = [HintPoint::default(); 3];
+        (points[0].u, points[0].v) = (-100, -100);
+        (points[1].u, points[1].v) = (i64::from(i32::MAX), 0);
+        points[2].v = 5;
+        interpolate(&mut points, 2, 2, 0, 1);
+        // Beyond the second reference: 5 + 0x7fffffff, in 32 bits.
+        assert_eq!(points[2].u, i64::from(i32::MIN) + 4);
     }
 
     #[test]

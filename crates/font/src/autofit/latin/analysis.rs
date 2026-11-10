@@ -3,8 +3,8 @@
 //! and the blue zones those edges lie in.
 
 use super::super::hints::{Dimension, Edge, GlyphHints, Segment, Width, direction, edge, point};
+use super::super::long::{abs, div_fix, mul_fix, wrap};
 use super::{Axis, Metrics, blue, constant};
-use crate::fixed::{div_fix, mul_fix};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
@@ -417,7 +417,7 @@ pub(super) fn compute_edges(
         {
             continue;
         }
-        if segment.serif.is_some() && 2 * height < 3 * segment_length_threshold {
+        if segment.serif.is_some() && 2 * height < wrap(3 * segment_length_threshold) {
             continue;
         }
         charge(work, axis.edges.len() + 1)?;
@@ -587,7 +587,7 @@ pub(super) fn compute_blue_edges(
             if !(top != major || neutral) {
                 continue;
             }
-            let dist = mul_fix((fpos - zone.reference.org).abs(), scale);
+            let dist = mul_fix(abs(fpos - zone.reference.org), scale);
             if dist < best_dist {
                 best_dist = dist;
                 best = Some((zone.reference.fit, neutral));
@@ -596,7 +596,7 @@ pub(super) fn compute_blue_edges(
             if edge.flags & edge::ROUND != 0 && dist != 0 && !neutral {
                 let under = fpos < zone.reference.org;
                 if top != under {
-                    let dist = mul_fix((fpos - zone.shoot.org).abs(), scale);
+                    let dist = mul_fix(abs(fpos - zone.shoot.org), scale);
                     if dist < best_dist {
                         best_dist = dist;
                         best = Some((zone.shoot.fit, neutral));
