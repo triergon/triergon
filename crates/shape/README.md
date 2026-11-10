@@ -46,7 +46,11 @@ font-function interface. `SizedMetrics` answers as libass's FreeType-backed
 functions do over a face at a size (`triergon_font::SizedFont`): the character
 map libass selects, or with `SizedMetrics::with_charmap` the one a face has been
 left on, read as libass reads it, default-load advances and `FT_KERNING_DEFAULT`
-kerning, at the size's scale and pixels per em. `OtMetrics` answers as HarfBuzz's built-in
+kerning, at the size's scale and pixels per em. For a face of an `@` font,
+`SizedMetrics::rotating` takes libass's glyph metrics cache as a
+`GlyphRotations`: a glyph its first character lookup reaches through a code
+point at or above U+02F1 advances by its default-load vertical advance, as
+libass gives HarfBuzz that glyph. `OtMetrics` answers as HarfBuzz's built-in
 functions do at units per em (its character map choice, `cmap` format 14
 variation sequences, `hmtx` advances, `glyf` and CFF extents). A callback that
 cannot answer as its font would ends the shaping call with its error. `Scale` reproduces HarfBuzz's scaling arithmetic,
@@ -139,12 +143,12 @@ paragraph separator inside the text.
 - `stch` stretching (refused when it would apply) and the Windows-1256 Arabic
   fallback lookups.
 - What libass reads from FreeType's hinted load: `SizedMetrics` gives no glyph
-  extents or contour points (`Unsupported`), so fallback mark positioning in a
-  font without GPOS marks fails (which leaves `ass-render`'s two
-  `hinted-extents-ass-*` cases open), and no default-load advance that FreeType's
-  auto-hinter sets. Faces whose character map libass would convert (Windows
-  multibyte encodings) are refused. The vertical advances libass substitutes in
-  an `@` font are not covered.
+  extents or contour points (`Unsupported`), but the empty extents of a glyph
+  without points, which every FreeType load gives it, so fallback mark
+  positioning in a font without GPOS marks fails where it measures a glyph with
+  an outline; and no default-load advance that FreeType's auto-hinter sets.
+  Faces whose character map libass would convert (Windows multibyte encodings)
+  are refused.
 - `OtMetrics`'s CFF glyph extents where HarfBuzz's charstring interpreter
   departs from FreeType's: it lacks the Type 2 arithmetic and storage operators
   and reads some curve operands differently. `OtMetrics` takes CFF extents from

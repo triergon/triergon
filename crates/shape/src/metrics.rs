@@ -260,6 +260,24 @@ impl Metrics for OtMetrics<'_> {
     }
 }
 
+/// libass's glyph metrics cache for a face of an `@` font at a size, which
+/// decides once per glyph whether the default-load metrics it keeps are
+/// rotated: their horizontal advance replaced by the vertical one
+/// (`get_cached_metrics` and `ass_glyph_metrics_construct` in `ass_shaper.c`).
+///
+/// The first lookup that loads a glyph decides: a character lookup through a
+/// code point at or above U+02F1 (`VERTICAL_LOWER_BOUND`) rotates it, any other lookup (another
+/// character, or an advance asked of a glyph no character lookup returned,
+/// such as one a substitution made) keeps it horizontal. libass keeps the
+/// cache for the renderer's life, across runs and frames, so its owner keeps
+/// these decisions as long.
+pub trait GlyphRotations {
+    /// Records that a lookup loaded `glyph` (through the character `c`, or
+    /// `None` for an advance) and returns whether its cached metrics are
+    /// rotated: the decision of the first such lookup.
+    fn rotated(&self, glyph: GlyphId, c: Option<char>) -> bool;
+}
+
 /// The font functions libass 0.17.5 installs on the HarfBuzz font of a face at a
 /// size (`init_font_funcs` and `get_hb_font` in `ass_shaper.c`): the face's
 /// character map looked up as libass looks codes up
@@ -269,11 +287,14 @@ impl Metrics for OtMetrics<'_> {
 /// [`SizedFont::harfbuzz_scale`] and pixels per em, so that hinting device
 /// tables apply.
 ///
+/// For a face of an `@` font ([`Self::rotating`]), the advance of a glyph
+/// libass's metrics cache keeps rotated is the default load's vertical advance
+/// ([`SizedFont::hinted_vertical_advance`]).
+///
 /// libass reads glyph extents and contour points from FreeType's hinted load,
 /// which this crate does not run: for a glyph of the face both are
-/// `Unsupported`, as is an advance `hinted_advance` cannot give. The vertical
-/// advances libass substitutes in an `@` font are not covered.
-#[derive(Debug)]
+/// `Unsupported`, but for the empty extents of a glyph without points, as is an
+/// advance `hinted_advance` cannot give.
 pub struct SizedMetrics<'a> {
     sized: SizedFont<'a>,
     lookup: Option<TextLookup<'a>>,
@@ -281,6 +302,19 @@ pub struct SizedMetrics<'a> {
     unicode: bool,
     variations: Variations<'a>,
     scale: Scale,
+    rotations: Option<&'a dyn GlyphRotations>,
+}
+
+impl std::fmt::Debug for SizedMetrics<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SizedMetrics")
+            .field("sized", &self.sized)
+            .field("lookup", &self.lookup)
+            .field("unicode", &self.unicode)
+            .field("scale", &self.scale)
+            .field("rotating", &self.rotations.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a> SizedMetrics<'a> {
@@ -326,7 +360,28 @@ impl<'a> SizedMetrics<'a> {
                 x_ppem: u32::from(size.x_ppem),
                 y_ppem: u32::from(size.y_ppem),
             },
+            rotations: None,
         })
+    }
+
+    /// The font functions of a face of an `@` font, whose glyph metrics
+    /// cache is `rotations`: every glyph a character lookup returns is
+    /// recorded there, and a glyph it keeps rotated advances by its vertical
+    /// advance.
+    #[must_use]
+    pub fn rotating(self, rotations: &'a dyn GlyphRotations) -> Self {
+        Self {
+            rotations: Some(rotations),
+            ..self
+        }
+    }
+
+    /// Records a glyph a character lookup returned in the metrics cache.
+    fn looked_up(&self, glyph: Option<GlyphId>, c: char) -> Option<GlyphId> {
+        if let (Some(glyph), Some(rotations)) = (glyph, self.rotations) {
+            rotations.rotated(glyph, Some(c));
+        }
+        glyph
     }
 
     /// `Unsupported` for a glyph of the face, which FreeType would hint; a glyph
@@ -346,24 +401,34 @@ impl Metrics for SizedMetrics<'_> {
     }
 
     fn nominal_glyph(&self, c: char) -> Option<GlyphId> {
-        self.lookup?.glyph(u32::from(c))
+        self.looked_up(self.lookup?.glyph(u32::from(c)), c)
     }
 
     fn variation_glyph(&self, c: char, selector: char) -> Option<GlyphId> {
         let lookup = self.lookup.filter(|_| self.unicode)?;
         let code = lookup.code(u32::from(c))?;
-        match self.variations.lookup(code, u32::from(selector)) {
+        let glyph = match self.variations.lookup(code, u32::from(selector)) {
             Variation::Default => lookup.charmap().glyph(code),
             Variation::Glyph(glyph) => Some(glyph),
             Variation::None => None,
-        }
+        };
+        self.looked_up(glyph, c)
     }
 
     fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
-        unless_unloadable(self.sized.hinted_advance(glyph), 0)
+        let advance = if self.rotations.is_some_and(|r| r.rotated(glyph, None)) {
+            self.sized.hinted_vertical_advance(glyph)
+        } else {
+            self.sized.hinted_advance(glyph)
+        };
+        unless_unloadable(advance, 0)
     }
 
     fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>> {
+        // A glyph without points has an empty box however FreeType loads it.
+        if let Ok(ControlBox::Empty) = self.sized.font().control_box(glyph) {
+            return Ok(Some(Extents::default()));
+        }
         self.hinted(glyph, "glyph extents of FreeType's hinted load")
     }
 
