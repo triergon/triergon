@@ -378,7 +378,7 @@ fn is_atx_heading(line: &str) -> bool {
 }
 
 fn starts_table(header: &str, delimiter: &str) -> bool {
-    if !header.contains('|') && !delimiter.contains('|') {
+    if table_pipes(header).next().is_none() && table_pipes(delimiter).next().is_none() {
         return false;
     }
     let mut width = 0;
@@ -394,16 +394,21 @@ fn starts_table(header: &str, delimiter: &str) -> bool {
     width == pipe_cells(header).count()
 }
 
+fn table_pipes(line: &str) -> impl Iterator<Item = usize> + '_ {
+    // Table splitting precedes inline escape processing.
+    line.match_indices('|')
+        .filter_map(move |(at, _)| (!line[..at].ends_with('\\')).then_some(at))
+}
+
 fn pipe_cells(line: &str) -> impl Iterator<Item = &str> {
     let line = line.trim();
     let row = line
         .strip_suffix('|')
-        .filter(|before| !escaped(line, before.len()))
+        .filter(|before| !before.ends_with('\\'))
         .unwrap_or(line);
     let row = row.strip_prefix('|').unwrap_or(row);
     let mut start = 0;
-    row.match_indices('|')
-        .filter_map(move |(at, _)| (!escaped(row, at)).then_some(at))
+    table_pipes(row)
         .chain(std::iter::once(row.len()))
         .map(move |end| {
             let cell = &row[start..end];
@@ -646,6 +651,16 @@ mod tests {
                     Literal ` marker | `deadbee` |\n\
                     Escaped \\| literal ` marker | `abc1234`";
         assert_eq!(cited_revisions(text, &[]), ["deadbee", "abc1234"]);
+    }
+
+    #[test]
+    fn escaped_table_pipes_are_consumed_before_inline_escapes() {
+        let text = concat!(
+            "| Result | Notes |\n",
+            "| --- | --- |\n",
+            r"| `x\\|` measured at `deadbee` | ok |"
+        );
+        assert_eq!(cited_revisions(text, &[]), ["deadbee"]);
     }
 
     #[test]
