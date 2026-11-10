@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "id": "font-hinting-default",
+  "operation": "font-sized",
+  "candidate": "font-worker",
+  "worker_operation": "font-sized-",
+  "reference": "freetype-native",
+  "gate": "required",
+  "compare_order": 2,
+  "contract": [
+    "what libass 0.17.5's shaper reads at its default size: every face of one font file read from memory and loaded at 256 pixels (16384 in 26.6), after libass's GDI face metrics, with a REAL_DIM size request",
+    "every glyph's FT_LOAD_DEFAULT load (with FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH and FT_LOAD_IGNORE_TRANSFORM, as ass_shaper.c loads it): metrics.horiAdvance and vertAdvance, which libass's HarfBuzz callbacks report as advances; horiBearingX, horiBearingY, width and height, which they report as glyph extents; then the hinted outline, whose points they report as contour points; a glyph FreeType cannot load folds as absent, and one the candidate cannot load this way ends its operation with an error, so the case fails; packets count glyphs",
+    "HarfBuzz positions marks it has no GPOS anchors for (fallback mark positioning) by these extents and contour points, so a face whose default load is open here can place such marks differently from libass; its unhinted outlines, which libass draws, are compared by font-hinting-none",
+    "the file is read before each timed and memory operation; the reference library is created once, outside it"
+  ],
+  "required_profiles": [
+    "truetype",
+    "cff",
+    "cff-cid",
+    "cff2",
+    "collection"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "the FreeType auto-hinter, for TrueType faces without bytecode",
+    "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
+  ],
+  "open_cases": []
+}

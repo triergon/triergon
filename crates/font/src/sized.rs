@@ -39,6 +39,16 @@ pub struct Band {
     pub y_max: i32,
 }
 
+/// How libass has FreeType load a glyph: with its flags and
+/// `FT_LOAD_NO_HINTING`, as it loads the outlines it draws, or with
+/// `FT_LOAD_DEFAULT`, as its HarfBuzz callbacks load the metrics, extents and
+/// contour points they report.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Load {
+    Unhinted,
+    Default,
+}
+
 /// How FreeType's default (hinted) loading treats the face's advances.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Hinting {
@@ -351,12 +361,80 @@ impl<'f> SizedFont<'f> {
     /// Those of [`Font::outline_into`]; `Overflow` for coordinates beyond
     /// `i32`.
     pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
-        let mut metrics = self.font.load(glyph, self.scale, outline)?;
-        // FreeType scales the linear advance by the size even when the glyph
-        // loads unscaled.
+        let mut work = WorkBudget::new(self.font.limits.work);
+        self.load(glyph, Load::Unhinted, outline, &mut work)
+    }
+
+    /// Loads `glyph` into `outline` as libass has FreeType load it with
+    /// `load`, within `work`, and returns the glyph slot's metrics.
+    ///
+    /// [`Load::Unhinted`] is what [`Self::outline_into`] describes, which
+    /// loads within the face's [`Limits`](crate::Limits). [`Load::Default`] is
+    /// FreeType's default load: a CFF glyph through FreeType's Adobe CFF
+    /// hinter at the hinted scale, its metrics then fitted to the pixel grid
+    /// (bearings floored and ceiled, advances rounded); at zero pixels per em,
+    /// the unscaled, unhinted load.
+    ///
+    /// # Errors
+    ///
+    /// For [`Load::Default`], `Unsupported` for TrueType glyphs, which need
+    /// FreeType's auto-hinter or TrueType interpreter, and where
+    /// [`Self::hinted_advance`] is; otherwise those of [`Self::outline_into`].
+    pub fn load(
+        &self,
+        glyph: GlyphId,
+        load: Load,
+        outline: &mut Outline,
+        work: &mut WorkBudget,
+    ) -> Result<GlyphMetrics> {
+        if load == Load::Unhinted || self.grid == 0 {
+            let mut metrics = self.font.load(glyph, self.scale, outline, work)?;
+            // FreeType scales the linear advance by the size even when the
+            // glyph loads unscaled.
+            metrics.linear_vertical_advance =
+                mul_div(metrics.linear_vertical_advance, self.metrics.y_scale, 64);
+            return Ok(metrics);
+        }
+        if let Hinting::Unsupported(what) = self.hinting {
+            return Err(Error::Unsupported(what));
+        }
+        let font = self.font;
+        let index = font.check(glyph)?;
+        let Outlines::Cff(cff) = &font.outlines else {
+            return Err(Error::Unsupported(
+                "hinted outlines of FreeType's TrueType interpreter",
+            ));
+        };
+        cff.load_hinted(
+            font.data.as_ref(),
+            glyph,
+            self.scale,
+            outline,
+            &font.limits,
+            work,
+        )?;
+        let advances = font.cff_advances(cff, glyph, index, self.hinted_scale)?;
+        let mut metrics = GlyphMetrics::of(advances, outline)?;
         metrics.linear_vertical_advance =
             mul_div(metrics.linear_vertical_advance, self.metrics.y_scale, 64);
+        self.fit_box(&mut metrics);
+        metrics.advance = self.fit(i64::from(metrics.advance))?;
+        metrics.vertical_advance = self.fit(i64::from(metrics.vertical_advance))?;
         Ok(metrics)
+    }
+
+    /// `ft_glyphslot_grid_fit_metrics` for horizontal layout: the left and
+    /// top edges floored and ceiled to pixels, the right and bottom ceiled
+    /// and floored.
+    fn fit_box(&self, m: &mut GlyphMetrics) {
+        let floor = |v: i32| v & !(self.grid as i32);
+        let ceil = |v: i32| floor(v.wrapping_add(self.grid as i32));
+        let right = ceil(m.bearing_x.wrapping_add(m.width));
+        let bottom = floor(m.bearing_y.wrapping_sub(m.height));
+        m.bearing_x = floor(m.bearing_x);
+        m.bearing_y = ceil(m.bearing_y);
+        m.width = right.wrapping_sub(m.bearing_x);
+        m.height = m.bearing_y.wrapping_sub(bottom);
     }
 
     /// Applies libass's synthetic styles to an outline loaded by

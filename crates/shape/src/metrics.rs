@@ -7,8 +7,8 @@ use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_font::{
-    CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont, TextLookup, Variant,
-    VariationSequences,
+    CharEncoding, Charmap, ControlBox, Font, GlyphId, GlyphMetrics, Load, Outline, Platform,
+    SizedFont, TextLookup, Variant, VariationSequences,
 };
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
@@ -258,10 +258,13 @@ impl Metrics for OtMetrics<'_> {
 /// libass's metrics cache keeps rotated ([`GlyphRotations`](crate::GlyphRotations)) is the default
 /// load's vertical advance ([`SizedFont::hinted_vertical_advance`]).
 ///
-/// libass reads glyph extents and contour points from FreeType's hinted load,
-/// which this crate does not run: for a glyph of the face both are
-/// `Unsupported`, but for the empty extents of a glyph without points, as is an
-/// advance `hinted_advance` cannot give.
+/// libass reads glyph extents and contour points from FreeType's default load
+/// ([`SizedFont::load`] with [`Load::Default`]): the extents are its grid-fitted
+/// bearings and size, the contour points its outline's. A glyph without points
+/// has empty extents in every face; for other glyphs, the default load's
+/// `Unsupported` (TrueType faces, which need FreeType's auto-hinter or TrueType
+/// interpreter) is the functions', as is an advance `hinted_advance` cannot
+/// give.
 pub struct SizedMetrics<'a> {
     sized: SizedFont<'a>,
     lookup: Option<TextLookup<'a>>,
@@ -271,8 +274,11 @@ pub struct SizedMetrics<'a> {
     variations: Option<VariationSequences<'a>>,
     scale: Scale,
     rotations: Option<&'a dyn Decide>,
-    /// The caller's budget for the charstrings the extents run.
+    /// The caller's budget for the default loads of extents and contour
+    /// points.
     work: RefCell<&'a mut WorkBudget>,
+    /// The outline those loads fill.
+    scratch: RefCell<Outline>,
 }
 
 impl std::fmt::Debug for SizedMetrics<'_> {
@@ -337,6 +343,7 @@ impl<'a> SizedMetrics<'a> {
             },
             rotations: None,
             work: RefCell::new(work),
+            scratch: RefCell::new(Outline::new(sized.font().data().budget())),
         })
     }
 
@@ -366,14 +373,16 @@ impl<'a> SizedMetrics<'a> {
         glyph
     }
 
-    /// `Unsupported` for a glyph of the face, which FreeType would hint; a glyph
-    /// outside it does not load, which libass answers with nothing.
-    fn hinted<T>(&self, glyph: GlyphId, what: &'static str) -> Result<Option<T>> {
-        if glyph.0 < self.sized.font().glyph_count() {
-            Err(Error::Unsupported(what))
-        } else {
-            Ok(None)
-        }
+    /// FreeType's default load of `glyph` into the scratch outline; `None`
+    /// for a glyph that does not load, which libass answers with nothing.
+    fn default_load(&self, glyph: GlyphId) -> Result<Option<GlyphMetrics>> {
+        let loaded = self.sized.load(
+            glyph,
+            Load::Default,
+            &mut self.scratch.borrow_mut(),
+            &mut self.work.borrow_mut(),
+        );
+        unless_unloadable(loaded.map(Some), None)
     }
 }
 
@@ -417,11 +426,21 @@ impl Metrics for SizedMetrics<'_> {
         if let Ok(ControlBox::Empty) = control {
             return Ok(Some(Extents::default()));
         }
-        self.hinted(glyph, "glyph extents of FreeType's hinted load")
+        Ok(self.default_load(glyph)?.map(|m| Extents {
+            x_bearing: m.bearing_x,
+            y_bearing: m.bearing_y,
+            width: m.width,
+            height: -m.height,
+        }))
     }
 
-    fn contour_point(&self, glyph: GlyphId, _point: u16) -> Result<Option<(i32, i32)>> {
-        self.hinted(glyph, "contour points of FreeType's hinted load")
+    fn contour_point(&self, glyph: GlyphId, point: u16) -> Result<Option<(i32, i32)>> {
+        if self.default_load(glyph)?.is_none() {
+            return Ok(None);
+        }
+        let outline = self.scratch.borrow();
+        let point = outline.points().get(usize::from(point));
+        Ok(point.map(|p| (p.point.x, p.point.y)))
     }
 
     fn has_h_kerning(&self) -> bool {

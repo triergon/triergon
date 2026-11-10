@@ -693,6 +693,20 @@ impl Cff {
         Ok(())
     }
 
+    /// Placeholder until the hinted path lands: FreeType's default load of a
+    /// CFF glyph.
+    pub(crate) fn load_hinted(
+        &self,
+        _data: &[u8],
+        _glyph: GlyphId,
+        _scale: Scale,
+        _outline: &mut Outline,
+        _limits: &Limits,
+        _work: &mut WorkBudget,
+    ) -> Result<()> {
+        Err(Error::Unsupported("hinted CFF outlines"))
+    }
+
     /// The `hmtx` `advance` of `glyph` as FreeType's loader reports it with
     /// [`Self::load`]: through the FontMatrix, then scaled.
     pub(crate) fn advance(

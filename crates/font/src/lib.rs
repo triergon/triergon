@@ -35,7 +35,7 @@ pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
 pub use outline::{Outline, OutlinePoint, Point, PointKind, Segment};
-pub use sized::{Band, SizeMetrics, SizedFont};
+pub use sized::{Band, Load, SizeMetrics, SizedFont};
 pub use store::{Built, Store, StoreKey};
 pub use synthesis::{Orientation, Synthesis};
 
@@ -126,6 +126,42 @@ pub struct GlyphMetrics {
     /// 16.16 pixels by the size's y scale for a glyph loaded at a size
     /// ([`SizedFont::outline_into`]).
     pub linear_vertical_advance: i64,
+    /// `horiBearingX`, `horiBearingY`, `width` and `height`: the control box
+    /// of the loaded outline (every point, off-curve ones too; zero for an
+    /// outline without points), fitted to the pixel grid by FreeType's
+    /// default load.
+    pub bearing_x: i32,
+    pub bearing_y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+impl GlyphMetrics {
+    /// The metrics of `advances` and of the control box of `outline`.
+    fn of(advances: Advances, outline: &Outline) -> Result<Self> {
+        let [x_min, y_min, x_max, y_max] = control_box(outline);
+        Ok(Self {
+            advance: glyf::narrow(advances.horizontal)?,
+            vertical_advance: glyf::narrow(advances.vertical)?,
+            linear_vertical_advance: advances.vertical_units,
+            bearing_x: x_min,
+            bearing_y: y_max,
+            width: x_max.wrapping_sub(x_min),
+            height: y_max.wrapping_sub(y_min),
+        })
+    }
+}
+
+/// `FT_Outline_Get_CBox`: the box of every point of `outline`, as `[x_min,
+/// y_min, x_max, y_max]`; zero for an outline without points.
+fn control_box(outline: &Outline) -> [i32; 4] {
+    let mut points = outline.points().iter().map(|p| p.point);
+    let Some(first) = points.next() else {
+        return [0; 4];
+    };
+    points.fold([first.x, first.y, first.x, first.y], |[a, b, c, d], p| {
+        [a.min(p.x), b.min(p.y), c.max(p.x), d.max(p.y)]
+    })
 }
 
 /// A glyph's advances as FreeType's loading computes them at a scale, before
@@ -694,7 +730,8 @@ impl Font {
     /// [`Limits`] and the outline budget's errors. On error the outline holds
     /// whatever was loaded before the failure.
     pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
-        self.load(glyph, Scale::UNITS, outline)
+        let mut work = WorkBudget::new(self.limits.work);
+        self.load(glyph, Scale::UNITS, outline, &mut work)
     }
 
     /// Loads `glyph` as FreeType does without hinting, at the 16.16 `scale` (one
@@ -704,14 +741,14 @@ impl Font {
         glyph: GlyphId,
         scale: Scale,
         outline: &mut Outline,
+        work: &mut WorkBudget,
     ) -> Result<GlyphMetrics> {
         let index = self.check(glyph)?;
         let data = self.data.as_ref();
-        let mut work = WorkBudget::new(self.limits.work);
         let advances = match &self.outlines {
             Outlines::Glyf(table) => {
                 outline.begin(self.limits.points);
-                let m = table.outline(&self.glyf_context(), glyph, scale, outline, &mut work)?;
+                let m = table.outline(&self.glyf_context(), glyph, scale, outline, work)?;
                 let (origin, advances) = self.glyf_advances(m, scale);
                 if origin != 0 {
                     glyf::translate(outline.points_mut(), (-origin, 0))?;
@@ -719,15 +756,11 @@ impl Font {
                 advances
             }
             Outlines::Cff(cff) => {
-                cff.load(data, glyph, scale, outline, &self.limits, &mut work)?;
+                cff.load(data, glyph, scale, outline, &self.limits, work)?;
                 self.cff_advances(cff, glyph, index, scale)?
             }
         };
-        Ok(GlyphMetrics {
-            advance: glyf::narrow(advances.horizontal)?,
-            vertical_advance: glyf::narrow(advances.vertical)?,
-            linear_vertical_advance: advances.vertical_units,
-        })
+        GlyphMetrics::of(advances, outline)
     }
 
     /// The advances of a TrueType glyph whose metrics are `m`, between
