@@ -2,7 +2,7 @@
 //! ordered work digest of the harness protocol and the readable line format.
 
 use std::io::{self, Write};
-use triergon_font::{Band, Charmap, Outline, PointKind, SizeMetrics, SizedFont, VerticalAdvance};
+use triergon_font::{Band, Charmap, GlyphMetrics, Outline, PointKind, SizeMetrics, SizedFont};
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
 
 /// What one size reports besides its glyphs.
@@ -132,7 +132,7 @@ pub enum Record<'a> {
     /// `None` where the glyph cannot be loaded.
     Vertical {
         index: u16,
-        unhinted: Option<VerticalAdvance>,
+        unhinted: Option<GlyphMetrics>,
         hinted: Option<i32>,
     },
 }
@@ -361,8 +361,12 @@ impl Sink for Work {
                 unhinted,
                 hinted,
             } => {
-                let (linear, advance) =
-                    unhinted.map_or((ABSENT, ABSENT), |v| (signed(v.linear), signed(v.advance)));
+                let (linear, advance) = unhinted.map_or((ABSENT, ABSENT), |m| {
+                    (
+                        signed(m.linear_vertical_advance),
+                        signed(m.vertical_advance.into()),
+                    )
+                });
                 let hinted = hinted.map_or(ABSENT, |a| signed(a.into()));
                 self.words(&[VERTICAL, index.into(), linear, advance, hinted]);
                 self.packets += 1;
@@ -520,7 +524,11 @@ impl<W: Write> Sink for Dump<W> {
             } => {
                 write!(self.0, "vertical {index}")?;
                 match unhinted {
-                    Some(v) => write!(self.0, " {} {}", v.linear, v.advance)?,
+                    Some(m) => write!(
+                        self.0,
+                        " {} {}",
+                        m.linear_vertical_advance, m.vertical_advance
+                    )?,
                     None => write!(self.0, " error")?,
                 }
                 match hinted {

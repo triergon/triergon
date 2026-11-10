@@ -8,7 +8,7 @@ use crate::fixed::{div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_round};
 use crate::glyf::{self, Glyf};
 use crate::outline::Outline;
 use crate::synthesis::Synthesis;
-use crate::{Font, GlyphId, GlyphMetrics, Outlines, VerticalMetrics};
+use crate::{Advances, Font, GlyphId, GlyphMetrics, Outlines, VerticalMetrics};
 use triergon_core::{Error, Result, WorkBudget};
 
 /// libass's largest outline coordinate, `OUTLINE_MAX`.
@@ -39,17 +39,6 @@ pub struct Band {
     pub y_max: i32,
 }
 
-/// A glyph's vertical advance as FreeType's loading reports it, for the
-/// glyphs libass draws rotated in an `@` font.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct VerticalAdvance {
-    /// `linearVertAdvance`: the advance in font units scaled to 16.16 pixels
-    /// by the size's y scale.
-    pub linear: i64,
-    /// `metrics.vertAdvance` in 26.6 pixels: scaled, not fitted to the grid.
-    pub advance: i64,
-}
-
 /// How FreeType's default (hinted) loading treats the face's advances.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Hinting {
@@ -69,10 +58,10 @@ pub struct SizedFont<'f> {
     /// The scales glyphs load at: the size's, or none at all (font units) at
     /// zero pixels per em.
     scale: Scale,
-    /// The scale hinted loading uses on both axes: TrueType faces that ask for
-    /// integer pixels per em (`head.flags` bit 3) scale by the rounded ppem
-    /// there.
-    hinted_scale: i64,
+    /// The scales hinted loading uses: the size's, but for TrueType faces
+    /// that ask for integer pixels per em (`head.flags` bit 3), which scale by
+    /// the rounded ppem on both axes.
+    hinted_scale: Scale,
     /// The grid hinted loading fits advances to, as the mask of a 26.6
     /// value's fraction: whole pixels (63), or none (0) at zero pixels per
     /// em.
@@ -168,7 +157,7 @@ impl Font {
                 font: self,
                 metrics,
                 scale: Scale::UNITS,
-                hinted_scale: Scale::UNITS.x,
+                hinted_scale: Scale::UNITS,
                 grid: 0,
                 hinting: Hinting::Unhinted,
             });
@@ -183,7 +172,10 @@ impl Font {
             font: self,
             metrics,
             scale: Scale { x: scale, y: scale },
-            hinted_scale,
+            hinted_scale: Scale {
+                x: hinted_scale,
+                y: hinted_scale,
+            },
             grid: 63,
             hinting: self.hinting(),
         })
@@ -344,7 +336,8 @@ impl<'f> SizedFont<'f> {
     /// (`FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP`): unhinted, scaled to 26.6
     /// pixels (unscaled at zero pixels per em), y up, the origin at the
     /// glyph's left side bearing as FreeType places it, with the unhinted
-    /// advance in 26.6 pixels (`advance.x` of the glyph slot).
+    /// advance in 26.6 pixels (`advance.x` of the glyph slot), the vertical
+    /// advance and the linear vertical advance in 16.16 pixels.
     ///
     /// TrueType points scale with `FT_MulFix` by the size's scales (unhinted
     /// loading ignores `head`'s integer-ppem flag); composites transform and
@@ -356,7 +349,12 @@ impl<'f> SizedFont<'f> {
     /// Those of [`Font::outline_into`]; `Overflow` for coordinates beyond
     /// `i32`.
     pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
-        self.font.load(glyph, self.scale, outline)
+        let mut metrics = self.font.load(glyph, self.scale, outline)?;
+        // FreeType scales the linear advance by the size even when the glyph
+        // loads unscaled.
+        metrics.linear_vertical_advance =
+            mul_div(metrics.linear_vertical_advance, self.metrics.y_scale, 64);
+        Ok(metrics)
     }
 
     /// Applies libass's synthetic styles to an outline loaded by
@@ -389,115 +387,36 @@ impl<'f> SizedFont<'f> {
     /// in `fpgm`, `prep` or the glyph's programs). Otherwise the errors of
     /// [`Self::outline_into`].
     pub fn hinted_advance(&self, glyph: GlyphId) -> Result<i32> {
-        if let Hinting::Unsupported(what) = self.hinting {
-            return Err(Error::Unsupported(what));
-        }
-        let font = self.font;
-        let index = font.check(glyph)?;
-        let data = font.data.as_ref();
-        let advance = match &font.outlines {
-            Outlines::Glyf(table) => {
-                let m = self.hinted_glyf_metrics(table, index)?;
-                let origin = i64::from(m.x_min) - i64::from(font.bearing(m.glyph));
-                let advance = i64::from(font.hmtx.advance(data, m.glyph));
-                let x = self.hinted_scale;
-                mul_fix(origin + advance, x) - mul_fix(origin, x)
-            }
-            Outlines::Cff(cff) => {
-                cff.advance(data, glyph, font.hmtx.advance(data, index), self.scale)?
-            }
-        };
-        self.fit(advance)
-    }
-
-    /// The vertical advance FreeType's unhinted loading reports for `glyph`
-    /// (`FT_LOAD_NO_HINTING`, as libass loads the outlines it draws rotated in an
-    /// `@` font).
-    ///
-    /// The advance in font units is the `vmtx` advance height where the face
-    /// has vertical metrics ([`Font::has_vertical_metrics`]), else the one
-    /// FreeType makes up from the typographic ascender and descender. A
-    /// TrueType glyph measures it between its scaled phantom points, from its
-    /// header's `yMax` plus the top side bearing down by the advance height, of
-    /// the glyph whose metrics apply (`USE_MY_METRICS`), and reads the
-    /// difference back in font units; a CFF glyph puts it through the
-    /// FontMatrix. At zero pixels per em it is unscaled.
-    ///
-    /// # Errors
-    ///
-    /// `Invalid` for a glyph outside the face or malformed glyph data, and
-    /// `Policy` for the face's limits.
-    pub fn vertical_advance(&self, glyph: GlyphId) -> Result<VerticalAdvance> {
-        let (units, advance) = self.vertical(glyph, false)?;
-        Ok(VerticalAdvance {
-            linear: mul_div(units, self.metrics.y_scale, 64),
-            advance,
-        })
+        self.fit(self.default_advances(glyph)?.horizontal)
     }
 
     /// The vertical advance FreeType's default loading reports
     /// (`metrics.vertAdvance` of `FT_LOAD_DEFAULT`, which libass gives
     /// HarfBuzz as the advance of a glyph it draws rotated): as
-    /// [`Self::vertical_advance`] at the hinted scale, rounded to a whole
-    /// pixel.
+    /// [`GlyphMetrics::vertical_advance`] at the hinted scale, rounded to a
+    /// whole pixel.
     ///
     /// # Errors
     ///
     /// As [`Self::hinted_advance`].
     pub fn hinted_vertical_advance(&self, glyph: GlyphId) -> Result<i32> {
+        self.fit(self.default_advances(glyph)?.vertical)
+    }
+
+    /// The advances FreeType's default loading computes for `glyph`, before
+    /// it fits them to the grid, read without the glyph's points.
+    fn default_advances(&self, glyph: GlyphId) -> Result<Advances> {
         if let Hinting::Unsupported(what) = self.hinting {
             return Err(Error::Unsupported(what));
         }
-        let (_, advance) = self.vertical(glyph, true)?;
-        self.fit(advance)
-    }
-
-    /// FreeType's vertical advance of `glyph`, loaded hinted or not: in font
-    /// units (`linearVertAdvance` before the size scales it) and scaled, not
-    /// fitted to the grid.
-    fn vertical(&self, glyph: GlyphId, hinted: bool) -> Result<(i64, i64)> {
-        let scale = if hinted {
-            Scale {
-                x: self.hinted_scale,
-                y: self.hinted_scale,
-            }
-        } else {
-            self.scale
-        };
         let font = self.font;
         let index = font.check(glyph)?;
-        let data = font.data.as_ref();
         match &font.outlines {
             Outlines::Glyf(table) => {
-                let m = if hinted {
-                    self.hinted_glyf_metrics(table, index)?
-                } else {
-                    glyf_metrics(font, table, index, &mut |_| Ok(()))?
-                };
-                let units = match font.vmtx {
-                    Some(vmtx) => {
-                        // The phantom points, scaled; their distance back in
-                        // font units, as a 16-bit advance height.
-                        let top = i64::from(m.y_max) + i64::from(vmtx.side_bearing(data, m.glyph));
-                        let bottom = top - i64::from(vmtx.advance(data, m.glyph));
-                        let (top, bottom) = (mul_fix(top, scale.y), mul_fix(bottom, scale.y));
-                        if top <= bottom {
-                            0
-                        } else {
-                            i64::from(div_fix(top - bottom, scale.y) as u16)
-                        }
-                    }
-                    None => font.made_up_vertical_advance(),
-                };
-                Ok((units, mul_fix(units, scale.y)))
+                let m = self.hinted_glyf_metrics(table, index)?;
+                Ok(font.glyf_advances(m, self.hinted_scale).1)
             }
-            Outlines::Cff(cff) => {
-                let units = match font.vmtx {
-                    Some(vmtx) => i64::from(vmtx.advance(data, index)),
-                    None => font.made_up_vertical_advance(),
-                };
-                Ok((units, cff.vertical_advance(data, glyph, units, scale)?))
-            }
+            Outlines::Cff(cff) => font.cff_advances(cff, glyph, index, self.hinted_scale),
         }
     }
 

@@ -255,6 +255,31 @@ fn cmap() -> Vec<u8> {
 
 /// The test font file.
 pub fn font() -> Vec<u8> {
+    font_with(Vec::new())
+}
+
+/// The test font with vertical metrics and a font program, so FreeType's
+/// default loading neither auto-hints it nor makes its vertical advances up:
+/// glyph 0 advances 1000 down, every other glyph 900.
+pub fn vertical_font() -> Vec<u8> {
+    let mut vhea = vec![0; 36];
+    vhea[0..4].copy_from_slice(&0x0001_1000_u32.to_be_bytes());
+    vhea[34..36].copy_from_slice(&2_u16.to_be_bytes());
+    let mut vmtx = Vec::new();
+    for (advance, top) in [(1000, 0), (900, 100)] {
+        be16(&mut vmtx, advance);
+        be16(&mut vmtx, top);
+    }
+    font_with(vec![
+        // PUSHB_1 0; POP
+        (b"fpgm", vec![0xb0, 0, 0x21]),
+        (b"vhea", vhea),
+        (b"vmtx", vmtx),
+    ])
+}
+
+/// The test font file with `extra` tables.
+fn font_with(extra: Vec<(&[u8; 4], Vec<u8>)>) -> Vec<u8> {
     let mut head = vec![0; 54];
     head[0..4].copy_from_slice(&0x0001_0000_u32.to_be_bytes());
     head[12..16].copy_from_slice(&0x5F0F_3CF5_u32.to_be_bytes());
@@ -285,6 +310,8 @@ pub fn font() -> Vec<u8> {
         (b"loca", loca),
         (b"maxp", maxp),
     ];
+    let mut tables = [tables, extra].concat();
+    tables.sort_by_key(|(tag, _)| **tag);
     let mut out = Vec::new();
     out.extend(0x0001_0000_u32.to_be_bytes());
     be16(&mut out, tables.len() as u16);

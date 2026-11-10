@@ -58,11 +58,14 @@ nonzero length is used, as FreeType sanitises the directory.
 format: any value but 0 means long offsets), `hhea`, `maxp` (any version),
 `hmtx` (an advance or bearing cut off by the table's end reads as zero, as do all
 advances without records) and `OS/2` (version 0 and later, at least 78 bytes;
-shorter is treated as absent). `head`, `hhea`, `maxp` and `hmtx` are required;
-`vhea` (36 bytes at least) and `vmtx` are read together, as FreeType reads
-vertical metrics only when both load and `vhea` lists a record
-(`has_vertical_metrics`), with `vmtx` cut as `hmtx` is when it runs past the
-file.
+shorter is treated as absent). `head`, `hhea`, `maxp` and `hmtx` are required.
+`vhea` and `vmtx` are read together: FreeType reads vertical metrics only when
+both load and `vhea` lists a record (`has_vertical_metrics`). As in FreeType,
+the extended `HHEA` and `VHEA`, with a 32-bit record count, and their `HMTX`
+and `VMTX` stand in for missing lower-case headers; a header's 36 bytes (38 for
+an extended one) are read from the file at its offset, so a short header reads
+on into the bytes after it and one cut off by the end of the file fails the
+face; and `vmtx` is cut as `hmtx` is when it runs past the file.
 As in FreeType, a `name` table that cannot be read counts as absent and the `cmap`
 version is not checked.
 
@@ -139,7 +142,7 @@ them, and a glyph whose operator reads past its operands fails; operand types ar
 not tracked.
 
 **Control boxes.** `Font::control_box` reads a glyph's box without building its
-outline, so no point limit applies: a TrueType glyph's `glyf` header box as
+outline, within the caller's `WorkBudget`, so no point limit applies: a TrueType glyph's `glyf` header box as
 stored, or the box of every point a charstring draws, control points included,
 in unrounded 16.16 before the FontMatrix (`ControlBox::Empty` when there are no
 points). HarfBuzz takes glyph extents from them.
@@ -178,12 +181,12 @@ them when the scale is undefined. A `SizedFont` then gives:
   that FreeType's v40 interpreter keeps backward compatibility and hinting cannot
   move an advance; other faces are `Unsupported` (see below). At zero pixels per
   em it is the unscaled advance.
-- `vertical_advance` and `hinted_vertical_advance`: the vertical advances
-  libass uses for a glyph of an `@` font it draws rotated. `vertical_advance` is
-  the unhinted load's `linearVertAdvance` (16.16, scaled by the size's y scale
-  with `FT_MulDiv`) and `metrics.vertAdvance` (26.6); `hinted_vertical_advance`
-  the default load's `metrics.vertAdvance`, which libass gives HarfBuzz, rounded
-  to a pixel at the hinting scale and `Unsupported` where `hinted_advance` is.
+- The vertical advances libass uses for a glyph of an `@` font it draws
+  rotated: the outline's `GlyphMetrics` carry the unhinted load's
+  `metrics.vertAdvance` (26.6) and `linearVertAdvance` (16.16, scaled by the
+  size's y scale with `FT_MulDiv`), and `hinted_vertical_advance` gives the
+  default load's `metrics.vertAdvance`, which libass gives HarfBuzz, rounded to
+  a pixel at the hinting scale and `Unsupported` where `hinted_advance` is.
   The advance in font units is the `vmtx` advance height with vertical metrics,
   else the one FreeType makes up from the typographic ascender and descender
   (`OS/2`, else `hhea`). A TrueType glyph measures it between its phantom

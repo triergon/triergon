@@ -46,6 +46,12 @@ pub(crate) struct Tables {
     pub(crate) hmtx: Option<Table>,
     pub(crate) vhea: Option<Table>,
     pub(crate) vmtx: Option<Table>,
+    /// The extended `HHEA`, `HMTX`, `VHEA` and `VMTX`, with 32-bit record
+    /// counts, which FreeType reads where the lower-case header is missing.
+    pub(crate) extended_hhea: Option<Table>,
+    pub(crate) extended_hmtx: Option<Table>,
+    pub(crate) extended_vhea: Option<Table>,
+    pub(crate) extended_vmtx: Option<Table>,
     pub(crate) maxp: Option<Table>,
     pub(crate) os2: Option<Table>,
     pub(crate) name: Option<Table>,
@@ -71,6 +77,10 @@ impl Tables {
             b"hmtx" => &mut self.hmtx,
             b"vhea" => &mut self.vhea,
             b"vmtx" => &mut self.vmtx,
+            b"HHEA" => &mut self.extended_hhea,
+            b"HMTX" => &mut self.extended_hmtx,
+            b"VHEA" => &mut self.extended_vhea,
+            b"VMTX" => &mut self.extended_vmtx,
             b"maxp" => &mut self.maxp,
             b"OS/2" => &mut self.os2,
             b"name" => &mut self.name,
@@ -100,6 +110,12 @@ pub(crate) fn find(data: &[u8], records: Table, tag: [u8; 4]) -> Option<Table> {
             let len = usize::try_from(u32_be(record, 12)?).ok()?;
             (len > 0 && offset.checked_add(len)? <= data.len()).then_some(Table { offset, len })
         })
+}
+
+/// The tables of advances and side bearings, which FreeType keeps when they
+/// run past the end of the file.
+fn is_metrics(tag: &[u8; 4]) -> bool {
+    matches!(tag, b"hmtx" | b"HMTX" | b"vmtx" | b"VMTX")
 }
 
 /// The number of faces in `data`: the collection's count, or one for a single font.
@@ -143,8 +159,8 @@ fn u32_be(data: &[u8], at: usize) -> Option<u32> {
 /// Reads the table directory of face `index`.
 ///
 /// A table whose range starts beyond the file is absent. One that ends beyond it is
-/// absent too, except `hmtx`, which keeps the bytes that exist: its trailing side
-/// bearings are optional for outlines and advances.
+/// absent too, except the metrics tables (`hmtx`, `vmtx` and their extended
+/// forms), which keep the whole records that exist.
 pub(crate) fn directory(
     data: &[u8],
     index: u32,
@@ -177,12 +193,12 @@ pub(crate) fn directory(
             continue;
         }
         // As FreeType sanitises the directory: a table past the end of the
-        // file is dropped, except `hmtx` and `vmtx`, cut to a multiple of four
-        // bytes; the first table of a tag with a nonzero length counts.
+        // file is dropped, except the metrics tables, cut to a multiple of
+        // four bytes; the first table of a tag with a nonzero length counts.
         let available = data.len() - offset;
         let len = if len <= available {
             len
-        } else if matches!(&tag, b"hmtx" | b"vmtx") {
+        } else if is_metrics(&tag) {
             available & !3
         } else {
             continue;
@@ -196,9 +212,7 @@ pub(crate) fn directory(
             let tag: [u8; 4] = record[..4].try_into().ok()?;
             let offset = usize::try_from(u32_be(record, 8)?).ok()?;
             let len = usize::try_from(u32_be(record, 12)?).ok()?;
-            let kept = offset <= data.len()
-                && (len <= data.len() - offset
-                    || matches!(&tag, b"hmtx" | b"HMTX" | b"vmtx" | b"VMTX"));
+            let kept = offset <= data.len() && (len <= data.len() - offset || is_metrics(&tag));
             kept.then_some(offset)
         });
         tables.loca_room = starts

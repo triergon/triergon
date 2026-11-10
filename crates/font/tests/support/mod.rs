@@ -1023,6 +1023,117 @@ fn cmap_order_faces() -> Vec<(&'static [u8; 4], Tables)> {
         .collect()
 }
 
+/// A vertical metrics header (`vhea`, or the extended `VHEA` with a 32-bit
+/// record count) listing `metrics` records.
+pub fn vhea(metrics: u32, extended: bool) -> Vec<u8> {
+    let mut t = 0x0001_1000_u32.to_be_bytes().to_vec();
+    t.extend(i16s(&[500, -500, 0]));
+    t.extend(u16s(&[1500]));
+    t.extend([0; 22]);
+    if extended {
+        t.extend(metrics.to_be_bytes());
+    } else {
+        t.extend(u16s(&[metrics as u16]));
+    }
+    t
+}
+
+/// TrueType faces with each way FreeType reads vertical advances. Their
+/// glyphs: 1 a square, 2 a bump, 3 glyph 1 at half size plus glyph 2 with its
+/// metrics, 4 glyph 1 moved up without them; 'A' to 'D' map 1 to 4.
+/// - `Records`: four long `vmtx` records (an advance height of 65535, one of
+///   zero that leaves the phantom points level, and the composite's own,
+///   which `USE_MY_METRICS` replaces) and a top side bearing after them.
+/// - `Made Up`: a `vhea` without records, so FreeType makes the advances up.
+/// - `Short`: a 32-byte `vhea`, whose record count FreeType reads from the
+///   `vmtx` after it, the first record's top side bearing: two records.
+/// - `Extended`: only `VHEA` and `VMTX`, which FreeType reads for them.
+///
+/// An `fpgm` keeps the auto-hinter off them.
+fn vertical_faces() -> Vec<(&'static [u8; 4], Tables)> {
+    let square: &[(i16, i16, bool)] = &[
+        (100, 0, true),
+        (100, 200, true),
+        (300, 200, true),
+        (300, 0, true),
+    ];
+    let bump: &[(i16, i16, bool)] = &[(0, 0, true), (50, 100, false), (100, 0, true)];
+    let (glyf, loca) = glyf(&[
+        Vec::new(),
+        simple(&[square]),
+        simple(&[bump]),
+        composite(&[(0, 1, 10, 20, Some(0.5)), (0x0200, 2, 0, 0, None)]),
+        composite(&[(0, 1, 0, 300, None)]),
+    ]);
+    let records = hmtx(&[(65535, 10), (0, 100), (1500, -30), (800, 70)]);
+    let faces: [(&str, Tables); 4] = [
+        (
+            "Records",
+            vec![
+                (*b"vhea", vhea(4, false)),
+                (*b"vmtx", [records.clone(), i16s(&[-20])].concat()),
+            ],
+        ),
+        (
+            "Made Up",
+            vec![(*b"vhea", vhea(0, false)), (*b"vmtx", records.clone())],
+        ),
+        (
+            "Short",
+            vec![
+                (*b"vhea", vhea(2, false)[..32].to_vec()),
+                (
+                    *b"vmtx",
+                    [hmtx(&[(1000, 2), (900, 40)]), i16s(&[-10, 5, 15])].concat(),
+                ),
+            ],
+        ),
+        (
+            "Extended",
+            vec![
+                (*b"VHEA", vhea(3, true)),
+                (*b"VMTX", [records[..12].to_vec(), i16s(&[25, -5])].concat()),
+            ],
+        ),
+    ];
+    faces
+        .into_iter()
+        .map(|(style, vertical)| {
+            let full = format!("Authored Vertical {style}");
+            let postscript = format!("AuthoredVertical-{style}").replace(' ', "");
+            let mut tables = vec![
+                (*b"head", head(1000, false, 0)),
+                (*b"hhea", hhea(5)),
+                (*b"maxp", maxp(5)),
+                (*b"OS/2", os2(400, 0x40)),
+                (
+                    *b"hmtx",
+                    hmtx(&[(500, 0), (400, 50), (300, 0), (600, 0), (450, 100)]),
+                ),
+                (
+                    *b"cmap",
+                    cmap(&[(0x41, 1), (0x42, 2), (0x43, 3), (0x44, 4)]),
+                ),
+                (
+                    *b"name",
+                    name(&[
+                        (1, "Authored Vertical"),
+                        (2, style),
+                        (4, &full),
+                        (6, &postscript),
+                    ]),
+                ),
+                (*b"glyf", glyf.clone()),
+                (*b"loca", loca.clone()),
+                // PUSHB_1 0; POP
+                (*b"fpgm", vec![0xb0, 0, 0x21]),
+            ];
+            tables.extend(vertical);
+            (b"\0\x01\0\0", tables)
+        })
+        .collect()
+}
+
 /// Authored fonts for the FreeType comparison: features the freely licensed
 /// corpus does not exercise. Named by their file in the corpus.
 pub fn authored_fonts() -> Vec<(&'static str, Vec<u8>)> {
@@ -1040,6 +1151,7 @@ pub fn authored_fonts() -> Vec<(&'static str, Vec<u8>)> {
             font(b"\0\x01\0\0", &cmap_formats_tables()),
         ),
         ("authored-cmap-order.ttc", collection(&cmap_order_faces())),
+        ("authored-vertical.ttc", collection(&vertical_faces())),
     ]
 }
 

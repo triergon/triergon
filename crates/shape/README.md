@@ -46,11 +46,15 @@ font-function interface. `SizedMetrics` answers as libass's FreeType-backed
 functions do over a face at a size (`triergon_font::SizedFont`): the character
 map libass selects, or with `SizedMetrics::with_charmap` the one a face has been
 left on, read as libass reads it, default-load advances and `FT_KERNING_DEFAULT`
-kerning, at the size's scale and pixels per em. For a face of an `@` font,
-`SizedMetrics::rotating` takes libass's glyph metrics cache as a
-`GlyphRotations`: a glyph its first character lookup reaches through a code
-point at or above U+02F1 advances by its default-load vertical advance, as
-libass gives HarfBuzz that glyph. `OtMetrics` answers as HarfBuzz's built-in
+kerning, at the size's scale and pixels per em, loading charstrings within the
+caller's `WorkBudget`. For a face of an `@` font, `SizedMetrics::rotating` takes
+one face's entries (`FaceRotations`) of libass's glyph metrics cache,
+`GlyphRotations`, which its owner keys by font, face and size as libass does and
+keeps as long as it shapes: a glyph whose first lookup is through a code point
+that `rotates` (U+02F1 and above) advances by its default-load vertical advance,
+as libass gives HarfBuzz that glyph, and a glyph first asked for an advance or
+extents stays horizontal. The cache's storage is charged before it grows, and a
+charge that fails ends the shaping call. `OtMetrics` answers as HarfBuzz's built-in
 functions do at units per em (its character map choice, `cmap` format 14
 variation sequences, `hmtx` advances, `glyf` and CFF extents). A callback that
 cannot answer as its font would ends the shaping call with its error. `Scale` reproduces HarfBuzz's scaling arithmetic,

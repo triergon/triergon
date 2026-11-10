@@ -266,10 +266,7 @@ fn vertical(
     sink: &mut impl Sink,
 ) -> Result<()> {
     for glyph in font.glyphs() {
-        let unhinted = sized
-            .outline_into(glyph, outline)
-            .and_then(|_| sized.vertical_advance(glyph))
-            .ok();
+        let unhinted = sized.outline_into(glyph, outline).ok();
         let hinted = match sized.hinted_vertical_advance(glyph) {
             Ok(advance) => Some(advance),
             Err(triergon_core::Error::Unsupported(what)) => {

@@ -13,7 +13,7 @@ use std::io::{self, BufWriter, Write};
 use std::ops::Range;
 use std::process::ExitCode;
 use std::time::Instant;
-use triergon_core::{Budget, Bytes};
+use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_font::{Font, Limits};
 use triergon_shape::bidi::{self, BaseDirection, BidiClass, Bracket, Level, Resolver};
 use triergon_shape::{
@@ -231,7 +231,13 @@ fn shape_text(
                 shape_texts(&font, &metrics, budget, settings, &mut buffer, sink)?;
             }
             Functions::Libass(height) => {
-                let Ok(metrics) = font.at_size(height).and_then(SizedMetrics::new) else {
+                // The comparison measures answers, not work: a face's runs
+                // share an unbounded budget.
+                let mut work = WorkBudget::new(u64::MAX);
+                let Ok(metrics) = font
+                    .at_size(height)
+                    .and_then(|sized| SizedMetrics::new(sized, &mut work))
+                else {
                     sink.record(Record::FaceError(index))?;
                     continue;
                 };
