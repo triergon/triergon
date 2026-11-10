@@ -17094,6 +17094,16 @@
    "sha256": "beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a",
    "bytes": 11567352,
    "source_revision": "3125c1e61d73a575419f7b653a1dae44a3269dae"
+  },
+  {
+   "name": "ts-program-tight-carrier-comparison",
+   "path": "ts-program-tight-carrier-comparison",
+   "retention": "retained",
+   "reason": "Complete TS program comparison and adjacent HLS and progressive playback comparisons on AArch64 Linux.",
+   "key": "evidence/ts-program-tight-carrier-comparison/7e18edf0a340b6ff4bb296b52deffc720f706c464340c7c73392127f9c87248c.tar.gz",
+   "sha256": "7e18edf0a340b6ff4bb296b52deffc720f706c464340c7c73392127f9c87248c",
+   "bytes": 125514110,
+   "source_revision": "eb3279f36c19c97dd9bdd68b1e66f371f28e38c1"
   }
  ]
 }
