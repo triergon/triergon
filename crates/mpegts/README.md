@@ -208,6 +208,11 @@ the remaining reader tables and distinct backing allocations against the storage
 limit; caller-held output and external reservations can still cause retryable
 backpressure.
 
+With `compat::adts::PacketPolicy::ReportFragments`, the reader reports opaque
+ADTS prefixes and EOF tails as `ReaderEvent::AdtsFragment`. Each fragment keeps
+its exact bytes, PES extents and applicable one-use clock. Complete ADTS frames
+still yield packets.
+
 Video defaults to `compat::annex_b::VideoEofPolicy::RejectUnframed`. With
 `VideoEofPolicy::ReportUnframed`, a final AVC or HEVC byte run with invalid
 leading bytes and no Annex B start code produces `ReaderEvent::IncompleteVideo`

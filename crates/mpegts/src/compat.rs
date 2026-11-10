@@ -10,6 +10,24 @@
 //! Projections that exist only to compare traces with FFmpeg are not policies. They
 //! are compiled only with the `reference-trace` feature.
 
+pub mod adts {
+    //! Parser packet boundaries for ADTS carried in MPEG-TS. Original PES
+    //! timing and extents remain available on every result.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+
+    /// Select how a transport reader handles bytes outside complete ADTS frames.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum PacketPolicy {
+        /// Use the specification reader and the selected audio EOF policy.
+        #[default]
+        Strict,
+        /// Use bounded parser framing and report opaque prefixes and EOF tails
+        /// through `ReaderEvent::AdtsFragment`.
+        ReportFragments,
+    }
+}
+
 pub mod annex_b {
     //! Retain unframed AVC and HEVC PES payload through logical EOF. The policy
     //! reports the source bytes separately from complete access units.

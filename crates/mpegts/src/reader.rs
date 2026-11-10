@@ -2,6 +2,7 @@
 mod lane;
 mod model;
 use crate::clock::{ClockKey, SourceTimePolicy};
+use crate::compat::adts::PacketPolicy;
 use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::pes::UnframedAudioPolicy;
 use crate::compat::{dvb, latm};
@@ -51,6 +52,8 @@ pub struct ReaderLimits {
     pub latm_packet_policy: latm::PacketPolicy,
     /// Reporting of a validated DVB subtitle prefix with an unfinished segment.
     pub dvb_subtitle_tail_policy: dvb::TailPolicy,
+    /// Framing policy for ADTS. The compatibility policy handles ADTS EOF itself.
+    pub adts_packet_policy: PacketPolicy,
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
@@ -73,6 +76,7 @@ impl Default for ReaderLimits {
             video_eof_policy: VideoEofPolicy::RejectUnframed,
             latm_packet_policy: latm::PacketPolicy::Strict,
             dvb_subtitle_tail_policy: dvb::TailPolicy::RejectTruncated,
+            adts_packet_policy: PacketPolicy::Strict,
             maximum_access_units: 32_000_000,
             maximum_pes_per_access_unit: 4096,
             elementary_input_window: 64 * 1024,
@@ -302,6 +306,7 @@ impl Reader {
             AccessUnit::DvbSubtitle(unit) if unit.truncated => {
                 Event::Other(ReaderEvent::DvbSubtitlePrefix(packet))
             }
+            AccessUnit::AdtsFragment(_) => Event::Other(ReaderEvent::AdtsFragment(packet)),
             AccessUnit::Video(unit) if !unit.has_vcl => {
                 Event::Other(ReaderEvent::VideoHeaders(packet))
             }

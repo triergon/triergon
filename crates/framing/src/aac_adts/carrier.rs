@@ -1,5 +1,5 @@
 //! Separately named carrier output; a raw unit is never an audio certificate.
-use super::{AacAdtsHeader, AacAdtsStreamLimits, AacAdtsStreamReader};
+use super::{AacAdtsFrame, AacAdtsHeader, AacAdtsStreamLimits, AacAdtsStreamReader};
 use crate::AacSource;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
@@ -24,6 +24,21 @@ pub struct AacAdtsCarrier {
     pub(crate) inspection_end: u64,
 }
 impl AacAdtsCarrier {
+    /// Convert an aligned, complete, selected AAC-LC envelope without copying
+    /// the coded bytes. Other carrier observations retain their original facts.
+    pub fn into_selected_frame(self) -> std::result::Result<AacAdtsFrame, Self> {
+        let Some(header) = self.header else {
+            return Err(self);
+        };
+        if self.boundary != (AacAdtsCarrierBoundary::DeclaredEnvelope { header_offset: 0 })
+            || self.selected_error.is_some()
+            || self.raw.len() != usize::from(header.frame_length())
+        {
+            return Err(self);
+        }
+        AacAdtsFrame::from_envelope(self.raw.clone(), self.source, header).map_err(|_| self)
+    }
+
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }

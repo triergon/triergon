@@ -10,6 +10,7 @@ use super::{
     ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
+use crate::compat::adts::PacketPolicy;
 use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
 use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors, UnframedAudioPolicy};
@@ -23,8 +24,8 @@ use triergon_core::{
     SourceId, Step, WorkBudget,
 };
 use triergon_framing::{
-    AacAdtsStreamLimits, AacAdtsStreamReader, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection,
-    Codec, RawAnnexBReader,
+    AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader,
+    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader,
 };
 use unframed_video::{LEADING_VIDEO_BYTES, UnframedVideoScan};
 
@@ -36,6 +37,7 @@ enum Framer {
     Loas(loas::Reader),
     LatmPes,
     Dvb(dvb::Reader),
+    AdtsFragments(AacAdtsCarrierReader),
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
 }
@@ -68,6 +70,18 @@ impl Framer {
                 caps,
                 limits.video,
             )?)),
+            0x0f if limits.adts_packet_policy == PacketPolicy::ReportFragments => Ok(
+                Self::AdtsFragments(AacAdtsCarrierReader::for_parser_packets(
+                    pool,
+                    source,
+                    caps,
+                    AacAdtsCarrierLimits {
+                        maximum_packet_bytes: limits.maximum_audio_frame_bytes,
+                        maximum_packets: limits.maximum_access_units,
+                        maximum_input_window: limits.elementary_input_window,
+                    },
+                )?),
+            ),
             0x0f => Ok(Self::Adts(AacAdtsStreamReader::new(
                 pool,
                 source,
@@ -163,6 +177,12 @@ impl Framer {
             Self::Video(reader) => map(reader.step(work, cancel)?, AccessUnit::Video),
             Self::Adts(reader) => map(reader.step(work, cancel)?, AccessUnit::Adts),
             Self::Loas(reader) => map(reader.step(work, cancel)?, AccessUnit::Loas),
+            Self::AdtsFragments(reader) => map(reader.step(work, cancel)?, |carrier| match carrier
+                .into_selected_frame()
+            {
+                Ok(frame) => AccessUnit::Adts(frame),
+                Err(fragment) => AccessUnit::AdtsFragment(fragment),
+            }),
             Self::Ac3(reader) => map(reader.step(work, cancel)?, |frame| {
                 AccessUnit::Ac3(Ac3AccessUnit::single(frame))
             }),
@@ -175,6 +195,7 @@ impl Framer {
             Self::Video(reader) => reader.provide_owned(window),
             Self::Adts(reader) => reader.provide_owned(window),
             Self::Loas(reader) => reader.provide(window),
+            Self::AdtsFragments(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
             Self::Dvb(_) | Self::LatmPes => unreachable!("the framer uses complete PES input"),
@@ -185,6 +206,7 @@ impl Framer {
             Self::Video(reader) => reader.finish(request.source, request.token),
             Self::Adts(reader) => reader.finish(request.source, request.token),
             Self::Loas(reader) => reader.finish(request),
+            Self::AdtsFragments(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
             Self::Dvb(_) | Self::LatmPes => unreachable!("the framer uses complete PES input"),
