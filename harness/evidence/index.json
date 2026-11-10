@@ -16950,6 +16950,16 @@
    "sha256": "1d64f438deca9655092d6b01d80730db4c34d05343c7152791bcef29296e4254",
    "bytes": 69117613,
    "source_revision": "af1b9b933480dbe44856bc54afcda636128b0702"
+  },
+  {
+   "name": "mp4-range-opus-current",
+   "path": "mp4-range-opus-current",
+   "retention": "retained",
+   "reason": "18 MP4 range comparisons on AArch64 Linux covering regular and fragmented edits, dedicated video sample entries and Opus trim and seek alignment.",
+   "key": "evidence/mp4-range-opus-current/48c4f1e51785ae87e5bf52ec0bda92255149aa08d178ee50b597ba21134d8c13.tar.gz",
+   "sha256": "48c4f1e51785ae87e5bf52ec0bda92255149aa08d178ee50b597ba21134d8c13",
+   "bytes": 12381635,
+   "source_revision": "77155a8e6f6d4ce3b4823bcaf6824713446feab3"
   }
  ]
 }
