@@ -141,7 +141,7 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Task | Entry points |
 | --- | --- |
 | Box framing | `BoxReader`, `BoxView::children`, `BoxChildren` |
-| Movie/track headers | `MovieHeader::parse`, `TrackHeader::parse`, `SampleDescription` |
+| Movie/track headers | `MovieHeader::parse`, `MovieHeader::declared_duration_ticks`, `TrackHeader::parse`, `SampleDescription` |
 | Regular sample tables | `SampleTableBuilder` → `SampleTable::{cursor, locate, previous_sync}` |
 | Fragments (`moof`/`traf`) | `Trex::parse`, `FragmentBuilder` → `FragmentIndex`, `OwnedFragmentCursor` |
 | One track, regular + fragments | `SourceTrack`, `TrackSampleCursor` |
@@ -301,6 +301,8 @@ rejects boxes extending past the source.
 - **Edits.** Source edit lists are parsed and mapped at rate one only.
   Non-unit rates and dwell edits are refused. The source view never repeats
   or shifts packets; the FFmpeg-compatible view does.
+  `SampleTable::has_composition_offsets` reports a regular table's `ctts`
+  presence before reading its samples.
   Range playback preserves AAC sample durations from `stts`, including
   durations longer than one coded frame. Trim counts use the coded frame length.
   The compatible view of a complete fragmented file supports one open-ended

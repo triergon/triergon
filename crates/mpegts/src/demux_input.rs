@@ -1,6 +1,6 @@
 //! The demuxer's input startup. This is not transport validation or the
 //! normative source position. No reference source was consulted.
-use crate::{PacketFormat, TransportPacket};
+use crate::PacketFormat;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Bytes, Error, InputCursor, InputToken, InputWindow, Result, SourceId, WorkBudget,
@@ -132,29 +132,29 @@ impl InputBinding {
         }
         Ok(())
     }
-    pub(crate) fn position(&self, packet: &TransportPacket) -> Result<i64> {
-        if packet.source_id != Some(self.source) {
+    pub(crate) fn position(
+        &self,
+        entity: SourceId,
+        offset: u64,
+        carrier_bytes: usize,
+        prefix_bytes: usize,
+    ) -> Result<i64> {
+        if entity != self.source {
             return Err(Error::SourceMismatch);
         }
-        let end = packet
-            .source_offset
-            .checked_add(packet.source.len() as u64)
+        let end = offset
+            .checked_add(carrier_bytes as u64)
             .ok_or(Error::Overflow)?;
-        if !self.extent.permits(end) || packet.source.len() != self.format.bytes() {
+        if !self.extent.permits(end) || carrier_bytes != self.format.bytes() {
             return Err(Error::Invalid("native startup packet range/format"));
         }
         let prefix = if self.basis == PositionBasis::SyncStart {
-            packet.prefix.as_ref().map_or(0, Bytes::len)
+            prefix_bytes
         } else {
             0
         };
-        i64::try_from(
-            packet
-                .source_offset
-                .checked_add(prefix as u64)
-                .ok_or(Error::Overflow)?,
-        )
-        .map_err(|_| Error::Overflow)
+        i64::try_from(offset.checked_add(prefix as u64).ok_or(Error::Overflow)?)
+            .map_err(|_| Error::Overflow)
     }
 }
 
@@ -319,28 +319,47 @@ impl InputBootstrap {
             ));
         }
         let sync = width - 188;
-        while self.inspected < self.backing.len() {
+        let bytes = self.backing.as_ref();
+        let header_end = bytes.len().saturating_sub(3);
+        let mut next_sync = self.inspected + (sync + width - self.inspected % width) % width;
+        let mut score = |index: usize| {
+            self.scores188[index % 188] += 1;
+            self.scores192[index % 192] += 1;
+            self.scores204[index % 204] += 1;
+        };
+        while self.inspected < bytes.len() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            let count = work.take((self.backing.len() - self.inspected).min(64) as u64) as usize;
+            let count = work.take((bytes.len() - self.inspected).min(64) as u64) as usize;
             if count == 0 {
                 return Ok(InputStep::Yield);
             }
             let start = self.inspected;
             let end = start + count;
-            let mut next_sync = start + (sync + width - start % width) % width;
-            for (offset, &byte) in self.backing.as_ref()[start..end].iter().enumerate() {
-                let i = start + offset;
-                if i == next_sync {
-                    self.bad_sync |= byte != 0x47;
-                    next_sync += width;
+            // A work chunk is shorter than a carrier, so it has at most one
+            // expected sync byte. Score competing grids only at complete headers.
+            if next_sync < end {
+                self.bad_sync |= bytes[next_sync] != 0x47;
+                next_sync += width;
+            }
+            let (words, tail) = bytes[start..end.min(header_end).max(start)].as_chunks::<8>();
+            for (offset, word) in words.iter().enumerate() {
+                const LOW_BITS: u64 = 0x7f7f_7f7f_7f7f_7f7f;
+                let difference = u64::from_le_bytes(*word) ^ 0x4747_4747_4747_4747;
+                // Each nonzero byte sets its high bit without a carry into
+                // neighbouring bytes. Only exact matches remain in the mask.
+                let mut matches =
+                    !((difference & LOW_BITS).wrapping_add(LOW_BITS) | difference) & !LOW_BITS;
+                while matches != 0 {
+                    score(start + offset * 8 + matches.trailing_zeros() as usize / 8);
+                    matches &= matches - 1;
                 }
-                // Score only sync bytes with a complete transport header.
-                if byte == 0x47 && i + 4 <= self.backing.len() {
-                    self.scores188[i % 188] += 1;
-                    self.scores192[i % 192] += 1;
-                    self.scores204[i % 204] += 1;
+            }
+            let tail_start = start + words.len() * 8;
+            for (offset, &byte) in tail.iter().enumerate() {
+                if byte == 0x47 {
+                    score(tail_start + offset);
                 }
             }
             self.inspected = end;

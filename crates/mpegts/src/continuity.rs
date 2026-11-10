@@ -89,6 +89,12 @@ impl Continuity {
         let ts = packet.ts_bytes();
         let outcome = match self.counter {
             None => ContinuityOutcome::First,
+            Some(previous)
+                if previous.wrapping_add(u8::from(has_payload)) & 15
+                    == packet.continuity_counter =>
+            {
+                ContinuityOutcome::Continuous
+            }
             Some(previous) => {
                 // H.222.0 2.4.3.3/5: a flagged packet can still be the second
                 // copy of a duplicate pair. Only an actual counter break is a
@@ -111,14 +117,11 @@ impl Continuity {
                     self.duplicated = true;
                     return Ok(ContinuityOutcome::Duplicate);
                 }
-                let expected = (previous + u8::from(has_payload)) & 15;
-                if expected == packet.continuity_counter {
-                    ContinuityOutcome::Continuous
-                } else if packet.discontinuity_indicator() {
+                if packet.discontinuity_indicator() {
                     ContinuityOutcome::SignalledDiscontinuity
                 } else {
                     ContinuityOutcome::Lost {
-                        expected,
+                        expected: previous.wrapping_add(u8::from(has_payload)) & 15,
                         actual: packet.continuity_counter,
                     }
                 }

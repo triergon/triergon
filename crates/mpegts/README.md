@@ -197,6 +197,17 @@ admitted observer for the active map. The private types 0x81 and 0x87 indicate
 audio, and 0x90 indicates presentation graphics in this view. MPEG-1 video
 (0x01) keeps its source kind and is unknown in the selected PES view.
 
+The startup probe scores sync bytes in groups while charging each inspected
+byte. Complete TS188 and M2TS192 carriers use one validator for common
+payload and adaptation layouts, including PCR. M2TS prefixes stay opaque.
+Program playback keeps tight carrier storage so a packet cannot retain an
+entire input window. A complete buffered carrier can reserve its storage and
+shared header together. The PES observer checks that the payload is the exact
+span at its declared offset in that carrier. A ready PES continuation can
+retain just the payload view while playback delivers the full transport event.
+For a carrier that needs incremental assembly, the observer retains the
+charged bytes and the fields used for packet order and offsets.
+
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
 in both feed modes. `poll_feed_carriers` lets a progressive feed move a
