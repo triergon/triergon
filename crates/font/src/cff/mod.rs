@@ -29,6 +29,8 @@ pub(crate) enum Version {
 
 /// Format ceilings: FDSelect indices are 8-bit in CFF, 16-bit in CFF2.
 const MAX_CFF_FONT_DICTS: u32 = 256;
+/// No glyph has this SID; glyph counts stay below it.
+const NO_GLYPH: u16 = u16::MAX;
 const MAX_CFF2_FONT_DICTS: u32 = 65536;
 
 /// What a glyph's Font DICT provides; a font without Font DICTs has one, from
@@ -78,6 +80,9 @@ pub(crate) struct Cff {
     /// The charset: the SID of each glyph, or its CID in a CID-keyed font;
     /// empty for CFF2, which has none.
     sids: BudgetVec<u16>,
+    /// The lowest glyph of each SID of a name-keyed face, [`NO_GLYPH`] for
+    /// none (`cff_charset_compute_cids`).
+    glyphs_by_sid: BudgetVec<u16>,
     /// The encoding of a name-keyed CFF face that maps a code.
     encoding: Option<Encoding>,
     cid: bool,
@@ -113,6 +118,7 @@ impl Cff {
             fd_select: None,
             strings: Index::default(),
             sids: BudgetVec::new(budget),
+            glyphs_by_sid: BudgetVec::new(budget),
             encoding: None,
             cid: false,
             glyph_count: 0,
@@ -169,8 +175,10 @@ impl Cff {
         cff.cid = top.ros;
         if version == Version::Cff1 {
             cff.read_charset(bytes, top.charset, work)?;
-            // CID-keyed fonts have no encoding.
+            // CID-keyed fonts have no glyph names, so neither `seac` nor an
+            // encoding.
             if !top.ros {
+                cff.index_sids(work)?;
                 cff.encoding = cff.read_encoding(bytes, top.encoding)?;
             }
         }
@@ -453,8 +461,20 @@ impl Cff {
     /// The first glyph whose charset SID is `sid`, for `seac`
     /// (`cff_lookup_glyph_by_stdcharcode`).
     pub(super) fn glyph_for_sid(&self, sid: u16) -> Option<u32> {
-        let glyph = self.sids.iter().position(|&s| s == sid)?;
-        u32::try_from(glyph).ok()
+        let glyph = *self.glyphs_by_sid.get(usize::from(sid))?;
+        (glyph != NO_GLYPH).then_some(u32::from(glyph))
+    }
+
+    /// Fills [`Self::glyphs_by_sid`] from the charset.
+    fn index_sids(&mut self, work: &mut WorkBudget) -> Result<()> {
+        let most = self.sids.iter().copied().max().map_or(0, usize::from);
+        charge(work, self.sids.len() + most)?;
+        self.glyphs_by_sid.try_resize(most + 1, NO_GLYPH)?;
+        for (glyph, &sid) in self.sids.iter().enumerate().rev() {
+            // Glyph counts stay below NO_GLYPH.
+            self.glyphs_by_sid[usize::from(sid)] = glyph as u16;
+        }
+        Ok(())
     }
 
     /// The glyph names in index order, as FreeType reads them for its
@@ -560,8 +580,8 @@ impl Cff {
                     if sid == 0 {
                         continue;
                     }
-                    if let Some(glyph) = sids.iter().position(|&s| s == sid).filter(|&g| g != 0) {
-                        glyphs[code] = narrow(glyph)?;
+                    if let Some(glyph) = self.glyph_for_sid(sid).filter(|&g| g != 0) {
+                        glyphs[code] = narrow(glyph as usize)?;
                         coded = code + 1;
                     }
                 }
@@ -602,8 +622,8 @@ impl Cff {
                     for _ in 0..r.u8()? {
                         let code = usize::from(r.u8()?);
                         let sid = r.u16()?;
-                        if let Some(glyph) = sids.iter().position(|&s| s == sid) {
-                            glyphs[code] = narrow(glyph)?;
+                        if let Some(glyph) = self.glyph_for_sid(sid) {
+                            glyphs[code] = narrow(glyph as usize)?;
                         }
                     }
                 }

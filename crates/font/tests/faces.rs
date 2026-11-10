@@ -3,9 +3,9 @@ mod support;
 use support::{bytes, cff_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
 use triergon_font::{
-    Bounds, Built, CharEncoding, CharstringBounds, CmapFormat, ControlBox, FaceInfo, Font, GlyphId,
-    Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind, Request, Segment,
-    Store, StoreKey, Style, select,
+    Bounds, Built, CharEncoding, CharmapKind, CharstringBounds, CmapFormat, ControlBox, FaceInfo,
+    Font, GlyphId, Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind,
+    Request, Segment, Store, StoreKey, Style, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -55,11 +55,11 @@ fn truetype_metrics_names_and_charmap() {
     assert_eq!(font.glyph_index('D'), None);
     let charmap = font.text_charmap().unwrap();
     assert_eq!(
-        (charmap.platform(), charmap.encoding(), charmap.format()),
+        (charmap.platform(), charmap.encoding(), charmap.kind()),
         (
             Platform::Windows,
             CharEncoding::Unicode,
-            CmapFormat::SegmentDelta
+            CharmapKind::Subtable(CmapFormat::SegmentDelta)
         )
     );
     assert_eq!(charmap.mappings().count(), 3);
@@ -470,15 +470,23 @@ fn cff_faces_list_freetype_charmaps_in_its_order() {
     let font = parse(&data);
     let kinds: Vec<_> = font
         .charmaps()
-        .map(|c| (c.platform(), c.encoding_id(), c.format()))
+        .map(|c| (c.platform(), c.encoding_id(), c.kind()))
         .collect();
     assert_eq!(
         kinds,
         [
-            (Platform::Macintosh, 1, CmapFormat::HighByte),
-            (Platform::Windows, 10, CmapFormat::Mixed),
-            (Platform::Windows, 1, CmapFormat::GlyphNames),
-            (Platform::Other(7), 2, CmapFormat::CffEncoding),
+            (
+                Platform::Macintosh,
+                1,
+                CharmapKind::Subtable(CmapFormat::HighByte)
+            ),
+            (
+                Platform::Windows,
+                10,
+                CharmapKind::Subtable(CmapFormat::Mixed)
+            ),
+            (Platform::Windows, 1, CharmapKind::GlyphNames),
+            (Platform::Other(7), 2, CharmapKind::CffEncoding),
         ]
     );
     // libass reads text through the Windows UCS-4 subtable.

@@ -112,6 +112,27 @@ pub(crate) fn u32_at(data: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes(*data.get(at..)?.first_chunk()?))
 }
 
+/// HarfBuzz's binary search (`hb_bsearch_impl`) over `count` items, where
+/// `compare` orders an item against the key: an index whose item compares
+/// equal. On unsorted items its probes decide which is found; on sorted ones
+/// it agrees with any binary search.
+pub(crate) fn bsearch(
+    count: usize,
+    compare: impl Fn(usize) -> std::cmp::Ordering,
+) -> Option<usize> {
+    use std::cmp::Ordering;
+    let (mut min, mut max) = (0_isize, isize::try_from(count).ok()? - 1);
+    while min <= max {
+        let mid = (min + max) / 2;
+        match compare(mid as usize) {
+            Ordering::Greater => max = mid - 1,
+            Ordering::Less => min = mid + 1,
+            Ordering::Equal => return Some(mid as usize),
+        }
+    }
+    None
+}
+
 /// `data[range]`, or `Invalid` when the range lies outside it.
 pub(crate) fn slice(data: &[u8], start: usize, len: usize) -> Result<&[u8]> {
     let end = start.checked_add(len).ok_or(TRUNCATED)?;

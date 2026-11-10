@@ -87,17 +87,23 @@ formats 0, 2, 4, 6, 8, 10, 12 and 13 on any platform, in directory order, each
 listed only when FreeType's default validation accepts it (lengths that fit,
 ascending non-overlapping groups for formats 8, 12 and 13, ordered segments and
 in-table glyph arrays for format 4, subheaders and glyph arrays inside the table
-for format 2); then for a CFF face without a Windows BMP or Unicode-platform
-subtable, the Unicode charmap FreeType builds from its glyph names
-(`CmapFormat::GlyphNames`, Windows platform, encoding 1): each name's code
+for format 2); then for a name-keyed CFF face without a listed subtable on
+Windows BMP (3, 1) or the Unicode platform, of any format including the
+variation-sequence formats 14 and 15, the Unicode charmap FreeType builds from
+its glyph names when one maps a code point (`CharmapKind::GlyphNames`, (3, 1)):
+each name's code
 point through FreeType's compiled Adobe Glyph List, `uniXXXX` and `uXXXX` forms,
 suffixed names as variants after their base, and FreeType's second mappings for
 `space`, `hyphen`, `Delta` and seven more, looked up with FreeType's own probes
 (which on duplicate names differ between 32- and 64-bit targets as FreeType's
-pointer arithmetic does); then for a name-keyed CFF face, the charmap of its
-encoding (`CmapFormat::CffEncoding`, platform 7): a custom encoding of format 0
-or 1 with supplements, or the Standard or Expert encoding through the charset.
-Format 14 subtables, which FreeType lists but cannot select, are left out.
+pointer arithmetic does); then for a name-keyed CFF face whose encoding maps a
+code, the charmap of that encoding (`CharmapKind::CffEncoding`, platform 7): a
+custom encoding of format 0 or 1 with supplements, or the Standard or Expert
+encoding through the charset's lowest glyph of each SID. Subtables of formats 14
+and 15, which FreeType lists but cannot select, are left out of the list and
+read as variation sequences instead (`variation_sequences`, FreeType's first
+valid (0, 5) subtable of either format, and `first_variation_sequences`,
+HarfBuzz's first (0, 5) record when it is format 14).
 Records stop at the table's end. Lookups are bounded by the end of the `cmap`
 table rather than the declared subtable length, and `mappings` steps through
 formats 2 and 8 and the added charmaps as `FT_Get_Next_Char` does. A glyph at or
@@ -239,7 +245,7 @@ the least recently used values that only the store holds are dropped.
 
 ## What it does not read
 
-`cmap` format 14 (variation selectors, which shaping will need), WOFF and WOFF2, bare CFF, Type 1 and Type 42, bitmap and colour glyphs (`EBDT`,
+WOFF and WOFF2, bare CFF, Type 1 and Type 42, bitmap and colour glyphs (`EBDT`,
 `CBDT`, `sbix`, `COLR`, `SVG `), variation instances other than the default (`fvar`,
 `gvar`, `HVAR`, `avar`), vertical origins and bearings (`VORG`, top side
 bearings beyond the advance), `post` beyond the
@@ -342,7 +348,8 @@ composites) are
   records, a short `vhea`, and `VHEA` with `VMTX`), and a CFF face with format 2
   and 8 subtables, glyph names of every form FreeType reads (with a variant, a
   repeated name and `space` and `Delta`, which it maps twice) and a custom
-  encoding with a supplement, used by the font features only. With them the
+  encoding with a supplement, used by the font and shaping features and by
+  `ass-render`. With them the
   comparison exercises every charstring operator except `vsindex` (CFF2 fonts in the
   corpus do not use it) and `random`, every supported cmap format, every step of
   the text charmap selection and every vertical-metrics path;

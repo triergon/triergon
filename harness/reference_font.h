@@ -166,10 +166,13 @@ static void font_outline(FontWork *w, const FT_Outline *o) {
     w->bytes += (uint64_t)o->n_points;
 }
 
-/* Every charmap FreeType lists but format 14, which cannot be selected: the
- * `cmap` subtables and the glyph-name and encoding charmaps of CFF faces
- * (format -1). */
-static int font_listed(FT_CharMap charmap) { return FT_Get_CMap_Format(charmap) != 14; }
+/* Every charmap FreeType lists but the variation-sequence subtables of formats
+ * 14 and 15, which FT_Set_Charmap refuses: the `cmap` subtables and the
+ * glyph-name and encoding charmaps of CFF faces (format -1). */
+static int font_listed(FT_CharMap charmap) {
+    FT_Long format = FT_Get_CMap_Format(charmap);
+    return format != 14 && format != 15;
+}
 
 /* The charmap libass 0.17.5 selects for text when it opens a face
  * (ass_charmap_magic in ass_font.c), over FreeType's charmaps in directory

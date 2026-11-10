@@ -104,8 +104,9 @@ fn adobe_glyph_index(name: &[u8]) -> u32 {
     let list = &ADOBE_GLYPH_LIST;
     let byte = |i: usize| list.get(i).copied().map_or(0, usize::from);
     let word = |i: usize| byte(i) << 8 | byte(i + 1);
-    // C reads the name as `char`, signed: bytes from 128 match no letter.
-    let letter = |c: u8| i32::from(c.cast_signed());
+    // A name byte from 128 matches no letter of the list, which stores seven
+    // bits, whether C's `char` is signed (x86) or unsigned (ARM).
+    let letter = |c: u8| i32::from(c);
     let Some((&first, mut rest)) = name.split_first() else {
         return 0;
     };
@@ -225,6 +226,11 @@ impl UnicodeMap {
     /// out of range on a 64-bit target and moves back on a 32-bit one. Where
     /// names repeat a code point, the probes decide which glyph is found.
     pub(crate) fn char_index(&self, code: u32) -> u16 {
+        self.char_index_for(code, PointerWidth::TARGET)
+    }
+
+    /// [`Self::char_index`] with FreeType's probes on a target of `width`.
+    fn char_index_for(&self, code: u32, width: PointerWidth) -> u16 {
         let maps = self.maps.as_slice();
         let (mut min, mut max) = (0_usize, maps.len());
         let mut mid = (max - min) >> 1;
@@ -245,7 +251,7 @@ impl UnicodeMap {
             } else {
                 max = mid;
             }
-            let next = predicted(mid, code.wrapping_sub(base));
+            let next = width.predicted(mid, code.wrapping_sub(base));
             mid = match next {
                 Some(next) if (min..max).contains(&next) => next,
                 _ => min + ((max - min) >> 1),
@@ -294,21 +300,40 @@ impl UnicodeMap {
     }
 }
 
-/// `mid += distance` on a `PS_UniMap*` (eight bytes): the index it points at,
-/// `None` where the pointer leaves every index. On a 32-bit target the byte
-/// offset wraps at 2^32, so a distance from a negative difference moves back.
-fn predicted(mid: usize, distance: u32) -> Option<usize> {
-    if cfg!(target_pointer_width = "32") {
-        let step = (distance.wrapping_mul(8).cast_signed() >> 3) as isize;
-        mid.checked_add_signed(step)
+/// The pointer width FreeType's `ps_unicodes_char_index` runs with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PointerWidth {
+    Bits32,
+    Bits64,
+}
+
+impl PointerWidth {
+    const TARGET: Self = if cfg!(target_pointer_width = "32") {
+        Self::Bits32
     } else {
-        mid.checked_add(distance as usize)
+        Self::Bits64
+    };
+
+    /// `mid += distance` on a `PS_UniMap*` (eight bytes): the index it
+    /// points at, `None` where the pointer leaves every index. On a 32-bit
+    /// target the byte offset wraps at 2^32, so a distance from a negative
+    /// difference moves back; on a 64-bit one it moves far past the end.
+    fn predicted(self, mid: usize, distance: u32) -> Option<usize> {
+        match self {
+            Self::Bits32 => {
+                let step = (distance.wrapping_mul(8).cast_signed() >> 3) as isize;
+                mid.checked_add_signed(step)
+            }
+            Self::Bits64 => mid.checked_add(distance as usize),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{UnicodeMap, VARIANT_BIT, adobe_glyph_index, standard_string, unicode_value};
+    use super::{
+        PointerWidth, UnicodeMap, VARIANT_BIT, adobe_glyph_index, standard_string, unicode_value,
+    };
     use triergon_core::Budget;
 
     #[test]
@@ -363,5 +388,31 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn duplicate_names_find_the_glyph_the_target_width_probes() {
+        // Four glyphs named A, then B to E: a search for A first probes B,
+        // below which a 32-bit target steps back one entry and a 64-bit one
+        // restarts at the middle of what is left.
+        let budget = Budget::new(1 << 16).unwrap();
+        let names: [Option<&[u8]>; 9] = [
+            Some(b".notdef"),
+            Some(b"A"),
+            Some(b"A"),
+            Some(b"A"),
+            Some(b"A"),
+            Some(b"B"),
+            Some(b"C"),
+            Some(b"D"),
+            Some(b"E"),
+        ];
+        let map = UnicodeMap::new(names.into_iter(), &budget)
+            .unwrap()
+            .unwrap();
+        assert_eq!(map.char_index_for(0x41, PointerWidth::Bits32), 4);
+        assert_eq!(map.char_index_for(0x41, PointerWidth::Bits64), 3);
+        assert_eq!(map.char_index_for(0x42, PointerWidth::Bits32), 5);
+        assert_eq!(map.char_index_for(0x42, PointerWidth::Bits64), 5);
     }
 }

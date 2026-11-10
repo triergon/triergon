@@ -578,7 +578,6 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
                 let component = self
                     .cff
                     .glyph_for_sid(sid)
-                    .filter(|_| sid != 0)
                     .ok_or(Error::Invalid("seac component"))?;
                 self.glyph::<N>(component, at, false)?;
             }
