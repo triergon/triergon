@@ -16934,25 +16934,6 @@
    "source_revision": "24f2299a8d12e120eabc7fc4a32e7eb8febc953e"
   },
   {
-   "name": "ass-rendering-divergences-fedfb790",
-   "path": "ass-rendering-divergences-fedfb790",
-   "retention": "retained",
-   "reason": "ASS rendering divergences from libass in the pull request that adds their cases",
-   "key": "evidence/ass-rendering-divergences-fedfb790/f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f.tar.gz",
-   "sha256": "f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f",
-   "bytes": 74838624
-  },
-  {
-   "name": "subtitles-pgs-plane-03f3efd3-linux-arm64",
-   "path": "subtitles-pgs-plane-03f3efd3-linux-arm64",
-   "retention": "retained",
-   "reason": "PGS status row memory, Linux AArch64, on a c8g.xlarge: kernel-bound memory (30 pairs) of all 317 subtitle-pgs cases at 03f3efd3, where each display writes the last display's plane buffer again in place, against the pinned FFmpeg subtitles reference, with the RSS proof; the instruction count of every subtitle-pgs and capsule case against main at 14699c4a on CPU 1; the manifest folds of all 546 cases; same-code of the subtitle and capsule workers; the tests; and the 10-pair long-movie-mkv screen of main and the first per-display design. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
-   "key": "evidence/subtitles-pgs-plane-03f3efd3-linux-arm64/6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d.tar.zst",
-   "sha256": "6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d",
-   "bytes": 2261151,
-   "source_revision": "03f3efd3a0fde0d558c68f5408c521d632802fb7"
-  },
-  {
    "name": "mp4-range-opus-aarch64",
    "retention": "retained",
    "reason": "MP4 range playback measurements in docs/status.md",
@@ -16970,6 +16951,45 @@
    "sha256": "48c4f1e51785ae87e5bf52ec0bda92255149aa08d178ee50b597ba21134d8c13",
    "bytes": 12381635,
    "source_revision": "77155a8e6f6d4ce3b4823bcaf6824713446feab3"
+  },
+  {
+   "name": "mp4-range-opus-edits",
+   "path": "mp4-range-opus-edits",
+   "retention": "retained",
+   "reason": "MP4 packet folds with Opus edit trim, unequal clocks and leading crops.",
+   "key": "evidence/mp4-range-opus-edits/cfb8b1edc7592533b43cf1327be9cfd98a83598c90f3390cabd4770f147e1223.tar.gz",
+   "sha256": "cfb8b1edc7592533b43cf1327be9cfd98a83598c90f3390cabd4770f147e1223",
+   "bytes": 14286932,
+   "source_revision": "63f6fe787b4f2976c339ee0548f032d21781dfb6"
+  },
+  {
+   "name": "mp4-range-opus-sequence",
+   "path": "mp4-range-opus-sequence",
+   "retention": "retained",
+   "reason": "MP4 range playback with corrected edit sequences on AArch64 Linux.",
+   "key": "evidence/mp4-range-opus-sequence/b3b814daff8a50d01c2ed89ae6219b1ba8cd2fbe094d7c3d61fb805cc76105e6.tar.gz",
+   "sha256": "b3b814daff8a50d01c2ed89ae6219b1ba8cd2fbe094d7c3d61fb805cc76105e6",
+   "bytes": 14290009,
+   "source_revision": "f61d41fedac63b7e2bae08586de4e2d5bb8e9ad0"
+  },
+  {
+   "name": "ass-rendering-divergences-fedfb790",
+   "path": "ass-rendering-divergences-fedfb790",
+   "retention": "retained",
+   "reason": "ASS rendering divergences from libass in the pull request that adds their cases",
+   "key": "evidence/ass-rendering-divergences-fedfb790/f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f.tar.gz",
+   "sha256": "f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f",
+   "bytes": 74838624
+  },
+  {
+   "name": "subtitles-pgs-plane-03f3efd3-linux-arm64",
+   "path": "subtitles-pgs-plane-03f3efd3-linux-arm64",
+   "retention": "retained",
+   "reason": "PGS status row memory, Linux AArch64, on a c8g.xlarge: kernel-bound memory (30 pairs) of all 317 subtitle-pgs cases at 03f3efd3, where each display writes the last display's plane buffer again in place, against the pinned FFmpeg subtitles reference, with the RSS proof; the instruction count of every subtitle-pgs and capsule case against main at 14699c4a on CPU 1; the manifest folds of all 546 cases; same-code of the subtitle and capsule workers; the tests; and the 10-pair long-movie-mkv screen of main and the first per-display design. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitles-pgs-plane-03f3efd3-linux-arm64/6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d.tar.zst",
+   "sha256": "6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d",
+   "bytes": 2261151,
+   "source_revision": "03f3efd3a0fde0d558c68f5408c521d632802fb7"
   }
  ]
 }

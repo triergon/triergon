@@ -161,6 +161,8 @@ the default font file during 12 cases' operations; those mappings count toward i
 | MPEG-TS progressive playback | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | HLS segments | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | Packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
+| MP4 range playback, earlier crop comparison | `63f6fe787b4f2976c339ee0548f032d21781dfb6` | `cfb8b1edc7592533b43cf1327be9cfd98a83598c90f3390cabd4770f147e1223` |
+| MP4 range playback, preceding gate build | `f61d41fedac63b7e2bae08586de4e2d5bb8e9ad0` | `b3b814daff8a50d01c2ed89ae6219b1ba8cd2fbe094d7c3d61fb805cc76105e6` |
 | MP4 range playback, 18-case comparison | `77155a8e6f6d4ce3b4823bcaf6824713446feab3` | `48c4f1e51785ae87e5bf52ec0bda92255149aa08d178ee50b597ba21134d8c13` |
 | MP4 range playback | `24f2299a8d12e120eabc7fc4a32e7eb8febc953e` | `7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6` |
 | MP4 range playback, dedicated sample entries | `17cad5c5bad576fe7102f53f78f3e150abbe24c8` | `632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e` |
