@@ -253,11 +253,11 @@ impl<'a> Slot<'a> {
                 SampleStep::End => return Ok(CursorStatus::End),
                 SampleStep::Sample(s) => s,
             };
-            let Some(demux) = plan.project(&sample)? else {
+            let Some((demux, sequence)) = plan.project(&sample)? else {
                 return Ok(CursorStatus::Yield);
             };
             let edit = EditIdentity {
-                sequence: sample.ordinal,
+                sequence,
                 edit_ordinal: plan.edit_ordinal(),
                 duration_basis: DurationBasis::OriginalDecodeTableOrdinal,
             };
