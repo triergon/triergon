@@ -4,8 +4,8 @@ use support::{bytes, cff_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
 use triergon_font::{
     Bounds, Built, CharEncoding, CharmapKind, CharstringBounds, CmapFormat, ControlBox, FaceInfo,
-    Font, GlyphId, Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind,
-    Request, Segment, Store, StoreKey, Style, select,
+    Font, GlyphId, Limits, Load, Orientation, Outline, OutlineFormat, Platform, Point, PointKind,
+    Request, Segment, SizedFont, Store, StoreKey, Style, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -124,11 +124,9 @@ fn sizes_scale_as_freetype_does_for_libass() {
     assert_eq!(sized.harfbuzz_scale(), (12800, 12800));
     assert_eq!(sized.embolden_strength(), 200);
     assert_eq!(sized.kerning(GlyphId(1), GlyphId(2)), -512);
-    // No bytecode: FreeType would auto-hint, which this crate does not.
-    assert!(matches!(
-        sized.default_advance(GlyphId(1)),
-        Err(Error::Unsupported(_))
-    ));
+    // No bytecode: the auto-hinter's advance, here the stem's distance to the
+    // phantom points kept, 80 pixels.
+    assert_eq!(sized.default_advance(GlyphId(1)), Ok(5120));
     let budget = Budget::new(1 << 20).unwrap();
     let mut outline = Outline::new(&budget);
     let metrics = sized.outline_into(GlyphId(1), &mut outline).unwrap();
@@ -176,6 +174,92 @@ fn sizes_scale_as_freetype_does_for_libass() {
     // hhea 800 and -200 without OS/2: 410 units are 6717.4 26.6 units, rounded to 105 pixels.
     assert_eq!(sized.default_advance(GlyphId(1)), Ok(6720));
     assert!(cff.is_postscript());
+}
+
+/// A default load: the outline's points and the metrics as (advance,
+/// vertical advance, bearing x, bearing y, width, height).
+type Loaded = (Vec<(i32, i32)>, [i32; 6]);
+
+/// The default load of `glyph`.
+fn default_load(sized: &SizedFont<'_>, glyph: u16) -> Result<Loaded, Error> {
+    let budget = Budget::new(1 << 20).unwrap();
+    let mut outline = Outline::new(&budget);
+    let mut work = WorkBudget::new(1 << 20);
+    let m = sized.load(GlyphId(glyph), Load::Default, &mut outline, &mut work)?;
+    let points = outline
+        .points()
+        .iter()
+        .map(|p| (p.point.x, p.point.y))
+        .collect();
+    let metrics = [
+        m.advance,
+        m.vertical_advance,
+        m.bearing_x,
+        m.bearing_y,
+        m.width,
+        m.height,
+    ];
+    Ok((points, metrics))
+}
+
+#[test]
+fn auto_hinted_glyphs_follow_freetypes_auto_hinter() {
+    // 'A', 'B' and 'C' map to glyphs 1 to 3: the Latin style, whose blue
+    // zones come from 'C' alone (a top at 120 and a bottom at 0 units). With
+    // no standard character the standard width is 50/2048 em, 24 units.
+    let face = parse(&font(
+        b"\0\x01\0\0",
+        &truetype_tables(400, 0, "Test Sans", "Regular"),
+    ));
+    // 12.8 26.6 units per font unit, 200 pixels per em.
+    let sized = face.at_size(16_384).unwrap();
+    // The square's stem is 200 units, 40 pixels: its edges stay on the
+    // pixels they scale to, the bottom on the bottom zone and the top a
+    // stem's height above it. The vertical advance is the typographic
+    // 1050 units, the scale unadjusted without an x height zone.
+    let (points, metrics) = default_load(&sized, 1).unwrap();
+    assert_eq!(points, [(640, 0), (640, 2560), (3200, 2560), (3200, 0)]);
+    assert_eq!(metrics, [5120, 13440, 640, 2560, 2560, 2560]);
+    assert_eq!(sized.default_vertical_advance(GlyphId(1)), Ok(13440));
+    // The quadratic bump has no vertical edges: its advance is rounded,
+    // its base snaps to the bottom zone and its control point follows.
+    let (points, metrics) = default_load(&sized, 2).unwrap();
+    assert_eq!(points, [(0, 0), (640, 1280), (1280, 0)]);
+    assert_eq!(metrics, [3840, 13440, 0, 1280, 1280, 1280]);
+    // The composite takes the bump's 300-unit advance around the inner
+    // square's stem.
+    assert_eq!(sized.default_advance(GlyphId(3)), Ok(3840));
+    // The empty notdef is no character's: the CJK fallback style, whose
+    // advance is the scaled one and whose outline is not hinted here.
+    assert_eq!(sized.default_advance(GlyphId(0)), Ok(6400));
+    assert_eq!(sized.default_vertical_advance(GlyphId(0)), Ok(13440));
+    assert_eq!(
+        default_load(&sized, 0),
+        Err(Error::Unsupported("the CJK auto-hinter"))
+    );
+
+    // At 7 pixels per em (scale 27546) the stem, 84/64 pixel, is centred
+    // between pixels: its edges at 21 and 105 move to 48 and 132, and the
+    // standard width is extra light, so the stem keeps its width.
+    let small = face.at_size(538).unwrap();
+    assert_eq!(small.metrics().x_ppem, 7);
+    let (points, metrics) = default_load(&small, 1).unwrap();
+    assert_eq!(points, [(48, 0), (48, 84), (132, 84), (132, 0)]);
+    // The left side bearing, under 24/64 pixel, gets 8/64 less before
+    // rounding: the phantom points round to 0 and 192.
+    assert_eq!(metrics, [192, 448, 0, 128, 192, 128]);
+    assert_eq!(small.default_advance(GlyphId(1)), Ok(192));
+
+    // An italic face is hinted vertically only: x stays scaled and the
+    // advance is the scaled one, rounded.
+    let italic = parse(&font(
+        b"\0\x01\0\0",
+        &truetype_tables(400, 1, "Test Sans", "Italic"),
+    ));
+    let small = italic.at_size(538).unwrap();
+    let (points, metrics) = default_load(&small, 1).unwrap();
+    assert_eq!(points, [(21, 0), (21, 84), (105, 84), (105, 0)]);
+    assert_eq!(metrics, [192, 448, 0, 128, 128, 128]);
 }
 
 #[test]

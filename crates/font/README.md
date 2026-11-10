@@ -234,7 +234,33 @@ them when the scale is undefined. A `SizedFont` then gives:
   hints it with Adobe's hinter (`cf2`, without stem darkening): its stems and
   hint masks, counter masks and blue zones at the hinted scale, then the
   FontMatrix and its offset; above 2000 pixels per em it loads unhinted, as
-  FreeType retries it. TrueType glyphs are `Unsupported` there (see below).
+  FreeType retries it. A glyph of a TrueType face without bytecode (no `fpgm`,
+  a `prep` of at most 7 bytes) goes through FreeType's auto-hinter, as below.
+  Other TrueType glyphs are `Unsupported` there (see below).
+- The auto-hinter (`autofit`), as FreeType 2.15 builds it without HarfBuzz and
+  runs it for `FT_LOAD_DEFAULT`: the glyph is loaded in font units and hinted
+  at the size's scales (not the integer-ppem ones). Each glyph takes the style
+  of the first script, in FreeType's order, whose character ranges contain a
+  character the face's Unicode charmap (`find_unicode_charmap`) maps to it;
+  uncovered glyphs take the CJK fallback. A style of the latin writing system
+  measures, once per face, its standard stem widths on the script's standard
+  characters, its blue zones on its blue strings and whether the digits share
+  one advance; a style without blue zones, and the dummy style, leave the
+  outline unhinted. Latin hinting finds segments, stems, serifs and edges in
+  both dimensions (vertically only in an italic face), fits the vertical scale
+  to the x height, aligns horizontal edges to blue zones (base characters
+  only), fits stems to whole pixels, interpolates strong and weak points, and
+  applies the accent adjustments of FreeType's database (tildes stretched,
+  blue zones kept off diacritics, diacritics kept a pixel from their base).
+  The outline is then moved by its hinted left phantom point; the advance
+  runs between the hinted phantom points (the scaled advance in a fixed-pitch
+  face and for digits of one width), the vertical advance is scaled by the
+  style's vertical scale, and the box is fitted outwards to pixels. Glyphs of
+  the CJK and Indic styles have their advances (the scaled advance, rounded,
+  which those writing systems leave unhinted) but their outlines are
+  `Unsupported`. The style of every glyph and each style's metrics are
+  computed on the first load that needs them and kept with the face, charged
+  to its budget.
 - `synthesize`: libass's synthetic styles, decided by `Font::synthesis` from the
   requested weight and slant against `OS/2.fsSelection` bits 0 and 5 and
   `Font::weight`: the oblique shear (0x2d24 for CFF faces, 0x5700 for others, as
@@ -243,19 +269,23 @@ them when the scale is undefined. A `SizedFont` then gives:
   `FT_Vector_NormLen` and the orientation test. `Outline::transform`,
   `embolden` and `orientation` are public.
 - `default_advance`: the advance of FreeType's default load, which libass's
-  HarfBuzz callbacks report: the unhinted advance at the hinting scale (TrueType
-  faces with `head.flags` bit 3 scale by the integer pixels per em there) rounded
-  to a pixel. That is exact for CFF and for TrueType whose `fpgm`, `prep` and
-  glyph programs can only issue `INSTCTRL` with a constant selector 1 or 2, so
-  that FreeType's v40 interpreter keeps backward compatibility and hinting cannot
-  move an advance; other faces are `Unsupported` (see below). At zero pixels per
-  em it is the unscaled advance.
+  HarfBuzz callbacks report, as `load` with `Load::Default` gives it: for an
+  auto-hinted face the auto-hinter's, found with only the vertical edges of a
+  latin glyph hinted and without the points of other glyphs; otherwise the
+  unhinted advance at the hinting scale (TrueType faces with `head.flags` bit 3
+  scale by the integer pixels per em there) rounded to a pixel. That is exact
+  for CFF and for TrueType whose `fpgm`, `prep` and glyph programs can only
+  issue `INSTCTRL` with a constant selector 1 or 2, so that FreeType's v40
+  interpreter keeps backward compatibility and hinting cannot move an advance;
+  other instructed faces are `Unsupported` (see below). At zero pixels per em
+  it is the unscaled advance.
 - The vertical advances libass uses for a glyph of an `@` font it draws
   rotated: the outline's `GlyphMetrics` carry the unhinted load's
   `metrics.vertAdvance` (26.6) and `linearVertAdvance` (16.16, scaled by the
   size's y scale with `FT_MulDiv`), and `default_vertical_advance` gives the
   default load's `metrics.vertAdvance`, which libass gives HarfBuzz, rounded to
-  a pixel at the hinting scale and `Unsupported` where `default_advance` is.
+  a pixel at the hinting scale (the auto-hinter's vertical scale for a face it
+  hints) and `Unsupported` where `default_advance` is.
   The advance in font units is the `vmtx` advance height with vertical metrics,
   else the one FreeType makes up from the typographic ascender and descender
   (`OS/2`, else `hhea`). A TrueType glyph measures it between its phantom
@@ -306,14 +336,17 @@ kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Ty
 A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
 opens it and fails each glyph.
 
-At a size, the default load of a TrueType glyph is `Unsupported`, hence its
-glyph extents and contour points, which libass's HarfBuzz callbacks report: an
-auto-hinted face needs FreeType's auto-hinter, and an instructed one the
-TrueType interpreter, which this crate does not run.
-`default_advance` is `Unsupported` for TrueType faces FreeType auto-hints (no
-`fpgm` and a `prep` of at most 7 bytes; the autohinter moves advances), tricky
-fonts known by family name, and programs that may leave backward compatibility;
-fonts FreeType finds tricky only by their table checksums are not recognised.
+At a size, the default load of an instructed TrueType glyph is `Unsupported`,
+hence its glyph extents and contour points, which libass's HarfBuzz callbacks
+report: it needs the TrueType interpreter, which this crate does not run. So is
+the default-load outline of an auto-hinted glyph of a CJK or Indic style, whose
+writing systems the auto-hinter here does not run, and HarfBuzz's coverage of
+glyphs through OpenType features, which FreeType's auto-hinter has only with
+HarfBuzz built in. The auto-hinter runs only the normal render mode, without
+the light mode's stem darkening.
+`default_advance` is `Unsupported` for tricky fonts known by family name and
+programs that may leave backward compatibility; fonts FreeType finds tricky only
+by their table checksums are not recognised.
 Sizes beyond 65535 pixels per em are refused. Coordinates are `i32`; a scaled coordinate beyond it is
 `Error::Overflow`, where FreeType's 64-bit `FT_Pos` goes on (libass rejects
 anything beyond 2^28 itself). The `random` operator does not follow FreeType's
@@ -344,9 +377,12 @@ lookup depends on; glyph programs, cmap entries, names and kerning pairs are rea
 from the font bytes when asked for. A face retains the shared `Bytes` plus small
 tables charged to the `Budget` it was created with: the supported cmap records, one
 Private DICT per CFF FDArray entry, variation region scalars and kern subtable
-records. An `Outline` charges its points and contour ends to its
-own budget and keeps its capacity across glyphs; a `SizedFont` is a small copyable
-view that allocates nothing.
+records. A face FreeType auto-hints also keeps, once a default load needs
+them, the auto-hinter's style of each glyph, its reverse charmap of accented
+characters and each latin style's metrics, charged to that budget, as is the
+scratch storage of an auto-hinted load. An `Outline` charges its points and
+contour ends to its own budget and keeps its capacity across glyphs; a
+`SizedFont` is a small copyable view that allocates nothing.
 
 `Limits` bounds the work of one parse and of one outline (`work`), nested
 composites and subroutine calls (`depth`) and the points of one outline

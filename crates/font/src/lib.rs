@@ -9,6 +9,7 @@
 )]
 // Pending: `missing_docs`, `clippy::expect_used`.
 
+mod autofit;
 mod cff;
 mod cmap;
 mod fixed;
@@ -117,8 +118,9 @@ pub struct VerticalMetrics {
 /// are scaled and the box is the outline's exact control box. With
 /// [`Load::Default`], FreeType's default load, the advances are rounded to
 /// whole pixels and the box is fitted outwards to the pixel grid
-/// (`ft_glyphslot_grid_fit_metrics`), unless the size has zero pixels per em,
-/// which loads as unhinted.
+/// (`ft_glyphslot_grid_fit_metrics`, or the auto-hinter's own fitting in
+/// `af_loader_load_glyph`), unless the size has zero pixels per em, which
+/// loads as unhinted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GlyphMetrics {
     /// The advance: `advance.x` unhinted, `metrics.horiAdvance` of the
@@ -164,7 +166,6 @@ impl GlyphMetrics {
     }
 }
 
-/// `FT_Outline_Get_CBox`: the box of every point of `outline`, as `[x_min,
 /// The axis count of an `fvar` table FreeType accepts as it loads a face
 /// (`sfnt_load_face`), which then gives the face a design vector at the
 /// default instance; zero for none.
@@ -196,6 +197,7 @@ fn fvar_axes(data: &[u8], fvar: Option<sfnt::Table>) -> u16 {
     if valid { axes } else { 0 }
 }
 
+/// `FT_Outline_Get_CBox`: the box of every point of `outline`, as `[x_min,
 /// y_min, x_max, y_max]`; zero for an outline without points.
 fn control_box(outline: &Outline) -> [i32; 4] {
     let mut points = outline.points().iter().map(|p| p.point);
@@ -291,6 +293,8 @@ pub struct Font {
     underline: (i16, i16),
     /// How FreeType's default loading treats the face's advances.
     default_load: sized::Hinting,
+    /// The auto-hinter's state, for a face FreeType auto-hints.
+    autofit: Option<autofit::Autofit>,
     limits: Limits,
 }
 
@@ -416,9 +420,13 @@ impl Font {
             kern,
             underline,
             default_load: sized::Hinting::Unhinted,
+            autofit: None,
             limits,
         };
         font.default_load = font.hinting();
+        if font.default_load == sized::Hinting::Auto {
+            font.autofit = Some(autofit::Autofit::new(budget.clone()));
+        }
         Ok(font)
     }
 
@@ -683,6 +691,12 @@ impl Font {
         cmap::text_charmap(self.charmaps())
     }
 
+    /// The charmap `FT_Select_Charmap` selects for `FT_ENCODING_UNICODE`
+    /// (`find_unicode_charmap`), whatever charmap libass reads text through.
+    fn unicode_charmap(&self) -> Option<Charmap<'_>> {
+        cmap::freetype_default(self.charmaps()).and_then(|index| self.charmap(index))
+    }
+
     /// `charmap`, one of this face's, read as libass 0.17.5 reads text through
     /// it (`ass_font_index_magic`).
     ///
@@ -813,6 +827,19 @@ impl Font {
             }
         };
         GlyphMetrics::of(advances, outline)
+    }
+
+    /// The advances of `glyph` in font units, as an unscaled load reports
+    /// them, read without its points.
+    fn unscaled_advances(&self, glyph: GlyphId, work: &mut WorkBudget) -> Result<Advances> {
+        let index = self.check(glyph)?;
+        match &self.outlines {
+            Outlines::Glyf(table) => {
+                let m = table.walk(&self.glyf_context(), index, work, &mut |_| Ok(()))?;
+                Ok(self.glyf_advances(m, Scale::UNITS).1)
+            }
+            Outlines::Cff(cff) => self.cff_advances(cff, glyph, index, Scale::UNITS),
+        }
     }
 
     /// The advances of a TrueType glyph whose metrics are `m`, between

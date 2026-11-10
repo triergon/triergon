@@ -464,7 +464,9 @@ pub(crate) fn text_charmap<'f>(
 /// the last full-Unicode charmap, else the last of the encodings FreeType
 /// calls Unicode (every Unicode- and ISO-platform subtable, Windows 1 and 10,
 /// and the charmap built from glyph names).
-fn freetype_default<'f>(charmaps: impl Iterator<Item = Charmap<'f>> + Clone) -> Option<usize> {
+pub(crate) fn freetype_default<'f>(
+    charmaps: impl Iterator<Item = Charmap<'f>> + Clone,
+) -> Option<usize> {
     let full = |c: &Charmap<'_>| match (c.platform(), c.encoding_id()) {
         (Platform::Windows, 10) | (Platform::Unicode, 4) => true,
         (Platform::Unicode, 6) => c.kind() == CharmapKind::Subtable(CmapFormat::ManyToOne),
