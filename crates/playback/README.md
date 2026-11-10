@@ -90,6 +90,8 @@ retryable and keeps the pending request, packet and buffers. `PlayerPolicy`
 defaults to 16 FIFO slots (at most 64), 32 MiB queued payload, 128 MiB seek
 input and 10,000,000 events. `Player::new_direct` skips the FIFO for callers
 that use `Player::read_output` with one caller-owned slot.
+Transport carrier, section and PES outputs use the budget of their retained
+storage for pool identity.
 
 **Clocks.** Every packet keeps its exact source timestamps. FFmpeg-compatible
 packet clocks are explicit opt-in views (`ClockChoice::ExplicitNativeProjection`,
@@ -119,6 +121,8 @@ reordering retains at most 32 KiB of media. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
+Range playback derives the duration from packet end times when the movie
+header's duration is unknown or exceeds the presentation clock.
 Complete fragmented files with an open-ended rate-one initialization edit
 apply the same edit clocks on startup and seek. The first AAC packet carries
 leading trim in `Mp4Packet::encoded_skip_samples`.

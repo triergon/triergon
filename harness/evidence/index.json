@@ -17030,6 +17030,34 @@
    "bytes": 74838624
   },
   {
+   "name": "ass-render-parity-28e5ccf0",
+   "path": "ass-render-parity-28e5ccf0",
+   "retention": "retained",
+   "reason": "ASS rendering status row and ARMv7 table: the 5,722 generated scripts and fixture mutations rendered frame by frame through the renderer at 94e2af8b and libass, natively on AArch64 and in the ARMv7 user space on an r6g.2xlarge, with peak RSS and wall time per worker, main's run of the first 2,827 cases at a68420fa; the work and time of every frame of the work-bound scripts on ARMv7; the collision replay, the double-to-int conversions GCC compiles for each target, and libass for ARMv7 against libass for AArch64 where it runs out of memory; the same-code check of 28e5ccf0 against 94e2af8b on every case; the ASS gates at 28e5ccf0 on both targets with their reports, identities and pins; random-4559, whose libass run timed out under load in the full run, rerun alone (run-4559.jsonl)",
+   "key": "evidence/ass-render-parity-28e5ccf0/bc26dfc21b141cc79b5bb4f8cb3d636dcfaa3f64fa24eec2d200409eff0c32f0.tar.gz",
+   "sha256": "bc26dfc21b141cc79b5bb4f8cb3d636dcfaa3f64fa24eec2d200409eff0c32f0",
+   "bytes": 14839425,
+   "source_revisions": {
+    "corpus": "94e2af8b6a4c03a08a9e7271391b591c9f939631",
+    "gates": "28e5ccf0ecb5419f7105d52c91ebe8d6c09f053c",
+    "baseline": "a68420fa773a8a4af1e3c8e008c23b1f752a17c8"
+   }
+  },
+  {
+   "name": "ass-render-parity-01ccb497",
+   "path": "ass-render-parity-01ccb497",
+   "retention": "retained",
+   "reason": "ASS rendering status row and ARMv7 table: the 5,722 generated scripts and fixture mutations rendered frame by frame through the renderer at 3469d84e and libass, natively on AArch64 and in the ARMv7 user space on an r6g.2xlarge, with peak RSS and wall time per worker, and their causes against the earlier attribution; the work and time of every frame of the 17 work-bound scripts on ARMv7 with the bound lifted (probe patch included), and libass's time for each whole script; the ASS gates and crate tests on both targets (AArch64 at dac0137f with the pins it recorded, which make 01ccb497; ARMv7 at 01ccb497, recording identical pins); the change values of every ass-render frame; host and package lists. No case reached libass's time limit, so none was rerun.",
+   "key": "evidence/ass-render-parity-01ccb497/c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be.tar.gz",
+   "sha256": "c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be",
+   "bytes": 3670319,
+   "source_revisions": {
+    "corpus": "3469d84e360ac2217d603effa4d1a9fd70a87ea1",
+    "gates": "01ccb49792cf1d4d05b74addf35dc616763b88e0",
+    "baseline": "fedfb790bfb52131389cb7c5134bab7ab813b55f"
+   }
+  },
+  {
    "name": "subtitles-pgs-plane-03f3efd3-linux-arm64",
    "path": "subtitles-pgs-plane-03f3efd3-linux-arm64",
    "retention": "retained",
@@ -17038,6 +17066,312 @@
    "sha256": "6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d",
    "bytes": 2261151,
    "source_revision": "03f3efd3a0fde0d558c68f5408c521d632802fb7"
+  },
+  {
+   "name": "mp4-forward-duration-range",
+   "path": "mp4-forward-duration-range",
+   "retention": "retained",
+   "reason": "MP4 forward and range playback on AArch64 Linux, including unknown movie duration and source Opus preroll.",
+   "key": "evidence/mp4-forward-duration-range/32aa6f481afc5f6074dd14a683a110bc044b781b9c40b72c84876af9b812f977.tar.gz",
+   "sha256": "32aa6f481afc5f6074dd14a683a110bc044b781b9c40b72c84876af9b812f977",
+   "bytes": 163250361,
+   "source_revision": "a41648dd4de2933d526415cce86a9ebbd1d4444b"
+  },
+  {
+   "name": "mp4-forward-range-rss-comparison",
+   "path": "mp4-forward-range-rss-comparison",
+   "retention": "retained",
+   "reason": "Earlier MP4 forward and range comparison, with two forward cases equal to reference total RSS.",
+   "key": "evidence/mp4-forward-range-rss-comparison/23cf7cdb3de800c1ca0d03dfe937ce6fda6cc768bef5933370223a88cda78c87.tar.gz",
+   "sha256": "23cf7cdb3de800c1ca0d03dfe937ce6fda6cc768bef5933370223a88cda78c87",
+   "bytes": 31931290,
+   "source_revision": "733ee1582e4fce4af1d89c91171e29e41a16d294"
+  },
+  {
+   "name": "mp4-forward-encoded-edits",
+   "retention": "retained",
+   "key": "evidence/mp4-forward-encoded-edits/fe95646449aa52a4a121aeecb3346308b270923aee9b0751b2125501abf36004.tar.zst",
+   "sha256": "fe95646449aa52a4a121aeecb3346308b270923aee9b0751b2125501abf36004"
+  },
+  {
+   "name": "mp4-forward-checked-range",
+   "retention": "retained",
+   "reason": "MP4 forward and range playback measurements in docs/status.md",
+   "key": "evidence/mp4-forward-checked-range/a3e74e11216d7769b7b167ac57cb17c043e6d92b4feb39a8422879c27493eebe.tar.zst",
+   "sha256": "a3e74e11216d7769b7b167ac57cb17c043e6d92b4feb39a8422879c27493eebe",
+   "bytes": 9139663,
+   "source_revision": "8bbf6eab798f3d58f62dce14915fb30acd14488e"
+  },
+  {
+   "name": "font-shape-ass-8786192b",
+   "path": "font-shape-ass-8786192b",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape and ass compare at 8786192b against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy and shape ucd --check on AArch64, and the user space's package list.",
+   "key": "evidence/font-shape-ass-8786192b/996b7f0a128c48391f232106246ef9b2cf7f4dd27ce6ec1eb709a68d8d86f008.tar.gz",
+   "sha256": "996b7f0a128c48391f232106246ef9b2cf7f4dd27ce6ec1eb709a68d8d86f008",
+   "bytes": 82936012,
+   "source_revision": "8786192bac7b0abea286ee999c8e03073a6ac796"
+  },
+  {
+   "name": "font-vertical-354f7d73",
+   "path": "font-vertical-354f7d73",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at 354f7d73 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy and shape ucd --check on AArch64; the ARMv7 font step ran again on an idle machine after the FreeType reference timed out on NotoSansCJK while the host compiled.",
+   "key": "evidence/font-vertical-354f7d73/f4e2ec2449012a0efc1ee4ec6c75cfff8122528e3c629fbbe68c1380d9eff7f5.tar.gz",
+   "sha256": "f4e2ec2449012a0efc1ee4ec6c75cfff8122528e3c629fbbe68c1380d9eff7f5",
+   "bytes": 98509170,
+   "source_revision": "354f7d735ac22df3b63e7849eb5869488c087bd9"
+  },
+  {
+   "name": "ts-program-carrier-copy-comparison",
+   "retention": "90 days",
+   "key": "qualification/ts-program-carrier-copy-comparison/a857f2cc5e13b6a25f220c802eeb68ce8b70fcf483c2f3c4e282deacc4767e64.tar.zst",
+   "sha256": "a857f2cc5e13b6a25f220c802eeb68ce8b70fcf483c2f3c4e282deacc4767e64"
+  },
+  {
+   "name": "ts-program-buffered-carriers",
+   "retention": "90 days",
+   "key": "qualification/ts-program-buffered-carriers/5ce1b0cfd343c3a12c68c5ba0b4ca55607edd145a817d138a0ff72096e660ea4.tar.zst",
+   "sha256": "5ce1b0cfd343c3a12c68c5ba0b4ca55607edd145a817d138a0ff72096e660ea4"
+  },
+  {
+   "name": "ts-program-buffered-playback",
+   "retention": "retained",
+   "reason": "MPEG-TS program playback measurements in docs/status.md",
+   "key": "evidence/ts-program-buffered-playback/beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a.tar.zst",
+   "sha256": "beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a",
+   "bytes": 11567352,
+   "source_revision": "3125c1e61d73a575419f7b653a1dae44a3269dae"
+  },
+  {
+   "name": "ts-program-tight-carrier-comparison",
+   "path": "ts-program-tight-carrier-comparison",
+   "retention": "retained",
+   "reason": "Complete TS program comparison and adjacent HLS and progressive playback comparisons on AArch64 Linux.",
+   "key": "evidence/ts-program-tight-carrier-comparison/7e18edf0a340b6ff4bb296b52deffc720f706c464340c7c73392127f9c87248c.tar.gz",
+   "sha256": "7e18edf0a340b6ff4bb296b52deffc720f706c464340c7c73392127f9c87248c",
+   "bytes": 125514110,
+   "source_revision": "eb3279f36c19c97dd9bdd68b1e66f371f28e38c1"
+  },
+  {
+   "name": "ts-program-borrowed-continuations",
+   "retention": "90 days",
+   "key": "qualification/ts-program-borrowed-continuations/b876dcb0179cad3fbfb9a2796aae857ac5ecbed3dc17262cb33b820b72dba6e3.tar.gz",
+   "sha256": "b876dcb0179cad3fbfb9a2796aae857ac5ecbed3dc17262cb33b820b72dba6e3"
+  },
+  {
+   "name": "ts-program-buffered-storage",
+   "retention": "90 days",
+   "key": "qualification/ts-program-buffered-storage/4b499e55200c8a4fc2eabc334c8dfb228e1b2e9a6f402ec1c92dea00d5c4c5aa.tar.gz",
+   "sha256": "4b499e55200c8a4fc2eabc334c8dfb228e1b2e9a6f402ec1c92dea00d5c4c5aa"
+  },
+  {
+   "name": "ts-program-pending-carrier",
+   "retention": "90 days",
+   "key": "qualification/ts-program-pending-carrier/37b58a06055b2fe378eec6885910196f8842574c0c03ab82e9d16d2803554d51.tar.gz",
+   "sha256": "37b58a06055b2fe378eec6885910196f8842574c0c03ab82e9d16d2803554d51"
+  },
+  {
+   "name": "ts-program-output-budget",
+   "retention": "90 days",
+   "key": "qualification/ts-program-output-budget/eb03555af41821a9e323a1d06e488eab579984915b8451117011d6df5a3bc531.tar.gz",
+   "sha256": "eb03555af41821a9e323a1d06e488eab579984915b8451117011d6df5a3bc531"
+  },
+  {
+   "name": "ts-program-and-progressive-gates",
+   "path": "ts-program-and-progressive-gates",
+   "retention": "retained",
+   "reason": "MPEG-TS program and progressive playback measurements in docs/status.md.",
+   "key": "evidence/ts-program-and-progressive-gates/a372562b91bb14dce3bbd7117f71deb098f6dba49492c5f4396a70336012d6fc.tar.gz",
+   "sha256": "a372562b91bb14dce3bbd7117f71deb098f6dba49492c5f4396a70336012d6fc",
+   "bytes": 89667279,
+   "source_revision": "23f68766543bcd57a96e88bfe5350095236ff88c"
+  },
+  {
+   "name": "transport-before-review",
+   "retention": "90 days",
+   "key": "qualification/transport-before-review/dee784888225a1716fc2e92d14f5269ad0b3b0361d64c9516f61e21a8479f590.tar.gz",
+   "sha256": "dee784888225a1716fc2e92d14f5269ad0b3b0361d64c9516f61e21a8479f590"
+  },
+  {
+   "name": "mpegts-shared-container-reader",
+   "path": "mpegts-shared-container-reader",
+   "retention": "retained",
+   "reason": "MPEG-TS and HLS measurements in docs/status.md.",
+   "key": "evidence/mpegts-shared-container-reader/8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5.tar.gz",
+   "sha256": "8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5",
+   "bytes": 275601976,
+   "source_revision": "21c9eef2f08a11bb7bd1c457997095326f2bb42d"
+  },
+  {
+   "name": "font-charmaps-944fd7cf",
+   "path": "font-charmaps-944fd7cf",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md after FreeType's full charmap order, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape and ass compare at 944fd7cf natively on AArch64 and in the armv7-userland user space, with raster compare, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64, each run's build log, and the user space's package list.",
+   "key": "evidence/font-charmaps-944fd7cf/c2ffb0cd91e0e5e313e08d4df02ff034978b054fffb88a27451a337e7e770d0e.tar.gz",
+   "sha256": "c2ffb0cd91e0e5e313e08d4df02ff034978b054fffb88a27451a337e7e770d0e",
+   "bytes": 98546546,
+   "source_revision": "944fd7cfc7712f505bd66e046afaa77f7eee6aac"
+  },
+  {
+   "name": "font-ass-vertical-a6e98452",
+   "path": "font-ass-vertical-a6e98452",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with `@` fonts drawn and shaped as libass does, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape and ass compare at a6e98452 natively on AArch64 and in the armv7-userland user space, with raster compare, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64, each run's build log, and the user space's package list.",
+   "key": "evidence/font-ass-vertical-a6e98452/d5b68414a5a9db73c98b0cab8f49919980da2d7754e46fcb84cf7cc6f8039f0a.tar.gz",
+   "sha256": "d5b68414a5a9db73c98b0cab8f49919980da2d7754e46fcb84cf7cc6f8039f0a",
+   "bytes": 98547570,
+   "source_revision": "a6e984526d20029e75b48650e9cc317f192da776"
+  },
+  {
+   "name": "font-charmaps-vertical-801e0349",
+   "path": "font-charmaps-vertical-801e0349",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's full charmap order and the @ font drawing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64. Measured at 801e0349, whose tree differs from b5bc0d90 only in docs/status.md and harness/evidence/index.json.",
+   "key": "evidence/font-charmaps-vertical-801e0349/8a5799509af3fa883fa3686ea181d7b630dee90db6e71e60cb55023c65e8cd37.tar.gz",
+   "sha256": "8a5799509af3fa883fa3686ea181d7b630dee90db6e71e60cb55023c65e8cd37",
+   "bytes": 98631031,
+   "source_revision": "b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506"
+  },
+  {
+   "name": "font-cmap-8e137d8d",
+   "path": "font-cmap-8e137d8d",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's full charmap order and format 4 search, HarfBuzz's cmap selection, and the @ font drawing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at 8e137d8d against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-cmap-8e137d8d/fe2bee783e52adedca9e0c427a16b3fa30afa70471aaa507f38be9e177dd2b8a.tar.gz",
+   "sha256": "fe2bee783e52adedca9e0c427a16b3fa30afa70471aaa507f38be9e177dd2b8a",
+   "bytes": 98639740,
+   "source_revision": "8e137d8d5c4e6dbe76c5289a769242cea9beda2d"
+  },
+  {
+   "name": "font-cmap-8058a77c",
+   "path": "font-cmap-8058a77c",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's full charmap order and format 4 search, HarfBuzz's cmap sanitizing, selection and remapping, and the @ font drawing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at 8058a77c against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-cmap-8058a77c/95b5c4d659408f264cbe8bfc24f20ca43a303863e23bbc107d3192956f5c6f7b.tar.gz",
+   "sha256": "95b5c4d659408f264cbe8bfc24f20ca43a303863e23bbc107d3192956f5c6f7b",
+   "bytes": 98652028,
+   "source_revision": "8058a77c444958ba82dcf4b5783720fc9aafe66f"
+  },
+  {
+   "name": "matroska-replay-budget",
+   "path": "matroska-replay-budget",
+   "retention": "retained",
+   "reason": "Matroska startup and seek with compact replay reusing packet-owned budgets, including all 44 pinned reference comparisons, 30 native AArch64 timing and memory pairs per case, the comparison against main, the identical-worker control, and the host tests.",
+   "key": "evidence/matroska-replay-budget/d0d651f4ba72568e8cfd9a8ba75615f308aacb3ec4f46a5981b39a92119eff7e.tar.gz",
+   "sha256": "d0d651f4ba72568e8cfd9a8ba75615f308aacb3ec4f46a5981b39a92119eff7e",
+   "bytes": 47588933,
+   "source_revision": "0de9d88015d5da3a1b6769a902c6a63048737bac",
+   "files": [
+    {
+     "path": "matroska-replay-budget/host/REBASED.txt",
+     "sha256": "47913c888092546c60876ce93423d09dc5a3900023ba5a6dd5cebd9f51e85b2f"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-after-rebase.sha256",
+     "sha256": "5a883c27993d405e4e354b2a31898de718b0a62df501845d81909b4fac158c2d"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-before-rebase.sha256",
+     "sha256": "5a883c27993d405e4e354b2a31898de718b0a62df501845d81909b4fac158c2d"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-build.log",
+     "sha256": "6050d9152c1c4cfb488cdec8186d20874d6e022d9ea00addd71af7f22a6ce7a5"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-clippy.log",
+     "sha256": "98f9460e04a71e06e26b224110d83c2c04c8d553351706ce94c65ab0858efd39"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-parity.log",
+     "sha256": "ac0b69e9c44c0d1347350c51fc438a0b0bf156eacefe538a0c53fb270c03b0de"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-rebased-build.log",
+     "sha256": "0d1ae8aec1a39906a82f44c374494babaf708b8f5b4349409b536a99b67f4869"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-tests.log",
+     "sha256": "c54c06568319ae85955ef3205d4049a05e2fe0d6a9b2add6a0e5030aca98486b"
+    },
+    {
+     "path": "matroska-replay-budget/native/BINDING.sha256",
+     "sha256": "b83c4490ede09832c1377312e10565124121509e56b634ba67cdeb9717df3e43"
+    },
+    {
+     "path": "matroska-replay-budget/native/GUEST.log",
+     "sha256": "33ba0940c5d96c10cf9dd94e3fe6b8e454ab9fe11828dc4e30861478d7a85619"
+    },
+    {
+     "path": "matroska-replay-budget/native/HOST.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "matroska-replay-budget/native/RESULTS.sha256",
+     "sha256": "8cef7f0c95c4dd543ba8185a841d449416f99169c0c07e8c9d6097dd1d7e47be"
+    },
+    {
+     "path": "matroska-replay-budget/native/RESULTS.tar.gz",
+     "sha256": "da50faa4ef4fc6ac57b14618059aa757fe067aaea2bb44386582ff1047e87205"
+    },
+    {
+     "path": "matroska-replay-budget/native/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "matroska-replay-budget/native/SOURCE.bundle",
+     "sha256": "e651db7d247409f7ecf744e48fb827523cfe597381a1fb8fead6b8d034dfa444"
+    },
+    {
+     "path": "matroska-replay-budget/native/SOURCE.txt",
+     "sha256": "d2df86d4facf02c35be2e5c47a7f9c8dbb3bc9cb2f03ad216084a148ef1d9696"
+    },
+    {
+     "path": "matroska-replay-budget/native/STOPPED.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "matroska-replay-budget/native/TREE.txt",
+     "sha256": "c2d25af13b321e0641312899559152c30622310d96a4bc8e21a01873071f0b4c"
+    },
+    {
+     "path": "matroska-replay-budget/native/guest.sh",
+     "sha256": "4f1862c271af0bd64a2e9b57ccf554863a2e0af39d13e6c4a40f49e0c61d76fd"
+    },
+    {
+     "path": "matroska-replay-budget/native/host.sh",
+     "sha256": "d080f81fa30ba3be28917474c4d6561de15d9a1bf207abd54b3720317b36cea4"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/BINDING.sha256",
+     "sha256": "20aee8b7bb3357eba1f3376760df1dfed086db345676190f64e4c00bcbb44f54"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/GUEST.log",
+     "sha256": "9bae42521d2f0bc39a79ce30343812d0fb8a7df9ea9ee907e53719623d50c317"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/HOST.exit",
+     "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/RESULTS.sha256",
+     "sha256": "9f807dfcafd0fcfa2023cf58113f60aa8890f1ca935a500ad2c41c799d0ce8ea"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/RESULTS.tar.gz",
+     "sha256": "581fd5def8b87b3445896c1567d50a6bb5eff1053719b2109ca850888692c409"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/STOPPED.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/guest.sh",
+     "sha256": "150549f901a099d5adeb90e87afff6e511eb941a3e10203b5d71016d07a854de"
+    }
+   ]
   }
  ]
 }

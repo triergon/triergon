@@ -16,6 +16,7 @@ use super::{Cff, Private, Version};
 use crate::Limits;
 use crate::fixed::{div_fix, mul_fix, sqrt_fixed};
 use crate::outline::Outline;
+use crate::postscript::STANDARD_ENCODING;
 use crate::read::Reader;
 use crate::work::charge;
 use triergon_core::{Error, Result, WorkBudget};
@@ -27,78 +28,6 @@ const MAX_SUBR_DEPTH: u32 = 16;
 const MAX_STEM_HINTS: usize = 96;
 const TRANSIENT_SLOTS: usize = 32;
 const ONE: Fixed = 0x1_0000;
-
-/// Standard Encoding: character code to SID, for `seac` (TN 5176 Appendix B).
-const STANDARD_ENCODING: [u8; 256] = {
-    let mut table = [0_u8; 256];
-    let mut code = 32;
-    while code <= 126 {
-        table[code] = (code - 31) as u8;
-        code += 1;
-    }
-    let high: [(usize, u8); 54] = [
-        (161, 96),
-        (162, 97),
-        (163, 98),
-        (164, 99),
-        (165, 100),
-        (166, 101),
-        (167, 102),
-        (168, 103),
-        (169, 104),
-        (170, 105),
-        (171, 106),
-        (172, 107),
-        (173, 108),
-        (174, 109),
-        (175, 110),
-        (177, 111),
-        (178, 112),
-        (179, 113),
-        (180, 114),
-        (182, 115),
-        (183, 116),
-        (184, 117),
-        (185, 118),
-        (186, 119),
-        (187, 120),
-        (188, 121),
-        (189, 122),
-        (191, 123),
-        (193, 124),
-        (194, 125),
-        (195, 126),
-        (196, 127),
-        (197, 128),
-        (198, 129),
-        (199, 130),
-        (200, 131),
-        (202, 132),
-        (203, 133),
-        (205, 134),
-        (206, 135),
-        (207, 136),
-        (208, 137),
-        (225, 138),
-        (227, 139),
-        (232, 140),
-        (233, 141),
-        (234, 142),
-        (235, 143),
-        (241, 144),
-        (245, 145),
-        (248, 146),
-        (249, 147),
-        (250, 148),
-        (251, 149),
-    ];
-    let mut i = 0;
-    while i < high.len() {
-        table[high[i].0] = high[i].1;
-        i += 1;
-    }
-    table
-};
 
 /// An integer as a charstring number.
 const fn int(v: i32) -> Fixed {
@@ -648,8 +577,7 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
                 let sid = STANDARD_ENCODING[code];
                 let component = self
                     .cff
-                    .glyph_for_sid(self.table, u16::from(sid))
-                    .filter(|_| sid != 0)
+                    .glyph_for_sid(sid)
                     .ok_or(Error::Invalid("seac component"))?;
                 self.glyph::<N>(component, at, false)?;
             }
@@ -1179,7 +1107,8 @@ fn flex(op: CharstringOperator, a: &[Fixed]) -> Result<[[Fixed; 6]; 2]> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CharstringOperator as Op, STANDARD_ENCODING, bias, flex, int, to_int};
+    use super::{CharstringOperator as Op, bias, flex, int, to_int};
+    use crate::postscript::STANDARD_ENCODING;
 
     #[test]
     fn bias_flex_numbers_and_standard_codes() {

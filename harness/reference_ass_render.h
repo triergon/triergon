@@ -321,6 +321,29 @@ static int assr_render_directives(const char *data, size_t size, const char *fon
     return 1;
 }
 
+/* 1 when the frames a fixture draws are well formed: every frames line (`;@frames`
+ * of a script, `@frames` of a stream) three numbers with a positive step and an
+ * end at or after its start, no more than the harness draws, and at least one,
+ * so a case cannot pass by drawing nothing. */
+static int assr_frames_valid(const char *data, size_t size, int stream) {
+    const char *prefix = stream ? "@frames " : ";@frames ";
+    size_t count = 0, skip = strlen(prefix);
+    for (const char *p = data, *end = data + size; p < end;) {
+        const char *q = memchr(p, '\n', (size_t)(end - p));
+        if (!q) q = end;
+        AssLine l = {p, (size_t)(q - p)};
+        p = q + 1;
+        if (!assr_starts(l, prefix)) continue;
+        const char *at = l.start + skip, *stop = l.start + l.len;
+        AssFrames f;
+        if (!assr_number(&at, stop, &f.start) || !assr_number(&at, stop, &f.step) ||
+            !assr_number(&at, stop, &f.end) || f.step <= 0 || f.end < f.start)
+            return 0;
+        count++;
+    }
+    return count > 0 && (stream || count <= ASSR_MAX_FRAMES);
+}
+
 static int assr_size(const char *text, int *out) {
     char *end;
     long v = strtol(text, &end, 10);
@@ -358,6 +381,11 @@ static int assr_render_main(int argc, char **argv) {
     AssFixture fixture;
     memset(&fixture, 0, sizeof fixture);
     int status = 0;
+    if (data && !assr_frames_valid(data, size, stream)) {
+        fprintf(stderr, "%s: a frames line is malformed, one too many, or missing\n", argv[2]);
+        status = 2;
+        goto done;
+    }
     if (!data || !assr_read_fixture(data, size, stream, &fixture) ||
         !assr_render_directives(data, size, args[1], &c)) {
         fprintf(stderr, "%s: unreadable, too large, or out of memory\n", argv[2]);

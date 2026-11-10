@@ -22,13 +22,12 @@
 //! payload and side data, the same fields in the same order as the reference
 //! worker (`harness/reference_ts.h`).
 
-use crate::runner::{Invocation, MAX_INPUT, Refusal, Result, Totals, measure};
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use crate::runner::{Invocation, Refusal, Result, Totals, measure};
+use crate::ts_input::{Entity, FIRST_SOURCE, Request, capabilities, parse};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
-    SourceId, Step, WorkBudget,
+    Budget, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceId, Step, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::pes::{
@@ -37,19 +36,19 @@ use triergon_mpegts::compat::pes::{
     PesFaultPolicy, PrivateAudioCarriage, PrivateAudioDescriptors, RegisteredCarriage,
     SourceContext, TransportFaultRecovery, TransportObservation,
 };
-use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, DvbNamespaceEvidence, ProgramMap};
+use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, ProgramMap};
 use triergon_mpegts::{
-    AssemblyStep, FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits,
-    SourceEpochs, SourceRange, TraceEvent, TransportStream,
+    AssemblyStep, FaultKind, MediaEntityEnd, ObservedTrace, ParseLimits, SourceEpochs, SourceRange,
+    TraceEvent, TransportStream,
 };
+
+pub(crate) mod au_recovery;
 
 pub const PREFIX: &str = "ts-";
 const OPERATION: &str = "mpegts-pes-packets";
 const PROFILE: DemuxProfile = DemuxProfile::PesPackets;
 const WINDOW: usize = 64 * 1024;
 const WORK: u64 = 4096;
-/// Matches the entity count limit of the public reference adapter.
-const MAX_ENTITIES: usize = 64;
 /// FFmpeg's `AV_NOPTS_VALUE`, folded for an absent timestamp on both sides.
 const NO_TIME: i64 = i64::MIN;
 /// FFmpeg's `AV_PKT_DATA_MPEGTS_STREAM_ID` side-data type.
@@ -79,7 +78,7 @@ fn fold_packet(
     fold_payload(totals, fields, packet.stream_id, packet.payload())
 }
 
-fn fold_payload<'a>(
+pub(super) fn fold_payload<'a>(
     totals: &mut Totals,
     fields: [u64; 8],
     stream_id: u8,
@@ -148,6 +147,10 @@ impl Cause {
                 ("pmt", range(map.source_ranges.as_slice().first()))
             }
             TraceEvent::Pes(pes) => ("pes", range(pes.header_source_ranges.as_slice().first())),
+            TraceEvent::UnboundedAdtsPes(rejected) => (
+                "unbounded_adts_pes",
+                range(rejected.pes().header_source_ranges.as_slice().first()),
+            ),
             TraceEvent::Timeline { .. } => ("timeline", None),
             TraceEvent::Discontinuity { .. } => ("discontinuity", None),
             TraceEvent::Diagnostic(fault) => (
@@ -641,28 +644,6 @@ impl Session {
     }
 }
 
-struct Entity {
-    source: SourceId,
-    input: Bytes,
-    discontinuity: bool,
-}
-
-fn capabilities(input: &Bytes) -> SourceCapabilities {
-    SourceCapabilities {
-        length: Some(input.len() as u64),
-        random_access: false,
-    }
-}
-
-/// A preloaded sequence of actual media entities, all charged to one pool.
-struct Request {
-    format: PacketFormat,
-    program: u16,
-    namespace: DescriptorNamespace,
-    input: Bytes,
-    following: BudgetVec<Entity>,
-}
-
 struct PacketAttempt {
     totals: Totals,
     try_control_completion: bool,
@@ -677,7 +658,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
     let attempt = packet_operation(pool, request, cancel)?;
     if attempt.try_control_completion
         && attempt.totals.packets == 0
-        && control_completion(pool, request, cancel)?.is_some()
+        && confirm_control_only_entity(pool, request, cancel)?.is_some()
     {
         return Ok(Totals::default());
     }
@@ -691,7 +672,7 @@ fn packet_operation(
     cancel: &AtomicBool,
 ) -> Result<PacketAttempt> {
     let raw = &request.input;
-    let mut input = InputCursor::new(pool, SourceId(1), capabilities(raw), WINDOW)?;
+    let mut input = InputCursor::new(pool, FIRST_SOURCE, capabilities(raw), WINDOW)?;
     let mut malformed = MalformedInputCompletion::new_with_namespace(
         &input,
         request.format,
@@ -837,7 +818,7 @@ fn packet_operation(
 fn sequence_operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
     let mut raw = &request.input;
     let mut following = request.following.as_slice().iter();
-    let mut input = InputCursor::new(pool, SourceId(1), capabilities(raw), WINDOW)?;
+    let mut input = InputCursor::new(pool, FIRST_SOURCE, capabilities(raw), WINDOW)?;
     let mut demux = TransportStream::new_with_namespace(
         pool.clone(),
         request.format,
@@ -953,25 +934,21 @@ fn provide_input(input: &mut InputCursor, raw: &Bytes, request: InputRequest) ->
     Ok(())
 }
 
-/// A bounded replay is needed because a program-policy refusal may precede
-/// physical EOF. Only the completion policy's confirmation can replace that refusal;
-/// an empty observer, parse error or advertised input length cannot do so.
-fn control_completion(
+/// Confirm a single control-only entity by advancing its source through
+/// physical End and Finished. A reader refusal may precede physical EOF.
+#[cold]
+#[inline(never)]
+pub(crate) fn confirm_control_only_entity(
     pool: &Budget,
     request: &Request,
     cancel: &AtomicBool,
 ) -> Result<Option<NoMediaConfirmation>> {
+    if !request.following.is_empty() {
+        return Ok(None);
+    }
     let raw = &request.input;
     let limits = ParseLimits::default();
-    let mut input = InputCursor::new(
-        pool,
-        SourceId(1),
-        SourceCapabilities {
-            length: Some(raw.len() as u64),
-            random_access: false,
-        },
-        WINDOW,
-    )?;
+    let mut input = InputCursor::new(pool, FIRST_SOURCE, capabilities(raw), WINDOW)?;
     let mut demux = TransportStream::new_with_namespace(
         pool.clone(),
         request.format,
@@ -1051,81 +1028,6 @@ fn control_completion(
     }
 }
 
-fn parse(pool: &Budget, path: &Path, arguments: &[String]) -> Result<Request> {
-    let usage = "expected SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...";
-    let [size, program, rest @ ..] = arguments else {
-        return Err(usage.into());
-    };
-    let format = match size.as_str() {
-        "188" => PacketFormat::Ts188,
-        "192" => PacketFormat::M2ts192,
-        _ => return Err(usage.into()),
-    };
-    let program: u16 = program.parse()?;
-    let (namespace, rest) = match rest {
-        [option, rest @ ..] if option == "--dvb" => (
-            DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile),
-            rest,
-        ),
-        _ => (DescriptorNamespace::Unspecified, rest),
-    };
-    let input = load_entity(pool, path, MAX_INPUT)?;
-    let mut remaining = MAX_INPUT - input.len() as u64;
-    let mut following = BudgetVec::new(pool);
-    let mut rest = rest.iter();
-    while let Some(argument) = rest.next() {
-        if following.len() == MAX_ENTITIES - 1 {
-            return Err(Error::Policy("TS media entity count").into());
-        }
-        let discontinuity = argument == "--discontinuity";
-        let name = if discontinuity {
-            rest.next().ok_or(usage)?
-        } else {
-            argument
-        };
-        let bytes = load_entity(pool, &entity(path, name)?, remaining)?;
-        remaining -= bytes.len() as u64;
-        let source = SourceId(2 + following.len() as u64);
-        following
-            .try_push(Entity {
-                source,
-                input: bytes,
-                discontinuity,
-            })
-            .map_err(|error| error.error)?;
-    }
-    Ok(Request {
-        format,
-        program,
-        namespace,
-        input,
-        following,
-    })
-}
-
-fn load_entity(pool: &Budget, path: &Path, remaining: u64) -> Result<Bytes> {
-    let metadata = path.metadata()?;
-    let size = metadata.len();
-    if !metadata.is_file() || size == 0 || size > remaining {
-        return Err("input must be a bounded nonempty file".into());
-    }
-    let mut file = std::fs::File::open(path)?;
-    let mut input = BudgetVec::try_filled(pool, 0, usize::try_from(size)?)?;
-    file.read_exact(input.as_mut_slice())?;
-    if file.read(&mut [0])? != 0 {
-        return Err("input grew beyond its declared extent".into());
-    }
-    Ok(input.freeze().map_err(|error| error.error)?)
-}
-
-/// A further media entity, named relative to the first input's directory.
-fn entity(first: &Path, name: &str) -> Result<PathBuf> {
-    if name.is_empty() || name.starts_with('-') || name.contains(['/', '\\']) || name == ".." {
-        return Err(format!("entity must be a file name next to the input: {name}").into());
-    }
-    Ok(first.with_file_name(name))
-}
-
 /// `ts-fold FILE ARGS`, `ts-bench FILE ITERATIONS ARGS` or `ts-memory FILE ARGS`,
 /// with ARGS `SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...`.
 pub fn run(args: &[String]) -> Result<()> {
@@ -1146,7 +1048,7 @@ pub fn run(args: &[String]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Request, control_completion, operation, parse};
+    use super::{Request, confirm_control_only_entity, operation, parse};
     use crate::runner::Totals;
     use std::path::Path;
     use std::sync::atomic::AtomicBool;
@@ -1361,11 +1263,13 @@ mod tests {
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../mpegts/tests/data/psi-crc-invalid.ts");
         let request = parse(&pool, &path, &["188".into(), "1".into()]).unwrap();
         let idle = pool.used();
-        let error = control_completion(&pool, &request, &AtomicBool::new(true)).unwrap_err();
+        let error =
+            confirm_control_only_entity(&pool, &request, &AtomicBool::new(true)).unwrap_err();
         assert_eq!(error.downcast_ref::<Error>(), Some(&Error::Cancelled));
         assert_eq!(pool.used(), idle);
         let pressure = pool.reserve(pool.available()).unwrap();
-        let error = control_completion(&pool, &request, &AtomicBool::new(false)).unwrap_err();
+        let error =
+            confirm_control_only_entity(&pool, &request, &AtomicBool::new(false)).unwrap_err();
         assert!(matches!(
             error.downcast_ref::<Error>(),
             Some(Error::Backpressure { .. })

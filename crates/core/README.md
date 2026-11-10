@@ -85,7 +85,8 @@ lives (`Charged::boxed` charges a boxed value's size). A `Reservation` held apar
 from its storage is for output a caller owns, such as a decoder's output frame:
 `resize_to` charges that storage before it grows. `Bytes` is an immutable shared span: slicing and
 cloning share one backing allocation, and every alias keeps the whole backing
-capacity charged (`retained_capacity`). `try_into_writer` turns a uniquely owned whole
+capacity charged (`retained_capacity`). `budget()` borrows the pool of that
+allocation. `try_into_writer` turns a uniquely owned whole
 allocation into a `BytesWriter`, keeping its bytes; a shared allocation or a slice is
 refused and returned. `BytesWriter::try_write_at` writes in place across steps, the fill
 seeing the earlier bytes or zero past them; growth charges old and new buffers together
@@ -127,6 +128,8 @@ source is the separate `finish` call, after which reads return
 Reads come in four forms: `read_into` (copy into a slice), `read_append` (copy
 into a `BudgetVec<u8>`), `read_discard` (skip without copy) and `read_span`
 (zero-copy `Bytes` alias of the window). `buffered()` peeks without consuming.
+`consume_response` lets a parser process a complete borrowed response
+without retaining an input window.
 A parser that still needs bytes after a partial read can use `pending_request()`
 to ask for the next window once the current window is empty and the source is
 still active. It checks cancellation before returning a request.

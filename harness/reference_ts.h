@@ -7,7 +7,7 @@
  * demuxer order: stream index, PID, PTS, DTS, duration, position, flags, payload and
  * every side-data element. The operation reaches EOF only when av_read_frame
  * returns AVERROR_EOF. FFmpeg probes the packet size itself, and its demuxer has no
- * caller-declared descriptor namespace, so the size and --dvb arguments describe
+ * caller-declared descriptor namespace, so the size and namespace arguments describe
  * the candidate's request only. Both modes use the same AVIO adapter for ordered
  * media entities and the same program filter and packet fold. The ts-au modes
  * enable codec parsing and retain NOFILLIN. */
@@ -138,7 +138,7 @@ done:
 #include "reference_ts_sequence.h"
 
 /* ts-fold FILE SIZE PROGRAM [OPTIONS] | ts-bench FILE N SIZE PROGRAM [OPTIONS] |
- * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb and further entities.
+ * ts-memory FILE SIZE PROGRAM [OPTIONS]; OPTIONS are --dvb or --atsc and further entities.
  * ts-au-fold, ts-au-bench and ts-au-memory use the same arguments with parsing. */
 static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
 {
@@ -148,6 +148,8 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     const int memory = !strcmp(mode, "memory");
     if (!bench && !memory && strcmp(mode, "fold"))
         return 2;
+    if (access_units && (bench || memory))
+        av_log_set_level(AV_LOG_QUIET);
     int at = bench ? 4 : 3;
     if (argc < at + 2)
         return 2;
@@ -164,7 +166,8 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     if (*end || program < 1 || program > 65535)
         return 2;
     int first_entity = at + 2;
-    if (first_entity < argc && !strcmp(argv[first_entity], "--dvb"))
+    if (first_entity < argc
+        && (!strcmp(argv[first_entity], "--dvb") || !strcmp(argv[first_entity], "--atsc")))
         ++first_entity;
     TsEntities source = {0};
     int result = 2;

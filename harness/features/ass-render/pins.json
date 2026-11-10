@@ -113,6 +113,16 @@
       "bytes": 619012,
       "digest": 16630156747280279572
     },
+    "charmap-retry-ass-1080p": {
+      "packets": 12,
+      "bytes": 45620,
+      "digest": 3127853172692033868
+    },
+    "charmap-retry-ass-720p": {
+      "packets": 12,
+      "bytes": 38740,
+      "digest": 2647018896958249612
+    },
     "charmap-unicode-ass-1080p": {
       "packets": 18,
       "bytes": 252670,
@@ -134,14 +144,14 @@
       "digest": 3233143565032904036
     },
     "clip-vector-empty-ass-1080p": {
-      "packets": 33,
-      "bytes": 301120,
-      "digest": 18444867028647299271
+      "packets": 39,
+      "bytes": 420316,
+      "digest": 3417116814822949159
     },
     "clip-vector-empty-ass-720p": {
-      "packets": 33,
+      "packets": 39,
       "bytes": 213984,
-      "digest": 1971397471732921091
+      "digest": 16351013272241871811
     },
     "clip-ass-1080p": {
       "packets": 168,
@@ -352,6 +362,16 @@
       "packets": 168,
       "bytes": 2920440,
       "digest": 11813353727600396068
+    },
+    "vertical-styles-ass-1080p": {
+      "packets": 36,
+      "bytes": 378524,
+      "digest": 16642839131572579926
+    },
+    "vertical-styles-ass-720p": {
+      "packets": 36,
+      "bytes": 258980,
+      "digest": 14262811015553712598
     },
     "wrap-ass-1080p": {
       "packets": 336,

@@ -41,6 +41,10 @@ struct Test {
 
 const TESTS: &[Test] = &[
     Test {
+        name: "transport::ordered_reference_entities",
+        run: |cx| crate::harness::build::test_transport_entities(cx.root),
+    },
+    Test {
         name: "capture_contract::encoder_rate_loop_matches_the_approved_contract",
         run: capture_contract::encoder_rate_loop_matches_the_approved_contract,
     },

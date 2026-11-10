@@ -339,6 +339,10 @@ pub struct CffProgram {
     /// The SID of each glyph after .notdef, as a format 0 charset; the ISOAdobe
     /// charset when absent.
     pub charset: Option<Vec<u16>>,
+    /// The string INDEX: the names of SIDs from 391.
+    pub strings: Vec<Vec<u8>>,
+    /// An encoding table; the Standard encoding when absent.
+    pub encoding: Option<Vec<u8>>,
     /// FontMatrix entries as decimal text.
     pub matrix: Option<[&'static str; 6]>,
     pub nominal_width: i32,
@@ -358,12 +362,16 @@ impl CffProgram {
             p
         };
         let private_len = private(0).len();
-        let top = |charstrings: i32, charset: i32, private_offset: i32| {
+        let top = |charstrings: i32, charset: i32, encoding: i32, private_offset: i32| {
             let mut t = long(charstrings);
             t.push(17);
             if self.charset.is_some() {
                 t.extend(long(charset));
                 t.push(15);
+            }
+            if self.encoding.is_some() {
+                t.extend(long(encoding));
+                t.push(16);
             }
             if let Some(matrix) = self.matrix {
                 for value in matrix {
@@ -383,24 +391,27 @@ impl CffProgram {
         });
         let header = vec![1, 0, 4, 4];
         let names = index(&[b"Test".to_vec()]);
-        let top_len = index(&[top(0, 0, 0)]).len();
-        let strings = index(&[]);
+        let top_len = index(&[top(0, 0, 0, 0)]).len();
+        let strings = index(&self.strings);
         let global = index(&self.global);
         let charstrings_at = header.len() + names.len() + top_len + strings.len() + global.len();
         let charstrings = index(&self.glyphs);
         let charset_at = charstrings_at + charstrings.len();
-        let private_at = charset_at + charset.as_ref().map_or(0, Vec::len);
+        let encoding_at = charset_at + charset.as_ref().map_or(0, Vec::len);
+        let private_at = encoding_at + self.encoding.as_ref().map_or(0, Vec::len);
         let mut out = header;
         out.extend(names);
         out.extend(index(&[top(
             charstrings_at as i32,
             charset_at as i32,
+            encoding_at as i32,
             private_at as i32,
         )]));
         out.extend(strings);
         out.extend(global);
         out.extend(charstrings);
         out.extend(charset.unwrap_or_default());
+        out.extend(self.encoding.clone().unwrap_or_default());
         out.extend(private(private_len as i32));
         if !self.local.is_empty() {
             out.extend(index(&self.local));
@@ -465,6 +476,8 @@ pub fn cff_table() -> Vec<u8> {
             ],
         ],
         charset: None,
+        strings: Vec::new(),
+        encoding: None,
         matrix: None,
         nominal_width: 400,
     }
@@ -765,6 +778,8 @@ fn cff_features_tables() -> Tables {
         local,
         // A, acute, D, B, C, E, F as standard strings.
         charset: Some(vec![34, 125, 37, 35, 36, 38, 39]),
+        strings: Vec::new(),
+        encoding: None,
         matrix: None,
         nominal_width: 500,
     };
@@ -831,6 +846,8 @@ fn cff_matrix_tables() -> Tables {
         global: Vec::new(),
         local: Vec::new(),
         charset: None,
+        strings: Vec::new(),
+        encoding: None,
         matrix: Some(["0.0005", "0", "0.0001", "0.0005", "0.025", "-0.0125"]),
         nominal_width: 0,
     };
@@ -1023,6 +1040,221 @@ fn cmap_order_faces() -> Vec<(&'static [u8; 4], Tables)> {
         .collect()
 }
 
+/// A vertical metrics header (`vhea`, or the extended `VHEA` with a 32-bit
+/// record count) listing `metrics` records.
+pub fn vhea(metrics: u32, extended: bool) -> Vec<u8> {
+    let mut t = 0x0001_1000_u32.to_be_bytes().to_vec();
+    t.extend(i16s(&[500, -500, 0]));
+    t.extend(u16s(&[1500]));
+    t.extend([0; 22]);
+    if extended {
+        t.extend(metrics.to_be_bytes());
+    } else {
+        t.extend(u16s(&[metrics as u16]));
+    }
+    t
+}
+
+/// A format 2 subtable: single bytes 0x41 and 0x42 to glyphs 7 and 1 through
+/// the first subheader, and 0x8140 to glyph 2 through the subheader of lead
+/// byte 0x81.
+pub fn cmap_high_byte() -> Vec<u8> {
+    let mut keys = [0_u16; 256];
+    keys[0x81] = 8;
+    let mut t = u16s(&[2, 540, 0]);
+    t.extend(u16s(&keys));
+    // Subheaders at 518 and 526; each glyph array offset counts from its
+    // idRangeOffset word, at 524 and 532, to the arrays at 534 and 538.
+    t.extend(u16s(&[0x41, 2, 0, 10]));
+    t.extend(u16s(&[0x40, 1, 0, 6]));
+    t.extend(u16s(&[7, 1, 2]));
+    t
+}
+
+/// A format 8 subtable from (first, last, glyph) groups, all of 16-bit codes
+/// but those above 0xFFFF.
+pub fn cmap_mixed(groups: &[(u32, u32, u32)]) -> Vec<u8> {
+    let mut t = u16s(&[8, 0]);
+    t.extend((8208 + 12 * groups.len() as u32).to_be_bytes());
+    t.extend(0_u32.to_be_bytes());
+    t.extend([0_u8; 8192]);
+    t.extend((groups.len() as u32).to_be_bytes());
+    for &(a, b, g) in groups {
+        for v in [a, b, g] {
+            t.extend(v.to_be_bytes());
+        }
+    }
+    t
+}
+
+/// TrueType faces with each way FreeType reads vertical advances. Their
+/// glyphs: 1 a square, 2 a bump, 3 glyph 1 at half size plus glyph 2 with its
+/// metrics, 4 glyph 1 moved up without them; 'A' to 'D' map 1 to 4.
+/// - `Records`: four long `vmtx` records (an advance height of 65535, one of
+///   zero that leaves the phantom points level, and the composite's own,
+///   which `USE_MY_METRICS` replaces) and a top side bearing after them.
+/// - `Made Up`: a `vhea` without records, so FreeType makes the advances up.
+/// - `Short`: a 32-byte `vhea`, whose record count FreeType reads from the
+///   `vmtx` after it, the first record's top side bearing: two records.
+/// - `Extended`: only `VHEA` and `VMTX`, which FreeType reads for them.
+///
+/// An `fpgm` keeps the auto-hinter off them.
+fn vertical_faces() -> Vec<(&'static [u8; 4], Tables)> {
+    let square: &[(i16, i16, bool)] = &[
+        (100, 0, true),
+        (100, 200, true),
+        (300, 200, true),
+        (300, 0, true),
+    ];
+    let bump: &[(i16, i16, bool)] = &[(0, 0, true), (50, 100, false), (100, 0, true)];
+    let (glyf, loca) = glyf(&[
+        Vec::new(),
+        simple(&[square]),
+        simple(&[bump]),
+        composite(&[(0, 1, 10, 20, Some(0.5)), (0x0200, 2, 0, 0, None)]),
+        composite(&[(0, 1, 0, 300, None)]),
+    ]);
+    let records = hmtx(&[(65535, 10), (0, 100), (1500, -30), (800, 70)]);
+    let faces: [(&str, Tables); 4] = [
+        (
+            "Records",
+            vec![
+                (*b"vhea", vhea(4, false)),
+                (*b"vmtx", [records.clone(), i16s(&[-20])].concat()),
+            ],
+        ),
+        (
+            "Made Up",
+            vec![(*b"vhea", vhea(0, false)), (*b"vmtx", records.clone())],
+        ),
+        (
+            "Short",
+            vec![
+                (*b"vhea", vhea(2, false)[..32].to_vec()),
+                (
+                    *b"vmtx",
+                    [hmtx(&[(1000, 2), (900, 40)]), i16s(&[-10, 5, 15])].concat(),
+                ),
+            ],
+        ),
+        (
+            "Extended",
+            vec![
+                (*b"VHEA", vhea(3, true)),
+                (*b"VMTX", [records[..12].to_vec(), i16s(&[25, -5])].concat()),
+            ],
+        ),
+    ];
+    faces
+        .into_iter()
+        .map(|(style, vertical)| {
+            let full = format!("Authored Vertical {style}");
+            let postscript = format!("AuthoredVertical-{style}").replace(' ', "");
+            let mut tables = vec![
+                (*b"head", head(1000, false, 0)),
+                (*b"hhea", hhea(5)),
+                (*b"maxp", maxp(5)),
+                (*b"OS/2", os2(400, 0x40)),
+                (
+                    *b"hmtx",
+                    hmtx(&[(500, 0), (400, 50), (300, 0), (600, 0), (450, 100)]),
+                ),
+                (
+                    *b"cmap",
+                    cmap(&[(0x41, 1), (0x42, 2), (0x43, 3), (0x44, 4)]),
+                ),
+                (
+                    *b"name",
+                    name(&[
+                        (1, "Authored Vertical"),
+                        (2, style),
+                        (4, &full),
+                        (6, &postscript),
+                    ]),
+                ),
+                (*b"glyf", glyf.clone()),
+                (*b"loca", loca.clone()),
+                // PUSHB_1 0; POP
+                (*b"fpgm", vec![0xb0, 0, 0x21]),
+            ];
+            tables.extend(vertical);
+            (b"\0\x01\0\0", tables)
+        })
+        .collect()
+}
+
+/// A CFF face whose charmaps are all ones FreeType reads beyond the common
+/// formats: a format 2 subtable on (1, 1), a format 8 one on (3, 10), the
+/// Unicode charmap FreeType builds from glyph names, since no subtable is
+/// (3, 1) or Unicode-platform, and the charmap of a custom encoding with a
+/// supplement. The names are standard strings and strings of the face: an
+/// Adobe Glyph List name, a variant, `uniXXXX` and `uXXXXX` forms, `space` and
+/// `Delta`, which FreeType maps twice, a name used by two glyphs and one that
+/// maps to no code point.
+fn charmaps_tables() -> Tables {
+    use Part::{N, Op};
+    let square = |side: i16| {
+        charstring(&[
+            N(50),
+            N(0),
+            Op(21),
+            N(side),
+            Op(6),
+            N(side),
+            Op(7),
+            N(-side),
+            Op(6),
+            Op(14),
+        ])
+    };
+    let mut glyphs = vec![charstring(&[Op(14)])];
+    glyphs.extend((1..10).map(|g| square(100 + 40 * g)));
+    let program = CffProgram {
+        glyphs,
+        global: Vec::new(),
+        local: Vec::new(),
+        // A, A.swash, uni00E9, u1F600, space, Delta, B, B, glyph9.
+        charset: Some(vec![34, 391, 392, 393, 1, 394, 35, 35, 395]),
+        strings: [&b"A.swash"[..], b"uni00E9", b"u1F600", b"Delta", b"glyph9"]
+            .map(<[u8]>::to_vec)
+            .to_vec(),
+        // Format 1 with supplements: codes 0x80..=0x83 for glyphs 1 to 4, and
+        // code 0xC0 for SID 395 (glyph 9).
+        encoding: Some(vec![0x81, 1, 0x80, 3, 1, 0xc0, 0x01, 0x8b]),
+        matrix: None,
+        nominal_width: 0,
+    };
+    let metrics: Vec<(u16, i16)> = (0..10).map(|g| (300 + 50 * g, 50)).collect();
+    vec![
+        (*b"head", head(1000, false, 0)),
+        (*b"hhea", hhea(10)),
+        (*b"maxp", maxp(10)),
+        (*b"OS/2", os2(400, 0x40)),
+        (*b"hmtx", hmtx(&metrics)),
+        (
+            *b"cmap",
+            cmap_records(&[
+                (1, 1, cmap_high_byte()),
+                (
+                    3,
+                    10,
+                    cmap_mixed(&[(0x42, 0x42, 8), (0x1_f600, 0x1_f600, 4)]),
+                ),
+            ]),
+        ),
+        (
+            *b"name",
+            name(&[
+                (1, "Authored Charmaps"),
+                (2, "Regular"),
+                (4, "Authored Charmaps Regular"),
+                (6, "AuthoredCharmaps-Regular"),
+            ]),
+        ),
+        (*b"CFF ", program.build()),
+    ]
+}
+
 /// Authored fonts for the FreeType comparison: features the freely licensed
 /// corpus does not exercise. Named by their file in the corpus.
 pub fn authored_fonts() -> Vec<(&'static str, Vec<u8>)> {
@@ -1040,6 +1272,8 @@ pub fn authored_fonts() -> Vec<(&'static str, Vec<u8>)> {
             font(b"\0\x01\0\0", &cmap_formats_tables()),
         ),
         ("authored-cmap-order.ttc", collection(&cmap_order_faces())),
+        ("authored-vertical.ttc", collection(&vertical_faces())),
+        ("authored-charmaps.otf", font(b"OTTO", &charmaps_tables())),
     ]
 }
 

@@ -239,7 +239,11 @@ selective style overrides), in the frame and storage size and margins of its
   `triergon_raster::Raster::render`, quantised against its run, and each run
   composited with its blur, `\be` and shadow by `Raster::compose`; then each
   run's shadow, border and fill as images, clipped by the clip rectangle (with `\kf`'s
-  split), multiplied by a vector clip, and the box of `BorderStyle` 4.
+  split), multiplied by a vector clip, and the box of `BorderStyle` 4. A
+  vector clip whose drawing has no contour empties every image of a regular
+  clip and leaves those of an inverse clip, as libass's empty mask does; one
+  whose drawing libass cannot place (its centre 125,000 frame pixels or more
+  from the origin) is not applied, as in libass.
 - **The frame.** Events are taken in layer and read order, and in the
   script's order where both are equal (libass's `qsort` leaves that order
   unspecified; a whole script's events differ in ReadOrder, a stream's need
@@ -265,8 +269,13 @@ selective style overrides), in the frame and storage size and margins of its
 
 Settings beyond the frame and storage size (margins, `use_margins`, a pixel
 aspect, font scale, line spacing and position) follow libass's formulas but
-are not compared. Not rendered: the glyphs of `@` fonts, which libass draws
-rotated with vertical metrics (`Error::Unsupported`), libass's simple shaping
+are not compared. The glyphs of `@` fonts from U+02F1 on are drawn as libass
+draws them, turned by 90° about their scaled vertical advance and the
+typographic descender and advancing by their linear vertical advance, and are
+shaped with the default-load vertical advance of every glyph libass's glyph
+metrics cache keeps rotated: a glyph's first lookup through a character from
+U+02F1 decides, for the renderer's life and for each requested font (family,
+weight, slant), face and size, as libass keys that cache. Not rendered: libass's simple shaping
 level, its hinting modes, selective style overrides and track features.
 
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
@@ -388,7 +397,7 @@ outlines (each one built and its points), layout (a pass per stage over the
 glyphs, and one for every rebalancing pass), drawing (glyph bitmaps,
 composites and vector clips, charged as `triergon-raster` charges them) and
 collision handling (each event against those placed before it in its
-layer). The charge grows linearly with the events and their text. Where
+layer, and the merge sort of the placed boxes after each one joins them). The charge grows linearly with the events and their text. Where
 libass would go on drawing, running out is `Error::Policy`; a caller that
 wants libass's unbounded behaviour raises the setting. With the `work-probe`
 feature, a development aid, `Renderer::work_spent` gives what the last frame
@@ -413,21 +422,17 @@ panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
-- `ass-render` renders the 33 scripts and 3 packet streams of
+- `ass-render` renders the 35 scripts and 3 packet streams of
   `harness/fixtures/ass-render` as a player configures libass (attached fonts,
   a default family and font file, no system font provider, no hinting) at
   1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 66/72 pass. The
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): all 76 pass. The
   box behind a `BorderStyle` 4 event, whose type libass leaves uninitialised,
   is told by its own buffer, also after a collision shift has cut rows off its
-  top, and compared as a kind of its own. The six open cases are three
-  fixtures at both sizes: `cjk.ass`, with an `@` font; `language-unknown.ass`,
-  a `Language` HarfBuzz does not register, which `triergon-shape` refuses; and
-  `hinted-extents.ass`, fallback mark positioning, which reads FreeType's
-  hinted glyph extents.
+  top, and compared as a kind of its own.
 - `ass-render-host` renders, as `ass-render` does, the fixtures whose libass
   result differs by target (`border-x-overflow.ass`, and `collision-far-tops.ass`,
   colliding events whose boxes end up 2³¹ or more rows apart), each pinned for
@@ -450,11 +455,8 @@ with any specification of the format.
 
 ## Not here
 
-Vertical text (`@` fonts), libass's simple shaping level and hinting modes,
+libass's simple shaping level and hinting modes,
 its selective style override (`ass_set_selective_style_override`; with libass's
 default settings it changes nothing), track features (`ass_track_set_feature`),
 `ass_step_sub`, `ass_configure_prune` (a player calls
-`prune_events`), reading files and charset conversion. The charmap retry of a
-face selected for a character it does not map is `Error::Unsupported` for faces
-with format 2 or 8 `cmap` subtables and for CFF faces whose Unicode charmap
-FreeType synthesises, whose charmap order `triergon-font` does not reproduce.
+`prune_events`), reading files and charset conversion.

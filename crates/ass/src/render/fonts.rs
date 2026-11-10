@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Reservation, Result, WorkBudget};
 use triergon_font::{Charmap, FaceInfo, Font, GlyphId, Limits, Request, select};
 
 use crate::{EmbeddedFont, FontDesc, charge};
@@ -78,15 +78,7 @@ impl Face {
     /// each charmap is selected in turn, in FreeType's order, and `symbol`
     /// looked up through it. The face keeps the one that maps it, or the
     /// last one. A charmap is charged to `work` as it is tried.
-    ///
-    /// FreeType's order is the face's charmaps when this crate reads them all
-    /// ([`Font::lists_every_charmap`]); a face with others is `Unsupported`.
     fn try_every_charmap(&mut self, symbol: u32, work: &mut WorkBudget) -> Result<Option<GlyphId>> {
-        if !self.font.lists_every_charmap() {
-            return Err(Error::Unsupported(
-                "a charmap FreeType lists that this crate does not read",
-            ));
-        }
         for (index, charmap) in self.font.charmaps().enumerate() {
             charge(work, 1)?;
             self.charmap = Some(index);
@@ -404,8 +396,7 @@ impl Library {
     ///
     /// `Unsupported` where libass would look `symbol` up in a way this crate
     /// does not: through a charmap whose codes libass converts
-    /// ([`Font::text_lookup`]), or through every charmap of a face with some
-    /// this crate does not read.
+    /// ([`Font::text_lookup`]).
     pub(super) fn glyph(
         &mut self,
         id: FontId,

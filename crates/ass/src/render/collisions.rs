@@ -6,8 +6,6 @@ use std::ops::Range;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
-use triergon_raster as raster;
-
 use super::images::Image;
 use crate::{Event, EventState, VAlign, charge};
 
@@ -17,10 +15,7 @@ use crate::{Event, EventState, VAlign, charge};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Placed {
     renderer: u32,
-    top: i32,
-    height: i32,
-    left: i32,
-    width: i32,
+    rect: Rect,
 }
 
 impl Placed {
@@ -36,14 +31,7 @@ impl Placed {
     }
 
     fn clear(&mut self) {
-        *self = Self {
-            renderer: self.renderer,
-            ..Self::default()
-        };
-    }
-
-    fn rect(&self) -> Rect {
-        Rect::new(self.top, self.height, self.left, self.width)
+        self.rect = Rect::default();
     }
 }
 
@@ -53,10 +41,7 @@ pub(super) struct EventBox {
     pub event: usize,
     pub layer: i32,
     pub read_order: i32,
-    pub top: i32,
-    pub height: i32,
-    pub left: i32,
-    pub width: i32,
+    pub rect: Rect,
     pub detect_collisions: bool,
     /// Bottom-aligned events move up, others down.
     pub moves_up: bool,
@@ -65,22 +50,19 @@ pub(super) struct EventBox {
 
 impl EventBox {
     /// The box of event `index`, `event` of its script, in its state after
-    /// its text, over `area`, with its `images`.
+    /// its text, at `rect`, with its `images`.
     pub(super) fn new(
         index: usize,
         event: &Event,
         state: &EventState<'_>,
-        area: raster::Rect,
+        rect: Rect,
         images: Range<usize>,
     ) -> Self {
         Self {
             event: index,
             layer: event.layer,
             read_order: event.read_order,
-            top: area.y_min,
-            height: area.y_max.wrapping_sub(area.y_min),
-            left: area.x_min,
-            width: area.x_max.wrapping_sub(area.x_min),
+            rect,
             detect_collisions: state.detect_collisions,
             moves_up: state.alignment.vertical == VAlign::Bottom,
             images,
@@ -90,32 +72,49 @@ impl EventBox {
     /// Whether collision handling moves the event: it detects collisions and
     /// has an area.
     pub(super) fn takes_part(&self) -> bool {
-        self.detect_collisions && self.height != 0 && self.width != 0
-    }
-
-    fn rect(&self) -> Rect {
-        Rect::new(self.top, self.height, self.left, self.width)
+        self.detect_collisions && self.rect.height() != 0 && self.rect.width() != 0
     }
 }
 
-/// A box in frame pixels.
-#[derive(Clone, Copy, Debug, Default)]
-struct Rect {
-    y0: i32,
-    y1: i32,
-    x0: i32,
-    x1: i32,
+/// An event's box in frame pixels, as libass keeps it: a top and left edge
+/// with a height and width, whose far sides it adds in `int` arithmetic.
+/// The far sides are exclusive.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct Rect {
+    pub y0: i32,
+    pub y1: i32,
+    pub x0: i32,
+    pub x1: i32,
 }
 
 impl Rect {
     /// The box from `top` and `left` over `height` and `width`, its far
     /// sides added in wrapping `int` arithmetic as libass adds them.
-    const fn new(top: i32, height: i32, left: i32, width: i32) -> Self {
+    pub(super) const fn new(top: i32, height: i32, left: i32, width: i32) -> Self {
         Self {
             y0: top,
             y1: top.wrapping_add(height),
             x0: left,
             x1: left.wrapping_add(width),
+        }
+    }
+
+    /// The height libass keeps, which the sides give back exactly.
+    pub(super) const fn height(&self) -> i32 {
+        self.y1.wrapping_sub(self.y0)
+    }
+
+    /// The width libass keeps.
+    pub(super) const fn width(&self) -> i32 {
+        self.x1.wrapping_sub(self.x0)
+    }
+
+    /// The box moved down by `rows`.
+    const fn shifted(self, rows: i32) -> Self {
+        Self {
+            y0: self.y0.wrapping_add(rows),
+            y1: self.y1.wrapping_add(rows),
+            ..self
         }
     }
 
@@ -146,12 +145,13 @@ impl Fixed {
         }
     }
 
-    /// Empties the boxes and reserves room for `events` of them.
+    /// Empties the boxes and reserves room for `events` of them and for the
+    /// sort's scratch.
     fn reset(&mut self, events: usize) -> Result<()> {
         self.boxes.clear();
         self.merge.clear();
         self.boxes.try_reserve_exact(events)?;
-        self.merge.try_reserve_exact(events)
+        self.merge.try_resize(events, Rect::default())
     }
 
     /// Adds `rect` after the boxes, unsorted.
@@ -159,36 +159,18 @@ impl Fixed {
         self.boxes.try_push(rect).map_err(|e| e.error)
     }
 
-    /// Sorts the boxes as libass does, with `qsort` and `cmp_rect_y0`, which
-    /// glibc runs as a stable merge sort. While no two tops lie 2³¹ or more
-    /// apart the comparison orders them by value and the sort keeps boxes
-    /// with equal tops in the order they were added, as an insertion sort
-    /// does in place; otherwise the sort is glibc's own, step for step,
-    /// whose result then depends on how it splits and merges.
+    /// Sorts the boxes as libass does on glibc: `qsort` with `cmp_rect_y0`,
+    /// which glibc runs as a stable merge sort. While no two tops lie 2³¹ or
+    /// more apart that orders them by value, boxes with equal tops in the
+    /// order they were added; otherwise the order follows the sort's splits
+    /// and merges. Charged as the merges' comparisons.
     fn sort(&mut self, work: &mut WorkBudget) -> Result<()> {
         let boxes = self.boxes.as_mut_slice();
-        let Some((low, high)) = boxes
-            .iter()
-            .map(|r| (r.y0, r.y0))
-            .reduce(|(l, h), (a, b)| (l.min(a), h.max(b)))
-        else {
-            return Ok(());
-        };
-        if high.abs_diff(low) <= i32::MAX.unsigned_abs() {
-            for end in 1..boxes.len() {
-                let mut i = end;
-                while i > 0 && boxes[i - 1].y0 > boxes[i].y0 {
-                    boxes.swap(i - 1, i);
-                    i -= 1;
-                }
-            }
-            return Ok(());
-        }
         let n = boxes.len();
-        charge(work, n.saturating_mul(n.ilog2() as usize + 1))?;
-        self.merge.clear();
-        self.merge.try_resize(n, Rect::default())?;
-        merge_sort(boxes, self.merge.as_mut_slice());
+        if n > 1 {
+            charge(work, n.saturating_mul(n.ilog2() as usize + 1))?;
+            merge_sort(boxes, &mut self.merge.as_mut_slice()[..n]);
+        }
         Ok(())
     }
 
@@ -237,7 +219,7 @@ fn shift(event: &mut EventBox, images: &mut [Image], shift: i32, frame_height: i
     for image in &mut images[event.images.clone()] {
         image.shift(shift, frame_height);
     }
-    event.top = event.top.wrapping_add(shift);
+    event.rect = event.rect.shifted(shift);
 }
 
 /// `fit_rect`: the shift that moves `s` clear of every fixed box it meets,
@@ -264,20 +246,15 @@ fn fit(s: Rect, fixed: &mut Fixed, up: bool, work: &mut WorkBudget) -> Result<i3
             }
         }
     }
-    let moved = Rect {
-        y0: s.y0.wrapping_add(shift),
-        y1: s.y1.wrapping_add(shift),
-        ..s
-    };
-    fixed.insert(moved, work)?;
+    fixed.insert(s.shifted(shift), work)?;
     Ok(shift)
 }
 
 /// `fix_collisions` over the events of one layer and their records: those
 /// placed before keep their place unless it changed height or now overlaps,
-/// the others move clear of them. `used` is reserved for every event before
-/// any record changes, so a refused reservation leaves the records as they
-/// were.
+/// the others move clear of them. Charged each event against those placed
+/// before it, and the sorts. `used` is reserved for every event before any
+/// record changes, so a refused reservation leaves the records as they were.
 pub(super) fn fix(
     events: &mut [EventBox],
     placed: &mut [Placed],
@@ -287,6 +264,8 @@ pub(super) fn fix(
     frame_height: i32,
     work: &mut WorkBudget,
 ) -> Result<()> {
+    let taking_part = events.iter().filter(|e| e.takes_part()).count();
+    charge(work, taking_part.saturating_mul(taking_part))?;
     // Each event joins the boxes at most once.
     used.reset(events.len())?;
     for (event, record) in events.iter_mut().zip(placed.iter_mut()) {
@@ -294,19 +273,19 @@ pub(super) fn fix(
             continue;
         }
         let record = record.for_renderer(renderer);
-        if record.height <= 0 {
+        if record.rect.height() <= 0 {
             continue;
         }
-        let s = record.rect();
-        if record.height != event.height {
+        let s = record.rect;
+        if record.rect.height() != event.rect.height() {
             record.clear();
         }
         if used.as_slice().iter().any(|u| s.overlaps(u)) {
             record.clear();
         }
-        if record.height > 0 {
-            used.push(record.rect())?;
-            let by = record.top.wrapping_sub(event.top);
+        if record.rect.height() > 0 {
+            used.push(record.rect)?;
+            let by = record.rect.y0.wrapping_sub(event.rect.y0);
             shift(event, images, by, frame_height);
         }
     }
@@ -316,19 +295,16 @@ pub(super) fn fix(
             continue;
         }
         let record = record.for_renderer(renderer);
-        if record.height != 0 {
+        if record.rect.height() != 0 {
             continue;
         }
-        let by = fit(event.rect(), used, event.moves_up, work)?;
+        let by = fit(event.rect, used, event.moves_up, work)?;
         if by != 0 {
             shift(event, images, by, frame_height);
         }
         *record = Placed {
             renderer,
-            top: event.top,
-            height: event.height,
-            left: event.left,
-            width: event.width,
+            rect: event.rect,
         };
     }
     Ok(())

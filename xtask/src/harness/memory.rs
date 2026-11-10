@@ -1115,21 +1115,30 @@ fn measure(
     seed: u64,
     certificate: &Value,
     invocation: Invocation<'_>,
-) -> R<Value> {
+) -> Value {
     if s(certificate, "status") != Some("qualified-selected-workers") {
-        return Ok(obj(vec![
+        return obj(vec![
             ("status", Value::str("observer-unqualified")),
             ("certificate", certificate.clone()),
-        ]));
+        ]);
     }
     let linux = s(certificate, "platform") == Some("Linux");
     if linux && !linux::certificate_current(root, certificate) {
-        return Ok(obj(vec![
+        return obj(vec![
             ("status", Value::str("instrumentation-changed")),
             ("certificate", certificate.clone()),
-        ]));
+        ]);
     }
-    let input_sha = file_sha(invocation.input)?;
+    let input_sha = match file_sha(invocation.input) {
+        Ok(hash) => hash,
+        Err(error) => {
+            return obj(vec![
+                ("status", Value::str("input-check-failed")),
+                ("input_error", Value::str(error)),
+                ("certificate", certificate.clone()),
+            ]);
+        }
+    };
     let mut rng = PyRandom::new(seed);
     let kernel = certificate
         .get("kernel_rss_required")
@@ -1182,13 +1191,18 @@ fn measure(
         )
     };
     push(&mut result, "input_sha256", Value::str(&input_sha));
-    if file_sha(invocation.input)? != input_sha {
-        push(&mut result, "status", Value::str("input-changed"));
+    match file_sha(invocation.input) {
+        Ok(hash) if hash == input_sha => (),
+        Ok(_) => push(&mut result, "status", Value::str("input-changed")),
+        Err(error) => {
+            push(&mut result, "status", Value::str("input-check-failed"));
+            push(&mut result, "input_error", Value::str(error));
+        }
     }
     if linux && !linux::certificate_current(root, certificate) {
         push(&mut result, "status", Value::str("instrumentation-changed"));
     }
-    Ok(result)
+    result
 }
 
 /// Check the exact worker closure and emit the observer's calibration results.
@@ -1397,7 +1411,7 @@ fn collect_invocation(
         seed,
         &certificate,
         invocation,
-    )?;
+    );
     let after = cpu_snapshot()?;
     let contaminants = active_cpu(&before, &after, false);
     push(&mut result, "cpu_before", before);
@@ -1531,6 +1545,37 @@ pub fn evidence_valid_with_outputs(
 #[cfg(test)]
 mod command_tests {
     use super::*;
+
+    #[test]
+    fn unreadable_memory_input_returns_a_failed_row() {
+        let root = crate::walk::scratch("unreadable-memory-input");
+        let input = root.join("missing.ts");
+        let certificate = Value::object([("status", Value::str("qualified-selected-workers"))]);
+        let result = measure(
+            &Native {
+                root: &root,
+                timeout: worker::DEFAULT_TIMEOUT,
+            },
+            &root,
+            &root,
+            &root,
+            1,
+            0,
+            &certificate,
+            Invocation {
+                operation: Some("memory"),
+                input: &input,
+                arguments: &[],
+                candidate_arguments: None,
+                expected_outputs: None,
+                work_fields: None,
+                timeout: worker::DEFAULT_TIMEOUT,
+            },
+        );
+        assert_eq!(s(&result, "status"), Some("input-check-failed"));
+        assert!(s(&result, "input_error").unwrap().contains("missing.ts"));
+        assert_eq!(result.get("certificate"), Some(&certificate));
+    }
 
     #[test]
     fn memory_work_requires_both_digests_even_when_all_roles_omit_the_second() {

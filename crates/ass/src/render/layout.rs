@@ -8,10 +8,9 @@ use triergon_core::{Budget, BudgetVec, Result, WorkBudget, round_ties_even_i32};
 use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::Level;
 
-use super::cache::Kept;
 use super::fonts::Library;
 use super::geometry::{Geometry, Scales};
-use super::outlines::{GlyphKey, OutlineValue, Outlines};
+use super::outlines::{GlyphKey, KeptOutline, Outlines};
 use super::shaping::{Shaped, ShapedGlyph, Shaping};
 use super::text::{Char, Evaluated, Text};
 use super::units::{d6_to_double, fmax};
@@ -24,7 +23,7 @@ use crate::{
 /// An outline and how it is scaled to the frame.
 #[derive(Clone, Debug)]
 pub(super) struct ScaledOutline {
-    pub(super) value: Kept<OutlineValue>,
+    pub(super) value: KeptOutline,
     /// From outline units to 26.6.
     pub(super) scale: [f64; 2],
     /// Added to y after the scale, 26.6: a drawing's baseline offset.

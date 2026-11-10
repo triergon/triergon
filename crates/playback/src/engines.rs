@@ -3,7 +3,7 @@ use crate::{
     Format, Result, SeekIntent, TrackKey, TrackKind,
     io::provide,
     mp4_native_replay::{NativeMp4Replay, NativeMp4ReplayStep},
-    mp4_open::{PendingMedia, RETAINED_MEDIA_BYTES},
+    mp4_open::PendingMedia,
     mp4_plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -341,6 +341,10 @@ pub(crate) enum NativePacket {
 }
 
 #[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "return original transport events without a heap allocation"
+)]
 pub(crate) enum TsPayloadStep {
     Event(TsEvent),
     Configuration(TsNativeConfiguration),
@@ -385,6 +389,7 @@ trait TsStepProjection: Sized {
 }
 
 impl TsStepProjection for BackendStep {
+    #[inline(always)]
     fn project(step: TsPayloadStep) -> Result<Self> {
         Ok(match step {
             TsPayloadStep::Event(event) => Self::Event(RawEvent::Ts(event)),
@@ -418,6 +423,7 @@ impl TsStepProjection for BackendStep {
 }
 
 impl TsStepProjection for TsPayloadStep {
+    #[inline]
     fn project(step: Self) -> Result<Self> {
         Ok(step)
     }
@@ -540,7 +546,10 @@ impl Engine {
             maximum_packet,
         };
         if engine.plan.replay_native_order {
-            engine.begin_media_replay()?;
+            engine.replay_media = Some(crate::progressive::prepare_media_replay(
+                &engine.input,
+                &mut engine.plan,
+            )?);
         }
         Ok(Self::Mp4(engine))
     }
@@ -1150,50 +1159,6 @@ impl Mp4Engine {
             && self.input.capabilities().random_access
     }
 
-    pub(crate) fn stage_native_empty_run(
-        &mut self,
-        boundary: FrontReadBoundary,
-        time_base: TimeBase,
-        duration: i64,
-        remaining: u32,
-    ) {
-        self.native_empty_run = Some((
-            Mp4NativeEmptyPacket {
-                boundary,
-                time_base,
-                handler: *b"vide",
-                pts: 0,
-                dts: 0,
-                duration,
-                position: 0,
-                flags: 0,
-            },
-            remaining,
-        ));
-    }
-
-    pub(crate) fn begin_media_replay(&mut self) -> Result<()> {
-        let [extent] = self.plan.media.as_slice() else {
-            return Err(Error::Unsupported(
-                "native replay needs a finite media extent",
-            ));
-        };
-        if self.input.position() != extent.start || self.input.capabilities().random_access {
-            return Err(Error::Invalid("native replay source position"));
-        }
-        let length = extent.end - extent.start;
-        if !(1..=RETAINED_MEDIA_BYTES as u64).contains(&length) {
-            return Err(Error::Unsupported(
-                "native replay exceeds media cache bound",
-            ));
-        }
-        let pending = PendingMedia::new(extent.start, length as usize, self.input.budget())?;
-        self.plan.media_cache.try_reserve_exact(1)?;
-        self.replay_media = Some(pending);
-        self.plan.replay_native_order = true;
-        Ok(())
-    }
-
     fn packet_config(&self, at_track: usize, description: u32) -> Result<Mp4Configuration> {
         let revision = self.configs[at_track]
             .ok_or(Error::Invalid("configuration missing"))?
@@ -1257,12 +1222,17 @@ impl Mp4Engine {
     }
 
     fn poll_progressive(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
-        if let Some(mut state) = self.progressive.take() {
-            let result = state.poll(self, w, c);
-            self.progressive = Some(state);
-            return result;
-        }
-        Ok(BackendStep::End)
+        let Some(state) = self.progressive.as_mut() else {
+            return Ok(BackendStep::End);
+        };
+        let mut continuation = crate::progressive::Continuation {
+            input: &mut self.input,
+            plan: &mut self.plan,
+            row: &mut self.row,
+            replay_media: &mut self.replay_media,
+            native_empty_run: &mut self.native_empty_run,
+        };
+        state.poll(&mut continuation, w, c)
     }
 
     fn poll_unavailable_first(
@@ -1887,19 +1857,18 @@ impl TsEngine {
         index: usize,
         mut packet: ts::TransportPacket,
         context: SourceContext,
-        ready: Option<(&mut WorkBudget, &AtomicBool)>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<bool> {
         let track = &mut self.native_tracks.as_mut_slice()[index];
         if let Some(observer) = track.observer.as_mut() {
-            if let Some((work, cancel)) = ready {
-                match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
-                    ReadyContinuation::Buffered => return Ok(true),
-                    ReadyContinuation::Complete => {
-                        self.native_active = Some(index);
-                        return Ok(false);
-                    }
-                    ReadyContinuation::Unhandled => {}
+            match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
+                ReadyContinuation::Buffered => return Ok(true),
+                ReadyContinuation::Complete => {
+                    self.native_active = Some(index);
+                    return Ok(false);
                 }
+                ReadyContinuation::Unhandled => {}
             }
             let pushed = if self.native_context.is_some() {
                 observer.push_with_input(packet, context, &self.input)
@@ -2089,13 +2058,15 @@ impl TsEngine {
                 match result {
                     Ok(ts::AssemblyStep::Output(packet)) => {
                         self.native_pending = Some(packet);
-                        if matches!(
-                            self.segment_discovery,
-                            Some(
-                                SegmentDiscovery::Progressive
-                                    | SegmentDiscovery::CompactProgressive
+                        if self.segment_discovery.is_none()
+                            || matches!(
+                                self.segment_discovery,
+                                Some(
+                                    SegmentDiscovery::Progressive
+                                        | SegmentDiscovery::CompactProgressive
+                                )
                             )
-                        ) {
+                        {
                             return self.project_pending_packet(w, c);
                         }
                         return T::project(TsPayloadStep::Yield);
@@ -2314,8 +2285,7 @@ impl TsEngine {
                     TraceEvent::Transport(packet) => {
                         if let Some(index) = self.native_tracks.index(packet.pid) {
                             let context = self.native_source_context();
-                            drained =
-                                self.offer_native_transport(index, packet, context, Some((w, c)))?;
+                            drained = self.offer_native_transport(index, packet, context, w, c)?;
                         }
                     }
                     TraceEvent::Pes(_) if self.program == 0 => {
@@ -2375,7 +2345,36 @@ impl TsEngine {
                 && let Some(index) = self.native_tracks.index(packet.pid)
             {
                 let context = self.native_source_context();
-                self.offer_native_transport(index, packet.clone(), context, None)?;
+                let track = &mut self.native_tracks.as_mut_slice()[index];
+                if let Some(observer) = track.observer.as_mut() {
+                    // Keep one unit for delivery of the original source event.
+                    let ready = if w.remaining() >= 3 {
+                        observer.append_ready_borrowed_continuation(
+                            packet,
+                            context,
+                            &self.input,
+                            w,
+                            c,
+                        )?
+                    } else {
+                        ReadyContinuation::Unhandled
+                    };
+                    match ready {
+                        ReadyContinuation::Buffered => {}
+                        ReadyContinuation::Complete => self.native_active = Some(index),
+                        ReadyContinuation::Unhandled => match observer.push_borrowed(
+                            packet,
+                            context,
+                            self.native_context.as_ref().map(|_| &self.input),
+                        ) {
+                            Ok(()) => self.native_active = Some(index),
+                            Err(error) => {
+                                track.refuse(error);
+                                self.native_update_at = Some(index);
+                            }
+                        },
+                    }
+                }
             }
             self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
             if matches!(event, TraceEvent::Finished) {
@@ -2462,6 +2461,7 @@ impl RawEvent {
             _ => Ok(None),
         }
     }
+    #[inline]
     pub fn payload_bytes(&self) -> usize {
         match self {
             Self::NativeTs { packet, .. } => packet.payload_len,

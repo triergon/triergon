@@ -35,8 +35,9 @@ pub const USAGE: &str = "usage: cargo xtask shape prepare [--jobs N]
             goes to OUTPUT/<feature> (OUTPUT: --output, default
             .research/shape-report)
   ucd       fetch the hash-pinned Unicode Character Database files and regenerate
-            the tables in crates/shape/src/unicode; --check fails if they would
-            change";
+            the tables in crates/shape/src/unicode, and the language tags in
+            crates/shape/src/language from the unpacked HarfBuzz release; --check
+            fails if they would change";
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {

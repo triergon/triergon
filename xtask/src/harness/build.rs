@@ -75,6 +75,34 @@ fn run(argv: &[String]) -> R<()> {
     }
 }
 
+pub(crate) fn test_transport_entities(root: &Path) -> R<()> {
+    let profile = PROFILE_REFERENCES
+        .iter()
+        .find(|profile| profile.record == "ffmpeg-formats-native")
+        .expect("formats reference profile");
+    let pkgconfig = root.join(profile.profile).join("install/lib/pkgconfig");
+    let mut query = vec!["--static", "--cflags", "--libs"];
+    query.extend(profile.packages);
+    let flags = output(
+        "pkg-config",
+        &query,
+        &[("PKG_CONFIG_LIBDIR", pkgconfig.display().to_string())],
+    )?;
+    let binary = root.join("target/harness/reference-ts-sequence-test");
+    let mut command = vec![std::env::var("CC").unwrap_or_else(|_| "cc".into())];
+    command.extend(profile.options.iter().map(ToString::to_string));
+    command.extend(profile.define.map(str::to_owned));
+    command.push(
+        root.join("harness/reference_ts_sequence_test.c")
+            .display()
+            .to_string(),
+    );
+    command.extend(shell_words(&flags)?);
+    command.extend(["-o".into(), binary.display().to_string()]);
+    run(&command)?;
+    run(&[binary.display().to_string(), root.display().to_string()])
+}
+
 /// POSIX shell word splitting of `pkg-config` output (quotes and backslashes).
 pub fn shell_words(text: &str) -> R<Vec<String>> {
     let (mut words, mut word, mut active) = (Vec::new(), String::new(), false);
@@ -266,10 +294,16 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 11] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 12] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "transport-worker",
+        package: "transport-worker",
         example: None,
         features: &[],
     },
@@ -350,6 +384,9 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let mut inputs = shared_inputs(root)?;
     if name == "isobmff-worker" {
         inputs.extend(crate::isobmff_bench::source_inputs(root)?);
+    }
+    if name == "transport-worker" {
+        inputs.extend(crate::transport_fixtures::entity_inputs(root)?);
     }
     if name == "framing-worker" {
         inputs.extend(

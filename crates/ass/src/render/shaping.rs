@@ -5,15 +5,19 @@
 //! character a cluster of glyphs. The bidi levels give the visual order of
 //! each line once lines are known (`ass_shaper_reorder`).
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Range;
 
-use triergon_core::{Budget, BudgetVec, Reservation, Result, WorkBudget, round_ties_even_i32};
+use triergon_core::{
+    Budget, BudgetVec, Error, Reservation, Result, WorkBudget, round_ties_even_i32,
+};
 use triergon_font::GlyphId;
 use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::{BaseDirection, BidiClass, Level, Resolver, reorder_line};
 use triergon_shape::{
-    Buffer, Direction, Face, Feature, Language, Plan, Script as WritingScript, SizedMetrics, Tag,
+    Buffer, Direction, Face, FaceRotations, Feature, GlyphRotations, Language, Plan,
+    Script as WritingScript, SizedMetrics, Tag,
 };
 
 use super::fonts::Library;
@@ -140,15 +144,20 @@ const RUN_UNITS: usize = 16;
 const MAX_PLANS: usize = 256;
 /// Bytes charged per plan beyond its own storage.
 const PLAN_ENTRY_BYTES: usize = 256;
-
 /// The shaper's state: a buffer, a bidi resolver, the plans built so far,
 /// and storage for the event being shaped.
 #[derive(Debug)]
 pub(super) struct Shaper {
     budget: Budget,
+    /// libass's glyph metrics cache for `@` fonts, which it never cuts:
+    /// whether each glyph's metrics are rotated, for the renderer's life.
+    rotations: RefCell<GlyphRotations<RotationKey>>,
+    /// The `@` font descriptions the cache has decisions for.
+    vertical_fonts: VerticalFonts,
     buffer: Buffer,
     resolver: Resolver,
     plans: HashMap<PlanKey, Plan>,
+    /// The plans' storage.
     charge: Reservation,
     /// The event's text as HarfBuzz reads it.
     text: BudgetVec<char>,
@@ -157,6 +166,74 @@ pub(super) struct Shaper {
     /// The glyphs shaping gave each character of the item being shaped,
     /// then where its cluster's next one goes.
     counts: BudgetVec<usize>,
+}
+
+/// What libass keys its glyph metrics cache by, besides the glyph: the font
+/// (the number of its description among [`VerticalFonts`]), the face and the
+/// size.
+type RotationKey = (u32, u32, u64);
+
+/// The descriptions of the `@` fonts asked for (family, weight and slant),
+/// numbered, as libass keys its glyph metrics cache by font: sorted by
+/// description and found by binary search, in storage charged to the budget
+/// before it grows.
+#[derive(Debug)]
+struct VerticalFonts {
+    /// By family name, weight and slant.
+    fonts: BudgetVec<VerticalFont>,
+    /// The family names, one after another.
+    names: BudgetVec<u8>,
+}
+
+/// An `@` font description: where its family name is in
+/// [`VerticalFonts::names`], its weight and slant, and its number.
+#[derive(Clone, Copy, Debug)]
+struct VerticalFont {
+    name: (usize, usize),
+    weight: u32,
+    slant: u32,
+    id: u32,
+}
+
+impl VerticalFonts {
+    fn new(budget: &Budget) -> Self {
+        Self {
+            fonts: BudgetVec::new(budget),
+            names: BudgetVec::new(budget),
+        }
+    }
+
+    /// The number of the description of `family`, `weight` and `slant`.
+    fn id(&mut self, family: &[u8], weight: u32, slant: u32) -> Result<u32> {
+        let names = self.names.as_slice();
+        let found = self.fonts.as_slice().binary_search_by(|f| {
+            let (start, len) = f.name;
+            (&names[start..start + len], f.weight, f.slant).cmp(&(family, weight, slant))
+        });
+        let at = match found {
+            Ok(i) => return Ok(self.fonts.as_slice()[i].id),
+            Err(at) => at,
+        };
+        let id = u32::try_from(self.fonts.len()).map_err(|_| Error::Overflow)?;
+        let name = (self.names.len(), family.len());
+        // Grown geometrically, as the descriptions accumulate for the
+        // renderer's life.
+        let spare = self.names.capacity() - self.names.len();
+        if spare < family.len() {
+            self.names
+                .try_reserve_exact(family.len().max(self.names.capacity()))?;
+        }
+        self.names.try_extend_from_slice(family)?;
+        let font = VerticalFont {
+            name,
+            weight,
+            slant,
+            id,
+        };
+        self.fonts.try_push(font).map_err(|e| e.error)?;
+        self.fonts.as_mut_slice()[at..].rotate_right(1);
+        Ok(id)
+    }
 }
 
 /// What finding runs gives a character (`ass_shaper_find_runs`).
@@ -263,6 +340,8 @@ impl Shaper {
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
             budget: budget.clone(),
+            rotations: RefCell::new(GlyphRotations::new(budget)),
+            vertical_fonts: VerticalFonts::new(budget),
             buffer: Buffer::new(budget),
             resolver: Resolver::new(budget),
             plans: HashMap::new(),
@@ -491,7 +570,16 @@ impl Shaper {
         let sized = face_font
             .font
             .at_size(pixels_26_6(text.style(first).size))?;
-        let metrics = SizedMetrics::with_charmap(sized, face_font.charmap())?;
+        let mut metrics = SizedMetrics::with_charmap(sized, face_font.charmap(), work)?;
+        let rotations;
+        if font.vertical() {
+            let id = self
+                .vertical_fonts
+                .id(font.family(), font.weight(), font.slant())?;
+            let size = text.style(first).size.to_bits();
+            rotations = FaceRotations::new(&self.rotations, (id, face_font.uid, size));
+            metrics = metrics.rotating(&rotations);
+        }
         let shaper_face = Face::new(&face_font.font);
         let key = PlanKey {
             face: face_font.uid,
@@ -504,18 +592,17 @@ impl Shaper {
             if self.plans.len() >= MAX_PLANS {
                 self.plans.clear();
             }
-            let code = language.split(|&b| b == 0).next().unwrap_or_default();
+            self.charge
+                .resize_to((self.plans.len() + 1).saturating_mul(PLAN_ENTRY_BYTES))?;
             let plan = Plan::new(
                 &shaper_face,
                 direction,
                 script,
-                &Language::new(std::str::from_utf8(code).unwrap_or("c"))?,
+                &Language::new(language),
                 &plan_features(features),
                 &self.budget,
             )?;
             self.plans.insert(key, plan);
-            self.charge
-                .resize_to(self.plans.len().saturating_mul(PLAN_ENTRY_BYTES))?;
         }
         let base = context.start;
         triergon_shape::shape(

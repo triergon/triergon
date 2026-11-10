@@ -14,6 +14,8 @@ impl ElementaryStream {
     /// AVC and 0x24 to HEVC. PES private data
     /// (0x06) names a codec only through a DVB descriptor, so only under a DVB
     /// [`DescriptorNamespace`] ([`Self::dvb_descriptor_codec`]).
+    /// ATSC A/53 Part 3 §5.7 assigns 0x81 and 0x87 to AC-3 and E-AC-3
+    /// in an explicitly selected ATSC namespace.
     pub fn codec(&self) -> Option<CodecId<'static>> {
         match self.stream_type {
             0x01 | 0x02 => Some(CodecId::Mpeg2Video),
@@ -22,6 +24,8 @@ impl ElementaryStream {
             0x11 => Some(CodecId::AacLatm),
             0x1b => Some(CodecId::H264),
             0x24 => Some(CodecId::Hevc),
+            0x81 if self.namespace == DescriptorNamespace::Atsc => Some(CodecId::Ac3),
+            0x87 if self.namespace == DescriptorNamespace::Atsc => Some(CodecId::Eac3),
             PES_PRIVATE_DATA if matches!(self.namespace, DescriptorNamespace::Dvb(_)) => {
                 self.dvb_descriptor_codec()
             }

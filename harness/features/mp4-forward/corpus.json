@@ -78,6 +78,21 @@
       }
     },
     {
+      "id": "regular-unknown-movie-duration",
+      "profile": "regular-unknown-movie-duration",
+      "file": "crates/playback/tests/fixtures/mp4/r-unknown-movie-duration.mov",
+      "sha256": "1688b0dc51fc97be4007b2750d8cb56a8dbdbeb090294e7c028d18a92e2e12f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "regular"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 72,
+        "digest": 5105473628434783124
+      }
+    },
+    {
       "id": "regular-r-multiple-mdats",
       "profile": "regular-r-multiple-mdats",
       "file": "crates/playback/tests/fixtures/mp4/r-multiple-mdats.mov",

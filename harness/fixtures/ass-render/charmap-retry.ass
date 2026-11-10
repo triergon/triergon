@@ -1,0 +1,24 @@
+;@default-font authored/authored-charmaps.otf
+;@frames 0 500 1500
+; A fallback face whose charmaps are a format 2 subtable, a format 8 one, the
+; Unicode charmap FreeType builds from its glyph names and its CFF encoding.
+; libass reads text through the format 8 subtable and tries every charmap in
+; FreeType's order for a character that does not map, keeping the one that
+; maps it, or the last: B through format 8, A through format 2, é and the emoji
+; through the glyph names, À only through the encoding, Δ through FreeType's
+; second mapping of Delta, Ω through none, and B again through format 2.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Missing,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,BAé😀ÀΔΩB
+Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,é A

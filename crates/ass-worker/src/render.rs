@@ -22,7 +22,7 @@ use triergon_ass::{
 use triergon_core::{Budget, Bytes};
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 
-use crate::fixture::{Command, Fixture, Frames as Frames_};
+use crate::fixture::{Command, Fixture, Frames as Frames_, frames_error};
 use crate::perform::{Result, parse};
 use crate::record::{self, Work};
 
@@ -313,6 +313,9 @@ pub fn run(args: &[String]) -> Result<()> {
         _ => return Err(USAGE.into()),
     };
     let data = std::fs::read(path)?;
+    if let Some(error) = frames_error(&data, stream) {
+        return Err(error.into());
+    }
     let fixture = Fixture::read(&data, stream);
     let fonts = Path::new(fonts);
     let case = Case {
