@@ -156,15 +156,18 @@ impl Anchor {
     }
 
     /// The event's box for collision handling, in frame pixels: its lines
-    /// and their borders, with VSFilter's biased roundings.
+    /// and their borders, with VSFilter's biased roundings. The border on
+    /// both sides is doubled in wrapping `int` arithmetic, as libass doubles
+    /// it (`ass_render.c:3001-3003`), so a border beyond 2^30 pixels gives
+    /// the box libass gives where `int` overflow wraps.
     pub(super) fn event_box(&self, layout: &Layout, par: f64) -> Rect {
         let (lines, text_box) = (&layout.lines, &layout.text_box);
         let top = (self.y - lines.first().asc - f64::from(lines.border_top)) as i32;
         let height =
             (lines.height + f64::from(lines.border_bottom) + f64::from(lines.border_top)) as i32;
-        let border_x = f64::from(lines.border_x);
-        let left = ((self.x + text_box.x_min) * par - border_x + 0.5) as i32;
-        let width = ((text_box.x_max - text_box.x_min) * par + 2.0 * border_x + 0.5) as i32;
+        let left = ((self.x + text_box.x_min) * par - f64::from(lines.border_x) + 0.5) as i32;
+        let both_sides = f64::from(lines.border_x.wrapping_mul(2));
+        let width = ((text_box.x_max - text_box.x_min) * par + both_sides + 0.5) as i32;
         Rect::new(
             left,
             top,

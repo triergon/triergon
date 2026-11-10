@@ -222,8 +222,9 @@ impl Painter {
 
     /// The bitmap of `outline` under a plain matrix, placed on its own: a
     /// vector clip, which libass draws through its bitmap cache too
-    /// (`blend_vector_clip`), and holds while it clips. `None` when nothing
-    /// is drawn.
+    /// (`blend_vector_clip`), and holds while it clips. `None` when the
+    /// matrix cannot be quantised; a drawing that draws nothing gives a
+    /// bitmap without pixels.
     pub(super) fn draw_shape(
         &mut self,
         outline: &Kept<OutlineValue>,
@@ -240,6 +241,7 @@ impl Painter {
         let raster = &mut self.raster;
         self.bitmaps
             .get(raster, key, &outline.shape, None, at, work)
+            .map(Some)
     }
 
     /// Draws and combines an event's runs, in order, into `out`.
@@ -427,7 +429,7 @@ impl GlyphSource for CachedBitmaps<'_> {
         };
         let found = self
             .bitmaps
-            .get(raster, key.clone(), shape, None, at, work)?;
+            .drawn(raster, key.clone(), shape, None, at, work)?;
         self.fill = found.is_some().then_some(key);
         Ok(found)
     }
@@ -451,7 +453,7 @@ impl GlyphSource for CachedBitmaps<'_> {
         let shape = &unit_box.shape;
         let found = self
             .bitmaps
-            .get(raster, key.clone(), shape, None, at, work)?;
+            .drawn(raster, key.clone(), shape, None, at, work)?;
         self.border = found.is_some().then_some(key);
         Ok(found)
     }
@@ -477,7 +479,7 @@ impl GlyphSource for CachedBitmaps<'_> {
         let shape = &border.shape;
         let found = self
             .bitmaps
-            .get(raster, key.clone(), shape, Some(&border), at, work)?;
+            .drawn(raster, key.clone(), shape, Some(&border), at, work)?;
         self.border = found.is_some().then_some(key);
         Ok(found)
     }
@@ -492,8 +494,8 @@ struct Bitmaps {
 
 impl Bitmaps {
     /// The bitmap of `shape` under `key`, placed at `at`: from the cache, or
-    /// drawn and kept with `drawn_from`. `None` when it draws nothing, which
-    /// is kept too.
+    /// drawn and kept with `drawn_from`. A shape that draws nothing gives a
+    /// bitmap without pixels, which is kept too, as libass keeps it.
     fn get(
         &mut self,
         raster: &mut Raster,
@@ -502,12 +504,11 @@ impl Bitmaps {
         drawn_from: Option<&Kept<OutlineValue>>,
         at: Quantized,
         work: &mut WorkBudget,
-    ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
+    ) -> Result<PlacedBitmap<SharedBitmap>> {
         charge(work, LOOKUP_UNITS)?;
         let kept = match self.cache.get(&key) {
             Lookup::Hit(kept) => kept,
-            // Never kept: a bitmap that draws nothing is kept empty.
-            Lookup::Empty => return Ok(None),
+            Lookup::Empty => unreachable!("bitmaps are kept with a value"),
             Lookup::Miss => {
                 let bitmap = match raster.draw(shape, &at.transform, work)? {
                     Some(bitmap) => bitmap,
@@ -528,11 +529,25 @@ impl Bitmaps {
                 self.cache.insert(key, kept, size)?
             }
         };
-        // Drawn bitmaps are never empty.
-        Ok((kept.bitmap.width() != 0).then(|| PlacedBitmap {
+        Ok(PlacedBitmap {
             bitmap: SharedBitmap(kept),
             origin: at.position,
-        }))
+        })
+    }
+
+    /// [`Bitmaps::get`] for a glyph, whose bitmaps are never empty: `None`
+    /// when it draws nothing.
+    fn drawn(
+        &mut self,
+        raster: &mut Raster,
+        key: BitmapKey,
+        shape: &Shape,
+        drawn_from: Option<&Kept<OutlineValue>>,
+        at: Quantized,
+        work: &mut WorkBudget,
+    ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
+        let found = self.get(raster, key, shape, drawn_from, at, work)?;
+        Ok((found.bitmap.width() != 0).then_some(found))
     }
 }
 

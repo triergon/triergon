@@ -449,7 +449,11 @@ impl Pipeline {
         )
     }
 
-    /// The vector clip drawn in the frame, if the event has one that draws.
+    /// The vector clip drawn in the frame, if the event has one whose
+    /// drawing can be placed. A drawing without a contour gives a mask
+    /// without pixels, which empties every image a regular clip clips and
+    /// leaves those of an inverse clip, as `blend_vector_clip` does with the
+    /// empty bitmap libass keeps for it (`ass_render.c:700-813`).
     fn vector_clip(
         &mut self,
         geometry: &Geometry<'_>,
