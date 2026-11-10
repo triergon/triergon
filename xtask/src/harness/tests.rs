@@ -993,7 +993,7 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
             checked += 1;
         }
     }
-    assert_eq!(checked, 921);
+    assert_eq!(checked, 922);
     let mut contract = load("harness/features/matroska-zlib/contract.json");
     put(&mut contract, &[], "reference", Value::str("not-built"));
     assert!(super::validation::selected_operation(&mixed_case(), &contract, &identity).is_ok());
