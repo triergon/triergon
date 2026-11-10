@@ -145,6 +145,81 @@ enum Slot<K, T> {
     Used { entry: Entry<K, T>, generation: u32 },
 }
 
+/// How a cache hashes its keys, every lookup of every frame: each word is
+/// mixed in with a folded 64-by-64-bit multiply, far cheaper than SipHash on
+/// the short keys the caches look up. The seed, drawn afresh for each cache,
+/// keeps a script from choosing keys that collide.
+#[derive(Clone, Copy, Debug)]
+struct KeyHasher {
+    seed: u64,
+}
+
+impl KeyHasher {
+    fn new() -> Self {
+        Self {
+            seed: RandomState::new().hash_one(0_u64),
+        }
+    }
+}
+
+impl BuildHasher for KeyHasher {
+    type Hasher = KeyState;
+
+    fn build_hasher(&self) -> KeyState {
+        KeyState(self.seed)
+    }
+}
+
+/// The odd constant the state is multiplied by: 2^64 over the golden ratio.
+const MIX: u64 = 0x9e37_79b9_7f4a_7c15;
+
+/// The low and high halves of `a * b`, folded together.
+const fn folded_multiply(a: u64, b: u64) -> u64 {
+    let product = (a as u128) * (b as u128);
+    (product as u64) ^ ((product >> 64) as u64)
+}
+
+/// A key's hash being built.
+struct KeyState(u64);
+
+impl Hasher for KeyState {
+    fn finish(&self) -> u64 {
+        folded_multiply(self.0, MIX.rotate_left(32))
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        let (words, rest) = bytes.as_chunks::<8>();
+        for word in words {
+            self.write_u64(u64::from_le_bytes(*word));
+        }
+        if !rest.is_empty() {
+            let mut word = [0; 8];
+            word[..rest.len()].copy_from_slice(rest);
+            self.write_u64(u64::from_le_bytes(word));
+        }
+    }
+
+    fn write_u8(&mut self, value: u8) {
+        self.write_u64(u64::from(value));
+    }
+
+    fn write_u16(&mut self, value: u16) {
+        self.write_u64(u64::from(value));
+    }
+
+    fn write_u32(&mut self, value: u32) {
+        self.write_u64(u64::from(value));
+    }
+
+    fn write_u64(&mut self, value: u64) {
+        self.0 = folded_multiply(self.0 ^ value, MIX);
+    }
+
+    fn write_usize(&mut self, value: usize) {
+        self.write_u64(value as u64);
+    }
+}
+
 /// The hasher of a map whose keys are hashes already.
 #[derive(Default)]
 struct Prehashed(u64);
@@ -176,7 +251,7 @@ pub(super) struct Cache<K, T> {
     free: u32,
     /// The first entry of each hash.
     index: HashMap<u64, u32, BuildHasherDefault<Prehashed>>,
-    hasher: RandomState,
+    hasher: KeyHasher,
     /// The use queue, oldest and newest.
     oldest: u32,
     newest: u32,
@@ -207,7 +282,7 @@ impl<K: CacheKey, T> Cache<K, T> {
             slots: BudgetVec::new(budget),
             free: NONE,
             index: HashMap::default(),
-            hasher: RandomState::new(),
+            hasher: KeyHasher::new(),
             oldest: NONE,
             newest: NONE,
             released: Arc::default(),
@@ -685,9 +760,26 @@ pub(super) mod sizes {
 mod tests {
     use triergon_core::Budget;
 
-    use super::{CacheKey, ITEM_BYTES, Kept};
+    use std::hash::BuildHasher;
+
+    use super::{CacheKey, ITEM_BYTES, Kept, KeyHasher};
 
     type Cache<T = u32> = super::Cache<u32, T>;
+
+    #[test]
+    fn keys_hash_alike_within_a_cache_and_apart_by_any_word() {
+        let hasher = KeyHasher::new();
+        let keys: [&[u8]; 5] = [b"", b"a", b"a\0", b"abcdefgh", b"abcdefghi"];
+        let hashes = keys.map(|key| hasher.hash_one(key));
+        for (i, a) in hashes.iter().enumerate() {
+            assert_eq!(*a, hasher.hash_one(keys[i]));
+            assert!(hashes[i + 1..].iter().all(|b| a != b), "{:?}", keys[i]);
+        }
+        assert_ne!(
+            hasher.hash_one((1_u32, 2_u32)),
+            hasher.hash_one((2_u32, 1_u32))
+        );
+    }
 
     impl CacheKey for u32 {
         type View<'a> = u32;

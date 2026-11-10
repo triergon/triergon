@@ -14,7 +14,10 @@
  *   -DTRIERGON_RASTER_REFERENCE   outlines, strokes, rasterising, blur and composition
  *                                 with libass's internal stages (reference_raster.h)
  *   -DTRIERGON_ASS_REFERENCE      ASS scripts, Matroska packets, override tags,
- *                                 drawings and karaoke with libass (reference_ass.h)
+ *                                 drawings, karaoke and frames with libass, its
+ *                                 sources compiled in with checks (reference_ass.h)
+ *   -DTRIERGON_ASS_PLAYER_REFERENCE  frames with libass.a linked untouched, the
+ *                                 measurement reference (reference_ass_player.h)
  *   otherwise                     the container operations below, with the feed
  *                                 and Matroska audio clock
  *                                 (TRIERGON_FEED_REFERENCE), HLS segment, MP4
@@ -35,6 +38,8 @@
 #include "reference_raster.h"
 #elif defined(TRIERGON_ASS_REFERENCE)
 #include "reference_ass.h"
+#elif defined(TRIERGON_ASS_PLAYER_REFERENCE)
+#include "reference_ass_player.h"
 #else
 #include <libavformat/avformat.h>
 #ifdef TRIERGON_COMBINED_REFERENCE

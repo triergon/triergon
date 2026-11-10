@@ -711,6 +711,17 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         }
         let reference = root.join(s(&selected.reference, "path").unwrap_or_default());
         row.push(("reference", reference_summary(&selected.reference)));
+        if let Some(name) = selected.measurement_worker {
+            row.push(("measurement_worker", Value::str(name)));
+            row.push((
+                "measurement_reference",
+                reference_summary(&selected.measured),
+            ));
+        }
+        let measured = root.join(s(&selected.measured, "path").unwrap_or_default());
+        if (options.benchmark || options.memory) && options.baseline_worker.is_none() {
+            super::comparison::measurable(&selected.measured)?;
+        }
         let file = s(case, "file").unwrap_or_default();
         let path = corpus.join(file);
         if Path::new(file)
@@ -749,7 +760,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 timeout,
             };
             timed = Some((
-                reference.clone(),
+                measured.clone(),
                 path.clone(),
                 Operation {
                     prefix: prefix.clone(),
@@ -815,7 +826,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 _ => vec![],
             };
             timed = Some((
-                reference.clone(),
+                measured.clone(),
                 path.clone(),
                 Operation {
                     prefix: prefix.into(),
@@ -847,8 +858,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         }
         let passed = s(&parity, "status") == Some("pass");
         row.push(("parity", parity));
-        if let (true, Some((reference, input, operation))) = (passed, timed) {
-            let reference = options.baseline_worker.clone().unwrap_or(reference);
+        if let (true, Some((measured, input, operation))) = (passed, timed) {
+            let reference = options.baseline_worker.clone().unwrap_or(measured);
             let check_inputs = || {
                 if digest(&input)? != sha {
                     return Ok(Some("input-hash-mismatch"));

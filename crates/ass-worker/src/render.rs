@@ -1,10 +1,20 @@
 //! The rendering operation of `harness/reference_ass_render.h`: a whole
 //! script or a stream fixture rendered frame by frame with the fonts its
 //! directives attach, every image folded in list order.
+//!
+//! One operation does what a player embedding libass does: it hands the
+//! attached fonts it has read to the renderer (`ass_add_font`, which copies
+//! them), opens the default font file (which libass opens itself), creates
+//! and configures the renderer, reads the script or runs the stream and
+//! renders every frame. The timed span is the reading and the rendering, as
+//! the reference's is: it starts once the renderer is configured, since
+//! every libass setter empties the renderer's caches (`ass_reconfigure`), and
+//! it ends before the renderer, the script and the fonts are freed, so
+//! neither side times a cache reset or the teardown.
 
 use std::io::{self, BufWriter, Write};
-use std::path::Path;
-use std::time::Instant;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use triergon_ass::{
     CacheLimits, Change, Fonts, Image, ImageKind, Options, Renderer, Script, Settings,
@@ -14,7 +24,7 @@ use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 
 use crate::fixture::{Command, Fixture, Frames as Frames_, frames_error};
 use crate::perform::{Result, parse};
-use crate::record::Work;
+use crate::record::{self, Work};
 
 const USAGE: &str =
     "usage: ass-worker ass-render-fold FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
@@ -52,13 +62,16 @@ pub struct FontFile {
     pub data: Vec<u8>,
 }
 
-fn read_font(fonts: &Path, path: &[u8]) -> Result<FontFile> {
-    let path = fonts.join(std::str::from_utf8(path)?);
-    if std::fs::metadata(&path)?.len() > MAX_FONT {
+fn font_path(fonts: &Path, path: &[u8]) -> Result<PathBuf> {
+    Ok(fonts.join(std::str::from_utf8(path)?))
+}
+
+fn read_font(path: &Path) -> Result<FontFile> {
+    if std::fs::metadata(path)?.len() > MAX_FONT {
         return Err(format!("{}: too large", path.display()).into());
     }
     Ok(FontFile {
-        data: std::fs::read(&path)?,
+        data: std::fs::read(path)?,
     })
 }
 
@@ -68,20 +81,21 @@ pub struct Case<'a> {
     pub stream: bool,
     pub attached: Vec<FontFile>,
     pub default_family: Option<&'a [u8]>,
-    pub default_font: Option<FontFile>,
+    /// The default font file, which the operation opens.
+    pub default_font: Option<PathBuf>,
     pub frame: Size,
     pub storage: Size,
 }
 
 /// libass's number for an image's kind (`IMAGE_TYPE_CHARACTER`, `_OUTLINE`,
-/// `_SHADOW`); `None` for the box behind a `BorderStyle` 4 event, whose type
-/// libass leaves uninitialised, so it is folded without one.
-const fn image_type(kind: ImageKind) -> Option<i64> {
+/// `_SHADOW`), and 3 for the box behind a `BorderStyle` 4 event, whose type
+/// libass leaves uninitialised: the reference tells the box by its buffer.
+const fn image_type(kind: ImageKind) -> i64 {
     match kind {
-        ImageKind::Fill => Some(0),
-        ImageKind::Border => Some(1),
-        ImageKind::Shadow => Some(2),
-        ImageKind::Background => None,
+        ImageKind::Fill => 0,
+        ImageKind::Border => 1,
+        ImageKind::Shadow => 2,
+        ImageKind::Background => 3,
     }
 }
 
@@ -110,10 +124,8 @@ impl Frames for Folded {
         fold(&mut work.digest, signed(change_number(change)));
         fold(&mut work.digest, images.len() as u64);
         for image in images {
-            if let Some(kind) = image_type(image.kind) {
-                fold(&mut work.digest, signed(kind));
-            }
             for value in [
+                image_type(image.kind),
                 i64::from(image.x),
                 i64::from(image.y),
                 image.width() as i64,
@@ -144,13 +156,10 @@ impl<W: Write> Frames for Printed<W> {
             images.len()
         )?;
         for image in images {
-            match image_type(image.kind) {
-                Some(kind) => write!(self.0, "image {kind}")?,
-                None => write!(self.0, "image -")?,
-            }
             write!(
                 self.0,
-                " {} {} {} {} {:08x}",
+                "image {} {} {} {} {} {:08x}",
+                image_type(image.kind),
                 image.x,
                 image.y,
                 image.width(),
@@ -169,18 +178,33 @@ impl<W: Write> Frames for Printed<W> {
     }
 }
 
+/// What one operation rendered with, freed by its caller after the timed
+/// span, and how long its reading and rendering took.
+struct Rendered {
+    _fonts: Fonts,
+    _renderer: Renderer,
+    _script: Option<Script>,
+    elapsed: Duration,
+}
+
 impl Case<'_> {
-    /// The renderer's configuration.
+    /// The renderer's fonts: copies of the attached files, and the default
+    /// font file opened, as libass opens it, or none when it cannot be read.
     fn fonts(&self, budget: &Budget) -> Result<Fonts> {
-        let bytes = |file: &FontFile| Bytes::copy_from_slice(budget, &file.data);
+        let default_font = match self.default_font.as_deref().map(read_font) {
+            Some(Ok(file)) => {
+                Some(Bytes::try_from_vec(budget, file.data).map_err(|refused| refused.error())?)
+            }
+            Some(Err(_)) | None => None,
+        };
         Ok(Fonts {
             attached: self
                 .attached
                 .iter()
-                .map(bytes)
+                .map(|file| Bytes::copy_from_slice(budget, &file.data))
                 .collect::<std::result::Result<_, _>>()?,
             default_family: self.default_family.map(<[u8]>::to_vec),
-            default_font: self.default_font.as_ref().map(bytes).transpose()?,
+            default_font,
         })
     }
 
@@ -196,20 +220,18 @@ impl Case<'_> {
         settings
     }
 
-    /// One operation: a renderer, the script read or the stream run, and
-    /// every frame rendered.
-    fn render(
-        &self,
-        budget: &Budget,
-        data: &[u8],
-        fonts: &Fonts,
-        out: &mut impl Frames,
-    ) -> Result<()> {
-        let mut renderer = Renderer::new(budget, &self.settings(), fonts)?;
+    /// One operation: the fonts, a renderer, the script read or the stream
+    /// run, and every frame rendered, timed from the configured renderer to
+    /// the last frame; what it rendered with is returned, to be freed outside
+    /// the timed span.
+    fn render(&self, budget: &Budget, data: &[u8], out: &mut impl Frames) -> Result<Rendered> {
+        let fonts = self.fonts(budget)?;
+        let mut renderer = Renderer::new(budget, &self.settings(), &fonts)?;
         let options = Options {
             extract_fonts: true,
             ..Options::default()
         };
+        let start = Instant::now();
         let mut frames = |script: &mut Script, frames: Frames_| -> Result<()> {
             for now in frames.times() {
                 let frame = renderer.render(script, now)?;
@@ -217,15 +239,34 @@ impl Case<'_> {
             }
             Ok(())
         };
-        if !self.stream {
-            if let Some(mut script) = parse(budget, data, &options)? {
+        let script = if self.stream {
+            let mut script = Script::new(budget, &options)?;
+            self.run_stream(&mut script, &mut frames)?;
+            Some(script)
+        } else {
+            let mut script = parse(budget, data, &options)?;
+            if let Some(script) = &mut script {
                 for f in &self.fixture.frames {
-                    frames(&mut script, *f)?;
+                    frames(script, *f)?;
                 }
             }
-            return Ok(());
-        }
-        let mut script = Script::new(budget, &options)?;
+            script
+        };
+        let elapsed = start.elapsed();
+        Ok(Rendered {
+            _fonts: fonts,
+            _renderer: renderer,
+            _script: script,
+            elapsed,
+        })
+    }
+
+    /// The stream's commands on `script`, rendering frames where they stand.
+    fn run_stream(
+        &self,
+        script: &mut Script,
+        frames: &mut impl FnMut(&mut Script, Frames_) -> Result<()>,
+    ) -> Result<()> {
         for command in &self.fixture.commands {
             match command {
                 Command::Private(text) => script.process_codec_private(text)?,
@@ -239,7 +280,7 @@ impl Case<'_> {
                 Command::Flush => script.flush_events(),
                 Command::Prune(deadline) => script.prune_events(*deadline),
                 Command::CheckReadOrder(check) => script.set_check_read_order(*check),
-                Command::Frames(f) => frames(&mut script, *f)?,
+                Command::Frames(f) => frames(script, *f)?,
                 Command::Dump => {}
             }
         }
@@ -281,7 +322,7 @@ pub fn run(args: &[String]) -> Result<()> {
         attached: fixture
             .attach
             .iter()
-            .map(|path| read_font(fonts, path))
+            .map(|path| read_font(&font_path(fonts, path)?))
             .collect::<Result<_>>()?,
         default_family: fixture.default_family,
         // libass opens the default font file itself and goes without one it
@@ -289,7 +330,8 @@ pub fn run(args: &[String]) -> Result<()> {
         // one fails the case on both sides).
         default_font: fixture
             .default_font
-            .and_then(|path| read_font(fonts, path).ok()),
+            .map(|path| font_path(fonts, path))
+            .transpose()?,
         frame: Size::read(frame_w, frame_h)?,
         storage: Size::read(storage_w, storage_h)?,
         stream,
@@ -298,34 +340,28 @@ pub fn run(args: &[String]) -> Result<()> {
     // An accounting ceiling far above any case of the corpus, so only parity
     // decides: 16 GiB, or all of a 32-bit address space.
     let budget = Budget::new(usize::try_from(1_u64 << 34).unwrap_or(usize::MAX))?;
-    let fonts = case.fonts(&budget)?;
     let mut out = io::stdout().lock();
     if action == "ass-render-dump" {
         let mut printed = Printed(BufWriter::new(out));
-        case.render(&budget, &data, &fonts, &mut printed)?;
+        case.render(&budget, &data, &mut printed)?;
         return Ok(printed.0.flush()?);
     }
     let memory = action == "ass-render-memory";
     if memory {
-        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
-        out.flush()?;
+        record::mark(&mut out, record::WINDOW_BEGIN)?;
     }
-    let start = (action == "ass-render-bench").then(Instant::now);
-    let mut total = Work::default();
+    let bench = action == "ass-render-bench";
+    let (mut total, mut elapsed) = (Work::default(), Duration::ZERO);
     for _ in 0..iterations {
         let mut folded = Folded::default();
-        case.render(&budget, std::hint::black_box(&data), &fonts, &mut folded)?;
+        let rendered = case.render(&budget, std::hint::black_box(&data), &mut folded)?;
+        elapsed += rendered.elapsed;
+        drop(rendered);
         total.accumulate(&folded.0);
     }
-    let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
+    let elapsed = if bench { elapsed.as_nanos() } else { 0 };
     if memory {
-        out.write_all(b"TRIERGON_END_V1\n")?;
-        out.flush()?;
+        record::mark(&mut out, record::WINDOW_END)?;
     }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"ass-render\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        total.packets, total.bytes, total.digest,
-    )?;
-    Ok(out.flush()?)
+    Ok(total.print(&mut out, "ass-render", iterations, elapsed)?)
 }

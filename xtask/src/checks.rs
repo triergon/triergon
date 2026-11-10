@@ -144,22 +144,31 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
 }
 
 /// The fields every feature contract (`harness/features/<id>/contract.json`) may
-/// declare that the harness reads the same way for all of them: `timeout_seconds`.
+/// declare that the harness reads the same way for all of them: `timeout_seconds`
+/// and `measurement_reference`.
 fn contract_fields(root: &Path) -> Vec<String> {
     let features = root.join("harness/features");
     walk::files(&features, &|rel| rel.ends_with("contract.json"))
         .into_iter()
-        .filter_map(|path| {
+        .flat_map(|path| {
             let rel = path
                 .strip_prefix(root)
                 .expect("walked under root")
-                .display();
-            match read_json(&path) {
-                Ok(contract) => crate::harness::worker::contract_timeout(&contract)
-                    .err()
-                    .map(|error| format!("{rel}: {error}")),
-                Err(error) => Some(format!("{rel}: {error}")),
-            }
+                .display()
+                .to_string();
+            let errors = match read_json(&path) {
+                Ok(contract) => [
+                    crate::harness::worker::contract_timeout(&contract).err(),
+                    crate::harness::build::measurement_reference_error(&contract),
+                ]
+                .into_iter()
+                .flatten()
+                .collect(),
+                Err(error) => vec![error],
+            };
+            errors
+                .into_iter()
+                .map(move |error| format!("{rel}: {error}"))
         })
         .collect()
 }
