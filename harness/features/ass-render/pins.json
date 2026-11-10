@@ -363,6 +363,16 @@
       "bytes": 2920440,
       "digest": 11813353727600396068
     },
+    "vertical-styles-ass-1080p": {
+      "packets": 0,
+      "bytes": 0,
+      "digest": 0
+    },
+    "vertical-styles-ass-720p": {
+      "packets": 0,
+      "bytes": 0,
+      "digest": 0
+    },
     "wrap-ass-1080p": {
       "packets": 336,
       "bytes": 14769624,
