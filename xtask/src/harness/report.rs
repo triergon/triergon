@@ -79,13 +79,18 @@ fn measure_pinned(
         return Ok(Value::object([("status", Value::str(status))]));
     }
     let result = measure()?;
-    if let Some(status) = check()? {
-        return Ok(Value::object([
+    match check() {
+        Ok(None) => Ok(result),
+        Ok(Some(status)) => Ok(Value::object([
             ("status", Value::str(status)),
             ("invalidated_measurement", result),
-        ]));
+        ])),
+        Err(error) => Ok(Value::object([
+            ("status", Value::str("input-check-failed")),
+            ("input_error", Value::str(error)),
+            ("invalidated_measurement", result),
+        ])),
     }
-    Ok(result)
 }
 
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -1109,6 +1114,23 @@ mod prefix_tests {
                 .and_then(|v| s(v, "status")),
             Some("measured")
         );
+        let measured = std::cell::Cell::new(false);
+        let result = measure_pinned(
+            || {
+                if measured.get() {
+                    Err("input unreadable".into())
+                } else {
+                    Ok(None)
+                }
+            },
+            || {
+                measured.set(true);
+                Ok(Value::object([("status", Value::str("measured"))]))
+            },
+        )
+        .unwrap();
+        assert_eq!(s(&result, "status"), Some("input-check-failed"));
+        assert!(result.get("invalidated_measurement").is_some());
         std::fs::remove_file(root.join("next.ts")).unwrap();
         std::fs::remove_dir(root).unwrap();
     }

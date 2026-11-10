@@ -1146,6 +1146,16 @@ fn contract(cases: &[Case]) -> R<Value> {
 struct Recording<'a> {
     worker: &'a Path,
     directory: &'a Path,
+    worker_sha256: &'a str,
+}
+
+impl Recording<'_> {
+    fn check_worker(self) -> R<()> {
+        if sha256::file_hex(self.worker).map_err(|e| e.to_string())? != self.worker_sha256 {
+            return Err("reference worker differs from the registered formats build".into());
+        }
+        Ok(())
+    }
 }
 
 fn reference(root: &Path, input: &Path, row: &Value, recording: Recording<'_>) -> R<Value> {
@@ -1270,13 +1280,9 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
     {
         return Err("AU case membership changed; re-record reference observations".into());
     }
-    let reference_sha = recording
-        .map(|r| {
-            fs::read(r.worker)
-                .map(|v| sha256::hex(&v))
-                .map_err(|e| e.to_string())
-        })
-        .transpose()?;
+    if let Some(recording) = recording {
+        recording.check_worker()?;
+    }
     paths.fixtures(DIRECTORY)?;
     let previous_rows = previous
         .as_ref()
@@ -1371,17 +1377,13 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
         put(&mut row, "reference_result_sha256", Value::str(result_hash))?;
         rows.push(row);
     }
-    if let Some(recording) = recording
-        && Some(sha256::hex(
-            &fs::read(recording.worker).map_err(|e| e.to_string())?,
-        )) != reference_sha
-    {
-        return Err("reference worker changed while recording".into());
+    if let Some(recording) = recording {
+        recording.check_worker()?;
     }
-    let recorded = match reference_sha {
-        Some(sha) => Value::object([
+    let recorded = match recording {
+        Some(recording) => Value::object([
             ("id", Value::str("ffmpeg-formats-native")),
-            ("worker_sha256", Value::str(sha)),
+            ("worker_sha256", Value::str(recording.worker_sha256)),
             ("mode", Value::str("ts-au-fold")),
         ]),
         None => pinned
@@ -1529,30 +1531,37 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
     let reference = reference
         .map(|p| p.canonicalize().map_err(|e| e.to_string()))
         .transpose()?;
-    if let Some(worker) = &reference {
-        let identity = read_json(&root.join("target/harness/identity.json"))?;
-        if let Some(error) = crate::harness::provenance::source_identity_error(root, &identity) {
-            return Err(error);
-        }
-        let registered =
-            crate::harness::comparison::reference_named(&identity, "ffmpeg-formats-native")?;
-        let path = root
-            .join(text(&registered, "path")?)
-            .canonicalize()
-            .map_err(|e| e.to_string())?;
-        if worker != &path
-            || sha256::file_hex(worker).map_err(|e| e.to_string())? != text(&registered, "sha256")?
-        {
-            return Err("reference worker differs from the registered formats build".into());
-        }
-    }
+    let reference = reference
+        .map(|worker| -> R<_> {
+            let identity = read_json(&root.join("target/harness/identity.json"))?;
+            if let Some(error) = crate::harness::provenance::source_identity_error(root, &identity)
+            {
+                return Err(error);
+            }
+            let registered =
+                crate::harness::comparison::reference_named(&identity, "ffmpeg-formats-native")?;
+            let path = root
+                .join(text(&registered, "path")?)
+                .canonicalize()
+                .map_err(|e| e.to_string())?;
+            if worker != path {
+                return Err("reference worker differs from the registered formats build".into());
+            }
+            Ok((worker, text(&registered, "sha256")?.to_owned()))
+        })
+        .transpose()?;
     let directory = observations
         .map(|p| private_directory(root, &p))
         .transpose()?;
-    let recording = reference
-        .as_deref()
-        .zip(directory.as_deref())
-        .map(|(worker, directory)| Recording { worker, directory });
+    let recording =
+        reference
+            .as_ref()
+            .zip(directory.as_deref())
+            .map(|((worker, worker_sha256), directory)| Recording {
+                worker,
+                directory,
+                worker_sha256,
+            });
     println!("{}", produce(&paths, recording)?);
     Ok(())
 }
