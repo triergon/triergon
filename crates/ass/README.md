@@ -270,7 +270,8 @@ draws them, turned by 90° about their scaled vertical advance and the
 typographic descender and advancing by their linear vertical advance, and are
 shaped with the default-load vertical advance of every glyph libass's glyph
 metrics cache keeps rotated: a glyph's first lookup through a character from
-U+02F1 decides, for the renderer's life. Not rendered: libass's simple shaping
+U+02F1 decides, for the renderer's life and for each requested font (family,
+weight, slant), face and size, as libass keys that cache. Not rendered: libass's simple shaping
 level, its hinting modes, selective style overrides and track features.
 
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
@@ -417,7 +418,7 @@ panics.
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 72/74 pass. The
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 74/76 pass. The
   box behind a `BorderStyle` 4 event is
   compared without its kind, since libass leaves its type uninitialised. The
   two open cases are one fixture at both sizes: `clip-vector-empty.ass`, vector
