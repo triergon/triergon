@@ -1,7 +1,7 @@
 //! Glyph lookup and metrics: the font functions shaping asks for, and HarfBuzz's
 //! scaling arithmetic.
 
-use crate::cmap::{Cmap, Kind, Subtable};
+use crate::cmap::{Cmap, Subtable};
 use crate::rotations::{Decide, FaceRotations};
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
@@ -149,7 +149,7 @@ impl<'a> OtMetrics<'a> {
         let upem = i64::from(font.units_per_em());
         Self {
             font,
-            subtable: cmap.and_then(Cmap::best),
+            subtable: cmap.and_then(|c| c.best(font.table(*b"OS/2").unwrap_or_default())),
             variations: cmap
                 .and_then(Cmap::variation_sequences)
                 .map(VariationSequences::format14),
@@ -206,15 +206,7 @@ impl Metrics for OtMetrics<'_> {
     }
 
     fn nominal_glyph(&self, c: char) -> Option<GlyphId> {
-        let subtable = self.subtable?;
-        let c = u32::from(c);
-        match subtable.kind {
-            Kind::Mac if c >= 0x80 => None,
-            Kind::Symbol => subtable
-                .glyph(c)
-                .or_else(|| (c <= 0xff).then(|| subtable.glyph(0xf000 + c)).flatten()),
-            _ => subtable.glyph(c),
-        }
+        self.subtable?.glyph(u32::from(c))
     }
 
     fn variation_glyph(&self, base: char, selector: char) -> Option<GlyphId> {

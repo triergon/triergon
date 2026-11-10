@@ -8,6 +8,7 @@
 //! the rules of that reference's own generator, from hash-pinned files on
 //! unicode.org cached under `.research/ucd/<version>/`.
 
+mod cmap;
 mod emit;
 mod fribidi;
 mod harfbuzz;
@@ -170,6 +171,7 @@ fn run(root: &Path, check: bool, net: &dyn Transport) -> Result<String, String> 
     let ignorables = Loaded::fetch(root, &USE_IGNORABLES, net)?;
     let tree = syllabic::TreeFiles::load(root)?;
     let languages = language::load(root)?;
+    let remaps = cmap::load(root)?;
     let outputs = [
         ("unicode/tables.rs", harfbuzz::generate(&harfbuzz)?),
         ("unicode/fribidi/tables.rs", fribidi::generate(&fribidi)?),
@@ -178,6 +180,7 @@ fn run(root: &Path, check: bool, net: &dyn Transport) -> Result<String, String> 
             syllabic::generate(&shapers, &ignorables, &tree)?,
         ),
         ("language/tables.rs", language::generate(&languages)?),
+        ("cmap/tables.rs", cmap::generate(&remaps)?),
     ];
     let mut stale = Vec::new();
     for (name, generated) in &outputs {
