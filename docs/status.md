@@ -165,6 +165,7 @@ the default font file during 12 cases' operations; those mappings count toward i
 | MP4 range playback, preceding gate build | `f61d41fedac63b7e2bae08586de4e2d5bb8e9ad0` | `b3b814daff8a50d01c2ed89ae6219b1ba8cd2fbe094d7c3d61fb805cc76105e6` |
 | MP4 range playback, 18-case comparison | `77155a8e6f6d4ce3b4823bcaf6824713446feab3` | `48c4f1e51785ae87e5bf52ec0bda92255149aa08d178ee50b597ba21134d8c13` |
 | MP4 range playback | `35912fe96ebc0c484a8a4b930260d54d54fcf1d0` | `30ed94ea480d780bd4101c88e4a0786bfbe1302a9ca924e42cc28c4f5a8565ac` |
+| MP4 range playback, preceding source-roll comparison | `fa02eb61592bc85ad2749a87f3a925385a5e31f2` | `405b5bec9c2c76a59b0343d4276f684b7b61a0d4847ce06e31d0d74831446e25` |
 | MP4 range playback, 15-case comparison | `24f2299a8d12e120eabc7fc4a32e7eb8febc953e` | `7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6` |
 | MP4 range playback, dedicated sample entries | `17cad5c5bad576fe7102f53f78f3e150abbe24c8` | `632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e` |
 | MP4 range playback, before track classification | `b35259fcac541aebaa14058f9ae4682f89a61fdb` | `dbdbdacc0d86df6eefacb0403c0bcc0b7f5ff1c480415112e4eca791724a55ba` |
