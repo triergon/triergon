@@ -47,6 +47,7 @@ pub(crate) struct Contract {
     pub id: String,
     pub path: PathBuf,
     pub document: Value,
+    pub compare_order: u64,
 }
 
 impl Contract {
@@ -88,7 +89,23 @@ pub(crate) fn discover(root: &Path) -> Result<Vec<Contract>, String> {
         if document.get("id").and_then(Value::as_str) != Some(id.as_str()) {
             return Err(format!("{}: expected feature id {id}", path.display()));
         }
-        contracts.push(Contract { id, path, document });
+        let compare_order = document
+            .get("compare_order")
+            .map(|value| {
+                match value {
+                    Value::Number(number) => number.as_i128().and_then(|n| u64::try_from(n).ok()),
+                    _ => None,
+                }
+                .ok_or_else(|| format!("{id}: compare_order must be a nonnegative integer"))
+            })
+            .transpose()?
+            .unwrap_or(u64::MAX);
+        contracts.push(Contract {
+            id,
+            path,
+            document,
+            compare_order,
+        });
     }
     contracts.sort_unstable_by(|a, b| a.id.cmp(&b.id));
     Ok(contracts)

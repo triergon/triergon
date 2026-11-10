@@ -9,6 +9,7 @@
 //! its canonical JSON, exactly what the generator writes, so the identity is
 //! deterministic.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -26,6 +27,68 @@ pub fn read(root: &Path, path: &Path) -> Result<(Value, String), String> {
     let value =
         generated(root, path).ok_or_else(|| format!("{}: no such manifest", path.display()))??;
     Ok((value.clone(), sha256::hex(canonical(&value).as_bytes())))
+}
+
+/// Check the declared membership and pin coverage before a required report.
+pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), String> {
+    let cases = manifest
+        .get("cases")
+        .and_then(Value::as_array)
+        .filter(|cases| !cases.is_empty())
+        .ok_or("required manifest has no cases")?;
+    let mut ids = BTreeSet::new();
+    let mut profiles = BTreeSet::new();
+    let prefix = contract
+        .get("worker_operation")
+        .and_then(Value::as_str)
+        .is_some();
+    let per_target = crate::generators::pinned_per_target(contract);
+    let targets = contract
+        .get("required_targets")
+        .and_then(Value::as_array)
+        .unwrap_or_default();
+    if prefix && per_target && targets.is_empty() {
+        return Err("per-target pins need required targets".into());
+    }
+    for case in cases {
+        let id = case
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.is_empty())
+            .ok_or("required manifest has a case without an ID")?;
+        if !ids.insert(id) {
+            return Err(format!("duplicate case ID {id}"));
+        }
+        if let Some(profile) = case.get("profile").and_then(Value::as_str) {
+            profiles.insert(profile.to_owned());
+        }
+        if prefix && per_target {
+            let pins = case.get(crate::generators::EXPECTED_BY_TARGET);
+            let unpinned = crate::generators::unpinned(contract, id);
+            for target in targets {
+                let target = target.as_str().ok_or("invalid required target")?;
+                let expected = pins.and_then(|pins| pins.get(target));
+                if expected.is_none_or(|value| value == &Value::Null)
+                    && !unpinned
+                        .iter()
+                        .any(|&(name, reason)| name == target && !reason.is_empty())
+                {
+                    return Err(format!("{id}: missing expected fold for {target}"));
+                }
+            }
+        } else if prefix
+            && case
+                .get("expected")
+                .is_none_or(|value| value == &Value::Null)
+        {
+            return Err(format!("{id}: missing expected fold"));
+        }
+    }
+    let missing = super::acceptance::missing_profiles(contract, &profiles);
+    if !missing.is_empty() {
+        return Err(format!("missing required profiles: {}", missing.join(", ")));
+    }
+    Ok(())
 }
 
 /// The bytes a manifest or pin file is committed or written as.
@@ -70,4 +133,65 @@ fn generated(root: &Path, path: &Path) -> Option<Result<Value, String>> {
     };
     let generator = crate::generators::for_contract(&document)?;
     Some(generator.manifest(root, id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn required_manifest_rejects_missing_profiles_and_pins() {
+        let contract =
+            json::parse(r#"{"worker_operation":"test-","required_profiles":["first","second"]}"#)
+                .unwrap();
+        let without_profile =
+            json::parse(r#"{"cases":[{"id":"one","profile":"first","expected":{}}]}"#).unwrap();
+        assert_eq!(
+            validate_required(&contract, &without_profile).unwrap_err(),
+            "missing required profiles: second"
+        );
+        let without_pin = json::parse(
+            r#"{"cases":[{"id":"one","profile":"first","expected":{}},
+                          {"id":"two","profile":"second"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            validate_required(&contract, &without_pin).unwrap_err(),
+            "two: missing expected fold"
+        );
+    }
+
+    #[test]
+    fn required_manifest_accepts_declared_target_exceptions() {
+        let manifest = json::parse(
+            r#"{"cases":[{"id":"one","profile":"sample","expected_by_target":{"first":{}}}]}"#,
+        )
+        .unwrap();
+        let contract = |exceptions: &str| {
+            json::parse(&format!(
+                r#"{{"worker_operation":"test-","required_profiles":["sample"],
+                    "pinned_per_target":true,"required_targets":["first","second"],
+                    "unpinned_targets":{exceptions}}}"#,
+            ))
+            .unwrap()
+        };
+        assert_eq!(
+            validate_required(&contract("[]"), &manifest).unwrap_err(),
+            "one: missing expected fold for second"
+        );
+        let allowed =
+            contract(r#"[{"id":"one","targets":["second"],"reason":"Host-dependent fold"}]"#);
+        validate_required(&allowed, &manifest).unwrap();
+    }
+
+    #[test]
+    fn required_repository_manifests_cover_every_declared_profile() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        for contract in super::super::features::required(root).unwrap() {
+            let (manifest, _) = read(root, &contract.manifest()).unwrap();
+            if let Err(error) = validate_required(&contract.document, &manifest) {
+                panic!("{}: {error}", contract.id);
+            }
+        }
+    }
 }

@@ -28,8 +28,8 @@ pub struct Generator {
     pub main: fn(&Path, &[String]) -> R<()>,
     /// Candidate worker named by this generator's feature contracts.
     pub candidate: &'static str,
-    /// The default note for this generator's pin files.
-    pub pin_note: &'static str,
+    /// The original reference and the note used for its pin files.
+    pub pin_note: (&'static str, &'static str),
     /// Where `COMMAND compare` reports and `COMMAND manifest` writes by default.
     pub report_directory: &'static str,
     pub manifest_directory: &'static str,
@@ -125,7 +125,9 @@ fn pins(root: &Path, id: &str) -> R<Vec<(String, Value)>> {
 
 impl Generator {
     pub fn features(&self, root: &Path) -> R<Vec<String>> {
-        Ok(crate::harness::features::discover(root)?
+        let mut contracts = crate::harness::features::discover(root)?;
+        contracts.sort_by_key(|contract| contract.compare_order);
+        Ok(contracts
             .into_iter()
             .filter(|contract| contract.generated() && contract.candidate() == Some(self.candidate))
             .map(|contract| contract.id)
@@ -242,10 +244,19 @@ impl Generator {
 
     /// The pin file holding `pins` in case order.
     fn pin_file(&self, reference: &str, document: &Value, pins: Vec<(String, Value)>) -> Value {
+        let (original_reference, original_note) = self.pin_note;
         let note = document
             .get("pin_note")
             .and_then(Value::as_str)
-            .unwrap_or(self.pin_note);
+            .map_or_else(|| {                if reference == original_reference {
+                    original_note.to_owned()
+                } else {
+                    format!(
+                        "Folds recorded with {reference} by `cargo xtask {} manifest --record`.",
+                        self.command
+                    )
+                }
+            }, str::to_owned);
         Value::object([
             ("schema", Value::int(1)),
             ("reference", Value::str(reference)),
@@ -790,28 +801,28 @@ mod tests {
     fn compare_selects_features_by_their_contracts_gate() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let [fonts, shape, raster, ass] = GENERATORS;
-        assert_eq!(compared(fonts, &[]), ["font-hinting-none", "font-outlines"]);
+        assert_eq!(compared(fonts, &[]), ["font-outlines", "font-hinting-none"]);
         assert_eq!(compared(fonts, &["--all"]), fonts.features(root).unwrap());
         assert_eq!(
             compared(shape, &[]),
             [
-                "shape-bidi",
-                "shape-libass",
-                "shape-simple",
                 "shape-text",
+                "shape-libass",
+                "shape-bidi",
+                "shape-simple",
                 "shape-unicode"
             ]
         );
         assert_eq!(compared(shape, &["--all"]), shape.features(root).unwrap());
         assert!(compared(shape, &["--diagnostic"]).is_empty());
-        let required = ["raster-bitmaps", "raster-glyphs", "raster-outlines"];
+        let required = ["raster-glyphs", "raster-outlines", "raster-bitmaps"];
         assert_eq!(compared(raster, &[]), required);
         assert_eq!(
             compared(raster, &["--all"]),
             [
-                "raster-bitmaps",
                 "raster-glyphs",
                 "raster-outlines",
+                "raster-bitmaps",
                 "raster-sweep"
             ]
         );
@@ -925,6 +936,23 @@ mod tests {
     }
 
     #[test]
+    fn alternate_references_get_their_own_pin_note() {
+        let generator = &crate::fonts::GENERATOR;
+        let contract = Value::Object(Vec::new());
+        let pins = generator.pin_file("alternate-font-reference", &contract, vec![]);
+        assert_eq!(
+            pins.get("reference").and_then(Value::as_str),
+            Some("alternate-font-reference")
+        );
+        assert_eq!(
+            pins.get("note").and_then(Value::as_str),
+            Some(
+                "Folds recorded with alternate-font-reference by `cargo xtask fonts manifest --record`."
+            )
+        );
+    }
+
+    #[test]
     fn recording_resolves_each_reference_before_writing_any_pins() {
         let root = crate::walk::scratch("generator-reference-selection");
         let features = root.join("harness/features");
@@ -964,11 +992,11 @@ mod tests {
             reports[0],
             args(&[
                 "--contract",
-                "harness/features/shape-bidi/contract.json",
+                "harness/features/shape-text/contract.json",
                 "--manifest",
-                "harness/features/shape-bidi/corpus.json",
+                "harness/features/shape-text/corpus.json",
                 "--output",
-                "out/shape-bidi",
+                "out/shape-text",
                 "--memory",
             ])
         );

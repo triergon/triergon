@@ -979,26 +979,30 @@ fn check_features(root: &Path) -> Task {
             (generator.write_inputs)(root)?;
         }
     }
-    let reports: Vec<Vec<String>> = contracts
+    let reports = contracts
         .iter()
         .map(|contract| {
+            let manifest = contract.manifest();
+            let (document, _) = harness::manifest::read(root, &manifest)?;
+            harness::manifest::validate_required(&contract.document, &document)
+                .map_err(|error| format!("{}: {error}", contract.id))?;
             let directory = generators::for_contract(&contract.document)
                 .map_or(".research/feature-reports", |generator| {
                     generator.report_directory
                 });
-            vec![
+            Ok(vec![
                 "--contract".to_owned(),
                 contract.path.display().to_string(),
                 "--manifest".to_owned(),
-                contract.manifest().display().to_string(),
+                manifest.display().to_string(),
                 "--output".to_owned(),
                 root.join(directory)
                     .join(&contract.id)
                     .display()
                     .to_string(),
-            ]
+            ])
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
     if run_reports(root, &reports) != ExitCode::SUCCESS {
         return Err("required feature comparison failed".into());
     }

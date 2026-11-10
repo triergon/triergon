@@ -107,7 +107,10 @@ pub const GENERATOR: Generator = Generator {
     command: "ass",
     main: super::main,
     candidate: "ass-worker",
-    pin_note: "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+    pin_note: (
+        "libass-ass-native",
+        "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+    ),
     report_directory: ".research/ass-report",
     manifest_directory: ".research/ass/manifests",
     row_sources: &ROW_SOURCES,

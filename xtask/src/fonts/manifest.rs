@@ -56,7 +56,10 @@ pub const GENERATOR: Generator = Generator {
     command: "fonts",
     main: super::main,
     candidate: "font-worker",
-    pin_note: "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+    pin_note: (
+        "freetype-native",
+        "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+    ),
     report_directory: ".research/font-report",
     manifest_directory: ".research/fonts/manifests",
     row_sources: &ROW_SOURCES,
