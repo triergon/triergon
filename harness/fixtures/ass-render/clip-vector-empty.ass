@@ -1,0 +1,27 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 1000
+; Vector clips whose drawings have no contour: a lone move, moves only, and
+; a line command missing its point. libass draws them as a bitmap without
+; pixels and a \clip then empties every image of its event (keeping its
+; place); an \iclip leaves them, as does a contour without area.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,100)\clip(m 0 0)}a lone move
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,200)\clip(2,m 100 100 m 300 50 n 20 20)}moves only
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,300)\clip(m 0 0 l)}a line without its point
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,400)\iclip(m 0 0)}inverse lone move
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,500)\clip(m 0 0 l 1280 0)}a line without area
+Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\an5\pos(640,600)}unclipped after

@@ -232,7 +232,7 @@ impl Case {
     /// The case's line, a line per frame, and the peak of its budget.
     fn record(&self) -> String {
         let mut out = format!("case {}\n", self.name);
-        let budget = Budget::new(1 << 34).ok();
+        let budget = Budget::new(usize::try_from(1_u64 << 34).unwrap_or(usize::MAX)).ok();
         let run = catch_unwind(AssertUnwindSafe(|| {
             if let Some(budget) = &budget
                 && let Err(error) = self.render(budget, &mut out)

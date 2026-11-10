@@ -174,7 +174,11 @@ resource limit becomes an explicit, reviewed rule for that case.
   with `triergon_ass::Renderer`'s; the box behind a `BorderStyle` 4 event,
   whose type libass leaves uninitialised, is told by its buffer and compared
   without one. It is required by
-  `cargo xtask check` and reported by `cargo xtask ass compare`.
+  `cargo xtask check` and reported by `cargo xtask ass compare`. The fixtures
+  whose libass result differs by target, because libass's renderer overflows
+  `int` or converts out of its range on the way, are `ass-render-host`'s
+  instead, pinned per target like `ass-parse-host`; the renderer follows
+  libass built with GCC for `armv7-unknown-linux-gnueabihf`.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   features commit no case rows. `cargo xtask fonts manifest`, `cargo
   xtask shape manifest`, `cargo xtask raster manifest` and `cargo xtask ass
@@ -303,8 +307,8 @@ and grades it. A contract may name its own candidate worker and reference, as
 and `formats` references, the five `subtitle-*` features with `subtitle-worker` and the
 `subtitles` reference, the three font features with `font-worker` and FreeType, the six
 shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
-features with `raster-worker` and libass, and the four ASS parsing features and
-`ass-render` with `ass-worker` and libass.
+features with `raster-worker` and libass, and the four ASS parsing features,
+`ass-render` and `ass-render-host` with `ass-worker` and libass.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
