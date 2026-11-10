@@ -241,6 +241,13 @@ impl NalReader {
     pub fn source(&self) -> SourceId {
         self.cursor.source()
     }
+    pub(crate) fn input_wait_buffer_capacity(&self) -> Result<usize> {
+        if self.cursor.buffered_owner().is_some() {
+            return Err(Error::Invalid("NAL reader has buffered input"));
+        }
+        Ok(self.buffer.as_ref().map_or(0, BudgetVec::capacity))
+    }
+
     pub fn budget(&self) -> &Budget {
         self.cursor.budget()
     }
@@ -259,6 +266,50 @@ impl NalReader {
             return Err(error);
         }
         self.cursor.provide_owned(window)
+    }
+
+    pub(crate) fn append_annex_payload(
+        &mut self,
+        request: &InputRequest,
+        bytes: &[u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        if !self.compact_annex_b
+            || self.phase != Phase::AnnexPayload
+            || self.zeroes != 0
+            || bytes.len() < 32
+            || bytes.len() > 4096
+            || bytes.last() == Some(&0)
+        {
+            return Ok(false);
+        }
+        let count = bytes.len() as u64;
+        let scan = count / 8 + count % 8;
+        if work.remaining() < count + scan {
+            return Ok(false);
+        }
+        work.take(scan);
+        if contains_zero_pair(bytes) {
+            return Ok(false);
+        }
+        let maximum = self.limits.maximum_nal_bytes;
+        let buffer = self
+            .buffer
+            .as_mut()
+            .ok_or(Error::Invalid("missing NAL builder"))?;
+        match self
+            .cursor
+            .consume_response(request, bytes.len(), work, cancel, || {
+                reserve_nal_bytes(buffer, maximum, bytes.len())?;
+                buffer.try_extend_from_slice(bytes)
+            }) {
+            Err(Error::Backpressure { .. } | Error::Allocation | Error::Limit { .. }) => Ok(false),
+            result => result,
+        }
     }
 
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
@@ -377,33 +428,7 @@ impl NalReader {
             return Ok(());
         }
         let maximum = self.limits.maximum_nal_bytes;
-        let buffer = self.buffer()?;
-        let needed = buffer.len().checked_add(count).ok_or(Error::Overflow)?;
-        if needed > maximum {
-            return Err(Error::Limit {
-                requested: needed,
-                maximum,
-            });
-        }
-        if needed > buffer.capacity() {
-            let target = buffer
-                .capacity()
-                .saturating_mul(2)
-                .max(64)
-                .min(maximum)
-                .max(needed);
-            let length = buffer.len();
-            buffer.try_reserve_exact(target - length).or_else(|error| {
-                if target != needed
-                    && matches!(error, Error::Backpressure { .. } | Error::Limit { .. })
-                {
-                    buffer.try_reserve_exact(needed - length)
-                } else {
-                    Err(error)
-                }
-            })?;
-        }
-        Ok(())
+        reserve_nal_bytes(self.buffer()?, maximum, count)
     }
 
     fn observed_prefix(&self, leading_zero_bytes: usize) -> Result<NalFraming> {
@@ -685,6 +710,75 @@ impl NalReader {
                     }));
                 }
             }
+        }
+    }
+}
+
+fn reserve_nal_bytes(buffer: &mut BudgetVec<u8>, maximum: usize, count: usize) -> Result<()> {
+    let needed = buffer.len().checked_add(count).ok_or(Error::Overflow)?;
+    if needed > maximum {
+        return Err(Error::Limit {
+            requested: needed,
+            maximum,
+        });
+    }
+    if needed > buffer.capacity() {
+        let target = buffer
+            .capacity()
+            .saturating_mul(2)
+            .max(64)
+            .min(maximum)
+            .max(needed);
+        let length = buffer.len();
+        buffer.try_reserve_exact(target - length).or_else(|error| {
+            if target != needed && matches!(error, Error::Backpressure { .. } | Error::Limit { .. })
+            {
+                buffer.try_reserve_exact(needed - length)
+            } else {
+                Err(error)
+            }
+        })?;
+    }
+    Ok(())
+}
+
+fn contains_zero_pair(bytes: &[u8]) -> bool {
+    let Some(right) = bytes.get(1..) else {
+        return false;
+    };
+    let (left_words, left_tail) = bytes[..right.len()].as_chunks::<8>();
+    let (right_words, right_tail) = right.as_chunks::<8>();
+    let mut zeroes = 0;
+    // The shifted slice includes pairs that straddle word boundaries.
+    for (&left, &right) in left_words.iter().zip(right_words) {
+        let pairs = u64::from_le_bytes(left) | u64::from_le_bytes(right);
+        zeroes |= pairs.wrapping_sub(0x0101_0101_0101_0101) & !pairs & 0x8080_8080_8080_8080;
+    }
+    zeroes != 0 || left_tail.iter().zip(right_tail).any(|(&a, &b)| a | b == 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::contains_zero_pair;
+
+    #[test]
+    fn zero_pair_scan_matches_adjacent_bytes_at_word_boundaries() {
+        let mut bytes = [1; 48];
+        for first in 0..bytes.len() {
+            bytes[first] = 0;
+            for second in first..bytes.len() {
+                bytes[second] = 0;
+                for end in second + 1..=bytes.len() {
+                    let prefix = &bytes[..end];
+                    assert_eq!(
+                        contains_zero_pair(prefix),
+                        prefix.windows(2).any(|pair| pair == [0, 0])
+                    );
+                }
+                bytes[second] = 1;
+                bytes[first] = 0;
+            }
+            bytes[first] = 1;
         }
     }
 }

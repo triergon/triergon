@@ -824,12 +824,24 @@ fn benchmark_once(
         };
         values.push((elapsed(a), elapsed(b)));
     }
+    let input_after = match digest(input) {
+        Ok(hash) => hash,
+        Err(error) => {
+            return Ok(status_only(
+                "input-check-failed",
+                &samples,
+                &warmups,
+                &observations,
+                vec![("input_error", Value::str(error))],
+            ));
+        }
+    };
     let unchanged = [candidate, reference]
         .into_iter()
         .chain(workers.iter().map(|(_, w)| w.as_path()))
         .zip(hashes.iter().chain(&hashes))
         .all(|(w, (_, h))| digest(w).is_ok_and(|d| &d == h))
-        && digest(input)? == input_sha;
+        && input_after == input_sha;
     if !unchanged {
         return Ok(status_only(
             "worker-or-input-changed",

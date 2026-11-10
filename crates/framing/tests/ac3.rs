@@ -431,6 +431,71 @@ fn first_frame_bytes() -> Vec<u8> {
 }
 
 #[test]
+fn complete_frame_parts_preserve_request_through_declines_and_pressure() {
+    let pool = Budget::new(8192).unwrap();
+    let input = first_frame_bytes();
+    let mut reader = Ac3FrameReader::new(
+        &pool,
+        SourceId(1),
+        SourceCapabilities {
+            length: Some(input.len() as u64),
+            random_access: false,
+        },
+        Ac3StreamSelection::Any,
+        Ac3FrameLimits {
+            maximum_input_window: input.len(),
+            ..limits()
+        },
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    let Step::NeedInput(request) = reader.step(&mut WorkBudget::new(1), &cancel).unwrap() else {
+        panic!("expected an aligned frame request");
+    };
+    let parts = [&input[..12], &input[12..]];
+    let mut short = WorkBudget::new(1);
+    assert!(
+        reader
+            .read_frame_parts(
+                &request,
+                input.len(),
+                parts.into_iter(),
+                &mut short,
+                &cancel
+            )
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(short.spent(), 0);
+    let split = [&input[..1], &input[1..]];
+    let mut work = WorkBudget::new(8192);
+    assert!(
+        reader
+            .read_frame_parts(&request, input.len(), split.into_iter(), &mut work, &cancel)
+            .unwrap()
+            .is_none()
+    );
+    let blocker = pool.reserve(pool.available()).unwrap();
+    assert!(matches!(
+        reader.read_frame_parts(&request, input.len(), parts.into_iter(), &mut work, &cancel),
+        Err(Error::Backpressure { .. })
+    ));
+    assert_eq!(reader.position(), 0);
+    drop(blocker);
+    let output = reader
+        .read_frame_parts(&request, input.len(), parts.into_iter(), &mut work, &cancel)
+        .unwrap()
+        .unwrap();
+    assert_eq!(output.bytes().as_ref(), input.as_slice());
+    assert_eq!(output.facts().header, probe_ac3_header(&input).unwrap());
+    assert_eq!(output.facts().offset, 0);
+    assert_eq!(output.facts().generation, request.token.generation());
+    assert_eq!(reader.position(), input.len() as u64);
+    reader.finish(request.source, request.token).unwrap();
+    assert!(matches!(reader.step(&mut work, &cancel), Ok(Step::End(_))));
+}
+
+#[test]
 fn audio_reserve_and_freeze_pressure_never_reparse_or_lose_input() {
     let pool = Budget::new(8192).unwrap();
     let input = first_frame_bytes();

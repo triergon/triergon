@@ -98,6 +98,7 @@ pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
             names.extend(generator.inputs(root, id));
         }
     }
+    names.extend(crate::transport_fixtures::source_inputs());
     names.sort_unstable();
     names.dedup();
     Ok(names)
