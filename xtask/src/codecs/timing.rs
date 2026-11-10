@@ -10,6 +10,7 @@
 //! correctness grading checks separately). Each claim key is measured once.
 
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -24,8 +25,7 @@ use crate::{python, sha256};
 const PAIRS: usize = 30;
 const SEED: u64 = 280;
 const WORKER_TIMEOUT: Duration = Duration::from_secs(600);
-/// `kind` of a claim key. A ledger may hold claims of other kinds, recorded in
-/// other formats; those never stand in for a claim of this one.
+/// Separate claims for records collected with the shared timing session.
 const KIND: &str = "codec-time-session";
 
 /// The arguments of `codecs time`.
@@ -61,11 +61,13 @@ fn set(object: &mut Value, key: &str, value: Value) {
     }
 }
 
-fn write_ledger(path: &Path, ledger: &Value) -> Result<(), String> {
+fn write_claims(path: &Path, claims: &Value) -> Result<(), String> {
+    let pending = path.with_extension(format!("{}.part", std::process::id()));
     write(
-        path,
-        json::to_python(&python::sort_keys(ledger), Some(1)) + "\n",
-    )
+        &pending,
+        json::to_python(&python::sort_keys(claims), Some(1)) + "\n",
+    )?;
+    fs::rename(&pending, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 fn get_str<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -99,6 +101,17 @@ fn digests_equal(timing: &Value) -> bool {
         })
 }
 
+fn iterations(workload: &Value) -> Result<u32, String> {
+    let count = match workload.get("iterations") {
+        Some(Value::Number(number)) => number.as_i128(),
+        _ => None,
+    };
+    count
+        .and_then(|count| u32::try_from(count).ok())
+        .filter(|count| *count > 0)
+        .ok_or_else(|| "workload iterations must be a positive integer".into())
+}
+
 pub fn run(options: &Options) -> Result<(), String> {
     let workloads = crate::checks::read_json(&options.workloads)
         .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
@@ -107,12 +120,14 @@ pub fn run(options: &Options) -> Result<(), String> {
         .and_then(Value::as_array)
         .ok_or("workloads file without workloads")?
         .to_vec();
-    let mut ledger = if options.ledger.exists() {
+    let timing_lock = timing::lock()?;
+    let claims_path = &options.ledger;
+    let mut claims = if claims_path.exists() {
         python::loads(
-            &fs::read_to_string(&options.ledger)
-                .map_err(|e| format!("{}: {e}", options.ledger.display()))?,
+            &fs::read_to_string(claims_path)
+                .map_err(|e| format!("{}: {e}", claims_path.display()))?,
         )
-        .ok_or_else(|| format!("{}: not JSON", options.ledger.display()))?
+        .ok_or_else(|| format!("{}: not JSON", claims_path.display()))?
     } else {
         Value::Object(Vec::new())
     };
@@ -141,11 +156,7 @@ pub fn run(options: &Options) -> Result<(), String> {
             return Err(format!("input hash differs from the workload: {id}"));
         }
         let name = get_str(w, "operation").ok_or("workload without operation")?;
-        let iterations = w
-            .get("iterations")
-            .and_then(python::int)
-            .and_then(|n| u32::try_from(n).ok())
-            .ok_or("workload without iterations")?;
+        let iterations = iterations(w).map_err(|error| format!("{id}: {error}"))?;
         let claim = Value::object([
             ("workers", hashes.clone()),
             ("input", input_sha.clone()),
@@ -154,9 +165,19 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("kind", Value::str(KIND)),
         ]);
         let key = sha256::hex(json::to_python(&python::sort_keys(&claim), None).as_bytes());
-        if ledger.get(&key).is_some() {
+        if let Some(previous) = claims.get(&key) {
+            if get_str(previous, "status") == Some("claimed") {
+                return Err(format!("{id}: prior timing attempt did not finish"));
+            }
             println!("SKIP {id}");
             continue;
+        }
+        let raw = options.out.join(format!("{}.json", id.replace('/', "__")));
+        if raw
+            .try_exists()
+            .map_err(|e| format!("{}: {e}", raw.display()))?
+        {
+            return Err(format!("{} exists", raw.display()));
         }
         let mut entry = Value::object([
             ("label", Value::str(options.label.as_str())),
@@ -165,10 +186,9 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("seed", Value::int(SEED)),
             ("utc", Value::str(python::utc_now())),
         ]);
-        set(&mut ledger, &key, entry.clone());
-        write_ledger(&options.ledger, &ledger)?;
         let operation = operation(name);
-        let timing = timing::benchmark(
+        let mut started = false;
+        let timing = timing_lock.benchmark(
             &options.candidate,
             &options.reference,
             &path,
@@ -176,7 +196,25 @@ pub fn run(options: &Options) -> Result<(), String> {
             iterations,
             SEED,
             &operation,
-        )?;
+            || {
+                set(&mut claims, &key, entry.clone());
+                write_claims(claims_path, &claims)?;
+                started = true;
+                Ok(())
+            },
+        );
+        if !started {
+            return Err(format!(
+                "{id}: timing setup failed: {}",
+                json::to_python(&timing?, None)
+            ));
+        }
+        let timing = timing.unwrap_or_else(|error| {
+            Value::object([
+                ("status", Value::str("timing-attempt-failed")),
+                ("error", Value::str(error)),
+            ])
+        });
         let measured = get_str(&timing, "status");
         let graded = (measured == Some("measured")).then(|| {
             timing::validate(
@@ -202,6 +240,10 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("key".to_owned(), Value::str(key.as_str())),
             ("label".to_owned(), Value::str(options.label.as_str())),
             ("operation".to_owned(), Value::str(name)),
+            ("workers".to_owned(), hashes.clone()),
+            ("input_sha256".to_owned(), input_sha),
+            ("iterations".to_owned(), Value::int(iterations)),
+            ("seed".to_owned(), Value::int(SEED)),
             (
                 "build_refusals".to_owned(),
                 Value::strings(refusals.clone()),
@@ -231,14 +273,13 @@ pub fn run(options: &Options) -> Result<(), String> {
         }
         result.push(("status".to_owned(), Value::str(state.as_str())));
         result.push(("timing".to_owned(), timing));
-        let raw = options.out.join(format!("{}.json", id.replace('/', "__")));
-        if raw.exists() {
-            return Err(format!("{} exists", raw.display()));
-        }
-        write(
-            &raw,
-            json::to_python(&Value::Object(result), Some(1)) + "\n",
-        )?;
+        let result = json::to_python(&Value::Object(result), Some(1)) + "\n";
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&raw)
+            .and_then(|mut file| file.write_all(result.as_bytes()))
+            .map_err(|e| format!("{}: {e}", raw.display()))?;
         set(&mut entry, "status", Value::str(state.as_str()));
         set(&mut entry, "raw", Value::str(python::path(&raw)));
         set(&mut entry, "raw_sha256", Value::str(sha(&raw)?));
@@ -257,8 +298,8 @@ pub fn run(options: &Options) -> Result<(), String> {
             "digest_equal",
             digest_equal.map_or(Value::Null, Value::Bool),
         );
-        set(&mut ledger, &key, entry);
-        write_ledger(&options.ledger, &ledger)?;
+        set(&mut claims, &key, entry);
+        write_claims(claims_path, &claims)?;
         println!(
             "CODECTIME {id} {state} {} {} {}",
             ratio
@@ -274,4 +315,19 @@ pub fn run(options: &Options) -> Result<(), String> {
     }
     println!("DONE");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn workload_iterations_require_a_positive_integer() {
+        for count in ["0", "-1", "8.5", "8.0", "\"8\"", "4294967296"] {
+            let workload = python::loads(&format!("{{\"iterations\":{count}}}")).unwrap();
+            assert!(iterations(&workload).is_err(), "accepted {count}");
+        }
+        let workload = Value::object([("iterations", Value::int(8))]);
+        assert_eq!(iterations(&workload), Ok(8));
+    }
 }

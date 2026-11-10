@@ -555,25 +555,56 @@ pub fn benchmark(
     seed: u64,
     operation: &Operation,
 ) -> Result<Value, String> {
-    retry_contaminated(|attempt| {
-        benchmark_once(
-            candidate,
-            reference,
-            input,
-            pairs,
-            iterations,
-            seed + attempt,
-            operation,
-        )
-    })
+    lock()?.benchmark(
+        candidate,
+        reference,
+        input,
+        pairs,
+        iterations,
+        seed,
+        operation,
+        || Ok(()),
+    )
+}
+
+impl Lock {
+    /// Call the preparation hook once, immediately before the first worker runs.
+    #[allow(clippy::too_many_arguments)] // Timing inputs and the preparation hook.
+    pub(crate) fn benchmark(
+        &self,
+        candidate: &Path,
+        reference: &Path,
+        input: &Path,
+        pairs: usize,
+        iterations: u32,
+        seed: u64,
+        operation: &Operation,
+        prepare: impl FnOnce() -> Result<(), String>,
+    ) -> Result<Value, String> {
+        let mut prepare = Some(prepare);
+        retry_contaminated(seed, |seed| {
+            benchmark_once(
+                candidate,
+                reference,
+                input,
+                pairs,
+                iterations,
+                seed,
+                operation,
+                &mut prepare,
+            )
+        })
+    }
 }
 
 fn retry_contaminated(
+    first_seed: u64,
     mut measure: impl FnMut(u64) -> Result<Value, String>,
 ) -> Result<Value, String> {
+    let last_seed = first_seed.checked_add(2).ok_or("timing seed overflow")?;
     let mut rejected = Vec::new();
-    for attempt in 0..3 {
-        let result = match measure(attempt) {
+    for seed in first_seed..=last_seed {
+        let mut result = match measure(seed) {
             Ok(result) => result,
             Err(error) if rejected.is_empty() => return Err(error),
             Err(error) => Value::object([
@@ -581,8 +612,10 @@ fn retry_contaminated(
                 ("error", Value::str(error)),
             ]),
         };
+        if let Value::Object(fields) = &mut result {
+            fields.push(("seed".into(), Value::int(seed)));
+        }
         if result.get("status").and_then(Value::as_str) != Some("contaminated") {
-            let mut result = result;
             if let Value::Object(fields) = &mut result {
                 fields.push((
                     "rejected_contaminated_attempts".into(),
@@ -649,6 +682,7 @@ impl Drop for TimedWorkers {
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Timing inputs and the preparation hook.
 fn benchmark_once(
     candidate: &Path,
     reference: &Path,
@@ -657,6 +691,7 @@ fn benchmark_once(
     iterations: u32,
     seed: u64,
     operation: &Operation,
+    prepare: &mut Option<impl FnOnce() -> Result<(), String>>,
 ) -> Result<Value, String> {
     if pairs < 2 || iterations < 1 {
         return Err("need at least two pairs and one iteration".into());
@@ -709,7 +744,6 @@ fn benchmark_once(
             }
         }};
     }
-    let _lock = lock()?;
     module_check!("before-timing-session");
     let busy = competing_builds()?;
     if !busy.is_empty() {
@@ -739,6 +773,9 @@ fn benchmark_once(
     };
     for (name, worker) in &workers {
         module_check!(format!("before-warmup:{name}"));
+        if let Some(prepare) = prepare.take() {
+            prepare()?;
+        }
         let warm = worker::execute(&argv(name, worker), operation.timeout);
         warmups.push(Value::object([
             ("worker", Value::str(*name)),
@@ -771,6 +808,7 @@ fn benchmark_once(
     };
     let mut before = cpu_snapshot()?;
     let mut watch = ContaminationWatch::new(before.clone());
+    let mut values = Vec::new();
     for index in 0..pairs {
         let mut order = [0usize, 1];
         rng.shuffle(&mut order);
@@ -796,17 +834,22 @@ fn benchmark_once(
         }
         let after = cpu_snapshot()?;
         row.push(("cpu_after".into(), after.clone()));
-        *samples.last_mut().expect("row") = Value::Object(row);
+        let row = Value::Object(row);
         let mut busy = active_cpu(&before, &after, false);
         busy.extend(watch.observe(&after, Instant::now()));
-        if !busy.is_empty() {
-            return Ok(status_only(
-                "contaminated",
-                &samples,
-                &warmups,
-                &observations,
-                vec![("contaminants", Value::strings(busy))],
-            ));
+        let pair = checked_pair(&row, &warm_work, iterations, operation, !busy.is_empty());
+        *samples.last_mut().expect("row") = row;
+        match pair {
+            Ok(pair) => values.push(pair),
+            Err(status) => {
+                return Ok(status_only(
+                    status,
+                    &samples,
+                    &warmups,
+                    &observations,
+                    vec![("contaminants", Value::strings(busy))],
+                ));
+            }
         }
         before = after;
     }
@@ -819,44 +862,6 @@ fn benchmark_once(
             &observations,
             vec![("contaminants", Value::strings(busy))],
         ));
-    }
-    let mut values = Vec::new();
-    for row in &samples {
-        if workers.iter().any(|(n, _)| !row.get(n).is_some_and(ok)) {
-            return Ok(status_only(
-                "worker-failure",
-                &samples,
-                &warmups,
-                &observations,
-                vec![],
-            ));
-        }
-        let (a, b) = (
-            data(row.get("candidate").unwrap()),
-            data(row.get("reference").unwrap()),
-        );
-        let work = super::comparison::paired_timing_work(
-            row.get("candidate").expect("checked candidate"),
-            row.get("reference").expect("checked reference"),
-            i128::from(iterations),
-            &operation.work_fields,
-            &operation.own_work,
-        );
-        if !work.as_ref().is_ok_and(|w| equal(w, &warm_work)) {
-            return Ok(status_only(
-                "unequal-work",
-                &samples,
-                &warmups,
-                &observations,
-                vec![],
-            ));
-        }
-        let elapsed = |d: &Value| {
-            d.get("elapsed_ns")
-                .and_then(Value::as_f64)
-                .unwrap_or(f64::NAN)
-        };
-        values.push((elapsed(a), elapsed(b)));
     }
     let input_after = match digest(input) {
         Ok(hash) => hash,
@@ -909,7 +914,6 @@ fn benchmark_once(
             Value::object(hashes.iter().map(|(n, h)| (*n, Value::str(h)))),
         ),
         ("input_sha256", Value::str(input_sha)),
-        ("seed", Value::int(seed as i64)),
         ("iterations", Value::int(iterations)),
         ("pairs", Value::int(pairs as i64)),
         ("ratio", interval_value(&summary)),
@@ -923,6 +927,47 @@ fn benchmark_once(
             Value::object(workers.iter().map(|(n, _)| (*n, per_iteration(n)))),
         ),
     ]))
+}
+
+/// Check a completed pair before its attempt can be retried for contamination.
+fn checked_pair(
+    row: &Value,
+    warm_work: &Value,
+    iterations: u32,
+    operation: &Operation,
+    contaminated: bool,
+) -> Result<(f64, f64), &'static str> {
+    let candidate = row
+        .get("candidate")
+        .filter(|result| ok(result))
+        .ok_or("worker-failure")?;
+    let reference = row
+        .get("reference")
+        .filter(|result| ok(result))
+        .ok_or("worker-failure")?;
+    let work = super::comparison::paired_timing_work(
+        candidate,
+        reference,
+        i128::from(iterations),
+        &operation.work_fields,
+        &operation.own_work,
+    )
+    .map_err(|_| "unequal-work")?;
+    if !equal(&work, warm_work) {
+        return Err("unequal-work");
+    }
+    let elapsed = |outcome: &Value| {
+        data(outcome)
+            .get("elapsed_ns")
+            .and_then(Value::as_f64)
+            .filter(|elapsed| elapsed.is_finite() && *elapsed > 0.0)
+            .ok_or("invalid-timing")
+    };
+    let values = (elapsed(candidate)?, elapsed(reference)?);
+    if contaminated {
+        return Err("contaminated");
+    }
+    Ok(values)
 }
 
 /// A ratio interval as timing records store it.
@@ -1040,14 +1085,57 @@ mod tests {
     use super::*;
 
     #[test]
+    fn worker_failure_and_work_mismatch_precede_contamination() {
+        let operation = Operation {
+            prefix: String::new(),
+            arguments: vec![],
+            candidate_options: vec![],
+            work_fields: ["packets", "bytes", "digest"].map(str::to_owned).into(),
+            own_work: vec![],
+            timeout: Duration::from_secs(1),
+        };
+        let run = |packets| {
+            Value::object([
+                ("status", Value::str("ok")),
+                (
+                    "data",
+                    Value::object([
+                        ("iterations", Value::int(2)),
+                        ("packets", Value::int(packets)),
+                        ("bytes", Value::int(188)),
+                        ("digest", Value::int(17)),
+                        ("elapsed_ns", Value::int(20)),
+                    ]),
+                ),
+            ])
+        };
+        let warm = super::super::comparison::paired_timing_work(
+            &run(1),
+            &run(1),
+            2,
+            &operation.work_fields,
+            &operation.own_work,
+        )
+        .unwrap();
+        let row = |candidate| Value::object([("candidate", candidate), ("reference", run(1))]);
+        let check = |candidate| checked_pair(&row(candidate), &warm, 2, &operation, true);
+        assert_eq!(
+            check(Value::object([("status", Value::str("failed"))])),
+            Err("worker-failure")
+        );
+        assert_eq!(check(run(2)), Err("unequal-work"));
+        assert_eq!(check(run(1)), Err("contaminated"));
+    }
+
+    #[test]
     fn failed_retry_preserves_rejected_samples() {
         let first = Value::object([
             ("status", Value::str("contaminated")),
             ("samples", Value::Array(vec![Value::int(17)])),
         ]);
-        let result = retry_contaminated(|attempt| match attempt {
-            0 => Ok(first.clone()),
-            1 => Err("input unreadable".into()),
+        let result = retry_contaminated(280, |seed| match seed {
+            280 => Ok(first.clone()),
+            281 => Err("input unreadable".into()),
             _ => panic!("timing must stop on a failed retry"),
         })
         .unwrap();
@@ -1061,8 +1149,13 @@ mod tests {
         );
         assert_eq!(
             result.get("rejected_contaminated_attempts"),
-            Some(&Value::Array(vec![first]))
+            Some(&Value::Array(vec![Value::object([
+                ("status", Value::str("contaminated")),
+                ("samples", Value::Array(vec![Value::int(17)])),
+                ("seed", Value::int(280)),
+            ])]))
         );
+        assert_eq!(result.get("seed"), Some(&Value::int(281)));
     }
 
     #[test]

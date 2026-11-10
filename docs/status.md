@@ -59,8 +59,8 @@ Codec and decode-session runtime at
 `ceb5076` reports the higher of two unpinned gate-build passes on the same instance type.
 These codec, decode-session and capture passes predate the shared paired runner: codec
 pairs were checked pair by pair rather than watched over the whole run, and capture
-sampled the median of three in-process sessions. At `c21176e0` on a c6g.2xlarge, the earlier
-and the shared runner time `aac-lc-stereo` at a median of 0.7350 and 0.7339 and of 0.7344 and
+sampled the median of three in-process sessions. In a diagnostic comparison at `c21176e0`
+on a c6g.2xlarge, the earlier and the shared runner time `aac-lc-stereo` at a median of 0.7350 and 0.7339 and of 0.7344 and
 0.7342, and capture `c07-ui-static-480-bottomup` at 1.3026 and 1.2978.
 The audio codecs in files, Ogg and audio elementary-stream rows use the gate build at
 `ccff5b5734c113c1d88160b84825157508c701c0` on a c8g.2xlarge, unpinned, against the `decode` profile:

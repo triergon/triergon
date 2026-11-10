@@ -84,13 +84,6 @@ fn write(path: &Path, text: String) -> Result<(), String> {
     fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-fn upper(interval: &Value) -> f64 {
-    interval
-        .get("upper_95")
-        .and_then(Value::as_f64)
-        .unwrap_or(f64::NAN)
-}
-
 fn case_args(case: &Value, keys: &[&str]) -> Vec<String> {
     keys.iter()
         .map(|k| python::str(case.get(k).unwrap_or(&Value::Null)))
@@ -426,7 +419,11 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         let runtime_gate =
             outputs.is_some() && a.pairs >= 30 && timed.get("gate_pass").is_some_and(Value::truthy);
         let runtime_target = timed.get("target_pass").is_some_and(Value::truthy);
-        let runtime_upper = upper(timed.get("ratio").unwrap_or(&Value::Null));
+        let runtime_upper = timed
+            .get("ratio")
+            .and_then(|ratio| ratio.get("upper_95"))
+            .and_then(Value::as_f64)
+            .filter(|bound| bound.is_finite());
         record.push(("runtime".into(), timed));
         if let Some(small) = &a.reference_small {
             record.push((
@@ -515,7 +512,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         line.extend(verdict);
         line.push((
             "runtime_upper95".into(),
-            Value::float(python::round(runtime_upper, 4)),
+            runtime_upper.map_or(Value::Null, |bound| Value::float(python::round(bound, 4))),
         ));
         line.push(("correctness".into(), correctness));
         let line = Value::Object(line);

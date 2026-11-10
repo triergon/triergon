@@ -90,7 +90,24 @@ fn row(r: &Value) -> Result<String, String> {
         None => float(psnr.first().ok_or("psnr_y is empty")?)?,
     };
     let pr = float(psnr.get(1).ok_or("psnr_y has one value")?)?;
-    let ratio = get(rt, "ratio")?;
+    let runtime = match rt.get("ratio") {
+        Some(ratio) => format!(
+            "{} / **{}**{}",
+            fixed(float(get(ratio, "median")?)?, 3),
+            fixed(float(get(ratio, "upper_95")?)?, 3),
+            if truthy(rt, "target_pass") {
+                " ✓target"
+            } else {
+                ""
+            },
+        ),
+        None => format!(
+            "FAIL ({})",
+            rt.get("status")
+                .and_then(Value::as_str)
+                .unwrap_or("unmeasured"),
+        ),
+    };
     let verdict = get(r, "verdict")?;
     let memory = if truthy(verdict, "heap_gate") && truthy(verdict, "rss_gate") {
         "pass"
@@ -102,7 +119,7 @@ fn row(r: &Value) -> Result<String, String> {
         }
     };
     Ok(format!(
-        "| {} | {} (±{}, {}% exact) | {} | {} ({}, {}×, {}/{} dB) | {} / **{}**{} | {} | {} | {} | {} | {} |",
+        "| {} | {} (±{}, {}% exact) | {} | {} ({}, {}×, {}/{} dB) | {runtime} | {} | {} | {} | {} | {} |",
         python::str(get(get(r, "case")?, "id")?),
         pass(c, "conversion"),
         python::str(optional(c, "conversion_max_abs")),
@@ -113,13 +130,6 @@ fn row(r: &Value) -> Result<String, String> {
         python::str(optional(c, "bits_ratio")),
         fixed(pc, 2),
         fixed(pr, 2),
-        fixed(float(get(ratio, "median")?)?, 3),
-        fixed(float(get(ratio, "upper_95")?)?, 3),
-        if truthy(rt, "target_pass") {
-            " ✓target"
-        } else {
-            ""
-        },
         match small {
             Some(s) => fixed(float(get(s, "median")?)?, 3),
             None => "–".into(),
@@ -152,4 +162,31 @@ pub fn run(run: &Path) -> Result<(), String> {
         println!("{}", row(&result)?);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timing_failure_and_measured_case_have_summary_rows() {
+        let case = r#"{
+            "case": {"id": "capture"},
+            "correctness_summary": {"psnr_y": [40, 40]},
+            "memory": {},
+            "verdict": {}
+        }"#;
+        let with_runtime = |runtime| {
+            let mut case = python::loads(case).unwrap();
+            if let Value::Object(fields) = &mut case {
+                fields.push(("runtime".into(), runtime));
+            }
+            case
+        };
+        let failed = with_runtime(Value::object([("status", Value::str("worker-failure"))]));
+        assert!(row(&failed).unwrap().contains("| FAIL (worker-failure) |"));
+        let measured =
+            with_runtime(python::loads(r#"{"ratio":{"median":0.9,"upper_95":1.1}}"#).unwrap());
+        assert!(row(&measured).unwrap().contains("| 0.900 / **1.100** |"));
+    }
 }
