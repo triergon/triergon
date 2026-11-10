@@ -93,9 +93,9 @@ pub enum Delivery {
     Present,
     UnknownTime,
 }
-pub(crate) struct OutputScope {
+pub(crate) struct OutputScope<Pool = Budget> {
     source: triergon_core::SourceId,
-    pool: Budget,
+    pool: Pool,
     session: u64,
     epoch: u64,
     generation: u64,
@@ -123,15 +123,14 @@ pub struct Output {
     bytes: usize,
 }
 impl Output {
-    pub(crate) fn into_matroska_replay(mut self) -> Option<MatroskaReplayOutput> {
-        let pool = self.pool.take().unwrap_or_else(|| self.pool().clone());
+    pub(crate) fn into_matroska_replay(self) -> Option<MatroskaReplayOutput> {
         let RawEvent::Matroska(event) = self.event else {
             return None;
         };
         Some(MatroskaReplayOutput {
             scope: OutputScope {
                 source: self.source,
-                pool,
+                pool: self.pool,
                 session: self.session,
                 epoch: self.epoch,
                 generation: self.generation,
@@ -197,7 +196,9 @@ impl Output {
     }
 }
 pub(crate) struct MatroskaReplayOutput {
-    scope: OutputScope,
+    // Packet configurations already retain the pool. Other events carry the
+    // same explicit budget handle as their original output.
+    scope: OutputScope<Option<Budget>>,
     pub event: triergon_matroska::typed::Event,
     delivery: Delivery,
     bytes: usize,
@@ -207,7 +208,7 @@ impl MatroskaReplayOutput {
     pub fn into_output(self) -> Output {
         Output {
             source: self.scope.source,
-            pool: Some(self.scope.pool),
+            pool: self.scope.pool,
             session: self.scope.session,
             epoch: self.scope.epoch,
             generation: self.scope.generation,
