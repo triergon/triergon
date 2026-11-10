@@ -1,5 +1,6 @@
 /* Seekable MP4 playback through the public MOV demuxer API. */
 #include <errno.h>
+#include "reference_mp4_roll.h"
 
 typedef struct {
     uint64_t packets;
@@ -8,7 +9,7 @@ typedef struct {
 } Mp4RangeWork;
 
 static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t target,
-                          Mp4RangeWork *work) {
+                          int recover, Mp4RangeWork *work) {
     Source source = {data, size, 0};
     AVFormatContext *format = avformat_alloc_context();
     AVIOContext *io = NULL;
@@ -75,20 +76,47 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
         result = AVERROR(ENOMEM);
         goto done;
     }
+    Mp4RollLanding landing = {0};
+    int waiting_video = recover;
+    int waiting_audio = recover;
     if (seek) {
         result = av_read_frame(format, packet);
         if (result < 0)
             goto done;
         av_packet_unref(packet);
-        result = av_seek_frame(format, video, target, AVSEEK_FLAG_BACKWARD);
-        if (result < 0)
-            goto done;
+        if (recover) {
+            result = mp4_seek_opus_roll(format, (Mp4View){data, size}, video, audio, target, &landing);
+            if (result < 0)
+                goto done;
+            fold(&work->digest, (uint64_t)landing.video_position);
+            fold(&work->digest, (uint64_t)landing.sync);
+            fold(&work->digest, (uint64_t)landing.first);
+            fold(&work->digest, (uint64_t)landing.lead);
+        } else {
+            result = av_seek_frame(format, video, target, AVSEEK_FLAG_BACKWARD);
+            if (result < 0)
+                goto done;
+        }
     }
     while ((result = av_read_frame(format, packet)) >= 0) {
         if (packet->pos < 0 || packet->size < 0 ||
             (packet->stream_index != video && packet->stream_index != audio)) {
             result = AVERROR_INVALIDDATA;
             goto done;
+        }
+        if (waiting_video && packet->stream_index == video) {
+            if (packet->pos != landing.video_position || packet->pts != landing.video_pts) {
+                result = AVERROR_INVALIDDATA;
+                goto done;
+            }
+            waiting_video = 0;
+        }
+        if (waiting_audio && packet->stream_index == audio) {
+            if (packet->pos != landing.audio_position) {
+                result = AVERROR_INVALIDDATA;
+                goto done;
+            }
+            waiting_audio = 0;
         }
         size_t skip_len = 0;
         const uint8_t *skip = av_packet_get_side_data(packet, AV_PKT_DATA_SKIP_SAMPLES, &skip_len);
@@ -113,7 +141,7 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
         av_packet_unref(packet);
     }
     if (result == AVERROR_EOF)
-        result = 0;
+        result = waiting_video || waiting_audio ? AVERROR_INVALIDDATA : 0;
 done:
     av_packet_free(&packet);
     avformat_close_input(&format);
@@ -142,11 +170,12 @@ static int mp4_range_main(int argc, char **argv, const uint8_t *data, size_t siz
         ++next;
     }
     int seek = argc > next;
+    int recover = argc == next + 2 && !strcmp(argv[next + 1], "opus-roll");
     int64_t target = 0;
     if (seek) {
         errno = 0;
         target = strtoll(argv[next], &end, 10);
-        if (argc != next + 1 || errno || end == argv[next] || *end)
+        if (argc != next + 1 + recover || errno || end == argv[next] || *end)
             return 2;
     }
     if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18)
@@ -155,7 +184,7 @@ static int mp4_range_main(int argc, char **argv, const uint8_t *data, size_t siz
     uint64_t start = now_ns();
     for (uint64_t i = 0; i < iterations; ++i) {
         Mp4RangeWork work = {0};
-        int result = mp4_range_read(data, size, seek, target, &work);
+        int result = mp4_range_read(data, size, seek, target, recover, &work);
         if (result < 0) {
             fprintf(stderr, "MP4 range playback: %s\n", av_err2str(result));
             return 1;

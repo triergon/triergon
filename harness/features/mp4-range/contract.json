@@ -14,7 +14,10 @@
     "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
     "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame",
     "compare open-ended fragment edits, startup trim with unequal media and sample clocks, and backward seeks on both sides of a sync boundary",
-    "compare Opus leading and trailing edit trim, unequal media and decoder clocks, long leading crops with variable packet durations, and secondary-track alignment at exact and between-sample seek boundaries"
+    "compare Opus leading and trailing edit trim, unequal media and decoder clocks, long leading crops with variable packet durations, and secondary-track alignment at exact and between-sample seek boundaries",
+    "opus-roll cases use the audio sample at the actual video presentation landing, including a landing whose PTS and DTS differ, to select the source roll group and decoder start",
+    "compare the video landing extent, audio sync and start ordinals, and preroll in 48 kHz samples before comparing the complete suffix",
+    "the reference uses the public MOV index, the source composition offsets and a complete roll map to select both track starts, then seeks once and reads the exact suffix"
   ],
   "required_profiles": [
     "regular-open",
@@ -38,7 +41,12 @@
     "opus-trim-end",
     "opus-trim-rescaled",
     "opus-crop-open",
-    "opus-crop-seek"
+    "opus-crop-seek",
+    "opus-recovery-start",
+    "opus-recovery-seek",
+    "opus-recovery-edit-boundary",
+    "opus-recovery-long-roll",
+    "opus-recovery-composition-offset"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

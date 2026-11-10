@@ -859,6 +859,7 @@ fn prepare_check() -> Task {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     for step in [
         &["prepare-ffmpeg"][..],
+        &["prepare-ffmpeg", "--profile", "formats"],
         &["fixtures"],
         &["fetch-vectors"],
         &["fonts", "prepare"],

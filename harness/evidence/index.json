@@ -16983,6 +16983,44 @@
    "source_revision": "35912fe96ebc0c484a8a4b930260d54d54fcf1d0"
   },
   {
+   "name": "mp4-range-roll-regression",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-roll-regression/ba09a896d810c6fbca384f2b47ae1b7b5981c9fbd36b9c4262caa36c3567d1e9.tar.gz",
+   "sha256": "ba09a896d810c6fbca384f2b47ae1b7b5981c9fbd36b9c4262caa36c3567d1e9",
+   "bytes": 85733795,
+   "source_revision": "7213bca65559deb8d87860afd9f74c8193a837d5"
+  },
+  {
+   "name": "mp4-range-opus-roll",
+   "retention": "retained",
+   "reason": "MP4 range playback measurements in docs/status.md",
+   "key": "evidence/mp4-range-opus-roll/fa73233358526ff6a4aad24e20467b1c1bcaaef772d86339b4df29ac5c300589.tar.gz",
+   "sha256": "fa73233358526ff6a4aad24e20467b1c1bcaaef772d86339b4df29ac5c300589",
+   "bytes": 87367200,
+   "source_revision": "a1bb29d99ef0573e40357e32d65f3dcec83249f7"
+  },
+  {
+   "name": "mp4-range-opus-matched-seek",
+   "path": "mp4-range-opus-matched-seek",
+   "retention": "retained",
+   "reason": "MP4 range packet comparisons using one reference seek for source Opus roll groups.",
+   "key": "evidence/mp4-range-opus-matched-seek/405b5bec9c2c76a59b0343d4276f684b7b61a0d4847ce06e31d0d74831446e25.tar.gz",
+   "sha256": "405b5bec9c2c76a59b0343d4276f684b7b61a0d4847ce06e31d0d74831446e25",
+   "bytes": 22856931,
+   "source_revision": "fa02eb61592bc85ad2749a87f3a925385a5e31f2"
+  },
+  {
+   "name": "mp4-range-opus-source-roll",
+   "path": "mp4-range-opus-source-roll",
+   "retention": "retained",
+   "reason": "27 MP4 range comparisons on AArch64 Linux covering regular and fragmented edits, dedicated video sample entries and Opus source-roll seek preroll.",
+   "key": "evidence/mp4-range-opus-source-roll/0b08e42f9e332814e7b4848fad4a773c5d9c1d9a8684ca97593ae5f514655fe1.tar.gz",
+   "sha256": "0b08e42f9e332814e7b4848fad4a773c5d9c1d9a8684ca97593ae5f514655fe1",
+   "bytes": 22846691,
+   "source_revision": "d688d4a01f48e5cb9353b9aa16770806f1f5dff3"
+  },
+  {
    "name": "ass-rendering-divergences-fedfb790",
    "path": "ass-rendering-divergences-fedfb790",
    "retention": "retained",

@@ -136,6 +136,28 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
     /// Plan a seek from the same checked tables. This reads no payload and
     /// leaves the active generation and any pending input usable until apply.
     pub fn prepare_seek(&self, request: Mp4NativeSeekRequest) -> Result<Mp4RangeSeekJob<'a>> {
+        self.prepare_range_seek(request, None)
+    }
+
+    /// Seek with the selected regular Opus track's decoder preroll. Feed the
+    /// resulting audio from the reported first sample and
+    /// discard PCM before the video presentation landing.
+    pub fn prepare_seek_with_opus_recovery(
+        &self,
+        request: Mp4NativeSeekRequest,
+        audio: u32,
+    ) -> Result<Mp4RangeSeekJob<'a>> {
+        if !self.player.selection.includes(TrackKey::Mp4(audio)) {
+            return Err(Error::Invalid("Opus recovery requires selected audio"));
+        }
+        self.prepare_range_seek(request, Some(audio))
+    }
+
+    fn prepare_range_seek(
+        &self,
+        request: Mp4NativeSeekRequest,
+        opus_audio: Option<u32>,
+    ) -> Result<Mp4RangeSeekJob<'a>> {
         let Some(Engine::Mp4(engine)) = self.player.engine.as_ref() else {
             return Err(Error::Closed);
         };
@@ -152,13 +174,19 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             request.timestamp,
             request.limits,
         )?;
-        let (global, replay_seed) = if checked.is_some() {
-            (None, None)
+        let (checked, global, replay_seed) = if let Some(checked) = checked {
+            let checked = match opus_audio {
+                Some(audio) => checked.with_opus_recovery(audio)?,
+                None => checked,
+            };
+            (Some(checked), None, None)
         } else {
-            (
-                Some(native_global_seek(self.movie, self.edits, request)?),
-                Some(self.cursor.fork_checked_replay()?),
-            )
+            let global = native_global_seek(self.movie, self.edits, request)?;
+            let global = match opus_audio {
+                Some(audio) => global.with_opus_recovery(audio)?,
+                None => global,
+            };
+            (None, Some(global), Some(self.cursor.fork_checked_replay()?))
         };
         Ok(Mp4RangeSeekJob {
             scope: SeekScope {
@@ -304,7 +332,7 @@ impl<'a> Mp4RangeSeekJob<'a> {
         if let Some(error) = self.failure {
             return Err(error);
         }
-        let (cursor, receipt) = self
+        let (cursor, landing) = self
             .replay
             .ok_or(Error::Invalid("native range seek still pending"))?;
         let offset = cursor
@@ -316,7 +344,7 @@ impl<'a> Mp4RangeSeekJob<'a> {
         Ok(Mp4RangeSeek {
             scope: self.scope,
             cursor: Some(cursor),
-            receipt,
+            landing,
             offset,
         })
     }
@@ -325,13 +353,17 @@ impl<'a> Mp4RangeSeekJob<'a> {
 pub struct Mp4RangeSeek<'a> {
     scope: SeekScope,
     cursor: Option<PacketCursor<'a>>,
-    receipt: SeekLanding,
+    landing: SeekLanding,
     offset: u64,
 }
 
 impl Mp4RangeSeek<'_> {
     pub fn receipt(&self) -> &SeekLanding {
-        &self.receipt
+        self.landing()
+    }
+
+    pub fn landing(&self) -> &SeekLanding {
+        &self.landing
     }
 
     pub fn start_offset(&self) -> u64 {

@@ -15,6 +15,7 @@ mod checksum;
 mod colour;
 mod content;
 mod header;
+mod mp4_range;
 mod reference_encodings;
 mod seek;
 mod timing;
@@ -86,6 +87,10 @@ const TESTS: &[Test] = &[
     Test {
         name: "header::header_encoding_does_not_rewrite_source_timing",
         run: header::header_encoding_does_not_rewrite_source_timing,
+    },
+    Test {
+        name: "mp4_range::opus_recovery_refuses_invalid_roll_maps",
+        run: mp4_range::opus_recovery_refuses_invalid_roll_maps,
     },
     Test {
         name: "reference_encodings::combined_private_scope_is_an_explicit_unsupported_reference_case",
