@@ -385,6 +385,7 @@ trait TsStepProjection: Sized {
 }
 
 impl TsStepProjection for BackendStep {
+    #[inline(always)]
     fn project(step: TsPayloadStep) -> Result<Self> {
         Ok(match step {
             TsPayloadStep::Event(event) => Self::Event(RawEvent::Ts(event)),
@@ -418,6 +419,7 @@ impl TsStepProjection for BackendStep {
 }
 
 impl TsStepProjection for TsPayloadStep {
+    #[inline]
     fn project(step: Self) -> Result<Self> {
         Ok(step)
     }
@@ -1851,19 +1853,18 @@ impl TsEngine {
         index: usize,
         mut packet: ts::TransportPacket,
         context: SourceContext,
-        ready: Option<(&mut WorkBudget, &AtomicBool)>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<bool> {
         let track = &mut self.native_tracks.as_mut_slice()[index];
         if let Some(observer) = track.observer.as_mut() {
-            if let Some((work, cancel)) = ready {
-                match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
-                    ReadyContinuation::Buffered => return Ok(true),
-                    ReadyContinuation::Complete => {
-                        self.native_active = Some(index);
-                        return Ok(false);
-                    }
-                    ReadyContinuation::Unhandled => {}
+            match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
+                ReadyContinuation::Buffered => return Ok(true),
+                ReadyContinuation::Complete => {
+                    self.native_active = Some(index);
+                    return Ok(false);
                 }
+                ReadyContinuation::Unhandled => {}
             }
             let pushed = if self.native_context.is_some() {
                 observer.push_with_input(packet, context, &self.input)
@@ -2053,13 +2054,15 @@ impl TsEngine {
                 match result {
                     Ok(ts::AssemblyStep::Output(packet)) => {
                         self.native_pending = Some(packet);
-                        if matches!(
-                            self.segment_discovery,
-                            Some(
-                                SegmentDiscovery::Progressive
-                                    | SegmentDiscovery::CompactProgressive
+                        if self.segment_discovery.is_none()
+                            || matches!(
+                                self.segment_discovery,
+                                Some(
+                                    SegmentDiscovery::Progressive
+                                        | SegmentDiscovery::CompactProgressive
+                                )
                             )
-                        ) {
+                        {
                             return self.project_pending_packet(w, c);
                         }
                         return T::project(TsPayloadStep::Yield);
@@ -2278,8 +2281,7 @@ impl TsEngine {
                     TraceEvent::Transport(packet) => {
                         if let Some(index) = self.native_tracks.index(packet.pid) {
                             let context = self.native_source_context();
-                            drained =
-                                self.offer_native_transport(index, packet, context, Some((w, c)))?;
+                            drained = self.offer_native_transport(index, packet, context, w, c)?;
                         }
                     }
                     TraceEvent::Pes(_) if self.program == 0 => {
@@ -2339,7 +2341,36 @@ impl TsEngine {
                 && let Some(index) = self.native_tracks.index(packet.pid)
             {
                 let context = self.native_source_context();
-                self.offer_native_transport(index, packet.clone(), context, None)?;
+                let track = &mut self.native_tracks.as_mut_slice()[index];
+                if let Some(observer) = track.observer.as_mut() {
+                    // Keep one unit for delivery of the original source event.
+                    let ready = if w.remaining() >= 3 {
+                        observer.append_ready_borrowed_continuation(
+                            packet,
+                            context,
+                            &self.input,
+                            w,
+                            c,
+                        )?
+                    } else {
+                        ReadyContinuation::Unhandled
+                    };
+                    match ready {
+                        ReadyContinuation::Buffered => {}
+                        ReadyContinuation::Complete => self.native_active = Some(index),
+                        ReadyContinuation::Unhandled => match observer.push_borrowed(
+                            packet,
+                            context,
+                            self.native_context.as_ref().map(|_| &self.input),
+                        ) {
+                            Ok(()) => self.native_active = Some(index),
+                            Err(error) => {
+                                track.refuse(error);
+                                self.native_update_at = Some(index);
+                            }
+                        },
+                    }
+                }
             }
             self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
             if matches!(event, TraceEvent::Finished) {
@@ -2426,6 +2457,7 @@ impl RawEvent {
             _ => Ok(None),
         }
     }
+    #[inline]
     pub fn payload_bytes(&self) -> usize {
         match self {
             Self::NativeTs { packet, .. } => packet.payload_len,
