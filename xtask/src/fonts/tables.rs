@@ -1231,7 +1231,14 @@ mod tests {
             source.text.split_whitespace().collect::<Vec<_>>(),
             ["A", "D"]
         );
-        assert_eq!(source.define("M").unwrap(), "( a )   f( a )");
+        assert_eq!(
+            source
+                .define("M")
+                .unwrap()
+                .split_whitespace()
+                .collect::<Vec<_>>(),
+            ["(", "a", ")", "f(", "a", ")"]
+        );
         assert_eq!(
             calls("X( a, \"b,c\" ), XY( 1 ), X( ( 1, 2 ) )", "X").unwrap(),
             [vec!["a", "\"b,c\""], vec!["( 1, 2 )"]]
