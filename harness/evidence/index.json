@@ -16856,6 +16856,16 @@
    "retention": "90 days",
    "key": "qualification/mp4-fragmented-range-rebased/824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da.tar.zst",
    "sha256": "824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da"
+  },
+  {
+   "name": "mp4-range-fragment-edit-clocks",
+   "path": "mp4-range-fragment-edit-clocks",
+   "retention": "retained",
+   "reason": "Fifteen MP4 range comparisons covering regular and fragmented edits and dedicated sample entries on AArch64 Linux.",
+   "key": "evidence/mp4-range-fragment-edit-clocks/7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6.tar.gz",
+   "sha256": "7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6",
+   "bytes": 10883413,
+   "source_revision": "24f2299a8d12e120eabc7fc4a32e7eb8febc953e"
   }
  ]
 }
