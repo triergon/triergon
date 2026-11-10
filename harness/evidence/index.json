@@ -16813,6 +16813,15 @@
    "key": "evidence/mp4-range-dedicated-entries-rebased/dbdbdacc0d86df6eefacb0403c0bcc0b7f5ff1c480415112e4eca791724a55ba.tar.gz",
    "sha256": "dbdbdacc0d86df6eefacb0403c0bcc0b7f5ff1c480415112e4eca791724a55ba",
    "bytes": 8604326
+  },
+  {
+   "name": "mp4-range-dedicated-entries-classified",
+   "path": "mp4-range-dedicated-entries-classified",
+   "retention": "retained",
+   "reason": "Ten MP4 range comparisons on AArch64 Linux after the reader track-classification change.",
+   "key": "evidence/mp4-range-dedicated-entries-classified/632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e.tar.gz",
+   "sha256": "632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e",
+   "bytes": 8608934
   }
  ]
 }
