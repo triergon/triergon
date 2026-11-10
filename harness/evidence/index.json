@@ -17030,6 +17030,15 @@
    "bytes": 74838624
   },
   {
+   "name": "ass-render-parity-28e5ccf0",
+   "path": "ass-render-parity-28e5ccf0",
+   "retention": "retained",
+   "reason": "ASS rendering status row and ARMv7 table: the 5,722 generated scripts and fixture mutations rendered frame by frame through the renderer at 94e2af8b and libass, natively on AArch64 and in the ARMv7 user space on an r6g.2xlarge, with peak RSS and wall time per worker, main's run of the first 2,827 cases at a68420fa; the work and time of every frame of the work-bound scripts on ARMv7; the collision replay, the double-to-int conversions GCC compiles for each target, and libass for ARMv7 against libass for AArch64 where it runs out of memory; the same-code check of 28e5ccf0 against 94e2af8b on every case; the ASS gates at 28e5ccf0 on both targets with their reports, identities and pins",
+   "key": "evidence/ass-render-parity-28e5ccf0/bc26dfc21b141cc79b5bb4f8cb3d636dcfaa3f64fa24eec2d200409eff0c32f0.tar.gz",
+   "sha256": "bc26dfc21b141cc79b5bb4f8cb3d636dcfaa3f64fa24eec2d200409eff0c32f0",
+   "bytes": 14839425
+  },
+  {
    "name": "subtitles-pgs-plane-03f3efd3-linux-arm64",
    "path": "subtitles-pgs-plane-03f3efd3-linux-arm64",
    "retention": "retained",
