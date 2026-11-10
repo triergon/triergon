@@ -18,6 +18,7 @@ mod matching;
 mod metrics;
 mod name;
 mod outline;
+mod postscript;
 mod read;
 mod sfnt;
 mod sized;
@@ -26,7 +27,10 @@ mod synthesis;
 mod work;
 
 pub use cff::{CharstringBounds, CharstringOperator, OperatorSet};
-pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings, TextLookup};
+pub use cmap::{
+    CharEncoding, Charmap, CharmapKind, CmapFormat, Mappings, TextLookup, Variant,
+    VariationSequences,
+};
 pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
@@ -196,9 +200,12 @@ pub struct Font {
     /// load and `vhea` lists at least one record.
     vmtx: Option<LongMetrics>,
     names: Names,
-    charmaps: BudgetVec<cmap::Subtable>,
-    /// `charmaps` is FreeType's list of the face's charmaps.
-    every_charmap: bool,
+    /// The `cmap` subtables FreeType makes selectable charmaps of.
+    subtables: BudgetVec<cmap::Subtable>,
+    /// The Unicode charmap FreeType builds from a CFF face's glyph names.
+    name_map: Option<postscript::UnicodeMap>,
+    /// The format 14 subtable FreeType reads variation sequences from.
+    variation_sequences: Option<cmap::Variations>,
     outlines: Outlines,
     kern: Kern,
     /// `post` underline position and thickness.
@@ -255,17 +262,10 @@ impl Font {
             Some(t) => cmap::parse(bytes, t, budget, &mut work)?,
             None => cmap::Subtables {
                 list: BudgetVec::new(budget),
-                skipped: false,
+                unicode_variations: false,
+                variation_sequences: None,
             },
         };
-        // FreeType gives a CFF face without a Windows BMP or Unicode-platform
-        // charmap one built from its glyph names (`cff_face_init`).
-        let synthesized = flavor == Flavor::Cff
-            && !cmap.list.iter().any(|s| {
-                s.platform() == Platform::Unicode
-                    || (s.platform() == Platform::Windows && s.encoding_id() == 1)
-            });
-        let every_charmap = !cmap.skipped && !synthesized;
         let (outlines, glyph_count) = match flavor {
             Flavor::TrueType => {
                 let (glyf, count) = Glyf::new(
@@ -297,6 +297,19 @@ impl Font {
             None => Kern::new(budget),
         };
         let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
+        // FreeType builds a Unicode charmap from the glyph names of a CFF face
+        // without a Windows BMP or Unicode-platform charmap (`cff_face_init`).
+        let unicode = cmap.unicode_variations
+            || cmap.list.iter().any(|s| {
+                s.platform() == Platform::Unicode
+                    || (s.platform() == Platform::Windows && s.encoding_id() == 1)
+            });
+        let name_map = match &outlines {
+            Outlines::Cff(cff) if !unicode && cff.has_charset() => {
+                postscript::UnicodeMap::new(cff.glyph_names(bytes), budget)?
+            }
+            _ => None,
+        };
         let mut font = Self {
             data,
             index,
@@ -308,8 +321,9 @@ impl Font {
             hmtx,
             vmtx,
             names,
-            charmaps: cmap.list,
-            every_charmap,
+            subtables: cmap.list,
+            name_map,
+            variation_sequences: cmap.variation_sequences,
             outlines,
             kern,
             underline,
@@ -516,53 +530,61 @@ impl Font {
         })
     }
 
-    /// The supported cmap subtables, in directory order.
-    pub fn charmaps(&self) -> impl Iterator<Item = Charmap<'_>> + '_ {
-        self.charmaps
+    /// The face's charmaps in FreeType's order: the `cmap` subtables FreeType
+    /// accepts (formats 0, 2, 4, 6, 8, 10, 12 and 13), in directory order;
+    /// then, for a CFF face without a Windows BMP or Unicode-platform charmap
+    /// (of any format, 14 and 15 included), the Unicode charmap FreeType
+    /// builds from its glyph names when one maps a code point
+    /// ([`CharmapKind::GlyphNames`]), a CID-keyed face's CIDs read as string
+    /// IDs as FreeType reads them; then, for a name-keyed CFF face whose
+    /// encoding maps a code, the charmap of its encoding
+    /// ([`CharmapKind::CffEncoding`]). FreeType also lists the
+    /// variation-sequence subtables of formats 14 and 15, which cannot be
+    /// selected and are left out.
+    pub fn charmaps(&self) -> impl Iterator<Item = Charmap<'_>> + Clone + '_ {
+        let (data, glyphs, work) = (
+            self.data.as_ref(),
+            u32::from(self.glyph_count),
+            self.limits.work,
+        );
+        let charmap = move |source| Charmap::new(data, glyphs, source, work);
+        let encoding = match &self.outlines {
+            Outlines::Cff(cff) => cff.encoding(),
+            Outlines::Glyf(_) => None,
+        };
+        self.subtables
             .as_slice()
             .iter()
-            .map(|&subtable| self.charmap_of(subtable))
+            .map(move |&subtable| charmap(cmap::Source::Table(subtable)))
+            .chain(self.name_map.as_ref().map(cmap::Source::Names).map(charmap))
+            .chain(encoding.map(cmap::Source::Encoding).map(charmap))
     }
 
     /// Charmap `index` of [`Self::charmaps`].
     pub fn charmap(&self, index: usize) -> Option<Charmap<'_>> {
-        self.charmaps
-            .get(index)
-            .map(|&subtable| self.charmap_of(subtable))
+        self.charmaps().nth(index)
     }
 
-    fn charmap_of(&self, subtable: cmap::Subtable) -> Charmap<'_> {
-        Charmap::new(
-            self.data.as_ref(),
-            u32::from(self.glyph_count),
-            subtable,
-            self.limits.work,
-        )
-    }
-
-    /// Whether [`Self::charmaps`] are all the charmaps FreeType gives the face,
-    /// in its order. FreeType also lists format 2 and 8 subtables, which this
-    /// crate does not read, and adds a Unicode charmap built from glyph names
-    /// to a CFF face without a (3, 1) or Unicode-platform subtable (this check
-    /// assumes it does whenever it may). The format 14 subtables it lists
-    /// cannot be selected.
-    pub const fn lists_every_charmap(&self) -> bool {
-        self.every_charmap
+    /// The Unicode variation sequences FreeType reads
+    /// (`FT_Face_GetCharVariantIndex`): its first variation-sequence charmap,
+    /// the first (0, 5) subtable of format 14 or 15 its validation keeps.
+    pub fn variation_sequences(&self) -> Option<VariationSequences<'_>> {
+        let variations = self.variation_sequences?;
+        Some(VariationSequences::new(
+            variations.table.bytes(self.data.as_ref()),
+            variations.extended,
+        ))
     }
 
     /// The charmap libass 0.17.5 uses for text, as it selects one when it opens
-    /// a face (`ass_charmap_magic`). In directory order: the first Windows
-    /// full-Unicode subtable (3, 10); else the first Windows BMP subtable (3, 1);
-    /// else the first other Windows subtable, such as Symbol (3, 0). A face
-    /// without Windows subtables keeps the charmap FreeType selects on opening
-    /// it: the last full-Unicode subtable ((0, 4), or (0, 6) in format 13),
+    /// a face (`ass_charmap_magic`). In [`Self::charmaps`] order: the first
+    /// Windows full-Unicode charmap (3, 10); else the first Windows BMP
+    /// charmap (3, 1), which may be the one FreeType builds from glyph names;
+    /// else the first other Windows charmap, such as Symbol (3, 0). A face
+    /// without Windows charmaps keeps the charmap FreeType selects on opening
+    /// it: the last full-Unicode charmap ((0, 4), or (0, 6) in format 13),
     /// else the last Unicode- or ISO-platform one. Without one of those, it is
-    /// the first subtable.
-    ///
-    /// Only the subtables [`Self::charmaps`] lists take part. FreeType also
-    /// lists formats 2, 8 and 14, and adds a Unicode charmap built from glyph
-    /// names to a CFF face without a (3, 1) or Unicode-platform subtable; libass
-    /// may select either, which this selection does not reproduce.
+    /// the first charmap.
     pub fn text_charmap(&self) -> Option<Charmap<'_>> {
         self.text_charmap_index()
             .and_then(|index| self.charmap(index))
@@ -570,7 +592,7 @@ impl Font {
 
     /// The index of [`Self::text_charmap`] in [`Self::charmaps`].
     pub fn text_charmap_index(&self) -> Option<usize> {
-        cmap::text_subtable(self.charmaps.as_slice())
+        cmap::text_charmap(self.charmaps())
     }
 
     /// `charmap`, one of this face's, read as libass 0.17.5 reads text through

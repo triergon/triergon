@@ -152,8 +152,8 @@ performance gates where it touches hot code.
    fonts with fallback, shapes, wraps, lays out, resolves collisions and draws
    the image list through `triergon-raster`. A Triergon worker and a libass
    worker render the same scripts and packet streams at the same times and
-   frame sizes, and the harness compares every image exactly; vertical text
-   (`@` fonts) is open. Behaviour where libass departs from the ASS
+   frame sizes, and the harness compares every image exactly, `@` fonts
+   included. Behaviour where libass departs from the ASS
    specification by choice will follow the compat-policy convention above.
    The renderer offers no hinting option until libass's hinting-enabled modes and
    FreeType's auto-hinter pass the reference and are gated.

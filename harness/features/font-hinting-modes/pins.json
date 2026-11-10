@@ -4682,6 +4682,96 @@
       "packets": 20,
       "bytes": 0,
       "digest": 17513787686162441854
+    },
+    "authored-charmaps-otf-outlines-4800": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 4546993272406235202
+    },
+    "authored-charmaps-otf-advances-4800": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 14101764977466340519
+    },
+    "authored-charmaps-otf-outlines-5280": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 2945667794474290188
+    },
+    "authored-charmaps-otf-advances-5280": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 6746529453326114023
+    },
+    "authored-charmaps-otf-outlines-3200": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 2648799949693417594
+    },
+    "authored-charmaps-otf-advances-3200": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 14689559858426983207
+    },
+    "authored-charmaps-otf-outlines-3072": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 13706765849823679733
+    },
+    "authored-charmaps-otf-advances-3072": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 11579208074180764455
+    },
+    "authored-charmaps-otf-outlines-2400": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 9701283061969718004
+    },
+    "authored-charmaps-otf-advances-2400": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 3927064209688824359
+    },
+    "authored-charmaps-otf-outlines-2160": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 6743778069295571920
+    },
+    "authored-charmaps-otf-advances-2160": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 15304192937780105895
+    },
+    "authored-charmaps-otf-outlines-853": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 14520716670675081863
+    },
+    "authored-charmaps-otf-advances-853": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 18240413827455277607
+    },
+    "authored-charmaps-otf-outlines-1568": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 8305078371716645510
+    },
+    "authored-charmaps-otf-advances-1568": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 1858674789096849959
+    },
+    "authored-charmaps-otf-outlines-538": {
+      "packets": 40,
+      "bytes": 144,
+      "digest": 6337148929713094075
+    },
+    "authored-charmaps-otf-advances-538": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 7403121927113349415
     }
   }
 }

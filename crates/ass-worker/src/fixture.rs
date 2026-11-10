@@ -117,6 +117,30 @@ fn number(s: &[u8]) -> Option<(i64, &[u8])> {
     Some((if negative { -value } else { value }, &digits[n..]))
 }
 
+/// Why the frames a renderer would draw for `data` are refused, if they are:
+/// a frames line (`;@frames` of a script, `@frames` of a stream) that is not
+/// three numbers with a positive step and an end at or after its start, more
+/// than the harness draws, or none at all, so a case cannot pass by drawing
+/// nothing.
+pub fn frames_error(data: &[u8], stream: bool) -> Option<&'static str> {
+    let prefix: &[u8] = if stream { b"@frames " } else { b";@frames " };
+    let mut count = 0;
+    for line in lines(data) {
+        let Some(frames) = line.strip_prefix(prefix) else {
+            continue;
+        };
+        if Frames::read(frames).is_none_or(|f| f.end < f.start) {
+            return Some("a malformed frames line");
+        }
+        count += 1;
+    }
+    match count {
+        0 => Some("no frames line"),
+        n if !stream && n > MAX_FRAMES => Some("more frames lines than the harness draws"),
+        _ => None,
+    }
+}
+
 impl<'a> Fixture<'a> {
     /// Reads the directives, and with `stream` the commands.
     pub fn read(data: &'a [u8], stream: bool) -> Self {
@@ -220,7 +244,7 @@ fn commands<'a>(lines: &[&'a [u8]]) -> Vec<Command<'a>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Command, Fixture, number};
+    use super::{Command, Fixture, frames_error, number};
 
     #[test]
     fn directives_and_commands_read_as_the_reference_reads_them() {
@@ -233,6 +257,13 @@ mod tests {
         assert_eq!(fixture.times, [0, 500]);
         assert_eq!(fixture.attach, [&b"a.ttf"[..]]);
         assert_eq!(fixture.frames[0].times().collect::<Vec<_>>(), [1, 2]);
+        assert_eq!(frames_error(data, false), None);
+        // Two numbers, an end before the start, or no frames at all draw
+        // nothing, which the renderers refuse.
+        assert!(frames_error(b";@frames 0 500\n", false).is_some());
+        assert!(frames_error(b";@frames 500 250 0\n", false).is_some());
+        assert!(frames_error(b"[Script Info]\n", false).is_some());
+        assert!(frames_error(data, true).is_some(), "@frames 0 0 9");
         assert_eq!(fixture.overrides, [&b"A=B"[..]]);
         assert!(matches!(
             fixture.commands[..],

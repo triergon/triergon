@@ -29,6 +29,8 @@ pub(crate) enum Version {
 
 /// Format ceilings: FDSelect indices are 8-bit in CFF, 16-bit in CFF2.
 const MAX_CFF_FONT_DICTS: u32 = 256;
+/// No glyph has this SID; glyph counts stay below it.
+const NO_GLYPH: u16 = u16::MAX;
 const MAX_CFF2_FONT_DICTS: u32 = 65536;
 
 /// What a glyph's Font DICT provides; a font without Font DICTs has one, from
@@ -48,14 +50,14 @@ struct Private {
     vsindex: usize,
 }
 
-/// The charset, which `seac` uses to find its components by standard code.
-#[derive(Clone, Copy, Debug)]
-enum Charset {
-    IsoAdobe,
-    /// Expert and Expert Subset: not supported for `seac`.
-    Predefined,
-    /// An explicit charset at this table offset.
-    Custom(usize),
+/// A face's encoding as FreeType lists it (`cff_encoding_load`): the glyph
+/// of each code, for the Adobe charmap a name-keyed CFF face gets.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Encoding {
+    /// The Adobe encoding id: 0 Standard, 1 Expert, 2 Custom.
+    pub(crate) id: u16,
+    /// The glyph of each code, zero for none.
+    pub(crate) glyphs: [u16; 256],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -73,7 +75,16 @@ pub(crate) struct Cff {
     global: Index,
     font_dicts: BudgetVec<FontDict>,
     fd_select: Option<FdSelect>,
-    charset: Charset,
+    /// The string INDEX, which holds the names of SIDs from 391.
+    strings: Index,
+    /// The charset: the SID of each glyph, or its CID in a CID-keyed font;
+    /// empty for CFF2, which has none.
+    sids: BudgetVec<u16>,
+    /// The lowest glyph of each SID of a name-keyed face, [`NO_GLYPH`] for
+    /// none (`cff_charset_compute_cids`).
+    glyphs_by_sid: BudgetVec<u16>,
+    /// The encoding of a name-keyed CFF face that maps a code.
+    encoding: Option<Encoding>,
     cid: bool,
     glyph_count: u32,
     /// The units per em of the Top DICT's normalised FontMatrix; Font DICTs
@@ -105,7 +116,10 @@ impl Cff {
             global: Index::default(),
             font_dicts: BudgetVec::new(budget),
             fd_select: None,
-            charset: Charset::IsoAdobe,
+            strings: Index::default(),
+            sids: BudgetVec::new(budget),
+            glyphs_by_sid: BudgetVec::new(budget),
+            encoding: None,
             cid: false,
             glyph_count: 0,
             units_per_em: i64::from(units_per_em),
@@ -120,7 +134,7 @@ impl Cff {
                 if names.len() == 0 || tops.len() == 0 {
                     return Err(Error::Invalid("CFF without a font"));
                 }
-                Index::parse(&mut r, version)?; // strings
+                cff.strings = Index::parse(&mut r, version)?;
                 cff.global = Index::parse(&mut r, version)?;
                 tops.get(bytes, 0)?
             }
@@ -159,11 +173,15 @@ impl Cff {
             .normalized();
         cff.units_per_em = top_matrix.units_per_em();
         cff.cid = top.ros;
-        cff.charset = match top.charset {
-            0 => Charset::IsoAdobe,
-            1 | 2 => Charset::Predefined,
-            offset => Charset::Custom(offset),
-        };
+        if version == Version::Cff1 {
+            cff.read_charset(bytes, top.charset, work)?;
+            // CID-keyed fonts have no glyph names, so neither `seac` nor an
+            // encoding.
+            if !top.ros {
+                cff.index_sids(work)?;
+                cff.encoding = cff.read_encoding(bytes, top.encoding)?;
+            }
+        }
         let font_dicts = top.ros || version == Version::Cff2;
         if font_dicts {
             let mut array = Reader::at(
@@ -268,6 +286,7 @@ impl Cff {
                 match operator {
                     op::CHAR_STRINGS => top.charstrings = Some(dict::single(operands)?),
                     op::CHARSET => top.charset = dict::single(operands)?,
+                    op::ENCODING => top.encoding = dict::single(operands)?,
                     op::PRIVATE => top.private = Some(private_location(operands)?),
                     op::FD_ARRAY => top.fd_array = Some(dict::single(operands)?),
                     op::FD_SELECT => top.fd_select = Some(dict::single(operands)?),
@@ -439,36 +458,179 @@ impl Cff {
         Ok(&self.scalars.as_slice()[first..first + len])
     }
 
-    /// The glyph whose charset SID is `sid`, for `seac`.
-    fn glyph_for_sid(&self, table: &[u8], sid: u16) -> Option<u32> {
-        match self.charset {
-            Charset::IsoAdobe => {
-                (u32::from(sid) < self.glyph_count && sid <= 228).then_some(u32::from(sid))
-            }
-            Charset::Predefined => None,
-            Charset::Custom(offset) => {
-                if sid == 0 {
-                    return Some(0);
-                }
-                let mut r = Reader::at(table, offset).ok()?;
-                let format = r.u8().ok()?;
-                let mut glyph = 1_u32;
-                while glyph < self.glyph_count {
-                    let first = r.u16().ok()?;
-                    let left = match format {
-                        0 => 0,
-                        1 => u16::from(r.u8().ok()?),
-                        2 => r.u16().ok()?,
-                        _ => return None,
-                    };
-                    if (first..=first.saturating_add(left)).contains(&sid) {
-                        return Some(glyph + u32::from(sid - first));
-                    }
-                    glyph += u32::from(left) + 1;
-                }
-                None
-            }
+    /// The first glyph whose charset SID is `sid`, for `seac`
+    /// (`cff_lookup_glyph_by_stdcharcode`).
+    pub(super) fn glyph_for_sid(&self, sid: u16) -> Option<u32> {
+        let glyph = *self.glyphs_by_sid.get(usize::from(sid))?;
+        (glyph != NO_GLYPH).then_some(u32::from(glyph))
+    }
+
+    /// Fills [`Self::glyphs_by_sid`] from the charset.
+    fn index_sids(&mut self, work: &mut WorkBudget) -> Result<()> {
+        let most = self.sids.iter().copied().max().map_or(0, usize::from);
+        charge(work, self.sids.len() + most)?;
+        self.glyphs_by_sid.try_resize(most + 1, NO_GLYPH)?;
+        for (glyph, &sid) in self.sids.iter().enumerate().rev() {
+            // Glyph counts stay below NO_GLYPH.
+            self.glyphs_by_sid[usize::from(sid)] = glyph as u16;
         }
+        Ok(())
+    }
+
+    /// The glyph names in index order, as FreeType reads them for its
+    /// Unicode charmap (`cff_sid_to_glyph_name`): each glyph's charset SID as
+    /// a standard string below 391, else as an object of the string INDEX,
+    /// up to a NUL; `None` beyond the strings. A CID-keyed font's CIDs are
+    /// read as SIDs too. Empty for CFF2.
+    pub(crate) fn glyph_names<'a>(
+        &'a self,
+        data: &'a [u8],
+    ) -> impl Iterator<Item = Option<&'a [u8]>> + 'a {
+        let table = self.table.bytes(data);
+        self.sids.iter().map(move |&sid| match sid {
+            0xffff => None,
+            0..=390 => crate::postscript::standard_string(sid).map(str::as_bytes),
+            _ => {
+                let name = self.strings.get(table, u32::from(sid - 391)).ok()?;
+                Some(&name[..name.iter().position(|&b| b == 0).unwrap_or(name.len())])
+            }
+        })
+    }
+
+    /// Whether the face has glyph names to build a Unicode charmap from: a
+    /// charset, which CFF2 has not.
+    pub(crate) fn has_charset(&self) -> bool {
+        !self.sids.is_empty()
+    }
+
+    /// The face's encoding, where it maps a code.
+    pub(crate) const fn encoding(&self) -> Option<&Encoding> {
+        self.encoding.as_ref()
+    }
+
+    /// `cff_charset_load`: the SID of every glyph, from a charset table
+    /// (formats 0, 1 and 2) or a predefined one, which must cover the glyphs.
+    fn read_charset(&mut self, table: &[u8], offset: usize, work: &mut WorkBudget) -> Result<()> {
+        let count = usize::try_from(self.glyph_count).map_err(|_| Error::Overflow)?;
+        charge(work, count)?;
+        self.sids.try_reserve_exact(count)?;
+        let predefined: Option<&[u16]> = match offset {
+            0 => Some(&crate::postscript::ISOADOBE_CHARSET),
+            1 => Some(&crate::postscript::EXPERT_CHARSET),
+            2 => Some(&crate::postscript::EXPERTSUBSET_CHARSET),
+            _ => None,
+        };
+        if let Some(charset) = predefined {
+            let sids = charset.get(..count).ok_or(Error::Invalid(
+                "CFF predefined charset shorter than the font",
+            ))?;
+            return self.sids.try_extend_from_slice(sids);
+        }
+        let mut r = Reader::at(table, offset)?;
+        let format = r.u8()?;
+        self.sids.try_push(0).map_err(|e| e.error)?;
+        match format {
+            0 => {
+                for _ in 1..count {
+                    self.sids.try_push(r.u16()?).map_err(|e| e.error)?;
+                }
+            }
+            1 | 2 => {
+                while self.sids.len() < count {
+                    let first = r.u16()?;
+                    let left = if format == 2 {
+                        r.u16()?
+                    } else {
+                        u16::from(r.u8()?)
+                    };
+                    // FreeType keeps a range from running past SID 65535.
+                    let left = left.min(u16::MAX - first);
+                    for sid in first..=first + left {
+                        if self.sids.len() == count {
+                            break;
+                        }
+                        self.sids.try_push(sid).map_err(|e| e.error)?;
+                    }
+                }
+            }
+            _ => return Err(Error::Invalid("CFF charset format")),
+        }
+        Ok(())
+    }
+
+    /// `cff_encoding_load`: the glyph of each code, from an encoding table
+    /// (formats 0 and 1, with supplements) or the Standard or Expert encoding
+    /// through the charset; `None` when no code has a glyph, where FreeType
+    /// lists no Adobe charmap.
+    fn read_encoding(&self, table: &[u8], offset: usize) -> Result<Option<Encoding>> {
+        let sids = self.sids.as_slice();
+        let count = sids.len();
+        let mut glyphs = [0_u16; 256];
+        let narrow = |glyph: usize| u16::try_from(glyph).map_err(|_| Error::Overflow);
+        let (id, coded) = match offset {
+            0 | 1 => {
+                let encoding = if offset == 0 {
+                    &crate::postscript::STANDARD_ENCODING
+                } else {
+                    &crate::postscript::EXPERT_ENCODING
+                };
+                // The lowest glyph of each SID (`cff_charset_compute_cids`).
+                let mut coded = 0;
+                for (code, &sid) in encoding.iter().enumerate() {
+                    if sid == 0 {
+                        continue;
+                    }
+                    if let Some(glyph) = self.glyph_for_sid(sid).filter(|&g| g != 0) {
+                        glyphs[code] = narrow(glyph as usize)?;
+                        coded = code + 1;
+                    }
+                }
+                (offset as u16, coded)
+            }
+            _ => {
+                let mut r = Reader::at(table, offset)?;
+                let format = r.u8()?;
+                let ranges = usize::from(r.u8()?);
+                let coded = match format & 0x7f {
+                    0 => {
+                        for glyph in 1..=ranges {
+                            let code = usize::from(r.u8()?);
+                            if glyph < count {
+                                glyphs[code] = narrow(glyph)?;
+                            }
+                        }
+                        ranges + 1
+                    }
+                    1 => {
+                        let (mut glyph, mut widest) = (1, 0);
+                        for _ in 0..ranges {
+                            let first = usize::from(r.u8()?);
+                            let left = usize::from(r.u8()?) + 1;
+                            widest = widest.max(left);
+                            for (code, glyph) in (first..).zip(glyph..glyph + left) {
+                                if glyph < count && code < 256 {
+                                    glyphs[code] = narrow(glyph)?;
+                                }
+                            }
+                            glyph += left;
+                        }
+                        widest.min(256)
+                    }
+                    _ => return Err(Error::Invalid("CFF encoding format")),
+                };
+                if format & 0x80 != 0 {
+                    for _ in 0..r.u8()? {
+                        let code = usize::from(r.u8()?);
+                        let sid = r.u16()?;
+                        if let Some(glyph) = self.glyph_for_sid(sid) {
+                            glyphs[code] = narrow(glyph as usize)?;
+                        }
+                    }
+                }
+                (2, coded)
+            }
+        };
+        Ok((coded > 0).then_some(Encoding { id, glyphs }))
     }
 
     /// The operators `glyph`'s program executes; `outline` is scratch storage.
@@ -579,6 +741,7 @@ impl Cff {
 struct Top {
     charstrings: Option<usize>,
     charset: usize,
+    encoding: usize,
     private: Option<(usize, usize)>,
     fd_array: Option<usize>,
     fd_select: Option<usize>,

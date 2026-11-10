@@ -176,9 +176,9 @@ mod tests {
         assert_eq!(
             ["font-outlines", "font-hinting-none", "font-hinting-modes"].map(|f| (f, count(f))),
             [
-                ("font-outlines", 52),
-                ("font-hinting-none", 156),
-                ("font-hinting-modes", 936)
+                ("font-outlines", 53),
+                ("font-hinting-none", 159),
+                ("font-hinting-modes", 954)
             ]
         );
         let none = GENERATOR.manifest(root, "font-hinting-none").unwrap();

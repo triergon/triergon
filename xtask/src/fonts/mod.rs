@@ -9,6 +9,7 @@
 //! flags, as the FFmpeg references are.
 
 mod manifest;
+mod tables;
 
 pub use manifest::GENERATOR;
 
@@ -23,6 +24,7 @@ use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
        cargo xtask fonts fetch
+       cargo xtask fonts tables [--check]
        cargo xtask fonts manifest [--record] [--output DIR]
        cargo xtask fonts compare [--all] [REPORT OPTION]...
 
@@ -36,6 +38,8 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
             harness/features/<feature>/pins.json) to DIR/<feature>/corpus.json
             (default .research/fonts/manifests); with --record, first re-record
             every pin from the built FreeType reference
+  tables    regenerate the PostScript glyph-name tables of triergon-font from
+            the unpacked FreeType release; --check fails if they would change
   compare   `cargo xtask report` on each required font feature (font-outlines,
             font-hinting-none), with --all also on font-hinting-modes; further
             report options pass through, and each report goes to OUTPUT/<feature>
@@ -77,6 +81,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
         [command, rest @ ..] if command == "manifest" => {
             GENERATOR.manifest_command(root, rest, USAGE)
         }
+        [command, rest @ ..] if command == "tables" => tables::main(root, rest),
         _ => Err(USAGE.into()),
     }
 }

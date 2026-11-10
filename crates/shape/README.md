@@ -55,8 +55,9 @@ that `rotates` (U+02F1 and above) advances by its default-load vertical advance,
 as libass gives HarfBuzz that glyph, and a glyph first asked for an advance or
 extents stays horizontal. The cache's storage is charged before it grows, and a
 charge that fails ends the shaping call. `OtMetrics` answers as HarfBuzz's built-in
-functions do at units per em (its character map choice, `cmap` format 14
-variation sequences, `hmtx` advances, `glyf` and CFF extents). A callback that
+functions do at units per em (its character map choice among the raw encoding
+records, which it sanitizes but does not validate, its `cmap` lookups, the
+last (0, 5) format 14 subtable's variation sequences, `hmtx` advances, `glyf` and CFF extents). A callback that
 cannot answer as its font would ends the shaping call with its error. `Scale` reproduces HarfBuzz's scaling arithmetic,
 including hinting device tables when a ppem is set.
 
@@ -213,7 +214,7 @@ characters.
   [`shape-worker`](../shape-worker/README.md) and the HarfBuzz 14.6.0 and FriBidi
   1.0.17 reference worker (`harness/reference_shape.h`, FriBidi as libass calls
   it), and require both to fold the same output:
-  - `shape-libass`: 200 cases over 25 corpus files and 22 script profiles, 3,029
+  - `shape-libass`: 201 cases over 26 corpus files and 22 script profiles, 3,105
     runs with libass's features and with kerning, ligatures, direction and
     language varied, shaped as libass 0.17.5 shapes them with hinting off; every
     glyph's id, cluster, advances and offsets. The reference opens each face
@@ -230,7 +231,8 @@ characters.
     advances FreeType's auto-hinter sets, and one CFF font without GPOS whose
     fallback mark positioning reads hinted glyph extents.
   - `shape-text` and `shape-text-all`: the same cases, and every corpus face and
-    script (1,746 cases, 101,691 runs), with HarfBuzz's built-in font functions
+    script (1,768 cases, 103,031 runs; 1,746 and 101,691 before the charmap face
+    joined them), with HarfBuzz's built-in font functions
     at units per em against `OtMetrics`. They cover the font tables' layout
     without FreeType; each lists one open case, the CFF font whose glyphs use
     operators HarfBuzz's charstring interpreter reads differently (above).

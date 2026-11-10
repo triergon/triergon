@@ -265,8 +265,13 @@ selective style overrides), in the frame and storage size and margins of its
 
 Settings beyond the frame and storage size (margins, `use_margins`, a pixel
 aspect, font scale, line spacing and position) follow libass's formulas but
-are not compared. Not rendered: the glyphs of `@` fonts, which libass draws
-rotated with vertical metrics (`Error::Unsupported`), libass's simple shaping
+are not compared. The glyphs of `@` fonts from U+02F1 on are drawn as libass
+draws them, turned by 90° about their scaled vertical advance and the
+typographic descender and advancing by their linear vertical advance, and are
+shaped with the default-load vertical advance of every glyph libass's glyph
+metrics cache keeps rotated: a glyph's first lookup through a character from
+U+02F1 decides, for the renderer's life and for each requested font (family,
+weight, slant), face and size, as libass keys that cache. Not rendered: libass's simple shaping
 level, its hinting modes, selective style overrides and track features.
 
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
@@ -413,11 +418,11 @@ panics.
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 68/72 pass. The
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 74/76 pass. The
   box behind a `BorderStyle` 4 event is
   compared without its kind, since libass leaves its type uninitialised. The
-  four open cases are two fixtures at both sizes: `cjk.ass`, with an `@` font;
-  and `clip-vector-empty.ass`, vector clips whose drawings have no contour, which
+  two open cases are one fixture at both sizes: `clip-vector-empty.ass`, vector
+  clips whose drawings have no contour, which
   libass draws as a bitmap without pixels that empties every image of the event,
   where the renderer leaves them unclipped.
 - `ass-render-host` renders, as `ass-render` does, the fixtures whose libass
@@ -441,11 +446,8 @@ with any specification of the format.
 
 ## Not here
 
-Vertical text (`@` fonts), libass's simple shaping level and hinting modes,
+libass's simple shaping level and hinting modes,
 its selective style override (`ass_set_selective_style_override`; with libass's
 default settings it changes nothing), track features (`ass_track_set_feature`),
 `ass_step_sub`, `ass_configure_prune` (a player calls
-`prune_events`), reading files and charset conversion. The charmap retry of a
-face selected for a character it does not map is `Error::Unsupported` for faces
-with format 2 or 8 `cmap` subtables and for CFF faces whose Unicode charmap
-FreeType synthesises, whose charmap order `triergon-font` does not reproduce.
+`prune_events`), reading files and charset conversion.

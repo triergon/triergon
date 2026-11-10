@@ -3,9 +3,9 @@ mod support;
 use support::{bytes, cff_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
 use triergon_font::{
-    Bounds, Built, CharEncoding, CharstringBounds, CmapFormat, ControlBox, FaceInfo, Font, GlyphId,
-    Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind, Request, Segment,
-    Store, StoreKey, Style, select,
+    Bounds, Built, CharEncoding, CharmapKind, CharstringBounds, CmapFormat, ControlBox, FaceInfo,
+    Font, GlyphId, Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind,
+    Request, Segment, Store, StoreKey, Style, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -55,11 +55,11 @@ fn truetype_metrics_names_and_charmap() {
     assert_eq!(font.glyph_index('D'), None);
     let charmap = font.text_charmap().unwrap();
     assert_eq!(
-        (charmap.platform(), charmap.encoding(), charmap.format()),
+        (charmap.platform(), charmap.encoding(), charmap.kind()),
         (
             Platform::Windows,
             CharEncoding::Unicode,
-            CmapFormat::SegmentDelta
+            CharmapKind::Subtable(CmapFormat::SegmentDelta)
         )
     );
     assert_eq!(charmap.mappings().count(), 3);
@@ -458,4 +458,63 @@ fn vertical_advances_follow_each_way_freetype_reads_them() {
         Font::new(bytes, 0, &budget, Limits::default()),
         Err(Error::Invalid(_))
     ));
+}
+
+#[test]
+fn cff_faces_list_freetype_charmaps_in_its_order() {
+    let data = support::authored_fonts()
+        .into_iter()
+        .find(|(name, _)| *name == "authored-charmaps.otf")
+        .unwrap()
+        .1;
+    let font = parse(&data);
+    let kinds: Vec<_> = font
+        .charmaps()
+        .map(|c| (c.platform(), c.encoding_id(), c.kind()))
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            (
+                Platform::Macintosh,
+                1,
+                CharmapKind::Subtable(CmapFormat::HighByte)
+            ),
+            (
+                Platform::Windows,
+                10,
+                CharmapKind::Subtable(CmapFormat::Mixed)
+            ),
+            (Platform::Windows, 1, CharmapKind::GlyphNames),
+            (Platform::Other(7), 2, CharmapKind::CffEncoding),
+        ]
+    );
+    // libass reads text through the Windows UCS-4 subtable.
+    assert_eq!(font.text_charmap_index(), Some(1));
+    let maps: Vec<Vec<(u32, u16)>> = font
+        .charmaps()
+        .map(|c| {
+            c.mappings()
+                .map(|m| m.map(|(c, g)| (c, g.0)).unwrap())
+                .collect()
+        })
+        .collect();
+    assert_eq!(maps[0], [(0x41, 7), (0x42, 1), (0x8140, 2)]);
+    assert_eq!(maps[1], [(0x42, 8), (0x1_f600, 4)]);
+    // Names: A, B (twice), é and the emoji, space with U+00A0 and Delta
+    // (U+2206) with U+0394 besides; A.swash is a variant of A.
+    let names: Vec<u32> = maps[2].iter().map(|&(c, _)| c).collect();
+    assert_eq!(
+        names,
+        [0x20, 0x41, 0x42, 0xa0, 0xe9, 0x394, 0x2206, 0x1_f600]
+    );
+    let names = font.charmap(2).unwrap();
+    assert_eq!(names.glyph(0x41), Some(GlyphId(1)));
+    assert_eq!(names.glyph(0xe9), Some(GlyphId(3)));
+    assert_eq!(names.glyph(0x394), Some(GlyphId(6)));
+    assert_eq!(
+        maps[3],
+        [(0x80, 1), (0x81, 2), (0x82, 3), (0x83, 4), (0xc0, 9)]
+    );
+    assert_eq!(names.encoding(), CharEncoding::Unicode);
 }

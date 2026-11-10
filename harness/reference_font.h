@@ -166,11 +166,12 @@ static void font_outline(FontWork *w, const FT_Outline *o) {
     w->bytes += (uint64_t)o->n_points;
 }
 
-static int font_supported(FT_CharMap charmap) {
-    switch (FT_Get_CMap_Format(charmap)) {
-    case 0: case 4: case 6: case 10: case 12: case 13: return 1;
-    default: return 0;
-    }
+/* Every charmap FreeType lists but the variation-sequence subtables of formats
+ * 14 and 15, which FT_Set_Charmap refuses: the `cmap` subtables and the
+ * glyph-name and encoding charmaps of CFF faces (format -1). */
+static int font_listed(FT_CharMap charmap) {
+    FT_Long format = FT_Get_CMap_Format(charmap);
+    return format != 14 && format != 15;
 }
 
 /* The charmap libass 0.17.5 selects for text when it opens a face
@@ -321,7 +322,7 @@ static void font_face(FT_Face face, long index, FontWork *w) {
     FT_CharMap textmap = font_text_charmap(face);
     for (int i = 0; i < face->num_charmaps; i++) {
         FT_CharMap c = face->charmaps[i];
-        if (!font_supported(c)) continue;
+        if (!font_listed(c)) continue;
         font_charmap(w, FONT_CHARMAP, "charmap", c);
         FT_Set_Charmap(face, c);
         FT_UInt glyph;

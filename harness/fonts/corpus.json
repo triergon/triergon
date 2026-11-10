@@ -589,6 +589,23 @@
           "format": "collection"
         }
       ]
+    },
+    {
+      "name": "authored-charmaps",
+      "generator": "authored-fonts",
+      "licence": "authored for this repository (MIT OR Apache-2.0)",
+      "origin": "crates/font/tests/support: a CFF face with format 2 and 8 subtables, glyph names FreeType builds a Unicode charmap from, and a custom encoding with a supplement",
+      "lanes": [
+        "font",
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "authored/authored-charmaps.otf",
+          "sha256": "61523f474bfe1f9f6c24087a31090b1d74d6cd94b2c6414370fa6d42c13e369a",
+          "format": "cff"
+        }
+      ]
     }
   ]
 }
