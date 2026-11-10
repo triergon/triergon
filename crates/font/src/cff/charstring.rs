@@ -891,8 +891,6 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
                 .iter()
                 .zip(scalars)
                 .fold(value, |sum, (&d, &weight)| {
-                    // Region scalars are 0 or 1 at the default instance.
-                    let weight = if weight == 0.0 { 0 } else { ONE };
                     sum.wrapping_add(mul_fix(i64::from(d), i64::from(weight)) as Fixed)
                 })
         })

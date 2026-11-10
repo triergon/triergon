@@ -48,12 +48,10 @@ struct FontDict {
 
 #[derive(Clone, Copy, Debug)]
 struct Private {
-    /// The DICT's size and offset, read again for the hinter's values.
-    location: Option<(usize, usize)>,
     subrs: Index,
-    default_width: f64,
-    nominal_width: f64,
     vsindex: usize,
+    /// The values the hinter reads.
+    hints: HintDict,
 }
 
 /// A face's encoding as FreeType lists it (`cff_encoding_load`): the glyph
@@ -98,8 +96,9 @@ pub(crate) struct Cff {
     units_per_em: i64,
     /// The face's units per em, from `head`, which bound the hinted scale.
     face_units_per_em: u16,
-    /// Region scalars of each ItemVariationData at the default instance.
-    scalars: BudgetVec<f64>,
+    /// Region scalars of each ItemVariationData at the default instance, in
+    /// 16.16: one or zero.
+    scalars: BudgetVec<Fixed>,
     variation_data: BudgetVec<(u32, u32)>,
 }
 
@@ -217,7 +216,7 @@ impl Cff {
                 cff.dict(font, work, |entry| {
                     match entry.operator {
                         op::PRIVATE => location = Some(private_location(entry.operands)?),
-                        op::FONT_MATRIX => matrix = Some(FontMatrix::parse(entry.encoded)?),
+                        op::FONT_MATRIX => matrix = Some(FontMatrix::parse(entry.operands)?),
                         _ => {}
                     }
                     Ok(())
@@ -266,11 +265,11 @@ impl Cff {
         self.version
     }
 
-    fn dict(
+    fn dict<'a>(
         &self,
-        bytes: &[u8],
+        bytes: &'a [u8],
         work: &mut WorkBudget,
-        apply: impl FnMut(Entry<'_>) -> Result<()>,
+        apply: impl FnMut(Entry<'a, '_>) -> Result<()>,
     ) -> Result<()> {
         let scalars = |i| self.region_scalars(i);
         match self.version {
@@ -284,35 +283,30 @@ impl Cff {
             charstring_type: 2,
             ..Top::default()
         };
-        self.dict(
-            bytes,
-            work,
-            |Entry {
-                 operator,
-                 operands,
-                 encoded,
-             }| {
-                match operator {
-                    op::CHAR_STRINGS => top.charstrings = Some(dict::single(operands)?),
-                    op::CHARSET => top.charset = dict::single(operands)?,
-                    op::ENCODING => top.encoding = dict::single(operands)?,
-                    op::PRIVATE => top.private = Some(private_location(operands)?),
-                    op::FD_ARRAY => top.fd_array = Some(dict::single(operands)?),
-                    op::FD_SELECT => top.fd_select = Some(dict::single(operands)?),
-                    op::VSTORE => top.vstore = Some(dict::single(operands)?),
-                    op::ROS => top.ros = true,
-                    op::SYNTHETIC_BASE => top.synthetic = true,
-                    op::CHARSTRING_TYPE => top.charstring_type = dict::single(operands)?,
-                    op::FONT_MATRIX => top.matrix = Some(FontMatrix::parse(encoded)?),
-                    _ => {}
-                }
-                Ok(())
-            },
-        )?;
+        self.dict(bytes, work, |Entry { operator, operands }| {
+            match operator {
+                op::CHAR_STRINGS => top.charstrings = Some(dict::single(operands)?),
+                op::CHARSET => top.charset = dict::single(operands)?,
+                op::ENCODING => top.encoding = dict::single(operands)?,
+                op::PRIVATE => top.private = Some(private_location(operands)?),
+                op::FD_ARRAY => top.fd_array = Some(dict::single(operands)?),
+                op::FD_SELECT => top.fd_select = Some(dict::single(operands)?),
+                op::VSTORE => top.vstore = Some(dict::single(operands)?),
+                op::ROS => top.ros = true,
+                op::SYNTHETIC_BASE => top.synthetic = true,
+                op::CHARSTRING_TYPE => top.charstring_type = dict::single(operands)?,
+                op::FONT_MATRIX => top.matrix = Some(FontMatrix::parse(operands)?),
+                _ => {}
+            }
+            Ok(())
+        })?;
         Ok(top)
     }
 
-    /// The Private DICT at `location` (size, offset); CFF2 Font DICTs may omit it.
+    /// The Private DICT at `location` (size, offset); CFF2 Font DICTs may omit
+    /// it. The hinter's values are read as `cff_load_private_dict` reads them:
+    /// the DICT's entries over FreeType's defaults, or zeros for a Font DICT
+    /// without a Private DICT (none, or an offset or size of zero).
     fn private_dict(
         &self,
         table: &[u8],
@@ -320,11 +314,9 @@ impl Cff {
         work: &mut WorkBudget,
     ) -> Result<Private> {
         let mut private = Private {
-            location,
             subrs: Index::default(),
-            default_width: 0.0,
-            nominal_width: 0.0,
             vsindex: 0,
+            hints: HintDict::ABSENT,
         };
         let Some((size, offset)) = location else {
             return match self.version {
@@ -334,22 +326,38 @@ impl Cff {
         };
         let bytes = slice(table, offset, size)?;
         let mut subrs = None;
-        self.dict(
-            bytes,
-            work,
-            |Entry {
-                 operator, operands, ..
-             }| {
-                match operator {
-                    op::SUBRS => subrs = Some(dict::single(operands)?),
-                    op::DEFAULT_WIDTH_X => private.default_width = first(operands)?,
-                    op::NOMINAL_WIDTH_X => private.nominal_width = first(operands)?,
-                    op::VSINDEX => private.vsindex = dict::single(operands)?,
-                    _ => {}
+        let mut hints = HintDict::DEFAULTS;
+        self.dict(bytes, work, |Entry { operator, operands }| {
+            let fixed = |o: &Operand<'_>| o.fixed(0);
+            match operator {
+                op::SUBRS => subrs = Some(dict::single(operands)?),
+                op::VSINDEX => private.vsindex = dict::single(operands)?,
+                // Unused here, but an entry without its operand fails the face,
+                // as it fails FreeType's parser.
+                op::DEFAULT_WIDTH_X | op::NOMINAL_WIDTH_X => {
+                    dict::first(operands)?;
                 }
-                Ok(())
-            },
-        )?;
+                op::BLUE_VALUES => hints.blue_values.set(operands.iter().map(fixed)),
+                op::OTHER_BLUES => hints.other_blues.set(operands.iter().map(fixed)),
+                op::FAMILY_BLUES => hints.family_blues.set(operands.iter().map(fixed)),
+                op::FAMILY_OTHER_BLUES => {
+                    hints.family_other_blues.set(operands.iter().map(fixed));
+                }
+                op::BLUE_SCALE => hints.blue_scale = dict::first(operands)?.fixed(3),
+                op::BLUE_SHIFT => hints.blue_shift = dict::first(operands)?.integer(),
+                op::BLUE_FUZZ => hints.blue_fuzz = dict::first(operands)?.integer(),
+                // FreeType stores LanguageGroup in an int.
+                op::LANGUAGE_GROUP => {
+                    hints.language_group = dict::first(operands)?.integer() as i32;
+                }
+                _ => {}
+            }
+            Ok(())
+        })?;
+        if size > 0 && offset > 0 {
+            hints.sanitize();
+            private.hints = hints;
+        }
         if self.version == Version::Cff2 {
             self.region_scalars(private.vsindex)?;
         }
@@ -358,43 +366,6 @@ impl Cff {
             private.subrs = Index::parse(&mut Reader::at(table, at)?, self.version)?;
         }
         Ok(private)
-    }
-
-    /// The Private DICT values of `glyph`'s Font DICT that the hinter reads,
-    /// as `cff_load_private_dict` reads them: the DICT's entries over
-    /// FreeType's defaults, or zeros for a Font DICT without a Private DICT
-    /// (an offset or size of zero).
-    fn hint_dict(&self, table: &[u8], glyph: u32, work: &mut WorkBudget) -> Result<HintDict> {
-        let location = self.private(table, glyph)?.location;
-        let Some((size, offset)) = location.filter(|&(size, offset)| size > 0 && offset > 0) else {
-            return Ok(HintDict::ABSENT);
-        };
-        let mut hints = HintDict::DEFAULTS;
-        self.dict(slice(table, offset, size)?, work, |entry| {
-            let operands = || Operand::all(entry.encoded, entry.operands);
-            // Other than arrays, entries take their first operand and need one.
-            let first = || {
-                operands()
-                    .next()
-                    .ok_or(Error::Invalid("CFF DICT operand count"))
-            };
-            let fixed = |o: Operand<'_>| o.fixed(0);
-            match entry.operator {
-                op::BLUE_VALUES => hints.blue_values.set(operands().map(fixed)),
-                op::OTHER_BLUES => hints.other_blues.set(operands().map(fixed)),
-                op::FAMILY_BLUES => hints.family_blues.set(operands().map(fixed)),
-                op::FAMILY_OTHER_BLUES => hints.family_other_blues.set(operands().map(fixed)),
-                op::BLUE_SCALE => hints.blue_scale = first()?.fixed(3),
-                op::BLUE_SHIFT => hints.blue_shift = first()?.integer(),
-                op::BLUE_FUZZ => hints.blue_fuzz = first()?.integer(),
-                // FreeType stores LanguageGroup in an int.
-                op::LANGUAGE_GROUP => hints.language_group = first()?.integer() as i32,
-                _ => {}
-            }
-            Ok(())
-        })?;
-        hints.sanitize();
-        Ok(hints)
     }
 
     /// Checks the FDSelect header; entries are read per glyph.
@@ -475,7 +446,7 @@ impl Cff {
                     .and_then(|n| n.checked_add(records))
                     .ok_or(Error::Overflow)?;
                 let mut axis = Reader::at(table, at)?;
-                let mut scalar = 1.0;
+                let mut scalar = 0x10000;
                 for _ in 0..axes {
                     let (start, peak, end) = (axis.i16()?, axis.i16()?, axis.i16()?);
                     // At the default instance every coordinate is zero: an axis whose
@@ -483,7 +454,7 @@ impl Cff {
                     // region (OpenType "Item variation store", region scalars).
                     let ignored = start > peak || peak > end || peak == 0 || (start < 0 && end > 0);
                     if !ignored {
-                        scalar = 0.0;
+                        scalar = 0;
                     }
                 }
                 self.scalars.try_push(scalar).map_err(|e| e.error)?;
@@ -495,7 +466,7 @@ impl Cff {
         Ok(())
     }
 
-    fn region_scalars(&self, vsindex: usize) -> Result<&[f64]> {
+    fn region_scalars(&self, vsindex: usize) -> Result<&[Fixed]> {
         let &(first, len) = self
             .variation_data
             .as_slice()
@@ -785,11 +756,10 @@ impl Cff {
             return self.load(data, glyph, scale, outline, limits, work);
         }
         let index = u32::from(glyph.0);
-        let dict = self.hint_dict(table, index, work)?;
         let scaling = Scaling {
             x,
             y,
-            blues: Some(Blues::new(&dict, y)),
+            blues: Some(Blues::new(&self.private(table, index)?.hints, y)),
         };
         charstring::outline(self, table, index, &scaling, outline, limits, work)?;
         if !matrix.is_identity() {
@@ -860,18 +830,11 @@ struct Top {
     matrix: Option<FontMatrix>,
 }
 
-fn private_location(operands: &[f64]) -> Result<(usize, usize)> {
+fn private_location(operands: &[Operand<'_>]) -> Result<(usize, usize)> {
     match operands {
-        [size, offset] => Ok((dict::integer(*size)?, dict::integer(*offset)?)),
+        [size, offset] => Ok((size.index()?, offset.index()?)),
         _ => Err(Error::Invalid("CFF Private operands")),
     }
-}
-
-fn first(operands: &[f64]) -> Result<f64> {
-    operands
-        .first()
-        .copied()
-        .ok_or(Error::Invalid("CFF DICT operand count"))
 }
 
 /// The FD of `glyph` in an FDSelect whose header [`Cff::check_fd_select`] checked.

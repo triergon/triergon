@@ -4,7 +4,7 @@
 //! concatenated with the Top DICT's for Font DICTs. Outlines are transformed
 //! in fixed point, so results match FreeType bit for bit.
 
-use super::number::{POWER_TENS, fixed_dynamic};
+use super::number::{Operand, POWER_TENS, fixed_dynamic};
 use crate::fixed::{ONE, div_fix, mul_div, mul_fix};
 use crate::read::Reader;
 use triergon_core::{Error, Result};
@@ -37,17 +37,20 @@ impl FontMatrix {
         }
     }
 
-    /// The FontMatrix whose operands are encoded in `operands`; FreeType reads
-    /// the first six. Values with implausible scales or a near-singular matrix
-    /// read as the identity with one unit per em, as FreeType falls back.
-    pub(super) fn parse(operands: &[u8]) -> Result<Self> {
-        let mut r = Reader::new(operands);
+    /// The FontMatrix of a DICT entry's operands; FreeType reads the first
+    /// six. Values with implausible scales or a near-singular matrix read as
+    /// the identity with one unit per em, as FreeType falls back.
+    pub(super) fn parse(operands: &[Operand<'_>]) -> Result<Self> {
         let mut values = [(0_i64, 0_i64); 6];
-        for value in &mut values {
-            if r.at_end() {
+        for (value, operand) in values.iter_mut().zip(operands) {
+            // Blends only occur in Private DICTs.
+            let Operand::Encoded(bytes) = *operand else {
                 return Err(Error::Invalid("CFF FontMatrix operands"));
-            }
-            *value = fixed_dynamic(&mut r)?;
+            };
+            *value = fixed_dynamic(&mut Reader::new(bytes))?;
+        }
+        if operands.len() < values.len() {
+            return Err(Error::Invalid("CFF FontMatrix operands"));
         }
         let scales = values.iter().filter(|(v, _)| *v != 0).map(|&(_, s)| s);
         let (min, max) = scales.fold((i64::MAX, i64::MIN), |(lo, hi), s| (lo.min(s), hi.max(s)));
@@ -190,7 +193,9 @@ impl FontMatrix {
 
 #[cfg(test)]
 mod tests {
+    use super::super::number::{Operand, number_length};
     use super::{FontMatrix, ONE};
+    use triergon_core::Result;
 
     fn real(text: &[u8]) -> Vec<u8> {
         let mut nibbles: Vec<u8> = text
@@ -213,9 +218,20 @@ mod tests {
         out
     }
 
+    /// The FontMatrix of `bytes`, one number after another.
+    fn parse(bytes: &[u8]) -> Result<FontMatrix> {
+        let mut operands = Vec::new();
+        let mut rest = bytes;
+        while !rest.is_empty() {
+            operands.push(Operand::Encoded(rest));
+            rest = &rest[number_length(rest).unwrap()..];
+        }
+        FontMatrix::parse(&operands)
+    }
+
     fn matrix(values: [&[u8]; 6]) -> FontMatrix {
         let bytes: Vec<u8> = values.iter().flat_map(|v| real(v)).collect();
-        FontMatrix::parse(&bytes).unwrap()
+        parse(&bytes).unwrap()
     }
 
     #[test]
@@ -223,7 +239,7 @@ mod tests {
         let m = matrix([b"0.001", b"0", b"0", b"0.001", b"0", b"0"]).normalized();
         assert_eq!(m, FontMatrix::identity(1000));
         // Integers: 1 0 0 1 0 0 at one unit per em.
-        let ints = FontMatrix::parse(&[140, 139, 139, 140, 139, 139]).unwrap();
+        let ints = parse(&[140, 139, 139, 140, 139, 139]).unwrap();
         assert_eq!(ints.normalized(), FontMatrix::identity(1));
     }
 
@@ -241,7 +257,7 @@ mod tests {
         let identity = FontMatrix::identity(1);
         assert_eq!(matrix([b"1", b"1", b"1", b"1", b"0", b"0"]), identity);
         assert_eq!(matrix([b"1E-12", b"0", b"0", b"1", b"0", b"0"]), identity);
-        assert!(FontMatrix::parse(&[139, 139]).is_err());
+        assert!(parse(&[139, 139]).is_err());
     }
 
     #[test]

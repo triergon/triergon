@@ -168,23 +168,25 @@ them, and a glyph whose operator reads past its operands fails; operand types ar
 not tracked.
 
 **Hinted CFF outlines.** The crate also builds a CFF or CFF2 glyph as FreeType's
-default load (`FT_LOAD_DEFAULT`) leaves it in the glyph slot, before metrics are
-fitted to the grid; `SizedFont` does not return these outlines yet. The same
+default load (`FT_LOAD_DEFAULT`) leaves it in the glyph slot, which
+`SizedFont::load` with `Load::Default` returns (below). The same
 interpreter and glyph path run with Adobe's hinter as FreeType 2.15's CFF driver
 runs it by default, without stem darkening: at a 64th of the size's 16.16 scale,
 rounded (adjusted first for a Font DICT with other units per em), the blue
 zones of the glyph's Private DICT (BlueValues, OtherBlues, FamilyBlues,
 FamilyOtherBlues, BlueScale, BlueShift, BlueFuzz, and LanguageGroup 1's
-synthetic em box hints, read with FreeType's defaults, number conversions and
-corrections) capture horizontal stem edges, and hint maps built from the masks
+synthetic em box hints, read when the face is parsed with FreeType's defaults,
+number conversions and corrections, so that an entry without its operand makes
+the face `Error::Invalid`) capture horizontal stem edges, and hint maps built from the masks
 move the other stems' edges onto pixel boundaries; each element of the path is
 mapped with the hint map in force when the next one is drawn, as in FreeType.
 The 26.6 points then go through the FontMatrix and are moved by its offset in
 font units, without further scaling. Sizes beyond 2000 pixels per em, which the
 hinter refuses, load unhinted and scaled, as FreeType retries them; a 16.16
-scale below 32 fails the glyph. The arithmetic is cf2's, 16.16 in 32 bits. In a
-CFF2 Private DICT, a blended value that is not a whole number may differ from
-FreeType's in its last 16.16 bit.
+scale below 32 fails the glyph. The arithmetic is cf2's, 16.16 in 32 bits.
+DICT operands are kept as encoded and converted where read, as FreeType's
+parser converts them; a CFF2 `blend` in a DICT sums each default and its
+deltas times the region scalars in 16.16, as `cff_blend_doBlend` does.
 
 **Control boxes.** `Font::control_box` reads a glyph's box without building its
 outline, within the caller's `WorkBudget`, so no point limit applies: a TrueType glyph's `glyf` header box as

@@ -266,31 +266,22 @@ pub(super) fn fixed_dynamic(r: &mut Reader<'_>) -> Result<(i64, i64)> {
 /// A DICT operand as FreeType's parser holds it: its encoding, or the 16.16
 /// result of a CFF2 `blend`.
 #[derive(Clone, Copy, Debug)]
-pub(super) enum Operand<'a> {
+pub(crate) enum Operand<'a> {
     /// The bytes from the operand's first on.
     Encoded(&'a [u8]),
     Blended(i64),
 }
 
-impl<'a> Operand<'a> {
-    /// The operands of a DICT entry, bottom first, from the bytes that encode
-    /// them and the values the DICT parser read. A CFF2 entry with a `blend`
-    /// has only its blended values: whole numbers are exact, other reals are
-    /// rounded to 16.16 where FreeType sums the 16.16 readings of the deltas.
-    pub(super) fn all(encoded: &'a [u8], values: &'a [f64]) -> impl Iterator<Item = Self> + 'a {
-        let plain = Numbers(encoded).is_plain() && Numbers(encoded).count() == values.len();
-        let encoded = plain.then_some(Numbers(encoded)).into_iter().flatten();
-        let blended = (!plain)
-            .then_some(values)
-            .into_iter()
-            .flatten()
-            .map(|&v| Self::Blended((v * 65536.0).round() as i64));
-        encoded.chain(blended)
+impl Default for Operand<'_> {
+    fn default() -> Self {
+        Self::Blended(0)
     }
+}
 
+impl Operand<'_> {
     /// `do_fixed`: the operand in 16.16, times `10^scaling`, saturating as
     /// FreeType saturates.
-    pub(super) fn fixed(self, scaling: usize) -> i64 {
+    pub(crate) fn fixed(self, scaling: usize) -> i64 {
         let power = POWER_TENS[scaling.min(9)];
         let limit = i64::MAX / power;
         let saturated = |v: i64| if v > 0 { 0x7fff_ffff } else { -0x7fff_ffff };
@@ -330,9 +321,32 @@ impl<'a> Operand<'a> {
         }
     }
 
+    /// The operand as a count, index or offset: a nonnegative whole number
+    /// below 2^32, from the five-byte form read signed.
+    pub(crate) fn index(self) -> Result<usize> {
+        let value = match self {
+            Self::Encoded(bytes) => {
+                let mut r = Reader::new(bytes);
+                match r.u8()? {
+                    30 => {
+                        let fixed = Real::read(&mut r).fixed(0);
+                        (fixed & 0xffff == 0).then_some(fixed >> 16)
+                    }
+                    29 => Some(i64::from(r.i32()?)),
+                    byte => shared_integer(byte, &mut r)?.map(i64::from),
+                }
+            }
+            Self::Blended(sum) => (sum & 0xffff == 0).then_some(sum >> 16),
+        };
+        value
+            .and_then(|v| u32::try_from(v).ok())
+            .and_then(|v| usize::try_from(v).ok())
+            .ok_or(Error::Invalid("CFF operand is not an index"))
+    }
+
     /// `cff_parse_num`: the operand as an integer, a real truncated toward
     /// negative infinity and a blend rounded to 16 bits.
-    pub(super) fn integer(self) -> i64 {
+    pub(crate) fn integer(self) -> i64 {
         match self {
             Self::Encoded(bytes) => {
                 let mut r = Reader::new(bytes);
@@ -350,37 +364,9 @@ impl<'a> Operand<'a> {
     }
 }
 
-/// The numbers of DICT operand bytes, each from its first byte on.
-struct Numbers<'a>(&'a [u8]);
-
-impl Numbers<'_> {
-    /// Whether the bytes hold numbers alone, without a `blend` among them.
-    fn is_plain(&self) -> bool {
-        let mut rest = self.0;
-        while !rest.is_empty() {
-            match number_length(rest) {
-                Some(len) => rest = &rest[len..],
-                None => return false,
-            }
-        }
-        true
-    }
-}
-
-impl<'a> Iterator for Numbers<'a> {
-    type Item = Operand<'a>;
-
-    fn next(&mut self) -> Option<Operand<'a>> {
-        let len = number_length(self.0)?;
-        let operand = Operand::Encoded(self.0);
-        self.0 = &self.0[len..];
-        Some(operand)
-    }
-}
-
 /// The length of the DICT number `bytes` start with, `None` for an operator or
 /// a number cut short.
-fn number_length(bytes: &[u8]) -> Option<usize> {
+pub(super) fn number_length(bytes: &[u8]) -> Option<usize> {
     let len = match *bytes.first()? {
         28 => 3,
         29 => 5,
@@ -419,24 +405,30 @@ mod tests {
 
     #[test]
     fn dict_operands_read_as_freetype_reads_them() {
+        let operand = |bytes: &'static [u8]| Operand::Encoded(bytes);
         // 0.039625 (BlueScale) times 1000 in 16.16: 39.625 → 2596864;
         // -10, and 0.5 truncated to an integer.
-        let bytes = [30, 0x0a, 0x03, 0x96, 0x25, 0xff, 129, 30, 0x0a, 0x5f];
-        let operands: Vec<Operand<'_>> = Operand::all(&bytes, &[0.039625, -10.0, 0.5]).collect();
-        assert_eq!(operands.len(), 3);
-        assert_eq!(operands[0].fixed(3), 2596864);
-        assert_eq!(operands[1].fixed(0), -10 << 16);
-        assert_eq!(operands[2].integer(), 0);
+        assert_eq!(
+            operand(&[30, 0x0a, 0x03, 0x96, 0x25, 0xff]).fixed(3),
+            2596864
+        );
+        assert_eq!(operand(&[129]).fixed(0), -10 << 16);
+        assert_eq!(operand(&[30, 0x0a, 0x5f]).integer(), 0);
         // Out of range integers saturate; the five-byte form is unsigned.
-        let large = [29, 0xff, 0xff, 0xff, 0xff];
-        let large = Operand::all(&large, &[-1.0]).next().unwrap();
+        let large = operand(&[29, 0xff, 0xff, 0xff, 0xff]);
         assert_eq!(
             (large.fixed(0), large.integer()),
             (0x7fff_ffff, 0xffff_ffff)
         );
-        // A blend leaves the parser's values: 12.5 rounds to 13 as a number.
-        let blended = [139, 149, 139, 23];
-        let values: Vec<Operand<'_>> = Operand::all(&blended, &[12.5]).collect();
-        assert_eq!((values[0].fixed(0), values[0].integer()), (819200, 13));
+        // A blend in 16.16: 12.5 rounds to 13 as a number.
+        let blended = Operand::Blended(12 << 16 | 0x8000);
+        assert_eq!((blended.fixed(0), blended.integer()), (819200, 13));
+        // Indices are whole and nonnegative.
+        assert_eq!(operand(&[239]).index(), Ok(100));
+        assert_eq!(operand(&[30, 0x3a, 0x0f]).index(), Ok(3));
+        assert!(operand(&[30, 0x3a, 0x5f]).index().is_err());
+        assert!(operand(&[129]).index().is_err());
+        assert!(operand(&[29, 0xff, 0xff, 0xff, 0xff]).index().is_err());
+        assert!(Operand::Blended(1 << 15).index().is_err());
     }
 }
