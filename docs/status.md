@@ -171,13 +171,15 @@ default load with CFF hinting, CFF DICT operands read once, and the `@` font nam
 worker change, which prepares both workers for memory collection and keeps measured worker
 identities verifiable. The current code has not been timed.
 
-The font, shaping and ASS rendering comparisons on Linux compare `a1aa6f0e1981d07ce9d27efcdc5b6815839f5481`
+The font, shaping and ASS rendering comparisons on Linux compare `cc09ffa8f270f0bbbe2a5de0db4dbf3ffb45be03`
 with FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 on a c6g.2xlarge:
 `cargo xtask fonts compare`, `shape compare` and `ass compare` natively on AArch64 and in the ARMv7
 user space, each target with its own reference builds, with the rasterising features and the crates'
 tests on AArch64. The commit after it changes only this file and the evidence index. The same
-comparisons at `ec9a4f1627b2734efbd4134ceb86c3a71740815d`, before the linear advances and the
-FontMatrix followed 32-bit FreeType, and at `cf5c7504c077ff47ab5da521261e5c7a04046f16`, before
+comparisons at `a1aa6f0e1981d07ce9d27efcdc5b6815839f5481`, before the FontMatrix was applied in
+32 bits and main's ASS renderer timing was merged, at
+`ec9a4f1627b2734efbd4134ceb86c3a71740815d`, before the linear advances and the FontMatrix's
+rounding and check followed 32-bit FreeType, and at `cf5c7504c077ff47ab5da521261e5c7a04046f16`, before
 the auto-hinter followed 32-bit FreeType's arithmetic and the CFF DICT readers its operand rules,
 gave the same results, with the xtask
 tests, clippy and rustfmt at `5061518644d081ede35891bfbfc21d5b6256e6c7`. The comparisons before the auto-hinter, at
@@ -285,7 +287,8 @@ against libass for AArch64 where it runs out of memory.
 | ASS rendering comparison and generated scripts, Linux AArch64 and ARMv7 | `01ccb49792cf1d4d05b74addf35dc616763b88e0` | `c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be` |
 | Earlier: ASS rendering parity, Linux AArch64 and ARMv7 | `28e5ccf0ecb5419f7105d52c91ebe8d6c09f053c` | `bc26dfc21b141cc79b5bb4f8cb3d636dcfaa3f64fa24eec2d200409eff0c32f0` |
 | Earlier: ASS rendering comparison and generated scripts, Linux AArch64 and ARMv7 | `fedfb790bfb52131389cb7c5134bab7ab813b55f` | `f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f` |
-| Fonts, shaping and ASS rendering comparison, Linux AArch64 and ARMv7 | `a1aa6f0e1981d07ce9d27efcdc5b6815839f5481` | `a22a7f4312953485804e6d3bfd654261d959eca9903ea2d92822157b525d6af3` |
+| Fonts, shaping and ASS rendering comparison, Linux AArch64 and ARMv7 | `cc09ffa8f270f0bbbe2a5de0db4dbf3ffb45be03` | `18028d8fa7452fd3d43d0d7d254560578d7f7a38d7a553d9fb42b7246a9df927` |
+| Earlier: the 32-bit linear advances, before the FontMatrix's transform, Linux AArch64 and ARMv7 | `a1aa6f0e1981d07ce9d27efcdc5b6815839f5481` | `a22a7f4312953485804e6d3bfd654261d959eca9903ea2d92822157b525d6af3` |
 | Earlier: the auto-hinter's 32-bit arithmetic before the linear advances', Linux AArch64 and ARMv7 | `ec9a4f1627b2734efbd4134ceb86c3a71740815d` | `cae121896f313cec3378f289f19b28fe1ddb73b8fcb5d0079f71247babb36010` |
 | Earlier: the auto-hinter before its 32-bit arithmetic, Linux AArch64 and ARMv7 | `cf5c7504c077ff47ab5da521261e5c7a04046f16` | `64b022b36608f08b8609d128e0deaba3e7b37fe86c8ca94c312e41e411e7df79` |
 | Earlier: the default load with CFF DICTs read once, Linux AArch64 and ARMv7 | `b531944603a96d8fad9a1bb50e99cd538528280e` | `a6c0e18c8ad7a3dfc38c8d4144c55f364b32b8c4aa4bf63f37b71f0316fd24a8` |

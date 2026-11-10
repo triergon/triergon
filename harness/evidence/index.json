@@ -19338,6 +19338,16 @@
      "sha256": "ab41ee66fe02b70cb4015aa21c3b2f005222cecdc20d8234d6544391707025e3"
     }
    ]
+  },
+  {
+   "name": "font-latin-cc09ffa8",
+   "path": "font-latin-cc09ffa8",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's auto-hinter, 32-bit ARM arithmetic for it, the linear advances and the FontMatrix, and CFF DICTs read as FreeType reads them, merged with main's ASS renderer timing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at cc09ffa8 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' and xtask tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-latin-cc09ffa8/18028d8fa7452fd3d43d0d7d254560578d7f7a38d7a553d9fb42b7246a9df927.tar.gz",
+   "sha256": "18028d8fa7452fd3d43d0d7d254560578d7f7a38d7a553d9fb42b7246a9df927",
+   "bytes": 112317324,
+   "source_revision": "cc09ffa8f270f0bbbe2a5de0db4dbf3ffb45be03"
   }
  ]
 }
