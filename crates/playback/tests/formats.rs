@@ -3190,6 +3190,46 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
 }
 
 #[test]
+fn range_playback_derives_duration_when_the_movie_header_is_unknown() {
+    let seed = include_bytes!("fixtures/mp4/r-front-stco.mov");
+    let mut short = seed.to_vec();
+    short[52..56].copy_from_slice(&u32::MAX.to_be_bytes());
+    // The version-one fixture widens the same header and keeps all media bytes.
+    let wide = include_bytes!("fixtures/mp4/r-unknown-movie-duration.mov");
+    let mut oversized = wide.to_vec();
+    oversized[60..68].copy_from_slice(&(u64::MAX - 1).to_be_bytes());
+    for (bytes, declared) in [
+        (short.as_slice(), None),
+        (wide.as_slice(), None),
+        (oversized.as_slice(), Some(u64::MAX - 1)),
+    ] {
+        let (opened, _) = open(bytes, 97, 64).unwrap();
+        assert_eq!(opened.movie.header().declared_duration_ticks(), declared);
+        let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+        assert!((0..1000).any(|_| job.poll(&mut WorkBudget::new(16), &off()).unwrap()));
+        let mut player = job
+            .finish(
+                opened.input,
+                opened.source,
+                1 << 20,
+                Selection::All,
+                PlayerPolicy::default(),
+            )
+            .unwrap();
+        assert_eq!(player.duration_us(), 6_000_000);
+        let outputs: Vec<_> = std::iter::from_fn(|| next_range_output(&mut player)).collect();
+        let packets = mp4_packets(&outputs);
+        assert_eq!(packets.len(), 6);
+        for (ordinal, packet) in packets.iter().enumerate() {
+            assert_eq!(
+                packet.native.as_ref().unwrap().demux.dts,
+                Some(ordinal as i64 * 1000)
+            );
+        }
+    }
+}
+
+#[test]
 fn native_range_packet_reclaims_optional_seek_state_under_pool_pressure() {
     let bytes = include_bytes!("fixtures/mp4/r-front-stco.mov");
     let (opened, _, pool) = observed_mp4_open(bytes);

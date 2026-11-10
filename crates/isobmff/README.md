@@ -141,7 +141,7 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Task | Entry points |
 | --- | --- |
 | Box framing | `BoxReader`, `BoxView::children`, `BoxChildren` |
-| Movie/track headers | `MovieHeader::parse`, `TrackHeader::parse`, `SampleDescription` |
+| Movie/track headers | `MovieHeader::parse`, `MovieHeader::declared_duration_ticks`, `TrackHeader::parse`, `SampleDescription` |
 | Regular sample tables | `SampleTableBuilder` → `SampleTable::{cursor, locate, previous_sync}` |
 | Fragments (`moof`/`traf`) | `Trex::parse`, `FragmentBuilder` → `FragmentIndex`, `OwnedFragmentCursor` |
 | One track, regular + fragments | `SourceTrack`, `TrackSampleCursor` |
