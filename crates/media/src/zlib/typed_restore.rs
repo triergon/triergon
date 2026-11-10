@@ -61,6 +61,8 @@ impl RestorePlan {
         self
     }
 }
+pub(crate) const COPY_CHUNK_BYTES: usize = 8192;
+
 #[derive(Debug)]
 enum CopyPhase {
     Reserve,
@@ -125,7 +127,7 @@ impl CopyJob {
             match self.phase {
                 CopyPhase::Reserve => {
                     if self.prefix.is_empty()
-                        && self.size <= 8192
+                        && self.size <= COPY_CHUNK_BYTES
                         && work.remaining() >= self.size as u64 + 2
                         && let Some(buffer) = &self.buffer
                         && let Ok(bytes) =
@@ -163,7 +165,8 @@ impl CopyJob {
                         };
                         continue;
                     }
-                    let count = work.take((bytes.len() - self.at).min(8192) as u64) as usize;
+                    let count =
+                        work.take((bytes.len() - self.at).min(COPY_CHUNK_BYTES) as u64) as usize;
                     if count == 0 {
                         return Ok(ParseStep::Yield);
                     }
