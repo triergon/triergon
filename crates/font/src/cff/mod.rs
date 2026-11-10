@@ -17,7 +17,7 @@ use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
 use crate::work::charge;
 use crate::{GlyphId, Limits};
-use dict::{CFF_OPERANDS, CFF2_OPERANDS, Entry, op};
+use dict::{CFF_DICT_STACK, CFF2_DICT_STACK, Entry, op};
 use hint::{Blues, HintDict};
 use index::Index;
 use matrix::FontMatrix;
@@ -97,17 +97,24 @@ pub(crate) struct Cff {
     /// The face's units per em, from `head`, which bound the hinted scale.
     face_units_per_em: u16,
     /// Region scalars of each ItemVariationData at the default instance, in
-    /// 16.16: one or zero.
+    /// 16.16, as `cff_blend_build_vector` computes them.
     scalars: BudgetVec<Fixed>,
     variation_data: BudgetVec<(u32, u32)>,
+    /// The axes of the face's `fvar`, zero without one (FreeType's `lenNDV`).
+    fvar_axes: u16,
+    /// The axes of the variation store's regions.
+    store_axes: u16,
 }
 
 impl Cff {
+    /// The `CFF ` or `CFF2` table at `table`. `fvar_axes` is the axis count of
+    /// the face's `fvar`, zero without one, which decides the region scalars.
     pub(crate) fn parse(
         data: &[u8],
         table: Table,
         version: Version,
         units_per_em: u16,
+        fvar_axes: u16,
         budget: &Budget,
         work: &mut WorkBudget,
     ) -> Result<Self> {
@@ -133,6 +140,8 @@ impl Cff {
             face_units_per_em: units_per_em,
             scalars: BudgetVec::new(budget),
             variation_data: BudgetVec::new(budget),
+            fvar_axes,
+            store_axes: 0,
         };
         let top = match (version, major) {
             (Version::Cff1, 1) => {
@@ -213,7 +222,7 @@ impl Cff {
             for i in 0..fonts.len() {
                 let font = fonts.get(bytes, i)?;
                 let (mut location, mut matrix) = (None, None);
-                cff.dict(font, work, |entry| {
+                cff.dict(font, false, work, |entry| {
                     match entry.operator {
                         op::PRIVATE => location = Some(private_location(entry.operands)?),
                         op::FONT_MATRIX => matrix = Some(FontMatrix::parse(entry.operands)?),
@@ -265,16 +274,22 @@ impl Cff {
         self.version
     }
 
+    /// Parses a Top or Font DICT, or with `private` a Private DICT, the only
+    /// one where a CFF2 `vsindex` and `blend` apply.
     fn dict<'a>(
         &self,
         bytes: &'a [u8],
+        private: bool,
         work: &mut WorkBudget,
         apply: impl FnMut(Entry<'a, '_>) -> Result<()>,
     ) -> Result<()> {
-        let scalars = |i| self.region_scalars(i);
+        let scalars = |i| self.blend_scalars(i);
         match self.version {
-            Version::Cff1 => dict::parse::<CFF_OPERANDS>(bytes, work, &scalars, apply),
-            Version::Cff2 => dict::parse::<CFF2_OPERANDS>(bytes, work, &scalars, apply),
+            Version::Cff1 => dict::parse::<CFF_DICT_STACK>(bytes, work, None, apply),
+            Version::Cff2 => {
+                let variations = private.then_some(&scalars as &dyn Fn(usize) -> _);
+                dict::parse::<CFF2_DICT_STACK>(bytes, work, variations, apply)
+            }
         }
     }
 
@@ -283,7 +298,7 @@ impl Cff {
             charstring_type: 2,
             ..Top::default()
         };
-        self.dict(bytes, work, |Entry { operator, operands }| {
+        self.dict(bytes, false, work, |Entry { operator, operands }| {
             match operator {
                 op::CHAR_STRINGS => top.charstrings = Some(dict::single(operands)?),
                 op::CHARSET => top.charset = dict::single(operands)?,
@@ -303,10 +318,11 @@ impl Cff {
         Ok(top)
     }
 
-    /// The Private DICT at `location` (size, offset); CFF2 Font DICTs may omit
-    /// it. The hinter's values are read as `cff_load_private_dict` reads them:
-    /// the DICT's entries over FreeType's defaults, or zeros for a Font DICT
-    /// without a Private DICT (none, or an offset or size of zero).
+    /// The Private DICT at `location` (size, offset), read as
+    /// `cff_load_private_dict` reads it: none, or one at offset or size zero,
+    /// leaves no local subroutines and zeros for the hinter's values; else the
+    /// DICT's entries over FreeType's defaults. An entry FreeType reads with
+    /// too few operands fails the face, as it fails FreeType's parser.
     fn private_dict(
         &self,
         table: &[u8],
@@ -318,25 +334,18 @@ impl Cff {
             vsindex: 0,
             hints: HintDict::ABSENT,
         };
-        let Some((size, offset)) = location else {
-            return match self.version {
-                Version::Cff2 => Ok(private),
-                Version::Cff1 => Err(Error::Invalid("CFF without a Private DICT")),
-            };
+        let Some((size, offset)) = location.filter(|&(size, offset)| size > 0 && offset > 0) else {
+            return Ok(private);
         };
         let bytes = slice(table, offset, size)?;
         let mut subrs = None;
         let mut hints = HintDict::DEFAULTS;
-        self.dict(bytes, work, |Entry { operator, operands }| {
+        let version = self.version;
+        self.dict(bytes, true, work, |Entry { operator, operands }| {
             let fixed = |o: &Operand<'_>| o.fixed(0);
             match operator {
                 op::SUBRS => subrs = Some(dict::single(operands)?),
-                op::VSINDEX => private.vsindex = dict::single(operands)?,
-                // Unused here, but an entry without its operand fails the face,
-                // as it fails FreeType's parser.
-                op::DEFAULT_WIDTH_X | op::NOMINAL_WIDTH_X => {
-                    dict::first(operands)?;
-                }
+                op::VSINDEX => private.vsindex = dict::first(operands)?.index()?,
                 op::BLUE_VALUES => hints.blue_values.set(operands.iter().map(fixed)),
                 op::OTHER_BLUES => hints.other_blues.set(operands.iter().map(fixed)),
                 op::FAMILY_BLUES => hints.family_blues.set(operands.iter().map(fixed)),
@@ -350,17 +359,16 @@ impl Cff {
                 op::LANGUAGE_GROUP => {
                     hints.language_group = dict::first(operands)?.integer() as i32;
                 }
+                // Unused here, but read by FreeType, which needs their operand.
+                other if op::unused_private(version, other) => {
+                    dict::first(operands)?;
+                }
                 _ => {}
             }
             Ok(())
         })?;
-        if size > 0 && offset > 0 {
-            hints.sanitize();
-            private.hints = hints;
-        }
-        if self.version == Version::Cff2 {
-            self.region_scalars(private.vsindex)?;
-        }
+        hints.sanitize();
+        private.hints = hints;
         if let Some(relative) = subrs {
             let at = offset.checked_add(relative).ok_or(Error::Overflow)?;
             private.subrs = Index::parse(&mut Reader::at(table, at)?, self.version)?;
@@ -420,7 +428,8 @@ impl Cff {
         let count = r.u16()?;
         charge(work, usize::from(count))?;
         let mut list = Reader::at(table, start.checked_add(regions).ok_or(Error::Overflow)?)?;
-        let axes = usize::from(list.u16()?);
+        self.store_axes = list.u16()?;
+        let axes = usize::from(self.store_axes);
         let region_count = list.u16()?;
         let records = list.offset();
         self.variation_data.try_reserve_exact(usize::from(count))?;
@@ -445,18 +454,8 @@ impl Cff {
                     .checked_mul(axes * 6)
                     .and_then(|n| n.checked_add(records))
                     .ok_or(Error::Overflow)?;
-                let mut axis = Reader::at(table, at)?;
-                let mut scalar = 0x10000;
-                for _ in 0..axes {
-                    let (start, peak, end) = (axis.i16()?, axis.i16()?, axis.i16()?);
-                    // At the default instance every coordinate is zero: an axis whose
-                    // valid, non-straddling range peaks away from zero excludes the
-                    // region (OpenType "Item variation store", region scalars).
-                    let ignored = start > peak || peak > end || peak == 0 || (start < 0 && end > 0);
-                    if !ignored {
-                        scalar = 0;
-                    }
-                }
+                let axis = &mut Reader::at(table, at)?;
+                let scalar = region_scalar(self.fvar_axes, self.store_axes, axis)?;
                 self.scalars.try_push(scalar).map_err(|e| e.error)?;
             }
             self.variation_data
@@ -464,6 +463,18 @@ impl Cff {
                 .map_err(|e| e.error)?;
         }
         Ok(())
+    }
+
+    /// The region scalars a `blend` applies under `vsindex`. The variation
+    /// store must have as many axes as `fvar`, as FreeType requires to build
+    /// its blend vector.
+    fn blend_scalars(&self, vsindex: usize) -> Result<&[Fixed]> {
+        if self.fvar_axes != 0 && self.fvar_axes != self.store_axes {
+            return Err(Error::Invalid(
+                "CFF2 variation store and fvar axis counts differ",
+            ));
+        }
+        self.region_scalars(vsindex)
     }
 
     fn region_scalars(&self, vsindex: usize) -> Result<&[Fixed]> {
@@ -837,6 +848,35 @@ fn private_location(operands: &[Operand<'_>]) -> Result<(usize, usize)> {
     }
 }
 
+/// `cff_blend_build_vector`'s factor for the region whose `axes` axes
+/// `axis` reads, at the default instance: zero without `fvar`, where FreeType
+/// has no design vector; else, at a coordinate of zero on every axis, one,
+/// scaled down by each axis that peaks away from zero with a range around
+/// it, and zero when such an axis's range excludes zero.
+fn region_scalar(fvar_axes: u16, axes: u16, axis: &mut Reader<'_>) -> Result<Fixed> {
+    if fvar_axes == 0 {
+        return Ok(0);
+    }
+    let mut scalar: i64 = 0x10000;
+    for _ in 0..axes {
+        // F2Dot14 coordinates; FreeType's 16.16 copies scale each ratio by
+        // four, which leaves `FT_MulDiv` unchanged.
+        let [start, peak, end] = [axis.i16()?, axis.i16()?, axis.i16()?].map(i64::from);
+        if peak == 0 {
+            continue;
+        }
+        if start >= 0 || end <= 0 {
+            return Ok(0);
+        }
+        scalar = if peak > 0 {
+            mul_div(scalar, -start, peak - start)
+        } else {
+            mul_div(scalar, end, end - peak)
+        };
+    }
+    Ok(scalar as Fixed)
+}
+
 /// The FD of `glyph` in an FDSelect whose header [`Cff::check_fd_select`] checked.
 fn fd_index(table: &[u8], select: FdSelect, glyph: u32) -> Option<usize> {
     let at = select.offset + 1;
@@ -891,9 +931,10 @@ mod authoring;
 #[cfg(test)]
 mod tests {
     use super::authoring::{CffProgram, Part, charstring, number};
-    use super::{Cff, FdSelect, Version, fd_index};
+    use super::{Cff, FdSelect, HintDict, Version, dict, fd_index, region_scalar};
     use crate::fixed::Scale;
     use crate::outline::Outline;
+    use crate::read::Reader;
     use crate::sfnt::Table;
     use crate::{GlyphId, Limits};
     use triergon_core::{Budget, Error, Result, WorkBudget};
@@ -928,7 +969,7 @@ mod tests {
             offset: 0,
             len: table.len(),
         };
-        let cff = Cff::parse(table, whole, Version::Cff1, 1000, &budget, &mut work).unwrap();
+        let cff = Cff::parse(table, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
         let mut outline = Outline::new(&budget);
         let (glyph, scale) = (GlyphId(1), Scale { x: scale, y: scale });
         let limits = Limits::default();
@@ -961,6 +1002,97 @@ mod tests {
     /// Two in 16.16, whose 64th FreeType's hinter scales by: 2048, exactly a
     /// 32nd of a pixel per unit, so unhinted points double.
     const TWO: i64 = 2 << 16;
+
+    #[test]
+    fn region_scalars_follow_freetypes_blend_vector_at_the_origin() {
+        let scalar = |fvar: u16, axes: &[[i16; 3]]| {
+            let bytes: Vec<u8> = axes
+                .iter()
+                .flatten()
+                .flat_map(|v| v.to_be_bytes())
+                .collect();
+            region_scalar(fvar, axes.len() as u16, &mut Reader::new(&bytes)).unwrap()
+        };
+        let half = 1 << 13;
+        // Without fvar, FreeType has no design vector: every region weighs 0.
+        assert_eq!(scalar(0, &[[0, 0, 0]]), 0);
+        // An axis peaking at zero, or not peaking, keeps the region whole.
+        assert_eq!(scalar(1, &[[-half, 0, half]]), 0x10000);
+        // A range that excludes zero excludes the region, ordered or not.
+        assert_eq!(scalar(1, &[[0, half, 2 * half]]), 0);
+        assert_eq!(scalar(1, &[[half, -half, 2 * half]]), 0);
+        // A range around zero with a peak away from it scales the region:
+        // from -0.5 to the peak at 0.5, zero is halfway; past a negative
+        // peak at -0.5 towards 1, two thirds of the way back.
+        assert_eq!(scalar(1, &[[-half, half, 2 * half]]), 0x8000);
+        assert_eq!(scalar(1, &[[-2 * half, -half, 2 * half]]), 43691);
+        // Axes multiply; a disordered range around zero still scales.
+        assert_eq!(
+            scalar(2, &[[-half, half, 2 * half], [-half, 2 * half, half]]),
+            10923
+        );
+    }
+
+    #[test]
+    fn a_missing_or_empty_private_dict_reads_as_none() {
+        let glyph = table(&rectangle(0, &[50]), Vec::new());
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+        let whole = Table {
+            offset: 0,
+            len: glyph.len(),
+        };
+        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        // Offset zero with a size, size zero, or none: nothing is read.
+        for location in [Some((5, 0)), Some((0, 40)), None] {
+            let private = cff.private_dict(&glyph, location, &mut work).unwrap();
+            assert_eq!(private.subrs.len(), 0);
+            assert_eq!(private.hints, HintDict::ABSENT);
+        }
+    }
+
+    #[test]
+    fn private_dict_entries_freetype_reads_need_their_operand() {
+        let parse = |private: Vec<u8>| {
+            let glyph = table(&rectangle(0, &[50]), private);
+            let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+            let whole = Table {
+                offset: 0,
+                len: glyph.len(),
+            };
+            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).map(|_| ())
+        };
+        // StdHW, StdVW, ForceBold, ForceBoldThreshold, lenIV,
+        // ExpansionFactor, initialRandomSeed, defaultWidthX, nominalWidthX.
+        for operator in [
+            &[10][..],
+            &[11],
+            &[12, 14],
+            &[12, 15],
+            &[12, 16],
+            &[12, 18],
+            &[12, 19],
+            &[20],
+            &[21],
+        ] {
+            assert!(parse(operator.to_vec()).is_err(), "{operator:?}");
+            assert!(
+                parse([&[139][..], operator].concat()).is_ok(),
+                "{operator:?}"
+            );
+        }
+        // CFF2 has no widths, ForceBold, lenIV or seed: FreeType skips them.
+        let skipped = |op| !dict::op::unused_private(Version::Cff2, op);
+        assert!(
+            [20, 21, 0x0c0e, 0x0c0f, 0x0c10, 0x0c13]
+                .into_iter()
+                .all(skipped)
+        );
+        assert!(
+            [10, 11, 0x0c12]
+                .into_iter()
+                .all(|op| dict::op::unused_private(Version::Cff2, op))
+        );
+    }
 
     #[test]
     fn a_glyph_without_stems_scales_uniformly_at_the_hinted_scale() {

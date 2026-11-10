@@ -142,8 +142,13 @@ arithmetic as at a size with a scale of one.
 
 **CFF and CFF2 outlines.** `CFF ` version 1 with Type 2 charstrings, name-keyed or
 CID-keyed (FDArray, FDSelect formats 0 and 3), and `CFF2` (FDSelect format 4 too)
-at the default instance of a variable font: `blend` applies region scalars at the
-origin, in charstrings and Private DICTs. Supported: all path operators, flex,
+at the default instance of a variable font: `blend` applies the region scalars
+FreeType's `cff_blend_build_vector` builds at the origin, in charstrings and
+Private DICTs. A face whose `fvar` FreeType accepts has a design vector of its
+axes, all zero: a region weighs one unless an axis peaks away from zero, which
+scales it down where that axis's range spans zero and excludes it otherwise.
+Without `fvar` every region weighs zero, and a variation store with other
+axes than `fvar` fails each `blend`. Supported: all path operators, flex,
 stem hints, `hintmask` and `cntrmask` (the stems are fixed by the first mask or
 move: later stem operators are ignored, as is a later mask operator with more
 than one operand, whose mask bytes then run as charstring, and a mask over more
@@ -184,9 +189,16 @@ The 26.6 points then go through the FontMatrix and are moved by its offset in
 font units, without further scaling. Sizes beyond 2000 pixels per em, which the
 hinter refuses, load unhinted and scaled, as FreeType retries them; a 16.16
 scale below 32 fails the glyph. The arithmetic is cf2's, 16.16 in 32 bits.
-DICT operands are kept as encoded and converted where read, as FreeType's
-parser converts them; a CFF2 `blend` in a DICT sums each default and its
-deltas times the region scalars in 16.16, as `cff_blend_doBlend` does.
+DICTs are read as FreeType's `cff_parser_run` reads them: up to 96 operands
+in CFF and 513 in CFF2, 27 as a one-byte number, operators without a meaning
+skipped with their operands, and a number cut short at the end ending the DICT.
+Operands are kept as encoded and converted where read, as FreeType's parser
+converts them. `vsindex` and `blend` apply only in a CFF2 Private DICT, where
+`blend` sums each default and its deltas times the region scalars in 16.16, as
+`cff_blend_doBlend` does, and `vsindex` may not follow it. A Private DICT that
+is missing, or at offset or size zero, is not read, as `cff_load_private_dict`
+skips it; an entry FreeType reads from its first operand, used here or not,
+fails the face without one.
 
 **Control boxes.** `Font::control_box` reads a glyph's box without building its
 outline, within the caller's `WorkBudget`, so no point limit applies: a TrueType glyph's `glyf` header box as

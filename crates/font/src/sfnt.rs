@@ -64,6 +64,7 @@ pub(crate) struct Tables {
     pub(crate) post: Option<Table>,
     pub(crate) fpgm: Option<Table>,
     pub(crate) prep: Option<Table>,
+    pub(crate) fvar: Option<Table>,
     /// The bytes from `loca` to the next table that starts after it, or to the
     /// end of the file: FreeType reads a short `loca` that far.
     pub(crate) loca_room: usize,
@@ -93,6 +94,7 @@ impl Tables {
             b"post" => &mut self.post,
             b"fpgm" => &mut self.fpgm,
             b"prep" => &mut self.prep,
+            b"fvar" => &mut self.fvar,
             _ => return None,
         })
     }

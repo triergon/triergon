@@ -638,13 +638,10 @@ impl Shaper {
         // then holds where its next glyph goes.
         let first = out.glyphs.len();
         let total: usize = counts.iter().map(|&n| n.max(1)).sum();
-        // The event's glyphs grow item by item: at least double, so the
-        // copies stay linear in them.
+        // The event's glyphs grow item by item, geometrically, so the copies
+        // stay linear in them.
+        out.glyphs.try_reserve(total)?;
         let needed = first + total;
-        if needed > out.glyphs.capacity() {
-            out.glyphs
-                .try_reserve_exact(needed.max(out.glyphs.capacity() * 2) - first)?;
-        }
         out.glyphs.try_resize(needed, ShapedGlyph::default())?;
         let mut at = first;
         for (k, count) in counts.as_mut_slice().iter_mut().enumerate() {

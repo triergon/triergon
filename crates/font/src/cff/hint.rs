@@ -692,67 +692,6 @@ fn edges(stems: &Stems, i: usize, origin: Fixed, scale: Fixed) -> (Edge, Edge) {
     )
 }
 
-/// `cf2_hintmap_build` placing the edges of the `horizontal` stems `mask`
-/// selects into `map`: the em box's, then those captured or placed by an
-/// earlier map, then the rest, adjusted. `initial` is the glyph path's
-/// initial map, and `None` when building that map, which holds the captured
-/// edges alone and one at zero below or above them all; a map other than the
-/// initial one records where its stems went, so that later maps keep them
-/// there.
-#[expect(clippy::too_many_arguments, reason = "cf2_hintmap_build's inputs")]
-fn place(
-    map: &mut HintMap,
-    initial: Option<&HintMap>,
-    blues: &Blues,
-    stems: &mut Stems,
-    horizontal: usize,
-    mask: &Mask,
-    origin: Fixed,
-    work: &mut WorkBudget,
-) -> Result<()> {
-    map.count = 0;
-    let scale = blues.scale;
-    if let Some([bottom, top]) = blues.em_box {
-        map.insert(bottom, Edge::default(), initial, scale, work)?;
-        map.insert(Edge::default(), top, initial, scale, work)?;
-    }
-    // The mask covers the horizontal stems, so there are at most 96.
-    let mut pending = *mask;
-    for i in 0..horizontal {
-        if pending.bit(i) {
-            let (mut bottom, mut top) = edges(stems, i, origin, scale);
-            if bottom.is_locked() || top.is_locked() || blues.capture(&mut bottom, &mut top) {
-                map.insert(bottom, top, initial, scale, work)?;
-                pending.clear(i);
-            }
-        }
-    }
-    if initial.is_some() {
-        for i in (0..horizontal).filter(|&i| pending.bit(i)) {
-            let (bottom, top) = edges(stems, i, origin, scale);
-            map.insert(bottom, top, initial, scale, work)?;
-        }
-    } else if map.count == 0 || map.edges[0].cs > 0 || map.edges[map.count - 1].cs < 0 {
-        // Locks the baseline of glyphs without hints there.
-        let zero = Edge::synthetic(flag::GHOST_BOTTOM, 0, 0, scale);
-        map.insert(zero, Edge::default(), initial, scale, work)?;
-    }
-    map.adjust(work)?;
-    if initial.is_some() {
-        for edge in map.edges[..map.count].iter().filter(|e| !e.is_synthetic()) {
-            let stem = &mut stems[usize::from(edge.index)];
-            if edge.is_top() {
-                stem.max_ds = edge.ds;
-            } else {
-                stem.min_ds = edge.ds;
-            }
-            stem.used = true;
-        }
-    }
-    map.valid = true;
-    Ok(())
-}
-
 /// What only hinting keeps: the horizontal stems' edges and the glyph path's
 /// hint maps.
 #[derive(Debug)]
@@ -766,9 +705,82 @@ struct Hinted<'b> {
     current: HintMap,
     /// The map at the current subpath's first point (`firstHintMap`).
     first: HintMap,
+    /// The map of a counter mask, which FreeType builds and discards.
+    counters: HintMap,
+}
+
+/// Which of [`Hinted`]'s maps [`Hinted::place`] builds.
+#[derive(Clone, Copy)]
+enum Map {
+    Initial,
+    Current,
+    Counters,
 }
 
 impl Hinted<'_> {
+    /// `cf2_hintmap_build` placing the edges of the `horizontal` stems
+    /// `mask` selects into the `target` map: the em box's, then those
+    /// captured or placed by an earlier map, then the rest, adjusted. The
+    /// initial map holds the captured edges alone and one at zero below or
+    /// above them all; the others are placed through it, and record where
+    /// their stems went, so that later maps keep them there.
+    fn place(
+        &mut self,
+        target: Map,
+        horizontal: usize,
+        mask: &Mask,
+        origin: Fixed,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
+        let (map, initial) = match target {
+            Map::Initial => (&mut self.initial, None),
+            Map::Current => (&mut self.current, Some(&self.initial)),
+            Map::Counters => (&mut self.counters, Some(&self.initial)),
+        };
+        let (blues, stems) = (self.blues, &mut self.stems);
+        map.count = 0;
+        let scale = blues.scale;
+        if let Some([bottom, top]) = blues.em_box {
+            map.insert(bottom, Edge::default(), initial, scale, work)?;
+            map.insert(Edge::default(), top, initial, scale, work)?;
+        }
+        // The mask covers the horizontal stems, so there are at most 96.
+        let mut pending = *mask;
+        for i in 0..horizontal {
+            if pending.bit(i) {
+                let (mut bottom, mut top) = edges(stems, i, origin, scale);
+                if bottom.is_locked() || top.is_locked() || blues.capture(&mut bottom, &mut top) {
+                    map.insert(bottom, top, initial, scale, work)?;
+                    pending.clear(i);
+                }
+            }
+        }
+        if initial.is_some() {
+            for i in (0..horizontal).filter(|&i| pending.bit(i)) {
+                let (bottom, top) = edges(stems, i, origin, scale);
+                map.insert(bottom, top, initial, scale, work)?;
+            }
+        } else if map.count == 0 || map.edges[0].cs > 0 || map.edges[map.count - 1].cs < 0 {
+            // Locks the baseline of glyphs without hints there.
+            let zero = Edge::synthetic(flag::GHOST_BOTTOM, 0, 0, scale);
+            map.insert(zero, Edge::default(), initial, scale, work)?;
+        }
+        map.adjust(work)?;
+        if initial.is_some() {
+            for edge in map.edges[..map.count].iter().filter(|e| !e.is_synthetic()) {
+                let stem = &mut stems[usize::from(edge.index)];
+                if edge.is_top() {
+                    stem.max_ds = edge.ds;
+                } else {
+                    stem.min_ds = edge.ds;
+                }
+                stem.used = true;
+            }
+        }
+        map.valid = true;
+        Ok(())
+    }
+
     /// The initial map, once: from all `count` stems, of which `horizontal`
     /// are horizontal, at the origin of the map that needs it first.
     fn build_initial(
@@ -783,16 +795,7 @@ impl Hinted<'_> {
         }
         let mut all = Mask::default();
         all.set_all(count)?;
-        place(
-            &mut self.initial,
-            None,
-            self.blues,
-            &mut self.stems,
-            horizontal,
-            &all,
-            origin,
-            work,
-        )
+        self.place(Map::Initial, horizontal, &all, origin, work)
     }
 }
 
@@ -828,6 +831,7 @@ impl<'b> Hints<'b> {
                 initial: HintMap::new(),
                 current: HintMap::new(),
                 first: HintMap::new(),
+                counters: HintMap::new(),
             }),
         }
     }
@@ -909,17 +913,7 @@ impl<'b> Hints<'b> {
             if horizontal > mask.count {
                 return Ok(());
             }
-            let mut counters = HintMap::new();
-            place(
-                &mut counters,
-                Some(&h.initial),
-                h.blues,
-                &mut h.stems,
-                horizontal,
-                &mask,
-                0,
-                work,
-            )?;
+            h.place(Map::Counters, horizontal, &mask, 0, work)?;
         }
         Ok(())
     }
@@ -942,16 +936,7 @@ impl<'b> Hints<'b> {
             return Ok(());
         }
         if let Some(h) = &mut self.hinted {
-            place(
-                &mut h.current,
-                Some(&h.initial),
-                h.blues,
-                &mut h.stems,
-                horizontal,
-                &self.mask,
-                origin,
-                work,
-            )?;
+            h.place(Map::Current, horizontal, &self.mask, origin, work)?;
         }
         self.built = true;
         self.mask.new = false;

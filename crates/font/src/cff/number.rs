@@ -39,14 +39,27 @@ pub(super) fn shared_integer(byte: u8, r: &mut Reader<'_>) -> Result<Option<i32>
 }
 
 /// `cff_parse_integer`: a DICT integer. FreeType assembles the five-byte form
-/// in an unsigned long, so its negative values read as large positive ones.
+/// in an unsigned long, so its negative values read as large positive ones,
+/// and reads 27, which no format defines, as a one-byte number.
 fn dict_integer(byte: u8, r: &mut Reader<'_>) -> Result<i64> {
     match byte {
+        27 => Ok(i64::from(byte) - 139),
         29 => Ok(i64::from(r.u32()?)),
         _ => shared_integer(byte, r)?
             .map(i64::from)
             .ok_or(Error::Invalid("reserved CFF DICT byte")),
     }
+}
+
+/// A DICT integer with the five-byte form read signed, as indices and the
+/// FontMatrix read it.
+fn signed_dict_integer(byte: u8, r: &mut Reader<'_>) -> Result<i64> {
+    let value = dict_integer(byte, r)?;
+    Ok(if byte == 29 {
+        i64::from((value as u32).cast_signed())
+    } else {
+        value
+    })
 }
 
 /// The digits of a real number as `cff_parse_real` collects them.
@@ -247,10 +260,7 @@ pub(super) fn fixed_dynamic(r: &mut Reader<'_>) -> Result<(i64, i64)> {
     let byte = r.u8()?;
     let number = match byte {
         30 => return Ok(Real::read(r).dynamic()),
-        29 => i64::from(r.i32()?),
-        _ => shared_integer(byte, r)?
-            .map(i64::from)
-            .ok_or(Error::Invalid("reserved CFF DICT byte"))?,
+        _ => signed_dict_integer(byte, r)?,
     };
     if number <= 0x7fff {
         return Ok((number.wrapping_shl(16), 0));
@@ -264,12 +274,12 @@ pub(super) fn fixed_dynamic(r: &mut Reader<'_>) -> Result<(i64, i64)> {
 }
 
 /// A DICT operand as FreeType's parser holds it: its encoding, or the 16.16
-/// result of a CFF2 `blend`.
+/// result of a CFF2 `blend`, which it pushes as a 32-bit number.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Operand<'a> {
     /// The bytes from the operand's first on.
     Encoded(&'a [u8]),
-    Blended(i64),
+    Blended(i32),
 }
 
 impl Default for Operand<'_> {
@@ -308,8 +318,7 @@ impl Operand<'_> {
                 }
             }
             Self::Blended(sum) => {
-                // The blend's result is pushed as a 32-bit number.
-                let value = i64::from(sum as i32);
+                let value = i64::from(sum);
                 if scaling > 0 {
                     if value.abs() > limit {
                         return saturated(value);
@@ -332,11 +341,10 @@ impl Operand<'_> {
                         let fixed = Real::read(&mut r).fixed(0);
                         (fixed & 0xffff == 0).then_some(fixed >> 16)
                     }
-                    29 => Some(i64::from(r.i32()?)),
-                    byte => shared_integer(byte, &mut r)?.map(i64::from),
+                    byte => signed_dict_integer(byte, &mut r).ok(),
                 }
             }
-            Self::Blended(sum) => (sum & 0xffff == 0).then_some(sum >> 16),
+            Self::Blended(sum) => (sum & 0xffff == 0).then_some(i64::from(sum >> 16)),
         };
         value
             .and_then(|v| u32::try_from(v).ok())
@@ -357,15 +365,15 @@ impl Operand<'_> {
                 }
             }
             Self::Blended(sum) => {
-                let rounded = (((sum as u32) >> 8) + 0x80) >> 8;
+                let rounded = ((sum.cast_unsigned() >> 8) + 0x80) >> 8;
                 i64::from((rounded as u16).cast_signed())
             }
         }
     }
 }
 
-/// The length of the DICT number `bytes` start with, `None` for an operator or
-/// a number cut short.
+/// The length of the DICT number `bytes` start with, `None` for one cut
+/// short; the first byte is a number's (27, 28, 29, 30 or 32 to 254).
 pub(super) fn number_length(bytes: &[u8]) -> Option<usize> {
     let len = match *bytes.first()? {
         28 => 3,
@@ -376,7 +384,7 @@ pub(super) fn number_length(bytes: &[u8]) -> Option<usize> {
                 .position(|&b| b >> 4 == 0xf || b & 0xf == 0xf)?
                 + 1
         }
-        32..=246 => 1,
+        27 | 32..=246 => 1,
         247..=254 => 2,
         _ => return None,
     };
@@ -430,5 +438,13 @@ mod tests {
         assert!(operand(&[129]).index().is_err());
         assert!(operand(&[29, 0xff, 0xff, 0xff, 0xff]).index().is_err());
         assert!(Operand::Blended(1 << 15).index().is_err());
+        // 27 reads as -112, which is no index; the five-byte form is signed
+        // as an index and unsigned as a number, from one decoder.
+        assert_eq!(
+            (operand(&[27]).integer(), operand(&[27]).fixed(0)),
+            (-112, -112 << 16)
+        );
+        assert!(operand(&[27]).index().is_err());
+        assert_eq!(operand(&[29, 0, 1, 0, 0]).index(), Ok(65536));
     }
 }

@@ -885,7 +885,7 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
 
     fn blend<const N: usize>(&mut self, s: &mut State<'_, N>) -> Result<()> {
         let count = index(s.stack.pop()?)?;
-        let scalars = self.cff.region_scalars(s.vsindex)?;
+        let scalars = self.cff.blend_scalars(s.vsindex)?;
         s.stack.blend(count, scalars.len(), |value, deltas| {
             deltas
                 .iter()
