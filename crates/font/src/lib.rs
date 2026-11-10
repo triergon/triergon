@@ -203,6 +203,8 @@ pub struct Font {
     kern: Kern,
     /// `post` underline position and thickness.
     underline: (i16, i16),
+    /// How FreeType's default loading treats the face's advances.
+    default_load: sized::Hinting,
     limits: Limits,
 }
 
@@ -295,7 +297,7 @@ impl Font {
             None => Kern::new(budget),
         };
         let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
-        Ok(Self {
+        let mut font = Self {
             data,
             index,
             tables,
@@ -311,8 +313,11 @@ impl Font {
             outlines,
             kern,
             underline,
+            default_load: sized::Hinting::Unhinted,
             limits,
-        })
+        };
+        font.default_load = font.hinting();
+        Ok(font)
     }
 
     /// The font bytes.
