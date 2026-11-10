@@ -1091,10 +1091,19 @@ fn check(root: &Path) -> Task {
         .env("CARGO_INCREMENTAL", "0")
         .env("RUSTDOCFLAGS", "-D warnings")
         .current_dir(root))?;
+    // Workspace feature unification can change the prepared worker binaries.
+    // Keep this build separate from the workers checked against their identities.
     cargo(
         root,
         None,
-        &["build", "--workspace", "--release", "--locked"],
+        &[
+            "build",
+            "--workspace",
+            "--release",
+            "--locked",
+            "--target-dir",
+            "target/check-release",
+        ],
     )?;
     for package in REFERENCE_TRACE_CRATES {
         cargo(
