@@ -548,3 +548,11 @@ set to the archive location:
    passes, so a set larger than memory unpacks on a 32-bit host.
 
 The index also records how identifiers were renamed.
+
+Every revision status cites stays reachable from `main`: `cargo xtask check-revisions`,
+part of `check`, fails when `HEAD` does not reach a cited commit. A pull request that
+cites its own commits merges with a merge commit. A cited commit that is off `main`
+joins it through a merge that keeps `main`'s tree (`git merge -s ours`).
+[harness/evidence/lost-revisions.json](../harness/evidence/lost-revisions.json) lists
+the cited revisions no copy is known of; the check accepts them only while they stay
+cited and absent, so the list can only shrink.

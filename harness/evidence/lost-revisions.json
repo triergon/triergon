@@ -1,0 +1,25 @@
+{
+  "description": "Source revisions docs/status.md cites that no copy of is known: GitHub does not hold them and no known clone does. Each result's evidence set still holds its raw samples and the build identity it was measured with. `cargo xtask check-revisions` accepts these as unreachable only while they stay cited and absent, so the list can only shrink: a revision found again is merged and dropped from it.",
+  "revisions": [
+    {
+      "revision": "a41648dd4de2933d526415cce86a9ebbd1d4444b",
+      "evidence": "mp4-forward-duration-range"
+    },
+    {
+      "revision": "733ee1582e4fce4af1d89c91171e29e41a16d294",
+      "evidence": "mp4-forward-range-rss-comparison"
+    },
+    {
+      "revision": "d688d4a01f48e5cb9353b9aa16770806f1f5dff3",
+      "evidence": "mp4-range-opus-source-roll"
+    },
+    {
+      "revision": "fa02eb61592bc85ad2749a87f3a925385a5e31f2",
+      "evidence": "mp4-range-opus-matched-seek"
+    },
+    {
+      "revision": "f61d41fedac63b7e2bae08586de4e2d5bb8e9ad0",
+      "evidence": "mp4-range-opus-sequence"
+    }
+  ]
+}

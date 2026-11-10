@@ -19,6 +19,9 @@ jobs:
       TRIERGON_DOWNLOAD_CACHE: /home/runner/.cache/triergon-downloads
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # `cargo xtask check-revisions` needs every commit HEAD reaches.
+          fetch-depth: 0
       - name: Restore pinned downloads
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
