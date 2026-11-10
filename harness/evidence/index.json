@@ -17040,6 +17040,26 @@
    "source_revision": "03f3efd3a0fde0d558c68f5408c521d632802fb7"
   },
   {
+   "name": "mp4-forward-duration-range",
+   "path": "mp4-forward-duration-range",
+   "retention": "retained",
+   "reason": "MP4 forward and range playback on AArch64 Linux, including unknown movie duration and source Opus preroll.",
+   "key": "evidence/mp4-forward-duration-range/32aa6f481afc5f6074dd14a683a110bc044b781b9c40b72c84876af9b812f977.tar.gz",
+   "sha256": "32aa6f481afc5f6074dd14a683a110bc044b781b9c40b72c84876af9b812f977",
+   "bytes": 163250361,
+   "source_revision": "a41648dd4de2933d526415cce86a9ebbd1d4444b"
+  },
+  {
+   "name": "mp4-forward-range-rss-comparison",
+   "path": "mp4-forward-range-rss-comparison",
+   "retention": "retained",
+   "reason": "Earlier MP4 forward and range comparison, with two forward cases equal to reference total RSS.",
+   "key": "evidence/mp4-forward-range-rss-comparison/23cf7cdb3de800c1ca0d03dfe937ce6fda6cc768bef5933370223a88cda78c87.tar.gz",
+   "sha256": "23cf7cdb3de800c1ca0d03dfe937ce6fda6cc768bef5933370223a88cda78c87",
+   "bytes": 31931290,
+   "source_revision": "733ee1582e4fce4af1d89c91171e29e41a16d294"
+  },
+  {
    "name": "mp4-forward-encoded-edits",
    "retention": "retained",
    "key": "evidence/mp4-forward-encoded-edits/fe95646449aa52a4a121aeecb3346308b270923aee9b0751b2125501abf36004.tar.zst",
