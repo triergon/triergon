@@ -1097,6 +1097,7 @@ fn contract(cases: &[Case]) -> R<Value> {
     Ok(Value::object([
         ("schema", Value::int(1)),
         ("id", Value::str("mpegts-access-units")),
+        ("gate", Value::str("required")),
         ("operation", Value::str(OPERATION)),
         ("candidate", Value::str("transport-worker")),
         ("worker_operation", Value::str("ts-au-")),
@@ -1109,6 +1110,7 @@ fn contract(cases: &[Case]) -> R<Value> {
                 "Contiguous entities and an initialization map continue within one reference format context without intermediate EOF. An explicit discontinuity blocks read-ahead before the next entity, flushes parser state through the public API and resumes with fresh AVIO over the same byte buffer. Only the final source EOF drains the parser; packet positions use logical offsets across the ordered original bytes.",
                 "Fold stream index, PID, signed PTS and DTS in 90kHz ticks (absent as INT64_MIN), duration, position, flags, payload length and every byte, then every side-data element's type, size and bytes.",
                 "Each complete operation reaches EOF and contributes its packet count, byte count and ordered digest. Both workers must match the independently recorded parser-enabled reference fold. All temporary operation storage is released before the memory END marker.",
+                "The reference reports diagnostics during the fold and suppresses them during timing and memory measurement. The runner checks every ordered input before and after each measurement.",
                 "The 97 retained PES input/argument tuples preserve their 272 request associations and use parser-enabled AU expectations. Opaque, damaged and unsupported inputs remain observations that may fail; they are never reclassified as genuine access units or removed.",
                 "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, 33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. Ordered controls cover ADTS across entities, an M2TS initialization section and AC-3 lookahead at a discontinuity. DVB AC-3 has explicit caller-declared descriptor namespace.",
                 "The coded 32 kHz DVB E-AC-3 control reuses the complete TS188 fixture. It compares both streams in the selected program with an explicit caller-declared DVB namespace.",
@@ -1233,6 +1235,7 @@ fn expected(observation: &Value) -> Value {
     };
     if data.get("operation").and_then(Value::as_str) != Some(OPERATION)
         || data.get("iterations") != Some(&Value::int(1))
+        || data.get("eof") != Some(&Value::Bool(true))
     {
         return Value::Null;
     }
@@ -1309,12 +1312,10 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
         let (work, result_hash) = if let Some(recording) = recording {
             let observation = reference(&paths.root, &input, &case.row, recording)?;
             let id = text(&case.row, "id")?;
-            if entities(&case.row).len() > 1
-                && observation.get("data").and_then(|data| data.get("eof"))
-                    != Some(&Value::Bool(true))
-            {
+            let work = expected(&observation);
+            if work == Value::Null {
                 return Err(format!(
-                    "reference did not reach the final entity's EOF: {id}"
+                    "reference did not produce a complete AU fold: {id}"
                 ));
             }
             let result_hash = observation_hash(&observation);
@@ -1336,7 +1337,7 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
                     )),
                 ),
             ]));
-            (expected(&observation), result_hash)
+            (work, result_hash)
         } else {
             let pin = &cases(pinned.ok_or("missing pins")?)?[index];
             let mut structural = pin.clone();
@@ -1411,8 +1412,21 @@ fn produce(paths: &Paths, recording: Option<Recording<'_>>) -> R<String> {
     {
         return Err("AU manifest differs from its recorded reference observations".into());
     }
-    paths.manifest(&format!("{FEATURE}/corpus.json"), &manifest)?;
     let contract = contract(&authored)?;
+    if recording.is_none()
+        && read_json(
+            &paths
+                .root
+                .join("harness")
+                .join(FEATURE)
+                .join("contract.json"),
+        )? != contract
+    {
+        return Err(
+            "generated MPEG-TS access-unit contract differs from the registered contract".into(),
+        );
+    }
+    paths.manifest(&format!("{FEATURE}/corpus.json"), &manifest)?;
     paths.manifest(&format!("{FEATURE}/contract.json"), &contract)?;
     if let Some(recording) = recording {
         write_json(
@@ -1515,6 +1529,23 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
     let reference = reference
         .map(|p| p.canonicalize().map_err(|e| e.to_string()))
         .transpose()?;
+    if let Some(worker) = &reference {
+        let identity = read_json(&root.join("target/harness/identity.json"))?;
+        if let Some(error) = crate::harness::provenance::source_identity_error(root, &identity) {
+            return Err(error);
+        }
+        let registered =
+            crate::harness::comparison::reference_named(&identity, "ffmpeg-formats-native")?;
+        let path = root
+            .join(text(&registered, "path")?)
+            .canonicalize()
+            .map_err(|e| e.to_string())?;
+        if worker != &path
+            || sha256::file_hex(worker).map_err(|e| e.to_string())? != text(&registered, "sha256")?
+        {
+            return Err("reference worker differs from the registered formats build".into());
+        }
+    }
     let directory = observations
         .map(|p| private_directory(root, &p))
         .transpose()?;
@@ -1754,7 +1785,7 @@ mod tests {
                 ]),
             ),
         ]);
-        assert_eq!(expected(&observation).get("packets"), Some(&Value::int(0)));
+        assert_eq!(expected(&observation), Value::Null);
         assert_eq!(
             observation.get("data").unwrap().get("eof"),
             Some(&Value::Bool(false))

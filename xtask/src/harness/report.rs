@@ -71,6 +71,23 @@ fn digest(path: &Path) -> Result<String, String> {
     sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+fn measure_pinned(
+    check: impl Fn() -> Result<Option<&'static str>, String>,
+    measure: impl FnOnce() -> Result<Value, String>,
+) -> Result<Value, String> {
+    if let Some(status) = check()? {
+        return Ok(Value::object([("status", Value::str(status))]));
+    }
+    let result = measure()?;
+    if let Some(status) = check()? {
+        return Ok(Value::object([
+            ("status", Value::str(status)),
+            ("invalidated_measurement", result),
+        ]));
+    }
+    Ok(result)
+}
+
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -814,28 +831,38 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         row.push(("parity", parity));
         if let (true, Some((reference, input, operation))) = (passed, timed) {
             let reference = options.baseline_worker.clone().unwrap_or(reference);
+            let check_inputs = || {
+                if digest(&input)? != sha {
+                    return Ok(Some("input-hash-mismatch"));
+                }
+                entity_input_failure(&corpus, case, false)
+            };
             if options.benchmark {
-                let timing = benchmark(
-                    &candidate,
-                    &reference,
-                    &input,
-                    options.pairs,
-                    iterations,
-                    options.seed,
-                    &operation,
-                )?;
+                let timing = measure_pinned(check_inputs, || {
+                    benchmark(
+                        &candidate,
+                        &reference,
+                        &input,
+                        options.pairs,
+                        iterations,
+                        options.seed,
+                        &operation,
+                    )
+                })?;
                 row.push(("timing", timing));
             }
             if options.memory {
-                let memory = super::memory::collect(
-                    root,
-                    &candidate,
-                    &reference,
-                    &input,
-                    options.memory_pairs.unwrap_or(options.pairs),
-                    options.seed,
-                    &operation,
-                )?;
+                let memory = measure_pinned(check_inputs, || {
+                    super::memory::collect(
+                        root,
+                        &candidate,
+                        &reference,
+                        &input,
+                        options.memory_pairs.unwrap_or(options.pairs),
+                        options.seed,
+                        &operation,
+                    )
+                })?;
                 row.push(("memory", memory));
             }
         }
@@ -1015,8 +1042,8 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
 #[cfg(test)]
 mod prefix_tests {
     use super::{
-        PrefixFeature, entity_input_failure, open_cases, ratchet, read_json, recorded_corpus,
-        reviewed_inputs, rights_reviewed, s,
+        PrefixFeature, entity_input_failure, measure_pinned, open_cases, ratchet, read_json,
+        recorded_corpus, reviewed_inputs, rights_reviewed, s,
     };
     use crate::json::{Value, parse};
     use std::path::Path;
@@ -1067,6 +1094,21 @@ mod prefix_tests {
                 None
             );
         }
+        let measured = measure_pinned(
+            || entity_input_failure(&root, &case, true),
+            || {
+                std::fs::write(root.join("next.ts"), b"changed while measuring").unwrap();
+                Ok(Value::object([("status", Value::str("measured"))]))
+            },
+        )
+        .unwrap();
+        assert_eq!(s(&measured, "status"), Some("entity-hash-mismatch"));
+        assert_eq!(
+            measured
+                .get("invalidated_measurement")
+                .and_then(|v| s(v, "status")),
+            Some("measured")
+        );
         std::fs::remove_file(root.join("next.ts")).unwrap();
         std::fs::remove_dir(root).unwrap();
     }

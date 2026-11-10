@@ -148,6 +148,8 @@ static int ts_main(int argc, char **argv, const uint8_t *bytes, long size)
     const int memory = !strcmp(mode, "memory");
     if (!bench && !memory && strcmp(mode, "fold"))
         return 2;
+    if (access_units && (bench || memory))
+        av_log_set_level(AV_LOG_QUIET);
     int at = bench ? 4 : 3;
     if (argc < at + 2)
         return 2;
