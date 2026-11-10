@@ -68,10 +68,10 @@ The codec, decode-session, file-audio and capture timing passes at `add6b27`, `c
 and `ceb5076`, and the ARMv7 codec timing and capture passes at `78a873dd`, predate the
 shared paired runner. Their codec pairs were checked pair by pair rather than watched over
 the whole run, and each capture sample was the median of three in-process sessions after
-a discarded one. In a diagnostic comparison on a c6g.2xlarge, the earlier runner at `642316cf` and the shared runner at
-`c21176e0` time `aac-lc-stereo` at a median of 0.7350 and 0.7339 (upper 95% bounds 0.7357
-and 0.7361) and of 0.7344 and 0.7342 (0.7363 and 0.7351), and capture
-`c07-ui-static-480-bottomup` at 1.3026 (1.3047) and 1.2978 (1.3001).
+a discarded one. In a diagnostic comparison on a c6g.2xlarge, the earlier runner at
+`642316cf` and the shared runner at `c21176e0` time `aac-lc-stereo` at a median of 0.7350
+and 0.7339 (upper 95% bounds 0.7357 and 0.7361) and of 0.7344 and 0.7342 (0.7363 and
+0.7351), and capture `c07-ui-static-480-bottomup` at 1.3026 (1.3047) and 1.2978 (1.3001).
 The remaining rows retain their earlier measurements.
 The packet-framing row uses the gate build at
 `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` on a c8g.large pinned to CPU 1,
