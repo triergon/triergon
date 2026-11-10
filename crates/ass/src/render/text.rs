@@ -17,7 +17,7 @@ use crate::{
 
 /// Code points from which an `@` font draws glyphs rotated
 /// (`VERTICAL_LOWER_BOUND`).
-const VERTICAL_LOWER_BOUND: u32 = 0x2f1;
+pub(super) const VERTICAL_LOWER_BOUND: u32 = 0x2f1;
 
 /// The font size libass draws and shapes every glyph at with hinting off,
 /// unless its size is 0: the glyph is then scaled to its size.

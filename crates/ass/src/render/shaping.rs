@@ -17,7 +17,7 @@ use triergon_shape::{
 };
 
 use super::fonts::Library;
-use super::text::{Char, Text};
+use super::text::{Char, Text, VERTICAL_LOWER_BOUND};
 use super::wrap::Line;
 use crate::{Info, charge};
 
@@ -142,9 +142,6 @@ const MAX_PLANS: usize = 256;
 const PLAN_ENTRY_BYTES: usize = 256;
 /// Bytes charged per glyph of an `@` font in the rotation map.
 const ROTATION_ENTRY_BYTES: usize = 32;
-/// The code points from which an `@` font's glyph metrics are rotated
-/// (`VERTICAL_LOWER_BOUND`, as in `text.rs`).
-const VERTICAL_LOWER_BOUND: u32 = 0x2f1;
 
 /// The shaper's state: a buffer, a bidi resolver, the plans built so far,
 /// and storage for the event being shaped.
@@ -553,12 +550,11 @@ impl Shaper {
             if self.plans.len() >= MAX_PLANS {
                 self.plans.clear();
             }
-            let code = language.split(|&b| b == 0).next().unwrap_or_default();
             let plan = Plan::new(
                 &shaper_face,
                 direction,
                 script,
-                &Language::new(std::str::from_utf8(code).unwrap_or("c")),
+                &Language::new(language),
                 &plan_features(features),
                 &self.budget,
             )?;

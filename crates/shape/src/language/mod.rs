@@ -51,16 +51,17 @@ pub(crate) enum Pattern {
 }
 
 impl Language {
-    /// The language a BCP 47 string names. An empty string is no language
-    /// (`HB_LANGUAGE_INVALID`) and selects no language system either.
+    /// The language a BCP 47 string names, up to a NUL, as HarfBuzz reads a C
+    /// string. An empty string is no language (`HB_LANGUAGE_INVALID`) and
+    /// selects no language system either.
     #[must_use]
-    pub fn new(code: &str) -> Self {
+    pub fn new(code: impl AsRef<[u8]>) -> Self {
         let mut language = Self {
             tags: [Tag::default(); MAX_TAGS],
             count: 0,
             script: None,
         };
-        let text = Text::new(code.as_bytes());
+        let text = Text::new(code.as_ref());
         if text.bytes.is_empty() {
             return language;
         }
@@ -360,7 +361,7 @@ mod tests {
     use super::Language;
     use crate::{Script, Tag};
 
-    fn tags(code: &str) -> Vec<Tag> {
+    fn tags(code: impl AsRef<[u8]>) -> Vec<Tag> {
         Language::new(code).ot_tags().to_vec()
     }
 
@@ -381,6 +382,15 @@ mod tests {
         assert!(tags("x").is_empty());
         assert!(tags("c").is_empty());
         assert!(tags("").is_empty());
+        assert_eq!(
+            tags("ko\0x"),
+            [tag(b"KOR "), tag(b"KOH ")],
+            "a NUL ends the string"
+        );
+        assert_eq!(Language::new(b"en\0\0"), Language::new("en"));
+        // A dropped first byte leaves an empty string, but HarfBuzz scans the
+        // rest for subtags: three characters, read as an empty ISO 639-3 code.
+        assert_eq!(tags(b"\xffen"), [Tag::from_u32(0x20)]);
         assert!(tags("?").is_empty());
         assert!(tags("abcdefgh").is_empty());
     }
