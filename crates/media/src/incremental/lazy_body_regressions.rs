@@ -214,29 +214,38 @@ fn lazy_body_fragmented_owned_exact_bytes_keep_literal_copy_work_and_alias_charg
 #[test]
 fn complete_body_has_the_same_exact_storage_and_work_as_fragmented_input() {
     const WIRE: &[u8] = &[0x1a, 0x45, 0xdf, 0xa3, 0x83, b'a', b'b', b'c'];
-    let pool = Budget::new(4096).unwrap();
-    let baseline = pool.used();
-    let mut reader = new(&pool);
-    let request = reader.request();
-    reader
-        .input
-        .provide_inline(request.source, request.token, request.offset, WIRE)
-        .unwrap();
-    let mut work = WorkBudget::new(32);
-    let step = reader.step(&mut work, &AtomicBool::new(false)).unwrap();
-    let ParseStep::Event(ElementEvent::Leaf { header, data }) = step else {
-        panic!("expected a complete leaf, got {step:?}");
-    };
-    assert_eq!(header.size, Some(3));
-    assert_eq!(header.data, 5);
-    assert_eq!(reader.position(), 8);
-    assert_eq!(work.spent(), 14);
-    assert_eq!(data.as_ref(), b"abc");
-    assert_eq!(data.retained_capacity(), 3);
-    drop(reader);
-    assert_eq!(data.as_ref(), b"abc");
-    drop(data);
-    assert_eq!(pool.used(), baseline);
+    for owned in [false, true] {
+        let pool = Budget::new(4096).unwrap();
+        let baseline = pool.used();
+        let mut reader = new(&pool);
+        let request = reader.request();
+        if owned {
+            let input = Bytes::copy_from_slice(&pool, WIRE).unwrap();
+            let window =
+                InputWindow::new(request.source, request.token, request.offset, input).unwrap();
+            reader.provide(&window).unwrap();
+        } else {
+            reader
+                .input
+                .provide_inline(request.source, request.token, request.offset, WIRE)
+                .unwrap();
+        }
+        let mut work = WorkBudget::new(32);
+        let step = reader.step(&mut work, &AtomicBool::new(false)).unwrap();
+        let ParseStep::Event(ElementEvent::Leaf { header, data }) = step else {
+            panic!("expected a complete leaf, got {step:?}");
+        };
+        assert_eq!(header.size, Some(3));
+        assert_eq!(header.data, 5);
+        assert_eq!(reader.position(), 8);
+        assert_eq!(work.spent(), 14);
+        assert_eq!(data.as_ref(), b"abc");
+        assert_eq!(data.retained_capacity(), 3);
+        drop(reader);
+        assert_eq!(data.as_ref(), b"abc");
+        drop(data);
+        assert_eq!(pool.used(), baseline);
+    }
 }
 
 // Test-only conservative original workspace; all observations use Reader.step.
