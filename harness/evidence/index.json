@@ -16973,6 +16973,16 @@
    "source_revision": "f61d41fedac63b7e2bae08586de4e2d5bb8e9ad0"
   },
   {
+   "name": "mp4-range-regular-opus",
+   "path": "mp4-range-regular-opus",
+   "retention": "retained",
+   "reason": "22 MP4 range comparisons on AArch64 Linux covering regular and fragmented edits, dedicated video sample entries and Opus trim and seek alignment.",
+   "key": "evidence/mp4-range-regular-opus/30ed94ea480d780bd4101c88e4a0786bfbe1302a9ca924e42cc28c4f5a8565ac.tar.gz",
+   "sha256": "30ed94ea480d780bd4101c88e4a0786bfbe1302a9ca924e42cc28c4f5a8565ac",
+   "bytes": 14277716,
+   "source_revision": "35912fe96ebc0c484a8a4b930260d54d54fcf1d0"
+  },
+  {
    "name": "ass-rendering-divergences-fedfb790",
    "path": "ass-rendering-divergences-fedfb790",
    "retention": "retained",
