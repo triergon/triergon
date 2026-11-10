@@ -69,12 +69,20 @@ impl Association {
     }
 
     fn selected_packet<'a>(&self, output: &'a Output) -> Result<Option<&'a Packet>> {
-        if output.delivery() == Delivery::Unselected {
-            return Ok(None);
-        }
         let RawEvent::Matroska(Event::Packet(packet)) = output.event() else {
             return Ok(None);
         };
+        self.selected_source(packet, output.delivery())
+    }
+
+    fn selected_source<'a>(
+        &self,
+        packet: &'a Packet,
+        delivery: Delivery,
+    ) -> Result<Option<&'a Packet>> {
+        if delivery == Delivery::Unselected {
+            return Ok(None);
+        }
         if !self.matches(packet) {
             return Err(Error::Invalid("Matroska feed configuration changed"));
         }
@@ -245,9 +253,13 @@ impl MatroskaTrackFeed {
     /// Use the player's current-generation and pause checks before submitting.
     /// Unselected source packets remain available without producing feed work.
     pub fn packet<'a>(&'a self, output: &'a Output) -> Result<Option<MatroskaFeedJob<'a>>> {
-        let Some(source) = self.association.selected_packet(output)? else {
-            return Ok(None);
-        };
+        self.association
+            .selected_packet(output)?
+            .map(|source| self.prepare_packet(source))
+            .transpose()
+    }
+
+    fn prepare_packet<'a>(&'a self, source: &'a Packet) -> Result<MatroskaFeedJob<'a>> {
         let payload = source.packet.data.as_ref();
         let codec = match &self.codec {
             FeedCodec::Avc(config) => {
@@ -268,11 +280,11 @@ impl MatroskaTrackFeed {
                 PacketJob::Aac(Some(params.header_for_payload(payload.len())?))
             }
         };
-        Ok(Some(MatroskaFeedJob {
+        Ok(MatroskaFeedJob {
             source,
             codec,
             cancelled: false,
-        }))
+        })
     }
 }
 

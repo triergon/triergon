@@ -45,8 +45,7 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "FreeType auto-hinter for FT_LOAD_DEFAULT advances",
-    "FreeType's hinted load (FT_LOAD_DEFAULT) for glyph extents, which fallback mark positioning reads in fonts without GPOS mark positioning"
+    "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
   ],
   "open_cases": [
     {
@@ -80,10 +79,6 @@
     {
       "id": "authored-cmap-formats-ttf-latn-libass",
       "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "authored-cff-features-otf-latn-libass",
-      "requirement": "FreeType's hinted load (FT_LOAD_DEFAULT) for glyph extents, which fallback mark positioning reads in fonts without GPOS mark positioning"
     }
   ]
 }

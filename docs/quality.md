@@ -60,13 +60,14 @@ resource limit becomes an explicit, reviewed rule for that case.
   links the reference worker (`harness/reference_font.h`). `cargo xtask fonts fetch`
   fetches the font corpus listed with sources, licences and hashes in
   `harness/fonts/corpus.json` and writes its authored fonts with the font crate's
-  `authored-fonts` example. Its files are the cases of three features run like
-  every other feature: `font-outlines` (face data and unscaled outlines) and
+  `authored-fonts` example. Its files are the cases of four features run like
+  every other feature: `font-outlines` (face data and unscaled outlines),
   `font-hinting-none` (libass's default configuration: unhinted outlines and
-  default-load advances at 256 pixels), which `cargo xtask check` requires, and
-  `font-hinting-modes` (the nine other heights libass requests when hinting is on),
-  run on demand and not gated yet. `cargo xtask fonts compare` reports the
-  required two, with `--all` all three.
+  default-load advances at 256 pixels) and `font-hinting-default` (every glyph's
+  default-load metrics and hinted outline there), which `cargo xtask check`
+  requires, and `font-hinting-modes` (the nine other heights libass requests when
+  hinting is on), run on demand and not gated yet. `cargo xtask fonts compare`
+  reports the required three, with `--all` all four.
 - **HarfBuzz and FriBidi pin.** `cargo xtask shape prepare` builds the FriBidi
   1.0.17 and HarfBuzz 14.6.0 release tarballs (hash-checked) as static libraries:
   FriBidi with its own configure, HarfBuzz from its single-file amalgamation
@@ -461,10 +462,14 @@ may override that count for diagnostic comparisons.
   --benchmark --baseline-worker W` from the changed tree, with `W` the same worker from
   the base tree. Correctness is still compared with the reference; the pairs and ratios
   are against `W`. Such a report is never an acceptance run.
-- Time copies, not build outputs. A freshly linked binary and a sequentially written
-  copy of it sit differently in the page cache, and identical bytes then time about
-  0.7% apart. `report`, `codecs time` and `capture qualify` write both workers afresh,
-  at paths of equal length, before each timing session.
+- Prepare both workers with the same sequential write and paths of equal length.
+  Linker output and a sequentially written copy can occupy the page cache differently.
+  Timing uses freshly written copies. Linux memory collection does the same for workers
+  selected by the report's build registration. It keeps both original paths for explicitly
+  supplied workers and when the loader resolves libraries relative to an executable.
+  Keep the measured executables with the raw memory samples. Grading Linux memory
+  results rehashes the worker paths in the observer certificate, including any copies
+  in the build tree.
 - Before a timing pass, `cargo xtask count CANDIDATE REFERENCE ARGUMENT...` runs both
   workers on one workload under Linux `perf stat`, five runs each, and prints the least
   user-mode instructions, cycles and branch misses. It fails when instructions rise more

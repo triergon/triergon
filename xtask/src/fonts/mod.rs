@@ -41,9 +41,10 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
   tables    regenerate the PostScript glyph-name tables of triergon-font from
             the unpacked FreeType release; --check fails if they would change
   compare   `cargo xtask report` on each required font feature (font-outlines,
-            font-hinting-none), with --all also on font-hinting-modes; further
-            report options pass through, and each report goes to OUTPUT/<feature>
-            (OUTPUT: --output, default .research/font-report)";
+            font-hinting-none, font-hinting-default), with --all also on
+            font-hinting-modes; further report options pass through, and each
+            report goes to OUTPUT/<feature> (OUTPUT: --output, default
+            .research/font-report)";
 
 pub(crate) const CORPUS_FILES: &str = ".research/fonts/files";
 pub const VERSION: &str = "2.15.0";

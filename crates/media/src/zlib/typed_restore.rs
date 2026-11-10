@@ -61,6 +61,8 @@ impl RestorePlan {
         self
     }
 }
+pub(crate) const COPY_CHUNK_BYTES: usize = 8192;
+
 #[derive(Debug)]
 enum CopyPhase {
     Reserve,
@@ -124,6 +126,21 @@ impl CopyJob {
             }
             match self.phase {
                 CopyPhase::Reserve => {
+                    if self.prefix.is_empty()
+                        && self.size <= COPY_CHUNK_BYTES
+                        && work.remaining() >= self.size as u64 + 2
+                        && let Some(buffer) = &self.buffer
+                        && let Ok(bytes) =
+                            triergon_core::Bytes::copy_from_slice(buffer.budget(), &self.input)
+                    {
+                        // Charge reserve, the copy and publication as in the
+                        // resumable path. Each frame keeps its own exact span.
+                        work.take(self.size as u64 + 2);
+                        self.result = Some(SharedBytes::from_core(bytes));
+                        self.buffer = None;
+                        self.phase = CopyPhase::Done;
+                        continue;
+                    }
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
@@ -148,7 +165,8 @@ impl CopyJob {
                         };
                         continue;
                     }
-                    let count = work.take((bytes.len() - self.at).min(8192) as u64) as usize;
+                    let count =
+                        work.take((bytes.len() - self.at).min(COPY_CHUNK_BYTES) as u64) as usize;
                     if count == 0 {
                         return Ok(ParseStep::Yield);
                     }

@@ -884,8 +884,11 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 let memory = measure_pinned(check_inputs, || {
                     super::memory::collect(
                         root,
-                        &candidate,
-                        &reference,
+                        super::memory::WorkerPaths {
+                            candidate: &candidate,
+                            reference: &reference,
+                            registered: options.baseline_worker.is_none(),
+                        },
                         &input,
                         options.memory_pairs.unwrap_or(options.pairs),
                         options.seed,
@@ -1244,6 +1247,7 @@ mod prefix_tests {
         assert_eq!(
             found,
             [
+                ("font-hinting-default", "font-sized-", 53),
                 ("font-hinting-modes", "font-sized-", 954),
                 ("font-hinting-none", "font-sized-", 159),
                 ("font-outlines", "font-", 53),

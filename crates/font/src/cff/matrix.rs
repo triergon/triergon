@@ -4,22 +4,10 @@
 //! concatenated with the Top DICT's for Font DICTs. Outlines are transformed
 //! in fixed point, so results match FreeType bit for bit.
 
+use super::number::{Operand, POWER_TENS, fixed_dynamic};
 use crate::fixed::{ONE, div_fix, mul_div, mul_fix};
 use crate::read::Reader;
 use triergon_core::{Error, Result};
-
-const POWER_TENS: [i64; 10] = [
-    1,
-    10,
-    100,
-    1_000,
-    10_000,
-    100_000,
-    1_000_000,
-    10_000_000,
-    100_000_000,
-    1_000_000_000,
-];
 
 /// A FontMatrix and the units per em it implies.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,17 +37,20 @@ impl FontMatrix {
         }
     }
 
-    /// The FontMatrix whose operands are encoded in `operands`; FreeType reads
-    /// the first six. Values with implausible scales or a near-singular matrix
-    /// read as the identity with one unit per em, as FreeType falls back.
-    pub(super) fn parse(operands: &[u8]) -> Result<Self> {
-        let mut r = Reader::new(operands);
+    /// The FontMatrix of a DICT entry's operands; FreeType reads the first
+    /// six. Values with implausible scales or a near-singular matrix read as
+    /// the identity with one unit per em, as FreeType falls back.
+    pub(super) fn parse(operands: &[Operand<'_>]) -> Result<Self> {
         let mut values = [(0_i64, 0_i64); 6];
-        for value in &mut values {
-            if r.at_end() {
+        for (value, operand) in values.iter_mut().zip(operands) {
+            // Blends only occur in Private DICTs.
+            let Operand::Encoded(bytes) = *operand else {
                 return Err(Error::Invalid("CFF FontMatrix operands"));
-            }
-            *value = fixed_dynamic(&mut r)?;
+            };
+            *value = fixed_dynamic(&mut Reader::new(bytes))?;
+        }
+        if operands.len() < values.len() {
+            return Err(Error::Invalid("CFF FontMatrix operands"));
         }
         let scales = values.iter().filter(|(v, _)| *v != 0).map(|&(_, s)| s);
         let (min, max) = scales.fold((i64::MAX, i64::MIN), |(lo, hi), s| (lo.min(s), hi.max(s)));
@@ -200,146 +191,11 @@ impl FontMatrix {
     }
 }
 
-/// `cff_parse_fixed_dynamic`: a DICT number as a 16.16 value and the power of
-/// ten that scales it, keeping as many digits as fit.
-fn fixed_dynamic(r: &mut Reader<'_>) -> Result<(i64, i64)> {
-    let byte = r.u8()?;
-    let number = match byte {
-        30 => return Ok(real_dynamic(r)),
-        29 => i64::from(r.i32()?),
-        _ => super::number::shared_integer(byte, r)?
-            .map(i64::from)
-            .ok_or(Error::Invalid("reserved CFF DICT byte"))?,
-    };
-    if number <= 0x7fff {
-        return Ok((number.wrapping_shl(16), 0));
-    }
-    let length = (5..10).find(|&n| number < POWER_TENS[n]).unwrap_or(10);
-    Ok(if number / POWER_TENS[length - 5] > 0x7fff {
-        (div_fix(number, POWER_TENS[length - 4]), (length - 4) as i64)
-    } else {
-        (div_fix(number, POWER_TENS[length - 5]), (length - 5) as i64)
-    })
-}
-
-/// `cff_parse_real` with a dynamic scale: the significant digits of a real
-/// (after its 30 byte) as 16.16 and a power of ten. Exponents past 1000
-/// saturate.
-fn real_dynamic(r: &mut Reader<'_>) -> (i64, i64) {
-    let mut nibbles = Nibbles { r, low: None };
-    let (mut number, mut exponent, mut exponent_add) = (0_i64, 0_i64, 0_i64);
-    let (mut integer_length, mut fraction_length) = (0_i64, 0_i64);
-    let mut negative = false;
-    let mut nib;
-    loop {
-        nib = nibbles.next();
-        match nib {
-            0xe => negative = true,
-            10.. => break,
-            _ if number >= 0x0ccc_cccc => exponent_add += 1,
-            _ if nib != 0 || number != 0 => {
-                integer_length += 1;
-                number = number * 10 + nib;
-            }
-            _ => {}
-        }
-    }
-    if nib == 0xa {
-        loop {
-            nib = nibbles.next();
-            if nib >= 10 {
-                break;
-            }
-            if nib == 0 && number == 0 {
-                exponent_add -= 1;
-            } else if number < 0x0ccc_cccc && fraction_length < 9 {
-                fraction_length += 1;
-                number = number * 10 + nib;
-            }
-        }
-    }
-    let mut overflow = false;
-    let negative_exponent = nib == 0xc;
-    if nib == 0xb || nib == 0xc {
-        loop {
-            nib = nibbles.next();
-            if nib >= 10 {
-                break;
-            }
-            if exponent > 1000 {
-                overflow = true;
-            } else {
-                exponent = exponent * 10 + nib;
-            }
-        }
-        if negative_exponent {
-            exponent = -exponent;
-        }
-    }
-    let sign = |v: i64| if negative { -v } else { v };
-    if number == 0 {
-        return (0, 0);
-    }
-    if overflow {
-        return (sign(if negative_exponent { 0 } else { 0x7fff_ffff }), 0);
-    }
-    exponent += exponent_add + integer_length;
-    fraction_length += integer_length;
-    let ten = |n: i64| POWER_TENS[usize::try_from(n).unwrap_or(0).min(9)];
-    let (result, scaling) = if fraction_length <= 5 {
-        if number > 0x7fff {
-            (div_fix(number, 10), exponent - fraction_length + 1)
-        } else {
-            if exponent > 0 {
-                let shift = exponent.min(5) - fraction_length;
-                if shift > 0 {
-                    exponent -= exponent.min(5);
-                    number *= ten(shift);
-                    if number > 0x7fff {
-                        number /= 10;
-                        exponent += 1;
-                    }
-                } else {
-                    exponent -= fraction_length;
-                }
-            } else {
-                exponent -= fraction_length;
-            }
-            (number << 16, exponent)
-        }
-    } else if number / ten(fraction_length - 5) > 0x7fff {
-        (div_fix(number, ten(fraction_length - 4)), exponent - 4)
-    } else {
-        (div_fix(number, ten(fraction_length - 5)), exponent - 5)
-    };
-    (sign(result), scaling)
-}
-
-/// The nibbles of a real, high first. The DICT parser checked that the real
-/// ends; a read past the operands would end it too.
-struct Nibbles<'r, 'a> {
-    r: &'r mut Reader<'a>,
-    low: Option<i64>,
-}
-
-impl Nibbles<'_, '_> {
-    fn next(&mut self) -> i64 {
-        if let Some(low) = self.low.take() {
-            return low;
-        }
-        match self.r.u8() {
-            Ok(byte) => {
-                self.low = Some(i64::from(byte & 0xf));
-                i64::from(byte >> 4)
-            }
-            Err(_) => 0xf,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use super::super::number::{Operand, number_length};
     use super::{FontMatrix, ONE};
+    use triergon_core::Result;
 
     fn real(text: &[u8]) -> Vec<u8> {
         let mut nibbles: Vec<u8> = text
@@ -362,9 +218,20 @@ mod tests {
         out
     }
 
+    /// The FontMatrix of `bytes`, one number after another.
+    fn parse(bytes: &[u8]) -> Result<FontMatrix> {
+        let mut operands = Vec::new();
+        let mut rest = bytes;
+        while !rest.is_empty() {
+            operands.push(Operand::Encoded(rest));
+            rest = &rest[number_length(rest).unwrap()..];
+        }
+        FontMatrix::parse(&operands)
+    }
+
     fn matrix(values: [&[u8]; 6]) -> FontMatrix {
         let bytes: Vec<u8> = values.iter().flat_map(|v| real(v)).collect();
-        FontMatrix::parse(&bytes).unwrap()
+        parse(&bytes).unwrap()
     }
 
     #[test]
@@ -372,7 +239,7 @@ mod tests {
         let m = matrix([b"0.001", b"0", b"0", b"0.001", b"0", b"0"]).normalized();
         assert_eq!(m, FontMatrix::identity(1000));
         // Integers: 1 0 0 1 0 0 at one unit per em.
-        let ints = FontMatrix::parse(&[140, 139, 139, 140, 139, 139]).unwrap();
+        let ints = parse(&[140, 139, 139, 140, 139, 139]).unwrap();
         assert_eq!(ints.normalized(), FontMatrix::identity(1));
     }
 
@@ -390,7 +257,7 @@ mod tests {
         let identity = FontMatrix::identity(1);
         assert_eq!(matrix([b"1", b"1", b"1", b"1", b"0", b"0"]), identity);
         assert_eq!(matrix([b"1E-12", b"0", b"0", b"1", b"0", b"0"]), identity);
-        assert!(FontMatrix::parse(&[139, 139]).is_err());
+        assert!(parse(&[139, 139]).is_err());
     }
 
     #[test]

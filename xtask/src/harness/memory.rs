@@ -1248,12 +1248,18 @@ pub fn admission(root: &Path, candidate: &Path, reference: &Path) -> R<()> {
     result
 }
 
+pub(crate) struct WorkerPaths<'a> {
+    pub candidate: &'a Path,
+    pub reference: &'a Path,
+    /// Both executables come from the runner's registered build.
+    pub registered: bool,
+}
+
 /// One memory collection under the measurement lock, rejected (but kept) when
 /// tracked processes used CPU meanwhile.
 pub fn collect(
     root: &Path,
-    candidate: &Path,
-    reference: &Path,
+    workers: WorkerPaths<'_>,
     input: &Path,
     pairs: usize,
     seed: u64,
@@ -1275,8 +1281,7 @@ pub fn collect(
         let reference_arguments = arguments(false)?;
         return collect_invocation(
             root,
-            candidate,
-            reference,
+            workers,
             pairs,
             seed,
             Invocation {
@@ -1298,8 +1303,7 @@ pub fn collect(
         .collect();
     collect_invocation(
         root,
-        candidate,
-        reference,
+        workers,
         pairs,
         seed,
         Invocation {
@@ -1328,8 +1332,11 @@ pub(crate) fn collect_command(
 ) -> R<Value> {
     collect_invocation(
         root,
-        candidate,
-        reference,
+        WorkerPaths {
+            candidate,
+            reference,
+            registered: false,
+        },
         pairs,
         seed,
         Invocation {
@@ -1363,8 +1370,11 @@ pub(crate) fn collect_commands(
 ) -> R<Value> {
     collect_invocation(
         root,
-        candidate,
-        reference,
+        WorkerPaths {
+            candidate,
+            reference,
+            registered: true,
+        },
         pairs,
         seed,
         Invocation {
@@ -1379,10 +1389,19 @@ pub(crate) fn collect_commands(
     )
 }
 
+fn prepare_workers(root: &Path, candidate: &Path, reference: &Path) -> R<[PathBuf; 2]> {
+    let workers = worker::WorkerPair::read(candidate, reference)?;
+    // Grading rechecks the worker paths in the observer certificate. Keep the
+    // measured copies in the build tree and reuse their paths for these bytes.
+    let directory = root
+        .join("target/harness/.memory-workers")
+        .join(workers.content_key());
+    workers.write(&directory)
+}
+
 fn collect_invocation(
     root: &Path,
-    candidate: &Path,
-    reference: &Path,
+    workers: WorkerPaths<'_>,
     pairs: usize,
     seed: u64,
     invocation: Invocation<'_>,
@@ -1396,17 +1415,31 @@ fn collect_invocation(
             ("samples", Value::Array(vec![])),
         ]));
     }
+    let before = cpu_snapshot()?;
     let host = Native {
         root,
         timeout: invocation.timeout,
     };
-    let before = cpu_snapshot()?;
-    let certificate = qualification(&host, root, candidate, reference);
+    let WorkerPaths {
+        candidate,
+        reference,
+        registered,
+    } = workers;
+    let prepared = registered
+        && host.linux()
+        && linux::relocatable_worker(candidate)
+        && linux::relocatable_worker(reference);
+    let [candidate, reference] = if prepared {
+        prepare_workers(root, candidate, reference)?
+    } else {
+        [candidate.to_path_buf(), reference.to_path_buf()]
+    };
+    let certificate = qualification(&host, root, &candidate, &reference);
     let mut result = measure(
         &host,
         root,
-        candidate,
-        reference,
+        &candidate,
+        &reference,
         pairs,
         seed,
         &certificate,
@@ -1414,6 +1447,15 @@ fn collect_invocation(
     );
     let after = cpu_snapshot()?;
     let contaminants = active_cpu(&before, &after, false);
+    push(
+        &mut result,
+        "worker_preparation",
+        Value::str(if prepared {
+            "sequential-copies"
+        } else {
+            "original-paths"
+        }),
+    );
     push(&mut result, "cpu_before", before);
     push(&mut result, "cpu_after", after);
     push(
@@ -1474,6 +1516,9 @@ pub fn evidence_valid_with_outputs(
         let mut covered = s(certificate, "status")? == "qualified-selected-workers"
             && !certificate.get("errors")?.truthy()
             && equal(certificate.get("worker_hashes")?, selected);
+        if require_linux || s(certificate, "platform") == Some("Linux") {
+            covered &= linux::measured_workers_current(certificate);
+        }
         if py_int(identity.get("schema")).unwrap_or(1) >= 2 {
             covered &= !memory.get("contaminants").is_some_and(Value::truthy)
                 && active_cpu(
@@ -1545,6 +1590,67 @@ pub fn evidence_valid_with_outputs(
 #[cfg(test)]
 mod command_tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn memory_preparation_replaces_both_files_and_keeps_certificate_paths() {
+        use std::os::unix::fs::MetadataExt;
+
+        let root = crate::walk::scratch("memory-worker-copies");
+        fs::create_dir_all(&root).unwrap();
+        let candidate = root.join("candidate");
+        let reference = root.join("longer-reference-name");
+        fs::write(&candidate, b"candidate").unwrap();
+        fs::write(&reference, b"reference").unwrap();
+        let paths = prepare_workers(&root, &candidate, &reference).unwrap();
+        let first = paths.each_ref().map(|path| fs::File::open(path).unwrap());
+        assert_eq!(paths[0].as_os_str().len(), paths[1].as_os_str().len());
+        assert_eq!(
+            paths,
+            prepare_workers(&root, &candidate, &reference).unwrap()
+        );
+        for (path, before) in paths.iter().zip(first) {
+            assert_ne!(
+                fs::metadata(path).unwrap().ino(),
+                before.metadata().unwrap().ino()
+            );
+        }
+        assert_eq!(fs::read(&paths[0]).unwrap(), fs::read(&candidate).unwrap());
+        assert_eq!(fs::read(&paths[1]).unwrap(), fs::read(&reference).unwrap());
+
+        let roles = ["candidate", "reference"];
+        let hashes = paths.each_ref().map(|path| file_sha(path).unwrap());
+        let certificate = Value::object([
+            (
+                "worker_hashes",
+                Value::object(roles.into_iter().zip(hashes.iter().map(Value::str))),
+            ),
+            (
+                "linked_libraries",
+                Value::object(roles.into_iter().zip(paths.iter().zip(&hashes).map(
+                    |(path, hash)| {
+                        Value::object([(
+                            "inspected_artifact",
+                            Value::object([
+                                ("path", Value::str(path.display().to_string())),
+                                ("sha256", Value::str(hash)),
+                            ]),
+                        )])
+                    },
+                ))),
+            ),
+        ]);
+
+        fs::write(&reference, b"rebuilt reference").unwrap();
+        let rebuilt = prepare_workers(&root, &candidate, &reference).unwrap();
+        assert_ne!(rebuilt, paths);
+        assert!(linux::measured_workers_current(&certificate));
+        fs::write(&paths[1], b"different bytes").unwrap();
+        assert!(!linux::measured_workers_current(&certificate));
+        fs::remove_file(&paths[1]).unwrap();
+        assert!(!linux::measured_workers_current(&certificate));
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn unreadable_memory_input_returns_a_failed_row() {

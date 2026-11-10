@@ -2,7 +2,9 @@
 //! recorded outcome; a successful result is never synthesised.
 
 use std::ffi::OsString;
-use std::io::Read;
+use std::fs;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -41,6 +43,65 @@ pub fn arg(value: impl ToString) -> OsString {
     OsString::from(value.to_string())
 }
 
+struct WorkerImage {
+    bytes: Vec<u8>,
+    permissions: fs::Permissions,
+}
+
+impl WorkerImage {
+    fn read(path: &Path) -> std::io::Result<Self> {
+        let mut file = fs::File::open(path)?;
+        let permissions = file.metadata()?.permissions();
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        Ok(Self { bytes, permissions })
+    }
+
+    fn write(&self, slot: &Path) -> Result<PathBuf, String> {
+        fs::create_dir_all(slot).map_err(|e| format!("{}: {e}", slot.display()))?;
+        let target = slot.join("worker");
+        let pending = slot.join(format!(".worker-{}", std::process::id()));
+        let mut file =
+            fs::File::create_new(&pending).map_err(|e| format!("{}: {e}", pending.display()))?;
+        let written = file
+            .write_all(&self.bytes)
+            .and_then(|()| file.set_permissions(self.permissions.clone()));
+        drop(file);
+        if let Err(error) = written.and_then(|()| fs::rename(&pending, &target)) {
+            let _ = fs::remove_file(&pending);
+            return Err(format!("{}: {error}", target.display()));
+        }
+        Ok(target)
+    }
+}
+
+pub(super) struct WorkerPair(WorkerImage, WorkerImage);
+
+impl WorkerPair {
+    pub fn read(candidate: &Path, reference: &Path) -> Result<Self, String> {
+        let read =
+            |path: &Path| WorkerImage::read(path).map_err(|e| format!("{}: {e}", path.display()));
+        Ok(Self(read(candidate)?, read(reference)?))
+    }
+
+    /// Name persistent copies by the exact bytes about to be written.
+    pub fn content_key(&self) -> String {
+        format!(
+            "{}-{}",
+            crate::sha256::hex(&self.0.bytes),
+            crate::sha256::hex(&self.1.bytes)
+        )
+    }
+
+    /// Give both workers fresh files with the same write pattern and path length.
+    pub fn write(&self, directory: &Path) -> Result<[PathBuf; 2], String> {
+        Ok([
+            self.0.write(&directory.join("a"))?,
+            self.1.write(&directory.join("b"))?,
+        ])
+    }
+}
+
 /// The exit code (negative signal number when killed), stdout and stderr of a
 /// finished process; `None` when it outlived `timeout` and was killed.
 pub struct Finished {
@@ -62,7 +123,7 @@ pub fn run(
 pub fn run_in(
     argv: &[OsString],
     env: &[(String, Option<String>)],
-    cwd: Option<&std::path::Path>,
+    cwd: Option<&Path>,
     timeout: Duration,
 ) -> Result<Option<Finished>, String> {
     let started = Instant::now();
@@ -121,11 +182,10 @@ pub fn run_in(
 
 /// Candidate invocations recorded for trace identities: the worker whose calls
 /// are recorded, and each call's arguments, exit code and stdout digest.
-static RECORDER: std::sync::Mutex<Option<(std::path::PathBuf, Vec<Value>)>> =
-    std::sync::Mutex::new(None);
+static RECORDER: std::sync::Mutex<Option<(PathBuf, Vec<Value>)>> = std::sync::Mutex::new(None);
 
 /// Record every later invocation of `worker` until [`stop_recording`].
-pub fn record_calls(worker: &std::path::Path) {
+pub fn record_calls(worker: &Path) {
     if let Ok(mut slot) = RECORDER.lock() {
         *slot = Some((worker.to_path_buf(), Vec::new()));
     }
@@ -144,7 +204,7 @@ pub fn stop_recording() -> Vec<Value> {
 fn recorded(argv: &[OsString]) -> Option<Value> {
     let mut slot = RECORDER.lock().ok()?;
     let (worker, calls) = slot.as_mut()?;
-    if std::fs::canonicalize(&argv[0]).ok().as_deref() != Some(worker.as_path()) {
+    if fs::canonicalize(&argv[0]).ok().as_deref() != Some(worker.as_path()) {
         return None;
     }
     let finished = match run(argv, &[], Duration::from_secs(u64::MAX / 4)) {
@@ -154,7 +214,7 @@ fn recorded(argv: &[OsString]) -> Option<Value> {
     };
     let shown = argv[1..].iter().enumerate().map(|(i, a)| {
         if i == 1 {
-            std::path::Path::new(a).file_name().map_or_else(
+            Path::new(a).file_name().map_or_else(
                 || a.to_string_lossy().into_owned(),
                 |n| n.to_string_lossy().into_owned(),
             )

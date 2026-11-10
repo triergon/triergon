@@ -10,8 +10,8 @@ use std::error::Error;
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use std::time::Instant;
-use triergon_core::{Budget, Bytes};
-use triergon_font::{Font, GlyphId, Limits, NameRecord, Outline, SizedFont, Synthesis};
+use triergon_core::{Budget, Bytes, WorkBudget};
+use triergon_font::{Font, GlyphId, Limits, Load, NameRecord, Outline, SizedFont, Synthesis};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -19,8 +19,8 @@ const MAX_INPUT: u64 = 64 << 20;
 const USAGE: &str = "usage: font-worker OPERATION-fold FILE [MODE HEIGHT]
        | OPERATION-bench FILE ITERATIONS [MODE HEIGHT]
        | OPERATION-memory FILE [MODE HEIGHT] | OPERATION-dump FILE [MODE HEIGHT]
-  OPERATION is font (no MODE or HEIGHT) or font-sized, with MODE outlines, advances
-  or vertical and HEIGHT in 26.6 pixels";
+  OPERATION is font (no MODE or HEIGHT) or font-sized, with MODE outlines, advances,
+  vertical or default and HEIGHT in 26.6 pixels";
 
 /// What one operation reads from every face.
 #[derive(Clone, Copy)]
@@ -35,6 +35,8 @@ enum Operation {
     /// The vertical advances of every glyph at a size, unhinted and of the
     /// default load.
     Vertical(i32),
+    /// The default-load metrics and outline of every glyph at a size.
+    Default(i32),
 }
 
 impl Operation {
@@ -44,6 +46,7 @@ impl Operation {
             Self::Scaled(_) => "font-sized-outlines",
             Self::Hinted(_) => "font-sized-advances",
             Self::Vertical(_) => "font-sized-vertical",
+            Self::Default(_) => "font-sized-default",
         }
     }
 }
@@ -100,7 +103,9 @@ fn read(file: &Bytes, budget: &Budget, operation: Operation, sink: &mut impl Sin
                     Err(_) => sink.record(Record::SizeError(height))?,
                 }
             }
-            Operation::Hinted(height) | Operation::Vertical(height) => {
+            Operation::Hinted(height)
+            | Operation::Vertical(height)
+            | Operation::Default(height) => {
                 sink.record(Record::SizedFace(index))?;
                 let Ok(sized) = font.at_size(height) else {
                     sink.record(Record::SizeError(height))?;
@@ -108,7 +113,10 @@ fn read(file: &Bytes, budget: &Budget, operation: Operation, sink: &mut impl Sin
                 };
                 match operation {
                     Operation::Hinted(_) => hinted(&font, &sized, sink),
-                    _ => vertical(&font, &sized, &mut Outline::new(budget), sink),
+                    Operation::Vertical(_) => {
+                        vertical(&font, &sized, &mut Outline::new(budget), sink)
+                    }
+                    _ => default(&font, &sized, &mut Outline::new(budget), sink),
                 }
                 .map_err(|e| format!("face {index} at {height}: {e}"))?;
             }
@@ -239,7 +247,7 @@ fn scaled(
 /// ends the operation with an error: it is not a value to compare.
 fn hinted(font: &Font, sized: &SizedFont<'_>, sink: &mut impl Sink) -> Result<()> {
     for glyph in font.glyphs() {
-        let advance = match sized.hinted_advance(glyph) {
+        let advance = match sized.default_advance(glyph) {
             Ok(advance) => Some(advance),
             Err(triergon_core::Error::Unsupported(what)) => {
                 return Err(
@@ -267,7 +275,7 @@ fn vertical(
 ) -> Result<()> {
     for glyph in font.glyphs() {
         let unhinted = sized.outline_into(glyph, outline).ok();
-        let hinted = match sized.hinted_vertical_advance(glyph) {
+        let hinted = match sized.default_vertical_advance(glyph) {
             Ok(advance) => Some(advance),
             Err(triergon_core::Error::Unsupported(what)) => {
                 return Err(format!(
@@ -282,6 +290,31 @@ fn vertical(
             index: glyph.0,
             unhinted,
             hinted,
+        })?;
+    }
+    Ok(())
+}
+
+/// The default-load metrics and outlines. A glyph the crate cannot load this
+/// way (`Unsupported`) ends the operation with an error.
+fn default(
+    font: &Font,
+    sized: &SizedFont<'_>,
+    outline: &mut Outline,
+    sink: &mut impl Sink,
+) -> Result<()> {
+    for glyph in font.glyphs() {
+        let mut work = WorkBudget::new(Limits::default().work);
+        let loaded = match sized.load(glyph, Load::Default, outline, &mut work) {
+            Ok(metrics) => Some(metrics),
+            Err(triergon_core::Error::Unsupported(what)) => {
+                return Err(format!("glyph {}: default load unsupported: {what}", glyph.0).into());
+            }
+            Err(_) => None,
+        };
+        sink.record(Record::Default {
+            index: glyph.0,
+            loaded: loaded.map(|m| (m, &*outline)),
         })?;
     }
     Ok(())
@@ -312,6 +345,7 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
         ("font-sized", [mode, height]) if mode == "vertical" => {
             Operation::Vertical(height.parse()?)
         }
+        ("font-sized", [mode, height]) if mode == "default" => Operation::Default(height.parse()?),
         _ => return Err(USAGE.into()),
     };
     Ok((action, operation, path))

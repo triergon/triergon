@@ -1,0 +1,272 @@
+{
+  "schema": 1,
+  "reference": "freetype-native",
+  "note": "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+  "pins": {
+    "arimo-bold-ttf-default-16384": {
+      "packets": 3292,
+      "bytes": 92025,
+      "digest": 7578766159214635456
+    },
+    "arimo-bolditalic-ttf-default-16384": {
+      "packets": 3292,
+      "bytes": 97497,
+      "digest": 9976908991384020553
+    },
+    "arimo-italic-ttf-default-16384": {
+      "packets": 3292,
+      "bytes": 97313,
+      "digest": 2326097415458399276
+    },
+    "arimo-regular-ttf-default-16384": {
+      "packets": 3292,
+      "bytes": 92895,
+      "digest": 7444563320084499118
+    },
+    "cousine-bold-ttf-default-16384": {
+      "packets": 2385,
+      "bytes": 68182,
+      "digest": 17835804728035719177
+    },
+    "cousine-bolditalic-ttf-default-16384": {
+      "packets": 2385,
+      "bytes": 72926,
+      "digest": 7129674315209010257
+    },
+    "cousine-italic-ttf-default-16384": {
+      "packets": 2385,
+      "bytes": 72956,
+      "digest": 5841021480842210612
+    },
+    "cousine-regular-ttf-default-16384": {
+      "packets": 2385,
+      "bytes": 68064,
+      "digest": 14495890743534545909
+    },
+    "tinos-bold-ttf-default-16384": {
+      "packets": 3279,
+      "bytes": 112864,
+      "digest": 17179094207916837050
+    },
+    "tinos-bolditalic-ttf-default-16384": {
+      "packets": 3279,
+      "bytes": 114917,
+      "digest": 17422048756458015308
+    },
+    "tinos-italic-ttf-default-16384": {
+      "packets": 3279,
+      "bytes": 115789,
+      "digest": 17394605210376048356
+    },
+    "tinos-regular-ttf-default-16384": {
+      "packets": 3279,
+      "bytes": 112861,
+      "digest": 16420831295017955780
+    },
+    "dejavumathtexgyre-ttf-default-16384": {
+      "packets": 4282,
+      "bytes": 138687,
+      "digest": 15889746306188581807
+    },
+    "dejavusans-bold-ttf-default-16384": {
+      "packets": 6196,
+      "bytes": 200419,
+      "digest": 14892270389058087756
+    },
+    "dejavusans-boldoblique-ttf-default-16384": {
+      "packets": 5413,
+      "bytes": 176983,
+      "digest": 1753956267033380552
+    },
+    "dejavusans-extralight-ttf-default-16384": {
+      "packets": 2032,
+      "bytes": 59075,
+      "digest": 15164809499545413484
+    },
+    "dejavusans-oblique-ttf-default-16384": {
+      "packets": 5355,
+      "bytes": 179651,
+      "digest": 682881077688391830
+    },
+    "dejavusans-ttf-default-16384": {
+      "packets": 6253,
+      "bytes": 203306,
+      "digest": 14806318411300132348
+    },
+    "dejavusanscondensed-bold-ttf-default-16384": {
+      "packets": 6196,
+      "bytes": 200383,
+      "digest": 6742813863315307967
+    },
+    "dejavusanscondensed-boldoblique-ttf-default-16384": {
+      "packets": 5413,
+      "bytes": 176983,
+      "digest": 10891622097119670181
+    },
+    "dejavusanscondensed-oblique-ttf-default-16384": {
+      "packets": 5355,
+      "bytes": 179649,
+      "digest": 10174570227506058139
+    },
+    "dejavusanscondensed-ttf-default-16384": {
+      "packets": 6253,
+      "bytes": 203306,
+      "digest": 13628125023948775450
+    },
+    "dejavusansmono-bold-ttf-default-16384": {
+      "packets": 3316,
+      "bytes": 101584,
+      "digest": 6219439212539243533
+    },
+    "dejavusansmono-boldoblique-ttf-default-16384": {
+      "packets": 2711,
+      "bytes": 75266,
+      "digest": 11586117792678221726
+    },
+    "dejavusansmono-oblique-ttf-default-16384": {
+      "packets": 2710,
+      "bytes": 75934,
+      "digest": 1260617657326100458
+    },
+    "dejavusansmono-ttf-default-16384": {
+      "packets": 3377,
+      "bytes": 103203,
+      "digest": 11745831967571867585
+    },
+    "dejavuserif-bold-ttf-default-16384": {
+      "packets": 3506,
+      "bytes": 115333,
+      "digest": 15430532634362337114
+    },
+    "dejavuserif-bolditalic-ttf-default-16384": {
+      "packets": 3506,
+      "bytes": 119739,
+      "digest": 1121200154314425840
+    },
+    "dejavuserif-italic-ttf-default-16384": {
+      "packets": 3507,
+      "bytes": 126056,
+      "digest": 2108862862939616575
+    },
+    "dejavuserif-ttf-default-16384": {
+      "packets": 3528,
+      "bytes": 121309,
+      "digest": 2348323378969042458
+    },
+    "dejavuserifcondensed-bold-ttf-default-16384": {
+      "packets": 3506,
+      "bytes": 115333,
+      "digest": 18284091013606962588
+    },
+    "dejavuserifcondensed-bolditalic-ttf-default-16384": {
+      "packets": 3506,
+      "bytes": 119739,
+      "digest": 253525022335910745
+    },
+    "dejavuserifcondensed-italic-ttf-default-16384": {
+      "packets": 3507,
+      "bytes": 126056,
+      "digest": 3952148212462365453
+    },
+    "dejavuserifcondensed-ttf-default-16384": {
+      "packets": 3528,
+      "bytes": 121309,
+      "digest": 7954862545438889774
+    },
+    "notosans-regular-ttf-default-16384": {
+      "packets": 3884,
+      "bytes": 125881,
+      "digest": 5409091789623004763
+    },
+    "notosans-regular-otf-default-16384": {
+      "packets": 3884,
+      "bytes": 123175,
+      "digest": 8790603961834920624
+    },
+    "notosans-bolditalic-otf-default-16384": {
+      "packets": 3895,
+      "bytes": 129034,
+      "digest": 9109164292751945406
+    },
+    "notosansjp-regular-otf-default-16384": {
+      "packets": 17936,
+      "bytes": 1644859,
+      "digest": 4688113356983182571
+    },
+    "notosansjp-vf-otf-default-16384": {
+      "packets": 17936,
+      "bytes": 1531597,
+      "digest": 7146522963916308715
+    },
+    "notosanscjk-regular-ttc-default-16384": {
+      "packets": 655350,
+      "bytes": 61566100,
+      "digest": 906608027873037057
+    },
+    "notosansarabic-regular-ttf-default-16384": {
+      "packets": 1399,
+      "bytes": 103505,
+      "digest": 5190577134503108822
+    },
+    "notonaskharabic-regular-ttf-default-16384": {
+      "packets": 1415,
+      "bytes": 122228,
+      "digest": 5995032746788712407
+    },
+    "notosanshebrew-regular-ttf-default-16384": {
+      "packets": 151,
+      "bytes": 3211,
+      "digest": 13881054686572854002
+    },
+    "notosansdevanagari-regular-ttf-default-16384": {
+      "packets": 845,
+      "bytes": 37100,
+      "digest": 4134102590603353473
+    },
+    "notosansbengali-regular-ttf-default-16384": {
+      "packets": 418,
+      "bytes": 17548,
+      "digest": 18120942362872175581
+    },
+    "notosanstamil-regular-ttf-default-16384": {
+      "packets": 244,
+      "bytes": 14616,
+      "digest": 3239798437410364603
+    },
+    "notosansthai-regular-ttf-default-16384": {
+      "packets": 140,
+      "bytes": 4597,
+      "digest": 18438128007983413488
+    },
+    "authored-cff-features-otf-default-16384": {
+      "packets": 8,
+      "bytes": 83,
+      "digest": 2979901005193679181
+    },
+    "authored-cff-matrix-otf-default-16384": {
+      "packets": 2,
+      "bytes": 4,
+      "digest": 17599146542360132010
+    },
+    "authored-cmap-formats-ttf-default-16384": {
+      "packets": 4,
+      "bytes": 14,
+      "digest": 926757919938194304
+    },
+    "authored-cmap-order-ttc-default-16384": {
+      "packets": 24,
+      "bytes": 84,
+      "digest": 18130533382218902479
+    },
+    "authored-vertical-ttc-default-16384": {
+      "packets": 20,
+      "bytes": 72,
+      "digest": 3077829894830613438
+    },
+    "authored-charmaps-otf-default-16384": {
+      "packets": 10,
+      "bytes": 36,
+      "digest": 13631386619077927750
+    }
+  }
+}

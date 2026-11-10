@@ -1,6 +1,8 @@
 //! CFF DICT data (Adobe Technical Note 5176, section 4; OpenType CFF2 DICTs).
 
-use super::number::shared_integer;
+use super::number::{Operand, number_length};
+use super::path::Fixed;
+use crate::fixed::mul_fix;
 use crate::read::Reader;
 use crate::work::charge;
 use triergon_core::{Error, Result, WorkBudget};
@@ -11,6 +13,14 @@ pub(crate) const CFF2_OPERANDS: usize = 513;
 
 /// A DICT operator: one byte, or 12 followed by a second byte as `0x0c00 | byte`.
 pub(crate) mod op {
+    pub(crate) const BLUE_VALUES: u16 = 6;
+    pub(crate) const OTHER_BLUES: u16 = 7;
+    pub(crate) const FAMILY_BLUES: u16 = 8;
+    pub(crate) const FAMILY_OTHER_BLUES: u16 = 9;
+    pub(crate) const BLUE_SCALE: u16 = 0x0c09;
+    pub(crate) const BLUE_SHIFT: u16 = 0x0c0a;
+    pub(crate) const BLUE_FUZZ: u16 = 0x0c0b;
+    pub(crate) const LANGUAGE_GROUP: u16 = 0x0c11;
     pub(crate) const PRIVATE: u16 = 18;
     pub(crate) const SUBRS: u16 = 19;
     pub(crate) const DEFAULT_WIDTH_X: u16 = 20;
@@ -29,7 +39,7 @@ pub(crate) mod op {
     pub(crate) const FD_SELECT: u16 = 0x0c25;
 }
 
-/// An operand stack: DICT numbers as `f64`, charstring numbers as 16.16.
+/// An operand stack: DICT operands, or charstring numbers as 16.16.
 pub(crate) struct Stack<T, const N: usize> {
     values: [T; N],
     len: usize,
@@ -107,145 +117,102 @@ impl<T: Copy + Default, const N: usize> Stack<T, N> {
     }
 }
 
-impl<const N: usize> Stack<f64, N> {
-    /// Blends at the default instance: each default plus its deltas weighted by
-    /// the region scalars.
-    pub(crate) fn blend_scalars(&mut self, count: usize, scalars: &[f64]) -> Result<()> {
-        self.blend(count, scalars.len(), |value, deltas| {
-            value + scalars.iter().zip(deltas).map(|(s, d)| s * d).sum::<f64>()
-        })
-    }
-}
-
-/// One DICT entry: an operator and its operands, as values and as encoded.
-pub(crate) struct Entry<'a> {
+/// One DICT entry: an operator and its operands as FreeType's parser holds
+/// them.
+pub(crate) struct Entry<'a, 'b> {
     pub(crate) operator: u16,
-    pub(crate) operands: &'a [f64],
-    /// The operand bytes, for values read with more care than `f64` (the
-    /// FontMatrix); blends make them differ from `operands`.
-    pub(crate) encoded: &'a [u8],
+    pub(crate) operands: &'b [Operand<'a>],
 }
 
-/// Calls `apply` for each entry. In a CFF2 Private DICT, `blend` is applied in
-/// place using `scalars(vsindex)`.
-pub(crate) fn parse<'s, const N: usize>(
-    bytes: &[u8],
+/// Calls `apply` for each entry. In a CFF2 DICT, `blend` replaces its operands
+/// with their blends in place, as `cff_blend_doBlend` does: each default in
+/// 16.16 plus its deltas times the 16.16 region scalars of `scalars(vsindex)`.
+pub(crate) fn parse<'a, 's, const N: usize>(
+    bytes: &'a [u8],
     work: &mut WorkBudget,
-    scalars: &dyn Fn(usize) -> Result<&'s [f64]>,
-    mut apply: impl FnMut(Entry<'_>) -> Result<()>,
+    scalars: &dyn Fn(usize) -> Result<&'s [Fixed]>,
+    mut apply: impl FnMut(Entry<'a, '_>) -> Result<()>,
 ) -> Result<()> {
     let mut r = Reader::new(bytes);
-    let mut stack = Stack::<f64, N>::new();
+    let mut stack = Stack::<Operand<'a>, N>::new();
     let mut vsindex = 0;
-    let mut start = 0;
     while !r.at_end() {
         charge(work, 1)?;
-        let end = r.offset();
+        let at = r.offset();
         let byte = r.u8()?;
         let operator = match byte {
             12 => 0x0c00 | u16::from(r.u8()?),
             0..=27 => u16::from(byte),
             _ => {
-                stack.push(number(byte, &mut r)?)?;
+                let number = &bytes[at..];
+                let len = number_length(number).ok_or(Error::Invalid("CFF DICT number"))?;
+                r.skip(len - 1)?;
+                stack.push(Operand::Encoded(number))?;
                 continue;
             }
         };
         match operator {
             op::VSINDEX if N == CFF2_OPERANDS => {
-                vsindex = integer(stack.pop()?)?;
+                vsindex = stack.pop()?.index()?;
                 scalars(vsindex)?;
             }
             op::BLEND if N == CFF2_OPERANDS => {
-                let count = integer(stack.pop()?)?;
-                stack.blend_scalars(count, scalars(vsindex)?)?;
+                let count = stack.pop()?.index()?;
+                let scalars = scalars(vsindex)?;
+                stack.blend(count, scalars.len(), |default, deltas| {
+                    let sum = deltas
+                        .iter()
+                        .zip(scalars)
+                        .fold(default.fixed(0), |sum, (d, &s)| {
+                            sum.wrapping_add(mul_fix(d.fixed(0), i64::from(s)))
+                        });
+                    Operand::Blended(sum)
+                })?;
                 continue;
             }
             _ => apply(Entry {
                 operator,
                 operands: stack.as_slice(),
-                encoded: &bytes[start..end],
             })?,
         }
         stack.clear();
-        start = r.offset();
     }
     Ok(())
 }
 
-/// A number in DICT data (TN 5176 Table 3).
-fn number(byte: u8, r: &mut Reader<'_>) -> Result<f64> {
-    match byte {
-        29 => Ok(f64::from(r.i32()?)),
-        30 => real(r),
-        _ => shared_integer(byte, r)?
-            .map(f64::from)
-            .ok_or(Error::Invalid("reserved CFF DICT byte")),
-    }
-}
-
-/// A real number: nibbles of digits, point, exponent and sign (TN 5176 Table 5).
-fn real(r: &mut Reader<'_>) -> Result<f64> {
-    const MAX: usize = 64;
-    let mut text = [0_u8; MAX];
-    let mut len = 0;
-    loop {
-        let byte = r.u8()?;
-        for nibble in [byte >> 4, byte & 0xf] {
-            let chars: &[u8] = match nibble {
-                0..=9 => &[b'0' + nibble],
-                0xa => b".",
-                0xb => b"E",
-                0xc => b"E-",
-                0xe => b"-",
-                0xf => {
-                    let text = std::str::from_utf8(&text[..len]).unwrap_or_default();
-                    // An empty or malformed real reads as zero, as FreeType does.
-                    return Ok(text
-                        .parse::<f64>()
-                        .ok()
-                        .filter(|n| n.is_finite())
-                        .unwrap_or(0.0));
-                }
-                _ => return Err(Error::Invalid("reserved CFF real nibble")),
-            };
-            text.get_mut(len..len + chars.len())
-                .ok_or(Error::Invalid("CFF real number too long"))?
-                .copy_from_slice(chars);
-            len += chars.len();
-        }
-    }
-}
-
-/// A nonnegative integral operand used as a count, index or offset.
-pub(crate) fn integer(value: f64) -> Result<usize> {
-    if value < 0.0 || value.fract() != 0.0 || value > f64::from(u32::MAX) {
-        return Err(Error::Invalid("CFF operand is not an index"));
-    }
-    usize::try_from(value as u32).map_err(|_| Error::Overflow)
-}
-
 /// The single operand of an offset or count operator.
-pub(crate) fn single(operands: &[f64]) -> Result<usize> {
+pub(crate) fn single(operands: &[Operand<'_>]) -> Result<usize> {
     match operands {
-        [value] => integer(*value),
+        [value] => value.index(),
         _ => Err(Error::Invalid("CFF DICT operand count")),
     }
 }
 
+/// The first operand of an entry that needs one.
+pub(crate) fn first<'a>(operands: &[Operand<'a>]) -> Result<Operand<'a>> {
+    operands
+        .first()
+        .copied()
+        .ok_or(Error::Invalid("CFF DICT operand count"))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{CFF_OPERANDS, CFF2_OPERANDS, Stack, op, parse, real};
-    use crate::read::Reader;
+    use super::{CFF_OPERANDS, CFF2_OPERANDS, Stack, op, parse};
     use triergon_core::{Result, WorkBudget};
 
-    fn entries<const N: usize>(bytes: &[u8], scalars: &[f64]) -> Result<Vec<(u16, Vec<f64>)>> {
+    /// Each entry's operator and operands in 16.16.
+    fn entries<const N: usize>(bytes: &[u8], scalars: &[i32]) -> Result<Vec<(u16, Vec<i64>)>> {
         let mut out = Vec::new();
         parse::<N>(
             bytes,
             &mut WorkBudget::new(1000),
             &|_| Ok(scalars),
             |entry| {
-                out.push((entry.operator, entry.operands.to_vec()));
+                out.push((
+                    entry.operator,
+                    entry.operands.iter().map(|o| o.fixed(0)).collect(),
+                ));
                 Ok(())
             },
         )?;
@@ -257,28 +224,34 @@ mod tests {
         // 100 17 (CharStrings); -1000 1131 -0.5 12 7 (FontMatrix, partial).
         let bytes = [239, 17, 254, 124, 250, 255, 30, 0xe0, 0xa5, 0xff, 12, 7];
         let parsed = entries::<CFF_OPERANDS>(&bytes, &[]).unwrap();
-        assert_eq!(parsed[0], (op::CHAR_STRINGS, vec![100.0]));
-        assert_eq!(parsed[1], (op::FONT_MATRIX, vec![-1000.0, 1131.0, -0.5]));
-        assert_eq!(real(&mut Reader::new(&[0x1a, 0x25, 0xff])), Ok(1.25));
-        assert_eq!(real(&mut Reader::new(&[0x2b, 0x3f])), Ok(2000.0));
-        assert_eq!(real(&mut Reader::new(&[0x2c, 0x1f])), Ok(0.2));
-        assert!(real(&mut Reader::new(&[0xd0])).is_err());
+        assert_eq!(parsed[0], (op::CHAR_STRINGS, vec![100 << 16]));
+        assert_eq!(
+            parsed[1],
+            (op::FONT_MATRIX, vec![-1000 << 16, 1131 << 16, -0x8000])
+        );
         assert!(entries::<CFF_OPERANDS>(&[255], &[]).is_err());
+        // A real without its end, and a two-byte integer cut short.
+        assert!(entries::<CFF_OPERANDS>(&[30, 0x12], &[]).is_err());
+        assert!(entries::<CFF_OPERANDS>(&[247], &[]).is_err());
     }
 
     #[test]
-    fn cff2_blends_at_the_default_instance() {
+    fn cff2_blends_at_the_default_instance_in_16_16() {
         // 10 20 (deltas for one value over two regions) 1 blend 19 (Subrs).
         let bytes = [149, 159, 169, 140, 23, 19];
-        let parsed = entries::<CFF2_OPERANDS>(&bytes, &[0.0, 1.0]).unwrap();
-        assert_eq!(parsed, [(op::SUBRS, vec![40.0])]);
-        let mut stack = Stack::<f64, 4>::new();
-        for v in [1.0, 2.0, 3.0, 4.0] {
+        let parsed = entries::<CFF2_OPERANDS>(&bytes, &[0, 0x10000]).unwrap();
+        assert_eq!(parsed, [(op::SUBRS, vec![40 << 16])]);
+        // 0.5 plus 0.25 times 1: 0.75.
+        let bytes = [30, 0xa5, 0xff, 30, 0xa2, 0x5f, 140, 23, 19];
+        let parsed = entries::<CFF2_OPERANDS>(&bytes, &[0x10000]).unwrap();
+        assert_eq!(parsed, [(op::SUBRS, vec![0xc000])]);
+        let mut stack = Stack::<i32, 4>::new();
+        for v in [1, 2, 3, 4] {
             stack.push(v).unwrap();
         }
-        assert!(stack.push(5.0).is_err());
-        assert!(stack.blend_scalars(2, &[1.0]).is_ok());
-        assert_eq!(stack.as_slice(), [4.0, 6.0]);
-        assert!(stack.blend_scalars(3, &[]).is_err());
+        assert!(stack.push(5).is_err());
+        assert!(stack.blend(2, 1, |v, d| v + d[0]).is_ok());
+        assert_eq!(stack.as_slice(), [4, 6]);
+        assert!(stack.blend(3, 0, |v, _| v).is_err());
     }
 }
