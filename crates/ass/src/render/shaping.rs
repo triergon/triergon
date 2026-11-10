@@ -216,6 +216,13 @@ impl VerticalFonts {
         };
         let id = u32::try_from(self.fonts.len()).map_err(|_| Error::Overflow)?;
         let name = (self.names.len(), family.len());
+        // Grown geometrically, as the descriptions accumulate for the
+        // renderer's life.
+        let spare = self.names.capacity() - self.names.len();
+        if spare < family.len() {
+            self.names
+                .try_reserve_exact(family.len().max(self.names.capacity()))?;
+        }
         self.names.try_extend_from_slice(family)?;
         let font = VerticalFont {
             name,
