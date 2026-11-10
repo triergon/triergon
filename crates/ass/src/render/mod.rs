@@ -101,7 +101,7 @@ pub struct Renderer {
     next_frame: BudgetVec<Image>,
     boxes: BudgetVec<EventBox>,
     placed: BudgetVec<Placed>,
-    used: BudgetVec<collisions::Rect>,
+    used: collisions::Fixed,
     /// The work the last call to [`Renderer::render`] spent.
     #[cfg(feature = "work-probe")]
     work_spent: u64,
@@ -155,7 +155,7 @@ impl Renderer {
             next_frame: BudgetVec::new(budget),
             boxes: BudgetVec::new(budget),
             placed: BudgetVec::new(budget),
-            used: BudgetVec::new(budget),
+            used: collisions::Fixed::new(budget),
             #[cfg(feature = "work-probe")]
             work_spent: 0,
         })
@@ -245,11 +245,11 @@ impl Renderer {
                 boxes.try_push(event).map_err(|e| e.error)?;
             }
         }
-        // libass sorts by layer and read order with qsort, which leaves the
-        // order of equal keys unspecified, and a ReadOrder repeats (0 for
-        // every event of a whole script): equal keys keep the script's order.
-        // Boxes are collected in that order, so the event index completes the
-        // key and the sort needs no scratch.
+        // libass sorts by layer and read order with qsort (`cmp_event_layer`),
+        // which glibc runs as a stable merge sort, and a ReadOrder repeats (0
+        // for every event of a whole script): equal keys keep the script's
+        // order. Boxes are collected in that order, so the event index
+        // completes the key and the sort needs no scratch.
         boxes
             .as_mut_slice()
             .sort_unstable_by_key(|b| (b.layer, b.read_order, b.event));
@@ -268,9 +268,6 @@ impl Renderer {
         for layer in boxes.as_mut_slice().chunk_by_mut(|a, b| a.layer == b.layer) {
             let (group, rest) = records.split_at_mut(layer.len());
             records = rest;
-            // Each event that takes part is fitted against those before it.
-            let taking_part = layer.iter().filter(|b| b.takes_part()).count();
-            charge(work, taking_part.saturating_mul(taking_part))?;
             collisions::fix(
                 layer,
                 group,
@@ -278,6 +275,7 @@ impl Renderer {
                 &mut self.used,
                 self.id,
                 self.canvas.height,
+                work,
             )?;
         }
         let next = &mut self.next_frame;
@@ -372,7 +370,7 @@ impl Pipeline {
         evaluated: &Evaluated<'_>,
         room: &Room<'_>,
         work: &mut WorkBudget,
-    ) -> Result<Rect> {
+    ) -> Result<collisions::Rect> {
         let text = &self.text;
         // Shaping and layout pass over the characters a fixed number of
         // times; font fallback, shaping, outlines and the line rebalancing
@@ -427,7 +425,7 @@ impl Pipeline {
         script: &Script,
         evaluated: &Evaluated<'_>,
         room: &Room<'_>,
-        area: Rect,
+        area: collisions::Rect,
         work: &mut WorkBudget,
     ) -> Result<()> {
         let geometry = room.geometry;
@@ -449,7 +447,11 @@ impl Pipeline {
         )
     }
 
-    /// The vector clip drawn in the frame, if the event has one that draws.
+    /// The vector clip drawn in the frame, if the event has one whose
+    /// drawing can be placed. A drawing without a contour gives a mask
+    /// without pixels, which empties every image a regular clip clips and
+    /// leaves those of an inverse clip, as `blend_vector_clip` does with the
+    /// empty bitmap libass keeps for it (`ass_render.c:700-813`).
     fn vector_clip(
         &mut self,
         geometry: &Geometry<'_>,
@@ -500,7 +502,7 @@ fn background(
     geometry: &Geometry<'_>,
     evaluated: &Evaluated<'_>,
     scales: &Scales,
-    event: Rect,
+    event: collisions::Rect,
     budget: &Budget,
 ) -> Result<Option<Image>> {
     let size = |shadow: f64, scale: f64| {
@@ -516,10 +518,10 @@ fn background(
         size(last.shadow_y, scales.border[1]),
     );
     let area = Rect::new(
-        event.x_min.wrapping_sub(sx),
-        event.y_min.wrapping_sub(sy),
-        event.x_max.wrapping_add(sx),
-        event.y_max.wrapping_add(sy),
+        event.x0.wrapping_sub(sx),
+        event.y0.wrapping_sub(sy),
+        event.x1.wrapping_add(sx),
+        event.y1.wrapping_add(sy),
     );
     let colour = apply_fade(last.colours.back, evaluated.state.fade);
     let canvas = geometry.canvas;

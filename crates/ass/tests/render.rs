@@ -148,6 +148,31 @@ fn clips_and_karaoke_split_images() {
     let images = renderer.render(&mut events, 500).unwrap().images;
     // The clip misses the text: its image is kept, empty.
     assert!(images.iter().all(|i| i.width() == 0 && i.height() == 0));
+    // A clip drawing without a contour empties every image as well; an
+    // inverse clip leaves them whole. A square far away misses the text and
+    // empties it too, unless it lies 125,000 frame pixels or more from the
+    // origin, where libass cannot place the clip and does not apply it.
+    const NEAR: &str = "m 50000 50000 l 50050 50000 50050 50050 50000 50050";
+    const FAR: &str = "m 70000 70000 l 70050 70000 70050 70050 70000 70050";
+    for (clip, drawing, empty) in [
+        ("clip", "m 0 0 m 140 -24", true),
+        ("iclip", "m 0 0 m 140 -24", false),
+        ("clip", NEAR, true),
+        ("clip", FAR, false),
+    ] {
+        let mut events = script(
+            &budget,
+            &format!(
+                "Dialogue: 0,0:00:00.00,0:00:02.00,Default,{{\\bord0\\shad0\\{clip}({drawing})}}ABC\n"
+            ),
+        );
+        let images = renderer.render(&mut events, 500).unwrap().images;
+        assert!(!images.is_empty());
+        assert!(
+            images.iter().all(|i| (i.width() == 0) == empty),
+            "{clip}({drawing}): {images:?}"
+        );
+    }
 }
 
 #[test]

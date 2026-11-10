@@ -114,8 +114,10 @@ static void assr_frame(AssImages *w, long long now, int changed, ASS_Image *imag
         assr_render_fold(w, count);
     }
     for (ASS_Image *image = images; image; image = image->next) {
-        /* A BorderStyle 4 box: its own buffer, no composite behind it. */
-        int box = assr_is_box(image->bitmap);
+        /* A BorderStyle 4 box: its own buffer, no composite behind it. The
+           buffer, not the bitmap, which shift_event moves past the rows a
+           collision shift cuts off the top of the frame. */
+        int box = assr_is_box(((ASS_ImagePriv *)image)->buffer);
         if (box && ((ASS_ImagePriv *)image)->source) w->unknown = 1;
         if (w->dump) {
             if (box)
