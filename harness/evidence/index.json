@@ -17044,6 +17044,20 @@
    }
   },
   {
+   "name": "ass-render-parity-01ccb497",
+   "path": "ass-render-parity-01ccb497",
+   "retention": "retained",
+   "reason": "ASS rendering status row and ARMv7 table: the 5,722 generated scripts and fixture mutations rendered frame by frame through the renderer at 3469d84e and libass, natively on AArch64 and in the ARMv7 user space on an r6g.2xlarge, with peak RSS and wall time per worker, and their causes against the earlier attribution; the work and time of every frame of the 17 work-bound scripts on ARMv7 with the bound lifted (probe patch included), and libass's time for each whole script; the ASS gates and crate tests on both targets (AArch64 at dac0137f with the pins it recorded, which make 01ccb497; ARMv7 at 01ccb497, recording identical pins); the change values of every ass-render frame; host and package lists. No case reached libass's time limit, so none was rerun.",
+   "key": "evidence/ass-render-parity-01ccb497/c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be.tar.gz",
+   "sha256": "c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be",
+   "bytes": 3670319,
+   "source_revisions": {
+    "corpus": "3469d84e360ac2217d603effa4d1a9fd70a87ea1",
+    "gates": "01ccb49792cf1d4d05b74addf35dc616763b88e0",
+    "baseline": "fedfb790bfb52131389cb7c5134bab7ab813b55f"
+   }
+  },
+  {
    "name": "subtitles-pgs-plane-03f3efd3-linux-arm64",
    "path": "subtitles-pgs-plane-03f3efd3-linux-arm64",
    "retention": "retained",

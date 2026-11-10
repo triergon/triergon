@@ -239,7 +239,11 @@ selective style overrides), in the frame and storage size and margins of its
   `triergon_raster::Raster::render`, quantised against its run, and each run
   composited with its blur, `\be` and shadow by `Raster::compose`; then each
   run's shadow, border and fill as images, clipped by the clip rectangle (with `\kf`'s
-  split), multiplied by a vector clip, and the box of `BorderStyle` 4.
+  split), multiplied by a vector clip, and the box of `BorderStyle` 4. A
+  vector clip whose drawing has no contour empties every image of a regular
+  clip and leaves those of an inverse clip, as libass's empty mask does; one
+  whose drawing libass cannot place (its centre 125,000 frame pixels or more
+  from the origin) is not applied, as in libass.
 - **The frame.** Events are taken in layer and read order, and in the
   script's order where both are equal (libass's `qsort` leaves that order
   unspecified; a whole script's events differ in ReadOrder, a stream's need
@@ -418,7 +422,7 @@ panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
-- `ass-render` renders the 33 scripts and 3 packet streams of
+- `ass-render` renders the 35 scripts and 3 packet streams of
   `harness/fixtures/ass-render` as a player configures libass (attached fonts,
   a default family and font file, no system font provider, no hinting) at
   1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
