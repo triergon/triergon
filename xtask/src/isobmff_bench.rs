@@ -279,6 +279,7 @@ impl Case {
             arguments: self.arguments.iter().map(OsString::from).collect(),
             candidate_options: self.candidate_options.iter().map(OsString::from).collect(),
             work_fields: vec![],
+            own_work: vec![],
             timeout: worker::DEFAULT_TIMEOUT,
         }
     }

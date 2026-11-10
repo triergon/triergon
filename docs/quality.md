@@ -413,6 +413,16 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
+- `report`, `external-vector`, `codecs time` and `capture qualify` time through one
+  paired runner. It holds the host-wide benchmark lock, runs and checks one warm-up of
+  each worker, observes every pair from the snapshot that closed the one before, proves
+  the RSS kernel module absent at each stage, and retries a contaminated session up to
+  twice on the next seeds, keeping the rejected attempts. Each session writes one timing
+  record, and one validator grades it: the pairs, the worker and input hashes, a clean
+  CPU record around every pair, the same work in both warm-ups and every pair, and a
+  ratio interval its samples reproduce. Work a contract names must match between the
+  workers. A worker's own output, such as an encoder's stream or a decoder digest that
+  may differ, need only repeat across that worker's runs.
 - `report`, `external-vector`, `codecs time` and `capture qualify` record the CPUs the
   run may use and those online. Neither instance size nor pinning is required, but a
   bound measured pinned to one CPU is not comparable with one measured unpinned.

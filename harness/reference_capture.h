@@ -14,11 +14,14 @@
  * Usage:
  *   reference convert  <w> <h> <flip> <frames> <in.rgba> <out.yuv>
  *   reference pipeline <w> <h> <flip> <frames> <bitrate> <in.rgba> <out.ts>
- *   reference time     <w> <h> <flip> <frames> <bitrate> <in.rgba> <iterations>
  *   reference memory   <w> <h> <flip> <frames> <bitrate> <in.rgba>
+ *   reference bench    <in.rgba> <iterations> <w> <h> <flip> <frames> <bitrate>
  *
- * `time` prints one JSON line per iteration with the elapsed nanoseconds of the
- * complete session (open, every frame converted+encoded+muxed+flushed, close).
+ * `bench` takes the harness's timing command line (input and iterations first)
+ * and times `iterations` complete sessions (open, every frame
+ * converted+encoded+muxed+flushed, close), each into a fresh sink; every
+ * session must produce the same stream, whose {iterations, elapsed_ns,
+ * packets (frames), bytes, digest} it prints.
  * `memory` performs the same session once between the shared observer's stdout
  * markers (harness/allocations-linux.c); input frames are loaded before BEGIN.
  * Output bytes go to a sink that hashes (FNV-1a 64) and counts, never retains.
@@ -212,7 +215,36 @@ static void write_marker(const char *text) {
     if (write(STDOUT_FILENO, text, n) != (ssize_t)n) die("marker");
 }
 
+static int bench(char **argv) {
+    int iterations = atoi(argv[3]);
+    int w = atoi(argv[4]), h = atoi(argv[5]), flip = atoi(argv[6]), frames = atoi(argv[7]);
+    int64_t bitrate = strtoll(argv[8], NULL, 10);
+    if (iterations <= 0) die("usage");
+    if (w <= 0 || h <= 0 || (w & 1) || (h & 1) || frames <= 0) die("geometry");
+    size_t frame_bytes = (size_t)w * (size_t)h * 4;
+    uint8_t *rgba = load(argv[2], frame_bytes * (size_t)frames);
+    uint64_t bytes = 0, digest = 0;
+    uint64_t start = now_ns();
+    for (int i = 0; i < iterations; i++) {
+        Sink sink = {NULL, UINT64_C(14695981039346656037), 0, 0};
+        session(w, h, flip, frames, bitrate, rgba, &sink);
+        if (i == 0) {
+            bytes = sink.bytes;
+            digest = sink.hash;
+        } else if (sink.bytes != bytes || sink.hash != digest) {
+            die("output differs between iterations");
+        }
+    }
+    uint64_t elapsed = now_ns() - start;
+    printf("{\"iterations\":%d,\"elapsed_ns\":%" PRIu64 ",\"packets\":%d,\"bytes\":%" PRIu64
+           ",\"digest\":%" PRIu64 "}\n",
+           iterations, elapsed, frames, bytes, digest);
+    free(rgba);
+    return 0;
+}
+
 int main(int argc, char **argv) {
+    if (argc == 9 && !strcmp(argv[1], "bench")) return bench(argv);
     if (argc < 7) die("usage");
     const char *mode = argv[1];
     int w = atoi(argv[2]), h = atoi(argv[3]), flip = atoi(argv[4]), frames = atoi(argv[5]);
@@ -250,16 +282,6 @@ int main(int argc, char **argv) {
         fclose(sink.file);
         printf("{\"bytes\":%" PRIu64 ",\"writes\":%" PRIu64 ",\"fnv1a64\":\"%016" PRIx64 "\"}\n",
                sink.bytes, sink.writes, sink.hash);
-    } else if (!strcmp(mode, "time") && argc == 9) {
-        int iterations = atoi(argv[8]);
-        for (int i = 0; i < iterations; i++) {
-            Sink sink = {NULL, UINT64_C(14695981039346656037), 0, 0};
-            uint64_t t0 = now_ns();
-            session(w, h, flip, frames, bitrate, rgba, &sink);
-            uint64_t t1 = now_ns();
-            printf("{\"ns\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"fnv1a64\":\"%016" PRIx64 "\"}\n",
-                   t1 - t0, sink.bytes, sink.hash);
-        }
     } else if (!strcmp(mode, "memory") && argc == 8) {
         Sink sink = {NULL, UINT64_C(14695981039346656037), 0, 0};
         fflush(stdout);

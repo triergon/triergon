@@ -756,6 +756,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     arguments: arguments.clone(),
                     candidate_options: vec![],
                     work_fields: work_fields.clone(),
+                    own_work: vec![],
                     timeout,
                 },
             ));
@@ -819,6 +820,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     arguments,
                     candidate_options: vec![],
                     work_fields: work_fields.clone(),
+                    own_work: vec![],
                     timeout,
                 },
             ));

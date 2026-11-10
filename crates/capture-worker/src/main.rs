@@ -5,12 +5,13 @@
 //!   capture-worker convert  <w> <h> <flip> <frames> <in.rgba> <out.yuv>
 //!   capture-worker recon    <w> <h> <flip> <frames> <bitrate> <in.rgba> <out.yuv>
 //!   capture-worker pipeline <w> <h> <flip> <frames> <bitrate> <in.rgba> <out.ts>
-//!   capture-worker time     <w> <h> <flip> <frames> <bitrate> <in.rgba> <iterations>
 //!   capture-worker memory   <w> <h> <flip> <frames> <bitrate> <in.rgba>
+//!   capture-worker bench    <in.rgba> <iterations> <w> <h> <flip> <frames> <bitrate>
 //! ```
 //!
-//! `time` and `memory` feed every frame's bytes to a hashing sink that keeps
-//! nothing, exactly like the reference worker.
+//! `bench` takes the harness's timing command line (input and iterations
+//! first). `bench` and `memory` feed every frame's bytes to a hashing sink that
+//! keeps nothing, exactly like the reference worker.
 #![forbid(unsafe_code)]
 
 use std::io::Write;
@@ -70,8 +71,57 @@ fn session(
     Ok(s.vbv_underflow_bits())
 }
 
+/// `bench`: `iterations` sessions, each from a fresh session and sink, timed
+/// together; every session must produce the same stream, which is the work.
+fn bench(args: &[String]) -> ExitCode {
+    let parse = |i: usize| args[i].parse::<u32>().ok();
+    let (Some(iterations), Some(w), Some(h), Some(flip), Some(count), Some(bitrate)) = (
+        parse(3).filter(|&n| n > 0),
+        parse(4),
+        parse(5),
+        parse(6),
+        parse(7),
+        parse(8),
+    ) else {
+        return fail("usage");
+    };
+    let frame_bytes = w as usize * h as usize * 4;
+    let Some(rgba) = std::fs::read(&args[2])
+        .ok()
+        .filter(|data| data.len() >= frame_bytes * count as usize)
+    else {
+        return fail("input");
+    };
+    let orientation = if flip != 0 {
+        Orientation::BottomUp
+    } else {
+        Orientation::TopDown
+    };
+    let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
+    let mut output = None;
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let mut sink = HashSink::new();
+        if let Err(e) = session(&cfg, orientation, &rgba, count as usize, &mut sink) {
+            return fail(&e);
+        }
+        if *output.get_or_insert((sink.bytes, sink.hash)) != (sink.bytes, sink.hash) {
+            return fail("output differs between iterations");
+        }
+    }
+    let elapsed = start.elapsed().as_nanos();
+    let (bytes, digest) = output.unwrap_or_default();
+    println!(
+        "{{\"iterations\":{iterations},\"elapsed_ns\":{elapsed},\"packets\":{count},\"bytes\":{bytes},\"digest\":{digest}}}"
+    );
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() == 9 && args[1] == "bench" {
+        return bench(&args);
+    }
     if args.len() < 7 {
         return fail("usage");
     }
@@ -166,28 +216,6 @@ fn main() -> ExitCode {
                 hash.hash,
                 underflow
             );
-        }
-        "time" if args.len() == 9 => {
-            let (Some(bitrate), Some(rgba), Some(iterations)) =
-                (parse(6), load(&args[7]), parse(8))
-            else {
-                return fail("input");
-            };
-            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
-            let mut stdout = std::io::stdout().lock();
-            for _ in 0..iterations {
-                let mut sink = HashSink::new();
-                let t0 = Instant::now();
-                if let Err(e) = session(&cfg, orientation, &rgba, count, &mut sink) {
-                    return fail(&e);
-                }
-                let ns = t0.elapsed().as_nanos();
-                let _ = writeln!(
-                    stdout,
-                    "{{\"ns\":{ns},\"bytes\":{},\"fnv1a64\":\"{:016x}\"}}",
-                    sink.bytes, sink.hash
-                );
-            }
         }
         "memory" if args.len() == 8 => {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {

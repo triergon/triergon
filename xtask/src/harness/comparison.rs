@@ -51,12 +51,17 @@ pub(crate) fn work_summary(data: &Value, fields: &[String]) -> Result<Value, Str
     Ok(Value::Object(work))
 }
 
-/// Equal work by both timed roles, including the declared iteration count.
+/// The work of one timed pair: each role's complete work, after checking the
+/// iteration count, the elapsed time and that both roles report the same value
+/// for every field outside `own`. `own` names the fields each worker reports
+/// of its own output (a digest or byte count where the two produce different
+/// bytes), which may differ between the roles but not between a role's runs.
 pub(crate) fn paired_timing_work(
     candidate: &Value,
     reference: &Value,
     iterations: i128,
     fields: &[String],
+    own: &[String],
 ) -> Result<Value, String> {
     for outcome in [candidate, reference] {
         let data = super::worker::data(outcome);
@@ -69,10 +74,20 @@ pub(crate) fn paired_timing_work(
     }
     let a = work_summary(super::worker::data(candidate), fields)?;
     let b = work_summary(super::worker::data(reference), fields)?;
-    if !super::diff::equal(&a, &b) {
+    let shared = |work: &Value| match work {
+        Value::Object(members) => Value::Object(
+            members
+                .iter()
+                .filter(|(key, _)| !own.contains(key))
+                .cloned()
+                .collect(),
+        ),
+        _ => Value::Null,
+    };
+    if !super::diff::equal(&shared(&a), &shared(&b)) {
         return Err("unequal timed work".into());
     }
-    Ok(a)
+    Ok(Value::object([("candidate", a), ("reference", b)]))
 }
 
 /// Both warmups publish the same complete work before any timed pair runs.
@@ -80,6 +95,7 @@ pub(crate) fn warmup_work(
     warmups: &[Value],
     iterations: i128,
     fields: &[String],
+    own: &[String],
 ) -> Result<Value, String> {
     if warmups.len() != 2
         || warmups[0].get("worker").and_then(Value::as_str) != Some("candidate")
@@ -92,6 +108,7 @@ pub(crate) fn warmup_work(
         warmups[1].get("result").ok_or("missing reference warmup")?,
         iterations,
         fields,
+        own,
     )
 }
 
@@ -325,20 +342,23 @@ mod work_tests {
     fn pairs_and_warmups_require_every_declared_field_on_both_roles() {
         let fields = work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap();
         let complete = result(Some(4));
-        let summary = paired_timing_work(&complete, &complete, 50, &fields).unwrap();
-        assert_eq!(summary.get("digest_b"), Some(&Value::int(4)));
+        let summary = paired_timing_work(&complete, &complete, 50, &fields, &[]).unwrap();
+        assert_eq!(
+            summary.get("reference").and_then(|w| w.get("digest_b")),
+            Some(&Value::int(4))
+        );
         for (a, b) in [
             (result(None), complete.clone()),
             (complete.clone(), result(None)),
             (result(None), result(None)),
             (result(Some(5)), complete.clone()),
         ] {
-            assert!(paired_timing_work(&a, &b, 50, &fields).is_err());
+            assert!(paired_timing_work(&a, &b, 50, &fields, &[]).is_err());
             let warmups = [
                 Value::object([("worker", Value::str("candidate")), ("result", a)]),
                 Value::object([("worker", Value::str("reference")), ("result", b)]),
             ];
-            assert!(warmup_work(&warmups, 50, &fields).is_err());
+            assert!(warmup_work(&warmups, 50, &fields, &[]).is_err());
         }
         let warmups = [
             Value::object([
@@ -347,6 +367,24 @@ mod work_tests {
             ]),
             Value::object([("worker", Value::str("reference")), ("result", complete)]),
         ];
-        assert_eq!(warmup_work(&warmups, 50, &fields).unwrap(), summary);
+        assert_eq!(warmup_work(&warmups, 50, &fields, &[]).unwrap(), summary);
+    }
+
+    #[test]
+    fn own_work_may_differ_between_roles_but_is_still_required() {
+        let fields = work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap();
+        let own = ["digest_b".to_owned()];
+        let (four, five) = (result(Some(4)), result(Some(5)));
+        let work = paired_timing_work(&four, &five, 50, &fields, &own).unwrap();
+        assert_eq!(
+            work.get("candidate").and_then(|w| w.get("digest_b")),
+            Some(&Value::int(4))
+        );
+        assert_eq!(
+            work.get("reference").and_then(|w| w.get("digest_b")),
+            Some(&Value::int(5))
+        );
+        assert!(paired_timing_work(&four, &result(None), 50, &fields, &own).is_err());
+        assert!(paired_timing_work(&four, &five, 50, &fields, &[]).is_err());
     }
 }

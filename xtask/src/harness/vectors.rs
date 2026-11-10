@@ -133,6 +133,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         arguments: vec![],
         candidate_options: vec![],
         work_fields: super::comparison::work_fields(&contract)?,
+        own_work: vec![],
         timeout,
     };
     if s(&result, "status") == Some("pass") {

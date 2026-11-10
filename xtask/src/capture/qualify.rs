@@ -6,37 +6,39 @@
 //!    and record its SHA-256;
 //! 2. correctness: `cargo xtask capture compare` (conversion, mux, encoder and
 //!    pipeline rules of `harness/capture/contract.json`);
-//! 3. runtime: paired, randomly ordered worker processes; each sample is the
-//!    median of `--iterations` in-process sessions after one discarded warm-up
-//!    session; the ratio interval is the bootstrap of the median paired ratio.
-//!    graded against the runtime gate of `harness/policy.json`;
+//! 3. runtime: one session of the shared paired runner
+//!    ([`crate::harness::timing::benchmark`]) over `bench` runs of
+//!    `--iterations` sessions each, graded by its validator and against the
+//!    runtime gate of `harness/policy.json`. Every run must reproduce its
+//!    worker's checked output;
 //! 4. memory: admit both workers to the shared observer and run separate heap
 //!    and RSS measurements. Each worker must reproduce its checked output.
 //!    Peak live heap must be lower in every pair. The upper paired 95% bounds
 //!    for heap and total resident peak RSS must both be below 1.0.
 //!
-//! The machine must be otherwise idle: a CPU-contention check runs before
-//! every timing and memory pair, and contaminated pairs wait and are retried,
-//! never silently used. Every raw observation is written.
+//! The machine must be otherwise idle: the timing session rejects a run during
+//! which a tracked process used CPU and retries it, and a CPU-contention check
+//! runs before every memory pair. Contaminated runs are kept, never used. Every
+//! raw observation is written.
 
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
 
 use crate::codecs::correctness::file_sha;
-use crate::harness::acceptance::active_cpu;
-use crate::harness::diff::equal;
+use crate::harness::comparison::BASE_WORK_FIELDS;
 use crate::harness::gate_build;
 use crate::harness::memory;
 use crate::harness::policy;
-use crate::harness::timing::{TimedWorkers, competing_builds, cpu_snapshot, lock};
+use crate::harness::timing::{self, Expected, Operation};
+use crate::harness::worker::{self, data};
 use crate::json::{self, Value};
-use crate::process::{check_output, exit_code};
-use crate::pyrandom::PyRandom;
-use crate::{python, sha256, stats};
+use crate::process::exit_code;
+use crate::{python, sha256};
 
-const RESAMPLES: usize = 4000;
+/// The case fields every worker mode after `convert` takes, in order.
+const SESSION: [&str; 5] = ["width", "height", "flip", "frames", "bitrate"];
 
 /// The arguments of `capture qualify`.
 pub struct Options {
@@ -82,61 +84,6 @@ fn write(path: &Path, text: String) -> Result<(), String> {
     fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// Wait until no competing build uses CPU; each wait is logged.
-fn wait_idle(log: &mut Vec<Value>) -> Result<(), String> {
-    for _ in 0..20 {
-        let busy = competing_builds()?;
-        if busy.is_empty() {
-            return Ok(());
-        }
-        log.push(Value::object([
-            ("contaminants", Value::strings(busy)),
-            ("utc", Value::float(python::time())),
-        ]));
-        std::thread::sleep(Duration::from_secs(3));
-    }
-    Err(format!(
-        "machine not idle: {}",
-        python::repr(log.last().expect("logged"))
-    ))
-}
-
-fn number(value: &Value) -> Result<f64, String> {
-    value
-        .as_f64()
-        .ok_or_else(|| format!("not a number: {}", json::to_python(value, None)))
-}
-
-/// `statistics.median`: the middle item itself for an odd count (an integer
-/// stays an integer), the mean of the two middle items otherwise.
-pub fn median(values: &[Value]) -> Result<Value, String> {
-    let mut sorted: Vec<(f64, &Value)> = values
-        .iter()
-        .map(|v| Ok((number(v)?, v)))
-        .collect::<Result<_, String>>()?;
-    sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let n = sorted.len();
-    if n == 0 {
-        return Err("no median for empty data".into());
-    }
-    if n % 2 == 1 {
-        return Ok(sorted[n / 2].1.clone());
-    }
-    let (a, b) = (sorted[n / 2 - 1].1, sorted[n / 2].1);
-    let sum = match (a, b) {
-        (Value::Number(x), Value::Number(y)) if x.is_integer() && y.is_integer() => {
-            (x.as_i128().unwrap_or(0) + y.as_i128().unwrap_or(0)) as f64
-        }
-        _ => number(a)? + number(b)?,
-    };
-    Ok(Value::float(sum / 2.0))
-}
-
-fn interval(pairs: &[(f64, f64)], seed: u64) -> Result<Value, String> {
-    let interval = stats::ratio_interval(pairs, seed, RESAMPLES)?;
-    Ok(crate::codecs::timing::interval_value(&interval))
-}
-
 fn upper(interval: &Value) -> f64 {
     interval
         .get("upper_95")
@@ -150,73 +97,48 @@ fn case_args(case: &Value, keys: &[&str]) -> Vec<String> {
         .collect()
 }
 
-fn time_sample(
-    worker: &str,
-    case: &Value,
-    path: &str,
-    iterations: usize,
-    expected: Option<&Value>,
-) -> Result<Value, String> {
-    let mut argv = vec![worker.to_owned(), "time".into()];
-    argv.extend(case_args(
-        case,
-        &["width", "height", "flip", "frames", "bitrate"],
-    ));
-    argv.extend([path.to_owned(), (iterations + 1).to_string()]);
-    let out = check_output(&argv)?;
-    let rows = python::splitlines(&out)
-        .into_iter()
-        .map(|line| python::loads(line).ok_or_else(|| format!("{worker}: not JSON: {line}")))
-        .collect::<Result<Vec<_>, _>>()?;
-    let field = |row: &Value, key: &str| {
-        row.get(key)
-            .cloned()
-            .ok_or_else(|| format!("{worker}: time row without {key}"))
-    };
-    let first = rows.first().ok_or("worker printed no time rows")?;
-    if rows.len() != iterations + 1 {
-        return Err(format!("{worker}: wrong number of time rows"));
+/// `bench IN.RGBA ITERATIONS W H FLIP FRAMES BITRATE`: frames are the shared
+/// work, the stream's byte count and digest each encoder's own.
+fn operation(case: &Value) -> Operation {
+    Operation {
+        prefix: String::new(),
+        arguments: case_args(case, &SESSION)
+            .into_iter()
+            .map(OsString::from)
+            .collect(),
+        candidate_options: vec![],
+        work_fields: BASE_WORK_FIELDS.map(str::to_owned).into(),
+        own_work: vec!["bytes".to_owned(), "digest".to_owned()],
+        timeout: worker::DEFAULT_TIMEOUT,
     }
-    let measured = rows[1..]
-        .iter()
-        .map(|r| field(r, "ns"))
-        .collect::<Result<Vec<_>, _>>()?;
-    let mut hashes: Vec<Value> = Vec::new();
-    for row in &rows {
-        let hash = field(row, "fnv1a64")?;
-        if !hashes.iter().any(|h| equal(h, &hash)) {
-            hashes.push(hash);
-        }
-    }
-    hashes.sort_by(|a, b| match (a, b) {
-        (Value::String(x), Value::String(y)) => x.cmp(y),
-        _ => number(a)
-            .unwrap_or(f64::NAN)
-            .total_cmp(&number(b).unwrap_or(f64::NAN)),
-    });
-    let output_matches = expected.is_none_or(|work| {
-        rows.iter().all(|row| {
-            ["bytes", "fnv1a64"].iter().all(|key| {
-                row.get(key)
-                    .zip(work.get(key))
-                    .is_some_and(|(a, b)| equal(a, b))
-            })
-        })
-    });
-    Ok(Value::object([
-        ("warmup_ns", field(first, "ns")?),
-        ("ns", Value::Array(measured.clone())),
-        ("median_ns", median(&measured)?),
-        ("hashes", Value::Array(hashes)),
-        ("bytes", field(first, "bytes")?),
-        ("output_matches", Value::Bool(output_matches)),
-    ]))
 }
 
-fn shuffled(rng: &mut PyRandom) -> [&'static str; 2] {
-    let mut order = ["candidate", "reference"];
-    rng.shuffle(&mut order);
-    order
+/// Whether each worker's warm-up printed the byte count and digest of that
+/// worker's correctness run. The validator has shown that every pair repeats
+/// the warm-up's work, and each run fails if its sessions' streams differ.
+fn outputs_match(timing: &Value, outputs: &Value) -> bool {
+    let warmups = timing
+        .get("warmups")
+        .and_then(Value::as_array)
+        .unwrap_or_default();
+    ["candidate", "reference"].into_iter().all(|role| {
+        let warmup = warmups
+            .iter()
+            .find(|w| w.get("worker").and_then(Value::as_str) == Some(role))
+            .and_then(|w| w.get("result"))
+            .map(data);
+        let expected = || -> Option<(i128, i128)> {
+            let output = outputs.get(role)?;
+            let digest = u64::from_str_radix(output.get("fnv1a64")?.as_str()?, 16).ok()?;
+            Some((python::int(output.get("bytes")?)?, i128::from(digest)))
+        };
+        warmup
+            .zip(expected())
+            .is_some_and(|(run, (bytes, digest))| {
+                run.get("bytes").and_then(python::int) == Some(bytes)
+                    && run.get("digest").and_then(python::int) == Some(digest)
+            })
+    })
 }
 
 /// Keep a measurement but pass nothing: the run was not on the gate build.
@@ -230,116 +152,67 @@ fn withhold_gates(timed: &mut Value) {
     }
 }
 
+/// One timing session of `case`, graded: the shared timing record with the
+/// validator's interval, whether every run reproduced its worker's checked
+/// output, and the gate verdicts.
 #[allow(clippy::too_many_arguments)] // The workers, input, gate and paired timing settings.
 fn runtime(
     gate: policy::Runtime,
     candidate: &str,
     reference: &str,
     case: &Value,
-    path: &str,
+    path: &Path,
     pairs: usize,
-    iterations: usize,
+    iterations: u32,
     seed: u64,
     expected_outputs: Option<&Value>,
 ) -> Result<Value, String> {
-    let timed = TimedWorkers::new(Path::new(candidate), Path::new(reference))?;
-    let (candidate, reference) = (
-        python::path(&timed.candidate),
-        python::path(&timed.reference),
-    );
-    let _lock = lock()?;
-    let mut rng = PyRandom::new(seed);
-    let mut contamination = Vec::new();
-    let mut samples = Vec::new();
-    wait_idle(&mut contamination)?;
-    let before = cpu_snapshot()?;
-    for i in 0..pairs {
-        wait_idle(&mut contamination)?;
-        let order = shuffled(&mut rng);
-        let mut pair = vec![
-            ("index".to_owned(), Value::int(i as i64)),
-            ("order".to_owned(), Value::strings(order)),
-        ];
-        for role in order {
-            let worker = if role == "candidate" {
-                &candidate
-            } else {
-                &reference
-            };
-            pair.push((
-                role.to_owned(),
-                time_sample(
-                    worker,
-                    case,
-                    path,
-                    iterations,
-                    expected_outputs.and_then(|outputs| outputs.get(role)),
-                )?,
-            ));
-        }
-        samples.push(Value::Object(pair));
-    }
-    let after = cpu_snapshot()?;
-    let contaminants = active_cpu(&before, &after, cfg!(target_os = "linux"));
-    let medians = |role: &str| -> Vec<Value> {
-        samples
-            .iter()
-            .map(|p| {
-                p.get(role)
-                    .and_then(|r| r.get("median_ns"))
-                    .cloned()
-                    .unwrap_or(Value::Null)
-            })
-            .collect()
+    let operation = operation(case);
+    let (candidate, reference) = (Path::new(candidate), Path::new(reference));
+    let mut timing = timing::benchmark(
+        candidate, reference, path, pairs, iterations, seed, &operation,
+    )?;
+    let measured = timing.get("status").and_then(Value::as_str) == Some("measured");
+    let hashes = Value::object([
+        ("candidate", Value::str(file_sha(candidate)?)),
+        ("reference", Value::str(file_sha(reference)?)),
+    ]);
+    let graded = if measured {
+        timing::validate(
+            &timing,
+            &Expected {
+                worker_hashes: &hashes,
+                input_sha256: Some(&Value::str(file_sha(path)?)),
+                minimum_pairs: 2,
+                work_fields: &operation.work_fields,
+                own_work: &operation.own_work,
+                require_linux: cfg!(target_os = "linux"),
+                module_absence: true,
+            },
+        )
+    } else {
+        Err("timing not measured".to_owned())
     };
-    let (c, r) = (medians("candidate"), medians("reference"));
-    let pairs_ns = c
-        .iter()
-        .zip(&r)
-        .map(|(a, b)| Ok((number(a)?, number(b)?)))
-        .collect::<Result<Vec<_>, String>>()?;
-    let ratio = interval(&pairs_ns, 0)?;
-    let stable = samples.iter().all(|p| {
-        ["candidate", "reference"].iter().all(|role| {
-            p.get(role).is_some_and(|sample| {
-                sample.get("output_matches").is_some_and(Value::truthy)
-                    && sample
-                        .get("hashes")
-                        .and_then(Value::as_array)
-                        .is_some_and(|hashes| hashes.len() == 1)
-            })
-        })
-    });
-    let clean = contaminants.is_empty();
-    let upper_95 = upper(&ratio);
-    Ok(Value::object([
-        ("pairs", Value::int(pairs as i64)),
-        ("iterations", Value::int(iterations as i64)),
-        ("seed", Value::int(seed)),
-        ("samples", Value::Array(samples.clone())),
-        ("ratio", ratio),
-        (
-            "candidate_median_ms",
-            Value::float(number(&median(&c)?)? / 1e6),
+    let deterministic =
+        graded.is_ok() && expected_outputs.is_none_or(|outputs| outputs_match(&timing, outputs));
+    let (gate_pass, target_pass) = match &graded {
+        Ok(interval) => (
+            deterministic && interval.upper_95 <= gate.ceiling,
+            deterministic && interval.upper_95 <= gate.target,
         ),
-        (
-            "reference_median_ms",
-            Value::float(number(&median(&r)?)? / 1e6),
-        ),
-        ("deterministic_output", Value::Bool(stable)),
-        ("contamination_waits", Value::Array(contamination)),
-        ("contaminants", Value::strings(contaminants)),
-        ("cpu_before", before),
-        ("cpu_after", after),
-        (
-            "gate_pass",
-            Value::Bool(clean && stable && upper_95 <= gate.ceiling),
-        ),
-        (
-            "target_pass",
-            Value::Bool(clean && stable && upper_95 <= gate.target),
-        ),
-    ]))
+        Err(_) => (false, false),
+    };
+    if let Value::Object(fields) = &mut timing {
+        if let Err(error) = &graded {
+            fields.push(("invalid".into(), Value::str(error)));
+        }
+        fields.extend([
+            ("deterministic_output".into(), Value::Bool(deterministic)),
+            ("gate_pass".into(), Value::Bool(gate_pass)),
+            ("target_pass".into(), Value::Bool(target_pass)),
+        ]);
+    }
+    Ok(timing)
 }
 
 /// `platform.uname()._asdict()`.
@@ -535,14 +408,15 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         };
         record.push(("correctness_summary".into(), correctness.clone()));
         let outputs = correctness.get("outputs");
+        let iterations = u32::try_from(a.iterations).map_err(|e| e.to_string())?;
         let mut timed = runtime(
             gate,
             &a.candidate,
             &a.reference,
             case,
-            &path_text,
+            &path,
             a.pairs,
-            a.iterations,
+            iterations,
             a.seed,
             outputs,
         )?;
@@ -562,9 +436,9 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     &a.candidate,
                     small,
                     case,
-                    &path_text,
+                    &path,
                     10.max(a.pairs / 3),
-                    a.iterations,
+                    iterations,
                     a.seed + 1,
                     None,
                 )?,
@@ -572,10 +446,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         }
         let measured = if let Some(outputs) = outputs {
             let mut args = vec!["memory".to_owned()];
-            args.extend(case_args(
-                case,
-                &["width", "height", "flip", "frames", "bitrate"],
-            ));
+            args.extend(case_args(case, &SESSION));
             args.push(path_text);
             memory::collect_command(
                 root,
@@ -661,24 +532,37 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    fn warmups(candidate_digest: u64) -> Value {
+        let run = |digest: u64| {
+            Value::object([
+                ("status", Value::str("ok")),
+                (
+                    "data",
+                    Value::object([("bytes", Value::int(188)), ("digest", Value::int(digest))]),
+                ),
+            ])
+        };
+        Value::object([(
+            "warmups",
+            Value::Array(vec![
+                Value::object([
+                    ("worker", Value::str("candidate")),
+                    ("result", run(candidate_digest)),
+                ]),
+                Value::object([("worker", Value::str("reference")), ("result", run(0xff))]),
+            ]),
+        )])
+    }
+
     #[test]
-    fn median_keeps_python_types() {
-        // python3 -c "import statistics as s; print(s.median([3, 1, 2]), s.median([4, 1, 3, 2]), s.median([1.5, 2]))"
-        let v = |t: &str| json::parse(t).unwrap();
-        assert_eq!(
-            json::to_python(&median(v("[3, 1, 2]").as_array().unwrap()).unwrap(), None),
-            "2"
-        );
-        assert_eq!(
-            json::to_python(
-                &median(v("[4, 1, 3, 2]").as_array().unwrap()).unwrap(),
-                None
-            ),
-            "2.5"
-        );
-        assert_eq!(
-            json::to_python(&median(v("[1.5, 2]").as_array().unwrap()).unwrap(), None),
-            "1.75"
-        );
+    fn timed_outputs_must_be_each_workers_checked_stream() {
+        let outputs = json::parse(
+            r#"{"candidate": {"bytes": 188, "fnv1a64": "00000000000000ab"},
+                "reference": {"bytes": 188, "fnv1a64": "00000000000000ff"}}"#,
+        )
+        .unwrap();
+        assert!(outputs_match(&warmups(0xab), &outputs));
+        assert!(!outputs_match(&warmups(0xff), &outputs));
+        assert!(!outputs_match(&warmups(0xab), &Value::Object(vec![])));
     }
 }

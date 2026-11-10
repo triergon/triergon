@@ -1,8 +1,11 @@
-//! Paired runtime measurement: warm both workers, then time them in randomly
-//! ordered pairs under a host-wide lock, rejecting any run during which a
-//! compiler, linker or FFmpeg process used CPU (or, on Linux, steal time grew).
-//! The whole run is observed: each pair starts from the snapshot that closed the
-//! one before. Every raw sample is kept; equal work is proven by the work digest.
+//! Paired runtime measurement, shared by every timing runner (`report`,
+//! `external-vector`, `codecs time`, `capture qualify`): warm both workers, then
+//! time them in randomly ordered pairs under a host-wide lock, rejecting any run
+//! during which a compiler, linker or FFmpeg process used CPU (or, on Linux,
+//! steal time grew). The whole run is observed: each pair starts from the
+//! snapshot that closed the one before. Every raw sample is kept; equal work is
+//! proven by the work digest. [`benchmark`] writes the one timing record and
+//! [`validate`] grades it.
 
 use std::ffi::OsString;
 use std::fs::{self, File};
@@ -12,6 +15,8 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use super::acceptance::{LINUX_CPU_KEY, active_cpu};
+use super::diff::equal;
+use super::linux::py_int;
 use super::validation::{array, field, text};
 use super::worker::{self, arg, data, ok};
 use crate::json::Value;
@@ -482,6 +487,10 @@ pub struct Operation {
     pub candidate_options: Vec<OsString>,
     /// Contract work fields in addition to the mandatory packet/byte/digest work.
     pub work_fields: Vec<String>,
+    /// Work fields each worker reports of its own output, equal between its runs
+    /// but not between the two workers: the byte count and digest of two
+    /// encoders, or the digest of two decoders whose outputs may differ.
+    pub own_work: Vec<String>,
     /// How long one worker run may take.
     pub timeout: Duration,
 }
@@ -746,9 +755,12 @@ fn benchmark_once(
             ));
         }
     }
-    let Ok(warm_work) =
-        super::comparison::warmup_work(&warmups, i128::from(iterations), &operation.work_fields)
-    else {
+    let Ok(warm_work) = super::comparison::warmup_work(
+        &warmups,
+        i128::from(iterations),
+        &operation.work_fields,
+        &operation.own_work,
+    ) else {
         return Ok(status_only(
             "unequal-work",
             &samples,
@@ -828,11 +840,9 @@ fn benchmark_once(
             row.get("reference").expect("checked reference"),
             i128::from(iterations),
             &operation.work_fields,
+            &operation.own_work,
         );
-        if !work
-            .as_ref()
-            .is_ok_and(|w| super::diff::equal(w, &warm_work))
-        {
+        if !work.as_ref().is_ok_and(|w| equal(w, &warm_work)) {
             return Ok(status_only(
                 "unequal-work",
                 &samples,
@@ -902,14 +912,7 @@ fn benchmark_once(
         ("seed", Value::int(seed as i64)),
         ("iterations", Value::int(iterations)),
         ("pairs", Value::int(pairs as i64)),
-        (
-            "ratio",
-            Value::object([
-                ("median", Value::float(summary.median)),
-                ("lower_95", Value::float(summary.lower_95)),
-                ("upper_95", Value::float(summary.upper_95)),
-            ]),
-        ),
+        ("ratio", interval_value(&summary)),
         ("samples", Value::Array(samples.clone())),
         ("warmups", Value::Array(warmups)),
         ("contaminants", Value::Array(vec![])),
@@ -920,6 +923,116 @@ fn benchmark_once(
             Value::object(workers.iter().map(|(n, _)| (*n, per_iteration(n)))),
         ),
     ]))
+}
+
+/// A ratio interval as timing records store it.
+pub fn interval_value(interval: &stats::Interval) -> Value {
+    Value::object([
+        ("median", Value::float(interval.median)),
+        ("lower_95", Value::float(interval.lower_95)),
+        ("upper_95", Value::float(interval.upper_95)),
+    ])
+}
+
+/// What a timing record must show to count, beyond its own consistency.
+pub struct Expected<'a> {
+    /// The SHA-256 of each worker, by role.
+    pub worker_hashes: &'a Value,
+    /// The SHA-256 of the input, where the caller knows it.
+    pub input_sha256: Option<&'a Value>,
+    pub minimum_pairs: i128,
+    /// As [`Operation::work_fields`] and [`Operation::own_work`].
+    pub work_fields: &'a [String],
+    pub own_work: &'a [String],
+    /// Whether every CPU snapshot must carry Linux accounting.
+    pub require_linux: bool,
+    /// Whether the record must prove the RSS kernel module absent; a record
+    /// that names the policy is always held to it.
+    pub module_absence: bool,
+}
+
+/// Grade a timing record written by [`benchmark`]: the declared pairs, the
+/// worker and input bindings, module absence, a clean CPU record around every
+/// pair, the same work in both warmups and every pair, and a ratio interval
+/// that the samples reproduce. Returns that interval.
+pub fn validate(timing: &Value, expected: &Expected<'_>) -> Result<stats::Interval, String> {
+    let raw = timing
+        .get("samples")
+        .and_then(Value::as_array)
+        .unwrap_or_default();
+    let (Some(pairs), Some(iterations)) = (
+        py_int(timing.get("pairs")),
+        py_int(timing.get("iterations")),
+    ) else {
+        return Err("timing without pairs or iterations".into());
+    };
+    if raw.len() as i128 != pairs || (raw.len() as i128) < expected.minimum_pairs {
+        return Err("timing pairs incomplete".into());
+    }
+    if !timing
+        .get("worker_hashes")
+        .is_some_and(|hashes| equal(hashes, expected.worker_hashes))
+    {
+        return Err("timed workers differ".into());
+    }
+    if expected
+        .input_sha256
+        .is_some_and(|input| timing.get("input_sha256") != Some(input))
+    {
+        return Err("timed input differs".into());
+    }
+    if timing.get("timing_module_policy").is_some() || expected.module_absence {
+        validate_module_absence(timing, raw, expected.require_linux)?;
+    }
+    let (fields, own) = (expected.work_fields, expected.own_work);
+    let mut expected_work = match timing.get("warmups") {
+        Some(Value::Array(warmups)) => Some(super::comparison::warmup_work(
+            warmups, iterations, fields, own,
+        )?),
+        // Records from before warmups were kept prove the ordinary work only.
+        None if fields.len() == super::comparison::BASE_WORK_FIELDS.len() && own.is_empty() => None,
+        _ => return Err("timing without warmups".into()),
+    };
+    let mut paired = Vec::new();
+    for (index, sample) in raw.iter().enumerate() {
+        if py_int(sample.get("pair")) != Some(index as i128)
+            || matches!(sample.get("pair"), Some(Value::Bool(_)))
+        {
+            return Err(format!("timing pair {index} out of order"));
+        }
+        let (Some(before), Some(after)) = (sample.get("cpu_before"), sample.get("cpu_after"))
+        else {
+            return Err(format!("timing pair {index} without CPU snapshots"));
+        };
+        let busy = active_cpu(before, after, expected.require_linux);
+        if !busy.is_empty() {
+            return Err(format!(
+                "timing pair {index} contaminated: {}",
+                busy.join(", ")
+            ));
+        }
+        let (Some(candidate), Some(reference)) = (sample.get("candidate"), sample.get("reference"))
+        else {
+            return Err(format!("timing pair {index} incomplete"));
+        };
+        let work =
+            super::comparison::paired_timing_work(candidate, reference, iterations, fields, own)?;
+        if expected_work.as_ref().is_some_and(|w| !equal(w, &work)) {
+            return Err(format!("timing pair {index} did other work"));
+        }
+        expected_work = Some(work);
+        let elapsed = |outcome: &Value| py_int(data(outcome).get("elapsed_ns")).unwrap_or(0) as f64;
+        paired.push((elapsed(candidate), elapsed(reference)));
+    }
+    let seed = py_int(timing.get("seed")).unwrap_or(0);
+    let interval = stats::ratio_interval(&paired, seed as u64, 4000)?;
+    if !timing
+        .get("ratio")
+        .is_some_and(|ratio| equal(ratio, &interval_value(&interval)))
+    {
+        return Err("recorded ratio differs from its samples".into());
+    }
+    Ok(interval)
 }
 
 #[cfg(test)]
@@ -978,6 +1091,7 @@ mod tests {
             arguments: ["1", "0", "memory", "4096"].map(OsString::from).to_vec(),
             candidate_options: vec!["--bounded-timing".into(), "--bounded-sync".into()],
             work_fields: vec![],
+            own_work: vec![],
             timeout: worker::DEFAULT_TIMEOUT,
         };
         let expected = ["open-bench", "input.mov", "50", "1", "0", "memory", "4096"]
@@ -1002,6 +1116,7 @@ mod tests {
             arguments: vec!["avc".into(), "aac".into()],
             candidate_options: vec![],
             work_fields: vec![],
+            own_work: vec![],
             timeout: worker::DEFAULT_TIMEOUT,
         };
         for candidate in [false, true] {
@@ -1266,9 +1381,6 @@ mod tests {
         let expected =
             crate::json::parse(r#"{"123": {"name": "clang", "cpu_ticks": 6234, "state": "S"}}"#)
                 .unwrap();
-        assert!(
-            super::super::diff::equal(&snapshot, &expected),
-            "{snapshot:?}"
-        );
+        assert!(equal(&snapshot, &expected), "{snapshot:?}");
     }
 }

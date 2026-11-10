@@ -30,7 +30,7 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  difference lists of reader-differences.json; appends one row per input
                  and view, and writes the observed lists to OUT.differences.json
   time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
-       [--only ID,...] [--recollect-contaminated LABEL]
+       [--only ID,...]
                  paired timing of the decoder workloads (30 pairs, seed 280)
   memory --candidate W --reference W --workloads F --root R --out DIR
          [--pairs N] [--seed S] [--only ID,...]
@@ -217,7 +217,6 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "out",
                     "label",
                     "only",
-                    "recollect-contaminated",
                 ],
                 &[],
             )?;
@@ -231,10 +230,6 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 out: a.path("out")?,
                 label: a.required("label")?.to_owned(),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
-                recollect_contaminated: a
-                    .get("recollect-contaminated")
-                    .filter(|o| !o.is_empty())
-                    .map(str::to_owned),
             })?;
         }
         "equivalence" => {
