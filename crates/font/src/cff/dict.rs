@@ -18,6 +18,7 @@ pub(crate) mod op {
     pub(crate) const VSINDEX: u16 = 22;
     pub(crate) const BLEND: u16 = 23;
     pub(crate) const VSTORE: u16 = 24;
+    pub(crate) const ENCODING: u16 = 16;
     pub(crate) const CHARSET: u16 = 15;
     pub(crate) const CHAR_STRINGS: u16 = 17;
     pub(crate) const CHARSTRING_TYPE: u16 = 0x0c06;
