@@ -13,6 +13,18 @@ impl MovieHeader {
     pub fn time_base(&self) -> Result<TimeBase> {
         TimeBase::new(1, u64::from(self.timescale))
     }
+
+    /// Duration in movie ticks when the header declares one. The raw field
+    /// retains the all-ones encoding of an unknown duration.
+    pub fn declared_duration_ticks(&self) -> Option<u64> {
+        let unknown = match self.raw.payload().first().copied() {
+            Some(0) => u64::from(u32::MAX),
+            Some(1) => u64::MAX,
+            _ => return None,
+        };
+        (self.duration != unknown).then_some(self.duration)
+    }
+
     pub fn parse(raw: &BoxView) -> Result<Self> {
         if raw.header().kind != *b"mvhd" {
             return Err(Error::Invalid("not mvhd"));

@@ -119,6 +119,8 @@ reordering retains at most 32 KiB of media. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
+Range playback derives the duration from packet end times when the movie
+header's duration is unknown or exceeds the presentation clock.
 Complete fragmented files with an open-ended rate-one initialization edit
 apply the same edit clocks on startup and seek. The first AAC packet carries
 leading trim in `Mp4Packet::encoded_skip_samples`.
