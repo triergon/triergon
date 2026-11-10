@@ -418,20 +418,24 @@ impl Metrics for SizedMetrics<'_> {
     fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>> {
         // Rotated or not, the cached extents are the default load's.
         self.loaded(glyph, None);
-        // A glyph without points has an empty box however FreeType loads it.
-        let control = self
-            .sized
-            .font()
-            .control_box(glyph, &mut self.work.borrow_mut());
-        if let Ok(ControlBox::Empty) = control {
-            return Ok(Some(Extents::default()));
+        match self.default_load(glyph) {
+            Ok(loaded) => Ok(loaded.map(|m| Extents {
+                x_bearing: m.bearing_x,
+                y_bearing: m.bearing_y,
+                width: m.width,
+                height: m.height.wrapping_neg(),
+            })),
+            // A glyph without points has an empty box however FreeType loads
+            // it, so its extents need no hinting this crate lacks.
+            Err(Error::Unsupported(what)) => {
+                let font = self.sized.font();
+                match font.control_box(glyph, &mut self.work.borrow_mut()) {
+                    Ok(ControlBox::Empty) => Ok(Some(Extents::default())),
+                    _ => Err(Error::Unsupported(what)),
+                }
+            }
+            Err(error) => Err(error),
         }
-        Ok(self.default_load(glyph)?.map(|m| Extents {
-            x_bearing: m.bearing_x,
-            y_bearing: m.bearing_y,
-            width: m.width,
-            height: -m.height,
-        }))
     }
 
     fn contour_point(&self, glyph: GlyphId, point: u16) -> Result<Option<(i32, i32)>> {
