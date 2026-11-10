@@ -10,7 +10,7 @@
 
 mod manifest;
 
-pub use manifest::LANE;
+pub use manifest::GENERATOR;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -74,7 +74,9 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
-        [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),
+        [command, rest @ ..] if command == "manifest" => {
+            GENERATOR.manifest_command(root, rest, USAGE)
+        }
         _ => Err(USAGE.into()),
     }
 }

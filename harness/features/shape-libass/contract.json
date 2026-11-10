@@ -6,6 +6,7 @@
   "worker_operation": "shape-libass-",
   "reference": "harfbuzz-native",
   "gate": "required",
+  "compare_order": 1,
   "contract": [
     "one font file read from memory; every face of a collection opened with FreeType and set up as libass 0.17.5 sets up its faces with hinting off (ASS_HINTING_NONE): its charmap (ass_charmap_magic), GDI face metrics (set_font_metrics) and a REAL_DIM size request of 256 pixels (16384 in 26.6, ass_face_set_size)",
     "a HarfBuzz font over the face's tables (ass_create_hb_font) with libass's font functions (init_font_funcs, get_hb_font): ass_font_index_magic and FT_Get_Char_Index or FT_Face_GetCharVariantIndex for glyphs; FT_LOAD_DEFAULT | FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH | FT_LOAD_IGNORE_TRANSFORM metrics, cached per glyph, for advances and extents; that load's outline for contour points; FT_KERNING_DEFAULT kerning; the scale (x and y scale times units per em, shifted down by 16) and ppem of the size; the font is not an @ font",

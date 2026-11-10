@@ -274,7 +274,7 @@ fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
 /// pinned per target, its pin for `target`; `None` when it has none there.
 pub fn expected_for<'a>(case: &'a Value, target: &str) -> Option<&'a Value> {
     case.get("expected").or_else(|| {
-        case.get(crate::lanes::EXPECTED_BY_TARGET)
+        case.get(crate::generators::EXPECTED_BY_TARGET)
             .and_then(|pins| pins.get(target))
     })
 }
@@ -282,7 +282,7 @@ pub fn expected_for<'a>(case: &'a Value, target: &str) -> Option<&'a Value> {
 /// A case without a pin for `target`, run and reported, neither passing nor
 /// failing: `unpinned`, with the contract's reason when it gives one.
 fn unpinned(mut ran: Value, contract: &Value, id: &str, target: &str) -> Value {
-    let reason = crate::lanes::unpinned(contract, id)
+    let reason = crate::generators::unpinned(contract, id)
         .into_iter()
         .find(|(t, _)| *t == target)
         .map_or_else(
@@ -374,7 +374,7 @@ impl PrefixFeature {
             work_fields: super::comparison::work_fields(&document)?,
             timeout: worker::contract_timeout(&document)
                 .map_err(|e| format!("{}: {e}", contract.display()))?,
-            per_target: crate::lanes::pinned_per_target(&document),
+            per_target: crate::generators::pinned_per_target(&document),
             id,
         })
     }
@@ -382,25 +382,14 @@ impl PrefixFeature {
     /// Every registered feature (`harness/features/<id>`) whose contract runs
     /// `candidate` through a worker operation prefix, in id order.
     pub fn registered(root: &Path, candidate: &str) -> Result<Vec<Self>, String> {
-        let features = root.join("harness/features");
-        let mut ids: Vec<String> = fs::read_dir(&features)
-            .map_err(|e| format!("{}: {e}", features.display()))?
-            .filter_map(Result::ok)
-            .map(|entry| entry.file_name().to_string_lossy().into_owned())
-            .collect();
-        ids.sort();
-        let mut found = Vec::new();
-        for id in ids {
-            let contract = features.join(&id).join("contract.json");
-            let document = read_json(&contract)?;
-            if document.get("worker_operation").is_some()
-                && s(&document, "candidate") == Some(candidate)
-            {
-                let manifest = features.join(&id).join("corpus.json");
-                found.push(Self::load(root, &contract, &manifest, None)?);
-            }
-        }
-        Ok(found)
+        super::features::discover(root)?
+            .iter()
+            .filter(|contract| {
+                contract.document.get("worker_operation").is_some()
+                    && contract.candidate() == Some(candidate)
+            })
+            .map(|contract| Self::load(root, &contract.path, &contract.manifest(), None))
+            .collect()
     }
 
     /// The built candidate and reference, checked against the build identity.
@@ -648,7 +637,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     timeout,
                 },
             ));
-            let per_target = crate::lanes::pinned_per_target(&contract);
+            let per_target = crate::generators::pinned_per_target(&contract);
             let expected = expected_for(case, &target);
             let ran = parity::feed_parity(
                 &run,
