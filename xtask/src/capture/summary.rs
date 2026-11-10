@@ -75,7 +75,7 @@ fn row(r: &Value) -> Result<String, String> {
     };
     let small = r
         .get("runtime_vs_small_config")
-        .and_then(|s| s.get("ratio"))
+        .and_then(super::qualify::ratio)
         .filter(|x| x.truthy());
     let truthy = |value: &Value, key: &str| value.get(key).is_some_and(Value::truthy);
     let pass = |value: &Value, key: &str| if truthy(value, key) { "pass" } else { "FAIL" };
@@ -90,7 +90,7 @@ fn row(r: &Value) -> Result<String, String> {
         None => float(psnr.first().ok_or("psnr_y is empty")?)?,
     };
     let pr = float(psnr.get(1).ok_or("psnr_y has one value")?)?;
-    let runtime = match rt.get("ratio") {
+    let runtime = match super::qualify::ratio(rt) {
         Some(ratio) => format!(
             "{} / **{}**{}",
             fixed(float(get(ratio, "median")?)?, 3),

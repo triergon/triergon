@@ -278,8 +278,7 @@ impl Case {
             prefix: format!("{}-", self.mode),
             arguments: self.arguments.iter().map(OsString::from).collect(),
             candidate_options: self.candidate_options.iter().map(OsString::from).collect(),
-            work_fields: vec![],
-            own_work: vec![],
+            work: timing::Work::default(),
             timeout: worker::DEFAULT_TIMEOUT,
         }
     }

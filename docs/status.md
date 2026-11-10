@@ -57,11 +57,6 @@ at `0e28298d038bea072629b3bad6389dcc806b4861` on a c8g.large pinned to CPU 1.
 Codec and decode-session runtime at
 `add6b27` is one unpinned gate-build pass of 30 pairs on a c8g.2xlarge. Capture at
 `ceb5076` reports the higher of two unpinned gate-build passes on the same instance type.
-These codec, decode-session and capture passes predate the shared paired runner: codec
-pairs were checked pair by pair rather than watched over the whole run, and capture
-sampled the median of three in-process sessions. In a diagnostic comparison at `c21176e0`
-on a c6g.2xlarge, the earlier and the shared runner time `aac-lc-stereo` at a median of 0.7350 and 0.7339 and of 0.7344 and
-0.7342, and capture `c07-ui-static-480-bottomup` at 1.3026 and 1.2978.
 The audio codecs in files, Ogg and audio elementary-stream rows use the gate build at
 `ccff5b5734c113c1d88160b84825157508c701c0` on a c8g.2xlarge, unpinned, against the `decode` profile:
 30 timing pairs per workload of `harness/codecs/file-workloads.json`, each demuxing,
@@ -69,6 +64,14 @@ decoding and mixing to stereo s16 on both sides (`cargo xtask codecs time`), 30 
 30 RSS pairs under the native observer (`cargo xtask codecs memory`), and the reader lane
 against the profile's `ffprobe`. The Ogg and audio elementary-stream rows rerun the reader
 lane with both Ogg views at `ccd3090572433e79d8ab65a377fcd9896d2839d9` on the same instance type.
+The codec, decode-session, file-audio and capture timing passes at `add6b27`, `ccff5b57`
+and `ceb5076`, and the ARMv7 codec timing and capture passes at `78a873dd`, predate the
+shared paired runner. Their codec pairs were checked pair by pair rather than watched over
+the whole run, and each capture sample was the median of three in-process sessions after
+a discarded one. In a diagnostic comparison on a c6g.2xlarge, the earlier runner at `642316cf` and the shared runner at
+`c21176e0` time `aac-lc-stereo` at a median of 0.7350 and 0.7339 (upper 95% bounds 0.7357
+and 0.7361) and of 0.7344 and 0.7342 (0.7363 and 0.7351), and capture
+`c07-ui-static-480-bottomup` at 1.3026 (1.3047) and 1.2978 (1.3001).
 The remaining rows retain their earlier measurements.
 The packet-framing row uses the gate build at
 `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` on a c8g.large pinned to CPU 1,

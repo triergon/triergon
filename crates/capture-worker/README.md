@@ -30,7 +30,7 @@ capture-worker bench    <in.rgba> <iterations> <w> <h> <flip> <frames> <bitrate>
 | `recon` | the encoder reconstruction of every frame, same layout |
 | `pipeline` | the TS file, and `{"bytes", "fnv1a64", "vbv_underflow_bits"}` on stdout |
 | `memory` | `TRIERGON_BEGIN_V1` and `TRIERGON_END_V1` markers around one session, then `{"bytes", "fnv1a64"}` |
-| `bench` | `{"iterations", "elapsed_ns", "packets", "bytes", "digest"}`: the time of `iterations` sessions, each opened afresh, and the submitted frame count (`packets`), stream byte count and hash per session; it fails if any session's stream differs |
+| `bench` | `{"iterations", "elapsed_ns", "packets", "bytes", "digest"}`: the time of `iterations` sessions, each opened afresh, the frame and byte totals over them, and the hash of their stream; it fails if any session's stream differs |
 
 `fnv1a64` is the 64-bit FNV-1a hash of all TS bytes, as 16 hex digits; `bench` prints
 it as the integer `digest`. `bench` and `memory` feed every

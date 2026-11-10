@@ -423,6 +423,10 @@ may override that count for diagnostic comparisons.
   ratio interval its samples reproduce. Work a contract names must match between the
   workers. A worker's own output, such as an encoder's stream or a decoder digest that
   may differ, need only repeat across that worker's runs.
+- A sample is one worker run of the declared iterations, timed in-process from the first
+  iteration to the last; the process warm-up comes before the pairs. A capture sample is
+  one run of `--iterations` complete sessions, each opened afresh, and the run fails if
+  any session's stream differs. Work counts are totals over the iterations.
 - `report`, `external-vector`, `codecs time` and `capture qualify` record the CPUs the
   run may use and those online. Neither instance size nor pinning is required, but a
   bound measured pinned to one CPU is not comparable with one measured unpinned.

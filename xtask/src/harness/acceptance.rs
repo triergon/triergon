@@ -232,6 +232,10 @@ pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_lin
     let Ok(fields) = super::comparison::work_fields(contract) else {
         return false;
     };
+    let work = super::comparison::Work {
+        fields,
+        own: vec![],
+    };
     timing
         .get("iterations")
         .is_some_and(|count| super::validation::iterations_valid(contract, count))
@@ -244,8 +248,7 @@ pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_lin
                 worker_hashes: selected,
                 input_sha256: row.get("input_sha256").filter(|v| v.truthy()),
                 minimum_pairs: int(contract.get("minimum_pairs")).unwrap_or(i128::MAX),
-                work_fields: &fields,
-                own_work: &[],
+                work: &work,
                 require_linux,
                 module_absence: contract.get("case_operations") == Some(&Value::Bool(true)),
             },

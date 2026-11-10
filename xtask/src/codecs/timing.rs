@@ -1,9 +1,9 @@
 //! Paired codec timing collection.
 //!
-//! Each workload is one session of the shared paired runner
-//! ([`crate::harness::timing::benchmark`]: 30 randomised pairs, seed 280, the
-//! benchmark lock, recorded warmups, the contamination watch and the
-//! kernel-module guard) graded by its validator. Equal work for decoders means
+//! Each workload is one session of the shared paired runner, graded by its
+//! validator ([`crate::harness::timing::measure`]: 30 randomised pairs on seed
+//! 280, retried on 281 and 282, the benchmark lock, recorded warmups, the
+//! contamination watch and the kernel-module guard). Equal work for decoders means
 //! equal output picture/block counts and byte counts; each worker's output
 //! digest must stay the same across its runs, and whether the two digests agree
 //! is recorded (they agree only where the outputs are bit-exact, which the
@@ -14,16 +14,15 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::harness::comparison::BASE_WORK_FIELDS;
 use crate::harness::gate_build;
 use crate::harness::policy;
-use crate::harness::timing::{self, Expected, Operation};
+use crate::harness::timing::{self, GATE_PAIRS, Operation, Work};
 use crate::harness::worker::data;
 use crate::json::{self, Value};
 use crate::{python, sha256};
 
-const PAIRS: usize = 30;
-const SEED: u64 = 280;
+/// The session's seed; its retries take the next two.
+pub const SEED: u64 = 280;
 const WORKER_TIMEOUT: Duration = Duration::from_secs(600);
 /// Separate claims for records collected with the shared timing session.
 const KIND: &str = "codec-time-session";
@@ -81,8 +80,10 @@ fn operation(name: &str) -> Operation {
         prefix: format!("{name}-"),
         arguments: vec![],
         candidate_options: vec![],
-        work_fields: BASE_WORK_FIELDS.map(str::to_owned).into(),
-        own_work: vec!["digest".to_owned()],
+        work: Work {
+            fields: vec![],
+            own: vec!["digest".to_owned()],
+        },
         timeout: WORKER_TIMEOUT,
     }
 }
@@ -186,16 +187,15 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("seed", Value::int(SEED)),
             ("utc", Value::str(python::utc_now())),
         ]);
-        let operation = operation(name);
         let mut result_file = None;
-        let timing = timing_lock.benchmark(
+        let graded = timing_lock.measure(
             &options.candidate,
             &options.reference,
             &path,
-            PAIRS,
+            GATE_PAIRS,
             iterations,
             SEED,
-            &operation,
+            &operation(name),
             || {
                 let file = fs::OpenOptions::new()
                     .write(true)
@@ -216,35 +216,18 @@ pub fn run(options: &Options) -> Result<(), String> {
         let Some(mut result_file) = result_file else {
             return Err(format!(
                 "{id}: timing setup failed: {}",
-                json::to_python(&timing?, None)
+                json::to_python(&graded?.record, None)
             ));
         };
-        let timing = timing.unwrap_or_else(|error| {
-            Value::object([
-                ("status", Value::str("timing-attempt-failed")),
-                ("error", Value::str(error)),
-            ])
-        });
-        let measured = get_str(&timing, "status");
-        let graded = (measured == Some("measured")).then(|| {
-            timing::validate(
-                &timing,
-                &Expected {
-                    worker_hashes: &hashes,
-                    input_sha256: Some(&input_sha),
-                    minimum_pairs: PAIRS as i128,
-                    work_fields: &operation.work_fields,
-                    own_work: &operation.own_work,
-                    require_linux: cfg!(target_os = "linux"),
-                    module_absence: true,
-                },
-            )
-        });
-        let state = match &graded {
-            Some(Err(_)) => "invalid-timing",
-            _ => measured.unwrap_or("timing-attempt-failed"),
-        }
-        .to_owned();
+        let graded = graded?;
+        let state = graded.status().to_owned();
+        // The seed of the attempt the session kept.
+        let seed = graded
+            .record
+            .get("seed")
+            .cloned()
+            .unwrap_or(Value::int(SEED));
+        set(&mut entry, "seed", seed.clone());
         let mut result = vec![
             ("id".to_owned(), Value::str(id.as_str())),
             ("key".to_owned(), Value::str(key.as_str())),
@@ -253,7 +236,7 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("workers".to_owned(), hashes.clone()),
             ("input_sha256".to_owned(), input_sha),
             ("iterations".to_owned(), Value::int(iterations)),
-            ("seed".to_owned(), Value::int(SEED)),
+            ("seed".to_owned(), seed),
             (
                 "build_refusals".to_owned(),
                 Value::strings(refusals.clone()),
@@ -261,28 +244,23 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("cpus".to_owned(), gate_build::cpus()),
         ];
         let (mut ratio, mut delivery, mut digest_equal) = (None, None, None);
-        match graded {
-            Some(Ok(interval)) => {
-                let equal = digests_equal(&timing);
-                let gate_build = refusals.is_empty();
-                let passes = gate_build && interval.upper_95 <= gate.ceiling;
-                result.extend([
-                    ("digest_equal".to_owned(), Value::Bool(equal)),
-                    ("delivery".to_owned(), Value::Bool(passes)),
-                    (
-                        "optimization".to_owned(),
-                        Value::Bool(gate_build && interval.upper_95 <= gate.target),
-                    ),
-                ]);
-                ratio = Some((timing::interval_value(&interval), interval.upper_95));
-                delivery = Some(passes);
-                digest_equal = Some(equal);
-            }
-            Some(Err(error)) => result.push(("invalid".to_owned(), Value::str(error))),
-            None => {}
+        if let Ok(interval) = &graded.interval {
+            let equal = digests_equal(&graded.record);
+            let gate_build = refusals.is_empty();
+            let passes = gate_build && interval.upper_95 <= gate.ceiling;
+            result.extend([
+                ("digest_equal".to_owned(), Value::Bool(equal)),
+                ("delivery".to_owned(), Value::Bool(passes)),
+                (
+                    "optimization".to_owned(),
+                    Value::Bool(gate_build && interval.upper_95 <= gate.target),
+                ),
+            ]);
+            ratio = Some((timing::interval_value(interval), interval.upper_95));
+            delivery = Some(passes);
+            digest_equal = Some(equal);
         }
-        result.push(("status".to_owned(), Value::str(state.as_str())));
-        result.push(("timing".to_owned(), timing));
+        result.extend(graded.into_fields());
         let result = json::to_python(&Value::Object(result), Some(1)) + "\n";
         result_file
             .write_all(result.as_bytes())

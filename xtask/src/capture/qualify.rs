@@ -27,15 +27,24 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::codecs::correctness::file_sha;
-use crate::harness::comparison::BASE_WORK_FIELDS;
+use std::time::Duration;
+
 use crate::harness::gate_build;
 use crate::harness::memory;
 use crate::harness::policy;
-use crate::harness::timing::{self, Expected, Operation};
-use crate::harness::worker::{self, data};
+use crate::harness::timing::{self, GATE_PAIRS, Operation, Work};
+use crate::harness::worker::data;
 use crate::json::{self, Value};
 use crate::process::exit_code;
 use crate::{python, sha256};
+
+/// How long one capture session may take in a timed run, on the slowest
+/// target.
+const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
+/// Offsets from `--seed`: the timing session and its two retries, then the
+/// `--enable-small` comparison and its retries, then memory.
+const SMALL_CONFIG_SEED: u64 = 3;
+const MEMORY_SEED: u64 = 6;
 
 /// The case fields every worker mode after `convert` takes, in order.
 const SESSION: [&str; 5] = ["width", "height", "flip", "frames", "bitrate"];
@@ -92,7 +101,7 @@ fn case_args(case: &Value, keys: &[&str]) -> Vec<String> {
 
 /// `bench IN.RGBA ITERATIONS W H FLIP FRAMES BITRATE`: frames are the shared
 /// work, the stream's byte count and digest each encoder's own.
-fn operation(case: &Value) -> Operation {
+fn operation(case: &Value, iterations: u32) -> Operation {
     Operation {
         prefix: String::new(),
         arguments: case_args(case, &SESSION)
@@ -100,16 +109,22 @@ fn operation(case: &Value) -> Operation {
             .map(OsString::from)
             .collect(),
         candidate_options: vec![],
-        work_fields: BASE_WORK_FIELDS.map(str::to_owned).into(),
-        own_work: vec!["bytes".to_owned(), "digest".to_owned()],
-        timeout: worker::DEFAULT_TIMEOUT,
+        work: Work {
+            fields: vec![],
+            own: vec!["bytes".to_owned(), "digest".to_owned()],
+        },
+        timeout: SESSION_TIMEOUT * iterations,
     }
 }
 
-/// Whether each worker's warm-up printed the byte count and digest of that
-/// worker's correctness run. The validator has shown that every pair repeats
-/// the warm-up's work, and each run fails if its sessions' streams differ.
+/// Whether each worker's warm-up printed the stream of that worker's
+/// correctness run: its digest, and its byte count once per session. The
+/// validator has shown that every pair repeats the warm-up's work, and each run
+/// fails if its sessions' streams differ.
 fn outputs_match(timing: &Value, outputs: &Value) -> bool {
+    let Some(sessions) = timing.get("iterations").and_then(python::int) else {
+        return false;
+    };
     let warmups = timing
         .get("warmups")
         .and_then(Value::as_array)
@@ -123,7 +138,8 @@ fn outputs_match(timing: &Value, outputs: &Value) -> bool {
         let expected = || -> Option<(i128, i128)> {
             let output = outputs.get(role)?;
             let digest = u64::from_str_radix(output.get("fnv1a64")?.as_str()?, 16).ok()?;
-            Some((python::int(output.get("bytes")?)?, i128::from(digest)))
+            let bytes = python::int(output.get("bytes")?)?;
+            Some((bytes.checked_mul(sessions)?, i128::from(digest)))
         };
         warmup
             .zip(expected())
@@ -145,9 +161,15 @@ fn withhold_gates(timed: &mut Value) {
     }
 }
 
-/// One timing session of `case`, graded: the shared timing record with the
-/// validator's interval, whether every run reproduced its worker's checked
-/// output, and the gate verdicts.
+/// The ratio interval of a runtime result, in the shared record or, for
+/// results written before it, beside the samples.
+pub(super) fn ratio(runtime: &Value) -> Option<&Value> {
+    runtime.get("timing").unwrap_or(runtime).get("ratio")
+}
+
+/// One timing session of `case`, graded: the shared result fields, whether
+/// every run reproduced its worker's checked output, and the gate verdicts,
+/// which need [`GATE_PAIRS`] pairs.
 #[allow(clippy::too_many_arguments)] // The workers, input, gate and paired timing settings.
 fn runtime(
     gate: policy::Runtime,
@@ -160,52 +182,30 @@ fn runtime(
     seed: u64,
     expected_outputs: Option<&Value>,
 ) -> Result<Value, String> {
-    let operation = operation(case);
-    let (candidate, reference) = (Path::new(candidate), Path::new(reference));
-    let mut timing = timing::benchmark(
-        candidate, reference, path, pairs, iterations, seed, &operation,
+    let graded = timing::measure(
+        Path::new(candidate),
+        Path::new(reference),
+        path,
+        pairs,
+        iterations,
+        seed,
+        &operation(case, iterations),
     )?;
-    let measured = timing.get("status").and_then(Value::as_str) == Some("measured");
-    let hashes = Value::object([
-        ("candidate", Value::str(file_sha(candidate)?)),
-        ("reference", Value::str(file_sha(reference)?)),
+    let deterministic = graded.interval.is_ok()
+        && expected_outputs.is_none_or(|outputs| outputs_match(&graded.record, outputs));
+    let passes = |bound: f64| {
+        graded.interval.as_ref().is_ok_and(|interval| {
+            deterministic && pairs >= GATE_PAIRS && interval.upper_95 <= bound
+        })
+    };
+    let (gate_pass, target_pass) = (passes(gate.ceiling), passes(gate.target));
+    let mut fields = graded.into_fields();
+    fields.extend([
+        ("deterministic_output".into(), Value::Bool(deterministic)),
+        ("gate_pass".into(), Value::Bool(gate_pass)),
+        ("target_pass".into(), Value::Bool(target_pass)),
     ]);
-    let graded = if measured {
-        timing::validate(
-            &timing,
-            &Expected {
-                worker_hashes: &hashes,
-                input_sha256: Some(&Value::str(file_sha(path)?)),
-                minimum_pairs: 2,
-                work_fields: &operation.work_fields,
-                own_work: &operation.own_work,
-                require_linux: cfg!(target_os = "linux"),
-                module_absence: true,
-            },
-        )
-    } else {
-        Err("timing not measured".to_owned())
-    };
-    let deterministic =
-        graded.is_ok() && expected_outputs.is_none_or(|outputs| outputs_match(&timing, outputs));
-    let (gate_pass, target_pass) = match &graded {
-        Ok(interval) => (
-            deterministic && interval.upper_95 <= gate.ceiling,
-            deterministic && interval.upper_95 <= gate.target,
-        ),
-        Err(_) => (false, false),
-    };
-    if let Value::Object(fields) = &mut timing {
-        if let Err(error) = &graded {
-            fields.push(("invalid".into(), Value::str(error)));
-        }
-        fields.extend([
-            ("deterministic_output".into(), Value::Bool(deterministic)),
-            ("gate_pass".into(), Value::Bool(gate_pass)),
-            ("target_pass".into(), Value::Bool(target_pass)),
-        ]);
-    }
-    Ok(timing)
+    Ok(Value::Object(fields))
 }
 
 /// `platform.uname()._asdict()`.
@@ -416,11 +416,9 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         if !refusals.is_empty() {
             withhold_gates(&mut timed);
         }
-        let runtime_gate =
-            outputs.is_some() && a.pairs >= 30 && timed.get("gate_pass").is_some_and(Value::truthy);
+        let runtime_gate = outputs.is_some() && timed.get("gate_pass").is_some_and(Value::truthy);
         let runtime_target = timed.get("target_pass").is_some_and(Value::truthy);
-        let runtime_upper = timed
-            .get("ratio")
+        let runtime_upper = ratio(&timed)
             .and_then(|ratio| ratio.get("upper_95"))
             .and_then(Value::as_f64)
             .filter(|bound| bound.is_finite());
@@ -436,7 +434,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     &path,
                     10.max(a.pairs / 3),
                     iterations,
-                    a.seed + 1,
+                    a.seed + SMALL_CONFIG_SEED,
                     None,
                 )?,
             ));
@@ -451,7 +449,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                 Path::new(&a.reference),
                 &path,
                 a.memory_pairs,
-                a.seed + 2,
+                a.seed + MEMORY_SEED,
                 &args,
                 outputs,
             )?

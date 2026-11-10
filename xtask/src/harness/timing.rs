@@ -15,6 +15,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use super::acceptance::{LINUX_CPU_KEY, active_cpu};
+pub use super::comparison::Work;
 use super::diff::equal;
 use super::linux::py_int;
 use super::validation::{array, field, text};
@@ -485,12 +486,7 @@ pub struct Operation {
     pub arguments: Vec<OsString>,
     /// Candidate compatibility options before the operation name.
     pub candidate_options: Vec<OsString>,
-    /// Contract work fields in addition to the mandatory packet/byte/digest work.
-    pub work_fields: Vec<String>,
-    /// Work fields each worker reports of its own output, equal between its runs
-    /// but not between the two workers: the byte count and digest of two
-    /// encoders, or the digest of two decoders whose outputs may differ.
-    pub own_work: Vec<String>,
+    pub work: Work,
     /// How long one worker run may take.
     pub timeout: Duration,
 }
@@ -808,12 +804,9 @@ fn benchmark_once(
             ));
         }
     }
-    let Ok(warm_work) = super::comparison::warmup_work(
-        &warmups,
-        i128::from(iterations),
-        &operation.work_fields,
-        &operation.own_work,
-    ) else {
+    let Ok(warm_work) =
+        super::comparison::warmup_work(&warmups, i128::from(iterations), &operation.work)
+    else {
         return Ok(status_only(
             "unequal-work",
             &samples,
@@ -965,8 +958,7 @@ fn checked_pair(
         candidate,
         reference,
         i128::from(iterations),
-        &operation.work_fields,
-        &operation.own_work,
+        &operation.work,
     )
     .map_err(|_| "unequal-work")?;
     if !equal(&work, warm_work) {
@@ -1002,9 +994,7 @@ pub struct Expected<'a> {
     /// The SHA-256 of the input, where the caller knows it.
     pub input_sha256: Option<&'a Value>,
     pub minimum_pairs: i128,
-    /// As [`Operation::work_fields`] and [`Operation::own_work`].
-    pub work_fields: &'a [String],
-    pub own_work: &'a [String],
+    pub work: &'a Work,
     /// Whether every CPU snapshot must carry Linux accounting.
     pub require_linux: bool,
     /// Whether the record must prove the RSS kernel module absent; a record
@@ -1045,13 +1035,13 @@ pub fn validate(timing: &Value, expected: &Expected<'_>) -> Result<stats::Interv
     if timing.get("timing_module_policy").is_some() || expected.module_absence {
         validate_module_absence(timing, raw, expected.require_linux)?;
     }
-    let (fields, own) = (expected.work_fields, expected.own_work);
+    let work = expected.work;
     let mut expected_work = match timing.get("warmups") {
-        Some(Value::Array(warmups)) => Some(super::comparison::warmup_work(
-            warmups, iterations, fields, own,
-        )?),
+        Some(Value::Array(warmups)) => {
+            Some(super::comparison::warmup_work(warmups, iterations, work)?)
+        }
         // Records from before warmups were kept prove the ordinary work only.
-        None if fields.len() == super::comparison::BASE_WORK_FIELDS.len() && own.is_empty() => None,
+        None if work.is_base() => None,
         _ => return Err("timing without warmups".into()),
     };
     let mut paired = Vec::new();
@@ -1076,12 +1066,11 @@ pub fn validate(timing: &Value, expected: &Expected<'_>) -> Result<stats::Interv
         else {
             return Err(format!("timing pair {index} incomplete"));
         };
-        let work =
-            super::comparison::paired_timing_work(candidate, reference, iterations, fields, own)?;
-        if expected_work.as_ref().is_some_and(|w| !equal(w, &work)) {
+        let done = super::comparison::paired_timing_work(candidate, reference, iterations, work)?;
+        if expected_work.as_ref().is_some_and(|w| !equal(w, &done)) {
             return Err(format!("timing pair {index} did other work"));
         }
-        expected_work = Some(work);
+        expected_work = Some(done);
         let elapsed = |outcome: &Value| py_int(data(outcome).get("elapsed_ns")).unwrap_or(0) as f64;
         paired.push((elapsed(candidate), elapsed(reference)));
     }
@@ -1096,6 +1085,134 @@ pub fn validate(timing: &Value, expected: &Expected<'_>) -> Result<stats::Interv
     Ok(interval)
 }
 
+/// The fewest pairs a runtime gate result rests on.
+pub const GATE_PAIRS: usize = 30;
+
+/// A timing session and its grade.
+pub struct Graded {
+    /// The session's timing record, as [`benchmark`] wrote it.
+    pub record: Value,
+    /// The validator's interval, or why the session does not count.
+    pub interval: Result<stats::Interval, String>,
+}
+
+impl Graded {
+    /// `measured`, `invalid-timing` for a measured record the validator
+    /// refuses, or the status the session ended with.
+    pub fn status(&self) -> &str {
+        match (
+            self.record.get("status").and_then(Value::as_str),
+            &self.interval,
+        ) {
+            (_, Ok(_)) => "measured",
+            (Some("measured"), Err(_)) => "invalid-timing",
+            (status, Err(_)) => status.unwrap_or("timing-attempt-failed"),
+        }
+    }
+
+    /// The fields every timing result carries: its status, the validator's
+    /// reason when it refuses a measured record, and the record itself.
+    pub fn into_fields(self) -> Vec<(String, Value)> {
+        let mut fields = vec![("status".to_owned(), Value::str(self.status()))];
+        if let (Some("measured"), Err(reason)) = (
+            self.record.get("status").and_then(Value::as_str),
+            &self.interval,
+        ) {
+            fields.push(("invalid".to_owned(), Value::str(reason)));
+        }
+        fields.push(("timing".to_owned(), self.record));
+        fields
+    }
+}
+
+/// One session of `pairs` pairs under the benchmark lock, graded as
+/// [`Lock::measure`] grades it.
+pub fn measure(
+    candidate: &Path,
+    reference: &Path,
+    input: &Path,
+    pairs: usize,
+    iterations: u32,
+    seed: u64,
+    operation: &Operation,
+) -> Result<Graded, String> {
+    lock()?.measure(
+        candidate,
+        reference,
+        input,
+        pairs,
+        iterations,
+        seed,
+        operation,
+        || Ok(()),
+    )
+}
+
+impl Lock {
+    /// One session of `pairs` pairs, graded against the workers and input as
+    /// they are now: every pair the session was asked for must be there.
+    /// `prepare` runs once, immediately before the first worker. A session that
+    /// fails once it has prepared is kept as a `timing-attempt-failed` record;
+    /// one that fails before is an error.
+    #[allow(clippy::too_many_arguments)] // Timing inputs and the preparation hook.
+    pub(crate) fn measure(
+        &self,
+        candidate: &Path,
+        reference: &Path,
+        input: &Path,
+        pairs: usize,
+        iterations: u32,
+        seed: u64,
+        operation: &Operation,
+        prepare: impl FnOnce() -> Result<(), String>,
+    ) -> Result<Graded, String> {
+        let mut prepared = false;
+        let record = self.benchmark(
+            candidate,
+            reference,
+            input,
+            pairs,
+            iterations,
+            seed,
+            operation,
+            || {
+                prepare()?;
+                prepared = true;
+                Ok(())
+            },
+        );
+        let record = match record {
+            Ok(record) => record,
+            Err(error) if prepared => Value::object([
+                ("status", Value::str("timing-attempt-failed")),
+                ("error", Value::str(error)),
+            ]),
+            Err(error) => return Err(error),
+        };
+        let interval = match record.get("status").and_then(Value::as_str) {
+            Some("measured") => {
+                let hashes = Value::object([
+                    ("candidate", Value::str(digest(candidate)?)),
+                    ("reference", Value::str(digest(reference)?)),
+                ]);
+                validate(
+                    &record,
+                    &Expected {
+                        worker_hashes: &hashes,
+                        input_sha256: Some(&Value::str(digest(input)?)),
+                        minimum_pairs: pairs as i128,
+                        work: &operation.work,
+                        require_linux: is_linux(),
+                        module_absence: true,
+                    },
+                )
+            }
+            status => Err(format!("timing {}", status.unwrap_or("not measured"))),
+        };
+        Ok(Graded { record, interval })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1106,8 +1223,7 @@ mod tests {
             prefix: String::new(),
             arguments: vec![],
             candidate_options: vec![],
-            work_fields: ["packets", "bytes", "digest"].map(str::to_owned).into(),
-            own_work: vec![],
+            work: Work::default(),
             timeout: Duration::from_secs(1),
         };
         let run = |packets| {
@@ -1125,14 +1241,9 @@ mod tests {
                 ),
             ])
         };
-        let warm = super::super::comparison::paired_timing_work(
-            &run(1),
-            &run(1),
-            2,
-            &operation.work_fields,
-            &operation.own_work,
-        )
-        .unwrap();
+        let warm =
+            super::super::comparison::paired_timing_work(&run(1), &run(1), 2, &operation.work)
+                .unwrap();
         let row = |candidate| Value::object([("candidate", candidate), ("reference", run(1))]);
         let check = |candidate| checked_pair(&row(candidate), &warm, 2, &operation, true);
         assert_eq!(
@@ -1194,13 +1305,91 @@ mod tests {
     }
 
     #[test]
+    fn a_worker_whose_own_output_changes_between_pairs_is_refused() {
+        let run = |digest: i64| {
+            Value::object([
+                ("status", Value::str("ok")),
+                (
+                    "data",
+                    Value::object([
+                        ("iterations", Value::int(1)),
+                        ("elapsed_ns", Value::int(100)),
+                        ("packets", Value::int(2)),
+                        ("bytes", Value::int(40)),
+                        ("digest", Value::int(digest)),
+                    ]),
+                ),
+            ])
+        };
+        let hashes = Value::object([
+            ("candidate", Value::str("a")),
+            ("reference", Value::str("b")),
+        ]);
+        let interval = stats::ratio_interval(&[(100.0, 100.0); 2], 0, 4000).unwrap();
+        let record = |second: i64| {
+            let samples = [7, second]
+                .into_iter()
+                .enumerate()
+                .map(|(pair, digest)| {
+                    Value::object([
+                        ("pair", Value::int(pair as i64)),
+                        ("order", Value::strings(["candidate", "reference"])),
+                        ("candidate", run(digest)),
+                        ("reference", run(9)),
+                        ("cpu_before", Value::Object(vec![])),
+                        ("cpu_after", Value::Object(vec![])),
+                    ])
+                })
+                .collect();
+            let warmup = |worker: &str, digest: i64| {
+                Value::object([("worker", Value::str(worker)), ("result", run(digest))])
+            };
+            Value::object([
+                ("pairs", Value::int(2)),
+                ("iterations", Value::int(1)),
+                ("seed", Value::int(0)),
+                ("worker_hashes", hashes.clone()),
+                ("ratio", interval_value(&interval)),
+                (
+                    "warmups",
+                    Value::Array(vec![warmup("candidate", 7), warmup("reference", 9)]),
+                ),
+                ("samples", Value::Array(samples)),
+            ])
+        };
+        let own = Work {
+            fields: vec![],
+            own: vec!["digest".to_owned()],
+        };
+        let expected = Expected {
+            worker_hashes: &hashes,
+            input_sha256: None,
+            minimum_pairs: 2,
+            work: &own,
+            require_linux: false,
+            module_absence: false,
+        };
+        assert!(validate(&record(7), &expected).is_ok());
+        assert_eq!(
+            validate(&record(8), &expected).unwrap_err(),
+            "timing pair 1 did other work"
+        );
+        // Without own work, the two workers' different digests are unequal work.
+        let shared = Work::default();
+        let strict = Expected {
+            work: &shared,
+            ..expected
+        };
+        assert!(validate(&record(7), &strict).is_err());
+    }
+
+    #[test]
     fn compatibility_options_apply_only_to_the_candidate() {
         let operation = Operation {
             prefix: "open-".into(),
             arguments: ["1", "0", "memory", "4096"].map(OsString::from).to_vec(),
             candidate_options: vec!["--bounded-timing".into(), "--bounded-sync".into()],
-            work_fields: vec![],
-            own_work: vec![],
+            work: Work::default(),
             timeout: worker::DEFAULT_TIMEOUT,
         };
         let expected = ["open-bench", "input.mov", "50", "1", "0", "memory", "4096"]
@@ -1224,8 +1413,7 @@ mod tests {
             prefix: "hls-".into(),
             arguments: vec!["avc".into(), "aac".into()],
             candidate_options: vec![],
-            work_fields: vec![],
-            own_work: vec![],
+            work: Work::default(),
             timeout: worker::DEFAULT_TIMEOUT,
         };
         for candidate in [false, true] {

@@ -1285,7 +1285,7 @@ pub fn collect(
                 arguments: &reference_arguments,
                 candidate_arguments: Some(&candidate_arguments),
                 expected_outputs: None,
-                work_fields: Some(&operation.work_fields),
+                work_fields: Some(&operation.work.fields),
                 timeout: operation.timeout,
             },
         );
@@ -1308,7 +1308,7 @@ pub fn collect(
             arguments: &arguments,
             candidate_arguments: None,
             expected_outputs: None,
-            work_fields: Some(&operation.work_fields),
+            work_fields: Some(&operation.work.fields),
             timeout: operation.timeout,
         },
     )

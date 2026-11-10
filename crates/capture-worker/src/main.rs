@@ -10,8 +10,9 @@
 //! ```
 //!
 //! `bench` takes the harness's timing command line (input and iterations
-//! first). `bench` and `memory` feed every frame's bytes to a hashing sink that
-//! keeps nothing, exactly like the reference worker.
+//! first) and reports totals over its sessions, as every timed worker does.
+//! `bench` and `memory` feed every frame's bytes to a hashing sink that keeps
+//! nothing, exactly like the reference worker.
 #![forbid(unsafe_code)]
 
 use std::io::Write;
@@ -71,56 +72,12 @@ fn session(
     Ok(s.vbv_underflow_bits())
 }
 
-/// `bench`: `iterations` sessions, each from a fresh session and sink, timed
-/// together; every session must produce the same stream, which is the work.
-fn bench(args: &[String]) -> ExitCode {
-    let parse = |i: usize| args[i].parse::<u32>().ok();
-    let (Some(iterations), Some(w), Some(h), Some(flip), Some(count), Some(bitrate)) = (
-        parse(3).filter(|&n| n > 0),
-        parse(4),
-        parse(5),
-        parse(6),
-        parse(7),
-        parse(8),
-    ) else {
-        return fail("usage");
-    };
-    let frame_bytes = w as usize * h as usize * 4;
-    let Some(rgba) = std::fs::read(&args[2])
-        .ok()
-        .filter(|data| data.len() >= frame_bytes * count as usize)
-    else {
-        return fail("input");
-    };
-    let orientation = if flip != 0 {
-        Orientation::BottomUp
-    } else {
-        Orientation::TopDown
-    };
-    let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
-    let mut output = None;
-    let start = Instant::now();
-    for _ in 0..iterations {
-        let mut sink = HashSink::new();
-        if let Err(e) = session(&cfg, orientation, &rgba, count as usize, &mut sink) {
-            return fail(&e);
-        }
-        if *output.get_or_insert((sink.bytes, sink.hash)) != (sink.bytes, sink.hash) {
-            return fail("output differs between iterations");
-        }
-    }
-    let elapsed = start.elapsed().as_nanos();
-    let (bytes, digest) = output.unwrap_or_default();
-    println!(
-        "{{\"iterations\":{iterations},\"elapsed_ns\":{elapsed},\"packets\":{count},\"bytes\":{bytes},\"digest\":{digest}}}"
-    );
-    ExitCode::SUCCESS
-}
-
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().collect();
+    let mut args: Vec<String> = std::env::args().collect();
     if args.len() == 9 && args[1] == "bench" {
-        return bench(&args);
+        // The timing command line, input and iterations first, in the order of
+        // the other modes: <w> <h> <flip> <frames> <bitrate> <in.rgba> <iterations>.
+        args[2..].rotate_left(2);
     }
     if args.len() < 7 {
         return fail("usage");
@@ -215,6 +172,35 @@ fn main() -> ExitCode {
                 ts.len(),
                 hash.hash,
                 underflow
+            );
+        }
+        "bench" if args.len() == 9 => {
+            // `iterations` sessions, each from a fresh session and sink, timed
+            // together. Every session must produce the same stream; the counts
+            // are totals over the sessions, the digest that of the stream.
+            let (Some(bitrate), Some(rgba), Some(iterations)) =
+                (parse(6), load(&args[7]), parse(8).filter(|&n| n > 0))
+            else {
+                return fail("input");
+            };
+            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
+            let mut stream = None;
+            let start = Instant::now();
+            for _ in 0..iterations {
+                let mut sink = HashSink::new();
+                if let Err(e) = session(&cfg, orientation, &rgba, count, &mut sink) {
+                    return fail(&e);
+                }
+                if *stream.get_or_insert((sink.bytes, sink.hash)) != (sink.bytes, sink.hash) {
+                    return fail("output differs between iterations");
+                }
+            }
+            let elapsed = start.elapsed().as_nanos();
+            let (bytes, digest) = stream.unwrap_or_default();
+            println!(
+                "{{\"iterations\":{iterations},\"elapsed_ns\":{elapsed},\"packets\":{},\"bytes\":{},\"digest\":{digest}}}",
+                count as u64 * u64::from(iterations),
+                bytes * u64::from(iterations)
             );
         }
         "memory" if args.len() == 8 => {
