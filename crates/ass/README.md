@@ -439,6 +439,17 @@ panics.
   `aarch64-unknown-linux-gnu` and `armv7-unknown-linux-gnueabihf` from that
   target's reference. All four cases pass on ARMv7; on AArch64 all four are
   open as a deliberate divergence.
+- Runtime and memory of both features are taken against `libass-player-native`
+  (`harness/reference_ass_player.h`, `libass.a` linked as a player links it) by
+  `cargo xtask report`, 30 timing and 30 memory pairs per case, and graded by
+  `cargo xtask grade`. Every passing case is within the runtime ceiling of
+  [docs/quality.md](../../docs/quality.md) and lower than libass in peak heap
+  and total RSS. On Linux AArch64 the `ass-render` ratios have a median of
+  0.813 and a highest upper bound of 1.066 (`cache-keys-ass-720p`), with peak
+  heap ≤0.841 and total RSS ≤0.943. On ARMv7, over all 80 cases, the highest
+  upper bound is 0.943, peak heap ≤0.928 and total RSS ≤0.961.
+  [docs/status.md](../../docs/status.md) names the measured revision and its
+  evidence.
 - `cargo xtask ass equivalence --base REV` renders the `ass-render`
   fixtures at their frames and every 40 ms, mutations of them with varied
   settings and style overrides, and scripts generated from a seed, with the

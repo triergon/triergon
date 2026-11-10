@@ -192,7 +192,9 @@ resource limit becomes an explicit, reviewed rule for that case.
   rendering its frames, from the configured renderer to the last frame on both
   sides: libass's renderer setters each empty its caches (`ass_reconfigure`),
   and the teardown frees them, so neither is timed. The memory window holds the
-  whole operation.
+  whole operation. These cases are timed by the same paired runner as the
+  codecs and capture: one lock, the same pair loop, contamination watch,
+  retries and validator, and the same minimum of pairs.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   features commit no case rows. `cargo xtask fonts manifest`, `cargo
   xtask shape manifest`, `cargo xtask raster manifest` and `cargo xtask ass
