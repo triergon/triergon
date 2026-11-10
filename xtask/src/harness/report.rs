@@ -79,7 +79,47 @@ fn entity_input_failure(corpus: &Path, case: &Value) -> Result<Option<&'static s
     let Some(entities) = case.get("entities") else {
         return Ok(None);
     };
-    for entity in entities.as_array().ok_or("expected an entity list")? {
+    let entities = entities.as_array().ok_or("expected an entity list")?;
+    let [primary, following @ ..] = entities else {
+        return Err("empty entity list".into());
+    };
+    let file = s(case, "file").ok_or("case without input path")?;
+    if s(primary, "file") != Some(file) || s(primary, "sha256") != s(case, "sha256") {
+        return Err("first entity does not match the case input".into());
+    }
+    let args = case_arguments(case);
+    let [_, _, args @ ..] = args.as_slice() else {
+        return Err("ordered transport input needs packet size and program".into());
+    };
+    let args = args
+        .strip_prefix(&[std::ffi::OsString::from("--dvb")])
+        .unwrap_or(args);
+    let mut args = args.iter();
+    for entity in following {
+        let Some(name) = args.next() else {
+            return Err("ordered entity has no worker argument".into());
+        };
+        let name = if name == "--discontinuity" {
+            args.next().ok_or("discontinuity without an entity")?
+        } else {
+            name
+        };
+        let relative = Path::new(name);
+        if name.to_str().is_none_or(|name| {
+            name.is_empty() || name.starts_with('-') || name.contains(['/', '\\'])
+        }) || !matches!(
+            relative.components().next(),
+            Some(std::path::Component::Normal(_))
+        ) || s(entity, "file").map(Path::new)
+            != Some(Path::new(file).with_file_name(relative).as_path())
+        {
+            return Err("ordered entity does not match its worker argument".into());
+        }
+    }
+    if args.next().is_some() {
+        return Err("worker entity argument has no input pin".into());
+    }
+    for entity in following {
         let file = Path::new(s(entity, "file").ok_or("entity without input path")?);
         if file.as_os_str().is_empty()
             || file
@@ -963,10 +1003,19 @@ mod prefix_tests {
         std::fs::create_dir_all(&root).unwrap();
         let input = b"known entity bytes";
         let hash = crate::sha256::hex(input);
-        let case = parse(&format!(
-            r#"{{"entities":[{{"file":"next.ts","sha256":"{hash}"}}]}}"#
-        ))
-        .unwrap();
+        let row = format!(
+            r#"{{"file":"first.ts","sha256":"{hash}","arguments":["188","1","next.ts"],
+                 "entities":[{{"file":"first.ts","sha256":"{hash}"}},
+                             {{"file":"next.ts","sha256":"{hash}"}}]}}"#
+        );
+        let case = parse(&row).unwrap();
+        let mismatched =
+            parse(&row.replace(r#"["188","1","next.ts"]"#, r#"["188","1","different.ts"]"#))
+                .unwrap();
+        assert_eq!(
+            entity_input_failure(&root, &mismatched).unwrap_err(),
+            "ordered entity does not match its worker argument"
+        );
         assert_eq!(
             entity_input_failure(&root, &case).unwrap(),
             Some("missing-entity")
