@@ -1,11 +1,11 @@
 //! Glyph lookup and metrics: the font functions shaping asks for, and HarfBuzz's
 //! scaling arithmetic.
 
-use crate::ot::data::{Data, bsearch};
 use std::cell::Cell;
 use triergon_core::{Error, Result};
 use triergon_font::{
-    CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont, TextLookup,
+    CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont, TextLookup, Variant,
+    VariationSequences,
 };
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
@@ -122,7 +122,8 @@ pub struct OtMetrics<'a> {
     symbol: bool,
     /// A Macintosh charmap maps only ASCII.
     ascii_only: bool,
-    variations: Variations<'a>,
+    /// HarfBuzz's variation sequences: the first (0, 5) record's subtable.
+    variations: Option<VariationSequences<'a>>,
     scale: Scale,
     x_mult: i64,
     x_multf: f32,
@@ -162,7 +163,7 @@ impl<'a> OtMetrics<'a> {
             charmap,
             symbol: is_symbol,
             ascii_only,
-            variations: Variations::of(font),
+            variations: font.first_variation_sequences(),
             scale,
             x_mult: i64::from(scale.x) * 0x10000 / upem,
             x_multf: scale.x as f32 / f32::from(font.units_per_em()),
@@ -229,10 +230,13 @@ impl Metrics for OtMetrics<'_> {
     }
 
     fn variation_glyph(&self, base: char, selector: char) -> Option<GlyphId> {
-        match self.variations.lookup(u32::from(base), u32::from(selector)) {
-            Variation::Default => self.nominal_glyph(base),
-            Variation::Glyph(glyph) => Some(glyph),
-            Variation::None => None,
+        match self
+            .variations?
+            .variant(u32::from(base), u32::from(selector))
+        {
+            Variant::Default => self.nominal_glyph(base),
+            Variant::Glyph(glyph) => Some(glyph),
+            Variant::None => None,
         }
     }
 
@@ -281,7 +285,8 @@ pub trait GlyphRotations {
 /// The font functions libass 0.17.5 installs on the HarfBuzz font of a face at a
 /// size (`init_font_funcs` and `get_hb_font` in `ass_shaper.c`): the face's
 /// character map looked up as libass looks codes up
-/// ([`Font::text_lookup`]), FreeType's variation sequences, default-load
+/// ([`Font::text_lookup`]), FreeType's variation sequences
+/// ([`Font::variation_sequences`]), default-load
 /// advances ([`SizedFont::hinted_advance`]) and `FT_KERNING_DEFAULT` kerning
 /// ([`SizedFont::kerning`]), in 26.6 pixels at the size's
 /// [`SizedFont::harfbuzz_scale`] and pixels per em, so that hinting device
@@ -300,7 +305,8 @@ pub struct SizedMetrics<'a> {
     lookup: Option<TextLookup<'a>>,
     /// A Unicode charmap, which FreeType needs for variation sequences.
     unicode: bool,
-    variations: Variations<'a>,
+    /// FreeType's variation sequences (`FT_Face_GetCharVariantIndex`).
+    variations: Option<VariationSequences<'a>>,
     scale: Scale,
     rotations: Option<&'a dyn GlyphRotations>,
 }
@@ -353,7 +359,7 @@ impl<'a> SizedMetrics<'a> {
             sized,
             lookup,
             unicode,
-            variations: Variations::of(sized.font()),
+            variations: sized.font().variation_sequences(),
             scale: Scale {
                 x,
                 y,
@@ -407,10 +413,10 @@ impl Metrics for SizedMetrics<'_> {
     fn variation_glyph(&self, c: char, selector: char) -> Option<GlyphId> {
         let lookup = self.lookup.filter(|_| self.unicode)?;
         let code = lookup.code(u32::from(c))?;
-        let glyph = match self.variations.lookup(code, u32::from(selector)) {
-            Variation::Default => lookup.charmap().glyph(code),
-            Variation::Glyph(glyph) => Some(glyph),
-            Variation::None => None,
+        let glyph = match self.variations?.variant(code, u32::from(selector)) {
+            Variant::Default => lookup.charmap().glyph(code),
+            Variant::Glyph(glyph) => Some(glyph),
+            Variant::None => None,
         };
         self.looked_up(glyph, c)
     }
@@ -442,67 +448,6 @@ impl Metrics for SizedMetrics<'_> {
 
     fn h_kerning(&self, left: GlyphId, right: GlyphId) -> Result<i32> {
         Ok(self.sized.kerning(left, right))
-    }
-}
-
-/// How a variation sequence maps.
-enum Variation {
-    /// To the base character's nominal glyph.
-    Default,
-    Glyph(GlyphId),
-    /// Not at all.
-    None,
-}
-
-/// The `cmap` format 14 subtable of the Unicode variation-sequence encoding (0,
-/// 5): the first one, as HarfBuzz and FreeType both take it.
-#[derive(Clone, Copy, Debug)]
-struct Variations<'a>(Data<'a>);
-
-impl<'a> Variations<'a> {
-    fn of(font: &'a Font) -> Self {
-        let cmap = Data(font.table(*b"cmap").unwrap_or_default());
-        let count = cmap.count(2, 4, 8);
-        let table = (0..count)
-            .map(|i| 4 + 8 * i)
-            .find(|&at| cmap.u16(at) == 0 && cmap.u16(at + 2) == 5)
-            .map(|at| cmap.offset32(at + 4))
-            .filter(|table| table.u16(0) == 14);
-        Self(table.unwrap_or_default())
-    }
-
-    /// The selector's default ranges first, then its mappings; a mapping to
-    /// glyph 0 is none.
-    fn lookup(self, c: u32, selector: u32) -> Variation {
-        let table = self.0;
-        let records = table.u32(6) as usize;
-        let records = records.min(table.0.len().saturating_sub(10) / 11);
-        let Some(record) = bsearch(records, |i| table.u24(10 + 11 * i).cmp(&selector)) else {
-            return Variation::None;
-        };
-        let at = 10 + 11 * record;
-        let defaults = table.at(table.u32(at + 3) as usize);
-        let count = (defaults.u32(0) as usize).min(defaults.0.len().saturating_sub(4) / 4);
-        let in_default = bsearch(count, |i| {
-            let first = defaults.u24(4 + 4 * i);
-            let last = first + u32::from(defaults.u8(4 + 4 * i + 3));
-            if c < first {
-                std::cmp::Ordering::Greater
-            } else if c > last {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Equal
-            }
-        });
-        if in_default.is_some() {
-            return Variation::Default;
-        }
-        let mappings = table.at(table.u32(at + 7) as usize);
-        let count = (mappings.u32(0) as usize).min(mappings.0.len().saturating_sub(4) / 5);
-        bsearch(count, |i| mappings.u24(4 + 5 * i).cmp(&c))
-            .map(|i| mappings.u16(4 + 5 * i + 3))
-            .filter(|&glyph| glyph != 0)
-            .map_or(Variation::None, |glyph| Variation::Glyph(GlyphId(glyph)))
     }
 }
 

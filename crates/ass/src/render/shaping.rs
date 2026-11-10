@@ -146,6 +146,9 @@ const PLAN_ENTRY_BYTES: usize = 256;
 #[derive(Debug)]
 pub(super) struct Shaper {
     budget: Budget,
+    /// libass's glyph metrics cache for `@` fonts: whether each glyph's
+    /// metrics are rotated, by face, size and glyph, for the renderer's life.
+    rotations: Rotations,
     buffer: Buffer,
     resolver: Resolver,
     plans: HashMap<PlanKey, Plan>,
@@ -157,6 +160,28 @@ pub(super) struct Shaper {
     /// The glyphs shaping gave each character of the item being shaped,
     /// then where its cluster's next one goes.
     counts: BudgetVec<usize>,
+}
+
+/// The rotation decisions of libass's glyph metrics cache.
+#[derive(Debug, Default)]
+struct Rotations(std::cell::RefCell<HashMap<(u32, u64, u16), bool>>);
+
+/// The metrics cache of one face at one size.
+struct FaceRotations<'a> {
+    rotations: &'a Rotations,
+    face: u32,
+    size: u64,
+}
+
+impl triergon_shape::GlyphRotations for FaceRotations<'_> {
+    fn rotated(&self, glyph: GlyphId, c: Option<char>) -> bool {
+        *self
+            .rotations
+            .0
+            .borrow_mut()
+            .entry((self.face, self.size, glyph.0))
+            .or_insert_with(|| c.is_some_and(|c| u32::from(c) >= 0x2f1))
+    }
 }
 
 /// What finding runs gives a character (`ass_shaper_find_runs`).
@@ -263,6 +288,7 @@ impl Shaper {
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
             budget: budget.clone(),
+            rotations: Rotations::default(),
             buffer: Buffer::new(budget),
             resolver: Resolver::new(budget),
             plans: HashMap::new(),
@@ -491,7 +517,15 @@ impl Shaper {
         let sized = face_font
             .font
             .at_size(pixels_26_6(text.style(first).size))?;
-        let metrics = SizedMetrics::with_charmap(sized, face_font.charmap())?;
+        let rotations = FaceRotations {
+            rotations: &self.rotations,
+            face: face_font.uid,
+            size: text.style(first).size.to_bits(),
+        };
+        let mut metrics = SizedMetrics::with_charmap(sized, face_font.charmap())?;
+        if font.vertical() {
+            metrics = metrics.rotating(&rotations);
+        }
         let shaper_face = Face::new(&face_font.font);
         let key = PlanKey {
             face: face_font.uid,

@@ -27,7 +27,9 @@ mod synthesis;
 mod work;
 
 pub use cff::{CharstringBounds, CharstringOperator, OperatorSet};
-pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings, TextLookup};
+pub use cmap::{
+    CharEncoding, Charmap, CmapFormat, Mappings, TextLookup, Variant, VariationSequences,
+};
 pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
@@ -178,6 +180,8 @@ pub struct Font {
     charmaps: BudgetVec<cmap::Entry>,
     /// The Unicode charmap FreeType builds from a CFF face's glyph names.
     name_map: Option<postscript::UnicodeMap>,
+    /// The format 14 subtable FreeType reads variation sequences from.
+    variation_sequences: Option<sfnt::Table>,
     outlines: Outlines,
     kern: Kern,
     /// `post` underline position and thickness.
@@ -221,6 +225,7 @@ impl Font {
             None => cmap::Subtables {
                 list: BudgetVec::new(budget),
                 unicode_variations: false,
+                variation_sequences: None,
             },
         };
         let (outlines, glyph_count) = match flavor {
@@ -299,6 +304,7 @@ impl Font {
             names,
             charmaps,
             name_map,
+            variation_sequences: cmap.variation_sequences,
             outlines,
             kern,
             underline,
@@ -529,6 +535,28 @@ impl Font {
                 Outlines::Glyf(_) => return None,
             },
         })
+    }
+
+    /// The Unicode variation sequences FreeType reads
+    /// (`FT_Face_GetCharVariantIndex`): its first variation-sequence charmap,
+    /// the first (0, 5) format 14 subtable its validation keeps.
+    pub fn variation_sequences(&self) -> Option<VariationSequences<'_>> {
+        VariationSequences::new(self.variation_sequences?.bytes(self.data.as_ref()))
+    }
+
+    /// The Unicode variation sequences HarfBuzz reads: the subtable of the
+    /// first (0, 5) encoding record, when it is format 14, unvalidated.
+    pub fn first_variation_sequences(&self) -> Option<VariationSequences<'_>> {
+        let cmap = self.table(*b"cmap")?;
+        let count = usize::from(read::u16_at(cmap, 2)?);
+        let at = (0..count)
+            .map(|i| 4 + 8 * i)
+            .take_while(|&at| at + 8 <= cmap.len())
+            .find(|&at| {
+                read::u16_at(cmap, at) == Some(0) && read::u16_at(cmap, at + 2) == Some(5)
+            })?;
+        let offset = usize::try_from(read::u32_at(cmap, at + 4)?).ok()?;
+        VariationSequences::new(cmap.get(offset..)?)
     }
 
     /// The charmap libass 0.17.5 uses for text, as it selects one when it opens

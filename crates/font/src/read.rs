@@ -101,6 +101,12 @@ pub(crate) fn u16_at(data: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_be_bytes(*data.get(at..)?.first_chunk()?))
 }
 
+/// The big-endian 24-bit value at `at`, if `data` holds it.
+pub(crate) fn u24_at(data: &[u8], at: usize) -> Option<u32> {
+    let [a, b, c] = *data.get(at..)?.first_chunk()?;
+    Some(u32::from_be_bytes([0, a, b, c]))
+}
+
 /// The big-endian `u32` at `at`, if `data` holds it.
 pub(crate) fn u32_at(data: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes(*data.get(at..)?.first_chunk()?))

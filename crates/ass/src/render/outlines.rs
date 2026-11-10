@@ -8,7 +8,7 @@ use std::hash::{Hash, Hasher};
 
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_font::{Font, GlyphId, Orientation};
-use triergon_raster::{BorderStroke, Outline, Raster, Shape, Vector, pixels_26_6};
+use triergon_raster::{BorderStroke, OUTLINE_MAX, Outline, Raster, Shape, Vector, pixels_26_6};
 
 use super::cache::{Cache, CacheKey, Kept, Lookup};
 use super::fonts::{FontId, RequestedFont};
@@ -270,16 +270,22 @@ impl Outlines {
         decorations: Decorations,
         work: &mut WorkBudget,
     ) -> Result<OutlineValue> {
-        if decorations.rotate {
-            return Err(Error::Unsupported("the vertical advance of an @ font"));
-        }
         let sized = source.at_size(pixels_26_6(size))?;
         let scratch = &mut self.scratch;
         let metrics = sized.outline_into(glyph, scratch)?;
         // Synthesis, decoration and the conversion pass over its points.
         charge(work, scratch.points().len())?;
         sized.synthesize(scratch, source.synthesis(font.weight(), font.slant()))?;
-        let advance = metrics.advance;
+        // A glyph an `@` font draws rotated advances by its linear vertical
+        // advance (`d16_to_d6`, in `int`).
+        let vertical = decorations
+            .rotate
+            .then(|| sized.vertical_advance(glyph))
+            .transpose()?;
+        let advance = match vertical {
+            Some(v) => (v.linear as i32).wrapping_add(512) >> 10,
+            None => metrics.advance,
+        };
         let lines = [
             (decorations.underline, sized.underline()),
             (decorations.strike_out, sized.strikeout()),
@@ -287,6 +293,19 @@ impl Outlines {
         .map(|(on, band)| band.filter(|_| on && advance > 0));
         let mut outline = Outline::new(&self.budget);
         outline.push_glyph(scratch.points(), scratch.contour_ends())?;
+        // Turned about the vertical advance and the typographic descender.
+        if let Some(v) = vertical {
+            let y_scale = sized.metrics().y_scale;
+            let desc = source.os2().map_or(0, |os2| {
+                (i64::from(os2.typo_descender) * y_scale + 0x8000) >> 16
+            });
+            let dv = v.advance + desc;
+            let limit = 2 * i64::from(OUTLINE_MAX);
+            if desc.abs() > limit || dv.abs() > limit {
+                return Err(Error::Invalid("rotated outline out of range"));
+            }
+            outline.rotate_90(Vector::new(dv as i32, -desc as i32))?;
+        }
         // The lines run the way the glyph's contours do, so they add to its
         // fill; the orientation is the source outline's, as FreeType finds it.
         if lines.iter().any(Option::is_some) {
