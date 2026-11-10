@@ -89,6 +89,9 @@ pub struct Fixture<'a> {
     pub default_family: Option<&'a [u8]>,
     pub default_font: Option<&'a [u8]>,
     pub frames: Vec<Frames>,
+    /// A `;@frames` directive was malformed or one too many, which the
+    /// renderers refuse.
+    pub bad_frames: bool,
     pub commands: Vec<Command<'a>>,
 }
 
@@ -145,11 +148,13 @@ impl<'a> Fixture<'a> {
                 fixture.default_family = Some(name);
             } else if let Some(path) = line.strip_prefix(b";@default-font ") {
                 fixture.default_font = Some(path);
-            } else if let Some(frames) = line.strip_prefix(b";@frames ")
-                && let Some(frames) = Frames::read(frames)
-                && fixture.frames.len() < MAX_FRAMES
-            {
-                fixture.frames.push(frames);
+            } else if let Some(frames) = line.strip_prefix(b";@frames ") {
+                match Frames::read(frames) {
+                    Some(frames) if fixture.frames.len() < MAX_FRAMES => {
+                        fixture.frames.push(frames);
+                    }
+                    _ => fixture.bad_frames = true,
+                }
             }
         }
         if stream {
@@ -233,6 +238,9 @@ mod tests {
         assert_eq!(fixture.times, [0, 500]);
         assert_eq!(fixture.attach, [&b"a.ttf"[..]]);
         assert_eq!(fixture.frames[0].times().collect::<Vec<_>>(), [1, 2]);
+        assert!(!fixture.bad_frames);
+        // Two numbers are no frames directive.
+        assert!(Fixture::read(b";@frames 0 500\n", false).bad_frames);
         assert_eq!(fixture.overrides, [&b"A=B"[..]]);
         assert!(matches!(
             fixture.commands[..],

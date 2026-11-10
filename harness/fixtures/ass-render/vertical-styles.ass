@@ -1,6 +1,6 @@
 ;@attach NotoSansJP-Regular.otf
 ;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
-;@frames 0 500
+;@frames 0 500 500
 ; Two styles of one `@` font that select the same face, one of them bold.
 ; libass keeps whether a glyph's metrics are rotated by font, face, size and
 ; glyph, decided by the first lookup: the vertical comma the vert feature

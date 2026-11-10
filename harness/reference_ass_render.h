@@ -254,7 +254,8 @@ static char *assr_read_file(const char *path, long limit, size_t *size) {
     return data;
 }
 
-/* The render directives of a fixture; 0 when a font cannot be read. */
+/* The render directives of a fixture; 0 when a font cannot be read or a frames
+ * directive is malformed or one too many. */
 static int assr_render_directives(const char *data, size_t size, const char *fonts, AssRenderCase *c) {
     for (const char *p = data, *end = data + size; p < end;) {
         const char *q = memchr(p, '\n', (size_t)(end - p));
@@ -282,12 +283,15 @@ static int assr_render_directives(const char *data, size_t size, const char *fon
             c->default_font = assr_join_path(fonts, value);
             free(value);
             if (!c->default_font) return 0;
-        } else if (assr_starts(l, ";@frames ") && c->n_frames < ASSR_MAX_FRAMES) {
+        } else if (assr_starts(l, ";@frames ")) {
             const char *at = l.start + 9, *stop = l.start + l.len;
             AssFrames *f = c->frames + c->n_frames;
-            if (assr_number(&at, stop, &f->start) && assr_number(&at, stop, &f->step) &&
-                assr_number(&at, stop, &f->end) && f->step > 0)
-                c->n_frames++;
+            if (c->n_frames >= ASSR_MAX_FRAMES || !assr_number(&at, stop, &f->start) ||
+                !assr_number(&at, stop, &f->step) || !assr_number(&at, stop, &f->end) || f->step <= 0) {
+                fprintf(stderr, "malformed or one too many ;@frames directives\n");
+                return 0;
+            }
+            c->n_frames++;
         }
     }
     return 1;

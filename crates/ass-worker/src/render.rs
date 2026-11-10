@@ -273,6 +273,9 @@ pub fn run(args: &[String]) -> Result<()> {
     };
     let data = std::fs::read(path)?;
     let fixture = Fixture::read(&data, stream);
+    if fixture.bad_frames {
+        return Err("malformed or one too many ;@frames directives".into());
+    }
     let fonts = Path::new(fonts);
     let case = Case {
         attached: fixture
