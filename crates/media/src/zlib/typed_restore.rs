@@ -124,6 +124,21 @@ impl CopyJob {
             }
             match self.phase {
                 CopyPhase::Reserve => {
+                    if self.prefix.is_empty()
+                        && self.size <= 8192
+                        && work.remaining() >= self.size as u64 + 2
+                        && let Some(buffer) = &self.buffer
+                        && let Ok(bytes) =
+                            triergon_core::Bytes::copy_from_slice(buffer.budget(), &self.input)
+                    {
+                        // Charge reserve, the copy and publication as in the
+                        // resumable path. Each frame keeps its own exact span.
+                        work.take(self.size as u64 + 2);
+                        self.result = Some(SharedBytes::from_core(bytes));
+                        self.buffer = None;
+                        self.phase = CopyPhase::Done;
+                        continue;
+                    }
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }

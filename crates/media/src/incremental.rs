@@ -767,7 +767,22 @@ impl ElementReader {
                         body.allocated = true;
                     }
                     if let Some(span) = &body.span {
-                        let count = work.take((span.len() - body.copied) as u64) as usize;
+                        let span_work = span.len() as u64;
+                        if body.transfer == BodyTransfer::Copy
+                            && span.len() == body.target
+                            && body.buffer.is_none()
+                            && work.remaining() > span_work
+                            && let Ok(bytes) = Bytes::copy_from_slice(self.input.budget(), span)
+                        {
+                            // The whole leaf fits this quantum. Copy and charge
+                            // the backing storage and header together, keeping
+                            // the existing publication step.
+                            work.take(span_work);
+                            body.direct = Some(bytes);
+                            body.span = None;
+                            continue;
+                        }
+                        let count = work.take(span_work - body.copied as u64) as usize;
                         if count == 0 {
                             return Ok(ParseStep::Yield);
                         }
