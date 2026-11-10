@@ -77,29 +77,32 @@ pub(super) fn prepare(
 ) -> Result<i64> {
     let has = |f: u16| adjustment & f != 0;
     let tilde = flag::TILDE_TOP | flag::TILDE_BOTTOM | flag::TILDE_TOP2 | flag::TILDE_BOTTOM2;
-    if has(tilde) {
+    // A glyph without contours has no tilde: the contour searches would
+    // return a contour 0 it lacks. FreeType hints only outlines with points,
+    // and so with contours.
+    if has(tilde) && !hints.contours.is_empty() {
         compute_vertical_extrema(hints, work)?;
-    }
-    // Inner tildes first.
-    if has(flag::TILDE_TOP2) {
-        let contour = second_highest_contour(hints);
-        let offset = stretch_tilde(hints, contour, true) + align_tilde(hints, contour, true);
-        move_contours_up(hints, hints.y_minima[contour], offset);
-    }
-    if has(flag::TILDE_BOTTOM2) {
-        let contour = second_lowest_contour(hints);
-        let offset = stretch_tilde(hints, contour, false) - align_tilde(hints, contour, false);
-        move_contours_down(hints, hints.y_maxima[contour], offset);
-    }
-    if has(flag::TILDE_TOP) {
-        let contour = highest_contour(hints);
-        stretch_tilde(hints, contour, true);
-        align_tilde(hints, contour, true);
-    }
-    if has(flag::TILDE_BOTTOM) {
-        let contour = lowest_contour(hints);
-        stretch_tilde(hints, contour, false);
-        align_tilde(hints, contour, false);
+        // Inner tildes first.
+        if has(flag::TILDE_TOP2) {
+            let contour = second_highest_contour(hints);
+            let offset = stretch_tilde(hints, contour, true) + align_tilde(hints, contour, true);
+            move_contours_up(hints, hints.y_minima[contour], offset);
+        }
+        if has(flag::TILDE_BOTTOM2) {
+            let contour = second_lowest_contour(hints);
+            let offset = stretch_tilde(hints, contour, false) - align_tilde(hints, contour, false);
+            move_contours_down(hints, hints.y_maxima[contour], offset);
+        }
+        if has(flag::TILDE_TOP) {
+            let contour = highest_contour(hints);
+            stretch_tilde(hints, contour, true);
+            align_tilde(hints, contour, true);
+        }
+        if has(flag::TILDE_BOTTOM) {
+            let contour = lowest_contour(hints);
+            stretch_tilde(hints, contour, false);
+            align_tilde(hints, contour, false);
+        }
     }
     analysis::detect_features(hints, Dimension::Vertical, metrics, top_to_bottom, work)?;
     let (mut capital, mut small) = ((None, None), (None, None));
