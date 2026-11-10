@@ -75,9 +75,28 @@ fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
 
-fn entity_input_failure(corpus: &Path, case: &Value) -> Result<Option<&'static str>, String> {
-    let Some(entities) = case.get("entities") else {
+fn entity_input_failure(
+    corpus: &Path,
+    case: &Value,
+    ordered_transport: bool,
+) -> Result<Option<&'static str>, String> {
+    let entities = case.get("entities");
+    if entities.is_none() && !ordered_transport {
         return Ok(None);
+    }
+    let args = case_arguments(case);
+    let [_, _, args @ ..] = args.as_slice() else {
+        return Err("ordered transport input needs packet size and program".into());
+    };
+    let args = args
+        .strip_prefix(&[std::ffi::OsString::from("--dvb")])
+        .unwrap_or(args);
+    let Some(entities) = entities else {
+        return if args.is_empty() {
+            Ok(None)
+        } else {
+            Err("worker entity argument has no input pin".into())
+        };
     };
     let entities = entities.as_array().ok_or("expected an entity list")?;
     let [primary, following @ ..] = entities else {
@@ -87,19 +106,19 @@ fn entity_input_failure(corpus: &Path, case: &Value) -> Result<Option<&'static s
     if s(primary, "file") != Some(file) || s(primary, "sha256") != s(case, "sha256") {
         return Err("first entity does not match the case input".into());
     }
-    let args = case_arguments(case);
-    let [_, _, args @ ..] = args.as_slice() else {
-        return Err("ordered transport input needs packet size and program".into());
-    };
-    let args = args
-        .strip_prefix(&[std::ffi::OsString::from("--dvb")])
-        .unwrap_or(args);
     let mut args = args.iter();
     for entity in following {
         let Some(name) = args.next() else {
             return Err("ordered entity has no worker argument".into());
         };
-        let name = if name == "--discontinuity" {
+        let discontinuity = name == "--discontinuity";
+        if entity
+            .get("discontinuity")
+            .is_some_and(|declared| declared != &Value::Bool(discontinuity))
+        {
+            return Err("entity discontinuity does not match its worker argument".into());
+        }
+        let name = if discontinuity {
             args.next().ok_or("discontinuity without an entity")?
         } else {
             name
@@ -677,7 +696,11 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([("status", Value::str("input-hash-mismatch"))])
         } else if !rights_reviewed(&reviewed, case) {
             Value::object([("status", Value::str("rights-unreviewed"))])
-        } else if let Some(status) = entity_input_failure(&corpus, case)? {
+        } else if let Some(status) = entity_input_failure(
+            &corpus,
+            case,
+            matches!(worker_operation.as_deref(), Some("ts-" | "ts-au-")),
+        )? {
             Value::object([("status", Value::str(status))])
         } else if let Some(prefix) = &worker_operation {
             let arguments = case_arguments(case);
@@ -1009,24 +1032,29 @@ mod prefix_tests {
                              {{"file":"next.ts","sha256":"{hash}"}}]}}"#
         );
         let case = parse(&row).unwrap();
+        let unpinned = parse(r#"{"arguments":["188","1","next.ts"]}"#).unwrap();
+        assert_eq!(
+            entity_input_failure(&root, &unpinned, true).unwrap_err(),
+            "worker entity argument has no input pin"
+        );
         let mismatched =
             parse(&row.replace(r#"["188","1","next.ts"]"#, r#"["188","1","different.ts"]"#))
                 .unwrap();
         assert_eq!(
-            entity_input_failure(&root, &mismatched).unwrap_err(),
+            entity_input_failure(&root, &mismatched, true).unwrap_err(),
             "ordered entity does not match its worker argument"
         );
         assert_eq!(
-            entity_input_failure(&root, &case).unwrap(),
+            entity_input_failure(&root, &case, true).unwrap(),
             Some("missing-entity")
         );
         std::fs::write(root.join("next.ts"), b"other entity bytes").unwrap();
         assert_eq!(
-            entity_input_failure(&root, &case).unwrap(),
+            entity_input_failure(&root, &case, true).unwrap(),
             Some("entity-hash-mismatch")
         );
         std::fs::write(root.join("next.ts"), input).unwrap();
-        assert_eq!(entity_input_failure(&root, &case).unwrap(), None);
+        assert_eq!(entity_input_failure(&root, &case, true).unwrap(), None);
         std::fs::remove_file(root.join("next.ts")).unwrap();
         std::fs::remove_dir(root).unwrap();
     }
