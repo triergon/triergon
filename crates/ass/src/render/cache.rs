@@ -116,22 +116,10 @@ pub(super) trait CacheKey {
     fn same(a: &Self::View<'_>, b: &Self::View<'_>) -> bool;
 }
 
-/// What a lookup finds.
-#[derive(Debug)]
-pub(super) enum Lookup<T> {
-    /// Nothing is kept for the key.
-    Miss,
-    /// The key is kept without a value: an outline that cannot be built.
-    Empty,
-    /// The value kept.
-    Hit(Kept<T>),
-}
-
 /// An entry's value: kept by the cache, or, cut while held, kept only by its
 /// holders.
 #[derive(Debug)]
 enum Value<T> {
-    Empty,
     Kept(Arc<Node<T>>),
     Lent(Weak<Node<T>>),
 }
@@ -193,10 +181,9 @@ pub(super) struct Cache<K, T> {
     oldest: u32,
     newest: u32,
     released: ReleaseLog,
+    /// The entries, each with a shared allocation for its value that lives
+    /// until it goes.
     len: usize,
-    /// The entries with a value, whose shared allocations live until the
-    /// entries go.
-    values: usize,
     /// libass's `cache_size`: what the entries kept count, held ones too.
     size: usize,
     limit: usize,
@@ -225,7 +212,6 @@ impl<K: CacheKey, T> Cache<K, T> {
             newest: NONE,
             released: Arc::default(),
             len: 0,
-            values: 0,
             size: 0,
             limit: usize::MAX,
             charge: Reservation::empty(budget),
@@ -234,27 +220,24 @@ impl<K: CacheKey, T> Cache<K, T> {
 
     /// The value kept for `key`, which is now the newest in the use queue,
     /// queued again if it was cut while held (`ass_cache_get`).
-    pub(super) fn get(&mut self, key: K::View<'_>) -> Lookup<T> {
-        let Some(at) = self.find(&key) else {
-            return Lookup::Miss;
-        };
+    pub(super) fn get(&mut self, key: K::View<'_>) -> Option<Kept<T>> {
+        let at = self.find(&key)?;
         let entry = self.entry_mut(at);
-        let found = match &entry.value {
-            Value::Empty => Lookup::Empty,
-            Value::Kept(node) => Lookup::Hit(Kept(Arc::clone(node))),
+        let node = match &entry.value {
+            Value::Kept(node) => Arc::clone(node),
             Value::Lent(node) => {
                 let Some(node) = node.upgrade() else {
                     // Let go but not yet taken out: as good as gone.
                     self.remove(at);
-                    return Lookup::Miss;
+                    return None;
                 };
                 entry.value = Value::Kept(Arc::clone(&node));
-                Lookup::Hit(Kept(node))
+                node
             }
         };
         self.unqueue(at);
         self.queue(at);
-        found
+        Some(Kept(node))
     }
 
     /// Keeps `value` for `key`, absent before, counted as `size` and,
@@ -267,7 +250,7 @@ impl<K: CacheKey, T> Cache<K, T> {
     /// `Overflow` when the count would, and the budget's errors; the cache is
     /// then unchanged.
     pub(super) fn insert(&mut self, key: K, value: T, size: usize) -> Result<Kept<T>> {
-        let at = self.add(key, Some(value), size)?;
+        let at = self.add(key, value, size)?;
         let Value::Kept(node) = &self.entry(at).value else {
             unreachable!("a value just kept");
         };
@@ -276,21 +259,9 @@ impl<K: CacheKey, T> Cache<K, T> {
         Ok(kept)
     }
 
-    /// Keeps `key` without a value, counted as [`insert`](Self::insert)
-    /// counts one.
-    ///
-    /// # Errors
-    ///
-    /// Those of [`insert`](Self::insert).
-    pub(super) fn insert_empty(&mut self, key: K, size: usize) -> Result<()> {
-        self.add(key, None, size)?;
-        self.shrink();
-        Ok(())
-    }
-
     /// Adds an entry for `key` as the newest in the queue, without cutting;
     /// its slot.
-    fn add(&mut self, key: K, value: Option<T>, size: usize) -> Result<u32> {
+    fn add(&mut self, key: K, value: T, size: usize) -> Result<u32> {
         let hash = self.hash(&key.view());
         debug_assert!(self.find(&key.view()).is_none(), "a key kept twice");
         let size = if size == 1 {
@@ -304,20 +275,14 @@ impl<K: CacheKey, T> Cache<K, T> {
         self.reserve()?;
         let (size, total) = total;
         let (at, generation) = self.take_slot();
-        let value = match value {
-            Some(value) => {
-                self.values += 1;
-                Value::Kept(Arc::new(Node {
-                    value,
-                    released: Released {
-                        log: Arc::clone(&self.released),
-                        slot: at,
-                        generation,
-                    },
-                }))
-            }
-            None => Value::Empty,
-        };
+        let value = Value::Kept(Arc::new(Node {
+            value,
+            released: Released {
+                log: Arc::clone(&self.released),
+                slot: at,
+                generation,
+            },
+        }));
         let chain = self.index.insert(hash, at).unwrap_or(NONE);
         let entry = Entry {
             key,
@@ -460,7 +425,7 @@ impl<K: CacheKey, T> Cache<K, T> {
                 .saturating_mul(Self::BUCKET_BYTES)
                 .saturating_add(Self::INDEX_TAIL_BYTES)
         };
-        let values = self.values.saturating_mul(Self::NODE_BYTES);
+        let values = self.len.saturating_mul(Self::NODE_BYTES);
         index.saturating_add(values).saturating_add(log)
     }
 
@@ -585,9 +550,6 @@ impl<K: CacheKey, T> Cache<K, T> {
         };
         self.free = at;
         self.len -= 1;
-        if !matches!(entry.value, Value::Empty) {
-            self.values -= 1;
-        }
         debug_assert!(entry.size <= self.size);
         self.size = self.size.saturating_sub(entry.size);
         // Dropping the entry lets go of its key and value, which may log
@@ -723,7 +685,7 @@ pub(super) mod sizes {
 mod tests {
     use triergon_core::Budget;
 
-    use super::{CacheKey, ITEM_BYTES, Kept, Lookup};
+    use super::{CacheKey, ITEM_BYTES, Kept};
 
     type Cache<T = u32> = super::Cache<u32, T>;
 
@@ -744,10 +706,7 @@ mod tests {
     }
 
     fn found<T: Copy>(cache: &mut Cache<T>, key: u32) -> Option<T> {
-        match cache.get(key) {
-            Lookup::Hit(value) => Some(*value),
-            _ => None,
-        }
+        cache.get(key).map(|value| *value)
     }
 
     #[test]
@@ -777,7 +736,7 @@ mod tests {
         assert_eq!(cache.size(), 2 * (100 + ITEM_BYTES));
         assert!(found(&mut cache, 1).is_none() && found(&mut cache, 2).is_none());
         assert!(found(&mut cache, 3).is_some());
-        let Lookup::Hit(again) = cache.get(0) else {
+        let Some(again) = cache.get(0) else {
             panic!("the held entry went");
         };
         assert!(Kept::ptr_eq(&held, &again));
@@ -797,7 +756,7 @@ mod tests {
         drop(held);
         cache.settle();
         assert_eq!((cache.len(), cache.size()), (0, 0));
-        assert!(matches!(cache.get(0), Lookup::Miss));
+        assert!(cache.get(0).is_none());
     }
 
     #[test]
@@ -821,7 +780,7 @@ mod tests {
         cache.cut(0);
         // Let go, but not yet taken out: the lookup takes it out.
         drop(held);
-        assert!(matches!(cache.get(0), Lookup::Miss));
+        assert!(cache.get(0).is_none());
         assert_eq!((cache.len(), cache.size()), (0, 0));
     }
 
@@ -833,13 +792,13 @@ mod tests {
         // Its release is recorded, and the lookup frees its slot before the
         // record is read.
         drop(held);
-        assert!(matches!(cache.get(0), Lookup::Miss));
+        assert!(cache.get(0).is_none());
         // The next entry takes the slot while the record is pending; held,
         // it outlasts the cut that reads the record.
         let next = cache.insert(1, 1, 100).unwrap();
         cache.settle();
         assert_eq!(cache.len(), 1);
-        let Lookup::Hit(found) = cache.get(1) else {
+        let Some(found) = cache.get(1) else {
             panic!("the stale record took the new entry");
         };
         assert!(Kept::ptr_eq(&found, &next));
@@ -877,13 +836,15 @@ mod tests {
         assert_eq!(cache.size(), 2);
     }
 
+    /// An outline that cannot be built is kept as `None`, found as such,
+    /// and goes at a cut like any value nothing holds.
     #[test]
-    fn an_empty_value_is_kept_and_never_held() {
-        let mut cache: Cache = cache();
-        cache.insert_empty(0, 10).unwrap();
-        assert!(matches!(cache.get(0), Lookup::Empty));
+    fn an_absent_value_is_kept_and_cut_as_any_other() {
+        let mut cache: Cache<Option<u32>> = cache();
+        drop(cache.insert(0, None, 10).unwrap());
+        assert_eq!(found(&mut cache, 0), Some(None));
         cache.cut(0);
-        assert!(matches!(cache.get(0), Lookup::Miss));
+        assert!(cache.get(0).is_none());
     }
 
     /// Outlines whose keys hold others: G, a border B(G) whose key holds
@@ -918,7 +879,7 @@ mod tests {
         cache.insert(Key::Glyph(2), 2, 1).unwrap();
         cache.cut(1);
         assert_eq!(cache.len(), 1);
-        assert!(matches!(cache.get((2, std::ptr::null())), Lookup::Hit(_)));
+        assert!(cache.get((2, std::ptr::null())).is_some());
     }
 
     /// Lookups leave nothing behind that holds a value: an outline a
@@ -932,7 +893,7 @@ mod tests {
             super::Cache::new(&Budget::new(1 << 20).unwrap());
         bitmaps.insert(7, outline, 100).unwrap();
         for _ in 0..1000 {
-            assert!(matches!(bitmaps.get(7), Lookup::Hit(_)));
+            assert!(bitmaps.get(7).is_some());
         }
         outlines.cut(0);
         assert_eq!(outlines.len(), 1);
@@ -953,7 +914,7 @@ mod tests {
         // The refused insertion left nothing behind, and lookups and cuts
         // need nothing of the budget.
         assert_eq!(cache.len(), kept as usize);
-        assert!(matches!(cache.get(kept), Lookup::Miss));
+        assert!(cache.get(kept).is_none());
         assert_eq!(found(&mut cache, 0), Some(0));
         cache.cut(0);
         assert_eq!(cache.len(), 0);

@@ -26,17 +26,7 @@
   "confidence": 0.95,
   "pending_module_requirements": [
     "triergon-shape's open shape-libass cases, which block qualifying triergon-ass: the default-load advances FreeType's auto-hinter sets (DejaVuMathTeXGyre, authored-cmap-formats and six Noto Emoji variants)",
-    "triergon-shape's open shape-libass case authored-cff-features-otf-latn-libass, which blocks qualifying triergon-ass: fallback mark positioning in a CFF font without GPOS reads FreeType's hinted glyph extents",
-    "triergon-ass: a vector clip whose drawing has no contour empties every image of its event, as blend_vector_clip does with the bitmap without pixels libass draws for it (ass_render.c:700-813)"
+    "triergon-shape's open shape-libass case authored-cff-features-otf-latn-libass, which blocks qualifying triergon-ass: fallback mark positioning in a CFF font without GPOS reads FreeType's hinted glyph extents"
   ],
-  "open_cases": [
-    {
-      "id": "clip-vector-empty-ass-1080p",
-      "requirement": "triergon-ass: a vector clip whose drawing has no contour empties every image of its event, as blend_vector_clip does with the bitmap without pixels libass draws for it (ass_render.c:700-813)"
-    },
-    {
-      "id": "clip-vector-empty-ass-720p",
-      "requirement": "triergon-ass: a vector clip whose drawing has no contour empties every image of its event, as blend_vector_clip does with the bitmap without pixels libass draws for it (ass_render.c:700-813)"
-    }
-  ]
+  "open_cases": []
 }

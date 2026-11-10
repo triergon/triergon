@@ -17030,6 +17030,34 @@
    "bytes": 74838624
   },
   {
+   "name": "ass-render-parity-28e5ccf0",
+   "path": "ass-render-parity-28e5ccf0",
+   "retention": "retained",
+   "reason": "ASS rendering status row and ARMv7 table: the 5,722 generated scripts and fixture mutations rendered frame by frame through the renderer at 94e2af8b and libass, natively on AArch64 and in the ARMv7 user space on an r6g.2xlarge, with peak RSS and wall time per worker, main's run of the first 2,827 cases at a68420fa; the work and time of every frame of the work-bound scripts on ARMv7; the collision replay, the double-to-int conversions GCC compiles for each target, and libass for ARMv7 against libass for AArch64 where it runs out of memory; the same-code check of 28e5ccf0 against 94e2af8b on every case; the ASS gates at 28e5ccf0 on both targets with their reports, identities and pins; random-4559, whose libass run timed out under load in the full run, rerun alone (run-4559.jsonl)",
+   "key": "evidence/ass-render-parity-28e5ccf0/bc26dfc21b141cc79b5bb4f8cb3d636dcfaa3f64fa24eec2d200409eff0c32f0.tar.gz",
+   "sha256": "bc26dfc21b141cc79b5bb4f8cb3d636dcfaa3f64fa24eec2d200409eff0c32f0",
+   "bytes": 14839425,
+   "source_revisions": {
+    "corpus": "94e2af8b6a4c03a08a9e7271391b591c9f939631",
+    "gates": "28e5ccf0ecb5419f7105d52c91ebe8d6c09f053c",
+    "baseline": "a68420fa773a8a4af1e3c8e008c23b1f752a17c8"
+   }
+  },
+  {
+   "name": "ass-render-parity-01ccb497",
+   "path": "ass-render-parity-01ccb497",
+   "retention": "retained",
+   "reason": "ASS rendering status row and ARMv7 table: the 5,722 generated scripts and fixture mutations rendered frame by frame through the renderer at 3469d84e and libass, natively on AArch64 and in the ARMv7 user space on an r6g.2xlarge, with peak RSS and wall time per worker, and their causes against the earlier attribution; the work and time of every frame of the 17 work-bound scripts on ARMv7 with the bound lifted (probe patch included), and libass's time for each whole script; the ASS gates and crate tests on both targets (AArch64 at dac0137f with the pins it recorded, which make 01ccb497; ARMv7 at 01ccb497, recording identical pins); the change values of every ass-render frame; host and package lists. No case reached libass's time limit, so none was rerun.",
+   "key": "evidence/ass-render-parity-01ccb497/c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be.tar.gz",
+   "sha256": "c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be",
+   "bytes": 3670319,
+   "source_revisions": {
+    "corpus": "3469d84e360ac2217d603effa4d1a9fd70a87ea1",
+    "gates": "01ccb49792cf1d4d05b74addf35dc616763b88e0",
+    "baseline": "fedfb790bfb52131389cb7c5134bab7ab813b55f"
+   }
+  },
+  {
    "name": "subtitles-pgs-plane-03f3efd3-linux-arm64",
    "path": "subtitles-pgs-plane-03f3efd3-linux-arm64",
    "retention": "retained",

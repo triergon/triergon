@@ -9,7 +9,7 @@
   "compare_order": 5,
   "pinned_per_target": true,
   "contract": [
-    "the rendering fixtures whose libass result C leaves to the target, rendered and folded as ass-render renders and folds them: libass's renderer overflows int or converts a double out of int's range on the way to the result (a horizontal border beyond 2^30 frame pixels doubled in int for the width of an event's box)",
+    "the rendering fixtures whose libass result C leaves to the target, rendered and folded as ass-render renders and folds them: libass's renderer overflows int or converts a double out of int's range on the way to the result (a horizontal border beyond 2^30 frame pixels doubled in int for the width of an event's box; an event box taller than int holds, whose collision boxes end up 2^31 or more rows apart, where cmp_rect_y0's int subtraction wraps and glibc's merge sort orders them)",
     "each case is pinned per target from that target's own reference run; a case passes when the candidate, the reference and the target's pin agree, and a target a case has no pin for runs and reports it without comparing",
     "the renderer follows libass built with GCC for armv7-unknown-linux-gnueabihf: an int overflow wraps and a conversion out of int's range saturates; where libass for aarch64-unknown-linux-gnu gives another result, the case is open there as a deliberate divergence",
     "the fixture and its fonts are read before each timed and memory operation, which creates the library and renderer, reads the script or runs the stream and renders every frame"
@@ -25,34 +25,33 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "triergon-ass: the width of an event's box doubles its horizontal border in int arithmetic, which wraps beyond 2^30 frame pixels in libass built with GCC for armv7-unknown-linux-gnueabihf (ass_render.c:3001-3003), so a BorderStyle 4 event loses its box",
-    "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels, and the renderer follows libass on 32-bit ARM with GCC"
+    "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu converts an event box's top, height, left and width from double to int with vector instructions that keep the low 32 bits (ass_render.c:2995-3003), where 32-bit ARM saturates, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC"
   ],
   "open_cases": [
     {
       "id": "border-x-overflow-ass-1080p",
-      "requirement": "triergon-ass: the width of an event's box doubles its horizontal border in int arithmetic, which wraps beyond 2^30 frame pixels in libass built with GCC for armv7-unknown-linux-gnueabihf (ass_render.c:3001-3003), so a BorderStyle 4 event loses its box",
-      "targets": [
-        "armv7-unknown-linux-gnueabihf"
-      ]
-    },
-    {
-      "id": "border-x-overflow-ass-1080p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels, and the renderer follows libass on 32-bit ARM with GCC",
+      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu converts an event box's top, height, left and width from double to int with vector instructions that keep the low 32 bits (ass_render.c:2995-3003), where 32-bit ARM saturates, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "border-x-overflow-ass-720p",
-      "requirement": "triergon-ass: the width of an event's box doubles its horizontal border in int arithmetic, which wraps beyond 2^30 frame pixels in libass built with GCC for armv7-unknown-linux-gnueabihf (ass_render.c:3001-3003), so a BorderStyle 4 event loses its box",
+      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu converts an event box's top, height, left and width from double to int with vector instructions that keep the low 32 bits (ass_render.c:2995-3003), where 32-bit ARM saturates, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
       "targets": [
-        "armv7-unknown-linux-gnueabihf"
+        "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "border-x-overflow-ass-720p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels, and the renderer follows libass on 32-bit ARM with GCC",
+      "id": "collision-far-tops-ass-1080p",
+      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu converts an event box's top, height, left and width from double to int with vector instructions that keep the low 32 bits (ass_render.c:2995-3003), where 32-bit ARM saturates, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "collision-far-tops-ass-720p",
+      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu converts an event box's top, height, left and width from double to int with vector instructions that keep the low 32 bits (ass_render.c:2995-3003), where 32-bit ARM saturates, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

@@ -1,0 +1,31 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 2000
+; Colliding events whose boxes end up 2^31 or more rows apart. A vertical
+; border of 1.4e9 makes an event's box taller than int can hold; libass
+; converts the height out of int's range, undefined in C, which saturates
+; when built with GCC for armv7 and keeps the low 32 bits when built with GCC
+; for aarch64, whose vector conversion of the box takes that path. Moved up
+; clear of the bottom line, the tall box and the one pushed above it start
+; near INT_MIN, and cmp_rect_y0's int subtraction then wraps, so the order
+; glibc's merge sort gives the boxes decides where the top-aligned events go.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,10,,bottom line
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,90,,{\ybord1.4e9}a very tall border
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,90,,pushed above
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,10,,{\an8}first at the top
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,10,,{\an8}second at the top
+Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,10,,{\an8}later at the top

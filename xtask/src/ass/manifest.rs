@@ -73,7 +73,7 @@ pub const PER_TARGET: [(&str, Operation); 15] = [
 /// way to it, where C leaves the result undefined: `ass-render-host`'s cases,
 /// pinned per target; the renderer follows libass built with GCC for
 /// `armv7-unknown-linux-gnueabihf`.
-pub const RENDER_PER_TARGET: [&str; 1] = ["border-x-overflow.ass"];
+pub const RENDER_PER_TARGET: [&str; 2] = ["border-x-overflow.ass", "collision-far-tops.ass"];
 
 /// The files case rows are generated from, besides the pins and the fixtures,
 /// which each row records by hash.
