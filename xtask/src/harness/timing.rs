@@ -631,6 +631,7 @@ fn retry_contaminated(
         ("status", Value::str("contaminated")),
         ("rejected_contaminated_attempts", Value::Array(rejected)),
         ("contaminants", contaminants),
+        ("seed", Value::int(last_seed)),
     ]))
 }
 
@@ -1111,14 +1112,19 @@ impl Graded {
     }
 
     /// The fields every timing result carries: its status, the validator's
-    /// reason when it refuses a measured record, and the record itself.
+    /// interval, or its reason when it refuses a measured record, and the
+    /// record itself. Only a graded result has a `ratio`.
     pub fn into_fields(self) -> Vec<(String, Value)> {
         let mut fields = vec![("status".to_owned(), Value::str(self.status()))];
-        if let (Some("measured"), Err(reason)) = (
+        match (
             self.record.get("status").and_then(Value::as_str),
             &self.interval,
         ) {
-            fields.push(("invalid".to_owned(), Value::str(reason)));
+            (_, Ok(interval)) => fields.push(("ratio".to_owned(), interval_value(interval))),
+            (Some("measured"), Err(reason)) => {
+                fields.push(("invalid".to_owned(), Value::str(reason)));
+            }
+            _ => {}
         }
         fields.push(("timing".to_owned(), self.record));
         fields
@@ -1252,6 +1258,23 @@ mod tests {
         );
         assert_eq!(check(run(2)), Err("unequal-work"));
         assert_eq!(check(run(1)), Err("contaminated"));
+    }
+
+    #[test]
+    fn three_contaminated_attempts_keep_each_seed_and_the_last() {
+        let result = retry_contaminated(280, |_| {
+            Ok(Value::object([("status", Value::str("contaminated"))]))
+        })
+        .unwrap();
+        assert_eq!(result.get("seed"), Some(&Value::int(282)));
+        let seeds: Vec<_> = result
+            .get("rejected_contaminated_attempts")
+            .and_then(Value::as_array)
+            .unwrap()
+            .iter()
+            .map(|attempt| attempt.get("seed").cloned())
+            .collect();
+        assert_eq!(seeds, [280, 281, 282].map(|seed| Some(Value::int(seed))));
     }
 
     #[test]

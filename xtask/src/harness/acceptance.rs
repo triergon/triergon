@@ -247,7 +247,9 @@ pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_lin
             &super::timing::Expected {
                 worker_hashes: selected,
                 input_sha256: row.get("input_sha256").filter(|v| v.truthy()),
-                minimum_pairs: int(contract.get("minimum_pairs")).unwrap_or(i128::MAX),
+                minimum_pairs: int(contract.get("minimum_pairs"))
+                    .unwrap_or(i128::MAX)
+                    .max(super::timing::GATE_PAIRS as i128),
                 work: &work,
                 require_linux,
                 module_absence: contract.get("case_operations") == Some(&Value::Bool(true)),

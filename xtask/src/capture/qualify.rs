@@ -25,10 +25,9 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-
-use crate::codecs::correctness::file_sha;
 use std::time::Duration;
 
+use crate::codecs::correctness::file_sha;
 use crate::harness::gate_build;
 use crate::harness::memory;
 use crate::harness::policy;
@@ -159,12 +158,6 @@ fn withhold_gates(timed: &mut Value) {
             }
         }
     }
-}
-
-/// The ratio interval of a runtime result, in the shared record or, for
-/// results written before it, beside the samples.
-pub(super) fn ratio(runtime: &Value) -> Option<&Value> {
-    runtime.get("timing").unwrap_or(runtime).get("ratio")
 }
 
 /// One timing session of `case`, graded: the shared result fields, whether
@@ -418,7 +411,9 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         }
         let runtime_gate = outputs.is_some() && timed.get("gate_pass").is_some_and(Value::truthy);
         let runtime_target = timed.get("target_pass").is_some_and(Value::truthy);
-        let runtime_upper = ratio(&timed)
+        // The validator's interval: a refused record has none.
+        let runtime_upper = timed
+            .get("ratio")
             .and_then(|ratio| ratio.get("upper_95"))
             .and_then(Value::as_f64)
             .filter(|bound| bound.is_finite());
