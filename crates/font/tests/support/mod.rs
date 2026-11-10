@@ -5,6 +5,10 @@
 use triergon_core::{Budget, Bytes};
 use triergon_font::{FaceInfo, Font, GlyphId, Limits, Outline, Request, select};
 
+mod cff;
+
+use cff::{CffProgram, Part, charstring, n};
+
 pub fn u16s(values: &[u16]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_be_bytes()).collect()
 }
@@ -275,151 +279,6 @@ pub fn truetype_tables(weight: u16, fs_selection: u16, family: &str, subfamily: 
     ]
 }
 
-/// A CFF number with a fixed five-byte encoding, so offsets do not move.
-fn long(value: i32) -> Vec<u8> {
-    let mut v = vec![29];
-    v.extend(value.to_be_bytes());
-    v
-}
-
-fn index(objects: &[Vec<u8>]) -> Vec<u8> {
-    if objects.is_empty() {
-        return vec![0, 0];
-    }
-    let mut out = u16s(&[objects.len() as u16]);
-    out.push(4);
-    let mut offset = 1_u32;
-    out.extend(offset.to_be_bytes());
-    for object in objects {
-        offset += object.len() as u32;
-        out.extend(offset.to_be_bytes());
-    }
-    for object in objects {
-        out.extend(object);
-    }
-    out
-}
-
-/// A one-byte charstring number (-107..=107).
-fn n(value: i16) -> u8 {
-    (value + 139) as u8
-}
-
-/// A CFF number written as a real (TN 5176 Table 5), from its decimal text.
-fn real(text: &str) -> Vec<u8> {
-    let mut nibbles: Vec<u8> = Vec::new();
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        nibbles.push(match c {
-            '0'..='9' => c as u8 - b'0',
-            '.' => 0xa,
-            'E' if chars.peek() == Some(&'-') => {
-                chars.next();
-                0xc
-            }
-            'E' => 0xb,
-            '-' => 0xe,
-            _ => panic!("not a real: {text}"),
-        });
-    }
-    nibbles.push(0xf);
-    if nibbles.len() % 2 == 1 {
-        nibbles.push(0xf);
-    }
-    let mut out = vec![30];
-    out.extend(nibbles.chunks(2).map(|pair| pair[0] << 4 | pair[1]));
-    out
-}
-
-/// The parts of a name-keyed CFF table.
-pub struct CffProgram {
-    pub glyphs: Vec<Vec<u8>>,
-    pub global: Vec<Vec<u8>>,
-    pub local: Vec<Vec<u8>>,
-    /// The SID of each glyph after .notdef, as a format 0 charset; the ISOAdobe
-    /// charset when absent.
-    pub charset: Option<Vec<u16>>,
-    /// The string INDEX: the names of SIDs from 391.
-    pub strings: Vec<Vec<u8>>,
-    /// An encoding table; the Standard encoding when absent.
-    pub encoding: Option<Vec<u8>>,
-    /// FontMatrix entries as decimal text.
-    pub matrix: Option<[&'static str; 6]>,
-    pub nominal_width: i32,
-}
-
-impl CffProgram {
-    /// The CFF table. Offsets use the five-byte integer form, so the layout is
-    /// computed once with placeholders and once for real.
-    pub fn build(&self) -> Vec<u8> {
-        let private = |subrs: i32| {
-            let mut p = long(self.nominal_width);
-            p.push(21); // nominalWidthX
-            if !self.local.is_empty() {
-                p.extend(long(subrs));
-                p.push(19); // Subrs, relative to the Private DICT
-            }
-            p
-        };
-        let private_len = private(0).len();
-        let top = |charstrings: i32, charset: i32, encoding: i32, private_offset: i32| {
-            let mut t = long(charstrings);
-            t.push(17);
-            if self.charset.is_some() {
-                t.extend(long(charset));
-                t.push(15);
-            }
-            if self.encoding.is_some() {
-                t.extend(long(encoding));
-                t.push(16);
-            }
-            if let Some(matrix) = self.matrix {
-                for value in matrix {
-                    t.extend(real(value));
-                }
-                t.extend([12, 7]);
-            }
-            t.extend(long(private_len as i32));
-            t.extend(long(private_offset));
-            t.push(18);
-            t
-        };
-        let charset = self.charset.as_ref().map(|sids| {
-            let mut c = vec![0];
-            c.extend(u16s(sids));
-            c
-        });
-        let header = vec![1, 0, 4, 4];
-        let names = index(&[b"Test".to_vec()]);
-        let top_len = index(&[top(0, 0, 0, 0)]).len();
-        let strings = index(&self.strings);
-        let global = index(&self.global);
-        let charstrings_at = header.len() + names.len() + top_len + strings.len() + global.len();
-        let charstrings = index(&self.glyphs);
-        let charset_at = charstrings_at + charstrings.len();
-        let encoding_at = charset_at + charset.as_ref().map_or(0, Vec::len);
-        let private_at = encoding_at + self.encoding.as_ref().map_or(0, Vec::len);
-        let mut out = header;
-        out.extend(names);
-        out.extend(index(&[top(
-            charstrings_at as i32,
-            charset_at as i32,
-            encoding_at as i32,
-            private_at as i32,
-        )]));
-        out.extend(strings);
-        out.extend(global);
-        out.extend(charstrings);
-        out.extend(charset.unwrap_or_default());
-        out.extend(self.encoding.clone().unwrap_or_default());
-        out.extend(private(private_len as i32));
-        if !self.local.is_empty() {
-            out.extend(index(&self.local));
-        }
-        out
-    }
-}
-
 /// A CFF table: glyph 1 a square drawn with a width, hints, a hintmask and a local
 /// subroutine; glyph 2 a curve through a global subroutine and a flex.
 pub fn cff_table() -> Vec<u8> {
@@ -480,52 +339,9 @@ pub fn cff_table() -> Vec<u8> {
         encoding: None,
         matrix: None,
         nominal_width: 400,
+        private: Vec::new(),
     }
     .build()
-}
-
-/// A two-byte charstring number (108..=1131 or -1131..=-108), or one byte inside
-/// -107..=107.
-pub fn number(value: i16) -> Vec<u8> {
-    match value {
-        -107..=107 => vec![n(value)],
-        108..=1131 => {
-            let v = value - 108;
-            vec![(v / 256 + 247) as u8, (v % 256) as u8]
-        }
-        -1131..=-108 => {
-            let v = -value - 108;
-            vec![(v / 256 + 251) as u8, (v % 256) as u8]
-        }
-        _ => {
-            let mut b = vec![28];
-            b.extend(value.to_be_bytes());
-            b
-        }
-    }
-}
-
-/// A charstring from numbers and operator bytes.
-fn charstring(parts: &[Part]) -> Vec<u8> {
-    parts
-        .iter()
-        .flat_map(|part| match *part {
-            Part::N(v) => number(v),
-            Part::Op(op) => vec![op],
-            Part::Escape(op) => vec![12, op],
-            Part::Byte(byte) => vec![byte],
-        })
-        .collect()
-}
-
-/// One element of an authored charstring.
-#[derive(Clone, Copy)]
-enum Part {
-    N(i16),
-    Op(u8),
-    Escape(u8),
-    /// A raw byte, such as a hint mask.
-    Byte(u8),
 }
 
 /// A CFF face exercising `seac`, arithmetic (`div`, `mul`, `add`, `sub`, `neg`,
@@ -782,6 +598,7 @@ fn cff_features_tables() -> Tables {
         encoding: None,
         matrix: None,
         nominal_width: 500,
+        private: Vec::new(),
     };
     vec![
         (*b"head", head(1000, false, 0)),
@@ -850,6 +667,7 @@ fn cff_matrix_tables() -> Tables {
         encoding: None,
         matrix: Some(["0.0005", "0", "0.0001", "0.0005", "0.025", "-0.0125"]),
         nominal_width: 0,
+        private: Vec::new(),
     };
     vec![
         (*b"head", head(2000, false, 0)),
@@ -1223,6 +1041,7 @@ fn charmaps_tables() -> Tables {
         encoding: Some(vec![0x81, 1, 0x80, 3, 1, 0xc0, 0x01, 0x8b]),
         matrix: None,
         nominal_width: 0,
+        private: Vec::new(),
     };
     let metrics: Vec<(u16, i16)> = (0..10).map(|g| (300 + 50 * g, 50)).collect();
     vec![
