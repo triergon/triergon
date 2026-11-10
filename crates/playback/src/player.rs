@@ -3,6 +3,7 @@ use crate::{BackendStep, Engine, RawEvent, Result, io::SourceOwner};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, TimeBase, WorkBudget};
 use triergon_isobmff::compat::mov::packets::PacketCursor;
+use triergon_mpegts::TraceEvent;
 
 mod mp4_native_seek;
 mod mp4_range;
@@ -148,15 +149,25 @@ impl Output {
         self.pool().same_pool(pool)
     }
     pub(crate) fn pool(&self) -> &Budget {
-        match &self.event {
+        Self::event_budget(&self.event)
+            .or(self.pool.as_ref())
+            .expect("output without a payload budget retains its allocation budget")
+    }
+
+    #[inline]
+    fn event_budget(event: &RawEvent) -> Option<&Budget> {
+        match event {
             RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)) => {
-                packet.configuration.budget()
+                Some(packet.configuration.budget())
             }
-            RawEvent::NativeTs { packet, .. } => packet.spans.budget(),
-            _ => self
-                .pool
-                .as_ref()
-                .expect("output without a payload budget retains its allocation budget"),
+            RawEvent::NativeTs { packet, .. } => Some(packet.spans.budget()),
+            RawEvent::Ts(event) => match &event.source {
+                TraceEvent::Transport(packet) => Some(packet.source.budget()),
+                TraceEvent::Section(section) => Some(section.bytes().budget()),
+                TraceEvent::Pes(packet) => Some(packet.header_source_ranges.budget()),
+                _ => None,
+            },
+            _ => None,
         }
     }
 
@@ -1197,7 +1208,7 @@ impl<S: Source> Player<S> {
             e,
             RawEvent::Matroska(triergon_matroska::typed::Event::Configuration(_))
                 | RawEvent::Ts(crate::TsEvent {
-                    source: triergon_mpegts::TraceEvent::ProgramMap { active: true, .. },
+                    source: TraceEvent::ProgramMap { active: true, .. },
                     ..
                 })
         ) {
@@ -1210,7 +1221,7 @@ impl<S: Source> Player<S> {
                 && matches!(
                     e,
                     RawEvent::Ts(crate::TsEvent {
-                        source: triergon_mpegts::TraceEvent::Pes(pes),
+                        source: TraceEvent::Pes(pes),
                         ..
                     }) if self.engine.as_ref().is_some_and(|engine| {
                         engine.replaces_source_ts_pes(pes.pid)
@@ -1348,15 +1359,9 @@ impl<S: Source> Player<S> {
         };
         *destination = Some(Output {
             source,
-            pool: if matches!(
-                &event,
-                RawEvent::Matroska(triergon_matroska::typed::Event::Packet(_))
-                    | RawEvent::NativeTs { .. }
-            ) {
-                None
-            } else {
-                Some(self.pool.clone())
-            },
+            pool: Output::event_budget(&event)
+                .is_none()
+                .then(|| self.pool.clone()),
             session: self.session,
             epoch: self.epoch,
             generation: self.generation,

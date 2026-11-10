@@ -90,6 +90,8 @@ retryable and keeps the pending request, packet and buffers. `PlayerPolicy`
 defaults to 16 FIFO slots (at most 64), 32 MiB queued payload, 128 MiB seek
 input and 10,000,000 events. `Player::new_direct` skips the FIFO for callers
 that use `Player::read_output` with one caller-owned slot.
+Transport carrier, section and PES outputs use the budget of their retained
+storage for pool identity.
 
 **Clocks.** Every packet keeps its exact source timestamps. FFmpeg-compatible
 packet clocks are explicit opt-in views (`ClockChoice::ExplicitNativeProjection`,

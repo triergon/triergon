@@ -17095,6 +17095,71 @@
    "source_revision": "354f7d735ac22df3b63e7849eb5869488c087bd9"
   },
   {
+   "name": "ts-program-carrier-copy-comparison",
+   "retention": "90 days",
+   "key": "qualification/ts-program-carrier-copy-comparison/a857f2cc5e13b6a25f220c802eeb68ce8b70fcf483c2f3c4e282deacc4767e64.tar.zst",
+   "sha256": "a857f2cc5e13b6a25f220c802eeb68ce8b70fcf483c2f3c4e282deacc4767e64"
+  },
+  {
+   "name": "ts-program-buffered-carriers",
+   "retention": "90 days",
+   "key": "qualification/ts-program-buffered-carriers/5ce1b0cfd343c3a12c68c5ba0b4ca55607edd145a817d138a0ff72096e660ea4.tar.zst",
+   "sha256": "5ce1b0cfd343c3a12c68c5ba0b4ca55607edd145a817d138a0ff72096e660ea4"
+  },
+  {
+   "name": "ts-program-buffered-playback",
+   "retention": "retained",
+   "reason": "MPEG-TS program playback measurements in docs/status.md",
+   "key": "evidence/ts-program-buffered-playback/beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a.tar.zst",
+   "sha256": "beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a",
+   "bytes": 11567352,
+   "source_revision": "3125c1e61d73a575419f7b653a1dae44a3269dae"
+  },
+  {
+   "name": "ts-program-tight-carrier-comparison",
+   "path": "ts-program-tight-carrier-comparison",
+   "retention": "retained",
+   "reason": "Complete TS program comparison and adjacent HLS and progressive playback comparisons on AArch64 Linux.",
+   "key": "evidence/ts-program-tight-carrier-comparison/7e18edf0a340b6ff4bb296b52deffc720f706c464340c7c73392127f9c87248c.tar.gz",
+   "sha256": "7e18edf0a340b6ff4bb296b52deffc720f706c464340c7c73392127f9c87248c",
+   "bytes": 125514110,
+   "source_revision": "eb3279f36c19c97dd9bdd68b1e66f371f28e38c1"
+  },
+  {
+   "name": "ts-program-borrowed-continuations",
+   "retention": "90 days",
+   "key": "qualification/ts-program-borrowed-continuations/b876dcb0179cad3fbfb9a2796aae857ac5ecbed3dc17262cb33b820b72dba6e3.tar.gz",
+   "sha256": "b876dcb0179cad3fbfb9a2796aae857ac5ecbed3dc17262cb33b820b72dba6e3"
+  },
+  {
+   "name": "ts-program-buffered-storage",
+   "retention": "90 days",
+   "key": "qualification/ts-program-buffered-storage/4b499e55200c8a4fc2eabc334c8dfb228e1b2e9a6f402ec1c92dea00d5c4c5aa.tar.gz",
+   "sha256": "4b499e55200c8a4fc2eabc334c8dfb228e1b2e9a6f402ec1c92dea00d5c4c5aa"
+  },
+  {
+   "name": "ts-program-pending-carrier",
+   "retention": "90 days",
+   "key": "qualification/ts-program-pending-carrier/37b58a06055b2fe378eec6885910196f8842574c0c03ab82e9d16d2803554d51.tar.gz",
+   "sha256": "37b58a06055b2fe378eec6885910196f8842574c0c03ab82e9d16d2803554d51"
+  },
+  {
+   "name": "ts-program-output-budget",
+   "retention": "90 days",
+   "key": "qualification/ts-program-output-budget/eb03555af41821a9e323a1d06e488eab579984915b8451117011d6df5a3bc531.tar.gz",
+   "sha256": "eb03555af41821a9e323a1d06e488eab579984915b8451117011d6df5a3bc531"
+  },
+  {
+   "name": "ts-program-and-progressive-gates",
+   "path": "ts-program-and-progressive-gates",
+   "retention": "retained",
+   "reason": "MPEG-TS program and progressive playback measurements in docs/status.md.",
+   "key": "evidence/ts-program-and-progressive-gates/a372562b91bb14dce3bbd7117f71deb098f6dba49492c5f4396a70336012d6fc.tar.gz",
+   "sha256": "a372562b91bb14dce3bbd7117f71deb098f6dba49492c5f4396a70336012d6fc",
+   "bytes": 89667279,
+   "source_revision": "23f68766543bcd57a96e88bfe5350095236ff88c"
+  },
+  {
    "name": "font-charmaps-944fd7cf",
    "path": "font-charmaps-944fd7cf",
    "retention": "retained",

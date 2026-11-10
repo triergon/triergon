@@ -588,7 +588,7 @@ impl TransportStream {
             Route::Ignore
         }
     }
-    fn find_feed_route(&self, pid: u16) -> Route {
+    fn route_for_carrier(&self, pid: u16) -> Route {
         // Elementary PIDs are unique. PAT/PMT changes clear or replace the
         // table before another carrier is read; recheck the indexed PID.
         if let Route::Pes(index) = self.route
@@ -1298,7 +1298,7 @@ impl TransportStream {
         {
             return Ok(false);
         }
-        let Route::Pes(index) = self.find_feed_route(pid) else {
+        let Route::Pes(index) = self.route_for_carrier(pid) else {
             return Ok(false);
         };
         let epochs = self.source_epochs();
@@ -1406,7 +1406,7 @@ impl TransportStream {
         self.clock_quarantined = true;
         self.diagnostic(FaultKind::Transport, Some(pid), Error::Invalid(reason))
     }
-    fn feed(&mut self, work: &mut WorkBudget) -> Result<()> {
+    fn feed<const FEED: bool>(&mut self, work: &mut WorkBudget) -> Result<()> {
         let packet = self
             .packet
             .as_mut()
@@ -1419,7 +1419,8 @@ impl TransportStream {
         let pid = packet.pid;
         let pusi = packet.payload_unit_start;
         let offset = packet.payload_source_offset;
-        if self.feed_omissions.is_some()
+        if FEED
+            && self.feed_omissions.is_some()
             && pusi
             && work.remaining() >= payload.len() as u64
             && let [0, section_and_stuffing @ ..] = payload.as_ref()
@@ -1504,7 +1505,11 @@ impl TransportStream {
         }
         Ok(())
     }
-    fn drain(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<TraceEvent>> {
+    fn drain<const FEED: bool>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<TraceEvent>> {
         let result = match self.route {
             Route::Pat => self
                 .pat
@@ -1537,7 +1542,7 @@ impl TransportStream {
                     .assembler
                     .as_mut()
                     .ok_or(Error::Invalid("PES route missing"))?;
-                let step = if self.feed_omissions.is_some() {
+                let step = if FEED && self.feed_omissions.is_some() {
                     assembler.poll_source::<false>(work, cancel)
                 } else {
                     assembler.poll_source::<true>(work, cancel)
@@ -1653,6 +1658,15 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<TraceEvent>> {
+        // Select the full trace before entering the per-carrier loop.
+        if self.feed_omissions.is_none() {
+            return self.poll_inner::<TraceEvent, false, false, false>(
+                input,
+                work,
+                cancel,
+                |_, _, _, _| Ok(FeedContinuation::Emit),
+            );
+        }
         self.poll_feed(input, work, cancel, &mut |_, _, _, _| {
             Ok(FeedContinuation::Emit)
         })
@@ -1748,7 +1762,7 @@ impl TransportStream {
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
-        self.poll_inner::<TraceEvent, DIRECT, RUNS>(input, work, cancel, consume)
+        self.poll_inner::<TraceEvent, true, DIRECT, RUNS>(input, work, cancel, consume)
     }
 
     pub fn poll_compact(
@@ -1757,12 +1771,15 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<CompactTraceEvent>> {
-        self.poll_inner::<CompactTraceEvent, false, false>(input, work, cancel, |_, _, _, _| {
-            Ok(FeedContinuation::Emit)
-        })
+        self.poll_inner::<CompactTraceEvent, true, false, false>(
+            input,
+            work,
+            cancel,
+            |_, _, _, _| Ok(FeedContinuation::Emit),
+        )
     }
 
-    fn poll_inner<T: PollOutput, const DIRECT: bool, const RUNS: bool>(
+    fn poll_inner<T: PollOutput, const FEED: bool, const DIRECT: bool, const RUNS: bool>(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
@@ -1782,7 +1799,7 @@ impl TransportStream {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if self.deferred_feed_events != 0 {
+            if FEED && self.deferred_feed_events != 0 {
                 if self.phase == FEED_FALLBACK_PHASE {
                     if work.remaining() == 0 {
                         return Ok(Step::Yield);
@@ -1815,8 +1832,8 @@ impl TransportStream {
                 if self.job.is_some() || self.section.is_some() || self.map_build.is_some() {
                     return Ok(Step::Yield);
                 }
-            } else if cancel.load(Ordering::Relaxed) {
-                // An idle collector still checks cancellation before returning Done.
+            } else if FEED && cancel.load(Ordering::Relaxed) {
+                // Feed omissions may have advanced since the loop's first check.
                 return Err(Error::Cancelled);
             }
             if work.remaining() == 0 {
@@ -1829,7 +1846,7 @@ impl TransportStream {
                             return Ok(Step::Yield);
                         }
                         let outcome = self.outcome.take();
-                        if self.feed_validated_carriers {
+                        if FEED && self.feed_validated_carriers {
                             let packet = self
                                 .packet
                                 .as_ref()
@@ -1857,7 +1874,7 @@ impl TransportStream {
                             continue;
                         }
                         if let Some(outcome) = outcome {
-                            if self.feed_omissions.is_some() {
+                            if FEED && self.feed_omissions.is_some() {
                                 self.omit_feed_events(1)?;
                                 continue;
                             }
@@ -1877,9 +1894,9 @@ impl TransportStream {
                             return Ok(ready(event));
                         }
                     }
-                    5 => self.feed(work)?,
+                    5 => self.feed::<FEED>(work)?,
                     6 => {
-                        if let Some(event) = self.drain(work, cancel)? {
+                        if let Some(event) = self.drain::<FEED>(work, cancel)? {
                             return Ok(ready(event));
                         }
                     }
@@ -1922,12 +1939,8 @@ impl TransportStream {
                 {
                     Ok(Step::Ready(mut carrier)) => {
                         self.entity_end = None;
-                        self.route = if DIRECT {
-                            self.find_feed_route(carrier.pid())
-                        } else {
-                            self.find_route(carrier.pid())
-                        };
-                        if self.validate_feed_continuation(&carrier, work)? {
+                        self.route = self.route_for_carrier(carrier.pid());
+                        if FEED && self.validate_feed_continuation(&carrier, work)? {
                             match consume(
                                 FeedItem::Carrier(FeedCarrier(&mut carrier)),
                                 self.feed_omissions.unwrap_or(0),
@@ -1963,7 +1976,7 @@ impl TransportStream {
                         }
                         let packet = carrier.into_packet()?;
                         self.phase = 1;
-                        if self.feed_validated_carriers {
+                        if FEED && self.feed_validated_carriers {
                             self.packet = Some(packet);
                             continue 'events;
                         }
@@ -2067,10 +2080,10 @@ mod dispatch_tests {
         for previous in [Route::Ignore, Route::Pmt, Route::Pes(0), Route::Pes(1)] {
             stream.route = previous;
             for (pid, expected) in expected {
-                let actual = stream.find_feed_route(pid);
+                let actual = stream.route_for_carrier(pid);
                 assert_eq!(actual, expected);
                 stream.route = actual;
-                assert_eq!(stream.find_feed_route(pid), expected);
+                assert_eq!(stream.route_for_carrier(pid), expected);
             }
         }
     }
@@ -2080,12 +2093,12 @@ mod dispatch_tests {
         let mut stream = stream();
         stream.route = Route::Pes(1);
         stream.routes.as_mut_slice().swap(0, 1);
-        assert_eq!(stream.find_feed_route(257), Route::Pes(0));
-        assert_eq!(stream.find_feed_route(256), Route::Pes(1));
+        assert_eq!(stream.route_for_carrier(257), Route::Pes(0));
+        assert_eq!(stream.route_for_carrier(256), Route::Pes(1));
         stream.route = Route::Pes(1);
         stream.routes.clear();
-        assert_eq!(stream.find_feed_route(256), Route::Ignore);
-        assert_eq!(stream.find_feed_route(100), Route::Pmt);
-        assert_eq!(stream.find_feed_route(300), Route::Clock);
+        assert_eq!(stream.route_for_carrier(256), Route::Ignore);
+        assert_eq!(stream.route_for_carrier(100), Route::Pmt);
+        assert_eq!(stream.route_for_carrier(300), Route::Clock);
     }
 }

@@ -209,8 +209,12 @@ impl Bytes {
     pub fn storage_address(&self) -> ByteStorageAddress {
         ByteStorageAddress(Arc::as_ptr(&self.storage).addr())
     }
+    /// The pool that accounts for the backing allocation.
+    pub fn budget(&self) -> &Budget {
+        &self.storage.charge.budget
+    }
     pub fn belongs_to(&self, budget: &Budget) -> bool {
-        self.storage.charge.budget.same_pool(budget)
+        self.budget().same_pool(budget)
     }
     /// Exclusive write access to a uniquely owned whole allocation, keeping its
     /// bytes and capacity. A shared allocation or a slice is returned intact.
