@@ -1002,6 +1002,11 @@
       "packets": 1703,
       "bytes": 1766,
       "digest": 2643349886622647399
+    },
+    "authored-charmaps-otf-latn-libass": {
+      "packets": 1703,
+      "bytes": 1766,
+      "digest": 14996261304910813611
     }
   }
 }

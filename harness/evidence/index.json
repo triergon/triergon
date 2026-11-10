@@ -17089,6 +17089,26 @@
    "source_revision": "8bbf6eab798f3d58f62dce14915fb30acd14488e"
   },
   {
+   "name": "font-shape-ass-8786192b",
+   "path": "font-shape-ass-8786192b",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape and ass compare at 8786192b against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy and shape ucd --check on AArch64, and the user space's package list.",
+   "key": "evidence/font-shape-ass-8786192b/996b7f0a128c48391f232106246ef9b2cf7f4dd27ce6ec1eb709a68d8d86f008.tar.gz",
+   "sha256": "996b7f0a128c48391f232106246ef9b2cf7f4dd27ce6ec1eb709a68d8d86f008",
+   "bytes": 82936012,
+   "source_revision": "8786192bac7b0abea286ee999c8e03073a6ac796"
+  },
+  {
+   "name": "font-vertical-354f7d73",
+   "path": "font-vertical-354f7d73",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at 354f7d73 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy and shape ucd --check on AArch64; the ARMv7 font step ran again on an idle machine after the FreeType reference timed out on NotoSansCJK while the host compiled.",
+   "key": "evidence/font-vertical-354f7d73/f4e2ec2449012a0efc1ee4ec6c75cfff8122528e3c629fbbe68c1380d9eff7f5.tar.gz",
+   "sha256": "f4e2ec2449012a0efc1ee4ec6c75cfff8122528e3c629fbbe68c1380d9eff7f5",
+   "bytes": 98509170,
+   "source_revision": "354f7d735ac22df3b63e7849eb5869488c087bd9"
+  },
+  {
    "name": "ts-program-carrier-copy-comparison",
    "retention": "90 days",
    "key": "qualification/ts-program-carrier-copy-comparison/a857f2cc5e13b6a25f220c802eeb68ce8b70fcf483c2f3c4e282deacc4767e64.tar.zst",
@@ -17152,6 +17172,72 @@
    "sha256": "a372562b91bb14dce3bbd7117f71deb098f6dba49492c5f4396a70336012d6fc",
    "bytes": 89667279,
    "source_revision": "23f68766543bcd57a96e88bfe5350095236ff88c"
+  },
+  {
+   "name": "transport-before-review",
+   "retention": "90 days",
+   "key": "qualification/transport-before-review/dee784888225a1716fc2e92d14f5269ad0b3b0361d64c9516f61e21a8479f590.tar.gz",
+   "sha256": "dee784888225a1716fc2e92d14f5269ad0b3b0361d64c9516f61e21a8479f590"
+  },
+  {
+   "name": "mpegts-shared-container-reader",
+   "path": "mpegts-shared-container-reader",
+   "retention": "retained",
+   "reason": "MPEG-TS and HLS measurements in docs/status.md.",
+   "key": "evidence/mpegts-shared-container-reader/8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5.tar.gz",
+   "sha256": "8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5",
+   "bytes": 275601976,
+   "source_revision": "21c9eef2f08a11bb7bd1c457997095326f2bb42d"
+  },
+  {
+   "name": "font-charmaps-944fd7cf",
+   "path": "font-charmaps-944fd7cf",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md after FreeType's full charmap order, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape and ass compare at 944fd7cf natively on AArch64 and in the armv7-userland user space, with raster compare, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64, each run's build log, and the user space's package list.",
+   "key": "evidence/font-charmaps-944fd7cf/c2ffb0cd91e0e5e313e08d4df02ff034978b054fffb88a27451a337e7e770d0e.tar.gz",
+   "sha256": "c2ffb0cd91e0e5e313e08d4df02ff034978b054fffb88a27451a337e7e770d0e",
+   "bytes": 98546546,
+   "source_revision": "944fd7cfc7712f505bd66e046afaa77f7eee6aac"
+  },
+  {
+   "name": "font-ass-vertical-a6e98452",
+   "path": "font-ass-vertical-a6e98452",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with `@` fonts drawn and shaped as libass does, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape and ass compare at a6e98452 natively on AArch64 and in the armv7-userland user space, with raster compare, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64, each run's build log, and the user space's package list.",
+   "key": "evidence/font-ass-vertical-a6e98452/d5b68414a5a9db73c98b0cab8f49919980da2d7754e46fcb84cf7cc6f8039f0a.tar.gz",
+   "sha256": "d5b68414a5a9db73c98b0cab8f49919980da2d7754e46fcb84cf7cc6f8039f0a",
+   "bytes": 98547570,
+   "source_revision": "a6e984526d20029e75b48650e9cc317f192da776"
+  },
+  {
+   "name": "font-charmaps-vertical-801e0349",
+   "path": "font-charmaps-vertical-801e0349",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's full charmap order and the @ font drawing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64. Measured at 801e0349, whose tree differs from b5bc0d90 only in docs/status.md and harness/evidence/index.json.",
+   "key": "evidence/font-charmaps-vertical-801e0349/8a5799509af3fa883fa3686ea181d7b630dee90db6e71e60cb55023c65e8cd37.tar.gz",
+   "sha256": "8a5799509af3fa883fa3686ea181d7b630dee90db6e71e60cb55023c65e8cd37",
+   "bytes": 98631031,
+   "source_revision": "b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506"
+  },
+  {
+   "name": "font-cmap-8e137d8d",
+   "path": "font-cmap-8e137d8d",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's full charmap order and format 4 search, HarfBuzz's cmap selection, and the @ font drawing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at 8e137d8d against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-cmap-8e137d8d/fe2bee783e52adedca9e0c427a16b3fa30afa70471aaa507f38be9e177dd2b8a.tar.gz",
+   "sha256": "fe2bee783e52adedca9e0c427a16b3fa30afa70471aaa507f38be9e177dd2b8a",
+   "bytes": 98639740,
+   "source_revision": "8e137d8d5c4e6dbe76c5289a769242cea9beda2d"
+  },
+  {
+   "name": "font-cmap-8058a77c",
+   "path": "font-cmap-8058a77c",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's full charmap order and format 4 search, HarfBuzz's cmap sanitizing, selection and remapping, and the @ font drawing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at 8058a77c against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-cmap-8058a77c/95b5c4d659408f264cbe8bfc24f20ca43a303863e23bbc107d3192956f5c6f7b.tar.gz",
+   "sha256": "95b5c4d659408f264cbe8bfc24f20ca43a303863e23bbc107d3192956f5c6f7b",
+   "bytes": 98652028,
+   "source_revision": "8058a77c444958ba82dcf4b5783720fc9aafe66f"
   }
  ]
 }

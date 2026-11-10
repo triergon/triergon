@@ -341,6 +341,10 @@ pub(crate) enum NativePacket {
 }
 
 #[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "return original transport events without a heap allocation"
+)]
 pub(crate) enum TsPayloadStep {
     Event(TsEvent),
     Configuration(TsNativeConfiguration),

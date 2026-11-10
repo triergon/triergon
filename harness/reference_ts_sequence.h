@@ -51,7 +51,7 @@ static int ts_entities_load(TsEntities *source, int argc, char **argv, int at,
     size_t directory = slash ? (size_t)(slash + 1 - argv[2]) : 0;
     int discontinuity = 0;
     for (int i = at + 2; i < argc; ++i) {
-        if (i == at + 2 && !strcmp(argv[i], "--dvb"))
+        if (i == at + 2 && (!strcmp(argv[i], "--dvb") || !strcmp(argv[i], "--atsc")))
             continue;
         if (!strcmp(argv[i], "--discontinuity") && !discontinuity) {
             discontinuity = 1;

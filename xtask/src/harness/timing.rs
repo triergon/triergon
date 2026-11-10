@@ -546,10 +546,8 @@ pub fn benchmark(
     seed: u64,
     operation: &Operation,
 ) -> Result<Value, String> {
-    let mut rejected = Vec::new();
-    let mut last = Value::Null;
-    for attempt in 0..3 {
-        let result = benchmark_once(
+    retry_contaminated(|attempt| {
+        benchmark_once(
             candidate,
             reference,
             input,
@@ -557,7 +555,23 @@ pub fn benchmark(
             iterations,
             seed + attempt,
             operation,
-        )?;
+        )
+    })
+}
+
+fn retry_contaminated(
+    mut measure: impl FnMut(u64) -> Result<Value, String>,
+) -> Result<Value, String> {
+    let mut rejected = Vec::new();
+    for attempt in 0..3 {
+        let result = match measure(attempt) {
+            Ok(result) => result,
+            Err(error) if rejected.is_empty() => return Err(error),
+            Err(error) => Value::object([
+                ("status", Value::str("timing-attempt-failed")),
+                ("error", Value::str(error)),
+            ]),
+        };
         if result.get("status").and_then(Value::as_str) != Some("contaminated") {
             let mut result = result;
             if let Value::Object(fields) = &mut result {
@@ -568,18 +582,17 @@ pub fn benchmark(
             }
             return Ok(result);
         }
-        rejected.push(result.clone());
-        last = result;
+        rejected.push(result);
     }
+    let contaminants = rejected
+        .last()
+        .and_then(|result| result.get("contaminants"))
+        .cloned()
+        .unwrap_or(Value::Array(vec![]));
     Ok(Value::object([
         ("status", Value::str("contaminated")),
         ("rejected_contaminated_attempts", Value::Array(rejected)),
-        (
-            "contaminants",
-            last.get("contaminants")
-                .cloned()
-                .unwrap_or(Value::Array(vec![])),
-        ),
+        ("contaminants", contaminants),
     ]))
 }
 
@@ -703,7 +716,18 @@ fn benchmark_once(
         .iter()
         .map(|(n, w)| Ok((*n, digest(w)?)))
         .collect::<Result<_, String>>()?;
-    let input_sha = digest(input)?;
+    let input_sha = match digest(input) {
+        Ok(hash) => hash,
+        Err(error) => {
+            return Ok(status_only(
+                "input-check-failed",
+                &samples,
+                &warmups,
+                &observations,
+                vec![("input_error", Value::str(error))],
+            ));
+        }
+    };
     for (name, worker) in &workers {
         module_check!(format!("before-warmup:{name}"));
         let warm = worker::execute(&argv(name, worker), operation.timeout);
@@ -824,12 +848,24 @@ fn benchmark_once(
         };
         values.push((elapsed(a), elapsed(b)));
     }
+    let input_after = match digest(input) {
+        Ok(hash) => hash,
+        Err(error) => {
+            return Ok(status_only(
+                "input-check-failed",
+                &samples,
+                &warmups,
+                &observations,
+                vec![("input_error", Value::str(error))],
+            ));
+        }
+    };
     let unchanged = [candidate, reference]
         .into_iter()
         .chain(workers.iter().map(|(_, w)| w.as_path()))
         .zip(hashes.iter().chain(&hashes))
         .all(|(w, (_, h))| digest(w).is_ok_and(|d| &d == h))
-        && digest(input)? == input_sha;
+        && input_after == input_sha;
     if !unchanged {
         return Ok(status_only(
             "worker-or-input-changed",
@@ -889,6 +925,32 @@ fn benchmark_once(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_retry_preserves_rejected_samples() {
+        let first = Value::object([
+            ("status", Value::str("contaminated")),
+            ("samples", Value::Array(vec![Value::int(17)])),
+        ]);
+        let result = retry_contaminated(|attempt| match attempt {
+            0 => Ok(first.clone()),
+            1 => Err("input unreadable".into()),
+            _ => panic!("timing must stop on a failed retry"),
+        })
+        .unwrap();
+        assert_eq!(
+            result.get("status").and_then(Value::as_str),
+            Some("timing-attempt-failed")
+        );
+        assert_eq!(
+            result.get("error").and_then(Value::as_str),
+            Some("input unreadable")
+        );
+        assert_eq!(
+            result.get("rejected_contaminated_attempts"),
+            Some(&Value::Array(vec![first]))
+        );
+    }
 
     #[test]
     fn failed_timing_preserves_complete_warmups_and_module_observations() {

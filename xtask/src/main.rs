@@ -33,6 +33,7 @@ mod sha256;
 mod shape;
 mod stats;
 mod toml;
+mod transport_fixtures;
 mod walk;
 mod worker_tests;
 mod zlib;
@@ -734,6 +735,8 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
 const FIXTURE_USAGE: &str = "usage: cargo xtask fixture <family> [options] --output FILE
 
 families and options:
+  transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
+           regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
   zlib     [--kind stored|fixed|dynamic] [--scope N] [--lace 0-3] [--aac] [--mixed] [--empty]
   header   [--scope N] [--lace] [--aac]
   colour   --mastering-width 4|8 --values V0,...,V9   (empty Colour with one MasteringMetadata)";
@@ -741,6 +744,9 @@ families and options:
 /// One corpus variant, for harness tests that need cases beyond the manifests.
 fn fixture(root: &Path, args: &[String]) -> Task {
     let family = args.first().map(String::as_str).ok_or(FIXTURE_USAGE)?;
+    if family == "transport-access-units" {
+        return transport_fixtures::main(root, &args[1..]);
+    }
     let mut options = std::collections::BTreeMap::new();
     let mut rest = args[1..].iter();
     while let Some(flag) = rest.next() {
@@ -1124,9 +1130,11 @@ fn check(root: &Path) -> Task {
     check_simd(root)?;
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;
-    // The Unicode tables are what their generator writes.
+    // The Unicode and glyph-name tables are what their generators write.
     println!("$ cargo xtask shape ucd --check");
     shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
+    println!("$ cargo xtask fonts tables --check");
+    fonts::main(root, &["tables".to_owned(), "--check".to_owned()])?;
     check_features(root)?;
     check_safety(root)?;
     check_design(root)?;

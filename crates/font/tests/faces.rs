@@ -1,11 +1,11 @@
 mod support;
 
 use support::{bytes, cff_tables, collection, font, truetype_tables};
-use triergon_core::{Budget, Bytes, Error};
+use triergon_core::{Budget, Bytes, Error, WorkBudget};
 use triergon_font::{
-    Bounds, Built, CharEncoding, CharstringBounds, CmapFormat, ControlBox, FaceInfo, Font, GlyphId,
-    Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind, Request, Segment,
-    Store, StoreKey, Style, select,
+    Bounds, Built, CharEncoding, CharmapKind, CharstringBounds, CmapFormat, ControlBox, FaceInfo,
+    Font, GlyphId, Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind,
+    Request, Segment, Store, StoreKey, Style, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -55,11 +55,11 @@ fn truetype_metrics_names_and_charmap() {
     assert_eq!(font.glyph_index('D'), None);
     let charmap = font.text_charmap().unwrap();
     assert_eq!(
-        (charmap.platform(), charmap.encoding(), charmap.format()),
+        (charmap.platform(), charmap.encoding(), charmap.kind()),
         (
             Platform::Windows,
             CharEncoding::Unicode,
-            CmapFormat::SegmentDelta
+            CharmapKind::Subtable(CmapFormat::SegmentDelta)
         )
     );
     assert_eq!(charmap.mappings().count(), 3);
@@ -200,10 +200,11 @@ fn cff_charstrings_with_subroutines_hints_and_flex() {
 
 #[test]
 fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
+    let work = || WorkBudget::new(1 << 20);
     let cff = parse(&font(b"OTTO", &cff_tables()));
     let unit = |v: i32| v << 16;
     assert_eq!(
-        cff.control_box(GlyphId(1)),
+        cff.control_box(GlyphId(1), &mut work()),
         Ok(ControlBox::Charstring(CharstringBounds {
             x_min: unit(50),
             y_min: 0,
@@ -211,7 +212,7 @@ fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
             y_max: unit(100),
         }))
     );
-    let Ok(ControlBox::Charstring(curve)) = cff.control_box(GlyphId(2)) else {
+    let Ok(ControlBox::Charstring(curve)) = cff.control_box(GlyphId(2), &mut work()) else {
         panic!("glyph 2 draws a curve");
     };
     let (points, _, _) = points(&cff, 2);
@@ -231,15 +232,18 @@ fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
         Err(Error::Policy(_))
     ));
     assert_eq!(
-        cff.control_box(GlyphId(2)),
+        cff.control_box(GlyphId(2), &mut work()),
         Ok(ControlBox::Charstring(curve))
     );
 
     let tables = truetype_tables(400, 0, "Test Sans", "Regular");
     let truetype = parse(&font(b"\0\x01\0\0", &tables));
-    assert_eq!(truetype.control_box(GlyphId(0)), Ok(ControlBox::Empty));
     assert_eq!(
-        truetype.control_box(GlyphId(1)),
+        truetype.control_box(GlyphId(0), &mut work()),
+        Ok(ControlBox::Empty)
+    );
+    assert_eq!(
+        truetype.control_box(GlyphId(1), &mut work()),
         Ok(ControlBox::Glyf(Bounds {
             x_min: 100,
             y_min: 0,
@@ -249,7 +253,7 @@ fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
     );
     assert_eq!(truetype.side_bearing(GlyphId(1)), Ok(50));
     assert!(matches!(
-        truetype.control_box(GlyphId(4)),
+        truetype.control_box(GlyphId(4), &mut work()),
         Err(Error::Invalid(_))
     ));
 }
@@ -407,4 +411,110 @@ fn the_store_shares_parsed_faces() {
         .unwrap();
     assert!(std::sync::Arc::ptr_eq(&a, &b));
     assert!(store.retained_bytes() > 0);
+}
+
+#[test]
+fn vertical_advances_follow_each_way_freetype_reads_them() {
+    let fonts = support::authored_fonts();
+    let (_, data) = fonts
+        .iter()
+        .find(|(name, _)| *name == "authored-vertical.ttc")
+        .unwrap();
+    let (budget, bytes) = bytes(data);
+    let mut outline = Outline::new(&budget);
+    // Per face: whether it has vertical metrics, and each glyph's advance
+    // height in font units.
+    let expected: [(bool, [i32; 5]); 4] = [
+        // 65535, level phantom points, the bump's own, the bump's through
+        // USE_MY_METRICS instead of the composite's 800, and the last record's.
+        (true, [65535, 0, 1500, 1500, 800]),
+        // Made up from the typographic ascender and descender.
+        (false, [1050; 5]),
+        // Two records, counted by the bytes after a short `vhea`.
+        (true, [1000, 900, 900, 900, 900]),
+        // `VHEA` and `VMTX`.
+        (true, [65535, 0, 1500, 1500, 1500]),
+    ];
+    for (index, (vertical, advances)) in expected.into_iter().enumerate() {
+        let font = Font::new(bytes.clone(), index as u32, &budget, Limits::default()).unwrap();
+        assert_eq!(font.has_vertical_metrics(), vertical, "face {index}");
+        for (glyph, advance) in advances.into_iter().enumerate() {
+            let metrics = font
+                .outline_into(GlyphId(glyph as u16), &mut outline)
+                .unwrap();
+            assert_eq!(
+                (metrics.vertical_advance, metrics.linear_vertical_advance),
+                (advance, i64::from(advance)),
+                "face {index}, glyph {glyph}"
+            );
+        }
+    }
+    // A `vhea` cut short at the end of the file fails the face.
+    let mut tables = truetype_tables(400, 0, "Test Sans", "Regular");
+    tables.push((*b"vhea", support::vhea(4, false)[..20].to_vec()));
+    let data = font(b"\0\x01\0\0", &tables);
+    let (budget, bytes) = support::bytes(&data);
+    assert!(matches!(
+        Font::new(bytes, 0, &budget, Limits::default()),
+        Err(Error::Invalid(_))
+    ));
+}
+
+#[test]
+fn cff_faces_list_freetype_charmaps_in_its_order() {
+    let data = support::authored_fonts()
+        .into_iter()
+        .find(|(name, _)| *name == "authored-charmaps.otf")
+        .unwrap()
+        .1;
+    let font = parse(&data);
+    let kinds: Vec<_> = font
+        .charmaps()
+        .map(|c| (c.platform(), c.encoding_id(), c.kind()))
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            (
+                Platform::Macintosh,
+                1,
+                CharmapKind::Subtable(CmapFormat::HighByte)
+            ),
+            (
+                Platform::Windows,
+                10,
+                CharmapKind::Subtable(CmapFormat::Mixed)
+            ),
+            (Platform::Windows, 1, CharmapKind::GlyphNames),
+            (Platform::Other(7), 2, CharmapKind::CffEncoding),
+        ]
+    );
+    // libass reads text through the Windows UCS-4 subtable.
+    assert_eq!(font.text_charmap_index(), Some(1));
+    let maps: Vec<Vec<(u32, u16)>> = font
+        .charmaps()
+        .map(|c| {
+            c.mappings()
+                .map(|m| m.map(|(c, g)| (c, g.0)).unwrap())
+                .collect()
+        })
+        .collect();
+    assert_eq!(maps[0], [(0x41, 7), (0x42, 1), (0x8140, 2)]);
+    assert_eq!(maps[1], [(0x42, 8), (0x1_f600, 4)]);
+    // Names: A, B (twice), é and the emoji, space with U+00A0 and Delta
+    // (U+2206) with U+0394 besides; A.swash is a variant of A.
+    let names: Vec<u32> = maps[2].iter().map(|&(c, _)| c).collect();
+    assert_eq!(
+        names,
+        [0x20, 0x41, 0x42, 0xa0, 0xe9, 0x394, 0x2206, 0x1_f600]
+    );
+    let names = font.charmap(2).unwrap();
+    assert_eq!(names.glyph(0x41), Some(GlyphId(1)));
+    assert_eq!(names.glyph(0xe9), Some(GlyphId(3)));
+    assert_eq!(names.glyph(0x394), Some(GlyphId(6)));
+    assert_eq!(
+        maps[3],
+        [(0x80, 1), (0x81, 2), (0x82, 3), (0x83, 4), (0xc0, 9)]
+    );
+    assert_eq!(names.encoding(), CharEncoding::Unicode);
 }

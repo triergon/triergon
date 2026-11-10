@@ -18,6 +18,7 @@ mod matching;
 mod metrics;
 mod name;
 mod outline;
+mod postscript;
 mod read;
 mod sfnt;
 mod sized;
@@ -26,7 +27,10 @@ mod synthesis;
 mod work;
 
 pub use cff::{CharstringBounds, CharstringOperator, OperatorSet};
-pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings, TextLookup};
+pub use cmap::{
+    CharEncoding, Charmap, CharmapKind, CmapFormat, Mappings, TextLookup, Variant,
+    VariationSequences,
+};
 pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
@@ -36,10 +40,10 @@ pub use store::{Built, Store, StoreKey};
 pub use synthesis::{Orientation, Synthesis};
 
 use cff::{Cff, Version};
-use fixed::{Scale, mul_fix};
+use fixed::{Scale, div_fix, mul_fix};
 use glyf::Glyf;
 use kern::Kern;
-use metrics::{Head, Hhea, Hmtx};
+use metrics::{Head, Hhea, LongMetrics};
 use name::Names;
 use sfnt::{Flavor, Tables};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -103,12 +107,35 @@ pub struct VerticalMetrics {
     pub height: i32,
 }
 
-/// What loading a glyph reports besides its outline.
+/// What loading a glyph reports besides its outline, at the scale it loads
+/// at. A TrueType composite takes the metrics of its last `USE_MY_METRICS`
+/// component; a CFF FontMatrix scales and offsets the advances.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GlyphMetrics {
-    /// The advance. A TrueType composite takes the advance of its last
-    /// `USE_MY_METRICS` component; a CFF FontMatrix scales and offsets it.
+    /// The advance (`advance.x` of FreeType's glyph slot).
     pub advance: i32,
+    /// The vertical advance (`metrics.vertAdvance`): the `vmtx` advance
+    /// height where the face has vertical metrics
+    /// ([`Font::has_vertical_metrics`]), else the one FreeType makes up from
+    /// the typographic ascender and descender. A TrueType glyph measures it
+    /// between its scaled phantom points, from its header's `yMax` plus the
+    /// top side bearing down by the advance height, and reads the distance
+    /// back in font units as a 16-bit value before scaling it again.
+    pub vertical_advance: i32,
+    /// `linearVertAdvance`: the vertical advance in font units, scaled to
+    /// 16.16 pixels by the size's y scale for a glyph loaded at a size
+    /// ([`SizedFont::outline_into`]).
+    pub linear_vertical_advance: i64,
+}
+
+/// A glyph's advances as FreeType's loading computes them at a scale, before
+/// any grid fitting: horizontal and vertical, and the vertical one in font
+/// units.
+#[derive(Clone, Copy, Debug)]
+struct Advances {
+    horizontal: i64,
+    vertical: i64,
+    vertical_units: i64,
 }
 
 /// A box in font units as a table stores it: the `head` box of all glyphs, or
@@ -168,15 +195,23 @@ pub struct Font {
     hhea: Hhea,
     os2: Option<Os2>,
     glyph_count: u16,
-    hmtx: Hmtx,
+    hmtx: LongMetrics,
+    /// `vmtx`, where FreeType reads vertical metrics: `vhea` and `vmtx` both
+    /// load and `vhea` lists at least one record.
+    vmtx: Option<LongMetrics>,
     names: Names,
-    charmaps: BudgetVec<cmap::Subtable>,
-    /// `charmaps` is FreeType's list of the face's charmaps.
-    every_charmap: bool,
+    /// The `cmap` subtables FreeType makes selectable charmaps of.
+    subtables: BudgetVec<cmap::Subtable>,
+    /// The Unicode charmap FreeType builds from a CFF face's glyph names.
+    name_map: Option<postscript::UnicodeMap>,
+    /// The format 14 subtable FreeType reads variation sequences from.
+    variation_sequences: Option<cmap::Variations>,
     outlines: Outlines,
     kern: Kern,
     /// `post` underline position and thickness.
     underline: (i16, i16),
+    /// How FreeType's default loading treats the face's advances.
+    default_load: sized::Hinting,
     limits: Limits,
 }
 
@@ -201,7 +236,19 @@ impl Font {
         let required =
             |table: Option<sfnt::Table>| table.ok_or(Error::Invalid("missing required table"));
         let head = metrics::head(required(tables.head)?.bytes(bytes))?;
-        let hhea = metrics::hhea(required(tables.hhea)?.bytes(bytes))?;
+        // FreeType fails a face without horizontal metrics, and reads
+        // vertical ones where both tables load.
+        let (hhea, hmtx) = metrics::header_and_records(
+            bytes,
+            [tables.hhea, tables.extended_hhea],
+            [tables.hmtx, tables.extended_hmtx],
+        )?
+        .ok_or(Error::Invalid("missing horizontal metrics"))?;
+        let vertical = metrics::header_and_records(
+            bytes,
+            [tables.vhea, tables.extended_vhea],
+            [tables.vmtx, tables.extended_vmtx],
+        )?;
         let maxp_glyphs = metrics::glyph_count(required(tables.maxp)?.bytes(bytes))?;
         let os2 = tables.os2.and_then(|t| metrics::os2(t.bytes(bytes)));
         // FreeType treats a broken `name` table as a missing one.
@@ -215,17 +262,10 @@ impl Font {
             Some(t) => cmap::parse(bytes, t, budget, &mut work)?,
             None => cmap::Subtables {
                 list: BudgetVec::new(budget),
-                skipped: false,
+                unicode_variations: false,
+                variation_sequences: None,
             },
         };
-        // FreeType gives a CFF face without a Windows BMP or Unicode-platform
-        // charmap one built from its glyph names (`cff_face_init`).
-        let synthesized = flavor == Flavor::Cff
-            && !cmap.list.iter().any(|s| {
-                s.platform() == Platform::Unicode
-                    || (s.platform() == Platform::Windows && s.encoding_id() == 1)
-            });
-        let every_charmap = !cmap.skipped && !synthesized;
         let (outlines, glyph_count) = match flavor {
             Flavor::TrueType => {
                 let (glyf, count) = Glyf::new(
@@ -248,13 +288,29 @@ impl Font {
                 (Outlines::Cff(Box::new(cff)), count)
             }
         };
-        let hmtx = Hmtx::new(required(tables.hmtx)?, hhea.metrics, glyph_count);
+        let hmtx = LongMetrics::new(hmtx, hhea.metrics, glyph_count);
+        let vmtx = vertical
+            .filter(|(vhea, _)| vhea.metrics > 0)
+            .map(|(vhea, table)| LongMetrics::new(table, vhea.metrics, glyph_count));
         let kern = match tables.kern {
             Some(t) => Kern::parse(bytes, t, budget, &mut work)?,
             None => Kern::new(budget),
         };
         let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
-        Ok(Self {
+        // FreeType builds a Unicode charmap from the glyph names of a CFF face
+        // without a Windows BMP or Unicode-platform charmap (`cff_face_init`).
+        let unicode = cmap.unicode_variations
+            || cmap.list.iter().any(|s| {
+                s.platform() == Platform::Unicode
+                    || (s.platform() == Platform::Windows && s.encoding_id() == 1)
+            });
+        let name_map = match &outlines {
+            Outlines::Cff(cff) if !unicode && cff.has_charset() => {
+                postscript::UnicodeMap::new(cff.glyph_names(bytes), budget)?
+            }
+            _ => None,
+        };
+        let mut font = Self {
             data,
             index,
             tables,
@@ -263,19 +319,29 @@ impl Font {
             os2,
             glyph_count,
             hmtx,
+            vmtx,
             names,
-            charmaps: cmap.list,
-            every_charmap,
+            subtables: cmap.list,
+            name_map,
+            variation_sequences: cmap.variation_sequences,
             outlines,
             kern,
             underline,
+            default_load: sized::Hinting::Unhinted,
             limits,
-        })
+        };
+        font.default_load = font.hinting();
+        Ok(font)
     }
 
     /// The font bytes.
     pub fn data(&self) -> &Bytes {
         &self.data
+    }
+
+    /// The limits the face was opened with.
+    pub const fn limits(&self) -> Limits {
+        self.limits
     }
 
     /// The bytes of table `tag`: the first nonempty record with that tag whose
@@ -464,53 +530,61 @@ impl Font {
         })
     }
 
-    /// The supported cmap subtables, in directory order.
-    pub fn charmaps(&self) -> impl Iterator<Item = Charmap<'_>> + '_ {
-        self.charmaps
+    /// The face's charmaps in FreeType's order: the `cmap` subtables FreeType
+    /// accepts (formats 0, 2, 4, 6, 8, 10, 12 and 13), in directory order;
+    /// then, for a CFF face without a Windows BMP or Unicode-platform charmap
+    /// (of any format, 14 and 15 included), the Unicode charmap FreeType
+    /// builds from its glyph names when one maps a code point
+    /// ([`CharmapKind::GlyphNames`]), a CID-keyed face's CIDs read as string
+    /// IDs as FreeType reads them; then, for a name-keyed CFF face whose
+    /// encoding maps a code, the charmap of its encoding
+    /// ([`CharmapKind::CffEncoding`]). FreeType also lists the
+    /// variation-sequence subtables of formats 14 and 15, which cannot be
+    /// selected and are left out.
+    pub fn charmaps(&self) -> impl Iterator<Item = Charmap<'_>> + Clone + '_ {
+        let (data, glyphs, work) = (
+            self.data.as_ref(),
+            u32::from(self.glyph_count),
+            self.limits.work,
+        );
+        let charmap = move |source| Charmap::new(data, glyphs, source, work);
+        let encoding = match &self.outlines {
+            Outlines::Cff(cff) => cff.encoding(),
+            Outlines::Glyf(_) => None,
+        };
+        self.subtables
             .as_slice()
             .iter()
-            .map(|&subtable| self.charmap_of(subtable))
+            .map(move |&subtable| charmap(cmap::Source::Table(subtable)))
+            .chain(self.name_map.as_ref().map(cmap::Source::Names).map(charmap))
+            .chain(encoding.map(cmap::Source::Encoding).map(charmap))
     }
 
     /// Charmap `index` of [`Self::charmaps`].
     pub fn charmap(&self, index: usize) -> Option<Charmap<'_>> {
-        self.charmaps
-            .get(index)
-            .map(|&subtable| self.charmap_of(subtable))
+        self.charmaps().nth(index)
     }
 
-    fn charmap_of(&self, subtable: cmap::Subtable) -> Charmap<'_> {
-        Charmap::new(
-            self.data.as_ref(),
-            u32::from(self.glyph_count),
-            subtable,
-            self.limits.work,
-        )
-    }
-
-    /// Whether [`Self::charmaps`] are all the charmaps FreeType gives the face,
-    /// in its order. FreeType also lists format 2 and 8 subtables, which this
-    /// crate does not read, and adds a Unicode charmap built from glyph names
-    /// to a CFF face without a (3, 1) or Unicode-platform subtable (this check
-    /// assumes it does whenever it may). The format 14 subtables it lists
-    /// cannot be selected.
-    pub const fn lists_every_charmap(&self) -> bool {
-        self.every_charmap
+    /// The Unicode variation sequences FreeType reads
+    /// (`FT_Face_GetCharVariantIndex`): its first variation-sequence charmap,
+    /// the first (0, 5) subtable of format 14 or 15 its validation keeps.
+    pub fn variation_sequences(&self) -> Option<VariationSequences<'_>> {
+        let variations = self.variation_sequences?;
+        Some(VariationSequences::new(
+            variations.table.bytes(self.data.as_ref()),
+            variations.extended,
+        ))
     }
 
     /// The charmap libass 0.17.5 uses for text, as it selects one when it opens
-    /// a face (`ass_charmap_magic`). In directory order: the first Windows
-    /// full-Unicode subtable (3, 10); else the first Windows BMP subtable (3, 1);
-    /// else the first other Windows subtable, such as Symbol (3, 0). A face
-    /// without Windows subtables keeps the charmap FreeType selects on opening
-    /// it: the last full-Unicode subtable ((0, 4), or (0, 6) in format 13),
+    /// a face (`ass_charmap_magic`). In [`Self::charmaps`] order: the first
+    /// Windows full-Unicode charmap (3, 10); else the first Windows BMP
+    /// charmap (3, 1), which may be the one FreeType builds from glyph names;
+    /// else the first other Windows charmap, such as Symbol (3, 0). A face
+    /// without Windows charmaps keeps the charmap FreeType selects on opening
+    /// it: the last full-Unicode charmap ((0, 4), or (0, 6) in format 13),
     /// else the last Unicode- or ISO-platform one. Without one of those, it is
-    /// the first subtable.
-    ///
-    /// Only the subtables [`Self::charmaps`] lists take part. FreeType also
-    /// lists formats 2, 8 and 14, and adds a Unicode charmap built from glyph
-    /// names to a CFF face without a (3, 1) or Unicode-platform subtable; libass
-    /// may select either, which this selection does not reproduce.
+    /// the first charmap.
     pub fn text_charmap(&self) -> Option<Charmap<'_>> {
         self.text_charmap_index()
             .and_then(|index| self.charmap(index))
@@ -518,7 +592,7 @@ impl Font {
 
     /// The index of [`Self::text_charmap`] in [`Self::charmaps`].
     pub fn text_charmap_index(&self) -> Option<usize> {
-        cmap::text_subtable(self.charmaps.as_slice())
+        cmap::text_charmap(self.charmaps())
     }
 
     /// `charmap`, one of this face's, read as libass 0.17.5 reads text through
@@ -571,7 +645,25 @@ impl Font {
     /// table has no value for it, as FreeType reads a short table.
     pub fn side_bearing(&self, glyph: GlyphId) -> Result<i16> {
         let glyph = self.check(glyph)?;
-        Ok(self.hmtx.side_bearing(self.data.as_ref(), glyph))
+        Ok(self.hmtx.bearing(self.data.as_ref(), glyph))
+    }
+
+    /// Whether FreeType reads vertical metrics for the face: `vhea` and `vmtx`
+    /// both load and `vhea` lists at least one record. Without them, it makes
+    /// up a vertical advance from the face's ascender and descender
+    /// ([`GlyphMetrics::vertical_advance`]).
+    pub const fn has_vertical_metrics(&self) -> bool {
+        self.vmtx.is_some()
+    }
+
+    /// The vertical advance FreeType makes up for a face without vertical
+    /// metrics: the typographic ascender minus descender of `OS/2`, else those
+    /// of `hhea`, in font units.
+    fn made_up_vertical_advance(&self) -> i64 {
+        match self.os2 {
+            Some(os2) => i64::from(os2.typo_ascender) - i64::from(os2.typo_descender),
+            None => i64::from(self.hhea.ascender) - i64::from(self.hhea.descender),
+        }
     }
 
     /// The `kern` table value for the pair, in font units.
@@ -616,27 +708,78 @@ impl Font {
         let index = self.check(glyph)?;
         let data = self.data.as_ref();
         let mut work = WorkBudget::new(self.limits.work);
-        let advance = match &self.outlines {
+        let advances = match &self.outlines {
             Outlines::Glyf(table) => {
                 outline.begin(self.limits.points);
                 let m = table.outline(&self.glyf_context(), glyph, scale, outline, &mut work)?;
-                // FreeType's phantom points: the origin and the advance.
-                let origin = i64::from(m.x_min) - i64::from(self.bearing(m.glyph));
-                let advance = i64::from(self.hmtx.advance(data, m.glyph));
-                let pp1 = mul_fix(origin, scale.x);
-                let pp2 = mul_fix(origin + advance, scale.x);
-                if pp1 != 0 {
-                    glyf::translate(outline.points_mut(), (-pp1, 0))?;
+                let (origin, advances) = self.glyf_advances(m, scale);
+                if origin != 0 {
+                    glyf::translate(outline.points_mut(), (-origin, 0))?;
                 }
-                pp2 - pp1
+                advances
             }
             Outlines::Cff(cff) => {
                 cff.load(data, glyph, scale, outline, &self.limits, &mut work)?;
-                cff.advance(data, glyph, self.hmtx.advance(data, index), scale)?
+                self.cff_advances(cff, glyph, index, scale)?
             }
         };
         Ok(GlyphMetrics {
-            advance: glyf::narrow(advance)?,
+            advance: glyf::narrow(advances.horizontal)?,
+            vertical_advance: glyf::narrow(advances.vertical)?,
+            linear_vertical_advance: advances.vertical_units,
+        })
+    }
+
+    /// The advances of a TrueType glyph whose metrics are `m`, between
+    /// FreeType's phantom points scaled by `scale`, and the scaled origin the
+    /// outline is moved by.
+    fn glyf_advances(&self, m: glyf::Metrics, scale: Scale) -> (i64, Advances) {
+        let data = self.data.as_ref();
+        // The horizontal phantom points: the origin and the advance.
+        let origin = i64::from(m.x_min) - i64::from(self.bearing(m.glyph));
+        let advance = i64::from(self.hmtx.advance(data, m.glyph));
+        let pp1 = mul_fix(origin, scale.x);
+        let pp2 = mul_fix(origin + advance, scale.x);
+        let vertical_units = match self.vmtx {
+            Some(vmtx) => {
+                // The vertical ones, scaled; their distance back in font
+                // units, as a 16-bit advance height.
+                let top = i64::from(m.y_max) + i64::from(vmtx.bearing(data, m.glyph));
+                let bottom = top - i64::from(vmtx.advance(data, m.glyph));
+                let (top, bottom) = (mul_fix(top, scale.y), mul_fix(bottom, scale.y));
+                if top <= bottom {
+                    0
+                } else {
+                    i64::from(div_fix(top - bottom, scale.y) as u16)
+                }
+            }
+            None => self.made_up_vertical_advance(),
+        };
+        let advances = Advances {
+            horizontal: pp2 - pp1,
+            vertical: mul_fix(vertical_units, scale.y),
+            vertical_units,
+        };
+        (pp1, advances)
+    }
+
+    /// The advances of a CFF glyph at `scale`, through the FontMatrix.
+    fn cff_advances(
+        &self,
+        cff: &Cff,
+        glyph: GlyphId,
+        index: u16,
+        scale: Scale,
+    ) -> Result<Advances> {
+        let data = self.data.as_ref();
+        let vertical_units = match self.vmtx {
+            Some(vmtx) => i64::from(vmtx.advance(data, index)),
+            None => self.made_up_vertical_advance(),
+        };
+        Ok(Advances {
+            horizontal: cff.advance(data, glyph, self.hmtx.advance(data, index), scale)?,
+            vertical: cff.vertical_advance(data, glyph, vertical_units, scale)?,
+            vertical_units,
         })
     }
 
@@ -666,25 +809,16 @@ impl Font {
     ///
     /// `Invalid` for a glyph outside the face and malformed glyph data (a `glyf`
     /// header cut short, a charstring that fails); `Policy` when a charstring
-    /// exceeds the [`Limits`] work or depth. No point limit applies.
-    pub fn control_box(&self, glyph: GlyphId) -> Result<ControlBox> {
+    /// exceeds `work` or the [`Limits`] depth. No point limit applies.
+    pub fn control_box(&self, glyph: GlyphId, work: &mut WorkBudget) -> Result<ControlBox> {
         self.check(glyph)?;
         let data = self.data.as_ref();
         match &self.outlines {
-            Outlines::Glyf(table) => Ok(match table.header(data, glyph.0)? {
-                Some((contours, [x_min, y_min, x_max, y_max])) if contours != 0 => {
-                    ControlBox::Glyf(Bounds {
-                        x_min,
-                        y_min,
-                        x_max,
-                        y_max,
-                    })
-                }
-                _ => ControlBox::Empty,
-            }),
+            Outlines::Glyf(table) => Ok(table
+                .header(data, glyph.0)?
+                .map_or(ControlBox::Empty, |header| ControlBox::Glyf(header.bounds))),
             Outlines::Cff(cff) => {
-                let mut work = WorkBudget::new(self.limits.work);
-                let bounds = cff.bounds(data, glyph, &self.limits, &mut work)?;
+                let bounds = cff.bounds(data, glyph, &self.limits, work)?;
                 Ok(bounds.map_or(ControlBox::Empty, ControlBox::Charstring))
             }
         }
@@ -720,7 +854,7 @@ impl Font {
 
     /// The `hmtx` left side bearing of a glyph known to be in the face.
     fn bearing(&self, glyph: u16) -> i32 {
-        i32::from(self.hmtx.side_bearing(self.data.as_ref(), glyph))
+        i32::from(self.hmtx.bearing(self.data.as_ref(), glyph))
     }
 
     /// Whether the face is CID-keyed CFF.

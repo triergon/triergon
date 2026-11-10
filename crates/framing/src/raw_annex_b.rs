@@ -197,6 +197,23 @@ impl RawAnnexBReader {
         self.nal.provide_owned(window)
     }
 
+    /// Consume a borrowed slice that fits wholly inside the current NAL
+    /// payload. If the reader needs to inspect a possible boundary, the caller
+    /// can provide the same slice as a regular input window.
+    pub fn append_payload(
+        &mut self,
+        request: &InputRequest,
+        bytes: &[u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        self.healthy()?;
+        if self.pending.is_some() || self.end.is_some() {
+            return Ok(false);
+        }
+        self.nal.append_annex_payload(request, bytes, work, cancel)
+    }
+
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         let result = self.nal.finish(source, token);
@@ -363,6 +380,24 @@ impl RawAnnexBReader {
             random_access: std::mem::take(&mut self.random_access),
             nals,
         }
+    }
+
+    /// Mutable buffers and completed NALs held while requesting more input.
+    ///
+    /// Returns an error if input or an unprocessed NAL is buffered.
+    #[doc(hidden)]
+    pub fn input_wait_storage(&self) -> Result<(usize, &[NalUnit])> {
+        if self.pending.is_some() {
+            return Err(Error::Invalid("Annex B reader has an unprocessed NAL"));
+        }
+        let nal_capacity = self.nal.input_wait_buffer_capacity()?;
+        let capacity = self
+            .unit
+            .capacity()
+            .checked_mul(size_of::<NalUnit>())
+            .and_then(|bytes| bytes.checked_add(nal_capacity))
+            .ok_or(Error::Overflow)?;
+        Ok((capacity, self.unit.as_slice()))
     }
 
     pub fn request(&self) -> InputRequest {

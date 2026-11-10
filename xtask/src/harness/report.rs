@@ -71,6 +71,35 @@ fn digest(path: &Path) -> Result<String, String> {
     sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+fn measure_pinned(
+    check: impl Fn() -> Result<Option<&'static str>, String>,
+    measure: impl FnOnce() -> Result<Value, String>,
+) -> Result<Value, String> {
+    match check() {
+        Ok(None) => (),
+        Ok(Some(status)) => return Ok(Value::object([("status", Value::str(status))])),
+        Err(error) => {
+            return Ok(Value::object([
+                ("status", Value::str("input-check-failed")),
+                ("input_error", Value::str(error)),
+            ]));
+        }
+    }
+    let result = measure()?;
+    match check() {
+        Ok(None) => Ok(result),
+        Ok(Some(status)) => Ok(Value::object([
+            ("status", Value::str(status)),
+            ("invalidated_measurement", result),
+        ])),
+        Err(error) => Ok(Value::object([
+            ("status", Value::str("input-check-failed")),
+            ("input_error", Value::str(error)),
+            ("invalidated_measurement", result),
+        ])),
+    }
+}
+
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -88,9 +117,10 @@ fn entity_input_failure(
     let [_, _, args @ ..] = args.as_slice() else {
         return Err("ordered transport input needs packet size and program".into());
     };
-    let args = args
-        .strip_prefix(&[std::ffi::OsString::from("--dvb")])
-        .unwrap_or(args);
+    let args = match args {
+        [namespace, remaining @ ..] if namespace == "--dvb" || namespace == "--atsc" => remaining,
+        _ => args,
+    };
     let Some(entities) = entities else {
         return if args.is_empty() {
             Ok(None)
@@ -813,28 +843,38 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         row.push(("parity", parity));
         if let (true, Some((reference, input, operation))) = (passed, timed) {
             let reference = options.baseline_worker.clone().unwrap_or(reference);
+            let check_inputs = || {
+                if digest(&input)? != sha {
+                    return Ok(Some("input-hash-mismatch"));
+                }
+                entity_input_failure(&corpus, case, false)
+            };
             if options.benchmark {
-                let timing = benchmark(
-                    &candidate,
-                    &reference,
-                    &input,
-                    options.pairs,
-                    iterations,
-                    options.seed,
-                    &operation,
-                )?;
+                let timing = measure_pinned(check_inputs, || {
+                    benchmark(
+                        &candidate,
+                        &reference,
+                        &input,
+                        options.pairs,
+                        iterations,
+                        options.seed,
+                        &operation,
+                    )
+                })?;
                 row.push(("timing", timing));
             }
             if options.memory {
-                let memory = super::memory::collect(
-                    root,
-                    &candidate,
-                    &reference,
-                    &input,
-                    options.memory_pairs.unwrap_or(options.pairs),
-                    options.seed,
-                    &operation,
-                )?;
+                let memory = measure_pinned(check_inputs, || {
+                    super::memory::collect(
+                        root,
+                        &candidate,
+                        &reference,
+                        &input,
+                        options.memory_pairs.unwrap_or(options.pairs),
+                        options.seed,
+                        &operation,
+                    )
+                })?;
                 row.push(("memory", memory));
             }
         }
@@ -1014,8 +1054,8 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
 #[cfg(test)]
 mod prefix_tests {
     use super::{
-        PrefixFeature, entity_input_failure, open_cases, ratchet, read_json, recorded_corpus,
-        reviewed_inputs, rights_reviewed, s,
+        PrefixFeature, entity_input_failure, measure_pinned, open_cases, ratchet, read_json,
+        recorded_corpus, reviewed_inputs, rights_reviewed, s,
     };
     use crate::json::{Value, parse};
     use std::path::Path;
@@ -1055,8 +1095,73 @@ mod prefix_tests {
         );
         std::fs::write(root.join("next.ts"), input).unwrap();
         assert_eq!(entity_input_failure(&root, &case, true).unwrap(), None);
+        for namespace in ["--dvb", "--atsc"] {
+            let with_namespace = parse(&row.replace(
+                r#"["188","1","next.ts"]"#,
+                &format!(r#"["188","1","{namespace}","next.ts"]"#),
+            ))
+            .unwrap();
+            assert_eq!(
+                entity_input_failure(&root, &with_namespace, true).unwrap(),
+                None
+            );
+        }
+        let measured = measure_pinned(
+            || entity_input_failure(&root, &case, true),
+            || {
+                std::fs::write(root.join("next.ts"), b"changed while measuring").unwrap();
+                Ok(Value::object([("status", Value::str("measured"))]))
+            },
+        )
+        .unwrap();
+        assert_eq!(s(&measured, "status"), Some("entity-hash-mismatch"));
+        assert_eq!(
+            measured
+                .get("invalidated_measurement")
+                .and_then(|v| s(v, "status")),
+            Some("measured")
+        );
+        let measured = std::cell::Cell::new(false);
+        let result = measure_pinned(
+            || {
+                if measured.get() {
+                    Err("input unreadable".into())
+                } else {
+                    Ok(None)
+                }
+            },
+            || {
+                measured.set(true);
+                Ok(Value::object([("status", Value::str("measured"))]))
+            },
+        )
+        .unwrap();
+        assert_eq!(s(&result, "status"), Some("input-check-failed"));
+        assert!(result.get("invalidated_measurement").is_some());
         std::fs::remove_file(root.join("next.ts")).unwrap();
         std::fs::remove_dir(root).unwrap();
+    }
+
+    #[test]
+    fn unreadable_input_before_memory_keeps_the_completed_timing_row() {
+        let timing = measure_pinned(
+            || Ok(None),
+            || Ok(Value::object([("status", Value::str("measured"))])),
+        )
+        .unwrap();
+        let memory = measure_pinned(
+            || Err("input unreadable".into()),
+            || panic!("memory must not run without a verified input"),
+        )
+        .unwrap();
+        let row = Value::object([("timing", timing), ("memory", memory)]);
+        assert_eq!(
+            row.get("timing").and_then(|v| s(v, "status")),
+            Some("measured")
+        );
+        let memory = row.get("memory").unwrap();
+        assert_eq!(s(memory, "status"), Some("input-check-failed"));
+        assert_eq!(s(memory, "input_error"), Some("input unreadable"));
     }
 
     #[test]
@@ -1122,9 +1227,9 @@ mod prefix_tests {
         assert_eq!(
             found,
             [
-                ("font-hinting-modes", "font-sized-", 918),
-                ("font-hinting-none", "font-sized-", 102),
-                ("font-outlines", "font-", 51),
+                ("font-hinting-modes", "font-sized-", 954),
+                ("font-hinting-none", "font-sized-", 159),
+                ("font-outlines", "font-", 53),
             ]
         );
         let reviewed = reviewed_inputs(root).unwrap();

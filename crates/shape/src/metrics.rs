@@ -1,11 +1,14 @@
 //! Glyph lookup and metrics: the font functions shaping asks for, and HarfBuzz's
 //! scaling arithmetic.
 
-use crate::ot::data::{Data, bsearch};
-use std::cell::Cell;
-use triergon_core::{Error, Result};
+use crate::cmap::{Cmap, Subtable};
+use crate::rotations::{Decide, FaceRotations};
+use std::cell::{Cell, RefCell};
+use std::hash::Hash;
+use triergon_core::{Error, Result, WorkBudget};
 use triergon_font::{
-    CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont, TextLookup,
+    CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont, TextLookup, Variant,
+    VariationSequences,
 };
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
@@ -100,6 +103,15 @@ pub trait Metrics {
     fn h_kerning(&self, _left: GlyphId, _right: GlyphId) -> Result<i32> {
         Ok(0)
     }
+    /// An error a function met but could not return, such as the storage of a
+    /// lookup that could not be charged: it ends the shaping call.
+    ///
+    /// # Errors
+    ///
+    /// That error, given once.
+    fn finish(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// A glyph the font cannot load (`Invalid`) answers `otherwise`, as it does to
@@ -111,18 +123,18 @@ fn unless_unloadable<T>(result: Result<T>, otherwise: T) -> Result<T> {
     }
 }
 
-/// The font functions HarfBuzz builds in (`hb-ot`), at a [`Scale`]: the character
-/// map HarfBuzz prefers, `cmap` format 14 variation sequences, `hmtx` advances,
-/// and extents from the `glyf` header box or the charstring's control box.
+/// The font functions HarfBuzz builds in (`hb-ot`), at a [`Scale`]: the `cmap`
+/// subtable HarfBuzz prefers among the table's raw encoding records, read as
+/// HarfBuzz reads it, its variation sequences, `hmtx`
+/// advances, and extents from the `glyf` header box or the charstring's
+/// control box.
 #[derive(Debug)]
 pub struct OtMetrics<'a> {
     font: &'a Font,
-    charmap: Option<Charmap<'a>>,
-    /// A symbol charmap also maps U+0000..U+00FF at U+F000..U+F0FF.
-    symbol: bool,
-    /// A Macintosh charmap maps only ASCII.
-    ascii_only: bool,
-    variations: Variations<'a>,
+    subtable: Option<Subtable<'a>>,
+    /// HarfBuzz's variation sequences: the last (0, 5) record's subtable of
+    /// format 14.
+    variations: Option<VariationSequences<'a>>,
     scale: Scale,
     x_mult: i64,
     x_multf: f32,
@@ -133,36 +145,14 @@ impl<'a> OtMetrics<'a> {
     /// The font functions of `font` at `scale`. Each glyph they read is bounded
     /// by the font's [`Limits`](triergon_font::Limits).
     pub fn new(font: &'a Font, scale: Scale) -> Self {
-        use Platform::{Macintosh, Unicode, Windows};
-        let find = |platform: Platform, encoding: Option<u16>| {
-            font.charmaps()
-                .find(|c| c.platform() == platform && encoding.is_none_or(|e| c.encoding_id() == e))
-        };
-        // HarfBuzz's preference: symbol, then full and BMP Unicode, then Mac.
-        let symbol = find(Windows, Some(0));
-        let unicode = [
-            (Windows, 10),
-            (Unicode, 6),
-            (Unicode, 4),
-            (Windows, 1),
-            (Unicode, 3),
-            (Unicode, 2),
-            (Unicode, 1),
-            (Unicode, 0),
-        ]
-        .into_iter()
-        .find_map(|(p, e)| find(p, Some(e)));
-        let mac = find(Macintosh, Some(0)).or_else(|| find(Macintosh, None));
-        let ascii_only = symbol.is_none() && unicode.is_none() && mac.is_some();
-        let is_symbol = symbol.is_some();
-        let charmap = symbol.or(unicode).or(mac);
+        let cmap = font.table(*b"cmap").and_then(Cmap::new);
         let upem = i64::from(font.units_per_em());
         Self {
             font,
-            charmap,
-            symbol: is_symbol,
-            ascii_only,
-            variations: Variations::of(font),
+            subtable: cmap.and_then(|c| c.best(font.table(*b"OS/2").unwrap_or_default())),
+            variations: cmap
+                .and_then(Cmap::variation_sequences)
+                .map(VariationSequences::format14),
             scale,
             x_mult: i64::from(scale.x) * 0x10000 / upem,
             x_multf: scale.x as f32 / f32::from(font.units_per_em()),
@@ -175,7 +165,10 @@ impl<'a> OtMetrics<'a> {
     /// CFF the charstring's control box, each side rounded as `roundf` rounds it
     /// after HarfBuzz narrows its double to a float.
     fn unscaled_extents(&self, glyph: GlyphId) -> Result<Option<[i32; 4]>> {
-        let Some(control) = unless_unloadable(self.font.control_box(glyph).map(Some), None)? else {
+        // HarfBuzz's own functions have no budget beyond the face's limits.
+        let mut work = WorkBudget::new(self.font.limits().work);
+        let control = self.font.control_box(glyph, &mut work).map(Some);
+        let Some(control) = unless_unloadable(control, None)? else {
             return Ok(None);
         };
         Ok(Some(match control {
@@ -205,10 +198,6 @@ impl<'a> OtMetrics<'a> {
             }
         }))
     }
-
-    fn lookup(&self, code: u32) -> Option<GlyphId> {
-        self.charmap?.glyph(code)
-    }
 }
 
 impl Metrics for OtMetrics<'_> {
@@ -217,22 +206,17 @@ impl Metrics for OtMetrics<'_> {
     }
 
     fn nominal_glyph(&self, c: char) -> Option<GlyphId> {
-        let c = u32::from(c);
-        if self.ascii_only && c >= 0x80 {
-            return None;
-        }
-        self.lookup(c).or_else(|| {
-            (self.symbol && c <= 0xff)
-                .then(|| self.lookup(0xf000 + c))
-                .flatten()
-        })
+        self.subtable?.glyph(u32::from(c))
     }
 
     fn variation_glyph(&self, base: char, selector: char) -> Option<GlyphId> {
-        match self.variations.lookup(u32::from(base), u32::from(selector)) {
-            Variation::Default => self.nominal_glyph(base),
-            Variation::Glyph(glyph) => Some(glyph),
-            Variation::None => None,
+        match self
+            .variations?
+            .variant(u32::from(base), u32::from(selector))
+        {
+            Variant::Default => self.nominal_glyph(base),
+            Variant::Glyph(glyph) => Some(glyph),
+            Variant::None => None,
         }
     }
 
@@ -263,35 +247,56 @@ impl Metrics for OtMetrics<'_> {
 /// The font functions libass 0.17.5 installs on the HarfBuzz font of a face at a
 /// size (`init_font_funcs` and `get_hb_font` in `ass_shaper.c`): the face's
 /// character map looked up as libass looks codes up
-/// ([`Font::text_lookup`]), FreeType's variation sequences, default-load
+/// ([`Font::text_lookup`]), FreeType's variation sequences
+/// ([`Font::variation_sequences`]), default-load
 /// advances ([`SizedFont::hinted_advance`]) and `FT_KERNING_DEFAULT` kerning
 /// ([`SizedFont::kerning`]), in 26.6 pixels at the size's
 /// [`SizedFont::harfbuzz_scale`] and pixels per em, so that hinting device
 /// tables apply.
 ///
+/// For a face of an `@` font ([`Self::rotating`]), the advance of a glyph
+/// libass's metrics cache keeps rotated ([`GlyphRotations`](crate::GlyphRotations)) is the default
+/// load's vertical advance ([`SizedFont::hinted_vertical_advance`]).
+///
 /// libass reads glyph extents and contour points from FreeType's hinted load,
 /// which this crate does not run: for a glyph of the face both are
-/// `Unsupported`, as is an advance `hinted_advance` cannot give. The vertical
-/// advances libass substitutes in an `@` font are not covered.
-#[derive(Debug)]
+/// `Unsupported`, but for the empty extents of a glyph without points, as is an
+/// advance `hinted_advance` cannot give.
 pub struct SizedMetrics<'a> {
     sized: SizedFont<'a>,
     lookup: Option<TextLookup<'a>>,
     /// A Unicode charmap, which FreeType needs for variation sequences.
     unicode: bool,
-    variations: Variations<'a>,
+    /// FreeType's variation sequences (`FT_Face_GetCharVariantIndex`).
+    variations: Option<VariationSequences<'a>>,
     scale: Scale,
+    rotations: Option<&'a dyn Decide>,
+    /// The caller's budget for the charstrings the extents run.
+    work: RefCell<&'a mut WorkBudget>,
+}
+
+impl std::fmt::Debug for SizedMetrics<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SizedMetrics")
+            .field("sized", &self.sized)
+            .field("lookup", &self.lookup)
+            .field("unicode", &self.unicode)
+            .field("scale", &self.scale)
+            .field("rotating", &self.rotations.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a> SizedMetrics<'a> {
     /// libass's font functions over `sized`, through the charmap libass
-    /// selects when it opens the face ([`Font::text_charmap`]).
+    /// selects when it opens the face ([`Font::text_charmap`]), with `work`
+    /// bounding what they load.
     ///
     /// # Errors
     ///
     /// As [`Self::with_charmap`].
-    pub fn new(sized: SizedFont<'a>) -> Result<Self> {
-        Self::with_charmap(sized, sized.font().text_charmap())
+    pub fn new(sized: SizedFont<'a>, work: &'a mut WorkBudget) -> Result<Self> {
+        Self::with_charmap(sized, sized.font().text_charmap(), work)
     }
 
     /// libass's font functions over `sized`, through `charmap`, the one the
@@ -302,7 +307,11 @@ impl<'a> SizedMetrics<'a> {
     ///
     /// `Unsupported` when libass would convert codes for the charmap, which
     /// this crate does not ([`Font::text_lookup`]).
-    pub fn with_charmap(sized: SizedFont<'a>, charmap: Option<Charmap<'a>>) -> Result<Self> {
+    pub fn with_charmap(
+        sized: SizedFont<'a>,
+        charmap: Option<Charmap<'a>>,
+        work: &'a mut WorkBudget,
+    ) -> Result<Self> {
         let lookup = charmap
             .map(|charmap| sized.font().text_lookup(charmap))
             .transpose()?;
@@ -319,14 +328,42 @@ impl<'a> SizedMetrics<'a> {
             sized,
             lookup,
             unicode,
-            variations: Variations::of(sized.font()),
+            variations: sized.font().variation_sequences(),
             scale: Scale {
                 x,
                 y,
                 x_ppem: u32::from(size.x_ppem),
                 y_ppem: u32::from(size.y_ppem),
             },
+            rotations: None,
+            work: RefCell::new(work),
         })
+    }
+
+    /// The font functions of a face of an `@` font, whose glyph metrics
+    /// cache keeps `rotations`: every glyph a lookup loads is recorded there,
+    /// and a glyph it keeps rotated advances by its vertical advance.
+    #[must_use]
+    pub fn rotating<K: Copy + Eq + Hash>(self, rotations: &'a FaceRotations<'a, K>) -> Self {
+        Self {
+            rotations: Some(rotations),
+            ..self
+        }
+    }
+
+    /// Records a glyph a lookup loads in the metrics cache: through the
+    /// character `c`, or `None` for an advance or extents. Whether its cached
+    /// metrics are rotated.
+    fn loaded(&self, glyph: GlyphId, c: Option<char>) -> bool {
+        self.rotations.is_some_and(|r| r.decide(glyph, c))
+    }
+
+    /// Records a glyph a character lookup returned in the metrics cache.
+    fn looked_up(&self, glyph: Option<GlyphId>, c: char) -> Option<GlyphId> {
+        if let Some(glyph) = glyph {
+            self.loaded(glyph, Some(c));
+        }
+        glyph
     }
 
     /// `Unsupported` for a glyph of the face, which FreeType would hint; a glyph
@@ -346,24 +383,40 @@ impl Metrics for SizedMetrics<'_> {
     }
 
     fn nominal_glyph(&self, c: char) -> Option<GlyphId> {
-        self.lookup?.glyph(u32::from(c))
+        self.looked_up(self.lookup?.glyph(u32::from(c)), c)
     }
 
     fn variation_glyph(&self, c: char, selector: char) -> Option<GlyphId> {
         let lookup = self.lookup.filter(|_| self.unicode)?;
         let code = lookup.code(u32::from(c))?;
-        match self.variations.lookup(code, u32::from(selector)) {
-            Variation::Default => lookup.charmap().glyph(code),
-            Variation::Glyph(glyph) => Some(glyph),
-            Variation::None => None,
-        }
+        let glyph = match self.variations?.variant(code, u32::from(selector)) {
+            Variant::Default => lookup.charmap().glyph(code),
+            Variant::Glyph(glyph) => Some(glyph),
+            Variant::None => None,
+        };
+        self.looked_up(glyph, c)
     }
 
     fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
-        unless_unloadable(self.sized.hinted_advance(glyph), 0)
+        let advance = if self.loaded(glyph, None) {
+            self.sized.hinted_vertical_advance(glyph)
+        } else {
+            self.sized.hinted_advance(glyph)
+        };
+        unless_unloadable(advance, 0)
     }
 
     fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>> {
+        // Rotated or not, the cached extents are the default load's.
+        self.loaded(glyph, None);
+        // A glyph without points has an empty box however FreeType loads it.
+        let control = self
+            .sized
+            .font()
+            .control_box(glyph, &mut self.work.borrow_mut());
+        if let Ok(ControlBox::Empty) = control {
+            return Ok(Some(Extents::default()));
+        }
         self.hinted(glyph, "glyph extents of FreeType's hinted load")
     }
 
@@ -378,66 +431,11 @@ impl Metrics for SizedMetrics<'_> {
     fn h_kerning(&self, left: GlyphId, right: GlyphId) -> Result<i32> {
         Ok(self.sized.kerning(left, right))
     }
-}
 
-/// How a variation sequence maps.
-enum Variation {
-    /// To the base character's nominal glyph.
-    Default,
-    Glyph(GlyphId),
-    /// Not at all.
-    None,
-}
-
-/// The `cmap` format 14 subtable of the Unicode variation-sequence encoding (0,
-/// 5): the first one, as HarfBuzz and FreeType both take it.
-#[derive(Clone, Copy, Debug)]
-struct Variations<'a>(Data<'a>);
-
-impl<'a> Variations<'a> {
-    fn of(font: &'a Font) -> Self {
-        let cmap = Data(font.table(*b"cmap").unwrap_or_default());
-        let count = cmap.count(2, 4, 8);
-        let table = (0..count)
-            .map(|i| 4 + 8 * i)
-            .find(|&at| cmap.u16(at) == 0 && cmap.u16(at + 2) == 5)
-            .map(|at| cmap.offset32(at + 4))
-            .filter(|table| table.u16(0) == 14);
-        Self(table.unwrap_or_default())
-    }
-
-    /// The selector's default ranges first, then its mappings; a mapping to
-    /// glyph 0 is none.
-    fn lookup(self, c: u32, selector: u32) -> Variation {
-        let table = self.0;
-        let records = table.u32(6) as usize;
-        let records = records.min(table.0.len().saturating_sub(10) / 11);
-        let Some(record) = bsearch(records, |i| table.u24(10 + 11 * i).cmp(&selector)) else {
-            return Variation::None;
-        };
-        let at = 10 + 11 * record;
-        let defaults = table.at(table.u32(at + 3) as usize);
-        let count = (defaults.u32(0) as usize).min(defaults.0.len().saturating_sub(4) / 4);
-        let in_default = bsearch(count, |i| {
-            let first = defaults.u24(4 + 4 * i);
-            let last = first + u32::from(defaults.u8(4 + 4 * i + 3));
-            if c < first {
-                std::cmp::Ordering::Greater
-            } else if c > last {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Equal
-            }
-        });
-        if in_default.is_some() {
-            return Variation::Default;
-        }
-        let mappings = table.at(table.u32(at + 7) as usize);
-        let count = (mappings.u32(0) as usize).min(mappings.0.len().saturating_sub(4) / 5);
-        bsearch(count, |i| mappings.u24(4 + 5 * i).cmp(&c))
-            .map(|i| mappings.u16(4 + 5 * i + 3))
-            .filter(|&glyph| glyph != 0)
-            .map_or(Variation::None, |glyph| Variation::Glyph(GlyphId(glyph)))
+    fn finish(&self) -> Result<()> {
+        self.rotations
+            .and_then(Decide::take_refusal)
+            .map_or(Ok(()), Err)
     }
 }
 
@@ -473,9 +471,11 @@ impl<'a> Scaled<'a> {
         }
     }
 
-    /// The first error a font function returned, if any.
+    /// The first error a font function returned, or one it met but could
+    /// not return ([`Metrics::finish`]).
     pub(crate) fn finish(&self) -> Result<()> {
-        self.error.get().map_or(Ok(()), Err)
+        let met = self.metrics.finish();
+        self.error.get().map_or(met, Err)
     }
 
     /// The answer of a fallible font function, or `otherwise` once one failed.

@@ -18,7 +18,7 @@ fn main() {
             let Ok(font) = Font::new(bytes.clone(), index, &budget, Limits::default()) else {
                 continue;
             };
-            formats.extend(font.charmaps().map(|c| c.format().number()));
+            formats.extend(font.charmaps().filter_map(|c| c.kind().format_number()));
             for glyph in font.glyphs() {
                 if let Ok(used) = font.charstring_operators(glyph, &mut scratch) {
                     operators = operators.union(used);

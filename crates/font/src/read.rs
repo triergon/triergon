@@ -101,9 +101,36 @@ pub(crate) fn u16_at(data: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_be_bytes(*data.get(at..)?.first_chunk()?))
 }
 
+/// The big-endian 24-bit value at `at`, if `data` holds it.
+pub(crate) fn u24_at(data: &[u8], at: usize) -> Option<u32> {
+    let [a, b, c] = *data.get(at..)?.first_chunk()?;
+    Some(u32::from_be_bytes([0, a, b, c]))
+}
+
 /// The big-endian `u32` at `at`, if `data` holds it.
 pub(crate) fn u32_at(data: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes(*data.get(at..)?.first_chunk()?))
+}
+
+/// HarfBuzz's binary search (`hb_bsearch_impl`) over `count` items, where
+/// `compare` orders an item against the key: an index whose item compares
+/// equal. On unsorted items its probes decide which is found; on sorted ones
+/// it agrees with any binary search.
+pub(crate) fn bsearch(
+    count: usize,
+    compare: impl Fn(usize) -> std::cmp::Ordering,
+) -> Option<usize> {
+    use std::cmp::Ordering;
+    let (mut min, mut max) = (0_isize, isize::try_from(count).ok()? - 1);
+    while min <= max {
+        let mid = (min + max) / 2;
+        match compare(mid as usize) {
+            Ordering::Greater => max = mid - 1,
+            Ordering::Less => min = mid + 1,
+            Ordering::Equal => return Some(mid as usize),
+        }
+    }
+    None
 }
 
 /// `data[range]`, or `Invalid` when the range lies outside it.

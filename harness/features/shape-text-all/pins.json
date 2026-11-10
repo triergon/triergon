@@ -8732,6 +8732,116 @@
       "packets": 5076,
       "bytes": 5598,
       "digest": 1676336528551437359
+    },
+    "authored-charmaps-otf-latn-libass": {
+      "packets": 2284,
+      "bytes": 2411,
+      "digest": 4059991740992180481
+    },
+    "authored-charmaps-otf-zyyy-libass": {
+      "packets": 858,
+      "bytes": 1069,
+      "digest": 12932084427752028533
+    },
+    "authored-charmaps-otf-grek-libass": {
+      "packets": 991,
+      "bytes": 1072,
+      "digest": 16683526855929345128
+    },
+    "authored-charmaps-otf-cyrl-libass": {
+      "packets": 1030,
+      "bytes": 1116,
+      "digest": 16351401255343166361
+    },
+    "authored-charmaps-otf-hani-libass": {
+      "packets": 607,
+      "bytes": 834,
+      "digest": 15305801987783670085
+    },
+    "authored-charmaps-otf-hira-libass": {
+      "packets": 886,
+      "bytes": 987,
+      "digest": 7619317084351774123
+    },
+    "authored-charmaps-otf-kana-libass": {
+      "packets": 675,
+      "bytes": 727,
+      "digest": 13638689136967580968
+    },
+    "authored-charmaps-otf-hang-libass": {
+      "packets": 760,
+      "bytes": 834,
+      "digest": 9168580503982406997
+    },
+    "authored-charmaps-otf-hebr-libass": {
+      "packets": 1226,
+      "bytes": 1313,
+      "digest": 14193238336554413387
+    },
+    "authored-charmaps-otf-arab-libass": {
+      "packets": 1487,
+      "bytes": 1598,
+      "digest": 13318820201688003032
+    },
+    "authored-charmaps-otf-deva-libass": {
+      "packets": 1112,
+      "bytes": 1206,
+      "digest": 6532648274475033115
+    },
+    "authored-charmaps-otf-beng-libass": {
+      "packets": 824,
+      "bytes": 919,
+      "digest": 3727489721570832751
+    },
+    "authored-charmaps-otf-taml-libass": {
+      "packets": 708,
+      "bytes": 785,
+      "digest": 16063826926675102786
+    },
+    "authored-charmaps-otf-gujr-libass": {
+      "packets": 804,
+      "bytes": 899,
+      "digest": 15254665506142362156
+    },
+    "authored-charmaps-otf-guru-libass": {
+      "packets": 708,
+      "bytes": 780,
+      "digest": 7182205646804450469
+    },
+    "authored-charmaps-otf-knda-libass": {
+      "packets": 768,
+      "bytes": 860,
+      "digest": 10922082234734389126
+    },
+    "authored-charmaps-otf-mlym-libass": {
+      "packets": 797,
+      "bytes": 887,
+      "digest": 1387599184020273320
+    },
+    "authored-charmaps-otf-telu-libass": {
+      "packets": 795,
+      "bytes": 874,
+      "digest": 17344410558932378306
+    },
+    "authored-charmaps-otf-sinh-libass": {
+      "packets": 794,
+      "bytes": 868,
+      "digest": 1959743713621407323
+    },
+    "authored-charmaps-otf-thai-libass": {
+      "packets": 865,
+      "bytes": 933,
+      "digest": 12841034256965298424
+    },
+    "authored-charmaps-otf-khmr-libass": {
+      "packets": 796,
+      "bytes": 892,
+      "digest": 17446826773931991228
+    },
+    "authored-charmaps-otf-mymr-libass": {
+      "packets": 846,
+      "bytes": 933,
+      "digest": 321206598911733648
     }
   }
 }

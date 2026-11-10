@@ -113,6 +113,16 @@
       "bytes": 619012,
       "digest": 16630156747280279572
     },
+    "charmap-retry-ass-1080p": {
+      "packets": 12,
+      "bytes": 45620,
+      "digest": 3127853172692033868
+    },
+    "charmap-retry-ass-720p": {
+      "packets": 12,
+      "bytes": 38740,
+      "digest": 2647018896958249612
+    },
     "charmap-unicode-ass-1080p": {
       "packets": 18,
       "bytes": 252670,
@@ -352,6 +362,16 @@
       "packets": 168,
       "bytes": 2920440,
       "digest": 11813353727600396068
+    },
+    "vertical-styles-ass-1080p": {
+      "packets": 36,
+      "bytes": 378524,
+      "digest": 16642839131572579926
+    },
+    "vertical-styles-ass-720p": {
+      "packets": 36,
+      "bytes": 258980,
+      "digest": 14262811015553712598
     },
     "wrap-ass-1080p": {
       "packets": 336,

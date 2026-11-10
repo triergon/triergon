@@ -11,6 +11,7 @@
     "libass 0.17.5's default configuration (ASS_HINTING_NONE): every face of one font file read from memory and loaded at 256 pixels (16384 in 26.6), after libass's GDI face metrics, with a REAL_DIM size request",
     "outlines cases: the size metrics, libass's ascent and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline and strikeout bands; the kerning at the size (FT_KERNING_DEFAULT) of every pair the kern table lists, nonzero values only; every glyph's FT_LOAD_NO_HINTING outline and advance, then that outline emboldened, slanted, and both; packets count outlines and bytes their points",
     "advances cases: every glyph's FT_LOAD_DEFAULT advance at that size, which libass's HarfBuzz callbacks report; packets count advances; an advance the candidate cannot give ends its operation with an error, so the case fails",
+    "vertical cases: every glyph's linearVertAdvance and metrics.vertAdvance of the FT_LOAD_NO_HINTING load, with which libass draws a glyph of an @ font rotated, then metrics.vertAdvance of the FT_LOAD_DEFAULT load, which its HarfBuzz callbacks report as that glyph's advance; packets count glyphs; a default-load advance the candidate cannot give ends its operation with an error, so the case fails",
     "the file is read before each timed and memory operation; the reference library is created once, outside it"
   ],
   "required_profiles": [
@@ -36,6 +37,14 @@
     },
     {
       "id": "authored-cmap-formats-ttf-advances-16384",
+      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
+    },
+    {
+      "id": "dejavumathtexgyre-ttf-vertical-16384",
+      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
+    },
+    {
+      "id": "authored-cmap-formats-ttf-vertical-16384",
       "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
     }
   ]
