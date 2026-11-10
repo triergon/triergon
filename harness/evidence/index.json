@@ -16932,6 +16932,15 @@
    "sha256": "7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6",
    "bytes": 10883413,
    "source_revision": "24f2299a8d12e120eabc7fc4a32e7eb8febc953e"
+  },
+  {
+   "name": "ass-rendering-divergences-fedfb790",
+   "path": "ass-rendering-divergences-fedfb790",
+   "retention": "retained",
+   "reason": "ASS rendering divergences from libass in the pull request that adds their cases",
+   "key": "evidence/ass-rendering-divergences-fedfb790/f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f.tar.gz",
+   "sha256": "f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f",
+   "bytes": 74838624
   }
  ]
 }
