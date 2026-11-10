@@ -895,8 +895,48 @@ impl DemuxObserver {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ReadyContinuation> {
-        let Some(payload) = packet.payload.as_ref() else {
+        let Some(next) = self.ready_continuation(packet, context, None, work, cancel)? else {
             return Ok(ReadyContinuation::Unhandled);
+        };
+        let bytes = packet
+            .payload
+            .take()
+            .ok_or(Error::Invalid("native PES payload missing"))?;
+        self.append_carrier_payload(packet, context, bytes, next)
+    }
+
+    /// Append from a carrier whose full transport event is still needed.
+    /// The payload keeps its original charge and the event remains intact.
+    pub fn append_ready_borrowed_continuation(
+        &mut self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        input: &triergon_core::InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ReadyContinuation> {
+        let Some(next) = self.ready_continuation(packet, context, Some(input), work, cancel)?
+        else {
+            return Ok(ReadyContinuation::Unhandled);
+        };
+        let bytes = packet
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("native PES payload missing"))?
+            .clone();
+        self.append_carrier_payload(packet, context, bytes, next)
+    }
+
+    fn ready_continuation(
+        &self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        input: Option<&triergon_core::InputCursor>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<usize>> {
+        let Some(payload) = packet.payload.as_ref() else {
+            return Ok(None);
         };
         let count = payload.len();
         let next = self
@@ -905,20 +945,28 @@ impl DemuxObserver {
             .ok_or(Error::Overflow)?;
         if packet.payload_unit_start
             || packet.discontinuity_indicator()
-            || packet.prefix.is_some()
+            || (packet.prefix.is_some() && (input.is_none() || self.demux_input.is_none()))
             || count == 0
             || !self.ready_body(packet.continuity_counter, next)
-            || self.input_error(packet, context, false, None, false)
+            || self
+                .input_error(packet, context, false, input, false)
                 .is_some()
             || cancel.load(Ordering::Relaxed)
             || !work.try_charge(2)
         {
-            return Ok(ReadyContinuation::Unhandled);
+            return Ok(None);
         }
-        let bytes = packet
-            .payload
-            .take()
-            .ok_or(Error::Invalid("native PES payload missing"))?;
+        Ok(Some(next))
+    }
+
+    fn append_carrier_payload(
+        &mut self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        bytes: Bytes,
+        next: usize,
+    ) -> Result<ReadyContinuation> {
+        let count = bytes.len();
         self.append_ready_span(
             DemuxSpan {
                 bytes,

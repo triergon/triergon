@@ -385,7 +385,7 @@ trait TsStepProjection: Sized {
 }
 
 impl TsStepProjection for BackendStep {
-    #[inline]
+    #[inline(always)]
     fn project(step: TsPayloadStep) -> Result<Self> {
         Ok(match step {
             TsPayloadStep::Event(event) => Self::Event(RawEvent::Ts(event)),
@@ -419,6 +419,7 @@ impl TsStepProjection for BackendStep {
 }
 
 impl TsStepProjection for TsPayloadStep {
+    #[inline]
     fn project(step: Self) -> Result<Self> {
         Ok(step)
     }
@@ -2340,7 +2341,27 @@ impl TsEngine {
                 && let Some(index) = self.native_tracks.index(packet.pid)
             {
                 let context = self.native_source_context();
-                self.offer_native_transport(index, packet.clone(), context, None)?;
+                if let Some(observer) = self.native_tracks.as_mut_slice()[index].observer.as_mut() {
+                    // Keep one unit for delivery of the original source event.
+                    let ready = if w.remaining() >= 3 {
+                        observer.append_ready_borrowed_continuation(
+                            packet,
+                            context,
+                            &self.input,
+                            w,
+                            c,
+                        )?
+                    } else {
+                        ReadyContinuation::Unhandled
+                    };
+                    match ready {
+                        ReadyContinuation::Buffered => {}
+                        ReadyContinuation::Complete => self.native_active = Some(index),
+                        ReadyContinuation::Unhandled => {
+                            self.offer_native_transport(index, packet.clone(), context, None)?;
+                        }
+                    }
+                }
             }
             self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
             if matches!(event, TraceEvent::Finished) {

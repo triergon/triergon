@@ -202,7 +202,8 @@ byte. Complete TS188 and M2TS192 carriers use one validator for common
 payload and adaptation layouts, including PCR. M2TS prefixes stay opaque.
 Program playback keeps tight carrier storage so a packet cannot retain an
 entire input window. The PES observer checks that the payload is the exact
-span at its declared offset in that carrier.
+span at its declared offset in that carrier. A ready PES continuation can
+retain just the payload view while playback delivers the full transport event.
 
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
