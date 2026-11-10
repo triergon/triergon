@@ -317,16 +317,19 @@ composites) are
   its own and with `--benchmark` and `--memory` measures runtime and memory
   against FreeType. `font-dump` and `font-sized-dump` print the folded values as
   lines in both workers, for diffing a failing case.
-- The corpus includes four fonts the crate's test support writes
+- The corpus includes five fonts the crate's test support writes
   (`examples/authored-fonts.rs`): `seac`, the arithmetic, logic and storage operators,
   the flex forms, counter masks, subroutines nested twelve deep, curve operators with
   operand counts the format does not allow, a skewing FontMatrix with an offset,
-  one cmap subtable of each supported format, and a collection with a face for each
-  step of the text charmap selection. With them the
+  one cmap subtable of each supported format, a collection with a face for each
+  step of the text charmap selection, and a collection with a face for each way
+  FreeType reads vertical advances (long `vmtx` records with level phantom
+  points, an advance height of 65535 and `USE_MY_METRICS`, a `vhea` without
+  records, a short `vhea`, and `VHEA` with `VMTX`). With them the
   comparison exercises every charstring operator except `vsindex` (CFF2 fonts in the
-  corpus do not use it) and `random`, every supported cmap format and every step of
-  the text charmap selection; `examples/font-coverage.rs` reports the operators and
-  formats.
+  corpus do not use it) and `random`, every supported cmap format, every step of
+  the text charmap selection and every vertical-metrics path;
+  `examples/font-coverage.rs` reports the operators and formats.
 - `cargo xtask fuzz --contract harness/features/<feature>/contract.json` mutates
   every case's file through the release and dev builds of the worker (the dev build
   checks overflow), with a timeout per input, and with `--reference` compares each
