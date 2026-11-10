@@ -432,6 +432,170 @@ fn dts_fixture(
     raw
 }
 
+const OPUS_DURATIONS: [u32; 6] = [960, 480, 1920, 480, 960, 240];
+
+fn opus_fixture(config: &[u8], edit_start: i32, edit_duration: u32) -> Vec<u8> {
+    let mut raw = dts_fixture(
+        b"Opus",
+        0,
+        &atom(b"dOps", config),
+        48_000,
+        960,
+        240,
+        &[(edit_duration, edit_start)],
+    );
+    let entry = fixture_payload(&raw, b"Opus");
+    raw[entry + 16..entry + 20].copy_from_slice(&[0, 2, 0, 16]);
+    raw[entry + 24..entry + 28].copy_from_slice(&(48_000u32 << 16).to_be_bytes());
+    let mut stts = vec![0, 0, 0, 0, 0, 0, 0, 6];
+    for duration in OPUS_DURATIONS {
+        stts.extend_from_slice(&1u32.to_be_bytes());
+        stts.extend_from_slice(&duration.to_be_bytes());
+    }
+    replace_fixture_body(
+        &mut raw,
+        b"stts",
+        &[b"stbl", b"minf", b"mdia", b"trak", b"moov"],
+        &stts,
+    );
+    let duration = fixture_payload(&raw, b"mdhd") + 16;
+    raw[duration..duration + 4].copy_from_slice(&OPUS_DURATIONS.iter().sum::<u32>().to_be_bytes());
+    raw
+}
+
+#[test]
+fn range_playback_uses_the_opus_edit_and_keeps_variable_packet_durations() {
+    let dops = [0, 2, 1, 56, 0, 0, 187, 128, 0, 0, 0];
+    let raw = opus_fixture(&dops, 720, 4320);
+    let source = Source::new(&raw, b"soun");
+    let config = range_config(
+        &source,
+        *b"isom",
+        &mut source.input(),
+        ConfigurationLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(config.kind(), EncodedEntryKind::Opus);
+    assert_eq!(config.configuration_box().payload(), dops);
+    assert_eq!(
+        config.demux().extradata.as_ref(),
+        b"OpusHead\x01\x02\x38\x01\x80\xbb\x00\x00\x00\x00\x00"
+    );
+    let plan = range_plan(&source, *b"isom").unwrap();
+    assert_eq!(plan.anchor_ticks(), 720);
+    assert_eq!(plan.selected_end_ticks(), 5040);
+    let packets = rows(&source, plan);
+    assert_eq!(packets.len(), OPUS_DURATIONS.len());
+    for (i, ((packet, skip), (duration, pts))) in packets
+        .iter()
+        .zip(
+            OPUS_DURATIONS
+                .into_iter()
+                .zip([-720, 240, 720, 2640, 3120, 4080]),
+        )
+        .enumerate()
+    {
+        assert_eq!(packet.demux.pts, Some(pts));
+        assert_eq!(packet.demux.dts, Some(pts));
+        assert_eq!(packet.demux.duration, i64::from(duration));
+        assert_eq!(packet.demux.flags, 1);
+        assert_eq!(*skip, (i == 0).then_some([208, 2, 0, 0, 0, 0, 0, 0, 0, 0]));
+    }
+}
+
+#[test]
+fn range_playback_keeps_opus_preroll_and_stops_at_the_edit_end() {
+    let dops = [0, 2, 1, 56, 0, 0, 187, 128, 0, 0, 0];
+    let raw = opus_fixture(&dops, 1440, 2300);
+    let source = Source::new(&raw, b"soun");
+    let packets = rows(&source, range_plan(&source, *b"isom").unwrap());
+    assert_eq!(
+        packets
+            .iter()
+            .map(|(packet, _)| (packet.demux.pts, packet.demux.flags))
+            .collect::<Vec<_>>(),
+        [
+            (Some(-1440), 5),
+            (Some(-480), 5),
+            (Some(0), 1),
+            (Some(1920), 1)
+        ]
+    );
+    assert_eq!(packets[0].1, Some([160, 5, 0, 0, 0, 0, 0, 0, 0, 0]));
+    assert_eq!(packets[3].1, Some([0, 0, 0, 0, 100, 0, 0, 0, 0, 0]));
+    let after_end = opus_fixture(&dops, 5040, 100);
+    assert_eq!(
+        range_plan(&Source::new(&after_end, b"soun"), *b"isom").unwrap_err(),
+        Error::Invalid("Opus edit starts after the last sample")
+    );
+}
+
+#[test]
+fn cropped_opus_keeps_source_and_edit_ordinals_distinct() {
+    let mut raw = include_bytes!("fixtures/range-encoded-edits/avc-opus-edit.mp4").to_vec();
+    for (at, value) in [
+        (1508, 2050_u32),
+        (1512, 52_800),
+        (1552, 154_896),
+        (1780, 20),
+        (1788, 140),
+    ] {
+        raw[at..at + 4].copy_from_slice(&value.to_be_bytes());
+    }
+    let source = Source::new(&raw, b"soun");
+    let packets = rows(&source, range_plan(&source, *b"isom").unwrap());
+    let (first, _) = &packets[0];
+    assert_eq!((first.source.ordinal, first.edit.unwrap().sequence), (5, 1));
+    let (retained, _) = &packets[16];
+    assert_eq!(
+        (retained.source.ordinal, retained.edit.unwrap().sequence),
+        (21, 17)
+    );
+    assert_eq!(retained.source.duration_ticks, 960);
+    assert_eq!(retained.demux.duration, 1008);
+}
+
+#[test]
+fn opus_global_seek_aligns_audio_without_the_range_checkpoints() {
+    let raw = include_bytes!("fixtures/range-encoded-edits/avc-opus-edit.mp4");
+    let video = Source::new(raw, b"vide");
+    let audio = Source::in_pool(raw, b"soun", video.pool.clone());
+    let plans = [
+        Some(range_plan(&video, *b"isom").unwrap()),
+        Some(range_plan(&audio, *b"isom").unwrap()),
+    ];
+    let recovery = plans[1]
+        .as_ref()
+        .unwrap()
+        .recovery_observation()
+        .unwrap()
+        .source_result()
+        .unwrap()
+        .source_scope(triergon_isobmff::RecoveryKind::Roll);
+    assert!(recovery.track_descriptions.is_some());
+    assert!(recovery.mappings.is_some());
+    let tracks = [video.track(), audio.track()];
+    let cancel = AtomicBool::new(false);
+    let mut seek = GlobalSeekJob::new_encoded_regular_rescaled(
+        &video.pool,
+        &tracks,
+        &video.media,
+        (video.header.track_id, 32000),
+        triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+        &plans,
+    )
+    .unwrap();
+    while seek.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Yield {}
+    let seek = seek.finish().unwrap();
+    assert_eq!(seek.landing().selected.timestamp, 32000);
+    let mut cursor = seek.cursor().unwrap();
+    while cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() == CursorStatus::Yield {}
+    let first = cursor.take_occurrence().unwrap();
+    assert_eq!(first.track_id, audio.header.track_id);
+    assert_eq!(first.demux.pts, Some(94752));
+    assert_eq!(first.source.range.start, 42991);
+}
+
 #[test]
 fn dts_core_descriptions_agree_with_range_admission() {
     for (tag, version, config, major, configuration_box) in [

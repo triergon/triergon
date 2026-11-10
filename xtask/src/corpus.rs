@@ -193,11 +193,115 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     })
     .collect();
     cases.extend(mp4_range_entries(paths, &output)?);
+    let opus_file = "avc-opus-edit.mp4";
+    let boundary_file = "avc-opus-seek-boundary.mp4";
+    let tail_file = "avc-opus-trimmed-end.mp4";
+    let rescaled_file = "avc-opus-rescaled-edit.mp4";
+    let crop_file = "avc-opus-cropped-edit.mp4";
+    let seed = paths
+        .root
+        .join("crates/isobmff/tests/fixtures/range-encoded-edits")
+        .join(opus_file);
+    let opus = fs::read(&seed).map_err(|e| format!("{}: {e}", seed.display()))?;
+    if sha256::hex(&opus) != "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a" {
+        return Err("MP4 Opus seed changed".into());
+    }
+    let mut boundary = opus.clone();
+    // At a two-second video landing this puts the second audio candidate
+    // exactly on the receiver's earlier search timestamp.
+    boundary[1512..1516].copy_from_slice(&528_i32.to_be_bytes());
+    let mut tail = opus.clone();
+    // The audio edit ends inside a coded packet, while the video continues.
+    for offset in [1420, 1508] {
+        tail[offset..offset + 4].copy_from_slice(&1003_u32.to_be_bytes());
+    }
+    let mut rescaled = tail.clone();
+    // Double the Opus media clock and all media ticks, leaving dOps unchanged.
+    for (offset, value) in [
+        (1512, 672_u32),
+        (1548, 96_000),
+        (1552, 307_968),
+        (1784, 2016),
+        (1792, 1920),
+        (1800, 672),
+    ] {
+        rescaled[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+    }
+    let mut crop = opus.clone();
+    // Crop 1.1 seconds from the front. Make the first duration run span 20
+    // packets so the retained and original run boundaries differ.
+    for (offset, value) in [
+        (1420, 2050_u32),
+        (1508, 2050),
+        (1512, 52_800),
+        (1552, 154_896),
+        (1780, 20),
+        (1788, 140),
+    ] {
+        crop[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+    }
+    write(&output.join(opus_file), &opus)?;
+    write(&output.join(boundary_file), &boundary)?;
+    write(&output.join(tail_file), &tail)?;
+    write(&output.join(rescaled_file), &rescaled)?;
+    write(&output.join(crop_file), &crop)?;
+    cases.extend([
+        mp4_range_case(
+            "opus-open",
+            opus_file,
+            &opus,
+            None,
+            (241, 65_677, 15_624_301_091_816_995_394),
+        ),
+        mp4_range_case(
+            "opus-seek",
+            opus_file,
+            &opus,
+            Some("32000"),
+            (92, 25_673, 5_125_035_269_830_725_090),
+        ),
+        mp4_range_case(
+            "opus-seek-edit-boundary",
+            boundary_file,
+            &boundary,
+            Some("32000"),
+            (91, 25_535, 8_414_310_448_937_091_467),
+        ),
+        mp4_range_case(
+            "opus-trim-end",
+            tail_file,
+            &tail,
+            None,
+            (131, 50_269, 5_934_296_594_475_595_056),
+        ),
+        mp4_range_case(
+            "opus-trim-rescaled",
+            rescaled_file,
+            &rescaled,
+            None,
+            (131, 50_269, 7_154_259_262_571_099_376),
+        ),
+        mp4_range_case(
+            "opus-crop-open",
+            crop_file,
+            &crop,
+            None,
+            (233, 64_822, 8_468_210_823_864_242_940),
+        ),
+        mp4_range_case(
+            "opus-crop-seek",
+            crop_file,
+            &crop,
+            Some("32000"),
+            (33, 17_176, 15_900_364_185_324_428_767),
+        ),
+    ]);
+    let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
     )?;
-    Ok("MP4 range corpus: fifteen playback comparisons".into())
+    Ok(format!("MP4 range corpus: {count} playback comparisons"))
 }
 
 fn mp4_range_case(

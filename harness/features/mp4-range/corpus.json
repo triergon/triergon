@@ -211,6 +211,103 @@
         "bytes": 2192,
         "digest": 4884662521198875690
       }
+    },
+    {
+      "id": "opus-open",
+      "profile": "opus-open",
+      "file": "avc-opus-edit.mp4",
+      "sha256": "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 241,
+        "bytes": 65677,
+        "digest": 15624301091816995394
+      }
+    },
+    {
+      "id": "opus-seek",
+      "profile": "opus-seek",
+      "file": "avc-opus-edit.mp4",
+      "sha256": "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000"
+      ],
+      "expected": {
+        "packets": 92,
+        "bytes": 25673,
+        "digest": 5125035269830725090
+      }
+    },
+    {
+      "id": "opus-seek-edit-boundary",
+      "profile": "opus-seek-edit-boundary",
+      "file": "avc-opus-seek-boundary.mp4",
+      "sha256": "b638bd26179ce0d091bc1e96f770788c3a6437a64d38342dcf1d6f896b015de4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000"
+      ],
+      "expected": {
+        "packets": 91,
+        "bytes": 25535,
+        "digest": 8414310448937091467
+      }
+    },
+    {
+      "id": "opus-trim-end",
+      "profile": "opus-trim-end",
+      "file": "avc-opus-trimmed-end.mp4",
+      "sha256": "d13e84fd4307cfba2a3e9c49f2e07f1d0cff85c8aa328f9355def77fa1b08511",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 131,
+        "bytes": 50269,
+        "digest": 5934296594475595056
+      }
+    },
+    {
+      "id": "opus-trim-rescaled",
+      "profile": "opus-trim-rescaled",
+      "file": "avc-opus-rescaled-edit.mp4",
+      "sha256": "d553d89ec289ae117de866f5965bf90efed4aed78433ebb361b04a75bcbaf57c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 131,
+        "bytes": 50269,
+        "digest": 7154259262571099376
+      }
+    },
+    {
+      "id": "opus-crop-open",
+      "profile": "opus-crop-open",
+      "file": "avc-opus-cropped-edit.mp4",
+      "sha256": "aa39c47facc37101f7d3df72c2070623929406bdc457719dd2c56a9802baea24",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 233,
+        "bytes": 64822,
+        "digest": 8468210823864242940
+      }
+    },
+    {
+      "id": "opus-crop-seek",
+      "profile": "opus-crop-seek",
+      "file": "avc-opus-cropped-edit.mp4",
+      "sha256": "aa39c47facc37101f7d3df72c2070623929406bdc457719dd2c56a9802baea24",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 17176,
+        "digest": 15900364185324428767
+      }
     }
   ]
 }

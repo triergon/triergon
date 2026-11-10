@@ -1,6 +1,6 @@
 # Encoded range edit fixtures
 
-These three synthetic files use a generated sine and a solid color. They cover a
+The Dolby and QuickTime fixtures use a generated sine and a solid color. They cover a
 leading encoder-delay edit in each Dolby audio format and a reordered QuickTime
 AVC track with an unspecified Macintosh language and a media handler distinct
 from its data handler.
@@ -20,3 +20,18 @@ timestamps, byte ranges and skip-samples side data. The Dolby fixtures use a
 movie timescale of 48,000, so the edit duration converts exactly to media ticks.
 [ETSI TS 102 366, Annex F](https://www.etsi.org/deliver/etsi_ts/102300_102399/102366/01.04.01_60/ts_102366v010401p.pdf).
 [QuickTime language code values](https://developer.apple.com/documentation/quicktime-file-format/language_code_values).
+
+`avc-opus-edit.mp4` is an authored sine and test pattern, with the same licence
+as the repository. The Matroska intermediate gives the MP4 sample table unequal
+first and last audio durations. The edit trims 336 samples, while `dOps` records
+312. The video clock is 16,000 Hz. The SHA-256 of the fixture is
+`109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a`.
+
+```sh
+ffmpeg -nostdin -f lavfi -i 'testsrc2=size=96x64:rate=25' \
+  -f lavfi -i 'sine=frequency=997:sample_rate=48000' -t 3.2 \
+  -pix_fmt yuv420p -c:v libx264 -crf 30 -preset ultrafast -g 25 -keyint_min 25 -sc_threshold 0 -bf 0 \
+  -c:a libopus -ac 2 -b:a 32k -map_metadata -1 -fflags +bitexact avc-opus-edit.mkv
+ffmpeg -nostdin -i avc-opus-edit.mkv -map 0:v:0 -map 0:a:0 \
+  -c copy -movflags +faststart -video_track_timescale 16000 -map_metadata -1 -fflags +bitexact avc-opus-edit.mp4
+```
