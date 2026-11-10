@@ -553,6 +553,6 @@ Every revision status cites stays reachable from `main`: `cargo xtask check-revi
 part of `check`, fails when `HEAD` does not reach a cited commit. A pull request that
 cites its own commits merges with a merge commit. A cited commit that is off `main`
 joins it through a merge that keeps `main`'s tree (`git merge -s ours`).
-[harness/evidence/lost-revisions.json](../harness/evidence/lost-revisions.json) lists
-the cited revisions no copy is known of; the check accepts them only while they stay
-cited and absent, so the list can only shrink.
+An abbreviated revision must identify one Git object, and that object must be a
+commit in the checkout history. Keep a bundle of the measured source with the
+archived result so its exact commit can be recovered.
