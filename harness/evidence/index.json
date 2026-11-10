@@ -46,23 +46,6 @@
  },
  "sets": [
   {
-   "name": "mpegts-control-completion-linux-arm64",
-   "retention": "retained",
-   "key": "evidence/mpegts-control-completion-linux-arm64/1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2.tar.gz",
-   "sha256": "1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2",
-   "bytes": 80420878,
-   "reason": "MPEG-TS measurements cited by docs/status.md"
-  },
-  {
-   "name": "mpegts-control-completion-macos",
-   "retention": "retained",
-   "reason": "MPEG-TS control-only completion status row: the complete 97-case live macOS comparison, 81 matching operations, 16 explicit open cases, previous outputs and refusals, exact source and workers",
-   "key": "evidence/mpegts-control-completion-macos/d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b.tar.gz",
-   "sha256": "d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b",
-   "bytes": 52915620,
-   "source_revision": "65eeada0888bcd112d4cbd90e68795fea93fd864"
-  },
-  {
    "name": "worker-build-selection",
    "retention": "90 days",
    "key": "qualification/repository/worker-build-selection/67d70ab82906705f581bbb02215ab30a42aa505e1334cb1691fed9a8302d8dc4.tar.gz",
@@ -16537,6 +16520,72 @@
    "source_revision": "090c856df65f9247d24ea9f1c927e35cf5d528e8"
   },
   {
+   "name": "mpegts-control-completion-linux-arm64",
+   "retention": "retained",
+   "key": "evidence/mpegts-control-completion-linux-arm64/1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2.tar.gz",
+   "sha256": "1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2",
+   "bytes": 80420878,
+   "reason": "MPEG-TS measurements cited by docs/status.md"
+  },
+  {
+   "name": "mpegts-control-completion-macos",
+   "retention": "retained",
+   "reason": "MPEG-TS control-only completion status row: the complete 97-case live macOS comparison, 81 matching operations, 16 explicit open cases, previous outputs and refusals, exact source and workers",
+   "key": "evidence/mpegts-control-completion-macos/d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b.tar.gz",
+   "sha256": "d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b",
+   "bytes": 52915620,
+   "source_revision": "65eeada0888bcd112d4cbd90e68795fea93fd864"
+  },
+  {
+   "name": "mpegts-finite-recovery",
+   "path": "mpegts-finite-recovery",
+   "retention": "retained",
+   "reason": "finite PES fault-recovery host comparisons cited by docs/status.md",
+   "key": "evidence/mpegts-finite-recovery/69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f.tar.gz",
+   "sha256": "69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f",
+   "bytes": 39685608
+  },
+  {
+   "name": "mpegts-source-boundaries",
+   "retention": "retained",
+   "key": "evidence/mpegts-source-boundaries/8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656.tar.gz",
+   "sha256": "8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656"
+  },
+  {
+   "name": "mpegts-ordered-pes",
+   "retention": "retained",
+   "key": "evidence/mpegts-ordered-pes/99ef872cb64a76ddb09036f432f3ccabc7b4ce02e6a2162020fd1303f3b58b33.tar.gz",
+   "sha256": "99ef872cb64a76ddb09036f432f3ccabc7b4ce02e6a2162020fd1303f3b58b33"
+  },
+  {
+   "name": "mpegts-pes-native",
+   "retention": "retained",
+   "key": "evidence/mpegts-pes-native/0abecbcda1308ab81d78f669a68bce42ab329f98b2cfda9558d1a7868912dfb1.tar.gz",
+   "sha256": "0abecbcda1308ab81d78f669a68bce42ab329f98b2cfda9558d1a7868912dfb1"
+  },
+  {
+   "name": "mpegts-pes-carrier-validation",
+   "retention": "retained",
+   "key": "evidence/mpegts-pes-carrier-validation/c3ccc85fe2cd3a44c2cc46489e2330d9a1fcc427491b0eddad4bcd878a6accdf.tar.gz",
+   "sha256": "c3ccc85fe2cd3a44c2cc46489e2330d9a1fcc427491b0eddad4bcd878a6accdf"
+  },
+  {
+   "name": "mpegts-pes-plain-carriers",
+   "retention": "retained",
+   "key": "evidence/mpegts-pes-plain-carriers/b9cfbecdde7ae92f6af342db61f254934b9e1733ad23591bfa5467de2f1424b8.tar.gz",
+   "sha256": "b9cfbecdde7ae92f6af342db61f254934b9e1733ad23591bfa5467de2f1424b8"
+  },
+  {
+   "name": "mpegts-pes-request-and-diagnostic",
+   "path": "mpegts-pes-request-and-diagnostic",
+   "retention": "retained",
+   "reason": "Ninety-seven MPEG-TS PES comparisons with source-bound completion and ordered input pins on AArch64 Linux.",
+   "key": "evidence/mpegts-pes-request-and-diagnostic/e09a5509dcf30826a5aad4101ccdde0fe676545616a279f11ed23cb4240adb4c.tar.gz",
+   "sha256": "e09a5509dcf30826a5aad4101ccdde0fe676545616a279f11ed23cb4240adb4c",
+   "bytes": 51856266,
+   "source_revision": "0f42a16e8e3c8f1375890efee80abe711a05c77b"
+  },
+  {
    "name": "runners-gate-build-linux-armv7",
    "path": "runners-gate-build-linux-armv7",
    "retention": "retained",
@@ -16839,54 +16888,6 @@
    "key": "evidence/mp4-range-dedicated-entries-classified/632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e.tar.gz",
    "sha256": "632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e",
    "bytes": 8608934
-  },
-  {
-   "name": "mpegts-finite-recovery",
-   "path": "mpegts-finite-recovery",
-   "retention": "retained",
-   "reason": "finite PES fault-recovery host comparisons cited by docs/status.md",
-   "key": "evidence/mpegts-finite-recovery/69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f.tar.gz",
-   "sha256": "69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f",
-   "bytes": 39685608
-  },
-  {
-   "name": "mpegts-source-boundaries",
-   "retention": "retained",
-   "key": "evidence/mpegts-source-boundaries/8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656.tar.gz",
-   "sha256": "8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656"
-  },
-  {
-   "name": "mpegts-ordered-pes",
-   "retention": "retained",
-   "key": "evidence/mpegts-ordered-pes/99ef872cb64a76ddb09036f432f3ccabc7b4ce02e6a2162020fd1303f3b58b33.tar.gz",
-   "sha256": "99ef872cb64a76ddb09036f432f3ccabc7b4ce02e6a2162020fd1303f3b58b33"
-  },
-  {
-   "name": "mpegts-pes-native",
-   "retention": "retained",
-   "key": "evidence/mpegts-pes-native/0abecbcda1308ab81d78f669a68bce42ab329f98b2cfda9558d1a7868912dfb1.tar.gz",
-   "sha256": "0abecbcda1308ab81d78f669a68bce42ab329f98b2cfda9558d1a7868912dfb1"
-  },
-  {
-   "name": "mpegts-pes-carrier-validation",
-   "retention": "retained",
-   "key": "evidence/mpegts-pes-carrier-validation/c3ccc85fe2cd3a44c2cc46489e2330d9a1fcc427491b0eddad4bcd878a6accdf.tar.gz",
-   "sha256": "c3ccc85fe2cd3a44c2cc46489e2330d9a1fcc427491b0eddad4bcd878a6accdf"
-  },
-  {
-   "name": "mpegts-pes-plain-carriers",
-   "retention": "retained",
-   "key": "evidence/mpegts-pes-plain-carriers/b9cfbecdde7ae92f6af342db61f254934b9e1733ad23591bfa5467de2f1424b8.tar.gz",
-   "sha256": "b9cfbecdde7ae92f6af342db61f254934b9e1733ad23591bfa5467de2f1424b8"
-  },
-  {
-   "name": "mpegts-current-reader-comparison",
-   "path": "mpegts-current-reader-comparison",
-   "retention": "retained",
-   "reason": "",
-   "key": "evidence/mpegts-current-reader-comparison/e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a.tar.gz",
-   "sha256": "e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a",
-   "bytes": 84851549
   }
  ]
 }
