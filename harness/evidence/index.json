@@ -17103,6 +17103,16 @@
    "sha256": "c2ffb0cd91e0e5e313e08d4df02ff034978b054fffb88a27451a337e7e770d0e",
    "bytes": 98546546,
    "source_revision": "944fd7cfc7712f505bd66e046afaa77f7eee6aac"
+  },
+  {
+   "name": "font-ass-vertical-a6e98452",
+   "path": "font-ass-vertical-a6e98452",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with `@` fonts drawn and shaped as libass does, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape and ass compare at a6e98452 natively on AArch64 and in the armv7-userland user space, with raster compare, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64, each run's build log, and the user space's package list.",
+   "key": "evidence/font-ass-vertical-a6e98452/d5b68414a5a9db73c98b0cab8f49919980da2d7754e46fcb84cf7cc6f8039f0a.tar.gz",
+   "sha256": "d5b68414a5a9db73c98b0cab8f49919980da2d7754e46fcb84cf7cc6f8039f0a",
+   "bytes": 98547570,
+   "source_revision": "a6e984526d20029e75b48650e9cc317f192da776"
   }
  ]
 }

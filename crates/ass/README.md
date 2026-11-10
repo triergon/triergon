@@ -417,11 +417,11 @@ panics.
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 70/74 pass. The
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): 72/74 pass. The
   box behind a `BorderStyle` 4 event is
   compared without its kind, since libass leaves its type uninitialised. The
-  four open cases are two fixtures at both sizes: `cjk.ass`, with an `@` font;
-  and `clip-vector-empty.ass`, vector clips whose drawings have no contour, which
+  two open cases are one fixture at both sizes: `clip-vector-empty.ass`, vector
+  clips whose drawings have no contour, which
   libass draws as a bitmap without pixels that empties every image of the event,
   where the renderer leaves them unclipped.
 - `ass-render-host` renders, as `ass-render` does, the fixtures whose libass
