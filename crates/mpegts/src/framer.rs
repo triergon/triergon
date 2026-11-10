@@ -183,10 +183,15 @@ impl TransportFramer {
     pub fn pending_or_last_packet_offset(&self) -> Option<u64> {
         self.start.or(self.last_packet_offset)
     }
+    pub(crate) fn accepts_observed_input(&self, input: &InputCursor) -> bool {
+        self.token.is_none() || self.observed_input(input)
+    }
+    pub(crate) fn observed_input(&self, input: &InputCursor) -> bool {
+        self.entity == Some(input.source()) && self.token.as_ref() == Some(&input.token())
+    }
     pub(crate) fn observed_entity_end(&self, input: &InputCursor) -> bool {
         self.entity_end_seen
-            && self.entity == Some(input.source())
-            && self.token.as_ref() == Some(&input.token())
+            && self.observed_input(input)
             && self.inspection.is_none()
             && self.push_ack.is_none()
             && self.carry.as_ref().is_some_and(BudgetVec::is_empty)

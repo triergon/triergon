@@ -129,13 +129,16 @@ impl Source {
             .unwrap()
             .unwrap()
     }
-    fn finished(&mut self) -> (TraceEvent, SourceContext) {
+    fn finished(&mut self) -> (triergon_mpegts::ObservedTrace<()>, SourceContext) {
         self.stream.end_of_source().unwrap();
         let Step::Ready(event) = self.next().unwrap() else {
             panic!("no source Finished")
         };
         assert!(matches!(event, TraceEvent::Finished));
-        (event, self.context())
+        (
+            self.stream.source_finished(&self.input).unwrap(),
+            self.context(),
+        )
     }
 }
 fn drain(
@@ -490,17 +493,7 @@ fn terminal_fault_needs_real_eof_and_finished_and_retries_without_allocating() {
             assert!(observer.terminal_confirmation().is_none());
             assert!(observer.end_of_source().is_err());
             assert!(observer.hold_terminal_transport(&fault, context).is_err());
-            assert!(
-                observer
-                    .confirm_terminal_finished(
-                        &TraceEvent::Finished,
-                        context,
-                        &mut source.input,
-                        &mut WorkBudget::new(1),
-                        &RUN
-                    )
-                    .is_err()
-            );
+            assert!(source.stream.source_finished(&source.input).is_err());
             let end = source.end();
             let used = pool.used();
             assert_eq!(
@@ -523,6 +516,22 @@ fn terminal_fault_needs_real_eof_and_finished_and_retries_without_allocating() {
             assert!(observer.terminal_confirmation().is_none());
             assert!(observer.end_of_source().is_err());
             let (finished, context) = source.finished();
+            let (mut alternate, ..) = tail(&pool, data);
+            alternate.end();
+            let (foreign_finished, _) = alternate.finished();
+            assert!(
+                observer
+                    .confirm_terminal_finished(
+                        &foreign_finished,
+                        context,
+                        &mut source.input,
+                        &mut WorkBudget::new(1),
+                        &RUN
+                    )
+                    .is_err()
+            );
+            assert!(observer.terminal_confirmation().is_none());
+            drop(alternate);
             assert!(
                 !observer
                     .confirm_terminal_finished(

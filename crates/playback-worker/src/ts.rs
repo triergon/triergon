@@ -39,8 +39,8 @@ use triergon_mpegts::compat::pes::{
 };
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, DvbNamespaceEvidence, ProgramMap};
 use triergon_mpegts::{
-    AssemblyStep, FaultKind, MediaEntityEnd, PacketFormat, ParseLimits, SourceEpochs, SourceRange,
-    TraceEvent, TransportStream,
+    AssemblyStep, FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits,
+    SourceEpochs, SourceRange, TraceEvent, TransportStream,
 };
 
 pub const PREFIX: &str = "ts-";
@@ -610,16 +610,17 @@ impl Session {
 
     fn confirm_terminal_finished(
         &mut self,
-        event: &TraceEvent,
         cause: Cause,
         input: &mut InputCursor,
         cancel: &AtomicBool,
+        witness: impl FnOnce(&InputCursor) -> triergon_core::Result<ObservedTrace<()>>,
     ) -> triergon_core::Result<bool> {
         if let Some(observer) = self.observer.as_mut()
             && observer.awaiting_terminal_completion()
         {
+            let finished = witness(input)?;
             return observer.confirm_terminal_finished(
-                event,
+                &finished,
                 cause.context()?,
                 input,
                 &mut WorkBudget::new(WORK),
@@ -763,12 +764,14 @@ fn packet_operation(
                     return refused(session, &error, cause, false);
                 }
                 if matches!(observed.event(), TraceEvent::Finished) {
-                    let event = observed.into_event();
+                    drop(observed);
                     let Some(eof) = logical_eof else {
                         let error = Error::Invalid("source finished without logical EOF");
                         return refused(session, &error, cause, false);
                     };
-                    match session.confirm_terminal_finished(&event, cause, &mut input, cancel) {
+                    match session.confirm_terminal_finished(cause, &mut input, cancel, |input| {
+                        malformed.source_finished(input)
+                    }) {
                         Ok(true) => {}
                         Ok(false) => {
                             return Err("terminal confirmation yielded on fixed grant".into());
@@ -880,7 +883,9 @@ fn sequence_operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> 
                         let error = Error::Invalid("source finished without logical EOF");
                         return Ok(session.refusal(&error, cause));
                     };
-                    match session.confirm_terminal_finished(&event, cause, &mut input, cancel) {
+                    match session.confirm_terminal_finished(cause, &mut input, cancel, |input| {
+                        demux.source_finished(input)
+                    }) {
                         Ok(true) => {}
                         Ok(false) => {
                             return Err("terminal confirmation yielded on fixed grant".into());
@@ -977,21 +982,16 @@ fn control_completion(
         PacketCompletion::new_for_format(pool.clone(), limits, request.program, request.format)?;
     let mut ordinal = 0_u64;
     loop {
-        match demux.poll(&mut input, &mut WorkBudget::new(WORK), cancel)? {
+        match demux.poll_observed(&mut input, &mut WorkBudget::new(WORK), cancel)? {
             Step::Ready(event) => {
                 let context = SourceContext {
                     source_event_ordinal: ordinal,
                     epochs: demux.source_epochs(),
                     byte_run_epoch: None,
                 };
-                let work = completion.required_work(&event)?;
-                match completion.observe(
-                    &event,
-                    input.source(),
-                    context,
-                    &mut WorkBudget::new(work),
-                    cancel,
-                ) {
+                let work = completion.required_work(event.event())?;
+                match completion.observe_issued(&event, context, &mut WorkBudget::new(work), cancel)
+                {
                     Ok(true) => {}
                     Ok(false) => return Err("completion yielded on its required grant".into()),
                     Err(Error::Invalid(_) | Error::Unsupported(_) | Error::Truncated) => {
@@ -1000,7 +1000,7 @@ fn control_completion(
                     Err(error) => return Err(error.into()),
                 }
                 ordinal = ordinal.checked_add(1).ok_or(Error::Overflow)?;
-                if matches!(event, TraceEvent::Finished) {
+                if matches!(event.event(), TraceEvent::Finished) {
                     let work = completion.required_end_work()?;
                     return match completion.confirm_no_media(
                         &mut input,

@@ -36,7 +36,7 @@ mod transport;
 pub use carrier::{RejectedTransport, TransportInspection, TransportInspector};
 pub use continuity::{Continuity, ContinuityOutcome};
 pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
-pub use media_entity::MediaEntityEnd;
+pub use media_entity::{MediaEntityEnd, ObservedTrace};
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
 pub use stream::{

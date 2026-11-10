@@ -2,11 +2,32 @@
 use crate::{PacketFormat, SourceEpochs};
 use triergon_core::{Budget, Error, InputCursor, InputToken, Result, SourceLocation};
 
+/// An event issued by the transport parser for a particular input operation.
+#[derive(Debug)]
+pub struct ObservedTrace<T> {
+    pub(crate) event: T,
+    pub(crate) origin: TraceOrigin,
+}
+impl<T> ObservedTrace<T> {
+    pub fn event(&self) -> &T {
+        &self.event
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct TraceOrigin {
+    pub(crate) issuer: usize,
+    pub(crate) token: InputToken,
+    pub(crate) source: triergon_core::SourceId,
+    pub(crate) epochs: SourceEpochs,
+}
+
 /// Witness of a real, fully drained source entity, not logical media EOF.
 /// Only the composed source operation can create this value.
 #[derive(Clone, Debug)]
 pub struct MediaEntityEnd {
     pub(crate) location: SourceLocation,
+    pub(crate) issuer: usize,
     pub(crate) token: InputToken,
     pub(crate) epochs: SourceEpochs,
     pub(crate) program: u16,

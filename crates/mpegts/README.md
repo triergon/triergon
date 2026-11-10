@@ -25,10 +25,11 @@ carriers), `catalogue` (programs and streams), `dvb` and `input`.
 Its `packet_completion` module re-exports the consumer policy in `compat::pes`.
 
 `compat::pes::PacketCompletion` confirms that one physical input contained only
-control traffic. Feed it every source event with its actual `SourceContext`,
-seal the `TransportStream::media_entity_end` witness before logical EOF, then
-observe source `Finished` and call `confirm_no_media`. A `NoMediaConfirmation`
-requires contiguous physical carrier coverage and a matching core EOF. Only
+control traffic. Poll the source with `TransportStream::poll_observed` and
+pass each issued event to `observe_issued` with its `SourceContext`. Seal the
+`media_entity_end` witness before logical EOF, then observe `Finished` and call
+`confirm_no_media`. A `NoMediaConfirmation` requires contiguous carrier coverage
+and matching events and EOF from the same parser and input cursor. Only
 PAT, associated PMT, null and no-payload carriers qualify; unexplained payload,
 rejected transport, source PES and unfinished PMT sections remain refusals.
 Malformed PSI and its diagnostics stay source facts rather than becoming

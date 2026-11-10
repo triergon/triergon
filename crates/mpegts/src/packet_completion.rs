@@ -5,10 +5,11 @@
 //! can be constructed from this operation's confirmation. Non-control payload needs
 //! the existing real-scope observer; it can never select an empty fallback.
 use crate::demux_pes::SourceContext;
+use crate::media_entity::{ObservedTrace, TraceOrigin};
 use crate::psi::{PatReader, PatSection, Section, SectionAssembler, TableStep};
 use crate::{
-    AssemblyStep, FaultKind, MediaEntityEnd, NullCarrierRun, PacketFormat, ParseLimits, TraceEvent,
-    TraceFault, TransportInspection, TransportInspector, TransportPacket,
+    AssemblyStep, CompactTraceEvent, FaultKind, MediaEntityEnd, NullCarrierRun, PacketFormat,
+    ParseLimits, TraceEvent, TraceFault, TransportInspection, TransportInspector, TransportPacket,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -115,6 +116,7 @@ pub struct PacketCompletion {
     program: u16,
     format: PacketFormat,
     source: Option<SourceId>,
+    origin: Option<TraceOrigin>,
     next_offset: u64,
     last_context: Option<SourceContext>,
     carriers: BudgetVec<PhysicalCarrier>,
@@ -155,6 +157,7 @@ impl PacketCompletion {
             program,
             format: PacketFormat::Ts188,
             source: None,
+            origin: None,
             next_offset: 0,
             last_context: None,
             no_media_blocker: None,
@@ -611,9 +614,71 @@ impl PacketCompletion {
         self.last_context = Some(context);
         Ok(())
     }
-    /// false means the source event has not been consumed. Errors are sticky
-    /// after admission; cancellation before the reservation leaves it retryable.
-    pub fn observe(
+    fn check_origin(&self, origin: &TraceOrigin, context: SourceContext) -> Result<()> {
+        if origin.epochs != context.epochs
+            || self.origin.as_ref().is_some_and(|first| {
+                first.issuer != origin.issuer
+                    || first.source != origin.source
+                    || first.token.generation() != origin.token.generation()
+            })
+        {
+            return Err(Error::Invalid("packet completion trace source mismatch"));
+        }
+        Ok(())
+    }
+
+    /// Admit a literal source event. False leaves it available to retry.
+    pub fn observe_issued(
+        &mut self,
+        event: &ObservedTrace<TraceEvent>,
+        context: SourceContext,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        self.observe_traced(&event.event, &event.origin, context, work, cancel)
+    }
+
+    fn observe_traced(
+        &mut self,
+        event: &TraceEvent,
+        origin: &TraceOrigin,
+        context: SourceContext,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        check_cancel(cancel)?;
+        self.check_origin(origin, context)?;
+        let consumed = self.observe(event, origin.source, context, work, cancel)?;
+        if consumed && self.origin.is_none() {
+            self.origin = Some(origin.clone());
+        }
+        Ok(consumed)
+    }
+
+    /// Admit one source-bound compact event. The budget still counts every carrier.
+    pub fn observe_compact(
+        &mut self,
+        event: &ObservedTrace<CompactTraceEvent>,
+        context: SourceContext,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        check_cancel(cancel)?;
+        self.check_origin(&event.origin, context)?;
+        let consumed = match &event.event {
+            CompactTraceEvent::Event(trace) => {
+                self.observe(trace, event.origin.source, context, work, cancel)?
+            }
+            CompactTraceEvent::NullRun(run) => self.observe_null_run(run, context, work, cancel)?,
+        };
+        if consumed && self.origin.is_none() {
+            self.origin = Some(event.origin.clone());
+        }
+        Ok(consumed)
+    }
+
+    // Errors after admission are sticky. An exhausted grant leaves the event pending.
+    fn observe(
         &mut self,
         event: &TraceEvent,
         source: SourceId,
@@ -639,7 +704,7 @@ impl PacketCompletion {
     }
     /// Admit one sealed run at its first literal source-event ordinal. The
     /// capacity limit still counts physical carriers, even in the compact view.
-    pub fn observe_null_run(
+    fn observe_null_run(
         &mut self,
         run: &NullCarrierRun,
         context: SourceContext,
@@ -722,7 +787,9 @@ impl PacketCompletion {
         if !self.budget.same_pool(input.budget()) || !self.budget.same_pool(&end.budget) {
             return Err(Error::ForeignPool);
         }
-        if end.program != self.program
+        if self.origin.as_ref().is_none_or(|origin| {
+            origin.issuer != end.issuer || origin.token.generation() != end.token.generation()
+        }) || end.program != self.program
             || end.format != self.format
             || Some(input.source()) != self.source
             || end.location.source != input.source()

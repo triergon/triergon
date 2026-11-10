@@ -2,6 +2,7 @@
 use crate::carrier::{PLAIN_PAYLOAD_BYTES, TS188_BYTES, payload_only_continuation};
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
 use crate::framer::FramedCarrier;
+use crate::media_entity::{ObservedTrace, TraceOrigin};
 use crate::psi::{
     DescriptorNamespace, PatCollector, PatReader, PatTable, PmtReader, ProgramMap, Section,
     TableStep,
@@ -10,7 +11,7 @@ use crate::{
     AssemblyStep, Continuity, ContinuityOutcome, NullCarrierRun, PacketFormat, ParseLimits, Pes,
     PesAssembler, SectionAssembler, SourceEpochs, TransportFramer, TransportPacket,
 };
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, Result, SourceId, SourceLocation, Step,
     WorkBudget,
@@ -380,7 +381,11 @@ pub struct TransportStream {
     eof_route: usize,
     finished: bool,
     boundary_event: bool,
+    trace_issuer: AtomicUsize,
+    trace_generation: Option<u64>,
 }
+
+static NEXT_TRACE_ISSUER: AtomicUsize = AtomicUsize::new(1);
 
 fn retryable(error: Error) -> bool {
     matches!(
@@ -525,6 +530,8 @@ impl TransportStream {
             eof_route: 0,
             finished: false,
             boundary_event: false,
+            trace_issuer: AtomicUsize::new(0),
+            trace_generation: None,
         })
     }
     /// Zero until the first complete PAT in single-program discovery mode.
@@ -686,6 +693,7 @@ impl TransportStream {
         match input.read_into(&mut [0_u8; 1], work, cancel)? {
             Step::End(actual) if actual == location => Ok(Some(crate::MediaEntityEnd {
                 location,
+                issuer: self.trace_issuer()?,
                 token: input.token(),
                 epochs: self.source_epochs(),
                 program: self.program,
@@ -695,6 +703,111 @@ impl TransportStream {
             _ => Err(Error::Invalid("media entity End not confirmed by core")),
         }
     }
+    fn trace_issuer(&self) -> Result<usize> {
+        let issuer = self.trace_issuer.load(Ordering::Relaxed);
+        if issuer != 0 {
+            return Ok(issuer);
+        }
+        let mut next = NEXT_TRACE_ISSUER.load(Ordering::Relaxed);
+        loop {
+            let following = next.checked_add(1).ok_or(Error::Overflow)?;
+            match NEXT_TRACE_ISSUER.compare_exchange_weak(
+                next,
+                following,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => break,
+                Err(current) => next = current,
+            }
+        }
+        Ok(self
+            .trace_issuer
+            .compare_exchange(0, next, Ordering::Relaxed, Ordering::Relaxed)
+            .map_or_else(|existing| existing, |_| next))
+    }
+
+    fn check_trace_input(&mut self, input: &InputCursor, cancel: &AtomicBool) -> Result<()> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if !self.budget.same_pool(input.budget()) {
+            return Err(Error::ForeignPool);
+        }
+        let generation = input.generation();
+        let matches = self.trace_generation.map_or_else(
+            || self.framer.accepts_observed_input(input),
+            |original| original == generation,
+        );
+        if !matches {
+            return Err(Error::Invalid(
+                "trace input differs from the source operation",
+            ));
+        }
+        self.trace_generation = Some(generation);
+        Ok(())
+    }
+
+    fn trace_origin(&self, input: &InputCursor) -> Result<TraceOrigin> {
+        if !self.budget.same_pool(input.budget()) {
+            return Err(Error::ForeignPool);
+        }
+        Ok(TraceOrigin {
+            issuer: self.trace_issuer()?,
+            token: input.token(),
+            source: input.source(),
+            epochs: self.source_epochs(),
+        })
+    }
+
+    fn bind_trace<T>(&self, step: Step<T>, input: &InputCursor) -> Result<Step<ObservedTrace<T>>> {
+        Ok(match step {
+            Step::Ready(event) => Step::Ready(ObservedTrace {
+                event,
+                origin: self.trace_origin(input)?,
+            }),
+            Step::NeedInput(request) => Step::NeedInput(request),
+            Step::End(location) => Step::End(location),
+            Step::Yield => Step::Yield,
+            Step::Backpressure(never) => match never {},
+        })
+    }
+
+    /// Poll the literal trace with its source identity for compatibility completion.
+    pub fn poll_observed(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<ObservedTrace<TraceEvent>>> {
+        self.check_trace_input(input, cancel)?;
+        let step = self.poll(input, work, cancel)?;
+        self.bind_trace(step, input)
+    }
+
+    /// Poll the compact trace with the same source identity as the literal trace.
+    pub fn poll_compact_observed(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<ObservedTrace<CompactTraceEvent>>> {
+        self.check_trace_input(input, cancel)?;
+        let step = self.poll_compact(input, work, cancel)?;
+        self.bind_trace(step, input)
+    }
+
+    /// Bind a published logical EOF to the parser and drained core cursor.
+    pub fn source_finished(&self, input: &InputCursor) -> Result<ObservedTrace<()>> {
+        if !self.finished || !self.framer.observed_entity_end(input) {
+            return Err(Error::Invalid("source has not published Finished"));
+        }
+        Ok(ObservedTrace {
+            event: (),
+            origin: self.trace_origin(input)?,
+        })
+    }
+
     /// Call after an observed entity End and only when that is the logical EOF.
     pub fn end_of_source(&mut self) -> Result<()> {
         if self.entity_end.is_none()

@@ -3,7 +3,9 @@
 // the strict source Timeline, rather than compatibility timestamps, binds it.
 use super::{SourceContext, TransportFaultRecovery};
 use crate::demux_pes::{DemuxBoundary, DemuxPacket};
-use crate::{FaultKind, MediaEntityEnd, PacketFormat, TraceEvent, TraceFault, TransportPacket};
+use crate::{
+    FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, TraceEvent, TraceFault, TransportPacket,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Error, InputCursor, InputToken, PushError, Result, SourceLocation, Step, WorkBudget,
@@ -37,7 +39,7 @@ impl TransportTailConfirmation {
 struct TailFault {
     fault: TraceFault,
     diagnostic: SourceContext,
-    end: Option<(SourceLocation, InputToken)>,
+    end: Option<MediaEntityEnd>,
 }
 #[derive(Debug)]
 enum Tail {
@@ -394,7 +396,7 @@ impl TransportFaultRecovery {
                 ));
             }
         }
-        tail.end = Some((end.location, end.token.clone()));
+        tail.end = Some(end.clone());
         Ok(true)
     }
 
@@ -402,7 +404,7 @@ impl TransportFaultRecovery {
     /// confirmation. An advertised length, starvation or an I/O error cannot.
     pub fn confirm_terminal_finished(
         &mut self,
-        event: &TraceEvent,
+        event: &ObservedTrace<()>,
         context: SourceContext,
         input: &mut InputCursor,
         work: &mut WorkBudget,
@@ -421,17 +423,19 @@ impl TransportFaultRecovery {
         let Some(Tail::Pending(tail)) = self.boundaries.tail.as_ref() else {
             return Err(Error::Invalid("no terminal transport awaiting Finished"));
         };
-        let (location, token) = tail
+        let end = tail
             .end
             .as_ref()
             .ok_or(Error::Invalid("terminal transport requires physical End"))?;
-        if !matches!(event, TraceEvent::Finished)
+        if event.origin.issuer != end.issuer
+            || event.origin.token != end.token
+            || event.origin.epochs != context.epochs
             || context.epochs != tail.diagnostic.epochs
             || context.byte_run_epoch.is_some()
             || context.source_event_ordinal <= tail.diagnostic.source_event_ordinal
-            || location.source != input.source()
-            || location.offset != input.position()
-            || *token != input.token()
+            || end.location.source != input.source()
+            || end.location.offset != input.position()
+            || end.token != input.token()
         {
             return Err(Error::Invalid(
                 "terminal transport source Finished mismatch",
@@ -441,14 +445,14 @@ impl TransportFaultRecovery {
             return Ok(false);
         }
         match input.read_into(&mut [0_u8; 1], &mut WorkBudget::new(1), cancel)? {
-            Step::End(actual) if actual == *location => {}
+            Step::End(actual) if actual == end.location => {}
             _ => {
                 return Err(Error::Invalid(
                     "terminal transport requires actual core EOF",
                 ));
             }
         }
-        let end = *location;
+        let end = end.location;
         let Some(Tail::Pending(tail)) = self.boundaries.tail.take() else {
             return Err(Error::Invalid("terminal transport state missing"));
         };

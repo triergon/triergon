@@ -5,8 +5,8 @@ use super::{SourceContext, TransportFaultRecovery};
 use crate::demux_pes::DemuxScope;
 use crate::psi::DescriptorNamespace;
 use crate::{
-    FaultKind, MediaEntityEnd, PacketFormat, ParseLimits, TraceEvent, TraceFault, TransportPacket,
-    TransportStream,
+    FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits, TraceEvent, TraceFault,
+    TransportPacket, TransportStream,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -269,6 +269,17 @@ impl MalformedInputCompletion {
     pub fn source_epochs(&self) -> crate::SourceEpochs {
         self.stream.source_epochs()
     }
+    /// Bind the observed logical EOF to the original source parser.
+    pub fn source_finished(&self, input: &InputCursor) -> Result<ObservedTrace<()>> {
+        self.identity(input)?;
+        if self.finished.is_none() {
+            return Err(Error::Invalid(
+                "malformed completion missing source Finished",
+            ));
+        }
+        self.stream.source_finished(input)
+    }
+
     /// Advance the bound source and issue its original event with the context
     /// captured by that advance.
     pub fn poll_source<'a>(

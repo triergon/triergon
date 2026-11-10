@@ -19,7 +19,7 @@ const INACTIVE: &[u8] = include_bytes!(concat!(
     reason = "test recorder retains the original inline owned source event; no extra boxed allocation"
 )]
 enum Item {
-    Event(TraceEvent, SourceContext),
+    Event(TraceEvent, SourceContext, TraceOrigin),
     End(MediaEntityEnd),
 }
 struct Run {
@@ -49,18 +49,18 @@ fn source(data: &[u8], budget: &Budget) -> Run {
     let mut items = Vec::new();
     for _ in 0..500_000 {
         match stream
-            .poll(&mut input, &mut WorkBudget::new(17), &cancel)
+            .poll_observed(&mut input, &mut WorkBudget::new(17), &cancel)
             .unwrap()
         {
             Step::Ready(event) => {
-                let finished = matches!(event, TraceEvent::Finished);
+                let finished = matches!(event.event(), TraceEvent::Finished);
                 let context = SourceContext {
                     source_event_ordinal: ordinal,
                     epochs: stream.source_epochs(),
                     byte_run_epoch: None,
                 };
                 ordinal += 1;
-                items.push(Item::Event(event, context));
+                items.push(Item::Event(event.event, context, event.origin));
                 if finished {
                     return Run { items, input };
                 }
@@ -103,9 +103,9 @@ fn view(b: &Budget) -> PacketCompletion {
 fn feed(v: &mut PacketCompletion, item: &Item, input: &mut InputCursor) -> Result<bool> {
     let cancel = AtomicBool::new(false);
     match item {
-        Item::Event(e, c) => {
+        Item::Event(e, c, origin) => {
             let work = v.required_work(e)?;
-            v.observe(e, SourceId(1), *c, &mut WorkBudget::new(work), &cancel)
+            v.observe_traced(e, origin, *c, &mut WorkBudget::new(work), &cancel)
         }
         Item::End(end) => {
             let work = v.required_end_work()?;
@@ -128,7 +128,7 @@ fn finish(
 }
 fn first(run: &Run) -> (&TransportPacket, SourceContext) {
     match &run.items[0] {
-        Item::Event(TraceEvent::Transport(p), c) => (p, *c),
+        Item::Event(TraceEvent::Transport(p), c, _) => (p, *c),
         _ => panic!("first carrier fixture"),
     }
 }
@@ -147,7 +147,7 @@ fn compact_null_runs_keep_physical_bytes_order_and_completion() {
         let budget = Budget::new(8 * 1024 * 1024).unwrap();
         let literal = source(&data, &budget);
         let mut expected = literal.items.iter().filter_map(|item| match item {
-            Item::Event(TraceEvent::Transport(packet), context) => Some((packet, context)),
+            Item::Event(TraceEvent::Transport(packet), context, _) => Some((packet, context)),
             _ => None,
         });
         let mut input = InputCursor::new(
@@ -172,62 +172,82 @@ fn compact_null_runs_keep_physical_bytes_order_and_completion() {
         let mut ordinal = 0;
         for _ in 0..10_000 {
             match stream
-                .poll_compact(&mut input, &mut WorkBudget::new(4096), &cancel)
+                .poll_compact_observed(&mut input, &mut WorkBudget::new(4096), &cancel)
                 .unwrap()
             {
-                Step::Ready(CompactTraceEvent::Event(event)) => {
-                    let context = SourceContext {
-                        source_event_ordinal: ordinal,
-                        epochs: stream.source_epochs(),
-                        byte_run_epoch: None,
-                    };
-                    ordinal += 1;
-                    if let TraceEvent::Transport(packet) = &event {
-                        let (want, want_context) = expected.next().unwrap();
-                        assert_eq!(
-                            (packet.source_offset, packet.source.as_ref(), &context),
-                            (want.source_offset, want.source.as_ref(), want_context)
-                        );
-                    }
-                    let done = matches!(event, TraceEvent::Finished);
-                    assert!(
-                        feed(&mut completion, &Item::Event(event, context), &mut input).unwrap()
-                    );
-                    if done {
-                        break;
-                    }
-                }
-                Step::Ready(CompactTraceEvent::NullRun(run)) => {
-                    let context = SourceContext {
-                        source_event_ordinal: ordinal,
-                        epochs: stream.source_epochs(),
-                        byte_run_epoch: None,
-                    };
-                    assert!(
-                        !completion
-                            .observe_null_run(&run, context, &mut WorkBudget::new(0), &cancel)
-                            .unwrap()
-                    );
-                    assert!(
-                        completion
-                            .observe_null_run(&run, context, &mut WorkBudget::new(1), &cancel)
-                            .unwrap()
-                    );
-                    for index in 0..run.len() {
-                        let packet = run.packet(index).unwrap();
-                        let (want, want_context) = expected.next().unwrap();
-                        assert_eq!(
-                            (
-                                packet.source_offset,
-                                packet.source.as_ref(),
-                                packet.source_id
-                            ),
-                            (want.source_offset, want.source.as_ref(), want.source_id)
-                        );
-                        assert_eq!(want_context.source_event_ordinal, ordinal);
+                Step::Ready(observed) => match observed.event() {
+                    CompactTraceEvent::Event(event) => {
+                        let context = SourceContext {
+                            source_event_ordinal: ordinal,
+                            epochs: stream.source_epochs(),
+                            byte_run_epoch: None,
+                        };
                         ordinal += 1;
+                        if let TraceEvent::Transport(packet) = event {
+                            let (want, want_context) = expected.next().unwrap();
+                            assert_eq!(
+                                (packet.source_offset, packet.source.as_ref(), &context),
+                                (want.source_offset, want.source.as_ref(), want_context)
+                            );
+                        }
+                        let done = matches!(event, TraceEvent::Finished);
+                        let work = completion.required_work(event).unwrap();
+                        assert!(
+                            completion
+                                .observe_compact(
+                                    &observed,
+                                    context,
+                                    &mut WorkBudget::new(work),
+                                    &cancel
+                                )
+                                .unwrap()
+                        );
+                        if done {
+                            break;
+                        }
                     }
-                }
+                    CompactTraceEvent::NullRun(run) => {
+                        let context = SourceContext {
+                            source_event_ordinal: ordinal,
+                            epochs: stream.source_epochs(),
+                            byte_run_epoch: None,
+                        };
+                        assert!(
+                            !completion
+                                .observe_compact(
+                                    &observed,
+                                    context,
+                                    &mut WorkBudget::new(0),
+                                    &cancel
+                                )
+                                .unwrap()
+                        );
+                        assert!(
+                            completion
+                                .observe_compact(
+                                    &observed,
+                                    context,
+                                    &mut WorkBudget::new(1),
+                                    &cancel
+                                )
+                                .unwrap()
+                        );
+                        for index in 0..run.len() {
+                            let packet = run.packet(index).unwrap();
+                            let (want, want_context) = expected.next().unwrap();
+                            assert_eq!(
+                                (
+                                    packet.source_offset,
+                                    packet.source.as_ref(),
+                                    packet.source_id
+                                ),
+                                (want.source_offset, want.source.as_ref(), want.source_id)
+                            );
+                            assert_eq!(want_context.source_event_ordinal, ordinal);
+                            ordinal += 1;
+                        }
+                    }
+                },
                 Step::NeedInput(r) => {
                     let at = r.offset as usize;
                     if at == data.len() {
@@ -263,6 +283,57 @@ fn compact_null_runs_keep_physical_bytes_order_and_completion() {
         assert_eq!(confirmation.physical_carriers(), data.len() / 188);
         assert_eq!(completion.physical_null_runs().is_empty(), window < 188);
     }
+}
+
+#[test]
+fn control_completion_requires_the_same_cursor_and_parser_at_end() {
+    let budget = Budget::new(8 * 1024 * 1024).unwrap();
+    let mut original = source(BAD_CRC, &budget);
+    let mut replacement = source(BAD_CRC, &budget);
+    assert_eq!(original.input.source(), replacement.input.source());
+    assert_eq!(original.input.position(), replacement.input.position());
+    let mut completion = view(&budget);
+    for item in &original.items {
+        if matches!(item, Item::End(_)) {
+            break;
+        }
+        assert!(feed(&mut completion, item, &mut original.input).unwrap());
+    }
+    let replacement_end = replacement
+        .items
+        .iter()
+        .find(|item| matches!(item, Item::End(_)))
+        .unwrap();
+    assert!(feed(&mut completion, replacement_end, &mut replacement.input).is_err());
+    assert!(completion.confirmation().is_none());
+    let original_end = original
+        .items
+        .iter()
+        .find(|item| matches!(item, Item::End(_)))
+        .unwrap();
+    assert!(feed(&mut completion, original_end, &mut original.input).unwrap());
+    let replacement_finished = replacement.items.last().unwrap();
+    assert!(
+        feed(
+            &mut completion,
+            replacement_finished,
+            &mut replacement.input
+        )
+        .is_err()
+    );
+    assert!(
+        feed(
+            &mut completion,
+            original.items.last().unwrap(),
+            &mut original.input
+        )
+        .unwrap()
+    );
+    assert!(
+        finish(&mut completion, &mut original.input)
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[test]
@@ -389,6 +460,7 @@ fn pmt_version_wrap_and_retyping_are_control_facts_without_media() {
                     map, active: true, ..
                 },
                 _,
+                _,
             ) => Some((map.header.version, map.streams.as_slice()[0].stream_type)),
             _ => None,
         })
@@ -460,7 +532,7 @@ fn storage_pressure_cannot_become_a_no_media_confirmation() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_CRC, &b);
     let mut completion = view(&b);
-    let Item::Event(event, context) = &run.items[0] else {
+    let Item::Event(event, context, _) = &run.items[0] else {
         panic!("first carrier")
     };
     let before = b.used();
@@ -515,7 +587,7 @@ fn zero_event_work_is_unconsumed_and_retryable() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_CRC, &b);
     let mut v = view(&b);
-    let Item::Event(e, c) = &run.items[0] else {
+    let Item::Event(e, c, _) = &run.items[0] else {
         panic!("carrier")
     };
     assert!(
@@ -546,7 +618,7 @@ fn cancellation_before_event_cannot_allocate_or_consume() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_CRC, &b);
     let mut v = view(&b);
-    let Item::Event(e, c) = &run.items[0] else {
+    let Item::Event(e, c, _) = &run.items[0] else {
         panic!("carrier")
     };
     let before = b.used();
@@ -569,7 +641,7 @@ fn foreign_pool_carrier_cannot_be_a_source_witness() {
     let run = source(BAD_CRC, &a);
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let mut v = view(&b);
-    let Item::Event(e, c) = &run.items[0] else {
+    let Item::Event(e, c, _) = &run.items[0] else {
         panic!("carrier")
     };
     assert_eq!(
@@ -635,7 +707,7 @@ fn foreign_entity_is_not_the_original_source() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(BAD_CRC, &b);
     let mut v = view(&b);
-    let Item::Event(e, c) = &run.items[0] else {
+    let Item::Event(e, c, _) = &run.items[0] else {
         panic!("carrier")
     };
     assert!(
@@ -654,20 +726,22 @@ fn missing_physical_carrier_cannot_be_empty_completion() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let mut run = source(BAD_CRC, &b);
     let mut v = view(&b);
-    let (p, c) = first(&run);
+    let Item::Event(TraceEvent::Transport(p), c, origin) = &run.items[0] else {
+        panic!("first carrier")
+    };
     let mut shifted = p.clone();
     shifted.source_offset += 188;
     shifted.payload_source_offset += 188;
-    v.observe(
+    v.observe_traced(
         &TraceEvent::Transport(shifted),
-        SourceId(1),
-        c,
+        origin,
+        *c,
         &mut WorkBudget::new(1_000_000),
         &AtomicBool::new(false),
     )
     .unwrap();
     for item in &run.items {
-        if matches!(item, Item::End(_) | Item::Event(TraceEvent::Finished, _)) {
+        if matches!(item, Item::End(_) | Item::Event(TraceEvent::Finished, _, _)) {
             feed(&mut v, item, &mut run.input).unwrap();
         }
     }
@@ -838,7 +912,7 @@ fn source_finished_without_actual_physical_end_is_refused() {
     let item = run
         .items
         .iter()
-        .find(|i| matches!(i, Item::Event(TraceEvent::Finished, _)))
+        .find(|i| matches!(i, Item::Event(TraceEvent::Finished, _, _)))
         .unwrap();
     assert!(feed(&mut v, item, &mut run.input).is_err());
 }
@@ -924,7 +998,7 @@ fn source_finished_is_required_after_sealed_physical_end() {
     let mut run = source(BAD_CRC, &b);
     let mut v = view(&b);
     for item in &run.items {
-        if matches!(item, Item::Event(TraceEvent::Finished, _)) {
+        if matches!(item, Item::Event(TraceEvent::Finished, _, _)) {
             break;
         }
         feed(&mut v, item, &mut run.input).unwrap();
@@ -1134,9 +1208,9 @@ fn rejected_carrier_from_foreign_pool_cannot_escape_backing() {
     let item = run
         .items
         .iter()
-        .find(|i| matches!(i,Item::Event(TraceEvent::Diagnostic(f),_) if f.rejected.is_some()))
+        .find(|i| matches!(i,Item::Event(TraceEvent::Diagnostic(f), _, _) if f.rejected.is_some()))
         .unwrap();
-    let Item::Event(event, context) = item else {
+    let Item::Event(event, context, _) = item else {
         panic!("actual rejection")
     };
     assert_eq!(
