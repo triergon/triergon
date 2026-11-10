@@ -1,6 +1,6 @@
 //! The demuxer's input startup. This is not transport validation or the
 //! normative source position. No reference source was consulted.
-use crate::{PacketFormat, TransportPacket};
+use crate::PacketFormat;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Bytes, Error, InputCursor, InputToken, InputWindow, Result, SourceId, WorkBudget,
@@ -132,29 +132,29 @@ impl InputBinding {
         }
         Ok(())
     }
-    pub(crate) fn position(&self, packet: &TransportPacket) -> Result<i64> {
-        if packet.source_id != Some(self.source) {
+    pub(crate) fn position(
+        &self,
+        entity: SourceId,
+        offset: u64,
+        carrier_bytes: usize,
+        prefix_bytes: usize,
+    ) -> Result<i64> {
+        if entity != self.source {
             return Err(Error::SourceMismatch);
         }
-        let end = packet
-            .source_offset
-            .checked_add(packet.source.len() as u64)
+        let end = offset
+            .checked_add(carrier_bytes as u64)
             .ok_or(Error::Overflow)?;
-        if !self.extent.permits(end) || packet.source.len() != self.format.bytes() {
+        if !self.extent.permits(end) || carrier_bytes != self.format.bytes() {
             return Err(Error::Invalid("native startup packet range/format"));
         }
         let prefix = if self.basis == PositionBasis::SyncStart {
-            packet.prefix.as_ref().map_or(0, Bytes::len)
+            prefix_bytes
         } else {
             0
         };
-        i64::try_from(
-            packet
-                .source_offset
-                .checked_add(prefix as u64)
-                .ok_or(Error::Overflow)?,
-        )
-        .map_err(|_| Error::Overflow)
+        i64::try_from(offset.checked_add(prefix as u64).ok_or(Error::Overflow)?)
+            .map_err(|_| Error::Overflow)
     }
 }
 

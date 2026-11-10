@@ -1853,19 +1853,18 @@ impl TsEngine {
         index: usize,
         mut packet: ts::TransportPacket,
         context: SourceContext,
-        ready: Option<(&mut WorkBudget, &AtomicBool)>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<bool> {
         let track = &mut self.native_tracks.as_mut_slice()[index];
         if let Some(observer) = track.observer.as_mut() {
-            if let Some((work, cancel)) = ready {
-                match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
-                    ReadyContinuation::Buffered => return Ok(true),
-                    ReadyContinuation::Complete => {
-                        self.native_active = Some(index);
-                        return Ok(false);
-                    }
-                    ReadyContinuation::Unhandled => {}
+            match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
+                ReadyContinuation::Buffered => return Ok(true),
+                ReadyContinuation::Complete => {
+                    self.native_active = Some(index);
+                    return Ok(false);
                 }
+                ReadyContinuation::Unhandled => {}
             }
             let pushed = if self.native_context.is_some() {
                 observer.push_with_input(packet, context, &self.input)
@@ -2280,8 +2279,7 @@ impl TsEngine {
                     TraceEvent::Transport(packet) => {
                         if let Some(index) = self.native_tracks.index(packet.pid) {
                             let context = self.native_source_context();
-                            drained =
-                                self.offer_native_transport(index, packet, context, Some((w, c)))?;
+                            drained = self.offer_native_transport(index, packet, context, w, c)?;
                         }
                     }
                     TraceEvent::Pes(_) if self.program == 0 => {
@@ -2341,7 +2339,8 @@ impl TsEngine {
                 && let Some(index) = self.native_tracks.index(packet.pid)
             {
                 let context = self.native_source_context();
-                if let Some(observer) = self.native_tracks.as_mut_slice()[index].observer.as_mut() {
+                let track = &mut self.native_tracks.as_mut_slice()[index];
+                if let Some(observer) = track.observer.as_mut() {
                     // Keep one unit for delivery of the original source event.
                     let ready = if w.remaining() >= 3 {
                         observer.append_ready_borrowed_continuation(
@@ -2357,9 +2356,17 @@ impl TsEngine {
                     match ready {
                         ReadyContinuation::Buffered => {}
                         ReadyContinuation::Complete => self.native_active = Some(index),
-                        ReadyContinuation::Unhandled => {
-                            self.offer_native_transport(index, packet.clone(), context, None)?;
-                        }
+                        ReadyContinuation::Unhandled => match observer.push_borrowed(
+                            packet,
+                            context,
+                            self.native_context.as_ref().map(|_| &self.input),
+                        ) {
+                            Ok(()) => self.native_active = Some(index),
+                            Err(error) => {
+                                track.refuse(error);
+                                self.native_update_at = Some(index);
+                            }
+                        },
                     }
                 }
             }

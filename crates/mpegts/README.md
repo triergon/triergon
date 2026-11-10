@@ -205,6 +205,8 @@ entire input window. A complete buffered carrier can reserve its storage and
 shared header together. The PES observer checks that the payload is the exact
 span at its declared offset in that carrier. A ready PES continuation can
 retain just the payload view while playback delivers the full transport event.
+For a carrier that needs incremental assembly, the observer retains the
+charged bytes and the fields used for packet order and offsets.
 
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
