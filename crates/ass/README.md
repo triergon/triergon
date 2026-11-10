@@ -346,11 +346,14 @@ metrics), its `lround`s (the layout resolution, `\kf`'s split column, a
 collision box, line borders, the baseline shear, the content area) and
 `double_to_d6` (`triergon_raster::pixels_26_6`) all saturate at `int`'s range
 with NaN as 0, also where libass's `long` is 64 bits wide. Collision handling
-keeps the boxes placed so far in order of their top edges, compared as values;
-libass sorts them with `cmp_rect_y0`, which subtracts them and so overflows,
-undefined in C, for tops more than 2³¹ apart, and leaves equal tops in an
-unspecified order, where the crate keeps the order they were placed in. No
-fixture of `ass-render` converts out of range or places boxes that far apart.
+sorts the boxes placed so far as libass does on glibc: `qsort` with
+`cmp_rect_y0`, which subtracts their tops in `int` and so overflows, undefined
+in C and wrapping as GCC builds it, for tops 2³¹ or more apart, run as glibc's
+stable merge sort. While the tops lie closer the crate orders them by value,
+keeping equal tops in the order they were placed in; otherwise it runs glibc's
+merge sort step for step. Another C library's `qsort` may order such boxes, or
+equal tops, differently. No fixture of `ass-render` converts out of range or
+places boxes that far apart.
 
 libass's renderer also overflows `int`, undefined in C, where it doubles an
 event's horizontal border for the width of its box. Built with GCC it wraps,
@@ -426,10 +429,11 @@ panics.
   `hinted-extents.ass`, fallback mark positioning, which reads FreeType's
   hinted glyph extents.
 - `ass-render-host` renders, as `ass-render` does, the fixtures whose libass
-  result differs by target (`border-x-overflow.ass`), each pinned for
+  result differs by target (`border-x-overflow.ass`, and `collision-far-tops.ass`,
+  colliding events whose boxes end up 2³¹ or more rows apart), each pinned for
   `aarch64-unknown-linux-gnu` and `armv7-unknown-linux-gnueabihf` from that
-  target's reference. Both pass on ARMv7; on AArch64 both are open as a
-  deliberate divergence.
+  target's reference. All four cases pass on ARMv7; on AArch64 all four are
+  open as a deliberate divergence.
 - `cargo xtask ass equivalence --base REV` renders the `ass-render`
   fixtures at their frames and every 40 ms, mutations of them with varied
   settings and style overrides, and scripts generated from a seed, with the
