@@ -767,6 +767,21 @@
       "packets": 24,
       "bytes": 0,
       "digest": 4635033380776533899
+    },
+    "authored-vertical-ttc-outlines-16384": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 13220686048495630210
+    },
+    "authored-vertical-ttc-advances-16384": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 14939020331291268734
+    },
+    "authored-vertical-ttc-vertical-16384": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 13594493870156394144
     }
   }
 }
