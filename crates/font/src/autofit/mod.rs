@@ -63,7 +63,9 @@ struct Globals {
     coverage: Coverage,
     /// FreeType's reverse charmap without HarfBuzz: each glyph the Unicode
     /// charmap maps a code point of the adjustment database to, with that
-    /// code point (the database's last one for a glyph), sorted by glyph.
+    /// code point, sorted by glyph and otherwise in database order. A later
+    /// code point replaces an earlier one for the same glyph, so the last
+    /// one of a glyph's run applies.
     reverse: BudgetVec<(u16, u32)>,
     /// Each latin style's metrics, once measured: `None` for a style
     /// without blue zones, which the dummy writing system then hints.
@@ -149,18 +151,8 @@ impl Autofit {
                     reverse.try_push((glyph.0, code)).map_err(|e| e.error)?;
                 }
             }
-            // Later entries replace earlier ones for the same glyph.
-            reverse.as_mut_slice().sort_by_key(|&(glyph, _)| glyph);
-            let entries = reverse.as_mut_slice();
-            let mut kept = 0;
-            for i in 0..entries.len() {
-                if i + 1 < entries.len() && entries[i + 1].0 == entries[i].0 {
-                    continue;
-                }
-                entries[kept] = entries[i];
-                kept += 1;
-            }
-            reverse.truncate(kept);
+            // Stable, so that a glyph's code points keep the database's order.
+            reverse.sort_by_key(|&(glyph, _)| glyph);
         }
         let mut metrics = BudgetVec::new(&self.budget);
         metrics.try_extend_with(STYLES.len(), |_| OnceLock::new())?;
@@ -404,12 +396,14 @@ impl Autofit {
 
 impl Globals {
     /// The adjustment database's flags for `glyph`, through the reverse
-    /// charmap.
+    /// charmap: those of the last code point listed for it.
     fn adjustment(&self, glyph: GlyphId) -> u16 {
         let entries = self.reverse.as_slice();
-        entries
-            .binary_search_by_key(&glyph.0, |&(g, _)| g)
-            .map_or(0, |at| latin::adjustment(entries[at].1))
+        let end = entries.partition_point(|&(g, _)| g <= glyph.0);
+        match end.checked_sub(1).map(|last| entries[last]) {
+            Some((g, code)) if g == glyph.0 => latin::adjustment(code),
+            _ => 0,
+        }
     }
 
     /// The advances `af_loader_load_glyph` reports, rounded to whole

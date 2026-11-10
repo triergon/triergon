@@ -99,17 +99,6 @@ pub(super) struct Width {
     pub(super) fit: i64,
 }
 
-/// `af_sort_pos`: an insertion sort.
-pub(super) fn sort_positions(table: &mut [i64]) {
-    for i in 1..table.len() {
-        let mut j = i;
-        while j > 0 && table[j] < table[j - 1] {
-            table.swap(j, j - 1);
-            j -= 1;
-        }
-    }
-}
-
 /// `af_sort_and_quantize_widths`: sorts the first `count` widths and
 /// replaces each cluster no wider than `threshold` by one width; returns
 /// the new count.
@@ -125,13 +114,9 @@ pub(super) fn sort_and_quantize_widths(
     if count == 1 {
         return 1;
     }
-    for i in 1..count {
-        let mut j = i;
-        while j > 0 && table[j].org < table[j - 1].org {
-            table.swap(j, j - 1);
-            j -= 1;
-        }
-    }
+    // FreeType's insertion sort moves a width only past larger ones, so it
+    // is stable, as this sort is.
+    table[..count].sort_by_key(|w| w.org);
     let mut start = 0;
     let mut current = table[0].org;
     let mut i = 1;
@@ -810,8 +795,7 @@ fn corner_is_flat(in_x: i64, in_y: i64, out_x: i64, out_y: i64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        GlyphHints, Width, corner_is_flat, direction, direction_of, point,
-        sort_and_quantize_widths, sort_positions,
+        GlyphHints, Width, corner_is_flat, direction, direction_of, point, sort_and_quantize_widths,
     };
     use crate::outline::{Outline, Point, PointKind};
     use triergon_core::{Budget, WorkBudget};
@@ -849,9 +833,6 @@ mod tests {
         let mut empty = [Width::default(); 16];
         assert_eq!(sort_and_quantize_widths(&mut empty, 0, 10), 1);
         assert_eq!(empty[0].org, 0);
-        let mut positions = [3, -1, 2];
-        sort_positions(&mut positions);
-        assert_eq!(positions, [-1, 2, 3]);
     }
 
     #[test]

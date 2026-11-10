@@ -11,7 +11,7 @@ pub(super) use adjust::adjustment;
 pub(super) use fit::{Glyph, Scope, apply};
 
 use super::Face;
-use super::hints::{Dimension, GlyphHints, Width, sort_and_quantize_widths, sort_positions};
+use super::hints::{Dimension, GlyphHints, Width, sort_and_quantize_widths};
 use super::style::clusters;
 use super::tables::{SCRIPTS, STYLES};
 use crate::fixed::{mul_div, mul_fix, pix_round};
@@ -273,8 +273,9 @@ impl Metrics {
             if flat_count == 0 && round_count == 0 {
                 continue;
             }
-            sort_positions(&mut rounds[..round_count]);
-            sort_positions(&mut flats[..flat_count]);
+            // `af_sort_pos`; equal positions are indistinguishable.
+            rounds[..round_count].sort_unstable();
+            flats[..flat_count].sort_unstable();
             let (mut reference, mut shoot) = match (flat_count, round_count) {
                 (0, _) => (rounds[round_count / 2], rounds[round_count / 2]),
                 (_, 0) => (flats[flat_count / 2], flats[flat_count / 2]),
@@ -329,18 +330,11 @@ impl Metrics {
                 b.shoot.org
             }
         };
-        let mut sorted = [0_usize; MAX_BLUES];
-        for (i, slot) in sorted.iter_mut().enumerate() {
-            *slot = i;
-        }
+        let mut sorted: [usize; MAX_BLUES] = std::array::from_fn(|i| i);
         let sorted = &mut sorted[..axis.blue_count];
-        for i in 1..sorted.len() {
-            let mut j = i;
-            while j > 0 && bottom(&axis.blues[sorted[j]]) < bottom(&axis.blues[sorted[j - 1]]) {
-                sorted.swap(j, j - 1);
-                j -= 1;
-            }
-        }
+        // FreeType's insertion sort moves a zone only past higher ones, so it
+        // is stable, as this sort is.
+        sorted.sort_by_key(|&i| bottom(&axis.blues[i]));
         for i in 0..sorted.len() - 1 {
             let next = &axis.blues[sorted[i + 1]];
             let b = if upward(next) {
