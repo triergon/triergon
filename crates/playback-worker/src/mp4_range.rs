@@ -38,7 +38,7 @@ struct Work {
 }
 
 impl Work {
-    fn video_configuration(&mut self, tag: [u8; 4], data: &[u8]) {
+    fn configuration(&mut self, tag: [u8; 4], data: &[u8]) {
         fold(&mut self.digest, u64::from(u32::from_le_bytes(tag)));
         fold(&mut self.digest, data.len() as u64);
         fold_bytes(&mut self.digest, data);
@@ -132,6 +132,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
         let codec = match &descriptions[0].format {
             b"dvh1" | b"dvhe" => Some("hevc"),
             b"dav1" => Some("av1"),
+            b"Opus" => Some("opus"),
             _ => None,
         };
         let edits = track.edits().filter(|_| track.fragments().is_empty());
@@ -152,9 +153,9 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
                 let tag = config.source_description().format;
                 let stream = config.demux();
                 if tag != descriptions[0].format || stream.codec != codec {
-                    return Err("incorrect MP4 range video configuration".into());
+                    return Err("incorrect MP4 range configuration".into());
                 }
-                result.video_configuration(tag, stream.extradata.as_ref());
+                result.configuration(tag, stream.extradata.as_ref());
             }
             Some(config)
         } else {

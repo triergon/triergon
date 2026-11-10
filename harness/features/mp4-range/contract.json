@@ -8,13 +8,13 @@
   "contract": [
     "open a preloaded regular or complete fragmented MP4 file through 32 KiB random-access input",
     "read AVC with AAC or Opus, regular dedicated HEVC/AAC entries or a regular dedicated AV1 entry through EOF in demux order",
-    "dedicated dvh1, dvhe and dav1 sample entries preserve the original tag and exact base decoder configuration",
+    "compare the original sample-entry tag and decoder configuration bytes for dvh1, dvhe, dav1 and Opus",
     "compare the reference container output when the MOV demuxer exposes dav1 without assigning an AV1 codec ID",
     "seek cases read one packet, seek backward using the video clock, then read the complete suffix",
     "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
     "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame",
     "compare open-ended fragment edits, startup trim with unequal media and sample clocks, and backward seeks on both sides of a sync boundary",
-    "compare Opus edit-list trim, unequal packet durations, and secondary-track alignment at a backward seek boundary"
+    "compare Opus leading and trailing edit trim, unequal media and decoder clocks, long leading crops with variable packet durations, and secondary-track alignment at exact and between-sample seek boundaries"
   ],
   "required_profiles": [
     "regular-open",
@@ -34,7 +34,11 @@
     "dav1-seek",
     "opus-open",
     "opus-seek",
-    "opus-seek-edit-boundary"
+    "opus-seek-edit-boundary",
+    "opus-trim-end",
+    "opus-trim-rescaled",
+    "opus-crop-open",
+    "opus-crop-seek"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

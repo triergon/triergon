@@ -222,7 +222,7 @@
       "expected": {
         "packets": 241,
         "bytes": 65677,
-        "digest": 4193873898465376234
+        "digest": 15624301091816995394
       }
     },
     {
@@ -237,7 +237,7 @@
       "expected": {
         "packets": 92,
         "bytes": 25673,
-        "digest": 11520860581798144314
+        "digest": 5125035269830725090
       }
     },
     {
@@ -252,7 +252,61 @@
       "expected": {
         "packets": 91,
         "bytes": 25535,
-        "digest": 12059760319648546611
+        "digest": 8414310448937091467
+      }
+    },
+    {
+      "id": "opus-trim-end",
+      "profile": "opus-trim-end",
+      "file": "avc-opus-trimmed-end.mp4",
+      "sha256": "d13e84fd4307cfba2a3e9c49f2e07f1d0cff85c8aa328f9355def77fa1b08511",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 131,
+        "bytes": 50269,
+        "digest": 5934296594475595056
+      }
+    },
+    {
+      "id": "opus-trim-rescaled",
+      "profile": "opus-trim-rescaled",
+      "file": "avc-opus-rescaled-edit.mp4",
+      "sha256": "d553d89ec289ae117de866f5965bf90efed4aed78433ebb361b04a75bcbaf57c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 131,
+        "bytes": 50269,
+        "digest": 7154259262571099376
+      }
+    },
+    {
+      "id": "opus-crop-open",
+      "profile": "opus-crop-open",
+      "file": "avc-opus-cropped-edit.mp4",
+      "sha256": "aa39c47facc37101f7d3df72c2070623929406bdc457719dd2c56a9802baea24",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 233,
+        "bytes": 64822,
+        "digest": 8468210823864242940
+      }
+    },
+    {
+      "id": "opus-crop-seek",
+      "profile": "opus-crop-seek",
+      "file": "avc-opus-cropped-edit.mp4",
+      "sha256": "aa39c47facc37101f7d3df72c2070623929406bdc457719dd2c56a9802baea24",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 17176,
+        "digest": 15900364185324428767
       }
     }
   ]
