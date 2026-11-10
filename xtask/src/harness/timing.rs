@@ -651,7 +651,8 @@ pub struct TimedWorkers {
 impl TimedWorkers {
     pub fn new(candidate: &Path, reference: &Path) -> Result<Self, String> {
         let directory = candidate.with_file_name(format!(".timed-{}", std::process::id()));
-        let [candidate, reference] = worker::copy_pair(&directory, candidate, reference)?;
+        let [candidate, reference] =
+            worker::WorkerPair::read(candidate, reference)?.write(&directory)?;
         Ok(TimedWorkers {
             directory,
             candidate,

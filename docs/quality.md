@@ -448,8 +448,11 @@ may override that count for diagnostic comparisons.
   are against `W`. Such a report is never an acceptance run.
 - Prepare both workers with the same sequential write and paths of equal length.
   Linker output and a sequentially written copy can occupy the page cache differently.
-  Timing and memory collection both use freshly written copies. Memory copies stay in
-  the build tree so grading can verify the workers in the observer certificate.
+  Timing and Linux memory collection use freshly written copies. Linux memory collection
+  keeps both original paths when the loader resolves libraries relative to an executable.
+  Keep the measured executables with the raw memory samples. Grading Linux memory
+  results rehashes the worker paths in the observer certificate, including any copies
+  in the build tree.
 - Before a timing pass, `cargo xtask count CANDIDATE REFERENCE ARGUMENT...` runs both
   workers on one workload under Linux `perf stat`, five runs each, and prints the least
   user-mode instructions, cycles and branch misses. It fails when instructions rise more

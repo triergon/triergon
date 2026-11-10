@@ -43,34 +43,63 @@ pub fn arg(value: impl ToString) -> OsString {
     OsString::from(value.to_string())
 }
 
-/// Give both workers fresh files with the same write pattern and path length.
-pub(super) fn copy_pair(
-    directory: &Path,
-    candidate: &Path,
-    reference: &Path,
-) -> Result<[PathBuf; 2], String> {
-    let copy = |slot: &str, source: &Path| -> Result<PathBuf, String> {
-        let slot = directory.join(slot);
-        fs::create_dir_all(&slot).map_err(|e| format!("{}: {e}", slot.display()))?;
+struct WorkerImage {
+    bytes: Vec<u8>,
+    permissions: fs::Permissions,
+}
+
+impl WorkerImage {
+    fn read(path: &Path) -> std::io::Result<Self> {
+        let mut file = fs::File::open(path)?;
+        let permissions = file.metadata()?.permissions();
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        Ok(Self { bytes, permissions })
+    }
+
+    fn write(&self, slot: &Path) -> Result<PathBuf, String> {
+        fs::create_dir_all(slot).map_err(|e| format!("{}: {e}", slot.display()))?;
         let target = slot.join("worker");
         let pending = slot.join(format!(".worker-{}", std::process::id()));
-        let bytes = fs::read(source).map_err(|e| format!("{}: {e}", source.display()))?;
-        let permissions = fs::metadata(source)
-            .map_err(|e| format!("{}: {e}", source.display()))?
-            .permissions();
         let mut file =
             fs::File::create_new(&pending).map_err(|e| format!("{}: {e}", pending.display()))?;
         let written = file
-            .write_all(&bytes)
-            .and_then(|()| file.set_permissions(permissions));
+            .write_all(&self.bytes)
+            .and_then(|()| file.set_permissions(self.permissions.clone()));
         drop(file);
         if let Err(error) = written.and_then(|()| fs::rename(&pending, &target)) {
             let _ = fs::remove_file(&pending);
             return Err(format!("{}: {error}", target.display()));
         }
         Ok(target)
-    };
-    Ok([copy("a", candidate)?, copy("b", reference)?])
+    }
+}
+
+pub(super) struct WorkerPair(WorkerImage, WorkerImage);
+
+impl WorkerPair {
+    pub fn read(candidate: &Path, reference: &Path) -> Result<Self, String> {
+        let read =
+            |path: &Path| WorkerImage::read(path).map_err(|e| format!("{}: {e}", path.display()));
+        Ok(Self(read(candidate)?, read(reference)?))
+    }
+
+    /// Name persistent copies by the exact bytes about to be written.
+    pub fn content_key(&self) -> String {
+        format!(
+            "{}-{}",
+            crate::sha256::hex(&self.0.bytes),
+            crate::sha256::hex(&self.1.bytes)
+        )
+    }
+
+    /// Give both workers fresh files with the same write pattern and path length.
+    pub fn write(&self, directory: &Path) -> Result<[PathBuf; 2], String> {
+        Ok([
+            self.0.write(&directory.join("a"))?,
+            self.1.write(&directory.join("b"))?,
+        ])
+    }
 }
 
 /// The exit code (negative signal number when killed), stdout and stderr of a
