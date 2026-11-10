@@ -873,8 +873,11 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 let memory = measure_pinned(check_inputs, || {
                     super::memory::collect(
                         root,
-                        &candidate,
-                        &reference,
+                        super::memory::WorkerPaths {
+                            candidate: &candidate,
+                            reference: &reference,
+                            registered: options.baseline_worker.is_none(),
+                        },
                         &input,
                         options.memory_pairs.unwrap_or(options.pairs),
                         options.seed,
