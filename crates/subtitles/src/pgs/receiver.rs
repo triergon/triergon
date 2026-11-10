@@ -15,7 +15,7 @@ use state::{PaletteWords, Receiver, Reference};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, Result, Rounding, Time, TimeBase, WorkBudget,
+    Budget, BudgetVec, Bytes, BytesWriter, Error, Result, Rounding, Time, TimeBase, WorkBudget,
 };
 use work::Work;
 
@@ -287,6 +287,22 @@ struct Draft {
     pixels: usize,
 }
 
+/// Plane storage. A display writes the last display's buffer again in place
+/// once the caller has released its rectangles, so its pages stay resident:
+/// each decoded rectangle's pixels in turn, sliced into the rectangles when the
+/// display is stored. Otherwise each plane is its own allocation, and the
+/// largest becomes the next display's buffer.
+#[derive(Debug)]
+enum Planes {
+    None,
+    /// The last display's buffer.
+    Kept(Bytes),
+    /// The buffer a display writes, and where its next plane starts.
+    Writing(BytesWriter, usize),
+    /// A display's largest plane so far, each in its own allocation.
+    Fresh(Bytes),
+}
+
 /// FFmpeg's PGS decoder over one stream's packets.
 ///
 /// One packet is active at a time. Accepted inputs, caches and outputs stay
@@ -319,6 +335,7 @@ pub struct ReceiverDecoder {
     refusal: Option<Refusal>,
     observations: ReceiverObservations,
     draft: Option<Draft>,
+    planes: Planes,
 }
 
 impl ReceiverDecoder {
@@ -345,6 +362,7 @@ impl ReceiverDecoder {
             refusal: None,
             observations: ReceiverObservations::default(),
             draft: None,
+            planes: Planes::None,
         })
     }
 
@@ -411,6 +429,7 @@ impl ReceiverDecoder {
         self.output = None;
         self.receiver = Receiver::new(&self.budget);
         self.draft = None;
+        self.planes = Planes::None;
         self.failed = Some(error);
         error
     }
@@ -636,14 +655,51 @@ impl ReceiverDecoder {
             .receiver
             .object(reference.object.id)
             .ok_or(Error::Invalid("PGS receiver object absent"))?;
-        let bitmap = match object.decode(&self.budget)? {
-            Some(pixels) => Bitmap {
-                width,
-                height,
-                stride: width,
-                pixels,
-            },
-            None => Bitmap::empty(width, self.packet()?.slice(0..0)?),
+        // A rectangle without its own pixels views none of the packet.
+        let packet = self
+            .packet
+            .as_ref()
+            .ok_or(Error::Invalid("PGS recovery physical packet absent"))?;
+        let empty = || packet.slice(0..0);
+        if let Planes::Kept(_) = self.planes
+            && let Planes::Kept(kept) = std::mem::replace(&mut self.planes, Planes::None)
+            && let Ok(planes) = kept.try_into_writer()
+        {
+            self.planes = Planes::Writing(planes, 0);
+        }
+        let bitmap = if let Planes::Writing(planes, at) = &mut self.planes {
+            let filled =
+                planes.try_write_at(*at, area, |plane| Ok::<_, Error>(object.fill(plane)))?;
+            if filled {
+                *at += area;
+                // Its pixels are sliced from the buffer when the display is stored.
+                Bitmap {
+                    width,
+                    height,
+                    stride: width,
+                    pixels: empty()?,
+                }
+            } else {
+                Bitmap::empty(width, empty()?)
+            }
+        } else {
+            let mut plane = BudgetVec::new(&self.budget);
+            plane.try_resize(area, 0)?;
+            if object.fill(plane.as_mut_slice()) {
+                let pixels = plane.freeze().map_err(|failure| failure.error)?;
+                if !matches!(&self.planes, Planes::Fresh(largest) if largest.len() >= pixels.len())
+                {
+                    self.planes = Planes::Fresh(pixels.clone());
+                }
+                Bitmap {
+                    width,
+                    height,
+                    stride: width,
+                    pixels,
+                }
+            } else {
+                Bitmap::empty(width, empty()?)
+            }
         };
         self.draft()?.pixels += area;
         self.push_rect(reference, Placement::Object, bitmap)?;
@@ -702,12 +758,30 @@ impl ReceiverDecoder {
         if !self.pay(work, cancel, 1)? {
             return Ok(None);
         }
-        let draft = self
+        let mut draft = self
             .draft
             .take()
             .ok_or(Error::Invalid("PGS receiver display absent"))?;
         if self.event.is_some() {
             return Err(Error::Invalid("PGS native public event already stored"));
+        }
+        match std::mem::replace(&mut self.planes, Planes::None) {
+            Planes::Writing(planes, _) => {
+                // Each decoded rectangle takes the next width * height bytes of
+                // the buffer; the others have no pixels.
+                let planes = planes.finish();
+                let mut at = 0;
+                for rect in draft.rectangles.as_mut_slice() {
+                    let area = usize::from(rect.width) * usize::from(rect.height);
+                    if area != 0 {
+                        rect.pixels = planes.slice(at..at + area)?;
+                        at += area;
+                    }
+                }
+                self.planes = Planes::Kept(planes);
+            }
+            Planes::Kept(planes) | Planes::Fresh(planes) => self.planes = Planes::Kept(planes),
+            Planes::None => {}
         }
         self.event = Some(RecoveredEvent {
             pts_microseconds: draft.pts,
@@ -802,6 +876,7 @@ impl ReceiverDecoder {
             return Err(Error::Invalid("PGS recovery reset busy"));
         }
         self.event = None;
+        self.planes = Planes::None;
         self.receiver = Receiver::new(&self.budget);
         self.failed = None;
         self.spent = 0;
