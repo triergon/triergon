@@ -63,8 +63,7 @@ struct OpusTiming {
 }
 
 impl OpusTiming {
-    fn duration(&self, ordinal: u64) -> Result<u32> {
-        let occurrence = ordinal - self.first;
+    fn duration(&self, occurrence: u64) -> Result<u32> {
         let runs = self.durations.as_slice();
         runs.get(runs.partition_point(|run| run.end_sample <= occurrence))
             .map(|run| run.ticks)
@@ -169,7 +168,8 @@ impl EncodedEditPlan {
             && self.source_edit.bytes().as_ref().as_ptr() == edits.raw().bytes().as_ref().as_ptr()
             && self.source_edit.bytes().len() == edits.raw().bytes().len()
     }
-    pub(crate) fn project(&self, source: &Sample) -> Result<Option<PacketView>> {
+    // Return the projected packet and its one-based edit sequence.
+    pub(crate) fn project(&self, source: &Sample) -> Result<Option<(PacketView, u64)>> {
         if source.ordinal == 0 || source.ordinal > self.count {
             return Err(Error::Invalid("encoded edit source ordinal"));
         }
@@ -180,14 +180,18 @@ impl EncodedEditPlan {
             .cts_ticks
             .ok_or(Error::Unsupported("encoded edit source CTS unknown"))?;
         let audio = !matches!(self.timing, EditTiming::Video);
-        if audio && dts >= self.end
-            || self
-                .opus_timing
-                .as_ref()
-                .is_some_and(|opus| source.ordinal < opus.first)
-        {
+        if audio && dts >= self.end {
             return Ok(None);
         }
+        let (duration, sequence) = match &self.opus_timing {
+            Some(opus) if opus.first > 1 => {
+                let Some(occurrence) = source.ordinal.checked_sub(opus.first) else {
+                    return Ok(None);
+                };
+                (opus.duration(occurrence)?, occurrence + 1)
+            }
+            _ => (source.duration_ticks, source.ordinal),
+        };
         let dts_field =
             ClockField::from_exact_ticks(dts.checked_sub(self.anchor).ok_or(Error::Overflow)?)?;
         let pts_field =
@@ -200,11 +204,7 @@ impl EncodedEditPlan {
         } else {
             cts < self.anchor || cts >= self.presentation_end
         };
-        let duration = match &self.opus_timing {
-            Some(opus) if opus.first > 1 => opus.duration(source.ordinal)?,
-            _ => source.duration_ticks,
-        };
-        Ok(Some(PacketView {
+        let packet = PacketView {
             source_ordinal: source.ordinal,
             source_description: source.description_index,
             source_range: source.range.clone(),
@@ -232,7 +232,8 @@ impl EncodedEditPlan {
                 } else {
                     0
                 },
-        }))
+        };
+        Ok(Some((packet, sequence)))
     }
     /// Demux skip-samples side data for a sample from this plan's source track.
     /// The first two little-endian words give leading and trailing sample counts.

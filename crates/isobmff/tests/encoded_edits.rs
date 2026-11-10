@@ -531,6 +531,31 @@ fn range_playback_keeps_opus_preroll_and_stops_at_the_edit_end() {
 }
 
 #[test]
+fn cropped_opus_keeps_source_and_edit_ordinals_distinct() {
+    let mut raw = include_bytes!("fixtures/range-encoded-edits/avc-opus-edit.mp4").to_vec();
+    for (at, value) in [
+        (1508, 2050_u32),
+        (1512, 52_800),
+        (1552, 154_896),
+        (1780, 20),
+        (1788, 140),
+    ] {
+        raw[at..at + 4].copy_from_slice(&value.to_be_bytes());
+    }
+    let source = Source::new(&raw, b"soun");
+    let packets = rows(&source, range_plan(&source, *b"isom").unwrap());
+    let (first, _) = &packets[0];
+    assert_eq!((first.source.ordinal, first.edit.unwrap().sequence), (5, 1));
+    let (retained, _) = &packets[16];
+    assert_eq!(
+        (retained.source.ordinal, retained.edit.unwrap().sequence),
+        (21, 17)
+    );
+    assert_eq!(retained.source.duration_ticks, 960);
+    assert_eq!(retained.demux.duration, 1008);
+}
+
+#[test]
 fn opus_global_seek_aligns_audio_without_the_range_checkpoints() {
     let raw = include_bytes!("fixtures/range-encoded-edits/avc-opus-edit.mp4");
     let video = Source::new(raw, b"vide");
