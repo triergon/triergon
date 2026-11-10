@@ -1,4 +1,4 @@
-//! Compare every packet of a regular AVC/AAC file through range playback.
+//! Compare regular MP4 range playback and dedicated video sample entries.
 
 use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
@@ -38,6 +38,12 @@ struct Work {
 }
 
 impl Work {
+    fn video_configuration(&mut self, tag: [u8; 4], data: &[u8]) {
+        fold(&mut self.digest, u64::from(u32::from_le_bytes(tag)));
+        fold(&mut self.digest, data.len() as u64);
+        fold_bytes(&mut self.digest, data);
+    }
+
     fn packet(&mut self, packet: &Mp4Packet) -> Result<()> {
         let row = packet.native.as_ref().ok_or("missing projected packet")?;
         let clock = &row.demux;
@@ -103,23 +109,33 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
     plans.try_reserve_exact(movie.tracks().len())?;
     let mut video = None;
     let mut audio = false;
+    let mut result = Work::default();
     for track in movie.tracks() {
         let header = track.header();
         let table = track.table();
         let descriptions = table.descriptions();
         match (header.handler, descriptions) {
-            (kind, [entry]) if kind == *b"vide" && entry.format == *b"avc1" && video.is_none() => {
-                video = Some(header.track_id);
+            (kind, [entry])
+                if kind == *b"vide"
+                    && matches!(&entry.format, b"avc1" | b"dvh1" | b"dvhe" | b"dav1")
+                    && video.is_none() =>
+            {
+                video = Some((header.track_id, entry.format));
             }
             (kind, [entry]) if kind == *b"soun" && entry.format == *b"mp4a" && !audio => {
                 audio = true;
             }
-            _ => return Err("expected one AVC and one AAC track".into()),
+            _ => return Err("unexpected MP4 range track".into()),
         }
         if !track.fragments().is_empty() {
             return Err("expected regular sample tables".into());
         }
-        let plan = if let Some(edits) = track.edits() {
+        let codec = match &descriptions[0].format {
+            b"dvh1" | b"dvhe" => Some("hevc"),
+            b"dav1" => Some("av1"),
+            _ => None,
+        };
+        let config = if track.edits().is_some() || codec.is_some() {
             let mut config = ConfigurationJob::new_range_playback(
                 header,
                 table,
@@ -131,7 +147,21 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
                 },
             )?;
             while config.poll(&mut opened.input, &mut work(), &cancel)? != CursorStatus::Ready {}
-            let configs = [config.take(&mut opened.input, &cancel)?];
+            let config = config.take(&mut opened.input, &cancel)?;
+            if let Some(codec) = codec {
+                let tag = config.source_description().format;
+                let stream = config.demux();
+                if tag != descriptions[0].format || stream.codec != codec {
+                    return Err("incorrect MP4 range video configuration".into());
+                }
+                result.video_configuration(tag, stream.extradata.as_ref());
+            }
+            Some(config)
+        } else {
+            None
+        };
+        let plan = if let Some(edits) = track.edits() {
+            let configs = [config.ok_or("missing MP4 edit configuration")?];
             let mut edit = EditJob::new_range_playback(
                 EditContext {
                     table,
@@ -151,7 +181,10 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
         };
         plans.try_push(plan).map_err(|error| error.error)?;
     }
-    let video = video.filter(|_| audio).ok_or("missing AVC/AAC pair")?;
+    let (video, tag) = video.ok_or("missing MP4 range video track")?;
+    if !audio && tag != *b"dav1" {
+        return Err("missing MP4 range audio track".into());
+    }
     let mut range = Mp4RangeOpen::new(movie, Some(plans.as_slice()), PlanLimits::default())?;
     while !range.poll(&mut work(), &cancel)? {}
     let mut player = range.finish(
@@ -188,7 +221,6 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Totals> {
         let mut command = job.finish()?;
         while !player.apply_seek(&mut command, &mut work(), &cancel)? {}
     }
-    let mut result = Work::default();
     loop {
         let progress = player.read_output(&mut output, &mut work(), &cancel)?;
         if let Some(item) = output.take() {

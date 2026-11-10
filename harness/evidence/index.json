@@ -16794,6 +16794,34 @@
    "key": "evidence/mpegts-current-reader-comparison/e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a.tar.gz",
    "sha256": "e8358290aa65f631134af4a70bc7d90ad3858b5cc7118f4c4ed43cfd1e8c8b8a",
    "bytes": 84851549
+  },
+  {
+   "name": "mp4-range-dedicated-sample-entries",
+   "path": "mp4-range-dedicated-sample-entries",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/mp4-range-dedicated-sample-entries/46789d11f9768aef71eead36ce8f2acc05c820abc95e19b4a3ffb36a09e9e71f.tar.gz",
+   "sha256": "46789d11f9768aef71eead36ce8f2acc05c820abc95e19b4a3ffb36a09e9e71f",
+   "bytes": 14900870,
+   "source_revision": "668ecf58571fd19eb7e9aba4020606b409229625"
+  },
+  {
+   "name": "mp4-range-dedicated-entries-rebased",
+   "path": "mp4-range-dedicated-entries-rebased",
+   "retention": "retained",
+   "reason": "Ten MP4 range comparisons for regular AVC/AAC and dedicated Dolby Vision entries on AArch64 Linux.",
+   "key": "evidence/mp4-range-dedicated-entries-rebased/dbdbdacc0d86df6eefacb0403c0bcc0b7f5ff1c480415112e4eca791724a55ba.tar.gz",
+   "sha256": "dbdbdacc0d86df6eefacb0403c0bcc0b7f5ff1c480415112e4eca791724a55ba",
+   "bytes": 8604326
+  },
+  {
+   "name": "mp4-range-dedicated-entries-classified",
+   "path": "mp4-range-dedicated-entries-classified",
+   "retention": "retained",
+   "reason": "Ten MP4 range comparisons on AArch64 Linux after the reader track-classification change.",
+   "key": "evidence/mp4-range-dedicated-entries-classified/632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e.tar.gz",
+   "sha256": "632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e",
+   "bytes": 8608934
   }
  ]
 }
