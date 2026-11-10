@@ -75,13 +75,70 @@ pub fn crc8(mut crc: u8, data: &[u8]) -> u8 {
     crc
 }
 
+const A52_RESIDUE_MASK: u32 = 0x7fff;
+
+/// Reduce modulo x^15 + x + 1, where x^15 contributes x + 1.
+fn a52_reduce(value: u32) -> u32 {
+    let high = value >> 15;
+    (value & A52_RESIDUE_MASK) ^ high ^ (high << 1)
+}
+
+/// Replace each power of x^15 with the corresponding power of x + 1.
+/// The result needs at most 18 bits, so it can be shifted before reduction.
+fn a52_fold_word(word: u64) -> u32 {
+    let group0 = word as u32 & A52_RESIDUE_MASK;
+    let group1 = (word >> 15) as u32 & A52_RESIDUE_MASK;
+    let group2 = (word >> 30) as u32 & A52_RESIDUE_MASK;
+    let group3 = (word >> 45) as u32 & A52_RESIDUE_MASK;
+    let group4 = (word >> 60) as u32;
+    let group3 = group3 ^ (group3 << 1);
+
+    group0
+        ^ group1
+        ^ (group1 << 1)
+        ^ group2
+        ^ (group2 << 2)
+        ^ group3
+        ^ (group3 << 2)
+        ^ group4
+        ^ (group4 << 4)
+}
+
+fn a52_fold_blocks(crc: u16, blocks: &[[u8; 16]]) -> u16 {
+    // The A/52 polynomial factors into (x + 1)(x^15 + x + 1).
+    // Track the residue modulo the second factor and parity modulo x + 1.
+    let mut residue = a52_reduce(u32::from(crc));
+    let mut parity_bits = u64::from(crc);
+    for block in blocks {
+        let word = u128::from_be_bytes(*block);
+        let high = (word >> 64) as u64;
+        let low = word as u64;
+        parity_bits ^= high ^ low;
+
+        // Modulo x^15 + x + 1, x^64 = x^8 + x^4 and x^128 = x^8 + x^2 + x.
+        let upper = a52_fold_word(high);
+        let input = a52_fold_word(low) ^ (upper << 8) ^ (upper << 4);
+        // Shift the input by x^16 = x^2 + x. One reduction covers both terms.
+        residue = a52_reduce(
+            (residue << 8) ^ (residue << 2) ^ (residue << 1) ^ (input << 2) ^ (input << 1),
+        );
+    }
+    // x^15 + x + 1 has odd parity, so adding it changes only the parity residue.
+    let extra = ((parity_bits ^ u64::from(residue)).count_ones() & 1) as u16;
+    residue as u16 ^ (extra * 0x8003)
+}
+
 /// Shifts `data` through the A/52 register (x^16 + x^15 + x^2 + 1, section 7.10.1)
 /// starting from `crc`, and returns the register. An A/52 or FLAC frame (RFC 9639 section
 /// 9.3) starts from zero, an MPEG audio frame (ISO/IEC 11172-3 2.4.3.1) from `0xffff`.
 #[must_use]
 pub fn crc16_a52(mut crc: u16, data: &[u8]) -> u16 {
+    let (blocks, tail) = data.as_chunks::<16>();
+    if !blocks.is_empty() {
+        crc = a52_fold_blocks(crc, blocks);
+    }
     let t = &A52;
-    let mut chunks = data.chunks_exact(4);
+    let mut chunks = tail.chunks_exact(4);
     for c in &mut chunks {
         let hi = (crc >> 8) as u8 ^ c[0];
         let lo = crc as u8 ^ c[1];
@@ -261,20 +318,27 @@ mod tests {
     }
 
     #[test]
-    fn sliced_a52_matches_the_bitwise_register() {
-        for length in [0, 1, 3, 4, 5, 8, 1001] {
-            let data = message(length);
-            let mut register = 0u16;
-            for &byte in &data {
-                for k in 0..8 {
-                    let feedback = ((register >> 15) as u8 ^ (byte >> (7 - k))) & 1;
-                    register <<= 1;
-                    if feedback != 0 {
-                        register ^= 0x8005;
+    fn a52_matches_the_bitwise_register() {
+        for length in (0..65).chain([511, 1001, 1534, 4094]) {
+            let data = message(length + 1);
+            let data = &data[1..];
+            for seed in [0u16, 0x1234, 0x8000, 0xffff] {
+                let mut register = seed;
+                for &byte in data {
+                    for k in 0..8 {
+                        let feedback = ((register >> 15) as u8 ^ (byte >> (7 - k))) & 1;
+                        register <<= 1;
+                        if feedback != 0 {
+                            register ^= 0x8005;
+                        }
                     }
                 }
+                assert_eq!(
+                    crc16_a52(seed, data),
+                    register,
+                    "length {length}, seed {seed:#06x}"
+                );
             }
-            assert_eq!(crc16_a52(0, &data), register);
         }
     }
 
@@ -295,10 +359,11 @@ mod tests {
     #[test]
     fn a52_continues_from_a_register() {
         let data = message(1001);
-        assert_eq!(
-            crc16_a52(0x1234, &data[..3]),
-            crc16_a52(crc16_a52(0x1234, &data[..1]), &data[1..3])
-        );
+        let expected = crc16_a52(0x1234, &data);
+        for split in [0, 1, 3, 15, 16, 17, 31, 32, 64, 999, data.len()] {
+            let (head, tail) = data.split_at(split);
+            assert_eq!(expected, crc16_a52(crc16_a52(0x1234, head), tail));
+        }
     }
 
     #[test]
