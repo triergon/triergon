@@ -573,6 +573,22 @@
           "format": "collection"
         }
       ]
+    },
+    {
+      "name": "authored-vertical",
+      "generator": "authored-fonts",
+      "licence": "authored for this repository (MIT OR Apache-2.0)",
+      "origin": "crates/font/tests/support: TrueType faces with long vmtx records (level phantom points, an advance height of 65535, USE_MY_METRICS), a vhea without records, a short vhea, and VHEA with VMTX",
+      "lanes": [
+        "font"
+      ],
+      "files": [
+        {
+          "path": "authored/authored-vertical.ttc",
+          "sha256": "fb67b8056f50a1524dbab1f328e3a03353efeb06b8eb00feac6e2e1717cc7f49",
+          "format": "collection"
+        }
+      ]
     }
   ]
 }
