@@ -27,6 +27,9 @@ struct Run {
     input: InputCursor,
 }
 fn source(data: &[u8], budget: &Budget) -> Run {
+    source_in_format(data, budget, PacketFormat::Ts188)
+}
+fn source_in_format(data: &[u8], budget: &Budget, format: PacketFormat) -> Run {
     let mut input = InputCursor::new(
         budget,
         SourceId(1),
@@ -37,13 +40,8 @@ fn source(data: &[u8], budget: &Budget) -> Run {
         4096,
     )
     .unwrap();
-    let mut stream = TransportStream::new(
-        budget.clone(),
-        PacketFormat::Ts188,
-        ParseLimits::default(),
-        1,
-    )
-    .unwrap();
+    let mut stream =
+        TransportStream::new(budget.clone(), format, ParseLimits::default(), 1).unwrap();
     let cancel = AtomicBool::new(false);
     let mut ordinal = 0;
     let mut items = Vec::new();
@@ -1256,6 +1254,42 @@ fn real_transport_failure_before_core_end_is_not_eof() {
     assert!(finish(&mut v, &mut input).is_err());
     assert!(v.confirmation().is_none());
 }
+#[test]
+fn changed_prefix_cannot_replace_original_physical_source() {
+    let budget = Budget::new(8 * 1024 * 1024).unwrap();
+    let format = PacketFormat::M2ts192;
+    let mut run = source_in_format(
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/data/m2ts192-opaque-prefix.m2ts"
+        )),
+        &budget,
+        format,
+    );
+    let Item::Event(event, context, origin) = &mut run.items[0] else {
+        panic!("expected an issued carrier");
+    };
+    let TraceEvent::Transport(packet) = event else {
+        panic!("expected a transport packet");
+    };
+    packet.prefix = Some(Bytes::copy_from_slice(&budget, &[255, 254, 253, 252]).unwrap());
+    let mut completion =
+        PacketCompletion::new_for_format(budget, ParseLimits::default(), 1, format).unwrap();
+    let work = completion.required_work(event).unwrap();
+    assert!(
+        completion
+            .observe_traced(
+                event,
+                origin,
+                *context,
+                &mut WorkBudget::new(work),
+                &AtomicBool::new(false)
+            )
+            .is_err()
+    );
+    assert!(completion.physical_carriers().is_empty());
+}
+
 #[test]
 fn rejected_carrier_from_foreign_pool_cannot_escape_backing() {
     let a = Budget::new(8 * 1024 * 1024).unwrap();
