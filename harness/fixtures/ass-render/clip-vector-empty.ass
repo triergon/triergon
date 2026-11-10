@@ -5,9 +5,11 @@
 ; Vector clips whose drawings have no contour: a lone move, moves only, and
 ; a line command missing its point. libass draws them as a bitmap without
 ; pixels and a \clip then empties every image of its event (keeping its
-; place); an \iclip leaves them, as does a contour without area. A drawing
-; whose points leave libass's outline range once scaled to the frame (here at
-; 1080 lines, not at 720) is drawn without pixels too, and empties its event.
+; place); an \iclip leaves them, as does a contour without area. A clip
+; whose drawing lies 125,000 frame pixels or more from the origin is not
+; applied, since libass cannot place it (quantize_transform): the square far
+; away empties its event at 720 lines, which it misses, and leaves it whole at
+; 1080.
 [Script Info]
 ScriptType: v4.00+
 PlayResX: 1280
@@ -26,5 +28,5 @@ Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,200)\clip(2,m 10
 Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,300)\clip(m 0 0 l)}a line without its point
 Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,400)\iclip(m 0 0)}inverse lone move
 Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,500)\clip(m 0 0 l 1280 0)}a line without area
-Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,650)\clip(m -4000000 -4000000 l 4000000 -4000000 4000000 4000000 -4000000 4000000)}beyond the range
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(640,650)\clip(m 100000 100000 l 100100 100000 100100 100100 100000 100100)}far away
 Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\an5\pos(640,600)}unclipped after
