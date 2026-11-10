@@ -62,7 +62,7 @@ enum Element {
 #[derive(Debug)]
 pub(super) struct Path<'s> {
     scaling: &'s Scaling,
-    hints: Hints,
+    hints: Hints<'s>,
     /// The current point in character space.
     current: (Fixed, Fixed),
     /// The current subpath's start.
@@ -77,10 +77,10 @@ pub(super) struct Path<'s> {
 
 impl<'s> Path<'s> {
     /// A path whose stems move up by `origin`, a `seac` accent's offset.
-    pub(super) const fn new(scaling: &'s Scaling, origin: Fixed) -> Self {
+    pub(super) fn new(scaling: &'s Scaling, origin: Fixed) -> Self {
         Self {
             scaling,
-            hints: Hints::new(origin),
+            hints: Hints::new(scaling.blues.as_ref(), origin),
             current: (0, 0),
             start: (0, 0),
             device: (0, 0),
@@ -109,17 +109,21 @@ impl<'s> Path<'s> {
 
     /// Reads the mask after a `cntrmask`.
     pub(super) fn counter_mask(&mut self, r: &mut Reader<'_>, work: &mut WorkBudget) -> Result<()> {
-        self.hints
-            .read_counter_mask(r, self.scaling.blues.as_ref(), work)
+        self.hints.read_counter_mask(r, work)
     }
 
     fn build_hint_map(&mut self, work: &mut WorkBudget) -> Result<()> {
-        self.hints.build_current(self.scaling.blues.as_ref(), work)
+        self.hints.build_current(work)
     }
 
-    /// `cf2_glyphpath_hintPoint`: a point in device space.
-    fn device_point(&self, map: &HintMap, p: (Fixed, Fixed)) -> (Fixed, Fixed) {
-        (mul(self.scaling.x, p.0), map.map(p.1, self.scaling.y))
+    /// `cf2_glyphpath_hintPoint`: a point in device space, scaled uniformly
+    /// without a hint map.
+    fn device_point(&self, map: Option<&HintMap>, p: (Fixed, Fixed)) -> (Fixed, Fixed) {
+        let y = map.map_or_else(
+            || mul(p.1, self.scaling.y),
+            |map| map.map(p.1, self.scaling.y),
+        );
+        (mul(self.scaling.x, p.0), y)
     }
 
     /// `cf2_glyphpath_moveTo`.

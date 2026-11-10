@@ -679,83 +679,48 @@ impl HintMap {
     }
 }
 
-/// A charstring's stem hints (`hStemHintArray`, `vStemHintArray`): the
-/// horizontal ones, the first 96 kept, since a mask over more fails, and the
-/// number of vertical ones.
-#[derive(Debug)]
-struct Stems {
-    horizontal: [Stem; MAX_HINTS],
-    horizontal_count: usize,
-    vertical_count: usize,
+/// The horizontal stem hints (`hStemHintArray`): the first 96, since a mask
+/// over more fails.
+type Stems = [Stem; MAX_HINTS];
+
+/// The bottom and top edges of horizontal stem `i`.
+fn edges(stems: &Stems, i: usize, origin: Fixed, scale: Fixed) -> (Edge, Edge) {
+    let stem = stems[i];
+    (
+        Edge::new(stem, i, origin, scale, true),
+        Edge::new(stem, i, origin, scale, false),
+    )
 }
 
-impl Stems {
-    const fn count(&self) -> usize {
-        self.horizontal_count + self.vertical_count
-    }
-
-    /// The bottom and top edges of horizontal stem `i`.
-    fn edges(&self, i: usize, origin: Fixed, scale: Fixed) -> (Edge, Edge) {
-        let stem = self.horizontal[i];
-        (
-            Edge::new(stem, i, origin, scale, true),
-            Edge::new(stem, i, origin, scale, false),
-        )
-    }
-}
-
-/// `cf2_hintmap_build`: builds `map` from the stems `mask` selects, all of
-/// them when no mask was read. `initial` is the glyph path's initial map, and
-/// `None` when building that map, which holds the captured edges alone and
-/// one at zero below or above them all. Unhinted, without `blues`, the map
-/// stays empty and only the mask's state changes.
-fn build(
-    map: &mut HintMap,
-    initial: Option<&HintMap>,
-    blues: Option<&Blues>,
-    stems: &mut Stems,
-    mask: &mut Mask,
-    origin: Fixed,
-    work: &mut WorkBudget,
-) -> Result<()> {
-    if !mask.valid {
-        mask.set_all(stems.count())?;
-    }
-    map.count = 0;
-    if stems.horizontal_count > mask.count {
-        return Ok(());
-    }
-    if let Some(blues) = blues {
-        place(map, initial, blues, stems, mask, origin, work)?;
-    }
-    map.valid = true;
-    mask.new = false;
-    Ok(())
-}
-
-/// The edges of a hint map: the em box's, then those captured or placed by an
-/// earlier map, then the rest, adjusted; a map other than the initial one
-/// records where its stems went, so that later maps keep them there.
+/// `cf2_hintmap_build` placing the edges of the `horizontal` stems `mask`
+/// selects into `map`: the em box's, then those captured or placed by an
+/// earlier map, then the rest, adjusted. `initial` is the glyph path's
+/// initial map, and `None` when building that map, which holds the captured
+/// edges alone and one at zero below or above them all; a map other than the
+/// initial one records where its stems went, so that later maps keep them
+/// there.
+#[expect(clippy::too_many_arguments, reason = "cf2_hintmap_build's inputs")]
 fn place(
     map: &mut HintMap,
     initial: Option<&HintMap>,
     blues: &Blues,
     stems: &mut Stems,
+    horizontal: usize,
     mask: &Mask,
     origin: Fixed,
     work: &mut WorkBudget,
 ) -> Result<()> {
+    map.count = 0;
     let scale = blues.scale;
     if let Some([bottom, top]) = blues.em_box {
         map.insert(bottom, Edge::default(), initial, scale, work)?;
         map.insert(Edge::default(), top, initial, scale, work)?;
     }
-    // `build` checked that the mask covers the horizontal stems, so at most 96.
-    let count = stems.horizontal_count;
+    // The mask covers the horizontal stems, so there are at most 96.
     let mut pending = *mask;
-    for i in 0..count {
+    for i in 0..horizontal {
         if pending.bit(i) {
-            let (mut bottom, mut top) = stems.edges(i, origin, scale);
+            let (mut bottom, mut top) = edges(stems, i, origin, scale);
             if bottom.is_locked() || top.is_locked() || blues.capture(&mut bottom, &mut top) {
                 map.insert(bottom, top, initial, scale, work)?;
                 pending.clear(i);
@@ -763,8 +728,8 @@ fn place(
         }
     }
     if initial.is_some() {
-        for i in (0..count).filter(|&i| pending.bit(i)) {
-            let (bottom, top) = stems.edges(i, origin, scale);
+        for i in (0..horizontal).filter(|&i| pending.bit(i)) {
+            let (bottom, top) = edges(stems, i, origin, scale);
             map.insert(bottom, top, initial, scale, work)?;
         }
     } else if map.count == 0 || map.edges[0].cs > 0 || map.edges[map.count - 1].cs < 0 {
@@ -775,7 +740,7 @@ fn place(
     map.adjust(work)?;
     if initial.is_some() {
         for edge in map.edges[..map.count].iter().filter(|e| !e.is_synthetic()) {
-            let stem = &mut stems.horizontal[usize::from(edge.index)];
+            let stem = &mut stems[usize::from(edge.index)];
             if edge.is_top() {
                 stem.max_ds = edge.ds;
             } else {
@@ -784,15 +749,16 @@ fn place(
             stem.used = true;
         }
     }
+    map.valid = true;
     Ok(())
 }
 
-/// The hints of one charstring as FreeType's interpreter keeps them: its stem
-/// hints and hint mask, and the hint maps of its glyph path.
+/// What only hinting keeps: the horizontal stems' edges and the glyph path's
+/// hint maps.
 #[derive(Debug)]
-pub(super) struct Hints {
+struct Hinted<'b> {
+    blues: &'b Blues,
     stems: Stems,
-    mask: Mask,
     /// The edges blue zones capture from all stems, which place the others
     /// (`initialHintMap`).
     initial: HintMap,
@@ -800,35 +766,74 @@ pub(super) struct Hints {
     current: HintMap,
     /// The map at the current subpath's first point (`firstHintMap`).
     first: HintMap,
-    /// The vertical offset of a `seac` accent, which moves its stems.
-    origin: Fixed,
 }
 
-impl Hints {
-    pub(super) const fn new(origin: Fixed) -> Self {
-        Self {
-            stems: Stems {
-                horizontal: [Stem {
-                    min: 0,
-                    max: 0,
-                    min_ds: 0,
-                    max_ds: 0,
-                    used: false,
-                }; MAX_HINTS],
-                horizontal_count: 0,
-                vertical_count: 0,
-            },
-            mask: Mask {
-                bits: [0; MAX_HINTS / 8],
-                count: 0,
-                valid: false,
-                new: false,
-            },
-            initial: HintMap::new(),
-            current: HintMap::new(),
-            first: HintMap::new(),
-            origin,
+impl Hinted<'_> {
+    /// The initial map, once: from all `count` stems, of which `horizontal`
+    /// are horizontal, at the origin of the map that needs it first.
+    fn build_initial(
+        &mut self,
+        count: usize,
+        horizontal: usize,
+        origin: Fixed,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
+        if self.initial.valid {
+            return Ok(());
         }
+        let mut all = Mask::default();
+        all.set_all(count)?;
+        place(
+            &mut self.initial,
+            None,
+            self.blues,
+            &mut self.stems,
+            horizontal,
+            &all,
+            origin,
+            work,
+        )
+    }
+}
+
+/// The hints of one charstring as FreeType's interpreter keeps them: the
+/// number of its stem hints and its hint mask, which decide how the
+/// charstring reads, and, hinting, the stems' edges and the hint maps of its
+/// glyph path. Unhinted, the hint maps hold no edges, so points scale
+/// uniformly; only whether the current one is built is kept.
+#[derive(Debug)]
+pub(super) struct Hints<'b> {
+    horizontal: usize,
+    vertical: usize,
+    mask: Mask,
+    /// Whether the current hint map is built (`hintMap.isValid`).
+    built: bool,
+    /// The vertical offset of a `seac` accent, which moves its stems.
+    origin: Fixed,
+    hinted: Option<Hinted<'b>>,
+}
+
+impl<'b> Hints<'b> {
+    /// The hints of a charstring placed by `blues`, or unhinted without.
+    pub(super) fn new(blues: Option<&'b Blues>, origin: Fixed) -> Self {
+        Self {
+            horizontal: 0,
+            vertical: 0,
+            mask: Mask::default(),
+            built: false,
+            origin,
+            hinted: blues.map(|blues| Hinted {
+                blues,
+                stems: [Stem::default(); MAX_HINTS],
+                initial: HintMap::new(),
+                current: HintMap::new(),
+                first: HintMap::new(),
+            }),
+        }
+    }
+
+    const fn count(&self) -> usize {
+        self.horizontal + self.vertical
     }
 
     /// Whether the stems are fixed: FreeType ignores stem operators once a
@@ -842,44 +847,49 @@ impl Hints {
         self.mask.new
     }
 
-    pub(super) const fn current(&self) -> &HintMap {
-        &self.current
+    /// The current hint map; `None` unhinted.
+    pub(super) fn current(&self) -> Option<&HintMap> {
+        self.hinted.as_ref().map(|h| &h.current)
     }
 
-    pub(super) const fn first(&self) -> &HintMap {
-        &self.first
+    /// The hint map of the subpath's first point; `None` unhinted.
+    pub(super) fn first(&self) -> Option<&HintMap> {
+        self.hinted.as_ref().map(|h| &h.first)
     }
 
     pub(super) const fn current_is_valid(&self) -> bool {
-        self.current.valid
+        self.built
     }
 
     /// `cf2_doStems` without the width: the stems of an operator's operands,
     /// past an odd first one, as running sums.
     pub(super) fn add_stems(&mut self, horizontal: bool, operands: &[Fixed]) {
-        let stems = &mut self.stems;
         let mut position: Fixed = 0;
         for pair in operands[operands.len() % 2..].chunks_exact(2) {
             let min = position.wrapping_add(pair[0]);
             position = min.wrapping_add(pair[1]);
             if !horizontal {
-                stems.vertical_count += 1;
+                self.vertical += 1;
                 continue;
             }
-            if let Some(stem) = stems.horizontal.get_mut(stems.horizontal_count) {
+            if let Some(stem) = self
+                .hinted
+                .as_mut()
+                .and_then(|h| h.stems.get_mut(self.horizontal))
+            {
                 *stem = Stem {
                     min,
                     max: position,
                     ..Stem::default()
                 };
             }
-            stems.horizontal_count += 1;
+            self.horizontal += 1;
         }
     }
 
     /// The mask after a `hintmask`.
     pub(super) fn read_mask(&mut self, r: &mut Reader<'_>) -> Result<()> {
-        self.mask.read(r, self.stems.count())
+        self.mask.read(r, self.count())
     }
 
     /// The mask after a `cntrmask`. Hinting, FreeType builds a hint map from
@@ -887,22 +897,26 @@ impl Hints {
     pub(super) fn read_counter_mask(
         &mut self,
         r: &mut Reader<'_>,
-        blues: Option<&Blues>,
         work: &mut WorkBudget,
     ) -> Result<()> {
         let mut mask = Mask::default();
-        mask.read(r, self.stems.count())?;
-        if let Some(blues) = blues {
+        mask.read(r, self.count())?;
+        let (count, horizontal) = (self.count(), self.horizontal);
+        if let Some(h) = &mut self.hinted {
             // FreeType places counter hints, and an initial map built for
             // them, without the accent offset.
-            self.build_initial(blues, 0, work)?;
+            h.build_initial(count, horizontal, 0, work)?;
+            if horizontal > mask.count {
+                return Ok(());
+            }
             let mut counters = HintMap::new();
-            build(
+            place(
                 &mut counters,
-                Some(&self.initial),
-                Some(blues),
-                &mut self.stems,
-                &mut mask,
+                Some(&h.initial),
+                h.blues,
+                &mut h.stems,
+                horizontal,
+                &mask,
                 0,
                 work,
             )?;
@@ -910,46 +924,44 @@ impl Hints {
         Ok(())
     }
 
-    /// Builds the current hint map from the mask.
-    pub(super) fn build_current(
-        &mut self,
-        blues: Option<&Blues>,
-        work: &mut WorkBudget,
-    ) -> Result<()> {
-        if let Some(blues) = blues {
-            self.build_initial(blues, self.origin, work)?;
+    /// `cf2_hintmap_build` of the current hint map from the mask, all stems
+    /// when no mask was read. A mask over fewer stems than the horizontal
+    /// ones leaves the map without edges, and as built as it was.
+    pub(super) fn build_current(&mut self, work: &mut WorkBudget) -> Result<()> {
+        let (count, horizontal, origin) = (self.count(), self.horizontal, self.origin);
+        if let Some(h) = &mut self.hinted {
+            h.build_initial(count, horizontal, origin, work)?;
         }
-        build(
-            &mut self.current,
-            Some(&self.initial),
-            blues,
-            &mut self.stems,
-            &mut self.mask,
-            self.origin,
-            work,
-        )
+        if !self.mask.valid {
+            self.mask.set_all(self.count())?;
+        }
+        if horizontal > self.mask.count {
+            if let Some(h) = &mut self.hinted {
+                h.current.count = 0;
+            }
+            return Ok(());
+        }
+        if let Some(h) = &mut self.hinted {
+            place(
+                &mut h.current,
+                Some(&h.initial),
+                h.blues,
+                &mut h.stems,
+                horizontal,
+                &self.mask,
+                origin,
+                work,
+            )?;
+        }
+        self.built = true;
+        self.mask.new = false;
+        Ok(())
     }
 
     /// Keeps the current map for the subpath's first point.
     pub(super) fn save_first(&mut self) {
-        self.first.copy_from(&self.current);
-    }
-
-    /// The initial map, once: from every stem, at the origin of the map
-    /// that needs it first.
-    fn build_initial(&mut self, blues: &Blues, origin: Fixed, work: &mut WorkBudget) -> Result<()> {
-        if self.initial.valid {
-            return Ok(());
+        if let Some(h) = &mut self.hinted {
+            h.first.copy_from(&h.current);
         }
-        let mut all = Mask::default();
-        build(
-            &mut self.initial,
-            None,
-            Some(blues),
-            &mut self.stems,
-            &mut all,
-            origin,
-            work,
-        )
     }
 }
