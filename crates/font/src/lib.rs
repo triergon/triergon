@@ -112,7 +112,7 @@ pub struct VerticalMetrics {
 /// metrics of its last `USE_MY_METRICS` component; a CFF FontMatrix scales and
 /// offsets the advances.
 ///
-/// Loaded unhinted ([`Font::load`] in font units, [`SizedFont::outline_into`]
+/// Loaded unhinted ([`Font::outline_into`] in font units, [`SizedFont::outline_into`]
 /// or [`SizedFont::load`] with [`Load::Unhinted`] at a size), the advances
 /// are scaled and the box is the outline's exact control box. With
 /// [`Load::Default`], FreeType's default load, the advances are rounded to
