@@ -28,9 +28,9 @@ mod work;
 
 pub use buffer::{Buffer, Glyph, Position};
 pub use face::Face;
+pub use language::Language;
 pub use metrics::{Extents, GlyphRotations, Metrics, OtMetrics, Scale, SizedMetrics};
 pub use plan::{Feature, Plan};
 pub use shape::shape;
-pub use language::Language;
 pub use tag::{Direction, Script, Tag};
 pub use work::Limits;

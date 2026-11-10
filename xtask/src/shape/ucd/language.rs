@@ -79,12 +79,18 @@ pub fn generate(header: &str) -> Result<Generated, String> {
         8,
     );
 
-    let values: Vec<[u8; 4]> = body(header, "static const hb_tag_t ot_languages3_multi_values[] = {")?
-        .iter()
-        .map(|line| one_tag(line))
-        .collect::<Result<_, _>>()?;
+    let values: Vec<[u8; 4]> = body(
+        header,
+        "static const hb_tag_t ot_languages3_multi_values[] = {",
+    )?
+    .iter()
+    .map(|line| one_tag(line))
+    .collect::<Result<_, _>>()?;
     let mut multi = Vec::new();
-    for line in body(header, "static const LangTagRange ot_languages3_multi[] = {")? {
+    for line in body(
+        header,
+        "static const LangTagRange ot_languages3_multi[] = {",
+    )? {
         let language = one_tag(line)?;
         let numbers: Vec<usize> = strip_comment(line)
             .rsplit(')')
@@ -92,7 +98,10 @@ pub fn generate(header: &str) -> Result<Generated, String> {
             .unwrap_or_default()
             .split(|c: char| !c.is_ascii_digit())
             .filter(|n| !n.is_empty())
-            .map(|n| n.parse().map_err(|_| format!("ot_languages3_multi: {line}")))
+            .map(|n| {
+                n.parse()
+                    .map_err(|_| format!("ot_languages3_multi: {line}"))
+            })
             .collect::<Result<_, _>>()?;
         let [offset, count] = <[usize; 2]>::try_from(numbers)
             .map_err(|_| format!("ot_languages3_multi: no offset and count: {line}"))?;
@@ -160,7 +169,9 @@ fn strip_comment(line: &str) -> String {
     let mut rest = line;
     while let Some(start) = rest.find("/*") {
         out.push_str(&rest[..start]);
-        rest = rest[start..].split_once("*/").map_or("", |(_, after)| after);
+        rest = rest[start..]
+            .split_once("*/")
+            .map_or("", |(_, after)| after);
     }
     out.push_str(rest);
     out
@@ -197,7 +208,10 @@ fn tag_expr(tag: [u8; 4]) -> String {
 }
 
 fn tag_list(tags: &[[u8; 4]]) -> String {
-    tags.iter().map(|&tag| tag_expr(tag)).collect::<Vec<_>>().join(", ")
+    tags.iter()
+        .map(|&tag| tag_expr(tag))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Fails unless the generated keys ascend, as HarfBuzz's binary searches need;
@@ -219,7 +233,10 @@ fn literal(text: &str) -> Result<(String, Option<usize>), String> {
     let (string, after) = rest
         .split_once('"')
         .ok_or_else(|| format!("unterminated string in: {text}"))?;
-    if !string.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+    if !string
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    {
         return Err(format!("unexpected string in: {text}"));
     }
     let length = after
@@ -269,7 +286,9 @@ fn complex(header: &str) -> Result<Vec<String>, String> {
                 continue;
             }
             if line != PREAMBLE[preamble] {
-                return Err(format!("hb_ot_tags_from_complex_language: unexpected `{line}`"));
+                return Err(format!(
+                    "hb_ot_tags_from_complex_language: unexpected `{line}`"
+                ));
             }
             preamble += 1;
             continue;
@@ -287,7 +306,9 @@ fn complex(header: &str) -> Result<Vec<String>, String> {
             pending_prefix = Some(counted(rest)?);
         } else if let Some(rest) = line.strip_prefix("&& subtag_matches (lang_str, limit, ") {
             let c = letter.ok_or("subtag_matches outside a case")?;
-            let prefix = pending_prefix.take().ok_or("subtag_matches without a prefix")?;
+            let prefix = pending_prefix
+                .take()
+                .ok_or("subtag_matches without a prefix")?;
             pattern = Some(format!(
                 "Pattern::PrefixSubtag(b'{c}', \"{prefix}\", \"{}\")",
                 counted(rest)?
@@ -335,7 +356,9 @@ fn complex(header: &str) -> Result<Vec<String>, String> {
                 | "tags[i] = possible_tags[i];"
                 | "*count = i;"
         ) {
-            return Err(format!("hb_ot_tags_from_complex_language: unexpected `{line}`"));
+            return Err(format!(
+                "hb_ot_tags_from_complex_language: unexpected `{line}`"
+            ));
         }
     }
     if pattern.is_some() || !tags.is_empty() || pending_prefix.is_some() {

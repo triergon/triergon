@@ -2,11 +2,11 @@
 //! each stage in order, and which positioning methods run — HarfBuzz's map
 //! builder and shape planner.
 
+use crate::Language;
 use crate::face::Face;
 use crate::ot::digest::Digest;
 use crate::ot::layout::{FeatureSubstitutions, LayoutTable};
 use crate::shapers::{Pause, Shaper};
-use crate::Language;
 use crate::tag::{Direction, Script, Tag};
 use crate::work;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};

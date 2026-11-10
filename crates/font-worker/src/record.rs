@@ -361,8 +361,8 @@ impl Sink for Work {
                 unhinted,
                 hinted,
             } => {
-                let (linear, advance) = unhinted
-                    .map_or((ABSENT, ABSENT), |v| (signed(v.linear), signed(v.advance)));
+                let (linear, advance) =
+                    unhinted.map_or((ABSENT, ABSENT), |v| (signed(v.linear), signed(v.advance)));
                 let hinted = hinted.map_or(ABSENT, |a| signed(a.into()));
                 self.words(&[VERTICAL, index.into(), linear, advance, hinted]);
                 self.packets += 1;
