@@ -3,6 +3,7 @@
 // the strict source Timeline, rather than compatibility timestamps, binds it.
 use super::{SourceContext, TransportFaultRecovery};
 use crate::demux_pes::{DemuxBoundary, DemuxPacket};
+use crate::media_entity::TraceOrigin;
 use crate::{
     FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, TraceEvent, TraceFault, TransportPacket,
 };
@@ -39,6 +40,7 @@ impl TransportTailConfirmation {
 struct TailFault {
     fault: TraceFault,
     diagnostic: SourceContext,
+    issuer: usize,
     end: Option<MediaEntityEnd>,
 }
 #[derive(Debug)]
@@ -269,23 +271,47 @@ impl TransportFaultRecovery {
         Ok(())
     }
 
-    /// Hold a possible final partial carrier or sync-invalid carrier. No EOF
-    /// or success is implied. Further transport is refused until physical EOF
-    /// and source Finished confirm this was the sole final unusable carrier.
+    /// Hold a parser-issued diagnostic for a possible final partial or
+    /// sync-invalid carrier. Physical EOF and Finished from that parser
+    /// must still confirm it was the sole final unusable carrier.
     pub fn hold_terminal_transport(
         &mut self,
-        fault: &TraceFault,
+        observed: &ObservedTrace<TraceEvent>,
+        context: SourceContext,
+    ) -> Result<()> {
+        self.hold_terminal_diagnostic(&observed.event, &observed.origin, context)
+    }
+
+    pub(super) fn hold_terminal_diagnostic(
+        &mut self,
+        event: &TraceEvent,
+        origin: &TraceOrigin,
         context: SourceContext,
     ) -> Result<()> {
         if let Some(error) = self.fault {
             return Err(error);
         }
-        if self.boundaries.source_input.is_none() {
-            return Err(Error::Unsupported(
+        let token = self
+            .boundaries
+            .source_input
+            .as_ref()
+            .ok_or(Error::Unsupported(
                 "terminal transport source input not bound",
+            ))?;
+        let scope = self.scope();
+        if *token != origin.token
+            || origin.source != scope.entity
+            || origin.epochs != context.epochs
+        {
+            return Err(Error::Invalid(
+                "terminal transport diagnostic source mismatch",
             ));
         }
-        let scope = self.scope();
+        let TraceEvent::Diagnostic(fault) = event else {
+            return Err(Error::Unsupported(
+                "terminal transport requires a diagnostic",
+            ));
+        };
         let last = self.boundaries.last_carrier;
         let carrier = match fault.error {
             Error::Truncated => fault.rejected.is_none(),
@@ -326,6 +352,7 @@ impl TransportFaultRecovery {
         self.boundaries.tail = Some(Tail::Pending(TailFault {
             fault: fault.clone(),
             diagnostic: context,
+            issuer: origin.issuer,
             end: None,
         }));
         Ok(())
@@ -372,6 +399,7 @@ impl TransportFaultRecovery {
             _ => false,
         };
         if tail.end.is_some()
+            || end.issuer != tail.issuer
             || end.program != scope.program
             || end.format != PacketFormat::Ts188
             || end.epochs != scope.epochs
@@ -429,6 +457,7 @@ impl TransportFaultRecovery {
             .ok_or(Error::Invalid("terminal transport requires physical End"))?;
         if event.origin.issuer != end.issuer
             || event.origin.token != end.token
+            || event.origin.source != end.location.source
             || event.origin.epochs != context.epochs
             || context.epochs != tail.diagnostic.epochs
             || context.byte_run_epoch.is_some()

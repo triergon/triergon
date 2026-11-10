@@ -905,6 +905,69 @@ fn actual_other_core_cursor_cannot_supply_end() {
     assert!(finish(&mut v, &mut other).is_err());
 }
 #[test]
+fn another_request_on_the_same_cursor_cannot_complete_the_first() {
+    let budget = Budget::new(8 * 1024 * 1024).unwrap();
+    let mut run = source(BAD_CRC, &budget);
+    let mut view = view(&budget);
+    let end = run
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::End(end) => Some(end.clone()),
+            Item::Event(..) => None,
+        })
+        .unwrap();
+    let old_token = run.input.token();
+    run.input
+        .continue_source(
+            end.location.source,
+            SourceCapabilities {
+                length: Some(end.location.offset),
+                random_access: true,
+            },
+        )
+        .unwrap();
+    let request = run.input.request_range(end.location.offset).unwrap();
+    run.input
+        .finish(request.source, request.token.clone())
+        .unwrap();
+    assert_eq!(old_token.generation(), request.token.generation());
+    assert_ne!(old_token, request.token);
+
+    assert!(feed(&mut view, &run.items[0], &mut run.input).unwrap());
+    let Item::Event(event, context, origin) = &run.items[1] else {
+        panic!("expected a second observed control event");
+    };
+    // Hold the issuer and all other facts constant to exercise the token check.
+    let mut later_origin = origin.clone();
+    later_origin.token = request.token.clone();
+    let mut work = WorkBudget::new(u64::MAX);
+    let cancel = AtomicBool::new(false);
+    assert_eq!(
+        view.observe_traced(event, &later_origin, *context, &mut work, &cancel),
+        Err(Error::Invalid("packet completion trace source mismatch"))
+    );
+    for item in run
+        .items
+        .iter()
+        .skip(1)
+        .take_while(|item| !matches!(item, Item::End(_)))
+    {
+        assert!(feed(&mut view, item, &mut run.input).unwrap());
+    }
+
+    let mut later_end = end;
+    later_end.token = request.token;
+    assert_eq!(
+        view.seal_physical_end(&later_end, &mut run.input, &mut work, &cancel),
+        Err(Error::Invalid(
+            "packet completion actual core/framer End mismatch"
+        ))
+    );
+    assert!(view.physical_end.is_none());
+}
+
+#[test]
 fn source_finished_without_actual_physical_end_is_refused() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let mut run = source(BAD_CRC, &b);

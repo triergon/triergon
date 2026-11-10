@@ -619,7 +619,7 @@ impl PacketCompletion {
             || self.origin.as_ref().is_some_and(|first| {
                 first.issuer != origin.issuer
                     || first.source != origin.source
-                    || first.token.generation() != origin.token.generation()
+                    || first.token != origin.token
             })
         {
             return Err(Error::Invalid("packet completion trace source mismatch"));
@@ -787,9 +787,11 @@ impl PacketCompletion {
         if !self.budget.same_pool(input.budget()) || !self.budget.same_pool(&end.budget) {
             return Err(Error::ForeignPool);
         }
-        if self.origin.as_ref().is_none_or(|origin| {
-            origin.issuer != end.issuer || origin.token.generation() != end.token.generation()
-        }) || end.program != self.program
+        if self
+            .origin
+            .as_ref()
+            .is_none_or(|origin| origin.issuer != end.issuer || origin.token != end.token)
+            || end.program != self.program
             || end.format != self.format
             || Some(input.source()) != self.source
             || end.location.source != input.source()

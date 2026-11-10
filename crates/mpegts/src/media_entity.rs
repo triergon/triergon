@@ -12,6 +12,11 @@ impl<T> ObservedTrace<T> {
     pub fn event(&self) -> &T {
         &self.event
     }
+
+    /// Consume the witness and keep its source event.
+    pub fn into_event(self) -> T {
+        self.event
+    }
 }
 
 #[derive(Clone, Debug)]

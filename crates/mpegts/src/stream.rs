@@ -748,7 +748,7 @@ impl TransportStream {
         Ok(())
     }
 
-    fn trace_origin(&self, input: &InputCursor) -> Result<TraceOrigin> {
+    pub(crate) fn trace_origin(&self, input: &InputCursor) -> Result<TraceOrigin> {
         if !self.budget.same_pool(input.budget()) {
             return Err(Error::ForeignPool);
         }

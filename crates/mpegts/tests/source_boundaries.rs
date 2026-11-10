@@ -9,8 +9,8 @@ use triergon_mpegts::compat::pes::{
     SourceContext, TransportFaultRecovery, TransportObservation,
 };
 use triergon_mpegts::{
-    AssemblyStep, MediaEntityEnd, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TraceFault,
-    TransportStream,
+    AssemblyStep, MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits, SourceEpochs,
+    TraceEvent, TransportStream,
 };
 
 const TIMELINE: &[u8] = include_bytes!("data/pcr-timeline-discontinuity.ts");
@@ -85,12 +85,13 @@ impl Source {
             grant,
         }
     }
-    fn next(&mut self) -> triergon_core::Result<Step<TraceEvent>> {
+    fn next_observed(&mut self) -> triergon_core::Result<Step<ObservedTrace<TraceEvent>>> {
         for _ in 0..100_000 {
-            match self
-                .stream
-                .poll(&mut self.input, &mut WorkBudget::new(self.grant), &RUN)?
-            {
+            match self.stream.poll_observed(
+                &mut self.input,
+                &mut WorkBudget::new(self.grant),
+                &RUN,
+            )? {
                 Step::NeedInput(r) => {
                     let start = r.offset as usize;
                     if start == self.bytes.len() {
@@ -115,6 +116,15 @@ impl Source {
         }
         panic!("bounded source did not advance");
     }
+    fn next(&mut self) -> triergon_core::Result<Step<TraceEvent>> {
+        Ok(match self.next_observed()? {
+            Step::Ready(observed) => Step::Ready(observed.into_event()),
+            Step::End(location) => Step::End(location),
+            Step::NeedInput(request) => Step::NeedInput(request),
+            Step::Yield => Step::Yield,
+            Step::Backpressure(never) => match never {},
+        })
+    }
     fn context(&self) -> SourceContext {
         SourceContext {
             source_event_ordinal: self.ordinal - 1,
@@ -129,7 +139,7 @@ impl Source {
             .unwrap()
             .unwrap()
     }
-    fn finished(&mut self) -> (triergon_mpegts::ObservedTrace<()>, SourceContext) {
+    fn finished(&mut self) -> (ObservedTrace<()>, SourceContext) {
         self.stream.end_of_source().unwrap();
         let Step::Ready(event) = self.next().unwrap() else {
             panic!("no source Finished")
@@ -262,7 +272,7 @@ fn tail(
     Source,
     TransportFaultRecovery,
     Vec<DemuxPacket>,
-    TraceFault,
+    ObservedTrace<TraceEvent>,
     SourceContext,
 ) {
     tail_from_source(pool, Source::new(data, pool, 1, 1))
@@ -274,23 +284,23 @@ fn tail_from_source(
     Source,
     TransportFaultRecovery,
     Vec<DemuxPacket>,
-    TraceFault,
+    ObservedTrace<TraceEvent>,
     SourceContext,
 ) {
     let mut observer = policy(pool, options());
     observer.bind_source_input(&source.input).unwrap();
     let mut packets = Vec::new();
     loop {
-        let Step::Ready(event) = source.next().unwrap() else {
+        let Step::Ready(observed) = source.next_observed().unwrap() else {
             panic!("no source fault")
         };
         let context = source.context();
-        match event {
+        match observed.event() {
             TraceEvent::Transport(packet) if packet.pid == 256 => {
-                observer.push(packet, context).unwrap();
+                observer.push(packet.clone(), context).unwrap();
                 packets.extend(drain(&mut observer, 1).unwrap());
             }
-            TraceEvent::Diagnostic(fault) => return (source, observer, packets, fault, context),
+            TraceEvent::Diagnostic(_) => return (source, observer, packets, observed, context),
             _ => {}
         }
     }
@@ -568,8 +578,11 @@ fn terminal_fault_needs_real_eof_and_finished_and_retries_without_allocating() {
             );
             assert_eq!(pool.used(), used);
             let confirmation = observer.terminal_confirmation().unwrap();
-            assert_eq!(confirmation.source_fault().error, fault.error);
-            assert_eq!(confirmation.source_fault().location, fault.location);
+            let TraceEvent::Diagnostic(diagnostic) = fault.event() else {
+                panic!("expected the staged diagnostic");
+            };
+            assert_eq!(confirmation.source_fault().error, diagnostic.error);
+            assert_eq!(confirmation.source_fault().location, diagnostic.location);
             assert_eq!(confirmation.physical_end(), end.location());
             assert_eq!(confirmation.source_finished(), context);
             observer.end_of_source().unwrap();
@@ -587,9 +600,9 @@ fn terminal_fault_needs_real_eof_and_finished_and_retries_without_allocating() {
 }
 
 #[test]
-fn wrong_context_and_transport_faults_cannot_select_terminal_completion() {
+fn wrong_context_or_foreign_diagnostic_cannot_select_terminal_completion() {
     let pool = Budget::new(1 << 20).unwrap();
-    let (_, mut observer, _, fault, context) = tail(&pool, PARTIAL);
+    let (source, mut observer, _, fault, context) = tail(&pool, PARTIAL);
     for invalid in [
         SourceContext {
             source_event_ordinal: 0,
@@ -606,29 +619,18 @@ fn wrong_context_and_transport_faults_cannot_select_terminal_completion() {
     ] {
         assert!(observer.hold_terminal_transport(&fault, invalid).is_err());
     }
-    for error in [
-        Error::Invalid("reserved adaptation control"),
-        Error::Invalid("PES start prefix"),
-        Error::Cancelled,
-        Error::Allocation,
-        Error::Backpressure {
-            requested: 1,
-            available: 0,
-        },
-    ] {
-        let mut other = fault.clone();
-        other.error = error;
-        assert!(observer.hold_terminal_transport(&other, context).is_err());
-    }
-    let mut other = fault.clone();
-    other.location.offset += 1;
-    assert!(observer.hold_terminal_transport(&other, context).is_err());
-    other = fault.clone();
-    other.location.source = SourceId(2);
-    assert!(observer.hold_terminal_transport(&other, context).is_err());
+    let (_, _, _, other, other_context) = tail(&pool, PARTIAL);
+    assert_eq!(
+        observer.hold_terminal_transport(&other, other_context),
+        Err(Error::Invalid(
+            "terminal transport diagnostic source mismatch"
+        ))
+    );
     let mut empty = policy(&pool, options());
+    empty.bind_source_input(&source.input).unwrap();
     assert!(empty.hold_terminal_transport(&fault, context).is_err());
     let mut disabled = policy(&pool, PesFaultPolicy::default());
+    disabled.bind_source_input(&source.input).unwrap();
     assert!(disabled.hold_terminal_transport(&fault, context).is_err());
     observer.hold_terminal_transport(&fault, context).unwrap();
 }
@@ -944,13 +946,13 @@ fn terminal_input_binding_cannot_be_added_after_carriers_or_replaced() {
     let mut source = Source::new(SYNC, &pool, 4096, 4096);
     let mut unbound = policy(&pool, options());
     loop {
-        let Step::Ready(event) = source.next().unwrap() else {
+        let Step::Ready(observed) = source.next_observed().unwrap() else {
             panic!("no terminal diagnostic");
         };
         let context = source.context();
-        match event {
+        match observed.event() {
             TraceEvent::Transport(packet) if packet.pid == 256 => {
-                unbound.push(packet, context).unwrap();
+                unbound.push(packet.clone(), context).unwrap();
                 drain(&mut unbound, 1).unwrap();
                 assert_eq!(
                     unbound.bind_source_input(&source.input),
@@ -959,9 +961,9 @@ fn terminal_input_binding_cannot_be_added_after_carriers_or_replaced() {
                     ))
                 );
             }
-            TraceEvent::Diagnostic(fault) => {
+            TraceEvent::Diagnostic(_) => {
                 assert_eq!(
-                    unbound.hold_terminal_transport(&fault, context),
+                    unbound.hold_terminal_transport(&observed, context),
                     Err(Error::Unsupported(
                         "terminal transport source input not bound"
                     ))

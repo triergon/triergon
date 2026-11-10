@@ -330,6 +330,7 @@ impl Session {
         event: &TraceEvent,
         cause: Cause,
         quarantined: bool,
+        hold_terminal: impl FnOnce(&mut TransportFaultRecovery) -> triergon_core::Result<()>,
     ) -> triergon_core::Result<()> {
         let unrouted = || Error::Unsupported(UNROUTED);
         let boundary_error = |error| match error {
@@ -429,10 +430,7 @@ impl Session {
                         Error::Truncated | Error::Invalid("TS sync byte")
                     ) =>
             {
-                self.observer
-                    .as_mut()
-                    .ok_or_else(unrouted)?
-                    .hold_terminal_transport(fault, cause.context()?)
+                hold_terminal(self.observer.as_mut().ok_or_else(unrouted)?)
                     .map_err(boundary_error)?;
             }
             TraceEvent::Diagnostic(fault)
@@ -746,6 +744,7 @@ fn packet_operation(
                         observed.event(),
                         cause,
                         observed.clock_is_quarantined(),
+                        |observer| observed.hold_terminal_transport(observer),
                     ),
                     Ok(Some(
                         MalformedSourceDisposition::AwaitDiagnostic
@@ -850,7 +849,7 @@ fn sequence_operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> 
     let mut ordinal = 0_u64;
     let mut logical_eof = None;
     loop {
-        let step = match demux.poll(&mut input, &mut WorkBudget::new(WORK), cancel) {
+        let step = match demux.poll_observed(&mut input, &mut WorkBudget::new(WORK), cancel) {
             Ok(step) => step,
             Err(error) => {
                 let cause = Cause::boundary(
@@ -863,19 +862,21 @@ fn sequence_operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> 
             }
         };
         match step {
-            Step::Ready(event) => {
-                let cause = Cause::event(&event, ordinal, input.source(), demux.source_epochs());
+            Step::Ready(observed) => {
+                let event = observed.event();
+                let cause = Cause::event(event, ordinal, input.source(), demux.source_epochs());
                 ordinal += 1;
                 if let Err(error) = session.observe(
                     &input,
                     request.program,
-                    &event,
+                    event,
                     cause,
                     demux.clock_is_quarantined(),
+                    |observer| observer.hold_terminal_transport(&observed, cause.context()?),
                 ) {
                     return Ok(session.refusal(&error, cause));
                 }
-                if let Err(error) = session.drain_after_event(&event, cancel) {
+                if let Err(error) = session.drain_after_event(event, cancel) {
                     return Ok(session.refusal(&error, cause));
                 }
                 if matches!(event, TraceEvent::Finished) {

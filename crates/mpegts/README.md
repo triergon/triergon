@@ -88,10 +88,10 @@ packets before one final partial or sync-invalid TS188 carrier. Its original
 transport diagnostic must immediately follow the last admitted carrier, with no
 unfinished PES. Bind the original core cursor with `bind_source_input` before
 admitting any carrier. Late binding and replacement bindings are refused. The
-same pool, source, generation and sequential request must supply both terminal
-confirmations; a fresh cursor cannot replace a failed one. `hold_terminal_transport`
-only stages that diagnostic. Real
-`TransportStream::media_entity_end` and core EOF must seal the exact final extent
+diagnostic and both terminal confirmations must come from the same parser,
+pool, source and cursor request. `hold_terminal_transport` stages a diagnostic
+issued by that parser. Real `TransportStream::media_entity_end` and core EOF
+must seal the exact final extent
 through `seal_terminal_end`, followed by source `Finished` and another core EOF
 check through `confirm_terminal_finished`. Only then does `terminal_confirmation`
 expose a `TransportTailConfirmation` and permit logical completion. The diagnostic

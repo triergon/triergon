@@ -106,6 +106,12 @@ impl MalformedSourceEvent<'_> {
     pub fn clock_is_quarantined(&self) -> bool {
         self.completion.stream.clock_is_quarantined()
     }
+
+    /// Stage this source's terminal diagnostic in its transport observer.
+    pub fn hold_terminal_transport(&self, observer: &mut TransportFaultRecovery) -> Result<()> {
+        let origin = self.completion.stream.trace_origin(self.input)?;
+        observer.hold_terminal_diagnostic(&self.event, &origin, self.context)
+    }
     pub fn required_work(&self) -> Result<u64> {
         MalformedInputCompletion::required_work(&self.event)
     }
