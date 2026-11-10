@@ -520,7 +520,10 @@ impl TransportFramer {
             }
             // Inspect complete buffered carriers directly for common flags/PCR
             // layouts. Other fields use the incremental inspector.
-            if self.buffered_carrier != BufferedCarrier::Carry
+            let tight_copy = self.buffered_carrier == BufferedCarrier::Carry
+                && carry.capacity() == 0
+                && work.remaining() >= missing as u64 + 2;
+            if (tight_copy || self.buffered_carrier != BufferedCarrier::Carry)
                 && carry.is_empty()
                 && input.buffered().len() >= missing
                 && work.remaining() >= missing as u64
@@ -534,24 +537,33 @@ impl TransportFramer {
                         Self::share_progressive_window(&mut self.progressive_windows, input)
                     }
                 };
-                if share || self.buffered_carrier == BufferedCarrier::Progressive {
-                    let start = input.position();
-                    let source = if share {
-                        let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
-                            return Err(Error::Invalid("buffered carrier span missing"));
-                        };
-                        source
-                    } else {
-                        // Preserve only the tight carrier if a shared window
-                        // cannot be replaced. Allocate before advancing input.
-                        let source =
-                            Bytes::copy_from_slice(&self.budget, &input.buffered()[..missing])?;
-                        if !matches!(input.read_discard(missing, work, cancel)?, Step::Ready(read) if read == missing)
-                        {
-                            return Err(Error::Invalid("buffered carrier extent changed"));
-                        }
-                        source
+                let start = input.position();
+                let source = if share {
+                    let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
+                        return Err(Error::Invalid("buffered carrier span missing"));
                     };
+                    Some(source)
+                } else if tight_copy || self.buffered_carrier == BufferedCarrier::Progressive {
+                    // Reserve the carrier and its shared header together. If
+                    // pressure blocks the tight copy, keep the usual carry retry.
+                    match Bytes::copy_from_slice(&self.budget, &input.buffered()[..missing]) {
+                        Ok(source) => {
+                            if !matches!(input.read_discard(missing, work, cancel)?, Step::Ready(read) if read == missing)
+                            {
+                                return Err(Error::Invalid("buffered carrier extent changed"));
+                            }
+                            if tight_copy {
+                                work.take(2); // The carry reserve and freeze work.
+                            }
+                            Some(source)
+                        }
+                        Err(Error::Backpressure { .. }) if tight_copy => None,
+                        Err(error) => return Err(error),
+                    }
+                } else {
+                    None
+                };
+                if let Some(source) = source {
                     self.next = Some(input.position());
                     if !cancel.load(Ordering::Relaxed)
                         && let Some(carrier) =

@@ -201,7 +201,8 @@ The startup probe scores sync bytes in groups while charging each inspected
 byte. Complete TS188 and M2TS192 carriers use one validator for common
 payload and adaptation layouts, including PCR. M2TS prefixes stay opaque.
 Program playback keeps tight carrier storage so a packet cannot retain an
-entire input window. The PES observer checks that the payload is the exact
+entire input window. A complete buffered carrier can reserve its storage and
+shared header together. The PES observer checks that the payload is the exact
 span at its declared offset in that carrier. A ready PES continuation can
 retain just the payload view while playback delivers the full transport event.
 
