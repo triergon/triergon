@@ -53,6 +53,9 @@ commands:
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
+  check-revisions
+                 every commit docs/status.md cites is reachable from HEAD (needs the
+                 full history)
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
   progressive    compare all five forward-only AVC/AAC TS188 feeds; --help for measurement options
   fixture        write one corpus variant (see `cargo xtask fixture --help`)
@@ -158,6 +161,7 @@ fn main() -> ExitCode {
         Some("check-links") => check_links(&root),
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
+        Some("check-revisions") => check_revisions(&root),
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
@@ -351,6 +355,12 @@ fn check_links(root: &Path) -> Task {
 
 fn check_design(root: &Path) -> Task {
     let summary = checks::design(root).map_err(|errors| errors.join("\n"))?;
+    println!("{summary}");
+    Ok(())
+}
+
+fn check_revisions(root: &Path) -> Task {
+    let summary = checks::revisions(root).map_err(|errors| errors.join("\n"))?;
     println!("{summary}");
     Ok(())
 }
@@ -1148,6 +1158,7 @@ fn check(root: &Path) -> Task {
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;
+    check_revisions(root)?;
     run(Command::new("python3")
         .arg("tools/test-core-time.py")
         .current_dir(root))
