@@ -17780,6 +17780,16 @@
      "sha256": "5bc0b798e75f9fd56c3bbc83615cc9bb98abc0a5b2dd1795d5dd0e3b76589ba9"
     }
    ]
+  },
+  {
+   "name": "matroska-audio-startup",
+   "path": "matroska-audio-startup",
+   "retention": "retained",
+   "reason": "Matroska audio-clock results in docs/status.md, with the native AArch64 comparison against the reference and main, identical-worker controls, startup and seek parity, and the separate legacy AAC comparison.",
+   "key": "evidence/matroska-audio-startup/a86113187261d0a8b1f568b4d8c0149113520274130ca2aa659fa73af330f040.tar.gz",
+   "sha256": "a86113187261d0a8b1f568b4d8c0149113520274130ca2aa659fa73af330f040",
+   "bytes": 77399331,
+   "source_revision": "b81e3b378d2b2102a7c46545ec89b9b6c345dfa1"
   }
  ]
 }
