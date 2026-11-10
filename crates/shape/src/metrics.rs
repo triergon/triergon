@@ -125,7 +125,7 @@ fn unless_unloadable<T>(result: Result<T>, otherwise: T) -> Result<T> {
 
 /// The font functions HarfBuzz builds in (`hb-ot`), at a [`Scale`]: the `cmap`
 /// subtable HarfBuzz prefers among the table's raw encoding records, read as
-/// HarfBuzz reads it ([`crate::cmap`]), its variation sequences, `hmtx`
+/// HarfBuzz reads it, its variation sequences, `hmtx`
 /// advances, and extents from the `glyf` header box or the charstring's
 /// control box.
 #[derive(Debug)]
