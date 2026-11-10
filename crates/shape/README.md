@@ -161,10 +161,14 @@ paragraph separator inside the text.
   GPOS whose glyphs use them can differ. libass never asks for these extents.
 - Variable font instances other than the default; the 24-bit "beyond 64K"
   layout formats.
-- Malformed tables are read leniently (an out-of-range structure reads as
-  absent, a count as the records that are present) where HarfBuzz's sanitizer
-  would reject or neuter them, so results on damaged fonts can differ; they
-  never panic.
+- Malformed layout tables are read leniently (an out-of-range structure reads
+  as absent, a count as the records that are present) where HarfBuzz's
+  sanitizer would reject them, so results on damaged fonts can differ; they
+  never panic. `cmap` is the exception: as HarfBuzz's sanitizer, which never
+  edits a table, `OtMetrics` takes a `cmap` with any subtable or
+  variation-sequence table outside it, or whose checks exceed its operation
+  budget, for no table. It reads a Windows Symbol subtable through the OS/2
+  font page's remapping and a Macintosh Roman one through `unicode_to_macroman`.
 
 ## Behaviour and limits
 

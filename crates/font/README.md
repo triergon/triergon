@@ -88,12 +88,11 @@ listed only when FreeType's default validation accepts it (lengths that fit,
 ascending non-overlapping groups for formats 8, 12 and 13, segments that start
 at or before their end, in any order, and in-table glyph arrays for format 4,
 subheaders and glyph arrays inside the table for format 2); then for a CFF face
-(a CID-keyed one's CIDs read as string IDs, as FreeType reads them) without a listed subtable on
-Windows BMP (3, 1) or the Unicode platform, of any format including the
-variation-sequence formats 14 and 15, the Unicode charmap FreeType builds from
-its glyph names when one maps a code point (`CharmapKind::GlyphNames`, (3, 1)):
-each name's code
-point through FreeType's compiled Adobe Glyph List, `uniXXXX` and `uXXXX` forms,
+(a CID-keyed one's CIDs read as string IDs, as FreeType reads them) without a
+listed subtable on Windows BMP (3, 1) or the Unicode platform, of any format
+including the variation-sequence formats 14 and 15, the Unicode charmap
+FreeType builds from its glyph names when one maps a code point
+(`CharmapKind::GlyphNames`, (3, 1)): each name's code point through FreeType's compiled Adobe Glyph List, `uniXXXX` and `uXXXX` forms,
 suffixed names as variants after their base, and FreeType's second mappings for
 `space`, `hyphen`, `Delta` and seven more, looked up with FreeType's own probes
 (which on duplicate names differ between 32- and 64-bit targets as FreeType's
