@@ -12,8 +12,8 @@ use triergon_raster::{
 };
 
 use super::CacheLimits;
-use super::cache::{CacheKey, Kept, Values, sizes};
-use super::outlines::{OutlineId, OutlineValue, Outlines};
+use super::cache::{Cache, CacheKey, Kept, sizes};
+use super::outlines::{KeptOutline, Outlines};
 use super::placement::{GlyphDrawing, PlacedRun, Placer, Runs};
 use super::units::d6_to_double;
 use crate::{Karaoke, Rgba, charge};
@@ -53,10 +53,10 @@ pub(super) struct Combined {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum BitmapSource {
     /// A glyph's or drawing's outline, or the unit square of opaque boxes.
-    Outline(OutlineId),
+    Outline(KeptOutline),
     /// The border stroked around a glyph's outline by a stroke: libass's
     /// border outline, which is one outline for one glyph and stroke.
-    Border(OutlineId, BorderStroke),
+    Border(KeptOutline, BorderStroke),
 }
 
 /// What identifies a bitmap (libass's `BitmapHashKey`): what it is drawn
@@ -86,7 +86,7 @@ impl CacheKey for BitmapKey {
 #[derive(Debug)]
 struct KeptBitmap {
     bitmap: Bitmap,
-    _drawn_from: Option<Kept<OutlineValue>>,
+    _drawn_from: Option<KeptOutline>,
 }
 
 /// A bitmap the bitmap cache keeps, which stays in the cache, counted, as
@@ -181,7 +181,7 @@ struct Drawn {
 pub(super) struct Painter {
     raster: Raster,
     bitmaps: Bitmaps,
-    composites: Values<RunKey, Composited>,
+    composites: Cache<RunKey, Composited>,
     /// The bitmaps of the run being drawn.
     drawn: BudgetVec<Drawn>,
     /// Its composite key's glyphs, made in this storage for every run; they
@@ -195,9 +195,9 @@ impl Painter {
             raster: Raster::new(budget, limits),
             bitmaps: Bitmaps {
                 budget: budget.clone(),
-                cache: Values::new(budget),
+                cache: Cache::new(budget),
             },
-            composites: Values::new(budget),
+            composites: Cache::new(budget),
             drawn: BudgetVec::new(budget),
             glyphs: BudgetVec::new(budget),
         }
@@ -227,7 +227,7 @@ impl Painter {
     /// bitmap without pixels.
     pub(super) fn draw_shape(
         &mut self,
-        outline: &Kept<OutlineValue>,
+        outline: &KeptOutline,
         matrix: &Matrix,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
@@ -235,7 +235,7 @@ impl Painter {
             return Ok(None);
         };
         let key = BitmapKey {
-            source: BitmapSource::Outline(OutlineId(outline.clone())),
+            source: BitmapSource::Outline(outline.clone()),
             transform: at.transform,
         };
         let raster = &mut self.raster;
@@ -405,7 +405,7 @@ impl Painter {
 struct CachedBitmaps<'a> {
     bitmaps: &'a mut Bitmaps,
     outlines: &'a mut Outlines,
-    glyph: &'a Kept<OutlineValue>,
+    glyph: &'a KeptOutline,
     fill: Option<BitmapKey>,
     border: Option<BitmapKey>,
 }
@@ -421,7 +421,7 @@ impl GlyphSource for CachedBitmaps<'_> {
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
         let key = BitmapKey {
-            source: BitmapSource::Outline(OutlineId(self.glyph.clone())),
+            source: BitmapSource::Outline(self.glyph.clone()),
             transform: at.transform,
         };
         let found = self
@@ -444,7 +444,7 @@ impl GlyphSource for CachedBitmaps<'_> {
             return Ok(None);
         };
         let key = BitmapKey {
-            source: BitmapSource::Outline(OutlineId(unit_box.clone())),
+            source: BitmapSource::Outline(unit_box.clone()),
             transform: at.transform,
         };
         let shape = &unit_box.shape;
@@ -470,7 +470,7 @@ impl GlyphSource for CachedBitmaps<'_> {
             return Ok(None);
         };
         let key = BitmapKey {
-            source: BitmapSource::Border(OutlineId(self.glyph.clone()), stroke),
+            source: BitmapSource::Border(self.glyph.clone(), stroke),
             transform: at.transform,
         };
         let shape = &border.shape;
@@ -486,7 +486,7 @@ impl GlyphSource for CachedBitmaps<'_> {
 #[derive(Debug)]
 struct Bitmaps {
     budget: Budget,
-    cache: Values<BitmapKey, KeptBitmap>,
+    cache: Cache<BitmapKey, KeptBitmap>,
 }
 
 impl Bitmaps {
@@ -498,7 +498,7 @@ impl Bitmaps {
         raster: &mut Raster,
         key: BitmapKey,
         shape: &Shape,
-        drawn_from: Option<&Kept<OutlineValue>>,
+        drawn_from: Option<&KeptOutline>,
         at: Quantized,
         work: &mut WorkBudget,
     ) -> Result<PlacedBitmap<SharedBitmap>> {
@@ -537,7 +537,7 @@ impl Bitmaps {
         raster: &mut Raster,
         key: BitmapKey,
         shape: &Shape,
-        drawn_from: Option<&Kept<OutlineValue>>,
+        drawn_from: Option<&KeptOutline>,
         at: Quantized,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {

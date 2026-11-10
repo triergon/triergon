@@ -5,12 +5,13 @@
 //! stroked.
 
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_font::{Font, GlyphId, Orientation};
 use triergon_raster::{BorderStroke, OUTLINE_MAX, Outline, Raster, Shape, Vector, pixels_26_6};
 
-use super::cache::{Cache, CacheKey, Kept, Lookup};
+use super::cache::{Cache, CacheKey, Kept};
 use super::fonts::{FontId, RequestedFont};
 use super::text::{Decorations, DrawingText};
 use crate::{Bold, Drawing, Italic, Limits, charge};
@@ -27,20 +28,39 @@ pub(super) struct OutlineValue {
     pub desc: i32,
 }
 
-/// An outline as libass's caches identify it: by the value, which a key
-/// holds while it is kept, as libass's keys hold theirs.
+/// A built outline the cache keeps. It is identified as libass's caches
+/// identify an outline, by the value, which a key holds while it is kept,
+/// as libass's keys hold theirs: two are equal when they are the same.
 #[derive(Clone, Debug)]
-pub(super) struct OutlineId(pub(super) Kept<OutlineValue>);
+pub(super) struct KeptOutline(Kept<Option<OutlineValue>>);
 
-impl PartialEq for OutlineId {
+impl KeptOutline {
+    /// The outline kept, `None` for one that cannot be built.
+    fn built(kept: Kept<Option<OutlineValue>>) -> Option<Self> {
+        kept.is_some().then_some(Self(kept))
+    }
+}
+
+impl Deref for KeptOutline {
+    type Target = OutlineValue;
+
+    fn deref(&self) -> &OutlineValue {
+        match &*self.0 {
+            Some(value) => value,
+            None => unreachable!("a kept outline is built"),
+        }
+    }
+}
+
+impl PartialEq for KeptOutline {
     fn eq(&self, other: &Self) -> bool {
         Kept::ptr_eq(&self.0, &other.0)
     }
 }
 
-impl Eq for OutlineId {}
+impl Eq for KeptOutline {}
 
-impl Hash for OutlineId {
+impl Hash for KeptOutline {
     fn hash<H: Hasher>(&self, state: &mut H) {
         Kept::as_ptr(&self.0).hash(state);
     }
@@ -49,7 +69,7 @@ impl Hash for OutlineId {
 /// A border outline (libass's `BorderHashKey`): a glyph's outline stroked.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct BorderKey {
-    glyph: OutlineId,
+    glyph: KeptOutline,
     stroke: BorderStroke,
 }
 
@@ -129,7 +149,9 @@ impl CacheKey for OutlineKey {
 #[derive(Debug)]
 pub(super) struct Outlines {
     budget: Budget,
-    cache: Cache<OutlineKey, OutlineValue>,
+    /// `None` for a key whose outline cannot be built, which libass also
+    /// keeps.
+    cache: Cache<OutlineKey, Option<OutlineValue>>,
     scratch: triergon_font::Outline,
 }
 
@@ -153,27 +175,14 @@ impl Outlines {
         self.cache.settle();
     }
 
-    /// The outline kept for `key`, if one is: `Ok(None)` for one that
-    /// cannot be built.
-    fn find(&mut self, key: KeyRef<'_>) -> Option<Result<Option<Kept<OutlineValue>>>> {
-        match self.cache.get(key) {
-            Lookup::Miss => None,
-            Lookup::Empty => Some(Ok(None)),
-            Lookup::Hit(found) => Some(Ok(Some(found))),
-        }
-    }
-
     /// Keeps `value` for `key`, counted as 1; `None` for an outline that
     /// cannot be built.
     fn keep(
         &mut self,
         key: OutlineKey,
         value: Option<OutlineValue>,
-    ) -> Result<Option<Kept<OutlineValue>>> {
-        match value {
-            Some(value) => self.cache.insert(key, value, 1).map(Some),
-            None => self.cache.insert_empty(key, 1).map(|()| None),
-        }
+    ) -> Result<Option<KeptOutline>> {
+        self.cache.insert(key, value, 1).map(KeptOutline::built)
     }
 
     /// The outline of a glyph of `font`, `None` when its face cannot load it.
@@ -182,9 +191,9 @@ impl Outlines {
         glyph: GlyphKey,
         font: &RequestedFont,
         work: &mut WorkBudget,
-    ) -> Result<Option<Kept<OutlineValue>>> {
-        if let Some(found) = self.find(KeyRef::Glyph(&glyph)) {
-            return found;
+    ) -> Result<Option<KeptOutline>> {
+        if let Some(found) = self.cache.get(KeyRef::Glyph(&glyph)) {
+            return Ok(KeptOutline::built(found));
         }
         charge(work, OUTLINE_UNITS)?;
         let source = &font.faces()[glyph.face].font;
@@ -201,17 +210,17 @@ impl Outlines {
     /// it cannot be stroked.
     pub(super) fn border(
         &mut self,
-        glyph: &Kept<OutlineValue>,
+        glyph: &KeptOutline,
         stroke: BorderStroke,
         raster: &mut Raster,
         work: &mut WorkBudget,
-    ) -> Result<Option<Kept<OutlineValue>>> {
+    ) -> Result<Option<KeptOutline>> {
         let key = BorderKey {
-            glyph: OutlineId(glyph.clone()),
+            glyph: glyph.clone(),
             stroke,
         };
-        if let Some(found) = self.find(KeyRef::Border(&key)) {
-            return found;
+        if let Some(found) = self.cache.get(KeyRef::Border(&key)) {
+            return Ok(KeptOutline::built(found));
         }
         let value = match raster.stroke_border(&glyph.shape, &stroke, work)? {
             Some(mut shape) => {
@@ -227,12 +236,13 @@ impl Outlines {
 
     /// The unit square opaque boxes are drawn from, which libass keeps as
     /// an outline (`ass_render.c:1294-1309`, `1423`).
-    pub(super) fn unit_box(&mut self) -> Result<Kept<OutlineValue>> {
-        if let Lookup::Hit(found) = self.cache.get(KeyRef::UnitBox) {
+    pub(super) fn unit_box(&mut self) -> Result<KeptOutline> {
+        if let Some(found) = self.cache.get(KeyRef::UnitBox).and_then(KeptOutline::built) {
             return Ok(found);
         }
         let value = OutlineValue::of_shape(Shape::unit_box(&self.budget)?);
-        self.cache.insert(OutlineKey::UnitBox, value, 1)
+        let kept = self.cache.insert(OutlineKey::UnitBox, Some(value), 1)?;
+        Ok(KeptOutline(kept))
     }
 
     /// The outline of a drawing, `None` when libass discards it.
@@ -241,9 +251,9 @@ impl Outlines {
         drawing: &DrawingText<'_>,
         limits: &Limits,
         work: &mut WorkBudget,
-    ) -> Result<Option<Kept<OutlineValue>>> {
-        if let Some(found) = self.find(KeyRef::Drawing(drawing.text)) {
-            return found;
+    ) -> Result<Option<KeptOutline>> {
+        if let Some(found) = self.cache.get(KeyRef::Drawing(drawing.text)) {
+            return Ok(KeptOutline::built(found));
         }
         // The parser passes over the text once.
         charge(work, OUTLINE_UNITS.saturating_add(drawing.text.len()))?;

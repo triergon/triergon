@@ -12,11 +12,10 @@ use triergon_raster::{
     Border, Effects, FrameScale, GlyphRequest, Placement, Shadow, Vector, pixels_26_6,
 };
 
-use super::cache::Kept;
 use super::collisions;
 use super::geometry::{Geometry, Scales};
 use super::layout::{LaidChar, Layout, TextBox, Timing};
-use super::outlines::OutlineValue;
+use super::outlines::KeptOutline;
 use super::shaping::Shaped;
 use super::text::{Char, GlyphStyle, Text};
 use super::units::d6_to_double;
@@ -312,7 +311,7 @@ fn timing(c: &Char, laid: &LaidChar, first: bool) -> Timing {
 /// What a placed glyph is drawn with.
 #[derive(Debug)]
 pub(super) struct GlyphDrawing<'a> {
-    pub(super) outline: &'a Kept<OutlineValue>,
+    pub(super) outline: &'a KeptOutline,
     placement: Placement,
     effects: Effects,
     /// It is timed by `\kf`, so its run tracks its leftmost x.
