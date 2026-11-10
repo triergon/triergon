@@ -135,6 +135,12 @@ pub enum Record<'a> {
         unhinted: Option<GlyphMetrics>,
         hinted: Option<i32>,
     },
+    /// The default-load metrics and outline; `None` when the glyph cannot be
+    /// loaded.
+    Default {
+        index: u16,
+        loaded: Option<(GlyphMetrics, &'a Outline)>,
+    },
 }
 
 /// Consumes the records of one operation.
@@ -164,6 +170,7 @@ const SCALED_GLYPH: u64 = 23;
 const STYLED: u64 = 24;
 const HINTED: u64 = 25;
 const VERTICAL: u64 = 26;
+const DEFAULT: u64 = 27;
 const ABSENT: u64 = u64::MAX;
 
 const fn point_tag(kind: PointKind) -> u8 {
@@ -372,6 +379,23 @@ impl Sink for Work {
                 self.words(&[VERTICAL, index.into(), linear, advance, hinted]);
                 self.packets += 1;
             }
+            Record::Default { index, loaded } => {
+                self.words(&[DEFAULT, index.into()]);
+                if let Some((m, outline)) = loaded {
+                    self.words(&[
+                        signed(m.advance.into()),
+                        signed(m.vertical_advance.into()),
+                        signed(m.bearing_x.into()),
+                        signed(m.bearing_y.into()),
+                        signed(m.width.into()),
+                        signed(m.height.into()),
+                    ]);
+                    self.outline(outline);
+                } else {
+                    fold(&mut self.digest, ABSENT);
+                    self.packets += 1;
+                }
+            }
         }
         Ok(())
     }
@@ -537,6 +561,17 @@ impl<W: Write> Sink for Dump<W> {
                     None => writeln!(self.0, " error"),
                 }
             }
+            Record::Default { index, loaded } => match loaded {
+                Some((m, outline)) => {
+                    write!(
+                        self.0,
+                        "default {index} {} {} {} {} {} {} ",
+                        m.advance, m.vertical_advance, m.bearing_x, m.bearing_y, m.width, m.height
+                    )?;
+                    self.outline(outline)
+                }
+                None => writeln!(self.0, "default {index} error"),
+            },
         }
     }
 }

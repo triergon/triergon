@@ -1709,6 +1709,44 @@ mod tests {
     }
 
     #[test]
+    fn each_step_is_charged_the_segments_and_groups_it_reads() {
+        // Unsorted format 4: after U+F000, the next step reads every segment
+        // from the first, 32 of them, before it finds nothing.
+        let mut list = vec![(0xf000, 0xf000, 0x1001)];
+        list.extend((0..30).map(|i| (0x20 + i, 0x20 + i, 0)));
+        list.push((0xffff, 0xffff, 1));
+        let data = cmap(&segments(&list));
+        let all: Vec<_> = charmaps(&data, 0x100, u64::MAX)[0].mappings().collect();
+        assert_eq!(all, [Ok((0xf000, GlyphId(1)))]);
+        let limited: Vec<_> = charmaps(&data, 0x100, 10)[0].mappings().collect();
+        assert_eq!(
+            limited,
+            [Ok((0xf000, GlyphId(1))), Err(Error::Policy("font work"))]
+        );
+        // Format 8: the first step reads 30 groups whose glyphs are past the
+        // glyph count before the one that maps.
+        let mut mixed = words(&[8, 0]);
+        let groups: Vec<(u32, u32, u32)> = (0..30)
+            .map(|i| (0x100 + 2 * i, 0x100 + 2 * i, 1000))
+            .chain([(0x200, 0x200, 5)])
+            .collect();
+        mixed.extend((8208 + 12 * groups.len() as u32).to_be_bytes());
+        mixed.extend([0; 4]);
+        mixed.extend([0; 8192]);
+        mixed.extend((groups.len() as u32).to_be_bytes());
+        for (start, end, glyph) in &groups {
+            for v in [start, end, glyph] {
+                mixed.extend(v.to_be_bytes());
+            }
+        }
+        let data = cmap(&mixed);
+        let all: Vec<_> = charmaps(&data, 100, u64::MAX)[0].mappings().collect();
+        assert_eq!(all, [Ok((0x200, GlyphId(5)))]);
+        let limited: Vec<_> = charmaps(&data, 100, 20)[0].mappings().collect();
+        assert_eq!(limited, [Err(Error::Policy("font work"))]);
+    }
+
+    #[test]
     fn coverage_and_many_to_one_groups() {
         let mut subtable = words(&[12, 0]);
         subtable.extend(40_u32.to_be_bytes());

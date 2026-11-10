@@ -147,11 +147,14 @@ paragraph separator inside the text.
   `Error::Unsupported`.
 - `stch` stretching (refused when it would apply) and the Windows-1256 Arabic
   fallback lookups.
-- What libass reads from FreeType's hinted load: `SizedMetrics` gives no glyph
-  extents or contour points (`Unsupported`), but the empty extents of a glyph
-  without points, which every FreeType load gives it, so fallback mark
-  positioning in a font without GPOS marks fails where it measures a glyph with
-  an outline; and no default-load advance that FreeType's auto-hinter sets.
+- What libass reads from FreeType's hinted load of a TrueType glyph:
+  `SizedMetrics` takes glyph extents and contour points from the font crate's
+  default load (`SizedFont::load` with `Load::Default`), which hints CFF, CFF2
+  and CID-keyed glyphs as FreeType does but not TrueType ones (`Unsupported`),
+  but for the empty extents of a glyph without points, which every FreeType load
+  gives it. So fallback mark positioning in a TrueType font without GPOS marks
+  fails where it measures a glyph with an outline; and no default-load advance
+  that FreeType's auto-hinter sets.
   Faces whose character map libass would convert (Windows multibyte encodings)
   are refused.
 - `OtMetrics`'s CFF glyph extents where HarfBuzz's charstring interpreter
@@ -161,10 +164,14 @@ paragraph separator inside the text.
   GPOS whose glyphs use them can differ. libass never asks for these extents.
 - Variable font instances other than the default; the 24-bit "beyond 64K"
   layout formats.
-- Malformed tables are read leniently (an out-of-range structure reads as
-  absent, a count as the records that are present) where HarfBuzz's sanitizer
-  would reject or neuter them, so results on damaged fonts can differ; they
-  never panic.
+- Malformed layout tables are read leniently (an out-of-range structure reads
+  as absent, a count as the records that are present) where HarfBuzz's
+  sanitizer would reject them, so results on damaged fonts can differ; they
+  never panic. `cmap` is the exception: as HarfBuzz's sanitizer, which never
+  edits a table, `OtMetrics` takes a `cmap` with any subtable or
+  variation-sequence table outside it, or whose checks exceed its operation
+  budget, for no table. It reads a Windows Symbol subtable through the OS/2
+  font page's remapping and a Macintosh Roman one through `unicode_to_macroman`.
 
 ## Behaviour and limits
 
@@ -227,9 +234,8 @@ characters.
     and extents, that load's outline for contour points, and
     `FT_KERNING_DEFAULT` kerning. The candidate shapes with `SizedMetrics` over
     `Font::at_size`. This compares device tables, contour-point anchors and
-    FreeType's advances. Nine cases are open: eight in fonts whose default-load
-    advances FreeType's auto-hinter sets, and one CFF font without GPOS whose
-    fallback mark positioning reads hinted glyph extents.
+    FreeType's advances. Eight cases are open, in fonts whose default-load
+    advances FreeType's auto-hinter sets.
   - `shape-text` and `shape-text-all`: the same cases, and every corpus face and
     script (1,768 cases, 103,031 runs; 1,746 and 101,691 before the charmap face
     joined them), with HarfBuzz's built-in font functions

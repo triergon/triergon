@@ -540,10 +540,28 @@ impl<T> BudgetVec<T> {
         Ok(())
     }
 
+    /// Room for `additional` more elements, grown as `try_push` grows: to
+    /// twice the capacity (at least 4) where that is more than needed, and
+    /// exactly what is needed where the budget allows no more. A refused
+    /// charge or allocation leaves the vector as it was.
+    #[inline]
+    pub fn try_reserve(&mut self, additional: usize) -> Result<()> {
+        let needed = self.len().checked_add(additional).ok_or(Error::Overflow)?;
+        if needed <= self.capacity() {
+            return Ok(());
+        }
+        self.grow_amortized(needed)
+    }
+
     #[cold]
     #[inline(never)]
     fn grow_for_push(&mut self) -> Result<()> {
         let needed = self.len().checked_add(1).ok_or(Error::Overflow)?;
+        self.grow_amortized(needed)
+    }
+
+    /// Grows to at least `needed`, geometrically where the budget allows.
+    fn grow_amortized(&mut self, needed: usize) -> Result<()> {
         let target = needed.max(self.capacity().saturating_mul(2).max(4));
         self.grow_to(target).or_else(|error| {
             if target != needed
@@ -729,6 +747,29 @@ pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
 mod tests {
     use super::{BudgetVec, Bytes, BytesView, nonzero_prefix_len};
     use crate::Budget;
+
+    #[test]
+    fn reserving_grows_geometrically_and_exactly_at_the_limit() {
+        // Growth charges the new buffer alongside the old until the copy.
+        let pool = Budget::new(Budget::control_storage_bytes() + 40).unwrap();
+        let mut vec = BudgetVec::<u8>::new(&pool);
+        vec.try_reserve(3).unwrap();
+        assert_eq!(vec.capacity(), 4);
+        vec.try_extend_from_slice(b"abcd").unwrap();
+        vec.try_reserve(1).unwrap();
+        assert_eq!(vec.capacity(), 8);
+        vec.try_extend_from_slice(b"efgh").unwrap();
+        vec.try_reserve(8).unwrap();
+        assert_eq!(vec.capacity(), 16);
+        vec.try_extend_from_slice(&[0; 8]).unwrap();
+        // Doubling to 32 beside the 16 would need 48 of the 40: exactly 17.
+        vec.try_reserve(1).unwrap();
+        assert_eq!(vec.capacity(), 17);
+        assert_eq!(&vec.as_slice()[..8], b"abcdefgh");
+        // Beyond the pool even exactly: refused, and the vector unchanged.
+        assert!(vec.try_reserve(100).is_err());
+        assert_eq!((vec.len(), vec.capacity()), (16, 17));
+    }
 
     #[test]
     fn shrinking_keeps_the_elements_and_returns_the_charge() {

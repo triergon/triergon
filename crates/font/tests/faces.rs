@@ -126,7 +126,7 @@ fn sizes_scale_as_freetype_does_for_libass() {
     assert_eq!(sized.kerning(GlyphId(1), GlyphId(2)), -512);
     // No bytecode: FreeType would auto-hint, which this crate does not.
     assert!(matches!(
-        sized.hinted_advance(GlyphId(1)),
+        sized.default_advance(GlyphId(1)),
         Err(Error::Unsupported(_))
     ));
     let budget = Budget::new(1 << 20).unwrap();
@@ -154,7 +154,7 @@ fn sizes_scale_as_freetype_does_for_libass() {
         &truetype_tables(400, 0, "ABCDEF+PMingLiU", "Regular"),
     ));
     assert_eq!(
-        tricky.at_size(16384).unwrap().hinted_advance(GlyphId(1)),
+        tricky.at_size(16384).unwrap().default_advance(GlyphId(1)),
         Err(Error::Unsupported(
             "hinted advances of a tricky TrueType font"
         ))
@@ -168,13 +168,13 @@ fn sizes_scale_as_freetype_does_for_libass() {
     let metrics = unscaled.outline_into(GlyphId(1), &mut outline).unwrap();
     assert_eq!(outline.points()[2].point, Point::new(250, 200));
     assert_eq!(metrics.advance, 400);
-    assert_eq!(unscaled.hinted_advance(GlyphId(1)), Ok(400));
+    assert_eq!(unscaled.default_advance(GlyphId(1)), Ok(400));
     assert_eq!(face.at_size(1).unwrap().metrics().x_ppem, 0);
 
     let cff = parse(&font(b"OTTO", &cff_tables()));
     let sized = cff.at_size(16384).unwrap();
     // hhea 800 and -200 without OS/2: 410 units are 6717.4 26.6 units, rounded to 105 pixels.
-    assert_eq!(sized.hinted_advance(GlyphId(1)), Ok(6720));
+    assert_eq!(sized.default_advance(GlyphId(1)), Ok(6720));
     assert!(cff.is_postscript());
 }
 

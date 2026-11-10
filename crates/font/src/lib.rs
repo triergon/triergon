@@ -35,7 +35,7 @@ pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
 pub use outline::{Outline, OutlinePoint, Point, PointKind, Segment};
-pub use sized::{Band, SizeMetrics, SizedFont};
+pub use sized::{Band, Load, SizeMetrics, SizedFont};
 pub use store::{Built, Store, StoreKey};
 pub use synthesis::{Orientation, Synthesis};
 
@@ -108,11 +108,21 @@ pub struct VerticalMetrics {
 }
 
 /// What loading a glyph reports besides its outline, at the scale it loads
-/// at. A TrueType composite takes the metrics of its last `USE_MY_METRICS`
-/// component; a CFF FontMatrix scales and offsets the advances.
+/// at, as FreeType's glyph slot reports it. A TrueType composite takes the
+/// metrics of its last `USE_MY_METRICS` component; a CFF FontMatrix scales and
+/// offsets the advances.
+///
+/// Loaded unhinted ([`Font::outline_into`] in font units, [`SizedFont::outline_into`]
+/// or [`SizedFont::load`] with [`Load::Unhinted`] at a size), the advances
+/// are scaled and the box is the outline's exact control box. With
+/// [`Load::Default`], FreeType's default load, the advances are rounded to
+/// whole pixels and the box is fitted outwards to the pixel grid
+/// (`ft_glyphslot_grid_fit_metrics`), unless the size has zero pixels per em,
+/// which loads as unhinted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GlyphMetrics {
-    /// The advance (`advance.x` of FreeType's glyph slot).
+    /// The advance: `advance.x` unhinted, `metrics.horiAdvance` of the
+    /// default load.
     pub advance: i32,
     /// The vertical advance (`metrics.vertAdvance`): the `vmtx` advance
     /// height where the face has vertical metrics
@@ -123,9 +133,47 @@ pub struct GlyphMetrics {
     /// back in font units as a 16-bit value before scaling it again.
     pub vertical_advance: i32,
     /// `linearVertAdvance`: the vertical advance in font units, scaled to
-    /// 16.16 pixels by the size's y scale for a glyph loaded at a size
-    /// ([`SizedFont::outline_into`]).
+    /// 16.16 pixels by the size's y scale for a glyph loaded at a size, by
+    /// either load.
     pub linear_vertical_advance: i64,
+    /// `horiBearingX`: from the origin to the left of the outline's control
+    /// box (every point, off-curve ones too; zero for an outline without
+    /// points).
+    pub bearing_x: i32,
+    /// `horiBearingY`: from the origin up to the top of the control box.
+    pub bearing_y: i32,
+    /// `width`: the control box's width.
+    pub width: i32,
+    /// `height`: the control box's height, positive.
+    pub height: i32,
+}
+
+impl GlyphMetrics {
+    /// The metrics of `advances` and of the control box of `outline`.
+    fn of(advances: Advances, outline: &Outline) -> Result<Self> {
+        let [x_min, y_min, x_max, y_max] = control_box(outline);
+        Ok(Self {
+            advance: glyf::narrow(advances.horizontal)?,
+            vertical_advance: glyf::narrow(advances.vertical)?,
+            linear_vertical_advance: advances.vertical_units,
+            bearing_x: x_min,
+            bearing_y: y_max,
+            width: x_max.wrapping_sub(x_min),
+            height: y_max.wrapping_sub(y_min),
+        })
+    }
+}
+
+/// `FT_Outline_Get_CBox`: the box of every point of `outline`, as `[x_min,
+/// y_min, x_max, y_max]`; zero for an outline without points.
+fn control_box(outline: &Outline) -> [i32; 4] {
+    let mut points = outline.points().iter().map(|p| p.point);
+    let Some(first) = points.next() else {
+        return [0; 4];
+    };
+    points.fold([first.x, first.y, first.x, first.y], |[a, b, c, d], p| {
+        [a.min(p.x), b.min(p.y), c.max(p.x), d.max(p.y)]
+    })
 }
 
 /// A glyph's advances as FreeType's loading computes them at a scale, before
@@ -694,7 +742,8 @@ impl Font {
     /// [`Limits`] and the outline budget's errors. On error the outline holds
     /// whatever was loaded before the failure.
     pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
-        self.load(glyph, Scale::UNITS, outline)
+        let mut work = WorkBudget::new(self.limits.work);
+        self.load(glyph, Scale::UNITS, outline, &mut work)
     }
 
     /// Loads `glyph` as FreeType does without hinting, at the 16.16 `scale` (one
@@ -704,14 +753,14 @@ impl Font {
         glyph: GlyphId,
         scale: Scale,
         outline: &mut Outline,
+        work: &mut WorkBudget,
     ) -> Result<GlyphMetrics> {
         let index = self.check(glyph)?;
         let data = self.data.as_ref();
-        let mut work = WorkBudget::new(self.limits.work);
         let advances = match &self.outlines {
             Outlines::Glyf(table) => {
                 outline.begin(self.limits.points);
-                let m = table.outline(&self.glyf_context(), glyph, scale, outline, &mut work)?;
+                let m = table.outline(&self.glyf_context(), glyph, scale, outline, work)?;
                 let (origin, advances) = self.glyf_advances(m, scale);
                 if origin != 0 {
                     glyf::translate(outline.points_mut(), (-origin, 0))?;
@@ -719,15 +768,11 @@ impl Font {
                 advances
             }
             Outlines::Cff(cff) => {
-                cff.load(data, glyph, scale, outline, &self.limits, &mut work)?;
+                cff.load(data, glyph, scale, outline, &self.limits, work)?;
                 self.cff_advances(cff, glyph, index, scale)?
             }
         };
-        Ok(GlyphMetrics {
-            advance: glyf::narrow(advances.horizontal)?,
-            vertical_advance: glyf::narrow(advances.vertical)?,
-            linear_vertical_advance: advances.vertical_units,
-        })
+        GlyphMetrics::of(advances, outline)
     }
 
     /// The advances of a TrueType glyph whose metrics are `m`, between

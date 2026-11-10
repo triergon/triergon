@@ -17254,6 +17254,16 @@
    "source_revision": "8058a77c444958ba82dcf4b5783720fc9aafe66f"
   },
   {
+   "name": "font-hinting-43c12afa",
+   "path": "font-hinting-43c12afa",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's default load (the CFF driver's hinted outlines and grid-fitted metrics, font-hinting-default) and the shaper's default-load extents and contour points, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at 43c12afa against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64; the first ARMv7 run, whose FreeType reference timed out on one NotoSansCJK case, kept beside the full rerun; the pin-recording probe at febcbac0; and the xtask tests and clippy at 5855bc8a.",
+   "key": "evidence/font-hinting-43c12afa/d3780ba08af7d67ed07ad587056870132b988e6737104ff8343d7cea2496d600.tar.gz",
+   "sha256": "d3780ba08af7d67ed07ad587056870132b988e6737104ff8343d7cea2496d600",
+   "bytes": 170526948,
+   "source_revision": "43c12afaf83f69076d430d830c7f247e51881c3e"
+  },
+  {
    "name": "paired-runner-c21176e0",
    "path": "paired-runner-c21176e0",
    "retention": "retained",
@@ -17472,6 +17482,16 @@
      "sha256": "150549f901a099d5adeb90e87afff6e511eb941a3e10203b5d71016d07a854de"
     }
    ]
+  },
+  {
+   "name": "font-hinting-e551b607",
+   "path": "font-hinting-e551b607",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's default load (font-hinting-default) and the shaper's default-load extents and contour points, merged with main's ASS renderer, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at e551b607 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, the xtask tests, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-hinting-e551b607/8b20bf3d1a9c1e8da9c4d6f497f93d2a5636d8d6a80e531c49f623c98ce42feb.tar.gz",
+   "sha256": "8b20bf3d1a9c1e8da9c4d6f497f93d2a5636d8d6a80e531c49f623c98ce42feb",
+   "bytes": 110210284,
+   "source_revision": "e551b607466657b4d604d8c107cad8735dd09e75"
   },
   {
    "name": "paired-runner-gate-71f03273",
@@ -17790,6 +17810,16 @@
    "sha256": "a86113187261d0a8b1f568b4d8c0149113520274130ca2aa659fa73af330f040",
    "bytes": 77399331,
    "source_revision": "b81e3b378d2b2102a7c46545ec89b9b6c345dfa1"
+  },
+  {
+   "name": "font-hinting-b5319446",
+   "path": "font-hinting-b5319446",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's default load (font-hinting-default), CFF DICT operands read once with 16.16 blends, the hint state kept only when hinting, and the shaper's extents from the one default load, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at b5319446 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the tests of triergon-core and the font, shaping, ASS and rasterising crates, clippy, the xtask tests, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-hinting-b5319446/a6c0e18c8ad7a3dfc38c8d4144c55f364b32b8c4aa4bf63f37b71f0316fd24a8.tar.gz",
+   "sha256": "a6c0e18c8ad7a3dfc38c8d4144c55f364b32b8c4aa4bf63f37b71f0316fd24a8",
+   "bytes": 110214380,
+   "source_revision": "b531944603a96d8fad9a1bb50e99cd538528280e"
   }
  ]
 }

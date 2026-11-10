@@ -21,9 +21,9 @@ fn a_glyph_first_found_through_a_rotating_code_point_advances_vertically() {
     let (budget, font) = vertical_font();
     let sized = font.at_size(16384).expect("size");
     let (across, down) = (GlyphId(28), GlyphId(1));
-    let horizontal = sized.hinted_advance(across).expect("advance");
+    let horizontal = sized.default_advance(across).expect("advance");
     let vertical = sized
-        .hinted_vertical_advance(across)
+        .default_vertical_advance(across)
         .expect("vertical advance");
     assert_ne!(horizontal, vertical);
     let rotations = RefCell::new(GlyphRotations::new(&budget));
@@ -41,7 +41,7 @@ fn a_glyph_first_found_through_a_rotating_code_point_advances_vertically() {
     assert_eq!(metrics.nominal_glyph('a'), Some(down));
     assert_eq!(
         metrics.h_advance(down),
-        Ok(sized.hinted_advance(down).expect("advance"))
+        Ok(sized.default_advance(down).expect("advance"))
     );
     // Extents decide too, and keep a glyph horizontal.
     assert_eq!(metrics.extents(GlyphId(5)), Ok(Some(Extents::default())));

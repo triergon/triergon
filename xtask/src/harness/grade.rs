@@ -1345,6 +1345,7 @@ mod tests {
             ("isobmff-open-index", 1020),
             ("font-outlines", 53),
             ("font-hinting-none", 159),
+            ("font-hinting-default", 53),
             ("font-hinting-modes", 954),
             ("matroska-audio-clocks", 10),
             ("mp4-forward", 39),

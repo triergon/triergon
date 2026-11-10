@@ -36,6 +36,10 @@ const MODES: &[&str] = &["outlines", "advances"];
 /// `@` font, unhinted and of the default load.
 const DEFAULT_MODES: &[&str] = &["outlines", "advances", "vertical"];
 
+/// What libass's shaper reads from the default load at its default size: every
+/// glyph's metrics and hinted outline.
+const DEFAULT_LOAD: &[&str] = &["default"];
+
 /// The cases `cargo xtask check` mutates: one file of each outline format but the
 /// collection, small enough for the dev build within the per-input timeout (the
 /// CJK collection takes about a minute per load there), and the authored fonts.
@@ -82,6 +86,7 @@ fn load(id: &str) -> R<Load> {
     match id {
         "font-outlines" => Ok(Load::Faces),
         "font-hinting-none" => Ok(Load::Sized(DEFAULT_MODES, &[UNHINTED_HEIGHT])),
+        "font-hinting-default" => Ok(Load::Sized(DEFAULT_LOAD, &[UNHINTED_HEIGHT])),
         "font-hinting-modes" => Ok(Load::Sized(MODES, &HINTING_HEIGHTS)),
         _ => Err(format!("{id}: not a font feature")),
     }
@@ -146,6 +151,9 @@ fn note(id: &str) -> &'static str {
         "font-hinting-none" => {
             "Every file of the font corpus as libass 0.17.5 loads it by default (ASS_HINTING_NONE): unhinted outlines at 256 pixels (16384 in 26.6), the FT_LOAD_DEFAULT advances there, and the vertical advances of both loads."
         }
+        "font-hinting-default" => {
+            "Every file of the font corpus at libass 0.17.5's default size of 256 pixels (16384 in 26.6): every glyph's FT_LOAD_DEFAULT metrics and hinted outline, which libass's HarfBuzz callbacks read for advances, extents and contour points."
+        }
         _ => {
             "Every file of the font corpus at the nine other 26.6 heights libass requests when hinting is on: unhinted outlines and FT_LOAD_DEFAULT advances."
         }
@@ -174,10 +182,17 @@ mod tests {
                 .len()
         };
         assert_eq!(
-            ["font-outlines", "font-hinting-none", "font-hinting-modes"].map(|f| (f, count(f))),
+            [
+                "font-outlines",
+                "font-hinting-none",
+                "font-hinting-default",
+                "font-hinting-modes"
+            ]
+            .map(|f| (f, count(f))),
             [
                 ("font-outlines", 53),
                 ("font-hinting-none", 159),
+                ("font-hinting-default", 53),
                 ("font-hinting-modes", 954)
             ]
         );

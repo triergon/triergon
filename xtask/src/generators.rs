@@ -801,7 +801,10 @@ mod tests {
     fn compare_selects_features_by_their_contracts_gate() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let [fonts, shape, raster, ass] = GENERATORS;
-        assert_eq!(compared(fonts, &[]), ["font-outlines", "font-hinting-none"]);
+        assert_eq!(
+            compared(fonts, &[]),
+            ["font-outlines", "font-hinting-none", "font-hinting-default"]
+        );
         assert_eq!(compared(fonts, &["--all"]), fonts.features(root).unwrap());
         assert_eq!(
             compared(shape, &[]),

@@ -341,10 +341,13 @@ fn trimmed(t: Data<'_>, array: usize, first: u32, count: u32, code: u32) -> Opti
 }
 
 /// `unicode_to_macroman`: zero for a code point Macintosh Roman lacks.
+///
+/// HarfBuzz compares the 32-bit code point through a 16-bit pointer
+/// (`_hb_cmp_operator<uint16_t, uint16_t>`), so on the little-endian targets
+/// this crate supports it reads the low 16 bits, and a code point above
+/// U+FFFF maps as its low 16 bits do.
 fn macroman(u: u32) -> u32 {
-    let Ok(u) = u16::try_from(u) else {
-        return 0;
-    };
+    let u = u as u16;
     bsearch(MACROMAN.len(), |i| MACROMAN[i].0.cmp(&u)).map_or(0, |i| u32::from(MACROMAN[i].1))
 }
 
@@ -500,6 +503,9 @@ mod tests {
             (macroman(0xE9), macroman(0x41), macroman(0x1_0000)),
             (0x8E, 0, 0)
         );
+        // Above U+FFFF, the low 16 bits are compared, as HarfBuzz reads them
+        // on a little-endian target.
+        assert_eq!((macroman(0x1_00E9), macroman(0x1_F8FF)), (0x8E, 0xF0));
         // 'é' through a Macintosh Roman subtable mapping 0x8E.
         let mut format0 = vec![0, 0, 1, 6, 0, 0];
         format0.extend([0; 256]);

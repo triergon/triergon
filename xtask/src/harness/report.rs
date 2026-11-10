@@ -1233,6 +1233,7 @@ mod prefix_tests {
         assert_eq!(
             found,
             [
+                ("font-hinting-default", "font-sized-", 53),
                 ("font-hinting-modes", "font-sized-", 954),
                 ("font-hinting-none", "font-sized-", 159),
                 ("font-outlines", "font-", 53),
