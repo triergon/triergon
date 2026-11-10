@@ -38,8 +38,9 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
             harness/features/<feature>/pins.json) to DIR/<feature>/corpus.json
             (default .research/fonts/manifests); with --record, first re-record
             every pin from the built FreeType reference
-  tables    regenerate the PostScript glyph-name tables of triergon-font from
-            the unpacked FreeType release; --check fails if they would change
+  tables    regenerate the PostScript glyph-name and auto-hinter tables of
+            triergon-font from the unpacked FreeType release; --check fails if
+            they would change
   compare   `cargo xtask report` on each required font feature (font-outlines,
             font-hinting-none, font-hinting-default), with --all also on
             font-hinting-modes; further report options pass through, and each
