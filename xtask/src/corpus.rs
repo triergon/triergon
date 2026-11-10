@@ -189,13 +189,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     ]
     .into_iter()
     .map(|(id, file, data, seek, packets, bytes, digest)| {
-        mp4_range_case(
-            id,
-            file,
-            data,
-            seek,
-            (packets, bytes, digest),
-        )
+        mp4_range_case(id, file, data, seek, (packets, bytes, digest))
     })
     .collect();
     cases.extend(mp4_range_entries(paths, &output)?);
