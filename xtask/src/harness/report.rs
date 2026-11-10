@@ -75,8 +75,15 @@ fn measure_pinned(
     check: impl Fn() -> Result<Option<&'static str>, String>,
     measure: impl FnOnce() -> Result<Value, String>,
 ) -> Result<Value, String> {
-    if let Some(status) = check()? {
-        return Ok(Value::object([("status", Value::str(status))]));
+    match check() {
+        Ok(None) => (),
+        Ok(Some(status)) => return Ok(Value::object([("status", Value::str(status))])),
+        Err(error) => {
+            return Ok(Value::object([
+                ("status", Value::str("input-check-failed")),
+                ("input_error", Value::str(error)),
+            ]));
+        }
     }
     let result = measure()?;
     match check() {
@@ -1133,6 +1140,28 @@ mod prefix_tests {
         assert!(result.get("invalidated_measurement").is_some());
         std::fs::remove_file(root.join("next.ts")).unwrap();
         std::fs::remove_dir(root).unwrap();
+    }
+
+    #[test]
+    fn unreadable_input_before_memory_keeps_the_completed_timing_row() {
+        let timing = measure_pinned(
+            || Ok(None),
+            || Ok(Value::object([("status", Value::str("measured"))])),
+        )
+        .unwrap();
+        let memory = measure_pinned(
+            || Err("input unreadable".into()),
+            || panic!("memory must not run without a verified input"),
+        )
+        .unwrap();
+        let row = Value::object([("timing", timing), ("memory", memory)]);
+        assert_eq!(
+            row.get("timing").and_then(|v| s(v, "status")),
+            Some("measured")
+        );
+        let memory = row.get("memory").unwrap();
+        assert_eq!(s(memory, "status"), Some("input-check-failed"));
+        assert_eq!(s(memory, "input_error"), Some("input unreadable"));
     }
 
     #[test]
