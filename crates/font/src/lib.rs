@@ -532,10 +532,11 @@ impl Font {
 
     /// The face's charmaps in FreeType's order: the `cmap` subtables FreeType
     /// accepts (formats 0, 2, 4, 6, 8, 10, 12 and 13), in directory order;
-    /// then, for a name-keyed CFF face without a Windows BMP or
-    /// Unicode-platform charmap (of any format, 14 and 15 included), the
-    /// Unicode charmap FreeType builds from its glyph names when one maps a
-    /// code point ([`CharmapKind::GlyphNames`]); then, for a name-keyed CFF face whose
+    /// then, for a CFF face without a Windows BMP or Unicode-platform charmap
+    /// (of any format, 14 and 15 included), the Unicode charmap FreeType
+    /// builds from its glyph names when one maps a code point
+    /// ([`CharmapKind::GlyphNames`]), a CID-keyed face's CIDs read as string
+    /// IDs as FreeType reads them; then, for a name-keyed CFF face whose
     /// encoding maps a code, the charmap of its encoding
     /// ([`CharmapKind::CffEncoding`]). FreeType also lists the
     /// variation-sequence subtables of formats 14 and 15, which cannot be

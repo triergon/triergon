@@ -85,9 +85,10 @@ select the record FreeType reports.
 **Character mapping.** FreeType's charmaps in its order (`charmaps`): `cmap`
 formats 0, 2, 4, 6, 8, 10, 12 and 13 on any platform, in directory order, each
 listed only when FreeType's default validation accepts it (lengths that fit,
-ascending non-overlapping groups for formats 8, 12 and 13, ordered segments and
-in-table glyph arrays for format 4, subheaders and glyph arrays inside the table
-for format 2); then for a name-keyed CFF face without a listed subtable on
+ascending non-overlapping groups for formats 8, 12 and 13, segments that start
+at or before their end, in any order, and in-table glyph arrays for format 4,
+subheaders and glyph arrays inside the table for format 2); then for a CFF face
+(a CID-keyed one's CIDs read as string IDs, as FreeType reads them) without a listed subtable on
 Windows BMP (3, 1) or the Unicode platform, of any format including the
 variation-sequence formats 14 and 15, the Unicode charmap FreeType builds from
 its glyph names when one maps a code point (`CharmapKind::GlyphNames`, (3, 1)):
