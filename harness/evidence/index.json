@@ -17073,6 +17073,16 @@
    "sha256": "a3e74e11216d7769b7b167ac57cb17c043e6d92b4feb39a8422879c27493eebe",
    "bytes": 9139663,
    "source_revision": "8bbf6eab798f3d58f62dce14915fb30acd14488e"
+  },
+  {
+   "name": "font-shape-ass-8786192b",
+   "path": "font-shape-ass-8786192b",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape and ass compare at 8786192b against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy and shape ucd --check on AArch64, and the user space's package list.",
+   "key": "evidence/font-shape-ass-8786192b/996b7f0a128c48391f232106246ef9b2cf7f4dd27ce6ec1eb709a68d8d86f008.tar.gz",
+   "sha256": "996b7f0a128c48391f232106246ef9b2cf7f4dd27ce6ec1eb709a68d8d86f008",
+   "bytes": 82936012,
+   "source_revision": "8786192bac7b0abea286ee999c8e03073a6ac796"
   }
  ]
 }

@@ -250,7 +250,8 @@ generator.
 
 The gate covers libass's default configuration, hinting off: unhinted outlines at
 256 pixels and the default-load advances libass's HarfBuzz callbacks read at that
-size (`font-hinting-none`). Two of its cases are open: DejaVuMathTeXGyre and
+size, with the vertical advances of `@` fonts (`font-hinting-none`). Four of its
+cases are open: the advances and vertical cases of DejaVuMathTeXGyre and
 authored-cmap-formats, whose default-load advances FreeType's auto-hinter moves.
 For libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL), the unhinted outlines
 and default-load advances at nine other sizes are only measured
