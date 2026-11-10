@@ -16,7 +16,8 @@
 //! glyph, the reverse charmap of the adjustment database, and each latin
 //! style's metrics in font units, measured when a glyph of the style is
 //! first loaded. Metrics are scaled for each load, which costs a few
-//! dozen multiplications.
+//! dozen multiplications. The storage hinting a glyph needs is kept with the
+//! face too and reused by the next load.
 
 mod hints;
 mod latin;
@@ -25,7 +26,7 @@ mod style;
 #[rustfmt::skip]
 mod tables;
 
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use hints::GlyphHints;
 use latin::Scope;
@@ -55,6 +56,11 @@ pub(crate) struct Scaler {
 pub(crate) struct Autofit {
     budget: Budget,
     globals: OnceLock<Globals>,
+    /// The storage the last load hinted with, for the next one. A load takes
+    /// it out for as long as it hints and puts it back after, so concurrent
+    /// loads of the face never share it: a load that finds none allocates
+    /// its own.
+    scratch: Mutex<Option<Scratch>>,
 }
 
 /// `AF_FaceGlobalsRec`, as the default load needs it.
@@ -76,7 +82,7 @@ struct Globals {
 
 /// What hints a glyph at a size.
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)] // One per load, on the stack.
+#[expect(clippy::large_enum_variant, reason = "one per load, on the stack")]
 enum Hinter {
     Dummy,
     /// The style's metrics, scaled.
@@ -128,11 +134,38 @@ impl Face<'_> {
     }
 }
 
+/// The storage hinting one glyph needs besides the caller's outline.
+#[derive(Debug)]
+struct Scratch {
+    hints: GlyphHints,
+    /// The glyph in font units, for a load that returns only advances.
+    outline: Outline,
+}
+
+impl Scratch {
+    fn new(budget: &Budget) -> Self {
+        Self {
+            hints: GlyphHints::new(budget),
+            outline: Outline::new(budget),
+        }
+    }
+}
+
+/// A glyph loaded at a size, and what hints it.
+struct GlyphLoad<'a> {
+    font: &'a Font,
+    globals: &'a Globals,
+    glyph: GlyphId,
+    scaler: Scaler,
+    hinter: Hinter,
+}
+
 impl Autofit {
     pub(crate) const fn new(budget: Budget) -> Self {
         Self {
             budget,
             globals: OnceLock::new(),
+            scratch: Mutex::new(None),
         }
     }
 
@@ -206,6 +239,38 @@ impl Autofit {
         })
     }
 
+    /// The face's state and the writing system for loading `glyph` at
+    /// `scaler`.
+    fn glyph_load<'a>(
+        &'a self,
+        font: &'a Font,
+        glyph: GlyphId,
+        scaler: Scaler,
+        work: &mut WorkBudget,
+    ) -> Result<GlyphLoad<'a>> {
+        let globals = self.globals(font, work)?;
+        let hinter = self.hinter(globals, font, glyph, scaler, work)?;
+        Ok(GlyphLoad {
+            font,
+            globals,
+            glyph,
+            scaler,
+            hinter,
+        })
+    }
+
+    /// Runs `f` with the face's scratch storage, or with new storage while
+    /// another load holds it, and keeps the storage for the next load.
+    fn with_scratch<T>(&self, f: impl FnOnce(&mut Scratch) -> T) -> T {
+        let kept = self.scratch.lock().ok().and_then(|mut slot| slot.take());
+        let mut scratch = kept.unwrap_or_else(|| Scratch::new(&self.budget));
+        let result = f(&mut scratch);
+        if let Ok(mut slot) = self.scratch.lock() {
+            *slot = Some(scratch);
+        }
+        result
+    }
+
     /// `af_loader_load_glyph` for `FT_LOAD_DEFAULT`: loads `glyph` into
     /// `outline` hinted at `scaler`, moved by the hinted left phantom
     /// point, and returns the glyph slot's metrics: the box of every point
@@ -225,15 +290,9 @@ impl Autofit {
         outline: &mut Outline,
         work: &mut WorkBudget,
     ) -> Result<GlyphMetrics> {
-        let globals = self.globals(font, work)?;
-        let hinter = self.hinter(globals, font, glyph, scaler, work)?;
-        let units = font.load(glyph, Scale::UNITS, outline, work)?;
-        let units = Advances {
-            horizontal: i64::from(units.advance),
-            vertical: i64::from(units.vertical_advance),
-            vertical_units: units.linear_vertical_advance,
-        };
-        let pp = if matches!(hinter, Hinter::Cjk) {
+        let load = self.glyph_load(font, glyph, scaler, work)?;
+        let units = load.load_units(outline, work)?;
+        let pp = if matches!(load.hinter, Hinter::Cjk) {
             // The CJK writing system moves no point of an outline without
             // points, and advances as [`Self::advances`] gives.
             if !outline.points().is_empty() {
@@ -241,22 +300,14 @@ impl Autofit {
             }
             (0, pix_round(mul_fix(units.horizontal, scaler.x_scale)))
         } else {
-            self.hint(
-                globals,
-                font,
-                glyph,
-                &hinter,
-                scaler,
-                units,
-                outline,
-                Scope::Outline,
-                work,
-            )?
+            self.with_scratch(|scratch| {
+                load.hint(&mut scratch.hints, units, outline, Scope::Outline, work)
+            })?
         };
         if pp.0 != 0 {
             glyf::translate(outline.points_mut(), (-pp.0, 0))?;
         }
-        let (horizontal, vertical) = globals.advances(glyph, &hinter, scaler, units, pp);
+        let (horizontal, vertical) = load.advances(units, pp);
         let [x_min, y_min, x_max, y_max] = control_box(outline).map(i64::from);
         let (left, bottom) = (pix_floor(x_min), pix_floor(y_min));
         let (right, top) = (pix_ceil(x_max), pix_ceil(y_max));
@@ -287,62 +338,64 @@ impl Autofit {
         scaler: Scaler,
         work: &mut WorkBudget,
     ) -> Result<(i64, i64)> {
-        let globals = self.globals(font, work)?;
-        let hinter = self.hinter(globals, font, glyph, scaler, work)?;
-        if !matches!(hinter, Hinter::Latin(_)) {
+        let load = self.glyph_load(font, glyph, scaler, work)?;
+        if !matches!(load.hinter, Hinter::Latin(_)) {
             let units = font.unscaled_advances(glyph, work)?;
             let pp2x = mul_fix(units.horizontal, scaler.x_scale);
-            return Ok(globals.advances(glyph, &hinter, scaler, units, (0, pix_round(pp2x))));
+            return Ok(load.advances(units, (0, pix_round(pp2x))));
         }
-        let mut outline = Outline::new(&self.budget);
-        let units = font.load(glyph, Scale::UNITS, &mut outline, work)?;
-        let units = Advances {
+        self.with_scratch(|scratch| {
+            let units = load.load_units(&mut scratch.outline, work)?;
+            let pp = load.hint(
+                &mut scratch.hints,
+                units,
+                &mut scratch.outline,
+                Scope::Advance,
+                work,
+            )?;
+            Ok(load.advances(units, pp))
+        })
+    }
+}
+
+impl GlyphLoad<'_> {
+    /// `FT_Load_Glyph` with `FT_LOAD_NO_SCALE`, as the auto-hinter loads the
+    /// glyph it hints: its outline in font units into `outline`, and its
+    /// advances.
+    fn load_units(&self, outline: &mut Outline, work: &mut WorkBudget) -> Result<Advances> {
+        let units = self.font.load(self.glyph, Scale::UNITS, outline, work)?;
+        Ok(Advances {
             horizontal: i64::from(units.advance),
             vertical: i64::from(units.vertical_advance),
             vertical_units: units.linear_vertical_advance,
-        };
-        let pp = self.hint(
-            globals,
-            font,
-            glyph,
-            &hinter,
-            scaler,
-            units,
-            &mut outline,
-            Scope::Advance,
-            work,
-        )?;
-        Ok(globals.advances(glyph, &hinter, scaler, units, pp))
+        })
     }
 
     /// Hints the glyph loaded in font units into `outline` (for
-    /// [`Scope::Outline`]) and returns the hinted phantom points' x: the
-    /// part of `af_loader_load_glyph` between loading and the metrics.
+    /// [`Scope::Outline`]) with `hints`, whose contents it replaces, and
+    /// returns the hinted phantom points' x: the part of
+    /// `af_loader_load_glyph` between loading and the metrics. `units` are
+    /// the glyph's advances in font units.
     ///
     /// The right phantom point starts at the scaled advance. A glyph
     /// without points keeps both as they are. Otherwise, with two or more
     /// hinted vertical edges, the side bearings follow the outermost edges'
     /// moves, rounded, with a pixel more where rounding would eat a side
     /// bearing; else both points are rounded.
-    #[allow(clippy::too_many_arguments)] // One step of the load.
     fn hint(
         &self,
-        globals: &Globals,
-        font: &Font,
-        glyph: GlyphId,
-        hinter: &Hinter,
-        scaler: Scaler,
+        hints: &mut GlyphHints,
         units: Advances,
         outline: &mut Outline,
         scope: Scope,
         work: &mut WorkBudget,
     ) -> Result<(i64, i64)> {
-        let (x_scale, y_scale) = hinter.scales(scaler);
+        let (x_scale, y_scale) = self.hinter.scales(self.scaler);
         let pp2x = mul_fix(units.horizontal, x_scale);
         if outline.is_empty() {
             return Ok((0, pp2x));
         }
-        let Hinter::Latin(metrics) = hinter else {
+        let Hinter::Latin(metrics) = &self.hinter else {
             // `af_dummy_hints_apply`: the points only scaled.
             if scope == Scope::Outline {
                 for p in outline.points_mut() {
@@ -352,17 +405,16 @@ impl Autofit {
             }
             return Ok((0, pix_round(pp2x)));
         };
-        let mut hints = GlyphHints::new(&self.budget);
         hints.x_scale = x_scale;
         hints.y_scale = y_scale;
-        hints.reload(outline, font.units_per_em(), work)?;
+        hints.reload(outline, self.font.units_per_em(), work)?;
         let info = latin::Glyph {
-            coverage: globals.coverage.entry(glyph.0),
-            adjustment: globals.adjustment(glyph),
-            ppem: scaler.ppem,
-            italic: font.style().italic,
+            coverage: self.globals.coverage.entry(self.glyph.0),
+            adjustment: self.globals.adjustment(self.glyph),
+            ppem: self.scaler.ppem,
+            italic: self.font.style().italic,
         };
-        latin::apply(&mut hints, metrics, info, scope, work)?;
+        latin::apply(hints, metrics, info, scope, work)?;
         if scope == Scope::Outline {
             hints.save(outline)?;
         }
@@ -392,6 +444,31 @@ impl Autofit {
         }
         Ok((pp1x, pp2x))
     }
+
+    /// The advances `af_loader_load_glyph` reports, rounded to whole
+    /// pixels, from the glyph's advances in font units `units` and its
+    /// hinted phantom points `pp`: for a fixed-pitch face, or a digit of a
+    /// style whose digits share one advance, the scaled advance; else the
+    /// distance between the phantom points, an advance of zero staying
+    /// zero; and the vertical advance scaled by the writing system's
+    /// vertical scale.
+    fn advances(&self, units: Advances, (pp1x, pp2x): (i64, i64)) -> (i64, i64) {
+        let (x_scale, y_scale) = self.hinter.scales(self.scaler);
+        let digits_same = match &self.hinter {
+            Hinter::Latin(metrics) => metrics.digits_have_same_width(),
+            Hinter::Dummy | Hinter::Cjk => false,
+        };
+        let digit = self.globals.coverage.entry(self.glyph.0) & DIGIT != 0;
+        let horizontal = if self.globals.fixed_pitch || (digit && digits_same) {
+            mul_fix(units.horizontal, x_scale)
+        } else if units.horizontal != 0 {
+            pp2x - pp1x
+        } else {
+            0
+        };
+        let vertical = mul_fix(units.vertical, y_scale);
+        (pix_round(horizontal), pix_round(vertical))
+    }
 }
 
 impl Globals {
@@ -404,37 +481,5 @@ impl Globals {
             Some((g, code)) if g == glyph.0 => latin::adjustment(code),
             _ => 0,
         }
-    }
-
-    /// The advances `af_loader_load_glyph` reports, rounded to whole
-    /// pixels, from the glyph's advances in font units `units` and its
-    /// hinted phantom points `pp`: for a fixed-pitch face, or a digit of a
-    /// style whose digits share one advance, the scaled advance; else the
-    /// distance between the phantom points, an advance of zero staying
-    /// zero; and the vertical advance scaled by the writing system's
-    /// vertical scale.
-    fn advances(
-        &self,
-        glyph: GlyphId,
-        hinter: &Hinter,
-        scaler: Scaler,
-        units: Advances,
-        (pp1x, pp2x): (i64, i64),
-    ) -> (i64, i64) {
-        let (x_scale, y_scale) = hinter.scales(scaler);
-        let digits_same = match hinter {
-            Hinter::Latin(metrics) => metrics.digits_have_same_width(),
-            Hinter::Dummy | Hinter::Cjk => false,
-        };
-        let digit = self.coverage.entry(glyph.0) & DIGIT != 0;
-        let horizontal = if self.fixed_pitch || (digit && digits_same) {
-            mul_fix(units.horizontal, x_scale)
-        } else if units.horizontal != 0 {
-            pp2x - pp1x
-        } else {
-            0
-        };
-        let vertical = mul_fix(units.vertical, y_scale);
-        (pix_round(horizontal), pix_round(vertical))
     }
 }

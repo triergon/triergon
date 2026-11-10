@@ -253,7 +253,7 @@ pub(super) fn compute_segments(
 /// ended where it starts, as `af_latin_hints_compute_segments` does: with
 /// identical directions the two become one; otherwise the longer one stays,
 /// in `previous`'s place.
-#[allow(clippy::too_many_arguments)] // The state of the segment walk.
+#[expect(clippy::too_many_arguments, reason = "the state of the segment walk")]
 fn merge_segments(
     segments: &mut [Segment],
     previous: usize,
