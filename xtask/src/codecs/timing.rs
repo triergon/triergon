@@ -187,7 +187,7 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("utc", Value::str(python::utc_now())),
         ]);
         let operation = operation(name);
-        let mut started = false;
+        let mut result_file = None;
         let timing = timing_lock.benchmark(
             &options.candidate,
             &options.reference,
@@ -197,18 +197,28 @@ pub fn run(options: &Options) -> Result<(), String> {
             SEED,
             &operation,
             || {
+                let file = fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&raw)
+                    .map_err(|e| format!("{}: {e}", raw.display()))?;
                 set(&mut claims, &key, entry.clone());
-                write_claims(claims_path, &claims)?;
-                started = true;
+                if let Err(error) = write_claims(claims_path, &claims) {
+                    drop(file);
+                    fs::remove_file(&raw)
+                        .map_err(|e| format!("{error}. {}: {e}", raw.display()))?;
+                    return Err(error);
+                }
+                result_file = Some(file);
                 Ok(())
             },
         );
-        if !started {
+        let Some(mut result_file) = result_file else {
             return Err(format!(
                 "{id}: timing setup failed: {}",
                 json::to_python(&timing?, None)
             ));
-        }
+        };
         let timing = timing.unwrap_or_else(|error| {
             Value::object([
                 ("status", Value::str("timing-attempt-failed")),
@@ -274,11 +284,9 @@ pub fn run(options: &Options) -> Result<(), String> {
         result.push(("status".to_owned(), Value::str(state.as_str())));
         result.push(("timing".to_owned(), timing));
         let result = json::to_python(&Value::Object(result), Some(1)) + "\n";
-        fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&raw)
-            .and_then(|mut file| file.write_all(result.as_bytes()))
+        result_file
+            .write_all(result.as_bytes())
+            .and_then(|()| result_file.sync_data())
             .map_err(|e| format!("{}: {e}", raw.display()))?;
         set(&mut entry, "status", Value::str(state.as_str()));
         set(&mut entry, "raw", Value::str(python::path(&raw)));

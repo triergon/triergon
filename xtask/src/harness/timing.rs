@@ -744,8 +744,24 @@ fn benchmark_once(
             }
         }};
     }
+    macro_rules! observe {
+        ($observation:expr) => {
+            match $observation {
+                Ok(value) => value,
+                Err(error) => {
+                    return Ok(status_only(
+                        "timing-environment-invalid",
+                        &samples,
+                        &warmups,
+                        &observations,
+                        vec![("error", Value::str(error))],
+                    ));
+                }
+            }
+        };
+    }
     module_check!("before-timing-session");
-    let busy = competing_builds()?;
+    let busy = observe!(competing_builds());
     if !busy.is_empty() {
         return Ok(status_only(
             "contaminated",
@@ -806,7 +822,7 @@ fn benchmark_once(
             vec![],
         ));
     };
-    let mut before = cpu_snapshot()?;
+    let mut before = observe!(cpu_snapshot());
     let mut watch = ContaminationWatch::new(before.clone());
     let mut values = Vec::new();
     for index in 0..pairs {
@@ -832,7 +848,7 @@ fn benchmark_once(
             *samples.last_mut().expect("row") = Value::Object(row.clone());
             module_check!(format!("after-pair:{index}:{name}"));
         }
-        let after = cpu_snapshot()?;
+        let after = observe!(cpu_snapshot());
         row.push(("cpu_after".into(), after.clone()));
         let row = Value::Object(row);
         let mut busy = active_cpu(&before, &after, false);
@@ -853,7 +869,7 @@ fn benchmark_once(
         }
         before = after;
     }
-    let busy = watch.close()?;
+    let busy = observe!(watch.close());
     if !busy.is_empty() {
         return Ok(status_only(
             "contaminated",
