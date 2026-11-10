@@ -130,11 +130,23 @@ impl PacketFields {
         keyframe: bool,
         discard_padding_ns: i64,
     ) -> Result<Self> {
-        let (pts_ns, duration_ns) = if timing.frames == 1 && timing.duration_ticks.is_none() {
-            // The single frame starts at the integral block time. Its default
-            // duration is already in nanoseconds.
-            let pts = i64::try_from(timing.source_base_ns()?).map_err(|_| Error::Overflow)?;
-            (Some(pts), timing.default_duration_ns)
+        let (pts_ns, duration_ns) = if timing.duration_ticks.is_none() {
+            // The block time and track default are already integral nanoseconds.
+            let base = timing.source_base_ns()?;
+            let pts = match (timing.frame, timing.default_duration_ns) {
+                (0, _) => Some(base),
+                (frame, Some(duration)) => Some(
+                    base.checked_add(i128::from(duration) * i128::from(frame))
+                        .ok_or(Error::Overflow)?,
+                ),
+                (_, None) => None,
+            };
+            (
+                pts.map(i64::try_from)
+                    .transpose()
+                    .map_err(|_| Error::Overflow)?,
+                timing.default_duration_ns,
+            )
         } else {
             let source = timing.source()?;
             (

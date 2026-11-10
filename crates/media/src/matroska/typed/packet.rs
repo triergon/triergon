@@ -7,7 +7,7 @@ use super::{
     syntax::check,
 };
 use crate::matroska::typed::syntax::Required;
-use crate::zlib::typed_restore::{RestoreJob, RestorePlan};
+use crate::zlib::typed_restore::{COPY_CHUNK_BYTES, RestoreJob, RestorePlan};
 use crate::{
     Error, Limits, Result, ebml,
     incremental::ParseStep,
@@ -16,7 +16,7 @@ use crate::{
     timing::BlockTiming,
 };
 use std::{ops::Range, sync::atomic::AtomicBool};
-use triergon_core::{Budget, BudgetVec, Time, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Time, WorkBudget};
 
 /// Shared Block/SimpleBlock syntax. A caller may supply just the actual prefix;
 /// the same failure is retained until full-body parsing by the scan controller.
@@ -638,21 +638,16 @@ impl PacketBatchJob {
                     }
                     let track = &self.live_configuration()?.tracks()[self.track];
                     let laced = frames != 1;
-                    if !laced && track.packet_decoder.is_none() && track.packet_prefix.is_empty() {
+                    let plain = scan_track_is_plain(track);
+                    let range = self.frame_range(self.frame)?;
+                    if !laced && plain {
                         // Exactly RestorePlan::identity's immutable source view.
                         // The same one-unit StartFrame admission and subsequent
                         // loop cancellation/Store work gate remain in force.
-                        let range = self.frame_range(self.frame)?;
                         self.ready = Some(std::mem::take(&mut self.source).into_slice(range)?);
                         self.phase = Phase::Store;
                         continue;
                     }
-                    let plan = if let Some(decoder) = &track.packet_decoder {
-                        RestorePlan::from_decoder(decoder)
-                            .borrow_single_stored(!laced && decoder.is_zlib_only())
-                    } else {
-                        RestorePlan::header(track.packet_prefix.clone())
-                    };
                     let limit = if laced {
                         self.limits
                             .block_bytes
@@ -661,7 +656,30 @@ impl PacketBatchJob {
                     } else {
                         self.limits.block_bytes
                     };
-                    let range = self.frame_range(self.frame)?;
+                    let size = range.len();
+                    if plain
+                        && size <= limit.min(COPY_CHUNK_BYTES)
+                        && work.remaining() >= size as u64 + 3
+                        && let Some(input) = self.source.get(range.clone())
+                    {
+                        check(cancel)?;
+                        if let Ok(bytes) =
+                            Bytes::copy_from_slice(self.live_configuration()?.budget(), input)
+                        {
+                            // Charge transform admission, reserve, bytes and freeze.
+                            // Each lace still owns exactly its restored payload.
+                            work.take(size as u64 + 3);
+                            self.ready = Some(SharedBytes::from_core(bytes));
+                            self.phase = Phase::Store;
+                            continue;
+                        }
+                    }
+                    let plan = if let Some(decoder) = &track.packet_decoder {
+                        RestorePlan::from_decoder(decoder)
+                            .borrow_single_stored(!laced && decoder.is_zlib_only())
+                    } else {
+                        RestorePlan::header(track.packet_prefix.clone())
+                    };
                     self.restore = Some(RestoreJob::new(
                         self.source.slice(range)?,
                         plan,

@@ -119,11 +119,11 @@ for review.
 
 ## Timing and memory
 
-`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280).
+`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280, retried on 281 and 282).
 `cargo xtask codecs memory --candidate target/release/codec-worker --reference
 target/harness/ffmpeg-decode-worker --workloads harness/codecs/file-workloads.json
 --root . --out DIR` measures both workers' `OP-memory` runs under the shared observer
-of `target/harness` (30 pairs, seed 282). Each worker's work is checked first and must
+of `target/harness` (30 pairs, seed 283). Each worker's work is checked first and must
 be equal; the gate is the paired 95% upper bounds of peak heap
 (`heap_ratio_upper_95`) and total resident peak RSS (`total_rss_ratio_upper_95`), both
 below 1.0, on native AArch64 Linux with the gate build. `DIR` keeps every raw

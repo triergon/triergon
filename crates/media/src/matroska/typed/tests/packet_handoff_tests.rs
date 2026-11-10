@@ -246,3 +246,57 @@ fn restored_laces_retry_real_pressure_and_keep_independent_decoded_capacity() {
     drop(packets);
     assert_eq!(pool.used(), baseline);
 }
+
+#[test]
+fn plain_lace_keeps_exact_work_and_independent_frames_across_quanta() {
+    for quantum in [1, 8192] {
+        let pool = Budget::new(128 * 1024).unwrap();
+        let baseline = pool.used();
+        let config = seed_configuration(&pool, &[]);
+        let source =
+            SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x84, 1, b'A', b'B', b'C', b'D'])
+                .unwrap();
+        let original = source.clone();
+        let mut job = packet::PacketBatchJob::new(
+            source,
+            true,
+            5,
+            1_000_000,
+            config,
+            Limits::default(),
+            &pool,
+        )
+        .unwrap();
+        let mut packets = Vec::new();
+        let mut spent = 0;
+        let cancel = AtomicBool::new(false);
+        for _ in 0..100 {
+            let mut work = WorkBudget::new(quantum);
+            let step = job.step(&mut work, &cancel).unwrap();
+            spent += work.spent();
+            match step {
+                ParseStep::Yield => (),
+                ParseStep::Event(packet) => packets.push(packet),
+                ParseStep::Finished => break,
+                other => panic!("plain lace: {other:?}"),
+            }
+        }
+        assert_eq!(spent, 24);
+        assert_eq!(packets.len(), 2);
+        assert_eq!(packets[0].packet.pts_ns, Some(5_000_000));
+        assert_eq!(packets[1].packet.pts_ns, None);
+        for (packet, payload) in packets.iter().zip([b"AB", b"CD"]) {
+            assert_eq!(packet.packet.data.as_ref(), payload);
+            assert_eq!(packet.packet.data.retained_capacity(), 2);
+            assert!(!packet.packet.data.storage.shares_storage_with(&original));
+        }
+        assert!(
+            !packets[0]
+                .packet
+                .data
+                .shares_storage_with(&packets[1].packet.data)
+        );
+        drop((job, original, packets));
+        assert_eq!(pool.used(), baseline);
+    }
+}

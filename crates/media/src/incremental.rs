@@ -767,7 +767,22 @@ impl ElementReader {
                         body.allocated = true;
                     }
                     if let Some(span) = &body.span {
-                        let count = work.take((span.len() - body.copied) as u64) as usize;
+                        let span_work = span.len() as u64;
+                        if body.transfer == BodyTransfer::Copy
+                            && span.len() == body.target
+                            && body.buffer.is_none()
+                            && work.remaining() > span_work
+                            && let Ok(bytes) = Bytes::copy_from_slice(self.input.budget(), span)
+                        {
+                            // The whole leaf fits this quantum. Copy and charge
+                            // the backing storage and header together, keeping
+                            // the existing publication step.
+                            work.take(span_work);
+                            body.direct = Some(bytes);
+                            body.span = None;
+                            continue;
+                        }
+                        let count = work.take(span_work - body.copied as u64) as usize;
                         if count == 0 {
                             return Ok(ParseStep::Yield);
                         }
@@ -875,30 +890,55 @@ impl ElementReader {
                             .ok_or(Error::Policy("operation read bytes"))?;
                         continue;
                     }
+                    let share_block = self.payload_ownership == PayloadOwnership::SharedBounded
+                        && matches!(body.header.id, 0xa0 | 0xa3);
+                    let byte_work = maximum as u64;
+                    if !share_block
+                        && body.scan == ScanBody::Off
+                        && maximum == body.target
+                        && work.remaining() > 2 * byte_work
+                        && self.scan_left >= byte_work
+                        && self
+                            .input
+                            .buffered_owner()
+                            .is_some_and(|window| window.retained_capacity() != maximum)
+                        && let Some(span) = self.input.buffered().get(..maximum)
+                        && let Ok(bytes) = Bytes::copy_from_slice(self.input.budget(), span)
+                    {
+                        // Charge the completed copy before discarding the window,
+                        // which can observe cancellation.
+                        work.take(byte_work);
+                        if !matches!(
+                            self.input.read_discard(maximum, work, cancel)?,
+                            Step::Ready(count) if count == maximum
+                        ) {
+                            return Err(Error::Invalid("complete buffered leaf"));
+                        }
+                        self.scan_left -= byte_work;
+                        body.remaining = 0;
+                        body.direct = Some(bytes);
+                        continue;
+                    }
                     match self.input.read_span(maximum, work, cancel)? {
                         Step::Ready(bytes) => {
                             body.remaining -= bytes.len() as u64;
-                            if body.collect {
-                                if body.remaining == 0
+                            if body.remaining == 0
+                                && bytes.len() == body.target
+                                && bytes.retained_capacity() == body.target
+                            {
+                                // Equal visible length and full capacity
+                                // exclude a hidden prefix or suffix.
+                                body.direct = Some(bytes);
+                            } else {
+                                body.transfer = if body.remaining == 0
                                     && bytes.len() == body.target
-                                    && bytes.retained_capacity() == body.target
+                                    && share_block
                                 {
-                                    // Equal visible length and full capacity
-                                    // exclude a hidden prefix/suffix. This is
-                                    // exactly the old leaf's capacity target.
-                                    body.direct = Some(bytes);
+                                    BodyTransfer::Borrow
                                 } else {
-                                    body.transfer = if body.remaining == 0
-                                        && bytes.len() == body.target
-                                        && self.payload_ownership == PayloadOwnership::SharedBounded
-                                        && matches!(body.header.id, 0xa0 | 0xa3)
-                                    {
-                                        BodyTransfer::Borrow
-                                    } else {
-                                        BodyTransfer::Copy
-                                    };
-                                    body.span = Some(bytes);
-                                }
+                                    BodyTransfer::Copy
+                                };
+                                body.span = Some(bytes);
                             }
                         }
                         Step::NeedInput(mut request) => {

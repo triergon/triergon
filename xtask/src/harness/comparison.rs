@@ -51,12 +51,32 @@ pub(crate) fn work_summary(data: &Value, fields: &[String]) -> Result<Value, Str
     Ok(Value::Object(work))
 }
 
-/// Equal work by both timed roles, including the declared iteration count.
+/// The work every run of a timed operation must report.
+#[derive(Clone, Debug, Default)]
+pub struct Work {
+    /// Contract work fields in addition to the mandatory packet/byte/digest work.
+    pub fields: Vec<String>,
+    /// Work fields each worker reports of its own output, equal between its runs
+    /// but not between the two workers: the byte count and digest of two
+    /// encoders, or the digest of two decoders whose outputs may differ.
+    pub own: Vec<String>,
+}
+
+impl Work {
+    /// Whether this is no more than the ordinary shared work.
+    pub(crate) fn is_base(&self) -> bool {
+        self.own.is_empty() && required_fields(&self.fields).len() == BASE_WORK_FIELDS.len()
+    }
+}
+
+/// The work of one timed pair: each role's complete work, after checking the
+/// iteration count, the elapsed time and that both roles report the same value
+/// for every field outside `work.own`.
 pub(crate) fn paired_timing_work(
     candidate: &Value,
     reference: &Value,
     iterations: i128,
-    fields: &[String],
+    work: &Work,
 ) -> Result<Value, String> {
     for outcome in [candidate, reference] {
         let data = super::worker::data(outcome);
@@ -67,19 +87,29 @@ pub(crate) fn paired_timing_work(
             return Err("invalid timed worker result".into());
         }
     }
-    let a = work_summary(super::worker::data(candidate), fields)?;
-    let b = work_summary(super::worker::data(reference), fields)?;
-    if !super::diff::equal(&a, &b) {
+    let a = work_summary(super::worker::data(candidate), &work.fields)?;
+    let b = work_summary(super::worker::data(reference), &work.fields)?;
+    let shared = |summary: &Value| match summary {
+        Value::Object(members) => Value::Object(
+            members
+                .iter()
+                .filter(|(key, _)| !work.own.contains(key))
+                .cloned()
+                .collect(),
+        ),
+        _ => Value::Null,
+    };
+    if !super::diff::equal(&shared(&a), &shared(&b)) {
         return Err("unequal timed work".into());
     }
-    Ok(a)
+    Ok(Value::object([("candidate", a), ("reference", b)]))
 }
 
 /// Both warmups publish the same complete work before any timed pair runs.
 pub(crate) fn warmup_work(
     warmups: &[Value],
     iterations: i128,
-    fields: &[String],
+    work: &Work,
 ) -> Result<Value, String> {
     if warmups.len() != 2
         || warmups[0].get("worker").and_then(Value::as_str) != Some("candidate")
@@ -91,7 +121,7 @@ pub(crate) fn warmup_work(
         warmups[0].get("result").ok_or("missing candidate warmup")?,
         warmups[1].get("result").ok_or("missing reference warmup")?,
         iterations,
-        fields,
+        work,
     )
 }
 
@@ -323,22 +353,28 @@ mod work_tests {
 
     #[test]
     fn pairs_and_warmups_require_every_declared_field_on_both_roles() {
-        let fields = work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap();
+        let shared = Work {
+            fields: work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap(),
+            own: vec![],
+        };
         let complete = result(Some(4));
-        let summary = paired_timing_work(&complete, &complete, 50, &fields).unwrap();
-        assert_eq!(summary.get("digest_b"), Some(&Value::int(4)));
+        let summary = paired_timing_work(&complete, &complete, 50, &shared).unwrap();
+        assert_eq!(
+            summary.get("reference").and_then(|w| w.get("digest_b")),
+            Some(&Value::int(4))
+        );
         for (a, b) in [
             (result(None), complete.clone()),
             (complete.clone(), result(None)),
             (result(None), result(None)),
             (result(Some(5)), complete.clone()),
         ] {
-            assert!(paired_timing_work(&a, &b, 50, &fields).is_err());
+            assert!(paired_timing_work(&a, &b, 50, &shared).is_err());
             let warmups = [
                 Value::object([("worker", Value::str("candidate")), ("result", a)]),
                 Value::object([("worker", Value::str("reference")), ("result", b)]),
             ];
-            assert!(warmup_work(&warmups, 50, &fields).is_err());
+            assert!(warmup_work(&warmups, 50, &shared).is_err());
         }
         let warmups = [
             Value::object([
@@ -347,6 +383,30 @@ mod work_tests {
             ]),
             Value::object([("worker", Value::str("reference")), ("result", complete)]),
         ];
-        assert_eq!(warmup_work(&warmups, 50, &fields).unwrap(), summary);
+        assert_eq!(warmup_work(&warmups, 50, &shared).unwrap(), summary);
+    }
+
+    #[test]
+    fn own_work_may_differ_between_roles_but_is_still_required() {
+        let shared = Work {
+            fields: work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap(),
+            own: vec![],
+        };
+        let own = Work {
+            own: vec!["digest_b".to_owned()],
+            ..shared.clone()
+        };
+        let (four, five) = (result(Some(4)), result(Some(5)));
+        let work = paired_timing_work(&four, &five, 50, &own).unwrap();
+        assert_eq!(
+            work.get("candidate").and_then(|w| w.get("digest_b")),
+            Some(&Value::int(4))
+        );
+        assert_eq!(
+            work.get("reference").and_then(|w| w.get("digest_b")),
+            Some(&Value::int(5))
+        );
+        assert!(paired_timing_work(&four, &result(None), 50, &own).is_err());
+        assert!(paired_timing_work(&four, &five, 50, &shared).is_err());
     }
 }
