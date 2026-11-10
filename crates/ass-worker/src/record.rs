@@ -148,6 +148,34 @@ impl Work {
         self.bytes += operation.bytes;
         fold(&mut self.digest, operation.digest);
     }
+
+    /// Prints the harness protocol's result line for `iterations` operations
+    /// of `operation` that took `elapsed_ns` (0 outside the bench mode).
+    pub fn print(
+        &self,
+        out: &mut impl Write,
+        operation: &str,
+        iterations: u64,
+        elapsed_ns: u128,
+    ) -> io::Result<()> {
+        writeln!(
+            out,
+            "{{\"schema\":1,\"operation\":\"{operation}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed_ns},\"eof\":true}}",
+            self.packets, self.bytes, self.digest,
+        )?;
+        out.flush()
+    }
+}
+
+/// The markers the memory mode brackets its operations with, so the
+/// allocation observer measures them alone.
+pub const WINDOW_BEGIN: &[u8] = b"TRIERGON_BEGIN_V1\n";
+pub const WINDOW_END: &[u8] = b"TRIERGON_END_V1\n";
+
+/// Writes `marker` and flushes it before anything that follows.
+pub fn mark(out: &mut impl Write, marker: &[u8]) -> io::Result<()> {
+    out.write_all(marker)?;
+    out.flush()
 }
 
 impl Sink for Work {

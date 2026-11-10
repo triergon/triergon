@@ -493,8 +493,6 @@ struct ProfileReference {
     libraries: &'static str,
     /// pkg-config packages, in link order.
     packages: &'static [&'static str],
-    /// Static libraries, or the profile's shared libraries found through an rpath.
-    link_static: bool,
     /// Compiler options before the source file.
     options: &'static [&'static str],
     /// Whether the build answers `identity -` (the container builds do; the
@@ -507,6 +505,10 @@ struct ProfileReference {
     /// Writes generated sources the reference includes and returns their
     /// directory, which joins its system include path.
     generated: Option<fn(&Path) -> R<PathBuf>>,
+    /// Whether the build compiles the library's own sources with checks of its
+    /// own, as the ASS parsing reference notes each conversion C leaves to the
+    /// target: its results are compared, and it is never timed or measured.
+    instrumented: bool,
 }
 
 const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
@@ -532,60 +534,76 @@ const SHAPE_OPTIONS: &[&str] = &[
 const RASTER_OPTIONS: &[&str] = &["-Wall", "-Wextra", "-Werror", "-Werror=uninitialized"];
 const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
 
-const PROFILE_REFERENCES: [ProfileReference; 12] = [
+/// What most reference builds share: the one reference source, with nothing
+/// generated and nothing instrumented.
+const REFERENCE: ProfileReference = ProfileReference {
+    profile: "",
+    linked: &[],
+    binary: "",
+    source: "harness/reference.c",
+    define: None,
+    record: "",
+    kind: "",
+    libraries: "",
+    packages: &[],
+    options: RELEASE_OPTIONS,
+    identity: false,
+    prepared: None,
+    generated: None,
+    instrumented: false,
+};
+
+/// The libass builds: against the FreeType, FriBidi and HarfBuzz references,
+/// with libass's private headers and its own compiler flags.
+const LIBASS: ProfileReference = ProfileReference {
+    profile: ".research/libass",
+    linked: &[".research/freetype", ".research/harfbuzz"],
+    packages: &["libass-internal"],
+    options: RASTER_OPTIONS,
+    prepared: Some(crate::raster::check_prepared),
+    ..REFERENCE
+};
+
+const PROFILE_REFERENCES: [ProfileReference; 13] = [
     ProfileReference {
         profile: ".research/reference-video",
-        linked: &[],
         binary: "ffmpeg-video-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_FEED_REFERENCE=1"),
         record: "ffmpeg-video-native",
         kind: "pinned FFmpeg with the H.264 and HEVC decoders; feed operations",
         libraries: "video_reference",
         packages: CONTAINER_PACKAGES,
-        link_static: true,
         options: CONTAINER_OPTIONS,
         identity: true,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
         profile: ".research/reference-formats",
-        linked: &[],
         binary: "ffmpeg-formats-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_HLS_REFERENCE=1"),
         record: "ffmpeg-formats-native",
         kind: "pinned FFmpeg MOV, TS and subtitle build for HLS and MP4 range operations",
         libraries: "formats_reference",
         packages: CONTAINER_PACKAGES,
-        link_static: true,
         options: CONTAINER_OPTIONS,
         identity: true,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
         profile: ".research/reference-subtitles",
-        linked: &[],
         binary: "ffmpeg-subtitles-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_SUBTITLE_REFERENCE=1"),
         record: "ffmpeg-subtitles-native",
         kind: "pinned FFmpeg subtitle decoders with libzvbi and the video decoders closed captions need; subtitle decode operations",
         libraries: "subtitles_reference",
         packages: CONTAINER_PACKAGES,
-        link_static: true,
         options: CONTAINER_OPTIONS,
         identity: true,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
         profile: ".research/reference-decode",
-        linked: &[],
         binary: "ffmpeg-decode-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_DECODE_REFERENCE=1"),
         record: "ffmpeg-decode-native",
         kind: "FFmpeg 9.0.2 decoders with the letterbox and downmix filter chains; codec operations",
@@ -598,141 +616,139 @@ const PROFILE_REFERENCES: [ProfileReference; 12] = [
             "libavcodec",
             "libavutil",
         ],
-        link_static: true,
         options: RELEASE_OPTIONS,
-        identity: false,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
         profile: ".research/reference-capture-static",
-        linked: &[],
         binary: "ffmpeg-capture-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_CAPTURE_REFERENCE=1"),
         record: "ffmpeg-capture-native",
         kind: "FFmpeg 9.0.2 capture component set (gating); RGBA conversion, MPEG-1 encode, MPEG-TS mux",
         libraries: "capture_reference",
         packages: CAPTURE_PACKAGES,
-        link_static: true,
         options: RELEASE_OPTIONS,
-        identity: false,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
         profile: ".research/reference-capture-small-static",
-        linked: &[],
         binary: "ffmpeg-capture-small-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_CAPTURE_REFERENCE=1"),
         record: "ffmpeg-capture-small-native",
         kind: "FFmpeg 9.0.2 capture component set built with --enable-small; reported, not gating",
         libraries: "capture_small_reference",
         packages: CAPTURE_PACKAGES,
-        link_static: true,
         options: RELEASE_OPTIONS,
-        identity: false,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
         profile: ".research/reference-formats",
-        linked: &[],
         binary: "ffmpeg-isobmff-worker",
         source: "harness/reference_isobmff.c",
-        define: None,
         record: "ffmpeg-isobmff-native",
         kind: "pinned FFmpeg MOV public-API open and index operations",
         libraries: "isobmff_reference",
         packages: CONTAINER_PACKAGES,
-        link_static: true,
         options: CONTAINER_OPTIONS,
-        identity: false,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
         profile: ".research/reference-formats",
-        linked: &[],
         binary: "ffmpeg-framing-worker",
         source: "harness/reference_framing.c",
-        define: None,
         record: "ffmpeg-framing-native",
         kind: "pinned FFmpeg AVC and HEVC public-API packet framing operations",
         libraries: "framing_reference",
         packages: CONTAINER_PACKAGES,
-        link_static: true,
         options: CONTAINER_OPTIONS,
-        identity: false,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
         profile: ".research/freetype",
-        linked: &[],
         binary: "freetype-font-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_FONT_REFERENCE=1"),
         record: "freetype-native",
         kind: "FreeType 2.15.0, static, without optional libraries; face tables, cmaps, kerning and unhinted outlines",
         libraries: "freetype_reference",
         packages: &["freetype2"],
-        link_static: true,
         options: RELEASE_OPTIONS,
-        identity: false,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
         profile: ".research/harfbuzz",
         linked: &[".research/freetype"],
         binary: "harfbuzz-shape-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_SHAPE_REFERENCE=1"),
         record: "harfbuzz-native",
         kind: "HarfBuzz 14.6.0 from its amalgamation and FriBidi 1.0.17, static, without floating-point contraction, with FreeType 2.15.0 for libass's font functions; OpenType shaping, bidi and Unicode properties",
         libraries: "harfbuzz_reference",
         packages: &["harfbuzz", "fribidi", "freetype2"],
-        link_static: true,
         options: SHAPE_OPTIONS,
-        identity: false,
-        prepared: None,
-        generated: None,
+        ..REFERENCE
     },
     ProfileReference {
-        profile: ".research/libass",
-        linked: &[".research/freetype", ".research/harfbuzz"],
         binary: "libass-raster-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_RASTER_REFERENCE=1"),
         record: "libass-native",
         kind: "libass 0.17.5, static, against the FreeType, FriBidi and HarfBuzz references, without floating-point contraction, with uninitialised automatic variables zeroed; its outline, stroker, rasteriser, blur, composition and clipping stages on the plain C bitmap engine (c: tile order 4, align order 4) on every host, and on the host's own engine for raster-simd- operations",
         libraries: "libass_reference",
-        packages: &["libass-internal"],
-        link_static: true,
-        options: RASTER_OPTIONS,
-        identity: false,
-        prepared: Some(crate::raster::check_prepared),
-        generated: None,
+        ..LIBASS
     },
     ProfileReference {
-        profile: ".research/libass",
-        linked: &[".research/freetype", ".research/harfbuzz"],
         binary: "libass-ass-worker",
-        source: "harness/reference.c",
         define: Some("-DTRIERGON_ASS_REFERENCE=1"),
         record: "libass-ass-native",
         kind: "libass 0.17.5, the build of the rasterising reference; its script, Matroska packet, override tag, drawing and karaoke parsing",
         libraries: "libass_ass_reference",
-        packages: &["libass-internal"],
-        link_static: true,
-        options: RASTER_OPTIONS,
-        identity: false,
-        prepared: Some(crate::raster::check_prepared),
         generated: Some(crate::ass::observed_sources),
+        instrumented: true,
+        ..LIBASS
+    },
+    ProfileReference {
+        binary: "libass-player-worker",
+        define: Some("-DTRIERGON_ASS_PLAYER_REFERENCE=1"),
+        record: "libass-player-native",
+        kind: "libass 0.17.5, the build of the rasterising reference linked as a player links it, none of its sources compiled into the worker; frame rendering through its public API on the plain C bitmap engine, the measurement reference of the ASS rendering features",
+        libraries: "libass_player_reference",
+        ..LIBASS
     },
 ];
+
+/// Why a contract's `measurement_reference` cannot stand in for its
+/// `reference`, if it cannot: it must be a registered build that is not
+/// instrumented, linked against the same pinned profiles as an instrumented
+/// `reference`.
+pub fn measurement_reference_error(contract: &Value) -> Option<String> {
+    let measurement = contract.get("measurement_reference")?;
+    let registered = |value: Option<&Value>| {
+        let name = value.and_then(Value::as_str)?;
+        PROFILE_REFERENCES.iter().find(|r| r.record == name)
+    };
+    let Some(measured) = registered(Some(measurement)) else {
+        return Some("measurement_reference must name a registered reference build".into());
+    };
+    let Some(reference) = registered(contract.get("reference")) else {
+        return Some("measurement_reference needs a registered reference build".into());
+    };
+    if measured.instrumented {
+        Some(format!(
+            "measurement_reference {} is instrumented",
+            measured.record
+        ))
+    } else if !reference.instrumented {
+        Some(format!(
+            "measurement_reference stands in only for an instrumented reference, not {}",
+            reference.record
+        ))
+    } else if (measured.profile, measured.linked) != (reference.profile, reference.linked) {
+        Some(format!(
+            "measurement_reference {} must link the pinned builds of {}",
+            measured.record, reference.record
+        ))
+    } else {
+        None
+    }
+}
 
 pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
     build_selected(root, comparison_build, None)
@@ -828,11 +844,8 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
             profiles().map(|profile| root.join(profile).join("install/lib/pkgconfig")),
         )
         .map_err(|e| e.to_string())?;
-        let mut query: Vec<&str> = Vec::new();
-        if reference.link_static {
-            query.push("--static");
-        }
-        query.extend(["--cflags", "--libs"]);
+        // Every reference links its pinned libraries statically.
+        let mut query = vec!["--static", "--cflags", "--libs"];
         query.extend(reference.packages);
         let flags = output(
             "pkg-config",
@@ -855,10 +868,6 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         }
         command.push(root.join(reference.source).display().to_string());
         command.extend(shell_words(&flags)?);
-        if !reference.link_static {
-            let lib = root.join(reference.profile).join("install/lib");
-            command.push(format!("-Wl,-rpath,{}", lib.display()));
-        }
         command.extend(["-o".into(), path.display().to_string()]);
         run(&command)?;
         profile_workers.push((reference, path, build, command));
@@ -1066,6 +1075,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
                 ),
                 ("sha256", Value::str(sha(path)?)),
                 ("kind", Value::str(reference.kind)),
+                ("instrumented", Value::Bool(reference.instrumented)),
                 ("compiler_command", strings(command)),
                 ("source", Value::str(reference.source)),
                 (
@@ -1293,6 +1303,25 @@ mod tests {
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
+    }
+
+    #[test]
+    fn only_an_uninstrumented_build_of_the_same_libraries_measures_for_a_reference() {
+        let contract = |reference: &str, measurement: &str| {
+            crate::json::parse(&format!(
+                r#"{{"reference":"{reference}","measurement_reference":"{measurement}"}}"#
+            ))
+            .unwrap()
+        };
+        let error =
+            |reference, measurement| measurement_reference_error(&contract(reference, measurement));
+        assert_eq!(error("libass-ass-native", "libass-player-native"), None);
+        assert!(error("libass-ass-native", "libass-ass-native").is_some());
+        assert!(error("libass-native", "libass-player-native").is_some());
+        assert!(error("libass-ass-native", "freetype-native").is_some());
+        assert!(error("libass-ass-native", "unbuilt").is_some());
+        let plain = crate::json::parse(r#"{"reference":"libass-ass-native"}"#).unwrap();
+        assert_eq!(measurement_reference_error(&plain), None);
     }
 
     #[test]

@@ -421,9 +421,9 @@ panics.
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
   glyphs and 24 MiB, which `cache-eviction.ass` overflows): 66/72 pass. The
-  box behind a `BorderStyle` 4 event is told by its own buffer, also after a
-  collision shift has cut rows off its top, and compared without its kind,
-  since libass leaves its type uninitialised. The six open cases are three
+  box behind a `BorderStyle` 4 event, whose type libass leaves uninitialised,
+  is told by its own buffer, also after a collision shift has cut rows off its
+  top, and compared as a kind of its own. The six open cases are three
   fixtures at both sizes: `cjk.ass`, with an `@` font; `language-unknown.ass`,
   a `Language` HarfBuzz does not register, which `triergon-shape` refuses; and
   `hinted-extents.ass`, fallback mark positioning, which reads FreeType's

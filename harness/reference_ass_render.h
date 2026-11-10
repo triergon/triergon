@@ -1,9 +1,12 @@
 /*
  * ASS rendering reference: libass 0.17.5's ass_render_frame through its public
  * API, as a player embeds it, with the bitmap engine set through the renderer's
- * internals. Included by reference_ass.h, whose fixture
- * reader, stream commands and libass build it shares (tooling only; never
- * linked into the library).
+ * internals (tooling only; never linked into the library). Included, after
+ * reference_ass_fixture.h, by both libass builds: reference_ass.h, the parity
+ * reference, which compiles libass's rendering, drawing and parsing sources
+ * into itself with checks of its own, and reference_ass_player.h, the
+ * measurement reference, which links libass.a untouched. Both fold the same
+ * values.
  *
  * Usage:
  *   reference ass-render-fold   FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
@@ -36,12 +39,19 @@
  * each image its type, position, size, colour and every row of alpha bytes, in
  * list order; `packets` counts images and `bytes` their alpha bytes. The box
  * libass draws behind a BorderStyle 4 event has no type (add_background leaves
- * it uninitialised): it is told by its buffer (reference_ass.h) and folded
- * without one, and dumped with `-` for it. The file and the fonts are read
- * before the operation. `ass-render-dump` prints the same values as lines:
+ * it uninitialised): it is told by its buffer (assr_is_box) and has type 3,
+ * ASSR_IMAGE_BOX, one past IMAGE_TYPE_SHADOW. The file and the attached fonts
+ * are read before the operation; libass opens the default font file itself.
+ * The timed span runs from ass_library_init to the last frame's fold; the
+ * teardown after it, which frees the caches, is not timed.
+ * `ass-render-dump` prints the same values as lines:
  *   frame TIME CHANGED IMAGES
  *   image TYPE X Y W H RRGGBBAA ROW-HEX...
  */
+
+#include <inttypes.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #define ASSR_MAX_FONTS 64
 #define ASSR_MAX_FRAMES 64
@@ -103,6 +113,19 @@ static void assr_fold_row(uint64_t *digest, const uint8_t *bytes, size_t n) {
     for (; i < n; i++) *digest = *digest * 31 + bytes[i];
 }
 
+/* The type of the box behind a BorderStyle 4 event. */
+#define ASSR_IMAGE_BOX 3
+
+/* Whether an image's own buffer (ASS_ImagePriv's) is the box add_background
+ * draws behind a BorderStyle 4 event (ass_render.c:2759-2790): the only buffer
+ * ass_aligned_alloc aligns to one byte. An image without a buffer of its own
+ * points into a cached composite, and the copy blend_vector_clip makes is
+ * aligned to the engine's rows (ass_render.c:700-813), 16 bytes for the C
+ * engine the reference sets. ass_aligned_alloc (ass_utils.c:59-74) puts a
+ * one-byte-aligned buffer one pointer past the block malloc returns, which
+ * malloc aligns to two pointers, so it is never aligned to the rows. */
+static int assr_is_box(const void *buffer) { return buffer && ((uintptr_t)buffer & 15) != 0; }
+
 static void assr_frame(AssImages *w, long long now, int changed, ASS_Image *images) {
     size_t count = 0;
     for (ASS_Image *image = images; image; image = image->next) count++;
@@ -119,13 +142,10 @@ static void assr_frame(AssImages *w, long long now, int changed, ASS_Image *imag
            collision shift cuts off the top of the frame. */
         int box = assr_is_box(((ASS_ImagePriv *)image)->buffer);
         if (box && ((ASS_ImagePriv *)image)->source) w->unknown = 1;
+        int type = box ? ASSR_IMAGE_BOX : image->type;
         if (w->dump) {
-            if (box)
-                fprintf(w->dump, "image - %d %d %d %d %08" PRIx32, image->dst_x, image->dst_y, image->w, image->h,
-                        image->color);
-            else
-                fprintf(w->dump, "image %d %d %d %d %d %08" PRIx32, image->type, image->dst_x, image->dst_y,
-                        image->w, image->h, image->color);
+            fprintf(w->dump, "image %d %d %d %d %d %08" PRIx32, type, image->dst_x, image->dst_y, image->w, image->h,
+                    image->color);
             for (int y = 0; y < image->h; y++) {
                 fputc(' ', w->dump);
                 for (int x = 0; x < image->w; x++)
@@ -134,10 +154,10 @@ static void assr_frame(AssImages *w, long long now, int changed, ASS_Image *imag
             fputc('\n', w->dump);
             continue;
         }
-        const uint64_t fields[] = {(uint64_t)image->type,   (uint64_t)(int64_t)image->dst_x,
+        const uint64_t fields[] = {(uint64_t)(int64_t)type,      (uint64_t)(int64_t)image->dst_x,
                                    (uint64_t)(int64_t)image->dst_y, (uint64_t)image->w,
-                                   (uint64_t)image->h,      image->color};
-        for (size_t i = box ? 1 : 0; i < sizeof fields / sizeof fields[0]; i++) assr_render_fold(w, fields[i]);
+                                   (uint64_t)image->h,              image->color};
+        for (size_t i = 0; i < sizeof fields / sizeof fields[0]; i++) assr_render_fold(w, fields[i]);
         for (int y = 0; y < image->h; y++)
             assr_fold_row(&w->digest, image->bitmap + (size_t)y * (size_t)image->stride, (size_t)image->w);
         w->packets++;
@@ -153,12 +173,14 @@ static void assr_frames(AssImages *w, ASS_Renderer *r, ASS_Track *t, AssFrames f
     }
 }
 
-/* One operation; 0 when libass could not be set up. */
+/* One operation; 0 when libass could not be set up. Its span up to the last
+ * frame is added to *elapsed, and the teardown is left out. */
 static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, size_t size, int stream,
-                       const AssFixture *f) {
+                       const AssFixture *f, uint64_t *elapsed) {
     int ok = 0;
     ASS_Renderer *r = NULL;
     ASS_Track *track = NULL;
+    uint64_t start = assr_now_ns();
     ASS_Library *lib = ass_library_init();
     if (!lib) return 0;
     ass_set_message_cb(lib, assr_quiet, NULL);
@@ -213,7 +235,8 @@ static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, s
             }
         }
     }
-    ok = !assr_boxes_lost;
+    ok = 1;
+    *elapsed += assr_now_ns() - start;
 done:
     if (track) ass_free_track(track);
     if (r) ass_renderer_done(r);
@@ -338,20 +361,21 @@ static int assr_render_main(int argc, char **argv) {
         status = 2;
         goto done;
     }
+    uint64_t elapsed = 0;
     if (dump) {
         AssImages work = {0, 0, 0, stdout, 0};
-        if (!assr_render(&work, &c, data, size, stream, &fixture) || work.unknown) status = 2;
+        if (!assr_render(&work, &c, data, size, stream, &fixture, &elapsed) || work.unknown) status = 2;
     } else {
         if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) status = 2;
-        uint64_t start = assr_now_ns(), packets = 0, bytes = 0, digest = 0;
+        uint64_t packets = 0, bytes = 0, digest = 0;
         for (unsigned long i = 0; i < iterations && !status; i++) {
             AssImages work = {0, 0, 0, NULL, 0};
-            if (!assr_render(&work, &c, data, size, stream, &fixture) || work.unknown) status = 2;
+            if (!assr_render(&work, &c, data, size, stream, &fixture, &elapsed) || work.unknown) status = 2;
             packets += work.packets;
             bytes += work.bytes;
             digest = digest * 31 + work.digest;
         }
-        uint64_t elapsed = bench ? assr_now_ns() - start : 0;
+        if (!bench) elapsed = 0;
         if (memory && !status && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16) status = 2;
         if (!status)
             printf("{\"schema\":1,\"operation\":\"ass-render\",\"iterations\":%lu,\"packets\":%" PRIu64

@@ -5,6 +5,7 @@
   "candidate": "ass-worker",
   "worker_operation": "ass-render-",
   "reference": "libass-ass-native",
+  "measurement_reference": "libass-player-native",
   "gate": "required",
   "compare_order": 5,
   "pinned_per_target": true,
@@ -12,7 +13,8 @@
     "the rendering fixtures whose libass result C leaves to the target, rendered and folded as ass-render renders and folds them: libass's renderer overflows int or converts a double out of int's range on the way to the result (a horizontal border beyond 2^30 frame pixels doubled in int for the width of an event's box; an event box taller than int holds, whose collision boxes end up 2^31 or more rows apart, where cmp_rect_y0's int subtraction wraps and glibc's merge sort orders them)",
     "each case is pinned per target from that target's own reference run; a case passes when the candidate, the reference and the target's pin agree, and a target a case has no pin for runs and reports it without comparing",
     "the renderer follows libass built with GCC for armv7-unknown-linux-gnueabihf: an int overflow wraps and a conversion out of int's range saturates; where libass for aarch64-unknown-linux-gnu gives another result, the case is open there as a deliberate divergence",
-    "the fixture and its fonts are read before each timed and memory operation, which creates the library and renderer, reads the script or runs the stream and renders every frame"
+    "the fixture and its attached font files are read before each timed and memory operation, which, as a player does, creates the library, hands it the attached fonts (ass_add_font copies them; the candidate copies them into its budget), opens the default font file (libass through FreeType; the candidate reads it), creates the renderer, reads the script or runs the stream and renders every frame; the timed span ends before the track, renderer and library are freed, on both sides, so neither times the teardown that releases its caches",
+    "timing and memory are measured against libass-player-native, libass.a linked as a player links it with none of its sources compiled into the worker; the parity reference libass-ass-native compiles libass's rendering, drawing and parsing sources with checks that note the conversions C leaves to the target, and is never timed or measured"
   ],
   "required_profiles": [
     "script"

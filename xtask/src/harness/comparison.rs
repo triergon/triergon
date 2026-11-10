@@ -202,6 +202,21 @@ pub fn reference_named(identity: &Value, name: &str) -> Result<Value, String> {
     Ok(Value::Object(members))
 }
 
+/// Refuses a reference that instruments its library's own code: the ASS
+/// parsing reference compiles libass's sources with checks that note each
+/// conversion C leaves to the target, so its results are compared but its
+/// time and memory are not libass's.
+pub fn measurable(record: &Value) -> Result<(), String> {
+    if record.get("instrumented") == Some(&Value::Bool(true)) {
+        return Err(format!(
+            "{} instruments the library it runs and is never timed or measured; \
+             name an uninstrumented build as the contract's measurement_reference",
+            s(record, "id").unwrap_or("the reference")
+        ));
+    }
+    Ok(())
+}
+
 pub fn reference_summary(record: &Value) -> Value {
     Value::object(
         ["id", "sha256", "kind"].map(|k| (k, record.get(k).cloned().unwrap_or(Value::Null))),
@@ -228,6 +243,22 @@ pub fn validate_case_evidence(
     {
         return Err("case reference does not match the built selected worker".into());
     }
+    // Timing and memory are measured against the contract's measurement
+    // reference when it names one.
+    let measured = match s(case, "measurement_worker") {
+        Some(name) => {
+            let record = reference_named(identity, name)?;
+            if !case
+                .get("measurement_reference")
+                .is_some_and(|r| super::diff::equal(r, &reference_summary(&record)))
+            {
+                return Err("case measurement reference does not match the built worker".into());
+            }
+            record
+        }
+        None => selected,
+    };
+    measurable(&measured)?;
     if let Some(rule) = rule {
         let parity = case.get("parity").cloned().unwrap_or(Value::Object(vec![]));
         if parity.get("comparison_rule") != rule.get("id") {
@@ -267,7 +298,7 @@ pub fn validate_case_evidence(
         ("candidate", candidate.cloned().unwrap_or(Value::Null)),
         (
             "reference",
-            selected.get("sha256").cloned().unwrap_or(Value::Null),
+            measured.get("sha256").cloned().unwrap_or(Value::Null),
         ),
     ]))
 }
@@ -276,6 +307,33 @@ pub fn validate_case_evidence(
 mod work_tests {
     use super::*;
     use crate::json::parse;
+
+    #[test]
+    fn an_instrumented_reference_is_never_measured() {
+        let identity = parse(
+            r#"{"comparison_references":{
+                "observed":{"path":"a","sha256":"1","kind":"k","instrumented":true},
+                "player":{"path":"b","sha256":"2","kind":"k","instrumented":false}}}"#,
+        )
+        .unwrap();
+        let case = |extra: &str| {
+            parse(&format!(
+                r#"{{"reference_worker":"observed","reference":{{"id":"observed","sha256":"1","kind":"k"}}{extra}}}"#
+            ))
+            .unwrap()
+        };
+        let error = validate_case_evidence(&case(""), &identity, None).unwrap_err();
+        assert!(error.contains("never timed or measured"), "{error}");
+        let measured = case(
+            r#","measurement_worker":"player","measurement_reference":{"id":"player","sha256":"2","kind":"k"}"#,
+        );
+        let hashes = validate_case_evidence(&measured, &identity, None).unwrap();
+        assert_eq!(hashes.get("reference"), Some(&Value::str("2")));
+        let stale = case(
+            r#","measurement_worker":"player","measurement_reference":{"id":"player","sha256":"3","kind":"k"}"#,
+        );
+        assert!(validate_case_evidence(&stale, &identity, None).is_err());
+    }
 
     fn v(text: &str) -> Value {
         parse(text).unwrap()
