@@ -332,7 +332,7 @@ impl<'a> Mp4RangeSeekJob<'a> {
         if let Some(error) = self.failure {
             return Err(error);
         }
-        let (cursor, receipt) = self
+        let (cursor, landing) = self
             .replay
             .ok_or(Error::Invalid("native range seek still pending"))?;
         let offset = cursor
@@ -344,7 +344,7 @@ impl<'a> Mp4RangeSeekJob<'a> {
         Ok(Mp4RangeSeek {
             scope: self.scope,
             cursor: Some(cursor),
-            receipt,
+            landing,
             offset,
         })
     }
@@ -353,13 +353,17 @@ impl<'a> Mp4RangeSeekJob<'a> {
 pub struct Mp4RangeSeek<'a> {
     scope: SeekScope,
     cursor: Option<PacketCursor<'a>>,
-    receipt: SeekLanding,
+    landing: SeekLanding,
     offset: u64,
 }
 
 impl Mp4RangeSeek<'_> {
     pub fn receipt(&self) -> &SeekLanding {
-        &self.receipt
+        self.landing()
+    }
+
+    pub fn landing(&self) -> &SeekLanding {
+        &self.landing
     }
 
     pub fn start_offset(&self) -> u64 {

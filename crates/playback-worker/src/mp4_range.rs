@@ -240,7 +240,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
         while !job.poll(&mut work(), &cancel)? {}
         let mut command = job.finish()?;
         if recovery {
-            let landing = command.receipt();
+            let landing = command.landing();
             let opus = landing.opus_recovery.ok_or("missing Opus recovery")?;
             let sample_clock = TimeBase::new(1, 48_000)?;
             let samples = opus
