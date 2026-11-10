@@ -139,16 +139,15 @@ c6g.2xlarge, unpinned, with 30 memory pairs per case against libass with
 `ass_set_cache_limits(renderer, 1000, 24)` under the `linux-glibc-v4` observer. libass maps
 the default font file during 12 cases' operations; those mappings count toward its total RSS.
 
-The font, shaping and ASS rendering comparisons on Linux compare `43c12afaf83f69076d430d830c7f247e51881c3e`
+The font, shaping and ASS rendering comparisons on Linux compare `e551b607466657b4d604d8c107cad8735dd09e75`
 with FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 on a c6g.2xlarge:
 `cargo xtask fonts compare`, `shape compare` and `ass compare` natively on AArch64 and in the ARMv7
 user space, each target with its own reference builds, with the rasterising features and the crates'
-tests on AArch64. In the ARMv7 user space the FreeType reference first timed out on one
-NotoSansCJK case of `font-hinting-none` (the candidate finished it); the full ARMv7 run was
-repeated on the idle machine, and both runs are archived. The commits after it change only an
-xtask test and the documentation; the xtask tests and clippy pass at
-`5855bc8a8e061e05b55850a8539c5d227fcc48c3`. The earlier comparisons at
-`8058a77c444958ba82dcf4b5783720fc9aafe66f`, `8786192bac7b0abea286ee999c8e03073a6ac796`,
+tests on AArch64. The same comparisons before the ASS renderer's latest changes were merged, at
+`43c12afaf83f69076d430d830c7f247e51881c3e`, gave the same font and shaping results; there the
+FreeType reference in the ARMv7 user space first timed out on one NotoSansCJK case of
+`font-hinting-none` (the candidate finished it), and the repeated run on the idle machine
+passed. The earlier comparisons at `8058a77c444958ba82dcf4b5783720fc9aafe66f`, `8786192bac7b0abea286ee999c8e03073a6ac796`,
 `944fd7cfc7712f505bd66e046afaa77f7eee6aac`, `a6e984526d20029e75b48650e9cc317f192da776`,
 `354f7d735ac22df3b63e7849eb5869488c087bd9`, `b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506` and
 `8e137d8d5c4e6dbe76c5289a769242cea9beda2d` are kept for the steps between.
@@ -244,7 +243,8 @@ against libass for AArch64 where it runs out of memory.
 | ASS rendering comparison and generated scripts, Linux AArch64 and ARMv7 | `01ccb49792cf1d4d05b74addf35dc616763b88e0` | `c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be` |
 | Earlier: ASS rendering parity, Linux AArch64 and ARMv7 | `28e5ccf0ecb5419f7105d52c91ebe8d6c09f053c` | `bc26dfc21b141cc79b5bb4f8cb3d636dcfaa3f64fa24eec2d200409eff0c32f0` |
 | Earlier: ASS rendering comparison and generated scripts, Linux AArch64 and ARMv7 | `fedfb790bfb52131389cb7c5134bab7ab813b55f` | `f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f` |
-| Fonts, shaping and ASS rendering comparison, Linux AArch64 and ARMv7 | `43c12afaf83f69076d430d830c7f247e51881c3e` | `d3780ba08af7d67ed07ad587056870132b988e6737104ff8343d7cea2496d600` |
+| Fonts, shaping and ASS rendering comparison, Linux AArch64 and ARMv7 | `e551b607466657b4d604d8c107cad8735dd09e75` | `8b20bf3d1a9c1e8da9c4d6f497f93d2a5636d8d6a80e531c49f623c98ce42feb` |
+| Earlier: the default load before the ASS renderer's latest changes, Linux AArch64 and ARMv7 | `43c12afaf83f69076d430d830c7f247e51881c3e` | `d3780ba08af7d67ed07ad587056870132b988e6737104ff8343d7cea2496d600` |
 | Earlier: HarfBuzz's cmap sanitizing and remapping, Linux AArch64 and ARMv7 | `8058a77c444958ba82dcf4b5783720fc9aafe66f` | `95b5c4d659408f264cbe8bfc24f20ca43a303863e23bbc107d3192956f5c6f7b` |
 | Earlier: FreeType's format 4 and HarfBuzz's cmap selection, Linux AArch64 and ARMv7 | `8e137d8d5c4e6dbe76c5289a769242cea9beda2d` | `fe2bee783e52adedca9e0c427a16b3fa30afa70471aaa507f38be9e177dd2b8a` |
 | Earlier: rotations by font, Linux AArch64 and ARMv7 | `b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506` | `8a5799509af3fa883fa3686ea181d7b630dee90db6e71e60cb55023c65e8cd37` |
