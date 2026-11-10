@@ -31,7 +31,7 @@ pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
 pub use outline::{Outline, OutlinePoint, Point, PointKind, Segment};
-pub use sized::{Band, SizeMetrics, SizedFont};
+pub use sized::{Band, SizeMetrics, SizedFont, VerticalAdvance};
 pub use store::{Built, Store, StoreKey};
 pub use synthesis::{Orientation, Synthesis};
 
@@ -169,6 +169,9 @@ pub struct Font {
     os2: Option<Os2>,
     glyph_count: u16,
     hmtx: Hmtx,
+    /// `vmtx`, where FreeType reads vertical metrics: `vhea` and `vmtx` both
+    /// load and `vhea` lists at least one record.
+    vmtx: Option<Hmtx>,
     names: Names,
     charmaps: BudgetVec<cmap::Subtable>,
     /// `charmaps` is FreeType's list of the face's charmaps.
@@ -249,6 +252,12 @@ impl Font {
             }
         };
         let hmtx = Hmtx::new(required(tables.hmtx)?, hhea.metrics, glyph_count);
+        let vmtx = tables
+            .vhea
+            .and_then(|t| metrics::hhea(t.bytes(bytes)).ok())
+            .filter(|vhea| vhea.metrics > 0)
+            .zip(tables.vmtx)
+            .map(|(vhea, table)| Hmtx::new(table, vhea.metrics, glyph_count));
         let kern = match tables.kern {
             Some(t) => Kern::parse(bytes, t, budget, &mut work)?,
             None => Kern::new(budget),
@@ -263,6 +272,7 @@ impl Font {
             os2,
             glyph_count,
             hmtx,
+            vmtx,
             names,
             charmaps: cmap.list,
             every_charmap,
@@ -572,6 +582,24 @@ impl Font {
     pub fn side_bearing(&self, glyph: GlyphId) -> Result<i16> {
         let glyph = self.check(glyph)?;
         Ok(self.hmtx.side_bearing(self.data.as_ref(), glyph))
+    }
+
+    /// Whether FreeType reads vertical metrics for the face: `vhea` and `vmtx`
+    /// both load and `vhea` lists at least one record. Without them, it makes
+    /// up a vertical advance from the face's ascender and descender
+    /// ([`SizedFont::vertical_advance`]).
+    pub const fn has_vertical_metrics(&self) -> bool {
+        self.vmtx.is_some()
+    }
+
+    /// The vertical advance FreeType makes up for a face without vertical
+    /// metrics: the typographic ascender minus descender of `OS/2`, else those
+    /// of `hhea`, in font units.
+    fn made_up_vertical_advance(&self) -> i64 {
+        match self.os2 {
+            Some(os2) => i64::from(os2.typo_ascender) - i64::from(os2.typo_descender),
+            None => i64::from(self.hhea.ascender) - i64::from(self.hhea.descender),
+        }
     }
 
     /// The `kern` table value for the pair, in font units.

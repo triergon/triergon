@@ -544,6 +544,19 @@ impl Cff {
         Ok(mul_fix(matrix.advance(i64::from(advance)), scale.x))
     }
 
+    /// A vertical advance of `glyph` in font units as FreeType's loader
+    /// reports it with [`Self::load`]: through the FontMatrix, then scaled.
+    pub(crate) fn vertical_advance(
+        &self,
+        data: &[u8],
+        glyph: GlyphId,
+        advance: i64,
+        scale: Scale,
+    ) -> Result<i64> {
+        let (matrix, scale) = self.placement(self.table.bytes(data), glyph, scale)?;
+        Ok(mul_fix(matrix.vertical_advance(advance), scale.y))
+    }
+
     /// The FontMatrix of `glyph` and `scale` adjusted for its Font DICT's
     /// units per em.
     fn placement(&self, table: &[u8], glyph: GlyphId, scale: Scale) -> Result<(FontMatrix, Scale)> {

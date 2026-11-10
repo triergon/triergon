@@ -1123,7 +1123,7 @@ mod prefix_tests {
             found,
             [
                 ("font-hinting-modes", "font-sized-", 918),
-                ("font-hinting-none", "font-sized-", 102),
+                ("font-hinting-none", "font-sized-", 153),
                 ("font-outlines", "font-", 51),
             ]
         );

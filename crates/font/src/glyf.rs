@@ -93,13 +93,27 @@ pub(crate) struct Glyf {
     long: bool,
 }
 
-/// Where a glyph's horizontal metrics come from: its own, or a component's
-/// (`USE_MY_METRICS`).
+/// Where a glyph's metrics come from: its own, or a component's
+/// (`USE_MY_METRICS`), with the header box values FreeType's phantom points
+/// start from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Metrics {
     pub(crate) glyph: u16,
     /// The `xMin` of that glyph's header, or zero for an empty glyph.
     pub(crate) x_min: i16,
+    /// The `yMax` of that glyph's header, or zero for an empty glyph.
+    pub(crate) y_max: i16,
+}
+
+impl Metrics {
+    /// The metrics of an empty glyph, whose box FreeType reads as zero.
+    const fn empty(glyph: u16) -> Self {
+        Self {
+            glyph,
+            x_min: 0,
+            y_max: 0,
+        }
+    }
 }
 
 /// What [`Glyf::outline`] needs from the face.
@@ -207,16 +221,21 @@ impl Glyf {
         }
         charge(work, 1)?;
         let Some((start, end)) = self.range(cx.data, glyph) else {
-            return Ok(Metrics { glyph, x_min: 0 });
+            return Ok(Metrics::empty(glyph));
         };
         let mut r = Reader::new(slice(cx.data, self.glyf.offset + start, end - start)?);
         let contours = r.i16()?;
         let x_min = r.i16()?;
-        r.skip(6)?;
+        r.skip(4)?; // yMin, xMax
+        let y_max = r.i16()?;
         if contours == 0 {
-            return Ok(Metrics { glyph, x_min: 0 });
+            return Ok(Metrics::empty(glyph));
         }
-        let mut metrics = Metrics { glyph, x_min };
+        let mut metrics = Metrics {
+            glyph,
+            x_min,
+            y_max,
+        };
         if contours > 0 {
             r.skip(2 * contours.unsigned_abs() as usize)?;
         } else {
@@ -270,18 +289,23 @@ impl Glyf {
         }
         charge(work, 1)?;
         let Some((start, end)) = self.range(cx.data, glyph) else {
-            return Ok(Metrics { glyph, x_min: 0 });
+            return Ok(Metrics::empty(glyph));
         };
         let bytes = slice(cx.data, self.glyf.offset + start, end - start)?;
         let mut r = Reader::new(bytes);
         let contours = r.i16()?;
         let x_min = r.i16()?;
-        r.skip(6)?; // yMin, xMax, yMax
+        r.skip(4)?; // yMin, xMax
+        let y_max = r.i16()?;
         if contours == 0 {
             // FreeType treats a glyph without contours as empty, header and all.
-            return Ok(Metrics { glyph, x_min: 0 });
+            return Ok(Metrics::empty(glyph));
         }
-        let mut metrics = Metrics { glyph, x_min };
+        let mut metrics = Metrics {
+            glyph,
+            x_min,
+            y_max,
+        };
         if contours > 0 {
             simple(&mut r, contours.unsigned_abs(), scale, outline, work)?;
         } else {

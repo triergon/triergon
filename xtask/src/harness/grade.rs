@@ -1307,7 +1307,7 @@ mod tests {
             ("packet-framing", 125),
             ("isobmff-open-index", 1020),
             ("font-outlines", 51),
-            ("font-hinting-none", 102),
+            ("font-hinting-none", 153),
             ("font-hinting-modes", 918),
             ("matroska-audio-clocks", 10),
             ("mp4-forward", 39),

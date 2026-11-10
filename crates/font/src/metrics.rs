@@ -1,4 +1,5 @@
-//! The face-wide tables: `head`, `hhea`, `maxp`, `OS/2` and `hmtx` (OpenType).
+//! The face-wide tables: `head`, `hhea` and `vhea`, `maxp`, `OS/2`, and `hmtx`
+//! and `vmtx` (OpenType).
 
 use crate::read::{Reader, u16_at};
 use crate::sfnt::Table;
@@ -39,7 +40,9 @@ pub(crate) fn head(data: &[u8]) -> Result<Head> {
     })
 }
 
-/// The `hhea` fields a face needs.
+/// The `hhea` fields a face needs, or those of `vhea`, which has the same
+/// layout: vertical ascender, descender and line gap, the largest advance
+/// height and the number of `vmtx` records.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Hhea {
     pub(crate) ascender: i16,
@@ -49,6 +52,8 @@ pub(crate) struct Hhea {
     pub(crate) metrics: u16,
 }
 
+/// Reads `hhea` or `vhea`; FreeType refuses either when it is shorter than 36
+/// bytes.
 pub(crate) fn hhea(data: &[u8]) -> Result<Hhea> {
     let mut r = Reader::new(data);
     r.skip(4)?; // version
@@ -191,7 +196,8 @@ pub(crate) fn underline(data: Option<&[u8]>) -> (i16, i16) {
 }
 
 /// Horizontal advances: `numberOfHMetrics` long records, then side bearings that
-/// reuse the last advance.
+/// reuse the last advance. `vmtx` has the same layout for advance heights and
+/// top side bearings, and is read the same way.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Hmtx {
     table: Table,

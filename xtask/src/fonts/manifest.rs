@@ -30,7 +30,11 @@ const HINTING_HEIGHTS: [i32; 9] = [4800, 5280, 3200, 3072, 2400, 2160, 853, 1568
 /// At a size: the unhinted outlines and metrics libass draws, and the default-load
 /// advances HarfBuzz receives. Each is a case of its own, so an advance the crate
 /// cannot give fails only its case.
-const MODES: [&str; 2] = ["outlines", "advances"];
+const MODES: &[&str] = &["outlines", "advances"];
+
+/// libass's default size adds the vertical advances it uses for the glyphs of an
+/// `@` font, unhinted and of the default load.
+const DEFAULT_MODES: &[&str] = &["outlines", "advances", "vertical"];
 
 /// The cases `cargo xtask check` mutates: one file of each outline format but the
 /// collection, small enough for the dev build within the per-input timeout (the
@@ -49,7 +53,7 @@ enum Load {
     /// Face data and unscaled outlines.
     Faces,
     /// Each mode at each height.
-    Sized(&'static [i32]),
+    Sized(&'static [&'static str], &'static [i32]),
 }
 
 pub const GENERATOR: Generator = Generator {
@@ -77,8 +81,8 @@ pub const GENERATOR: Generator = Generator {
 fn load(id: &str) -> R<Load> {
     match id {
         "font-outlines" => Ok(Load::Faces),
-        "font-hinting-none" => Ok(Load::Sized(&[UNHINTED_HEIGHT])),
-        "font-hinting-modes" => Ok(Load::Sized(&HINTING_HEIGHTS)),
+        "font-hinting-none" => Ok(Load::Sized(DEFAULT_MODES, &[UNHINTED_HEIGHT])),
+        "font-hinting-modes" => Ok(Load::Sized(MODES, &HINTING_HEIGHTS)),
         _ => Err(format!("{id}: not a font feature")),
     }
 }
@@ -120,9 +124,9 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
             };
             match load {
                 Load::Faces => rows.push(row(stem.clone(), Vec::new())),
-                Load::Sized(heights) => {
+                Load::Sized(modes, heights) => {
                     for &height in heights {
-                        for mode in MODES {
+                        for &mode in modes {
                             let arguments = vec![mode.to_owned(), height.to_string()];
                             rows.push(row(format!("{stem}-{mode}-{height}"), arguments));
                         }
@@ -140,7 +144,7 @@ fn note(id: &str) -> &'static str {
             "Every file of the font corpus with every face: face data and unscaled outlines."
         }
         "font-hinting-none" => {
-            "Every file of the font corpus as libass 0.17.5 loads it by default (ASS_HINTING_NONE): unhinted outlines at 256 pixels (16384 in 26.6) and the FT_LOAD_DEFAULT advances there."
+            "Every file of the font corpus as libass 0.17.5 loads it by default (ASS_HINTING_NONE): unhinted outlines at 256 pixels (16384 in 26.6), the FT_LOAD_DEFAULT advances there, and the vertical advances of both loads."
         }
         _ => {
             "Every file of the font corpus at the nine other 26.6 heights libass requests when hinting is on: unhinted outlines and FT_LOAD_DEFAULT advances."
@@ -173,7 +177,7 @@ mod tests {
             ["font-outlines", "font-hinting-none", "font-hinting-modes"].map(|f| (f, count(f))),
             [
                 ("font-outlines", 51),
-                ("font-hinting-none", 102),
+                ("font-hinting-none", 153),
                 ("font-hinting-modes", 918)
             ]
         );

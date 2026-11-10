@@ -44,6 +44,8 @@ pub(crate) struct Tables {
     pub(crate) head: Option<Table>,
     pub(crate) hhea: Option<Table>,
     pub(crate) hmtx: Option<Table>,
+    pub(crate) vhea: Option<Table>,
+    pub(crate) vmtx: Option<Table>,
     pub(crate) maxp: Option<Table>,
     pub(crate) os2: Option<Table>,
     pub(crate) name: Option<Table>,
@@ -67,6 +69,8 @@ impl Tables {
             b"head" => &mut self.head,
             b"hhea" => &mut self.hhea,
             b"hmtx" => &mut self.hmtx,
+            b"vhea" => &mut self.vhea,
+            b"vmtx" => &mut self.vmtx,
             b"maxp" => &mut self.maxp,
             b"OS/2" => &mut self.os2,
             b"name" => &mut self.name,
@@ -173,12 +177,12 @@ pub(crate) fn directory(
             continue;
         }
         // As FreeType sanitises the directory: a table past the end of the
-        // file is dropped, except `hmtx`, cut to a multiple of four bytes;
-        // the first table of a tag with a nonzero length counts.
+        // file is dropped, except `hmtx` and `vmtx`, cut to a multiple of four
+        // bytes; the first table of a tag with a nonzero length counts.
         let available = data.len() - offset;
         let len = if len <= available {
             len
-        } else if &tag == b"hmtx" {
+        } else if matches!(&tag, b"hmtx" | b"vmtx") {
             available & !3
         } else {
             continue;
