@@ -43,12 +43,7 @@ impl Placed {
     }
 
     fn rect(&self) -> Rect {
-        Rect {
-            y0: self.top,
-            y1: self.top.wrapping_add(self.height),
-            x0: self.left,
-            x1: self.left.wrapping_add(self.width),
-        }
+        Rect::new(self.top, self.height, self.left, self.width)
     }
 }
 
@@ -99,12 +94,7 @@ impl EventBox {
     }
 
     fn rect(&self) -> Rect {
-        Rect {
-            y0: self.top,
-            y1: self.top.wrapping_add(self.height),
-            x0: self.left,
-            x1: self.left.wrapping_add(self.width),
-        }
+        Rect::new(self.top, self.height, self.left, self.width)
     }
 }
 
@@ -118,6 +108,17 @@ struct Rect {
 }
 
 impl Rect {
+    /// The box from `top` and `left` over `height` and `width`, its far
+    /// sides added in wrapping `int` arithmetic as libass adds them.
+    const fn new(top: i32, height: i32, left: i32, width: i32) -> Self {
+        Self {
+            y0: top,
+            y1: top.wrapping_add(height),
+            x0: left,
+            x1: left.wrapping_add(width),
+        }
+    }
+
     fn overlaps(&self, other: &Self) -> bool {
         !(self.y0 >= other.y1 || other.y0 >= self.y1 || self.x0 >= other.x1 || other.x0 >= self.x1)
     }
