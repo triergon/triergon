@@ -212,16 +212,12 @@ impl Bytes {
     pub fn belongs_to(&self, budget: &Budget) -> bool {
         self.storage.charge.budget.same_pool(budget)
     }
-    /// Clear a uniquely owned full allocation for another write. A shared
-    /// owner or a slice is returned intact.
-    pub fn try_reuse(mut self) -> std::result::Result<BytesWriter, Self> {
-        if self.range != (0..self.storage.data.len()) {
+    /// Exclusive write access to a uniquely owned whole allocation, keeping its
+    /// bytes and capacity. A shared allocation or a slice is returned intact.
+    pub fn try_into_writer(mut self) -> std::result::Result<BytesWriter, Self> {
+        if self.range != (0..self.storage.data.len()) || Arc::get_mut(&mut self.storage).is_none() {
             return Err(self);
         }
-        let Some(storage) = Arc::get_mut(&mut self.storage) else {
-            return Err(self);
-        };
-        storage.data.clear();
         Ok(BytesWriter(self.storage))
     }
     /// Refills a uniquely owned allocation in place: `fill` gets its first `len` bytes
@@ -248,8 +244,9 @@ impl Bytes {
     }
 }
 
-/// Exclusive access to an existing charged byte allocation. Its capacity
-/// includes the shared owner, so publishing the new bytes needs no allocation.
+/// Exclusive access to a charged byte allocation, written in place across
+/// steps. No other handle exists while it does; [`finish`](Self::finish)
+/// publishes the bytes.
 #[derive(Debug)]
 pub struct BytesWriter(Arc<Storage>);
 
@@ -262,29 +259,44 @@ impl BytesWriter {
         self.0.charge.budget.same_pool(budget)
     }
 
-    pub fn append_repeated(&mut self, byte: u8, count: usize) -> Result<()> {
-        self.append_runs([(byte, count)])
-    }
-
-    /// Append runs to this allocation. Check the combined length before
-    /// writing any pixels so a rejected append leaves the writer intact.
-    pub fn append_runs<const N: usize>(&mut self, runs: [(u8, usize); N]) -> Result<()> {
-        let data = &mut Arc::get_mut(&mut self.0)
-            .expect("byte writer is the sole owner")
-            .data;
-        let end = runs.iter().try_fold(data.len(), |len, &(_, count)| {
-            len.checked_add(count).ok_or(Error::Overflow)
-        })?;
-        if end > data.capacity() {
-            return Err(Error::Limit {
-                requested: end,
-                maximum: data.capacity(),
-            });
+    /// Writes `len` bytes at `offset` through `fill`, which sees the bytes there
+    /// now: earlier contents, or zero past the earlier end. An allocation ending
+    /// before `offset + len` grows first; the growth is charged, old and new
+    /// buffers together, before it is reserved, and a refused charge or
+    /// allocation changes nothing.
+    pub fn try_write_at<T, E: From<Error>>(
+        &mut self,
+        offset: usize,
+        len: usize,
+        fill: impl FnOnce(&mut [u8]) -> std::result::Result<T, E>,
+    ) -> std::result::Result<T, E> {
+        let storage = Arc::get_mut(&mut self.0).ok_or(Error::Invalid("byte writer shared"))?;
+        let end = offset.checked_add(len).ok_or(Error::Overflow)?;
+        if end > storage.data.capacity() {
+            let held = storage.charge.bytes();
+            let during = storage
+                .data
+                .capacity()
+                .checked_add(end)
+                .and_then(|bytes| bytes.checked_add(STORAGE_BYTES))
+                .ok_or(Error::Overflow)?;
+            storage.charge.grow_to(during)?;
+            if storage
+                .data
+                .try_reserve_exact(end - storage.data.len())
+                .is_err()
+            {
+                storage.charge.shrink_by(storage.charge.bytes() - held);
+                return Err(Error::Allocation.into());
+            }
+            // The old buffer is gone: keep the charge of the one now held.
+            let after = storage.data.capacity() + STORAGE_BYTES;
+            storage.charge.resize_to(after)?;
         }
-        for (byte, count) in runs {
-            data.resize(data.len() + count, byte);
+        if end > storage.data.len() {
+            storage.data.resize(end, 0);
         }
-        Ok(())
+        fill(&mut storage.data[offset..end])
     }
 
     pub fn finish(self) -> Bytes {

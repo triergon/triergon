@@ -8,7 +8,7 @@
 use super::super::{CompositionObject, Crop};
 use super::{DisplayLimits, PacketClock, ReceiverObservations, Refusal, reserve_amortised};
 use std::sync::Arc;
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result};
+use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
 
 /// The most composition objects the receiver presents from one PCS.
@@ -200,18 +200,12 @@ impl Object {
         self.width != 0 && !self.encoded.is_empty()
     }
 
-    /// The object's index plane, or `None` when its RLE does not fill it.
-    pub(super) fn decode(&self, budget: &Budget) -> Result<Option<Bytes>> {
-        let mut plane = BudgetVec::new(budget);
-        plane.try_resize(usize::from(self.width) * usize::from(self.height), 0)?;
-        if !super::rle::decode(
-            self.encoded.as_slice(),
-            usize::from(self.height),
-            plane.as_mut_slice(),
-        ) {
-            return Ok(None);
-        }
-        plane.freeze().map(Some).map_err(|failure| failure.error)
+    /// Decodes the object into `plane` (`width * height` bytes), returning
+    /// whether its RLE wrote every pixel. Only then is the plane output, so no
+    /// byte it left unwritten is ever read.
+    #[inline(never)]
+    pub(super) fn fill(&self, plane: &mut [u8]) -> bool {
+        super::rle::decode(self.encoded.as_slice(), usize::from(self.height), plane)
     }
 }
 
