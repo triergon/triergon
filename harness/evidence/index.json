@@ -17198,6 +17198,16 @@
    "sha256": "fe2bee783e52adedca9e0c427a16b3fa30afa70471aaa507f38be9e177dd2b8a",
    "bytes": 98639740,
    "source_revision": "8e137d8d5c4e6dbe76c5289a769242cea9beda2d"
+  },
+  {
+   "name": "font-cmap-8058a77c",
+   "path": "font-cmap-8058a77c",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's full charmap order and format 4 search, HarfBuzz's cmap sanitizing, selection and remapping, and the @ font drawing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at 8058a77c against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-cmap-8058a77c/95b5c4d659408f264cbe8bfc24f20ca43a303863e23bbc107d3192956f5c6f7b.tar.gz",
+   "sha256": "95b5c4d659408f264cbe8bfc24f20ca43a303863e23bbc107d3192956f5c6f7b",
+   "bytes": 98652028,
+   "source_revision": "8058a77c444958ba82dcf4b5783720fc9aafe66f"
   }
  ]
 }
