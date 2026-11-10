@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::checks::read_json;
 use crate::corpus::write_json;
 use crate::harness::report::{self, Options};
-use crate::harness::{comparison, diff, provenance, worker};
+use crate::harness::{build, comparison, diff, provenance, worker};
 use crate::json::{self, Value};
 use crate::sha256;
 
@@ -236,24 +236,7 @@ fn bound_workers(root: &Path, identity: &Value) -> Result<(PathBuf, PathBuf, Val
     if let Some(error) = provenance::source_identity_error(root, identity) {
         return Err(error);
     }
-    let candidate = root.join("target/release/playback-worker");
-    let record = identity
-        .get("additional_candidates")
-        .and_then(|v| v.get("playback-worker"))
-        .ok_or("playback-worker is not in the build identity")?;
-    let graph = provenance::selected_graph(
-        root,
-        &provenance::cargo_metadata(root)?,
-        "playback-worker",
-        &provenance::matroska_inputs(),
-    )?;
-    if text(record, "sha256")? != digest(&candidate)?
-        || !record
-            .get("selected_graph")
-            .is_some_and(|value| diff::differences(value, &graph).is_empty())
-    {
-        return Err("playback-worker sources or binary changed; rebuild".into());
-    }
+    let candidate = build::candidate_worker(root, identity, "playback-worker")?;
     let reference_record = comparison::reference_named(identity, "ffmpeg-formats-native")?;
     let reference = root
         .join(text(&reference_record, "path")?)

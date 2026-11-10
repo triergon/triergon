@@ -4,14 +4,15 @@
 //! fixture with `;@time` walked at those times; the operations of
 //! [`PER_TARGET`] are `ass-parse-host`'s instead. Rendering renders every
 //! script and stream of `harness/fixtures/ass-render` in each of
-//! [`RENDER_SIZES`]. The work each case must fold is pinned in
-//! `harness/features/<id>/pins.json`, libass's folds (see [`crate::lanes`]),
+//! [`RENDER_SIZES`], those of [`RENDER_PER_TARGET`] as `ass-render-host`'s
+//! cases. The work each case must fold is pinned in
+//! `harness/features/<id>/pins.json`, libass's folds (see [`crate::generators`]),
 //! per target in `ass-parse-host`.
 
 use std::path::Path;
 
+use crate::generators::Generator;
 use crate::json::Value;
-use crate::lanes::Lane;
 
 type R<T> = Result<T, String>;
 
@@ -67,6 +68,13 @@ pub const PER_TARGET: [(&str, Operation); 15] = [
     ("tags-pbo-overflow.ass", Operation::Walk),
 ];
 
+/// The rendering fixtures whose libass result differs by target, because
+/// libass's renderer overflows `int` or converts out of `int`'s range on the
+/// way to it, where C leaves the result undefined: `ass-render-host`'s cases,
+/// pinned per target; the renderer follows libass built with GCC for
+/// `armv7-unknown-linux-gnueabihf`.
+pub const RENDER_PER_TARGET: [&str; 1] = ["border-x-overflow.ass"];
+
 /// The files case rows are generated from, besides the pins and the fixtures,
 /// which each row records by hash.
 pub const ROW_SOURCES: [&str; 1] = ["xtask/src/ass/manifest.rs"];
@@ -103,33 +111,27 @@ pub const SMOKE_CASES: [(&str, &[&str]); 5] = [
     ),
 ];
 
-pub const FEATURES: [&str; 5] = [
-    "ass-parse-scripts",
-    "ass-parse-chunks",
-    "ass-parse-events",
-    "ass-parse-host",
-    "ass-render",
-];
-
-pub const LANE: Lane = Lane {
+pub const GENERATOR: Generator = Generator {
     command: "ass",
     main: super::main,
-    features: &FEATURES,
-    reference: "libass-ass-native",
-    pin_note: "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+    candidate: "ass-worker",
+    pin_note: (
+        "libass-ass-native",
+        "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+    ),
     report_directory: ".research/ass-report",
     manifest_directory: ".research/ass/manifests",
     row_sources: &ROW_SOURCES,
     rows,
     note,
     directory,
-    write_inputs: crate::lanes::no_inputs,
+    write_inputs: crate::generators::no_inputs,
     check_inputs,
     smoke: &SMOKE_CASES,
 };
 
 fn directory(id: &str) -> &'static str {
-    if id == "ass-render" {
+    if id == "ass-render" || id == "ass-render-host" {
         RENDER_FIXTURES
     } else {
         FIXTURES
@@ -140,6 +142,9 @@ fn note(id: &str) -> &'static str {
     match id {
         "ass-render" => {
             "Every authored script and stream rendered as a player embeds libass 0.17.5: attached fonts, a default family and font file, no system font provider, no hinting, a frame larger than the storage size; every image of every frame."
+        }
+        "ass-render-host" => {
+            "The rendered scripts whose result C leaves to the host, rendered as ass-render renders them: libass's int arithmetic overflowing or converting out of range; pinned from each target's reference."
         }
         "ass-parse-scripts" => {
             "Every authored script read whole as libass 0.17.5's ass_read_memory reads it, with the style overrides and font extraction its directives set: every track, style and event field and every embedded font."
@@ -199,8 +204,8 @@ fn timed(data: &[u8]) -> bool {
 }
 
 fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
-    if id == "ass-render" {
-        return render_rows(root);
+    if id == "ass-render" || id == "ass-render-host" {
+        return render_rows(root, id == "ass-render-host");
     }
     let mut rows = Vec::new();
     for (name, data) in fixtures(root, FIXTURES)? {
@@ -241,10 +246,14 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
     Ok(rows)
 }
 
-/// Every rendering fixture in every size.
-fn render_rows(root: &Path) -> R<Vec<Value>> {
+/// Every rendering fixture in every size: those of [`RENDER_PER_TARGET`] with
+/// `per_target`, the others without.
+fn render_rows(root: &Path, per_target: bool) -> R<Vec<Value>> {
     let mut rows = Vec::new();
     for (name, data) in fixtures(root, RENDER_FIXTURES)? {
+        if RENDER_PER_TARGET.contains(&name.as_str()) != per_target {
+            continue;
+        }
         let (profile, mode) = match kind(&name) {
             Some(Kind::Script(_)) => ("script", "script"),
             Some(Kind::Stream) => ("stream", "chunks"),
@@ -270,19 +279,11 @@ fn render_rows(root: &Path) -> R<Vec<Value>> {
 }
 
 /// Every file of the fixture directories is a script or a stream; a tree
-/// without the lane's features needs no fixtures.
+/// without these features needs no fixtures.
 fn check_inputs(root: &Path) -> Vec<String> {
-    let registered = FEATURES.iter().any(|feature| {
-        root.join("harness/features")
-            .join(feature)
-            .join("contract.json")
-            .is_file()
-    });
-    if !registered {
-        return Vec::new();
-    }
     let mut errors = Vec::new();
     let mut parsing = Vec::new();
+    let mut rendering = Vec::new();
     for directory in [FIXTURES, RENDER_FIXTURES] {
         match fixtures(root, directory) {
             Ok(files) => {
@@ -296,6 +297,8 @@ fn check_inputs(root: &Path) -> Vec<String> {
                 );
                 if directory == FIXTURES {
                     parsing = files;
+                } else {
+                    rendering = files;
                 }
             }
             Err(error) => errors.push(error),
@@ -309,6 +312,13 @@ fn check_inputs(root: &Path) -> Vec<String> {
             .any(|(file, data)| file == name && (!walked || timed(data)))
         {
             errors.push(format!("{FIXTURES}/{name}: no fixture of that name to run"));
+        }
+    }
+    for name in RENDER_PER_TARGET {
+        if !rendering.iter().any(|(file, _)| file == name) {
+            errors.push(format!(
+                "{RENDER_FIXTURES}/{name}: no fixture of that name to render"
+            ));
         }
     }
     errors
@@ -360,9 +370,12 @@ mod tests {
         let rendered = std::fs::read_dir(root.join(super::RENDER_FIXTURES))
             .unwrap()
             .count();
+        let sizes = super::RENDER_SIZES.len();
+        let host = rows(root, "ass-render-host").unwrap();
+        assert_eq!(host.len(), super::RENDER_PER_TARGET.len() * sizes);
         assert_eq!(
-            rows(root, "ass-render").unwrap().len(),
-            rendered * super::RENDER_SIZES.len()
+            rows(root, "ass-render").unwrap().len() + host.len(),
+            rendered * sizes
         );
     }
 }

@@ -75,6 +75,89 @@ fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
 
+fn entity_input_failure(
+    corpus: &Path,
+    case: &Value,
+    ordered_transport: bool,
+) -> Result<Option<&'static str>, String> {
+    let entities = case.get("entities");
+    if entities.is_none() && !ordered_transport {
+        return Ok(None);
+    }
+    let args = case_arguments(case);
+    let [_, _, args @ ..] = args.as_slice() else {
+        return Err("ordered transport input needs packet size and program".into());
+    };
+    let args = args
+        .strip_prefix(&[std::ffi::OsString::from("--dvb")])
+        .unwrap_or(args);
+    let Some(entities) = entities else {
+        return if args.is_empty() {
+            Ok(None)
+        } else {
+            Err("worker entity argument has no input pin".into())
+        };
+    };
+    let entities = entities.as_array().ok_or("expected an entity list")?;
+    let [primary, following @ ..] = entities else {
+        return Err("empty entity list".into());
+    };
+    let file = s(case, "file").ok_or("case without input path")?;
+    if s(primary, "file") != Some(file) || s(primary, "sha256") != s(case, "sha256") {
+        return Err("first entity does not match the case input".into());
+    }
+    let mut args = args.iter();
+    for entity in following {
+        let Some(name) = args.next() else {
+            return Err("ordered entity has no worker argument".into());
+        };
+        let discontinuity = name == "--discontinuity";
+        if entity
+            .get("discontinuity")
+            .is_some_and(|declared| declared != &Value::Bool(discontinuity))
+        {
+            return Err("entity discontinuity does not match its worker argument".into());
+        }
+        let name = if discontinuity {
+            args.next().ok_or("discontinuity without an entity")?
+        } else {
+            name
+        };
+        let relative = Path::new(name);
+        if name.to_str().is_none_or(|name| {
+            name.is_empty() || name.starts_with('-') || name.contains(['/', '\\'])
+        }) || !matches!(
+            relative.components().next(),
+            Some(std::path::Component::Normal(_))
+        ) || s(entity, "file").map(Path::new)
+            != Some(Path::new(file).with_file_name(relative).as_path())
+        {
+            return Err("ordered entity does not match its worker argument".into());
+        }
+    }
+    if args.next().is_some() {
+        return Err("worker entity argument has no input pin".into());
+    }
+    for entity in following {
+        let file = Path::new(s(entity, "file").ok_or("entity without input path")?);
+        if file.as_os_str().is_empty()
+            || file
+                .components()
+                .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        {
+            return Err("entity input escapes corpus".into());
+        }
+        let path = corpus.join(file);
+        if !path.is_file() {
+            return Ok(Some("missing-entity"));
+        }
+        if digest(&path)? != s(entity, "sha256").ok_or("entity without input hash")? {
+            return Ok(Some("entity-hash-mismatch"));
+        }
+    }
+    Ok(None)
+}
+
 fn command_output(program: &str, args: &[&str]) -> String {
     Command::new(program)
         .args(args)
@@ -274,7 +357,7 @@ fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
 /// pinned per target, its pin for `target`; `None` when it has none there.
 pub fn expected_for<'a>(case: &'a Value, target: &str) -> Option<&'a Value> {
     case.get("expected").or_else(|| {
-        case.get(crate::lanes::EXPECTED_BY_TARGET)
+        case.get(crate::generators::EXPECTED_BY_TARGET)
             .and_then(|pins| pins.get(target))
     })
 }
@@ -282,7 +365,7 @@ pub fn expected_for<'a>(case: &'a Value, target: &str) -> Option<&'a Value> {
 /// A case without a pin for `target`, run and reported, neither passing nor
 /// failing: `unpinned`, with the contract's reason when it gives one.
 fn unpinned(mut ran: Value, contract: &Value, id: &str, target: &str) -> Value {
-    let reason = crate::lanes::unpinned(contract, id)
+    let reason = crate::generators::unpinned(contract, id)
         .into_iter()
         .find(|(t, _)| *t == target)
         .map_or_else(
@@ -374,7 +457,7 @@ impl PrefixFeature {
             work_fields: super::comparison::work_fields(&document)?,
             timeout: worker::contract_timeout(&document)
                 .map_err(|e| format!("{}: {e}", contract.display()))?,
-            per_target: crate::lanes::pinned_per_target(&document),
+            per_target: crate::generators::pinned_per_target(&document),
             id,
         })
     }
@@ -382,25 +465,14 @@ impl PrefixFeature {
     /// Every registered feature (`harness/features/<id>`) whose contract runs
     /// `candidate` through a worker operation prefix, in id order.
     pub fn registered(root: &Path, candidate: &str) -> Result<Vec<Self>, String> {
-        let features = root.join("harness/features");
-        let mut ids: Vec<String> = fs::read_dir(&features)
-            .map_err(|e| format!("{}: {e}", features.display()))?
-            .filter_map(Result::ok)
-            .map(|entry| entry.file_name().to_string_lossy().into_owned())
-            .collect();
-        ids.sort();
-        let mut found = Vec::new();
-        for id in ids {
-            let contract = features.join(&id).join("contract.json");
-            let document = read_json(&contract)?;
-            if document.get("worker_operation").is_some()
-                && s(&document, "candidate") == Some(candidate)
-            {
-                let manifest = features.join(&id).join("corpus.json");
-                found.push(Self::load(root, &contract, &manifest, None)?);
-            }
-        }
-        Ok(found)
+        super::features::discover(root)?
+            .iter()
+            .filter(|contract| {
+                contract.document.get("worker_operation").is_some()
+                    && contract.candidate() == Some(candidate)
+            })
+            .map(|contract| Self::load(root, &contract.path, &contract.manifest(), None))
+            .collect()
     }
 
     /// The built candidate and reference, checked against the build identity.
@@ -624,9 +696,18 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([("status", Value::str("input-hash-mismatch"))])
         } else if !rights_reviewed(&reviewed, case) {
             Value::object([("status", Value::str("rights-unreviewed"))])
+        } else if let Some(status) = entity_input_failure(
+            &corpus,
+            case,
+            matches!(worker_operation.as_deref(), Some("ts-" | "ts-au-")),
+        )? {
+            Value::object([("status", Value::str(status))])
         } else if let Some(prefix) = &worker_operation {
             let arguments = case_arguments(case);
             row.push(("input_sha256", Value::str(sha)));
+            if let Some(entities) = case.get("entities") {
+                row.push(("input_entities", entities.clone()));
+            }
             row.push(("candidate_worker", Value::str(&candidate_name)));
             row.push(("operation", selected.operation));
             let run = Run {
@@ -648,7 +729,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     timeout,
                 },
             ));
-            let per_target = crate::lanes::pinned_per_target(&contract);
+            let per_target = crate::generators::pinned_per_target(&contract);
             let expected = expected_for(case, &target);
             let ran = parity::feed_parity(
                 &run,
@@ -933,11 +1014,50 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
 #[cfg(test)]
 mod prefix_tests {
     use super::{
-        PrefixFeature, open_cases, ratchet, read_json, recorded_corpus, reviewed_inputs,
-        rights_reviewed, s,
+        PrefixFeature, entity_input_failure, open_cases, ratchet, read_json, recorded_corpus,
+        reviewed_inputs, rights_reviewed, s,
     };
     use crate::json::{Value, parse};
     use std::path::Path;
+
+    #[test]
+    fn ordered_input_hashes_are_checked_before_running_the_workers() {
+        let root = crate::walk::scratch("ordered-input-hashes");
+        std::fs::create_dir_all(&root).unwrap();
+        let input = b"known entity bytes";
+        let hash = crate::sha256::hex(input);
+        let row = format!(
+            r#"{{"file":"first.ts","sha256":"{hash}","arguments":["188","1","next.ts"],
+                 "entities":[{{"file":"first.ts","sha256":"{hash}"}},
+                             {{"file":"next.ts","sha256":"{hash}"}}]}}"#
+        );
+        let case = parse(&row).unwrap();
+        let unpinned = parse(r#"{"arguments":["188","1","next.ts"]}"#).unwrap();
+        assert_eq!(
+            entity_input_failure(&root, &unpinned, true).unwrap_err(),
+            "worker entity argument has no input pin"
+        );
+        let mismatched =
+            parse(&row.replace(r#"["188","1","next.ts"]"#, r#"["188","1","different.ts"]"#))
+                .unwrap();
+        assert_eq!(
+            entity_input_failure(&root, &mismatched, true).unwrap_err(),
+            "ordered entity does not match its worker argument"
+        );
+        assert_eq!(
+            entity_input_failure(&root, &case, true).unwrap(),
+            Some("missing-entity")
+        );
+        std::fs::write(root.join("next.ts"), b"other entity bytes").unwrap();
+        assert_eq!(
+            entity_input_failure(&root, &case, true).unwrap(),
+            Some("entity-hash-mismatch")
+        );
+        std::fs::write(root.join("next.ts"), input).unwrap();
+        assert_eq!(entity_input_failure(&root, &case, true).unwrap(), None);
+        std::fs::remove_file(root.join("next.ts")).unwrap();
+        std::fs::remove_dir(root).unwrap();
+    }
 
     #[test]
     fn rights_are_synthetic_or_a_recorded_reviewed_licence() {

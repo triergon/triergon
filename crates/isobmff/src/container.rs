@@ -41,8 +41,8 @@ use triergon_core::{
 fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>) -> CodecId<'a> {
     match (handler, format) {
         (b"vide", b"avc1" | b"avc3") => CodecId::H264,
-        (b"vide", b"hvc1" | b"hev1") => CodecId::Hevc,
-        (b"vide", b"av01") => CodecId::Av1,
+        (b"vide", b"hvc1" | b"hev1" | b"dvh1" | b"dvhe") => CodecId::Hevc,
+        (b"vide", b"av01" | b"dav1") => CodecId::Av1,
         (b"vide", b"vp09") => CodecId::Vp9,
         (b"vide", b"raw ") => CodecId::RawVideo,
         (b"soun", b"mp4a") => match object_type {
@@ -85,7 +85,9 @@ fn configuration_box(codec: CodecId<'_>) -> Option<[u8; 4]> {
     })
 }
 
-fn media_kind(handler: &[u8; 4]) -> MediaKind {
+/// Classify an `hdlr` handler code without copying or allocating.
+/// Unrecognized handlers remain [`MediaKind::Unknown`].
+pub fn media_kind(handler: &[u8; 4]) -> MediaKind {
     match handler {
         b"vide" => MediaKind::Video,
         b"soun" => MediaKind::Audio,
@@ -946,7 +948,10 @@ mod tests {
             (b"vide", b"avc3", None, CodecId::H264),
             (b"vide", b"hvc1", None, CodecId::Hevc),
             (b"vide", b"hev1", None, CodecId::Hevc),
+            (b"vide", b"dvh1", None, CodecId::Hevc),
+            (b"vide", b"dvhe", None, CodecId::Hevc),
             (b"vide", b"av01", None, CodecId::Av1),
+            (b"vide", b"dav1", None, CodecId::Av1),
             (b"vide", b"vp09", None, CodecId::Vp9),
             (b"vide", b"raw ", None, CodecId::RawVideo),
             (b"soun", b"mp4a", Some(0x40), CodecId::Aac),

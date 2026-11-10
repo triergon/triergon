@@ -73,7 +73,7 @@ packet projections before merging the tracks for delivery.
 | Progressive TS188 | `ts_progressive::TsProgressiveReader` (AVC + ADTS AAC) |
 | HLS media segments | `hls_segment::HlsSegmentReader` (AVC + AAC), `HlsMediaSegmentReader` (AVC/HEVC + AAC/AC-3/E-AC-3) |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
-| Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge`; MP4 AVC and HEVC samples frame through `triergon_framing::NalPacketSession` |
+| Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge` (including MP4 `av01` and `dav1`); MP4 AVC and HEVC samples frame through `triergon_framing::NalPacketSession` |
 | Subtitles | `text_bridge::TextBridge`, `bitmap_bridge::{PgsBridge, DvdReceiver}`, `matroska_feed::MatroskaBitmapTrack`, `mp4_dvd::{Mp4DvdSetup, Mp4DvdTrack}`, `dvb_ts::DvbTsBridge`, `pgs_ts::PgsTsTrack`, `teletext_ts::TeletextTsBridge`, `caption_bridge::CaptionBridge` |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
@@ -119,6 +119,9 @@ reordering retains at most 32 KiB of media. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
+Complete fragmented files with an open-ended rate-one initialization edit
+apply the same edit clocks on startup and seek. The first AAC packet carries
+leading trim in `Mp4Packet::encoded_skip_samples`.
 For a file with surplus timing entries, `Mp4Open::with_timing_policy` can
 use the timing prefix covered by the sample sizes for forward playback and
 `Mp4RangeOpen`. Each track's table reports the unused timing occurrences. The source playback view

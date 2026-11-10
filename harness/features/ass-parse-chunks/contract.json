@@ -6,6 +6,7 @@
   "worker_operation": "ass-",
   "reference": "libass-ass-native",
   "gate": "required",
+  "compare_order": 1,
   "contract": [
     "one authored stream fixture run as libass 0.17.5 runs a Matroska track: ass_new_track, then in order ass_process_codec_private, ass_process_data, ass_read_styles (on memory: the parser state switched to the styles section around ass_process_data), ass_process_chunk with the container's start and duration and ReadOrder deduplication as ass_set_check_readorder sets it, ass_flush_events and ass_prune_events, with the style overrides and font extraction its directives set",
     "recorded at every @dump command and at the end: the track as ass-parse-scripts records it, with every embedded font extracted so far",

@@ -1,13 +1,13 @@
 //! The font features' corpus manifests, generated. Every file of the font corpus
 //! (`harness/fonts/corpus.json`) becomes cases of each feature's load settings; the
 //! work each case must fold is pinned in `harness/features/<id>/pins.json`, the
-//! FreeType reference's folds (see [`crate::lanes`]).
+//! FreeType reference's folds (see [`crate::generators`]).
 
 use std::path::Path;
 
 use super::{CORPUS, corpus};
+use crate::generators::{self, Generator};
 use crate::json::Value;
-use crate::lanes::{self, Lane};
 
 type R<T> = Result<T, String>;
 
@@ -52,22 +52,22 @@ enum Load {
     Sized(&'static [i32]),
 }
 
-pub const FEATURES: [&str; 3] = ["font-outlines", "font-hinting-none", "font-hinting-modes"];
-
-pub const LANE: Lane = Lane {
+pub const GENERATOR: Generator = Generator {
     command: "fonts",
     main: super::main,
-    features: &FEATURES,
-    reference: "freetype-native",
-    pin_note: "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+    candidate: "font-worker",
+    pin_note: (
+        "freetype-native",
+        "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+    ),
     report_directory: ".research/font-report",
     manifest_directory: ".research/fonts/manifests",
     row_sources: &ROW_SOURCES,
     rows,
     note,
     directory: |_| DIRECTORY,
-    write_inputs: lanes::no_inputs,
-    check_inputs: lanes::no_checks,
+    write_inputs: generators::no_inputs,
+    check_inputs: generators::no_checks,
     smoke: &[
         ("font-outlines", &SMOKE_CASES),
         ("font-hinting-none", &SMOKE_CASES),
@@ -155,9 +155,14 @@ mod tests {
     #[test]
     fn every_font_feature_generates_its_pinned_cases() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        assert!(LANE.check(root).is_empty(), "{:?}", LANE.check(root));
+        assert!(
+            GENERATOR.check(root).is_empty(),
+            "{:?}",
+            GENERATOR.check(root)
+        );
         let count = |id| {
-            LANE.manifest(root, id)
+            GENERATOR
+                .manifest(root, id)
                 .unwrap()
                 .get("cases")
                 .and_then(Value::as_array)
@@ -165,14 +170,14 @@ mod tests {
                 .len()
         };
         assert_eq!(
-            FEATURES.map(|f| (f, count(f))),
+            ["font-outlines", "font-hinting-none", "font-hinting-modes"].map(|f| (f, count(f))),
             [
                 ("font-outlines", 51),
                 ("font-hinting-none", 102),
                 ("font-hinting-modes", 918)
             ]
         );
-        let none = LANE.manifest(root, "font-hinting-none").unwrap();
+        let none = GENERATOR.manifest(root, "font-hinting-none").unwrap();
         let first = &none.get("cases").and_then(Value::as_array).unwrap()[1];
         assert_eq!(
             first.get("id").and_then(Value::as_str),
@@ -201,17 +206,20 @@ mod tests {
         };
         copy("contract.json");
         copy("pins.json");
-        assert!(LANE.check(&root).is_empty());
+        assert!(GENERATOR.check(&root).is_empty());
         let pins = std::fs::read_to_string(feature.join("pins.json")).unwrap();
+        let other_reference = pins.replacen("freetype-native", "other-reference", 1);
+        std::fs::write(feature.join("pins.json"), other_reference).unwrap();
+        assert!(GENERATOR.check(&root)[0].contains("pin reference differs"));
         std::fs::write(feature.join("pins.json"), pins.replace("\n  ", "\n ")).unwrap();
         assert!(
-            LANE.check(&root)[0].contains("not in the form"),
+            GENERATOR.check(&root)[0].contains("not in the form"),
             "hand formatting"
         );
         let renamed = pins.replacen("arimo-bold-ttf", "arimo-bold", 1);
         std::fs::write(feature.join("pins.json"), renamed).unwrap();
         assert!(
-            LANE.check(&root)[0].contains("pinned as"),
+            GENERATOR.check(&root)[0].contains("pinned as"),
             "a case id differs"
         );
         std::fs::remove_dir_all(root).unwrap();

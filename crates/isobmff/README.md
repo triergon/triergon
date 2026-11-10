@@ -11,6 +11,9 @@ I/O of its own, decodes no codec, and does not apply edits to presentation.
 works in generic code and inside `triergon::AnyReader`. The parts below stay
 available for finer control.
 
+`media_kind(&handler)` classifies an `hdlr` handler code without allocating,
+using the same mapping as `TrackInfo::kind`. Unknown handlers stay unknown.
+
 The crate exposes two views of the same file:
 
 - **Source view** (`BoxReader`, `SampleTable`, `FragmentIndex`, `SampleReader`,
@@ -176,6 +179,11 @@ and shares a sample's window where the whole sample fits in one.
 | `random_access` | `stss` or fragment sample flags |
 | `Event::Other` | `ReaderEvent::Box` for each root box, `ReaderEvent::Movie` once tracks are available |
 
+Dolby Vision sample entries `dvh1` and `dvhe` report HEVC and `dav1` reports AV1.
+The reader and range playback keep the source entry code and expose the base
+`hvcC` or `av1C` configuration. Dolby Vision boxes remain available through
+`SampleDescription::extensions`. See the [registered sample entries](https://mp4ra.org/registered-types/codecs).
+
 `request_seek` finds the latest stated sync sample presented at or before the target
 on the track's media clock, or the first one if none is, without reading media. It
 reports `SeekMethod::Index`. Other tracks resume at their first sample at or after
@@ -295,6 +303,9 @@ rejects boxes extending past the source.
   or shifts packets; the FFmpeg-compatible view does.
   Range playback preserves AAC sample durations from `stts`, including
   durations longer than one coded frame. Trim counts use the coded frame length.
+  The compatible view of a complete fragmented file supports one open-ended
+  rate-one initialization edit. Packet clocks and backward seek queries share
+  the edit's offset. AAC leading trim uses the configured audio sample rate.
 - **Seek.** Seek planners select a preceding container sync sample, record
   available and missing preroll, and validate every media range before
   publishing a plan. A sync sample is a container fact, not proof of decoder

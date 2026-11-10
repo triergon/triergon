@@ -384,6 +384,11 @@ fn membership<'a>(expected: &[Value], actual: &'a [Value]) -> R<BTreeMap<&'a str
             return Err(format!("{id}: input hash mismatch"));
         }
         require_same(field(actual, "profile")?, field(row, "profile")?, "profile")?;
+        match (row.get("entities"), actual.get("input_entities")) {
+            (Some(expected), Some(reported)) => require_same(reported, expected, "input entities")?,
+            (None, None) => {}
+            _ => return Err(format!("{id}: input entities mismatch")),
+        }
     }
     Ok(found)
 }
@@ -1336,11 +1341,15 @@ mod tests {
                 .iter()
                 .rev()
                 .map(|row| {
-                    object(&[
+                    let mut report = object(&[
                         ("id", row.get("id").unwrap().clone()),
                         ("profile", row.get("profile").unwrap().clone()),
                         ("input_sha256", row.get("sha256").unwrap().clone()),
-                    ])
+                    ]);
+                    if let Some(entities) = row.get("entities") {
+                        put(&mut report, "input_entities", entities.clone()).unwrap();
+                    }
+                    report
                 })
                 .collect();
             assert_eq!(
@@ -1349,6 +1358,14 @@ mod tests {
                 "{feature}"
             );
             assert!(membership(expected, &actual[1..]).is_err(), "{feature}");
+            if let Some(index) = actual
+                .iter()
+                .position(|row| row.get("input_entities").is_some())
+            {
+                let mut changed = actual.clone();
+                put(&mut changed[index], "input_entities", Value::Array(vec![])).unwrap();
+                assert!(membership(expected, &changed).is_err(), "{feature}");
+            }
             let mut pilot = manifest.clone();
             put(&mut pilot, "cases", Value::Array(expected[1..].to_vec())).unwrap();
             let pilot_sha = sha256::hex(json::to_python(&pilot, Some(2)).as_bytes());

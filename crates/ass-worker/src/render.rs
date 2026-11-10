@@ -293,8 +293,8 @@ pub fn run(args: &[String]) -> Result<()> {
         fixture,
     };
     // An accounting ceiling far above any case of the corpus, so only parity
-    // decides.
-    let budget = Budget::new(1 << 34)?;
+    // decides: 16 GiB, or all of a 32-bit address space.
+    let budget = Budget::new(usize::try_from(1_u64 << 34).unwrap_or(usize::MAX))?;
     let fonts = case.fonts(&budget)?;
     let mut out = io::stdout().lock();
     if action == "ass-render-dump" {

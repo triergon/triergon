@@ -6,6 +6,7 @@
   "worker_operation": "ass-",
   "reference": "libass-ass-native",
   "gate": "required",
+  "compare_order": 0,
   "contract": [
     "one authored script read from memory as libass 0.17.5's ass_read_memory reads it, without a codepage, after the style overrides (ass_set_style_overrides) and font extraction (ass_set_extract_fonts) its ;@force and ;@extract-fonts directives set",
     "recorded: every track field (script type, play and layout resolution, timer, wrap style, ScaledBorderAndShadow, kerning, YCbCr matrix, language, the default style), the style and event format lines, every style field (names, size, colours, weight and slant values, decorations, scales, spacing, angle, border style, outline, shadow, alignment, margins, encoding, blur, justification), every event field (times, ReadOrder, layer, style, name, margins, effect, text) and every extracted font's name, size and FNV-1a hash; no track when libass returns none; values libass treats alike are recorded as one (Underline and StrikeOut as 0 or 1, Alignment by its four low bits, WrapStyle and Justify by the values libass names)",

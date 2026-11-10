@@ -1,4 +1,4 @@
-/* Regular AVC/AAC playback through the public MOV demuxer API. */
+/* Seekable MP4 playback through the public MOV demuxer API. */
 #include <errno.h>
 
 typedef struct {
@@ -33,17 +33,38 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
     int video = -1;
     int audio = -1;
     result = AVERROR_INVALIDDATA;
-    if (format->nb_streams != 2)
+    if (format->nb_streams < 1 || format->nb_streams > 2)
         goto done;
     for (unsigned i = 0; i < format->nb_streams; ++i) {
         const AVCodecParameters *codec = format->streams[i]->codecpar;
-        if (codec->codec_type == AVMEDIA_TYPE_VIDEO && codec->codec_id == AV_CODEC_ID_H264)
+        const uint32_t tag = codec->codec_tag;
+        const int video_codec =
+            (codec->codec_id == AV_CODEC_ID_H264 && tag == MKTAG('a', 'v', 'c', '1')) ||
+            (codec->codec_id == AV_CODEC_ID_HEVC &&
+             (tag == MKTAG('d', 'v', 'h', '1') || tag == MKTAG('d', 'v', 'h', 'e'))) ||
+            /* The MOV demuxer can emit dav1 packets and configuration with no codec ID. */
+            (tag == MKTAG('d', 'a', 'v', '1') &&
+             (codec->codec_id == AV_CODEC_ID_AV1 || codec->codec_id == AV_CODEC_ID_NONE));
+        if (video < 0 && codec->codec_type == AVMEDIA_TYPE_VIDEO && video_codec)
             video = (int)i;
-        if (codec->codec_type == AVMEDIA_TYPE_AUDIO && codec->codec_id == AV_CODEC_ID_AAC)
+        else if (audio < 0 && codec->codec_type == AVMEDIA_TYPE_AUDIO &&
+                 codec->codec_id == AV_CODEC_ID_AAC)
             audio = (int)i;
+        else
+            goto done;
     }
-    if (video < 0 || audio < 0)
+    if (video < 0)
         goto done;
+    const AVCodecParameters *codec = format->streams[video]->codecpar;
+    if (audio < 0 && codec->codec_tag != MKTAG('d', 'a', 'v', '1'))
+        goto done;
+    if (codec->codec_tag != MKTAG('a', 'v', 'c', '1')) {
+        if (codec->extradata_size <= 0 || !codec->extradata)
+            goto done;
+        fold(&work->digest, codec->codec_tag);
+        fold(&work->digest, (uint64_t)codec->extradata_size);
+        fold_bytes(&work->digest, codec->extradata, (size_t)codec->extradata_size);
+    }
     packet = av_packet_alloc();
     if (!packet) {
         result = AVERROR(ENOMEM);

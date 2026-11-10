@@ -6,6 +6,7 @@
   "worker_operation": "simple-",
   "reference": "harfbuzz-native",
   "gate": "required",
+  "compare_order": 4,
   "contract": [
     "one text file read from memory: one text per line",
     "libass 0.17.5's ASS_SHAPING_SIMPLE over each line as one paragraph: FriBidi 1.0.17's levels with the case's base direction, fribidi_get_joining_types, fribidi_join_arabic and fribidi_shape with FRIBIDI_FLAGS_DEFAULT | FRIBIDI_FLAGS_ARABIC",

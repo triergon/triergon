@@ -1,4 +1,4 @@
-//! Sparse restart states for regular tracks that passed the demux range scan.
+//! Sparse restart states for tracks that passed the demux range scan.
 use super::{PacketCursor, Phase, Slot, count};
 use crate::{BuildStatus, CursorStatus, IndexEntry, SchedulingClock, SeekLanding, SeekLimits};
 use std::{
@@ -82,10 +82,10 @@ impl<'a> Checkpoints<'a> {
         } else {
             0
         };
-        // The regular demux index accepts this flag/size/clock profile.
-        // Anything ambiguous stays on the original full seek planner.
+        // A fragment run beginning at a key needs no distance from a
+        // preceding run. Let the full index handle other append boundaries.
         if track.previous.is_some_and(|before| timestamp <= before)
-            || (track.entries == 0 && !key)
+            || (!key && (track.entries == 0 || slot.starts_fragment_run))
             || flags & !admitted != 0
             || row.source.range.start > i64::MAX as u64
             || row.source.range.end.checked_sub(row.source.range.start)? > 0x1fff_ffff
@@ -103,6 +103,9 @@ impl<'a> Checkpoints<'a> {
         if track.entries.is_multiple_of(CHECKPOINT_INTERVAL) || spare {
             if self.stored == MAX_CHECKPOINTS {
                 return None;
+            }
+            if slot.saw_fragment && track.points.is_empty() {
+                track.points.try_reserve_exact(1).ok()?;
             }
             track
                 .points
@@ -123,18 +126,18 @@ impl<'a> Checkpoints<'a> {
 }
 
 impl<'a> PacketCursor<'a> {
-    /// Collect optional seek restarts as the complete regular range is checked.
+    /// Collect optional seek restarts as the complete range is checked.
     /// The cursor must be exhausted and rewound before using the restarts.
     pub fn enable_range_seek_checkpoints(&mut self) {
         if matches!(self.phase, Phase::Media)
             && self.complete_source
             && !self.front_source
             && self.limits.max_occurrences <= i32::MAX as u64
-            && self
-                .slots
-                .as_slice()
-                .iter()
-                .all(|slot| slot.resume_remaining == 0 && slot.track.fragments.is_empty())
+            && self.slots.as_slice().iter().all(|slot| {
+                slot.resume_remaining == 0
+                    && (slot.track.fragments.is_empty()
+                        || (slot.track.table.sample_count() == 0 && slot.track.edits.is_some()))
+            })
         {
             self.seek_checkpoints = Checkpoints::new(self.slots.budget(), self.slots.as_slice())
                 .ok()
@@ -332,7 +335,7 @@ impl<'a> TrackSeek<'a> {
     }
 }
 
-/// Source-bound seek over the sparse regular-track restarts from range open.
+/// Source-bound seek over the sparse track restarts from range open.
 #[derive(Debug)]
 pub struct RangeSeekJob<'a> {
     index: Arc<Checkpoints<'a>>,
@@ -405,6 +408,9 @@ impl<'a> RangeSeekJob<'a> {
             if target == i64::MIN {
                 return Err(Error::Unsupported("native seek null timestamp argument"));
             }
+            // A query below the signed index range still lands at its first
+            // key. Every checkpoint has a defined DTS above the null value.
+            let target = target.saturating_sub(points[0].slot.fragment_media_start.unwrap_or(0));
             self.scan = Some(TrackSeek::new(points, target));
         }
     }

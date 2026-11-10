@@ -69,6 +69,15 @@ benchmarks assume it.
    edited by hand. Put the
    per-case results in the pull request and update [docs/status.md](docs/status.md).
 
+Register comparisons in `harness/features/<id>/contract.json`. The contract
+selects the candidate, reference and operation. Set its `gate` to `required`
+to include the comparison in `cargo xtask check`. Worker identities bind the
+registered contracts and their corpus inputs. Generated manifests record and
+verify their pins against the reference named in the contract. A generated
+feature can set `pin_note` to describe those pins. Required comparisons check
+manifest profiles and expected folds before running. Set `compare_order` to
+order a generator's reports. Unranked features follow in ID order.
+
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
 [docs/architecture.md](docs/architecture.md) for where code belongs.
 

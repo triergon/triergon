@@ -62,7 +62,7 @@ pub mod mov {
         //! [`PacketCursor::new_encoded_regular`](super::packets::PacketCursor::new_encoded_regular).
         pub use crate::encoded_edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
-            EncodedEditProfile,
+            EncodedEditProfile, fragment_aac::FragmentAacTrimJob,
         };
         pub use crate::mov_cursor::EditIdentity;
         pub use crate::mov_edits::{DurationBasis, EditCursor, EditLimits, EditOccurrence};

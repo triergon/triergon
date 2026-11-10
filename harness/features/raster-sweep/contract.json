@@ -6,6 +6,7 @@
   "worker_operation": "raster-",
   "reference": "libass-native",
   "gate": "on-demand",
+  "compare_order": 3,
   "contract": [
     "one font file read from memory: glyph ids spread evenly over face 0, loaded as libass 0.17.5 loads them with hinting off (ASS_HINTING_NONE): GDI face metrics, a REAL_DIM size request of the case's 26.6 pixel height and unhinted outlines (FT_LOAD_NO_HINTING), from FreeType 2.15.0 in the reference and triergon-font in the candidate; the cases of the arguments over those glyphs",
     "one case file read from memory, one case per line, generated from a seed: random outline and random bitmap cases as in raster-outlines and raster-bitmaps",

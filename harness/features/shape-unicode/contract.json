@@ -6,6 +6,7 @@
   "worker_operation": "unicode-",
   "reference": "harfbuzz-native",
   "gate": "required",
+  "compare_order": 5,
   "contract": [
     "one file of code point ranges read from memory, covering every Unicode scalar value",
     "per code point: HarfBuzz 14.6.0's default Unicode functions (general category, combining class, script, mirroring, decomposition) and FriBidi 1.0.17's bidi type, bracket, mirror and joining type, in their C APIs' numbering; packets count code points"

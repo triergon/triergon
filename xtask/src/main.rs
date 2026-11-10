@@ -17,10 +17,10 @@ mod fetch;
 mod fonts;
 mod framing_bench;
 mod fuzz;
+mod generators;
 mod harness;
 mod isobmff_bench;
 mod json;
-mod lanes;
 mod numpy;
 mod playback_golds;
 mod prepare;
@@ -45,7 +45,7 @@ const USAGE: &str = "usage: cargo xtask <command>
 
 commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
-  check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
+  check-simd     clippy and tests of the opt-in HEVC SIMD path on the pinned nightly
   prepare-check  once before `check`: the pinned FFmpeg, FreeType, HarfBuzz, FriBidi and
                  libass references, the fixtures, the required vectors, the font corpus and
                  the workers (built with the reference first on PATH)
@@ -138,8 +138,8 @@ fn main() -> ExitCode {
     }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = root();
-    if let Some(lane) = args.first().and_then(|command| lanes::lane_named(command)) {
-        return lane_main(&root, lane, &args[1..]);
+    if let Some(generator) = args.first().and_then(|command| generators::named(command)) {
+        return generator_main(&root, generator, &args[1..]);
     }
     let result = match args.first().map(String::as_str) {
         Some("check") => check(&root),
@@ -848,7 +848,7 @@ fn run(command: &mut Command) -> Task {
     }
 }
 
-/// The nightly toolchain of the opt-in HEVC `std::simd` lane, pinned so that lints
+/// The nightly toolchain of the opt-in HEVC `std::simd` path, pinned so that lints
 /// and code generation do not change underneath the checks and measurements.
 const NIGHTLY: &str = "nightly-2026-10-17";
 
@@ -872,7 +872,7 @@ fn prepare_check() -> Task {
     Ok(())
 }
 
-/// The opt-in nightly `std::simd` lane of the HEVC decoder must decode exactly as
+/// The opt-in nightly `std::simd` path of the HEVC decoder must decode exactly as
 /// the scalar default does (the conformance tests compare both with FFmpeg digests).
 fn check_simd(root: &Path) -> Task {
     run(Command::new("rustup").args([
@@ -928,20 +928,20 @@ const REFERENCE_TRACE_CRATES: [&str; 5] = [
     "triergon-subtitles",
 ];
 
-/// `cargo xtask COMMAND ARGS` for a lane: `compare` runs the reports of the
-/// features it selects, anything else is the lane's own subcommand.
-fn lane_main(root: &Path, lane: &lanes::Lane, args: &[String]) -> ExitCode {
+/// `cargo xtask COMMAND ARGS` for a generator: `compare` runs the reports of the
+/// features it selects, anything else is the generator's own subcommand.
+fn generator_main(root: &Path, generator: &generators::Generator, args: &[String]) -> ExitCode {
     let result = match args {
         [command, rest @ ..] if command == "compare" => {
-            match lane
+            match generator
                 .reports(root, rest)
-                .and_then(|reports| (lane.write_inputs)(root).map(|()| reports))
+                .and_then(|reports| (generator.write_inputs)(root).map(|()| reports))
             {
-                Ok(reports) => return lane_compare(root, &reports),
+                Ok(reports) => return run_reports(root, &reports),
                 Err(error) => Err(error),
             }
         }
-        _ => (lane.main)(root, args),
+        _ => (generator.main)(root, args),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -954,7 +954,7 @@ fn lane_main(root: &Path, lane: &lanes::Lane, args: &[String]) -> ExitCode {
 
 /// The reports `COMMAND compare` stands for; exits with the first failing one's
 /// code.
-fn lane_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
+fn run_reports(root: &Path, reports: &[Vec<String>]) -> ExitCode {
     let mut result = ExitCode::SUCCESS;
     for args in reports {
         println!("$ cargo xtask report {}", args.join(" "));
@@ -966,15 +966,50 @@ fn lane_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
     result
 }
 
-/// A lane's generated inputs, `COMMAND compare` on its required features, then
-/// one round of mutations of each feature's smoke cases.
-fn lane_check(root: &Path, lane: &lanes::Lane) -> Task {
-    (lane.write_inputs)(root)?;
-    let reports = lane.reports(root, &[])?;
-    if lane_compare(root, &reports) != ExitCode::SUCCESS {
-        return Err(format!("cargo xtask {} compare failed", lane.command));
+/// Prepare generated inputs and run the contracts required by the workspace check.
+fn check_features(root: &Path) -> Task {
+    let contracts = harness::features::required(root)?;
+    if contracts.is_empty() {
+        return Err("no required feature contracts".into());
     }
-    smoke_campaigns(root, lane.smoke.iter().copied())
+    for generator in generators::GENERATORS {
+        if contracts.iter().any(|contract| {
+            contract.generated() && contract.candidate() == Some(generator.candidate)
+        }) {
+            (generator.write_inputs)(root)?;
+        }
+    }
+    let reports = contracts
+        .iter()
+        .map(|contract| {
+            let manifest = contract.manifest();
+            let (document, _) = harness::manifest::read(root, &manifest)?;
+            harness::manifest::validate_required(&contract.document, &document)
+                .map_err(|error| format!("{}: {error}", contract.id))?;
+            let directory = generators::for_contract(&contract.document)
+                .map_or(".research/feature-reports", |generator| {
+                    generator.report_directory
+                });
+            Ok(vec![
+                "--contract".to_owned(),
+                contract.path.display().to_string(),
+                "--manifest".to_owned(),
+                manifest.display().to_string(),
+                "--output".to_owned(),
+                root.join(directory)
+                    .join(&contract.id)
+                    .display()
+                    .to_string(),
+            ])
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    if run_reports(root, &reports) != ExitCode::SUCCESS {
+        return Err("required feature comparison failed".into());
+    }
+    for generator in generators::GENERATORS {
+        smoke_campaigns(root, generator.smoke.iter().copied())?;
+    }
+    Ok(())
 }
 
 /// One fuzz round over the given cases of each feature through the release and
@@ -1088,13 +1123,10 @@ fn check(root: &Path) -> Task {
     check_simd(root)?;
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;
-    lane_check(root, &fonts::LANE)?;
     // The Unicode tables are what their generator writes.
     println!("$ cargo xtask shape ucd --check");
     shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
-    lane_check(root, &shape::LANE)?;
-    lane_check(root, &raster::LANE)?;
-    lane_check(root, &ass::LANE)?;
+    check_features(root)?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;

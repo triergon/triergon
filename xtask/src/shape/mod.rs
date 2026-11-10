@@ -10,7 +10,7 @@ mod reference;
 mod texts;
 mod ucd;
 
-pub use manifest::LANE;
+pub use manifest::GENERATOR;
 
 use std::path::Path;
 
@@ -56,7 +56,9 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             println!("{}", built.display());
             Ok(())
         }
-        [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),
+        [command, rest @ ..] if command == "manifest" => {
+            GENERATOR.manifest_command(root, rest, USAGE)
+        }
         [command, rest @ ..] if command == "ucd" => ucd::main(root, rest),
         _ => Err(USAGE.into()),
     }

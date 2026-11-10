@@ -10,7 +10,7 @@ mod equivalence;
 mod manifest;
 mod observed;
 
-pub use manifest::LANE;
+pub use manifest::GENERATOR;
 pub use observed::observed_sources;
 
 use std::path::Path;
@@ -34,9 +34,10 @@ pub const USAGE: &str = "usage: cargo xtask ass prepare [--jobs N]
             (default .research/ass/manifests); with --record, first re-record
             every pin from the built reference
   compare   `cargo xtask report` on each ASS feature (ass-parse-scripts,
-            ass-parse-chunks, ass-parse-events, ass-parse-host, which fails
-            the command only on the targets its contract requires, and
-            ass-render; --all adds none today); further report options pass
+            ass-parse-chunks, ass-parse-events, ass-render, and ass-parse-host
+            and ass-render-host, which fail the command only on the targets
+            their contracts require; --all adds none today); further report
+            options pass
             through, and each report goes to OUTPUT/<feature> (OUTPUT:
             --output, default .research/ass-report)
   equivalence  the renderer of REV and of the working tree on the same
@@ -62,7 +63,9 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             println!("{}", observed_sources(root)?.display());
             Ok(())
         }
-        [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),
+        [command, rest @ ..] if command == "manifest" => {
+            GENERATOR.manifest_command(root, rest, USAGE)
+        }
         [command, help] if command == "equivalence" && (help == "--help" || help == "-h") => {
             println!("{}", equivalence::USAGE);
             Ok(())

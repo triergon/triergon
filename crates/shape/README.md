@@ -131,7 +131,8 @@ paragraph separator inside the text.
   fallback lookups.
 - What libass reads from FreeType's hinted load: `SizedMetrics` gives no glyph
   extents or contour points (`Unsupported`), so fallback mark positioning in a
-  font without GPOS marks fails, and no default-load advance that FreeType's
+  font without GPOS marks fails (which leaves `ass-render`'s two
+  `hinted-extents-ass-*` cases open), and no default-load advance that FreeType's
   auto-hinter sets. Faces whose character map libass would convert (Windows
   multibyte encodings) are refused. The vertical advances libass substitutes in
   an `@` font are not covered.
@@ -143,7 +144,9 @@ paragraph separator inside the text.
 - Variable font instances other than the default; the 24-bit "beyond 64K"
   layout formats.
 - Languages outside the table of `Language`: libass's script languages, the major
-  European, Middle Eastern and Asian languages and `c`.
+  European, Middle Eastern and Asian languages and `c`. HarfBuzz selects no
+  language system for a language it does not register; refusing one leaves
+  `ass-render`'s two `language-unknown-ass-*` cases open.
 - Malformed tables are read leniently (an out-of-range structure reads as
   absent, a count as the records that are present) where HarfBuzz's sanitizer
   would reject or neuter them, so results on damaged fonts can differ; they

@@ -608,6 +608,22 @@ pub fn acceptance(
     )
 }
 
+/// The declared profiles absent from the supplied case set.
+pub(super) fn missing_profiles(contract: &Value, present: &BTreeSet<String>) -> Vec<String> {
+    let mut missing: Vec<String> = contract
+        .get("required_profiles")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|profile| !present.contains(*profile))
+        .map(str::to_owned)
+        .collect();
+    missing.sort();
+    missing.dedup();
+    missing
+}
+
 /// Grade owned rows one at a time, retaining only identities, profiles and findings.
 /// An input error or a missing registered refusal withholds acceptance.
 pub(crate) fn acceptance_iter(
@@ -688,17 +704,7 @@ pub(crate) fn acceptance_iter(
     for id in registered.keys().filter(|id| !refusals.contains(**id)) {
         reasons.push(format!("{id}: required refusal missing or invalid"));
     }
-    let mut missing: Vec<String> = contract
-        .get("required_profiles")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(Value::as_str)
-        .filter(|profile| !passed.contains(*profile))
-        .map(str::to_owned)
-        .collect();
-    missing.sort();
-    missing.dedup();
+    let missing = missing_profiles(contract, &passed);
     if !missing.is_empty() {
         reasons.push(format!("missing required profiles: {}", missing.join(", ")));
     }

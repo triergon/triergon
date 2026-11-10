@@ -22,6 +22,16 @@ pub mod pes {
     //! select the carriage: [`RegisteredCarriage`] for AVC, HEVC and AAC,
     //! [`PrivateAudioCarriage`] for AC-3 and E-AC-3, and
     //! [`DvbSubtitlesDescriptors`] for DVB subtitles.
+    //! [`TransportFaultRecovery`] adds opt-in extraction from finite TS188 AVC
+    //! carriers with TEI or scrambling. Its [`TransportObservation::Faulted`]
+    //! result retains the actual source diagnostic and opaque bytes separately
+    //! from validated source PES.
+    //! [`PesFaultPolicy`] separately opts into isolated timing-header faults and
+    //! fully checked rejected clock fields. [`PesFaultPacket`] retains the source
+    //! refusal; [`DiagnosticTimeView`] reports optional encoded compatibility time.
+    //! A source-signalled PCR/DI transition needs [`TransportFaultRecovery::confirm_source_timeline`].
+    //! Opt-in terminal transport handling needs real core/framer EOF and source
+    //! Finished; [`TransportTailConfirmation`] retains the excluded source fault.
     //!
     //! [`PesCutter`] cuts one PID of any stream type into the packets the demuxer
     //! hands a decoder ([`CutPes`]): each starts at a unit start and ends at its
@@ -36,14 +46,31 @@ pub mod pes {
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::demux_clock::{
-        ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, TimestampOrigin,
+        ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, DiagnosticTimeView, EncodedTimeView,
+        TimestampOrigin,
     };
     pub use crate::demux_pes::{
         CompactDemuxPacket, CompactPayload, CutPes, DemuxBoundary, DemuxObserver, DemuxPacket,
         DemuxPayloadKind, DemuxScope, DemuxSpan, DemuxSpanView, DemuxSpanViews,
         DvbSubtitlesDescriptors, PayloadCursor, PesCutter, PrivateAudioCarriage,
         PrivateAudioDescriptors, ReadyContinuation, RegisteredCarriage, SourceContext,
-        pcr_bounded_pts,
+        pcr_bounded_pts, selected_track_kind,
+    };
+    pub use crate::demux_transport::{
+        MalformedInputCompletion, MalformedInputFact, MalformedInputKind,
+        MalformedSourceDisposition, MalformedSourceEvent, NoPacketsConfirmation,
+    };
+    pub use crate::demux_transport::{
+        PesFaultCarrier, PesFaultHeader, PesFaultKind, PesFaultPacket, PesFaultPolicy,
+        TransportFaultHeader, TransportFaultKind, TransportFaultPacket, TransportFaultRecovery,
+        TransportObservation, TransportTailConfirmation,
+    };
+    /// Control-only completion from complete physical carrier coverage and
+    /// actual source EOF. The confirmation never creates a validated PES scope
+    /// or accepts media from a rejected carrier.
+    pub use crate::packet_completion::{
+        ControlCarrierKind, ControlPatFact, NoMediaConfirmation, PacketCompletion, PhysicalCarrier,
+        PhysicalNullRun,
     };
 }
 

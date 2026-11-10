@@ -6,6 +6,7 @@
   "worker_operation": "raster-simd-",
   "reference": "libass-native",
   "gate": "diagnostic",
+  "compare_order": 4,
   "cases_from": [
     "raster-glyphs",
     "raster-outlines",
