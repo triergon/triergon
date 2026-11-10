@@ -145,14 +145,14 @@ c6g.2xlarge, unpinned, with 30 memory pairs per case against libass with
 `ass_set_cache_limits(renderer, 1000, 24)` under the `linux-glibc-v4` observer. libass maps
 the default font file during 12 cases' operations; those mappings count toward its total RSS.
 
-The font, shaping and ASS rendering comparisons on Linux compare `b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506`
+The font, shaping and ASS rendering comparisons on Linux compare `8e137d8d5c4e6dbe76c5289a769242cea9beda2d`
 with FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 on a c6g.2xlarge:
 `cargo xtask fonts compare`, `shape compare` and `ass compare` natively on AArch64 and in the ARMv7
 user space, each target with its own reference builds, with the rasterising features and the crates'
-tests on AArch64. They ran at `801e0349`, whose tree differs from that revision only in this file and
-the evidence index. The earlier comparisons at `8786192bac7b0abea286ee999c8e03073a6ac796`,
-`944fd7cfc7712f505bd66e046afaa77f7eee6aac`, `a6e984526d20029e75b48650e9cc317f192da776` and
-`354f7d735ac22df3b63e7849eb5869488c087bd9` are kept for the steps between.
+tests on AArch64. The earlier comparisons at `8786192bac7b0abea286ee999c8e03073a6ac796`,
+`944fd7cfc7712f505bd66e046afaa77f7eee6aac`, `a6e984526d20029e75b48650e9cc317f192da776`,
+`354f7d735ac22df3b63e7849eb5869488c087bd9` and `b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506` are kept for
+the steps between.
 
 The earlier ASS rendering comparison on Linux compares `fedfb790bfb52131389cb7c5134bab7ab813b55f` with
 each target's libass build on a c6g.2xlarge: `cargo xtask ass compare --all` natively on AArch64
@@ -228,7 +228,8 @@ mutations against libass on AArch64 that the open-case and unattributed counts c
 | ARMv7: ASS parsing | `21642833a1c1f4d8e587a5c5bc903910f215428e` | `c039ca3e2cb63255140973528ddd22cc7e96b32e5254d22ea4f954011822a35d` |
 | ASS rendering memory, Linux AArch64 | `e6de7e70827bb930a8ef9e5cb4d30b1e4e7d0727` | `799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3` |
 | ASS rendering comparison and generated scripts, Linux AArch64 and ARMv7 | `fedfb790bfb52131389cb7c5134bab7ab813b55f` | `f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f` |
-| Fonts, shaping and ASS rendering comparison, Linux AArch64 and ARMv7 | `b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506` | `8a5799509af3fa883fa3686ea181d7b630dee90db6e71e60cb55023c65e8cd37` |
+| Fonts, shaping and ASS rendering comparison, Linux AArch64 and ARMv7 | `8e137d8d5c4e6dbe76c5289a769242cea9beda2d` | `fe2bee783e52adedca9e0c427a16b3fa30afa70471aaa507f38be9e177dd2b8a` |
+| Earlier: rotations by font, Linux AArch64 and ARMv7 | `b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506` | `8a5799509af3fa883fa3686ea181d7b630dee90db6e71e60cb55023c65e8cd37` |
 | Earlier: fonts, shaping and ASS rendering, Linux AArch64 and ARMv7 | `8786192bac7b0abea286ee999c8e03073a6ac796` | `996b7f0a128c48391f232106246ef9b2cf7f4dd27ce6ec1eb709a68d8d86f008` |
 | Earlier: vertical metrics, Linux AArch64 and ARMv7 | `354f7d735ac22df3b63e7849eb5869488c087bd9` | `f4e2ec2449012a0efc1ee4ec6c75cfff8122528e3c629fbbe68c1380d9eff7f5` |
 | Earlier: charmaps, Linux AArch64 and ARMv7 | `944fd7cfc7712f505bd66e046afaa77f7eee6aac` | `c2ffb0cd91e0e5e313e08d4df02ff034978b054fffb88a27451a337e7e770d0e` |
