@@ -17224,6 +17224,16 @@
    "sha256": "95b5c4d659408f264cbe8bfc24f20ca43a303863e23bbc107d3192956f5c6f7b",
    "bytes": 98652028,
    "source_revision": "8058a77c444958ba82dcf4b5783720fc9aafe66f"
+  },
+  {
+   "name": "paired-runner-c21176e0",
+   "path": "paired-runner-c21176e0",
+   "retention": "retained",
+   "reason": "Codec and capture timing rows of docs/status.md, earlier and shared runner, Linux AArch64 on a c6g.2xlarge: cargo xtask codecs time on aac-lc-stereo twice with the runner at 642316cf and twice at c21176e0 (old, new, new, old), and cargo xtask capture qualify on c07-ui-static-480-bottomup once with each, with both trees' build identities and the run log.",
+   "key": "evidence/paired-runner-c21176e0/9a2cb6808d49462ff33e0666a44773692c44e85414f5aa9b2a21ea27a11a6bcf.tar.gz",
+   "sha256": "9a2cb6808d49462ff33e0666a44773692c44e85414f5aa9b2a21ea27a11a6bcf",
+   "bytes": 10271011,
+   "source_revision": "c21176e03328f26e0f49d6870dad0a55dd7c5e76"
   }
  ]
 }

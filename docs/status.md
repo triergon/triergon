@@ -57,6 +57,11 @@ at `0e28298d038bea072629b3bad6389dcc806b4861` on a c8g.large pinned to CPU 1.
 Codec and decode-session runtime at
 `add6b27` is one unpinned gate-build pass of 30 pairs on a c8g.2xlarge. Capture at
 `ceb5076` reports the higher of two unpinned gate-build passes on the same instance type.
+These codec, decode-session and capture passes predate the shared paired runner: codec
+pairs were checked pair by pair rather than watched over the whole run, and capture
+sampled the median of three in-process sessions. At `c21176e0` on a c6g.2xlarge, the earlier
+and the shared runner time `aac-lc-stereo` at a median of 0.7350 and 0.7339 and of 0.7344 and
+0.7342, and capture `c07-ui-static-480-bottomup` at 1.3026 and 1.2978.
 The audio codecs in files, Ogg and audio elementary-stream rows use the gate build at
 `ccff5b5734c113c1d88160b84825157508c701c0` on a c8g.2xlarge, unpinned, against the `decode` profile:
 30 timing pairs per workload of `harness/codecs/file-workloads.json`, each demuxing,
@@ -192,6 +197,7 @@ mutations against libass on AArch64 that the open-case and unattributed counts c
 | Audio codecs in files | `ccff5b5734c113c1d88160b84825157508c701c0` | `0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53` |
 | Ogg, audio elementary streams | `ccd3090572433e79d8ab65a377fcd9896d2839d9` | `8123e0f020a9c4ccedd83aea3e665d4486d55e26612e8bc29626e9a3026e2cd1` |
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |
+| Codec and capture timing, earlier and shared runner | `c21176e03328f26e0f49d6870dad0a55dd7c5e76` | `9a2cb6808d49462ff33e0666a44773692c44e85414f5aa9b2a21ea27a11a6bcf` |
 | MP4 forward and range playback | `a41648dd4de2933d526415cce86a9ebbd1d4444b` | `32aa6f481afc5f6074dd14a683a110bc044b781b9c40b72c84876af9b812f977` |
 | MP4 forward and range playback, earlier RSS comparison | `733ee1582e4fce4af1d89c91171e29e41a16d294` | `23cf7cdb3de800c1ca0d03dfe937ce6fda6cc768bef5933370223a88cda78c87` |
 | MP4 forward and range playback, earlier comparison | `8bbf6eab798f3d58f62dce14915fb30acd14488e` | `a3e74e11216d7769b7b167ac57cb17c043e6d92b4feb39a8422879c27493eebe` |
