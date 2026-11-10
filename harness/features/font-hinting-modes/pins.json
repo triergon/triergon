@@ -4592,6 +4592,96 @@
       "packets": 24,
       "bytes": 0,
       "digest": 4256478963032741003
+    },
+    "authored-vertical-ttc-outlines-4800": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 1104706905932056678
+    },
+    "authored-vertical-ttc-advances-4800": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 2289719764645279358
+    },
+    "authored-vertical-ttc-outlines-5280": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 10494590698797000130
+    },
+    "authored-vertical-ttc-advances-5280": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 2583935769982051966
+    },
+    "authored-vertical-ttc-outlines-3200": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 8897264809462058170
+    },
+    "authored-vertical-ttc-advances-3200": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 6019659652330346110
+    },
+    "authored-vertical-ttc-outlines-3072": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 8135470043633390574
+    },
+    "authored-vertical-ttc-advances-3072": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 15415163592103937662
+    },
+    "authored-vertical-ttc-outlines-2400": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 11501354326002923814
+    },
+    "authored-vertical-ttc-advances-2400": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 9690525595652224638
+    },
+    "authored-vertical-ttc-outlines-2160": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 2079082122761389238
+    },
+    "authored-vertical-ttc-advances-2160": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 9405335734177781374
+    },
+    "authored-vertical-ttc-outlines-853": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 10728967455194480050
+    },
+    "authored-vertical-ttc-advances-853": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 118953539268236926
+    },
+    "authored-vertical-ttc-outlines-1568": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 11642084394861526530
+    },
+    "authored-vertical-ttc-advances-1568": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 14128111604315006590
+    },
+    "authored-vertical-ttc-outlines-538": {
+      "packets": 80,
+      "bytes": 288,
+      "digest": 12034166831974925134
+    },
+    "authored-vertical-ttc-advances-538": {
+      "packets": 20,
+      "bytes": 0,
+      "digest": 17513787686162441854
     }
   }
 }

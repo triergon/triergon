@@ -2,11 +2,12 @@
 //! each stage in order, and which positioning methods run — HarfBuzz's map
 //! builder and shape planner.
 
+use crate::Language;
 use crate::face::Face;
 use crate::ot::digest::Digest;
 use crate::ot::layout::{FeatureSubstitutions, LayoutTable};
 use crate::shapers::{Pause, Shaper};
-use crate::tag::{Direction, Language, Script, Tag};
+use crate::tag::{Direction, Script, Tag};
 use crate::work;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
@@ -101,7 +102,7 @@ impl<'a> Builder<'a> {
             tables[0].default_substitutions(&mut work)?,
             tables[1].default_substitutions(&mut work)?,
         ];
-        let (script_tags, script_count) = script.ot_tags();
+        let (script_tags, script_count) = language.script_tags(script);
         let mut builder = Self {
             tables,
             substitutions,

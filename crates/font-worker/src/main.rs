@@ -19,8 +19,8 @@ const MAX_INPUT: u64 = 64 << 20;
 const USAGE: &str = "usage: font-worker OPERATION-fold FILE [MODE HEIGHT]
        | OPERATION-bench FILE ITERATIONS [MODE HEIGHT]
        | OPERATION-memory FILE [MODE HEIGHT] | OPERATION-dump FILE [MODE HEIGHT]
-  OPERATION is font (no MODE or HEIGHT) or font-sized, with MODE outlines or advances
-  and HEIGHT in 26.6 pixels";
+  OPERATION is font (no MODE or HEIGHT) or font-sized, with MODE outlines, advances
+  or vertical and HEIGHT in 26.6 pixels";
 
 /// What one operation reads from every face.
 #[derive(Clone, Copy)]
@@ -32,6 +32,9 @@ enum Operation {
     Scaled(i32),
     /// The default-load (hinted) advance of every glyph at a size.
     Hinted(i32),
+    /// The vertical advances of every glyph at a size, unhinted and of the
+    /// default load.
+    Vertical(i32),
 }
 
 impl Operation {
@@ -40,6 +43,7 @@ impl Operation {
             Self::Faces => "font-outlines",
             Self::Scaled(_) => "font-sized-outlines",
             Self::Hinted(_) => "font-sized-advances",
+            Self::Vertical(_) => "font-sized-vertical",
         }
     }
 }
@@ -96,13 +100,17 @@ fn read(file: &Bytes, budget: &Budget, operation: Operation, sink: &mut impl Sin
                     Err(_) => sink.record(Record::SizeError(height))?,
                 }
             }
-            Operation::Hinted(height) => {
+            Operation::Hinted(height) | Operation::Vertical(height) => {
                 sink.record(Record::SizedFace(index))?;
-                match font.at_size(height) {
-                    Ok(sized) => hinted(&font, &sized, sink)
-                        .map_err(|e| format!("face {index} at {height}: {e}"))?,
-                    Err(_) => sink.record(Record::SizeError(height))?,
+                let Ok(sized) = font.at_size(height) else {
+                    sink.record(Record::SizeError(height))?;
+                    continue;
+                };
+                match operation {
+                    Operation::Hinted(_) => hinted(&font, &sized, sink),
+                    _ => vertical(&font, &sized, &mut Outline::new(budget), sink),
                 }
+                .map_err(|e| format!("face {index} at {height}: {e}"))?;
             }
         }
     }
@@ -248,6 +256,37 @@ fn hinted(font: &Font, sized: &SizedFont<'_>, sink: &mut impl Sink) -> Result<()
     Ok(())
 }
 
+/// The vertical advances: of the unhinted load where the glyph's outline
+/// loads, and of the default load. A default-load advance the crate cannot
+/// give (`Unsupported`) ends the operation with an error.
+fn vertical(
+    font: &Font,
+    sized: &SizedFont<'_>,
+    outline: &mut Outline,
+    sink: &mut impl Sink,
+) -> Result<()> {
+    for glyph in font.glyphs() {
+        let unhinted = sized.outline_into(glyph, outline).ok();
+        let hinted = match sized.hinted_vertical_advance(glyph) {
+            Ok(advance) => Some(advance),
+            Err(triergon_core::Error::Unsupported(what)) => {
+                return Err(format!(
+                    "glyph {}: hinted vertical advance unsupported: {what}",
+                    glyph.0
+                )
+                .into());
+            }
+            Err(_) => None,
+        };
+        sink.record(Record::Vertical {
+            index: glyph.0,
+            unhinted,
+            hinted,
+        })?;
+    }
+    Ok(())
+}
+
 enum Action {
     Fold,
     Bench(u64),
@@ -270,6 +309,9 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
         ("font", []) => Operation::Faces,
         ("font-sized", [mode, height]) if mode == "outlines" => Operation::Scaled(height.parse()?),
         ("font-sized", [mode, height]) if mode == "advances" => Operation::Hinted(height.parse()?),
+        ("font-sized", [mode, height]) if mode == "vertical" => {
+            Operation::Vertical(height.parse()?)
+        }
         _ => return Err(USAGE.into()),
     };
     Ok((action, operation, path))
