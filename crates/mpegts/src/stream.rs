@@ -424,9 +424,9 @@ impl TransportStream {
         Self::new_with_program(budget, format, limits, Some(program), descriptor_namespace)
     }
 
-    /// Borrow complete carriers from the first suitable bounded allocation
-    /// and keep the full transport trace. Split carriers and other backing
-    /// allocations use the carry buffer.
+    /// Borrow complete carriers from a bounded, final aligned input window
+    /// and keep the full transport trace. Earlier windows and split carriers
+    /// use the carry buffer.
     #[must_use]
     pub fn with_shared_carriers(mut self) -> Self {
         self.framer.share_input();
@@ -449,9 +449,9 @@ impl TransportStream {
         )
     }
 
-    /// Read one independent segment, sharing complete carriers with the
-    /// input window and validating source PES without retaining it. Feed
-    /// callers still receive transport packets, program tables and faults.
+    /// Read one independent segment, sharing complete carriers with a
+    /// bounded, final aligned input window. Validate source PES without
+    /// retaining it, and publish transport packets, program tables and faults.
     pub fn new_single_program_feed(
         budget: Budget,
         limits: ParseLimits,

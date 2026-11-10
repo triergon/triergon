@@ -200,8 +200,10 @@ audio, and 0x90 indicates presentation graphics in this view. MPEG-1 video
 The startup probe scores sync bytes in groups while charging each inspected
 byte. When delivering full transport events, the PES observer can retain
 only the payload of a validated continuation that fits its existing arena.
-Sharing keeps room for the next input window and a carry buffer. The borrowed
-continuation path requires an exact span still held by the bound cursor.
+Shared segment carriers use only a bounded, final aligned input window.
+Earlier windows use the carry buffer so a pending PES does not retain an input
+reply that still needs replacing. The borrowed continuation path requires an
+exact span still held by the bound cursor.
 Complete buffered TS188 and M2TS192 carriers share the validator for common
 payload and adaptation layouts, including PCR. M2TS prefixes stay opaque.
 

@@ -275,35 +275,18 @@ impl TransportFramer {
         let Some(window) = input.buffered_owner() else {
             return false;
         };
-        // One bounded owner per segment. A short read backed by an oversized
-        // allocation must not keep that capacity alive through a PES span.
-        let capacity = window.retained_capacity();
-        // A pending PES can retain this window after the cursor drains it.
-        // Leave enough room for a fresh reply and one tight carrier.
+        // A pending PES can retain this allocation. Share only when no more
+        // input reply or split carrier can be needed for this entity.
         let buffered = input.buffered().len();
-        let needs_reply = input
+        let final_bytes = input
             .capabilities()
             .length
-            .is_none_or(|length| length.saturating_sub(input.position()) > buffered as u64);
-        let needs_carry = needs_reply || !buffered.is_multiple_of(carrier_bytes);
-        let headroom = if needs_carry {
-            let carry = carrier_bytes + Bytes::owner_overhead_bytes();
-            if needs_reply {
-                carry.saturating_add(
-                    input
-                        .request()
-                        .maximum
-                        .saturating_add(Bytes::owner_overhead_bytes()),
-                )
-            } else {
-                carry
-            }
-        } else {
-            0
-        };
-        if capacity > MAX_SHARED_INPUT_CAPACITY
+            .and_then(|length| length.checked_sub(input.position()));
+        let capacity = window.retained_capacity();
+        if final_bytes != Some(buffered as u64)
+            || !buffered.is_multiple_of(carrier_bytes)
+            || capacity > MAX_SHARED_INPUT_CAPACITY
             || capacity > window.len().saturating_mul(8)
-            || input.budget().available() < headroom
         {
             return false;
         }
@@ -610,11 +593,11 @@ impl TransportFramer {
                     continue;
                 }
             }
-            // Reserve before advancing the shared cursor; a failed allocation has
-            // consumed no source bytes. A complete carry survives failed freeze.
+            // Reserve before consuming bytes. Shared carriers can leave no
+            // available credit, so their empty-window polls must reach EOF
+            // without a reservation.
             if carry.capacity() < carry.len() + missing
-                && (self.buffered_carrier != BufferedCarrier::Progressive
-                    || !input.buffered().is_empty())
+                && (self.buffered_carrier == BufferedCarrier::Carry || !input.buffered().is_empty())
             {
                 if !work.try_charge(1) {
                     return Ok(Step::Yield);
@@ -968,7 +951,7 @@ mod tests {
     }
 
     #[test]
-    fn segment_carriers_copy_sparse_and_independent_windows() {
+    fn segment_carriers_share_only_the_final_aligned_window() {
         let budget = Budget::new(256 * 1024).unwrap();
         let mut input = InputCursor::new(
             &budget,
@@ -985,7 +968,7 @@ mod tests {
         let mut wire = [0xff; 188];
         wire[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
         let mut owners = Vec::new();
-        for (capacity, share) in [(64 * 1024, false), (188, true), (188, false)] {
+        for (capacity, share) in [(64 * 1024, false), (188, false), (188, true)] {
             let mut data = Vec::with_capacity(capacity);
             data.extend_from_slice(&wire);
             let owner = Bytes::try_from_vec(&budget, data).unwrap();
@@ -1220,7 +1203,7 @@ mod tests {
     }
 
     #[test]
-    fn an_unretained_shared_carrier_returns_its_window_budget() {
+    fn a_retained_final_carrier_does_not_block_end_of_input() {
         let limit = 188 + Bytes::owner_overhead_bytes() + Budget::control_storage_bytes();
         let budget = Budget::new(limit).unwrap();
         let mut input = InputCursor::new(
@@ -1249,16 +1232,23 @@ mod tests {
             .unwrap();
         let mut framer = TransportFramer::new(budget.clone(), PacketFormat::Ts188);
         framer.share_input();
+        let cancel = AtomicBool::new(false);
+        let mut work = WorkBudget::new(4096);
+        let Step::Ready(packet) = framer.poll(&mut input, &mut work, &cancel).unwrap() else {
+            panic!("expected the final carrier");
+        };
+        assert_eq!(budget.available(), 0);
+        let Step::NeedInput(request) = framer.poll(&mut input, &mut work, &cancel).unwrap() else {
+            panic!("expected the end-of-input request");
+        };
+        assert_eq!(request.maximum, 0);
+        input.finish(request.source, request.token).unwrap();
         assert!(matches!(
-            framer
-                .poll(
-                    &mut input,
-                    &mut WorkBudget::new(4096),
-                    &AtomicBool::new(false)
-                )
-                .unwrap(),
-            Step::Ready(_)
+            framer.poll(&mut input, &mut work, &cancel).unwrap(),
+            Step::End(location) if location.offset == 188
         ));
+        assert_eq!(packet.source.as_ref(), &wire);
+        drop(packet);
         assert_eq!(budget.used(), Budget::control_storage_bytes());
     }
 
