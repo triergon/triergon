@@ -506,7 +506,7 @@ fn range_playback_uses_the_opus_edit_and_keeps_variable_packet_durations() {
 #[test]
 fn range_playback_keeps_opus_preroll_and_stops_at_the_edit_end() {
     let dops = [0, 2, 1, 56, 0, 0, 187, 128, 0, 0, 0];
-    let raw = opus_fixture(&dops, 1440, 2400);
+    let raw = opus_fixture(&dops, 1440, 2300);
     let source = Source::new(&raw, b"soun");
     let packets = rows(&source, range_plan(&source, *b"isom").unwrap());
     assert_eq!(
@@ -522,6 +522,7 @@ fn range_playback_keeps_opus_preroll_and_stops_at_the_edit_end() {
         ]
     );
     assert_eq!(packets[0].1, Some([160, 5, 0, 0, 0, 0, 0, 0, 0, 0]));
+    assert_eq!(packets[3].1, Some([0, 0, 0, 0, 100, 0, 0, 0, 0, 0]));
     let after_end = opus_fixture(&dops, 5040, 100);
     assert_eq!(
         range_plan(&Source::new(&after_end, b"soun"), *b"isom").unwrap_err(),

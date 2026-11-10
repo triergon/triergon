@@ -48,7 +48,8 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
         if (video < 0 && codec->codec_type == AVMEDIA_TYPE_VIDEO && video_codec)
             video = (int)i;
         else if (audio < 0 && codec->codec_type == AVMEDIA_TYPE_AUDIO &&
-                 (codec->codec_id == AV_CODEC_ID_AAC || codec->codec_id == AV_CODEC_ID_OPUS))
+                 (codec->codec_id == AV_CODEC_ID_AAC ||
+                  (codec->codec_id == AV_CODEC_ID_OPUS && tag == MKTAG('O', 'p', 'u', 's'))))
             audio = (int)i;
         else
             goto done;
@@ -58,12 +59,16 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
     const AVCodecParameters *codec = format->streams[video]->codecpar;
     if (audio < 0 && codec->codec_tag != MKTAG('d', 'a', 'v', '1'))
         goto done;
-    if (codec->codec_tag != MKTAG('a', 'v', 'c', '1')) {
-        if (codec->extradata_size <= 0 || !codec->extradata)
+    for (unsigned i = 0; i < format->nb_streams; ++i) {
+        const AVCodecParameters *config = format->streams[i]->codecpar;
+        if ((int)i == video ? config->codec_tag == MKTAG('a', 'v', 'c', '1')
+                            : config->codec_id != AV_CODEC_ID_OPUS)
+            continue;
+        if (config->extradata_size <= 0 || !config->extradata)
             goto done;
-        fold(&work->digest, codec->codec_tag);
-        fold(&work->digest, (uint64_t)codec->extradata_size);
-        fold_bytes(&work->digest, codec->extradata, (size_t)codec->extradata_size);
+        fold(&work->digest, config->codec_tag);
+        fold(&work->digest, (uint64_t)config->extradata_size);
+        fold_bytes(&work->digest, config->extradata, (size_t)config->extradata_size);
     }
     packet = av_packet_alloc();
     if (!packet) {

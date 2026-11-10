@@ -99,6 +99,9 @@ impl SampleTable {
     pub(crate) fn composition_runs(&self) -> Option<&Words> {
         self.ctts.as_ref()
     }
+    pub(crate) fn decode_runs(&self) -> &Words {
+        &self.stts
+    }
     pub fn cursor(&self) -> SampleCursor<'_> {
         SampleCursor {
             table: self,
