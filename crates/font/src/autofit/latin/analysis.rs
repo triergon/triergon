@@ -3,8 +3,8 @@
 //! and the blue zones those edges lie in.
 
 use super::super::hints::{Dimension, Edge, GlyphHints, Segment, Width, direction, edge, point};
-use super::super::long::{abs, div_fix, mul_fix, wrap};
 use super::{Axis, Metrics, blue, constant};
+use crate::long::{abs, div_fix, mul_fix, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 

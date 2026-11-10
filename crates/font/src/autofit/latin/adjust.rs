@@ -11,9 +11,9 @@
 //! `FT_LONG_MAX`, that a contour of one or two points keeps as its extrema.
 
 use super::super::hints::{Dimension, GlyphHints, edge, point};
-use super::super::long::{self, mul_fix, pix_round, wrap};
 use super::super::tables::ADJUSTMENTS;
 use super::{Blue, Metrics, analysis, blue};
+use crate::long::{self, mul_fix, pix_round, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 

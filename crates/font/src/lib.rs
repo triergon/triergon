@@ -15,6 +15,7 @@ mod cmap;
 mod fixed;
 mod glyf;
 mod kern;
+mod long;
 mod matching;
 mod metrics;
 mod name;

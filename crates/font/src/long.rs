@@ -1,6 +1,6 @@
 //! FreeType's `FT_Long` arithmetic as GCC builds it for 32-bit ARMv7, where
 //! `long`, and with it `FT_Pos` and `FT_Fixed`, is 32 bits wide. The
-//! auto-hinter follows it there.
+//! auto-hinter and the linear advances `FT_Load_Glyph` scales follow it there.
 //!
 //! Positions, distances and scales are kept in `i64`, each within `i32` as an
 //! `FT_Long` holds it. Sums, differences and products of a few such values are
@@ -15,53 +15,61 @@
 use crate::fixed;
 
 /// `FT_LONG_MAX`.
-pub(super) const MAX: i64 = i32::MAX as i64;
+pub(crate) const MAX: i64 = i32::MAX as i64;
 /// `FT_LONG_MIN`.
-pub(super) const MIN: i64 = i32::MIN as i64;
+pub(crate) const MIN: i64 = i32::MIN as i64;
 
 /// `v` as an `FT_Long` holds it: its low 32 bits, sign-extended.
-pub(super) const fn wrap(v: i64) -> i64 {
+pub(crate) const fn wrap(v: i64) -> i64 {
     v as i32 as i64
 }
 
 /// The 32 bits of `v`, as an `FT_Pos` outline coordinate.
-pub(super) const fn to_i32(v: i64) -> i32 {
+pub(crate) const fn to_i32(v: i64) -> i32 {
     v as i32
 }
 
 /// `FT_ABS` of `v` as an `FT_Long`: `FT_LONG_MIN` stays negative.
-pub(super) const fn abs(v: i64) -> i64 {
+pub(crate) const fn abs(v: i64) -> i64 {
     (v as i32).wrapping_abs() as i64
 }
 
 /// `FT_MulFix`.
-pub(super) const fn mul_fix(a: i64, b: i64) -> i64 {
+pub(crate) const fn mul_fix(a: i64, b: i64) -> i64 {
     wrap(fixed::mul_fix(wrap(a), wrap(b)))
 }
 
 /// `FT_DivFix`.
-pub(super) fn div_fix(a: i64, b: i64) -> i64 {
+pub(crate) fn div_fix(a: i64, b: i64) -> i64 {
     wrap(fixed::div_fix(wrap(a), wrap(b)))
 }
 
 /// `FT_MulDiv`.
-pub(super) fn mul_div(a: i64, b: i64, c: i64) -> i64 {
+pub(crate) fn mul_div(a: i64, b: i64, c: i64) -> i64 {
     wrap(fixed::mul_div(wrap(a), wrap(b), wrap(c)))
 }
 
+/// `FT_Load_Glyph`'s scaling of a linear advance in font units to 16.16
+/// pixels, `FT_MulDiv(advance, scale, 64)`, after every load at a size.
+pub(crate) fn linear_advance(units: i64, scale: i64) -> i64 {
+    mul_div(units, scale, 64)
+}
+
 /// `FT_PIX_ROUND` (and `FT_PIX_ROUND_LONG`).
-pub(super) const fn pix_round(v: i64) -> i64 {
+pub(crate) const fn pix_round(v: i64) -> i64 {
     wrap(fixed::pix_round(wrap(v)))
 }
 
 /// `FT_PIX_CEIL_LONG`.
-pub(super) const fn pix_ceil(v: i64) -> i64 {
+pub(crate) const fn pix_ceil(v: i64) -> i64 {
     wrap(fixed::pix_ceil(wrap(v)))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX, MIN, abs, div_fix, mul_div, mul_fix, pix_ceil, pix_round, wrap};
+    use super::{
+        MAX, MIN, abs, div_fix, linear_advance, mul_div, mul_fix, pix_ceil, pix_round, wrap,
+    };
 
     #[test]
     fn results_keep_their_low_32_bits() {
@@ -84,5 +92,15 @@ mod tests {
         assert_eq!(pix_round(MAX - 10), MIN);
         assert_eq!(pix_ceil(MAX - 10), MIN);
         assert_eq!(pix_round(95), 64);
+    }
+
+    #[test]
+    fn linear_advances_wrap_as_on_32_bit_arm() {
+        // 65535 units at a y scale of 2^20 (16 pixels per unit): 2^36 / 64
+        // is 2^30, which fits; at 2^22 it is 2^32, whose low bits are zero.
+        assert_eq!(linear_advance(65535, 1 << 20), 0x3fff_c000);
+        assert_eq!(linear_advance(65535, 1 << 22), -0x1_0000);
+        // A y scale of 2^31 is FT_LONG_MIN as a 32-bit FT_Fixed.
+        assert_eq!(linear_advance(1, 1 << 31), -(1 << 25));
     }
 }

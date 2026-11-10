@@ -12,9 +12,9 @@ pub(super) use fit::{Glyph, Scope, apply};
 
 use super::Face;
 use super::hints::{Dimension, GlyphHints, Width, sort_and_quantize_widths};
-use super::long::{self, abs, mul_div, mul_fix, pix_round, wrap};
 use super::style::clusters;
 use super::tables::{SCRIPTS, STYLES};
+use crate::long::{self, abs, mul_div, mul_fix, pix_round, wrap};
 use crate::outline::{Outline, OutlinePoint, PointKind};
 use triergon_core::{Result, WorkBudget};
 

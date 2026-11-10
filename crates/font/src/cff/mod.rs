@@ -166,7 +166,7 @@ impl Cff {
             }
             _ => return Err(Error::Invalid("CFF major version")),
         };
-        let top = cff.top_dict(top, work)?;
+        let top = cff.font_dict_entries(top, Kind::Top, work)?;
         let mut charstrings = Reader::at(
             bytes,
             top.charstrings
@@ -222,16 +222,9 @@ impl Cff {
             cff.font_dicts
                 .try_reserve_exact(usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?)?;
             for i in 0..fonts.len() {
-                let font = fonts.get(bytes, i)?;
-                let (mut location, mut matrix) = (None, None);
-                cff.dict(font, Kind::Font, None, work, |entry| {
-                    match entry.operator {
-                        op::PRIVATE => location = Some(private_location(entry.operands)?),
-                        op::FONT_MATRIX => matrix = Some(FontMatrix::parse(entry.operands)?),
-                        _ => {}
-                    }
-                    Ok(())
-                })?;
+                let font = cff.font_dict_entries(fonts.get(bytes, i)?, Kind::Font, work)?;
+                // A Font DICT with its own ROS has no Private DICT to FreeType.
+                let (location, matrix) = (font.private.filter(|_| !font.ros), font.matrix);
                 // FreeType concatenates with the Top DICT's matrix only when the
                 // Top DICT has one, and normalises copies of it again.
                 let matrix = match (matrix, top.matrix) {
@@ -306,43 +299,39 @@ impl Cff {
         }
     }
 
-    fn top_dict(&self, bytes: &[u8], work: &mut WorkBudget) -> Result<Top> {
+    /// The entries of the Top DICT, or of a Font DICT, which FreeType reads
+    /// as a Top DICT in CFF (`cff_subfont_load`).
+    fn font_dict_entries(&self, bytes: &[u8], kind: Kind, work: &mut WorkBudget) -> Result<Top> {
         let mut top = Top {
             charstring_type: 2,
             ..Top::default()
         };
-        self.dict(
-            bytes,
-            Kind::Top,
-            None,
-            work,
-            |Entry { operator, operands }| {
-                // FreeType reads the first operand of each, offsets into unsigned
-                // fields; `min_operands` checked that there are enough.
-                let first = operands[0];
-                match operator {
-                    op::CHAR_STRINGS => top.charstrings = Some(first.unsigned()),
-                    op::CHARSET => top.charset = first.unsigned(),
-                    op::ENCODING => top.encoding = first.unsigned(),
-                    op::PRIVATE => top.private = Some(private_location(operands)?),
-                    op::FD_ARRAY => top.fd_array = Some(first.unsigned()),
-                    op::FD_SELECT => top.fd_select = Some(first.unsigned()),
-                    op::VSTORE => top.vstore = Some(first.unsigned()),
-                    // A registry of 0xFFFF marks no ROS (`cid_registry`).
-                    op::ROS => top.ros = first.integer() as u32 != 0xffff,
-                    op::SYNTHETIC_BASE => top.synthetic = true,
-                    op::CHARSTRING_TYPE => top.charstring_type = first.integer(),
-                    op::MULTIPLE_MASTER if !(2..=16).contains(&first.integer()) => {
-                        return Err(Error::Invalid("CFF MultipleMaster design count"));
-                    }
-                    op::FONT_MATRIX => top.matrix = Some(FontMatrix::parse(operands)?),
-                    // `maxstack` sizes the Private DICT's stack, but FreeType clamps
-                    // it to `CFF2_MAXSTACK` both ways.
-                    _ => {}
+        self.dict(bytes, kind, None, work, |Entry { operator, operands }| {
+            // FreeType reads the first operand of each, offsets into unsigned
+            // fields; `min_operands` checked that there are enough.
+            let first = operands[0];
+            match operator {
+                op::CHAR_STRINGS => top.charstrings = Some(first.unsigned()),
+                op::CHARSET => top.charset = first.unsigned(),
+                op::ENCODING => top.encoding = first.unsigned(),
+                op::PRIVATE => top.private = Some(private_location(operands)?),
+                op::FD_ARRAY => top.fd_array = Some(first.unsigned()),
+                op::FD_SELECT => top.fd_select = Some(first.unsigned()),
+                op::VSTORE => top.vstore = Some(first.unsigned()),
+                // A registry of 0xFFFF marks no ROS (`cid_registry`).
+                op::ROS => top.ros = first.integer() as u32 != 0xffff,
+                op::SYNTHETIC_BASE => top.synthetic = true,
+                op::CHARSTRING_TYPE => top.charstring_type = first.integer(),
+                op::MULTIPLE_MASTER if !(2..=16).contains(&first.integer()) => {
+                    return Err(Error::Invalid("CFF MultipleMaster design count"));
                 }
-                Ok(())
-            },
-        )?;
+                op::FONT_MATRIX => top.matrix = Some(FontMatrix::parse(operands)?),
+                // `maxstack` sizes the Private DICT's stack, but FreeType clamps
+                // it to `CFF2_MAXSTACK` both ways.
+                _ => {}
+            }
+            Ok(())
+        })?;
         Ok(top)
     }
 
@@ -886,7 +875,7 @@ struct PrivateValues {
     hints: HintDict,
 }
 
-/// The Top DICT entries this reader uses.
+/// The Top or Font DICT entries this reader uses.
 #[derive(Debug, Default)]
 struct Top {
     charstrings: Option<usize>,
@@ -1113,6 +1102,76 @@ mod tests {
         }
     }
 
+    /// The unhinted points of glyph 1, `glyph` run as a CFF2 charstring
+    /// over a variation store of one region that weighs one.
+    fn cff2_points(glyph: &[Part]) -> Result<Vec<(i32, i32)>> {
+        let table = table(glyph, Vec::new());
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+        let whole = Table {
+            offset: 0,
+            len: table.len(),
+        };
+        let mut cff = Cff::parse(&table, whole, Version::Cff1, 1000, 0, &budget, &mut work)?;
+        cff.version = Version::Cff2;
+        cff.scalars.try_push(0x10000).map_err(|e| e.error)?;
+        cff.variation_data.try_push((0, 1)).map_err(|e| e.error)?;
+        let mut outline = Outline::new(&budget);
+        let scale = Scale { x: TWO, y: TWO };
+        cff.load(
+            &table,
+            GlyphId(1),
+            scale,
+            &mut outline,
+            &Limits::default(),
+            &mut work,
+        )?;
+        Ok(outline
+            .points()
+            .iter()
+            .map(|p| (p.point.x, p.point.y))
+            .collect())
+    }
+
+    #[test]
+    fn charstring_vsindex_follows_freetypes_cff2_interpreter() {
+        // rmoveto 0 100; 10 5 1 blend (15 with the region's 5); hlineto; vlineto 50.
+        let path = [
+            N(0),
+            N(100),
+            Op(21),
+            N(10),
+            N(5),
+            N(1),
+            Op(16),
+            Op(6),
+            N(50),
+            Op(7),
+        ];
+        let drawn = [(0, 200), (30, 200), (30, 300)];
+        assert_eq!(cff2_points(&path), Ok(drawn.to_vec()));
+        // A negative vsindex is ignored.
+        assert_eq!(
+            cff2_points(&[&[N(-1), Op(15)][..], &path].concat()),
+            Ok(drawn.to_vec())
+        );
+        // One outside the variation store fails only at a blend.
+        let outside = [N(5), Op(15)];
+        assert_eq!(
+            cff2_points(&[&outside[..], &path].concat()),
+            Err(Error::Invalid("CFF2 vsindex outside the variation store"))
+        );
+        let without_blend = [N(0), N(100), Op(21), N(15), Op(6), N(50), Op(7)];
+        assert_eq!(
+            cff2_points(&[&outside[..], &without_blend].concat()),
+            Ok(drawn.to_vec())
+        );
+        // vsindex after a blend is refused.
+        assert_eq!(
+            cff2_points(&[&path[..], &[N(0), Op(15)]].concat()),
+            Err(Error::Invalid("CFF2 vsindex after blend"))
+        );
+    }
+
     #[test]
     fn top_dict_entries_read_as_freetype_reads_them() {
         let glyph = table(&rectangle(0, &[50]), Vec::new());
@@ -1122,7 +1181,8 @@ mod tests {
             len: glyph.len(),
         };
         let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
-        let top = |bytes: &[u8]| cff.top_dict(bytes, &mut WorkBudget::new(100));
+        let top =
+            |bytes: &[u8]| cff.font_dict_entries(bytes, dict::Kind::Top, &mut WorkBudget::new(100));
         // An offset reads the first of its operands.
         assert_eq!(top(&[239, 240, 17]).unwrap().charstrings, Some(100));
         assert!(top(&[17]).is_err());
@@ -1139,6 +1199,14 @@ mod tests {
         assert!(top(&[138, 139, 18]).is_err());
         // Operators FreeType does not know are skipped with their operands.
         assert!(top(&[14, 239, 17]).is_ok());
+        // A CFF Font DICT is read as a Top DICT: a bad MultipleMaster fails
+        // it, and its own ROS is read, which makes FreeType skip its Private.
+        let font = |bytes: &[u8]| {
+            cff.font_dict_entries(bytes, dict::Kind::Font, &mut WorkBudget::new(100))
+        };
+        assert!(font(&[140, 139, 139, 139, 139, 12, 24]).is_err());
+        let with_ros = font(&[139, 139, 139, 12, 30, 149, 239, 18]).unwrap();
+        assert!(with_ros.ros && with_ros.private == Some((10, 100)));
     }
 
     #[test]

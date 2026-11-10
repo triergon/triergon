@@ -57,13 +57,18 @@ impl FontMatrix {
         if !(-9..=0).contains(&max) || !(0..=9).contains(&(max - min)) {
             return Ok(Self::identity(1));
         }
+        // Rounded to the common power of ten, saturating at the 32-bit
+        // `FT_LONG_MIN` and `FT_LONG_MAX` of 32-bit ARM.
         let [xx, yx, xy, yy, dx, dy] = values.map(|(value, scale)| {
             let divisor = POWER_TENS[usize::try_from(max - scale).unwrap_or(0)];
             let half = divisor >> 1;
-            if value < 0 {
-                (value - half) / divisor
-            } else {
-                (value + half) / divisor
+            let (min, max) = (i64::from(i32::MIN), i64::from(i32::MAX));
+            match value {
+                0 => 0,
+                v if v < 0 && min + half < v => (v - half) / divisor,
+                v if v < 0 => min / divisor,
+                v if max - half > v => (v + half) / divisor,
+                _ => max / divisor,
             }
         });
         let matrix = Self {
@@ -82,16 +87,20 @@ impl FontMatrix {
         })
     }
 
-    /// `FT_Matrix_Check`: nonzero 32-bit coefficients whose determinant is not
-    /// small next to the squared Frobenius norm.
+    /// `FT_Matrix_Check` as GCC builds it for 32-bit ARM: nonzero 32-bit
+    /// coefficients, shifted right so that the largest has 15 significant
+    /// bits (`FT_MSB(val) - 4 * sizeof(FT_ULong) + 2`), whose determinant is
+    /// not small next to the squared Frobenius norm, both in 32 bits.
     fn is_regular(&self) -> bool {
-        let [xx, xy, yx, yy] = [self.xx, self.xy, self.yx, self.yy];
-        let any = xx.unsigned_abs() | xy.unsigned_abs() | yx.unsigned_abs() | yy.unsigned_abs();
+        let coefficients = [self.xx, self.xy, self.yx, self.yy];
+        let any = coefficients.iter().fold(0, |any, v| any | v.unsigned_abs());
         if any == 0 || any > 0x7fff_ffff {
             return false;
         }
+        let shift = (any as u32).ilog2().saturating_sub(14);
+        let [xx, xy, yx, yy] = coefficients.map(|v| (v as i32) >> shift);
         let det = xx.wrapping_mul(yy).wrapping_sub(xy.wrapping_mul(yx));
-        let frobenius = [xx, xy, yx, yy].iter().fold(0_u64, |sum, v| {
+        let frobenius = [xx, xy, yx, yy].iter().fold(0_u32, |sum, v| {
             sum.wrapping_add(v.wrapping_mul(*v).cast_unsigned())
         });
         det.unsigned_abs() > frobenius / 32
@@ -258,6 +267,26 @@ mod tests {
         assert_eq!(matrix([b"1", b"1", b"1", b"1", b"0", b"0"]), identity);
         assert_eq!(matrix([b"1E-12", b"0", b"0", b"1", b"0", b"0"]), identity);
         assert!(parse(&[139, 139]).is_err());
+    }
+
+    #[test]
+    fn normalising_and_checking_follow_32_bit_arm() {
+        // At a divisor of 10^7, xx's 2147482993 is within half the divisor of
+        // FT_LONG_MAX, so FreeType saturates it to FT_LONG_MAX / 10^7, 214,
+        // rather than rounding it to 215.
+        let m = matrix([b"3.276799e7", b"0", b"0", b"3e7", b"1e4", b"0"]);
+        assert_eq!(m.xx, 214);
+        assert_ne!(m, FontMatrix::identity(1));
+        // FT_Matrix_Check shifts the coefficients to 15 significant bits
+        // first: this matrix passes it in 32 bits, though not in 64.
+        let skewed = FontMatrix {
+            xx: -6420,
+            xy: -441_914,
+            yx: 14_130_792,
+            yy: 0,
+            ..FontMatrix::identity(1)
+        };
+        assert!(skewed.is_regular());
     }
 
     #[test]

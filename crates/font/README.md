@@ -169,7 +169,10 @@ that engine builds unhinted ones: points are whole font units (the 16.16 value a
 1/64 scale, rounded, then shifted down), a contour starts at its first segment,
 lines of zero length are dropped, and closing a contour drops a final on-curve
 point equal to its first and a contour left with one point. The FontMatrix is
-read, normalised and applied in fixed point as FreeType does: a Font DICT's matrix
+read, normalised and applied in fixed point as FreeType does on 32-bit ARM
+(coefficients rounded to a common power of ten saturate at the 32-bit
+`FT_LONG_MIN` and `FT_LONG_MAX`, and `FT_Matrix_Check` scales them to 15
+significant bits and tests them in 32 bits): a Font DICT's matrix
 follows the Top DICT's, outlines and advances go through it, and a Font DICT whose
 matrix implies other units per em scales its glyphs by the ratio. Drawing
 operators read operand counts the format does not allow as FreeType's engine reads
@@ -209,8 +212,9 @@ is missing, or at offset or size zero, is not read, as `cff_load_private_dict`
 skips it; an entry FreeType reads in any DICT, used here or not, fails the
 face with fewer operands than FreeType reads (`cfftoken.h` and the field
 readers of `cffparse.c`), as does a MultipleMaster entry with other than 2 to
-16 designs, and a ROS entry with registry 0xFFFF marks no CID-keyed face. One
-difference remains: a CFF2 face whose `fvar` passes FreeType's header check
+16 designs, and a ROS entry with registry 0xFFFF marks no CID-keyed face. A
+CFF Font DICT is read as a Top DICT, as FreeType reads it, and one with its own
+ROS has no Private DICT. One difference remains: a CFF2 face whose `fvar` passes FreeType's header check
 but which `TT_Get_MM_Var` then refuses opens here, with the header's axes,
 where FreeType fails to open it (`cff_face_init` sets the default instance).
 
@@ -274,7 +278,8 @@ them when the scale is undefined. A `SizedFont` then gives:
   which those writing systems leave unhinted) and, without points, their empty
   outlines, but outlines with points are `Unsupported`. The style of every glyph and each style's metrics are
   computed on the first load that needs them and kept with the face, charged
-  to its budget.
+  to its budget, as is the storage one load hints in, which the next reuses
+  and which stays charged at the largest glyph's size.
 - `synthesize`: libass's synthetic styles, decided by `Font::synthesis` from the
   requested weight and slant against `OS/2.fsSelection` bits 0 and 5 and
   `Font::weight`: the oblique shear (0x2d24 for CFF faces, 0x5700 for others, as
@@ -296,7 +301,8 @@ them when the scale is undefined. A `SizedFont` then gives:
 - The vertical advances libass uses for a glyph of an `@` font it draws
   rotated: the outline's `GlyphMetrics` carry the unhinted load's
   `metrics.vertAdvance` (26.6) and `linearVertAdvance` (16.16, scaled by the
-  size's y scale with `FT_MulDiv`), and `default_vertical_advance` gives the
+  size's y scale with `FT_MulDiv`, in 32 bits as on 32-bit ARM, after either
+  load), and `default_vertical_advance` gives the
   default load's `metrics.vertAdvance`, which libass gives HarfBuzz, rounded to
   a pixel at the hinting scale (the auto-hinter's vertical scale for a face it
   hints) and `Unsupported` where `default_advance` is.

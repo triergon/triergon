@@ -4,11 +4,11 @@
 //! monochrome and LCD modes' variations.
 
 use super::super::hints::{Dimension, Edge, GlyphHints, Point, Segment, edge};
-use super::super::long::{abs, mul_div, pix_round, wrap};
 use super::super::style::NONBASE;
 use super::super::tables::{SCRIPTS, STYLES};
 use super::adjust;
 use super::{Axis, Metrics, analysis};
+use crate::long::{abs, mul_div, pix_round, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 

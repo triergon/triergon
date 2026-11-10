@@ -6,6 +6,7 @@
 use crate::fixed::Scale;
 use crate::fixed::{div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_round};
 use crate::glyf::{self, Glyf};
+use crate::long;
 use crate::outline::Outline;
 use crate::synthesis::Synthesis;
 use crate::{Font, GlyphId, GlyphMetrics, Outlines, VerticalMetrics};
@@ -409,7 +410,7 @@ impl<'f> SizedFont<'f> {
             // FreeType scales the linear advance by the size even when the
             // glyph loads unscaled.
             metrics.linear_vertical_advance =
-                mul_div(metrics.linear_vertical_advance, self.metrics.y_scale, 64);
+                long::linear_advance(metrics.linear_vertical_advance, self.metrics.y_scale);
             return Ok(metrics);
         }
         if let Hinting::Unsupported(what) = self.hinting {
@@ -436,7 +437,7 @@ impl<'f> SizedFont<'f> {
         let advances = font.cff_advances(cff, glyph, index, self.hinted_scale)?;
         let mut metrics = GlyphMetrics::of(advances, outline)?;
         metrics.linear_vertical_advance =
-            mul_div(metrics.linear_vertical_advance, self.metrics.y_scale, 64);
+            long::linear_advance(metrics.linear_vertical_advance, self.metrics.y_scale);
         self.fit_box(&mut metrics);
         metrics.advance = glyf::narrow(self.fit(i64::from(metrics.advance)))?;
         metrics.vertical_advance = glyf::narrow(self.fit(i64::from(metrics.vertical_advance)))?;

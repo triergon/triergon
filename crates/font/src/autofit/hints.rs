@@ -8,8 +8,8 @@
 //! they do there; positions, as `FT_Pos`, wrap in 32 bits (see
 //! [`long`](super::long)).
 
-use super::long::{div_fix, mul_fix, to_i32, wrap};
 use crate::Orientation;
+use crate::long::{div_fix, mul_fix, to_i32, wrap};
 use crate::outline::{Outline, PointKind};
 use crate::work::charge;
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
