@@ -34,7 +34,7 @@ static Mp4View mp4_box(Mp4View input, uint32_t wanted) {
     return (Mp4View){0};
 }
 
-static Mp4View mp4_roll_table(Mp4View input, uint32_t track_id) {
+static Mp4View mp4_sample_table(Mp4View input, uint32_t track_id) {
     Mp4View movie = mp4_box(input, MKBETAG('m','o','o','v'));
     uint32_t kind;
     Mp4View track;
@@ -54,6 +54,34 @@ static Mp4View mp4_roll_table(Mp4View input, uint32_t track_id) {
     return (Mp4View){0};
 }
 
+static uint32_t mp4_sample_count(Mp4View table) {
+    Mp4View sizes = mp4_box(table, MKBETAG('s','t','s','z'));
+    if (!sizes.data)
+        sizes = mp4_box(table, MKBETAG('s','t','z','2'));
+    return sizes.size >= 12 ? AV_RB32(sizes.data + 8) : 0;
+}
+
+static int mp4_run_value(Mp4View body, size_t offset, uint32_t samples,
+                         uint32_t sample, uint32_t maximum, uint32_t *value) {
+    if (body.size < offset + 4 || sample >= samples)
+        return AVERROR_INVALIDDATA;
+    uint32_t rows = AV_RB32(body.data + offset);
+    offset += 4;
+    if (rows > (body.size - offset) / 8 || (size_t)rows * 8 != body.size - offset)
+        return AVERROR_INVALIDDATA;
+    uint32_t covered = 0;
+    for (uint32_t i = 0; i < rows; ++i, offset += 8) {
+        uint32_t count = AV_RB32(body.data + offset);
+        uint32_t entry = AV_RB32(body.data + offset + 4);
+        if (!count || count > samples - covered || entry > maximum)
+            return AVERROR_INVALIDDATA;
+        if (sample >= covered && sample - covered < count)
+            *value = entry;
+        covered += count;
+    }
+    return covered == samples ? 0 : AVERROR_INVALIDDATA;
+}
+
 static Mp4View mp4_roll_group(Mp4View table, uint32_t wanted) {
     uint32_t kind;
     Mp4View body;
@@ -64,38 +92,27 @@ static Mp4View mp4_roll_group(Mp4View table, uint32_t wanted) {
 }
 
 /* Returns the number of preceding packets, or zero for an ungrouped sample. */
-static int mp4_roll_distance(Mp4View table, uint32_t sample) {
+static int mp4_roll_distance(Mp4View table, uint32_t samples, uint32_t sample) {
     Mp4View map = mp4_roll_group(table, MKBETAG('s','b','g','p'));
     Mp4View desc = mp4_roll_group(table, MKBETAG('s','g','p','d'));
     if (map.size < 12 || map.data[0] > 1 || desc.size < 12 || desc.data[0] > 2)
         return AVERROR_INVALIDDATA;
-    size_t offset = map.data[0] == 0 ? 8 : 12;
-    if (map.size < offset + 4)
-        return AVERROR_INVALIDDATA;
-    uint32_t count = AV_RB32(map.data + offset);
-    offset += 4;
-    if (count > (map.size - offset) / 8)
-        return AVERROR_INVALIDDATA;
-    uint32_t group = 0;
-    for (uint32_t i = 0; i < count; ++i, offset += 8) {
-        uint32_t run = AV_RB32(map.data + offset);
-        if (sample < run) {
-            group = AV_RB32(map.data + offset + 4);
-            break;
-        }
-        sample -= run;
-    }
-
     uint8_t version = desc.data[0];
-    offset = version == 0 ? 8 : version == 1 ? 12 : 16;
+    size_t offset = version == 0 ? 8 : version == 1 ? 12 : 16;
     if (desc.size < offset + 4)
         return AVERROR_INVALIDDATA;
+    uint32_t entries = AV_RB32(desc.data + offset);
+    uint32_t group = 0;
+    int result = mp4_run_value(map, map.data[0] == 0 ? 8 : 12, samples, sample,
+                               entries < UINT16_MAX ? entries : UINT16_MAX, &group);
+    if (result < 0)
+        return result;
     if (!group && version == 2)
         group = AV_RB32(desc.data + 12);
     if (!group)
         return 0;
     uint32_t length = version == 0 ? 2 : AV_RB32(desc.data + 8);
-    if (group > AV_RB32(desc.data + offset))
+    if (group > entries)
         return AVERROR_INVALIDDATA;
     offset += 4;
     for (uint32_t i = 1; i <= group; ++i) {
@@ -119,6 +136,7 @@ static int mp4_roll_distance(Mp4View table, uint32_t sample) {
 
 typedef struct {
     int64_t video_position;
+    int64_t video_pts;
     int64_t audio_position;
     int sync;
     int first;
@@ -130,40 +148,48 @@ static int64_t mp4_clock_delta(int64_t later, int64_t earlier) {
     return earlier != AV_NOPTS_VALUE && later >= earlier && delta <= INT64_MAX ? (int64_t)delta : -1;
 }
 
-static int mp4_seek_opus_roll(AVFormatContext *format, AVPacket *packet, Mp4View input,
-                              int video, int audio, Mp4RollLanding *landing) {
+static int mp4_seek_opus_roll(AVFormatContext *format, Mp4View input,
+                              int video, int audio, int64_t timestamp, Mp4RollLanding *landing) {
     if (audio < 0)
         return AVERROR_INVALIDDATA;
     AVStream *v = format->streams[video];
     AVStream *a = format->streams[audio];
     if (a->codecpar->codec_id != AV_CODEC_ID_OPUS)
         return AVERROR_INVALIDDATA;
-    int result;
-    int64_t video_pts = AV_NOPTS_VALUE;
-    while ((result = av_read_frame(format, packet)) >= 0) {
-        if (packet->stream_index == video) {
-            video_pts = packet->pts;
-            landing->video_position = packet->pos;
-            av_packet_unref(packet);
-            break;
-        }
-        av_packet_unref(packet);
-    }
-    if (result < 0 || video_pts == AV_NOPTS_VALUE || landing->video_position < 0)
+    int video_sample = av_index_search_timestamp(v, timestamp, AVSEEK_FLAG_BACKWARD);
+    if (video_sample < 0)
+        video_sample = 0;
+    const AVIndexEntry *picture = avformat_index_get_entry(v, video_sample);
+    if (!picture || !(picture->flags & AVINDEX_KEYFRAME) || picture->pos < 0 ||
+        picture->timestamp == AV_NOPTS_VALUE)
         return AVERROR_INVALIDDATA;
+    Mp4View video_table = mp4_sample_table(input, (uint32_t)v->id);
+    uint32_t video_samples = mp4_sample_count(video_table);
+    if (video_samples == 0 || video_samples != (uint32_t)avformat_index_get_entries_count(v))
+        return AVERROR_INVALIDDATA;
+    Mp4View ctts = mp4_box(video_table, MKBETAG('c','t','t','s'));
+    uint32_t composition = 0;
+    if (ctts.data &&
+        (ctts.size < 8 || AV_RB32(ctts.data) != 0 ||
+         mp4_run_value(ctts, 4, video_samples, (uint32_t)video_sample, INT32_MAX, &composition) < 0))
+        return AVERROR_INVALIDDATA;
+    if (picture->timestamp > INT64_MAX - composition)
+        return AVERROR_INVALIDDATA;
+    int64_t video_pts = picture->timestamp + composition;
+    landing->video_position = picture->pos;
+    landing->video_pts = video_pts;
 
-    Mp4View table = mp4_roll_table(input, (uint32_t)a->id);
-    Mp4View sizes = mp4_box(table, MKBETAG('s','t','s','z'));
-    if (!sizes.size)
-        sizes = mp4_box(table, MKBETAG('s','t','z','2'));
+    Mp4View table = mp4_sample_table(input, (uint32_t)a->id);
+    uint32_t samples_count = mp4_sample_count(table);
     int entries = avformat_index_get_entries_count(a);
-    if (sizes.size < 12 || entries < 1 || (uint32_t)entries != AV_RB32(sizes.data + 8))
+    if (entries < 1 || (uint32_t)entries != samples_count || a->duration <= 0 ||
+        av_compare_ts(video_pts, v->time_base, a->duration, a->time_base) >= 0)
         return AVERROR_INVALIDDATA;
     int64_t target = av_rescale_q_rnd(video_pts, v->time_base, a->time_base, AV_ROUND_DOWN);
     int sync = av_index_search_timestamp(a, target, AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
     if (sync < 0)
         sync = 0;
-    int distance = mp4_roll_distance(table, (uint32_t)sync);
+    int distance = mp4_roll_distance(table, samples_count, (uint32_t)sync);
     if (distance < 0)
         return distance;
     int first = distance > 0 && sync >= distance ? sync - distance : 0;
@@ -186,5 +212,6 @@ static int mp4_seek_opus_roll(AVFormatContext *format, AVPacket *packet, Mp4View
     if (av_compare_ts(lead, a->time_base, landing->lead, samples))
         return AVERROR_INVALIDDATA;
     int64_t start = first_entry->timestamp;
-    return avformat_seek_file(format, audio, start, start, start, AVSEEK_FLAG_ANY);
+    // Keep the other stream's keyframe constraint when seeking from Opus.
+    return avformat_seek_file(format, audio, start, start, start, 0);
 }

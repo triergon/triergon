@@ -3779,6 +3779,90 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
 }
 
 #[test]
+fn range_player_keeps_the_active_seek_after_refusing_opus_recovery() {
+    let seed = include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/avc-opus-edit.mp4");
+    let mut ended = seed.to_vec();
+    for at in [1420, 1508] {
+        ended[at..at + 4].copy_from_slice(&1500_u32.to_be_bytes());
+    }
+    let mut incomplete = seed.to_vec();
+    assert_eq!(&incomplete[2902..2906], &157_u32.to_be_bytes());
+    incomplete[2902..2906].copy_from_slice(&156_u32.to_be_bytes());
+
+    let mut fragmented = include_bytes!("fixtures/mp4/fragmented-avc-aac.mp4").to_vec();
+    // The fragment packet bytes stay opaque. Use the regular Opus sample
+    // description and pad it to the existing entry size.
+    assert_eq!(&fragmented[978..982], b"mp4a");
+    assert_eq!(&seed[1693..1697], b"Opus");
+    fragmented[974..1049].copy_from_slice(&seed[1689..1764]);
+    fragmented[974..978].copy_from_slice(&110_u32.to_be_bytes());
+    fragmented[1049..1053].copy_from_slice(&35_u32.to_be_bytes());
+    fragmented[1053..1057].copy_from_slice(b"free");
+    fragmented[1057..1084].fill(0);
+
+    for (raw, is_fragmented, timestamp) in [
+        (ended.as_slice(), false, 32_000),
+        (incomplete.as_slice(), false, 32_000),
+        (fragmented.as_slice(), true, 12_800),
+    ] {
+        for checkpoints in [true, false] {
+            let (opened, plans) = if is_fragmented {
+                (open(raw, 97, 4096).unwrap().0, Vec::new())
+            } else {
+                encoded_range_open(raw)
+            };
+            let edits = (!is_fragmented).then_some(plans.as_slice());
+            let tracks = opened.movie.tracks();
+            let video = tracks[0].header().track_id;
+            let audio = tracks[1].header().track_id;
+            let mut job = Mp4RangeOpen::new(&opened.movie, edits, PlanLimits::default()).unwrap();
+            let cancel = off();
+            assert!((0..1000).any(|_| job.poll(&mut WorkBudget::new(64), &cancel).unwrap()));
+            let mut player = job
+                .finish(
+                    opened.input,
+                    opened.source,
+                    1 << 20,
+                    Selection::All,
+                    PlayerPolicy::default(),
+                )
+                .unwrap();
+            let first = next_range_output(&mut player).unwrap();
+            if !checkpoints {
+                assert!(player.discard_seek_checkpoints());
+            }
+            let request = Mp4NativeSeekRequest {
+                video,
+                timestamp,
+                limits: Default::default(),
+            };
+            let error = match player.prepare_seek_with_opus_recovery(request, audio) {
+                Err(error) => error,
+                Ok(mut job) => (0..1000)
+                    .find_map(|_| match job.poll(&mut WorkBudget::new(64), &cancel) {
+                        Err(error) => Some(error),
+                        Ok(false) => None,
+                        Ok(true) => panic!("invalid Opus recovery completed"),
+                    })
+                    .expect("Opus recovery refusal"),
+            };
+            assert!(matches!(error, C::Unsupported(_)), "{error:?}");
+            assert!(player.current(&first));
+            let mut ordinary = player.prepare_seek(request).unwrap();
+            assert!((0..1000).any(|_| ordinary.poll(&mut WorkBudget::new(64), &cancel).unwrap()));
+            let mut command = ordinary.finish().unwrap();
+            assert!(
+                player
+                    .apply_seek(&mut command, &mut WorkBudget::new(4096), &cancel)
+                    .unwrap()
+            );
+            assert!(!player.current(&first));
+            assert!(next_range_output(&mut player).is_some());
+        }
+    }
+}
+
+#[test]
 fn native_range_cursor_keeps_encoded_source_clocks_and_trim() {
     let original = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
     let mut variable = original.to_vec();
