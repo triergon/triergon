@@ -322,7 +322,7 @@
       "expected": {
         "packets": 241,
         "bytes": 65677,
-        "digest": 12505035923324092948
+        "digest": 10527166544542341228
       }
     },
     {
@@ -338,7 +338,7 @@
       "expected": {
         "packets": 95,
         "bytes": 26088,
-        "digest": 230186244915985021
+        "digest": 15507622761405975333
       }
     },
     {
@@ -354,7 +354,7 @@
       "expected": {
         "packets": 95,
         "bytes": 26088,
-        "digest": 9107170095252525693
+        "digest": 5937862538032964389
       }
     },
     {
@@ -370,7 +370,23 @@
       "expected": {
         "packets": 97,
         "bytes": 26371,
-        "digest": 2219999170451168846
+        "digest": 17550833167330169510
+      }
+    },
+    {
+      "id": "opus-recovery-composition-offset",
+      "profile": "opus-recovery-composition-offset",
+      "file": "avc-opus-video-composition-offset.mp4",
+      "sha256": "f18067fb267cd1da91c23ba63d706106906ceb6fb315ec671894cba4736f91aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "opus-roll"
+      ],
+      "expected": {
+        "packets": 93,
+        "bytes": 25808,
+        "digest": 16784415058963717857
       }
     }
   ]

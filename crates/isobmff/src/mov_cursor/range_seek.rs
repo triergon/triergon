@@ -425,10 +425,14 @@ impl<'a> RangeSeekJob<'a> {
                 let Some(landing) = recovery.poll(work, cancel)? else {
                     return Ok(BuildStatus::Yield);
                 };
+                let edit = points[0]
+                    .slot
+                    .encoded_edit
+                    .ok_or(Error::Invalid("missing Opus seek edit"))?;
                 self.scan
                     .as_mut()
                     .expect("Opus recovery follows the audio search")
-                    .restart_at(points, landing.first_sample - 1);
+                    .restart_at(points, edit.opus_occurrence(landing.first_sample)?);
                 self.landing
                     .as_mut()
                     .expect("Opus recovery follows the reference seek")
@@ -452,13 +456,13 @@ impl<'a> RangeSeekJob<'a> {
                         .as_ref()
                         .ok_or(Error::Invalid("missing Opus seek sample"))?
                         .source;
-                    if best.ordinal + 1 != sample.ordinal {
-                        return Err(Error::Invalid("Opus seek occurrence order"));
-                    }
                     let edit = best
                         .slot
                         .encoded_edit
                         .ok_or(Error::Unsupported("Opus recovery needs an Opus edit"))?;
+                    if best.ordinal != edit.opus_occurrence(sample.ordinal)? {
+                        return Err(Error::Invalid("Opus seek occurrence order"));
+                    }
                     self.opus_recovery = Some(OpusRecoverySeek::new(
                         self.slots.budget(),
                         best.slot.track,
@@ -488,7 +492,11 @@ impl<'a> RangeSeekJob<'a> {
                         .demux
                         .pts
                         .ok_or(Error::Invalid("missing video landing PTS"))?;
-                    reference_base.rescale(pts, target_base, Rounding::Floor)?
+                    let edit = points[0]
+                        .slot
+                        .encoded_edit
+                        .ok_or(Error::Invalid("missing Opus seek edit"))?;
+                    edit.opus_seek_timestamp(pts, reference_base, target_base)?
                 } else {
                     let timestamp = reference_base.rescale(
                         landing.selected.timestamp,

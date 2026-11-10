@@ -84,17 +84,18 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
         if (result < 0)
             goto done;
         av_packet_unref(packet);
-        result = av_seek_frame(format, video, target, AVSEEK_FLAG_BACKWARD);
-        if (result < 0)
-            goto done;
         if (recover) {
-            result = mp4_seek_opus_roll(format, packet, (Mp4View){data, size}, video, audio, &landing);
+            result = mp4_seek_opus_roll(format, (Mp4View){data, size}, video, audio, target, &landing);
             if (result < 0)
                 goto done;
             fold(&work->digest, (uint64_t)landing.video_position);
             fold(&work->digest, (uint64_t)landing.sync);
             fold(&work->digest, (uint64_t)landing.first);
             fold(&work->digest, (uint64_t)landing.lead);
+        } else {
+            result = av_seek_frame(format, video, target, AVSEEK_FLAG_BACKWARD);
+            if (result < 0)
+                goto done;
         }
     }
     while ((result = av_read_frame(format, packet)) >= 0) {
@@ -104,9 +105,9 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
             goto done;
         }
         if (waiting_video && packet->stream_index == video) {
-            if (packet->pos != landing.video_position) {
-                av_packet_unref(packet);
-                continue;
+            if (packet->pos != landing.video_position || packet->pts != landing.video_pts) {
+                result = AVERROR_INVALIDDATA;
+                goto done;
             }
             waiting_video = 0;
         }
