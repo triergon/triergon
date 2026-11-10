@@ -211,6 +211,16 @@ them when the scale is undefined. A `SizedFont` then gives:
   SCALED_COMPONENT_OFFSET) and the `xMin - lsb` origin are scaled with
   `FT_MulFix`; component matrices apply as `FT_Outline_Transform`. CFF outlines
   are the font-unit outlines above, then scaled point by point.
+- `load`: one glyph loaded as `FT_Load_Glyph` loads it, with
+  `Load::Unhinted` (the load above) or `Load::Default`, the load libass's
+  HarfBuzz callbacks make (`FT_LOAD_DEFAULT`), into an `Outline` and the full
+  `GlyphMetrics`: the advances and the control box (`horiBearingX`,
+  `horiBearingY`, `width`, `height`), fitted to the pixel grid by the default
+  load. A CFF, CFF2 or CID-keyed glyph is hinted there as FreeType's CFF driver
+  hints it with Adobe's hinter (`cf2`, without stem darkening): its stems and
+  hint masks, counter masks and blue zones at the hinted scale, then the
+  FontMatrix and its offset; above 2000 pixels per em it loads unhinted, as
+  FreeType retries it. TrueType glyphs are `Unsupported` there (see below).
 - `synthesize`: libass's synthetic styles, decided by `Font::synthesis` from the
   requested weight and slant against `OS/2.fsSelection` bits 0 and 5 and
   `Font::weight`: the oblique shear (0x2d24 for CFF faces, 0x5700 for others, as
@@ -282,9 +292,10 @@ kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Ty
 A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
 opens it and fails each glyph.
 
-At a size, `SizedFont` does not give what needs hinting: hinted outlines, hence
-the glyph extents and contour points libass's HarfBuzz callbacks report (they
-load glyphs hinted).
+At a size, the default load of a TrueType glyph is `Unsupported`, hence its
+glyph extents and contour points, which libass's HarfBuzz callbacks report: an
+auto-hinted face needs FreeType's auto-hinter, and an instructed one the
+TrueType interpreter, which this crate does not run.
 `hinted_advance` is `Unsupported` for TrueType faces FreeType auto-hints (no
 `fpgm` and a `prep` of at most 7 bytes; the autohinter moves advances), tricky
 fonts known by family name, and programs that may leave backward compatibility;
@@ -301,11 +312,16 @@ The gate covers libass's default configuration, hinting off: unhinted outlines a
 size, with the vertical advances of `@` fonts (`font-hinting-none`). Four of its
 cases are open: the advances and vertical cases of DejaVuMathTeXGyre and
 authored-cmap-formats, whose default-load advances FreeType's auto-hinter moves.
-For libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL), the unhinted outlines
-and default-load advances at nine other sizes are only measured
-(`font-hinting-modes`), and hinted outlines are not compared: the hinted CFF
-outlines above are checked by unit tests only, and TrueType outlines are not
-hinted, so hinting-enabled output is unverified.
+The default load itself, every glyph's metrics and hinted outline at that size,
+is gated too (`font-hinting-default`): every CFF, CFF2 and CID-keyed face matches
+FreeType, and the TrueType faces are open, two under the auto-hinter and the
+rest under the TrueType interpreter. For libass's default configuration that
+gap is in what HarfBuzz reads to position marks without GPOS anchors (glyph
+extents and contour points) in TrueType fonts; the outlines libass draws are
+unhinted and compared. For libass's hinting-enabled modes (NATIVE, LIGHT,
+NORMAL), the unhinted outlines and default-load advances at nine other sizes are
+only measured (`font-hinting-modes`), and the hinted outlines those modes draw
+are not compared.
 
 ## Behaviour and limits
 
@@ -330,7 +346,7 @@ composites) are
 
 - `cargo test -p triergon-font`: unit tests per table, faces built in memory
   (TrueType, CFF and a collection) and a deterministic mutation test over them.
-- Three harness features (`harness/features/font-*`) run every file of the corpus
+- Four harness features (`harness/features/font-*`) run every file of the corpus
   in `harness/fonts/corpus.json` through [`font-worker`](../font-worker/README.md)
   and the FreeType 2.15.0 reference worker (`harness/reference_font.h`), and require
   both to fold exactly what FreeType folds:
@@ -349,15 +365,20 @@ composites) are
     folds every glyph's `linearVertAdvance` and `metrics.vertAdvance` of the
     unhinted load and `metrics.vertAdvance` of the default load, failing the same
     way.
+  - `font-hinting-default`, one case per file at 256 pixels: every glyph's
+    default load (`FT_LOAD_DEFAULT`, as libass's shaper loads it), folding
+    `metrics.horiAdvance` and `vertAdvance`, `horiBearingX` and `horiBearingY`,
+    `width` and `height`, then the hinted outline, every point. A glyph `load`
+    declares `Unsupported` ends the candidate's operation with an error.
   - `font-hinting-modes`, the outlines and advances cases at the nine other heights libass
     requests with hinting on: 75, 82.5, 50, 48, 37.5, 33.75, 13.33, 24.5 and 8.4
     pixels (common ASS sizes on 1080- and 720-line frames, below 25 pixels per em,
     and small).
 
-  `cargo xtask check` requires `font-outlines` and `font-hinting-none`
-  (`cargo xtask fonts compare`); `font-hinting-modes` runs on demand
-  (`cargo xtask fonts compare --all`) and is not gated yet. `font-hinting-none`
-  lists its open cases, which `check` still runs and reports. The case rows are
+  `cargo xtask check` requires `font-outlines`, `font-hinting-none` and
+  `font-hinting-default` (`cargo xtask fonts compare`); `font-hinting-modes` runs
+  on demand (`cargo xtask fonts compare --all`) and is not gated yet. The
+  required features list their open cases, which `check` still runs and reports. The case rows are
   generated (`cargo xtask fonts manifest`) and each case's expected work is pinned
   from FreeType's output in `pins.json`. `cargo xtask report` runs each feature on
   its own and with `--benchmark` and `--memory` measures runtime and memory

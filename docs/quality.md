@@ -60,13 +60,14 @@ resource limit becomes an explicit, reviewed rule for that case.
   links the reference worker (`harness/reference_font.h`). `cargo xtask fonts fetch`
   fetches the font corpus listed with sources, licences and hashes in
   `harness/fonts/corpus.json` and writes its authored fonts with the font crate's
-  `authored-fonts` example. Its files are the cases of three features run like
-  every other feature: `font-outlines` (face data and unscaled outlines) and
+  `authored-fonts` example. Its files are the cases of four features run like
+  every other feature: `font-outlines` (face data and unscaled outlines),
   `font-hinting-none` (libass's default configuration: unhinted outlines and
-  default-load advances at 256 pixels), which `cargo xtask check` requires, and
-  `font-hinting-modes` (the nine other heights libass requests when hinting is on),
-  run on demand and not gated yet. `cargo xtask fonts compare` reports the
-  required two, with `--all` all three.
+  default-load advances at 256 pixels) and `font-hinting-default` (every glyph's
+  default-load metrics and hinted outline there), which `cargo xtask check`
+  requires, and `font-hinting-modes` (the nine other heights libass requests when
+  hinting is on), run on demand and not gated yet. `cargo xtask fonts compare`
+  reports the required three, with `--all` all four.
 - **HarfBuzz and FriBidi pin.** `cargo xtask shape prepare` builds the FriBidi
   1.0.17 and HarfBuzz 14.6.0 release tarballs (hash-checked) as static libraries:
   FriBidi with its own configure, HarfBuzz from its single-file amalgamation

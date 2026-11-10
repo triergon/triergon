@@ -17224,6 +17224,16 @@
    "sha256": "95b5c4d659408f264cbe8bfc24f20ca43a303863e23bbc107d3192956f5c6f7b",
    "bytes": 98652028,
    "source_revision": "8058a77c444958ba82dcf4b5783720fc9aafe66f"
+  },
+  {
+   "name": "font-hinting-43c12afa",
+   "path": "font-hinting-43c12afa",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's default load (the CFF driver's hinted outlines and grid-fitted metrics, font-hinting-default) and the shaper's default-load extents and contour points, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at 43c12afa against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64; the first ARMv7 run, whose FreeType reference timed out on one NotoSansCJK case, kept beside the full rerun; the pin-recording probe at febcbac0; and the xtask tests and clippy at 5855bc8a.",
+   "key": "evidence/font-hinting-43c12afa/d3780ba08af7d67ed07ad587056870132b988e6737104ff8343d7cea2496d600.tar.gz",
+   "sha256": "d3780ba08af7d67ed07ad587056870132b988e6737104ff8343d7cea2496d600",
+   "bytes": 170526948,
+   "source_revision": "43c12afaf83f69076d430d830c7f247e51881c3e"
   }
  ]
 }

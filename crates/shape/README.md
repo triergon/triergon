@@ -147,11 +147,14 @@ paragraph separator inside the text.
   `Error::Unsupported`.
 - `stch` stretching (refused when it would apply) and the Windows-1256 Arabic
   fallback lookups.
-- What libass reads from FreeType's hinted load: `SizedMetrics` gives no glyph
-  extents or contour points (`Unsupported`), but the empty extents of a glyph
-  without points, which every FreeType load gives it, so fallback mark
-  positioning in a font without GPOS marks fails where it measures a glyph with
-  an outline; and no default-load advance that FreeType's auto-hinter sets.
+- What libass reads from FreeType's hinted load of a TrueType glyph:
+  `SizedMetrics` takes glyph extents and contour points from the font crate's
+  default load (`SizedFont::load` with `Load::Default`), which hints CFF, CFF2
+  and CID-keyed glyphs as FreeType does but not TrueType ones (`Unsupported`),
+  but for the empty extents of a glyph without points, which every FreeType load
+  gives it. So fallback mark positioning in a TrueType font without GPOS marks
+  fails where it measures a glyph with an outline; and no default-load advance
+  that FreeType's auto-hinter sets.
   Faces whose character map libass would convert (Windows multibyte encodings)
   are refused.
 - `OtMetrics`'s CFF glyph extents where HarfBuzz's charstring interpreter
