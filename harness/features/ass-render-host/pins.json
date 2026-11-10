@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "reference": "libass-ass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+  "pins": {
+    "border-x-overflow-ass-1080p": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 10,
+        "bytes": 566316,
+        "digest": 3759897563250435472
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 12,
+        "bytes": 824574,
+        "digest": 17125879848364744024
+      }
+    },
+    "border-x-overflow-ass-720p": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 10,
+        "bytes": 286940,
+        "digest": 6495811536436573796
+      },
+      "armv7-unknown-linux-gnueabihf": {
+        "packets": 12,
+        "bytes": 444346,
+        "digest": 793013727674242958
+      }
+    }
+  }
+}

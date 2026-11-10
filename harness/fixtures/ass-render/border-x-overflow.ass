@@ -1,0 +1,25 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 500
+; Borders beyond 2^30 frame pixels in BorderStyle 4 boxes, at libass's
+; default 384x288 play size. libass doubles the event's horizontal border in
+; int arithmetic for its box width; the overflow is undefined. Built with GCC
+; for armv7 it wraps, and the \xbord1e9 and \bord1e9 events lose their boxes
+; while \ybord1e9 and a border below 2^30 keep theirs; built with GCC for
+; aarch64, \ybord1e9's box is lost too.
+[Script Info]
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,24,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,4,2,1,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(192,40)\xbord1e9}xbord
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(192,100)\bord1e9}bord
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(192,160)\ybord1e9}ybord
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\an5\pos(192,220)\xbord2e8}xbord 2e8

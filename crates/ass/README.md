@@ -352,6 +352,14 @@ undefined in C, for tops more than 2³¹ apart, and leaves equal tops in an
 unspecified order, where the crate keeps the order they were placed in. No
 fixture of `ass-render` converts out of range or places boxes that far apart.
 
+libass's renderer also overflows `int`, undefined in C, where it doubles an
+event's horizontal border for the width of its box. Built with GCC for
+32-bit ARM it wraps, and the renderer will follow that; today it doubles the
+border as a `double`. The case is `ass-render-host`'s, pinned per target,
+where the box of a horizontal border beyond 2³⁰ frame pixels differs: libass
+built with GCC for `aarch64-unknown-linux-gnu` also loses the box of such a
+vertical border.
+
 ## Behaviour and limits
 
 A `Script` charges its styles, events, strings (one allocation per style and per
@@ -415,6 +423,11 @@ panics.
   HarfBuzz does not register, which `triergon-shape` refuses; and
   `hinted-extents.ass`, fallback mark positioning, which reads FreeType's hinted
   glyph extents.
+- `ass-render-host` renders, as `ass-render` does, the fixtures whose libass
+  result differs by target (`border-x-overflow.ass`), each pinned for
+  `aarch64-unknown-linux-gnu` and `armv7-unknown-linux-gnueabihf` from that
+  target's reference. Both cases are open on both targets: on ARMv7 until the
+  box width wraps as libass's does, on AArch64 as a deliberate divergence.
 - `cargo xtask ass equivalence --base REV` renders the `ass-render`
   fixtures at their frames and every 40 ms, mutations of them with varied
   settings and style overrides, and scripts generated from a seed, with the
