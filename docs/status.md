@@ -21,7 +21,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1606 (44/44 pass) | heap ≤0.404, total RSS ≤0.849 | — |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10/10 packet folds (`matroska-audio-clocks`) | 1.4510 (6/10 pass) | heap ≤1.822 (8/10 lower), total RSS ≤1.043 (0/10 lower) | audio seek |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 and Dolby Vision sample entry identification | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 0.8854 (972/972 pass) | heap ≤0.4132, total RSS ≤0.7260 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
-| MP4 range playback | Regular AVC/AAC and AVC/Opus startup and backward seek, fragmented AVC/AAC with open-ended edits, and dedicated HEVC and AV1 sample entries | 22 complete open and backward-seek comparisons (`mp4-range`), 2,250 packets | 1.1501 (22/22 pass) | heap ≤0.7109, total RSS ≤0.9650 (22/22 lower) | other range playback profiles |
+| MP4 range playback | Regular AVC/AAC and AVC/Opus startup and backward seek, fragmented AVC/AAC with open-ended edits, and dedicated HEVC and AV1 sample entries, with source-declared Opus seek preroll | 27 complete open and backward-seek comparisons (`mp4-range`), 2,871 packets | 1.1279 (27/27 pass) | heap ≤0.7109, total RSS ≤0.9675 (27/27 lower) | other range playback profiles |
 | Ogg | Pages with CRC and resync, multiplexed and chained streams, Vorbis, Opus and FLAC mappings with canonical configurations, granule timing, pre-skip and end trims, bisection seeking | Packets against the pinned `ffprobe` (`cargo xtask codecs readers`) on 21 FATE Vorbis files and 13 generated Opus, Vorbis and FLAC files (multiplexed, chained, damaged, truncated), in two views: the FFmpeg-compatible `compat::clock` 31/34 pass, 3 differ only by reviewed FFmpeg behaviours; the reader's own timing 7/34 pass, 25 differ only where `compat::clock` reproduces FFmpeg, 2 by reviewed behaviours ([reader rules](../harness/codecs/reader-rules.json), [frozen differences](../harness/codecs/reader-differences.json)) | within the codec workloads | within the codec workloads | `b_vorbis.ogg`, `chain_vorbis.ogg`: a negative last duration FFmpeg prints modulo 2^32; `crc_bad.opus`: the first packet after a page that fails its CRC, which FFmpeg times from its own page and `compat::clock` from the stream start; Theora and Speex untimed; chained seeks not compared with FFmpeg |
 | Audio elementary streams | Native FLAC (with or without `fLaC`), MPEG audio with ID3v2/ID3v1/APE tags, Xing/Info/VBRI and LAME gapless trims, ADTS, AC-3/E-AC-3; one shared frame-stream engine | Packets as the readers emit them against the pinned `ffprobe` on 271 FLAC, MPEG audio, ADTS, AC-3 and E-AC-3 files (the IETF FLAC testbench, MP3 conformance, generated and crafted damaged streams): 253/271 pass, 16 differ only by reviewed FFmpeg behaviours, 2 refused by both (testbench faulty `06 - missing streaminfo metadata block`, `07 - other metadata blocks preceding streaminfo metadata block`) | within the codec workloads | within the codec workloads | FLAC `flac_s20_rate768k`, `06 - samplerate 768kHz` (no durations at 768 kHz), `01 - changing samplerate`, `27 - old format variable blocksize file created with Flake 0.11`, `11 - file starting with unparsable data`, `11 - incorrect metadata block length`, `08 - blocksize 65536`, `09 - blocksize 1`; crafted `ac3_tags`, `adts_mid_junk`, `flac_corrupt`, `flac_id3`, `flac_mid_junk`, `mp3_foreign_frame`, `mp3_mid_junk_falsesync`; MP3 `he_free` (free format, refused by FFmpeg); E-AC-3 dependent substreams on real files; ADTS and AC-3 seek cost |
 | MPEG-TS | PSI, continuity, PES assembly and ordered TS188/M2TS192 entities with control-only and bounded fault completion, with format-owned track classification | 97/97 PES compatibility-view comparisons across all 272 requests | 1.1182 (97/97 pass) | heap ≤0.0726, total RSS ≤0.9843 (97/97 lower) | strict source clocks, access-unit demux, full FATE mapping |
@@ -131,11 +131,12 @@ samples. `cargo xtask grade` cannot join them, because FFmpeg's log lines carry 
 addresses that differ between runs.
 
 The MP4 range playback row uses the gate build at
-`35912fe96ebc0c484a8a4b930260d54d54fcf1d0` on a c8g.large pinned to CPU 1.
-All 22 cases match, with 30 timing pairs of 50 complete operations and 30 memory
+`d688d4a01f48e5cb9353b9aa16770806f1f5dff3` on a c8g.large pinned to CPU 1.
+All 27 cases match, with 30 timing pairs of 50 complete operations and 30 memory
 pairs. Every case passes runtime, peak heap and total RSS.
 Regular Opus cases cover edit-list trim, variable packet duration and
-secondary audio alignment on a backward video seek.
+secondary audio alignment on a backward video seek. The five source-roll cases
+also compare the video landing, both audio ordinals and decoder preroll.
 Broader profile and FATE coverage remain pending.
 
 The rasterising rows on Linux compare the gate build at
@@ -164,7 +165,8 @@ the default font file during 12 cases' operations; those mappings count toward i
 | MP4 range playback, earlier crop comparison | `63f6fe787b4f2976c339ee0548f032d21781dfb6` | `cfb8b1edc7592533b43cf1327be9cfd98a83598c90f3390cabd4770f147e1223` |
 | MP4 range playback, preceding gate build | `f61d41fedac63b7e2bae08586de4e2d5bb8e9ad0` | `b3b814daff8a50d01c2ed89ae6219b1ba8cd2fbe094d7c3d61fb805cc76105e6` |
 | MP4 range playback, 18-case comparison | `77155a8e6f6d4ce3b4823bcaf6824713446feab3` | `48c4f1e51785ae87e5bf52ec0bda92255149aa08d178ee50b597ba21134d8c13` |
-| MP4 range playback | `35912fe96ebc0c484a8a4b930260d54d54fcf1d0` | `30ed94ea480d780bd4101c88e4a0786bfbe1302a9ca924e42cc28c4f5a8565ac` |
+| MP4 range playback | `d688d4a01f48e5cb9353b9aa16770806f1f5dff3` | `0b08e42f9e332814e7b4848fad4a773c5d9c1d9a8684ca97593ae5f514655fe1` |
+| MP4 range playback, 22-case comparison | `35912fe96ebc0c484a8a4b930260d54d54fcf1d0` | `30ed94ea480d780bd4101c88e4a0786bfbe1302a9ca924e42cc28c4f5a8565ac` |
 | MP4 range playback, preceding source-roll comparison | `fa02eb61592bc85ad2749a87f3a925385a5e31f2` | `405b5bec9c2c76a59b0343d4276f684b7b61a0d4847ce06e31d0d74831446e25` |
 | MP4 range playback, 15-case comparison | `24f2299a8d12e120eabc7fc4a32e7eb8febc953e` | `7cdbd50c398a89b4ec25f7d5f4184e0a46948c60cb6a22829a7ba1ac4a2a00e6` |
 | MP4 range playback, dedicated sample entries | `17cad5c5bad576fe7102f53f78f3e150abbe24c8` | `632c275355a60d74974d1850f261a52ad4635414bddf7c2e0396ac914f59c97e` |

@@ -17011,6 +17011,16 @@
    "source_revision": "fa02eb61592bc85ad2749a87f3a925385a5e31f2"
   },
   {
+   "name": "mp4-range-opus-source-roll",
+   "path": "mp4-range-opus-source-roll",
+   "retention": "retained",
+   "reason": "27 MP4 range comparisons on AArch64 Linux covering regular and fragmented edits, dedicated video sample entries and Opus source-roll seek preroll.",
+   "key": "evidence/mp4-range-opus-source-roll/0b08e42f9e332814e7b4848fad4a773c5d9c1d9a8684ca97593ae5f514655fe1.tar.gz",
+   "sha256": "0b08e42f9e332814e7b4848fad4a773c5d9c1d9a8684ca97593ae5f514655fe1",
+   "bytes": 22846691,
+   "source_revision": "d688d4a01f48e5cb9353b9aa16770806f1f5dff3"
+  },
+  {
    "name": "ass-rendering-divergences-fedfb790",
    "path": "ass-rendering-divergences-fedfb790",
    "retention": "retained",
