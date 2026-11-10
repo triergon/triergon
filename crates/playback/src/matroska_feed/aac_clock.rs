@@ -18,7 +18,7 @@ impl MatroskaTrackFeed {
         budget: &Budget,
         maximum_packets: usize,
     ) -> Result<Option<MatroskaClockProbe<'_, Self>>> {
-        if !matches!(self.codec, FeedCodec::Aac(_)) {
+        if !matches!(self.codec, FeedCodec::Aac { .. }) {
             return Ok(None);
         }
         if !self.association.configuration.belongs_to(budget) {
@@ -28,8 +28,13 @@ impl MatroskaTrackFeed {
     }
 
     fn aac_timing(&self, packet: &MatroskaFeedPacket<'_>) -> Result<NativePacketTiming> {
-        let (FeedCodec::Aac(params), MatroskaFeedPayload::Aac { raw, .. }) =
-            (&self.codec, &packet.payload)
+        let (
+            FeedCodec::Aac {
+                params,
+                infer_duration,
+            },
+            MatroskaFeedPayload::Aac { raw, .. },
+        ) = (&self.codec, &packet.payload)
         else {
             return Err(Error::Invalid("native AAC clock packet codec"));
         };
@@ -43,7 +48,7 @@ impl MatroskaTrackFeed {
             self.limits.aac_output_bytes,
         )?;
         let mut timing = NativePacketTiming::demux(packet.source)?;
-        if timing.duration_ns.is_none() {
+        if *infer_duration && timing.duration_ns.is_none() {
             // Indexed AAC-LC cores admitted by this feed have 1024 samples.
             let rate = indexed_aac_frequency(params.frequency_index)
                 .ok_or(Error::Invalid("AAC clock frequency"))?;

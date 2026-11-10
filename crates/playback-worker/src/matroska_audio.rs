@@ -298,7 +298,7 @@ mod tests {
             assert_eq!(select.family(MediaKind::Video, CodecId::Aac), None);
             assert_eq!(select.family(audio, CodecId::Opus), None);
             assert_eq!(
-                select.family(audio, CodecId::Other(b"A_AAC/MPEG4/LC")),
+                select.family(audio, CodecId::Other(b"A_AAC/MPEG4/LC/UNKNOWN")),
                 None
             );
         }

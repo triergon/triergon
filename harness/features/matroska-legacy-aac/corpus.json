@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "mpeg2-lc",
+      "profile": "mpeg2-lc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg2-lc.mkv",
+      "sha256": "c26f0023c6742aa8efc02c36452325beeab0f637f0fe8e248ffab4a4a84e1043",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2684,
+        "digest": 13556022409630435448
+      }
+    },
+    {
+      "id": "mpeg4-lc",
+      "profile": "mpeg4-lc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv",
+      "sha256": "4047e3e399b1620bcccdf5d6600f4712da82b7d166b079c120ef5e408775c121",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2684,
+        "digest": 13556022409630435448
+      }
+    },
+    {
+      "id": "mpeg2-lc-laced",
+      "profile": "mpeg2-lc-laced",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg2-lc-laced.mkv",
+      "sha256": "a64071af30efc713936cb81e3f7765eab919ee7733989b4bd6a2200cd935268f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2684,
+        "digest": 11401982484679608440
+      }
+    },
+    {
+      "id": "mpeg4-lc-timed",
+      "profile": "mpeg4-lc-timed",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-timed.mkv",
+      "sha256": "d3774cb3e25bb6ce6a161c9de10b9f25d133e4b0155f59935d09682c4430f51d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2684,
+        "digest": 2500949635470321784
+      }
+    }
+  ]
+}

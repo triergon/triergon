@@ -45,6 +45,17 @@ AAC-LC tracks and one each of AC-3 and E-AC-3. The damaged control uses
 the same Dolby tracks and replaces the first AC-3 packet's initial sync
 byte with zero. Its declared sample rate and channel count remain intact.
 
+`aac-mpeg2-lc.mkv` and `aac-mpeg4-lc.mkv` wrap the same eight stereo
+AAC-LC packets at 48 kHz with their respective deprecated CodecID and no
+CodecPrivate. The packets were encoded from a synthetic 660 Hz sine. The
+MPEG-2 laced variant packs the first three packets into a Xiph lace. The
+MPEG-4 timed variant adds DefaultDuration of 21,333,333 ns. The ADTS
+reference `aac-lc.feed` is identical for all four files.
+
+```sh
+ffmpeg -i aac-mpeg4-lc.mkv -map 0:a:0 -c:a copy -f adts aac-lc.feed
+```
+
 `avc-reordered-discovery.mkv` contains twelve 64×48 pictures at 24 fps
 from `testsrc2`, encoded with libx264 High profile and one B picture.
 `hevc-no-default-duration-discovery.mkv` encodes the same synthetic
