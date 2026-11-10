@@ -340,26 +340,23 @@ pub fn revisions(root: &Path) -> Result<String, Vec<String>> {
     ))
 }
 
-/// Distinct commit citations in their order of appearance, excluding external revisions.
+/// Distinct commit citations in the status document's paragraphs, headings and tables.
 fn cited_revisions<'a>(text: &'a str, external: &[&str]) -> Vec<&'a str> {
     let mut cited = Vec::new();
     let mut paragraph = 0;
     let mut offset = 0;
-    for line in text.split_inclusive('\n') {
+    let mut table = false;
+    let mut lines = text.split_inclusive('\n').peekable();
+    while let Some(line) = lines.next() {
         let end = offset + line.len();
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with(['#', '|']) {
+        let boundary = line.trim().is_empty() || is_atx_heading(line);
+        table = !boundary && (table || lines.peek().is_some_and(|next| starts_table(line, next)));
+        if boundary || table {
             cite_inline(&text[paragraph..offset], external, &mut cited);
-            if trimmed.starts_with('|') {
-                let mut start = 0;
-                for (pipe, _) in line
-                    .match_indices('|')
-                    .filter(|&(at, _)| !escaped(line, at))
-                {
-                    cite_inline(&line[start..pipe], external, &mut cited);
-                    start = pipe + 1;
+            if table {
+                for cell in pipe_cells(line) {
+                    cite_inline(cell, external, &mut cited);
                 }
-                cite_inline(&line[start..], external, &mut cited);
             } else {
                 cite_inline(line, external, &mut cited);
             }
@@ -369,6 +366,50 @@ fn cited_revisions<'a>(text: &'a str, external: &[&str]) -> Vec<&'a str> {
     }
     cite_inline(&text[paragraph..], external, &mut cited);
     cited
+}
+
+fn is_atx_heading(line: &str) -> bool {
+    let line = line.trim_end_matches(['\r', '\n']);
+    let start = line.trim_start_matches(' ');
+    let content = start.trim_start_matches('#');
+    line.len() - start.len() <= 3
+        && (1..=6).contains(&(start.len() - content.len()))
+        && (content.is_empty() || content.starts_with([' ', '\t']))
+}
+
+fn starts_table(header: &str, delimiter: &str) -> bool {
+    if !header.contains('|') && !delimiter.contains('|') {
+        return false;
+    }
+    let mut width = 0;
+    for cell in pipe_cells(delimiter) {
+        let cell = cell.trim();
+        let dashes = cell.strip_prefix(':').unwrap_or(cell);
+        let dashes = dashes.strip_suffix(':').unwrap_or(dashes);
+        if dashes.is_empty() || !dashes.bytes().all(|byte| byte == b'-') {
+            return false;
+        }
+        width += 1;
+    }
+    width == pipe_cells(header).count()
+}
+
+fn pipe_cells(line: &str) -> impl Iterator<Item = &str> {
+    let line = line.trim();
+    let row = line
+        .strip_suffix('|')
+        .filter(|before| !escaped(line, before.len()))
+        .unwrap_or(line);
+    let row = row.strip_prefix('|').unwrap_or(row);
+    let mut start = 0;
+    row.match_indices('|')
+        .filter_map(move |(at, _)| (!escaped(row, at)).then_some(at))
+        .chain(std::iter::once(row.len()))
+        .map(move |end| {
+            let cell = &row[start..end];
+            start = end + 1;
+            cell
+        })
 }
 
 fn escaped(text: &str, offset: usize) -> bool {
@@ -586,6 +627,7 @@ mod tests {
     #[test]
     fn unclosed_delimiters_do_not_cross_status_blocks() {
         let text = "Unclosed ` marker.\n \nMeasured at `deadbee`.\n\n\
+                    | Result | Revision |\n| --- | --- |\n\
                     | Unclosed ` marker | `def1234` |\n\
                     | Unclosed ` marker |\n| `abc1234` |";
         assert_eq!(
@@ -594,6 +636,26 @@ mod tests {
         );
         assert_eq!(
             cited_revisions("Measured at `\ndeadbee`.", &[]),
+            ["deadbee"]
+        );
+    }
+
+    #[test]
+    fn table_cells_can_omit_outer_pipes() {
+        let text = "| Result | Revision |\n| :--- | ---: |\n\
+                    Literal ` marker | `deadbee` |\n\
+                    Escaped \\| literal ` marker | `abc1234`";
+        assert_eq!(cited_revisions(text, &[]), ["deadbee", "abc1234"]);
+    }
+
+    #[test]
+    fn atx_heading_can_interrupt_a_paragraph() {
+        assert_eq!(
+            cited_revisions("Unclosed ` marker.\n## Measured `deadbee`", &[]),
+            ["deadbee"]
+        );
+        assert_eq!(
+            cited_revisions("Start `\n#tag ` measured at `deadbee`.", &[]),
             ["deadbee"]
         );
     }
