@@ -17093,6 +17093,16 @@
    "sha256": "f4e2ec2449012a0efc1ee4ec6c75cfff8122528e3c629fbbe68c1380d9eff7f5",
    "bytes": 98509170,
    "source_revision": "354f7d735ac22df3b63e7849eb5869488c087bd9"
+  },
+  {
+   "name": "font-charmaps-944fd7cf",
+   "path": "font-charmaps-944fd7cf",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md after FreeType's full charmap order, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape and ass compare at 944fd7cf natively on AArch64 and in the armv7-userland user space, with raster compare, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64, each run's build log, and the user space's package list.",
+   "key": "evidence/font-charmaps-944fd7cf/c2ffb0cd91e0e5e313e08d4df02ff034978b054fffb88a27451a337e7e770d0e.tar.gz",
+   "sha256": "c2ffb0cd91e0e5e313e08d4df02ff034978b054fffb88a27451a337e7e770d0e",
+   "bytes": 98546546,
+   "source_revision": "944fd7cfc7712f505bd66e046afaa77f7eee6aac"
   }
  ]
 }
