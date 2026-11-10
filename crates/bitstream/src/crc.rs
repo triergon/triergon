@@ -77,7 +77,7 @@ pub fn crc8(mut crc: u8, data: &[u8]) -> u8 {
 
 const A52_RESIDUE_MASK: u32 = 0x7fff;
 
-/// Reduce modulo x^15 + x + 1, where x^15 contributes x + 1.
+/// Reduce a polynomial of degree at most 28 modulo x^15 + x + 1.
 fn a52_reduce(value: u32) -> u32 {
     let high = value >> 15;
     (value & A52_RESIDUE_MASK) ^ high ^ (high << 1)

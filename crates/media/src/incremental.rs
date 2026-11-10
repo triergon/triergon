@@ -905,15 +905,15 @@ impl ElementReader {
                         && let Some(span) = self.input.buffered().get(..maximum)
                         && let Ok(bytes) = Bytes::copy_from_slice(self.input.budget(), span)
                     {
-                        // Read and copy the complete leaf in this quantum.
-                        // The window can be released without a temporary span.
+                        // Charge the completed copy before discarding the window,
+                        // which can observe cancellation.
+                        work.take(byte_work);
                         if !matches!(
                             self.input.read_discard(maximum, work, cancel)?,
                             Step::Ready(count) if count == maximum
                         ) {
                             return Err(Error::Invalid("complete buffered leaf"));
                         }
-                        work.take(byte_work);
                         self.scan_left -= byte_work;
                         body.remaining = 0;
                         body.direct = Some(bytes);
