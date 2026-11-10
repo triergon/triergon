@@ -184,6 +184,7 @@ const REQUIRED: &[(&str, &[&str])] = &[
     ("NotoEmoji-wght.ttf", &["Zyyy"]),
     ("authored-cmap-formats.ttf", &["Latn"]),
     ("authored-cff-features.otf", &["Latn"]),
+    ("authored-charmaps.otf", &["Latn"]),
 ];
 
 /// Random strings per script: in the required cases, and in the whole sweep.

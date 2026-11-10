@@ -6,8 +6,8 @@ use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_font::{
-    CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont, TextLookup, Variant,
-    VariationSequences,
+    CharEncoding, Charmap, CharmapKind, CmapFormat, ControlBox, Font, GlyphId, Platform, SizedFont,
+    TextLookup, Variant, VariationSequences,
 };
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
@@ -122,8 +122,9 @@ fn unless_unloadable<T>(result: Result<T>, otherwise: T) -> Result<T> {
     }
 }
 
-/// The font functions HarfBuzz builds in (`hb-ot`), at a [`Scale`]: the character
-/// map HarfBuzz prefers, `cmap` format 14 variation sequences, `hmtx` advances,
+/// The font functions HarfBuzz builds in (`hb-ot`), at a [`Scale`]: the `cmap`
+/// subtable HarfBuzz prefers (through which formats 2 and 8 map nothing),
+/// `cmap` format 14 variation sequences, `hmtx` advances,
 /// and extents from the `glyf` header box or the charstring's control box.
 #[derive(Debug)]
 pub struct OtMetrics<'a> {
@@ -146,9 +147,14 @@ impl<'a> OtMetrics<'a> {
     /// by the font's [`Limits`](triergon_font::Limits).
     pub fn new(font: &'a Font, scale: Scale) -> Self {
         use Platform::{Macintosh, Unicode, Windows};
+        // HarfBuzz reads the `cmap` table's own subtables, not the charmaps
+        // FreeType adds to a CFF face.
         let find = |platform: Platform, encoding: Option<u16>| {
-            font.charmaps()
-                .find(|c| c.platform() == platform && encoding.is_none_or(|e| c.encoding_id() == e))
+            font.charmaps().find(|c| {
+                matches!(c.kind(), CharmapKind::Subtable(_))
+                    && c.platform() == platform
+                    && encoding.is_none_or(|e| c.encoding_id() == e)
+            })
         };
         // HarfBuzz's preference: symbol, then full and BMP Unicode, then Mac.
         let symbol = find(Windows, Some(0));
@@ -221,8 +227,14 @@ impl<'a> OtMetrics<'a> {
         }))
     }
 
+    /// HarfBuzz's `CmapSubtable::get_glyph`, which maps nothing through
+    /// formats 2 and 8.
     fn lookup(&self, code: u32) -> Option<GlyphId> {
-        self.charmap?.glyph(code)
+        let charmap = self.charmap?;
+        match charmap.kind() {
+            CharmapKind::Subtable(CmapFormat::HighByte | CmapFormat::Mixed) => None,
+            _ => charmap.glyph(code),
+        }
     }
 }
 
