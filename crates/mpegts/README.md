@@ -296,7 +296,8 @@ Logical EOF drains the framers before the original `Finished` event and final
 the reader checks the allocations it must retain across that growth. If they
 cannot fit together, it reports a PES `Limit` diagnostic. Memory held by caller
 outputs can cause retryable `Backpressure`, with the original bytes and ranges
-preserved on retry.
+preserved on retry. If the pool cannot also hold a diagnostic for a permanent
+PES limit, the reader returns the limit directly.
 
 Audio defaults to `AudioEofPolicy::RejectIncomplete`: an unfinished
 frame still returns `Truncated`. With `AudioEofPolicy::ReportIncomplete`, only

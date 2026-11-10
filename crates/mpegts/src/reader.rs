@@ -207,11 +207,10 @@ impl Reader {
             .iter()
             .position(|entry| entry.pid == stream.pid)
             .and_then(|position| self.stream.as_ref()?.route_state(position, stream.pid))
-            .is_some_and(|(epochs, pending)| {
+            .is_some_and(|(epochs, _)| {
                 epochs.configuration == lane.track.epoch
                     && !matches!(lane.run, PesRun::Active(old, _) if old != epochs)
                     && !matches!(lane.run, PesRun::BeforeBoundary(_))
-                    && pending.is_none_or(|start| start.source == self.source)
             })
     }
 
@@ -523,7 +522,20 @@ impl Reader {
                         return Ok(Step::Yield);
                     }
                     if !Self::is_inline_source(raw) {
-                        let charge = Shared::<TraceEvent>::reserve(&self.pool)?;
+                        let charge =
+                            Shared::<TraceEvent>::reserve(&self.pool).map_err(|error| {
+                                if matches!(error, Error::Backpressure { .. } | Error::Limit { .. })
+                                    && let TraceEvent::Diagnostic(fault) = raw
+                                    && fault.kind == crate::FaultKind::Pes
+                                    && matches!(fault.error, Error::Limit { .. })
+                                {
+                                    // Return the permanent limit directly when a
+                                    // shared diagnostic would exceed the budget.
+                                    fault.error
+                                } else {
+                                    error
+                                }
+                            })?;
                         let event = self.raw.take().expect("raw source");
                         self.pending = Some(SourceEvent(Shared::new(event, charge)));
                     }

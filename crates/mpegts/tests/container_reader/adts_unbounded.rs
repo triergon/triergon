@@ -209,6 +209,22 @@ fn before_last_span(
     window: usize,
     retain_first_carrier: bool,
 ) -> (Drive<'_>, Option<TransportPacket>) {
+    before_span(
+        raw,
+        maximum,
+        window,
+        retain_first_carrier,
+        (raw.len() - 188) as u64,
+    )
+}
+
+fn before_span(
+    raw: &[u8],
+    maximum: usize,
+    window: usize,
+    retain_first_carrier: bool,
+    last_offset: u64,
+) -> (Drive<'_>, Option<TransportPacket>) {
     let pool = Budget::new(maximum).unwrap();
     let mut drive = Drive {
         reader: Reader::new(
@@ -230,7 +246,6 @@ fn before_last_span(
         catalogue: Vec::new(),
         catalogue_epoch_override: None,
     };
-    let last_offset = (raw.len() - 188) as u64;
     let mut first_carrier = None;
     let mut at_last_carrier = false;
     while let Some(event) = drive.next().unwrap() {
@@ -349,6 +364,27 @@ fn finite_pes_span_growth_refuses_a_permanent_limit() {
             maximum
         }
     );
+}
+
+#[test]
+fn finite_pes_limit_can_be_returned_without_allocating_a_diagnostic() {
+    let frame = adts(b"first body span");
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    let offset = ts.bytes.len() as u64;
+    ts.pes(PID, 0xc0, &frame, Some(90_000), None);
+    // Keep the shared window live after consuming the failed carrier.
+    ts.payload(0x1fff, &[0]);
+    let window = ts.bytes.len();
+    let (drive, _) = before_span(&ts.bytes, 1 << 20, window, false, offset);
+    let maximum = drive.pool.used() + size_of::<triergon_mpegts::SourceRange>();
+    let (mut drive, _) = before_span(&ts.bytes, maximum, window, false, offset);
+    let error = Error::Limit {
+        requested: maximum + size_of::<triergon_mpegts::PesSpan>(),
+        maximum,
+    };
+    assert_eq!(grow_last_span(&mut drive.reader).unwrap_err(), error);
+    assert_eq!(drive.reader.request().unwrap_err(), error);
 }
 
 #[test]

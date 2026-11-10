@@ -241,6 +241,59 @@ fn a_discontinuity_interrupts_partial_audio_and_rebuilds_tracks() {
 }
 
 #[test]
+fn adding_an_audio_route_keeps_video_pes_open_across_contiguous_entities() {
+    let raw = include_bytes!("../../../framing/fixtures/raw-annex-b/avc-aud0.h264");
+    let mut transport = Transport::new();
+    transport.tables(&[(0x1b, PID, &[])], 0);
+    transport.pes(PID, 0xe0, &raw[..2045], Some(90_000), None);
+    let mut body = Transport::new();
+    body.counters = transport.counters;
+    body.pes(PID, 0xe0, &raw[2045..], Some(180_000), None);
+    transport.bytes.extend_from_slice(&body.bytes[..188]);
+    let split = transport.bytes.len();
+    transport.tables(&[(0x1b, PID, &[]), (0x0f, PID + 1, &[])], 1);
+    transport.bytes.extend_from_slice(&body.bytes[188..]);
+
+    let events = read(&[
+        Entity {
+            source: ID,
+            raw: &transport.bytes[..split],
+            transition: EntityTransition::Contiguous,
+        },
+        Entity {
+            source: SourceId(3),
+            raw: &transport.bytes[split..],
+            transition: EntityTransition::Contiguous,
+        },
+    ]);
+    let mut payload = Vec::new();
+    let mut crossing = false;
+    for event in events {
+        match event {
+            Event::Packet(packet) => {
+                payload.extend_from_slice(packet.payload());
+                crossing |= packet.sources().iter().any(|source| {
+                    let TraceEvent::Pes(pes) = source.pes.event() else {
+                        return false;
+                    };
+                    pes.header_source_ranges[0].entity == ID
+                        && pes
+                            .spans()
+                            .last()
+                            .is_some_and(|span| span.source_range().entity == SourceId(3))
+                });
+            }
+            Event::Other(ReaderEvent::Interrupted { .. } | ReaderEvent::InterruptedPes { .. }) => {
+                panic!("unrelated PMT entry interrupted a contiguous video route")
+            }
+            _ => (),
+        }
+    }
+    assert_eq!(payload, raw);
+    assert!(crossing);
+}
+
+#[test]
 fn a_later_entity_pmt_interrupts_the_open_pes_from_the_previous_entity() {
     open_pes_at_pmt_boundary(false);
 }
