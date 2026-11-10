@@ -27,25 +27,6 @@
   "iterations": 1,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-  ],
-  "open_cases": [
-    {
-      "id": "dejavumathtexgyre-ttf-advances-16384",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "authored-cmap-formats-ttf-advances-16384",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "dejavumathtexgyre-ttf-vertical-16384",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "authored-cmap-formats-ttf-vertical-16384",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    }
-  ]
+  "pending_module_requirements": [],
+  "open_cases": []
 }

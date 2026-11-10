@@ -989,7 +989,7 @@ mod tests {
             for v in [16_u16, 2, 2, axis_size, 1, instance_size] {
                 fvar.extend(v.to_be_bytes());
             }
-            fvar.resize(16 + 40 + 12, 0);
+            fvar.resize(16 + 40 + usize::from(instance_size), 0);
             fvar
         };
         let axes = |fvar: &[u8]| {

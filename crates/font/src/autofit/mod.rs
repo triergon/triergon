@@ -222,7 +222,7 @@ impl Autofit {
     ///
     /// # Errors
     ///
-    /// `Unsupported` for a glyph of a CJK or Indic style; those of loading
+    /// `Unsupported` for a glyph with points of a CJK or Indic style; those of loading
     /// the glyph in font units; `Overflow` for hinted coordinates beyond
     /// `i32`; `Policy` when `work` runs out; and the face budget's errors.
     pub(crate) fn load(
@@ -235,26 +235,32 @@ impl Autofit {
     ) -> Result<GlyphMetrics> {
         let globals = self.globals(font, work)?;
         let hinter = self.hinter(globals, font, glyph, scaler, work)?;
-        if matches!(hinter, Hinter::Cjk) {
-            return Err(Error::Unsupported("the CJK auto-hinter"));
-        }
         let units = font.load(glyph, Scale::UNITS, outline, work)?;
         let units = Advances {
             horizontal: i64::from(units.advance),
             vertical: i64::from(units.vertical_advance),
             vertical_units: units.linear_vertical_advance,
         };
-        let pp = self.hint(
-            globals,
-            font,
-            glyph,
-            &hinter,
-            scaler,
-            units,
-            outline,
-            Scope::Outline,
-            work,
-        )?;
+        let pp = if matches!(hinter, Hinter::Cjk) {
+            // The CJK writing system moves no point of an outline without
+            // points, and advances as [`Self::advances`] gives.
+            if !outline.points().is_empty() {
+                return Err(Error::Unsupported("the CJK auto-hinter"));
+            }
+            (0, pix_round(mul_fix(units.horizontal, scaler.x_scale)))
+        } else {
+            self.hint(
+                globals,
+                font,
+                glyph,
+                &hinter,
+                scaler,
+                units,
+                outline,
+                Scope::Outline,
+                work,
+            )?
+        };
         if pp.0 != 0 {
             glyf::translate(outline.points_mut(), (-pp.0, 0))?;
         }

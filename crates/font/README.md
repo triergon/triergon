@@ -257,8 +257,8 @@ them when the scale is undefined. A `SizedFont` then gives:
   face and for digits of one width), the vertical advance is scaled by the
   style's vertical scale, and the box is fitted outwards to pixels. Glyphs of
   the CJK and Indic styles have their advances (the scaled advance, rounded,
-  which those writing systems leave unhinted) but their outlines are
-  `Unsupported`. The style of every glyph and each style's metrics are
+  which those writing systems leave unhinted) and, without points, their empty
+  outlines, but outlines with points are `Unsupported`. The style of every glyph and each style's metrics are
   computed on the first load that needs them and kept with the face, charged
   to its budget.
 - `synthesize`: libass's synthetic styles, decided by `Font::synthesis` from the
@@ -339,7 +339,7 @@ opens it and fails each glyph.
 At a size, the default load of an instructed TrueType glyph is `Unsupported`,
 hence its glyph extents and contour points, which libass's HarfBuzz callbacks
 report: it needs the TrueType interpreter, which this crate does not run. So is
-the default-load outline of an auto-hinted glyph of a CJK or Indic style, whose
+the default-load outline, with points, of an auto-hinted glyph of a CJK or Indic style, whose
 writing systems the auto-hinter here does not run, and HarfBuzz's coverage of
 glyphs through OpenType features, which FreeType's auto-hinter has only with
 HarfBuzz built in. The auto-hinter runs only the normal render mode, without
