@@ -301,6 +301,130 @@ fn pass_count(cell: &str) -> Option<(u64, u64)> {
     Some((passing.parse().ok()?, cases.parse().ok()?))
 }
 
+/// Every commit `docs/status.md` cites is an ancestor of `HEAD`, so the
+/// source revision of a result stays fetchable once its pull request is merged.
+///
+/// A citation is a code span of 7 to 40 lowercase hexadecimal digits that is not a
+/// prefix of the pinned FFmpeg revision. The only cited revisions allowed to be
+/// unreachable are those in `harness/evidence/lost-revisions.json`, which no copy is
+/// known of: each must stay cited and absent from the repository, so the list can only
+/// shrink.
+pub fn revisions(root: &Path) -> Result<String, Vec<String>> {
+    let one = |error: String| vec![error];
+    let status = fs::read_to_string(root.join("docs/status.md"))
+        .map_err(|e| one(format!("docs/status.md: {e}")))?;
+    let lost = lost_revisions(root).map_err(one)?;
+    if git(root, &["rev-parse", "--is-shallow-repository"]).map_err(one)? == "true" {
+        return Err(one(
+            "the checkout is shallow: cited revisions are checked against the full history".into(),
+        ));
+    }
+    let reachable = git(root, &["rev-list", "HEAD"]).map_err(one)?;
+    let reachable: Vec<&str> = reachable.lines().collect();
+    let cited = cited_revisions(&status, &[crate::prepare::REVISION]);
+    let mut errors = Vec::new();
+    for &revision in &cited {
+        let listed = lost.iter().any(|l| prefixes(l, revision));
+        let found = reachable.iter().filter(|c| c.starts_with(revision)).count();
+        let error = match found {
+            0 if listed && !is_commit(root, revision) => continue,
+            0 if listed => {
+                "is listed as lost but is a commit again: merge it and drop it \
+                            from harness/evidence/lost-revisions.json"
+            }
+            0 => {
+                "is not a commit HEAD reaches: merge it without changing the tree \
+                  (`git merge -s ours`)"
+            }
+            1 if listed => "is reachable: drop it from harness/evidence/lost-revisions.json",
+            1 => continue,
+            _ => "names more than one commit HEAD reaches: cite more digits",
+        };
+        errors.push(format!("docs/status.md cites `{revision}`, which {error}"));
+    }
+    for revision in &lost {
+        if !cited.iter().any(|c| prefixes(revision, c)) {
+            errors.push(format!(
+                "harness/evidence/lost-revisions.json lists `{revision}`, which docs/status.md \
+                 no longer cites: drop it"
+            ));
+        }
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    Ok(format!(
+        "Cited revisions OK: {} citations, {} reachable from HEAD and {} recorded as lost",
+        cited.len(),
+        cited.len() - lost.len(),
+        lost.len()
+    ))
+}
+
+/// The distinct code spans of `text` that cite a commit, in order: 7 to 40 lowercase
+/// hexadecimal digits that are not a prefix of an `external` revision.
+pub fn cited_revisions<'a>(text: &'a str, external: &[&str]) -> Vec<&'a str> {
+    let mut cited = Vec::new();
+    for span in text.split('`').skip(1).step_by(2) {
+        let hex = span
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+        if hex
+            && (7..=40).contains(&span.len())
+            && !external.iter().any(|e| e.starts_with(span))
+            && !cited.contains(&span)
+        {
+            cited.push(span);
+        }
+    }
+    cited
+}
+
+/// Whether one revision abbreviates the other.
+fn prefixes(a: &str, b: &str) -> bool {
+    a.starts_with(b) || b.starts_with(a)
+}
+
+fn lost_revisions(root: &Path) -> Result<Vec<String>, String> {
+    let path = root.join("harness/evidence/lost-revisions.json");
+    let lost = read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    lost.get("revisions")
+        .and_then(Value::as_array)
+        .ok_or("harness/evidence/lost-revisions.json: no revisions list")?
+        .iter()
+        .map(|entry| {
+            entry
+                .get("revision")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| {
+                    "harness/evidence/lost-revisions.json: an entry has no revision".into()
+                })
+        })
+        .collect()
+}
+
+fn is_commit(root: &Path, revision: &str) -> bool {
+    git(root, &["cat-file", "-t", revision]).is_ok_and(|kind| kind == "commit")
+}
+
+fn git(root: &Path, args: &[&str]) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("cannot run git: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {} failed:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let text = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
+    Ok(text.trim_end().to_owned())
+}
+
 pub fn read_json(path: &Path) -> Result<Value, String> {
     let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
     json::parse(&text).map_err(|e| e.to_string())
@@ -417,6 +541,18 @@ pub fn has_unsafe_syntax(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cites_hexadecimal_code_spans_of_commit_length() {
+        let text = "at `ceb5076` and `03f3efd3a0fde0d558c68f5408c521d632802fb7`, again \
+                    `ceb5076`; FFmpeg `d32b387f`; not `abc123`, `ABCDEF0`, `deadbeefx`, \
+                    `1000 ms`, a digest `6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d` \
+                    or text between `spans` cafe1234 `here`";
+        assert_eq!(
+            cited_revisions(text, &["d32b387f2b0a484599d4587d651891f0c63c4238"]),
+            ["ceb5076", "03f3efd3a0fde0d558c68f5408c521d632802fb7"]
+        );
+    }
 
     #[test]
     fn finds_link_targets_like_the_markdown_pattern() {
