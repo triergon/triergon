@@ -146,6 +146,29 @@ impl EncodedEditPlan {
         )
     }
 
+    pub(crate) fn opus_seek_timestamp(
+        &self,
+        pts: i64,
+        video_base: TimeBase,
+        audio_base: TimeBase,
+    ) -> Result<i64> {
+        let target = Time::from_ticks(i128::from(pts), video_base)?;
+        if target >= self.opus_presentation_end()? {
+            return Err(Error::Unsupported("Opus seek reaches the presentation end"));
+        }
+        target.to_i64_ticks(audio_base, Rounding::Floor)
+    }
+
+    pub(crate) fn opus_occurrence(&self, sample: u64) -> Result<u64> {
+        let timing = self
+            .opus_timing
+            .as_ref()
+            .ok_or(Error::Invalid("missing Opus timing"))?;
+        sample.checked_sub(timing.first).ok_or(Error::Unsupported(
+            "Opus recovery precedes the retained edit prefix",
+        ))
+    }
+
     pub(crate) fn opus_roll_scope(&self) -> Result<crate::RecoveryScope<'_>> {
         if !matches!(self.timing, EditTiming::Opus) {
             return Err(Error::Unsupported("Opus recovery needs an Opus edit"));

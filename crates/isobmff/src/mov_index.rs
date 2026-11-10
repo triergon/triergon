@@ -945,7 +945,9 @@ impl<'a> GlobalSeekJob<'a> {
                 let Some(landing) = recovery.poll(work, cancel)? else {
                     return Ok(BuildStatus::Yield);
                 };
-                self.anchors.as_mut_slice()[self.at].occurrence = landing.first_sample - 1;
+                self.anchors.as_mut_slice()[self.at].occurrence = self
+                    .opus_edit(self.at)?
+                    .opus_occurrence(landing.first_sample)?;
                 self.reference
                     .as_mut()
                     .expect("Opus recovery follows the reference seek")
@@ -979,13 +981,14 @@ impl<'a> GlobalSeekJob<'a> {
                 };
                 if self.opus_track == Some(at) {
                     let sample = &landing.selected.occurrence.source;
-                    if landing.selected.ordinal + 1 != sample.ordinal {
+                    let edit = self.opus_edit(at)?;
+                    if landing.selected.ordinal != edit.opus_occurrence(sample.ordinal)? {
                         return Err(Error::Invalid("Opus seek occurrence order"));
                     }
                     self.opus_recovery = Some(OpusRecoverySeek::new(
                         &self.pool,
                         self.tracks.as_slice()[at],
-                        self.opus_edit(at)?.opus_roll_scope()?,
+                        edit.opus_roll_scope()?,
                         sample,
                     )?);
                 } else {
@@ -1015,32 +1018,24 @@ impl<'a> GlobalSeekJob<'a> {
                 .ok_or(Error::Invalid("native reference selection absent"))?
                 .selected;
             let recovering_opus = self.opus_track == Some(self.at);
-            let (timestamp, rounding) = if recovering_opus {
-                (
-                    selected
-                        .occurrence
-                        .demux
-                        .pts
-                        .ok_or(Error::Invalid("missing video landing PTS"))?,
-                    Rounding::Floor,
-                )
-            } else {
-                (selected.timestamp, Rounding::NearestAway)
-            };
             let track = self.tracks.as_slice()[self.at];
             let base = MediaClock::from_source(track.media_base)?.demux_base;
-            let timestamp = if self.reference_base == base {
-                timestamp
+            let timestamp = if recovering_opus {
+                let pts = selected
+                    .occurrence
+                    .demux
+                    .pts
+                    .ok_or(Error::Invalid("missing video landing PTS"))?;
+                self.opus_edit(self.at)?
+                    .opus_seek_timestamp(pts, self.reference_base, base)?
             } else {
-                self.reference_base.rescale(timestamp, base, rounding)?
-            };
-            let timestamp = match self
-                .encoded_edits
-                .and_then(|plans| plans[self.at].as_ref())
-                .filter(|_| !recovering_opus)
-            {
-                Some(edit) => edit.align_seek_timestamp(timestamp, base)?,
-                None => timestamp,
+                let timestamp =
+                    self.reference_base
+                        .rescale(selected.timestamp, base, Rounding::NearestAway)?;
+                match self.encoded_edits.and_then(|plans| plans[self.at].as_ref()) {
+                    Some(edit) => edit.align_seek_timestamp(timestamp, base)?,
+                    None => timestamp,
+                }
             };
             self.child = Some(SeekJob::build(self.track_context(self.at), timestamp)?);
         }

@@ -297,38 +297,48 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
         ),
     ]);
     let long_roll_file = "avc-opus-long-roll.mp4";
+    let composition_file = "avc-opus-video-composition-offset.mp4";
     let mut long_roll = opus.clone();
     // Request six preceding packets in the seed's Opus roll description.
     long_roll[2872..2874].copy_from_slice(&(-6_i16).to_be_bytes());
+    let composition = mp4_opus_composition_fixture(&opus);
     write(&output.join(long_roll_file), &long_roll)?;
+    write(&output.join(composition_file), &composition)?;
     cases.extend([
         mp4_range_case(
             "opus-recovery-start",
             opus_file,
             &opus,
             ["0", "opus-roll"],
-            (241, 65_677, 12_505_035_923_324_092_948),
+            (241, 65_677, 10_527_166_544_542_341_228),
         ),
         mp4_range_case(
             "opus-recovery-seek",
             opus_file,
             &opus,
             ["32000", "opus-roll"],
-            (95, 26_088, 230_186_244_915_985_021),
+            (95, 26_088, 15_507_622_761_405_975_333),
         ),
         mp4_range_case(
             "opus-recovery-edit-boundary",
             boundary_file,
             &boundary,
             ["32000", "opus-roll"],
-            (95, 26_088, 9_107_170_095_252_525_693),
+            (95, 26_088, 5_937_862_538_032_964_389),
         ),
         mp4_range_case(
             "opus-recovery-long-roll",
             long_roll_file,
             &long_roll,
             ["41000", "opus-roll"],
-            (97, 26_371, 2_219_999_170_451_168_846),
+            (97, 26_371, 17_550_833_167_330_169_510),
+        ),
+        mp4_range_case(
+            "opus-recovery-composition-offset",
+            composition_file,
+            &composition,
+            ["32000", "opus-roll"],
+            (93, 25_808, 16_784_415_058_963_717_857),
         ),
     ]);
     let count = cases.len();
@@ -337,6 +347,35 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
     )?;
     Ok(format!("MP4 range corpus: {count} playback comparisons"))
+}
+
+fn mp4_opus_composition_fixture(seed: &[u8]) -> Vec<u8> {
+    // Move the second video keyframe's presentation by 40 ms. Keep decode
+    // timing and payloads intact and account for the added box in chunk offsets.
+    let mut offsets = [40_u32.to_be_bytes(), *b"ctts", [0; 4], 3_u32.to_be_bytes()].concat();
+    for (count, ticks) in [(50_u32, 0_u32), (1, 640), (29, 0)] {
+        offsets.extend_from_slice(&count.to_be_bytes());
+        offsets.extend_from_slice(&ticks.to_be_bytes());
+    }
+    let grow = offsets.len() as u32;
+    let mut data = seed.to_vec();
+    for at in [32, 148, 284, 369, 433] {
+        let size = u32::from_be_bytes(seed[at..at + 4].try_into().expect("box size"));
+        data[at..at + 4].copy_from_slice(&(size + grow).to_be_bytes());
+    }
+    for table in [1048, 2508] {
+        let count = u32::from_be_bytes(
+            seed[table + 12..table + 16]
+                .try_into()
+                .expect("chunk count"),
+        );
+        for at in (table + 16..).step_by(4).take(count as usize) {
+            let chunk = u32::from_be_bytes(seed[at..at + 4].try_into().expect("chunk offset"));
+            data[at..at + 4].copy_from_slice(&(chunk + grow).to_be_bytes());
+        }
+    }
+    data.splice(1384..1384, offsets);
+    data
 }
 
 fn mp4_range_case<'a>(

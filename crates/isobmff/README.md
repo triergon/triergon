@@ -312,10 +312,10 @@ rejects boxes extending past the source.
   leading crop. Source packet durations stay available alongside the projected
   durations. A secondary Opus seek keeps an exact match or searches 10 ms earlier
   when the target falls between samples. The optional `with_opus_recovery` policy
-  starts from the Opus track's source
-  `roll` group at the video presentation landing. It reports the first
-  source sample and available preroll, including when recovery starts at the
-  beginning of the track.
+  starts from the Opus track's source `roll` group at the video presentation
+  landing. It reports the first source sample and available preroll, including
+  when recovery starts at the beginning of the track. It refuses a landing at
+  or past the end of the Opus presentation window.
 - **Seek.** Seek planners select a preceding container sync sample, record
   available and missing preroll, and validate every media range before
   publishing a plan. A sync sample is a container fact, not proof of decoder
