@@ -10,7 +10,7 @@ use crate::GlyphId;
 use crate::cff::Encoding;
 use crate::name::Platform;
 use crate::postscript::UnicodeMap;
-use crate::read::{Reader, slice, u16_at, u32_at};
+use crate::read::{Reader, slice, u16_at, u24_at, u32_at};
 use crate::sfnt::Table;
 use crate::work::charge;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
@@ -169,16 +169,13 @@ fn high_byte_valid(table: &[u8]) -> Option<()> {
 fn variations_valid(table: &[u8]) -> Option<()> {
     let fits = |ok: bool| ok.then_some(());
     let long = |at: usize| u32_at(table, at).and_then(|n| usize::try_from(n).ok());
-    let u24 = |at: usize| -> Option<u32> {
-        Some(u32::from(*table.get(at)?) << 16 | u32::from(u16_at(table, at + 1)?))
-    };
     fits(table.len() >= 10)?;
     let (length, selectors) = (long(2)?, long(6)?);
     fits(length <= table.len() && length >= 10 && (length - 10) / 11 >= selectors)?;
     let mut last_selector = 1;
     for n in 0..selectors {
         let at = 10 + 11 * n;
-        let selector = u24(at)?;
+        let selector = u24_at(table, at)?;
         let (defaults, mappings) = (long(at + 3)?, long(at + 7)?);
         fits(defaults < length && mappings < length && selector >= last_selector)?;
         last_selector = selector + 1;
@@ -188,7 +185,7 @@ fn variations_valid(table: &[u8]) -> Option<()> {
             let mut last = 0;
             for i in 0..ranges {
                 let at = defaults + 4 + 4 * i;
-                let (base, count) = (u24(at)?, u32::from(*table.get(at + 3)?));
+                let (base, count) = (u24_at(table, at)?, u32::from(*table.get(at + 3)?));
                 fits(base + count < 0x11_0000 && base >= last)?;
                 last = base + count + 1;
             }
@@ -198,7 +195,7 @@ fn variations_valid(table: &[u8]) -> Option<()> {
             fits(count <= table.len().checked_sub(mappings + 4)? / 5)?;
             let mut last = 0;
             for i in 0..count {
-                let code = u24(mappings + 4 + 5 * i)?;
+                let code = u24_at(table, mappings + 4 + 5 * i)?;
                 fits(code < 0x11_0000 && code >= last)?;
                 last = code + 1;
             }
@@ -287,6 +284,9 @@ pub(crate) struct Subtables {
     /// A Unicode-platform variation-sequence subtable (format 14), which
     /// FreeType lists but cannot select.
     pub(crate) unicode_variations: bool,
+    /// The file offset of the first (0, 5) format 14 subtable FreeType keeps,
+    /// which it reads variation sequences from.
+    pub(crate) variation_sequences: Option<Table>,
 }
 
 /// Reads the encoding records, keeping the supported subtables in directory order.
@@ -302,6 +302,7 @@ pub(crate) fn parse(
     let mut subtables = Subtables {
         list: BudgetVec::new(budget),
         unicode_variations: false,
+        variation_sequences: None,
     };
     // The version is ignored: the format allows newer subtables under 0.
     let Some(count) = u16_at(bytes, 2) else {
@@ -319,9 +320,16 @@ pub(crate) fn parse(
         }
         let number = u16_at(bytes, offset);
         let Some(format) = number.and_then(CmapFormat::from_number) else {
-            subtables.unicode_variations |= number == Some(14)
+            let kept = number == Some(14)
                 && platform == Platform::Unicode
                 && bytes.get(offset..).and_then(variations_valid).is_some();
+            subtables.unicode_variations |= kept;
+            if kept && encoding == 5 && subtables.variation_sequences.is_none() {
+                subtables.variation_sequences = Some(Table {
+                    offset: table.offset + offset,
+                    len: table.len - offset,
+                });
+            }
             continue;
         };
         if bytes.get(offset..).is_some_and(|sub| format.valid(sub)) {
@@ -774,6 +782,90 @@ impl Iterator for Mappings<'_> {
         }
         None
     }
+}
+
+/// How a Unicode variation sequence maps, in a `cmap` format 14 subtable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Variant {
+    /// To the base character's glyph in the face's Unicode charmap.
+    Default,
+    /// To this glyph.
+    Glyph(GlyphId),
+    /// Not at all.
+    None,
+}
+
+/// A `cmap` format 14 subtable: a face's Unicode variation sequences.
+/// [`Font::variation_sequences`](crate::Font::variation_sequences) and
+/// [`Font::first_variation_sequences`](crate::Font::first_variation_sequences)
+/// give one.
+#[derive(Clone, Copy, Debug)]
+pub struct VariationSequences<'f> {
+    table: &'f [u8],
+}
+
+impl<'f> VariationSequences<'f> {
+    /// The subtable starting at `table`'s first byte, if it is format 14.
+    pub(crate) fn new(table: &'f [u8]) -> Option<Self> {
+        (u16_at(table, 0) == Some(14)).then_some(Self { table })
+    }
+
+    /// How `c` followed by `selector` maps, as FreeType's
+    /// `tt_cmap14_char_var_index` and HarfBuzz's `get_glyph_variant` read it:
+    /// the selector's record by binary search, then its default ranges, then
+    /// its mappings, where glyph 0 is none. An offset of zero is no table, and
+    /// counts are cut to what the subtable holds.
+    pub fn variant(&self, c: u32, selector: u32) -> Variant {
+        let table = self.table;
+        let u24 = |t: &[u8], at: usize| u24_at(t, at).unwrap_or(0);
+        let long = |t: &[u8], at: usize| u32_at(t, at).map_or(0, |n| n as usize);
+        let records = long(table, 6).min(table.len().saturating_sub(10) / 11);
+        let Some(record) = search(records, |i| u24(table, 10 + 11 * i).cmp(&selector)) else {
+            return Variant::None;
+        };
+        let at = 10 + 11 * record;
+        let part = |offset: usize| (offset != 0).then(|| table.get(offset..)).flatten();
+        if let Some(defaults) = part(long(table, at + 3)) {
+            let count = long(defaults, 0).min(defaults.len().saturating_sub(4) / 4);
+            let found = search(count, |i| {
+                let first = u24(defaults, 4 + 4 * i);
+                let last = first + u32::from(defaults.get(4 + 4 * i + 3).copied().unwrap_or(0));
+                if c < first {
+                    std::cmp::Ordering::Greater
+                } else if c > last {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            });
+            if found.is_some() {
+                return Variant::Default;
+            }
+        }
+        let Some(mappings) = part(long(table, at + 7)) else {
+            return Variant::None;
+        };
+        let count = long(mappings, 0).min(mappings.len().saturating_sub(4) / 5);
+        search(count, |i| u24(mappings, 4 + 5 * i).cmp(&c))
+            .and_then(|i| u16_at(mappings, 4 + 5 * i + 3))
+            .filter(|&glyph| glyph != 0)
+            .map_or(Variant::None, |glyph| Variant::Glyph(GlyphId(glyph)))
+    }
+}
+
+/// A binary search over `count` items by `compare`: the index of one that
+/// compares equal.
+fn search(count: usize, compare: impl Fn(usize) -> std::cmp::Ordering) -> Option<usize> {
+    let (mut low, mut high) = (0, count);
+    while low < high {
+        let mid = low + (high - low) / 2;
+        match compare(mid) {
+            std::cmp::Ordering::Less => low = mid + 1,
+            std::cmp::Ordering::Greater => high = mid,
+            std::cmp::Ordering::Equal => return Some(mid),
+        }
+    }
+    None
 }
 
 /// Formats 6 and 10: `count` glyph words for codes from `first`, at `array`.
