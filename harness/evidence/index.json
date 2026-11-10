@@ -17324,6 +17324,126 @@
      "sha256": "3901f1a66ea5926e40a9266f34c6dbb894443748134730d85aebd5b6b78c6c37"
     }
    ]
+  },
+  {
+   "name": "matroska-replay-budget",
+   "path": "matroska-replay-budget",
+   "retention": "retained",
+   "reason": "Matroska startup and seek with compact replay reusing packet-owned budgets, including all 44 pinned reference comparisons, 30 native AArch64 timing and memory pairs per case, the comparison against main, the identical-worker control, and the host tests.",
+   "key": "evidence/matroska-replay-budget/d0d651f4ba72568e8cfd9a8ba75615f308aacb3ec4f46a5981b39a92119eff7e.tar.gz",
+   "sha256": "d0d651f4ba72568e8cfd9a8ba75615f308aacb3ec4f46a5981b39a92119eff7e",
+   "bytes": 47588933,
+   "source_revision": "0de9d88015d5da3a1b6769a902c6a63048737bac",
+   "files": [
+    {
+     "path": "matroska-replay-budget/host/REBASED.txt",
+     "sha256": "47913c888092546c60876ce93423d09dc5a3900023ba5a6dd5cebd9f51e85b2f"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-after-rebase.sha256",
+     "sha256": "5a883c27993d405e4e354b2a31898de718b0a62df501845d81909b4fac158c2d"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-before-rebase.sha256",
+     "sha256": "5a883c27993d405e4e354b2a31898de718b0a62df501845d81909b4fac158c2d"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-build.log",
+     "sha256": "6050d9152c1c4cfb488cdec8186d20874d6e022d9ea00addd71af7f22a6ce7a5"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-clippy.log",
+     "sha256": "98f9460e04a71e06e26b224110d83c2c04c8d553351706ce94c65ab0858efd39"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-parity.log",
+     "sha256": "ac0b69e9c44c0d1347350c51fc438a0b0bf156eacefe538a0c53fb270c03b0de"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-rebased-build.log",
+     "sha256": "0d1ae8aec1a39906a82f44c374494babaf708b8f5b4349409b536a99b67f4869"
+    },
+    {
+     "path": "matroska-replay-budget/host/compact-replay-tests.log",
+     "sha256": "c54c06568319ae85955ef3205d4049a05e2fe0d6a9b2add6a0e5030aca98486b"
+    },
+    {
+     "path": "matroska-replay-budget/native/BINDING.sha256",
+     "sha256": "b83c4490ede09832c1377312e10565124121509e56b634ba67cdeb9717df3e43"
+    },
+    {
+     "path": "matroska-replay-budget/native/GUEST.log",
+     "sha256": "33ba0940c5d96c10cf9dd94e3fe6b8e454ab9fe11828dc4e30861478d7a85619"
+    },
+    {
+     "path": "matroska-replay-budget/native/HOST.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "matroska-replay-budget/native/RESULTS.sha256",
+     "sha256": "8cef7f0c95c4dd543ba8185a841d449416f99169c0c07e8c9d6097dd1d7e47be"
+    },
+    {
+     "path": "matroska-replay-budget/native/RESULTS.tar.gz",
+     "sha256": "da50faa4ef4fc6ac57b14618059aa757fe067aaea2bb44386582ff1047e87205"
+    },
+    {
+     "path": "matroska-replay-budget/native/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "matroska-replay-budget/native/SOURCE.bundle",
+     "sha256": "e651db7d247409f7ecf744e48fb827523cfe597381a1fb8fead6b8d034dfa444"
+    },
+    {
+     "path": "matroska-replay-budget/native/SOURCE.txt",
+     "sha256": "d2df86d4facf02c35be2e5c47a7f9c8dbb3bc9cb2f03ad216084a148ef1d9696"
+    },
+    {
+     "path": "matroska-replay-budget/native/STOPPED.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "matroska-replay-budget/native/TREE.txt",
+     "sha256": "c2d25af13b321e0641312899559152c30622310d96a4bc8e21a01873071f0b4c"
+    },
+    {
+     "path": "matroska-replay-budget/native/guest.sh",
+     "sha256": "4f1862c271af0bd64a2e9b57ccf554863a2e0af39d13e6c4a40f49e0c61d76fd"
+    },
+    {
+     "path": "matroska-replay-budget/native/host.sh",
+     "sha256": "d080f81fa30ba3be28917474c4d6561de15d9a1bf207abd54b3720317b36cea4"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/BINDING.sha256",
+     "sha256": "20aee8b7bb3357eba1f3376760df1dfed086db345676190f64e4c00bcbb44f54"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/GUEST.log",
+     "sha256": "9bae42521d2f0bc39a79ce30343812d0fb8a7df9ea9ee907e53719623d50c317"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/HOST.exit",
+     "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/RESULTS.sha256",
+     "sha256": "9f807dfcafd0fcfa2023cf58113f60aa8890f1ca935a500ad2c41c799d0ce8ea"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/RESULTS.tar.gz",
+     "sha256": "581fd5def8b87b3445896c1567d50a6bb5eff1053719b2109ca850888692c409"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/STOPPED.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "matroska-replay-budget/preflight/guest.sh",
+     "sha256": "150549f901a099d5adeb90e87afff6e511eb941a3e10203b5d71016d07a854de"
+    }
+   ]
   }
  ]
 }
