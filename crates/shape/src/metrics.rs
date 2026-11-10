@@ -1,13 +1,14 @@
 //! Glyph lookup and metrics: the font functions shaping asks for, and HarfBuzz's
 //! scaling arithmetic.
 
+use crate::cmap::{Cmap, Kind, Subtable};
 use crate::rotations::{Decide, FaceRotations};
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_font::{
-    CharEncoding, Charmap, CharmapKind, CmapFormat, ControlBox, Font, GlyphId, Platform, SizedFont,
-    TextLookup, Variant, VariationSequences,
+    CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, SizedFont, TextLookup, Variant,
+    VariationSequences,
 };
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
@@ -123,18 +124,16 @@ fn unless_unloadable<T>(result: Result<T>, otherwise: T) -> Result<T> {
 }
 
 /// The font functions HarfBuzz builds in (`hb-ot`), at a [`Scale`]: the `cmap`
-/// subtable HarfBuzz prefers (through which formats 2 and 8 map nothing),
-/// `cmap` format 14 variation sequences, `hmtx` advances,
-/// and extents from the `glyf` header box or the charstring's control box.
+/// subtable HarfBuzz prefers among the table's raw encoding records, read as
+/// HarfBuzz reads it ([`crate::cmap`]), its variation sequences, `hmtx`
+/// advances, and extents from the `glyf` header box or the charstring's
+/// control box.
 #[derive(Debug)]
 pub struct OtMetrics<'a> {
     font: &'a Font,
-    charmap: Option<Charmap<'a>>,
-    /// A symbol charmap also maps U+0000..U+00FF at U+F000..U+F0FF.
-    symbol: bool,
-    /// A Macintosh charmap maps only ASCII.
-    ascii_only: bool,
-    /// HarfBuzz's variation sequences: the first (0, 5) record's subtable.
+    subtable: Option<Subtable<'a>>,
+    /// HarfBuzz's variation sequences: the last (0, 5) record's subtable of
+    /// format 14.
     variations: Option<VariationSequences<'a>>,
     scale: Scale,
     x_mult: i64,
@@ -146,41 +145,14 @@ impl<'a> OtMetrics<'a> {
     /// The font functions of `font` at `scale`. Each glyph they read is bounded
     /// by the font's [`Limits`](triergon_font::Limits).
     pub fn new(font: &'a Font, scale: Scale) -> Self {
-        use Platform::{Macintosh, Unicode, Windows};
-        // HarfBuzz reads the `cmap` table's own subtables, not the charmaps
-        // FreeType adds to a CFF face.
-        let find = |platform: Platform, encoding: Option<u16>| {
-            font.charmaps().find(|c| {
-                matches!(c.kind(), CharmapKind::Subtable(_))
-                    && c.platform() == platform
-                    && encoding.is_none_or(|e| c.encoding_id() == e)
-            })
-        };
-        // HarfBuzz's preference: symbol, then full and BMP Unicode, then Mac.
-        let symbol = find(Windows, Some(0));
-        let unicode = [
-            (Windows, 10),
-            (Unicode, 6),
-            (Unicode, 4),
-            (Windows, 1),
-            (Unicode, 3),
-            (Unicode, 2),
-            (Unicode, 1),
-            (Unicode, 0),
-        ]
-        .into_iter()
-        .find_map(|(p, e)| find(p, Some(e)));
-        let mac = find(Macintosh, Some(0)).or_else(|| find(Macintosh, None));
-        let ascii_only = symbol.is_none() && unicode.is_none() && mac.is_some();
-        let is_symbol = symbol.is_some();
-        let charmap = symbol.or(unicode).or(mac);
+        let cmap = font.table(*b"cmap").and_then(Cmap::new);
         let upem = i64::from(font.units_per_em());
         Self {
             font,
-            charmap,
-            symbol: is_symbol,
-            ascii_only,
-            variations: font.first_variation_sequences(),
+            subtable: cmap.and_then(Cmap::best),
+            variations: cmap
+                .and_then(Cmap::variation_sequences)
+                .map(VariationSequences::format14),
             scale,
             x_mult: i64::from(scale.x) * 0x10000 / upem,
             x_multf: scale.x as f32 / f32::from(font.units_per_em()),
@@ -226,16 +198,6 @@ impl<'a> OtMetrics<'a> {
             }
         }))
     }
-
-    /// HarfBuzz's `CmapSubtable::get_glyph`, which maps nothing through
-    /// formats 2 and 8.
-    fn lookup(&self, code: u32) -> Option<GlyphId> {
-        let charmap = self.charmap?;
-        match charmap.kind() {
-            CharmapKind::Subtable(CmapFormat::HighByte | CmapFormat::Mixed) => None,
-            _ => charmap.glyph(code),
-        }
-    }
 }
 
 impl Metrics for OtMetrics<'_> {
@@ -244,15 +206,15 @@ impl Metrics for OtMetrics<'_> {
     }
 
     fn nominal_glyph(&self, c: char) -> Option<GlyphId> {
+        let subtable = self.subtable?;
         let c = u32::from(c);
-        if self.ascii_only && c >= 0x80 {
-            return None;
+        match subtable.kind {
+            Kind::Mac if c >= 0x80 => None,
+            Kind::Symbol => subtable
+                .glyph(c)
+                .or_else(|| (c <= 0xff).then(|| subtable.glyph(0xf000 + c)).flatten()),
+            _ => subtable.glyph(c),
         }
-        self.lookup(c).or_else(|| {
-            (self.symbol && c <= 0xff)
-                .then(|| self.lookup(0xf000 + c))
-                .flatten()
-        })
     }
 
     fn variation_glyph(&self, base: char, selector: char) -> Option<GlyphId> {

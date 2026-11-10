@@ -532,9 +532,10 @@ impl Font {
 
     /// The face's charmaps in FreeType's order: the `cmap` subtables FreeType
     /// accepts (formats 0, 2, 4, 6, 8, 10, 12 and 13), in directory order;
-    /// then, for a CFF face without a Windows BMP or Unicode-platform charmap,
-    /// the Unicode charmap FreeType builds from its glyph names
-    /// ([`CharmapKind::GlyphNames`]); then, for a name-keyed CFF face whose
+    /// then, for a name-keyed CFF face without a Windows BMP or
+    /// Unicode-platform charmap (of any format, 14 and 15 included), the
+    /// Unicode charmap FreeType builds from its glyph names when one maps a
+    /// code point ([`CharmapKind::GlyphNames`]); then, for a name-keyed CFF face whose
     /// encoding maps a code, the charmap of its encoding
     /// ([`CharmapKind::CffEncoding`]). FreeType also lists the
     /// variation-sequence subtables of formats 14 and 15, which cannot be
@@ -572,22 +573,6 @@ impl Font {
             variations.table.bytes(self.data.as_ref()),
             variations.extended,
         ))
-    }
-
-    /// The Unicode variation sequences HarfBuzz reads: the subtable of the
-    /// first (0, 5) encoding record, when it is format 14, unvalidated.
-    pub fn first_variation_sequences(&self) -> Option<VariationSequences<'_>> {
-        let cmap = self.table(*b"cmap")?;
-        let count = usize::from(read::u16_at(cmap, 2)?);
-        let at = (0..count)
-            .map(|i| 4 + 8 * i)
-            .take_while(|&at| at + 8 <= cmap.len())
-            .find(|&at| {
-                read::u16_at(cmap, at) == Some(0) && read::u16_at(cmap, at + 2) == Some(5)
-            })?;
-        let offset = usize::try_from(read::u32_at(cmap, at + 4)?).ok()?;
-        let table = cmap.get(offset..)?;
-        (read::u16_at(table, 0) == Some(14)).then(|| VariationSequences::new(table, false))
     }
 
     /// The charmap libass 0.17.5 uses for text, as it selects one when it opens

@@ -70,13 +70,17 @@ impl CmapFormat {
     }
 
     /// Whether FreeType's default validation accepts the subtable, given the
-    /// bytes from its start to the end of the `cmap` table; `steps` counts
+    /// bytes from its start to the end of the `cmap` table, with the flags it
+    /// finds (format 4's unsorted or overlapping segments); `steps` counts
     /// the records read.
-    fn check(self, table: &[u8], steps: &mut usize) -> Option<()> {
+    fn check(self, table: &[u8], steps: &mut usize) -> Option<u8> {
         let short = |at| u16_at(table, at).map(usize::from);
         let long = |at| u32_at(table, at).and_then(|n| usize::try_from(n).ok());
         let limit = table.len();
         let fits = |ok: bool| ok.then_some(());
+        if self == Self::SegmentDelta {
+            return segment_delta_valid(table, steps);
+        }
         match self {
             Self::ByteEncoding => {
                 let length = short(2)?;
@@ -91,7 +95,7 @@ impl CmapFormat {
                 fits(groups <= (limit - 8208) / 12)?;
                 ascending_groups(table, 8208, groups, steps)
             }
-            Self::SegmentDelta => segment_delta_valid(table, steps),
+            Self::SegmentDelta => None,
             Self::Trimmed => {
                 fits(limit >= 10)?;
                 let (length, count) = (short(2)?, short(8)?);
@@ -109,6 +113,7 @@ impl CmapFormat {
                 ascending_groups(table, 16, groups, steps)
             }
         }
+        .map(|()| 0)
     }
 }
 
@@ -224,7 +229,7 @@ fn variations_valid(table: &[u8], extended: bool, steps: &mut usize) -> Option<(
 /// `tt_cmap4_validate` at FreeType's default level: the segment arrays fit the
 /// rest of the `cmap` table, no segment starts after it ends, and glyph-array
 /// offsets stay within the table (FreeType lets a final 0xFFFF segment off).
-fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<()> {
+fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<u8> {
     let limit = table.len();
     let fits = |ok: bool| ok.then_some(());
     // FreeType measures the subtable to the end of `cmap`, whatever its length says.
@@ -234,11 +239,21 @@ fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<()> {
     *steps += segments;
     let (starts, offsets) = (16 + 2 * segments, 16 + 6 * segments);
     let glyph_ids = offsets + 2 * segments;
+    let (mut flags, mut last_start, mut last_end) = (0, 0, 0);
     for n in 0..segments {
         let end = usize::from(u16_at(table, 14 + 2 * n)?);
         let start = usize::from(u16_at(table, starts + 2 * n)?);
         let offset = usize::from(u16_at(table, offsets + 2 * n)?);
         fits(start <= end)?;
+        // Overlapping segments pass at the default level, ordered or not.
+        if n > 0 && start <= last_end {
+            flags |= if last_start > start || last_end > end {
+                UNSORTED
+            } else {
+                OVERLAPPING
+            };
+        }
+        (last_start, last_end) = (start, end);
         let sentinel = n == segments - 1 && start == 0xffff && end == 0xffff;
         if offset == 0xffff {
             fits(sentinel)?;
@@ -247,7 +262,7 @@ fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<()> {
             fits(array >= glyph_ids && array + 2 * (end - start + 1) <= limit)?;
         }
     }
-    Some(())
+    Some(flags)
 }
 
 /// What a platform and encoding number mean, for cmap subtables and name
@@ -258,7 +273,8 @@ pub enum CharEncoding {
     Unicode,
     /// Full Unicode: Windows encoding 10, or Unicode-platform encodings 4 and 6.
     UnicodeFull,
-    /// Unicode variation sequences (Unicode-platform encoding 5, cmap format 14).
+    /// Unicode variation sequences (Unicode-platform encoding 5, cmap format
+    /// 14, or FreeType's format 15).
     UnicodeVariations,
     /// Windows Symbol (encoding 0): codes usually in U+F020..U+F0FF.
     Symbol,
@@ -288,6 +304,8 @@ pub(crate) struct Subtable {
     platform: Platform,
     encoding: u16,
     format: CmapFormat,
+    /// What validation found: format 4's unsorted or overlapping segments.
+    flags: u8,
     /// The subtable's offset in the file.
     offset: usize,
     /// The end of the `cmap` table in the file.
@@ -320,8 +338,11 @@ pub(crate) struct Subtables {
 /// subtable, or nothing FreeType keeps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kept {
-    Format(CmapFormat),
-    Variations { extended: bool },
+    /// A selectable format, with its validation flags.
+    Format(CmapFormat, u8),
+    Variations {
+        extended: bool,
+    },
     None,
 }
 
@@ -383,8 +404,8 @@ pub(crate) fn parse(
                 .map_or(Kept::None, |()| Kept::Variations { extended: n == 15 }),
             number => number
                 .and_then(CmapFormat::from_number)
-                .and_then(|format| format.check(sub, &mut steps).map(|()| format))
-                .map_or(Kept::None, Kept::Format),
+                .and_then(|format| format.check(sub, &mut steps).map(|flags| (format, flags)))
+                .map_or(Kept::None, |(format, flags)| Kept::Format(format, flags)),
         };
         last = Some((*offset, *kept));
         charge(work, steps)?;
@@ -393,11 +414,12 @@ pub(crate) fn parse(
     for &(platform, encoding, offset) in list.as_slice() {
         let at = validated.partition_point(|&(o, _)| o < offset);
         match validated[at].1 {
-            Kept::Format(format) => {
+            Kept::Format(format, flags) => {
                 let subtable = Subtable {
                     platform,
                     encoding,
                     format,
+                    flags,
                     offset: table.offset + offset,
                     end: table.offset + table.len,
                 };
@@ -482,7 +504,7 @@ impl Subtable {
     }
 
     /// The glyph `code` maps to, without the glyph-count check.
-    fn lookup(&self, table: &[u8], code: u32) -> Option<u32> {
+    fn lookup(&self, table: &[u8], code: u32, glyph_count: u32) -> Option<u32> {
         match self.format {
             CmapFormat::ByteEncoding => {
                 let code = usize::try_from(code).ok().filter(|&c| c < 256)?;
@@ -490,7 +512,7 @@ impl Subtable {
             }
             CmapFormat::HighByte => Some(u32::from(high_byte(table, code))),
             CmapFormat::SegmentDelta => {
-                segment_delta(table, u16::try_from(code).ok()?).map(u32::from)
+                Some(SegmentDelta::new(table, self.flags, glyph_count).char_index(code))
             }
             CmapFormat::Trimmed => {
                 let first = u32::from(u16_at(table, 6)?);
@@ -508,26 +530,30 @@ impl Subtable {
 
     /// `char_next` of formats 2 and 8: the first code after `code` that maps
     /// to a glyph other than zero, and that glyph; `None` past the last.
-    fn next_mapping(&self, table: &[u8], code: u32, glyph_count: u32) -> Option<(u32, u32)> {
+    fn next_mapping(
+        &self,
+        table: &[u8],
+        code: u32,
+        glyph_count: u32,
+        state: &mut SegmentState,
+    ) -> Option<(u32, u32)> {
         match self.format {
             CmapFormat::HighByte => high_byte_next(table, code),
+            CmapFormat::SegmentDelta => {
+                let (code, glyph) =
+                    SegmentDelta::new(table, self.flags, glyph_count).char_next(state, code);
+                (glyph != 0).then_some((code, glyph))
+            }
             CmapFormat::Mixed => mixed_next(table, code, glyph_count),
             _ => None,
         }
     }
 
-    /// Range `i` of codes the subtable can map, in subtable order; formats 2
-    /// and 8 are stepped through instead.
+    /// Range `i` of codes the subtable can map, in subtable order; formats 2,
+    /// 4 and 8 are stepped through instead.
     fn code_range(&self, table: &[u8], i: usize) -> Option<(u32, u32)> {
         match self.format {
             CmapFormat::ByteEncoding => (i == 0).then_some((0, 255)),
-            CmapFormat::SegmentDelta => {
-                let count = usize::from(u16_at(table, 6)? / 2);
-                (i < count).then_some(())?;
-                let end = u16_at(table, 14 + 2 * i)?;
-                let start = u16_at(table, 16 + 2 * count + 2 * i)?;
-                Some((u32::from(start), u32::from(end.max(start))))
-            }
             CmapFormat::Trimmed | CmapFormat::TrimmedArray => {
                 (i == 0).then_some(())?;
                 let (first, count) = if self.format == CmapFormat::Trimmed {
@@ -544,7 +570,7 @@ impl Subtable {
                 let (first, last) = (u32_at(table, at)?, u32_at(table, at + 4)?);
                 Some((first, last.max(first)))
             }
-            CmapFormat::HighByte | CmapFormat::Mixed => None,
+            CmapFormat::HighByte | CmapFormat::SegmentDelta | CmapFormat::Mixed => None,
         }
     }
 }
@@ -616,7 +642,9 @@ impl<'f> Charmap<'f> {
     /// above the face's glyph count give `None`.
     pub fn glyph(&self, code: u32) -> Option<GlyphId> {
         let glyph = match self.source {
-            Source::Table(subtable) => subtable.lookup(subtable.table(self.data), code)?,
+            Source::Table(subtable) => {
+                subtable.lookup(subtable.table(self.data), code, self.glyph_count)?
+            }
             Source::Names(map) => u32::from(map.char_index(code)),
             Source::Encoding(encoding) => {
                 u32::from(*encoding.glyphs.get(usize::try_from(code).ok()?)?)
@@ -636,10 +664,10 @@ impl<'f> Charmap<'f> {
 
     /// `char_next`: the first code after `code` the charmap gives a glyph
     /// other than zero, perhaps one past the glyph count, and that glyph.
-    fn next_mapping(&self, code: u32) -> Option<(u32, u32)> {
+    fn next_mapping(&self, code: u32, state: &mut SegmentState) -> Option<(u32, u32)> {
         match self.source {
             Source::Table(subtable) => {
-                subtable.next_mapping(subtable.table(self.data), code, self.glyph_count)
+                subtable.next_mapping(subtable.table(self.data), code, self.glyph_count, state)
             }
             Source::Names(map) => match map.char_next(code) {
                 (_, 0) => None,
@@ -665,7 +693,6 @@ impl<'f> Charmap<'f> {
             self.source,
             Source::Table(Subtable {
                 format: CmapFormat::ByteEncoding
-                    | CmapFormat::SegmentDelta
                     | CmapFormat::Trimmed
                     | CmapFormat::TrimmedArray
                     | CmapFormat::SegmentedCoverage
@@ -688,6 +715,7 @@ impl<'f> Charmap<'f> {
             range: 0,
             next: None,
             stepped: None,
+            segments: SegmentState::default(),
             work: WorkBudget::new(self.work),
             done: false,
         }
@@ -738,6 +766,8 @@ pub struct Mappings<'f> {
     next: Option<(u32, u32)>,
     /// Stepping through the charmap: the last code given.
     stepped: Option<u32>,
+    /// Where format 4's `char_next` continues from.
+    segments: SegmentState,
     work: WorkBudget,
     done: bool,
 }
@@ -762,7 +792,7 @@ impl Mappings<'_> {
                 self.done = true;
                 return Some(Err(Error::Policy("font work")));
             }
-            let Some((next, glyph)) = charmap.next_mapping(code) else {
+            let Some((next, glyph)) = charmap.next_mapping(code, &mut self.segments) else {
                 self.done = true;
                 return None;
             };
@@ -824,9 +854,8 @@ pub enum Variant {
 
 /// A `cmap` variation-sequence subtable: format 14, or FreeType's format 15,
 /// whose mappings name three-byte glyphs.
-/// [`Font::variation_sequences`](crate::Font::variation_sequences) and
-/// [`Font::first_variation_sequences`](crate::Font::first_variation_sequences)
-/// give one.
+/// [`Font::variation_sequences`](crate::Font::variation_sequences) gives
+/// FreeType's; [`Self::format14`] reads one another reader selects.
 #[derive(Clone, Copy, Debug)]
 pub struct VariationSequences<'f> {
     table: &'f [u8],
@@ -838,25 +867,38 @@ impl<'f> VariationSequences<'f> {
         Self { table, extended }
     }
 
+    /// The sequences of the format 14 subtable starting `table`, read to the
+    /// end of the `cmap` table, for a reader that selects the subtable as
+    /// HarfBuzz does.
+    pub const fn format14(table: &'f [u8]) -> Self {
+        Self::new(table, false)
+    }
+
     /// How `c` followed by `selector` maps, as FreeType's
     /// `tt_cmap14_char_var_index` and HarfBuzz's `get_glyph_variant` read it:
     /// the selector's record, then its default ranges, then its mappings,
     /// where glyph 0 is none, each found with HarfBuzz's binary search, which
     /// FreeType's agrees with on the ascending tables its validation keeps.
-    /// An offset of zero is no table, counts are cut to what the subtable
-    /// holds, and a glyph beyond 65535 is none.
+    /// An offset of zero is no table, as is one whose entries run past the
+    /// end of the `cmap` table (HarfBuzz neuters it; FreeType's validation
+    /// keeps no such subtable), and a glyph beyond 65535 is none.
     pub fn variant(&self, c: u32, selector: u32) -> Variant {
         let table = self.table;
         let u24 = |t: &[u8], at: usize| u24_at(t, at).unwrap_or(0);
         let long = |t: &[u8], at: usize| u32_at(t, at).map_or(0, |n| n as usize);
-        let records = long(table, 6).min(table.len().saturating_sub(10) / 11);
+        // Entries of `size` bytes after a 32-bit count at `at`, if they fit.
+        let entries = |t: &[u8], at: usize, size: usize| {
+            let count = long(t, at);
+            (count <= t.len().saturating_sub(at + 4) / size).then_some(count)
+        };
+        let records = entries(table, 6, 11).unwrap_or(0);
         let Some(record) = bsearch(records, |i| u24(table, 10 + 11 * i).cmp(&selector)) else {
             return Variant::None;
         };
         let at = 10 + 11 * record;
         let part = |offset: usize| (offset != 0).then(|| table.get(offset..)).flatten();
         if let Some(defaults) = part(long(table, at + 3)) {
-            let count = long(defaults, 0).min(defaults.len().saturating_sub(4) / 4);
+            let count = entries(defaults, 0, 4).unwrap_or(0);
             let found = bsearch(count, |i| {
                 let first = u24(defaults, 4 + 4 * i);
                 let last = first + u32::from(defaults.get(4 + 4 * i + 3).copied().unwrap_or(0));
@@ -876,7 +918,7 @@ impl<'f> VariationSequences<'f> {
             return Variant::None;
         };
         let record = if self.extended { 6 } else { 5 };
-        let count = long(mappings, 0).min(mappings.len().saturating_sub(4) / record);
+        let count = entries(mappings, 0, record).unwrap_or(0);
         let glyph = bsearch(count, |i| u24(mappings, 4 + record * i).cmp(&c)).map(|i| {
             let at = 4 + record * i + 3;
             if self.extended {
@@ -899,46 +941,431 @@ fn trimmed(table: &[u8], array: usize, first: u32, count: u32, code: u32) -> Opt
     u16_at(table, at).map(u32::from)
 }
 
-/// Format 4: binary search for the first segment whose end is at or after `code`.
-fn segment_delta(table: &[u8], code: u16) -> Option<u16> {
-    let count = usize::from(u16_at(table, 6)? / 2);
-    let end = |i: usize| u16_at(table, 14 + 2 * i);
-    let (mut low, mut high) = (0, count);
-    while low < high {
-        let mid = low + (high - low) / 2;
-        if end(mid)? < code {
-            low = mid + 1;
-        } else {
-            high = mid;
+/// `TT_CMAP_FLAG_UNSORTED`: format 4 segments whose starts or ends descend.
+const UNSORTED: u8 = 1;
+/// `TT_CMAP_FLAG_OVERLAPPING`: format 4 segments that overlap in order.
+const OVERLAPPING: u8 = 2;
+
+/// Where FreeType's format 4 `char_next` continues from (`TT_CMap4Rec`): the
+/// last code it gave and the segment it is in.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SegmentState {
+    charcode: u32,
+    gindex: u32,
+    range: usize,
+    start: u32,
+    end: u32,
+    delta: i32,
+    /// Where the segment's glyph array starts in the subtable, if it has one.
+    values: Option<usize>,
+}
+
+impl Default for SegmentState {
+    fn default() -> Self {
+        Self {
+            charcode: u32::MAX,
+            gindex: 0,
+            range: 0,
+            start: 0,
+            end: 0,
+            delta: 0,
+            values: None,
         }
     }
-    if low == count {
-        return Some(0);
+}
+
+/// A format 4 subtable as FreeType reads it (`tt_cmap4_char_map_linear`,
+/// `tt_cmap4_char_map_binary`, `tt_cmap4_set_range` and `tt_cmap4_next`): a
+/// linear search through segments its validation found unsorted, else a
+/// binary search, which for overlapping segments takes the first that holds
+/// the code and has glyphs. The arrays are read to the end of the `cmap`
+/// table, which bounds glyph arrays; reads past it give zero.
+#[derive(Clone, Copy, Debug)]
+struct SegmentDelta<'a> {
+    table: &'a [u8],
+    segments: usize,
+    flags: u8,
+    glyph_count: u32,
+}
+
+impl<'a> SegmentDelta<'a> {
+    fn new(table: &'a [u8], flags: u8, glyph_count: u32) -> Self {
+        let segments = usize::from(u16_at(table, 6).unwrap_or(0) >> 1);
+        Self {
+            table,
+            segments,
+            flags,
+            glyph_count,
+        }
     }
-    let start = u16_at(table, 16 + 2 * count + 2 * low)?;
-    if code < start {
-        return Some(0);
+
+    fn word(&self, at: usize) -> u32 {
+        u16_at(self.table, at).map_or(0, u32::from)
     }
-    let delta = u16_at(table, 16 + 4 * count + 2 * low)?;
-    let range_at = 16 + 6 * count + 2 * low;
-    let range = u16_at(table, range_at)?;
-    if range == 0 {
-        return Some(code.wrapping_add(delta));
+
+    fn short(&self, at: usize) -> i32 {
+        i32::from(self.word(at) as u16 as i16)
     }
-    // Some fonts mark the final 0xFFFF segment with an idRangeOffset of 0xFFFF.
-    if range == 0xffff {
-        return Some(0);
+
+    /// FreeType's fix for a last segment 0xFFFF..0xFFFF whose glyph array
+    /// lies past the table: delta 1 and no array. `at` is its offset word.
+    fn last_fix(
+        &self,
+        i: usize,
+        start: u32,
+        end: u32,
+        at: usize,
+        delta: &mut i32,
+        offset: &mut u32,
+    ) {
+        if i + 1 >= self.segments
+            && start == 0xffff
+            && end == 0xffff
+            && *offset != 0
+            && at + *offset as usize + 2 > self.table.len()
+        {
+            *delta = 1;
+            *offset = 0;
+        }
     }
-    let glyph = u16_at(
-        table,
-        range_at + usize::from(range) + 2 * usize::from(code - start),
-    )
-    .unwrap_or(0);
-    Some(if glyph == 0 {
-        0
-    } else {
-        glyph.wrapping_add(delta)
-    })
+
+    /// A glyph array entry adjusted by `delta`: zero for an empty entry or
+    /// one past the glyph count.
+    fn array_glyph(&self, at: usize, delta: i32) -> u32 {
+        match self.word(at) {
+            0 => 0,
+            g => match (g as i32).wrapping_add(delta) as u32 & 0xffff {
+                g if g >= self.glyph_count => 0,
+                g => g,
+            },
+        }
+    }
+
+    /// `tt_cmap4_char_index`.
+    fn char_index(&self, code: u32) -> u32 {
+        if code >= 0x1_0000 {
+            0
+        } else if self.flags & UNSORTED != 0 {
+            self.linear(code, false).1
+        } else {
+            self.binary(code, false).1
+        }
+    }
+
+    /// `tt_cmap4_char_next`: the code after `code` that maps, and its glyph
+    /// (zero at the end).
+    fn char_next(&self, state: &mut SegmentState, code: u32) -> (u32, u32) {
+        if code >= 0xffff {
+            return (code, 0);
+        }
+        if self.flags & UNSORTED != 0 {
+            return self.linear(code, true);
+        }
+        if code == state.charcode {
+            self.next(state);
+            let gindex = state.gindex;
+            return (if gindex != 0 { state.charcode } else { code }, gindex);
+        }
+        let (charcode, gindex, mid, end) = self.binary(code, true);
+        if self.segments == 0 {
+            return (code, 0);
+        }
+        // Where the search stopped is the nearest segment to the code.
+        let mid = if charcode > end { mid + 1 } else { mid };
+        if mid == self.segments && charcode > end {
+            return (code, 0);
+        }
+        if !self.set_range(state, mid) {
+            return (if gindex != 0 { charcode } else { code }, gindex);
+        }
+        state.charcode = charcode;
+        let gindex = if gindex != 0 {
+            state.gindex = gindex;
+            gindex
+        } else {
+            self.next(state);
+            state.gindex
+        };
+        (if gindex != 0 { state.charcode } else { code }, gindex)
+    }
+
+    /// `tt_cmap4_char_map_linear`.
+    fn linear(&self, code: u32, next: bool) -> (u32, u32) {
+        let n = self.segments;
+        if n == 0 {
+            return (code, 0);
+        }
+        let mut charcode = code + u32::from(next);
+        let mut gindex = 0;
+        'segments: for i in 0..n {
+            let end = self.word(14 + 2 * i);
+            let start = self.word(16 + 2 * n + 2 * i);
+            if charcode < start {
+                if next {
+                    charcode = start;
+                } else {
+                    break;
+                }
+            }
+            while charcode <= end {
+                let at = 16 + 6 * n + 2 * i;
+                let mut delta = self.short(16 + 4 * n + 2 * i);
+                let mut offset = self.word(at);
+                self.last_fix(i, start, end, at, &mut delta, &mut offset);
+                if offset == 0xffff {
+                    continue 'segments;
+                }
+                if offset != 0 {
+                    let r = at + offset as usize + 2 * (charcode - start) as usize;
+                    if next && r > self.table.len() {
+                        continue 'segments;
+                    }
+                    gindex = self.array_glyph(r, delta);
+                } else {
+                    gindex = (charcode as i32).wrapping_add(delta) as u32 & 0xffff;
+                    if next && gindex >= self.glyph_count {
+                        gindex = 0;
+                        let (code, last) = (charcode as i32 + delta, end as i32 + delta);
+                        if code < 0 && last >= 0 {
+                            charcode = (-delta) as u32;
+                        } else if code < 0x1_0000 && last >= 0x1_0000 {
+                            charcode = (0x1_0000 - delta) as u32;
+                        } else {
+                            continue 'segments;
+                        }
+                    }
+                }
+                if next && gindex == 0 {
+                    if charcode >= 0xffff {
+                        break 'segments;
+                    }
+                    charcode += 1;
+                    continue;
+                }
+                break 'segments;
+            }
+        }
+        (if next { charcode } else { code }, gindex)
+    }
+
+    /// `tt_cmap4_char_map_binary` up to its `next` tail: the code, its glyph,
+    /// and the segment and end the search stopped at.
+    fn binary(&self, code: u32, next: bool) -> (u32, u32, usize, u32) {
+        let n = self.segments;
+        if n == 0 {
+            return (code, 0, 0, 0);
+        }
+        let n2 = 2 * n;
+        let mut charcode = code + u32::from(next);
+        let mut gindex = 0;
+        let (mut min, mut max) = (0, n);
+        let (mut mid, mut end);
+        // Reads segment `i` as FreeType's pointer walks it, leaving `p` at its
+        // offset word.
+        let read = |i: usize, p: &mut usize| {
+            *p = 14 + 2 * i;
+            let end = self.word(*p);
+            *p += 2 + n2;
+            let start = self.word(*p);
+            *p += n2;
+            let delta = self.short(*p);
+            *p += n2;
+            (end, start, delta, self.word(*p))
+        };
+        loop {
+            mid = (min + max) >> 1;
+            let mut p = 14 + 2 * mid;
+            end = self.word(p);
+            p += 2 + n2;
+            let mut start = self.word(p);
+            if charcode < start {
+                max = mid;
+            } else if charcode > end {
+                min = mid + 1;
+            } else {
+                p += n2;
+                let mut delta = self.short(p);
+                p += n2;
+                let mut offset = self.word(p);
+                self.last_fix(mid, start, end, p, &mut delta, &mut offset);
+                if self.flags & OVERLAPPING != 0 {
+                    // The first segment holding the code, whose glyphs are
+                    // not missing.
+                    max = mid;
+                    if offset == 0xffff {
+                        mid = max + 1;
+                    }
+                    let mut i = max;
+                    while i > 0 {
+                        let old = p;
+                        let mut q = 14 + 2 * (i - 1);
+                        let prev_end = self.word(q);
+                        if charcode > prev_end {
+                            p = old;
+                            break;
+                        }
+                        (end, start, delta, offset) = read(i - 1, &mut q);
+                        p = q;
+                        if offset != 0xffff {
+                            mid = i - 1;
+                        }
+                        i -= 1;
+                    }
+                    if mid == max + 1 {
+                        if i != max {
+                            (end, start, delta, offset) = read(max, &mut p);
+                        }
+                        mid = max;
+                        i = max + 1;
+                        while i < n {
+                            p = 14 + 2 * i;
+                            let next_end = self.word(p);
+                            p += 2 + n2;
+                            let next_start = self.word(p);
+                            if charcode < next_start {
+                                break;
+                            }
+                            (end, start) = (next_end, next_start);
+                            p += n2;
+                            delta = self.short(p);
+                            p += n2;
+                            offset = self.word(p);
+                            if offset != 0xffff {
+                                mid = i;
+                            }
+                            i += 1;
+                        }
+                        i -= 1;
+                        if mid == max {
+                            mid = i;
+                            break;
+                        }
+                    }
+                    if mid != i {
+                        (end, start, delta, offset) = read(mid, &mut p);
+                    }
+                } else if offset == 0xffff {
+                    break;
+                }
+                if offset != 0 {
+                    let r = p + offset as usize + 2 * charcode.wrapping_sub(start) as usize;
+                    if next && r > self.table.len() {
+                        break;
+                    }
+                    gindex = self.array_glyph(r, delta);
+                } else {
+                    gindex = (charcode as i32).wrapping_add(delta) as u32 & 0xffff;
+                    if next && gindex >= self.glyph_count {
+                        gindex = 0;
+                        let (code, last) = (charcode as i32 + delta, end as i32 + delta);
+                        if code < 0 && last >= 0 {
+                            charcode = (-delta) as u32;
+                        } else if code < 0x1_0000 && last >= 0x1_0000 {
+                            charcode = (0x1_0000 - delta) as u32;
+                        }
+                    }
+                }
+                break;
+            }
+            if min >= max {
+                break;
+            }
+        }
+        (charcode, gindex, mid, end)
+    }
+
+    /// `tt_cmap4_set_range`: the first segment from `range` whose glyphs are
+    /// not missing, or `false` past the last.
+    fn set_range(&self, state: &mut SegmentState, mut range: usize) -> bool {
+        let n = self.segments;
+        while range < n {
+            let mut p = 14 + 2 * range;
+            state.end = self.word(p);
+            p += 2 + 2 * n;
+            state.start = self.word(p);
+            p += 2 * n;
+            state.delta = self.short(p);
+            p += 2 * n;
+            let mut offset = self.word(p);
+            let (start, end) = (state.start, state.end);
+            self.last_fix(range, start, end, p, &mut state.delta, &mut offset);
+            if offset != 0xffff {
+                state.values = (offset != 0).then_some(p + offset as usize);
+                state.range = range;
+                return true;
+            }
+            range += 1;
+        }
+        false
+    }
+
+    /// `tt_cmap4_next`: the code after the state's that maps, from its
+    /// segment on.
+    fn next(&self, state: &mut SegmentState) {
+        let mut charcode = state.charcode.wrapping_add(1);
+        if charcode < state.start {
+            charcode = state.start;
+        }
+        loop {
+            let (end, delta) = (state.end, state.delta);
+            'segment: {
+                if charcode > end {
+                    break 'segment;
+                }
+                if let Some(values) = state.values {
+                    let mut p = values + 2 * (charcode - state.start) as usize;
+                    if p > self.table.len() {
+                        break 'segment;
+                    }
+                    loop {
+                        let g = self.word(p);
+                        p += 2;
+                        if g != 0 {
+                            let g = (g as i32).wrapping_add(delta) as u32 & 0xffff;
+                            if g != 0 {
+                                (state.charcode, state.gindex) = (charcode, g);
+                                return;
+                            }
+                        }
+                        charcode += 1;
+                        if charcode > end {
+                            break;
+                        }
+                    }
+                } else {
+                    loop {
+                        let mut g = (charcode as i32).wrapping_add(delta) as u32 & 0xffff;
+                        if g >= self.glyph_count {
+                            g = 0;
+                            let (code, last) = (charcode as i32 + delta, end as i32 + delta);
+                            if code < 0 && last >= 0 {
+                                charcode = (-delta) as u32;
+                            } else if code < 0x1_0000 && last >= 0x1_0000 {
+                                charcode = (0x1_0000 - delta) as u32;
+                            } else {
+                                break 'segment;
+                            }
+                        }
+                        if g != 0 {
+                            (state.charcode, state.gindex) = (charcode, g);
+                            return;
+                        }
+                        charcode += 1;
+                        if charcode > end {
+                            break;
+                        }
+                    }
+                }
+            }
+            if !self.set_range(state, state.range + 1) {
+                break;
+            }
+            if charcode < state.start {
+                charcode = state.start;
+            }
+        }
+        (state.charcode, state.gindex) = (u32::MAX, 0);
+    }
 }
 
 /// Format 2: the subheader of `code` (`tt_cmap2_get_subheader`): the first
@@ -1198,12 +1625,60 @@ mod tests {
         assert_eq!(charmap.glyph(0x1_0000), None);
         let pairs: Vec<_> = charmap.mappings().map(Result::unwrap).collect();
         assert_eq!(pairs, [(0x41, GlyphId(0x42)), (0x61, GlyphId(17))]);
-        // Five codes in the first two segments, then the work runs out.
-        let [limited] = charmaps(&data, 0x43, 4)[..] else {
+        // Two steps of `char_next`, then the work runs out.
+        let [limited] = charmaps(&data, 0x43, 2)[..] else {
             panic!()
         };
         let results: Vec<_> = limited.mappings().collect();
         assert_eq!(results.last(), Some(&Err(Error::Policy("font work"))));
+    }
+
+    /// A format 4 subtable of (start, end, delta) segments without glyph
+    /// arrays.
+    fn segments(segments: &[(u16, u16, u16)]) -> Vec<u8> {
+        let n = segments.len() as u16;
+        let mut subtable = words(&[4, 0, 0, 2 * n, 0, 0, 0]);
+        subtable.extend(words(&segments.iter().map(|s| s.1).collect::<Vec<_>>()));
+        subtable.extend(words(&[0]));
+        subtable.extend(words(&segments.iter().map(|s| s.0).collect::<Vec<_>>()));
+        subtable.extend(words(&segments.iter().map(|s| s.2).collect::<Vec<_>>()));
+        subtable.extend(words(&vec![0; segments.len()]));
+        subtable
+    }
+
+    #[test]
+    fn format_4_searches_unsorted_segments_linearly_and_overlapping_ones_first() {
+        // Unsorted: FreeType's linear search stops at the first segment that
+        // starts past the code, so the later 'A'..='E' never maps it.
+        let data = cmap(&segments(&[
+            (0x50, 0x60, 1),
+            (0x41, 0x45, 2),
+            (0xffff, 0xffff, 1),
+        ]));
+        let [unsorted] = charmaps(&data, 0x100, u64::MAX)[..] else {
+            panic!("one charmap");
+        };
+        assert_eq!(unsorted.glyph(0x42), None);
+        assert_eq!(unsorted.glyph(0x55), Some(GlyphId(0x56)));
+        let pairs: Vec<_> = unsorted.mappings().map(Result::unwrap).collect();
+        assert_eq!(pairs.first(), Some(&(0x50, GlyphId(0x51))));
+        assert!(pairs.iter().all(|&(code, _)| code >= 0x50), "{pairs:?}");
+        // Overlapping in order: the first segment holding the code maps it.
+        let data = cmap(&segments(&[
+            (0x41, 0x48, 1),
+            (0x45, 0x50, 100),
+            (0xffff, 0xffff, 1),
+        ]));
+        let [overlapping] = charmaps(&data, 0x100, u64::MAX)[..] else {
+            panic!("one charmap");
+        };
+        assert_eq!(overlapping.glyph(0x46), Some(GlyphId(0x47)));
+        assert_eq!(overlapping.glyph(0x4a), Some(GlyphId(0x4a + 100)));
+        // Stepping goes on through the next segment from where the first ends.
+        let pairs: Vec<_> = overlapping.mappings().map(Result::unwrap).collect();
+        let codes: Vec<u32> = pairs.iter().map(|&(code, _)| code).collect();
+        assert_eq!(codes, (0x41..=0x50).collect::<Vec<_>>());
+        assert_eq!(pairs[8], (0x49, GlyphId(0x49 + 100)));
     }
 
     #[test]
@@ -1276,6 +1751,7 @@ mod tests {
                         platform: Platform::from_id(platform),
                         encoding,
                         format,
+                        flags: 0,
                         offset,
                         end: 0,
                     };

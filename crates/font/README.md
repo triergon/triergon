@@ -102,11 +102,14 @@ custom encoding of format 0 or 1 with supplements, or the Standard or Expert
 encoding through the charset's lowest glyph of each SID. Subtables of formats 14
 and 15, which FreeType lists but cannot select, are left out of the list and
 read as variation sequences instead (`variation_sequences`, FreeType's first
-valid (0, 5) subtable of either format, and `first_variation_sequences`,
-HarfBuzz's first (0, 5) record when it is format 14).
+valid (0, 5) subtable of either format; `VariationSequences::format14` reads one
+another reader selects). Format 4 is read as FreeType reads it: a linear search
+through segments its validation finds unsorted, else a binary search that for
+overlapping segments takes the first holding the code, and `char_next`'s walk
+from segment to segment.
 Records stop at the table's end. Lookups are bounded by the end of the `cmap`
 table rather than the declared subtable length, and `mappings` steps through
-formats 2 and 8 and the added charmaps as `FT_Get_Next_Char` does. A glyph at or
+formats 2, 4 and 8 and the added charmaps as `FT_Get_Next_Char` does. A glyph at or
 above the glyph count is unmapped. `text_charmap` is the charmap libass selects
 when it opens a face (`ass_charmap_magic`): the first Windows full-Unicode
 charmap (3, 10), else the first (3, 1), which may be the one built from glyph
@@ -254,8 +257,7 @@ only scanned for `INSTCTRL`, CFF hints are skipped), Apple `kern` version 1 and
 kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Type
 1 charstrings (CharstringType 1) and synthetic fonts.
 A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
-opens it and fails each glyph. A format 4 subtable whose segments overlap or are out
-of order is searched in order rather than with FreeType's overlap handling.
+opens it and fails each glyph.
 
 At a size, what needs hinting is not reproduced: hinted outlines, hence the glyph
 extents and contour points libass's HarfBuzz callbacks report (they load glyphs

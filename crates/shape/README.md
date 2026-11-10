@@ -55,8 +55,9 @@ that `rotates` (U+02F1 and above) advances by its default-load vertical advance,
 as libass gives HarfBuzz that glyph, and a glyph first asked for an advance or
 extents stays horizontal. The cache's storage is charged before it grows, and a
 charge that fails ends the shaping call. `OtMetrics` answers as HarfBuzz's built-in
-functions do at units per em (its character map choice, `cmap` format 14
-variation sequences, `hmtx` advances, `glyf` and CFF extents). A callback that
+functions do at units per em (its character map choice among the raw encoding
+records, which it sanitizes but does not validate, its `cmap` lookups, the
+last (0, 5) format 14 subtable's variation sequences, `hmtx` advances, `glyf` and CFF extents). A callback that
 cannot answer as its font would ends the shaping call with its error. `Scale` reproduces HarfBuzz's scaling arithmetic,
 including hinting device tables when a ppem is set.
 

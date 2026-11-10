@@ -12,6 +12,7 @@
 
 pub mod bidi;
 mod buffer;
+mod cmap;
 mod face;
 mod fallback;
 mod language;
