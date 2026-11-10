@@ -332,6 +332,26 @@ fn first_carrier_charge(raw: &[u8]) -> usize {
 }
 
 #[test]
+fn finite_pes_span_growth_refuses_a_permanent_limit() {
+    let frame = adts(&[0x31; 800]);
+    let mut ts = Transport::new();
+    ts.tables(&[(0x0f, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &frame, Some(90_000), None);
+    assert_eq!(ts.bytes.len(), 7 * 188);
+    let (drive, _) = before_last_span(&ts.bytes, 1 << 20, 188, false);
+    let minimum = drive.pool.used() + 5 * size_of::<triergon_mpegts::PesSpan>();
+    let maximum = minimum - 1;
+    let (mut drive, _) = before_last_span(&ts.bytes, maximum, 188, false);
+    assert_eq!(
+        grow_last_span(&mut drive.reader).unwrap_err(),
+        Error::Limit {
+            requested: minimum,
+            maximum
+        }
+    );
+}
+
+#[test]
 fn unbounded_span_growth_counts_pinned_reader_storage() {
     let (raw, _) = span_growth_source();
     let minimum = span_growth_minimum(&raw, 188);

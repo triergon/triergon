@@ -152,7 +152,7 @@ impl Payload {
 #[derive(Debug)]
 enum SpanGrowth {
     Credit(usize),
-    // The allocation was fully paid before the audit began.
+    // Count the retained backing before retrying a refused replacement.
     Audit(SpanGrowthAudit),
     // A refused header-range replacement, including the pending backing.
     HeaderBlocked(usize),
@@ -688,7 +688,17 @@ impl PesAssembler {
         Ok(())
     }
 
-    fn reserve_adts_span(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+    #[cold]
+    fn audit_span_growth(&mut self) -> Result<()> {
+        self.span_growth = SpanGrowth::Audit(SpanGrowthAudit::new(
+            &self.spans,
+            &self.header_ranges,
+            self.header.as_ref().map_or(0, PesHeader::retained_storage),
+        )?);
+        Ok(())
+    }
+
+    fn reserve_body_span(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         let spans = self.spans.len();
         if spans < self.spans.capacity() {
             return Ok(true);
@@ -736,11 +746,7 @@ impl PesAssembler {
                 Err(Error::Backpressure { .. })
                     if matches!(self.span_growth, SpanGrowth::Credit(_)) =>
                 {
-                    self.span_growth = SpanGrowth::Audit(SpanGrowthAudit::new(
-                        &self.spans,
-                        &self.header_ranges,
-                        self.header.as_ref().map_or(0, PesHeader::retained_storage),
-                    )?);
+                    self.audit_span_growth()?;
                 }
                 Err(error) => return Err(error),
             }
@@ -965,12 +971,13 @@ impl PesAssembler {
                     return Err(limit(spans.saturating_add(1), self.limits.source_spans));
                 }
                 if RETAIN
-                    && self.unbounded_adts
-                    && self.header.as_ref().is_some_and(|header| {
-                        header.declared_packet_length == 0
-                            && (0xc0..=0xdf).contains(&header.stream_id)
-                    })
-                    && !self.reserve_adts_span(work, cancel)?
+                    && (matches!(self.span_growth, SpanGrowth::Audit(_))
+                        || (self.unbounded_adts
+                            && self.header.as_ref().is_some_and(|header| {
+                                header.declared_packet_length == 0
+                                    && (0xc0..=0xdf).contains(&header.stream_id)
+                            })))
+                    && !self.reserve_body_span(work, cancel)?
                 {
                     return Ok(AssemblyStep::Yield);
                 }
@@ -1011,6 +1018,10 @@ impl PesAssembler {
                 }) {
                     if count == available {
                         pending.bytes = Some(rejected.value.bytes);
+                    }
+                    if matches!(rejected.error, Error::Backpressure { .. }) {
+                        self.audit_span_growth()?;
+                        continue;
                     }
                     return Err(rejected.error);
                 }

@@ -176,6 +176,7 @@ and [A/52 Annex G §3.3](https://www.atsc.org/wp-content/uploads/2021/04/A52-201
 Existing framers delimit the complete source bytes before decoder-feed conversion.
 MPEG audio/video, other subtitle carriages and ambiguous private streams currently emit
 `ReaderEvent::Unsupported`. Their original PMTs and PES remain available as source events.
+For DVB AC-3, an elementary `AC-3` registration can corroborate descriptor `0x6a`.
 
 The DVB E-AC-3 carriage requires PMT stream type `0x06`, an elementary
 `0x7a` descriptor and PES stream ID `0xbd`. A matching elementary
@@ -284,15 +285,18 @@ changes separately.
 `ReaderEvent::Continuity` reports `First` and `Continuous` counter observations.
 `ReaderEvent::Source` delivers the remaining trace events, including continuity
 transitions. All are delivered in source order. PMT track catalogues change
-atomically with the corresponding source event. A PMT, clock or interrupted-byte-run
-boundary reports unpublished bytes through
-`ReaderEvent::Interrupted`, rather than treating a loss boundary as EOF.
+atomically with the corresponding source event. A PMT stream-list change keeps
+framing for routes whose signalling and clock binding still apply. Published
+packets use the active compatible PMT and retain their original PES ranges.
+A PAT that invalidates the active PMT clears the catalogue. Routes affected
+by a table, clock or interrupted-byte-run boundary report unpublished bytes
+through `ReaderEvent::Interrupted`.
 Logical EOF drains the framers before the original `Finished` event and final
-`Step::End`. When a split PES header needs a larger source-range table, the
-reader checks the allocations it must retain across that growth. If they cannot
-fit together, it reports a PES `Limit` diagnostic. Memory held by caller outputs
-can instead cause retryable `Backpressure`, with the original header and byte
-ranges preserved on retry.
+`Step::End`. When a PES needs a larger header or payload source-range table,
+the reader checks the allocations it must retain across that growth. If they
+cannot fit together, it reports a PES `Limit` diagnostic. Memory held by caller
+outputs can cause retryable `Backpressure`, with the original bytes and ranges
+preserved on retry.
 
 Audio defaults to `AudioEofPolicy::RejectIncomplete`: an unfinished
 frame still returns `Truncated`. With `AudioEofPolicy::ReportIncomplete`, only
@@ -614,7 +618,7 @@ Verification:
   FFmpeg reference; nonmatching cases are kept as failures, not normalised.
   `cargo xtask report` runs that comparison from
   [`harness/features/mpegts-pes/`](../../harness/features/mpegts-pes/contract.json)
-  through `playback-worker`'s `ts-` modes, which use the public API only:
+  through `transport-worker`'s `ts-` modes, which use the public API only:
   `TransportStream` selects the program, its first active PMT binds a
   `compat::pes::DemuxObserver` to the one elementary stream, wrapped by
   `TransportFaultRecovery`, and `DemuxClock` places the timestamps. A typed

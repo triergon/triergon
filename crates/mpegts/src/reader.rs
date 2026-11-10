@@ -117,7 +117,7 @@ impl Default for ReaderLimits {
 enum Phase {
     Prepare,
     Begin,
-    DrainAll(usize),
+    DrainAll { index: usize, retained: usize },
     Build(usize),
     DrainLane(usize),
     FaultLane(usize),
@@ -172,6 +172,49 @@ impl std::fmt::Debug for Reader {
 }
 
 impl Reader {
+    fn keeps_lane(&self, index: usize, source: &SourceEvent) -> bool {
+        if !matches!(source.event(), TraceEvent::ProgramMap { active: true, .. }) {
+            return false;
+        }
+        let lane = &self.lanes.as_slice()[index];
+        let old = lane.track.program_map();
+        let new = source.map();
+        if old.pcr_pid != new.pcr_pid || old.header.extension != new.header.extension {
+            return false;
+        }
+        // A version change alone still marks a source boundary. A changed
+        // stream list can leave other routes continuous.
+        if old.streams.len() == new.streams.len()
+            && old
+                .streams
+                .iter()
+                .zip(new.streams.iter())
+                .all(|(old, new)| {
+                    old.pid == new.pid
+                        && old.stream_type == new.stream_type
+                        && old.descriptor_bytes.as_ref() == new.descriptor_bytes.as_ref()
+                })
+        {
+            return false;
+        }
+        let stream = lane.track.stream();
+        if matches!(stream.stream_type, 0x06 | 0x81 | 0x87)
+            && old.program_descriptors.as_ref() != new.program_descriptors.as_ref()
+        {
+            return false;
+        }
+        new.streams
+            .iter()
+            .position(|entry| entry.pid == stream.pid)
+            .and_then(|position| self.stream.as_ref()?.route_state(position, stream.pid))
+            .is_some_and(|(epochs, pending)| {
+                epochs.configuration == lane.track.epoch
+                    && !matches!(lane.run, PesRun::Active(old, _) if old != epochs)
+                    && !matches!(lane.run, PesRun::BeforeBoundary(_))
+                    && pending.is_none_or(|start| start.source == self.source)
+            })
+    }
+
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -508,16 +551,28 @@ impl Reader {
                         }
                         let source = self.pending.as_ref().expect("pending source");
                         match source.event() {
-                            TraceEvent::Pat(table) => { self.tsid = Some(table.header.extension); self.phase = Phase::Publish; }
+                            TraceEvent::Pat(table) => {
+                                self.tsid = Some(table.header.extension);
+                                self.phase = if self.map.is_some()
+                                    && !self.stream.as_ref().expect("active transport").has_active_map()
+                                {
+                                    Phase::DrainAll { index: 0, retained: 0 }
+                                } else {
+                                    Phase::Publish
+                                };
+                            }
                             TraceEvent::ProgramMap { active: true, configuration_epoch, .. }
                                 if self.map.as_ref().is_none_or(|map| !matches!(map.event(), TraceEvent::ProgramMap { configuration_epoch: old, .. } if old == configuration_epoch)) => {
-                                    self.rebuild = Some(source.clone()); self.phase = Phase::DrainAll(0);
+                                    self.rebuild = Some(source.clone());
+                                    self.phase = Phase::DrainAll { index: 0, retained: 0 };
                                 }
                             TraceEvent::Discontinuity { .. } | TraceEvent::Finished => {
-                                self.rebuild = None; self.phase = Phase::DrainAll(0);
+                                self.rebuild = None;
+                                self.phase = Phase::DrainAll { index: 0, retained: 0 };
                             }
                             TraceEvent::Timeline { .. } => {
-                                self.rebuild = self.map.clone(); self.phase = Phase::DrainAll(0);
+                                self.rebuild = self.map.clone();
+                                self.phase = Phase::DrainAll { index: 0, retained: 0 };
                             }
                             TraceEvent::Continuity { pid, outcome: ContinuityOutcome::SignalledDiscontinuity } => {
                                 self.phase = self.lanes.as_slice().iter()
@@ -553,16 +608,21 @@ impl Reader {
                                 if let Some(index) = self.lanes.as_slice().iter().position(|lane| Some(lane.track.stream().pid) == fault.pid) {
                                     self.phase = Phase::FaultLane(index);
                                 } else if fault.pid.is_none() {
-                                    self.rebuild = self.map.clone(); self.phase = Phase::DrainAll(0);
+                                    self.rebuild = self.map.clone();
+                                    self.phase = Phase::DrainAll { index: 0, retained: 0 };
                                 } else { self.phase = Phase::Publish; }
                             }
                             TraceEvent::Diagnostic(fault) if fault.kind == crate::FaultKind::Program => {
-                                self.rebuild = self.map.clone(); self.phase = Phase::DrainAll(0);
+                                self.rebuild = self.map.clone();
+                                self.phase = Phase::DrainAll { index: 0, retained: 0 };
                             }
                             _ => self.phase = Phase::Publish,
                         }
                     }
-                    Phase::DrainAll(index) => {
+                    Phase::DrainAll {
+                        index,
+                        mut retained,
+                    } => {
                         if index < self.lanes.len() {
                             let cause = self.pending.as_ref().expect("pending boundary");
                             if matches!(cause.event(), TraceEvent::Finished) {
@@ -573,18 +633,28 @@ impl Reader {
                                 if !work.try_charge(1) {
                                     return Ok(Step::Yield);
                                 }
-                                let lane = &self.lanes.as_slice()[index];
-                                if let Some(elementary_range) = lane.unpublished() {
+                                if self.keeps_lane(index, cause) {
+                                    self.lanes.as_mut_slice().swap(index, retained);
+                                    retained += 1;
+                                } else if let Some(elementary_range) =
+                                    self.lanes.as_slice()[index].unpublished()
+                                {
                                     let event = ReaderEvent::Interrupted {
-                                        track: lane.track.clone(),
+                                        track: self.lanes.as_slice()[index].track.clone(),
                                         elementary_range,
                                         cause: cause.clone(),
                                     };
-                                    self.phase = Phase::DrainAll(index + 1);
+                                    self.phase = Phase::DrainAll {
+                                        index: index + 1,
+                                        retained,
+                                    };
                                     return Ok(Step::Ready(Event::Other(event)));
                                 }
                             }
-                            self.phase = Phase::DrainAll(index + 1);
+                            self.phase = Phase::DrainAll {
+                                index: index + 1,
+                                retained,
+                            };
                         } else {
                             if self.deferred_fragment
                                 && matches!(
@@ -606,7 +676,7 @@ impl Reader {
                                 TraceEvent::Finished
                             ) {
                                 self.boundary = self.pending.clone();
-                                self.lanes.clear();
+                                self.lanes.truncate(retained);
                                 self.staged_tracks.clear();
                             }
                             self.active = None;
@@ -641,14 +711,24 @@ impl Reader {
                                 index,
                                 epoch: epochs.configuration,
                             };
-                            let mut lane = Lane::new(&self.pool, track, self.limits)?;
-                            if let Some(start) = pending_header {
-                                lane.run = PesRun::BeforeBoundary(start);
-                            }
-                            self.staged_tracks
-                                .try_push(lane.track.clone())
-                                .map_err(|e| e.error)?;
-                            self.lanes.try_push(lane).map_err(|e| e.error)?;
+                            let retained = self.lanes.as_slice()[index..]
+                                .iter()
+                                .position(|lane| lane.track.stream().pid == track.stream().pid);
+                            let position = if let Some(retained) = retained {
+                                let position = index + retained;
+                                self.lanes.as_mut_slice()[position].track = track.clone();
+                                position
+                            } else {
+                                let mut lane = Lane::new(&self.pool, track.clone(), self.limits)?;
+                                if let Some(start) = pending_header {
+                                    lane.run = PesRun::BeforeBoundary(start);
+                                }
+                                let position = self.lanes.len();
+                                self.lanes.try_push(lane).map_err(|e| e.error)?;
+                                position
+                            };
+                            self.lanes.as_mut_slice().swap(index, position);
+                            self.staged_tracks.try_push(track).map_err(|e| e.error)?;
                             self.phase = Phase::Build(index + 1);
                         } else {
                             self.unsupported_at = Some(0);
@@ -765,6 +845,17 @@ impl Reader {
                     }
                     let source = self.pending.take().expect("published source");
                     match source.event() {
+                        TraceEvent::Pat(_)
+                            if !self
+                                .stream
+                                .as_ref()
+                                .expect("active transport")
+                                .has_active_map() =>
+                        {
+                            self.map = None;
+                            self.tracks.clear();
+                            self.boundary = None;
+                        }
                         TraceEvent::Discontinuity { .. } => {
                             self.map = None;
                             self.tracks.clear();

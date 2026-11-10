@@ -253,10 +253,16 @@ impl<'a> Drive<'a> {
                                 (
                                     stream.pid,
                                     self.catalogue_epoch_override
+                                        .filter(|_| stream.pid == PID)
                                         .unwrap_or(*configuration_epoch),
                                 )
                             })
                             .collect();
+                    } else if matches!(&event, Event::Other(ReaderEvent::Source(source))
+                        if matches!(source.event(), TraceEvent::Pat(_)))
+                        && self.reader.tracks().is_empty()
+                    {
+                        self.catalogue.clear();
                     }
                     self.assert_catalogue();
                     return Ok(Some(event));
@@ -1157,6 +1163,118 @@ fn pmt_change_reports_interrupted_bytes_and_publishes_an_atomic_new_catalogue() 
 }
 
 #[test]
+fn adding_audio_to_a_pmt_keeps_the_existing_avc_access_units() {
+    let raw = include_bytes!("../../framing/fixtures/raw-annex-b/avc-aud0.h264");
+    let golden = include_str!("../../framing/fixtures/raw-annex-b/avc-aud0.packets");
+    let first_end = 2045;
+    let mut ts = Transport::new();
+    ts.tables(&[(0x1b, PID, &[])], 0);
+    ts.pes(PID, 0xe0, &raw[..first_end], Some(90_000), None);
+    ts.tables(&[(0x0f, PID + 1, &[]), (0x1b, PID, &[])], 1);
+    let frame = adts(b"added audio");
+    ts.pes(PID + 1, 0xc0, &frame, Some(100_000), None);
+    ts.pes(PID, 0xe0, &raw[first_end..], Some(180_000), None);
+
+    let mut drive = Drive::new(&ts.bytes, ReaderLimits::default(), 7, 1);
+    drive.catalogue_epoch_override = Some(2);
+    let mut video = Vec::new();
+    let mut audio = 0;
+    while let Some(event) = drive.next().unwrap() {
+        match event {
+            Event::Packet(packet) if packet.track_info().stream().pid == PID => {
+                assert_eq!(packet.track_info().configuration_epoch(), 2);
+                video.push(packet.payload().to_vec());
+            }
+            Event::Packet(packet) => {
+                assert_eq!(packet.payload(), frame);
+                audio += 1;
+            }
+            Event::Other(ReaderEvent::Interrupted { .. }) => {
+                panic!("unrelated PMT entry interrupted video")
+            }
+            _ => (),
+        }
+    }
+    assert_eq!(audio, 1);
+    assert_eq!(video.concat(), raw);
+    assert_eq!(
+        video.iter().map(Vec::len).collect::<Vec<_>>(),
+        golden
+            .lines()
+            .map(|row| row
+                .split_whitespace()
+                .nth(1)
+                .unwrap()
+                .parse::<usize>()
+                .unwrap())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn a_pat_route_change_interrupts_pending_audio_and_clears_tracks() {
+    for (program, pmt_pid) in [(PROGRAM, 4097u16), (PROGRAM + 1, 4096)] {
+        let mut ts = Transport::new();
+        ts.tables(&[(0x0f, PID, &[])], 0);
+        let frame = adts(b"pending audio");
+        ts.pes(PID, 0xc0, &frame[..7], Some(90_000), None);
+        ts.section(
+            0,
+            vec![
+                0,
+                0xb0,
+                13,
+                0,
+                9,
+                0xc3,
+                0,
+                0,
+                0,
+                program as u8,
+                0xe0 | (pmt_pid >> 8) as u8,
+                pmt_pid as u8,
+            ],
+        );
+
+        let limits = ReaderLimits {
+            program: Some(PROGRAM),
+            audio_eof_policy: AudioEofPolicy::ReportIncomplete,
+            ..ReaderLimits::default()
+        };
+        let mut drive = Drive::new(&ts.bytes, limits, 7, 1);
+        let mut interrupted = false;
+        let mut invalidated = false;
+        while let Some(event) = drive.next().unwrap() {
+            match event {
+                Event::Other(ReaderEvent::Interrupted {
+                    cause,
+                    elementary_range,
+                    ..
+                }) => {
+                    assert!(matches!(cause.event(), TraceEvent::Pat(_)));
+                    assert_eq!(elementary_range, 0..7);
+                    assert_eq!(drive.reader.tracks().len(), 1);
+                    interrupted = true;
+                }
+                Event::Other(ReaderEvent::Source(source))
+                    if matches!(source.event(), TraceEvent::Pat(table)
+                        if table.header.version == 1) =>
+                {
+                    assert!(interrupted);
+                    assert!(drive.reader.tracks().is_empty());
+                    invalidated = true;
+                }
+                Event::Packet(_) | Event::Other(ReaderEvent::IncompleteAudio(_)) => {
+                    panic!("invalidated route emitted a packet")
+                }
+                _ => (),
+            }
+        }
+        assert!(invalidated);
+    }
+}
+
+#[test]
 fn retained_pes_and_au_limits_are_enforced_without_pes_fallback() {
     let mut ts = Transport::new();
     ts.tables(&[(0x0f, PID, &[])], 0);
@@ -1191,13 +1309,16 @@ fn retained_pes_and_au_limits_are_enforced_without_pes_fallback() {
 }
 
 #[test]
-fn explicit_dvb_ac3_reports_the_signalled_codec_and_preserves_the_private_tag() {
+fn corroborated_dvb_ac3_reports_the_signalled_codec_and_preserves_the_private_tag() {
     use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
     let mut frame = [0; 192];
     // Authored AC-3 envelope: 48 kHz, stereo, 48 kbit/s; opaque coded body.
     frame[..8].copy_from_slice(&[0x0b, 0x77, 0, 0, 4, 0x40, 0x40, 0x1f]);
     let mut ts = Transport::new();
-    ts.tables(&[(6, PID, &[0x6a, 1, 0])], 0);
+    ts.tables(
+        &[(6, PID, &[0x6a, 1, 0, 0x05, 4, b'A', b'C', b'-', b'3'])],
+        0,
+    );
     ts.pes(PID, 0xbd, &frame[..17], Some(90_000), None);
     ts.pes(PID, 0xbd, &frame[17..], None, None);
     let mut drive = Drive::new(

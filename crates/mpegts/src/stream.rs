@@ -601,6 +601,9 @@ impl TransportStream {
     pub fn clock_is_quarantined(&self) -> bool {
         self.clock_quarantined
     }
+    pub(crate) fn has_active_map(&self) -> bool {
+        self.pmt_source.is_some()
+    }
     pub(crate) fn route_state(
         &self,
         index: usize,

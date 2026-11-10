@@ -136,23 +136,16 @@ impl Framer {
                     elementary: stream.descriptor_bytes.as_ref(),
                 };
                 let carriage =
-                    match PrivateAudioCarriage::from_observed_pmt(6, descriptors, limits.transport)
-                    {
-                        // An elementary registration can corroborate the DVB descriptor.
-                        Err(Error::Unsupported(_))
-                            if matches!(
-                                PrivateAudioCarriage::from_hls_pmt(
-                                    6,
-                                    descriptors,
-                                    limits.transport
-                                ),
-                                Ok(PrivateAudioCarriage::DvbEac3Tag)
-                            ) =>
-                        {
-                            PrivateAudioCarriage::DvbEac3Tag
-                        }
-                        result => result?,
-                    };
+                    PrivateAudioCarriage::from_observed_pmt(6, descriptors, limits.transport)
+                        .or_else(|error| {
+                            // An elementary registration can corroborate the DVB descriptor.
+                            if matches!(error, Error::Unsupported(_)) {
+                                PrivateAudioCarriage::from_hls_pmt(6, descriptors, limits.transport)
+                                    .map_err(|_| error)
+                            } else {
+                                Err(error)
+                            }
+                        })?;
                 if carriage == PrivateAudioCarriage::DvbEac3Tag {
                     Ok(Self::Eac3(eac3::Reader::new(
                         pool, track, limits, source, caps,
