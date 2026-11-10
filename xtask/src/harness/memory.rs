@@ -1182,8 +1182,13 @@ fn measure(
         )
     };
     push(&mut result, "input_sha256", Value::str(&input_sha));
-    if file_sha(invocation.input)? != input_sha {
-        push(&mut result, "status", Value::str("input-changed"));
+    match file_sha(invocation.input) {
+        Ok(hash) if hash == input_sha => (),
+        Ok(_) => push(&mut result, "status", Value::str("input-changed")),
+        Err(error) => {
+            push(&mut result, "status", Value::str("input-check-failed"));
+            push(&mut result, "input_error", Value::str(error));
+        }
     }
     if linux && !linux::certificate_current(root, certificate) {
         push(&mut result, "status", Value::str("instrumentation-changed"));

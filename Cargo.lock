@@ -96,6 +96,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "transport-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-framing",
+ "triergon-harness-protocol",
+ "triergon-harness-runner",
+ "triergon-mpegts",
+]
+
+[[package]]
 name = "triergon"
 version = "0.0.0"
 dependencies = [
@@ -301,6 +312,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-bitstream",
  "triergon-core",
+ "triergon-framing",
  "triergon-harness-protocol",
 ]
 

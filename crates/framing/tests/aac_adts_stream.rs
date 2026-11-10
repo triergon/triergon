@@ -68,6 +68,16 @@ fn provide(
     }
     Ok(at + count == data.len())
 }
+#[test]
+fn frame_buffer_capacity_excludes_buffered_input() {
+    let pool = Budget::new(4096).unwrap();
+    let mut reader = new(&pool, None);
+    let input = wire(&[1, 2, 3], None);
+    let capacity = reader.input_wait_buffer_capacity();
+    assert!(provide(&pool, &mut reader, &input, input.len(), false).unwrap());
+    assert_eq!(reader.input_wait_buffer_capacity(), capacity);
+}
+
 struct Outcome {
     frames: Vec<AacAdtsFrame>,
     end: Result<SourceLocation, Error>,

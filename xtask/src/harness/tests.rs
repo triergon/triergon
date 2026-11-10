@@ -924,7 +924,7 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
         (
             "mpegts-pes",
             "playback-ts-fold-v1",
-            Some("playback-worker"),
+            Some("transport-worker"),
             Some("ffmpeg-formats-native"),
         ),
         (
