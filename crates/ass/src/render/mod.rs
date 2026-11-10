@@ -101,7 +101,7 @@ pub struct Renderer {
     next_frame: BudgetVec<Image>,
     boxes: BudgetVec<EventBox>,
     placed: BudgetVec<Placed>,
-    used: BudgetVec<collisions::Rect>,
+    used: collisions::Fixed,
     /// The work the last call to [`Renderer::render`] spent.
     #[cfg(feature = "work-probe")]
     work_spent: u64,
@@ -155,7 +155,7 @@ impl Renderer {
             next_frame: BudgetVec::new(budget),
             boxes: BudgetVec::new(budget),
             placed: BudgetVec::new(budget),
-            used: BudgetVec::new(budget),
+            used: collisions::Fixed::new(budget),
             #[cfg(feature = "work-probe")]
             work_spent: 0,
         })
@@ -278,6 +278,7 @@ impl Renderer {
                 &mut self.used,
                 self.id,
                 self.canvas.height,
+                work,
             )?;
         }
         let next = &mut self.next_frame;

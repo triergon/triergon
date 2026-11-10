@@ -4,12 +4,12 @@
 
 use std::ops::Range;
 
-use triergon_core::{BudgetVec, Result};
+use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
 use triergon_raster as raster;
 
 use super::images::Image;
-use crate::{Event, EventState, VAlign};
+use crate::{Event, EventState, VAlign, charge};
 
 /// Where an event was placed by collision handling, kept with the event
 /// across frames (libass's `ASS_RenderPriv`). A record made by another
@@ -109,8 +109,8 @@ impl EventBox {
 }
 
 /// A box in frame pixels.
-#[derive(Clone, Copy, Debug)]
-pub(super) struct Rect {
+#[derive(Clone, Copy, Debug, Default)]
+struct Rect {
     y0: i32,
     y1: i32,
     x0: i32,
@@ -121,6 +121,114 @@ impl Rect {
     fn overlaps(&self, other: &Self) -> bool {
         !(self.y0 >= other.y1 || other.y0 >= self.y1 || self.x0 >= other.x1 || other.x0 >= self.x1)
     }
+
+    /// `cmp_rect_y0`: the difference of the tops in `int`, which wraps for
+    /// tops 2³¹ or more apart.
+    const fn cmp_y0(&self, other: &Self) -> i32 {
+        self.y0.wrapping_sub(other.y0)
+    }
+}
+
+/// The boxes of the events placed so far in a layer, in libass's order, and
+/// the scratch its sort merges through: storage kept between frames.
+#[derive(Debug)]
+pub(super) struct Fixed {
+    boxes: BudgetVec<Rect>,
+    merge: BudgetVec<Rect>,
+}
+
+impl Fixed {
+    pub(super) fn new(budget: &Budget) -> Self {
+        Self {
+            boxes: BudgetVec::new(budget),
+            merge: BudgetVec::new(budget),
+        }
+    }
+
+    /// Empties the boxes and reserves room for `events` of them.
+    fn reset(&mut self, events: usize) -> Result<()> {
+        self.boxes.clear();
+        self.merge.clear();
+        self.boxes.try_reserve_exact(events)?;
+        self.merge.try_reserve_exact(events)
+    }
+
+    /// Adds `rect` after the boxes, unsorted.
+    fn push(&mut self, rect: Rect) -> Result<()> {
+        self.boxes.try_push(rect).map_err(|e| e.error)
+    }
+
+    /// Sorts the boxes as libass does, with `qsort` and `cmp_rect_y0`, which
+    /// glibc runs as a stable merge sort. While no two tops lie 2³¹ or more
+    /// apart the comparison orders them by value and the sort keeps boxes
+    /// with equal tops in the order they were added, as an insertion sort
+    /// does in place; otherwise the sort is glibc's own, step for step,
+    /// whose result then depends on how it splits and merges.
+    fn sort(&mut self, work: &mut WorkBudget) -> Result<()> {
+        let boxes = self.boxes.as_mut_slice();
+        let Some((low, high)) = boxes
+            .iter()
+            .map(|r| (r.y0, r.y0))
+            .reduce(|(l, h), (a, b)| (l.min(a), h.max(b)))
+        else {
+            return Ok(());
+        };
+        if high.abs_diff(low) <= i32::MAX.unsigned_abs() {
+            for end in 1..boxes.len() {
+                let mut i = end;
+                while i > 0 && boxes[i - 1].y0 > boxes[i].y0 {
+                    boxes.swap(i - 1, i);
+                    i -= 1;
+                }
+            }
+            return Ok(());
+        }
+        let n = boxes.len();
+        charge(work, n.saturating_mul(n.ilog2() as usize + 1))?;
+        self.merge.clear();
+        self.merge.try_resize(n, Rect::default())?;
+        merge_sort(boxes, self.merge.as_mut_slice());
+        Ok(())
+    }
+
+    /// Adds `rect` and sorts the boxes (`fit_rect`).
+    fn insert(&mut self, rect: Rect, work: &mut WorkBudget) -> Result<()> {
+        self.push(rect)?;
+        self.sort(work)
+    }
+
+    fn as_slice(&self) -> &[Rect] {
+        self.boxes.as_slice()
+    }
+}
+
+/// glibc's `msort_with_tmp` with `cmp_rect_y0`: the first half and then the
+/// second sorted, then merged through `tmp`, a box of the first half first
+/// while it compares at most equal.
+fn merge_sort(boxes: &mut [Rect], tmp: &mut [Rect]) {
+    let n = boxes.len();
+    if n <= 1 {
+        return;
+    }
+    let n1 = n / 2;
+    merge_sort(&mut boxes[..n1], tmp);
+    merge_sort(&mut boxes[n1..], tmp);
+    let (mut i, mut j, mut k) = (0, n1, 0);
+    while i < n1 && j < n {
+        if boxes[i].cmp_y0(&boxes[j]) <= 0 {
+            tmp[k] = boxes[i];
+            i += 1;
+        } else {
+            tmp[k] = boxes[j];
+            j += 1;
+        }
+        k += 1;
+    }
+    // What is left of the first half follows; the second half's rest is
+    // already in place.
+    let rest = n1 - i;
+    tmp[k..k + rest].copy_from_slice(&boxes[i..n1]);
+    boxes[..k + rest].copy_from_slice(&tmp[..k + rest]);
 }
 
 /// `shift_event`.
@@ -131,22 +239,9 @@ fn shift(event: &mut EventBox, images: &mut [Image], shift: i32, frame_height: i
     event.top = event.top.wrapping_add(shift);
 }
 
-/// Inserts `rect` after the boxes that start above it or at the same row,
-/// keeping them ordered by their top edge (libass sorts them so).
-fn insert(fixed: &mut BudgetVec<Rect>, rect: Rect) -> Result<()> {
-    fixed.try_push(rect).map_err(|e| e.error)?;
-    let slice = fixed.as_mut_slice();
-    let mut i = slice.len() - 1;
-    while i > 0 && slice[i - 1].y0 > slice[i].y0 {
-        slice.swap(i - 1, i);
-        i -= 1;
-    }
-    Ok(())
-}
-
 /// `fit_rect`: the shift that moves `s` clear of every fixed box it meets,
 /// down or up; the moved box joins them.
-fn fit(s: Rect, fixed: &mut BudgetVec<Rect>, up: bool) -> Result<i32> {
+fn fit(s: Rect, fixed: &mut Fixed, up: bool, work: &mut WorkBudget) -> Result<i32> {
     let mut shift: i32 = 0;
     let meets = |f: &Rect, shift: i32| {
         !(s.y1.wrapping_add(shift) <= f.y0
@@ -173,26 +268,26 @@ fn fit(s: Rect, fixed: &mut BudgetVec<Rect>, up: bool) -> Result<i32> {
         y1: s.y1.wrapping_add(shift),
         ..s
     };
-    insert(fixed, moved)?;
+    fixed.insert(moved, work)?;
     Ok(shift)
 }
 
 /// `fix_collisions` over the events of one layer and their records: those
 /// placed before keep their place unless it changed height or now overlaps,
-/// the others move clear of them. `used` is scratch storage, reserved for
-/// every event before any record changes, so a refused reservation leaves
-/// the records as they were.
+/// the others move clear of them. `used` is reserved for every event before
+/// any record changes, so a refused reservation leaves the records as they
+/// were.
 pub(super) fn fix(
     events: &mut [EventBox],
     placed: &mut [Placed],
     images: &mut [Image],
-    used: &mut BudgetVec<Rect>,
+    used: &mut Fixed,
     renderer: u32,
     frame_height: i32,
+    work: &mut WorkBudget,
 ) -> Result<()> {
-    used.clear();
     // Each event joins the boxes at most once.
-    used.try_reserve_exact(events.len())?;
+    used.reset(events.len())?;
     for (event, record) in events.iter_mut().zip(placed.iter_mut()) {
         if !event.takes_part() {
             continue;
@@ -209,11 +304,12 @@ pub(super) fn fix(
             record.clear();
         }
         if record.height > 0 {
-            insert(used, record.rect())?;
+            used.push(record.rect())?;
             let by = record.top.wrapping_sub(event.top);
             shift(event, images, by, frame_height);
         }
     }
+    used.sort(work)?;
     for (event, record) in events.iter_mut().zip(placed.iter_mut()) {
         if !event.takes_part() {
             continue;
@@ -222,7 +318,7 @@ pub(super) fn fix(
         if record.height != 0 {
             continue;
         }
-        let by = fit(event.rect(), used, event.moves_up)?;
+        let by = fit(event.rect(), used, event.moves_up, work)?;
         if by != 0 {
             shift(event, images, by, frame_height);
         }
@@ -235,4 +331,29 @@ pub(super) fn fix(
         };
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Rect, merge_sort};
+
+    fn tops(tops: [i32; 3]) -> [Rect; 3] {
+        tops.map(|y0| Rect {
+            y0,
+            ..Rect::default()
+        })
+    }
+
+    #[test]
+    fn tops_far_apart_sort_as_glibc_merges_them() {
+        // `cmp_rect_y0` wraps between the last box and the second, which
+        // then compares below it: glibc's merge sort leaves the order as it
+        // is, where sorting by value would move the last box first.
+        let mut boxes = tops([-2_147_482_658, 989, -2_147_482_736]);
+        merge_sort(&mut boxes, &mut [Rect::default(); 3]);
+        assert_eq!(boxes.map(|r| r.y0), [-2_147_482_658, 989, -2_147_482_736]);
+        let mut boxes = tops([30, 10, 20]);
+        merge_sort(&mut boxes, &mut [Rect::default(); 3]);
+        assert_eq!(boxes.map(|r| r.y0), [10, 20, 30]);
+    }
 }
