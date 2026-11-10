@@ -6,7 +6,8 @@ use crate::face::Face;
 use crate::ot::digest::Digest;
 use crate::ot::layout::{FeatureSubstitutions, LayoutTable};
 use crate::shapers::{Pause, Shaper};
-use crate::tag::{Direction, Language, Script, Tag};
+use crate::Language;
+use crate::tag::{Direction, Script, Tag};
 use crate::work;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
@@ -101,7 +102,11 @@ impl<'a> Builder<'a> {
             tables[0].default_substitutions(&mut work)?,
             tables[1].default_substitutions(&mut work)?,
         ];
-        let (script_tags, script_count) = script.ot_tags();
+        // A private-use script subtag replaces the script's own tags.
+        let (script_tags, script_count) = match language.script_tag() {
+            Some(tag) => ([tag; 3], 1),
+            None => script.ot_tags(),
+        };
         let mut builder = Self {
             tables,
             substitutions,

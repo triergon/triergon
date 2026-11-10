@@ -509,7 +509,7 @@ impl Shaper {
                 &shaper_face,
                 direction,
                 script,
-                &Language::new(std::str::from_utf8(code).unwrap_or("c"))?,
+                &Language::new(std::str::from_utf8(code).unwrap_or("c")),
                 &plan_features(features),
                 &self.budget,
             )?;

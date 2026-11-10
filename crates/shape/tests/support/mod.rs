@@ -355,7 +355,7 @@ pub fn shape_latin_within(
     let face = Face::new(&font);
     let scale = Scale::units(font.units_per_em());
     let metrics = OtMetrics::new(&font, scale);
-    let language = Language::new("en").expect("language");
+    let language = Language::new("en");
     let plan = Plan::new(
         &face,
         Direction::LeftToRight,
@@ -398,9 +398,7 @@ pub fn exercise(data: &[u8]) -> usize {
     let mut shaped = 0;
     for (text, script, direction) in TEXTS {
         let text: Vec<char> = text.chars().collect();
-        let Ok(language) = Language::new("en") else {
-            continue;
-        };
+        let language = Language::new("en");
         let Ok(plan) = Plan::new(
             &face,
             direction,

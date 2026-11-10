@@ -253,18 +253,15 @@ fn shape_texts(
     sink: &mut impl Sink,
 ) -> Result<()> {
     let face = Face::new(font);
-    let plan = Language::new(&settings.language).ok().and_then(|language| {
-        let (direction, script) = (settings.direction, settings.script);
-        Plan::new(
-            &face,
-            direction,
-            script,
-            &language,
-            &settings.features,
-            budget,
-        )
-        .ok()
-    });
+    let plan = Plan::new(
+        &face,
+        settings.direction,
+        settings.script,
+        &Language::new(&settings.language),
+        &settings.features,
+        budget,
+    )
+    .ok();
     for (t, argument) in settings.texts.iter().enumerate() {
         let Some((text, item)) = item(argument) else {
             sink.record(Record::TextError(t))?;
