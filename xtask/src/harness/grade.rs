@@ -1150,6 +1150,19 @@ mod tests {
                         "worker_hashes",
                         field(&identity, "binaries").unwrap().clone(),
                     ),
+                    (
+                        "warmups",
+                        Value::Array(
+                            ["candidate", "reference"]
+                                .map(|role| {
+                                    object(&[
+                                        ("worker", Value::str(role)),
+                                        ("result", field(&timed_raw[0], role).unwrap().clone()),
+                                    ])
+                                })
+                                .into(),
+                        ),
+                    ),
                     ("samples", Value::Array(timed_raw)),
                     ("timing_module_policy", Value::str(timing::MODULE_POLICY)),
                     ("timing_module_observations", Value::Array(observations)),
@@ -1802,6 +1815,18 @@ mod tests {
             }
             change(row, &[section], "samples", Value::Array(samples));
         }
+        let mut warmups = array(field(&fixture.timed, "timing").unwrap(), "warmups")
+            .unwrap()
+            .to_vec();
+        for warmup in &mut warmups {
+            change(warmup, &["result", "data"], "digest_b", Value::int(17));
+        }
+        change(
+            &mut fixture.timed,
+            &["timing"],
+            "warmups",
+            Value::Array(warmups),
+        );
         put(
             &mut fixture.expected,
             "expected",

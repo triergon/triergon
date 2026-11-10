@@ -533,20 +533,24 @@ mod tests {
                 ("status", Value::str("ok")),
                 (
                     "data",
-                    Value::object([("bytes", Value::int(188)), ("digest", Value::int(digest))]),
+                    Value::object([("bytes", Value::int(376)), ("digest", Value::int(digest))]),
                 ),
             ])
         };
-        Value::object([(
-            "warmups",
-            Value::Array(vec![
-                Value::object([
-                    ("worker", Value::str("candidate")),
-                    ("result", run(candidate_digest)),
+        Value::object([
+            // Two sessions of a 188-byte stream.
+            ("iterations", Value::int(2)),
+            (
+                "warmups",
+                Value::Array(vec![
+                    Value::object([
+                        ("worker", Value::str("candidate")),
+                        ("result", run(candidate_digest)),
+                    ]),
+                    Value::object([("worker", Value::str("reference")), ("result", run(0xff))]),
                 ]),
-                Value::object([("worker", Value::str("reference")), ("result", run(0xff))]),
-            ]),
-        )])
+            ),
+        ])
     }
 
     #[test]
