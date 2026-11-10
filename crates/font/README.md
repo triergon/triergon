@@ -328,12 +328,15 @@ composites) are
   its own and with `--benchmark` and `--memory` measures runtime and memory
   against FreeType. `font-dump` and `font-sized-dump` print the folded values as
   lines in both workers, for diffing a failing case.
-- The corpus includes four fonts the crate's test support writes
+- The corpus includes five fonts the crate's test support writes
   (`examples/authored-fonts.rs`): `seac`, the arithmetic, logic and storage operators,
   the flex forms, counter masks, subroutines nested twelve deep, curve operators with
   operand counts the format does not allow, a skewing FontMatrix with an offset,
-  one cmap subtable of each supported format, and a collection with a face for each
-  step of the text charmap selection. With them the
+  one cmap subtable of each common format, a collection with a face for each
+  step of the text charmap selection, and a CFF face with format 2 and 8 subtables,
+  glyph names of every form FreeType reads (with a variant, a repeated name and
+  `space` and `Delta`, which it maps twice) and a custom encoding with a
+  supplement, used by the font features only. With them the
   comparison exercises every charstring operator except `vsindex` (CFF2 fonts in the
   corpus do not use it) and `random`, every supported cmap format and every step of
   the text charmap selection; `examples/font-coverage.rs` reports the operators and
