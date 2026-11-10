@@ -3834,7 +3834,7 @@ fn range_player_keeps_the_active_seek_after_refusing_opus_recovery() {
             let request = Mp4NativeSeekRequest {
                 video,
                 timestamp,
-                limits: Default::default(),
+                limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
             };
             let error = match player.prepare_seek_with_opus_recovery(request, audio) {
                 Err(error) => error,
