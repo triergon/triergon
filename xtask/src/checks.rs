@@ -341,13 +341,55 @@ pub fn revisions(root: &Path) -> Result<String, Vec<String>> {
 }
 
 /// Distinct commit citations in their order of appearance, excluding external revisions.
-fn cited_revisions<'a>(mut text: &'a str, external: &[&str]) -> Vec<&'a str> {
+fn cited_revisions<'a>(text: &'a str, external: &[&str]) -> Vec<&'a str> {
     let mut cited = Vec::new();
+    let mut paragraph = 0;
+    let mut offset = 0;
+    for line in text.split_inclusive('\n') {
+        let end = offset + line.len();
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with(['#', '|']) {
+            cite_inline(&text[paragraph..offset], external, &mut cited);
+            if trimmed.starts_with('|') {
+                let mut start = 0;
+                for (pipe, _) in line
+                    .match_indices('|')
+                    .filter(|&(at, _)| !escaped(line, at))
+                {
+                    cite_inline(&line[start..pipe], external, &mut cited);
+                    start = pipe + 1;
+                }
+                cite_inline(&line[start..], external, &mut cited);
+            } else {
+                cite_inline(line, external, &mut cited);
+            }
+            paragraph = end;
+        }
+        offset = end;
+    }
+    cite_inline(&text[paragraph..], external, &mut cited);
+    cited
+}
+
+fn escaped(text: &str, offset: usize) -> bool {
+    text.as_bytes()[..offset]
+        .iter()
+        .rev()
+        .take_while(|&&byte| byte == b'\\')
+        .count()
+        % 2
+        != 0
+}
+
+fn cite_inline<'a>(mut text: &'a str, external: &[&str], cited: &mut Vec<&'a str>) {
     while let Some(open) = text.find('`') {
-        let start = &text[open..];
+        let start = &text[open + usize::from(escaped(text, open))..];
         let content = start.trim_start_matches('`');
         let width = start.len() - content.len();
         text = content;
+        if width == 0 {
+            continue;
+        }
 
         let mut search = content;
         while let Some(close) = search.find('`') {
@@ -372,7 +414,6 @@ fn cited_revisions<'a>(mut text: &'a str, external: &[&str]) -> Vec<&'a str> {
             break;
         }
     }
-    cited
 }
 
 fn git(root: &Path, args: &[&str]) -> Result<String, String> {
@@ -529,6 +570,31 @@ mod tests {
         assert_eq!(
             cited_revisions("`` unmatched before `abc1234`", &[]),
             ["abc1234"]
+        );
+    }
+
+    #[test]
+    fn escaped_openers_leave_later_citations_visible() {
+        assert_eq!(
+            cited_revisions(r"Literal \` marker. Measured at `deadbee`.", &[]),
+            ["deadbee"]
+        );
+        assert_eq!(cited_revisions(r"Slash \\`deadbee`.", &[]), ["deadbee"]);
+        assert_eq!(cited_revisions(r"Literal \```deadbee``.", &[]), ["deadbee"]);
+    }
+
+    #[test]
+    fn unclosed_delimiters_do_not_cross_status_blocks() {
+        let text = "Unclosed ` marker.\n \nMeasured at `deadbee`.\n\n\
+                    | Unclosed ` marker | `def1234` |\n\
+                    | Unclosed ` marker |\n| `abc1234` |";
+        assert_eq!(
+            cited_revisions(text, &[]),
+            ["deadbee", "def1234", "abc1234"]
+        );
+        assert_eq!(
+            cited_revisions("Measured at `\ndeadbee`.", &[]),
+            ["deadbee"]
         );
     }
 
