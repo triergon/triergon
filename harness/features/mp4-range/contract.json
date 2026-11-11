@@ -8,6 +8,7 @@
   "contract": [
     "open a preloaded regular or complete fragmented MP4 file through 32 KiB random-access input",
     "read AVC with AAC or Opus, regular dedicated HEVC/AAC entries or a regular dedicated AV1 entry through EOF in demux order",
+    "for AVC/AAC with RTP hint tracks, compare all selected audio and video packets at startup and after backward seek. The range player checks source extents for all tracks and excludes data tracks from edit projection, packet delivery and seek alignment",
     "compare the original sample-entry tag and decoder configuration bytes for dvh1, dvhe, dav1, Opus and QuickTime AAC",
     "compare six-channel QuickTime AAC in version-2 sound descriptions with a wave container, including a variant without optional frma and mp4a marker atoms and a 44.1 kHz variant with reordered AVC pictures",
     "compare fragmented QuickTime AVC/AAC with empty initialization sample tables and a version-1 sound description",
@@ -59,7 +60,9 @@
     "quicktime-aac-fragmented-open",
     "quicktime-aac-fragmented-seek",
     "quicktime-aac-7-1-open",
-    "quicktime-aac-7-1-seek"
+    "quicktime-aac-7-1-seek",
+    "rtp-hints-open",
+    "rtp-hints-seek"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

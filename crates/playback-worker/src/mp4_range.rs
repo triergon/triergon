@@ -2,6 +2,7 @@
 
 use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
+use triergon_core::container::MediaKind;
 use triergon_core::{
     Budget, BudgetVec, Bytes, InputCursor, Rounding, SourceCapabilities, SourceId, Time, TimeBase,
     WorkBudget,
@@ -164,6 +165,10 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
     let mut result = Work::default();
     for track in movie.tracks() {
         let header = track.header();
+        if triergon_isobmff::media_kind(&header.handler) == MediaKind::Data {
+            plans.try_push(None).map_err(|error| error.error)?;
+            continue;
+        }
         let table = track.table();
         let descriptions = table.descriptions();
         match (header.handler, descriptions) {
@@ -260,7 +265,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
     if audio.is_none() && tag != *b"dav1" {
         return Err("missing MP4 range audio track".into());
     }
-    let mut range = Mp4RangeOpen::new(movie, Some(plans.as_slice()), PlanLimits::default())?;
+    let mut range = Mp4RangeOpen::for_media(movie, Some(plans.as_slice()), PlanLimits::default())?;
     while !range.poll(&mut work(), &cancel)? {}
     let mut player = range.finish(
         opened.input,
