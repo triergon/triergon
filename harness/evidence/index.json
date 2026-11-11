@@ -17044,6 +17044,19 @@
    }
   },
   {
+   "name": "ass-collision-order-1d2ae4a0",
+   "path": "ass-collision-order-1d2ae4a0",
+   "retention": "retained",
+   "reason": "ASS collision order paragraph and table row: the collision boxes' top-down merge sort at 1d2ae4a0 on an r6g.2xlarge, natively on AArch64 and in the ARMv7 user space; the ASS gates and crate tests on both targets; the 5,722 generated scripts and fixture mutations rendered frame by frame through the renderer and libass; cargo xtask ass equivalence against 365affd2 with both sides' records, on ARMv7 also each side on one thread in its own process and each build's 4-thread records against its one-thread records; instruction counts of every ass-render and ass-render-host case against 365affd2; the scripts that ran them and a bundle of the measured commit.",
+   "key": "evidence/ass-collision-order-1d2ae4a0/e4e97db001bf538840edc2cbfb8db80c126aeb97df3edeb68cf7185b2fe4bd04.tar.gz",
+   "sha256": "e4e97db001bf538840edc2cbfb8db80c126aeb97df3edeb68cf7185b2fe4bd04",
+   "bytes": 15727298,
+   "source_revisions": {
+    "candidate": "1d2ae4a0287972ac3402bd2e717e5b7fdaa086ff",
+    "base": "365affd25711acfb0be0fbb087e932632e5edf5a"
+   }
+  },
+  {
    "name": "ass-render-parity-01ccb497",
    "path": "ass-render-parity-01ccb497",
    "retention": "retained",

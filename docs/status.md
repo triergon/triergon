@@ -211,6 +211,18 @@ merged at `642316cf260e427f8d2044adc2253e427dd13d2a`; that earlier set also hold
 libass's collision sort, the conversions GCC compiles for each target, and libass for ARMv7
 against libass for AArch64 where it runs out of memory.
 
+The collision boxes' top-down merge sort at `1d2ae4a0287972ac3402bd2e717e5b7fdaa086ff` passes the
+same comparison and tests on both targets, and its instructions on every `ass-render` and
+`ass-render-host` case are within 0.02% of its parent's. The generated scripts and mutations
+differ against libass for AArch64 in the same 115 scripts and 1 mutation, and against libass for
+ARMv7 in 49 scripts and no mutation: the 50 above but `random-9675`, one of the 4 where libass
+for ARMv7 departs near the end of its address space, which it renders as the renderer does in
+that run. Against its parent, `cargo xtask ass equivalence --random 5182` records every frame
+alike on AArch64; on ARMv7 3 cases differ with each side on one thread in its own process, and
+124 on 4 threads, every one at a frame that one side or both refuse for storage at the end of
+the 32-bit address space, as the same build differs from itself in 128 and 131 cases between
+4 threads and one.
+
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
 | Matroska / WebM | `0e28298d038bea072629b3bad6389dcc806b4861` | `a20dcbbe804bfd21ee631cc42f61466d2400d5115abb8ea97dd243ef733ba74f` |
@@ -288,6 +300,7 @@ against libass for AArch64 where it runs out of memory.
 | ARMv7: ASS parsing | `21642833a1c1f4d8e587a5c5bc903910f215428e` | `c039ca3e2cb63255140973528ddd22cc7e96b32e5254d22ea4f954011822a35d` |
 | ASS rendering runtime and memory, Linux AArch64 and ARMv7 | `5b3e03f0e9410853152043d033b4f4d757e98a40` | `632964773b8ca4cbd5b2b3c09a2b6ddeafdaeeaff56588ea345bae8550012bb7` |
 | Earlier: ASS rendering memory against the instrumented libass build, Linux AArch64 | `e6de7e70827bb930a8ef9e5cb4d30b1e4e7d0727` | `799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3` |
+| ASS collision order: comparison, generated scripts and equivalence, Linux AArch64 and ARMv7 | `1d2ae4a0287972ac3402bd2e717e5b7fdaa086ff` | `e4e97db001bf538840edc2cbfb8db80c126aeb97df3edeb68cf7185b2fe4bd04` |
 | ASS rendering comparison and generated scripts, Linux AArch64 and ARMv7 | `01ccb49792cf1d4d05b74addf35dc616763b88e0` | `c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be` |
 | Earlier: ASS rendering parity, Linux AArch64 and ARMv7 | `28e5ccf0ecb5419f7105d52c91ebe8d6c09f053c` | `bc26dfc21b141cc79b5bb4f8cb3d636dcfaa3f64fa24eec2d200409eff0c32f0` |
 | Earlier: ASS rendering comparison and generated scripts, Linux AArch64 and ARMv7 | `fedfb790bfb52131389cb7c5134bab7ab813b55f` | `f10a94cf995ed49ac8e9befda3441efcf3c900a984105b1385c3d34444418d1f` |

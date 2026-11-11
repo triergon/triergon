@@ -358,10 +358,14 @@ with NaN as 0, also where libass's `long` is 64 bits wide. Collision handling
 sorts the boxes placed so far as libass does on glibc: `qsort` with
 `cmp_rect_y0`, which subtracts their tops in `int` and so overflows, undefined
 in C and wrapping as GCC builds it, for tops 2³¹ or more apart, run as glibc's
-stable merge sort. While the tops lie closer the crate orders them by value,
-keeping equal tops in the order they were placed in; otherwise it runs glibc's
-merge sort step for step. Another C library's `qsort` may order such boxes, or
-equal tops, differently. No fixture of `ass-render` converts out of range or
+stable merge sort. While the tops lie closer that comparison is a total
+preorder and the crate orders them by value, keeping equal tops in the order
+they were placed in. Farther apart it is not transitive, and the order
+depends on which pairs the sort compares: the crate sorts with a top-down
+merge sort that sorts the first half, of the length halved and rounded down,
+and then the rest, and merges them stably, which orders such boxes as libass
+does on glibc. Another C library's `qsort` may order them, or equal tops,
+differently. No fixture of `ass-render` converts out of range or
 places boxes that far apart.
 
 libass's renderer also overflows `int`, undefined in C, where it doubles an
