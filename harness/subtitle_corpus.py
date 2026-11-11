@@ -15,6 +15,10 @@
         subtitle-pgs-capsules), each case's expected fold recorded by running the
         reference worker REFERENCE on it.
 
+    subtitle_corpus.py record subtitle-text-host REFERENCE TARGET
+        Record each subtitle-text-host case's fold for target triple TARGET with
+        the reference worker REFERENCE built for it, keeping the other targets'.
+
 Run from the repository root. Every input is authored-synthetic and already in
 the repository or derived byte for byte from repository fixtures.
 """
@@ -262,11 +266,12 @@ def authored():
         write("ass", name, capsule(2, b"", [open_op(num, den), packet_op(pts, duration, packet)]))
     for name, (label, packet) in SINGLE_BYTE_PACKETS.items():
         write("charset", name, capsule(2, label, [open_op(num, den), packet_op(pts, duration, packet)]))
-    for name, text in DOCUMENTS.items():
-        path = OUT / "documents" / f"{name}.{name.split('-')[0]}"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(text if isinstance(text, bytes) else text.encode())
-    return len(ASS_PACKETS) + len(SINGLE_BYTE_PACKETS) + len(DOCUMENTS)
+    for directory, documents in [("documents", DOCUMENTS), ("host", HOST_DOCUMENTS)]:
+        for name, text in documents.items():
+            path = OUT / directory / f"{name}.{name.split('-')[0]}"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(text if isinstance(text, bytes) else text.encode())
+    return len(ASS_PACKETS) + len(SINGLE_BYTE_PACKETS) + len(DOCUMENTS) + len(HOST_DOCUMENTS)
 
 
 def documents():
@@ -288,14 +293,40 @@ def text_inputs():
     yield from documents()
 
 
+# Documents whose time fields leave the 32-bit range, which FFmpeg reads
+# differently by target: the cases of subtitle-text-host, pinned per target.
+HOST_FIELDS = [
+    "2147483648", "4294967295", "4294967296", "4294967297", "9223372036854775808",
+    "18446744073709551615", "18446744073709551616", "99999999999999999999",
+    "-2147483649", "-4294967297",
+]
+HOST_DOCUMENTS = {
+    **{f"srt-hours-{field.replace('-', 'minus-')}": f"1\n{field}:00:01,000 --> 00:00:02,000\nA\n\n" for field in HOST_FIELDS},
+    **{f"srt-seconds-{field.replace('-', 'minus-')}": f"1\n00:00:{field},000 --> 00:00:02,000\nA\n\n" for field in HOST_FIELDS},
+    **{f"vtt-seconds-{field}": f"WEBVTT\n\n00:{field}.000 --> 00:02.000\nA\n\n"
+       for field in ["4294967296", "4294967297", "9223372036854775808"]},
+}
+
+
+def host_inputs():
+    for name in HOST_DOCUMENTS:
+        kind = name.split("-")[0]
+        path = (OUT / "host" / f"{name}.{kind}").relative_to(ROOT)
+        yield name, kind, str(path), [kind]
+
+
 def pgs_inputs():
     for path in sorted(PGS.glob("*/input.bin")):
         yield path.parent.name, path.parent.name.split("--")[0], str(path.relative_to(ROOT)), []
 
 
-def record(feature, reference):
-    inputs = text_inputs() if feature == "subtitle-text" else pgs_inputs()
-    prefix = "subtitle-text-" if feature == "subtitle-text" else "pgs-"
+def record(feature, reference, target=None):
+    inputs = {"subtitle-text": text_inputs, "subtitle-text-host": host_inputs}.get(feature, pgs_inputs)()
+    prefix = "subtitle-text-" if feature.startswith("subtitle-text") else "pgs-"
+    path = ROOT / "harness/features" / feature / "corpus.json"
+    earlier = {}
+    if target is not None and path.exists():
+        earlier = {case["id"]: case["expected_by_target"] for case in json.loads(path.read_text())["cases"]}
     cases = []
     for case_id, group, file, arguments in inputs:
         result = subprocess.run(
@@ -304,19 +335,22 @@ def record(feature, reference):
         fold = json.loads(result.stdout.decode().strip().splitlines()[-1])
         if fold.get("eof") is not True:
             raise SystemExit(f"{case_id}: reference did not reach the end")
-        cases.append(
-            {
-                "id": case_id,
-                "profile": case_id,
-                "group": group,
-                "file": file,
-                "sha256": hashlib.sha256((ROOT / file).read_bytes()).hexdigest(),
-                "rights": "authored-synthetic",
-                "arguments": arguments,
-                "expected": {key: fold[key] for key in ["packets", "bytes", "digest"]},
-            }
-        )
-    path = ROOT / "harness/features" / feature / "corpus.json"
+        expected = {key: fold[key] for key in ["packets", "bytes", "digest"]}
+        case = {
+            "id": case_id,
+            "profile": case_id,
+            "group": group,
+            "file": file,
+            "sha256": hashlib.sha256((ROOT / file).read_bytes()).hexdigest(),
+            "rights": "authored-synthetic",
+            "arguments": arguments,
+        }
+        if target is None:
+            case["expected"] = expected
+        else:
+            pins = dict(earlier.get(case_id, {}), **{target: expected})
+            case["expected_by_target"] = dict(sorted(pins.items()))
+        cases.append(case)
     path.write_text(json.dumps({"schema": 1, "directory": ".", "cases": cases}, indent=2) + "\n")
     print(f"{feature}: {len(cases)} cases")
 
@@ -325,8 +359,10 @@ def main():
     if len(sys.argv) == 3 and sys.argv[1] == "capsules":
         counts = [mov_text(), tx3g(sys.argv[2]), charset(), ass(), authored()]
         print("mov-text %d, tx3g %d, charset %d, ass %d, authored %d" % tuple(counts))
-    elif len(sys.argv) == 4 and sys.argv[1] == "record":
+    elif len(sys.argv) == 4 and sys.argv[1] == "record" and sys.argv[2] != "subtitle-text-host":
         record(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) == 5 and sys.argv[1] == "record" and sys.argv[2] == "subtitle-text-host":
+        record(sys.argv[2], sys.argv[3], sys.argv[4])
     else:
         raise SystemExit(__doc__)
 

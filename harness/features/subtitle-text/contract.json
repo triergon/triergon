@@ -10,7 +10,7 @@
     "82 mov_text cases from crates/subtitles/tests/native-mov-text-fixtures and the samples the 79 tx3g semantic tests build, as decoder sessions: compat::mov_text::Decoder on the candidate, FFmpeg's mov_text decoder on the reference, with the case's extradata, packet time base, frame size, clock and flushes",
     "each mov_text call folds its return value and the complete subtitle: format, PTS in microseconds, display window, rectangle type, geometry, flags, colours and ASS text",
     "74 recorded charset receiver cases and 6 single-byte charset cases as labelled ASS packets, and 17 ASS packets without a label, as decoder sessions: compat::ass::Decoder on the candidate, with the glibc repertoire for a label, FFmpeg's ass decoder with sub_charenc on the reference; each folds the header bytes and the published text with its PTS in microseconds and duration in milliseconds",
-    "34 SubRip and 26 WebVTT documents authored for the demuxers' rules and the 14 SubRip and 18 WebVTT documents of the text fixtures, through compat::document::Reader on the candidate and FFmpeg's srt and webvtt demuxers on the reference, folding every cue's start and duration in milliseconds, its text and the WebVTT identifier and settings, then whether the document was read",
+    "37 SubRip and 27 WebVTT documents authored for the demuxers' rules and the 14 SubRip and 18 WebVTT documents of the text fixtures, through compat::document::Reader on the candidate and FFmpeg's srt and webvtt demuxers on the reference, folding every cue's start and duration in milliseconds, its text and the WebVTT identifier and settings, then whether the document was read",
     "capsules and authored documents are written by harness/subtitle_corpus.py; the expected fold is recorded independently from the reference worker"
   ],
   "required_profiles": [
@@ -370,7 +370,8 @@
     "vtt-repeat-dropped"
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
   ],
   "iterations": 2000,
   "minimum_pairs": 30,
