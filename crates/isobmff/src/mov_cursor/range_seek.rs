@@ -165,12 +165,7 @@ impl<'a> PacketCursor<'a> {
     /// The cursor must be exhausted and rewound before using the restarts.
     pub fn enable_range_seek_checkpoints(&mut self) {
         if matches!(self.phase, Phase::Media) && self.complete_source && !self.front_source {
-            if self.projection.is_all() {
-                self.initialize_range_seek_checkpoints();
-            } else {
-                // Allocate checkpoint slots after validating and projecting the tracks.
-                self.recording_seek_checkpoints = true;
-            }
+            self.recording_seek_checkpoints = true;
         }
     }
 

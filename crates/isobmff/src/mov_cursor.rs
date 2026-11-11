@@ -1226,9 +1226,6 @@ impl<'a> PacketCursor<'a> {
                         if !projection.is_all() {
                             // The clock pass charged one unit for visiting each slot.
                             projection.retain(&mut self.slots);
-                            if self.recording_seek_checkpoints {
-                                self.initialize_range_seek_checkpoints();
-                            }
                         }
                         self.at = 0;
                         self.phase = Phase::Initialize;
@@ -1257,6 +1254,10 @@ impl<'a> PacketCursor<'a> {
                 }
                 Phase::Initialize => {
                     if self.at == self.slots.len() {
+                        if self.recording_seek_checkpoints {
+                            // Reserve optional restarts after initializing the required cursors.
+                            self.initialize_range_seek_checkpoints();
+                        }
                         self.at = 0;
                         self.phase = if self.check_projections {
                             Phase::CheckProjections

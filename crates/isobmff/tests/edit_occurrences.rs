@@ -260,31 +260,38 @@ fn rewinding_checked_edits_reuses_the_reserved_cursor() {
         media_base,
         edits: Some((&edits, movie_base)),
     }];
-    let mut cursor = PacketCursor::new_complete_source(
-        &pool,
-        &tracks,
-        &media,
-        PacketLimits::default(),
-        DemuxProfile::NoParseNoFillin,
-    )
-    .unwrap();
-    let cancel = AtomicBool::new(false);
-    cursor.check_projections_before_replay().unwrap();
-    let mut work = WorkBudget::new(4096);
-    assert_eq!(cursor.poll(&mut work, &cancel), Ok(CursorStatus::End));
+    for only_required_storage in [false, true] {
+        let mut cursor = PacketCursor::new_complete_source(
+            &pool,
+            &tracks,
+            &media,
+            PacketLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+        )
+        .unwrap();
+        let cancel = AtomicBool::new(false);
+        let _reserve_for_open = only_required_storage.then(|| {
+            pool.reserve(pool.available() - size_of::<EditCursor<'_>>())
+                .unwrap()
+        });
+        cursor.enable_range_seek_checkpoints();
+        cursor.check_projections_before_replay().unwrap();
+        let mut work = WorkBudget::new(4096);
+        assert_eq!(cursor.poll(&mut work, &cancel), Ok(CursorStatus::End));
 
-    let _reservation = pool.reserve(pool.available()).unwrap();
-    cursor.rewind_at_end().unwrap();
-    for (&ordinal, &dts) in probe.samples.iter().zip(probe.dts) {
-        assert_eq!(cursor.poll(&mut work, &cancel), Ok(CursorStatus::Ready));
-        let packet = cursor.take_occurrence().unwrap();
-        assert_eq!(
-            (packet.source.ordinal, packet.demux.dts),
-            (ordinal, Some(dts))
-        );
+        let _reservation = pool.reserve(pool.available()).unwrap();
+        cursor.rewind_at_end().unwrap();
+        for (&ordinal, &dts) in probe.samples.iter().zip(probe.dts) {
+            assert_eq!(cursor.poll(&mut work, &cancel), Ok(CursorStatus::Ready));
+            let packet = cursor.take_occurrence().unwrap();
+            assert_eq!(
+                (packet.source.ordinal, packet.demux.dts),
+                (ordinal, Some(dts))
+            );
+        }
+        assert_eq!(cursor.poll(&mut work, &cancel), Ok(CursorStatus::End));
+        assert_eq!(pool.available(), 0);
     }
-    assert_eq!(cursor.poll(&mut work, &cancel), Ok(CursorStatus::End));
-    assert_eq!(pool.available(), 0);
 }
 
 #[test]
