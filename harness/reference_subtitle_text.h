@@ -1,5 +1,5 @@
 /* Own reference tooling: text subtitles through public FFmpeg APIs, the same
- * operations as subtitle-capsule-worker's subtitle-text- modes.
+ * operations as subtitle-worker's subtitle-text- modes.
  *
  * - packets: a session capsule (TRSTXT01) of decoder opens, packets and flushes
  *   through the mov_text or ass decoder and avcodec_decode_subtitle2, with the
@@ -303,9 +303,8 @@ done:
     }
 }
 
-/* subtitle-text-fold FILE KIND [ENCODING] | subtitle-text-bench FILE N KIND [ENCODING] |
- * subtitle-text-memory FILE KIND [ENCODING]. The SubRip and WebVTT demuxers detect a
- * UTF-16 byte-order mark themselves; the stated encoding is the candidate's input. */
+/* subtitle-text-fold FILE KIND | subtitle-text-bench FILE N KIND |
+ * subtitle-text-memory FILE KIND; KIND is packets, srt or vtt. */
 static int text_main(int argc, char **argv, const uint8_t *bytes, long size)
 {
     const int bench = !strcmp(argv[1], "subtitle-text-bench");
@@ -313,7 +312,7 @@ static int text_main(int argc, char **argv, const uint8_t *bytes, long size)
     if (!bench && !memory && strcmp(argv[1], "subtitle-text-fold"))
         return 2;
     const int first = bench ? 4 : 3;
-    if (argc < first + 1 || argc > first + 2 || size < 0)
+    if (argc != first + 1 || size < 0)
         return 2;
     unsigned long iterations = 1;
     if (bench) {
@@ -330,7 +329,7 @@ static int text_main(int argc, char **argv, const uint8_t *bytes, long size)
      * add stdio inside the measured window. */
     av_log_set_level(AV_LOG_QUIET);
     static TextSession session;
-    if (packets && (argc != first + 1 || text_parse(bytes, (size_t)size, &session) < 0)) {
+    if (packets && text_parse(bytes, (size_t)size, &session) < 0) {
         text_free(&session);
         fprintf(stderr, "reference: not a subtitle text capsule\n");
         return 2;

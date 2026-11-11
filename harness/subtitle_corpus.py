@@ -2,12 +2,13 @@
 """Author the subtitle runners' inputs and record their expected folds.
 
     subtitle_corpus.py capsules TX3G_SAMPLES
-        Write the subtitle-text session capsules under
-        harness/fixtures/subtitle-text/ from repository fixtures: the captured
-        mov_text cases, the samples the tx3g semantic tests build (recorded with
+        Write the subtitle-text inputs under harness/fixtures/subtitle-text/:
+        session capsules from repository fixtures (the captured mov_text cases,
+        the samples the tx3g semantic tests build, recorded with
         TRIERGON_TX3G_SAMPLES=TX3G_SAMPLES, see
-        crates/subtitles/tests/text_tx3g_semantics.rs), the recorded charset
-        receiver cases and the authored ASS packets.
+        crates/subtitles/tests/text_tx3g_semantics.rs, the recorded charset
+        receiver cases and the ASS packets of the text fixtures), and the ASS
+        packets and SubRip and WebVTT documents authored here.
 
     subtitle_corpus.py record FEATURE REFERENCE
         Write harness/features/FEATURE/corpus.json (subtitle-text or
@@ -37,44 +38,98 @@ ASS_CLOCK = (1, 1000, 1000, 2000)
 TX3G_CLOCK = (1, 90000, 0, 135000)
 
 
-EMPTY = (
-    "an empty packet is an event in Triergon (text README, Behaviour and limits); "
-    "avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
-)
-OPAQUE = (
-    "the opaque ASS profile (OpaqueAss1) carries the packet bytes unvalidated and unconverted; "
-    "the reference refuses decoded text that is not UTF-8"
-)
-STRICT_SRT = "the strict SubRip profile (SubRipStrict1) refuses {}; the srt demuxer accepts it"
-REFUSED_VTT = "the strict WebVTT profile (WebVttSourceStrict1) refuses {}; the webvtt demuxer reports an empty document"
-# Cases where Triergon and the reference differ, with the cause. They stay in the
-# corpus as failures.
-DIFFERENCES = {
-    **{f"charset-{label}-empty": EMPTY for label in ["big5", "cp932", "cp949", "cp950", "euc-kr", "gbk", "shift_jis"]},
-    "ass-ass-empty-not-clear": EMPTY,
-    "ass-ass-invalid-utf8-unvalidated": OPAQUE,
-    "ass-ass-unknown-charset-opaque": OPAQUE,
-    "srt-crlf-multiline": "Triergon keeps CRLF line ends in cue text (no line-ending rewriting); the srt demuxer rewrites them to LF",
-    "srt-utf16be-bom": (
-        "the reference's UTF-16 SubRip reader keeps one byte of the first character of the cue text "
-        "(U+00C5 becomes 0xC3); Triergon decodes the character. Only the comparison-only "
-        "reference_trace::carriage view reproduces the reference"
-    ),
-    "srt-explicit-utf16be": "the caller states UTF-16BE without a byte-order mark; the srt demuxer has no stated encoding and reads no cue",
-    "srt-end-before-start": STRICT_SRT.format("an end time before the start time"),
-    "srt-sequence-missing": STRICT_SRT.format("a cue without its number"),
-    "srt-fraction-width": STRICT_SRT.format("a two-digit millisecond field"),
-    "srt-overlong-utf8": STRICT_SRT.format("an overlong UTF-8 sequence"),
-    "srt-lone-surrogate": "Triergon refuses a lone UTF-16 surrogate; the srt demuxer reads no cue and reports success",
-    "vtt-cr-lines": "WebVTT allows CR line ends and Triergon reads the cue; the webvtt demuxer finds no cue",
-    "vtt-bad-signature": REFUSED_VTT.format("a signature line other than WEBVTT"),
-    "vtt-utf16-refused": REFUSED_VTT.format("a UTF-16 document"),
-    "vtt-missing-fraction": REFUSED_VTT.format("a timestamp without milliseconds"),
-    "vtt-zero-interval-strict": "the strict WebVTT profile refuses a zero-length cue; the webvtt demuxer keeps it",
-    "vtt-surrogate-utf8": "Triergon refuses an encoded surrogate as invalid UTF-8; the webvtt demuxer passes the bytes through",
+# ASS packets authored here, each a capsule with the clock of the others: the
+# decode call's UTF-8 check, which stops at the first NUL and refuses U+FFFE.
+ASS_PACKETS = {
+    "utf8-after-nul": b"0,0,Default,,0,0,0,,A\x00\xff",
+    "nul-only": b"\x00",
+    "overlong": b"0,0,Default,,0,0,0,,\xc0\x80",
+    "surrogate": b"0,0,Default,,0,0,0,,\xed\xa0\x80",
+    "above-unicode": b"0,0,Default,,0,0,0,,\xf4\x90\x80\x80",
+    "largest-scalar": b"0,0,Default,,0,0,0,,\xf4\x8f\xbf\xbf",
+    "noncharacter-fffe": b"0,0,Default,,0,0,0,,\xef\xbf\xbe",
+    "noncharacter-ffff": b"0,0,Default,,0,0,0,,\xef\xbf\xbf",
+    "truncated": b"0,0,Default,,0,0,0,,\xe6\xb0",
 }
 
+T1 = "00:00:01,000 --> 00:00:02,000"
+T2 = "00:00:03,000 --> 00:00:04,000"
+V1 = "00:01.000 --> 00:02.000"
+V2 = "00:03.000 --> 00:04.000"
 
+
+def utf16be(text):
+    return b"\xfe\xff" + text.encode("utf-16-be")
+
+
+def utf16le(text):
+    return b"\xff\xfe" + text.encode("utf-16-le")
+
+
+# Documents authored here, one per rule of the srt and webvtt demuxers that
+# the documents of the text fixtures do not reach.
+DOCUMENTS = {
+    "srt-sorted": f"1\n00:00:05,000 --> 00:00:06,000\nB\n\n2\n{T1}\nA\n\n",
+    "srt-equal-start-order": f"1\n00:00:01,000 --> 00:00:03,000\nA\n\n2\n{T1}\nB\n\n",
+    "srt-lines-before-first-cue": f"garbage\n1\n{T1}\nA\n\n",
+    "srt-text-across-blank-lines": f"1\n{T1}\nA\n\n\n\nB\n\ngarbage\n2\n{T2}\nC\n\n",
+    "srt-number-without-blank-line": f"1\n{T1}\nA\n2\n{T2}\nB\n\n",
+    "srt-number-blank-then-timing": f"1\n{T1}\nA\n\n2\n\n{T2}\nB\n\n",
+    "srt-number-prefix": f"1\n{T1}\nA\n3a\n{T2}\nB\n",
+    "srt-negative-number-is-text": f"1\n{T1}\nA\n-3\n{T2}\nB\n",
+    "srt-number-not-last-is-text": f"1\n{T1}\nA\n42\nB\n\n",
+    "srt-only-line-whole-number": f"1\n{T1}\n100\n{T2}\nB\n",
+    "srt-only-line-number-prefix": f"1\n{T1}\n100:5\n{T2}\nB\n",
+    "srt-empty-cue-dropped": f"1\n{T1}\n1\n{T2}\nB\n\n",
+    "srt-coordinates": f"1\n{T1}  X1:10 X2:20 Y1:5 Y2:6\nA\n\n",
+    "srt-short-fields": "1\n0:0:1,5 --> 0:0:2,25\nA\n\n",
+    "srt-unbounded-fields": "1\n00:61:01,000 --> 00:00:02,000\nA\n\n",
+    "srt-wide-fraction": "1\n00:00:01,1234 --> 00:00:02,000\nA\n\n",
+    "srt-dot-separator": "1\n00:00:01.000 --> 00:00:02.000\nA\n\n",
+    "srt-no-space-around-arrow": "1\n  00:00:01,000-->00:00:02,000\nA\n\n",
+    "srt-signed-fields": "1\n-00:00:01,000 --> +00:00:02,000\nA\n\n",
+    "srt-no-fraction": "1\n00:00:01 --> 00:00:02\nA\n\n",
+    "srt-single-dash": "1\n00:00:01,000 -> 00:00:02,000\nA\n\n",
+    "srt-cr-lines": f"1\r{T1}\rA\r\r",
+    "srt-no-final-line-end": f"1\n{T1}\nA",
+    "srt-nul-ends-document": f"1\n{T1}\nA\n\n2\n{T2}\nB\x00C\n\n",
+    "srt-nul-in-only-line": f"1\n{T1}\nA\x00B\n\n",
+    "srt-duration-wraps": "1\n00:00:00,000 --> 999:00:00,000\nA\n\n",
+    "srt-negative-duration-until-next": f"1\n00:00:05,000 --> 00:00:04,000\nA\n\n2\n00:00:07,000 --> 00:00:08,000\nB\n\n3\n00:00:06,000 --> 00:00:06,500\nC\n\n",
+    "srt-negative-duration-last": "1\n00:00:10,000 --> 00:00:04,000\nA\n\n2\n00:00:05,000 --> 00:00:06,000\nB\n\n",
+    "srt-zero-duration-kept": f"1\n00:00:05,000 --> 00:00:05,000\nA\n\n2\n{T2}\nB\n\n",
+    "srt-utf16-line-start-cut": utf16be(f"1\n{T1}\n\u00c5x\n\u00c6y\n\n"),
+    "srt-utf16-crlf-no-cut": utf16be(f"1\r\n{T1}\r\n\u00c5x\r\n\u00c6y\r\n\r\n"),
+    "srt-utf16-cr-cut": utf16le(f"1\r{T1}\r\u6c34x\r\u00c6y\r\r"),
+    "srt-utf16-blank-line-pairs": utf16be(f"1\n{T1}\nA\n\n\u00c5\n\n\n\u00c6\r\n\n\u00c7\n\n"),
+    "srt-utf16-surrogate-ends": utf16be(f"1\n{T1}\nA\nB") + b"\xdc\x00\x00C",
+    "vtt-sorted": f"WEBVTT\n\n00:05.000 --> 00:06.000\nB\n\n{V1}\nA\n\n",
+    "vtt-header-without-blank-line": f"WEBVTT\n{V1}\nA\n\n",
+    "vtt-no-header": f"{V1}\nA\n\n{V2}\nB\n\n",
+    "vtt-two-identifier-lines": f"WEBVTT\n\na\nb\n{V1}\nA\n\n",
+    "vtt-skipped-block-prefixes": f"WEBVTT\n\nNOTEX\n\nSTYLES\n\nWEBVTT\n{V1}\nA\n\n{V2}\nB\n\n",
+    "vtt-byte-order-mark-not-skipped": f"\ufeff{V1}\nA\n\n",
+    "vtt-short-fraction": "WEBVTT\n\n00:01.12 --> 00:02.000\nA\n\n",
+    "vtt-three-digit-hours": "WEBVTT\n\n001:00:01.000 --> 001:00:02.000\nA\n\n",
+    "vtt-comma-fraction": "WEBVTT\n\n00:01,000 --> 00:02,000\nA\n\n",
+    "vtt-arrow-on-later-line": f"WEBVTT\n\nid\n00:01.000 x\ny --> 00:02.000 s\nA\n\n",
+    "vtt-end-on-next-line": "WEBVTT\n\n00:01.000 -->\n00:02.000 s\nA\n\n",
+    "vtt-settings-after-end-word": "WEBVTT\n\n00:01.000 --> 00:02.000x  s\nA\n\n00:03.000 --> 99:+1. 7\nB\n\n",
+    "vtt-settings-end-at-cr": "WEBVTT\n\n00:01.000 --> 00:02.000 a\rb\nA\n\n",
+    "vtt-timing-in-payload": f"WEBVTT\n\n{V1}\nA\n{V2}\nB\n\n",
+    "vtt-empty-payload": f"WEBVTT\n\n{V1}\n\n{V2}\nB\n\n",
+    "vtt-cr-cr-lf-ends-block": f"WEBVTT\n\n{V1}\nA\r\r\nB\n{V2}\nC\n\n",
+    "vtt-cr-then-crlf-ends-block": f"WEBVTT\rX\r\n{V1}\nA\rB\r\n{V2}\nC\n\n",
+    "vtt-lone-cr-kept": f"WEBVTT\n\n{V1}\nA\rB\nC\r\n\rD\n\n",
+    "vtt-cr-only-lines": f"WEBVTT\n\n{V1}\nA\n\r\r\n{V2}\nB\n\n",
+    "vtt-leading-line-breaks-skipped": f"WEBVTT\n\n\r\rid\n{V1}\nA\n\n",
+    "vtt-nul-ends-block": f"WEBVTT\n\n{V1}\nA\n\x00\n{V2}\nB\n\n",
+    "vtt-nul-mid-line": f"WEBVTT\n\n{V1}\nA\x00B\n\n{V2}\nC\n\n",
+    "vtt-nul-starts-identifier": f"WEBVTT\n\n{V1}\nA\n\x00X\n{V2}\nC\n\n",
+    "vtt-nul-after-block-ends-document": f"WEBVTT\n\n{V1}\nA\n\n\x00\n\n{V2}\nB\n\n",
+    "vtt-negative-duration-until-next": "WEBVTT\n\n00:05.000 --> 00:04.000\nA\n\n00:10.000 --> 00:11.000\nB\n\n",
+    "vtt-long-duration": "WEBVTT\n\n00:00.000 --> 999:00:00.000\nA\n\n",
+}
 def capsule(codec, label, ops):
     out = bytearray(b"TRSTXT01")
     out += struct.pack(">BH", codec, len(label)) + label
@@ -183,14 +238,28 @@ def ass():
     return count
 
 
+def authored():
+    num, den, pts, duration = ASS_CLOCK
+    for name, packet in ASS_PACKETS.items():
+        write("ass", name, capsule(2, b"", [open_op(num, den), packet_op(pts, duration, packet)]))
+    for name, text in DOCUMENTS.items():
+        path = OUT / "documents" / f"{name}.{name.split('-')[0]}"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(text if isinstance(text, bytes) else text.encode())
+    return len(ASS_PACKETS) + len(DOCUMENTS)
+
+
 def documents():
     manifest = json.loads((TEXT / "manifest.json").read_text())
-    names = {"Utf8": "utf8", "Utf16Bom": "utf16-bom", "Utf16Be": "utf16be", "Utf16Le": "utf16le"}
     kinds = {"SubRip": "srt", "WebVtt": "vtt"}
     for case in manifest["cases"]:
         if case["format"] in kinds:
             path = (TEXT / case["input"]).relative_to(ROOT)
-            yield case["id"], kinds[case["format"]], str(path), [kinds[case["format"]], names[case["encoding"]]]
+            yield case["id"], kinds[case["format"]], str(path), [kinds[case["format"]]]
+    for name in DOCUMENTS:
+        kind = name.split("-")[0]
+        path = (OUT / "documents" / f"{name}.{kind}").relative_to(ROOT)
+        yield name, kind, str(path), [kind]
 
 
 def text_inputs():
@@ -228,8 +297,6 @@ def record(feature, reference):
                 "expected": {key: fold[key] for key in ["packets", "bytes", "digest"]},
             }
         )
-        if case_id in DIFFERENCES:
-            cases[-1]["difference"] = DIFFERENCES[case_id]
     path = ROOT / "harness/features" / feature / "corpus.json"
     path.write_text(json.dumps({"schema": 1, "directory": ".", "cases": cases}, indent=2) + "\n")
     print(f"{feature}: {len(cases)} cases")
@@ -237,8 +304,8 @@ def record(feature, reference):
 
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "capsules":
-        counts = [mov_text(), tx3g(sys.argv[2]), charset(), ass()]
-        print("mov-text %d, tx3g %d, charset %d, ass %d" % tuple(counts))
+        counts = [mov_text(), tx3g(sys.argv[2]), charset(), ass(), authored()]
+        print("mov-text %d, tx3g %d, charset %d, ass %d, authored %d" % tuple(counts))
     elif len(sys.argv) == 4 and sys.argv[1] == "record":
         record(sys.argv[2], sys.argv[3])
     else:

@@ -6,7 +6,7 @@ use super::{
 };
 use crate::text::{Input, unicode::cancelled};
 use std::{fmt::Write, sync::atomic::AtomicBool};
-use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 const INVALID_DATA: i32 = -1094995529;
 #[derive(Debug, Clone, Copy)]
@@ -538,30 +538,12 @@ impl PacketJob {
     }
     pub(super) fn take_output(mut self, options: Options) -> Result<Output> {
         let subtitle = if self.returned > 0 && self.advance {
-            let pts = self
-                .clock
-                .pts
-                .filter(|&p| p != i64::MIN)
-                .and_then(|pts| options.packet_timebase.map(|b| rescale(pts, b, 1_000_000)))
-                .filter(|&p| p != i64::MIN);
-            let duration = self
-                .clock
-                .duration
-                .filter(|&d| d != 0)
-                .and_then(|d| options.packet_timebase.map(|b| rescale(d, b, 1000)))
-                .unwrap_or(0);
-            let end = u32::try_from((duration as u64) & u64::from(u32::MAX))
-                .map_err(|_| Error::Overflow)?;
-            Some(Subtitle {
-                pts_microseconds: pts,
-                start_display_ms: 0,
-                end_display_ms: end,
-                ass: self
-                    .writer
-                    .frozen
-                    .take()
-                    .ok_or(Error::Invalid("native ASS missing owner"))?,
-            })
+            let ass = self
+                .writer
+                .frozen
+                .take()
+                .ok_or(Error::Invalid("native ASS missing owner"))?;
+            Some(Subtitle::at(ass, self.clock, options.packet_timebase)?)
         } else {
             None
         };
@@ -581,9 +563,4 @@ fn utf8_width(b: u8) -> usize {
         0xf0..=0xf4 => 4,
         _ => 1,
     }
-}
-fn rescale(ticks: i64, base: TimeBase, denominator: u64) -> i64 {
-    TimeBase::new(1, denominator)
-        .and_then(|to| base.rescale(ticks, to, Rounding::NearestAway))
-        .unwrap_or(i64::MIN)
 }

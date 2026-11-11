@@ -4,12 +4,17 @@
 //! Utf8Packet1, MatroskaWebVttCarriage1 and OpaqueAss1. Their limits and
 //! source/semantic boundaries are documented in this module's README.md.
 //! These profiles do not establish FFmpeg compatibility; the FFmpeg-compatible
-//! conversions are in [`crate::compat::charset`] and [`crate::compat::mov_text`].
+//! readers and conversions are in [`crate::compat::document`],
+//! [`crate::compat::ass`], [`crate::compat::charset`] and
+//! [`crate::compat::mov_text`].
 #![forbid(unsafe_code)]
 
+pub(crate) mod ass_decoder;
 #[cfg(feature = "reference-trace")]
 pub(crate) mod carriage;
 pub mod charset;
+pub(crate) mod decoded;
+pub(crate) mod demuxer;
 pub(crate) mod mov_text;
 pub(crate) mod receiver_charset;
 pub mod tx3g_config;

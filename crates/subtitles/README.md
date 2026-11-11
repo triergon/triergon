@@ -97,7 +97,9 @@ level it ranks them at. The PGS receiver is polled: `push(&mut packet, clock,
 | `compat::cc` | `Decoder`, `Options`, `CaptionExtractor`, `SccPackets` |
 | `compat::teletext` | `Decoder`, `Options`, `Format`, `PageSelection` |
 | `compat::charset` | `AssPacketJob`, `receiver_charset` |
+| `compat::ass` | `Decoder`: ASS packet to the subtitle the decode call returns, with `sub_charenc` conversion |
 | `compat::mov_text` | `Decoder`: tx3g sample to ASS event |
+| `compat::document` | `Reader`: SubRip or WebVTT document to the cues FFmpeg's `srt` and `webvtt` demuxers read |
 
 ## Supported
 
@@ -105,6 +107,16 @@ level it ranks them at. The PGS receiver is polled: `push(&mut packet, clock,
 pinned FFmpeg build (git `d32b387f` on the 9.0 branch; teletext with libzvbi
 0.2.46), including its tolerances of malformed input. Text also has operations that
 follow the specification and keep every original byte.
+
+`compat::document::Reader` reads a SubRip or WebVTT document as FFmpeg's demuxers
+do, which is not what the specifications say: SubRip cue numbers are optional and
+recognised by position, cue text runs to the next timing line with its empty lines
+left out, time fields have no range and the fraction counts milliseconds, the
+duration is kept in 32 bits; WebVTT blocks end at FFmpeg's line-break runs, a cue's
+`-->` may be on a later line, a cue that does not read ends the document. Cues are
+sorted by start time, and one that ends before it starts lasts until the next. A
+UTF-16 SubRip document is converted as FFmpeg converts it, the first byte of some
+characters after a line break included.
 
 **Comparison-only projections.** The non-default `reference-trace` feature adds
 `reference_trace`: the text `carriage` session that reproduces FFmpeg's demuxer
