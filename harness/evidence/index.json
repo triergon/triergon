@@ -19348,6 +19348,16 @@
    "sha256": "18028d8fa7452fd3d43d0d7d254560578d7f7a38d7a553d9fb42b7246a9df927",
    "bytes": 112317324,
    "source_revision": "cc09ffa8f270f0bbbe2a5de0db4dbf3ffb45be03"
+  },
+  {
+   "name": "subtitle-text-gate-b9898139",
+   "path": "subtitle-text-gate-b9898139",
+   "retention": "retained",
+   "reason": "Text subtitle rows of docs/status.md, Linux AArch64 on a c8g.xlarge and the armv7-userland user space on a c6g.2xlarge: timing and memory (30 pairs, CPU 1) of all 354 subtitle-text cases at b9898139 against the pinned FFmpeg 9.0 reference, graded, with the kernel RSS proof on AArch64 and standard bounds on ARMv7; same-code of the subtitle worker against main at 365affd2; the instruction count of every subtitle-text case and of the bitmap subtitle features against main; the subtitle crate's and worker's tests on both targets; and a git bundle of the branch. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitle-text-gate-b9898139/35aa64c6d273f3f6956811a143c299b9ed01ca1c9c9810e9f2eb0a9d42c75aca.tar.zst",
+   "sha256": "35aa64c6d273f3f6956811a143c299b9ed01ca1c9c9810e9f2eb0a9d42c75aca",
+   "bytes": 9692934,
+   "source_revision": "b9898139893705884c3cff03f1994cbb2157594a"
   }
  ]
 }

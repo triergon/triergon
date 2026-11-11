@@ -216,4 +216,6 @@ pinned FFmpeg build, and case by case against the build itself through the
 subtitle runner (`crates/subtitle-worker`, `harness/features/subtitle-*`). Every operation is also exercised at several work quanta,
 under allocation pressure and with cancellation. Gates and the reference build
 are described in [docs/quality.md](../../docs/quality.md); current results are
-in [docs/status.md](../../docs/status.md).
+in [docs/status.md](../../docs/status.md). The text conversions (`subtitle-text`)
+were measured at `b9898139893705884c3cff03f1994cbb2157594a` on Linux AArch64 and
+in the ARMv7 user space.
