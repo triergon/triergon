@@ -494,14 +494,30 @@ impl PrefixFeature {
 
     /// Every registered feature (`harness/features/<id>`) whose contract runs
     /// `candidate` through a worker operation prefix, in id order.
-    pub fn registered(root: &Path, candidate: &str) -> Result<Vec<Self>, String> {
-        super::features::discover(root)?
-            .iter()
+    pub fn registered(
+        root: &Path,
+        candidate: &str,
+        corpora: &BTreeMap<String, PathBuf>,
+    ) -> Result<Vec<Self>, String> {
+        let contracts: Vec<_> = super::features::discover(root)?
+            .into_iter()
             .filter(|contract| {
                 contract.document.get("worker_operation").is_some()
                     && contract.candidate() == Some(candidate)
             })
-            .map(|contract| Self::load(root, &contract.path, &contract.manifest(), None))
+            .collect();
+        if let Some(id) = corpora
+            .keys()
+            .find(|id| !contracts.iter().any(|contract| contract.id == id.as_str()))
+        {
+            return Err(format!("{candidate} has no registered prefix feature {id}"));
+        }
+        contracts
+            .iter()
+            .map(|contract| {
+                let corpus = corpora.get(&contract.id).map(PathBuf::as_path);
+                Self::load(root, &contract.path, &contract.manifest(), corpus)
+            })
             .collect()
     }
 
@@ -1078,6 +1094,7 @@ mod prefix_tests {
         recorded_corpus, reviewed_inputs, rights_reviewed, s,
     };
     use crate::json::{Value, parse};
+    use std::collections::BTreeMap;
     use std::path::Path;
 
     #[test]
@@ -1237,9 +1254,42 @@ mod prefix_tests {
     }
 
     #[test]
+    fn registered_prefix_features_use_supplied_corpus_directories() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let mut corpora = BTreeMap::from([
+            ("hls-segments".to_owned(), root.join("harness/fixtures/hls")),
+            (
+                "matroska-startup-seek".to_owned(),
+                root.join(".research/startup-seek-fixtures"),
+            ),
+            (
+                "mp4-range".to_owned(),
+                root.join(".research/mp4-range-fixtures"),
+            ),
+            (
+                "progressive-ts188".to_owned(),
+                root.join("harness/features/progressive-ts188/inputs"),
+            ),
+        ]);
+        let features = PrefixFeature::registered(root, "playback-worker", &corpora).unwrap();
+        for (id, directory) in &corpora {
+            let feature = features.iter().find(|feature| feature.id == *id).unwrap();
+            assert_eq!(&feature.corpus, directory);
+            assert!(!feature.cases.is_empty());
+        }
+        corpora.insert("unused".to_owned(), root.to_path_buf());
+        assert!(
+            PrefixFeature::registered(root, "playback-worker", &corpora)
+                .err()
+                .unwrap()
+                .contains("no registered prefix feature unused")
+        );
+    }
+
+    #[test]
     fn the_font_features_are_registered_prefix_features() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let features = PrefixFeature::registered(root, "font-worker").unwrap();
+        let features = PrefixFeature::registered(root, "font-worker", &BTreeMap::new()).unwrap();
         let found: Vec<(&str, &str, usize)> = features
             .iter()
             .map(|f| (f.id.as_str(), f.prefix.as_str(), f.cases.len()))

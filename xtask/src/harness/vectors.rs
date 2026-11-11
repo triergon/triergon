@@ -3,6 +3,7 @@
 //! the pinned source tree. Samples stay in the ignored cache; running them is
 //! local testing, not permission to redistribute them.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -446,6 +447,7 @@ pub fn trace_identities(
     candidate: &Path,
     output: &Path,
     compare: Option<&Path>,
+    corpora: &BTreeMap<String, PathBuf>,
 ) -> R<i32> {
     let candidate =
         fs::canonicalize(candidate).map_err(|e| format!("{}: {e}", candidate.display()))?;
@@ -453,7 +455,7 @@ pub fn trace_identities(
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let features = PrefixFeature::registered(root, &name)?;
+    let features = PrefixFeature::registered(root, &name, corpora)?;
     let identity = read_json(&root.join("target/harness/identity.json"))?;
     let native = root.join("target/harness/ffmpeg-worker");
     let scratch = std::env::temp_dir().join(format!("triergon-traces-{}", std::process::id()));
