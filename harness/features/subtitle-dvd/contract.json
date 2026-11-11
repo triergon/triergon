@@ -5,15 +5,17 @@
   "candidate": "subtitle-worker",
   "worker_operation": "sub-",
   "reference": "ffmpeg-subtitles-native",
+  "measurement_reference": "ffmpeg-subtitles-plain-native",
   "contract": [
     "DVD subpictures from VobSub idx/sub, program streams, Matroska and MP4, with idx, private-data, option or IFO palettes and forced_subs_only; reference: FFmpeg dvdsub",
     "preparation outside the timed operation: open the input, select the subpicture stream and its configuration, and copy its packets in demux order",
-    "one timed operation: create and open the decoder with the stream's configuration, packet time base and options, decode every prepared packet with one call each, drain, fold every output subtitle and free it, free the decoder",
+    "one timed operation: create and open the decoder with the stream's configuration, packet time base and options (a decoder that refuses to open folds as no subtitles and the word 2^64 - 1 in both workers), decode every prepared packet with one call each, drain, fold every output subtitle and free it, free the decoder",
     "every output subtitle folded: packet index, pts, display start and end, format, and per rectangle its type, position, size, colour count, flags, ARGB palette, index pixels, text and ASS line",
     "exact equality of the fold with the reference on every case; deliberate differences only as listed compatibility exceptions"
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
   ],
   "iterations": 50,
   "minimum_pairs": 30,

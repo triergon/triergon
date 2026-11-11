@@ -4,6 +4,7 @@
 //! (`.vob`, VobSub `.sub`) and [`vobsub`] the lines of a VobSub `.idx`. The
 //! reference's receiver over packets, its demuxers' packets and its palette
 //! sources are in [`crate::compat::dvd`].
+mod c_text;
 pub(crate) mod demux;
 pub mod program_stream;
 pub(crate) mod receiver;

@@ -5,6 +5,7 @@
   "candidate": "subtitle-worker",
   "worker_operation": "sub-",
   "reference": "ffmpeg-subtitles-native",
+  "measurement_reference": "ffmpeg-subtitles-plain-native",
   "contract": [
     "DVB subtitles (EN 300 743) from MPEG-TS, M2TS and Matroska, with the compute_edt, compute_clut and dvb_substream options; reference: FFmpeg dvbsub",
     "preparation outside the timed operation: open the input, select the subtitling stream and its service configuration, and copy its packets in demux order (each PES data field cut into codec packets as the reference's demuxer does)",
@@ -13,7 +14,8 @@
     "exact equality of the fold with the reference on every case; deliberate differences only as listed compatibility exceptions"
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
   ],
   "iterations": 50,
   "minimum_pairs": 30,

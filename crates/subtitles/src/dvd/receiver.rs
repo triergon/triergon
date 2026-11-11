@@ -4,6 +4,7 @@
 //! control sequence table, expands the interlaced 2-bit or 8-bit pixels,
 //! resolves the colours and removes transparent borders, with the reference's
 //! tolerances at every step (see [`Decoder`]).
+use super::c_text::{is_space, scan_int, strtoul16};
 use super::wire::{Command, Commands, DvdArea};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
@@ -27,7 +28,9 @@ impl Settings {
     /// line). A line beginning `palette:` replaces the palette and one
     /// beginning `size:` the canvas; other lines are ignored. Both values are
     /// scanned from the rest of the text, so they can continue on the next
-    /// line. A `size:` line without two numbers is ignored.
+    /// line. A `size:` line without two numbers is ignored, and one with a number beyond
+    /// 2³¹ − 1 or below −2³¹ is refused, as observed in FFmpeg built for 32-bit ARMv7
+    /// (FFmpeg for AArch64 keeps the number's low 32 bits).
     ///
     /// # Errors
     ///
@@ -89,6 +92,10 @@ impl Settings {
 
     /// The `palette` option: up to sixteen hexadecimal colours separated by
     /// commas. It takes precedence over the configuration and the IFO palette.
+    /// Each number keeps its low 24 bits. A negative one is negated modulo 2³², and one
+    /// beyond 32 bits is white (`0xffffff`) whatever its sign, as observed in FFmpeg built
+    /// for 32-bit ARMv7 (FFmpeg for AArch64 keeps the low bits of a number up to 64 bits).
+    /// A `palette:` line of the configuration is read the same way.
     pub fn apply_palette_option(&mut self, text: &[u8]) {
         self.palette = Some(parse_colour_list(text));
     }
@@ -110,18 +117,20 @@ fn below_0e(word: u64) -> u64 {
     word.wrapping_sub(ONES * 0x0e) & !word & HIGHS
 }
 
-/// Sixteen colours as the reference's `parse_palette` reads them: each number
-/// converted as `strtoul` does in base 16 (after white space, with an optional
-/// sign and `0x`) and kept to its low 24 bits, then any run of commas and
-/// white space skipped. An entry without digits is black and leaves the text
-/// where it was, so once the skip cannot move either, the rest are black.
+/// Sixteen colours from a colour list: each number read with C's `strtoul` semantics in
+/// base 16 (C17 7.22.1.4: after white space, with an optional sign and `0x`) for a 32-bit
+/// `unsigned long` (AAPCS) and kept to its low 24 bits, then any run of commas and white
+/// space skipped. A number beyond 32 bits is therefore white whatever its sign, as observed
+/// in FFmpeg built for 32-bit ARMv7.
+/// An entry without digits is black and leaves the text where it was, so once
+/// the skip cannot move either, the rest are black.
 fn parse_colour_list(text: &[u8]) -> [u32; 16] {
     let mut colours = [0; 16];
     let mut at = 0;
     for colour in &mut colours {
         let start = at;
         let (value, end) = strtoul16(text, at);
-        *colour = (value & 0x00ff_ffff) as u32;
+        *colour = value & 0x00ff_ffff;
         at = end;
         while text.get(at).is_some_and(|&b| b == b',' || is_space(b)) {
             at += 1;
@@ -134,55 +143,8 @@ fn parse_colour_list(text: &[u8]) -> [u32; 16] {
     colours
 }
 
-/// C's `isspace` in the C locale.
-fn is_space(b: u8) -> bool {
-    matches!(b, b' ' | b'\t'..=b'\r')
-}
-
-/// `strtoul(text + start, &end, 16)`: the value and `end`, which stays at
-/// `start` without digits. Out of range is `ULONG_MAX` whatever the sign; in
-/// range, a minus negates in unsigned arithmetic.
-fn strtoul16(text: &[u8], start: usize) -> (u64, usize) {
-    let hex = |at: usize| match text.get(at) {
-        Some(&b @ b'0'..=b'9') => Some(b - b'0'),
-        Some(&b @ b'a'..=b'f') => Some(b - b'a' + 10),
-        Some(&b @ b'A'..=b'F') => Some(b - b'A' + 10),
-        _ => None,
-    };
-    let mut at = start;
-    while text.get(at).copied().is_some_and(is_space) {
-        at += 1;
-    }
-    let negative = text.get(at) == Some(&b'-');
-    if matches!(text.get(at), Some(b'-' | b'+')) {
-        at += 1;
-    }
-    if text.get(at) == Some(&b'0')
-        && matches!(text.get(at + 1), Some(b'x' | b'X'))
-        && hex(at + 2).is_some()
-    {
-        at += 2;
-    }
-    let digits = at;
-    let (mut value, mut overflow) = (0_u64, false);
-    while let Some(nibble) = hex(at) {
-        overflow |= value >> 60 != 0;
-        value = value << 4 | u64::from(nibble);
-        at += 1;
-    }
-    if at == digits {
-        (0, start)
-    } else if overflow {
-        (u64::MAX, at)
-    } else if negative {
-        (value.wrapping_neg(), at)
-    } else {
-        (value, at)
-    }
-}
-
-/// `%dx%d` as C's `sscanf` reads it: each number after optional white space,
-/// with an optional sign, the `x` right after the first.
+/// Two decimal numbers separated by an `x` right after the first, each after
+/// optional white space and with an optional sign ([`scan_int`]).
 fn scan_size(text: &[u8]) -> Option<[i32; 2]> {
     let (width, end) = scan_int(text, 0)?;
     if text.get(end) != Some(&b'x') {
@@ -192,42 +154,9 @@ fn scan_size(text: &[u8]) -> Option<[i32; 2]> {
     Some([width, height])
 }
 
-/// One `%d` from `start`: a decimal number converted as `strtol` does (out of
-/// range is `LONG_MAX` or `LONG_MIN`) and stored in an `int`, which keeps its
-/// low 32 bits; with the index after it.
-fn scan_int(text: &[u8], start: usize) -> Option<(i32, usize)> {
-    let mut at = start;
-    while text.get(at).copied().is_some_and(is_space) {
-        at += 1;
-    }
-    let negative = text.get(at) == Some(&b'-');
-    if matches!(text.get(at), Some(b'-' | b'+')) {
-        at += 1;
-    }
-    let digits = at;
-    let (mut magnitude, mut overflow) = (0_u64, false);
-    while let Some(&byte @ b'0'..=b'9') = text.get(at) {
-        let (scaled, carry) = magnitude.overflowing_mul(10);
-        let (sum, wrapped) = scaled.overflowing_add(u64::from(byte - b'0'));
-        overflow |= carry | wrapped;
-        magnitude = sum;
-        at += 1;
-    }
-    if at == digits {
-        return None;
-    }
-    let value = match (overflow, negative) {
-        (false, false) => i64::try_from(magnitude).unwrap_or(i64::MAX),
-        (false, true) => 0_i64.checked_sub_unsigned(magnitude).unwrap_or(i64::MIN),
-        (true, false) => i64::MAX,
-        (true, true) => i64::MIN,
-    };
-    Some((value as i32, at))
-}
-
 /// A size the reference opens a decoder with: both dimensions positive, and
-/// eight bytes per pixel plus 128 pixels of padding each way addressable
-/// with an `int`.
+/// eight bytes per pixel plus 128 pixels of padding each way below 2³¹ − 1
+/// bytes.
 fn checked_canvas([width, height]: [i32; 2]) -> Result<[u32; 2]> {
     let limit = u64::from(i32::MAX.unsigned_abs());
     match (u32::try_from(width), u32::try_from(height)) {

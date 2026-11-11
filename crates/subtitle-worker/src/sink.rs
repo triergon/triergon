@@ -102,6 +102,20 @@ impl<'a> Sink<'a> {
         Ok(())
     }
 
+    /// A decoder that refuses to open with the stream's configuration and
+    /// options: a result of its own, folded as the one word `u64::MAX`, which no
+    /// header length can be, and traced in place of the header line.
+    pub fn refused_open(&mut self, packets: usize) -> io::Result<()> {
+        fold(&mut self.work.digest, u64::MAX);
+        if let Some(out) = self.trace.as_deref_mut() {
+            writeln!(
+                out,
+                "{{\"schema\":1,\"operation\":\"subtitle-decode\",\"packets\":{packets},\"refused\":\"open\"}}"
+            )?;
+        }
+        Ok(())
+    }
+
     /// A packet the decoder refused; traced only, never folded.
     pub fn refused(&mut self, packet: usize, code: i32) -> io::Result<()> {
         if let Some(out) = self.trace.as_deref_mut() {

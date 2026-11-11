@@ -47,7 +47,19 @@ resource limit becomes an explicit, reviewed rule for that case.
   needs) for the playback startup and seek reference, and `subtitles` (the PGS, DVB,
   DVD, closed-caption and teletext decoders, the latter through a hash-checked
   libzvbi 0.2.46, with the video decoders caption extraction needs) for the subtitle
-  decode comparison. Decoders and
+  decode comparison. A decoder that refuses to open with the stream's
+  configuration and options is a result both subtitle workers fold alike, as no
+  subtitles and the one word 2^64 − 1, and trace as a `"refused":"open"` line in
+  place of the header. The `subtitles` worker is linked with `--wrap` for the C
+  library calls whose result can differ between its targets for the same
+  arguments: `strtol`, `strtoul` and `sscanf`'s integer conversions, which read
+  through `long`, and the rounding functions with results C leaves unspecified
+  out of range. Its `sub-fold` flags a run that reached such a difference
+  (`harness/reference_subtitles_host.h`), and a flagged case fails any feature
+  not pinned per target. Because the wrappers run inside the operation, that
+  build is never timed or measured: the subtitle features name the same build
+  without them, `ffmpeg-subtitles-plain-native`, as their
+  `measurement_reference`. Decoders and
   capture are measured against the FFmpeg 9.0.2 release tarball: `decode` (the default
   configuration) for the codec comparison, whose `ffmpeg` and `ffprobe` also decode
   capture output independently, and `capture` (gating) and `capture-small` for the
@@ -231,6 +243,15 @@ resource limit becomes an explicit, reviewed rule for that case.
   when a case is the same on every target (it belongs in a feature pinned for
   every target), and when a feature not pinned per target has a pin the
   reference flags.
+  A feature with a written manifest pins a case per target in its
+  `expected_by_target`. The five bitmap, caption and teletext subtitle features
+  pin each case once, from the reference on AArch64, and require 32-bit ARMv7
+  too, so every ARMv7 run compares that target's reference with those pins: a
+  case whose reference result differs between the targets fails there, flagged
+  or not, until a feature pinned per target holds it. `subtitle-dvd-host` holds
+  the DVD cases the subtitles reference flags. The decoder follows FFmpeg built
+  with GCC for `armv7-unknown-linux-gnueabihf`, and such a case is open on
+  AArch64.
   Pins are recorded with the feature's `worker_operation`, the operation
   `report`, `grade` and `fuzz` run. A diagnostic feature that compares another
   reference with these pins names the features in `cases_from` (`raster-simd`
@@ -321,7 +342,7 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, the five bitmap and caption `subtitle-*` features with
+and `formats` references, the six bitmap, caption and teletext `subtitle-*` features with
 `subtitle-worker` and the `subtitles` reference, `subtitle-text` with `subtitle-worker`
 and the `formats` reference, the three font features with `font-worker` and FreeType, the six
 shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
@@ -489,7 +510,14 @@ may override that count for diagnostic comparisons.
   supplied workers and when the loader resolves libraries relative to an executable.
   Keep the measured executables with the raw memory samples. Grading Linux memory
   results rehashes the worker paths in the observer certificate, including any copies
-  in the build tree.
+  in the build tree. Before every memory run on Linux, both workers are written back and
+  their cached pages dropped (`sync FILE`, then `dd iflag=nocache`, which asks for
+  `POSIX_FADV_DONTNEED`; no root needed), so each run of either worker maps its
+  executable from the same, empty, page-cache state. Without it, a freshly written copy
+  can stay cached in larger blocks, and the kernel then makes more of the executable
+  resident on some runs than on others: 320 kB more of a subtitle worker's own mapping,
+  and so of the resident peak, on a c8g.xlarge. A failed eviction fails the run. Memory
+  results collected before this eviction may include that effect, on either side.
 - Before a timing pass, `cargo xtask count CANDIDATE REFERENCE ARGUMENT...` runs both
   workers on one workload under Linux `perf stat`, five runs each, and prints the least
   user-mode instructions, cycles and branch misses. It fails when instructions rise more
@@ -542,7 +570,9 @@ part of the image.
 A user space built the same way later can pick up newer packages; compare its
 `dpkg-query -W` list before treating its results as comparable. Inside, install rustup
 as on any host, and run every command under `setarch linux32`. Record the CPU, kernel
-and user-space package list with the results.
+and user-space package list with the results. The `subtitles` reference builds libzvbi
+from its source archive, which needs `apt-get install autoconf automake libtool autopoint
+gettext` in the user space first.
 
 The kernel RSS bound works for a 32-bit process through the module's 32-bit ioctl
 entry point. The module belongs to the host's kernel, so build and load it on the host,

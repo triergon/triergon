@@ -19552,6 +19552,16 @@
    "sha256": "d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a",
    "bytes": 424394382,
    "source_revision": "afb9049c681916c97311fc9f495e27ceaa69f4df"
+  },
+  {
+   "name": "subtitles-armv7-arm64-f2634911",
+   "path": "subtitles-armv7-arm64-f2634911",
+   "retention": "retained",
+   "reason": "Subtitle, caption and teletext status rows on 32-bit ARMv7 (8513398b, two c6g.4xlarge hosts in the armv7-userland user space with 13 packages added for libzvbi's build) and Linux AArch64 (f2634911, c8g.xlarge, kernel-bound memory with page-cache eviction; its workers are byte-identical to 8513398b's): parity of the six features on both targets, 30 timing pairs and 30 memory pairs per case on CPU 1 against ffmpeg-subtitles-plain-native, the graded reports, the measured workers, environment and package lists. Also the c8g gate at 8513398b before the page-cache eviction, the page-cache before/after measurements, a Graviton2 AArch64 timing diagnostic, instruction counts, the caption profiles, the clean-room probe tools and results the DVD rules and the reference's flag were derived from, and bundles of both measured sources. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitles-armv7-arm64-f2634911/9ed7263aabbc4f44910c5135fcf077419ea5b426e3a09a888e83f10153680c32.tar.zst",
+   "sha256": "9ed7263aabbc4f44910c5135fcf077419ea5b426e3a09a888e83f10153680c32",
+   "bytes": 84259003,
+   "source_revision": "f263491102d307997d40d40826a6193d8468e87e"
   }
  ]
 }

@@ -95,7 +95,11 @@ pub fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
 
 impl Prepared for Dvd {
     fn run(&self, sink: &mut Sink<'_>) -> Result<()> {
-        let settings = self.options.settings(&self.track.configuration)?;
+        // Settings the reference's decoder refuses to open with, such as a
+        // `size:` it cannot allocate, end the operation with that result.
+        let Ok(settings) = self.options.settings(&self.track.configuration) else {
+            return Ok(sink.refused_open(self.track.packets.len())?);
+        };
         let mut decoder = Decoder::new(&self.pool, settings, Limits::default());
         sink.header(self.track.packets.len(), None)?;
         for (index, packet) in self.track.packets.iter().enumerate() {
