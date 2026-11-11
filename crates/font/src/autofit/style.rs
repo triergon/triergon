@@ -42,7 +42,7 @@ pub(crate) struct Style {
     pub(crate) writing_system: WritingSystem,
     /// The index of the script in [`SCRIPTS`].
     pub(crate) script: usize,
-    /// The blue strings of a style of the latin writing system.
+    /// The blue strings of a style of the latin or CJK writing system.
     pub(crate) blues: &'static [BlueString],
     /// Whether the style covers its script's characters
     /// (`AF_COVERAGE_DEFAULT`) rather than the glyphs of an OpenType feature.
@@ -51,7 +51,7 @@ pub(crate) struct Style {
 
 /// A blue string (`AF_Blue_StringRec`): space-separated clusters whose
 /// extrema give one blue zone, and the zone's properties
-/// (`AF_BLUE_PROPERTY_LATIN_*`).
+/// (`AF_BLUE_PROPERTY_LATIN_*` or `AF_BLUE_PROPERTY_CJK_*`).
 #[derive(Debug)]
 pub(crate) struct BlueString {
     pub(crate) text: &'static str,
@@ -189,6 +189,12 @@ mod tests {
     fn the_tables_name_the_styles_the_loader_relies_on() {
         let fallback = &STYLES[usize::from(STYLE_FALLBACK)];
         assert_eq!(fallback.writing_system, WritingSystem::Cjk);
+        // Its blue zones are a top and a bottom one, each string's
+        // reference characters before a `|` and its overshoot ones after.
+        let properties: Vec<_> = fallback.blues.iter().map(|b| b.properties).collect();
+        assert_eq!(properties, [0x01, 0x00]);
+        assert!(fallback.blues[0].text.starts_with("\u{4ed6} \u{4eec} "));
+        assert!(fallback.blues.iter().all(|b| b.text.contains(" | ")));
         // The dummy style covers no characters.
         let dummy: Vec<_> = STYLES
             .iter()
