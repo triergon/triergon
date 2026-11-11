@@ -1,6 +1,29 @@
 //! Resolving one paragraph: the explicit rules, the isolating run sequences,
 //! then the levels of the characters X9 removed and the paragraph's part of
 //! rule L1.
+//!
+//! # After a paragraph separator
+//!
+//! A paragraph holds a paragraph separator before its end only when it is
+//! given text that [`super::paragraphs`] would split, as libass's simple
+//! shaping gives it. FriBidi resolves the text after the first separator apart
+//! from the rest, and so does this resolver. The explicit rules stop there,
+//! and each implicit rule then sees that text a little differently:
+//! - here: the separator and the text after it are at explicit level 0 and
+//!   isolate depth 0, and further separators right after the first stay at
+//!   its depth; isolates match, and P2 finds the first strong letter, past it;
+//! - in `sequence.rs`: sos and eos compare with level 0 for the sequences that
+//!   start at the separator or after it (`Paragraph::base`), and the text
+//!   after the separator at the level of a sequence that an isolate initiator
+//!   ended continues that sequence, with N1 not joining neutrals across the
+//!   separator (`Sequence::break_at`) unless the first character after it is
+//!   a PDI that closes an isolate opened before it;
+//! - in `weak.rs`: the embedding and override characters, which are kept
+//!   there, are strong classes that are neither L nor AL for W2 and W7;
+//! - in `neutral.rs`: N1 compares them as themselves (`context`), so a
+//!   neutral stretch takes their direction only between two of a kind;
+//! - in `class.rs` and `sequence.rs`: RLE and RLO count as R in N0
+//!   (`BidiClass::strong_rtl`) and in I1 and I2 (`raise`).
 
 use super::charge;
 use super::class::{BaseDirection, BidiClass, Bracket, Level};

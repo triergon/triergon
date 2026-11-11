@@ -14,10 +14,9 @@ use triergon_core::{Error, Result};
 /// end of the line take the paragraph level of `direction`. Unlike UAX #9's
 /// L1, and as FriBidi applies it, an isolate formatting character ends that
 /// stretch and keeps its level, like the characters before it. Then `items` is
-/// reordered as L2
-/// reverses characters: from the highest level to the lowest odd one, every
-/// maximal stretch at that level or above. `levels` keeps logical order.
-/// Combining marks are not moved (L3 is not applied).
+/// reordered as L2 reverses characters: from the highest level to the lowest
+/// odd one, every maximal stretch at that level or above. `levels` keeps
+/// logical order. Combining marks are not moved (L3 is not applied).
 ///
 /// # Errors
 ///

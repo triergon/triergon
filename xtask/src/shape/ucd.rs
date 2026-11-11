@@ -151,7 +151,23 @@ const BIDI: Release = Release {
     ],
 };
 
-/// The largest file, UnicodeData.txt, is under 2.5 MiB.
+/// Unicode 14.0.0's bidi conformance tests, which `cargo xtask shape conformance`
+/// runs the bidi tables and resolver through.
+const BIDI_TESTS: Release = Release {
+    version: "14.0.0",
+    files: &[
+        File {
+            path: "BidiTest.txt",
+            sha256: "306a86c1c29458531e56c29ffde6badede65897275a5941ac7fc6985d6b0994f",
+        },
+        File {
+            path: "BidiCharacterTest.txt",
+            sha256: "7739891361250475fe55cfc7eeee7024ba2626bdce8c7db02bf7ae9d1bcdfb3f",
+        },
+    ],
+};
+
+/// The largest file, BidiTest.txt, is under 8 MiB.
 const FILE_LIMIT: usize = 8 << 20;
 
 const OUTPUT: &str = "crates/shape/src";
@@ -164,6 +180,33 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     };
     println!("{}", run(root, check, &fetch::Network)?);
     Ok(())
+}
+
+/// `cargo xtask shape conformance`: fetch the pinned conformance tests and run the
+/// `bidi_conformance` example on them, which fails unless every case passes.
+pub fn conformance(root: &Path, args: &[String]) -> Result<(), String> {
+    if !args.is_empty() {
+        return Err(super::USAGE.to_owned());
+    }
+    Loaded::fetch(root, &BIDI_TESTS, &fetch::Network)?;
+    let cache = root.join(".research/ucd").join(BIDI_TESTS.version);
+    let paths: Vec<String> = BIDI_TESTS
+        .files
+        .iter()
+        .map(|file| cache.join(file.path).display().to_string())
+        .collect();
+    let mut args = vec![
+        "run",
+        "--release",
+        "--locked",
+        "-p",
+        "triergon-shape",
+        "--example",
+        "bidi_conformance",
+        "--",
+    ];
+    args.extend(paths.iter().map(String::as_str));
+    crate::cargo(root, None, &args)
 }
 
 fn run(root: &Path, check: bool, net: &dyn Transport) -> Result<String, String> {

@@ -151,13 +151,6 @@ does.
 
 ## What it does not cover
 
-- Two corners of FriBidi's bidi results. One paragraph whose text holds a
-  paragraph separator with an isolate opened before it and closed after it:
-  FriBidi resolves the text between the separator and the isolate's PDI apart
-  from the isolate, and the crate does not, which shows in simple shaping of such
-  a line; text resolved paragraph by paragraph, as libass's complex shaping and
-  `shape-bidi` resolve it, never holds one. And a mark right after the PDI of an
-  isolate that overflows level 125, after an Arabic letter and a number.
 - Vertical directions (libass shapes `@` fonts horizontally with `vert`).
 - Apple Advanced Typography (`morx`, `kerx`, `trak` with `STAT`) and Apple `kern`
   version 1; in an OpenType `kern` table, subtables of formats 1, 2 and 3, which
@@ -237,9 +230,10 @@ Paragraphs are limited to 2³² characters.
   which shapes with mutated copies of a font built in memory (GDEF, GSUB
   ligature, single and chaining lookups, GPOS pair and mark attachment), resolves
   random text of every bidi class and checks that the work limit stops a call.
-- `cargo run --release -p triergon-shape --example bidi_conformance --
-  BidiTest.txt BidiCharacterTest.txt` runs Unicode 14.0.0's conformance files:
-  770,241 cases of classes and 91,707 of characters, all passing.
+- `cargo xtask shape conformance` fetches Unicode 14.0.0's hash-pinned
+  conformance files and runs the `bidi_conformance` example on them: 770,241
+  cases of classes in BidiTest.txt and 91,707 of characters in
+  BidiCharacterTest.txt, all passing.
 - Six harness features (`harness/features/shape-*`) run through
   [`shape-worker`](../shape-worker/README.md) and the HarfBuzz 14.6.0 and FriBidi
   1.0.17 reference worker (`harness/reference_shape.h`, FriBidi as libass calls

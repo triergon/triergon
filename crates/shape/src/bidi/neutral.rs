@@ -1,24 +1,27 @@
 //! Rules BD16 and N0 for the paired brackets of a paragraph, and N1 and N2 on
 //! the classes of one isolating run sequence.
 //!
-//! The bracket pairs are FriBidi's. UAX #9 pairs brackets within an isolating
-//! run sequence; FriBidi pairs them per isolate depth over the whole paragraph,
-//! which differs from it in these ways:
-//! - Each depth keeps a stack of at most 63 opening brackets, emptied when the
-//!   level changes between characters of that depth with no shallower one
-//!   between them, but kept across separate isolates of one depth, whatever
-//!   their levels, so that brackets in two isolates can pair. An opening
-//!   bracket that finds its stack full ends the pairing of the whole paragraph,
-//!   and the pairs found before it stay.
-//! - The stacks of the first 16 depths start 16 slots apart in one array yet
-//!   each holds 63 brackets: from its 17th bracket on, a depth's stack
-//!   overwrites the stacks of the depths after it, so that a closing bracket
-//!   there may pair with an opening bracket of a shallower depth.
-//! - N0b looks at every strong class between the brackets, at any depth, and
-//!   takes the embedding direction where one of them, raised as I1 and I2 would
-//!   raise it, reaches the level of the opening bracket. N0c looks for a strong
-//!   class at the opening bracket's depth, and takes for the prior context the
-//!   last strong class before the opening bracket at that depth, or the
+//! The bracket pairs are FriBidi's, as probes of it show them. UAX #9 pairs
+//! brackets within an isolating run sequence; FriBidi pairs them per isolate
+//! depth over the whole paragraph, which differs from it in these ways:
+//! - Each depth has one stack of open brackets, shared by separate isolates of
+//!   that depth, so that brackets in two isolates can pair. It holds at most
+//!   63: the 64th opening bracket at any depth ends the pairing of the rest of
+//!   the paragraph, and the pairs found before it stay.
+//! - A depth's stack is emptied where a level run of that depth starts because
+//!   of an embedding or a PDF, but not where one starts with a PDI that closes
+//!   an isolate, nor on entering or leaving a deeper isolate.
+//! - At depths 0 to 15 a stack's slot `i` is slot `i - 16q` of depth `d + q`'s
+//!   stack, up to depth 15: a bracket pushed at either depth overwrites the
+//!   other's, and a closing bracket, which searches its own depth's open
+//!   brackets, may so pair with one pushed at another depth. Deeper stacks
+//!   share nothing.
+//! - N0b counts a strong class between the brackets, at any depth, as the
+//!   embedding direction where the level I1 and I2 would give it is the
+//!   opening bracket's level; one at the opening bracket's depth otherwise
+//!   counts as the opposite direction, and one at another depth not at all.
+//!   N0c takes for the prior context the last strong class before the opening
+//!   bracket at its depth, across earlier isolates and embeddings, and the
 //!   embedding direction where there is none.
 //!
 //! Where brackets pair within one isolating run sequence, as in every case of
@@ -33,8 +36,8 @@ use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 /// The opening brackets a depth keeps unpaired at most.
 const MAX_OPEN_BRACKETS: usize = 63;
 
-/// The depths whose stacks share one array, and the slots between the starts
-/// of their stacks.
+/// The depths whose stacks share slots, and how far apart in them consecutive
+/// depths' stacks start.
 const SHARED_DEPTHS: usize = 16;
 const SHARED_ROW: usize = 16;
 
@@ -155,7 +158,7 @@ pub(super) fn resolve_brackets(
         types,
         levels,
         sequence_of,
-        paragraph.depths,
+        paragraph,
         absorbed,
         brackets,
         work,
@@ -196,11 +199,12 @@ fn pair(
     types: &[BidiClass],
     levels: &[Level],
     sequence_of: &[u32],
-    depths: &[u8],
+    paragraph: &Paragraph<'_>,
     absorbed: &[bool],
     brackets: &[Option<Bracket>],
     work: &mut WorkBudget,
 ) -> Result<()> {
+    let depths = paragraph.depths;
     charge(work, types.len())?;
     storage.pairs.clear();
     storage.start_paragraph()?;
@@ -221,7 +225,9 @@ fn pair(
             deepest = depth + 1;
             let state = storage.depth(depth);
             if state.level != levels[at].0 {
-                if state.level != u8::MAX {
+                let closes_isolate = paragraph.classes[at] == BidiClass::Pdi
+                    && paragraph.partner.get(at).is_some_and(|&p| p != NONE);
+                if state.level != u8::MAX && !closes_isolate {
                     state.open = 0;
                 }
                 state.level = levels[at].0;
@@ -305,8 +311,9 @@ fn pair_direction(
 
 /// The class a neutral stretch compares on one side of it in N1: L, or R for
 /// R, AL and the numbers. The embedding and override characters, which are
-/// only in a sequence after a paragraph separator, compare as themselves, as
-/// in FriBidi: the stretch takes their direction only between two of a kind.
+/// only in a sequence after a paragraph separator (see `paragraph.rs`),
+/// compare as themselves: the stretch takes their direction only between two
+/// of a kind.
 fn context(class: BidiClass) -> Option<BidiClass> {
     match class {
         BidiClass::R | BidiClass::Al | BidiClass::En | BidiClass::An => Some(BidiClass::R),

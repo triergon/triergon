@@ -5,6 +5,7 @@
 mod tables;
 
 use crate::bidi::{BidiClass, Bracket, JoiningType};
+use crate::unicode::ArabicForm;
 
 /// The Bidi_Class of `cp`, with the defaults of unassigned code points; L beyond
 /// U+10FFFF.
@@ -35,17 +36,9 @@ pub(crate) fn joining_type(cp: u32) -> JoiningType {
     JoiningType::ALL[usize::from(tables::JOINING_TYPE.get(cp))]
 }
 
-/// A positional presentation form, the column of the generated table.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Form {
-    Initial,
-    Medial,
-    Final,
-    Isolated,
-}
-
-/// The presentation form of `cp` in `form`, if UnicodeData.txt has one.
-pub(crate) fn presentation_form(cp: u32, form: Form) -> Option<u32> {
+/// The presentation form of `cp` in `form`, if UnicodeData.txt has one; the
+/// generated table has a column per form, in the order of [`ArabicForm`].
+pub(crate) fn presentation_form(cp: u32, form: ArabicForm) -> Option<u32> {
     let row =
         tables::PRESENTATION_FORMS.get(cp.checked_sub(tables::PRESENTATION_FIRST)? as usize)?;
     Some(u32::from(row[form as usize])).filter(|&f| f != 0)
@@ -103,8 +96,8 @@ mod tests {
         assert_eq!(joining_type(0x627), JoiningType::RightJoining);
         assert_eq!(joining_type(0x64E), JoiningType::Transparent);
         assert_eq!(joining_type(0x200D), JoiningType::JoinCausing);
-        assert_eq!(presentation_form(0x628, Form::Initial), Some(0xFE91));
-        assert_eq!(presentation_form(0x627, Form::Initial), None);
+        assert_eq!(presentation_form(0x628, ArabicForm::Initial), Some(0xFE91));
+        assert_eq!(presentation_form(0x627, ArabicForm::Initial), None);
         assert_eq!(lam_alef(0x627, false), Some(0xFEFB));
         assert_eq!(lam_alef(0x627, true), Some(0xFEFC));
     }

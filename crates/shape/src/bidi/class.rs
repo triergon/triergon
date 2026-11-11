@@ -130,8 +130,8 @@ impl BidiClass {
 
     /// The direction a strong class or number takes in rules N0 to N2, where
     /// numbers count as R: `Some(false)` for L, `Some(true)` for R, EN and AN.
-    /// RLE and RLO, which a sequence holds only after a paragraph separator,
-    /// count as R.
+    /// RLE and RLO, which a sequence holds only after a paragraph separator
+    /// (see `paragraph.rs`), count as R.
     pub(super) const fn strong_rtl(self) -> Option<bool> {
         match self {
             Self::L => Some(false),

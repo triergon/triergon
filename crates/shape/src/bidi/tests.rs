@@ -236,6 +236,33 @@ fn deepest_levels() {
     // overflowed one, so that the two link.
     let text = repeated(&[(LRE, 61), (0x627, 1), (LRI, 2), (PDI, 2), (0x31, 1)]);
     assert_eq!(levels_of(&text, Ltr)[61..], [123, 123, 124, 124, 123, 124]);
+    // A mark after the PDI of an overflowed isolate, after a European number
+    // after an Arabic letter, is an Arabic number.
+    let text = repeated(&[(LRI, 63), (0x627, 1), (0x31, 1), (PDI, 1), (0x300, 1)]);
+    assert_eq!(levels_of(&text, Ltr)[63..], [125, 126, 125, 126]);
+    // A PDF under an isolate leaves an overflowed embedding counted.
+    let text = repeated(&[
+        (LRI, 62),
+        (LRE, 1),
+        (PDF, 1),
+        (0x202B, 1),
+        (0x21, 1),
+        (PDI, 1),
+        (0x202B, 1),
+        (0x21, 1),
+    ]);
+    assert_eq!(
+        levels_of(&text, Ltr)[62..],
+        [122, 122, 122, 124, 122, 122, 123]
+    );
+    // An empty isolate raised past overflowed ones, at the deepest depth: the
+    // text before it takes the higher level's direction only where a strong
+    // class follows at that level.
+    let mut text = repeated(&[(LRI, 124), (0x5D0, 1), (0x24, 1), (RLI, 1), (PDI, 1)]);
+    text.push(0x21);
+    assert_eq!(levels_of(&text, Ltr)[124..], [125, 124, 124, 125, 125]);
+    *text.last_mut().unwrap() = 0x61;
+    assert_eq!(levels_of(&text, Ltr)[124..], [125, 125, 125, 125, 126]);
 }
 
 /// FriBidi's bracket pairs, as its comparison shows them.
@@ -258,6 +285,15 @@ fn bracket_pairs() {
     assert_eq!(levels_of(&text, Ltr), [0, 1, 1, 1, 1, 2]);
     let text = [0x7C0, 0x2069, 0x20D0, 0xFE59, 0x2070, 0x29];
     assert_eq!(levels_of(&text, Ltr), [1, 1, 1, 1, 2, 0]);
+    // A level run that starts with a PDI keeps the brackets open at its
+    // depth: past 63 embeddings the PDI drops to level 0, and the bracket
+    // before the isolate pairs with the one after it.
+    let mut text = repeated(&[(0x202A, 63), (0x6DD, 1), (0x28, 1), (0x61C, 1)]);
+    text.extend([0x2068, 0x710, 0x2069, 0xFF09]);
+    assert_eq!(levels_of(&text, Ltr).last(), Some(&1));
+    let last = text.len() - 1;
+    text[last] = 0x21;
+    assert_eq!(levels_of(&text, Ltr).last(), Some(&0));
 }
 
 /// FriBidi's simple shaping, as its comparison shows it.
@@ -290,6 +326,14 @@ fn simple_shaping_choices() {
     );
     assert_eq!(shape(&[0x2029, 0x7B, 0x5D0], Rtl)[1], 0x7B);
     assert_eq!(shape(&[0x2066, 0x2029, 0x7B, 0x5D0], Rtl)[2], 0x7D);
+    // An isolate open across the separator keeps N1 from joining neutrals
+    // across it, unless a PDI closing such an isolate comes right after it.
+    let text = [0x600, 0x2068, 0x2029, 0x21, 0x2069, 0xFF08, 0x6DD];
+    assert_eq!(shape(&text, Ltr)[5], 0xFF08);
+    let text = [0x600, 0x2068, 0x2029, 0x2069, 0xFF08, 0x6DD];
+    assert_eq!(shape(&text, Ltr)[4], 0xFF09);
+    let text = [0x660, 0x2068, 0x2068, 0x2029, 0x2069, 0x29, 0x5D1];
+    assert_eq!(shape(&text, Ltr)[5], 0x28);
 }
 
 #[test]
@@ -447,6 +491,33 @@ fn nested_brackets_and_isolates() -> Vec<char> {
         text.push('\u{2069}');
     }
     text
+}
+
+#[test]
+fn deep_nesting_costs_linear_work() {
+    // Isolates far deeper than level 125, with brackets and empty isolates at
+    // the deepest depth: the levels are FriBidi's, and the work per character
+    // does not grow with the depth.
+    let budget = Budget::new(1 << 26).expect("budget");
+    let mut spent = Vec::new();
+    for depth in [5_000, 20_000] {
+        let mut text = repeated(&[(0x2066, depth), (0x5D0, 1), (0x24, 1)]);
+        for _ in 0..depth / 4 {
+            text.extend([0x2067, 0x2069, 0x28, 0x21]);
+        }
+        let text: Vec<char> = text.iter().filter_map(|&c| char::from_u32(c)).collect();
+        let classes: Vec<BidiClass> = text.iter().map(|&c| BidiClass::of(c)).collect();
+        let brackets: Vec<Option<Bracket>> = text.iter().map(|&c| Bracket::of(c)).collect();
+        let mut levels = vec![Level::default(); text.len()];
+        let mut resolver = Resolver::new(&budget);
+        resolver
+            .resolve(&classes, Some(&brackets), Ltr, &mut levels)
+            .expect("resolve");
+        let levels: Vec<u8> = levels[depth..depth + 4].iter().map(|l| l.get()).collect();
+        assert_eq!(levels, [125, 124, 124, 125]);
+        spent.push(resolver.work_spent() as f64 / text.len() as f64);
+    }
+    assert!(spent[1] < 32.0 && spent[1] < spent[0] * 1.1, "{spent:?}");
 }
 
 #[test]

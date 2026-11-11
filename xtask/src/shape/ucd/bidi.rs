@@ -33,7 +33,7 @@ const CLASSES: [&str; 23] = [
 const JOINING: [&str; 7] = ["U", "R", "D", "C", "T", "L", "G"];
 
 /// Decomposition tags of the positional presentation forms, in the order of the
-/// generated shaping table's columns.
+/// generated table's columns and of `triergon-shape`'s `ArabicForm`.
 const FORMS: [&str; 4] = ["initial", "medial", "final", "isolated"];
 
 const LAM: u32 = 0x0644;

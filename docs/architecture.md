@@ -143,7 +143,7 @@ performance gates where it touches hot code.
    | Crate | Role |
    |---|---|
    | `triergon-font` | Faces, `cmap`, names, outlines, metrics, `kern`, face matching, a budgeted value `Store`; raw table access for the shaper |
-   | `triergon-shape` | Unicode data generated from the pinned UCD releases its references compiled, the bidirectional algorithm as FriBidi resolves it, and OpenType shaping (GDEF, GSUB, GPOS, `kern` fallback) with the script shapers libass reaches through HarfBuzz: default, Arabic, Hebrew, Indic, Khmer, Myanmar, Thai, Hangul and the Universal Shaping Engine |
+   | `triergon-shape` | Unicode data generated from the pinned UCD releases its references compiled, the bidirectional algorithm of UAX #9 with FriBidi's results where the two differ, and OpenType shaping (GDEF, GSUB, GPOS, `kern` fallback) with the script shapers libass reaches through HarfBuzz: default, Arabic, Hebrew, Indic, Khmer, Myanmar, Thai, Hangul and the Universal Shaping Engine |
    | `triergon-raster` | Outlines in 26.6 fixed point, the glyph transform and its quantisation, flattening, stroking for borders, the tile rasteriser, Gaussian and box blur, the alpha bitmaps borders and shadows combine into, and their rectangle clipping |
    | `triergon-ass` | Script and Matroska-packet parsing, styles, typed override tags, animation, karaoke, drawings, font selection and fallback, line wrapping, alignment, collisions, `\clip`/`\iclip`, and the renderer |
 

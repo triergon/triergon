@@ -4,11 +4,11 @@
 //! Joining follows the logical order. A character joins the last joining
 //! character before it, passing over transparent characters (marks and format
 //! characters) at its level and ignored ones (BN controls), when both are at
-//! one level and each joins on the side that faces the other. The sides are visual: at an
-//! odd level the character before joins on its left and the character after it
-//! on its right, as their joining types (ArabicShaping.txt) give them in
-//! right-to-left text; at an even level the sides swap, so that a right-joining
-//! character joins the character after it.
+//! one level and each joins on the side that faces the other. The sides are
+//! visual: at an odd level the character before joins on its left and the
+//! character after it on its right, as their joining types (ArabicShaping.txt)
+//! give them in right-to-left text; at an even level the sides swap, so that a
+//! right-joining character joins the character after it.
 //!
 //! Then every right-, left- and dual-joining character takes the presentation
 //! form of its joined sides, a LAM and the ALEF right after it that it joins
@@ -24,7 +24,8 @@
 
 use super::class::{BidiClass, JoiningType, Level};
 use super::mirror;
-use crate::unicode::bidi::{self as data, Form};
+use crate::unicode::ArabicForm;
+use crate::unicode::bidi as data;
 use triergon_core::{Error, Result};
 
 /// What replaces a LAM that forms a ligature with the ALEF after it: ZERO WIDTH
@@ -136,10 +137,10 @@ fn shape(text: &mut [char], levels: &[Level], joiner: Joiner, joins_after: bool)
         (joins_after, joiner.joined_before)
     };
     let form = match (right, left) {
-        (true, true) => Form::Medial,
-        (true, false) => Form::Final,
-        (false, true) => Form::Initial,
-        (false, false) => Form::Isolated,
+        (true, true) => ArabicForm::Medial,
+        (true, false) => ArabicForm::Final,
+        (false, true) => ArabicForm::Initial,
+        (false, false) => ArabicForm::Isolated,
     };
     if let Some(shaped) =
         data::presentation_form(u32::from(text[joiner.at]), form).and_then(char::from_u32)

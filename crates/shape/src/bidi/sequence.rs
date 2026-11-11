@@ -12,12 +12,13 @@
 //!
 //! At a level change within a depth, sos and eos take the direction of the
 //! higher of the two levels; at the start of a depth and at its end they take
-//! that of the higher of the sequence's level and the paragraph's, or with
-//! level 0 for the sequences that start at or after the first paragraph
-//! separator (see [`super::Resolver::resolve`]). Where an isolate initiator
-//! left open before that separator ends a sequence, the text after the
-//! separator at its level continues it, but N1 does not join neutrals across
-//! the separator; further separators right after the first stay at its depth.
+//! that of the higher of the sequence's level and the paragraph's. Where the
+//! level changes at an isolate initiator's matching PDI right after it, which
+//! happens at the deepest depth, eos takes the higher level's direction only
+//! where the stretch from the PDI holds a strong class, and is otherwise that
+//! of the end of the depth. After a paragraph separator inside the paragraph
+//! they compare with level 0, and a sequence may continue past the separator
+//! (see `paragraph.rs`).
 
 use super::class::{BidiClass, Bracket, Level};
 use super::explicit::{MAX_ISOLATE_DEPTH, NONE};
@@ -30,10 +31,10 @@ struct Sequence {
     level: u8,
     /// [`Paragraph::base`] at its first character.
     base: u8,
-    /// Whether it ends with an isolate initiator without a matching PDI.
-    unmatched: bool,
+    /// The position of its last character.
+    last: u32,
     /// Where N1 stops joining neutrals: its first character after the first
-    /// paragraph separator, when an isolate initiator left open before the
+    /// paragraph separator, when an isolate initiator open across the
     /// separator ended it there, else [`NONE`].
     break_at: u32,
     sos: BidiClass,
@@ -88,6 +89,20 @@ pub(super) struct Paragraph<'a> {
 }
 
 impl Paragraph<'_> {
+    /// Whether the character at `last` is an isolate initiator before the
+    /// first paragraph separator, without a matching PDI before it, and `next`,
+    /// the first character after the separator, is not a PDI that closes an
+    /// isolate opened before the separator.
+    fn open_across(&self, last: u32, next: usize) -> bool {
+        let last = last as usize;
+        // The paragraph has partners: it holds an isolate initiator.
+        last < self.explicit_end
+            && self.classes[last].is_isolate_initiator()
+            && (self.partner[last] == NONE || self.partner[last] as usize >= self.explicit_end)
+            && !(self.classes[next] == BidiClass::Pdi
+                && (self.partner[next] as usize) < self.explicit_end)
+    }
+
     /// The level sos and eos compare with at the start and end of a depth for
     /// a sequence starting at `at`: the paragraph's, but 0 from the first
     /// paragraph separator on, which with what follows it is at level 0.
@@ -218,8 +233,9 @@ pub(super) fn resolve_plain(
     Ok(())
 }
 
-/// Rules I1 and I2 for one character. The embedding and override characters
-/// after a paragraph separator take the direction of their class.
+/// Rules I1 and I2 for one character. The embedding and override characters,
+/// kept after a paragraph separator (see `paragraph.rs`), take the direction
+/// of their class.
 fn raise(level: &mut Level, class: BidiClass) {
     level.0 += match (level.0 & 1 == 1, class) {
         (false, BidiClass::R | BidiClass::Rle | BidiClass::Rlo)
@@ -237,6 +253,39 @@ fn contiguous(positions: &[u32]) -> Option<std::ops::Range<usize>> {
     let (&first, &last) = (positions.first()?, positions.last()?);
     let range = first as usize..last as usize + 1;
     (range.len() == positions.len()).then_some(range)
+}
+
+/// Whether the stretch of one depth and level from `at` holds a strong class
+/// before a character at another depth or level ends it.
+fn strong_ahead(
+    paragraph: &Paragraph<'_>,
+    types: &[BidiClass],
+    levels: &[Level],
+    at: usize,
+    work: &mut WorkBudget,
+) -> Result<bool> {
+    let (depth, level) = (paragraph.depths[at], levels[at]);
+    let mut found = false;
+    let mut steps = 0;
+    for next in at..types.len() {
+        let class = types[next];
+        if class == BidiClass::Bn && next < paragraph.explicit_end {
+            continue;
+        }
+        steps += 1;
+        if paragraph.depths[next] != depth || levels[next] != level {
+            break;
+        }
+        if matches!(
+            class,
+            BidiClass::L | BidiClass::R | BidiClass::Al | BidiClass::En | BidiClass::An
+        ) {
+            found = true;
+            break;
+        }
+    }
+    charge(work, steps)?;
+    Ok(found)
 }
 
 /// `vector` at `len` elements, filled with `value` only where it grows.
@@ -302,17 +351,25 @@ fn sequences(
         }
         let after_separator = at >= paragraph.explicit_end;
         let sos = match sequences.get_mut(open[depth] as usize) {
-            Some(s) if s.level == level && s.unmatched && after_separator => {
+            Some(s) if s.level == level && after_separator && paragraph.open_across(s.last, at) => {
                 // The text after the separator continues a sequence that
-                // ends with an isolate initiator left open before it, but N1
-                // does not join neutrals across.
+                // ends with an isolate initiator open across it, but N1 does
+                // not join neutrals across.
                 s.break_at = s.len;
                 None
             }
             Some(s) if s.level == level => None,
             Some(s) => {
                 let boundary = direction(s.level.max(level));
-                s.eos = boundary;
+                // After an isolate initiator and its matching PDI right after
+                // it, the higher level counts only where the stretch from the
+                // PDI holds a strong class.
+                let empty = paragraph.partner.get(s.last as usize) == Some(&(at as u32));
+                s.eos = if empty && !strong_ahead(paragraph, types, levels, at, work)? {
+                    direction(s.level.max(s.base))
+                } else {
+                    boundary
+                };
                 Some(boundary)
             }
             None => Some(direction(level.max(paragraph.base(at)))),
@@ -323,7 +380,7 @@ fn sequences(
                 .try_push(Sequence {
                     level,
                     base: paragraph.base(at),
-                    unmatched: false,
+                    last: at as u32,
                     break_at: NONE,
                     sos,
                     eos: sos,
@@ -335,9 +392,7 @@ fn sequences(
         let s = open[depth];
         let sequence = &mut sequences[s as usize];
         sequence.len += 1;
-        sequence.unmatched = at < paragraph.explicit_end
-            && paragraph.classes[at].is_isolate_initiator()
-            && paragraph.partner[at] == NONE;
+        sequence.last = at as u32;
         storage.sequence_of[at] = s;
         deepest = deepest.max(depth + 1);
     }

@@ -115,7 +115,9 @@ pub(super) const MAX_ISOLATE_DEPTH: u8 = 124;
 ///   every embedding the stack holds down to the state an isolate saved, and
 ///   the stack may hold none.
 /// - A PDF pops an embedding even inside an overflowed isolate, and returns to
-///   the isolate depth the embedding saved.
+///   the isolate depth the embedding saved. Where an isolate initiator set the
+///   level, a PDF leaves the count of overflowed embeddings as it is, so an
+///   embedding that overflowed there keeps the next ones off until the PDI.
 /// - Every isolate initiator, overflowed or not, deepens the isolate depth of
 ///   what follows it, up to [`MAX_ISOLATE_DEPTH`]. A PDI that closes a valid
 ///   isolate returns to the depth of the initiator whose saved state it pops
@@ -234,9 +236,11 @@ pub(super) fn levels(
                 depths[i] = depth;
             }
             BidiClass::Pdf => {
-                if overflow_embeddings > 0 {
+                if current.isolate {
+                    // Even the embeddings that overflowed here stay counted.
+                } else if overflow_embeddings > 0 {
                     overflow_embeddings -= 1;
-                } else if saved > 0 && !current.isolate {
+                } else if saved > 0 {
                     saved -= 1;
                     current = stack[saved];
                     depth = current.depth;
@@ -327,5 +331,37 @@ mod tests {
         assert_eq!(types[69], Bn);
         assert_eq!(types[70], Lri);
         assert_eq!(depths[70..], [0, 1, 1, 1]);
+    }
+
+    #[test]
+    fn pdf_under_an_isolate_keeps_overflowed_embeddings() {
+        let budget = Budget::new(1 << 16).unwrap();
+        let mut partner = BudgetVec::new(&budget);
+        let mut work = WorkBudget::new(10_000);
+        // 62 isolates reach level 124, the LRE overflows, and the RLE after
+        // its PDF stays off as well; inside an embedding the PDF frees it.
+        for (prefix, level) in [(&[Lri; 62][..], 124), (&[Lri; 61][..], 125)] {
+            let mut classes = prefix.to_vec();
+            if level == 125 {
+                classes.push(Lre);
+            }
+            classes.extend([Lre, Pdf, Rle, On]);
+            match_isolates(&classes, &mut partner, &mut work).unwrap();
+            let mut types = classes.clone();
+            let mut out = vec![Level(0); classes.len()];
+            let mut depths = vec![0; classes.len()];
+            levels(
+                &classes,
+                classes.len(),
+                &partner,
+                0,
+                &mut types,
+                &mut out,
+                &mut depths,
+                &mut work,
+            )
+            .unwrap();
+            assert_eq!(out.last().unwrap().0, level);
+        }
     }
 }

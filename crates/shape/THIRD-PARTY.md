@@ -4,7 +4,10 @@
 
 The generated tables in `src/unicode` (`tables.rs`, `syllabic_tables.rs` and
 `bidi/tables.rs`) hold data derived from the Unicode Character Database, from the
-hash-pinned files that `cargo xtask shape ucd` names in each table's header.
+hash-pinned files that `cargo xtask shape ucd` names in each table's header:
+`tables.rs` and `syllabic_tables.rs` from Unicode 17.0.0 and 18.0.0, under the Unicode
+License V3 below, and `bidi/tables.rs` from Unicode 14.0.0, under the licence agreement
+in force at that release, quoted after it.
 
 The bidirectional algorithm in `src/bidi` follows Unicode Standard Annex #9, revision
 44 (Unicode 14.0.0), and was written with the Unicode Consortium's C reference
@@ -26,7 +29,13 @@ code was copied from it. The release read, Version 14.0.0 of September 23, 2021,
 | `source/brtest.c` | `c99a465acdcac71534bf09bf777cdf700cf210bc7ff32c3f217412f8465f1640` |
 | `source/brutils.c` | `9c1c57a6c648e76c0e7bcea7065ac1252c462aa6905e8d1dc553b735da05bc6a` |
 
-The data files and the reference implementation are under the licence below.
+The release carries no licence text of its own. Its source files state "Copyright 2021,
+Unicode, Inc. All rights reserved." (`brinput.c` 2016, `brtest.c` 2018, `brrule.c` 2020),
+and its `ReadMe.txt` says the
+source code "is distributed, under the general Unicode Character Database terms of use
+(see https://www.unicode.org/copyright.html)".
+
+The Unicode 17.0.0 and 18.0.0 data files are under this licence:
 
 ```
 UNICODE LICENSE V3
@@ -68,4 +77,58 @@ Except as contained in this notice, the name of a copyright holder shall
 not be used in advertising or otherwise to promote the sale, use or other
 dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
+```
+
+The Unicode 14.0.0 data files, and the reference implementation through the terms of use
+its `ReadMe.txt` names, are under the licence agreement that
+<https://www.unicode.org/license.txt> published when 14.0.0 was released (as archived on
+8 November 2021):
+
+```
+UNICODE, INC. LICENSE AGREEMENT - DATA FILES AND SOFTWARE
+
+See Terms of Use <https://www.unicode.org/copyright.html>
+for definitions of Unicode Inc.’s Data Files and Software.
+
+NOTICE TO USER: Carefully read the following legal agreement.
+BY DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING UNICODE INC.'S
+DATA FILES ("DATA FILES"), AND/OR SOFTWARE ("SOFTWARE"),
+YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT.
+IF YOU DO NOT AGREE, DO NOT DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE
+THE DATA FILES OR SOFTWARE.
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2021 Unicode, Inc. All rights reserved.
+Distributed under the Terms of Use in https://www.unicode.org/copyright.html.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Unicode data files and any associated documentation
+(the "Data Files") or Unicode software and any associated documentation
+(the "Software") to deal in the Data Files or Software
+without restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, and/or sell copies of
+the Data Files or Software, and to permit persons to whom the Data Files
+or Software are furnished to do so, provided that either
+(a) this copyright and permission notice appear with all copies
+of the Data Files or Software, or
+(b) this copyright and permission notice appear in associated
+Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT OF THIRD PARTY RIGHTS.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS
+NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL
+DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THE DATA FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder
+shall not be used in advertising or otherwise to promote the sale,
+use or other dealings in these Data Files or Software without prior
+written authorization of the copyright holder.
 ```

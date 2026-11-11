@@ -5,6 +5,9 @@
 //!     BidiTest.txt BidiCharacterTest.txt
 //! ```
 //!
+//! `cargo xtask shape conformance` fetches the hash-pinned Unicode 14.0.0 files
+//! and runs it on them.
+//!
 //! Each case is resolved as one paragraph and reordered as one line, as the
 //! files assume; levels and visual order are compared for the characters the
 //! files give levels (rule X9 removes the others). It prints the cases that pass

@@ -7,11 +7,13 @@
 //!   marks is a bracket that N0 resolves, the marks and the run after them
 //!   take its direction.
 //! - The embedding and override characters, which are only in a sequence
-//!   after a paragraph separator, are strong classes that are neither L nor
-//!   AL for W2 and W7.
+//!   after a paragraph separator (see `paragraph.rs`), are strong classes that
+//!   are neither L nor AL for W2 and W7.
 //! - Marks after a PDI join its run, which looking forward W4 and W5 pass
 //!   over when the PDI closes an overflowed isolate (in a sequence, the only
-//!   PDIs after a character that is not an isolate initiator).
+//!   PDIs after a character that is not an isolate initiator). Marks after
+//!   such PDIs that follow a European number W2 makes an Arabic number are
+//!   Arabic numbers.
 
 use super::charge;
 use super::class::{BidiClass, Bracket, fill};
@@ -44,19 +46,25 @@ pub(super) fn resolve(
     // as W1 leaves it, and W2 and W3 then change it as they change that class.
     // W1: a mark takes the class of the character before it, ON after an
     // isolate initiator, and sos at the start; after a PDI it joins the PDI's
-    // run, a neutral as ON is.
+    // run, a neutral as ON is, unless the PDIs before it follow a European
+    // number that W2 makes an Arabic number.
     // W2 and W3: a European number after an Arabic letter (the last strong
     // class before it, or sos) is an Arabic number; Arabic letters become R.
     let mut before = sos;
     let mut strong = sos;
+    // Whether the last character before the PDIs just passed (or the last
+    // character) is a European number that W2 made an Arabic number.
+    let mut changed_number = false;
     let mut at = 0;
     while at < types.len() {
-        let (class, end) = if types[at] == Nsm {
+        let raw = types[at];
+        let (class, end) = if raw == Nsm {
             let end = types[at..]
                 .iter()
                 .position(|&c| c != Nsm)
                 .map_or(types.len(), |n| at + n);
             let class = match before {
+                Pdi if changed_number => An,
                 Pdi => Pdi,
                 Lri | Rli | Fsi => On,
                 _ => before,
@@ -81,21 +89,23 @@ pub(super) fn resolve(
             En if strong == Al => An,
             _ => class,
         };
+        if raw != Pdi {
+            changed_number = raw == En && class == An;
+        }
         fill(&mut types[at..end], class);
         at = end;
     }
     // W4: one separator between two numbers of a type it separates takes
     // their type.
     for at in 1..types.len().saturating_sub(1) {
-        let previous = types[at - 1];
-        let Some(next) = following(types, at + 1) else {
-            continue;
+        let number = match (types[at], types[at - 1]) {
+            (Es | Cs, En) => En,
+            (Cs, An) => An,
+            _ => continue,
         };
-        types[at] = match (types[at], previous, next) {
-            (Es | Cs, En, En) => En,
-            (Cs, An, An) => An,
-            (class, _, _) => class,
-        };
+        if following(types, at + 1, work)? == Some(number) {
+            types[at] = number;
+        }
     }
     // W5 to W7 in one pass. W5: terminators next to a European number become
     // European numbers. W6: the remaining separators and terminators are
@@ -112,7 +122,7 @@ pub(super) fn resolve(
                     .iter()
                     .position(|&c| c != Et)
                     .map_or(types.len(), |n| at + n);
-                let touches = before == Some(En) || following(types, end) == Some(En);
+                let touches = before == Some(En) || following(types, end, work)? == Some(En);
                 (if touches { En } else { On }, end)
             }
             Es | Cs => (On, at + 1),
@@ -131,13 +141,19 @@ pub(super) fn resolve(
     Ok(())
 }
 
-/// The first class from `at` on that is not PDI.
-fn following(types: &[BidiClass], at: usize) -> Option<BidiClass> {
-    types
-        .get(at..)?
+/// The first class from `at` on that is not PDI, charging the PDIs passed.
+/// W4 asks only after a separator and W5 only after a run of terminators, so
+/// each PDI is passed at most once by each.
+fn following(types: &[BidiClass], at: usize, work: &mut WorkBudget) -> Result<Option<BidiClass>> {
+    let rest = types.get(at..).unwrap_or_default();
+    let passed = rest
         .iter()
-        .copied()
-        .find(|&c| c != BidiClass::Pdi)
+        .position(|&c| c != BidiClass::Pdi)
+        .unwrap_or(rest.len());
+    if passed > 0 {
+        charge(work, passed)?;
+    }
+    Ok(rest.get(passed).copied())
 }
 
 /// The neutral run at `at`, after marks that joined a neutral run, joins that
@@ -184,5 +200,25 @@ mod tests {
         assert_eq!(weak(&[Et, Et, En, Et], R), [En, En, En, En]);
         assert_eq!(weak(&[L, Et, En, R, En], R), [L, L, L, R, En]);
         assert_eq!(weak(&[An, Cs, En], R), [An, On, En]);
+        assert_eq!(weak(&[En, Cs, Pdi, Pdi, En], R), [En, En, Pdi, Pdi, En]);
+        assert_eq!(weak(&[Et, Pdi, En], R), [En, Pdi, En]);
+        // Marks after PDIs after a European number that W2 changes.
+        assert_eq!(weak(&[Al, En, Pdi, Pdi, Nsm], L), [R, An, Pdi, Pdi, An]);
+        assert_eq!(weak(&[R, En, Pdi, Nsm], L), [R, En, Pdi, Pdi]);
+        assert_eq!(weak(&[Al, En, Nsm, Pdi, Nsm], L), [R, An, An, Pdi, Pdi]);
+    }
+
+    #[test]
+    fn looking_past_pdis_stays_linear() {
+        // Marks after a PDI take its class, so every look forward from them
+        // would pass the rest of the run.
+        for tail in [Nsm, Pdi, Cs, Et] {
+            let mut types = vec![Lri, Pdi];
+            types.extend((0..20_000).map(|n| if n % 2 == 0 { Nsm } else { tail }));
+            types.push(En);
+            let mut work = WorkBudget::new(u64::MAX);
+            resolve(&mut types, L, None, &mut work).unwrap();
+            assert!(work.spent() <= 5 * 20_003, "{tail:?}: {}", work.spent());
+        }
     }
 }
