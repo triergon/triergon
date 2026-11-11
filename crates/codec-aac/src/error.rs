@@ -18,6 +18,8 @@ pub enum Feature {
     CouplingTarget,
     /// Channel layouts that need more channels than the decoder supports.
     TooManyChannels,
+    /// A raw AAC program whose speaker positions cannot be represented unambiguously.
+    RawProgramLayout,
     /// Reserved / escape sampling frequency index.
     SampleRateIndex(u8),
 }

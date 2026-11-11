@@ -370,7 +370,8 @@ pipeline ([harness/capture](../harness/capture/README.md)).
 workloads](../harness/features/aac-access-units/contract.json) from the pinned
 QuickTime and authored audio-only packets. It compares the ordered speakers and
 every decoded PCM plane. The authored clips cover every supported fixed layout
-and indexed rate. `cargo xtask codecs aac-sources --out DIR` records the source
+and indexed rate, and program configurations from mono to eight channels.
+`cargo xtask codecs aac-sources --out DIR` records the source
 clips from independently varying channel tones using the pinned encoder. The
 committed sources fix the encoded input bytes across architectures.
 The paired codec timing and memory commands require passing parity bound to
@@ -533,9 +534,25 @@ time`. It has a user `ubuntu` (uid 1000, passwordless `sudo`); its home director
 part of the image.
 A user space built the same way later can pick up newer packages; compare its
 `dpkg-query -W` list before treating its results as comparable. Inside, install rustup
-as on any host, and run every command under `setarch linux32`. Memory uses the standard
-bounds: the kernel RSS proof module has no 32-bit ioctl entry point. Record the CPU,
-kernel and user-space package list with the results.
+as on any host, and run every command under `setarch linux32`. Record the CPU, kernel
+and user-space package list with the results.
+
+The kernel RSS bound works for a 32-bit process through the module's 32-bit ioctl
+entry point. The module belongs to the host's kernel, so build and load it on the host,
+which needs the kernel's headers, and bind debugfs into the user space before entering
+it. Run `prove.sh` on the host from the repository inside the user space, naming the
+user space's root; it builds and runs the check, and records the architecture and page
+size, inside it:
+
+```sh
+sudo mount --bind /sys/kernel/debug /srv/armhf/sys/kernel/debug
+cd /srv/armhf/home/ubuntu/triergon
+harness/rss-bound/prove.sh .research/rss-bound/RSS-REVIEW.json .research/rss-bound /srv/armhf
+```
+
+Then build the workers with `TRIERGON_RSS_KERNEL_PROOF` and collect memory with
+`TRIERGON_RSS_KERNEL_BOUND=1` inside the user space, as the
+[kernel proof workflow](../harness/rss-bound/README.md) describes.
 
 ## Robustness
 

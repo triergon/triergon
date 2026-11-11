@@ -19415,6 +19415,26 @@
    "source_revision": "b96eb9ec65abbe4548b4bc00a74e8504a6d0001d"
   },
   {
+   "name": "aac-program-range",
+   "path": "aac-program-range",
+   "retention": "retained",
+   "reason": "AAC program range open and seek parity, paired runtime, peak heap and total resident peak",
+   "key": "evidence/aac-program-range/6b41bc92f4c55f6a868dc01181d152a75fe9cbb4868eebb72a6da437b4cf5579.tar.gz",
+   "sha256": "6b41bc92f4c55f6a868dc01181d152a75fe9cbb4868eebb72a6da437b4cf5579",
+   "bytes": 46410219,
+   "source_revision": "98ad5b82da81ba113b3bab206459efc7ede2ed8a"
+  },
+  {
+   "name": "aac-program-range-reviewed",
+   "path": "aac-program-range-reviewed",
+   "retention": "retained",
+   "reason": "Range parity and paired native bounds with the AAC program parser charged to the input budget",
+   "key": "evidence/aac-program-range-reviewed/1beefed497c83dcff49a8638ddbcda6f7968af67806753d727afd10ad16dad26.tar.gz",
+   "sha256": "1beefed497c83dcff49a8638ddbcda6f7968af67806753d727afd10ad16dad26",
+   "bytes": 64212278,
+   "source_revision": "a961b3b38b083180e11a5d57bcf6ab73a15b72dc"
+  },
+  {
    "name": "mp4-range-seek-checkpoints",
    "path": "mp4-range-seek-checkpoints",
    "retention": "retained",
@@ -19462,6 +19482,56 @@
    "sha256": "5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949",
    "bytes": 129922253,
    "source_revision": "3d422610316d79665c80b48ab8a27a8a57880efe"
+  },
+  {
+   "name": "aac-program-configurations",
+   "path": "aac-program-configurations",
+   "retention": "retained",
+   "reason": "Configured raw AAC-LC speaker and PCM parity, paired runtime, peak heap and total resident peak",
+   "key": "evidence/aac-program-configurations/86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf.tar.gz",
+   "sha256": "86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf",
+   "bytes": 163382979,
+   "source_revision": "0a51b7c3746c882b3ca5127ad047162130c01ea6"
+  },
+  {
+   "name": "aac-program-configurations-reviewed",
+   "path": "aac-program-configurations-reviewed",
+   "retention": "retained",
+   "reason": "Configured AAC-LC parity and native comparisons with height validation and grouped rear pairs",
+   "key": "evidence/aac-program-configurations-reviewed/7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e.tar.gz",
+   "sha256": "7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e",
+   "bytes": 181869637,
+   "source_revision": "7b479ad67690a7c2bc03c15f4ff8545c05bc965a"
+  },
+  {
+   "name": "aac-program-speaker-mapping",
+   "path": "aac-program-speaker-mapping",
+   "retention": "retained",
+   "reason": "Configured AAC-LC parity, runtime, peak heap and total resident peak with distinct speaker positions",
+   "key": "evidence/aac-program-speaker-mapping/68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf.tar.gz",
+   "sha256": "68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf",
+   "bytes": 181930058,
+   "source_revision": "fde36dd91d85ca700538421062ceacd45075c5b8"
+  },
+  {
+   "name": "armv7-kernel-rss-linux-armv7",
+   "path": "armv7-kernel-rss-linux-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 rows of docs/status.md measured under the kernel RSS bound through its 32-bit entry point, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1 at afb9049c: 30 timing pairs and 30 kernel-bound memory pairs of mp4-forward, ts-program, matroska-audio-clocks and raw-annex-b graded by cargo xtask grade; 30 kernel-bound memory pairs of hls-segments, matroska-startup-seek, the six Matroska feature groups, the external HDR vector, mpegts-pes, isobmff-bench and framing; the kernel proofs with their positive and invalidation checks, the build identities, the scripts, the CPU, kernel and user-space package list.",
+   "key": "evidence/armv7-kernel-rss-linux-armv7/4567e8ba906099070b64ac43868bdd9695d350049f25645078e35c0f334ce8b1.tar.gz",
+   "sha256": "4567e8ba906099070b64ac43868bdd9695d350049f25645078e35c0f334ce8b1",
+   "bytes": 4609695693,
+   "source_revision": "afb9049c681916c97311fc9f495e27ceaa69f4df"
+  },
+  {
+   "name": "armv7-ass-thumb-linux-armv7",
+   "path": "armv7-ass-thumb-linux-armv7",
+   "retention": "retained",
+   "reason": "ASS rendering ARMv7 memory row of docs/status.md under the kernel RSS bound through its 32-bit entry point, and the native AArch64 proof of the same module source, on a c6g.4xlarge at afb9049c: 30 kernel-bound memory pairs of ass-render and ass-render-host against libass-player-native in the armv7-userland user space pinned to CPU 1; the AArch64 proof with its positive and invalidation checks and 30 kernel-bound memory pairs of mp4-forward; the thumbv7neon-unknown-linux-gnueabihf playback-worker experiment against the gate build and FFmpeg (timing pairs and kernel-bound RSS observations, with both binaries); the kernel proofs, build identities, scripts, CPU, kernel and user-space package list.",
+   "key": "evidence/armv7-ass-thumb-linux-armv7/d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a.tar.gz",
+   "sha256": "d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a",
+   "bytes": 424394382,
+   "source_revision": "afb9049c681916c97311fc9f495e27ceaa69f4df"
   },
   {
    "name": "matroska-legacy-aac",

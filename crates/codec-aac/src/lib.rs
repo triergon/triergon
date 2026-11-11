@@ -149,9 +149,9 @@ impl Decoder {
     }
 }
 
-/// Decoder for one raw AAC-LC access unit per packet with a fixed layout.
-/// Supply the indexed core rate and channel configuration from a checked
-/// AudioSpecificConfig with 1024 core samples and no core dependency.
+/// Decoder for one raw AAC-LC access unit per packet.
+/// Supply the indexed core rate and layout from a checked AudioSpecificConfig
+/// with 1024 core samples and no core dependency.
 #[derive(Debug)]
 pub struct RawLcDecoder {
     core: decoder::Core,
@@ -195,6 +195,23 @@ impl RawLcDecoder {
         Ok(Self { core })
     }
 
+    /// Set up an explicit program layout from the byte-aligned PCE in an
+    /// AudioSpecificConfig with channel configuration zero. Pass the complete
+    /// `program_config_element()` field through its comment, starting at its tag.
+    pub fn with_program_config_in(
+        frequency_index: u8,
+        program_config: &[u8],
+        budget: &Budget,
+    ) -> Result<Self, DecodeError> {
+        let mut reader = CachedBitReader::new(program_config);
+        let program = pce::parse_pce(&mut reader, 0)?;
+        if reader.left() != 0 {
+            return Err(DecodeError::InvalidData("raw AAC program extent"));
+        }
+        let core = decoder::Core::with_program(budget, frequency_index, &program)?;
+        Ok(Self { core })
+    }
+
     /// Decode one complete raw data block from the container sample.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         decode_with::<true>(&mut self.core, out, |core, out| {
@@ -227,7 +244,7 @@ fn decode_with<const RAW: bool>(
     decode: impl FnOnce(&mut decoder::Core, &mut AudioFrame) -> Result<(), DecodeError>,
 ) -> Result<(), DecodeError> {
     if RAW {
-        // The fixed decoder overwrites the entire reserved frame on success.
+        // The raw decoder overwrites the entire reserved frame on success.
         out.samples_per_channel = 0;
     } else {
         out.clear();

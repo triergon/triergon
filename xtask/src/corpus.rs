@@ -489,6 +489,33 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (145, 35_398, 5_283_456_504_139_288_625),
         ),
     ]);
+    let program_file = "avc-aac-program.mov";
+    let program_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(program_file);
+    let program =
+        fs::read(&program_seed).map_err(|error| format!("{}: {error}", program_seed.display()))?;
+    if sha256::hex(&program) != "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9" {
+        return Err("AAC program range seed changed".into());
+    }
+    write(&output.join(program_file), &program)?;
+    cases.extend([
+        mp4_range_case(
+            "aac-program-open",
+            program_file,
+            &program,
+            [],
+            (174, 91_514, 9_360_453_060_203_789_492),
+        ),
+        mp4_range_case(
+            "aac-program-seek",
+            program_file,
+            &program,
+            ["24000"],
+            (102, 54_337, 7_863_734_754_543_817_612),
+        ),
+    ]);
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",
