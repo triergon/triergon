@@ -4,49 +4,12 @@ use crate::{Error, Result, ebml, incremental::ParseStep, storage::SharedBytes};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::WorkBudget;
 
-#[derive(Clone, Debug)]
-pub(crate) struct Frames {
-    // Before Ranges these are lengths; each charged Ranges step replaces one
-    // length with its checked absolute end. A start is the preceding end, so
-    // full-width offsets need one word per frame without allocation/narrowing.
-    ends: [usize; 256],
-    base: usize,
-    count: usize,
-}
-impl Frames {
-    pub(crate) fn len(&self) -> usize {
-        self.count
-    }
-    pub(crate) fn get(&self, index: usize) -> Option<Range<usize>> {
-        let end = *self.ends.get(index).filter(|_| index < self.count)?;
-        let start = if index == 0 {
-            self.base
-        } else {
-            self.ends[index - 1]
-        };
-        Some(start..end)
-    }
-    #[cfg(test)]
-    pub(crate) fn ranges(&self) -> impl Iterator<Item = Range<usize>> + '_ {
-        self.ends[..self.count]
-            .iter()
-            .enumerate()
-            .map(|(index, end)| {
-                let start = if index == 0 {
-                    self.base
-                } else {
-                    self.ends[index - 1]
-                };
-                start..*end
-            })
-    }
-}
 #[derive(Debug)]
 enum Phase {
     Count,
     Sizes,
     Last,
-    Ranges,
+    PrepareRanges,
     Done,
 }
 #[derive(Debug)]
@@ -56,10 +19,15 @@ pub(crate) struct LaceJob {
     mode: u8,
     phase: Phase,
     at: usize,
-    frames: Frames,
-    n: usize,
+    count: usize,
+    frame: usize,
     xiph: usize,
-    used: usize,
+    // Sum of descriptor lengths during validation and payload offset during replay.
+    payload_at: usize,
+    previous_size: usize,
+    data_start: usize,
+    fixed_size: usize,
+    ready: Option<Range<usize>>,
     failed: bool,
 }
 impl LaceJob {
@@ -74,14 +42,14 @@ impl LaceJob {
             mode,
             phase: Phase::Count,
             at,
-            frames: Frames {
-                ends: [0; 256],
-                base: 0,
-                count: 0,
-            },
-            n: 0,
+            count: 0,
+            frame: 0,
             xiph: 0,
-            used: 0,
+            payload_at: 0,
+            previous_size: 0,
+            data_start: 0,
+            fixed_size: 0,
+            ready: None,
             failed: false,
         })
     }
@@ -99,26 +67,111 @@ impl LaceJob {
         }
         result
     }
-    /// Borrow the one retained descriptor arena only after validation completes.
-    /// Packet batches keep this job until all restored frames are staged.
-    pub(crate) fn frames(&self) -> Option<&Frames> {
-        matches!(self.phase, Phase::Done).then_some(&self.frames)
+    pub(crate) fn frame_count(&self) -> Option<usize> {
+        matches!(self.phase, Phase::Done).then_some(self.count)
     }
-    #[cfg(test)]
-    pub(crate) fn step(
+
+    /// Validate every descriptor before replaying the immutable header under the
+    /// same work budget. The cached range survives frame-allocation pressure.
+    pub(crate) fn frame_range(
         &mut self,
+        index: usize,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<Frames>> {
-        match self.step_descriptors(work, cancel)? {
-            ParseStep::Event(()) => {
-                let Some(frames) = self.frames() else {
-                    return Err(Error::Invalid("missing lace frames"));
-                };
-                Ok(ParseStep::Event(frames.clone()))
-            }
-            other => super::pending(other),
+    ) -> Result<Option<Range<usize>>> {
+        if self.failed || !matches!(self.phase, Phase::Done) || index >= self.count {
+            return Err(Error::Invalid("missing frame range"));
         }
+        let result = self.advance_range(index, work, cancel);
+        if result.is_err() {
+            self.failed = true;
+        }
+        result
+    }
+
+    fn advance_range(
+        &mut self,
+        index: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Range<usize>>> {
+        check(cancel)?;
+        if let Some(range) = &self.ready {
+            if self.frame == index {
+                return Ok(Some(range.clone()));
+            }
+            if index != self.frame + 1 {
+                return Err(Error::Invalid("lace frame order"));
+            }
+            self.frame = index;
+            self.ready = None;
+        }
+        if self.frame != index {
+            return Err(Error::Invalid("lace frame order"));
+        }
+        loop {
+            check(cancel)?;
+            if !work.try_charge(1) {
+                return Ok(None);
+            }
+            let size = if self.frame == self.count - 1 {
+                self.range
+                    .end
+                    .checked_sub(self.payload_at)
+                    .ok_or(Error::Overflow)?
+            } else if self.mode == 2 {
+                self.fixed_size
+            } else {
+                let Some(size) = self.read_size(self.data_start)? else {
+                    continue;
+                };
+                size
+            };
+            let end = self.payload_at.checked_add(size).ok_or(Error::Overflow)?;
+            if end > self.range.end {
+                return Err(Error::Truncated);
+            }
+            let range = self.payload_at..end;
+            self.ready = Some(range.clone());
+            self.payload_at = end;
+            return Ok(Some(range));
+        }
+    }
+
+    fn finish_descriptors(&mut self) {
+        self.data_start = self.at;
+        self.phase = Phase::PrepareRanges;
+    }
+
+    fn read_size(&mut self, end: usize) -> Result<Option<usize>> {
+        let size = if self.mode == 1 {
+            let byte = *self
+                .source
+                .get(self.at)
+                .filter(|_| self.at < end)
+                .ok_or(Error::Truncated)?;
+            self.at += 1;
+            self.xiph = self
+                .xiph
+                .checked_add(usize::from(byte))
+                .ok_or(Error::Overflow)?;
+            if byte == 255 {
+                return Ok(None);
+            }
+            std::mem::take(&mut self.xiph)
+        } else {
+            let (value, width, _) = ebml::vint(&self.source[self.at..end], false)?;
+            self.at += width;
+            if self.frame == 0 {
+                usize::try_from(value).map_err(|_| Error::Overflow)?
+            } else {
+                let delta = i128::from(value) - ((1_i128 << (7 * width - 1)) - 1);
+                usize::try_from(self.previous_size as i128 + delta)
+                    .map_err(|_| Error::Invalid("negative/overflow lace size"))?
+            }
+        };
+        self.previous_size = size;
+        Ok(Some(size))
     }
     fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep<()>> {
         loop {
@@ -132,9 +185,8 @@ impl LaceJob {
             match self.phase {
                 Phase::Count => {
                     if self.mode == 0 {
-                        self.frames.count = 1;
-                        self.frames.ends[0] = self.range.len();
-                        self.phase = Phase::Ranges;
+                        self.count = 1;
+                        self.finish_descriptors();
                         continue;
                     }
                     let count = usize::from(
@@ -148,15 +200,14 @@ impl LaceJob {
                         return Err(Error::Invalid("lacing requires multiple frames"));
                     }
                     self.at += 1;
-                    self.frames.count = count;
+                    self.count = count;
                     if self.mode == 2 {
                         let bytes = self.range.end - self.at;
                         if !bytes.is_multiple_of(count) {
                             return Err(Error::Invalid("fixed lace remainder"));
                         }
-                        // Fill each fixed size in its separately charged range step.
-                        self.used = bytes / count;
-                        self.phase = Phase::Ranges;
+                        self.fixed_size = bytes / count;
+                        self.finish_descriptors();
                     } else if matches!(self.mode, 1 | 3) {
                         self.phase = Phase::Sizes;
                     } else {
@@ -164,74 +215,31 @@ impl LaceJob {
                     }
                 }
                 Phase::Sizes => {
-                    if self.n == self.frames.count - 1 {
+                    if self.frame == self.count - 1 {
                         self.phase = Phase::Last;
                         continue;
                     }
-                    let size = if self.mode == 1 {
-                        let b = *self
-                            .source
-                            .get(self.at)
-                            .filter(|_| self.at < self.range.end)
-                            .ok_or(Error::Truncated)?;
-                        self.at += 1;
-                        self.xiph = self
-                            .xiph
-                            .checked_add(usize::from(b))
-                            .ok_or(Error::Overflow)?;
-                        if b == 255 {
-                            continue;
-                        }
-                        std::mem::take(&mut self.xiph)
-                    } else {
-                        let (value, width, _) =
-                            ebml::vint(&self.source[self.at..self.range.end], false)?;
-                        self.at += width;
-                        if self.n == 0 {
-                            usize::try_from(value).map_err(|_| Error::Overflow)?
-                        } else {
-                            let delta = i128::from(value) - ((1_i128 << (7 * width - 1)) - 1);
-                            usize::try_from(self.frames.ends[self.n - 1] as i128 + delta)
-                                .map_err(|_| Error::Invalid("negative/overflow lace size"))?
-                        }
+                    let Some(size) = self.read_size(self.range.end)? else {
+                        continue;
                     };
-                    self.frames.ends[self.n] = size;
-                    self.used = self.used.checked_add(size).ok_or(Error::Overflow)?;
-                    self.n += 1;
+                    self.payload_at = self.payload_at.checked_add(size).ok_or(Error::Overflow)?;
+                    self.frame += 1;
                 }
                 Phase::Last => {
-                    self.frames.ends[self.frames.count - 1] = self
-                        .range
+                    self.range
                         .end
                         .checked_sub(self.at)
-                        .and_then(|n| n.checked_sub(self.used))
+                        .and_then(|remaining| remaining.checked_sub(self.payload_at))
                         .ok_or(Error::Invalid("lace exceeds block"))?;
-                    self.n = 0;
-                    self.phase = Phase::Ranges;
+                    self.finish_descriptors();
                 }
-                Phase::Ranges => {
-                    if self.n == 0 {
-                        self.frames.base = self.at;
-                    }
-                    if self.n == self.frames.count {
-                        if self.at != self.range.end {
-                            return Err(Error::Invalid("unconsumed lace bytes"));
-                        }
-                        self.phase = Phase::Done;
-                        continue;
-                    }
-                    let size = if self.mode == 2 {
-                        self.used
-                    } else {
-                        self.frames.ends[self.n]
-                    };
-                    let end = self.at.checked_add(size).ok_or(Error::Overflow)?;
-                    if end > self.range.end {
-                        return Err(Error::Truncated);
-                    }
-                    self.frames.ends[self.n] = end;
-                    self.n += 1;
-                    self.at = end;
+                Phase::PrepareRanges => {
+                    self.at = self.range.start + usize::from(self.mode != 0);
+                    self.frame = 0;
+                    self.xiph = 0;
+                    self.payload_at = self.data_start;
+                    self.previous_size = 0;
+                    self.phase = Phase::Done;
                 }
                 Phase::Done => unreachable!(),
             }
@@ -250,14 +258,25 @@ mod tests {
         let source = SharedBytes::try_from_vec(&pool, data.to_vec())?;
         let mut job = LaceJob::new(source, 0..data.len(), mode)?;
         loop {
-            match job.step(&mut WorkBudget::new(u64::MAX), &AtomicBool::new(false))? {
-                ParseStep::Event(frames) => {
-                    return Ok(frames.ranges().map(|range| data[range].to_vec()).collect());
-                }
+            match job.step_descriptors(&mut WorkBudget::new(u64::MAX), &AtomicBool::new(false))? {
+                ParseStep::Event(()) => break,
                 ParseStep::Yield => continue,
                 other => panic!("unexpected lace step {other:?}"),
             }
         }
+        let mut frames = Vec::new();
+        for index in 0..job.frame_count().unwrap() {
+            let Some(range) = job.frame_range(
+                index,
+                &mut WorkBudget::new(u64::MAX),
+                &AtomicBool::new(false),
+            )?
+            else {
+                panic!("unlimited lace work yielded");
+            };
+            frames.push(data[range].to_vec());
+        }
+        Ok(frames)
     }
 
     #[test]
@@ -272,5 +291,52 @@ mod tests {
             assert!(lace(b, 3).is_err(), "{b:?}");
         }
         assert!(lace(&[1, 0, 1, 2], 2).is_err());
+    }
+
+    #[test]
+    fn xiph_range_resumes_each_octet_and_checks_cancellation_when_cached() {
+        let mut data = vec![1, 255, 255, 255, 0];
+        data.resize(771, b'A');
+        let pool = triergon_core::Budget::new(64 * 1024).unwrap();
+        let source = SharedBytes::try_from_vec(&pool, data).unwrap();
+        let mut job = LaceJob::new(source, 0..771, 1).unwrap();
+        let running = AtomicBool::new(false);
+        assert!(matches!(
+            job.step_descriptors(&mut WorkBudget::new(32), &running)
+                .unwrap(),
+            ParseStep::Event(())
+        ));
+        for _ in 0..3 {
+            assert!(
+                job.frame_range(0, &mut WorkBudget::new(1), &running)
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        assert!(matches!(
+            job.frame_range(0, &mut WorkBudget::new(1), &running).unwrap(),
+            Some(range) if range == (5..770)
+        ));
+        assert_eq!(
+            job.frame_range(0, &mut WorkBudget::new(0), &AtomicBool::new(true))
+                .unwrap_err(),
+            Error::Cancelled
+        );
+        assert!(
+            job.frame_range(0, &mut WorkBudget::new(1), &running)
+                .is_err()
+        );
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn ebml_size_delta_uses_full_width_until_the_lace_is_rejected() {
+        let size = 1_u64 << 40;
+        let delta = (1_u64 << 55) - 1 - size;
+        let marker = 1_u64 << 56;
+        let mut data = vec![2];
+        data.extend_from_slice(&(marker | size).to_be_bytes());
+        data.extend_from_slice(&(marker | delta).to_be_bytes());
+        assert_eq!(lace(&data, 3), Err(Error::Invalid("lace exceeds block")));
     }
 }
