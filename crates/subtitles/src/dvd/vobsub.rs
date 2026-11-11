@@ -5,7 +5,7 @@
 //! [`Lines`] reads it one line at a time without allocating: settings such as
 //! `size:` and `palette:` stay raw for the caller, and every `id:`, `delay:`
 //! and `timestamp:` line is decoded. Line ends may be LF or CRLF. A `delay:`
-//! line is read as the reference reads it, with 32-bit ARMv7's `long`, and is
+//! line gives the delays observed in FFmpeg built for 32-bit ARMv7, and is
 //! never malformed: whatever its fields do not say is zero.
 use super::c_text::scan_int;
 use triergon_core::{Error, Result};
@@ -112,12 +112,12 @@ fn classify(line: &[u8]) -> Result<Line<'_>> {
     Ok(Line::Setting(line))
 }
 
-/// A `delay:` value in milliseconds, as the reference reads it: after spaces
-/// (only U+0020), a `-` negates the whole delay; then up to four fields
-/// `H:M:S:ms`, each a `%d` of C's `sscanf` with a 32-bit `long` (after any white
-/// space, with an optional sign, saturating at `int`'s range), each but the
-/// first right after a `:`. Fields it does not reach are zero, so text without
-/// a number is a delay of zero; the fields are summed in 64 bits.
+/// A `delay:` value in milliseconds, with the values observed in FFmpeg built for 32-bit
+/// ARMv7: after spaces (only U+0020), a `-` negates the whole delay; then up to four fields
+/// `H:M:S:ms`, each a decimal number after any white space and an optional sign, saturating
+/// at 2³¹ − 1 and −2³¹ ([`scan_int`]), each but the first right after a `:`. Fields it does
+/// not reach are zero, so text without a number is a delay of zero; the fields are summed in
+/// 64 bits.
 fn delay(value: &[u8]) -> i64 {
     let spaces = value.iter().take_while(|&&b| b == b' ').count();
     let (negative, text) = match &value[spaces..] {

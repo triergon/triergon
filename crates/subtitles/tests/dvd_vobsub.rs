@@ -89,9 +89,9 @@ fn streams_are_created_by_their_first_timestamp() {
     assert_eq!(times(2), [3000]);
 }
 
-/// `delay:` values as the pinned FFmpeg build for 32-bit ARMv7 reads them:
-/// spaces then an optional `-` for the whole delay, up to four `%d` fields
-/// saturating at `int`'s range, missing fields zero, never an error.
+/// `delay:` values as observed in the pinned FFmpeg build for 32-bit ARMv7:
+/// spaces then an optional `-` for the whole delay, up to four decimal fields
+/// saturating at 2³¹ − 1 and −2³¹, missing fields zero, never an error.
 #[test]
 fn delays_are_read_as_32_bit_arm_reads_them() {
     let delay = |value: &str| match lines(format!("delay:{value}").as_bytes())[..] {
@@ -105,7 +105,7 @@ fn delays_are_read_as_32_bit_arm_reads_them() {
         ("  -00:00:01:000", -1000),
         (" +00:00:01:000", 1000),
         ("  +00:00:01:000", 1000),
-        // Only spaces come before the sign; a `%d` field reads the rest.
+        // Only spaces come before the sign; the first field reads the rest.
         ("\t-00:00:01:000", 1000),
         (" --00:00:01:000", -1000),
         (" - -00:00:01:000", -1000),

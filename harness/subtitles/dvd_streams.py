@@ -1022,8 +1022,8 @@ FIXTURE_SETS = [
 
 def index_variants(out, case):
     """The `.idx` text variants: header lines, line ends, tracks, timestamps,
-    palettes, and the numbers of `size:` and `delay:` lines, which FFmpeg reads
-    through C's `long` (so beyond 32 bits they depend on the target)."""
+    palettes, and the numbers of `size:` and `delay:` lines, whose values beyond
+    32 bits were observed to differ between FFmpeg's targets."""
     unit = spu(glyphs(16, 6, 1), 10, 10)
     sub = b"".join(sectors(0x20, unit, 90000, 0)) + b"".join(sectors(0x21, unit, 90000, 0))
     T = lambda ms, pos=0: "timestamp: %s, filepos: %09x" % (timestamp(ms), pos)

@@ -517,9 +517,9 @@ fn configuration_and_options_select_the_palette() {
     assert_eq!(options.palette, None);
 }
 
-/// Palette numbers are read with a 32-bit `unsigned long`, as on 32-bit
-/// ARMv7: beyond 32 bits a number is `ULONG_MAX`, so white, whatever its sign
-/// or leading zeros; within them a minus negates modulo 2^32.
+/// Palette numbers as observed in FFmpeg built for 32-bit ARMv7: beyond 32
+/// bits a number is white, whatever its sign or leading zeros; within them a
+/// minus negates modulo 2³².
 #[test]
 fn palette_numbers_are_read_with_a_32_bit_unsigned_long() {
     let mut options = Settings::default();
@@ -544,8 +544,8 @@ fn palette_numbers_are_read_with_a_32_bit_unsigned_long() {
     assert_eq!(read.unwrap().palette.unwrap()[..3], [0xffffff; 3]);
 }
 
-/// The canvas of the `size:` line, read as the reference's `sscanf("%dx%d")`
-/// and refused where the reference cannot open its decoder.
+/// The canvas of the `size:` line: two numbers separated by an `x`, refused
+/// where the reference cannot open its decoder.
 #[test]
 fn the_size_line_sets_the_canvas() {
     let canvas = |text: &[u8]| Settings::from_configuration(text).map(|s| s.canvas);
@@ -593,8 +593,8 @@ fn the_size_line_sets_the_canvas() {
     // The largest square the reference accepts, and one past it.
     assert_eq!(canvas(b"size: 16255x16255"), Ok(Some([16255, 16255])));
     assert!(canvas(b"size: 16256x16256").is_err());
-    // A number is converted with a 32-bit `long`, as on 32-bit ARMv7: beyond
-    // it, `LONG_MAX` or `LONG_MIN`, a size the reference refuses.
+    // A number beyond 2³¹ − 1 or below −2³¹ refuses the size, as observed in
+    // FFmpeg built for 32-bit ARMv7.
     for beyond in [
         &b"size: 4294968016x480"[..],
         b"size: 2147483648x480",

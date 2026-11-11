@@ -20,9 +20,9 @@
   ],
   "pending_module_requirements": [
     "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu decodes the palette option's 1122334455, a number beyond 32 bits, as its low bits (0x334455), where FFmpeg built for 32-bit ARM gives 0xffffff; the decoder follows 32-bit ARM",
-    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: width 4294968016, beyond int's range, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
-    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: height -4294966816, beyond int's range, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
-    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads delay: fields beyond int's range as their low 32 bits, where FFmpeg built for 32-bit ARM saturates them at int's range, so the subtitles are shown at other times there; the decoder follows 32-bit ARM"
+    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: width 4294968016, beyond 2^31 - 1, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
+    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: height -4294966816, beyond 2^31 - 1, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
+    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads delay: fields beyond 2^31 - 1 or below -2^31 as their low 32 bits, where FFmpeg built for 32-bit ARM saturates them at 2^31 - 1 and -2^31, so the subtitles are shown at other times there; the decoder follows 32-bit ARM"
   ],
   "open_cases": [
     {
@@ -34,21 +34,21 @@
     },
     {
       "id": "vobsub-idx-size-beyond-32-bits",
-      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: width 4294968016, beyond int's range, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
+      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: width 4294968016, beyond 2^31 - 1, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "vobsub-idx-size-negative-beyond-32-bits",
-      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: height -4294966816, beyond int's range, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
+      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: height -4294966816, beyond 2^31 - 1, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "vobsub-idx-delay-beyond-32-bits",
-      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads delay: fields beyond int's range as their low 32 bits, where FFmpeg built for 32-bit ARM saturates them at int's range, so the subtitles are shown at other times there; the decoder follows 32-bit ARM",
+      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads delay: fields beyond 2^31 - 1 or below -2^31 as their low 32 bits, where FFmpeg built for 32-bit ARM saturates them at 2^31 - 1 and -2^31, so the subtitles are shown at other times there; the decoder follows 32-bit ARM",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

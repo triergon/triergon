@@ -447,12 +447,13 @@ in every case each worker's resident set at the start of the operation varies by
 32 pages between pairs (the candidate's from about 423 to 659 pages, the reference's from
 about 570 to 712), so the counts of pairs with a lower observed peak carry that spread.
 
-The DVD decoder reads the numbers of a VobSub configuration and of the `palette` option as
-FFmpeg built for ARMv7 does, with a 32-bit `long`: a colour list's (the `palette` option and
-a `palette:` line), a `size:` line's, which beyond `int`'s range refuse the size, and a
-`.idx` `delay:` line's (a `-` after spaces negating the whole delay, then up to four `%d`
-fields, each saturating at `int`'s range, missing fields zero). FFmpeg built for AArch64
-keeps 64 bits, or the low 32, of such numbers instead. `subtitle-dvd-host` pins the cases
+The DVD decoder gives the numbers of a VobSub configuration and of the `palette` option the
+values observed in FFmpeg built for ARMv7: a colour list's numbers (the `palette` option and
+a `palette:` line) wrap modulo 2³², and one beyond 32 bits is white (`0xffffff`); a `size:`
+number beyond 2³¹ − 1 or below −2³¹ refuses the size; and a `.idx` `delay:` line is a `-`
+after spaces negating the whole delay, then up to four fields that saturate at 2³¹ − 1 and
+−2³¹, missing fields zero. FFmpeg built for AArch64 keeps the low 32 bits of such numbers, or
+all 64 for a colour, instead. The probes these values come from are in the raw samples. `subtitle-dvd-host` pins the cases
 that reach them per target and holds four of them open on AArch64, each target-dependent
 by design: `vobsub-palette-option`, which `subtitle-dvd` held before and which passed there,
 and the cases `vobsub-idx-size-beyond-32-bits`, `vobsub-idx-size-negative-beyond-32-bits`

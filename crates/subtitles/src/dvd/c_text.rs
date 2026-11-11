@@ -1,15 +1,15 @@
-//! Numbers in DVD configuration and index text, read as C's conversion
-//! functions read them in FFmpeg built for 32-bit ARMv7, where `long` has 32
-//! bits: the decoder follows that build wherever the width of `long` decides a
-//! result.
+//! Numbers in DVD configuration and index text. Each reader implements a C string-to-integer
+//! conversion (C17 7.22.1.4) with 32-bit ARM's widths (AAPCS, ILP32: `long` has 32 bits), so
+//! the decoder gives the values observed in FFmpeg built for 32-bit ARMv7, which it follows where
+//! the targets differ (probes in evidence set `subtitles-armv7-arm64-f2634911`, `clean-room/`).
 
 /// C's `isspace` in the C locale.
 pub(super) fn is_space(b: u8) -> bool {
     matches!(b, b' ' | b'\t'..=b'\r')
 }
 
-/// `strtoul(text + start, &end, 16)` with a 32-bit `unsigned long`: the value
-/// and `end`, which stays at `start` without digits. Out of range (above
+/// C's `strtoul(text + start, &end, 16)` (C17 7.22.1.4) with a 32-bit
+/// `unsigned long`: the value and `end`, which stays at `start` without digits. Out of range (above
 /// `0xffffffff`) is `ULONG_MAX` whatever the sign; in range, a minus negates
 /// in unsigned arithmetic.
 pub(super) fn strtoul16(text: &[u8], start: usize) -> (u32, usize) {
@@ -51,9 +51,9 @@ pub(super) fn strtoul16(text: &[u8], start: usize) -> (u32, usize) {
     }
 }
 
-/// One `%d` from `start`: a decimal number converted as `strtol` does with a
-/// 32-bit `long`, as on 32-bit ARMv7 (out of range is `LONG_MAX` or
-/// `LONG_MIN`, which an `int` holds unchanged); with the index after it.
+/// A decimal number from `start`, with C's `strtol` semantics (C17 7.22.1.4)
+/// for a 32-bit `long`: after white space and an optional sign, saturating at
+/// 2³¹ − 1 and −2³¹; with the index after it, or `None` without digits.
 pub(super) fn scan_int(text: &[u8], start: usize) -> Option<(i32, usize)> {
     let mut at = start;
     while text.get(at).copied().is_some_and(is_space) {

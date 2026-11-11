@@ -28,9 +28,9 @@ impl Settings {
     /// line). A line beginning `palette:` replaces the palette and one
     /// beginning `size:` the canvas; other lines are ignored. Both values are
     /// scanned from the rest of the text, so they can continue on the next
-    /// line. A `size:` line without two numbers is ignored; its numbers are
-    /// converted with a 32-bit `long`, as on 32-bit ARMv7, so one beyond
-    /// `int`'s range saturates and the size is refused.
+    /// line. A `size:` line without two numbers is ignored, and one with a number beyond
+    /// 2³¹ − 1 or below −2³¹ is refused, as observed in FFmpeg built for 32-bit ARMv7
+    /// (FFmpeg for AArch64 keeps the number's low 32 bits).
     ///
     /// # Errors
     ///
@@ -92,10 +92,10 @@ impl Settings {
 
     /// The `palette` option: up to sixteen hexadecimal colours separated by
     /// commas. It takes precedence over the configuration and the IFO palette.
-    /// Each number is read as C's `strtoul` reads it with a 32-bit `unsigned
-    /// long`, as on 32-bit ARMv7, and keeps its low 24 bits: a number beyond
-    /// 32 bits is white, a negative one is negated modulo 2^32. A `palette:`
-    /// line of the configuration is read the same way.
+    /// Each number keeps its low 24 bits. A negative one is negated modulo 2³², and one
+    /// beyond 32 bits is white (`0xffffff`) whatever its sign, as observed in FFmpeg built
+    /// for 32-bit ARMv7 (FFmpeg for AArch64 keeps the low bits of a number up to 64 bits).
+    /// A `palette:` line of the configuration is read the same way.
     pub fn apply_palette_option(&mut self, text: &[u8]) {
         self.palette = Some(parse_colour_list(text));
     }
@@ -117,11 +117,11 @@ fn below_0e(word: u64) -> u64 {
     word.wrapping_sub(ONES * 0x0e) & !word & HIGHS
 }
 
-/// Sixteen colours as the reference reads a colour list: each number
-/// converted as `strtoul` does in base 16 (after white space, with an optional
-/// sign and `0x`) with a 32-bit `unsigned long`, as on 32-bit ARMv7, and kept
-/// to its low 24 bits, then any run of commas and white space skipped. A
-/// number beyond 32 bits is therefore white (`ULONG_MAX`) whatever its sign.
+/// Sixteen colours from a colour list: each number read with C's `strtoul` semantics in
+/// base 16 (C17 7.22.1.4: after white space, with an optional sign and `0x`) for a 32-bit
+/// `unsigned long` (AAPCS) and kept to its low 24 bits, then any run of commas and white
+/// space skipped. A number beyond 32 bits is therefore white whatever its sign, as observed
+/// in FFmpeg built for 32-bit ARMv7.
 /// An entry without digits is black and leaves the text where it was, so once
 /// the skip cannot move either, the rest are black.
 fn parse_colour_list(text: &[u8]) -> [u32; 16] {
@@ -143,8 +143,8 @@ fn parse_colour_list(text: &[u8]) -> [u32; 16] {
     colours
 }
 
-/// `%dx%d` as C's `sscanf` reads it: each number after optional white space,
-/// with an optional sign, the `x` right after the first.
+/// Two decimal numbers separated by an `x` right after the first, each after
+/// optional white space and with an optional sign ([`scan_int`]).
 fn scan_size(text: &[u8]) -> Option<[i32; 2]> {
     let (width, end) = scan_int(text, 0)?;
     if text.get(end) != Some(&b'x') {
@@ -155,8 +155,8 @@ fn scan_size(text: &[u8]) -> Option<[i32; 2]> {
 }
 
 /// A size the reference opens a decoder with: both dimensions positive, and
-/// eight bytes per pixel plus 128 pixels of padding each way addressable
-/// with an `int`.
+/// eight bytes per pixel plus 128 pixels of padding each way below 2³¹ − 1
+/// bytes.
 fn checked_canvas([width, height]: [i32; 2]) -> Result<[u32; 2]> {
     let limit = u64::from(i32::MAX.unsigned_abs());
     match (u32::try_from(width), u32::try_from(height)) {
