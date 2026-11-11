@@ -4,10 +4,11 @@
 //! usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
 //! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE, KIND-CODEC one of video-h264,
 //! video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac, audio-mp3,
-//! audio-vorbis, audio-opus. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
+//! audio-vorbis, audio-opus, audio-aac-access-units. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest
 //! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
-//! interleaved stereo s16le). File loading and process start are outside the timed
+//! interleaved stereo s16le). Configured AAC instead folds every native f32 plane.
+//! File loading and process start are outside the timed
 //! interval.
 //!
 //! The elementary-stream splitting below mirrors the reference worker's own parser
@@ -18,6 +19,7 @@
 //! session's track decoder, as the reference reads them through its demuxer.
 //! `packets` prints what a container reader emits per packet ([`packets`]).
 #![forbid(unsafe_code)]
+mod aac_access_units;
 mod packets;
 
 use std::io::Write;
@@ -35,6 +37,7 @@ struct Output {
     bytes: u64,
     digest: InterleavedDigest,
     raw: Option<std::io::BufWriter<std::fs::File>>,
+    aac_speakers: Option<([u8; 8], usize)>,
 }
 impl Output {
     fn emit(&mut self, bytes: &[u8]) {
@@ -242,6 +245,18 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
         "audio-ac3" => audio(AudioCodec::Ac3, data, out),
         "audio-eac3" => audio(AudioCodec::Eac3, data, out),
         "audio-aac" => audio(AudioCodec::Aac, data, out),
+        aac_access_units::OPERATION | aac_access_units::COMPAT_OPERATION => {
+            use triergon_session::compat::aac::Policy;
+            let layout = if op == aac_access_units::OPERATION {
+                Policy::Specification
+            } else {
+                Policy::ConventionalSurround
+            };
+            if let Err(error) = aac_access_units::decode(data, layout, out) {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        }
         "audio-dts" => audio(AudioCodec::Dts, data, out),
         "audio-flac" | "audio-mp3" | "audio-vorbis" | "audio-opus" => file_audio(data, out),
         _ => {
@@ -269,7 +284,18 @@ fn main() {
         );
         std::process::exit(2);
     };
-    let data = std::fs::read(args.get(2).expect("input")).expect("input");
+    let input = args.get(2).expect("input");
+    let data = if matches!(
+        op,
+        aac_access_units::OPERATION | aac_access_units::COMPAT_OPERATION
+    ) {
+        aac_access_units::load(input).unwrap_or_else(|error| {
+            eprintln!("{input}: {error}");
+            std::process::exit(1);
+        })
+    } else {
+        std::fs::read(input).expect("input")
+    };
     let mut out = Output::default();
     match kind {
         "bench" => {
@@ -325,12 +351,16 @@ fn main() {
             ));
             run(op, &data, &mut out);
             out.raw.take().expect("raw").flush().expect("raw flush");
-            println!(
-                "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
+            print!(
+                "{{\"packets\":{},\"bytes\":{},\"digest\":{}",
                 out.frames,
                 out.bytes,
                 out.digest.finish()
             );
+            if let Some((speakers, channels)) = out.aac_speakers {
+                print!(",\"speakers\":{:?}", &speakers[..channels]);
+            }
+            println!("}}");
         }
         _ => {
             eprintln!("unknown mode {kind}");

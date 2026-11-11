@@ -112,6 +112,9 @@ fn classify(row: &Value, lane: &str) -> String {
     let ds = get(decoder, "status").or_else(|| get(row, "status"));
     let os = get(output, "status");
     let is = |v: Option<&Value>, s: &str| text(v) == Some(s);
+    if lane == "aac-mov" {
+        return if is(ds, "pass") { "pass" } else { "FAIL" }.into();
+    }
     let os_none = matches!(os, None | Some(Value::Null));
     if is(ds, "ffmpeg-refused") && (is(os, "reference-produced-nothing") || os_none) {
         // ours_frames counts every non-error JSON line, the example's summary included.
@@ -305,6 +308,17 @@ mod tests {
 
     #[test]
     fn classifies_refusals_and_failures() {
+        assert_eq!(
+            classify(&row(r#"{"decoder":{"status":"pass"}}"#), "aac-mov"),
+            "pass"
+        );
+        assert_eq!(
+            classify(
+                &row(r#"{"decoder":{"status":"ffmpeg-refused"}}"#),
+                "aac-mov"
+            ),
+            "FAIL"
+        );
         assert_eq!(
             classify(
                 &row(

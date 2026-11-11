@@ -19396,6 +19396,46 @@
    "key": "evidence/mp4-range-seek-checkpoints/cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b.tar.gz",
    "sha256": "cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b",
    "bytes": 137198328
+  },
+  {
+   "name": "aac-mov-host",
+   "path": "aac-mov-host",
+   "retention": "retained",
+   "reason": "AAC in MOV PCM and ADTS regression comparisons",
+   "key": "evidence/aac-mov-host/100613a296e2f18f9631c60992057cb0debc108f1926c41a33b8c3f6f06f4556.tar.gz",
+   "sha256": "100613a296e2f18f9631c60992057cb0debc108f1926c41a33b8c3f6f06f4556",
+   "bytes": 101185082,
+   "source_revision": "63f5e8e5626ed5dac0bbeb9c0e742e0eec6146e6"
+  },
+  {
+   "name": "aac-mov-fragment-host",
+   "path": "aac-mov-fragment-host",
+   "retention": "retained",
+   "reason": "QuickTime AAC host packet and PCM comparisons",
+   "key": "evidence/aac-mov-fragment-host/0bc8fb8726cff0d2ba18d7c138ba83375baf13265bb148086522047bf816aea2.tar.gz",
+   "sha256": "0bc8fb8726cff0d2ba18d7c138ba83375baf13265bb148086522047bf816aea2",
+   "bytes": 30928202,
+   "source_revision": "9559dae0b89dfd2df2b08b9a97267bc75711be65"
+  },
+  {
+   "name": "aac-access-units",
+   "path": "aac-access-units",
+   "retention": "retained",
+   "reason": "Configured AAC speaker and sample parity, paired runtime, and peak memory",
+   "key": "evidence/aac-access-units/b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0.tar.gz",
+   "sha256": "b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0",
+   "bytes": 69596368,
+   "source_revision": "907ac3dce61c98bd05f52bfa3ff92497efdd141d"
+  },
+  {
+   "name": "aac-layouts-and-rates",
+   "path": "aac-layouts-and-rates",
+   "retention": "retained",
+   "reason": "Fixed AAC channel and rate parity, paired runtime and peak memory",
+   "key": "evidence/aac-layouts-and-rates/5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949.tar.gz",
+   "sha256": "5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949",
+   "bytes": 129922253,
+   "source_revision": "3d422610316d79665c80b48ab8a27a8a57880efe"
   }
  ]
 }

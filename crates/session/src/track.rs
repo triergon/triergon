@@ -1,8 +1,14 @@
 //! Decoding the packets of one container audio track.
+use std::sync::atomic::AtomicBool;
 use triergon_codec::{AudioDecoder, AudioFrame, Budget, DecodeFailure, DownmixLevels};
-use triergon_core::BudgetVec;
 use triergon_core::container::{PacketInfo, TrackInfo};
+use triergon_core::{BudgetVec, Bytes, Error, SourceId, WorkBudget};
+use triergon_framing::{
+    AacAscFacts, AacAscParser, AacConfigLimits, AacSource, BuildStep, aac_fixed_channel_count,
+    indexed_aac_frequency,
+};
 
+use crate::compat::aac::Policy;
 use crate::{AudioCodec, Discard, audio_codec, audio_configuration, audio_decoder_in};
 
 /// The decoder of one container audio track. It chooses the decoder from the track's
@@ -51,6 +57,31 @@ impl TrackDecoder {
         })
     }
 
+    /// Decode raw AAC-LC from the selected sample description's AudioSpecificConfig.
+    /// The caller must use a decoder configured for each packet's description.
+    /// Use [`Self::new_in`] for ADTS-framed packets.
+    pub fn aac_access_units_in(
+        configuration: &[u8],
+        budget: &Budget,
+    ) -> Result<Self, DecodeFailure> {
+        Self::aac_access_units_with_layout_in(configuration, Policy::Specification, budget)
+    }
+
+    /// Decode configured AAC-LC with an explicit speaker mapping.
+    pub fn aac_access_units_with_layout_in(
+        configuration: &[u8],
+        layout: Policy,
+        budget: &Budget,
+    ) -> Result<Self, DecodeFailure> {
+        let decoder = parse_aac_access_unit_config(configuration, budget)?
+            .decoder_with_layout_in(layout, budget)?;
+        Ok(Self {
+            codec: AudioCodec::Aac,
+            delay: decoder.delay(),
+            decoder,
+        })
+    }
+
     /// The codec being decoded.
     pub fn codec(&self) -> AudioCodec {
         self.codec
@@ -81,4 +112,99 @@ impl TrackDecoder {
     pub fn into_decoder(self) -> Box<dyn AudioDecoder> {
         self.decoder
     }
+}
+
+/// The fixed configuration of raw AAC-LC packets in a container track.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AacAccessUnitConfig {
+    frequency_index: u8,
+    channel_configuration: u8,
+}
+
+impl AacAccessUnitConfig {
+    /// Select indexed rates, 1024 core samples and fixed layouts up to eight channels
+    /// from parsed AudioSpecificConfig facts.
+    pub fn from_asc(facts: AacAscFacts) -> Result<Self, DecodeFailure> {
+        if facts.outer_object_type.code != 2
+            || facts.core_object_type.code != 2
+            || facts.core_frequency.explicit_hz.is_some()
+            || indexed_aac_frequency(facts.core_frequency.index) != Some(facts.core_frequency.hz)
+            || aac_fixed_channel_count(facts.channel_configuration).is_none()
+            || facts.ga.frame_length_flag
+            || facts.ga.core_coder_delay.is_some()
+            || facts.ga.extension_flag3 == Some(true)
+            || facts.sbr.is_present()
+            || facts.ps.is_present()
+        {
+            return Err(DecodeFailure("unsupported raw AAC-LC configuration".into()));
+        }
+        Ok(Self {
+            frequency_index: facts.core_frequency.index,
+            channel_configuration: facts.channel_configuration,
+        })
+    }
+
+    /// Build the decoder with the default track-decoder storage budget.
+    pub fn decoder(self) -> Result<Box<dyn AudioDecoder>, DecodeFailure> {
+        let budget =
+            Budget::new(TrackDecoder::DEFAULT_STORAGE_BYTES).map_err(DecodeFailure::from_error)?;
+        self.decoder_in(&budget)
+    }
+
+    /// Build a decoder for one raw AAC-LC access unit per packet.
+    pub fn decoder_in(self, budget: &Budget) -> Result<Box<dyn AudioDecoder>, DecodeFailure> {
+        self.decoder_with_layout_in(Policy::Specification, budget)
+    }
+
+    /// Build the configured decoder with an explicit speaker mapping.
+    pub fn decoder_with_layout_in(
+        self,
+        layout: Policy,
+        budget: &Budget,
+    ) -> Result<Box<dyn AudioDecoder>, DecodeFailure> {
+        let decoder = triergon_codec_aac::RawLcDecoder::with_layout_in(
+            self.frequency_index,
+            self.channel_configuration,
+            layout,
+            budget,
+        )
+        .map_err(DecodeFailure::from_error)?;
+        Ok(Box::new(decoder))
+    }
+}
+
+fn parse_aac_access_unit_config(
+    configuration: &[u8],
+    budget: &Budget,
+) -> Result<AacAccessUnitConfig, DecodeFailure> {
+    let limits = AacConfigLimits {
+        maximum_record_bytes: 4096,
+        maximum_pce_elements: 64,
+        maximum_comment_bytes: 255,
+    };
+    if configuration.len() > limits.maximum_record_bytes {
+        return Err(DecodeFailure::from_error(Error::Limit {
+            requested: configuration.len(),
+            maximum: limits.maximum_record_bytes,
+        }));
+    }
+    let bytes = Bytes::copy_from_slice(budget, configuration).map_err(DecodeFailure::from_error)?;
+    let mut parser = AacAscParser::new(
+        budget,
+        AacSource {
+            source: SourceId(0),
+            generation: 0,
+            offset: 0,
+        },
+        bytes,
+        limits,
+    )
+    .map_err(DecodeFailure::from_error)?;
+    let BuildStep::Ready(parsed) = parser
+        .step(&mut WorkBudget::new(u64::MAX), &AtomicBool::new(false))
+        .map_err(DecodeFailure::from_error)?
+    else {
+        return Err(DecodeFailure("missing AAC AudioSpecificConfig".into()));
+    };
+    AacAccessUnitConfig::from_asc(parsed.facts())
 }
