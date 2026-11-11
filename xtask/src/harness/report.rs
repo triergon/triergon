@@ -168,24 +168,63 @@ fn entity_input_failure(
     if args.next().is_some() {
         return Err("worker entity argument has no input pin".into());
     }
-    for entity in following {
-        let file = Path::new(s(entity, "file").ok_or("entity without input path")?);
+    auxiliary_input_failure(
+        corpus,
+        following,
+        "entity",
+        "missing-entity",
+        "entity-hash-mismatch",
+    )
+}
+
+fn auxiliary_input_failure(
+    corpus: &Path,
+    inputs: &[Value],
+    kind: &str,
+    missing: &'static str,
+    changed: &'static str,
+) -> Result<Option<&'static str>, String> {
+    for input in inputs {
+        let file = Path::new(s(input, "file").ok_or_else(|| format!("{kind} without input path"))?);
         if file.as_os_str().is_empty()
             || file
                 .components()
                 .any(|c| !matches!(c, std::path::Component::Normal(_)))
         {
-            return Err("entity input escapes corpus".into());
+            return Err(format!("{kind} input escapes corpus"));
         }
         let path = corpus.join(file);
         if !path.is_file() {
-            return Ok(Some("missing-entity"));
+            return Ok(Some(missing));
         }
-        if digest(&path)? != s(entity, "sha256").ok_or("entity without input hash")? {
-            return Ok(Some("entity-hash-mismatch"));
+        if digest(&path)?
+            != s(input, "sha256").ok_or_else(|| format!("{kind} without input hash"))?
+        {
+            return Ok(Some(changed));
         }
     }
     Ok(None)
+}
+
+fn additional_input_failure(
+    corpus: &Path,
+    case: &Value,
+    prefix: Option<&str>,
+) -> Result<Option<&'static str>, String> {
+    let failure = entity_input_failure(corpus, case, matches!(prefix, Some("ts-" | "ts-au-")))?;
+    if failure.is_some() {
+        return Ok(failure);
+    }
+    let Some(companions) = case.get("companions") else {
+        return Ok(None);
+    };
+    auxiliary_input_failure(
+        corpus,
+        companions.as_array().ok_or("expected a companion list")?,
+        "companion",
+        "missing-companion",
+        "companion-hash-mismatch",
+    )
 }
 
 fn command_output(program: &str, args: &[&str]) -> String {
@@ -525,15 +564,23 @@ impl PrefixFeature {
     pub fn workers(&self, root: &Path) -> Result<(PathBuf, PathBuf), String> {
         let identity = read_json(&root.join("target/harness/identity.json"))?;
         let candidate = validation::candidate_worker(root, &identity, &self.candidate)?;
-        let record = super::comparison::reference_named(&identity, &self.reference)?;
-        let reference = root.join(s(&record, "path").unwrap_or_default());
-        if Some(super::linux::file_sha(&reference)?.as_str()) != s(&record, "sha256") {
+        Ok((candidate, self.reference_worker(root, &identity)?))
+    }
+
+    pub(super) fn reference_worker(
+        &self,
+        root: &Path,
+        identity: &Value,
+    ) -> Result<PathBuf, String> {
+        let record = super::comparison::reference_named(identity, &self.reference)?;
+        let reference = root.join(validation::text(&record, "path")?);
+        if super::linux::file_sha(&reference)? != validation::hash(&record, "sha256")? {
             return Err(format!(
                 "{} changed since build identity; rebuild",
                 self.reference
             ));
         }
-        Ok((candidate, reference))
+        Ok(reference)
     }
 
     /// A case's input file, which may not escape the corpus directory.
@@ -547,6 +594,18 @@ impl PrefixFeature {
             return Err(format!("{}: input escapes corpus", self.id));
         }
         Ok(self.corpus.join(file))
+    }
+
+    pub(super) fn verified_input(&self, case: &Value) -> Result<PathBuf, String> {
+        let path = self.input(case)?;
+        if digest(&path)? != validation::hash(case, "sha256")? {
+            return Err(format!("input changed: {}", path.display()));
+        }
+        if let Some(status) = additional_input_failure(&self.corpus, case, Some(&self.prefix))? {
+            let id = s(case, "id").unwrap_or_default();
+            return Err(format!("{}/{id}: {status}", self.id));
+        }
+        Ok(path)
     }
 }
 
@@ -753,11 +812,9 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([("status", Value::str("input-hash-mismatch"))])
         } else if !rights_reviewed(&reviewed, case) {
             Value::object([("status", Value::str("rights-unreviewed"))])
-        } else if let Some(status) = entity_input_failure(
-            &corpus,
-            case,
-            matches!(worker_operation.as_deref(), Some("ts-" | "ts-au-")),
-        )? {
+        } else if let Some(status) =
+            additional_input_failure(&corpus, case, worker_operation.as_deref())?
+        {
             Value::object([("status", Value::str(status))])
         } else if let Some(prefix) = &worker_operation {
             let arguments = case_arguments(case);
@@ -880,7 +937,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 if digest(&input)? != sha {
                     return Ok(Some("input-hash-mismatch"));
                 }
-                entity_input_failure(&corpus, case, false)
+                additional_input_failure(&corpus, case, worker_operation.as_deref())
             };
             if options.benchmark {
                 let timing = measure_pinned(check_inputs, || {
