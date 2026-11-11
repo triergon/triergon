@@ -358,11 +358,19 @@ with NaN as 0, also where libass's `long` is 64 bits wide. Collision handling
 sorts the boxes placed so far as libass does on glibc: `qsort` with
 `cmp_rect_y0`, which subtracts their tops in `int` and so overflows, undefined
 in C and wrapping as GCC builds it, for tops 2³¹ or more apart, run as glibc's
-stable merge sort. While the tops lie closer the crate orders them by value,
-keeping equal tops in the order they were placed in; otherwise it runs glibc's
-merge sort step for step. Another C library's `qsort` may order such boxes, or
-equal tops, differently. No fixture of `ass-render` converts out of range or
-places boxes that far apart.
+stable merge sort. While the tops lie closer that comparison is a total
+preorder and the crate orders them by value, keeping equal tops in the order
+they were placed in. Farther apart it is not transitive, and the order
+depends on which pairs the sort compares: the crate sorts with a top-down
+merge sort that sorts the first half, of the length halved and rounded down,
+and then the rest, and merges them stably. `collision-far-margins.ass` of
+`ass-render` places boxes that far apart, each within `int`'s range, and the
+crate places its events there as libass does on both targets; rounding the
+half up instead places them differently. Another C library's `qsort` may
+order such boxes, or equal tops, differently. The far event's position there
+leaves `int`'s range in 26.6 fixed point: libass for ARMv7 and the crate draw
+nothing of it, and libass for AArch64 draws it inside the frame, so the case
+clips it away. No other fixture of `ass-render` converts out of range.
 
 libass's renderer also overflows `int`, undefined in C, where it doubles an
 event's horizontal border for the width of its box. Built with GCC it wraps,
@@ -422,14 +430,14 @@ panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
-- `ass-render` renders the 35 scripts and 3 packet streams of
+- `ass-render` renders the 36 scripts and 3 packet streams of
   `harness/fixtures/ass-render` as a player configures libass (attached fonts,
   a default family and font file, no system font provider, no hinting) at
   1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB, which `cache-eviction.ass` overflows): all 76 pass. The
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): all 78 pass. The
   box behind a `BorderStyle` 4 event, whose type libass leaves uninitialised,
   is told by its own buffer, also after a collision shift has cut rows off its
   top, and compared as a kind of its own.
