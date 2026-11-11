@@ -17044,6 +17044,19 @@
    }
   },
   {
+   "name": "ass-collision-far-margins-02e3a75a",
+   "path": "ass-collision-far-margins-02e3a75a",
+   "retention": "retained",
+   "reason": "ASS collision order paragraph and table row: collision-far-margins.ass at 02e3a75a on an r6g.2xlarge, natively on AArch64 and in the ARMv7 user space; the ASS gates and crate tests on both targets; the ass-render pins as each target's libass records them; frame dumps of the case, clipped and unclipped, from libass, the renderer and the renderer with its merge sort's first run rounded up; the variants' patches and a bundle of the measured commit.",
+   "key": "evidence/ass-collision-far-margins-02e3a75a/736748aa549fec74078fa33d31dba3e0a123290e652278c3359d37a0a9737db2.tar.gz",
+   "sha256": "736748aa549fec74078fa33d31dba3e0a123290e652278c3359d37a0a9737db2",
+   "bytes": 6483969,
+   "source_revisions": {
+    "candidate": "02e3a75a86bd5c22900d972c02055e23a37103ab",
+    "base": "731cdf1cd6b9822f744d3fe13428b9f8428bc145"
+   }
+  },
+  {
    "name": "ass-collision-order-1d2ae4a0",
    "path": "ass-collision-order-1d2ae4a0",
    "retention": "retained",
