@@ -515,7 +515,7 @@ fn f32_samples(bytes: &[u8]) -> Result<Vec<f32>, String> {
 type ChannelStats = (Vec<f64>, Vec<f64>);
 
 /// Per-channel RMS and max |candidate - reference| of interleaved f32 audio,
-/// reduced in numpy's order; `None` when the layouts cannot be compared.
+/// reduced in numpy's order. `None` indicates incompatible lengths or non-finite samples.
 pub fn channel_stats(
     candidate: &[u8],
     reference: &[u8],
@@ -524,6 +524,9 @@ pub fn channel_stats(
     let c = f32_samples(candidate)?;
     let r = f32_samples(reference)?;
     if channels <= 0 || c.len() != r.len() || c.len() % channels as usize != 0 {
+        return Ok(None);
+    }
+    if c.iter().chain(&r).any(|sample| !sample.is_finite()) {
         return Ok(None);
     }
     let channels = channels as usize;
@@ -590,8 +593,16 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
     }
     if lane == "aac-mov" {
         // Compare the complete decoder packets from the neutral MOV view.
-        reference_argv
-            .extend(["-flags2", "+skip_manual", "-ignore_editlist", "1"].map(String::from));
+        reference_argv.extend(
+            [
+                "-xerror",
+                "-flags2",
+                "+skip_manual",
+                "-ignore_editlist",
+                "1",
+            ]
+            .map(String::from),
+        );
     }
     reference_argv.extend(["-i", path].map(String::from));
     if lane == "aac-mov" {
@@ -701,6 +712,24 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
         (Some(v), Some(n)) => python::equals_int(v, n),
         _ => false,
     };
+    let ours_layout = info.get("layout").and_then(Value::as_str);
+    let reference_layout = stream
+        .as_ref()
+        .and_then(|s| s.get("channel_layout"))
+        .and_then(Value::as_str);
+    // Fixed AAC configurations 5 and 6 each have one surround pair in
+    // Table 1.19. FFmpeg labels those planes as back in MOV.
+    let surround_pair_labels = lane == "aac-mov"
+        && matches!(
+            (reference_layout, ours_layout),
+            (Some("5.0"), Some("5.0(side)")) | (Some("5.1"), Some("5.1(side)"))
+        );
+    if lane == "aac-mov" {
+        row.push((
+            "surround_pair_labels".into(),
+            Value::Bool(surround_pair_labels),
+        ));
+    }
     let exact = same(ours_channels, reference_channels)
         && same(ours_rate, reference_rate)
         && candidate.len() == reference.len()
@@ -708,7 +737,8 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
             || (ours_run.code == 0
                 && reference_run.code == 0
                 && info.get("errors").and_then(python::int) == Some(0)
-                && info.get("layout") == stream.as_ref().and_then(|s| s.get("channel_layout"))));
+                && (surround_pair_labels
+                    || ours_layout.is_some() && ours_layout == reference_layout)));
     let stats = if exact {
         let channels = reference_channels.ok_or_else(|| {
             Stop::Fatal("'<=' not supported between instances of 'NoneType' and 'int'".into())
@@ -988,6 +1018,13 @@ mod tests {
         assert_eq!(abs, [1.0013580322265625e-05, 0.0004999999655410647]);
         assert_eq!(channel_stats(&c, &r, 4).unwrap(), None);
         assert!(channel_stats(&c[..5], &r[..5], 1).is_err());
+        let non_finite: Vec<u8> = [0.0_f32, f32::NAN]
+            .into_iter()
+            .flat_map(f32::to_le_bytes)
+            .collect();
+        let finite = [0_u8; 8];
+        assert_eq!(channel_stats(&non_finite, &finite, 2).unwrap(), None);
+        assert_eq!(channel_stats(&finite, &non_finite, 2).unwrap(), None);
     }
 
     #[test]

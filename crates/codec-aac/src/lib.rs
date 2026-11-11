@@ -93,7 +93,7 @@ impl Decoder {
     /// this frame's output (1024 or, with SBR, 2048 samples per raw_data_block). On error
     /// `out` is left empty; the decoder stays usable for the next frame.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        decode_with(&mut self.core, out, |core, out| decode_adts(core, au, out))
+        decode_with::<false>(&mut self.core, out, |core, out| decode_adts(core, au, out))
     }
 
     /// Reset overlap, prediction, PNS and SBR/PS signal history after a discontinuity.
@@ -138,6 +138,9 @@ pub struct RawLcDecoder {
 }
 
 impl RawLcDecoder {
+    /// Maximum raw block size, including ancillary and fill data.
+    pub const MAX_ACCESS_UNIT_BYTES: usize = 64 << 10;
+
     /// Set up the fixed layout and charge its decoder state to `budget`.
     pub fn new_in(
         frequency_index: u8,
@@ -154,7 +157,10 @@ impl RawLcDecoder {
 
     /// Decode one complete raw data block from the container sample.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        decode_with(&mut self.core, out, |core, out| {
+        decode_with::<true>(&mut self.core, out, |core, out| {
+            if au.len() > Self::MAX_ACCESS_UNIT_BYTES {
+                return Err(DecodeError::ResourceLimit("raw AAC access unit"));
+            }
             decode_blocks::<true>(core, au, 1, false, out)
         })
     }
@@ -175,7 +181,7 @@ impl AudioDecoder for RawLcDecoder {
     }
 }
 
-fn decode_with(
+fn decode_with<const RAW: bool>(
     core: &mut decoder::Core,
     out: &mut AudioFrame,
     decode: impl FnOnce(&mut decoder::Core, &mut AudioFrame) -> Result<(), DecodeError>,
@@ -183,10 +189,14 @@ fn decode_with(
     out.clear();
     // Restore delay and random state on a refused access unit.
     let (random, skip_samples) = (core.random, core.skip_samples);
+    let coupling_elements = core.cce.len();
     let result = decode(core, out);
     if result.is_err() {
         core.random = random;
         core.skip_samples = skip_samples;
+        if RAW {
+            core.cce.truncate(coupling_elements);
+        }
         out.clear();
     }
     result
@@ -229,11 +239,11 @@ fn decode_blocks<const RAW: bool>(
     #[cfg(feature = "inspect")]
     core.sbr_fil_ranges.clear();
     let mut br = CachedBitReader::new(payload);
-    core.reserve_output(out, usize::from(blocks))?;
+    core.reserve_output::<RAW>(out, usize::from(blocks))?;
     for block in 0..blocks {
         let start = br.position();
         core.decode_block::<RAW>(&mut br, start, out, usize::from(blocks - block))?;
-        core.emit_planes(out)?;
+        core.emit_planes::<RAW>(out)?;
         if per_block_crc {
             br.skip(16);
         }

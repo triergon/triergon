@@ -45,17 +45,27 @@ impl TrackDecoder {
     pub fn new_in(track: &dyn TrackInfo, budget: &Budget) -> Result<TrackDecoder, DecodeFailure> {
         let codec = audio_codec(track.codec())
             .ok_or_else(|| DecodeFailure(format!("unsupported codec {:?}", track.codec())))?;
-        let source_configuration = track.configuration();
-        let decoder = if codec == AudioCodec::Aac && !source_configuration.is_empty() {
-            parse_aac_access_unit_config(source_configuration, budget)?.decoder_in(budget)?
-        } else {
-            let mut configuration = BudgetVec::new(budget);
-            audio_configuration(codec, source_configuration, &mut configuration)
-                .map_err(DecodeFailure::from_error)?;
-            audio_decoder_in(codec, &configuration, budget)?
-        };
+        let mut configuration = BudgetVec::new(budget);
+        audio_configuration(codec, track.configuration(), &mut configuration)
+            .map_err(DecodeFailure::from_error)?;
+        let decoder = audio_decoder_in(codec, &configuration, budget)?;
         Ok(TrackDecoder {
             codec,
+            delay: decoder.delay(),
+            decoder,
+        })
+    }
+
+    /// Decode raw AAC-LC from the selected sample description's AudioSpecificConfig.
+    /// The caller must use a decoder configured for each packet's description.
+    /// Use [`Self::new_in`] for ADTS-framed packets.
+    pub fn aac_access_units_in(
+        configuration: &[u8],
+        budget: &Budget,
+    ) -> Result<Self, DecodeFailure> {
+        let decoder = parse_aac_access_unit_config(configuration, budget)?.decoder_in(budget)?;
+        Ok(Self {
+            codec: AudioCodec::Aac,
             delay: decoder.delay(),
             decoder,
         })

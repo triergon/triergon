@@ -34,7 +34,7 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 
 `RawLcDecoder::new_in` accepts the indexed core rate and fixed channel configuration
 from a checked AudioSpecificConfig. Its `decode` consumes one complete raw data block
-and produces 1024 samples per channel. The supported fixed configurations are 1–7,
+of at most 64 KiB and produces 1024 samples per channel. The supported fixed configurations are 1–7,
 11, 12 and 14. Their audible elements follow Table 1.19, including the distinct
 7.1 Front, Back and Top layouts. Raw packets that use a PCE for their layout,
 carry SBR, or require 960-sample blocks are outside this decoder's scope.

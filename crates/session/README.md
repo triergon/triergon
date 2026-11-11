@@ -57,10 +57,11 @@ SIMD kernels.
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
-configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). An AAC
-track with AudioSpecificConfig uses its raw access units and fixed channel layout.
-An AAC track with empty configuration uses ADTS. Callers with parsed ASC facts
-can construct an `AacAccessUnitConfig` and build the same decoder for an `AudioSession`.
+configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). The
+generic AAC track decoder takes ADTS. For raw packets, call
+`TrackDecoder::aac_access_units_in` with the AudioSpecificConfig of the packet's
+sample description. Callers with parsed ASC facts can construct an
+`AacAccessUnitConfig` and build the same decoder for an `AudioSession`.
 `TrackDecoder::decode(packet, frame)` drops what the container marks for
 discarding: the packet's `Trim`, samples before time zero (Matroska CodecDelay, Ogg
 pre-skip) and the decoder's start delay (`AudioDecoder::delay`, the Opus pre-skip), a

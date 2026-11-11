@@ -110,6 +110,18 @@ fn raw_fixed_layouts_follow_the_speaker_configuration() {
     };
     let cases: &[(u8, &[u32], &[Speaker])] = &[
         (
+            6,
+            &[0, 1, 1, 3],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                SideLeft,
+                SideRight,
+            ],
+        ),
+        (
             7,
             &[0, 1, 1, 1, 3],
             &[
@@ -194,6 +206,13 @@ fn raw_lc_refuses_sbr_and_bytes_after_its_single_block() {
     let budget = Budget::new(4 << 20).unwrap();
     let mut decoder = RawLcDecoder::new_in(4, 1, &budget).unwrap();
     let mut frame = AudioFrame::default();
+    assert_eq!(
+        decoder.decode(
+            &vec![0; RawLcDecoder::MAX_ACCESS_UNIT_BYTES + 1],
+            &mut frame
+        ),
+        Err(DecodeError::ResourceLimit("raw AAC access unit"))
+    );
     let mut packet = block(false);
     packet.push(0);
     assert_eq!(
@@ -213,6 +232,46 @@ fn raw_lc_refuses_sbr_and_bytes_after_its_single_block() {
     assert_eq!(frame.samples_per_channel, 0);
     decoder.decode(&block(false), &mut frame).unwrap();
     assert_eq!(frame.samples_per_channel, 1024);
+}
+
+#[test]
+fn raw_output_capacity_is_charged_before_overlap_advances() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let mut tested = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let mut reference = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let packet = noise_block(false, false, false);
+    let mut expected = AudioFrame::default();
+    let mut actual = AudioFrame::default();
+    tested.decode(&packet, &mut actual).unwrap();
+    reference.decode(&packet, &mut expected).unwrap();
+    let pressure = budget.reserve(budget.available()).unwrap();
+    let mut larger = AudioFrame {
+        planes: vec![Vec::with_capacity(2048)],
+        ..AudioFrame::default()
+    };
+    assert!(matches!(
+        tested.decode(&packet, &mut larger),
+        Err(DecodeError::Budget(_))
+    ));
+    assert_eq!(larger.samples_per_channel, 0);
+    drop(pressure);
+    tested.decode(&packet, &mut actual).unwrap();
+    reference.decode(&packet, &mut expected).unwrap();
+    assert!(expected.planes[0].iter().any(|&sample| sample != 0.0));
+    assert_eq!(actual.planes, expected.planes);
+}
+
+#[test]
+fn a_truncated_raw_coupling_element_releases_its_charge() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let mut decoder = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let mut frame = AudioFrame::default();
+    let packet = block(false);
+    decoder.decode(&packet, &mut frame).unwrap();
+    let used = budget.used();
+    assert!(decoder.decode(&[0x40], &mut frame).is_err()); // CCE with no body
+    assert_eq!(budget.used(), used);
+    decoder.decode(&packet, &mut frame).unwrap();
 }
 
 #[test]

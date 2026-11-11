@@ -55,6 +55,9 @@ original access units. The reference reads the original sample table with
 `-ignore_editlist 1` and emits the complete decoder output with
 `-flags2 +skip_manual`. The comparison checks rate, speaker layout, sample count
 and every float sample under the AAC accuracy rules.
+For fixed configurations 5 and 6, FFmpeg labels the single surround pair as
+back and the decoder labels it as side. The comparison records both labels
+and checks both corresponding PCM planes in their original order.
 
 The vectors are the FATE suite's `aac`, `ac3`, `eac3`, `dts`, `h264-conformance` and
 `hevc-conformance` directories in `.research/fate-samples`, plus 71 elementary streams

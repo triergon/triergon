@@ -86,7 +86,7 @@ fn a_quicktime_aac_track_preserves_eight_speakers() {
         .find(|track| track.kind() == MediaKind::Audio)
         .unwrap();
     let id = track.id();
-    let mut decoder = TrackDecoder::new_in(track, &budget).unwrap();
+    let mut decoder = TrackDecoder::aac_access_units_in(track.configuration(), &budget).unwrap();
     let mut frame = AudioFrame::default();
     let mut count = 0;
     while let Some(current) = packet {

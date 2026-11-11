@@ -545,7 +545,7 @@ impl Core {
                     last_elem = Some(ei);
                 }
                 ID_CCE => {
-                    crate::cce::parse_cce(self, br, &cfg)?;
+                    crate::cce::parse_cce::<RAW>(self, br, &cfg)?;
                     last_elem = None;
                 }
                 ID_DSE => {
@@ -905,8 +905,16 @@ impl Core {
     /// decoded. `emit_planes` grows the frame again only when the access unit reconfigures
     /// the decoder in band (a PCE, a CPE in a mono stream, the start of SBR or PS), which
     /// creates state when it appears.
-    pub(crate) fn reserve_output(&mut self, out: &mut AudioFrame, blocks: usize) -> Result<()> {
+    pub(crate) fn reserve_output<const RAW: bool>(
+        &mut self,
+        out: &mut AudioFrame,
+        blocks: usize,
+    ) -> Result<()> {
         let (channels, len) = (self.layout.channels(), blocks * self.frame_len());
+        if RAW {
+            // Charge caller-provided capacity before advancing signal history.
+            return Ok(out.try_resize(channels, len, &mut self.output_charge)?);
+        }
         if out.planes.len() < channels || out.planes[..channels].iter().any(|p| p.capacity() < len)
         {
             out.try_resize(channels, len, &mut self.output_charge)?;
@@ -917,14 +925,19 @@ impl Core {
 
     /// Append this block's output (frame_len samples per plane) in layout order; planes
     /// without a decoded element stay silent.
-    pub(crate) fn emit_planes(&mut self, out: &mut AudioFrame) -> Result<()> {
+    pub(crate) fn emit_planes<const RAW: bool>(&mut self, out: &mut AudioFrame) -> Result<()> {
         let flen = self.frame_len();
         let channels = self.layout.channels();
-        if out.planes.len() != channels {
-            out.clear(); // a mid-frame layout change restarts collection
-        }
-        let base = out.planes.first().map_or(0, Vec::len);
-        out.try_resize(channels, base + flen, &mut self.output_charge)?;
+        let base = if RAW {
+            0
+        } else {
+            if out.planes.len() != channels {
+                out.clear(); // a mid-frame layout change restarts collection
+            }
+            let base = out.planes.first().map_or(0, Vec::len);
+            out.try_resize(channels, base + flen, &mut self.output_charge)?;
+            base
+        };
         for (si, slot) in self.slots.iter().enumerate() {
             let Some(e) = self
                 .elements
@@ -1004,11 +1017,6 @@ fn fixed_config_slots(cfg: u8, raw_access_units: bool) -> Vec<Slot> {
         tag: 0,
         speakers: [Some(LowFrequency), None],
     };
-    let surround = if raw_access_units {
-        cpe(BackLeft, BackRight)
-    } else {
-        cpe(SideLeft, SideRight)
-    };
     let mut v = match cfg {
         1 => vec![sce(FrontCenter)],
         2 => vec![cpe(FrontLeft, FrontRight)],
@@ -1018,9 +1026,17 @@ fn fixed_config_slots(cfg: u8, raw_access_units: bool) -> Vec<Slot> {
             cpe(FrontLeft, FrontRight),
             sce(BackCenter),
         ],
-        // ADTS keeps its established side pair for configurations 5 and 6.
-        5 => vec![sce(FrontCenter), cpe(FrontLeft, FrontRight), surround],
-        6 => vec![sce(FrontCenter), cpe(FrontLeft, FrontRight), surround, lfe],
+        5 => vec![
+            sce(FrontCenter),
+            cpe(FrontLeft, FrontRight),
+            cpe(SideLeft, SideRight),
+        ],
+        6 => vec![
+            sce(FrontCenter),
+            cpe(FrontLeft, FrontRight),
+            cpe(SideLeft, SideRight),
+            lfe,
+        ],
         7 if raw_access_units => vec![
             sce(FrontCenter),
             cpe(FrontLeftOfCenter, FrontRightOfCenter),
