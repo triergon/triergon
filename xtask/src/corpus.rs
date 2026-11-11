@@ -437,6 +437,32 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (73, 30_733, 1_084_237_239_961_408_002),
         ),
     ]);
+    let hinted_file = "avc-aac-rtp-hints.mp4";
+    let hinted_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(hinted_file);
+    let hinted = fs::read(&hinted_seed).map_err(|e| format!("{}: {e}", hinted_seed.display()))?;
+    if sha256::hex(&hinted) != "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273" {
+        return Err("RTP hint MP4 range seed changed".into());
+    }
+    write(&output.join(hinted_file), &hinted)?;
+    cases.extend([
+        mp4_range_case(
+            "rtp-hints-open",
+            hinted_file,
+            &hinted,
+            [],
+            (289, 72_260, 16_322_489_954_875_018_336),
+        ),
+        mp4_range_case(
+            "rtp-hints-seek",
+            hinted_file,
+            &hinted,
+            ["26880"],
+            (145, 35_398, 5_283_456_504_139_288_625),
+        ),
+    ]);
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",

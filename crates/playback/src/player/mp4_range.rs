@@ -32,15 +32,37 @@ type Edits<'a> = &'a [Option<EncodedEditPlan>];
 pub struct Mp4RangeOpen<'a> {
     movie: &'a Movie,
     edits: Option<Edits<'a>>,
+    media_tracks_only: bool,
     index: Mp4IndexJob<'a>,
 }
 
 impl<'a> Mp4RangeOpen<'a> {
     pub fn new(movie: &'a Movie, edits: Option<Edits<'a>>, limits: PlanLimits) -> Result<Self> {
+        Self::open(movie, edits, limits, false)
+    }
+
+    /// Prepare media playback with container data tracks excluded from edit
+    /// projection, packet delivery and seeks. Sample extent checks cover every
+    /// source track. Edit plans retain their original source track ordinals.
+    pub fn for_media(
+        movie: &'a Movie,
+        edits: Option<Edits<'a>>,
+        limits: PlanLimits,
+    ) -> Result<Self> {
+        Self::open(movie, edits, limits, true)
+    }
+
+    fn open(
+        movie: &'a Movie,
+        edits: Option<Edits<'a>>,
+        limits: PlanLimits,
+        media_tracks_only: bool,
+    ) -> Result<Self> {
         Ok(Self {
             movie,
             edits,
-            index: Mp4IndexJob::new_native_range(movie, edits, limits)?,
+            media_tracks_only,
+            index: Mp4IndexJob::new_native_range(movie, edits, limits, media_tracks_only)?,
         })
     }
 
@@ -76,6 +98,7 @@ impl<'a> Mp4RangeOpen<'a> {
         Ok(Mp4RangePlayer {
             movie: self.movie,
             edits: self.edits,
+            media_tracks_only: self.media_tracks_only,
             cursor,
             player,
             duration_us,
@@ -89,6 +112,7 @@ impl<'a> Mp4RangeOpen<'a> {
 pub struct Mp4RangePlayer<'a, S: Source> {
     movie: &'a Movie,
     edits: Option<Edits<'a>>,
+    media_tracks_only: bool,
     cursor: PacketCursor<'a>,
     player: Player<S>,
     duration_us: i64,
@@ -181,7 +205,8 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             };
             (Some(checked), None, None)
         } else {
-            let global = native_global_seek(self.movie, self.edits, request)?;
+            let global =
+                native_global_seek(self.movie, self.edits, request, self.media_tracks_only)?;
             let global = match opus_audio {
                 Some(audio) => global.with_opus_recovery(audio)?,
                 None => global,
