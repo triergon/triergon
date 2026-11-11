@@ -30,8 +30,30 @@ jobs:
           restore-keys: pinned-downloads-
       - name: Install check dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config zlib1g-dev nasm rsync zstd
+          packages=(build-essential pkg-config zlib1g-dev nasm rsync zstd)
+          retry=(-o Acquire::Retries=1)
+          refresh=(-o APT::Update::Error-Mode=any)
+          if ! sudo apt-get "${retry[@]}" "${refresh[@]}" update ||
+             ! sudo apt-get "${retry[@]}" install -y "${packages[@]}"; then
+            # Use the signed Ubuntu archives directly if the runner's mirror is unavailable.
+            sources="$RUNNER_TEMP/ubuntu-check.sources"
+            cat > "$sources" <<'EOF'
+          Types: deb
+          URIs: https://archive.ubuntu.com/ubuntu/
+          Suites: noble noble-updates noble-backports
+          Components: main universe
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+          Types: deb
+          URIs: https://security.ubuntu.com/ubuntu/
+          Suites: noble-security
+          Components: main universe
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          EOF
+            direct=(-o "Dir::Etc::sourcelist=$sources" -o Dir::Etc::sourceparts=-)
+            sudo apt-get "${direct[@]}" "${retry[@]}" "${refresh[@]}" update
+            sudo apt-get "${direct[@]}" "${retry[@]}" install -y "${packages[@]}"
+          fi
           rustup show active-toolchain || rustup toolchain install
           rustc -vV
           mkdir -p "$TRIERGON_DOWNLOAD_CACHE"
