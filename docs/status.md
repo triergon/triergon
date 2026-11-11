@@ -351,7 +351,10 @@ The DVD decoder reads the numbers of a colour list (the `palette` option and a c
 for AArch64 reads them with 64 bits, so a number beyond 32 bits gives another colour there
 (`vobsub-palette-option`, which `subtitle-dvd` pins with the AArch64 result). It reads the
 numbers of a `size:` line with a 32-bit `long` too, so one beyond `int`'s range refuses the
-size, where FFmpeg for AArch64 keeps its low 32 bits. The subtitles reference flags a fold that
+size, where FFmpeg for AArch64 keeps its low 32 bits. A `.idx` `delay:` line is read as FFmpeg
+for ARMv7 reads it: a `-` after spaces negates the whole delay, then up to four `%d` fields,
+each saturating at `int`'s range there (FFmpeg for AArch64 keeps their low 32 bits), with
+missing fields zero. The subtitles reference flags a fold that
 reaches a C library result differing between the two targets; of the five subtitle features'
 cases it flags only `vobsub-palette-option`, on both, which therefore fails `subtitle-dvd`, a
 feature not pinned per target.

@@ -4,7 +4,10 @@
 //!
 //! [`Lines`] reads it one line at a time without allocating: settings such as
 //! `size:` and `palette:` stay raw for the caller, and every `id:`, `delay:`
-//! and `timestamp:` line is decoded. Line ends may be LF or CRLF.
+//! and `timestamp:` line is decoded. Line ends may be LF or CRLF. A `delay:`
+//! line is read as the reference reads it, with 32-bit ARMv7's `long`, and is
+//! never malformed: whatever its fields do not say is zero.
+use super::c_text::scan_int;
 use triergon_core::{Error, Result};
 
 /// One line of an index.
@@ -22,7 +25,8 @@ pub enum Line<'a> {
         language: &'a [u8],
         index: Option<u8>,
     },
-    /// `delay: [-]HH:MM:SS:mmm`: the offset of the timestamps that follow.
+    /// `delay: [-]HH:MM:SS:mmm`: the offset of the timestamps that follow, in
+    /// milliseconds. Every such line parses (see [`Lines`]).
     Delay(i64),
     /// `timestamp: HH:MM:SS:mmm, filepos: HEX`: a unit of the current track at
     /// this byte position of the `.sub` file.
@@ -44,7 +48,7 @@ impl<'a> Lines<'a> {
 }
 
 impl<'a> Iterator for Lines<'a> {
-    /// The line's raw bytes and its meaning; `Err` for an `id:`, `delay:` or
+    /// The line's raw bytes and its meaning; `Err` for an `id:` or
     /// `timestamp:` line that does not parse.
     type Item = (&'a [u8], Result<Line<'a>>);
 
@@ -90,11 +94,7 @@ fn classify(line: &[u8]) -> Result<Line<'_>> {
         });
     }
     if let Some(value) = line.strip_prefix(b"delay:") {
-        let mut scanner = Scanner(value);
-        scanner.space();
-        let negative = scanner.literal(b"-");
-        let time = scanner.clock().ok_or(Error::Invalid("VobSub delay"))?;
-        return Ok(Line::Delay(if negative { -time } else { time }));
+        return Ok(Line::Delay(delay(value)));
     }
     if let Some(value) = line.strip_prefix(b"timestamp:") {
         let mut scanner = Scanner(value);
@@ -110,6 +110,36 @@ fn classify(line: &[u8]) -> Result<Line<'_>> {
         });
     }
     Ok(Line::Setting(line))
+}
+
+/// A `delay:` value in milliseconds, as the reference reads it: after spaces
+/// (only U+0020), a `-` negates the whole delay; then up to four fields
+/// `H:M:S:ms`, each a `%d` of C's `sscanf` with a 32-bit `long` (after any white
+/// space, with an optional sign, saturating at `int`'s range), each but the
+/// first right after a `:`. Fields it does not reach are zero, so text without
+/// a number is a delay of zero; the fields are summed in 64 bits.
+fn delay(value: &[u8]) -> i64 {
+    let spaces = value.iter().take_while(|&&b| b == b' ').count();
+    let (negative, text) = match &value[spaces..] {
+        [b'-', rest @ ..] => (true, rest),
+        rest => (false, rest),
+    };
+    let mut total = 0_i64;
+    let mut at = 0;
+    for (i, scale) in [3_600_000, 60_000, 1_000, 1].into_iter().enumerate() {
+        if i != 0 {
+            if text.get(at) != Some(&b':') {
+                break;
+            }
+            at += 1;
+        }
+        let Some((field, end)) = scan_int(text, at) else {
+            break;
+        };
+        total += i64::from(field) * scale;
+        at = end;
+    }
+    if negative { -total } else { total }
 }
 
 /// A cursor over the fields of one line.
