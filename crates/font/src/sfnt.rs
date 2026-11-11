@@ -64,6 +64,7 @@ pub(crate) struct Tables {
     pub(crate) post: Option<Table>,
     pub(crate) fpgm: Option<Table>,
     pub(crate) prep: Option<Table>,
+    pub(crate) fvar: Option<Table>,
     /// The bytes from `loca` to the next table that starts after it, or to the
     /// end of the file: FreeType reads a short `loca` that far.
     pub(crate) loca_room: usize,
@@ -93,6 +94,7 @@ impl Tables {
             b"post" => &mut self.post,
             b"fpgm" => &mut self.fpgm,
             b"prep" => &mut self.prep,
+            b"fvar" => &mut self.fvar,
             _ => return None,
         })
     }
@@ -229,9 +231,40 @@ pub(crate) fn directory(
     Ok((flavor, tables))
 }
 
+/// The axis count of an `fvar` table FreeType accepts as it loads a face
+/// (`sfnt_load_face`), which then gives the face a design vector at the
+/// default instance; zero for none.
+pub(crate) fn fvar_axes(data: &[u8], fvar: Option<Table>) -> u16 {
+    let Some(bytes) = fvar.map(|t| t.bytes(data)).filter(|b| b.len() >= 20) else {
+        return 0;
+    };
+    let mut r = Reader::new(bytes);
+    let header = (|| {
+        let version = r.u32()?;
+        let offset = r.u16()?;
+        r.skip(2)?;
+        Ok::<_, Error>((version, offset, r.u16()?, r.u16()?, r.u16()?, r.u16()?))
+    })();
+    let Ok((version, offset, axes, axis_size, instances, instance_size)) = header else {
+        return 0;
+    };
+    let [axes_n, instances_n, instance_size_n] = [axes, instances, instance_size].map(usize::from);
+    let fits =
+        usize::from(offset) + usize::from(axis_size) * axes_n + instance_size_n * instances_n
+            <= bytes.len();
+    let valid = version == 0x0001_0000
+        && axis_size == 20
+        && axes != 0
+        && axes <= 0x3ffe
+        && (instance_size_n == 4 + 4 * axes_n || instance_size_n == 6 + 4 * axes_n)
+        && instances <= 0x7eff
+        && fits;
+    if valid { axes } else { 0 }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Flavor, directory, face_count};
+    use super::{Flavor, Table, directory, face_count, fvar_axes};
     use triergon_core::{Error, WorkBudget};
 
     fn font(signature: &[u8; 4], tables: &[(&[u8; 4], u32, u32)]) -> Vec<u8> {
@@ -293,5 +326,35 @@ mod tests {
             Err(Error::Unsupported("font file signature"))
         );
         assert!(directory(&data, 0, &mut WorkBudget::new(0)).is_err());
+    }
+
+    #[test]
+    fn fvar_gives_its_axes_only_with_a_header_freetype_accepts() {
+        // Version 1.0, axes at 16, two axes of 20 bytes, one instance of
+        // 4 + 4 × 2 bytes, then the arrays.
+        let header = |version: u32, axis_size: u16, instance_size: u16| {
+            let mut fvar = version.to_be_bytes().to_vec();
+            for v in [16_u16, 2, 2, axis_size, 1, instance_size] {
+                fvar.extend(v.to_be_bytes());
+            }
+            fvar.resize(16 + 40 + usize::from(instance_size), 0);
+            fvar
+        };
+        let axes = |fvar: &[u8]| {
+            let table = Table {
+                offset: 0,
+                len: fvar.len(),
+            };
+            fvar_axes(fvar, Some(table))
+        };
+        assert_eq!(axes(&header(0x0001_0000, 20, 12)), 2);
+        assert_eq!(axes(&header(0x0001_0000, 20, 14)), 2);
+        assert_eq!(axes(&header(0x0002_0000, 20, 12)), 0);
+        assert_eq!(axes(&header(0x0001_0000, 16, 12)), 0);
+        assert_eq!(axes(&header(0x0001_0000, 20, 13)), 0);
+        // Arrays past the table's end, and a table shorter than 20 bytes.
+        assert_eq!(axes(&header(0x0001_0000, 20, 12)[..60]), 0);
+        assert_eq!(axes(&header(0x0001_0000, 20, 12)[..19]), 0);
+        assert_eq!(fvar_axes(&[], None), 0);
     }
 }

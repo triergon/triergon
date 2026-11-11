@@ -142,8 +142,17 @@ arithmetic as at a size with a scale of one.
 
 **CFF and CFF2 outlines.** `CFF ` version 1 with Type 2 charstrings, name-keyed or
 CID-keyed (FDArray, FDSelect formats 0 and 3), and `CFF2` (FDSelect format 4 too)
-at the default instance of a variable font: `blend` applies region scalars at the
-origin, in charstrings and Private DICTs. Supported: all path operators, flex,
+at the default instance of a variable font: `blend` applies the region scalars
+FreeType's `cff_blend_build_vector` builds at the origin, in charstrings and
+Private DICTs. A face whose `fvar` FreeType accepts has a design vector of its
+axes, all zero: a region weighs one unless an axis peaks away from zero, which
+scales it down where that axis's range spans zero and excludes it otherwise.
+Without `fvar` every region weighs zero. A variation store with other axes
+than `fvar` fails each charstring `blend`; in the Private DICT it does not stop
+the face from opening, as FreeType first reads that DICT without a design
+vector, and the hinter then takes what the DICT's second reading, with the
+vector, gives before its first `blend`, as FreeType ignores that reading's
+error. Supported: all path operators, flex,
 stem hints, `hintmask` and `cntrmask` (the stems are fixed by the first mask or
 move: later stem operators are ignored, as is a later mask operator with more
 than one operand, whose mask bytes then run as charstring, and a mask over more
@@ -160,7 +169,10 @@ that engine builds unhinted ones: points are whole font units (the 16.16 value a
 1/64 scale, rounded, then shifted down), a contour starts at its first segment,
 lines of zero length are dropped, and closing a contour drops a final on-curve
 point equal to its first and a contour left with one point. The FontMatrix is
-read, normalised and applied in fixed point as FreeType does: a Font DICT's matrix
+read, normalised and applied in fixed point as FreeType does on 32-bit ARM
+(coefficients rounded to a common power of ten saturate at the 32-bit
+`FT_LONG_MIN` and `FT_LONG_MAX`, and `FT_Matrix_Check` scales them to 15
+significant bits and tests them in 32 bits): a Font DICT's matrix
 follows the Top DICT's, outlines and advances go through it, and a Font DICT whose
 matrix implies other units per em scales its glyphs by the ratio. Drawing
 operators read operand counts the format does not allow as FreeType's engine reads
@@ -184,9 +196,28 @@ The 26.6 points then go through the FontMatrix and are moved by its offset in
 font units, without further scaling. Sizes beyond 2000 pixels per em, which the
 hinter refuses, load unhinted and scaled, as FreeType retries them; a 16.16
 scale below 32 fails the glyph. The arithmetic is cf2's, 16.16 in 32 bits.
-DICT operands are kept as encoded and converted where read, as FreeType's
-parser converts them; a CFF2 `blend` in a DICT sums each default and its
-deltas times the region scalars in 16.16, as `cff_blend_doBlend` does.
+DICTs are read as FreeType's `cff_parser_run` reads them: a Top or Font DICT
+entry takes up to 95 operands in CFF and 512 in CFF2, a Private DICT entry 96
+and 513 (the Top DICT's `maxstack`, which FreeType clamps to 513, plus one);
+27 is a one-byte number, operators FreeType does not know in a DICT are
+skipped with their operands, and a number cut short at the end ends the DICT.
+Operands are kept as encoded and converted where read, as FreeType's parser
+converts them on 32-bit ARM, the five-byte form signed; offsets and counts
+take the first operand, cast to 32 unsigned bits. `vsindex` and `blend` apply
+only in a CFF2 Private DICT, where `blend` sums each default and its deltas
+times the region scalars in 16.16, as `cff_blend_doBlend` does, and `vsindex`
+may not follow it; a charstring's `vsindex` ignores a negative index, and an
+index outside the variation store fails at its `blend`. A Private DICT that
+is missing, or at offset or size zero, is not read, as `cff_load_private_dict`
+skips it; an entry FreeType reads in any DICT, used here or not, fails the
+face with fewer operands than FreeType reads (`cfftoken.h` and the field
+readers of `cffparse.c`), as does a MultipleMaster entry with other than 2 to
+16 designs, and a ROS entry with registry 0xFFFF marks no CID-keyed face. A
+CFF Font DICT is read as a Top DICT, as FreeType reads it, and one with its own
+ROS has no Private DICT. One difference remains: a CFF2 face whose `fvar`
+passes FreeType's header check but which `TT_Get_MM_Var` then refuses opens
+here, with the header's axes, where FreeType fails to open it (`cff_face_init`
+sets the default instance).
 
 **Control boxes.** `Font::control_box` reads a glyph's box without building its
 outline, within the caller's `WorkBudget`, so no point limit applies: a TrueType glyph's `glyf` header box as
@@ -222,7 +253,34 @@ them when the scale is undefined. A `SizedFont` then gives:
   hints it with Adobe's hinter (`cf2`, without stem darkening): its stems and
   hint masks, counter masks and blue zones at the hinted scale, then the
   FontMatrix and its offset; above 2000 pixels per em it loads unhinted, as
-  FreeType retries it. TrueType glyphs are `Unsupported` there (see below).
+  FreeType retries it. A glyph of a TrueType face without bytecode (no `fpgm`,
+  a `prep` of at most 7 bytes) goes through FreeType's auto-hinter, as below.
+  Other TrueType glyphs are `Unsupported` there (see below).
+- The auto-hinter (`autofit`), as FreeType 2.15 builds it without HarfBuzz and
+  runs it for `FT_LOAD_DEFAULT`: the glyph is loaded in font units and hinted
+  at the size's scales (not the integer-ppem ones). Each glyph takes the style
+  of the first script, in FreeType's order, whose character ranges contain a
+  character the face's Unicode charmap (`find_unicode_charmap`) maps to it;
+  uncovered glyphs take the CJK fallback. A style of the latin writing system
+  measures, once per face, its standard stem widths on the script's standard
+  characters, its blue zones on its blue strings and whether the digits share
+  one advance; a style without blue zones, and the dummy style, leave the
+  outline unhinted. Latin hinting finds segments, stems, serifs and edges in
+  both dimensions (vertically only in an italic face), fits the vertical scale
+  to the x height, aligns horizontal edges to blue zones (base characters
+  only), fits stems to whole pixels, interpolates strong and weak points, and
+  applies the accent adjustments of FreeType's database (tildes stretched,
+  blue zones kept off diacritics, diacritics kept a pixel from their base).
+  The outline is then moved by its hinted left phantom point; the advance
+  runs between the hinted phantom points (the scaled advance in a fixed-pitch
+  face and for digits of one width), the vertical advance is scaled by the
+  style's vertical scale, and the box is fitted outwards to pixels. Glyphs of
+  the CJK and Indic styles have their advances (the scaled advance, rounded,
+  which those writing systems leave unhinted) and, without points, their empty
+  outlines, but outlines with points are `Unsupported`. The style of every glyph and each style's metrics are
+  computed on the first load that needs them and kept with the face, charged
+  to its budget, as is the storage one load hints in, which the next reuses
+  and which stays charged at the largest glyph's size.
 - `synthesize`: libass's synthetic styles, decided by `Font::synthesis` from the
   requested weight and slant against `OS/2.fsSelection` bits 0 and 5 and
   `Font::weight`: the oblique shear (0x2d24 for CFF faces, 0x5700 for others, as
@@ -231,19 +289,24 @@ them when the scale is undefined. A `SizedFont` then gives:
   `FT_Vector_NormLen` and the orientation test. `Outline::transform`,
   `embolden` and `orientation` are public.
 - `default_advance`: the advance of FreeType's default load, which libass's
-  HarfBuzz callbacks report: the unhinted advance at the hinting scale (TrueType
-  faces with `head.flags` bit 3 scale by the integer pixels per em there) rounded
-  to a pixel. That is exact for CFF and for TrueType whose `fpgm`, `prep` and
-  glyph programs can only issue `INSTCTRL` with a constant selector 1 or 2, so
-  that FreeType's v40 interpreter keeps backward compatibility and hinting cannot
-  move an advance; other faces are `Unsupported` (see below). At zero pixels per
-  em it is the unscaled advance.
+  HarfBuzz callbacks report, as `load` with `Load::Default` gives it: for an
+  auto-hinted face the auto-hinter's, found with only the vertical edges of a
+  latin glyph hinted and without the points of other glyphs; otherwise the
+  unhinted advance at the hinting scale (TrueType faces with `head.flags` bit 3
+  scale by the integer pixels per em there) rounded to a pixel. That is exact
+  for CFF and for TrueType whose `fpgm`, `prep` and glyph programs can only
+  issue `INSTCTRL` with a constant selector 1 or 2, so that FreeType's v40
+  interpreter keeps backward compatibility and hinting cannot move an advance;
+  other instructed faces are `Unsupported` (see below). At zero pixels per em
+  it is the unscaled advance.
 - The vertical advances libass uses for a glyph of an `@` font it draws
   rotated: the outline's `GlyphMetrics` carry the unhinted load's
   `metrics.vertAdvance` (26.6) and `linearVertAdvance` (16.16, scaled by the
-  size's y scale with `FT_MulDiv`), and `default_vertical_advance` gives the
+  size's y scale with `FT_MulDiv`, in 32 bits as on 32-bit ARM, after either
+  load), and `default_vertical_advance` gives the
   default load's `metrics.vertAdvance`, which libass gives HarfBuzz, rounded to
-  a pixel at the hinting scale and `Unsupported` where `default_advance` is.
+  a pixel at the hinting scale (the auto-hinter's vertical scale for a face it
+  hints) and `Unsupported` where `default_advance` is.
   The advance in font units is the `vmtx` advance height with vertical metrics,
   else the one FreeType makes up from the typographic ascender and descender
   (`OS/2`, else `hhea`). A TrueType glyph measures it between its phantom
@@ -294,33 +357,37 @@ kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Ty
 A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
 opens it and fails each glyph.
 
-At a size, the default load of a TrueType glyph is `Unsupported`, hence its
-glyph extents and contour points, which libass's HarfBuzz callbacks report: an
-auto-hinted face needs FreeType's auto-hinter, and an instructed one the
-TrueType interpreter, which this crate does not run.
-`default_advance` is `Unsupported` for TrueType faces FreeType auto-hints (no
-`fpgm` and a `prep` of at most 7 bytes; the autohinter moves advances), tricky
-fonts known by family name, and programs that may leave backward compatibility;
-fonts FreeType finds tricky only by their table checksums are not recognised.
+At a size, the default load of an instructed TrueType glyph is `Unsupported`,
+hence its glyph extents and contour points, which libass's HarfBuzz callbacks
+report: it needs the TrueType interpreter, which this crate does not run. So is
+the default-load outline, with points, of an auto-hinted glyph of a CJK or Indic style, whose
+writing systems the auto-hinter here does not run, and HarfBuzz's coverage of
+glyphs through OpenType features, which FreeType's auto-hinter has only with
+HarfBuzz built in. The auto-hinter runs only the normal render mode, without
+the light mode's stem darkening.
+`default_advance` is `Unsupported` for tricky fonts known by family name and
+programs that may leave backward compatibility; fonts FreeType finds tricky only
+by their table checksums are not recognised.
 Sizes beyond 65535 pixels per em are refused. Coordinates are `i32`; a scaled coordinate beyond it is
-`Error::Overflow`, where FreeType's 64-bit `FT_Pos` goes on (libass rejects
-anything beyond 2^28 itself). The `random` operator does not follow FreeType's
+`Error::Overflow` in an unhinted or CFF load, where FreeType's `FT_Pos` wraps at
+32 bits on 32-bit ARM (libass rejects anything beyond 2^28 itself); the
+auto-hinter wraps its `FT_Pos` and `FT_Fixed` arithmetic as FreeType does there. The `random` operator does not follow FreeType's
 generator.
 
 ## Hinting
 
 The gate covers libass's default configuration, hinting off: unhinted outlines at
 256 pixels and the default-load advances libass's HarfBuzz callbacks read at that
-size, with the vertical advances of `@` fonts (`font-hinting-none`). Four of its
-cases are open: the advances and vertical cases of DejaVuMathTeXGyre and
-authored-cmap-formats, whose default-load advances FreeType's auto-hinter moves.
-The default load itself, every glyph's metrics and hinted outline at that size,
-is gated too (`font-hinting-default`): every CFF, CFF2 and CID-keyed face matches
-FreeType, and the TrueType faces are open, two under the auto-hinter and the
-rest under the TrueType interpreter. For libass's default configuration that
-gap is in what HarfBuzz reads to position marks without GPOS anchors (glyph
-extents and contour points) in TrueType fonts; the outlines libass draws are
-unhinted and compared. For libass's hinting-enabled modes (NATIVE, LIGHT,
+size, with the vertical advances of `@` fonts (`font-hinting-none`), all of which
+match FreeType, the auto-hinted faces' included. The default load itself, every
+glyph's metrics and hinted outline at that size, is gated too
+(`font-hinting-default`): every CFF, CFF2 and CID-keyed face matches FreeType, and
+so does the auto-hinted authored-cmap-formats. DejaVuMathTeXGyre is open under the
+auto-hinter's CJK writing system, which styles most of its glyphs, and the
+instructed TrueType faces under the TrueType interpreter. For libass's default
+configuration that gap is in what HarfBuzz reads to position marks without GPOS
+anchors (glyph extents and contour points) in those fonts; the outlines libass
+draws are unhinted and compared. For libass's hinting-enabled modes (NATIVE, LIGHT,
 NORMAL), the unhinted outlines and default-load advances at nine other sizes are
 only measured (`font-hinting-modes`), and the hinted outlines those modes draw
 are not compared.
@@ -332,9 +399,12 @@ lookup depends on; glyph programs, cmap entries, names and kerning pairs are rea
 from the font bytes when asked for. A face retains the shared `Bytes` plus small
 tables charged to the `Budget` it was created with: the supported cmap records, one
 Private DICT per CFF FDArray entry, variation region scalars and kern subtable
-records. An `Outline` charges its points and contour ends to its
-own budget and keeps its capacity across glyphs; a `SizedFont` is a small copyable
-view that allocates nothing.
+records. A face FreeType auto-hints also keeps, once a default load needs
+them, the auto-hinter's style of each glyph, its reverse charmap of accented
+characters and each latin style's metrics, charged to that budget, as is the
+scratch storage of an auto-hinted load. An `Outline` charges its points and
+contour ends to its own budget and keeps its capacity across glyphs; a
+`SizedFont` is a small copyable view that allocates nothing.
 
 `Limits` bounds the work of one parse and of one outline (`work`), nested
 composites and subroutine calls (`depth`) and the points of one outline

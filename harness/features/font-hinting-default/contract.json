@@ -27,7 +27,7 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "the FreeType auto-hinter, for TrueType faces without bytecode",
+    "the auto-hinter's CJK writing system, for the hinted outlines of the glyphs it gives a CJK or Indic style",
     "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
   ],
   "open_cases": [
@@ -46,10 +46,6 @@
     {
       "id": "arimo-regular-ttf-default-16384",
       "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
-    },
-    {
-      "id": "authored-cmap-formats-ttf-default-16384",
-      "requirement": "the FreeType auto-hinter, for TrueType faces without bytecode"
     },
     {
       "id": "authored-cmap-order-ttc-default-16384",
@@ -77,7 +73,7 @@
     },
     {
       "id": "dejavumathtexgyre-ttf-default-16384",
-      "requirement": "the FreeType auto-hinter, for TrueType faces without bytecode"
+      "requirement": "the auto-hinter's CJK writing system, for the hinted outlines of the glyphs it gives a CJK or Indic style"
     },
     {
       "id": "dejavusans-bold-ttf-default-16384",

@@ -1,7 +1,7 @@
 //! The face-wide tables: `head`, `hhea` and `vhea`, `maxp`, `OS/2`, and `hmtx`
 //! and `vmtx` (OpenType).
 
-use crate::read::{Reader, u16_at};
+use crate::read::{Reader, u16_at, u32_at};
 use crate::sfnt::Table;
 use triergon_core::{Error, Result};
 
@@ -222,6 +222,16 @@ pub(crate) fn underline(data: Option<&[u8]>) -> (i16, i16) {
             u16_at(post, 10).map_or(0, u16::cast_signed),
         ),
         _ => (0, 0),
+    }
+}
+
+/// Whether `post` declares the face fixed pitch (`isFixedPitch`), which
+/// FreeType reports as `FT_FACE_FLAG_FIXED_WIDTH`; false when the table is
+/// absent or shorter than its 32-byte header.
+pub(crate) fn fixed_pitch(data: Option<&[u8]>) -> bool {
+    match data {
+        Some(post) if post.len() >= 32 => u32_at(post, 12).is_some_and(|v| v != 0),
+        _ => false,
     }
 }
 

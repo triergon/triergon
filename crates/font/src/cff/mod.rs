@@ -10,14 +10,17 @@ mod matrix;
 mod number;
 mod path;
 
-use crate::fixed::{Scale, div_fix, mul_div, mul_fix};
+use crate::fixed::{Scale, div_fix, mul_fix};
 use crate::glyf::narrow;
+use crate::long::mul_div;
 use crate::outline::{Outline, Point};
 use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
 use crate::work::charge;
 use crate::{GlyphId, Limits};
-use dict::{CFF_OPERANDS, CFF2_OPERANDS, Entry, op};
+use dict::{
+    CFF_PRIVATE_STACK, CFF_TOP_STACK, CFF2_PRIVATE_STACK, CFF2_TOP_STACK, Entry, Kind, Weights, op,
+};
 use hint::{Blues, HintDict};
 use index::Index;
 use matrix::FontMatrix;
@@ -97,17 +100,24 @@ pub(crate) struct Cff {
     /// The face's units per em, from `head`, which bound the hinted scale.
     face_units_per_em: u16,
     /// Region scalars of each ItemVariationData at the default instance, in
-    /// 16.16: one or zero.
+    /// 16.16, as `cff_blend_build_vector` computes them.
     scalars: BudgetVec<Fixed>,
     variation_data: BudgetVec<(u32, u32)>,
+    /// The axes of the face's `fvar`, zero without one (FreeType's `lenNDV`).
+    fvar_axes: u16,
+    /// The axes of the variation store's regions.
+    store_axes: u16,
 }
 
 impl Cff {
+    /// The `CFF ` or `CFF2` table at `table`. `fvar_axes` is the axis count of
+    /// the face's `fvar`, zero without one, which decides the region scalars.
     pub(crate) fn parse(
         data: &[u8],
         table: Table,
         version: Version,
         units_per_em: u16,
+        fvar_axes: u16,
         budget: &Budget,
         work: &mut WorkBudget,
     ) -> Result<Self> {
@@ -133,6 +143,8 @@ impl Cff {
             face_units_per_em: units_per_em,
             scalars: BudgetVec::new(budget),
             variation_data: BudgetVec::new(budget),
+            fvar_axes,
+            store_axes: 0,
         };
         let top = match (version, major) {
             (Version::Cff1, 1) => {
@@ -155,7 +167,7 @@ impl Cff {
             }
             _ => return Err(Error::Invalid("CFF major version")),
         };
-        let top = cff.top_dict(top, work)?;
+        let top = cff.font_dict_entries(top, Kind::Top, work)?;
         let mut charstrings = Reader::at(
             bytes,
             top.charstrings
@@ -211,16 +223,9 @@ impl Cff {
             cff.font_dicts
                 .try_reserve_exact(usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?)?;
             for i in 0..fonts.len() {
-                let font = fonts.get(bytes, i)?;
-                let (mut location, mut matrix) = (None, None);
-                cff.dict(font, work, |entry| {
-                    match entry.operator {
-                        op::PRIVATE => location = Some(private_location(entry.operands)?),
-                        op::FONT_MATRIX => matrix = Some(FontMatrix::parse(entry.operands)?),
-                        _ => {}
-                    }
-                    Ok(())
-                })?;
+                let font = cff.font_dict_entries(fonts.get(bytes, i)?, Kind::Font, work)?;
+                // A Font DICT with its own ROS has no Private DICT to FreeType.
+                let (location, matrix) = (font.private.filter(|_| !font.ros), font.matrix);
                 // FreeType concatenates with the Top DICT's matrix only when the
                 // Top DICT has one, and normalises copies of it again.
                 let matrix = match (matrix, top.matrix) {
@@ -265,37 +270,65 @@ impl Cff {
         self.version
     }
 
-    fn dict<'a>(
-        &self,
+    /// Parses a DICT of `kind` as `cff_parser_run` does: entries FreeType
+    /// does not know in it are skipped, and one with fewer operands than
+    /// FreeType reads fails the parse. `weights` gives the region scalars a
+    /// CFF2 Private DICT's `blend` applies.
+    fn dict<'a, 's>(
+        &'s self,
         bytes: &'a [u8],
+        kind: Kind,
+        weights: Option<&dyn Fn(usize) -> Result<Weights<'s>>>,
         work: &mut WorkBudget,
-        apply: impl FnMut(Entry<'a, '_>) -> Result<()>,
+        mut apply: impl FnMut(Entry<'a, '_>) -> Result<()>,
     ) -> Result<()> {
-        let scalars = |i| self.region_scalars(i);
-        match self.version {
-            Version::Cff1 => dict::parse::<CFF_OPERANDS>(bytes, work, &scalars, apply),
-            Version::Cff2 => dict::parse::<CFF2_OPERANDS>(bytes, work, &scalars, apply),
+        let version = self.version;
+        let checked = |entry: Entry<'a, '_>| match op::min_operands(version, kind, entry.operator) {
+            None => Ok(()),
+            Some(n) if entry.operands.len() < n => Err(Error::Invalid("CFF DICT operand count")),
+            Some(_) => apply(entry),
+        };
+        match (version, kind) {
+            (Version::Cff1, Kind::Private) => {
+                dict::parse::<CFF_PRIVATE_STACK>(bytes, work, None, checked)
+            }
+            (Version::Cff1, _) => dict::parse::<CFF_TOP_STACK>(bytes, work, None, checked),
+            (Version::Cff2, Kind::Private) => {
+                dict::parse::<CFF2_PRIVATE_STACK>(bytes, work, weights, checked)
+            }
+            (Version::Cff2, _) => dict::parse::<CFF2_TOP_STACK>(bytes, work, None, checked),
         }
     }
 
-    fn top_dict(&self, bytes: &[u8], work: &mut WorkBudget) -> Result<Top> {
+    /// The entries of the Top DICT, or of a Font DICT, which FreeType reads
+    /// as a Top DICT in CFF (`cff_subfont_load`).
+    fn font_dict_entries(&self, bytes: &[u8], kind: Kind, work: &mut WorkBudget) -> Result<Top> {
         let mut top = Top {
             charstring_type: 2,
             ..Top::default()
         };
-        self.dict(bytes, work, |Entry { operator, operands }| {
+        self.dict(bytes, kind, None, work, |Entry { operator, operands }| {
+            // FreeType reads the first operand of each, offsets into unsigned
+            // fields; `min_operands` checked that there are enough.
+            let first = operands[0];
             match operator {
-                op::CHAR_STRINGS => top.charstrings = Some(dict::single(operands)?),
-                op::CHARSET => top.charset = dict::single(operands)?,
-                op::ENCODING => top.encoding = dict::single(operands)?,
+                op::CHAR_STRINGS => top.charstrings = Some(first.unsigned()),
+                op::CHARSET => top.charset = first.unsigned(),
+                op::ENCODING => top.encoding = first.unsigned(),
                 op::PRIVATE => top.private = Some(private_location(operands)?),
-                op::FD_ARRAY => top.fd_array = Some(dict::single(operands)?),
-                op::FD_SELECT => top.fd_select = Some(dict::single(operands)?),
-                op::VSTORE => top.vstore = Some(dict::single(operands)?),
-                op::ROS => top.ros = true,
+                op::FD_ARRAY => top.fd_array = Some(first.unsigned()),
+                op::FD_SELECT => top.fd_select = Some(first.unsigned()),
+                op::VSTORE => top.vstore = Some(first.unsigned()),
+                // A registry of 0xFFFF marks no ROS (`cid_registry`).
+                op::ROS => top.ros = first.integer() as u32 != 0xffff,
                 op::SYNTHETIC_BASE => top.synthetic = true,
-                op::CHARSTRING_TYPE => top.charstring_type = dict::single(operands)?,
+                op::CHARSTRING_TYPE => top.charstring_type = first.integer(),
+                op::MULTIPLE_MASTER if !(2..=16).contains(&first.integer()) => {
+                    return Err(Error::Invalid("CFF MultipleMaster design count"));
+                }
                 op::FONT_MATRIX => top.matrix = Some(FontMatrix::parse(operands)?),
+                // `maxstack` sizes the Private DICT's stack, but FreeType clamps
+                // it to `CFF2_MAXSTACK` both ways.
                 _ => {}
             }
             Ok(())
@@ -303,10 +336,17 @@ impl Cff {
         Ok(top)
     }
 
-    /// The Private DICT at `location` (size, offset); CFF2 Font DICTs may omit
-    /// it. The hinter's values are read as `cff_load_private_dict` reads them:
-    /// the DICT's entries over FreeType's defaults, or zeros for a Font DICT
-    /// without a Private DICT (none, or an offset or size of zero).
+    /// The Private DICT at `location` (size, offset), read as
+    /// `cff_load_private_dict` reads it: none, or one at offset or size zero,
+    /// leaves no local subroutines and zeros for the hinter's values; else the
+    /// DICT's entries over FreeType's defaults.
+    ///
+    /// FreeType parses it when it opens the face without a design vector, so
+    /// that every `blend` weighs its deltas zero, and reads its local
+    /// subroutines and `vsindex` from that parse. Each glyph load of a face
+    /// with variations and `fvar` parses it again with the design vector, and
+    /// the hinter takes its values from that parse, unsanitised up to the
+    /// error should it fail (`cf2_font_setup` ignores the error).
     fn private_dict(
         &self,
         table: &[u8],
@@ -318,54 +358,66 @@ impl Cff {
             vsindex: 0,
             hints: HintDict::ABSENT,
         };
-        let Some((size, offset)) = location else {
-            return match self.version {
-                Version::Cff2 => Ok(private),
-                Version::Cff1 => Err(Error::Invalid("CFF without a Private DICT")),
-            };
+        let Some((size, offset)) = location.filter(|&(size, offset)| size > 0 && offset > 0) else {
+            return Ok(private);
         };
         let bytes = slice(table, offset, size)?;
-        let mut subrs = None;
-        let mut hints = HintDict::DEFAULTS;
-        self.dict(bytes, work, |Entry { operator, operands }| {
+        let zero = |i| self.region_scalars(i).map(|s| Weights::Zero(s.len()));
+        let (opened, parsed) = self.read_private(bytes, &zero, work);
+        parsed?;
+        private.vsindex = opened.vsindex;
+        private.hints = opened.hints;
+        if self.fvar_axes != 0 && !self.variation_data.is_empty() {
+            let regions = |i| self.blend_scalars(i).map(Weights::Regions);
+            private.hints = self.read_private(bytes, &regions, work).0.hints;
+        }
+        if let Some(relative) = opened.subrs {
+            let at = offset.checked_add(relative).ok_or(Error::Overflow)?;
+            private.subrs = Index::parse(&mut Reader::at(table, at)?, self.version)?;
+        }
+        Ok(private)
+    }
+
+    /// One parse of a Private DICT's `bytes` with `weights` for its blends:
+    /// what it read, and how it ended. The hinter's values are corrected as
+    /// `cff_load_private_dict` corrects them only when the parse succeeds.
+    fn read_private<'s>(
+        &'s self,
+        bytes: &[u8],
+        weights: &dyn Fn(usize) -> Result<Weights<'s>>,
+        work: &mut WorkBudget,
+    ) -> (PrivateValues, Result<()>) {
+        let mut values = PrivateValues {
+            subrs: None,
+            vsindex: 0,
+            hints: HintDict::DEFAULTS,
+        };
+        let hints = &mut values.hints;
+        let parsed = self.dict(bytes, Kind::Private, Some(weights), work, |entry| {
+            let (operator, operands) = (entry.operator, entry.operands);
             let fixed = |o: &Operand<'_>| o.fixed(0);
             match operator {
-                op::SUBRS => subrs = Some(dict::single(operands)?),
-                op::VSINDEX => private.vsindex = dict::single(operands)?,
-                // Unused here, but an entry without its operand fails the face,
-                // as it fails FreeType's parser.
-                op::DEFAULT_WIDTH_X | op::NOMINAL_WIDTH_X => {
-                    dict::first(operands)?;
-                }
+                op::SUBRS => values.subrs = Some(operands[0].unsigned()),
+                op::VSINDEX => values.vsindex = operands[0].unsigned(),
                 op::BLUE_VALUES => hints.blue_values.set(operands.iter().map(fixed)),
                 op::OTHER_BLUES => hints.other_blues.set(operands.iter().map(fixed)),
                 op::FAMILY_BLUES => hints.family_blues.set(operands.iter().map(fixed)),
                 op::FAMILY_OTHER_BLUES => {
                     hints.family_other_blues.set(operands.iter().map(fixed));
                 }
-                op::BLUE_SCALE => hints.blue_scale = dict::first(operands)?.fixed(3),
-                op::BLUE_SHIFT => hints.blue_shift = dict::first(operands)?.integer(),
-                op::BLUE_FUZZ => hints.blue_fuzz = dict::first(operands)?.integer(),
+                op::BLUE_SCALE => hints.blue_scale = operands[0].fixed(3),
+                op::BLUE_SHIFT => hints.blue_shift = operands[0].integer(),
+                op::BLUE_FUZZ => hints.blue_fuzz = operands[0].integer(),
                 // FreeType stores LanguageGroup in an int.
-                op::LANGUAGE_GROUP => {
-                    hints.language_group = dict::first(operands)?.integer() as i32;
-                }
+                op::LANGUAGE_GROUP => hints.language_group = operands[0].integer() as i32,
                 _ => {}
             }
             Ok(())
-        })?;
-        if size > 0 && offset > 0 {
-            hints.sanitize();
-            private.hints = hints;
+        });
+        if parsed.is_ok() {
+            values.hints.sanitize();
         }
-        if self.version == Version::Cff2 {
-            self.region_scalars(private.vsindex)?;
-        }
-        if let Some(relative) = subrs {
-            let at = offset.checked_add(relative).ok_or(Error::Overflow)?;
-            private.subrs = Index::parse(&mut Reader::at(table, at)?, self.version)?;
-        }
-        Ok(private)
+        (values, parsed)
     }
 
     /// Checks the FDSelect header; entries are read per glyph.
@@ -420,7 +472,8 @@ impl Cff {
         let count = r.u16()?;
         charge(work, usize::from(count))?;
         let mut list = Reader::at(table, start.checked_add(regions).ok_or(Error::Overflow)?)?;
-        let axes = usize::from(list.u16()?);
+        self.store_axes = list.u16()?;
+        let axes = usize::from(self.store_axes);
         let region_count = list.u16()?;
         let records = list.offset();
         self.variation_data.try_reserve_exact(usize::from(count))?;
@@ -445,18 +498,8 @@ impl Cff {
                     .checked_mul(axes * 6)
                     .and_then(|n| n.checked_add(records))
                     .ok_or(Error::Overflow)?;
-                let mut axis = Reader::at(table, at)?;
-                let mut scalar = 0x10000;
-                for _ in 0..axes {
-                    let (start, peak, end) = (axis.i16()?, axis.i16()?, axis.i16()?);
-                    // At the default instance every coordinate is zero: an axis whose
-                    // valid, non-straddling range peaks away from zero excludes the
-                    // region (OpenType "Item variation store", region scalars).
-                    let ignored = start > peak || peak > end || peak == 0 || (start < 0 && end > 0);
-                    if !ignored {
-                        scalar = 0;
-                    }
-                }
+                let axis = &mut Reader::at(table, at)?;
+                let scalar = region_scalar(self.fvar_axes, self.store_axes, axis)?;
                 self.scalars.try_push(scalar).map_err(|e| e.error)?;
             }
             self.variation_data
@@ -464,6 +507,18 @@ impl Cff {
                 .map_err(|e| e.error)?;
         }
         Ok(())
+    }
+
+    /// The region scalars a `blend` applies under `vsindex`. The variation
+    /// store must have as many axes as `fvar`, as FreeType requires to build
+    /// its blend vector.
+    fn blend_scalars(&self, vsindex: usize) -> Result<&[Fixed]> {
+        if self.fvar_axes != 0 && self.fvar_axes != self.store_axes {
+            return Err(Error::Invalid(
+                "CFF2 variation store and fvar axis counts differ",
+            ));
+        }
+        self.region_scalars(vsindex)
     }
 
     fn region_scalars(&self, vsindex: usize) -> Result<&[Fixed]> {
@@ -814,7 +869,14 @@ impl Cff {
     }
 }
 
-/// The Top DICT entries this reader uses.
+/// What one parse of a Private DICT reads.
+struct PrivateValues {
+    subrs: Option<usize>,
+    vsindex: usize,
+    hints: HintDict,
+}
+
+/// The Top or Font DICT entries this reader uses.
 #[derive(Debug, Default)]
 struct Top {
     charstrings: Option<usize>,
@@ -826,15 +888,46 @@ struct Top {
     vstore: Option<usize>,
     ros: bool,
     synthetic: bool,
-    charstring_type: usize,
+    charstring_type: i64,
     matrix: Option<FontMatrix>,
 }
 
+/// The size and offset of `Private`, which FreeType refuses negative.
 fn private_location(operands: &[Operand<'_>]) -> Result<(usize, usize)> {
-    match operands {
-        [size, offset] => Ok((size.index()?, offset.index()?)),
-        _ => Err(Error::Invalid("CFF Private operands")),
+    let [size, offset] = [operands[0], operands[1]].map(Operand::integer);
+    if size < 0 || offset < 0 {
+        return Err(Error::Invalid("CFF Private DICT size or offset"));
     }
+    Ok((size as usize, offset as usize))
+}
+
+/// `cff_blend_build_vector`'s factor for the region whose `axes` axes
+/// `axis` reads, at the default instance: zero without `fvar`, where FreeType
+/// has no design vector; else, at a coordinate of zero on every axis, one,
+/// scaled down by each axis that peaks away from zero with a range around
+/// it, and zero when such an axis's range excludes zero.
+fn region_scalar(fvar_axes: u16, axes: u16, axis: &mut Reader<'_>) -> Result<Fixed> {
+    if fvar_axes == 0 {
+        return Ok(0);
+    }
+    let mut scalar: i64 = 0x10000;
+    for _ in 0..axes {
+        // F2Dot14 coordinates; FreeType's 16.16 copies scale each ratio by
+        // four, which leaves `FT_MulDiv` unchanged.
+        let [start, peak, end] = [axis.i16()?, axis.i16()?, axis.i16()?].map(i64::from);
+        if peak == 0 {
+            continue;
+        }
+        if start >= 0 || end <= 0 {
+            return Ok(0);
+        }
+        scalar = if peak > 0 {
+            mul_div(scalar, -start, peak - start)
+        } else {
+            mul_div(scalar, end, end - peak)
+        };
+    }
+    Ok(scalar as Fixed)
 }
 
 /// The FD of `glyph` in an FDSelect whose header [`Cff::check_fd_select`] checked.
@@ -891,9 +984,10 @@ mod authoring;
 #[cfg(test)]
 mod tests {
     use super::authoring::{CffProgram, Part, charstring, number};
-    use super::{Cff, FdSelect, Version, fd_index};
+    use super::{Cff, FdSelect, HintDict, Version, dict, fd_index, region_scalar};
     use crate::fixed::Scale;
     use crate::outline::Outline;
+    use crate::read::Reader;
     use crate::sfnt::Table;
     use crate::{GlyphId, Limits};
     use triergon_core::{Budget, Error, Result, WorkBudget};
@@ -928,7 +1022,7 @@ mod tests {
             offset: 0,
             len: table.len(),
         };
-        let cff = Cff::parse(table, whole, Version::Cff1, 1000, &budget, &mut work).unwrap();
+        let cff = Cff::parse(table, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
         let mut outline = Outline::new(&budget);
         let (glyph, scale) = (GlyphId(1), Scale { x: scale, y: scale });
         let limits = Limits::default();
@@ -961,6 +1055,234 @@ mod tests {
     /// Two in 16.16, whose 64th FreeType's hinter scales by: 2048, exactly a
     /// 32nd of a pixel per unit, so unhinted points double.
     const TWO: i64 = 2 << 16;
+
+    #[test]
+    fn region_scalars_follow_freetypes_blend_vector_at_the_origin() {
+        let scalar = |fvar: u16, axes: &[[i16; 3]]| {
+            let bytes: Vec<u8> = axes
+                .iter()
+                .flatten()
+                .flat_map(|v| v.to_be_bytes())
+                .collect();
+            region_scalar(fvar, axes.len() as u16, &mut Reader::new(&bytes)).unwrap()
+        };
+        let half = 1 << 13;
+        // Without fvar, FreeType has no design vector: every region weighs 0.
+        assert_eq!(scalar(0, &[[0, 0, 0]]), 0);
+        // An axis peaking at zero, or not peaking, keeps the region whole.
+        assert_eq!(scalar(1, &[[-half, 0, half]]), 0x10000);
+        // A range that excludes zero excludes the region, ordered or not.
+        assert_eq!(scalar(1, &[[0, half, 2 * half]]), 0);
+        assert_eq!(scalar(1, &[[half, -half, 2 * half]]), 0);
+        // A range around zero with a peak away from it scales the region:
+        // from -0.5 to the peak at 0.5, zero is halfway; past a negative
+        // peak at -0.5 towards 1, two thirds of the way back.
+        assert_eq!(scalar(1, &[[-half, half, 2 * half]]), 0x8000);
+        assert_eq!(scalar(1, &[[-2 * half, -half, 2 * half]]), 43691);
+        // Axes multiply; a disordered range around zero still scales.
+        assert_eq!(
+            scalar(2, &[[-half, half, 2 * half], [-half, 2 * half, half]]),
+            10923
+        );
+    }
+
+    #[test]
+    fn a_missing_or_empty_private_dict_reads_as_none() {
+        let glyph = table(&rectangle(0, &[50]), Vec::new());
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+        let whole = Table {
+            offset: 0,
+            len: glyph.len(),
+        };
+        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        // Offset zero with a size, size zero, or none: nothing is read.
+        for location in [Some((5, 0)), Some((0, 40)), None] {
+            let private = cff.private_dict(&glyph, location, &mut work).unwrap();
+            assert_eq!(private.subrs.len(), 0);
+            assert_eq!(private.hints, HintDict::ABSENT);
+        }
+    }
+
+    /// The unhinted points of glyph 1, `glyph` run as a CFF2 charstring
+    /// over a variation store of one region that weighs one.
+    fn cff2_points(glyph: &[Part]) -> Result<Vec<(i32, i32)>> {
+        let table = table(glyph, Vec::new());
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+        let whole = Table {
+            offset: 0,
+            len: table.len(),
+        };
+        let mut cff = Cff::parse(&table, whole, Version::Cff1, 1000, 0, &budget, &mut work)?;
+        cff.version = Version::Cff2;
+        cff.scalars.try_push(0x10000).map_err(|e| e.error)?;
+        cff.variation_data.try_push((0, 1)).map_err(|e| e.error)?;
+        let mut outline = Outline::new(&budget);
+        let scale = Scale { x: TWO, y: TWO };
+        cff.load(
+            &table,
+            GlyphId(1),
+            scale,
+            &mut outline,
+            &Limits::default(),
+            &mut work,
+        )?;
+        Ok(outline
+            .points()
+            .iter()
+            .map(|p| (p.point.x, p.point.y))
+            .collect())
+    }
+
+    #[test]
+    fn charstring_vsindex_follows_freetypes_cff2_interpreter() {
+        // rmoveto 0 100; 10 5 1 blend (15 with the region's 5); hlineto; vlineto 50.
+        let path = [
+            N(0),
+            N(100),
+            Op(21),
+            N(10),
+            N(5),
+            N(1),
+            Op(16),
+            Op(6),
+            N(50),
+            Op(7),
+        ];
+        let drawn = [(0, 200), (30, 200), (30, 300)];
+        assert_eq!(cff2_points(&path), Ok(drawn.to_vec()));
+        // A negative vsindex is ignored.
+        assert_eq!(
+            cff2_points(&[&[N(-1), Op(15)][..], &path].concat()),
+            Ok(drawn.to_vec())
+        );
+        // One outside the variation store fails only at a blend.
+        let outside = [N(5), Op(15)];
+        assert_eq!(
+            cff2_points(&[&outside[..], &path].concat()),
+            Err(Error::Invalid("CFF2 vsindex outside the variation store"))
+        );
+        let without_blend = [N(0), N(100), Op(21), N(15), Op(6), N(50), Op(7)];
+        assert_eq!(
+            cff2_points(&[&outside[..], &without_blend].concat()),
+            Ok(drawn.to_vec())
+        );
+        // vsindex after a blend is refused.
+        assert_eq!(
+            cff2_points(&[&path[..], &[N(0), Op(15)]].concat()),
+            Err(Error::Invalid("CFF2 vsindex after blend"))
+        );
+    }
+
+    #[test]
+    fn top_dict_entries_read_as_freetype_reads_them() {
+        let glyph = table(&rectangle(0, &[50]), Vec::new());
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+        let whole = Table {
+            offset: 0,
+            len: glyph.len(),
+        };
+        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let top =
+            |bytes: &[u8]| cff.font_dict_entries(bytes, dict::Kind::Top, &mut WorkBudget::new(100));
+        // An offset reads the first of its operands.
+        assert_eq!(top(&[239, 240, 17]).unwrap().charstrings, Some(100));
+        assert!(top(&[17]).is_err());
+        // A registry of 0xFFFF is no ROS; -1 in two bytes is 0xFFFFFFFF.
+        assert!(!top(&[29, 0, 0, 0xff, 0xff, 139, 139, 12, 30]).unwrap().ros);
+        assert!(top(&[28, 0xff, 0xff, 139, 139, 12, 30]).unwrap().ros);
+        assert!(top(&[139, 139, 139, 12, 30]).unwrap().ros);
+        assert!(top(&[139, 139, 12, 30]).is_err());
+        // MultipleMaster needs five operands and 2 to 16 designs; FontBBox four.
+        assert!(top(&[141, 139, 139, 139, 139, 12, 24]).is_ok());
+        assert!(top(&[140, 139, 139, 139, 139, 12, 24]).is_err());
+        assert!(top(&[139, 139, 139, 5]).is_err());
+        // A negative Private DICT size fails.
+        assert!(top(&[138, 139, 18]).is_err());
+        // Operators FreeType does not know are skipped with their operands.
+        assert!(top(&[14, 239, 17]).is_ok());
+        // A CFF Font DICT is read as a Top DICT: a bad MultipleMaster fails
+        // it, and its own ROS is read, which makes FreeType skip its Private.
+        let font = |bytes: &[u8]| {
+            cff.font_dict_entries(bytes, dict::Kind::Font, &mut WorkBudget::new(100))
+        };
+        assert!(font(&[140, 139, 139, 139, 139, 12, 24]).is_err());
+        let with_ros = font(&[139, 139, 139, 12, 30, 149, 239, 18]).unwrap();
+        assert!(with_ros.ros && with_ros.private == Some((10, 100)));
+    }
+
+    #[test]
+    fn a_failed_private_dict_reparse_keeps_what_it_read_unsanitised() {
+        let glyph = table(&rectangle(0, &[50]), Vec::new());
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+        let whole = Table {
+            offset: 0,
+            len: glyph.len(),
+        };
+        let mut cff =
+            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        cff.version = Version::Cff2;
+        // BlueShift 2000, then a blend whose blend vector cannot be built.
+        let bytes = [28, 0x07, 0xd0, 12, 10, 139, 139, 140, 23];
+        let failing = |_| {
+            Err(Error::Invalid(
+                "CFF2 variation store and fvar axis counts differ",
+            ))
+        };
+        let (values, parsed) = cff.read_private(&bytes, &failing, &mut work);
+        assert!(parsed.is_err());
+        assert_eq!(values.hints.blue_shift, 2000);
+        // A parse that succeeds corrects it to FreeType's default.
+        let (values, parsed) = cff.read_private(&bytes[..5], &failing, &mut work);
+        assert!(parsed.is_ok());
+        assert_eq!(values.hints.blue_shift, 7);
+    }
+
+    #[test]
+    fn private_dict_entries_freetype_reads_need_their_operand() {
+        let parse = |private: Vec<u8>| {
+            let glyph = table(&rectangle(0, &[50]), private);
+            let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
+            let whole = Table {
+                offset: 0,
+                len: glyph.len(),
+            };
+            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).map(|_| ())
+        };
+        // StdHW, StdVW, ForceBold, ForceBoldThreshold, lenIV,
+        // ExpansionFactor, initialRandomSeed, defaultWidthX, nominalWidthX.
+        for operator in [
+            &[10][..],
+            &[11],
+            &[12, 14],
+            &[12, 15],
+            &[12, 16],
+            &[12, 18],
+            &[12, 19],
+            &[20],
+            &[21],
+        ] {
+            assert!(parse(operator.to_vec()).is_err(), "{operator:?}");
+            assert!(
+                parse([&[139][..], operator].concat()).is_ok(),
+                "{operator:?}"
+            );
+        }
+        // CFF2 has no widths, ForceBold, lenIV or seed: FreeType skips them.
+        let private = |op| dict::op::min_operands(Version::Cff2, dict::Kind::Private, op);
+        assert!(
+            [20, 21, 0x0c0e, 0x0c0f, 0x0c10, 0x0c13]
+                .into_iter()
+                .all(|op| private(op).is_none())
+        );
+        assert!(
+            [10, 11, 0x0c12, 22]
+                .into_iter()
+                .all(|op| private(op) == Some(1))
+        );
+        // Nor CFF2 Top DICTs the charset, Encoding or ROS of CFF.
+        let top = |op| dict::op::min_operands(Version::Cff2, dict::Kind::Top, op);
+        assert_eq!([15, 16, 0x0c1e].map(top), [None; 3]);
+    }
 
     #[test]
     fn a_glyph_without_stems_scales_uniformly_at_the_hinted_scale() {

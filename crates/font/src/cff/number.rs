@@ -38,15 +38,26 @@ pub(super) fn shared_integer(byte: u8, r: &mut Reader<'_>) -> Result<Option<i32>
     }))
 }
 
-/// `cff_parse_integer`: a DICT integer. FreeType assembles the five-byte form
-/// in an unsigned long, so its negative values read as large positive ones.
-fn dict_integer(byte: u8, r: &mut Reader<'_>) -> Result<i64> {
+/// `cff_parse_integer` as GCC builds it for 32-bit ARM, where `FT_Long` has
+/// 32 bits: a DICT integer, the five-byte form signed. It reads 27, which no
+/// format defines, as a one-byte number.
+fn dict_integer(byte: u8, r: &mut Reader<'_>) -> Result<i32> {
     match byte {
-        29 => Ok(i64::from(r.u32()?)),
-        _ => shared_integer(byte, r)?
-            .map(i64::from)
-            .ok_or(Error::Invalid("reserved CFF DICT byte")),
+        27 => Ok(i32::from(byte) - 139),
+        29 => r.i32(),
+        _ => shared_integer(byte, r)?.ok_or(Error::Invalid("reserved CFF DICT byte")),
     }
+}
+
+/// `(FT_Long)((FT_ULong)v << 16)` with a 32-bit `FT_Long`: an integer in
+/// 16.16, wrapping.
+const fn to_fixed(v: i32) -> i64 {
+    ((v.cast_unsigned() << 16).cast_signed()) as i64
+}
+
+/// `FT_LONG_MAX / 10^scaling` with a 32-bit `FT_Long`.
+fn power_ten_limit(scaling: usize) -> i32 {
+    (i64::from(i32::MAX) / POWER_TENS[scaling.min(9)]) as i32
 }
 
 /// The digits of a real number as `cff_parse_real` collects them.
@@ -247,14 +258,12 @@ pub(super) fn fixed_dynamic(r: &mut Reader<'_>) -> Result<(i64, i64)> {
     let byte = r.u8()?;
     let number = match byte {
         30 => return Ok(Real::read(r).dynamic()),
-        29 => i64::from(r.i32()?),
-        _ => shared_integer(byte, r)?
-            .map(i64::from)
-            .ok_or(Error::Invalid("reserved CFF DICT byte"))?,
+        _ => dict_integer(byte, r)?,
     };
     if number <= 0x7fff {
-        return Ok((number.wrapping_shl(16), 0));
+        return Ok((to_fixed(number), 0));
     }
+    let number = i64::from(number);
     let length = (5..10).find(|&n| number < POWER_TENS[n]).unwrap_or(10);
     Ok(if number / POWER_TENS[length - 5] > 0x7fff {
         (div_fix(number, POWER_TENS[length - 4]), (length - 4) as i64)
@@ -264,12 +273,12 @@ pub(super) fn fixed_dynamic(r: &mut Reader<'_>) -> Result<(i64, i64)> {
 }
 
 /// A DICT operand as FreeType's parser holds it: its encoding, or the 16.16
-/// result of a CFF2 `blend`.
+/// result of a CFF2 `blend`, which it pushes as a 32-bit number.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Operand<'a> {
     /// The bytes from the operand's first on.
     Encoded(&'a [u8]),
-    Blended(i64),
+    Blended(i32),
 }
 
 impl Default for Operand<'_> {
@@ -279,12 +288,13 @@ impl Default for Operand<'_> {
 }
 
 impl Operand<'_> {
-    /// `do_fixed`: the operand in 16.16, times `10^scaling`, saturating as
-    /// FreeType saturates.
+    /// `do_fixed` as GCC builds it for 32-bit ARM: the operand in 16.16,
+    /// times `10^scaling`, saturating as FreeType saturates. Its limit tests
+    /// shift and compare 32-bit values, wrapping as they do there.
     pub(crate) fn fixed(self, scaling: usize) -> i64 {
-        let power = POWER_TENS[scaling.min(9)];
-        let limit = i64::MAX / power;
-        let saturated = |v: i64| if v > 0 { 0x7fff_ffff } else { -0x7fff_ffff };
+        let power = POWER_TENS[scaling.min(9)] as i32;
+        let limit = power_ten_limit(scaling);
+        let saturated = |v: i32| if v > 0 { 0x7fff_ffff } else { -0x7fff_ffff };
         match self {
             Self::Encoded(bytes) => {
                 let mut r = Reader::new(bytes);
@@ -296,52 +306,33 @@ impl Operand<'_> {
                     return 0;
                 };
                 if scaling > 0 {
-                    if value.abs() << 16 > limit {
+                    if value.wrapping_abs().wrapping_shl(16) > limit {
                         return saturated(value);
                     }
-                    value *= power;
+                    value = value.wrapping_mul(power);
                 }
                 if (-0x7fff..=0x7fff).contains(&value) {
-                    value << 16
+                    to_fixed(value)
                 } else {
                     saturated(value)
                 }
             }
-            Self::Blended(sum) => {
-                // The blend's result is pushed as a 32-bit number.
-                let value = i64::from(sum as i32);
+            Self::Blended(value) => {
                 if scaling > 0 {
-                    if value.abs() > limit {
+                    if value.wrapping_abs() > limit {
                         return saturated(value);
                     }
-                    return value * power;
+                    return i64::from(value.wrapping_mul(power));
                 }
-                value
+                i64::from(value)
             }
         }
     }
 
-    /// The operand as a count, index or offset: a nonnegative whole number
-    /// below 2^32, from the five-byte form read signed.
-    pub(crate) fn index(self) -> Result<usize> {
-        let value = match self {
-            Self::Encoded(bytes) => {
-                let mut r = Reader::new(bytes);
-                match r.u8()? {
-                    30 => {
-                        let fixed = Real::read(&mut r).fixed(0);
-                        (fixed & 0xffff == 0).then_some(fixed >> 16)
-                    }
-                    29 => Some(i64::from(r.i32()?)),
-                    byte => shared_integer(byte, &mut r)?.map(i64::from),
-                }
-            }
-            Self::Blended(sum) => (sum & 0xffff == 0).then_some(sum >> 16),
-        };
-        value
-            .and_then(|v| u32::try_from(v).ok())
-            .and_then(|v| usize::try_from(v).ok())
-            .ok_or(Error::Invalid("CFF operand is not an index"))
+    /// The operand as an offset, count or index FreeType stores in an
+    /// unsigned field: `cff_parse_num`, cast to 32 bits.
+    pub(crate) fn unsigned(self) -> usize {
+        self.integer() as u32 as usize
     }
 
     /// `cff_parse_num`: the operand as an integer, a real truncated toward
@@ -352,20 +343,20 @@ impl Operand<'_> {
                 let mut r = Reader::new(bytes);
                 match r.u8() {
                     Ok(30) => Real::read(&mut r).fixed(0) >> 16,
-                    Ok(byte) => dict_integer(byte, &mut r).unwrap_or(0),
+                    Ok(byte) => dict_integer(byte, &mut r).map_or(0, i64::from),
                     Err(_) => 0,
                 }
             }
             Self::Blended(sum) => {
-                let rounded = (((sum as u32) >> 8) + 0x80) >> 8;
+                let rounded = ((sum.cast_unsigned() >> 8) + 0x80) >> 8;
                 i64::from((rounded as u16).cast_signed())
             }
         }
     }
 }
 
-/// The length of the DICT number `bytes` start with, `None` for an operator or
-/// a number cut short.
+/// The length of the DICT number `bytes` start with, `None` for one cut
+/// short; the first byte is a number's (27, 28, 29, 30 or 32 to 254).
 pub(super) fn number_length(bytes: &[u8]) -> Option<usize> {
     let len = match *bytes.first()? {
         28 => 3,
@@ -376,7 +367,7 @@ pub(super) fn number_length(bytes: &[u8]) -> Option<usize> {
                 .position(|&b| b >> 4 == 0xf || b & 0xf == 0xf)?
                 + 1
         }
-        32..=246 => 1,
+        27 | 32..=246 => 1,
         247..=254 => 2,
         _ => return None,
     };
@@ -385,7 +376,7 @@ pub(super) fn number_length(bytes: &[u8]) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Operand, shared_integer};
+    use super::{Operand, fixed_dynamic, shared_integer};
     use crate::read::Reader;
 
     #[test]
@@ -414,21 +405,39 @@ mod tests {
         );
         assert_eq!(operand(&[129]).fixed(0), -10 << 16);
         assert_eq!(operand(&[30, 0x0a, 0x5f]).integer(), 0);
-        // Out of range integers saturate; the five-byte form is unsigned.
-        let large = operand(&[29, 0xff, 0xff, 0xff, 0xff]);
-        assert_eq!(
-            (large.fixed(0), large.integer()),
-            (0x7fff_ffff, 0xffff_ffff)
-        );
         // A blend in 16.16: 12.5 rounds to 13 as a number.
         let blended = Operand::Blended(12 << 16 | 0x8000);
         assert_eq!((blended.fixed(0), blended.integer()), (819200, 13));
-        // Indices are whole and nonnegative.
-        assert_eq!(operand(&[239]).index(), Ok(100));
-        assert_eq!(operand(&[30, 0x3a, 0x0f]).index(), Ok(3));
-        assert!(operand(&[30, 0x3a, 0x5f]).index().is_err());
-        assert!(operand(&[129]).index().is_err());
-        assert!(operand(&[29, 0xff, 0xff, 0xff, 0xff]).index().is_err());
-        assert!(Operand::Blended(1 << 15).index().is_err());
+        // 27 reads as -112.
+        assert_eq!(
+            (operand(&[27]).integer(), operand(&[27]).fixed(0)),
+            (-112, -112 << 16)
+        );
+        // Offsets and counts go into unsigned fields, truncated reals too.
+        assert_eq!(operand(&[239]).unsigned(), 100);
+        assert_eq!(operand(&[30, 0x3a, 0x5f]).unsigned(), 3);
+        assert_eq!(operand(&[129]).unsigned(), 0xffff_fff6);
+    }
+
+    #[test]
+    fn dict_numbers_follow_freetype_on_32_bit_arm() {
+        let operand = |bytes: &'static [u8]| Operand::Encoded(bytes);
+        // The five-byte form is signed 32-bit there: -1, which shifts to
+        // -1.0 in 16.16, and reads as 2^32 - 1 into an unsigned field.
+        let minus_one = operand(&[29, 0xff, 0xff, 0xff, 0xff]);
+        assert_eq!(minus_one.integer(), -1);
+        assert_eq!(minus_one.fixed(0), -65536);
+        assert_eq!(minus_one.unsigned(), 0xffff_ffff);
+        // 65536 times 10^9: the limit test shifts 65536 left by 16 in 32
+        // bits, to zero, so it passes, and the product wraps negative.
+        assert_eq!(operand(&[29, 0, 1, 0, 0]).fixed(9), -0x7fff_ffff);
+        // 70000 × 10: the shifted value wraps, but stays above the limit.
+        assert_eq!(operand(&[29, 0, 1, 0x11, 0x70]).fixed(1), 0x7fff_ffff);
+        // A blend checks its 16.16 value against FT_LONG_MAX / 10^s in 32 bits.
+        assert_eq!(Operand::Blended(0x0021_0000).fixed(3), 0x7fff_ffff);
+        assert_eq!(Operand::Blended(0x0020_0000).fixed(3), 0x0020_0000 * 1000);
+        // `cff_parse_fixed_dynamic` shifts an integer into 16.16 in 32 bits.
+        let mut r = Reader::new(&[29, 0xff, 0xfe, 0x79, 0x60]);
+        assert_eq!(fixed_dynamic(&mut r), Ok((2_036_334_592, 0)));
     }
 }

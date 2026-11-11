@@ -2,10 +2,12 @@
 //! power of ten (`cff_parse_font_matrix`), normalised so that `yy` is one with
 //! the rest of the scale moved into units per em (`cff_face_init`), and
 //! concatenated with the Top DICT's for Font DICTs. Outlines are transformed
-//! in fixed point, so results match FreeType bit for bit.
+//! in fixed point as FreeType does on 32-bit ARM, with 32-bit `FT_Long`
+//! products and sums, so results match it bit for bit.
 
 use super::number::{Operand, POWER_TENS, fixed_dynamic};
-use crate::fixed::{ONE, div_fix, mul_div, mul_fix};
+use crate::fixed::ONE;
+use crate::long::{div_fix, mul_div, mul_fix, wrap};
 use crate::read::Reader;
 use triergon_core::{Error, Result};
 
@@ -57,13 +59,18 @@ impl FontMatrix {
         if !(-9..=0).contains(&max) || !(0..=9).contains(&(max - min)) {
             return Ok(Self::identity(1));
         }
+        // Rounded to the common power of ten, saturating at the 32-bit
+        // `FT_LONG_MIN` and `FT_LONG_MAX` of 32-bit ARM.
         let [xx, yx, xy, yy, dx, dy] = values.map(|(value, scale)| {
             let divisor = POWER_TENS[usize::try_from(max - scale).unwrap_or(0)];
             let half = divisor >> 1;
-            if value < 0 {
-                (value - half) / divisor
-            } else {
-                (value + half) / divisor
+            let (min, max) = (i64::from(i32::MIN), i64::from(i32::MAX));
+            match value {
+                0 => 0,
+                v if v < 0 && min + half < v => (v - half) / divisor,
+                v if v < 0 => min / divisor,
+                v if max - half > v => (v + half) / divisor,
+                _ => max / divisor,
             }
         });
         let matrix = Self {
@@ -82,16 +89,20 @@ impl FontMatrix {
         })
     }
 
-    /// `FT_Matrix_Check`: nonzero 32-bit coefficients whose determinant is not
-    /// small next to the squared Frobenius norm.
+    /// `FT_Matrix_Check` as GCC builds it for 32-bit ARM: nonzero 32-bit
+    /// coefficients, shifted right so that the largest has 15 significant
+    /// bits (`FT_MSB(val) - 4 * sizeof(FT_ULong) + 2`), whose determinant is
+    /// not small next to the squared Frobenius norm, both in 32 bits.
     fn is_regular(&self) -> bool {
-        let [xx, xy, yx, yy] = [self.xx, self.xy, self.yx, self.yy];
-        let any = xx.unsigned_abs() | xy.unsigned_abs() | yx.unsigned_abs() | yy.unsigned_abs();
+        let coefficients = [self.xx, self.xy, self.yx, self.yy];
+        let any = coefficients.iter().fold(0, |any, v| any | v.unsigned_abs());
         if any == 0 || any > 0x7fff_ffff {
             return false;
         }
+        let shift = (any as u32).ilog2().saturating_sub(14);
+        let [xx, xy, yx, yy] = coefficients.map(|v| (v as i32) >> shift);
         let det = xx.wrapping_mul(yy).wrapping_sub(xy.wrapping_mul(yx));
-        let frobenius = [xx, xy, yx, yy].iter().fold(0_u64, |sum, v| {
+        let frobenius = [xx, xy, yx, yy].iter().fold(0_u32, |sum, v| {
             sum.wrapping_add(v.wrapping_mul(*v).cast_unsigned())
         });
         det.unsigned_abs() > frobenius / 32
@@ -128,8 +139,9 @@ impl FontMatrix {
             1
         };
         let val = ONE * scaling;
+        // `ADD_LONG` of two `FT_MulDiv`s, in 32 bits.
         let product =
-            |a: i64, b: i64, c: i64, d: i64| mul_div(a, b, val).wrapping_add(mul_div(c, d, val));
+            |a: i64, b: i64, c: i64, d: i64| wrap(mul_div(a, b, val) + mul_div(c, d, val));
         Self {
             xx: product(top.xx, self.xx, top.xy, self.yx),
             xy: product(top.xx, self.xy, top.xy, self.yy),
@@ -161,11 +173,11 @@ impl FontMatrix {
             (x, y)
         } else {
             (
-                mul_fix(x, self.xx).wrapping_add(mul_fix(y, self.xy)),
-                mul_fix(x, self.yx).wrapping_add(mul_fix(y, self.yy)),
+                wrap(mul_fix(x, self.xx) + mul_fix(y, self.xy)),
+                wrap(mul_fix(x, self.yx) + mul_fix(y, self.yy)),
             )
         };
-        (x.wrapping_add(self.dx), y.wrapping_add(self.dy))
+        (wrap(x + self.dx), wrap(y + self.dy))
     }
 
     /// The horizontal advance through the matrix: scaled by `xx`, then moved by
@@ -176,7 +188,7 @@ impl FontMatrix {
         } else {
             mul_fix(advance, self.xx)
         };
-        advance.wrapping_add(self.dx)
+        wrap(advance + self.dx)
     }
 
     /// The vertical advance through the matrix: scaled by `yy`, then moved by
@@ -187,7 +199,7 @@ impl FontMatrix {
         } else {
             mul_fix(advance, self.yy)
         };
-        advance.wrapping_add(self.dy)
+        wrap(advance + self.dy)
     }
 }
 
@@ -258,6 +270,32 @@ mod tests {
         assert_eq!(matrix([b"1", b"1", b"1", b"1", b"0", b"0"]), identity);
         assert_eq!(matrix([b"1E-12", b"0", b"0", b"1", b"0", b"0"]), identity);
         assert!(parse(&[139, 139]).is_err());
+    }
+
+    #[test]
+    fn normalising_and_checking_follow_32_bit_arm() {
+        // 0.03 0 0 0.03 30000 0: normalising divides the offset, 30000 at the
+        // shared power of ten, by 0.03 with FT_DivFix, whose result keeps its
+        // low 32 bits: 1114157335, 17000 font units, not 1000040.
+        let m = matrix([b"0.03", b"0", b"0", b"0.03", b"30000", b"0"]);
+        assert_eq!((m.xx, m.yy, m.dx), (1966, 1966, 1_966_080_000));
+        assert_eq!(m.normalized().dx, 17000);
+        // At a divisor of 10^7, xx's 2147482993 is within half the divisor of
+        // FT_LONG_MAX, so FreeType saturates it to FT_LONG_MAX / 10^7, 214,
+        // rather than rounding it to 215.
+        let m = matrix([b"3.276799e7", b"0", b"0", b"3e7", b"1e4", b"0"]);
+        assert_eq!(m.xx, 214);
+        assert_ne!(m, FontMatrix::identity(1));
+        // FT_Matrix_Check shifts the coefficients to 15 significant bits
+        // first: this matrix passes it in 32 bits, though not in 64.
+        let skewed = FontMatrix {
+            xx: -6420,
+            xy: -441_914,
+            yx: 14_130_792,
+            yy: 0,
+            ..FontMatrix::identity(1)
+        };
+        assert!(skewed.is_regular());
     }
 
     #[test]

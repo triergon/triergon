@@ -262,9 +262,9 @@ impl Metrics for OtMetrics<'_> {
 /// ([`SizedFont::load`] with [`Load::Default`]): the extents are its grid-fitted
 /// bearings and size, the contour points its outline's. A glyph without points
 /// has empty extents in every face; for other glyphs, the default load's
-/// `Unsupported` (TrueType faces, which need FreeType's auto-hinter or TrueType
-/// interpreter) is the functions', as is an advance `default_advance` cannot
-/// give.
+/// `Unsupported` (instructed TrueType faces, which need FreeType's TrueType
+/// interpreter, and the glyphs FreeType's auto-hinter gives a CJK or Indic
+/// style) is the functions', as is an advance `default_advance` cannot give.
 pub struct SizedMetrics<'a> {
     sized: SizedFont<'a>,
     lookup: Option<TextLookup<'a>>,

@@ -2,8 +2,8 @@
 
 #![allow(dead_code)]
 
-use triergon_core::{Budget, Bytes};
-use triergon_font::{FaceInfo, Font, GlyphId, Limits, Outline, Request, select};
+use triergon_core::{Budget, Bytes, WorkBudget};
+use triergon_font::{FaceInfo, Font, GlyphId, Limits, Load, Outline, Request, select};
 
 mod cff;
 
@@ -1219,6 +1219,9 @@ pub fn exercise(data: &[u8], limits: Limits) {
             let _ = font.kerning(glyph, GlyphId(1));
             for size in &sized {
                 let _ = size.default_advance(glyph);
+                let _ = size.default_vertical_advance(glyph);
+                let mut work = WorkBudget::new(limits.work);
+                let _ = size.load(glyph, Load::Default, &mut scaled, &mut work);
                 let _ = size.kerning(glyph, GlyphId(1));
                 if size.outline_into(glyph, &mut scaled).is_ok() {
                     let _ = size.synthesize(&mut scaled, synthesis);

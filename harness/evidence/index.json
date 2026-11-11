@@ -17822,6 +17822,36 @@
    "source_revision": "b531944603a96d8fad9a1bb50e99cd538528280e"
   },
   {
+   "name": "font-latin-cf5c7504",
+   "path": "font-latin-cf5c7504",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's auto-hinter (style coverage, the dummy and Latin writing systems, the accent adjustments) for TrueType faces without bytecode, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at cf5c7504 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64; the xtask tests, clippy and rustfmt at 50615186; and the test and quick comparison runs at 7ff5e1f2 and 60f4cc48 that set the open cases.",
+   "key": "evidence/font-latin-cf5c7504/64b022b36608f08b8609d128e0deaba3e7b37fe86c8ca94c312e41e411e7df79.tar.gz",
+   "sha256": "64b022b36608f08b8609d128e0deaba3e7b37fe86c8ca94c312e41e411e7df79",
+   "bytes": 193911261,
+   "source_revision": "cf5c7504c077ff47ab5da521261e5c7a04046f16"
+  },
+  {
+   "name": "font-latin-ec9a4f16",
+   "path": "font-latin-ec9a4f16",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's auto-hinter, its 32-bit ARM arithmetic, and CFF DICTs sized, checked and read as FreeType reads them, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at ec9a4f16 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' and xtask tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-latin-ec9a4f16/cae121896f313cec3378f289f19b28fe1ddb73b8fcb5d0079f71247babb36010.tar.gz",
+   "sha256": "cae121896f313cec3378f289f19b28fe1ddb73b8fcb5d0079f71247babb36010",
+   "bytes": 110396155,
+   "source_revision": "ec9a4f1627b2734efbd4134ceb86c3a71740815d"
+  },
+  {
+   "name": "font-latin-a1aa6f0e",
+   "path": "font-latin-a1aa6f0e",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's auto-hinter, 32-bit ARM arithmetic for it, the linear advances and the FontMatrix, and CFF DICTs read as FreeType reads them, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at a1aa6f0e against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' and xtask tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-latin-a1aa6f0e/a22a7f4312953485804e6d3bfd654261d959eca9903ea2d92822157b525d6af3.tar.gz",
+   "sha256": "a22a7f4312953485804e6d3bfd654261d959eca9903ea2d92822157b525d6af3",
+   "bytes": 110394107,
+   "source_revision": "a1aa6f0e1981d07ce9d27efcdc5b6815839f5481"
+  },
+  {
    "name": "ass-render-runtime-5b3e03f0",
    "path": "ass-render-runtime-5b3e03f0",
    "retention": "retained",
@@ -19308,6 +19338,16 @@
      "sha256": "ab41ee66fe02b70cb4015aa21c3b2f005222cecdc20d8234d6544391707025e3"
     }
    ]
+  },
+  {
+   "name": "font-latin-cc09ffa8",
+   "path": "font-latin-cc09ffa8",
+   "retention": "retained",
+   "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's auto-hinter, 32-bit ARM arithmetic for it, the linear advances and the FontMatrix, and CFF DICTs read as FreeType reads them, merged with main's ASS renderer timing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at cc09ffa8 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' and xtask tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+   "key": "evidence/font-latin-cc09ffa8/18028d8fa7452fd3d43d0d7d254560578d7f7a38d7a553d9fb42b7246a9df927.tar.gz",
+   "sha256": "18028d8fa7452fd3d43d0d7d254560578d7f7a38d7a553d9fb42b7246a9df927",
+   "bytes": 112317324,
+   "source_revision": "cc09ffa8f270f0bbbe2a5de0db4dbf3ffb45be03"
   }
  ]
 }
