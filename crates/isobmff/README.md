@@ -50,7 +50,8 @@ Short regular tracks can keep extra seek restart points in the existing
 checkpoint allocation.
 Complete fragment-only tracks can also retain a restart for backward seek
 when their projected decode times increase. Non-sync run starts can retain
-restarts at fragment boundaries.
+restarts at fragment boundaries. A small number of additional restarts at
+short intervals and fragment boundaries reduce replay work for nearby seeks.
 
 ```rust
 use std::sync::atomic::AtomicBool;

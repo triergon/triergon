@@ -16,6 +16,7 @@ use triergon_core::{Budget, BudgetVec, Error, Reservation, Result, Rounding, Wor
 const CHECKPOINT_INTERVAL: u64 = 8192;
 const SHORT_CHECKPOINT_INTERVAL: u64 = 32;
 const MAX_SHORT_CHECKPOINTS_PER_TRACK: usize = 4;
+const MAX_FRAGMENT_CHECKPOINTS_PER_TRACK: usize = 8;
 const MAX_CHECKPOINTS: usize = 256;
 
 #[derive(Clone, Debug)]
@@ -111,7 +112,18 @@ impl<'a> Checkpoints<'a> {
         let spare = self.use_spare_capacity
             && track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL)
             && track.points.len() < track.points.capacity().min(MAX_SHORT_CHECKPOINTS_PER_TRACK);
-        if track.entries.is_multiple_of(CHECKPOINT_INTERVAL) || spare {
+        // Keep nearby restarts for short fragment sequences and denser tracks
+        // such as audio. Limit the extra points so long sources still have room
+        // for the regular interval and can drop extra points under pressure.
+        let periodic = track.entries.is_multiple_of(CHECKPOINT_INTERVAL);
+        let fragment_restart = !periodic
+            && slot.saw_fragment
+            && self.stored < MAX_CHECKPOINTS / 2
+            && track.points.len() < MAX_FRAGMENT_CHECKPOINTS_PER_TRACK
+            && (track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL)
+                || (slot.starts_fragment_run && slot.append_run.is_some_and(|(_, run)| run == 0)))
+            && track.points.try_reserve_exact(1).is_ok();
+        if periodic || spare || fragment_restart {
             if self.stored == MAX_CHECKPOINTS {
                 return None;
             }
