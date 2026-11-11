@@ -651,8 +651,7 @@ impl Core {
                 "no channel configuration (missing PCE)",
             ));
         }
-        // finish: SBR/PS + coupling + output
-        self.finish_frame();
+        self.finish_frame::<RAW>(out);
         Ok(layout_changed)
     }
 
@@ -838,7 +837,7 @@ impl Core {
         }
     }
 
-    fn finish_frame(&mut self) {
+    fn finish_frame<const RAW: bool>(&mut self, frame: &mut AudioFrame) {
         let cfg = CoreCfg {
             aot: self.aot,
             sf_index: self.sf_index,
@@ -848,20 +847,28 @@ impl Core {
         crate::cce::process_cces(self);
         for ei in 0..self.elements.len() {
             let e: &mut ElementState = &mut self.elements[ei];
-            if !e.decoded {
+            if !RAW && !e.decoded {
                 continue;
             }
             let (kind, tag) = (
-                if e.ch_decoded == [true, false] && e.kind == ID_CPE {
+                if !RAW && e.ch_decoded == [true, false] && e.kind == ID_CPE {
                     ID_SCE
                 } else {
                     e.kind
                 },
                 e.bs_tag,
             );
-            for c in 0..2 {
-                if e.ch_decoded[c] {
-                    let (cd, st, out) = (&mut e.cd[c], &mut e.ch[c], &mut e.out[c]);
+            let channels = if RAW { e.nch } else { 2 };
+            for c in 0..channels {
+                if RAW || e.ch_decoded[c] {
+                    let out = if RAW {
+                        // Every fixed slot has its own element in wire order. The
+                        // frame has already reserved a plane for each channel.
+                        &mut frame.planes[self.plane_of[ei][c]][..]
+                    } else {
+                        &mut e.out[c][..]
+                    };
+                    let (cd, st) = (&mut e.cd[c], &mut e.ch[c]);
                     process_channel(&mut self.fb, &cfg, cd, st, out, &self.cce, kind, tag, c);
                 } else if e.kind == ID_CPE {
                     for v in &mut e.out[c][..1024] {
@@ -869,6 +876,9 @@ impl Core {
                     }
                 }
             }
+        }
+        if RAW {
+            return;
         }
         for ei in 0..self.elements.len() {
             let e: &mut ElementState = &mut self.elements[ei];
@@ -925,19 +935,14 @@ impl Core {
 
     /// Append this block's output (frame_len samples per plane) in layout order; planes
     /// without a decoded element stay silent.
-    pub(crate) fn emit_planes<const RAW: bool>(&mut self, out: &mut AudioFrame) -> Result<()> {
+    pub(crate) fn emit_planes(&mut self, out: &mut AudioFrame) -> Result<()> {
         let flen = self.frame_len();
         let channels = self.layout.channels();
-        let base = if RAW {
-            0
-        } else {
-            if out.planes.len() != channels {
-                out.clear(); // a mid-frame layout change restarts collection
-            }
-            let base = out.planes.first().map_or(0, Vec::len);
-            out.try_resize(channels, base + flen, &mut self.output_charge)?;
-            base
-        };
+        if out.planes.len() != channels {
+            out.clear(); // a mid-frame layout change restarts collection
+        }
+        let base = out.planes.first().map_or(0, Vec::len);
+        out.try_resize(channels, base + flen, &mut self.output_charge)?;
         for (si, slot) in self.slots.iter().enumerate() {
             let Some(e) = self
                 .elements

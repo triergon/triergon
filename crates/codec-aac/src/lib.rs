@@ -186,7 +186,12 @@ fn decode_with<const RAW: bool>(
     out: &mut AudioFrame,
     decode: impl FnOnce(&mut decoder::Core, &mut AudioFrame) -> Result<(), DecodeError>,
 ) -> Result<(), DecodeError> {
-    out.clear();
+    if RAW {
+        // The fixed decoder overwrites the entire reserved frame on success.
+        out.samples_per_channel = 0;
+    } else {
+        out.clear();
+    }
     // Restore delay and random state on a refused access unit.
     let (random, skip_samples) = (core.random, core.skip_samples);
     let coupling_elements = core.cce.len();
@@ -243,7 +248,9 @@ fn decode_blocks<const RAW: bool>(
     for block in 0..blocks {
         let start = br.position();
         core.decode_block::<RAW>(&mut br, start, out, usize::from(blocks - block))?;
-        core.emit_planes::<RAW>(out)?;
+        if !RAW {
+            core.emit_planes(out)?;
+        }
         if per_block_crc {
             br.skip(16);
         }
