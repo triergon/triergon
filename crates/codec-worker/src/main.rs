@@ -4,10 +4,11 @@
 //! usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
 //! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE, KIND-CODEC one of video-h264,
 //! video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac, audio-mp3,
-//! audio-vorbis, audio-opus. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
+//! audio-vorbis, audio-opus, audio-aac-access-units. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest
 //! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
-//! interleaved stereo s16le). File loading and process start are outside the timed
+//! interleaved stereo s16le). Configured AAC instead folds every native f32 plane.
+//! File loading and process start are outside the timed
 //! interval.
 //!
 //! The elementary-stream splitting below mirrors the reference worker's own parser
@@ -18,6 +19,7 @@
 //! session's track decoder, as the reference reads them through its demuxer.
 //! `packets` prints what a container reader emits per packet ([`packets`]).
 #![forbid(unsafe_code)]
+mod aac_access_units;
 mod packets;
 
 use std::io::Write;
@@ -242,6 +244,12 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
         "audio-ac3" => audio(AudioCodec::Ac3, data, out),
         "audio-eac3" => audio(AudioCodec::Eac3, data, out),
         "audio-aac" => audio(AudioCodec::Aac, data, out),
+        "audio-aac-access-units" => {
+            if let Err(error) = aac_access_units::decode(data, out) {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        }
         "audio-dts" => audio(AudioCodec::Dts, data, out),
         "audio-flac" | "audio-mp3" | "audio-vorbis" | "audio-opus" => file_audio(data, out),
         _ => {

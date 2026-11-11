@@ -1,0 +1,41 @@
+{
+  "schema": "triergon.codecs.workloads.v1",
+  "workloads": [
+    {
+      "id": "avc-aac-quicktime-surround",
+      "path": "avc-aac-quicktime-surround.aac-access-units",
+      "sha256": "5268ab47bdd5b8c889d1bac442ac1fbe73926b1cbb0bf698dc0f74e951eb14e7",
+      "bytes": 99557,
+      "operation": "audio-aac-access-units",
+      "iterations": 4,
+      "packets": 189,
+      "sample_rate": 48000,
+      "channels": 6,
+      "source_sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5"
+    },
+    {
+      "id": "avc-aac-quicktime-reordered",
+      "path": "avc-aac-quicktime-reordered.aac-access-units",
+      "sha256": "9f7d3badfa30002f02c28a53d8b48b4d7ce01542cdf3a308224d6c68ecc0d851",
+      "bytes": 53156,
+      "operation": "audio-aac-access-units",
+      "iterations": 4,
+      "packets": 174,
+      "sample_rate": 44100,
+      "channels": 6,
+      "source_sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b"
+    },
+    {
+      "id": "avc-aac-quicktime-7-1",
+      "path": "avc-aac-quicktime-7-1.aac-access-units",
+      "sha256": "1acb45025765d2786088265614084442e9408fadd13d2900772c00674855655e",
+      "bytes": 85332,
+      "operation": "audio-aac-access-units",
+      "iterations": 4,
+      "packets": 174,
+      "sample_rate": 44100,
+      "channels": 8,
+      "source_sha256": "005afe6563563ff5af1eee044f68759a188fe75079cf9e74745d43d5b2231c3c"
+    }
+  ]
+}

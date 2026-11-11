@@ -366,6 +366,12 @@ of and records the identities of the codec crates against the pinned FFmpeg deco
 and compares the packets of the audio container readers with its `ffprobe`
 (`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
 pipeline ([harness/capture](../harness/capture/README.md)).
+`cargo xtask codecs aac-access-units` prepares the pinned configured AAC
+workloads from the original QuickTime packets and compares each decoded PCM plane.
+The same inputs and decoder operations run through the paired codec timing and
+memory commands. The measured work includes decoder construction, decoding every
+packet, folding every PCM plane, flushing and teardown. File loading and
+container parsing take place before that work.
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest, with a timeout per
 input (`--timeout-seconds`, 3 by default, or the contract's `timeout_seconds`). With `--contract` it builds that manifest from a prefix feature's cases: the

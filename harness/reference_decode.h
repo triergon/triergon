@@ -102,6 +102,8 @@ struct out {
     FILE *raw;
 };
 
+#include "reference_aac_access_units.h"
+
 static void sink_frames(AVFilterContext *sink, struct out *o, int video) {
     AVFrame *f = av_frame_alloc();
     for (;;) {
@@ -360,7 +362,9 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
 static void pass(const char *name, const AVCodecParameters *par, const uint8_t *data, size_t size, int video,
                  struct out *o) {
     const char *demuxer;
-    if (!video && file_lane(name, &demuxer))
+    if (!video && !strcmp(name, "aac-access-units"))
+        aac_access_units(data, size, o);
+    else if (!video && file_lane(name, &demuxer))
         demux_pass(demuxer, data, size, o);
     else
         one_pass(name, par, data, size, video, o);
