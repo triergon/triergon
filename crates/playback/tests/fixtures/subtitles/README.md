@@ -16,3 +16,28 @@ Expected values in `subtitle_bridges.rs` come from the reference worker
 Muxing and encoding use Homebrew `ffmpeg` 9.0.2 as an authoring tool. The
 caption times are the reference's plus the MP4 edit list's media time (3003
 ticks at 90 kHz), which the playback source view keeps.
+
+## Fragmented MP4
+
+The two files in `../mp4/` contain synthetic AVC and AAC, one timed-text cue
+from 0.200 to 2.600 seconds, and the DVD subpictures from `dvd-commands.mp4`.
+`fragmented-subtitles.mp4` has no edits and includes non-sync text samples at
+the beginning and in the last fragment. `fragmented-subtitle-edit.mp4` has a
+200 ms leading empty subpicture edit before its open-ended media edit.
+
+The MP4 range contract checks open and video seeks at 0, 1.5 and approximately
+3.66 seconds. The video timescale is 16,384 ticks per second.
+
+```sh
+ffmpeg -nostdin -v error -y -f lavfi -i testsrc2=size=96x64:rate=8 \
+    -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000 -t 4 \
+    -c:v libx264 -threads 1 -preset ultrafast -pix_fmt yuv420p -g 8 \
+    -sc_threshold 0 -bf 0 -c:a aac -ac 2 av.mp4
+printf '%s\n' 1 '00:00:00,200 --> 00:00:02,600' 'Across the seek' > cues.srt
+ffmpeg -nostdin -v error -y -i av.mp4 -i cues.srt -itsoffset 0.2 -i dvd-commands.mp4 \
+    -map 0:v:0 -map 0:a:0 -map 1:s:0 -map 2:s:0 -t 4 -c copy -c:s:0 mov_text subtitles.mp4
+ffmpeg -nostdin -v error -y -i subtitles.mp4 -map 0 -c copy \
+    -movflags +empty_moov+frag_keyframe+default_base_moof -use_editlist 0 fragmented-subtitles.mp4
+ffmpeg -nostdin -v error -y -i subtitles.mp4 -map 0 -c copy \
+    -movflags +delay_moov+frag_keyframe+default_base_moof fragmented-subtitle-edit.mp4
+```

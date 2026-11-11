@@ -113,6 +113,55 @@ fn complete_fragment_edit_offsets_the_packet_and_resume_clocks() {
     }
 }
 
+#[test]
+fn leading_empty_fragment_edit_delays_packets_without_shifting_the_seek_query() {
+    use triergon_isobmff::compat::mov::{
+        packets::{DemuxProfile, DemuxTrack},
+        seek::{SeekJob, SeekLimits},
+    };
+    let pool = Budget::new(65536).unwrap();
+    let table = fragment_sample_table(&pool);
+    let fragments = [fixture::fragment(
+        &pool,
+        1,
+        1000,
+        1,
+        Some(0),
+        &[0, 0x10000, 0],
+    )];
+    let edits = fixture::edits(&pool, &[(8, -1, 1, 0), (0, 4, 1, 0)]);
+    let track = DemuxTrack {
+        track_id: 7,
+        table: &table,
+        fragments: &fragments,
+        media_base: TimeBase::new(1, 1000).unwrap(),
+        edits: Some((&edits, TimeBase::new(1, 3000).unwrap())),
+    };
+    let media = 1000..1006;
+    let cancel = AtomicBool::new(false);
+    // Eight movie ticks round to three media ticks of delay. The seek
+    // query subtracts only the four-tick media start.
+    for (target, source_dts, packet_dts) in [(22, 0, -1), (23, 20, 19)] {
+        let mut seek = SeekJob::new_complete_source(
+            &pool,
+            track,
+            std::slice::from_ref(&media),
+            target,
+            SeekLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+        )
+        .unwrap();
+        assert!((0..512).any(|_| {
+            seek.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Ready
+        }));
+        let plan = seek.finish().unwrap();
+        let packet = &plan.landing().selected.occurrence;
+        assert_eq!(packet.source.dts_ticks, Some(source_dts));
+        assert_eq!(packet.demux.dts, Some(packet_dts));
+        assert_eq!(packet.edit.unwrap().edit_ordinal, 2);
+    }
+}
+
 fn fragment_sample_table(pool: &Budget) -> triergon_isobmff::SampleTable {
     let boxes = common::roots(
         pool,

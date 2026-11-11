@@ -315,8 +315,10 @@ rejects boxes extending past the source.
   The regular range view also establishes a 1024-sample clock for indexed AAC-LC
   configurations 11, 12 and 14 when the media timescale matches the core rate.
   The compatible view of a complete fragmented file supports one open-ended
-  rate-one initialization edit. Packet clocks and backward seek queries share
-  the edit's offset. AAC leading trim uses the configured audio sample rate.
+  rate-one media edit after an optional leading empty edit. The empty edit
+  delays packet clocks by its duration, rounded to the track time base.
+  Backward seek queries subtract the media start. AAC leading trim for
+  a single initialization edit uses the configured audio sample rate.
   Regular Opus range playback retains the `dOps` record and exposes its canonical
   identification header. The MOV policy projects leading and trailing edit trim
   and retains up to one second of history plus the preceding sample for a long

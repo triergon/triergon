@@ -9,7 +9,7 @@ use triergon_core::{
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_isobmff::{
-    AacConfigurationJob, AacConfigurationStep, ConfigurationLimits,
+    AacConfigurationJob, AacConfigurationStep, ConfigurationLimits, ObjectTypeScan,
     compat::mov::{
         edits::{
             EncodedEditContext as EditContext, EncodedEditJob as EditJob,
@@ -165,26 +165,39 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
     let mut result = Work::default();
     for track in movie.tracks() {
         let header = track.header();
-        if triergon_isobmff::media_kind(&header.handler) == MediaKind::Data {
+        let kind = triergon_isobmff::media_kind(&header.handler);
+        if kind == MediaKind::Data {
             plans.try_push(None).map_err(|error| error.error)?;
             continue;
         }
         let table = track.table();
         let descriptions = table.descriptions();
-        match (header.handler, descriptions) {
+        match (&header.handler, descriptions) {
             (kind, [entry])
-                if kind == *b"vide"
+                if kind == b"vide"
                     && matches!(&entry.format, b"avc1" | b"dvh1" | b"dvhe" | b"dav1")
                     && video.is_none() =>
             {
                 video = Some((header.track_id, entry.format));
             }
             (kind, [entry])
-                if kind == *b"soun"
+                if kind == b"soun"
                     && matches!(&entry.format, b"mp4a" | b"Opus")
                     && audio.is_none() =>
             {
                 audio = Some(header.track_id);
+            }
+            (b"sbtl" | b"text" | b"subt", [entry]) if entry.format == *b"tx3g" => (),
+            (b"subp", [entry]) if entry.format == *b"mp4s" => {
+                let mut scan = ObjectTypeScan::new(entry, ConfigurationLimits::default())?;
+                loop {
+                    if let Some((object_type, _)) = scan.poll(&mut work())? {
+                        if object_type != 0xe0 {
+                            return Err("unexpected MP4 subpicture object type".into());
+                        }
+                        break;
+                    }
+                }
             }
             _ => return Err("unexpected MP4 range track".into()),
         }
@@ -195,7 +208,9 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
             b"mp4a" if major_brand == Some(*b"qt  ") => Some("aac"),
             _ => None,
         };
-        let edits = track.edits().filter(|_| track.fragments().is_empty());
+        let edits = track
+            .edits()
+            .filter(|_| kind != MediaKind::Subtitle && track.fragments().is_empty());
         let config = if codec == Some("aac") && !track.fragments().is_empty() {
             // A fragment's description lives in the initialization table even
             // when that table contains no samples.

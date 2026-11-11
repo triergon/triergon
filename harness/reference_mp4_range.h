@@ -57,6 +57,10 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
                  (codec->codec_id == AV_CODEC_ID_AAC ||
                   (codec->codec_id == AV_CODEC_ID_OPUS && tag == MKTAG('O', 'p', 'u', 's'))))
             audio = (int)i;
+        else if (codec->codec_type == AVMEDIA_TYPE_SUBTITLE &&
+                 ((codec->codec_id == AV_CODEC_ID_MOV_TEXT && tag == MKTAG('t', 'x', '3', 'g')) ||
+                  (codec->codec_id == AV_CODEC_ID_DVD_SUBTITLE && tag == MKTAG('m', 'p', '4', 's'))))
+            continue;
         else
             goto done;
     }
@@ -109,8 +113,10 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
         }
     }
     while ((result = av_read_frame(format, packet)) >= 0) {
-        if (packet->pos < 0 || packet->size < 0 ||
-            (packet->stream_index != video && packet->stream_index != audio)) {
+        if (packet->pos < 0 || packet->size < 0 || packet->stream_index < 0 ||
+            (unsigned)packet->stream_index >= format->nb_streams ||
+            (packet->stream_index != video && packet->stream_index != audio &&
+             format->streams[packet->stream_index]->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE)) {
             result = AVERROR_INVALIDDATA;
             goto done;
         }
