@@ -388,6 +388,62 @@
         "bytes": 25808,
         "digest": 16784415058963717857
       }
+    },
+    {
+      "id": "quicktime-aac-open",
+      "profile": "quicktime-aac-open",
+      "file": "avc-aac-quicktime-surround.mov",
+      "sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 289,
+        "bytes": 174560,
+        "digest": 8952730278029084733
+      }
+    },
+    {
+      "id": "quicktime-aac-seek",
+      "profile": "quicktime-aac-seek",
+      "file": "avc-aac-quicktime-surround.mov",
+      "sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "26880"
+      ],
+      "expected": {
+        "packets": 145,
+        "bytes": 85958,
+        "digest": 4047899442073086333
+      }
+    },
+    {
+      "id": "quicktime-aac-minimal-wave-open",
+      "profile": "quicktime-aac-minimal-wave-open",
+      "file": "avc-aac-quicktime-minimal-wave.mov",
+      "sha256": "5cb6c10eda05f3926d5a3cc65bc7ced39ef268cec19d5f577b69e9b544a29827",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 289,
+        "bytes": 174560,
+        "digest": 8952730278029084733
+      }
+    },
+    {
+      "id": "quicktime-aac-minimal-wave-seek",
+      "profile": "quicktime-aac-minimal-wave-seek",
+      "file": "avc-aac-quicktime-minimal-wave.mov",
+      "sha256": "5cb6c10eda05f3926d5a3cc65bc7ced39ef268cec19d5f577b69e9b544a29827",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "26880"
+      ],
+      "expected": {
+        "packets": 145,
+        "bytes": 85958,
+        "digest": 4047899442073086333
+      }
     }
   ]
 }

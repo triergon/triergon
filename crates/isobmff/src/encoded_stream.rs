@@ -451,11 +451,37 @@ impl AacConfigurationJob {
     }
 }
 
+fn quicktime_aac_extensions(entry: &SampleDescription) -> Result<usize> {
+    let raw = entry.raw();
+    let body = raw.payload();
+    fields::slice(body, 0, 64)?;
+    // The version-2 sizeOfStructOnly includes the sample entry's box header.
+    let extensions = usize::try_from(fields::u32_at(body, 28)?).map_err(|_| Error::Overflow)?;
+    let offset = extensions
+        .checked_sub(usize::from(raw.header().header_size))
+        .filter(|&offset| offset >= 64)
+        .ok_or(Error::Invalid("QuickTime sound extension offset"))?;
+    fields::slice(body, 0, offset)?;
+    let sample_rate = f64::from_bits(fields::u64_at(body, 32)?);
+    if fields::u32_at(body, 16)? != 0x0003_0010
+        || fields::u32_at(body, 20)? != 0xfffe_0000
+        || fields::u32_at(body, 24)? != 65_536
+        || fields::u32_at(body, 44)? != 0x7f00_0000
+        || !sample_rate.is_finite()
+        || sample_rate <= 0.0
+        || fields::u32_at(body, 40)? == 0
+    {
+        return Err(Error::Invalid("QuickTime version-2 sound description"));
+    }
+    Ok(offset)
+}
+
 #[derive(Debug)]
 struct EsdsDescriptionWalk {
     children: BoxChildren,
     wave: Option<BoxChildren>,
     seen_wave: bool,
+    quicktime_extended_sound: bool,
     wave_fields: AacWaveFields,
     scanned: bool,
     limits: ConfigurationLimits,
@@ -474,23 +500,33 @@ impl EsdsDescriptionWalk {
             max_boxes: limits.max_child_boxes,
             ..Limits::default()
         };
-        let children = if entry.format == *b"mp4s" {
+        let (children, quicktime_extended_sound) = match &entry.format {
             // MPEG-4 system streams (DVD subpictures) have a plain sample entry.
-            entry.raw().children(8, child_limits)?
-        } else if entry.format != *b"mp4a" {
-            return Err(Error::Invalid(
-                "AAC configuration requires an mp4a description",
-            ));
-        } else if fields::u16_at(entry.raw().payload(), 8)? == 1 {
-            crate::SoundV1Source::parse_contexts(entry)?;
-            entry.raw().children(44, child_limits)?
-        } else {
-            entry.extensions(EntryLayout::AudioV0, child_limits)?
+            b"mp4s" => (entry.raw().children(8, child_limits)?, false),
+            b"mp4a" => match fields::u16_at(entry.raw().payload(), 8)? {
+                1 => {
+                    crate::SoundV1Source::parse_contexts(entry)?;
+                    (entry.raw().children(44, child_limits)?, false)
+                }
+                2 => (
+                    entry
+                        .raw()
+                        .children(quicktime_aac_extensions(entry)?, child_limits)?,
+                    true,
+                ),
+                _ => (entry.extensions(EntryLayout::AudioV0, child_limits)?, false),
+            },
+            _ => {
+                return Err(Error::Invalid(
+                    "AAC configuration requires an mp4a description",
+                ));
+            }
         };
         Ok(Self {
             children,
             wave: None,
             seen_wave: false,
+            quicktime_extended_sound,
             wave_fields: AacWaveFields::default(),
             scanned: false,
             limits,
@@ -507,12 +543,21 @@ impl EsdsDescriptionWalk {
             match children.poll(work)? {
                 BoxStep::Yield => return Ok(false),
                 BoxStep::End if nested => {
-                    if !self.wave_fields.complete() || self.esds.is_none() {
+                    if !self.wave_fields.complete(!self.quicktime_extended_sound)
+                        || self.esds.is_none()
+                    {
                         return Err(Error::Unsupported("incomplete AAC wave context"));
                     }
                     self.wave = None;
                 }
-                BoxStep::End => self.scanned = true,
+                BoxStep::End => {
+                    if self.quicktime_extended_sound && !self.seen_wave {
+                        return Err(Error::Unsupported(
+                            "QuickTime AAC requires wave configuration",
+                        ));
+                    }
+                    self.scanned = true;
+                }
                 BoxStep::Box(raw) => {
                     self.inspected_boxes =
                         self.inspected_boxes.checked_add(1).ok_or(Error::Overflow)?;
@@ -687,8 +732,8 @@ impl AacWaveFields {
         Ok(())
     }
 
-    fn complete(&self) -> bool {
-        self.format && self.marker && self.terminator
+    fn complete(&self, require_format_and_marker: bool) -> bool {
+        self.terminator && (!require_format_and_marker || (self.format && self.marker))
     }
 }
 
@@ -736,6 +781,7 @@ pub struct EncodedStreamJob<'a> {
     view: DescriptionView,
     major: Option<[u8; 4]>,
     sound_source: Option<crate::SoundV1Source>,
+    requires_wave: bool,
     wave_fields: Option<Wave>,
     inspected_boxes: u32,
     wave_source: Option<crate::WaveObservation>,
@@ -892,11 +938,13 @@ impl<'a> EncodedStreamJob<'a> {
             max_boxes: limits.max_child_boxes,
             ..Limits::default()
         };
-        let sound_source = if metadata_receiver
-            && major == Some(*b"qt  ")
-            && kind == EncodedEntryKind::Aac
-            && fields::u16_at(entry.raw().payload(), 8)? == 1
-        {
+        let quicktime = metadata_receiver && major == Some(*b"qt  ");
+        let sound_version = if quicktime && kind == EncodedEntryKind::Aac {
+            fields::u16_at(entry.raw().payload(), 8)?
+        } else {
+            0
+        };
+        let sound_source = if sound_version == 1 {
             Some(match view {
                 DescriptionView::Contexts | DescriptionView::RangePlayback => {
                     crate::SoundV1Source::parse_contexts(&entry)?
@@ -906,16 +954,21 @@ impl<'a> EncodedStreamJob<'a> {
         } else {
             None
         };
+        let wave_offset = match sound_version {
+            1 => Some(44),
+            2 if view == DescriptionView::RangePlayback => Some(quicktime_aac_extensions(&entry)?),
+            _ => None,
+        };
         let quicktime_visual =
             view == DescriptionView::RangePlayback && matches!(layout, EntryLayout::Visual);
-        if metadata_receiver
-            && major == Some(*b"qt  ")
-            && sound_source.is_none()
-            && !quicktime_visual
-            && kind != EncodedEntryKind::Dts
+        if quicktime && wave_offset.is_none() && !quicktime_visual && kind != EncodedEntryKind::Dts
         {
             return Err(Error::Unsupported(
-                "encoded V4 QuickTime AudioV1/mp4a profile only",
+                if view == DescriptionView::RangePlayback {
+                    "QuickTime range playback sample entry"
+                } else {
+                    "encoded V4 QuickTime AudioV1/mp4a profile only"
+                },
             ));
         }
         let children = if kind == EncodedEntryKind::Dts {
@@ -923,8 +976,8 @@ impl<'a> EncodedStreamJob<'a> {
                 return Err(Error::Unsupported("DTS QuickTime sample entry brand"));
             }
             dts_entry_children(&entry, child_limits)?
-        } else if sound_source.is_some() {
-            entry.raw().children(44, child_limits)?
+        } else if let Some(offset) = wave_offset {
+            entry.raw().children(offset, child_limits)?
         } else {
             entry.extensions(layout, child_limits)?
         };
@@ -946,6 +999,7 @@ impl<'a> EncodedStreamJob<'a> {
             view,
             major,
             sound_source,
+            requires_wave: wave_offset.is_some(),
             wave_fields: None,
             inspected_boxes: 0,
             wave_source: None,
@@ -1191,7 +1245,10 @@ impl<'a> EncodedStreamJob<'a> {
                             .wave_fields
                             .as_mut()
                             .ok_or(Error::Invalid("wave state absent"))?;
-                        if w.format.is_none() || w.marker.is_none() || w.terminator.is_none() {
+                        if w.terminator.is_none()
+                            || (self.sound_source.is_some()
+                                && (w.format.is_none() || w.marker.is_none()))
+                        {
                             let error = Error::Unsupported("encoded incomplete mp4a wave context");
                             if let Some(report) = &mut self.wave_source {
                                 report.fault(error, w.raw.clone(), report.child_count)?;
@@ -1209,7 +1266,7 @@ impl<'a> EncodedStreamJob<'a> {
                     BoxStep::Yield => return Ok(CursorStatus::Yield),
                     BoxStep::Box(raw) => {
                         self.inspect_box()?;
-                        if raw.header().kind == *b"wave" && self.sound_source.is_some() {
+                        if raw.header().kind == *b"wave" && self.requires_wave {
                             if self.wave_fields.is_some() {
                                 return Err(Error::Invalid("encoded duplicate wave context"));
                             }
@@ -1249,13 +1306,15 @@ impl<'a> EncodedStreamJob<'a> {
                             && self.kind == EncodedEntryKind::Aac
                         {
                             return Err(Error::Unsupported(
-                                "encoded AAC wave requires QuickTime AudioV1",
+                                "encoded AAC wave requires a QuickTime sound description",
                             ));
                         } else if raw.header().kind == self.config_kind {
-                            if self.sound_source.is_some() {
-                                return Err(Error::Unsupported(
-                                    "encoded sound-v1 config outside wave",
-                                ));
+                            if self.requires_wave {
+                                return Err(Error::Unsupported(if self.sound_source.is_some() {
+                                    "encoded sound-v1 config outside wave"
+                                } else {
+                                    "encoded QuickTime AAC configuration outside wave"
+                                }));
                             }
                             self.accept_configuration(raw)?;
                         }
@@ -1272,7 +1331,7 @@ impl<'a> EncodedStreamJob<'a> {
                             let start = usize::from(cfg.header().header_size);
                             let bytes = cfg.bytes().slice(start..cfg.bytes().len())?;
                             let profile = if self.view == DescriptionView::RangePlayback
-                                && self.sound_source.is_none()
+                                && !self.requires_wave
                             {
                                 EsdsProfile::RangeAudio
                             } else {
@@ -1365,7 +1424,7 @@ impl<'a> EncodedStreamJob<'a> {
             });
             if self.view != DescriptionView::Regular && self.major == Some(*b"qt  ") {
                 let vendor = fields::fourcc(self.entry.raw().payload(), 12)?;
-                if self.sound_source.is_some() && vendor != [0; 4] {
+                if self.requires_wave && vendor != [0; 4] {
                     return Err(Error::Unsupported(
                         "encoded QuickTime nonzero vendor profile",
                     ));
@@ -1696,6 +1755,51 @@ mod aac_entry_tests {
                 job.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
                 AacConfigurationStep::End
             ));
+        }
+    }
+
+    #[test]
+    fn quicktime_aac_uses_the_declared_sound_extension_offset() {
+        let mut body = vec![0; 68];
+        body[7] = 1;
+        body[9] = 2;
+        body[16..20].copy_from_slice(&0x0003_0010_u32.to_be_bytes());
+        body[20..24].copy_from_slice(&0xfffe_0000_u32.to_be_bytes());
+        body[24..28].copy_from_slice(&65_536_u32.to_be_bytes());
+        body[28..32].copy_from_slice(&76_u32.to_be_bytes());
+        body[32..40].copy_from_slice(&48_000_f64.to_be_bytes());
+        body[40..44].copy_from_slice(&2_u32.to_be_bytes());
+        body[44..48].copy_from_slice(&0x7f00_0000_u32.to_be_bytes());
+        body.extend(atom(b"wave", &wave_config(b"mp4a", false)));
+        let pool = Budget::new(4096).unwrap();
+        let entry = |body: &[u8]| {
+            let bytes = Bytes::copy_from_slice(&pool, &atom(b"mp4a", body)).unwrap();
+            SampleDescription::parse(BoxView::new(bytes, START).unwrap(), 1).unwrap()
+        };
+        let limits = ConfigurationLimits::default();
+        let cancel = AtomicBool::new(false);
+        let mut job = AacConfigurationJob::new(&entry(&body), limits).unwrap();
+        let config = (0..200)
+            .find_map(
+                |_| match job.poll(&mut WorkBudget::new(16), &cancel).unwrap() {
+                    AacConfigurationStep::Ready(config) => Some(config),
+                    AacConfigurationStep::Yield => None,
+                    AacConfigurationStep::End => panic!("AAC configuration missing"),
+                },
+            )
+            .unwrap();
+        assert_eq!(config.bytes.as_ref(), ASC);
+        assert_eq!(config.offset, START + (body.len() - ASC.len()) as u64);
+
+        for (offset, expected) in [
+            (71_u32, Error::Invalid("QuickTime sound extension offset")),
+            (u32::MAX, Error::Truncated),
+        ] {
+            body[28..32].copy_from_slice(&offset.to_be_bytes());
+            assert_eq!(
+                AacConfigurationJob::new(&entry(&body), limits).unwrap_err(),
+                expected
+            );
         }
     }
 

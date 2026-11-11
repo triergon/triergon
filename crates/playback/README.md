@@ -56,6 +56,10 @@ Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
 When the movie declares its duration, the range player checks source ranges and
 packet projections before merging the tracks for delivery.
+QuickTime range playback reads AAC configuration from version 1 and version 2
+sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
+fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
+also runs with the optional format and marker atoms replaced by free boxes.
 
 ## Supported
 

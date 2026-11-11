@@ -155,6 +155,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
     while !matches!(open.advance(&mut work(), &cancel)?, OpenProgress::Ready) {}
     let mut opened = open.finish()?;
     let movie = &opened.movie;
+    let major_brand = movie.major_brand();
     let movie_base = movie.header().time_base()?;
     let mut plans = BudgetVec::new(pool);
     plans.try_reserve_exact(movie.tracks().len())?;
@@ -186,6 +187,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
             b"dvh1" | b"dvhe" => Some("hevc"),
             b"dav1" => Some("av1"),
             b"Opus" => Some("opus"),
+            b"mp4a" if major_brand == Some(*b"qt  ") => Some("aac"),
             _ => None,
         };
         let edits = track.edits().filter(|_| track.fragments().is_empty());
@@ -195,7 +197,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
                 table,
                 &opened.input,
                 DescriptionSelection {
-                    major_brand: movie.major_brand(),
+                    major_brand,
                     description: descriptions[0].index,
                     limits: ConfigurationLimits::default(),
                 },

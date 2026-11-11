@@ -342,6 +342,50 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (93, 25_808, 16_784_415_058_963_717_857),
         ),
     ]);
+    let surround_file = "avc-aac-quicktime-surround.mov";
+    let minimal_wave_file = "avc-aac-quicktime-minimal-wave.mov";
+    let surround_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(surround_file);
+    let surround =
+        fs::read(&surround_seed).map_err(|e| format!("{}: {e}", surround_seed.display()))?;
+    if sha256::hex(&surround) != "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5"
+    {
+        return Err("QuickTime surround AAC range seed changed".into());
+    }
+    let mut minimal_wave = surround.clone();
+    // Replace the optional wave format and marker atoms with free boxes of equal size.
+    minimal_wave[1989..1993].copy_from_slice(b"free");
+    minimal_wave[2001..2005].copy_from_slice(b"free");
+    write(&output.join(surround_file), &surround)?;
+    write(&output.join(minimal_wave_file), &minimal_wave)?;
+    let open = (289, 174_560, 8_952_730_278_029_084_733);
+    let seek = (145, 85_958, 4_047_899_442_073_086_333);
+    cases.extend([
+        mp4_range_case("quicktime-aac-open", surround_file, &surround, [], open),
+        mp4_range_case(
+            "quicktime-aac-seek",
+            surround_file,
+            &surround,
+            ["26880"],
+            seek,
+        ),
+        mp4_range_case(
+            "quicktime-aac-minimal-wave-open",
+            minimal_wave_file,
+            &minimal_wave,
+            [],
+            open,
+        ),
+        mp4_range_case(
+            "quicktime-aac-minimal-wave-seek",
+            minimal_wave_file,
+            &minimal_wave,
+            ["26880"],
+            seek,
+        ),
+    ]);
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",
