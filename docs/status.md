@@ -346,18 +346,16 @@ peaks are given beside it.
 
 The subtitle, closed-caption and teletext features have not been run on ARMv7: their parity,
 runtime and memory there are not verified; nor are the runtime and memory of fonts and shaping.
-The DVD decoder reads the numbers of a colour list (the `palette` option and a configuration's
-`palette:` line) with a 32-bit `unsigned long`, as FFmpeg built for ARMv7 does; FFmpeg built
-for AArch64 reads them with 64 bits, so a number beyond 32 bits gives another colour there
-(`vobsub-palette-option`, which `subtitle-dvd` pins with the AArch64 result). It reads the
-numbers of a `size:` line with a 32-bit `long` too, so one beyond `int`'s range refuses the
-size, where FFmpeg for AArch64 keeps its low 32 bits. A `.idx` `delay:` line is read as FFmpeg
-for ARMv7 reads it: a `-` after spaces negates the whole delay, then up to four `%d` fields,
-each saturating at `int`'s range there (FFmpeg for AArch64 keeps their low 32 bits), with
-missing fields zero. The subtitles reference flags a fold that
-reaches a C library result differing between the two targets; of the five subtitle features'
-cases it flags only `vobsub-palette-option`, on both, which therefore fails `subtitle-dvd`, a
-feature not pinned per target.
+The DVD decoder reads the numbers FFmpeg reads through C's `long` as FFmpeg built for ARMv7
+does, with 32 bits: a colour list's (the `palette` option and a configuration's `palette:`
+line), a `size:` line's, which beyond `int`'s range refuse the size, and a `.idx` `delay:`
+line's (a `-` after spaces negating the whole delay, then up to four `%d` fields, each
+saturating at `int`'s range, missing fields zero). FFmpeg built for AArch64 keeps 64 or the low
+32 bits of such numbers instead. `subtitle-dvd-host` pins the cases that reach them per target
+and holds them open on AArch64 (`vobsub-palette-option`, `vobsub-idx-size-beyond-32-bits`,
+`vobsub-idx-size-negative-beyond-32-bits`, `vobsub-idx-delay-beyond-32-bits`), with
+`vobsub-idx-size-int-min`, which both refuse. A decoder that refuses to open is a result both
+workers fold and compare.
 
 Above the ceiling on ARMv7: codecs `h264-high-1080p` 1.5371, `h264-main-1920x800`
 1.3155, `dts-core-es-6.1` 1.7268, `dts-core-7.1-master` 1.7785, `ac3-5.1-448` 1.3602,

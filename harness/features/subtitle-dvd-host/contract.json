@@ -12,19 +12,40 @@
     "each case is pinned per target from that target's own reference run, with the reference's flag; a case passes when the candidate, the reference and the target's pin agree",
     "the decoder follows FFmpeg built with GCC for armv7-unknown-linux-gnueabihf; where FFmpeg for aarch64-unknown-linux-gnu gives another result, the case is open there as a deliberate divergence",
     "preparation outside the timed operation: open the input, select the subpicture stream and its configuration, and copy its packets in demux order",
-    "one timed operation: create and open the decoder with the stream's configuration, packet time base and options, decode every prepared packet with one call each, drain, fold every output subtitle and free it, free the decoder"
+    "one timed operation: create and open the decoder with the stream's configuration, packet time base and options (a decoder that refuses to open folds as no subtitles and the word 2^64 - 1 in both workers), decode every prepared packet with one call each, drain, fold every output subtitle and free it, free the decoder"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
     "armv7-unknown-linux-gnueabihf"
   ],
   "pending_module_requirements": [
-    "a deliberate divergence: FFmpeg built for aarch64-unknown-linux-gnu reads some numbers of a DVD option or configuration with 64 bits where FFmpeg built for 32-bit ARM reads them with 32, so a palette number beyond 32 bits gives another colour there; the decoder follows 32-bit ARM"
+    "a deliberate divergence: FFmpeg built for aarch64-unknown-linux-gnu reads some numbers of a DVD option, configuration or VobSub index with 64 bits where FFmpeg built for 32-bit ARM reads them with 32, so there a palette number beyond 32 bits gives another colour, a size: number beyond int's range a canvas where 32-bit ARM refuses to open the decoder, and a delay: field beyond int's range another time; the decoder follows 32-bit ARM"
   ],
   "open_cases": [
     {
       "id": "vobsub-palette-option",
-      "requirement": "a deliberate divergence: FFmpeg built for aarch64-unknown-linux-gnu reads some numbers of a DVD option or configuration with 64 bits where FFmpeg built for 32-bit ARM reads them with 32, so a palette number beyond 32 bits gives another colour there; the decoder follows 32-bit ARM",
+      "requirement": "a deliberate divergence: FFmpeg built for aarch64-unknown-linux-gnu reads some numbers of a DVD option, configuration or VobSub index with 64 bits where FFmpeg built for 32-bit ARM reads them with 32, so there a palette number beyond 32 bits gives another colour, a size: number beyond int's range a canvas where 32-bit ARM refuses to open the decoder, and a delay: field beyond int's range another time; the decoder follows 32-bit ARM",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "vobsub-idx-size-beyond-32-bits",
+      "requirement": "a deliberate divergence: FFmpeg built for aarch64-unknown-linux-gnu reads some numbers of a DVD option, configuration or VobSub index with 64 bits where FFmpeg built for 32-bit ARM reads them with 32, so there a palette number beyond 32 bits gives another colour, a size: number beyond int's range a canvas where 32-bit ARM refuses to open the decoder, and a delay: field beyond int's range another time; the decoder follows 32-bit ARM",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "vobsub-idx-size-negative-beyond-32-bits",
+      "requirement": "a deliberate divergence: FFmpeg built for aarch64-unknown-linux-gnu reads some numbers of a DVD option, configuration or VobSub index with 64 bits where FFmpeg built for 32-bit ARM reads them with 32, so there a palette number beyond 32 bits gives another colour, a size: number beyond int's range a canvas where 32-bit ARM refuses to open the decoder, and a delay: field beyond int's range another time; the decoder follows 32-bit ARM",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "vobsub-idx-delay-beyond-32-bits",
+      "requirement": "a deliberate divergence: FFmpeg built for aarch64-unknown-linux-gnu reads some numbers of a DVD option, configuration or VobSub index with 64 bits where FFmpeg built for 32-bit ARM reads them with 32, so there a palette number beyond 32 bits gives another colour, a size: number beyond int's range a canvas where 32-bit ARM refuses to open the decoder, and a delay: field beyond int's range another time; the decoder follows 32-bit ARM",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

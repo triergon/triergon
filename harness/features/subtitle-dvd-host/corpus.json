@@ -32,6 +32,130 @@
           "host_dependent": true
         }
       }
+    },
+    {
+      "id": "vobsub-idx-size-beyond-32-bits",
+      "profile": "vobsub-idx-size-beyond-32-bits",
+      "file": "dvd/idx-size-beyond-32-bits.idx",
+      "sha256": "e28d75782f0298c862e6d37ca90a9ebd6ed4c30059f0bfe1f4dca042fcd413a4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-size-beyond-32-bits.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 112,
+          "digest": 3709003682102700352,
+          "host_dependent": true
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 0,
+          "bytes": 0,
+          "digest": 18446744073709551615,
+          "host_dependent": true
+        }
+      }
+    },
+    {
+      "id": "vobsub-idx-size-negative-beyond-32-bits",
+      "profile": "vobsub-idx-size-negative-beyond-32-bits",
+      "file": "dvd/idx-size-negative-beyond-32-bits.idx",
+      "sha256": "9fefb85b8d272211f1d92946834f77db27a901b544e687613c2cc9225947f7c1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-size-negative-beyond-32-bits.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 112,
+          "digest": 3709003682102700352,
+          "host_dependent": true
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 0,
+          "bytes": 0,
+          "digest": 18446744073709551615,
+          "host_dependent": true
+        }
+      }
+    },
+    {
+      "id": "vobsub-idx-size-int-min",
+      "profile": "vobsub-idx-size-int-min",
+      "file": "dvd/idx-size-int-min.idx",
+      "sha256": "72be037fe6bc9182b9374e6e739aaaa309ffcc88f594c920dc2f5ecda3997abe",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-size-int-min.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 0,
+          "bytes": 0,
+          "digest": 18446744073709551615,
+          "host_dependent": true
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 0,
+          "bytes": 0,
+          "digest": 18446744073709551615,
+          "host_dependent": true
+        }
+      }
+    },
+    {
+      "id": "vobsub-idx-delay-beyond-32-bits",
+      "profile": "vobsub-idx-delay-beyond-32-bits",
+      "file": "dvd/idx-delay-beyond-32-bits.idx",
+      "sha256": "001797ef7a5dcc7624597ac9104df8546afa8b14cb7c498e9078ddd82e450fd7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-delay-beyond-32-bits.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 12,
+          "bytes": 56142,
+          "digest": 628476229090322483,
+          "host_dependent": true
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 12,
+          "bytes": 56142,
+          "digest": 17193506398397371131,
+          "host_dependent": true
+        }
+      }
     }
   ]
 }
