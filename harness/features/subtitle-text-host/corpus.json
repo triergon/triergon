@@ -1,0 +1,535 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "srt-hours-2147483648",
+      "profile": "srt-hours-2147483648",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-2147483648.srt",
+      "sha256": "5dc111ee06b15473fcc4b5a6ce13e4eee08c20b9f56aa32f74d1736cfbee9963",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 9576802471793377844
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 16232587669887438863
+        }
+      }
+    },
+    {
+      "id": "srt-hours-4294967295",
+      "profile": "srt-hours-4294967295",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-4294967295.srt",
+      "sha256": "9b377d14290403da393579ed2e7f5c8b8939215ee616435b313468e3a658f11a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 707959907875735858
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 16232587669887438863
+        }
+      }
+    },
+    {
+      "id": "srt-hours-4294967296",
+      "profile": "srt-hours-4294967296",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-4294967296.srt",
+      "sha256": "9e648233b53acf20f547f7b4c864ec708965b9380752a7f090f5d529651e41db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 6654686160095529233
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 16232587669887438863
+        }
+      }
+    },
+    {
+      "id": "srt-hours-4294967297",
+      "profile": "srt-hours-4294967297",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-4294967297.srt",
+      "sha256": "13700b3fb697bf5a2fa87b0544b903bd92b9e6d6b7ab26715658dc90798567e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 3128772717689727026
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 16232587669887438863
+        }
+      }
+    },
+    {
+      "id": "srt-hours-9223372036854775808",
+      "profile": "srt-hours-9223372036854775808",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-9223372036854775808.srt",
+      "sha256": "c03d11950967f0760ab6e666ce629c525abab7211a453c2716c9355813032c0c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 707959907875735858
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 16232587669887438863
+        }
+      }
+    },
+    {
+      "id": "srt-hours-18446744073709551615",
+      "profile": "srt-hours-18446744073709551615",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-18446744073709551615.srt",
+      "sha256": "5a0af0f15cc0b8ff26fc8b32629b96dfa53cd9fd0ad304ca4b12558296480791",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 707959907875735858
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 16232587669887438863
+        }
+      }
+    },
+    {
+      "id": "srt-hours-18446744073709551616",
+      "profile": "srt-hours-18446744073709551616",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-18446744073709551616.srt",
+      "sha256": "79323ab3238c5a4d27110e189c2d6b65b1a0b0e51b863b22b81145e94dcb13f6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 707959907875735858
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 16232587669887438863
+        }
+      }
+    },
+    {
+      "id": "srt-hours-99999999999999999999",
+      "profile": "srt-hours-99999999999999999999",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-99999999999999999999.srt",
+      "sha256": "ae2055a9f02810514ea230ed4561247ab0f4c61779afa2b36b15ce7b28bb0cb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 707959907875735858
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 16232587669887438863
+        }
+      }
+    },
+    {
+      "id": "srt-hours-minus-2147483649",
+      "profile": "srt-hours-minus-2147483649",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-minus-2147483649.srt",
+      "sha256": "16dde2db6ef6f6683564b9de7e0e126e2ce25232a9246d7c77c179a4db04d1af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 16232587669887438863
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 9576802471793377844
+        }
+      }
+    },
+    {
+      "id": "srt-hours-minus-4294967297",
+      "profile": "srt-hours-minus-4294967297",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-hours-minus-4294967297.srt",
+      "sha256": "8e1e302d920b57938ef7621e283e97bb3b16f09c908bda076121a9cb2ad39bb0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 707959907875735858
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 9576802471793377844
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-2147483648",
+      "profile": "srt-seconds-2147483648",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-2147483648.srt",
+      "sha256": "632ae591b65dee186c60949fda5a6c2955e71f4f6b288804f7a03beb133ebee7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12430395503298261476
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12875867671335584224
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-4294967295",
+      "profile": "srt-seconds-4294967295",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-4294967295.srt",
+      "sha256": "ea413cdb2bcc494fd90dab7c7f3829e780ab8f31b47daff1fe362d15241ba8cf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 17684970407429437490
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12875867671335584224
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-4294967296",
+      "profile": "srt-seconds-4294967296",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-4294967296.srt",
+      "sha256": "349d3e75a791160fca6cffa37de881f44c504978a8a04f8245a6c7f228cad716",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 7621292767204408210
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12875867671335584224
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-4294967297",
+      "profile": "srt-seconds-4294967297",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-4294967297.srt",
+      "sha256": "fc31c425c620ec9a17f39183c058bd6f08ec695da87fb8a2a477f600337e925e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 6654686160095529233
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12875867671335584224
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-9223372036854775808",
+      "profile": "srt-seconds-9223372036854775808",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-9223372036854775808.srt",
+      "sha256": "9f87a4e4ea27d0561b87c60b9ac0d84cba8b07b9f9ee03e97be4515dcb13dd3a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 17684970407429437490
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12875867671335584224
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-18446744073709551615",
+      "profile": "srt-seconds-18446744073709551615",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-18446744073709551615.srt",
+      "sha256": "47e53022ddfc549a25a42d730f44f7f973ef4daf2682fe7ce0ab01c1b277e8b9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 17684970407429437490
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12875867671335584224
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-18446744073709551616",
+      "profile": "srt-seconds-18446744073709551616",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-18446744073709551616.srt",
+      "sha256": "495e577b5fa856cd400085a65a19f2208a4a4a26ba8989fa9eb953d7cef879c5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 17684970407429437490
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12875867671335584224
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-99999999999999999999",
+      "profile": "srt-seconds-99999999999999999999",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-99999999999999999999.srt",
+      "sha256": "8f24aa4022c79ff86ccb0868e46e51710075723c94acf833dca56813921ed6ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 17684970407429437490
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12875867671335584224
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-minus-2147483649",
+      "profile": "srt-seconds-minus-2147483649",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-minus-2147483649.srt",
+      "sha256": "72a9825a51a6abfa1031066fdc5f2e0223c90352a6cad1a40de714dc8f3579cf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12875867671335584224
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12430395503298261476
+        }
+      }
+    },
+    {
+      "id": "srt-seconds-minus-4294967297",
+      "profile": "srt-seconds-minus-4294967297",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/host/srt-seconds-minus-4294967297.srt",
+      "sha256": "859cbd79ed6271cb0448bf7371421f5df1c8241c59711d81ca54334654756ac1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 17684970407429437490
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12430395503298261476
+        }
+      }
+    },
+    {
+      "id": "vtt-seconds-4294967296",
+      "profile": "vtt-seconds-4294967296",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/host/vtt-seconds-4294967296.vtt",
+      "sha256": "75d77fcc2af89e6b2ea213870d13ea385cc4b60cc854458eba469b0903e58478",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12149176266633134994
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 6250682457037152306
+        }
+      }
+    },
+    {
+      "id": "vtt-seconds-4294967297",
+      "profile": "vtt-seconds-4294967297",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/host/vtt-seconds-4294967297.vtt",
+      "sha256": "24f7178e0c21f5512aa2322e11e6a53cc4c094c39c37173fe05ed922d68c5bf3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 13705469346545345041
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 6250682457037152306
+        }
+      }
+    },
+    {
+      "id": "vtt-seconds-9223372036854775808",
+      "profile": "vtt-seconds-9223372036854775808",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/host/vtt-seconds-9223372036854775808.vtt",
+      "sha256": "70bbe04e5d5f88c4ee070fe03b0a890b001e3b7e77ab19bdb778d173428d67a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 12149176266633134994
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 1,
+          "bytes": 1,
+          "digest": 6250682457037152306
+        }
+      }
+    }
+  ]
+}

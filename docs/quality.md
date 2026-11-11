@@ -321,8 +321,9 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, the five `subtitle-*` features with `subtitle-worker` and the
-`subtitles` reference, the three font features with `font-worker` and FreeType, the six
+and `formats` references, the five bitmap and caption `subtitle-*` features with
+`subtitle-worker` and the `subtitles` reference, `subtitle-text` with `subtitle-worker`
+and the `formats` reference, the three font features with `font-worker` and FreeType, the six
 shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
 features with `raster-worker` and libass, and the four ASS parsing features,
 `ass-render` and `ass-render-host` with `ass-worker` and libass.
@@ -355,6 +356,12 @@ identity every collection is checked against. `cargo xtask trace-identities` rec
 digest of every candidate trace, so a change can show its traces are byte-identical
 (`--compare` an earlier record): the Matroska cases for `media-worker`, every case of
 each feature that runs the `--candidate` worker through a prefix otherwise.
+Pass `--corpus FEATURE=DIR` for each prefix feature whose files are outside its
+recorded directory or whose manifest omits the directory. Relative directories are
+resolved from the repository root. Prefix comparisons verify the reference worker's
+build hash and the manifest hashes of the primary input, ordered entities and
+companion files before running a case. DVD palette paths resolve inside the
+selected corpus and keep their manifest spelling in recorded traces.
 `cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent
@@ -370,7 +377,8 @@ pipeline ([harness/capture](../harness/capture/README.md)).
 workloads](../harness/features/aac-access-units/contract.json) from the pinned
 QuickTime and authored audio-only packets. It compares the ordered speakers and
 every decoded PCM plane. The authored clips cover every supported fixed layout
-and indexed rate. `cargo xtask codecs aac-sources --out DIR` records the source
+and indexed rate, and program configurations from mono to eight channels.
+`cargo xtask codecs aac-sources --out DIR` records the source
 clips from independently varying channel tones using the pinned encoder. The
 committed sources fix the encoded input bytes across architectures.
 The paired codec timing and memory commands require passing parity bound to

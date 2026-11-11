@@ -300,6 +300,114 @@
       "sample_rate": 96000,
       "channels": 2,
       "source_sha256": "211fab5702ef7e1b049bd36f676e9b0b20852c1fe5912ca45d0f6f5f645ac2a0"
+    },
+    {
+      "id": "aac-program-mono",
+      "path": "aac-program-mono.aac-access-units",
+      "sha256": "7ce6b4f1cc513c683d8c6ccb5befc0c38073837c660db34c40246f948ca75ea7",
+      "bytes": 15115,
+      "operation": "audio-aac-access-units-compat",
+      "iterations": 4,
+      "packets": 97,
+      "sample_rate": 48000,
+      "channels": 1,
+      "source_sha256": "fd3f05c51b4f830eb2f89783f42f1b5a3842f2a9762a0b6773396ac5fd4e7d1b"
+    },
+    {
+      "id": "aac-program-stereo",
+      "path": "aac-program-stereo.aac-access-units",
+      "sha256": "e83fc553bb6fea56b0875c51f665c6444dd7777dba1bc971a2930b1ac7d80b3b",
+      "bytes": 24662,
+      "operation": "audio-aac-access-units-compat",
+      "iterations": 4,
+      "packets": 97,
+      "sample_rate": 44100,
+      "channels": 2,
+      "source_sha256": "7b1082a8670447d67483bc4035ec011b5b55ac259ff25c57f6c6217fb3fc9067"
+    },
+    {
+      "id": "aac-program-three-front",
+      "path": "aac-program-three-front.aac-access-units",
+      "sha256": "68b0df8b9943fca173bce5ad68646300d0d151955d7f95c62e3aa33d52e66f79",
+      "bytes": 31460,
+      "operation": "audio-aac-access-units-compat",
+      "iterations": 4,
+      "packets": 97,
+      "sample_rate": 48000,
+      "channels": 3,
+      "source_sha256": "0347cdced2d1231103b4f4f6bdc94b161fab667149442e48ee50e9030dce69ba"
+    },
+    {
+      "id": "aac-program-back-centre",
+      "path": "aac-program-back-centre.aac-access-units",
+      "sha256": "6fa2015e2e80b41bddef403de03f24af36d422d0d69e09f35a4b990296851f71",
+      "bytes": 39961,
+      "operation": "audio-aac-access-units-compat",
+      "iterations": 4,
+      "packets": 97,
+      "sample_rate": 48000,
+      "channels": 4,
+      "source_sha256": "1d0b389dc6b71c5c0983eeab1d6e8766aa8e29ffd8869ea27bb63ab2106e9401"
+    },
+    {
+      "id": "aac-program-back-pair",
+      "path": "aac-program-back-pair.aac-access-units",
+      "sha256": "9ac82e3563b31232a01e753a09f400ab3fb201d0f6015ccbc6e95ce4ee36511a",
+      "bytes": 48130,
+      "operation": "audio-aac-access-units-compat",
+      "iterations": 4,
+      "packets": 97,
+      "sample_rate": 48000,
+      "channels": 5,
+      "source_sha256": "b4a679547aa2a6318feee97605508e1a23974088792b5a970b6f6a033ae34875"
+    },
+    {
+      "id": "aac-program-back-pair-lfe",
+      "path": "aac-program-back-pair-lfe.aac-access-units",
+      "sha256": "1ef7485044f423d3a7a8b15abcfde5c2fc96bca4df638576906eaf10625ffdf8",
+      "bytes": 55779,
+      "operation": "audio-aac-access-units-compat",
+      "iterations": 4,
+      "packets": 97,
+      "sample_rate": 48000,
+      "channels": 6,
+      "source_sha256": "76ab7d5d725549ea968ff755290ef2890f92284bdccc1c4ceae17adcc691c62e"
+    },
+    {
+      "id": "aac-program-back-three-lfe",
+      "path": "aac-program-back-three-lfe.aac-access-units",
+      "sha256": "f487e41c713c9dbb25aa904f7260b7bdb14d737ed05c3a2f037c3702f26399b3",
+      "bytes": 64333,
+      "operation": "audio-aac-access-units-compat",
+      "iterations": 4,
+      "packets": 97,
+      "sample_rate": 48000,
+      "channels": 7,
+      "source_sha256": "5e821fd23f62c3d40a1fa367dd4362bebe1bec5164a692123b920481b5d9147e"
+    },
+    {
+      "id": "aac-program-surround",
+      "path": "aac-program-surround.aac-access-units",
+      "sha256": "a8d2c6f1314d826fd8bd92c5b48c94bdcfe9a27312aba2dc24006060cfd09201",
+      "bytes": 72265,
+      "operation": "audio-aac-access-units-compat",
+      "iterations": 4,
+      "packets": 97,
+      "sample_rate": 48000,
+      "channels": 8,
+      "source_sha256": "a6b8e645e0a3f23106cb6e9e045a47416a72cfbd2fd52431f7f57239ba5e6e58"
+    },
+    {
+      "id": "aac-program-wide-front",
+      "path": "aac-program-wide-front.aac-access-units",
+      "sha256": "fe5af1d6364e2025e2bd0f6d8c822aeb1bee0ae885d14da0bcb2215dab34d780",
+      "bytes": 44415,
+      "operation": "audio-aac-access-units-compat",
+      "iterations": 4,
+      "packets": 97,
+      "sample_rate": 96000,
+      "channels": 8,
+      "source_sha256": "e2f137c7f7df307c8d07e2b78f66cceaa08b3ee49de4b480e669434617ca09ec"
     }
   ]
 }

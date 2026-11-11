@@ -21,8 +21,8 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1488 (44/44 pass) | heap ≤0.4038, total RSS ≤0.9202 (44/44 lower) | FATE mapping |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10/10 packet folds (`matroska-audio-clocks`) | 1.1408 (10/10 pass) | heap ≤0.8103, total RSS ≤0.9875 (10/10 lower) | audio seek and FATE coverage |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 and Dolby Vision sample entry identification | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 0.8854 (972/972 pass) | heap ≤0.4132, total RSS ≤0.7260 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
-| MP4 range playback | Regular AVC/AAC and AVC/Opus startup and backward seek, fragmented AVC/AAC with open-ended edits, dedicated HEVC and AV1 sample entries, source-declared Opus seek preroll, QuickTime AAC with version-2 sound descriptions including 7.1 AAC and fragmented version-1 sound descriptions, and media playback in the presence of RTP hint tracks | 39 complete open and backward-seek comparisons (`mp4-range`), 5,169 packets on AArch64 Linux | 1.1232 (39/39 pass) | heap ≤0.7121, total RSS ≤0.9841 (39/39 lower) | other range playback profiles |
-| AAC in MOV | Raw AAC-LC access units with 1024 samples per plane, all thirteen indexed rates and fixed configurations 1–7, 11, 12 and 14. The conventional surround policy selects the reference speaker mapping. | The [configured decoder comparison](../harness/features/aac-access-units/contract.json) covers 25 clips, 2,671 access units and 11,204,608 PCM samples. Three QuickTime clips use the specification mapping with the single surround pair labelled side or back. Twenty-two audio-only clips use the conventional surround mapping with exact speaker order. | 0.8276 (25/25 pass) | heap ≤0.807, total RSS ≤0.466 (25/25 lower) | 960-sample frames, program-configured layouts and SBR in raw access units |
+| MP4 range playback | Regular AVC/AAC and AVC/Opus startup and backward seek, fragmented AVC/AAC with open-ended edits, dedicated HEVC and AV1 sample entries, source-declared Opus seek preroll, QuickTime AAC with fixed and program configurations, including regular version-2 descriptions and fragmented version-1 descriptions, and media playback in the presence of RTP hint tracks | 41 complete open and backward-seek comparisons (`mp4-range`), including 276 packets from the AAC program clip, out of 5,445 packets on AArch64 Linux | 1.1133 (41/41 pass) | heap ≤0.7121, total RSS ≤0.9847 (41/41 lower) | additional range playback profiles and FATE coverage |
+| AAC in MOV | Raw AAC-LC access units with 1024 samples per plane and all thirteen indexed rates. Supports fixed configurations 1–7, 11, 12 and 14 and out-of-band programs assigning up to eight distinct speaker positions. | The [configured decoder comparison](../harness/features/aac-access-units/contract.json) covers 34 clips, 3,544 access units and 15,575,040 PCM samples. Two fixed-layout QuickTime clips compare the surround pair in the same plane positions with side or back labels. Every other clip compares exact speaker order. | 0.8262 (34/34 pass) | heap ≤0.8066, total RSS ≤0.4586 (34/34 lower) | 960-sample frames and SBR in raw access units |
 | Ogg | Pages with CRC and resync, multiplexed and chained streams, Vorbis, Opus and FLAC mappings with canonical configurations, granule timing, pre-skip and end trims, bisection seeking | Packets against the pinned `ffprobe` (`cargo xtask codecs readers`) on 21 FATE Vorbis files and 13 generated Opus, Vorbis and FLAC files (multiplexed, chained, damaged, truncated), in two views: the FFmpeg-compatible `compat::clock` 31/34 pass, 3 differ only by reviewed FFmpeg behaviours; the reader's own timing 7/34 pass, 25 differ only where `compat::clock` reproduces FFmpeg, 2 by reviewed behaviours ([reader rules](../harness/codecs/reader-rules.json), [frozen differences](../harness/codecs/reader-differences.json)) | within the codec workloads | within the codec workloads | `b_vorbis.ogg`, `chain_vorbis.ogg`: a negative last duration FFmpeg prints modulo 2^32; `crc_bad.opus`: the first packet after a page that fails its CRC, which FFmpeg times from its own page and `compat::clock` from the stream start; Theora and Speex untimed; chained seeks not compared with FFmpeg |
 | Audio elementary streams | Native FLAC (with or without `fLaC`), MPEG audio with ID3v2/ID3v1/APE tags, Xing/Info/VBRI and LAME gapless trims, ADTS, AC-3/E-AC-3; one shared frame-stream engine | Packets as the readers emit them against the pinned `ffprobe` on 271 FLAC, MPEG audio, ADTS, AC-3 and E-AC-3 files (the IETF FLAC testbench, MP3 conformance, generated and crafted damaged streams): 253/271 pass, 16 differ only by reviewed FFmpeg behaviours, 2 refused by both (testbench faulty `06 - missing streaminfo metadata block`, `07 - other metadata blocks preceding streaminfo metadata block`) | within the codec workloads | within the codec workloads | FLAC `flac_s20_rate768k`, `06 - samplerate 768kHz` (no durations at 768 kHz), `01 - changing samplerate`, `27 - old format variable blocksize file created with Flake 0.11`, `11 - file starting with unparsable data`, `11 - incorrect metadata block length`, `08 - blocksize 65536`, `09 - blocksize 1`; crafted `ac3_tags`, `adts_mid_junk`, `flac_corrupt`, `flac_id3`, `flac_mid_junk`, `mp3_foreign_frame`, `mp3_mid_junk_falsesync`; MP3 `he_free` (free format, refused by FFmpeg); E-AC-3 dependent substreams on real files; ADTS and AC-3 seek cost |
 | MPEG-TS | PSI, continuity, PES assembly and ordered TS188/M2TS192 entities with control-only and bounded fault completion, with format-owned track classification | 97/97 PES compatibility-view comparisons across all 272 requests | 0.9413 (97/97 pass) | heap ≤0.065330, total RSS ≤0.891584 (97/97 lower) | strict source clocks, full FATE mapping |
@@ -31,7 +31,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.1185 (3/3 pass) | heap ≤0.015079, total RSS ≤0.723530 (3/3 lower) | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.0336 (71/71 pass) | heap ≤0.020733, total RSS ≤0.808122 (71/71 lower) | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
-| Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | `subtitle-text`: 275 cases (82 captured mov_text cases, the samples of the 79 tx3g tests, 74 charset cases, 8 ASS packets, 32 SubRip and WebVTT documents) folded by `subtitle-capsule-worker` against the reference's recorded folds, 24 of them with differences the corpus names; not gated | not measured | not measured | timing and memory; gating `subtitle-text` |
+| Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets, and mov_text and tx3g to ASS | 354/354 cases (`subtitle-text`: 82 captured mov_text cases, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); `subtitle-text-host` pins per target the 23 SubRip and WebVTT documents whose time fields leave the 32-bit range: 23/23 pass on ARMv7, 0/23 on AArch64 (open) | 0.8573 (354/354 pass; worst `tx3g-known_box_trailing_bytes_and_short_bodies_are_errors`, median of the cases 0.383) | heap ≤0.336, total RSS ≤0.911 (354/354 lower) | on AArch64, `subtitle-text-host`'s 23 cases, a deliberate divergence: FFmpeg for AArch64 reads a SubRip time field beyond the 32-bit range as its value, held to the 64-bit signed range, modulo 2^32, and a WebVTT field whose digits exceed 2^32 − 1 as those digits, held to 2^64 − 1, modulo 2^32, where on 32-bit ARM both saturate; the reader follows 32-bit ARM, so these cases are not timed or measured on AArch64; on ARMv7, total RSS is not accepted: it is the declared ceiling under standard bounds, not kernel-bound, and is above the reference ([32-bit ARMv7](#32-bit-armv7)); FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska) | 0.8564 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤0.959 (317/317 lower) | FATE coverage |
 | Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 229/229 cases (`subtitle-dvb`: TS and Matroska) | 0.8568 (229/229 pass) | heap ≤0.991, total RSS ≤0.813 (229/229 lower) | FATE coverage |
 | Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 223/223 cases (`subtitle-dvd`) | 0.8592 (223/223 pass) | heap ≤0.959, total RSS ≤0.853 (223/223 lower) | FATE coverage |
@@ -106,7 +106,9 @@ The subtitle rows use gate builds on a c8g.xlarge pinned to CPU 1, with 30 timin
 of 50 operations and 30 memory pairs under the kernel RSS proof; every row is a graded
 report. DVB is from `0d70bebfc0799f65df14f170ed97e68c5a35daa7`, DVD from
 `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc`, PGS, closed captions and teletext from
-`956c42961f4a27d88f96d5800d59ff1eeb088018`. Between these builds, the subtitle worker's
+`956c42961f4a27d88f96d5800d59ff1eeb088018`, and text from
+`6126b759b9b983afe488c3c362c6e37c2d1425a2`, whose timing pairs are of 2,000 operations.
+Between the bitmap builds, the subtitle worker's
 functions differ only in the DVB and DVD receivers, apart from constant addresses. PGS memory is
 from `03f3efd3`, which keeps planes resident by writing the last display's buffer again
 (30 memory pairs under the kernel RSS proof); its runtime is from `956c4296`, and against main
@@ -148,6 +150,13 @@ The expanded AAC comparison uses the gate build at
 with 30 timing pairs of four complete decode sessions and 30 separate memory pairs
 per clip. All 25 clips pass speaker, PCM, runtime, peak heap and total RSS checks.
 The 64, 88.2 and 96 kHz stereo clips exceed the optimization target.
+
+The AAC program comparison uses the gate build at
+`fde36dd91d85ca700538421062ceacd45075c5b8` on the same instance type and CPU
+with 30 timing and 30 memory pairs per clip. The nine added program layouts
+match every PCM plane and ordered speaker. The decoder rejects overlapping
+speaker positions. All 34 clips pass delivery and 31 reach the runtime
+optimization target.
 
 The rasterising rows on Linux compare the gate build at
 `a7b6635e20cc2dc9d4592a874ba0eecab24f2870` with the libass reference: the four
@@ -323,7 +332,12 @@ The bidi resolver written from UAX #9 was measured at
 | AAC in MOV and fragmented QuickTime host comparisons | `9559dae0b89dfd2df2b08b9a97267bc75711be65` | `0bc8fb8726cff0d2ba18d7c138ba83375baf13265bb148086522047bf816aea2` |
 | AAC access-unit decoder | `907ac3dce61c98bd05f52bfa3ff92497efdd141d` | `b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0` |
 | AAC access-unit decoder, fixed layouts and indexed rates | `3d422610316d79665c80b48ab8a27a8a57880efe` | `5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949` |
+| AAC access-unit decoder with program configurations | `0a51b7c3746c882b3ca5127ad047162130c01ea6` | `86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf` |
+| AAC access-unit decoder with height validation and rear pairs | `7b479ad67690a7c2bc03c15f4ff8545c05bc965a` | `7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e` |
+| AAC access-unit decoder with distinct program speakers | `fde36dd91d85ca700538421062ceacd45075c5b8` | `68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf` |
 | MP4 range playback with configured 7.1 AAC | `09c154a3d4c8e38c34f59815ad7219df1e86ee26` | `cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b` |
+| MP4 range playback with AAC program configurations | `98ad5b82da81ba113b3bab206459efc7ede2ed8a` | `6b41bc92f4c55f6a868dc01181d152a75fe9cbb4868eebb72a6da437b4cf5579` |
+| MP4 range playback with the bounded AAC program parser | `a961b3b38b083180e11a5d57bcf6ab73a15b72dc` | `1beefed497c83dcff49a8638ddbcda6f7968af67806753d727afd10ad16dad26` |
 | MP4 forward and range playback, earlier RSS comparison | `733ee1582e4fce4af1d89c91171e29e41a16d294` | `23cf7cdb3de800c1ca0d03dfe937ce6fda6cc768bef5933370223a88cda78c87` |
 | MP4 forward and range playback, earlier comparison | `8bbf6eab798f3d58f62dce14915fb30acd14488e` | `a3e74e11216d7769b7b167ac57cb17c043e6d92b4feb39a8422879c27493eebe` |
 | MP4 forward and range, encoded edits | `2a1b26347fee56f5506db63efbc8e3e3c66ad388` | `fe95646449aa52a4a121aeecb3346308b270923aee9b0751b2125501abf36004` |
@@ -333,6 +347,7 @@ The bidi resolver written from UAX #9 was measured at
 | Subtitles: PGS memory | `03f3efd3a0fde0d558c68f5408c521d632802fb7` | `6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d` |
 | Subtitles: DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
 | Subtitles: DVB | `0d70bebfc0799f65df14f170ed97e68c5a35daa7` | `06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077` |
+| Subtitles: text, Linux AArch64 and ARMv7 | `6126b759b9b983afe488c3c362c6e37c2d1425a2` | `aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676` |
 | MPEG-TS | `5634f47d33ca2a9ba671c82e805398ce4eafd83e` | `1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2` |
 | MPEG-TS finite fault recovery, host | `f3f439b803e079208c9ab422270a77feb6281207` | `69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f` |
 | MPEG-TS source boundaries, macOS AArch64 | `f939fb92a6e1309fdafcd84b0bc037130ed35ee3` | `8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656` |
@@ -393,9 +408,10 @@ NEON), with every FFmpeg reference built from the same pins in the same user spa
 (Graviton2, Neoverse N1 r3p1), kernel `7.0.0-1014-aws`, pinned to CPU 1, 30 pairs.
 Memory is measured under the kernel RSS bound, through its 32-bit entry point, wherever
 the table says "kernel-bound": total RSS there is the candidate's proven resident peak
-over the reference's observed peak. The capture row uses the standard bounds: its total
-RSS is the candidate's virtual peak over the reference's observed resident peak, a
-ceiling that already lies below the reference; the ASS rendering row was measured that way
+over the reference's observed peak. The capture and text subtitle rows use the standard
+bounds: their total RSS is the candidate's virtual peak over the reference's observed
+resident peak, a ceiling that lies below the reference for capture but not for text
+subtitles; the ASS rendering row was measured that way
 at `5b3e03f0` too (total RSS ≤0.961), and is now kernel-bound.
 
 | Area | Verified against the reference | Runtime | Memory |
@@ -418,9 +434,12 @@ at `5b3e03f0` too (total RSS ≤0.961), and is now kernel-bound.
 | Fonts | `font-outlines` 53/53, `font-hinting-none` 159/159 and `font-hinting-default` 9/53 (the same open cases as on AArch64) | not measured | not measured |
 | Shaping | `shape-libass` 195/201 and `shape-text` 200/201 (the same open cases as on AArch64), `shape-bidi` 24/24, `shape-simple` 6/6, `shape-unicode` 1/1 | not measured | not measured |
 | ASS rendering | `ass-render` 78/78 and `ass-render-host` 4/4 pass; the crate's tests pass | 0.9427 (80/80 pass; the 2 `ass-render` cases added since are not timed) | kernel-bound at `afb9049c`: heap ≤0.929, total RSS ≤0.929 (80/80 lower; the 2 `ass-render` cases added since are not measured) |
+| Subtitles, text | `subtitle-text` 354/354 and `subtitle-text-host` 23/23 pass; the subtitle crate's and worker's tests pass | `subtitle-text` 0.8547 (354/354 pass), `subtitle-text-host` 0.0744 (23/23 pass) | heap ≤0.336 (377/377 lower); total RSS not accepted: ceiling ≤2.224, observed peaks ≤1.160, the highest peak above the reference's in 310 of 377 cases |
 
-The subtitle, closed-caption and teletext features have not been run on ARMv7: their parity,
-runtime and memory there are not verified; nor are the runtime and memory of fonts and shaping.
+The text subtitle row was measured on a c6g.2xlarge, the same Neoverse N1 core, at
+`6126b759`. The bitmap subtitle, closed-caption and teletext features have not been run on
+ARMv7: their parity, runtime and memory there are not verified; nor are the runtime and
+memory of fonts and shaping.
 
 Above the ceiling on ARMv7: codecs `h264-high-1080p` 1.5371, `h264-main-1920x800`
 1.3155, `dts-core-es-6.1` 1.7268, `dts-core-7.1-master` 1.7785, `ac3-5.1-448` 1.3602,

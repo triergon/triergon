@@ -3,22 +3,6 @@
   "scope": "Additional original constraints over unchanged authored source cases, no native oracle",
   "cases": [
     {
-      "test": "line_capacity_limit_is_a_policy_error",
-      "source_case": "srt-basic",
-      "overrides_or_extra_source": {
-        "max_line_bytes": 4
-      },
-      "expected": "Limit; no event"
-    },
-    {
-      "test": "cue_limit_preserves_the_already_published_prefix",
-      "source_case": "srt-overlap-order",
-      "overrides_or_extra_source": {
-        "max_cues": 1
-      },
-      "expected": "first source cue, then Limit; no reordered or duplicate cue"
-    },
-    {
       "test": "modifier_count_limit_precedes_atomic_packet_publication",
       "source_case": "tx3g-style-highlight-raw",
       "overrides_or_extra_source": {
@@ -28,7 +12,7 @@
     },
     {
       "test": "decoded_utf8_limit_is_independent_of_source_byte_limit",
-      "source_case": "srt-utf16be-bom",
+      "source_case": "tx3g-utf16be-bom",
       "overrides_or_extra_source": {
         "max_decoded_bytes": 2
       },
@@ -42,13 +26,13 @@
     },
     {
       "test": "utf16_output_retains_source_and_new_immutable_utf8_charge",
-      "source_case": "srt-utf16be-bom",
+      "source_case": "tx3g-utf16be-bom",
       "overrides_or_extra_source": {},
       "expected": "exact source+decoded charges survive decoder drop; final alias returns captured baseline"
     },
     {
       "test": "output_pressure_yields_then_resumes_identical_utf16_cue",
-      "source_case": "srt-utf16be-bom",
+      "source_case": "tx3g-utf16be-bom",
       "overrides_or_extra_source": {
         "reserve_all_available_after_provide": true
       },
@@ -56,11 +40,11 @@
     },
     {
       "test": "cancellation_during_utf16_work_resumes_without_skipping_scalar",
-      "source_case": "srt-utf16le-bom",
+      "source_case": "tx3g-utf16be-bom",
       "overrides_or_extra_source": {
         "work_before_cancel": 1
       },
-      "expected": "Cancelled before work; resume exact cue with surrogate pair"
+      "expected": "Cancelled before work; resume the exact cue"
     },
     {
       "test": "long_utf8_validation_yields_and_charges_every_source_byte",
@@ -92,15 +76,6 @@
         "max_addition_bytes": 16
       },
       "expected": "Limit requested51 maximum16; all original owners returned"
-    },
-    {
-      "test": "unknown_declared_charset_is_not_guessed_or_lossily_decoded",
-      "source_case": "srt-basic",
-      "overrides_or_extra_source": {
-        "encoding": "Opaque",
-        "charset_label_ascii": "unknown-author-charset"
-      },
-      "expected": "Unsupported:declared charset conversion; no guessed decoded output"
     }
   ]
 }

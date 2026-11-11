@@ -233,6 +233,10 @@ MPEG-4 Audio. Callers validate the bytes and determine the audio object type sep
 `ObjectTypeScan` reads any `mp4a` or `mp4s` description's stated object
 type and decoder-specific information the same way.
 
+Range playback accepts edit lists for indexed AAC-LC with 1024 core samples and
+an explicit Program Configuration Element of up to eight channels. The edit plan
+keeps the sample durations in `stts` and uses the coded frame length for trims.
+
 `BoxReader::with_media_data_policy` can preserve a terminal `mdat`'s
 declared extent when the source length is known and the media ends early.
 This lets a compatibility consumer validate sample ranges against the

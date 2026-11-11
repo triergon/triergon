@@ -70,6 +70,22 @@ FFmpeg 9.0.2 encoded the fixture as 44.1 kHz AAC-LC with channel configuration
 12. The fixture is distributed under the repository's dual licence. The
 [range corpus](../../harness/features/mp4-range/corpus.json) records its SHA-256.
 
+`avc-aac-program.mov` uses an authored AVC pattern and seven independent tones
+in a 48 kHz AAC-LC program with a leading edit. The range corpus compares its
+original configuration and every selected packet on open and backward seek.
+The fixture uses the repository's dual licence. To regenerate it with FFmpeg
+9.0.2 and libx264:
+
+```sh
+signal='0.13*sin(2*PI*107*t)|0.13*sin(2*PI*211*t)|0.13*sin(2*PI*307*t)|0.13*sin(2*PI*53*t)|0.13*sin(2*PI*409*t)|0.13*sin(2*PI*509*t)|0.13*sin(2*PI*601*t)'
+ffmpeg -nostdin -f lavfi -i 'testsrc2=s=96x64:r=25' \
+  -f lavfi -i "aevalsrc=${signal}:s=48000:c=6.1(back)" -t 2.4 \
+  -c:v libx264 -threads:v 1 -g 25 -keyint_min 25 -sc_threshold 0 -bf 0 -pix_fmt yuv420p \
+  -c:a aac -aac_pce 1 -threads:a 1 -b:a 224k -flags:a +bitexact -fflags +bitexact \
+  -video_track_timescale 16000 -movie_timescale 48000 -use_editlist 1 -movflags +faststart \
+  avc-aac-program.mov
+```
+
 `Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
 Data tracks such as RTP hints and timecode still have their sample extents checked.
 Supply any edit plans in source track order, with `None` for each data track.

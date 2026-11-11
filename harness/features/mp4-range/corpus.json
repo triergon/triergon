@@ -556,6 +556,34 @@
         "bytes": 35398,
         "digest": 5283456504139288625
       }
+    },
+    {
+      "id": "aac-program-open",
+      "profile": "aac-program-open",
+      "file": "avc-aac-program.mov",
+      "sha256": "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 174,
+        "bytes": 91514,
+        "digest": 9360453060203789492
+      }
+    },
+    {
+      "id": "aac-program-seek",
+      "profile": "aac-program-seek",
+      "file": "avc-aac-program.mov",
+      "sha256": "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "24000"
+      ],
+      "expected": {
+        "packets": 102,
+        "bytes": 54337,
+        "digest": 7863734754543817612
+      }
     }
   ]
 }
