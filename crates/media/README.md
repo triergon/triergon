@@ -143,8 +143,10 @@ duration is known, and fractional lace durations and negative PTS are kept.
 `dts_ns` is not derived. `compat::clock::packet_timing` is an opt-in view in
 Segment ticks that reproduces FFmpeg's packet clock, including its omissions.
 
-**Content encoding.** Encodings apply in descending `ContentEncodingOrder`; each
-laced frame is decoded separately. `zlib::decompress` reads one complete RFC 1950
+**Content encoding.** The reader validates lace sizes against the block before
+delivery and walks the checked header with a fixed-size cursor under the caller's
+work budget. Encodings apply in descending `ContentEncodingOrder`, and each laced
+frame is decoded separately. `zlib::decompress` reads one complete RFC 1950
 stream (stored, fixed and dynamic blocks), checks Adler-32 before returning
 anything and rejects trailing bytes. Cancellation is checked between blocks,
 symbols and checksum chunks.

@@ -25,23 +25,38 @@ fn lace_job_resumes_descriptors_and_exposes_checked_source_ranges() {
         let pool = Budget::new(64 * 1024).unwrap();
         let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
         let mut job = lace::LaceJob::new(source.clone(), 0..raw.len(), mode).unwrap();
-        let mut frames = None;
+        let mut completed = false;
         for _ in 0..1000 {
             let mut work = WorkBudget::new(1);
-            match job.step(&mut work, &AtomicBool::new(false)).unwrap() {
+            match job
+                .step_descriptors(&mut work, &AtomicBool::new(false))
+                .unwrap()
+            {
                 ParseStep::Yield => (),
-                ParseStep::Event(value) => {
-                    frames = Some(value);
+                ParseStep::Event(()) => {
+                    completed = true;
                     break;
                 }
                 _ => panic!("bounded known lace"),
             }
             assert!(work.spent() <= 1);
         }
-        let frames = frames.unwrap();
-        assert_eq!(frames.len(), expected.len());
-        for (range, bytes) in frames.ranges().zip(expected) {
-            assert_eq!(&source[range], bytes.as_slice());
+        assert!(completed);
+        assert_eq!(job.frame_count(), Some(expected.len()));
+        for (index, bytes) in expected.into_iter().enumerate() {
+            let mut range = None;
+            for _ in 0..1000 {
+                let mut work = WorkBudget::new(1);
+                let step = job
+                    .frame_range(index, &mut work, &AtomicBool::new(false))
+                    .unwrap();
+                assert!(work.spent() <= 1);
+                if let Some(value) = step {
+                    range = Some(value);
+                    break;
+                }
+            }
+            assert_eq!(&source[range.unwrap()], bytes.as_slice());
         }
     }
 }

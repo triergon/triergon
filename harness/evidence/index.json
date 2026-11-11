@@ -19348,6 +19348,16 @@
    "sha256": "18028d8fa7452fd3d43d0d7d254560578d7f7a38d7a553d9fb42b7246a9df927",
    "bytes": 112317324,
    "source_revision": "cc09ffa8f270f0bbbe2a5de0db4dbf3ffb45be03"
+  },
+  {
+   "name": "matroska-lace-ranges",
+   "path": "matroska-lace-ranges",
+   "retention": "retained",
+   "reason": "Matroska, startup and seek, and audio clock comparisons in docs/status.md",
+   "key": "evidence/matroska-lace-ranges/883ce5128410aefb3ec9affe3579a798ee8d1c5d082c1d129a462d67728e7af9.tar.gz",
+   "sha256": "883ce5128410aefb3ec9affe3579a798ee8d1c5d082c1d129a462d67728e7af9",
+   "bytes": 122757292,
+   "source_revision": "513149a970caad5b30c61becba1bc2bda1c5e193"
   }
  ]
 }
