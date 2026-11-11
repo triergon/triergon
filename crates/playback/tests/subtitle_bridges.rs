@@ -133,7 +133,7 @@ fn cues(text: &mut TextBridge, source: TextSource) -> Vec<(Vec<u8>, Option<Time>
         match text.step(&mut WorkBudget::new(64), &off()).unwrap() {
             TextStep::Yield => {}
             TextStep::NeedPacket => return out,
-            TextStep::Event(event) => {
+            TextStep::Cue(event) => {
                 let cue = event.cue;
                 assert_eq!(cue.input.format, text::Format::OpaqueAss);
                 out.push((cue.input.payload.to_vec(), cue.start, cue.duration));

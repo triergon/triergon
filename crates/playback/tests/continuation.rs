@@ -1160,7 +1160,7 @@ fn tx3g_real_reader_handoff_retains_source_sample_and_exact_clock_after_teardown
     ));
     assert_eq!(b.used(), before);
     let result = loop {
-        if let TextStep::Event(o) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
+        if let TextStep::Cue(o) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
             break o;
         }
     };
@@ -1223,7 +1223,7 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
     );
     bridge.provide(source).unwrap();
     let result = loop {
-        if let TextStep::Event(o) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
+        if let TextStep::Cue(o) = bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
             break o;
         }
     };
@@ -1238,50 +1238,43 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
 fn authored_ass_documents_keep_exact_source_bytes() {
     use text_bridge::*;
     use triergon_subtitles::text;
-    for (format, encoding, bytes) in [(
-        text::Format::OpaqueAss,
-        text::Encoding::Opaque,
-        b"0,0,Default,,0,0,0,,{\\i1}raw\\Nbytes".as_slice(),
-    )] {
-        let b = pool();
-        let payload = Bytes::copy_from_slice(&b, bytes).unwrap();
-        let input = text::Input {
-            format,
-            encoding,
-            payload: payload.clone(),
-            codec_id: None,
-            codec_private: None,
-            charset_label: None,
-            addition: None,
-            timing: text::Timing::unknown(),
-            source_id: ID,
-            generation: 7,
-            sequence: 0,
-            configuration_epoch: 0,
-            container_position: None,
-        };
-        let mut bridge = TextBridge::new(&b, ID, 0, 7, text::Limits::default());
-        bridge.provide(TextSource::document(&b, input)).unwrap();
-        bridge.finish();
-        let mut cues = 0;
-        for _ in 0..100_000 {
-            match bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
-                TextStep::Event(o) => {
-                    assert_eq!(o.cue.input.payload.as_ref(), bytes);
-                    if format == text::Format::OpaqueAss {
-                        assert!(o.cue.decoded_utf8.is_none());
-                    }
-                    cues += 1;
-                }
-                TextStep::Finished => break,
-                _ => {}
+    let bytes = b"0,0,Default,,0,0,0,,{\\i1}raw\\Nbytes".as_slice();
+    let b = pool();
+    let payload = Bytes::copy_from_slice(&b, bytes).unwrap();
+    let input = text::Input {
+        format: text::Format::OpaqueAss,
+        encoding: text::Encoding::Opaque,
+        payload: payload.clone(),
+        codec_id: None,
+        codec_private: None,
+        charset_label: None,
+        addition: None,
+        timing: text::Timing::unknown(),
+        source_id: ID,
+        generation: 7,
+        sequence: 0,
+        configuration_epoch: 0,
+        container_position: None,
+    };
+    let mut bridge = TextBridge::new(&b, ID, 0, 7, text::Limits::default());
+    bridge.provide(TextSource::document(&b, input)).unwrap();
+    bridge.finish();
+    let mut cues = 0;
+    for _ in 0..100_000 {
+        match bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
+            TextStep::Cue(o) => {
+                assert_eq!(o.cue.input.payload.as_ref(), bytes);
+                assert!(o.cue.decoded_utf8.is_none());
+                cues += 1;
             }
+            TextStep::Finished => break,
+            _ => {}
         }
-        assert_eq!(cues, 1);
-        drop(bridge);
-        drop(payload);
-        assert_eq!(b.used(), Budget::control_storage_bytes());
     }
+    assert_eq!(cues, 1);
+    drop(bridge);
+    drop(payload);
+    assert_eq!(b.used(), Budget::control_storage_bytes());
 }
 
 fn bitmap_scope() -> bitmap_bridge::BitmapScope {

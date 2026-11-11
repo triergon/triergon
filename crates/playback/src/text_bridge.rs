@@ -130,7 +130,7 @@ pub struct TextOutput {
 )]
 pub enum TextStep {
     Yield,
-    Event(TextOutput),
+    Cue(TextOutput),
     NeedPacket,
     Finished,
 }
@@ -486,7 +486,7 @@ impl TextBridge {
                 self.pending = None;
                 TextStep::Finished
             }
-            text::Status::Cue(cue) => TextStep::Event(TextOutput {
+            text::Status::Cue(cue) => TextStep::Cue(TextOutput {
                 source: self
                     .pending
                     .as_ref()
