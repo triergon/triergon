@@ -48,6 +48,8 @@ Complete indexed sources can check all packet projections by track before
 rewinding for merged playback.
 Short regular tracks can keep extra seek restart points in the existing
 checkpoint allocation.
+Complete fragment-only tracks can also retain a restart for backward seek
+when their projected decode times increase and each run begins at a sync sample.
 
 ```rust
 use std::sync::atomic::AtomicBool;
