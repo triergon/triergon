@@ -154,6 +154,69 @@
       "sample_rate": 96000,
       "channels": 2,
       "configuration": 2
+    },
+    {
+      "name": "aac-program-mono.mov",
+      "sha256": "fd3f05c51b4f830eb2f89783f42f1b5a3842f2a9762a0b6773396ac5fd4e7d1b",
+      "sample_rate": 48000,
+      "channels": 1,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-stereo.mov",
+      "sha256": "7b1082a8670447d67483bc4035ec011b5b55ac259ff25c57f6c6217fb3fc9067",
+      "sample_rate": 44100,
+      "channels": 2,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-three-front.mov",
+      "sha256": "0347cdced2d1231103b4f4f6bdc94b161fab667149442e48ee50e9030dce69ba",
+      "sample_rate": 48000,
+      "channels": 3,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-back-centre.mov",
+      "sha256": "1d0b389dc6b71c5c0983eeab1d6e8766aa8e29ffd8869ea27bb63ab2106e9401",
+      "sample_rate": 48000,
+      "channels": 4,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-back-pair.mov",
+      "sha256": "b4a679547aa2a6318feee97605508e1a23974088792b5a970b6f6a033ae34875",
+      "sample_rate": 48000,
+      "channels": 5,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-back-pair-lfe.mov",
+      "sha256": "76ab7d5d725549ea968ff755290ef2890f92284bdccc1c4ceae17adcc691c62e",
+      "sample_rate": 48000,
+      "channels": 6,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-back-three-lfe.mov",
+      "sha256": "5e821fd23f62c3d40a1fa367dd4362bebe1bec5164a692123b920481b5d9147e",
+      "sample_rate": 48000,
+      "channels": 7,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-surround.mov",
+      "sha256": "a6b8e645e0a3f23106cb6e9e045a47416a72cfbd2fd52431f7f57239ba5e6e58",
+      "sample_rate": 48000,
+      "channels": 8,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-wide-front.mov",
+      "sha256": "e2f137c7f7df307c8d07e2b78f66cceaa08b3ee49de4b480e669434617ca09ec",
+      "sample_rate": 96000,
+      "channels": 8,
+      "configuration": 0
     }
   ]
 }

@@ -19464,6 +19464,36 @@
    "source_revision": "3d422610316d79665c80b48ab8a27a8a57880efe"
   },
   {
+   "name": "aac-program-configurations",
+   "path": "aac-program-configurations",
+   "retention": "retained",
+   "reason": "Configured raw AAC-LC speaker and PCM parity, paired runtime, peak heap and total resident peak",
+   "key": "evidence/aac-program-configurations/86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf.tar.gz",
+   "sha256": "86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf",
+   "bytes": 163382979,
+   "source_revision": "0a51b7c3746c882b3ca5127ad047162130c01ea6"
+  },
+  {
+   "name": "aac-program-configurations-reviewed",
+   "path": "aac-program-configurations-reviewed",
+   "retention": "retained",
+   "reason": "Configured AAC-LC parity and native comparisons with height validation and grouped rear pairs",
+   "key": "evidence/aac-program-configurations-reviewed/7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e.tar.gz",
+   "sha256": "7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e",
+   "bytes": 181869637,
+   "source_revision": "7b479ad67690a7c2bc03c15f4ff8545c05bc965a"
+  },
+  {
+   "name": "aac-program-speaker-mapping",
+   "path": "aac-program-speaker-mapping",
+   "retention": "retained",
+   "reason": "Configured AAC-LC parity, runtime, peak heap and total resident peak with distinct speaker positions",
+   "key": "evidence/aac-program-speaker-mapping/68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf.tar.gz",
+   "sha256": "68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf",
+   "bytes": 181930058,
+   "source_revision": "fde36dd91d85ca700538421062ceacd45075c5b8"
+  },
+  {
    "name": "armv7-kernel-rss-linux-armv7",
    "path": "armv7-kernel-rss-linux-armv7",
    "retention": "retained",
