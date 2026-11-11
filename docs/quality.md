@@ -490,7 +490,13 @@ may override that count for diagnostic comparisons.
   supplied workers and when the loader resolves libraries relative to an executable.
   Keep the measured executables with the raw memory samples. Grading Linux memory
   results rehashes the worker paths in the observer certificate, including any copies
-  in the build tree.
+  in the build tree. Before every memory run on Linux, both workers are written back and
+  their cached pages dropped (`sync FILE`, then `dd iflag=nocache`, which asks for
+  `POSIX_FADV_DONTNEED`; no root needed), so each run of either worker maps its
+  executable from the same, empty, page-cache state. Without it, a freshly written copy
+  can stay cached in larger blocks, and the kernel then makes more of the executable
+  resident on some runs than on others: 320 kB more of a subtitle worker's own mapping,
+  and so of the resident peak, on a c8g.xlarge. A failed eviction fails the run.
 - Before a timing pass, `cargo xtask count CANDIDATE REFERENCE ARGUMENT...` runs both
   workers on one workload under Linux `perf stat`, five runs each, and prints the least
   user-mode instructions, cycles and branch misses. It fails when instructions rise more

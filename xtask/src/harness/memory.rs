@@ -56,6 +56,12 @@ pub trait Host {
     fn nm(&self, args: &[&str], path: &Path) -> R<String>;
     fn environment(&self) -> R<Value>;
     fn kernel_requested(&self) -> Option<String>;
+    /// Put each worker file in the same page-cache state before an observer
+    /// run: none of its pages cached.
+    fn evict(&self, workers: &[&Path]) -> R<()> {
+        let _ = workers;
+        Ok(())
+    }
 }
 
 /// The real host, with workers and instrumentation under `root/target/harness`.
@@ -132,6 +138,34 @@ impl Host for Native<'_> {
 
     fn kernel_requested(&self) -> Option<String> {
         std::env::var("TRIERGON_RSS_KERNEL_BOUND").ok()
+    }
+
+    /// A freshly written copy can be cached in larger blocks than a file read
+    /// back, and the kernel then makes more of an executable resident when it
+    /// maps it, by run. Each worker is written back (`sync FILE`) and its cached
+    /// pages dropped (`dd iflag=nocache`, `POSIX_FADV_DONTNEED`), so every run of
+    /// either worker maps its executable from the same, empty, state.
+    fn evict(&self, workers: &[&Path]) -> R<()> {
+        if !self.linux() {
+            return Ok(());
+        }
+        let run = |command: &mut std::process::Command| -> R<()> {
+            let status = command
+                .status()
+                .map_err(|e| format!("page-cache eviction: {e}"))?;
+            if status.success() {
+                Ok(())
+            } else {
+                Err(format!("page-cache eviction failed: {status}"))
+            }
+        };
+        for worker in workers {
+            run(std::process::Command::new("sync").arg(worker))?;
+            run(std::process::Command::new("dd")
+                .arg(format!("if={}", worker.display()))
+                .args(["iflag=nocache", "count=0", "status=none"]))?;
+        }
+        Ok(())
     }
 }
 
@@ -1159,14 +1193,20 @@ fn measure(
             } else {
                 reference
             };
-            let observed = host.observe(
-                worker,
-                invocation.operation,
-                Some(invocation.input),
-                mode,
-                invocation.arguments_for(name == "candidate"),
-                kernel && mode == "rss",
-            );
+            let observed = match host.evict(&[candidate, reference]) {
+                Ok(()) => host.observe(
+                    worker,
+                    invocation.operation,
+                    Some(invocation.input),
+                    mode,
+                    invocation.arguments_for(name == "candidate"),
+                    kernel && mode == "rss",
+                ),
+                Err(error) => obj(vec![
+                    ("status", Value::str("page-cache-eviction-failed")),
+                    ("error", Value::str(error)),
+                ]),
+            };
             row.push((format!("{name}_{mode}"), observed));
         }
         samples.push(Value::Object(row));
@@ -1456,6 +1496,13 @@ fn collect_invocation(
             "original-paths"
         }),
     );
+    if cfg!(target_os = "linux") {
+        push(
+            &mut result,
+            "worker_page_cache",
+            Value::str("both workers evicted before each run"),
+        );
+    }
     push(&mut result, "cpu_before", before);
     push(&mut result, "cpu_after", after);
     push(
@@ -1590,6 +1637,26 @@ pub fn evidence_valid_with_outputs(
 #[cfg(test)]
 mod command_tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn eviction_leaves_the_workers_unchanged() {
+        let root = crate::walk::scratch("memory-worker-eviction");
+        fs::create_dir_all(&root).unwrap();
+        let workers = [root.join("candidate"), root.join("reference")];
+        for (worker, bytes) in workers.iter().zip([&b"candidate"[..], b"reference"]) {
+            fs::write(worker, bytes).unwrap();
+        }
+        let host = Native {
+            root: &root,
+            timeout: Duration::from_secs(5),
+        };
+        host.evict(&[&workers[0], &workers[1]]).unwrap();
+        assert_eq!(fs::read(&workers[0]).unwrap(), b"candidate");
+        assert_eq!(fs::read(&workers[1]).unwrap(), b"reference");
+        assert!(host.evict(&[&root.join("missing")]).is_err() || !host.linux());
+        let _ = fs::remove_dir_all(&root);
+    }
 
     #[cfg(unix)]
     #[test]
