@@ -444,6 +444,34 @@
         "bytes": 85958,
         "digest": 4047899442073086333
       }
+    },
+    {
+      "id": "quicktime-aac-reordered-open",
+      "profile": "quicktime-aac-reordered-open",
+      "file": "avc-aac-quicktime-reordered.mov",
+      "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 274,
+        "bytes": 61802,
+        "digest": 11057392877255542627
+      }
+    },
+    {
+      "id": "quicktime-aac-reordered-seek",
+      "profile": "quicktime-aac-reordered-seek",
+      "file": "avc-aac-quicktime-reordered.mov",
+      "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "26880"
+      ],
+      "expected": {
+        "packets": 141,
+        "bytes": 30781,
+        "digest": 3570639560812143604
+      }
     }
   ]
 }

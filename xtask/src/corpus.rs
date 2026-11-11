@@ -386,6 +386,31 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             seek,
         ),
     ]);
+    let reordered_file = "avc-aac-quicktime-reordered.mov";
+    let reordered_seed = surround_seed.with_file_name(reordered_file);
+    let reordered =
+        fs::read(&reordered_seed).map_err(|e| format!("{}: {e}", reordered_seed.display()))?;
+    if sha256::hex(&reordered) != "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b"
+    {
+        return Err("Reordered QuickTime AAC range seed changed".into());
+    }
+    write(&output.join(reordered_file), &reordered)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-reordered-open",
+            reordered_file,
+            &reordered,
+            [],
+            (274, 61_802, 11_057_392_877_255_542_627),
+        ),
+        mp4_range_case(
+            "quicktime-aac-reordered-seek",
+            reordered_file,
+            &reordered,
+            ["26880"],
+            (141, 30_781, 3_570_639_560_812_143_604),
+        ),
+    ]);
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",

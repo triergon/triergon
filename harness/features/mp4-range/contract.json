@@ -9,7 +9,7 @@
     "open a preloaded regular or complete fragmented MP4 file through 32 KiB random-access input",
     "read AVC with AAC or Opus, regular dedicated HEVC/AAC entries or a regular dedicated AV1 entry through EOF in demux order",
     "compare the original sample-entry tag and decoder configuration bytes for dvh1, dvhe, dav1, Opus and QuickTime AAC",
-    "compare six-channel QuickTime AAC in a version-2 sound description with a wave container, including a variant without its optional frma and mp4a marker atoms",
+    "compare six-channel QuickTime AAC in version-2 sound descriptions with a wave container, including a variant without optional frma and mp4a marker atoms and a 44.1 kHz variant with reordered AVC pictures",
     "compare the reference container output when the MOV demuxer exposes dav1 without assigning an AV1 codec ID",
     "seek cases read one packet, seek backward using the video clock, then read the complete suffix",
     "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
@@ -51,7 +51,9 @@
     "quicktime-aac-open",
     "quicktime-aac-seek",
     "quicktime-aac-minimal-wave-open",
-    "quicktime-aac-minimal-wave-seek"
+    "quicktime-aac-minimal-wave-seek",
+    "quicktime-aac-reordered-open",
+    "quicktime-aac-reordered-seek"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

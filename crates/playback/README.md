@@ -60,6 +60,7 @@ QuickTime range playback reads AAC configuration from version 1 and version 2
 sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
 fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
 also runs with the optional format and marker atoms replaced by free boxes.
+`avc-aac-quicktime-reordered.mov` adds 44.1 kHz AAC and AVC with B pictures.
 
 ## Supported
 
