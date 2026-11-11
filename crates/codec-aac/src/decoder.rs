@@ -1256,21 +1256,32 @@ fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
         }
     }
     // back
-    let back_pairs = back.iter().filter(|e| e.is_cpe).count();
+    let mut back_pairs = back.iter().filter(|e| e.is_cpe).count();
+    if !adts {
+        back_pairs += back
+            .split(|e| e.is_cpe)
+            .map(|singles| singles.len() / 2)
+            .sum::<usize>();
+    }
     let mut first_back_pair_to_side = side.is_empty() && (back_pairs >= 2 || cfg56);
+    let mut back_speakers = |can_use_side| {
+        if first_back_pair_to_side && can_use_side {
+            first_back_pair_to_side = false;
+            (SideLeft, SideRight)
+        } else {
+            (BackLeft, BackRight)
+        }
+    };
     let mut k = 0;
     while k < back.len() {
         if back[k].is_cpe {
-            if first_back_pair_to_side {
-                slots.push(cpe(back[k].tag, SideLeft, SideRight));
-                first_back_pair_to_side = false;
-            } else {
-                slots.push(cpe(back[k].tag, BackLeft, BackRight));
-            }
+            let (left, right) = back_speakers(true);
+            slots.push(cpe(back[k].tag, left, right));
             k += 1;
         } else if k + 1 < back.len() && !back[k + 1].is_cpe {
-            slots.push(sce(back[k].tag, BackLeft));
-            slots.push(sce(back[k + 1].tag, BackRight));
+            let (left, right) = back_speakers(!adts);
+            slots.push(sce(back[k].tag, left));
+            slots.push(sce(back[k + 1].tag, right));
             k += 2;
         } else {
             slots.push(sce(back[k].tag, BackCenter));

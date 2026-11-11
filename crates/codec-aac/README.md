@@ -44,6 +44,7 @@ blocks are outside this decoder's scope.
 Element from an AudioSpecificConfig with channel configuration zero. It supports
 up to eight channels and matches coded elements by type and tag. The
 AudioSpecificConfig program remains in effect when a packet contains its own PCE.
+Height information is applied when its extension is complete and its CRC-8 is valid.
 [ISO/IEC 14496-3:2001/Cor.2:2004, 4.5.1](https://standards.iteh.ai/catalog/standards/iso/09c0e8dc-4b21-438e-a1f1-665e44bfb859/iso-iec-14496-3-2001-cor-2-2004)
 
 `RawLcDecoder::with_layout_in` accepts
