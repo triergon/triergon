@@ -194,10 +194,11 @@ impl Fixed {
 /// apart: beyond that its wrapping difference can rank `a` before `b`, `b`
 /// before `c` and `c` before `a`. Every stable sort agrees on a total
 /// preorder, but on such boxes the order depends on which pairs a sort
-/// compares, so it must be this one, with this split, which is the order
-/// libass gives them on glibc. The standard library's sorts compare other
-/// pairs, may panic on a comparison that is not a total order, and take
-/// storage outside the budget.
+/// compares, so it must be this one, with this split: on
+/// `collision-far-margins.ass` it places the events as libass does on glibc,
+/// and the length halved and rounded up does not. The standard library's
+/// sorts compare other pairs, may panic on a comparison that is not a total
+/// order, and take storage outside the budget.
 fn merge_sort(boxes: &mut [Rect], scratch: &mut [Rect]) {
     let len = boxes.len();
     if len < 2 {

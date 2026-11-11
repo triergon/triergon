@@ -1,0 +1,32 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 500
+; Colliding events whose boxes lie 2^31 or more rows apart, each box within
+; int's range. At 1920x1080 the 960x540 script scales by 2, so the second
+; event's margin puts its box near INT_MIN, while the others sit in the
+; frame. The difference of two tops then wraps in the comparison of the
+; collision boxes, which is no longer transitive, so the order the sort gives
+; them decides where the last event goes: pushed up above "moved down", it is
+; left overlapping "moved up". The far event is clipped away: its position
+; leaves int's range in 26.6 fixed point, and libass built for aarch64 then
+; draws it inside the frame where libass built for armv7 draws nothing. At
+; 1280x720 the scale is 4/3, nothing wraps, and the events stack by value.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 960
+PlayResY: 540
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,24,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,172,,{\an8}moved down
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,1073742196,,{\clip(0,0,0,0)}far above
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,377,,moved up
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,339,,moved up too
+
