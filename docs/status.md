@@ -346,6 +346,10 @@ peaks are given beside it.
 
 The subtitle, closed-caption and teletext features have not been run on ARMv7: their parity,
 runtime and memory there are not verified; nor are the runtime and memory of fonts and shaping.
+The DVD decoder reads the numbers of a colour list (the `palette` option and a configuration's
+`palette:` line) with a 32-bit `unsigned long`, as FFmpeg built for ARMv7 does; FFmpeg built
+for AArch64 reads them with 64 bits, so a number beyond 32 bits gives another colour there
+(`vobsub-palette-option`, which `subtitle-dvd` pins with the AArch64 result).
 
 Above the ceiling on ARMv7: codecs `h264-high-1080p` 1.5371, `h264-main-1920x800`
 1.3155, `dts-core-es-6.1` 1.7268, `dts-core-7.1-master` 1.7785, `ac3-5.1-448` 1.3602,

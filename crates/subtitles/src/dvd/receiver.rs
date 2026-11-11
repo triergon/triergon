@@ -89,6 +89,10 @@ impl Settings {
 
     /// The `palette` option: up to sixteen hexadecimal colours separated by
     /// commas. It takes precedence over the configuration and the IFO palette.
+    /// Each number is read as C's `strtoul` reads it with a 32-bit `unsigned
+    /// long`, as on 32-bit ARMv7, and keeps its low 24 bits: a number beyond
+    /// 32 bits is white, a negative one is negated modulo 2^32. A `palette:`
+    /// line of the configuration is read the same way.
     pub fn apply_palette_option(&mut self, text: &[u8]) {
         self.palette = Some(parse_colour_list(text));
     }
@@ -110,18 +114,20 @@ fn below_0e(word: u64) -> u64 {
     word.wrapping_sub(ONES * 0x0e) & !word & HIGHS
 }
 
-/// Sixteen colours as the reference's `parse_palette` reads them: each number
+/// Sixteen colours as the reference reads a colour list: each number
 /// converted as `strtoul` does in base 16 (after white space, with an optional
-/// sign and `0x`) and kept to its low 24 bits, then any run of commas and
-/// white space skipped. An entry without digits is black and leaves the text
-/// where it was, so once the skip cannot move either, the rest are black.
+/// sign and `0x`) with a 32-bit `unsigned long`, as on 32-bit ARMv7, and kept
+/// to its low 24 bits, then any run of commas and white space skipped. A
+/// number beyond 32 bits is therefore white (`ULONG_MAX`) whatever its sign.
+/// An entry without digits is black and leaves the text where it was, so once
+/// the skip cannot move either, the rest are black.
 fn parse_colour_list(text: &[u8]) -> [u32; 16] {
     let mut colours = [0; 16];
     let mut at = 0;
     for colour in &mut colours {
         let start = at;
         let (value, end) = strtoul16(text, at);
-        *colour = (value & 0x00ff_ffff) as u32;
+        *colour = value & 0x00ff_ffff;
         at = end;
         while text.get(at).is_some_and(|&b| b == b',' || is_space(b)) {
             at += 1;
@@ -139,10 +145,11 @@ fn is_space(b: u8) -> bool {
     matches!(b, b' ' | b'\t'..=b'\r')
 }
 
-/// `strtoul(text + start, &end, 16)`: the value and `end`, which stays at
-/// `start` without digits. Out of range is `ULONG_MAX` whatever the sign; in
-/// range, a minus negates in unsigned arithmetic.
-fn strtoul16(text: &[u8], start: usize) -> (u64, usize) {
+/// `strtoul(text + start, &end, 16)` with a 32-bit `unsigned long`: the value
+/// and `end`, which stays at `start` without digits. Out of range (above
+/// `0xffffffff`) is `ULONG_MAX` whatever the sign; in range, a minus negates
+/// in unsigned arithmetic.
+fn strtoul16(text: &[u8], start: usize) -> (u32, usize) {
     let hex = |at: usize| match text.get(at) {
         Some(&b @ b'0'..=b'9') => Some(b - b'0'),
         Some(&b @ b'a'..=b'f') => Some(b - b'a' + 10),
@@ -164,16 +171,16 @@ fn strtoul16(text: &[u8], start: usize) -> (u64, usize) {
         at += 2;
     }
     let digits = at;
-    let (mut value, mut overflow) = (0_u64, false);
+    let (mut value, mut overflow) = (0_u32, false);
     while let Some(nibble) = hex(at) {
-        overflow |= value >> 60 != 0;
-        value = value << 4 | u64::from(nibble);
+        overflow |= value >> 28 != 0;
+        value = value << 4 | u32::from(nibble);
         at += 1;
     }
     if at == digits {
         (0, start)
     } else if overflow {
-        (u64::MAX, at)
+        (u32::MAX, at)
     } else if negative {
         (value.wrapping_neg(), at)
     } else {

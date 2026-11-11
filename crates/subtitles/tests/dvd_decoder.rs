@@ -507,7 +507,7 @@ fn configuration_and_options_select_the_palette() {
     assert_eq!(
         options.palette.unwrap()[..9],
         [
-            0x112233, 0x445566, 0x778899, 0xaabbcc, 0xddeeff, 0xabcdef, 0x102030, 0x334455, 0
+            0x112233, 0x445566, 0x778899, 0xaabbcc, 0xddeeff, 0xabcdef, 0x102030, 0xffffff, 0
         ]
     );
     options.apply_palette_option(b"zz,445566");
@@ -515,6 +515,33 @@ fn configuration_and_options_select_the_palette() {
 
     options.apply_ifo(None);
     assert_eq!(options.palette, None);
+}
+
+/// Palette numbers are read with a 32-bit `unsigned long`, as on 32-bit
+/// ARMv7: beyond 32 bits a number is `ULONG_MAX`, so white, whatever its sign
+/// or leading zeros; within them a minus negates modulo 2^32.
+#[test]
+fn palette_numbers_are_read_with_a_32_bit_unsigned_long() {
+    let mut options = Settings::default();
+    options.apply_palette_option(
+        b"1122334455,100000000,ffffffff,-1,-100000000,-ffffffff,80000000,-80000001,\
+          8000000000000000,10000000000000000,0x1122334455,00000000000000001122334455",
+    );
+    assert_eq!(
+        options.palette.unwrap()[..12],
+        [
+            0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0x000001, 0x000000, 0xffffff,
+            0xffffff, 0xffffff, 0xffffff, 0xffffff
+        ]
+    );
+    options.apply_palette_option(b"-0x100000000,ffffffff0,-ffffffff0,fedcba98,-fedcba98,-0,1");
+    assert_eq!(
+        options.palette.unwrap()[..7],
+        [0xffffff, 0xffffff, 0xffffff, 0xdcba98, 0x234568, 0, 1]
+    );
+    // The configuration's `palette:` line is read the same way.
+    let read = Settings::from_configuration(b"palette: 1122334455, 100000000, -100000000\n");
+    assert_eq!(read.unwrap().palette.unwrap()[..3], [0xffffff; 3]);
 }
 
 /// The canvas of the `size:` line, read as the reference's `sscanf("%dx%d")`
