@@ -36,7 +36,13 @@
  * 24 bits of strtoul's), and anything compiled into the libraries rather than
  * called: conversions from floating point out of range, `long double`
  * arithmetic, which has 64 bits on ARMv7 and 128 on AArch64, and
- * floating-point contraction. A run that fails prints no fold, so no flag. */
+ * floating-point contraction. A run that fails prints no fold, so no flag; a
+ * decoder that refuses to open is not such a failure, and its fold carries the
+ * flag. What the flag cannot see, the libm functions among it, the harness
+ * still catches: the subtitle features require 32-bit ARMv7 and pin each case
+ * once from AArch64, so every ARMv7 run compares that target's reference with
+ * those pins, and a case whose result differs between the targets fails there
+ * unless a feature pinned per target holds it (docs/quality.md). */
 #include <math.h>
 #include <stdarg.h>
 #include <stdatomic.h>
