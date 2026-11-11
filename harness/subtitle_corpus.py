@@ -52,6 +52,20 @@ ASS_PACKETS = {
     "truncated": b"0,0,Default,,0,0,0,,\xe6\xb0",
 }
 
+# Labelled ASS packets for the single-byte charsets the decode call's
+# sub_charenc accepts: the reference converts 0x80 to 0x9F to the C1 controls
+# under both Latin-1 labels and refuses the bytes the Windows code pages leave
+# undefined.
+LINE = b"0,0,Default,,0,0,0,,"
+SINGLE_BYTE_PACKETS = {
+    "windows-1251-text": (b"windows-1251", LINE + bytes([0xCF, 0xF0, 0xE8, 0xE2, 0xE5, 0xF2]) + bytes(range(0x80, 0x98)) + bytes(range(0x99, 0x100))),
+    "windows-1251-undefined": (b"windows-1251", LINE + b"A\x98"),
+    "windows-1252-text": (b"windows-1252", LINE + bytes(b for b in range(0x80, 0x100) if b not in (0x81, 0x8D, 0x8F, 0x90, 0x9D))),
+    "windows-1252-undefined": (b"windows-1252", LINE + b"A\x81"),
+    "latin1-c1-controls": (b"latin1", LINE + bytes(range(0x80, 0x100))),
+    "iso-8859-1-c1-controls": (b"iso-8859-1", LINE + bytes(range(0x80, 0x100))),
+}
+
 T1 = "00:00:01,000 --> 00:00:02,000"
 T2 = "00:00:03,000 --> 00:00:04,000"
 V1 = "00:01.000 --> 00:02.000"
@@ -242,20 +256,21 @@ def authored():
     num, den, pts, duration = ASS_CLOCK
     for name, packet in ASS_PACKETS.items():
         write("ass", name, capsule(2, b"", [open_op(num, den), packet_op(pts, duration, packet)]))
+    for name, (label, packet) in SINGLE_BYTE_PACKETS.items():
+        write("charset", name, capsule(2, label, [open_op(num, den), packet_op(pts, duration, packet)]))
     for name, text in DOCUMENTS.items():
         path = OUT / "documents" / f"{name}.{name.split('-')[0]}"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(text if isinstance(text, bytes) else text.encode())
-    return len(ASS_PACKETS) + len(DOCUMENTS)
+    return len(ASS_PACKETS) + len(SINGLE_BYTE_PACKETS) + len(DOCUMENTS)
 
 
 def documents():
     manifest = json.loads((TEXT / "manifest.json").read_text())
     kinds = {"SubRip": "srt", "WebVtt": "vtt"}
-    for case in manifest["cases"]:
-        if case["format"] in kinds:
-            path = (TEXT / case["input"]).relative_to(ROOT)
-            yield case["id"], kinds[case["format"]], str(path), [kinds[case["format"]]]
+    for document in manifest["documents"]:
+        path = (TEXT / document["input"]).relative_to(ROOT)
+        yield document["id"], kinds[document["format"]], str(path), [kinds[document["format"]]]
     for name in DOCUMENTS:
         kind = name.split("-")[0]
         path = (OUT / "documents" / f"{name}.{kind}").relative_to(ROOT)

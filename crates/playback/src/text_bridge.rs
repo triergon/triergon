@@ -122,7 +122,7 @@ impl TextSource {
 }
 pub struct TextOutput {
     pub source: TextSource,
-    pub event: text::Event,
+    pub cue: text::Cue,
 }
 #[expect(
     clippy::large_enum_variant,
@@ -486,13 +486,13 @@ impl TextBridge {
                 self.pending = None;
                 TextStep::Finished
             }
-            text::Status::Event(event) => TextStep::Event(TextOutput {
+            text::Status::Cue(cue) => TextStep::Event(TextOutput {
                 source: self
                     .pending
                     .as_ref()
                     .ok_or(Error::Invalid("text event without source"))?
                     .clone(),
-                event,
+                cue,
             }),
         })
     }

@@ -23,43 +23,24 @@ resumable states. Rejected input is handed back unchanged.
 
 ```rust
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, SourceId, Time, WorkBudget};
-use triergon_subtitles::text::{Encoding, Event, Extractor, Format, Input, Limits, Status, Timing};
+use triergon_core::{Budget, Bytes, WorkBudget};
+use triergon_subtitles::compat::document::{Limits, Reader, Status, Syntax};
 
 let pool = Budget::new(1 << 20)?;
 let cancel = AtomicBool::new(false);
-let srt = b"1\n00:00:01,000 --> 00:00:02,500\nHello\n\n";
-let input = Input {
-    format: Format::SubRip,
-    encoding: Encoding::Utf8, // stated by the caller, never guessed
-    payload: Bytes::copy_from_slice(&pool, srt)?,
-    codec_id: None,
-    codec_private: None,
-    charset_label: None,
-    addition: None,
-    timing: Timing::unknown(), // a whole document carries its own cue times
-    source_id: SourceId(1),
-    generation: 0,
-    sequence: 0,
-    configuration_epoch: 0,
-    container_position: None,
-};
-let mut extractor = Extractor::new(&pool, Limits::default(), 0);
-extractor.provide(input).map_err(|rejected| rejected.error)?; // one complete document or sample
-extractor.finish_input();
+let srt = Bytes::copy_from_slice(&pool, b"1\n00:00:01,000 --> 00:00:02,500\nHello\n\n")?;
+let mut reader = Reader::new(&pool, srt, Syntax::SubRip, Limits::default())?;
 let mut cues = Vec::new();
 loop {
-    match extractor.step(&mut WorkBudget::new(4096), &cancel)? {
-        Status::Event(Event::Cue(cue)) => cues.push(cue),
-        Status::Event(Event::Metadata(_)) | Status::Yield => {}
-        Status::NeedOutput => { /* release held output, then step again */ }
-        Status::NeedInput | Status::Finished => break,
+    match reader.poll(&mut WorkBudget::new(4096), &cancel)? {
+        Status::Cue(cue) => cues.push(cue),
+        Status::Yield => {}
+        Status::Finished => break,
     }
 }
 assert_eq!(cues.len(), 1);
-assert_eq!(cues[0].start, Some(Time::new(1, 1)?));
-assert_eq!(cues[0].end, Some(Time::new(5, 2)?));
-assert_eq!(cues[0].decoded_utf8.as_deref(), Some(&b"Hello"[..]));
+assert_eq!((cues[0].start_ms, cues[0].duration_ms), (1000, 1500));
+assert_eq!(cues[0].text.as_ref(), b"Hello");
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -85,7 +66,7 @@ level it ranks them at. The PGS receiver is polled: `push(&mut packet, clock,
 
 | Module | Entry points |
 | --- | --- |
-| `text` | `Extractor`, `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob` |
+| `text` | `Extractor` (packets), `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob` |
 | `dvb` | `SourceConfiguration`, `DvbPacket`: a service's configuration and its packets with their original clocks |
 | `pgs` | `SegmentIter`: segments of a packet or SUP stream; `DisplayLimits`, `DisplayConfig` and the outputs of the PGS receiver |
 | `dvd` | `vobsub` (`.idx` text), `program_stream` (MPEG-2 program streams) |
@@ -105,8 +86,8 @@ level it ranks them at. The PGS receiver is polled: `push(&mut packet, clock,
 
 **Receivers.** One receiver per format in `compat` reproduces the output of the
 pinned FFmpeg build (git `d32b387f` on the 9.0 branch; teletext with libzvbi
-0.2.46), including its tolerances of malformed input. Text also has operations that
-follow the specification and keep every original byte.
+0.2.46), including its tolerances of malformed input. Text packets also have operations
+that follow the specification and keep every original byte.
 
 `compat::document::Reader` reads a SubRip or WebVTT document as FFmpeg's demuxers
 do, which is not what the specifications say: SubRip cue numbers are optional and
@@ -116,7 +97,11 @@ duration is kept in 32 bits; WebVTT blocks end at FFmpeg's line-break runs, a cu
 `-->` may be on a later line, a cue that does not read ends the document. Cues are
 sorted by start time, and one that ends before it starts lasts until the next. A
 UTF-16 SubRip document is converted as FFmpeg converts it, the first byte of some
-characters after a line break included.
+characters after a line break included. A document in another charset is FFmpeg's
+`sub_charenc` case: each cue's text converts on its own with `charset::CharsetJob`
+and the receiver repertoire, so a cue the charset refuses has no text and the
+others keep theirs (the strict SubRip reader this crate had before refused the
+whole document).
 
 **Comparison-only projections.** The non-default `reference-trace` feature adds
 `reference_trace`: the text `carriage` session that reproduces FFmpeg's demuxer
@@ -127,8 +112,6 @@ absent from default builds.
 
 | Format | `text::Format` | What is decoded | What is passed through |
 | --- | --- | --- | --- |
-| SubRip | `SubRip` | Cue numbers, exact times, multi-line text, CRLF/LF/CR framing | Raw cue byte ranges |
-| WebVTT file | `WebVtt` | Header, cue identifiers, times, settings, payload; NOTE/STYLE/REGION blocks in order | Settings and payload as raw text (no CSS, no cue-text parsing) |
 | WebVTT in Matroska | `MatroskaWebVtt` | Block-addition fields: settings, identifier, comments | `CodecPrivate`, unknown additions, block-relative inline times |
 | tx3g / mov_text | `Tx3g` | Text length, UTF-8 or UTF-16BE text; optional style/effect resolution and FFmpeg-compatible ASS output (below) | Modifier boxes in original order |
 | UTF-8 packet | `Utf8Packet` | Strict UTF-8 validation | The payload itself |
@@ -172,8 +155,8 @@ bytes are errors; nothing is replaced with U+FFFD.
 
 ## Behaviour and limits
 
-- **Input.** Text operations take one complete document or demuxed sample per
-  `provide`. Bitmap, caption and teletext decoders take complete packets; PES/TS
+- **Input.** `text::Extractor` takes one demuxed sample per `provide`, and
+  `compat::document::Reader` one whole document. Bitmap, caption and teletext decoders take complete packets; PES/TS
   reassembly is upstream (`triergon-mpegts`; `compat::dvb::PesParser` cuts a DVB
   PES data field into codec packets as FFmpeg's demuxer does).
   An empty packet is an event, not end of stream; only `finish_input` ends input.
@@ -189,8 +172,8 @@ bytes are errors; nothing is replaced with U+FFFD.
   the next packet and nothing is rounded to microseconds except in named native
   fields.
 - **Text normalisation.** `decoded_utf8` is a strict character conversion only:
-  no Unicode, line-ending, whitespace, entity or markup rewriting. A UTF-8 BOM is
-  framing in a document and content in a demuxed packet.
+  no Unicode, line-ending, whitespace, entity or markup rewriting. A UTF-8 BOM in
+  a demuxed packet is content.
 - **Not handled.** DVB character-coded and progressive objects, depth-reduction
   modes and disparity (FFmpeg drops them too, and the receiver does as it does);
   DVD colour-change commands (the control sequence ends there, as in FFmpeg);

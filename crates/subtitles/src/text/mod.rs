@@ -1,7 +1,7 @@
 //! Bounded text source ingestion with original bytes and exact cue times.
 //!
-//! Named profiles: SubRipStrict1, WebVttSourceStrict1, Tx3gCarriage1,
-//! Utf8Packet1, MatroskaWebVttCarriage1 and OpaqueAss1. Their limits and
+//! Named profiles: Tx3gCarriage1, Utf8Packet1, MatroskaWebVttCarriage1 and
+//! OpaqueAss1. Their limits and
 //! source/semantic boundaries are documented in this module's README.md.
 //! These profiles do not establish FFmpeg compatibility; the FFmpeg-compatible
 //! readers and conversions are in [`crate::compat::document`],
@@ -20,10 +20,7 @@ pub(crate) mod receiver_charset;
 pub mod tx3g_config;
 pub mod tx3g_semantics;
 
-mod clock;
-mod document;
 mod emit;
-mod line;
 mod model;
 mod sample;
 mod session;
@@ -53,7 +50,7 @@ const _: () = assert!(size_of::<std::result::Result<(), ProvideError>>() <= 448)
 pub enum Status {
     NeedInput,
     Yield,
-    Event(Event),
+    Cue(Cue),
     NeedOutput,
     Finished,
 }
@@ -184,12 +181,10 @@ impl Extractor {
             .step(input, &self.pool, self.limits, work, cancel);
         match result {
             Ok(Action::Yield) => Ok(Status::Yield),
-            Ok(Action::Event { event, last }) => {
-                if last {
-                    self.session = None;
-                    self.pending = None;
-                }
-                Ok(Status::Event(event))
+            Ok(Action::Cue(cue)) => {
+                self.session = None;
+                self.pending = None;
+                Ok(Status::Cue(cue))
             }
             Ok(Action::Complete) => {
                 self.session = None;

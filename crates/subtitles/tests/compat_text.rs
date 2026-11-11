@@ -246,3 +246,110 @@ fn ass_charset_labels_open_and_convert_as_the_receiver_does() {
     // An invalid trail byte refuses the conversion.
     assert!(decode(&mut decoder, b"\xa4\x00", &pool).is_none());
 }
+
+/// Each cue of a SubRip document converted from `label` as FFmpeg's
+/// `sub_charenc` decoder option converts it, `None` where the conversion is
+/// refused: `compat::document` reads the cues, `CharsetJob` converts each
+/// with the repertoire the reference build accepts.
+fn recoded(source: &[u8], label: &[u8]) -> Vec<Option<Vec<u8>>> {
+    use triergon_subtitles::compat::charset::receiver_charset_with_glibc_euc_kr;
+    use triergon_subtitles::text::Limits;
+    use triergon_subtitles::text::charset::{CharsetJob, CharsetStatus};
+    let pool = Budget::new(1 << 20).unwrap();
+    let charset = receiver_charset_with_glibc_euc_kr(label).unwrap();
+    let label = Bytes::copy_from_slice(&pool, label).unwrap();
+    let cancel = AtomicBool::new(false);
+    let document = Bytes::copy_from_slice(&pool, source).unwrap();
+    let mut reader = document::Reader::new(
+        &pool,
+        document,
+        document::Syntax::SubRip,
+        document::Limits::default(),
+    )
+    .unwrap();
+    let mut texts = Vec::new();
+    loop {
+        match reader.poll(&mut WorkBudget::new(7), &cancel).unwrap() {
+            document::Status::Yield => {}
+            document::Status::Cue(cue) => {
+                let mut job =
+                    CharsetJob::new(&cue.text, Some(&label), charset, &pool, Limits::default())
+                        .unwrap();
+                texts.push(loop {
+                    match job.poll(&mut WorkBudget::new(3), &cancel) {
+                        Ok(CharsetStatus::Pending) => {}
+                        Ok(CharsetStatus::Ready) => {
+                            break Some(job.take_output(&cancel).unwrap().utf8.as_ref().to_vec());
+                        }
+                        Err(_) => break None,
+                    }
+                });
+            }
+            document::Status::Finished => return texts,
+        }
+    }
+}
+
+#[test]
+fn subrip_cues_convert_as_sub_charenc_converts_them() {
+    // FFmpeg's subrip decoder with sub_charenc set to the label publishes these
+    // texts for the cue `1\r\n00:00:01,000 --> 00:00:02,500\r\nTEXT\r\n`.
+    for (label, text, expected) in [
+        (&b"gbk"[..], &b"\xd6\xd0\xce\xc4"[..], "中文"),
+        (b"big5", b"\xa4\xa4\xa4\xe5", "中文"),
+        (b"shift_jis", b"\x93\xfa\x96\x7b", "日本"),
+        (b"euc-kr", b"\xc7\xd1\xb1\xdb", "한글"),
+        (b"cp932", b"\x81\x60", "～"),
+        (b"cp949", b"\x81\x41", "갂"),
+        (b"cp950", b"\xa1\x45", "‧"),
+    ] {
+        let mut source = b"1\r\n00:00:01,000 --> 00:00:02,500\r\n".to_vec();
+        source.extend_from_slice(text);
+        source.extend_from_slice(b"\r\n");
+        assert_eq!(
+            recoded(&source, label),
+            [Some(expected.as_bytes().to_vec())]
+        );
+    }
+}
+
+#[test]
+fn subrip_cues_convert_from_single_byte_charsets_as_sub_charenc_converts_them() {
+    // FFmpeg's subrip decoder with sub_charenc: Latin-1 keeps 0x80 to 0x9F as
+    // the C1 controls under both labels; Windows-1252 refuses the bytes its
+    // table leaves undefined, Windows-1251 its one undefined byte, 0x98.
+    let cue = |text: &[u8]| {
+        let mut source = b"1\r\n00:00:01,000 --> 00:00:02,500\r\n".to_vec();
+        source.extend_from_slice(text);
+        source.extend_from_slice(b"\r\n");
+        source
+    };
+    let one = |text: &str| vec![Some(text.as_bytes().to_vec())];
+    assert_eq!(
+        recoded(&cue(b"\xcf\xf0\xe8\xe2\xe5\xf2"), b"windows-1251"),
+        one("Привет")
+    );
+    assert_eq!(recoded(&cue(b"\x80 \xe9"), b"windows-1252"), one("€ é"));
+    for label in [&b"latin1"[..], b"iso-8859-1"] {
+        assert_eq!(recoded(&cue(b"\xa0 \xe9"), label), one("\u{a0} é"));
+        assert_eq!(recoded(&cue(b"\x80\x9f"), label), one("\u{80}\u{9f}"));
+    }
+    for undefined in [0x81, 0x8d, 0x8f, 0x90, 0x9d] {
+        assert_eq!(recoded(&cue(&[b'A', undefined]), b"windows-1252"), [None]);
+    }
+    assert_eq!(recoded(&cue(b"\x98"), b"windows-1251"), [None]);
+}
+
+#[test]
+fn a_cue_the_charset_refuses_leaves_the_others() {
+    // FFmpeg publishes the first cue and refuses only the second packet.
+    let source =
+        b"1\n00:00:00,000 --> 00:00:01,000\nvalid\n\n2\n00:00:02,000 --> 00:00:03,000\n\xd6\n";
+    assert_eq!(recoded(source, b"gbk"), [Some(b"valid".to_vec()), None]);
+    let source =
+        b"1\n00:00:00,000 --> 00:00:01,000\nvalid\n\n2\n00:00:02,000 --> 00:00:03,000\n\x98\n";
+    assert_eq!(
+        recoded(source, b"windows-1251"),
+        [Some(b"valid".to_vec()), None]
+    );
+}

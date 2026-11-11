@@ -452,14 +452,11 @@ fn signed_and_unknown_clock_facts_are_retained_without_inference() {
 #[test]
 fn uncaptured_charset_profile_is_not_silently_admitted_to_receiver_policy() {
     let p = Budget::new(4096).unwrap();
-    assert!(receiver_charset(b"windows-1252").is_err());
-    let v = run(&p, input(&p, b"windows-1252", b"A"), 1);
+    assert!(receiver_charset(b"us-ascii").is_err());
+    let v = run(&p, input(&p, b"us-ascii", b"A"), 1);
     assert_eq!(v.outcome(), Outcome::UnsupportedLabel);
     assert!(v.converted().is_none());
-    assert_eq!(
-        Charset::from_label(b"windows-1252").unwrap(),
-        Charset::Windows1252
-    );
+    assert_eq!(Charset::from_label(b"us-ascii").unwrap(), Charset::Ascii);
 }
 #[test]
 fn absent_receiver_declaration_remains_unknown_while_source_is_retained() {

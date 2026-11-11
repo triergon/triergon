@@ -29,7 +29,6 @@ pub(crate) struct Scalar {
     pub value: char,
     pub start: usize,
     pub end: usize,
-    pub decoded_start: usize,
     pub decoded_end: usize,
 }
 
@@ -76,7 +75,6 @@ impl Cursor {
 
     fn scalar(&mut self, value: u32) -> Result<Scalar> {
         let value = char::from_u32(value).ok_or(Error::Invalid("invalid Unicode scalar"))?;
-        let decoded_start = self.decoded;
         self.decoded = self
             .decoded
             .checked_add(value.len_utf8())
@@ -85,7 +83,6 @@ impl Cursor {
             value,
             start: self.scalar_start,
             end: self.at,
-            decoded_start,
             decoded_end: self.decoded,
         })
     }

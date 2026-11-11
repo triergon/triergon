@@ -7,8 +7,6 @@ Exact rules for `triergon_subtitles::text`. The crate overview is in
 
 | Profile | `Format` | Rules |
 | --- | --- | --- |
-| `SubRipStrict1` | `SubRip` | Numeric cue number; `hh:mm:ss,mmm --> hh:mm:ss,mmm` with two or more hour digits; multi-line text; CRLF, LF or CR line ends. A declared strict profile, not a universal SRT grammar. |
-| `WebVttSourceStrict1` | `WebVtt` | UTF-8 with optional BOM; exact cue times; identifier, settings, payload, NOTE, STYLE and REGION kept in source order. Malformed input and zero or negative intervals are errors (no browser-style recovery). |
 | `Tx3gCarriage1` | `Tx3g` | Big-endian u16 text length (the 2048-byte recommendation is not enforced); UTF-8 or FEFF-prefixed UTF-16BE; modifier boxes kept whole and in order. Byte-reversed UTF-16 is rejected. |
 | ISO-box tx3g | `Tx3g` | Selected with `Extractor::tx3g_iso_boxes`: additionally reads ISO size-0 (to end of sample), size-1 (64-bit) and `uuid` modifier boxes. `Extractor::new` reports them as unsupported. |
 | `Utf8Packet1` | `Utf8Packet` | Strict UTF-8; the payload is aliased, not copied; no document framing. |
@@ -16,17 +14,17 @@ Exact rules for `triergon_subtitles::text`. The crate overview is in
 | `OpaqueAss1` | `OpaqueAss` | Packet, configuration, charset label and timing carried unchanged. No ASS validation and no charset assertion. |
 
 Every `Cue` keeps its complete `Input`, the raw and text byte ranges, and
-`decoded_utf8` when the encoding is known. Already published records survive a
-later framing error. Whole-input character validation happens before the first
-cue is published.
+`decoded_utf8` when the encoding is known. Whole-input character validation
+happens before the cue is published. Whole SubRip and WebVTT documents are read
+by `compat::document`, as FFmpeg's demuxers read them.
 
 ## Encodings
 
 `Encoding::Utf8` rejects overlong forms, surrogates and values above U+10FFFF.
 `Utf16Bom` requires a BOM; `Utf16Be`/`Utf16Le` treat a leading FEFF as content.
-`Ascii`, `Latin1`, `Windows1251`, `Windows1252` and `Multibyte(_)` are accepted
-by SubRip only; WebVTT and `Utf8Packet` require UTF-8. Unknown document
-encodings return `Error::Unsupported`.
+`Utf8Packet` and `MatroskaWebVtt` require UTF-8. `Ascii`, `Latin1`,
+`Windows1251`, `Windows1252` and `Multibyte(_)` are the encodings of
+`charset::CharsetJob`.
 
 `charset::CharsetJob` converts a whole byte stream with an explicit `Charset`.
 It validates and counts the input first, then writes into exactly sized storage.
@@ -52,8 +50,8 @@ PTS are distinct.
 ## Carriage session
 
 `reference_trace::carriage::Session` (with the `reference-trace` feature)
-publishes an immutable `Snapshot` per input with the FFmpeg-compatible packet
-view (`Snapshot::reader_view()` returns `ReaderView::Reference`): millisecond
+publishes an immutable `Snapshot` per input, a sample `Input` or a whole
+`DocumentInput` (`Source`), with the FFmpeg-compatible packet view (`Snapshot::reader_view()` returns `ReaderView::Reference`): millisecond
 document timing
 that keeps zero or negative intervals, and the reference's UTF-16 SubRip
 line-entry byte behaviour. `recover_pending` returns inputs after cancellation
@@ -62,5 +60,5 @@ or a resource failure.
 ## Default limits
 
 `Limits::default()`: input 4 MiB; configuration and BlockAddition 1 MiB each;
-labels 256 bytes; source line 64 KiB; 4096 cues per document; 4096 modifiers per
+labels 256 bytes; 4096 modifiers per
 sample; decoded output 4 MiB per cue. Limits are caller policy, not syntax.

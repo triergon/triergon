@@ -1,6 +1,6 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
-use triergon_subtitles::text::{Encoding, Event, Extractor, Format, Input, Limits, Status, Timing};
+use triergon_subtitles::text::{Encoding, Extractor, Format, Input, Limits, Status, Timing};
 fn input(pool: &Budget, bytes: &[u8]) -> Input {
     Input {
         format: Format::Tx3g,
@@ -27,7 +27,7 @@ fn extract(bytes: &[u8], q: u64) -> triergon_subtitles::text::Cue {
             .step(&mut WorkBudget::new(q), &AtomicBool::new(false))
             .unwrap()
         {
-            Status::Event(Event::Cue(cue)) => return cue,
+            Status::Cue(cue) => return cue,
             Status::Yield => {}
             x => panic!("unexpected {x:?}"),
         }
@@ -591,98 +591,4 @@ fn tx3g_config_backpressure_retry_keeps_exact_font_record_and_raw_owner() {
     assert_eq!(out.fonts.len(), 2);
     assert_eq!(out.boxes.len(), 1);
     assert!(out.raw.shares_storage_with(&raw));
-}
-
-fn legacy_srt(raw_text: &[u8], encoding: Encoding, q: u64) -> triergon_subtitles::text::Cue {
-    let pool = Budget::new(16384).unwrap();
-    let prefix = b"1\r\n00:00:01,000 --> 00:00:02,500\r\n";
-    let mut raw = prefix.to_vec();
-    raw.extend_from_slice(raw_text);
-    raw.extend_from_slice(b"\r\n");
-    let mut source = input(&pool, &raw);
-    source.format = Format::SubRip;
-    source.encoding = encoding;
-    source.configuration_epoch = 601;
-    source.charset_label = Some(Bytes::copy_from_slice(&pool, b"original-declared-label").unwrap());
-    let mut extractor = Extractor::new(&pool, Limits::default(), 0);
-    extractor.provide(source).unwrap();
-    for _ in 0..10000 {
-        match extractor
-            .step(&mut WorkBudget::new(q), &AtomicBool::new(false))
-            .unwrap()
-        {
-            Status::Yield => {}
-            Status::Event(Event::Cue(cue)) => {
-                assert_eq!(cue.input.payload.as_ref(), raw);
-                assert_eq!(cue.text_range, prefix.len()..prefix.len() + raw_text.len());
-                assert_eq!(cue.input.configuration_epoch, 601);
-                assert_eq!(
-                    cue.input.charset_label.as_ref().unwrap().as_ref(),
-                    b"original-declared-label"
-                );
-                return cue;
-            }
-            x => panic!("unexpected legacy source status {x:?}"),
-        }
-    }
-    panic!("bounded legacy SRT extraction");
-}
-#[test]
-fn declared_windows1251_srt_extracts_utf8_and_preserves_physical_source_ranges() {
-    for q in [1, 7, 4096] {
-        let cue = legacy_srt(
-            &[0xcf, 0xf0, 0xe8, 0xe2, 0xe5, 0xf2],
-            Encoding::Windows1251,
-            q,
-        );
-        assert_eq!(
-            cue.decoded_utf8.as_ref().unwrap().as_ref(),
-            "Привет".as_bytes()
-        );
-        assert_eq!(cue.effective_encoding, Encoding::Windows1251);
-        assert_eq!(cue.start.unwrap(), triergon_core::Time::new(1, 1).unwrap());
-        assert_eq!(
-            cue.duration.unwrap(),
-            triergon_core::Time::new(3, 2).unwrap()
-        );
-    }
-}
-#[test]
-fn declared_windows1252_and_latin1_srt_do_not_normalize_codepoints() {
-    for q in [1, 7, 4096] {
-        assert_eq!(
-            legacy_srt(&[0x80, b' ', 0xe9], Encoding::Windows1252, q)
-                .decoded_utf8
-                .unwrap()
-                .as_ref(),
-            "€ é".as_bytes()
-        );
-        assert_eq!(
-            legacy_srt(&[0xa0, b' ', 0xe9], Encoding::Latin1, q)
-                .decoded_utf8
-                .unwrap()
-                .as_ref(),
-            "\u{a0} é".as_bytes()
-        );
-    }
-}
-#[test]
-fn undefined_legacy_srt_byte_never_publishes_a_valid_looking_prefix() {
-    let pool = Budget::new(8192).unwrap();
-    let mut source = input(
-        &pool,
-        b"1\n00:00:00,000 --> 00:00:01,000\nvalid\n\n2\n00:00:02,000 --> 00:00:03,000\n\x98\n",
-    );
-    source.format = Format::SubRip;
-    source.encoding = Encoding::Windows1251;
-    let mut parser = Extractor::new(&pool, Limits::default(), 0);
-    parser.provide(source).unwrap();
-    for _ in 0..10000 {
-        match parser.step(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
-            Ok(Status::Yield) => {}
-            Err(Error::Invalid(_)) => return,
-            x => panic!("invalid charset emitted source event {x:?}"),
-        }
-    }
-    panic!("undefined charset byte was not checked");
 }

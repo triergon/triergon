@@ -134,9 +134,7 @@ fn cues(text: &mut TextBridge, source: TextSource) -> Vec<(Vec<u8>, Option<Time>
             TextStep::Yield => {}
             TextStep::NeedPacket => return out,
             TextStep::Event(event) => {
-                let text::Event::Cue(cue) = event.event else {
-                    panic!("caption metadata")
-                };
+                let cue = event.cue;
                 assert_eq!(cue.input.format, text::Format::OpaqueAss);
                 out.push((cue.input.payload.to_vec(), cue.start, cue.duration));
             }

@@ -1,8 +1,9 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
+use triergon_subtitles::compat::document::Syntax;
 use triergon_subtitles::reference_trace::carriage::{
-    CallerClock, Discovery, Limits, Operation, ProgressKind, Session, Status,
+    CallerClock, Discovery, DocumentInput, Limits, Operation, ProgressKind, Session, Source, Status,
 };
 use triergon_subtitles::text::{Encoding, Format, Input, Timing};
 
@@ -31,29 +32,32 @@ fn run_case(index: usize) {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(1 << 20).unwrap();
         let baseline = pool.used();
-        let utf16 = case.payload.starts_with(b"\xfe\xff") || case.payload.starts_with(b"\xff\xfe");
-        let input = Input {
-            format: if case.packet {
-                Format::Utf8Packet
-            } else {
-                Format::SubRip
-            },
-            encoding: if utf16 {
-                Encoding::Utf16Bom
-            } else {
-                Encoding::Utf8
-            },
-            payload: Bytes::copy_from_slice(&pool, case.payload).unwrap(),
-            codec_id: None,
-            codec_private: None,
-            charset_label: None,
-            addition: None,
-            timing: Timing::unknown(),
-            source_id: SourceId(41),
-            generation: 7,
-            sequence: 53,
-            configuration_epoch: 11,
-            container_position: None,
+        let payload = Bytes::copy_from_slice(&pool, case.payload).unwrap();
+        let input = if case.packet {
+            Source::Sample(Input {
+                format: Format::Utf8Packet,
+                encoding: Encoding::Utf8,
+                payload,
+                codec_id: None,
+                codec_private: None,
+                charset_label: None,
+                addition: None,
+                timing: Timing::unknown(),
+                source_id: SourceId(41),
+                generation: 7,
+                sequence: 53,
+                configuration_epoch: 11,
+                container_position: None,
+            })
+        } else {
+            Source::Document(DocumentInput {
+                syntax: Syntax::SubRip,
+                payload,
+                source_id: SourceId(41),
+                generation: 7,
+                sequence: 53,
+                configuration_epoch: 11,
+            })
         };
         let original = input.clone();
         let mut offered = Some(input);
@@ -91,13 +95,32 @@ fn run_case(index: usize) {
             }
         }
         let result = result.expect("bounded complete source must publish");
-        assert_eq!(result.input.payload.as_ref(), case.payload);
-        assert!(result.input.payload.shares_storage_with(&original.payload));
-        assert_eq!(result.input.timing, original.timing);
-        assert_eq!(result.input.source_id, SourceId(41));
-        assert_eq!(result.input.generation, 7);
-        assert_eq!(result.input.sequence, 53);
-        assert_eq!(result.input.configuration_epoch, 11);
+        let facts = |source: &Source| match source {
+            Source::Sample(input) => (
+                input.payload.clone(),
+                input.source_id,
+                input.generation,
+                input.sequence,
+                input.configuration_epoch,
+            ),
+            Source::Document(document) => (
+                document.payload.clone(),
+                document.source_id,
+                document.generation,
+                document.sequence,
+                document.configuration_epoch,
+            ),
+        };
+        let (payload, source_id, generation, sequence, epoch) = facts(&result.input);
+        assert_eq!(payload.as_ref(), case.payload);
+        assert!(payload.shares_storage_with(&facts(&original).0));
+        if let (Source::Sample(actual), Source::Sample(offered)) = (&result.input, &original) {
+            assert_eq!(actual.timing, offered.timing);
+        }
+        assert_eq!(source_id, SourceId(41));
+        assert_eq!(generation, 7);
+        assert_eq!(sequence, 53);
+        assert_eq!(epoch, 11);
         assert!(result.error_code.is_none());
         let stream = result.stream.as_ref().unwrap();
         assert_eq!(stream.index, 0);

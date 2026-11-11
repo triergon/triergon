@@ -3,9 +3,17 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, Time, WorkBudget};
 use triergon_subtitles::reference_trace::carriage::{
-    CallerClock, Limits, Operation, Session, Status,
+    CallerClock, Limits, Operation, Session, Snapshot, Source, Status,
 };
 use triergon_subtitles::text::{Encoding, Format, Input, RawClock, Timing};
+
+/// The sample a snapshot read.
+fn sample(snapshot: &Snapshot) -> &Input {
+    let Source::Sample(input) = &snapshot.input else {
+        panic!("a sample snapshot")
+    };
+    input
+}
 
 fn input(pool: &Budget) -> Input {
     Input {
@@ -35,7 +43,7 @@ fn clock() -> CallerClock {
         duration: None,
     }
 }
-fn output(session: &mut Session) -> triergon_subtitles::reference_trace::carriage::Snapshot {
+fn output(session: &mut Session) -> Snapshot {
     for _ in 0..32 {
         match session
             .poll(&mut WorkBudget::new(4096), &AtomicBool::new(false))
@@ -53,7 +61,7 @@ fn packet_and_configuration_alone_survive_every_original_root_and_snapshot_drop(
     let pool = Budget::new(1 << 20).unwrap();
     let baseline = pool.used();
     let original = input(&pool);
-    let mut offered = Some(original.clone());
+    let mut offered = Some(Source::Sample(original.clone()));
     let mut session = Session::new(&pool, Limits::default());
     session
         .provide(&mut offered, Operation::Sample(clock()))
@@ -95,7 +103,7 @@ fn raw_unreduced_clock_and_known_sentinel_are_not_normalized() {
         dts: None,
         duration: Some(0),
     };
-    let mut offered = Some(source);
+    let mut offered = Some(Source::Sample(source));
     let mut session = Session::new(&pool, Limits::default());
     session
         .provide(&mut offered, Operation::Sample(caller))
@@ -104,7 +112,7 @@ fn raw_unreduced_clock_and_known_sentinel_are_not_normalized() {
     assert_eq!(result.packets.as_slice()[0].packet_time_base, [2, 180000]);
     assert_eq!(result.packets.as_slice()[0].pts_raw, i64::MIN);
     assert_eq!(
-        result.input.timing.raw_clock().unwrap().pts_ticks,
+        sample(&result).timing.raw_clock().unwrap().pts_ticks,
         Some(i128::from(i64::MIN))
     );
     let Operation::Sample(actual) = result.operation else {
@@ -118,7 +126,7 @@ fn exact_source_time_is_not_rounded_into_the_callers_clock() {
     let pool = Budget::new(1 << 20).unwrap();
     let mut source = input(&pool);
     source.timing = Timing::exact(Some(Time::new(1, 3).unwrap()), None);
-    let mut offered = Some(source);
+    let mut offered = Some(Source::Sample(source));
     let mut session = Session::new(&pool, Limits::default());
     let wrong = CallerClock {
         pts: Some(333),
@@ -128,16 +136,16 @@ fn exact_source_time_is_not_rounded_into_the_callers_clock() {
         session.provide(&mut offered, Operation::Sample(wrong)),
         Err(Error::Invalid(_))
     ));
-    assert_eq!(
-        offered.as_ref().unwrap().timing.start(),
-        Some(Time::new(1, 3).unwrap())
-    );
+    let Some(Source::Sample(kept)) = offered.as_ref() else {
+        panic!("the offered sample is kept")
+    };
+    assert_eq!(kept.timing.start(), Some(Time::new(1, 3).unwrap()));
 }
 #[test]
 fn output_pressure_retains_immutable_owners_and_never_overwrites_the_slot() {
     let pool = Budget::new(1 << 20).unwrap();
     let original = input(&pool);
-    let mut offered = Some(original.clone());
+    let mut offered = Some(Source::Sample(original.clone()));
     let mut session = Session::new(&pool, Limits::default());
     session
         .provide(&mut offered, Operation::Sample(clock()))
@@ -156,7 +164,7 @@ fn output_pressure_retains_immutable_owners_and_never_overwrites_the_slot() {
         );
         assert_eq!(work.spent(), 0);
     }
-    let mut next = Some(original);
+    let mut next = Some(Source::Sample(original));
     assert!(
         session
             .provide(&mut next, Operation::Sample(clock()))
@@ -164,7 +172,7 @@ fn output_pressure_retains_immutable_owners_and_never_overwrites_the_slot() {
     );
     assert!(next.is_some());
     let first = session.take_output().unwrap();
-    assert_eq!(first.input.sequence, 21);
+    assert_eq!(sample(&first).sequence, 21);
     session
         .provide(&mut next, Operation::Sample(clock()))
         .unwrap();
@@ -174,7 +182,7 @@ fn output_pressure_retains_immutable_owners_and_never_overwrites_the_slot() {
 fn capacity_pressure_can_be_released_and_retried_without_losing_pending_data() {
     let pool = Budget::new(1 << 20).unwrap();
     let original = input(&pool);
-    let mut offered = Some(original.clone());
+    let mut offered = Some(Source::Sample(original.clone()));
     let mut session = Session::new(&pool, Limits::default());
     session
         .provide(&mut offered, Operation::Sample(clock()))

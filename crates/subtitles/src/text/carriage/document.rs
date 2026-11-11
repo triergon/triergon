@@ -7,7 +7,6 @@ use super::utf16::{Decoder, LineMark};
 use super::{
     Discovery, FormatFacts, Limits, Packet, Progress, ProgressKind, ReaderView, SideData, Stream,
 };
-use crate::text::Input;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -346,12 +345,12 @@ impl Document {
 
     pub(crate) fn advance(
         &mut self,
-        input: &Input,
+        payload: &Bytes,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
         if self.decoder.is_none() && self.decoded.is_none() {
-            let raw = input.payload.as_ref();
+            let raw = payload.as_ref();
             if raw.starts_with(b"\xfe\xff") || raw.starts_with(b"\xff\xfe") {
                 self.decoder = Some(Decoder::new(
                     &self.pool,
@@ -361,7 +360,7 @@ impl Document {
             }
         }
         if let Some(decoder) = self.decoder.as_mut() {
-            if !decoder.advance(input.payload.as_ref(), work, cancel)? {
+            if !decoder.advance(payload.as_ref(), work, cancel)? {
                 return Ok(false);
             }
             let (bytes, marks, stopped) = decoder.finish()?;
@@ -370,7 +369,7 @@ impl Document {
             self.unicode_stopped = stopped;
             self.decoder = None;
         }
-        let source = self.decoded.as_ref().unwrap_or(&input.payload).clone();
+        let source = self.decoded.as_ref().unwrap_or(payload).clone();
         while !self.done {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);

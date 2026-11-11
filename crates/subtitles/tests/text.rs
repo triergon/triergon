@@ -2,18 +2,9 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, Time, WorkBudget};
 use triergon_subtitles::text::{
-    Addition, Cue, Encoding, Event, Extractor, Field, FieldOwner, Format, Input, Limits,
-    MetadataKind, RawClock, Status, Timing,
+    Addition, Cue, Encoding, Extractor, Field, FieldOwner, Format, Input, Limits, RawClock, Status,
+    Timing,
 };
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ExpectedKind {
-    Cue,
-    Header,
-    Note,
-    Style,
-    Region,
-}
 
 #[derive(Clone, Copy)]
 struct ExpectedField {
@@ -24,7 +15,6 @@ struct ExpectedField {
 type ExpectedModifier = ([u8; 4], (usize, usize));
 
 struct ExpectedEvent {
-    kind: ExpectedKind,
     raw: (usize, usize),
     text: (usize, usize),
     decoded: Option<&'static [u8]>,
@@ -75,7 +65,6 @@ const EMPTY: Case = Case {
 
 /// What an expected event leaves unstated.
 const EMPTY_EVENT: ExpectedEvent = ExpectedEvent {
-    kind: ExpectedKind::Cue,
     raw: (0, 0),
     text: (0, 0),
     decoded: None,
@@ -190,50 +179,33 @@ fn field(actual: Option<&Field>, expected: Option<ExpectedField>, input: &Input)
     }
 }
 
-fn check_event(event: &Event, expected: &ExpectedEvent, original: &Input) {
-    match event {
-        Event::Cue(cue) => {
-            assert_eq!(expected.kind, ExpectedKind::Cue);
-            same_input(&cue.input, original);
-            assert_eq!(cue.raw_range, expected.raw.0..expected.raw.1);
-            assert_eq!(cue.text_range, expected.text.0..expected.text.1);
-            assert!(cue.raw_range.start <= cue.text_range.start);
-            assert!(cue.text_range.end <= cue.raw_range.end);
-            assert!(cue.raw_range.end <= original.payload.len());
-            assert_eq!(
-                cue.decoded_utf8.as_ref().map(AsRef::as_ref),
-                expected.decoded
-            );
-            assert_eq!(cue.effective_encoding, expected.encoding);
-            assert_eq!(cue.start, exact(expected.start));
-            assert_eq!(cue.end, exact(expected.end));
-            assert_eq!(cue.duration, exact(expected.duration));
-            field(cue.identifier.as_ref(), expected.identifier, &cue.input);
-            field(cue.settings.as_ref(), expected.settings, &cue.input);
-            field(cue.comments.as_ref(), expected.comments, &cue.input);
-            assert_eq!(cue.modifiers.len(), expected.modifiers.len());
-            for (actual, (kind, range)) in cue.modifiers.as_slice().iter().zip(expected.modifiers) {
-                assert_eq!(&actual.kind, kind);
-                assert_eq!(actual.range, range.0..range.1);
-                assert!(actual.range.end <= original.payload.len());
-                assert_eq!(
-                    &original.payload.as_ref()[actual.range.start + 4..actual.range.start + 8],
-                    kind
-                );
-            }
-        }
-        Event::Metadata(metadata) => {
-            let kind = match metadata.kind {
-                MetadataKind::Header => ExpectedKind::Header,
-                MetadataKind::Note => ExpectedKind::Note,
-                MetadataKind::Style => ExpectedKind::Style,
-                MetadataKind::Region => ExpectedKind::Region,
-            };
-            assert_eq!(kind, expected.kind);
-            same_input(&metadata.input, original);
-            assert_eq!(metadata.raw_range, expected.raw.0..expected.raw.1);
-            assert!(metadata.raw_range.end <= original.payload.len());
-        }
+fn check_event(cue: &Cue, expected: &ExpectedEvent, original: &Input) {
+    same_input(&cue.input, original);
+    assert_eq!(cue.raw_range, expected.raw.0..expected.raw.1);
+    assert_eq!(cue.text_range, expected.text.0..expected.text.1);
+    assert!(cue.raw_range.start <= cue.text_range.start);
+    assert!(cue.text_range.end <= cue.raw_range.end);
+    assert!(cue.raw_range.end <= original.payload.len());
+    assert_eq!(
+        cue.decoded_utf8.as_ref().map(AsRef::as_ref),
+        expected.decoded
+    );
+    assert_eq!(cue.effective_encoding, expected.encoding);
+    assert_eq!(cue.start, exact(expected.start));
+    assert_eq!(cue.end, exact(expected.end));
+    assert_eq!(cue.duration, exact(expected.duration));
+    field(cue.identifier.as_ref(), expected.identifier, &cue.input);
+    field(cue.settings.as_ref(), expected.settings, &cue.input);
+    field(cue.comments.as_ref(), expected.comments, &cue.input);
+    assert_eq!(cue.modifiers.len(), expected.modifiers.len());
+    for (actual, (kind, range)) in cue.modifiers.as_slice().iter().zip(expected.modifiers) {
+        assert_eq!(&actual.kind, kind);
+        assert_eq!(actual.range, range.0..range.1);
+        assert!(actual.range.end <= original.payload.len());
+        assert_eq!(
+            &original.payload.as_ref()[actual.range.start + 4..actual.range.start + 8],
+            kind
+        );
     }
 }
 
@@ -284,18 +256,16 @@ fn run_case(index: usize) {
                     assert!(work.spent() <= units);
                     match status {
                         Ok(Status::Yield) => assert!(work.spent() != 0),
-                        Ok(Status::Event(event)) => {
+                        Ok(Status::Cue(cue)) => {
                             let expected = case
                                 .events
                                 .get(output.len())
                                 .unwrap_or_else(|| panic!("{}: unexpected prefix event", case.id));
-                            check_event(&event, expected, &original);
-                            if let Event::Cue(cue) = &event
-                                && let Some(decoded) = &cue.decoded_utf8
-                            {
+                            check_event(&cue, expected, &original);
+                            if let Some(decoded) = &cue.decoded_utf8 {
                                 assert!(decoded.belongs_to(&pool));
                             }
-                            output.push(event);
+                            output.push(cue);
                         }
                         Ok(Status::Finished) => {
                             finished = true;
@@ -353,7 +323,7 @@ fn opaque(pool: &Budget, bytes: &[u8], generation: u64) -> Input {
 fn next_opaque(parser: &mut Extractor) -> Cue {
     let mut work = WorkBudget::new(4096);
     match parser.step(&mut work, &AtomicBool::new(false)).unwrap() {
-        Status::Event(Event::Cue(cue)) => cue,
+        Status::Cue(cue) => cue,
         other => panic!("expected opaque event, got {other:?}"),
     }
 }
@@ -605,7 +575,7 @@ fn resource_failure(id: &str, limits: Limits, expected_cues: usize) {
                 assert!(work.spent() <= units);
                 match result {
                     Ok(Status::Yield) => assert!(work.spent() != 0),
-                    Ok(Status::Event(Event::Cue(cue))) => {
+                    Ok(Status::Cue(cue)) => {
                         same_input(&cue.input, &original);
                         cues += 1;
                     }
@@ -624,30 +594,6 @@ fn resource_failure(id: &str, limits: Limits, expected_cues: usize) {
 }
 
 #[test]
-fn line_capacity_limit_is_a_policy_error() {
-    resource_failure(
-        "srt-basic",
-        Limits {
-            max_line_bytes: 4,
-            ..Limits::default()
-        },
-        0,
-    );
-}
-
-#[test]
-fn cue_limit_preserves_the_already_published_prefix() {
-    resource_failure(
-        "srt-overlap-order",
-        Limits {
-            max_cues: 1,
-            ..Limits::default()
-        },
-        1,
-    );
-}
-
-#[test]
 fn modifier_count_limit_precedes_atomic_packet_publication() {
     resource_failure(
         "tx3g-style-highlight-raw",
@@ -662,7 +608,7 @@ fn modifier_count_limit_precedes_atomic_packet_publication() {
 #[test]
 fn decoded_utf8_limit_is_independent_of_source_byte_limit() {
     resource_failure(
-        "srt-utf16be-bom",
+        "tx3g-utf16be-bom",
         Limits {
             max_decoded_bytes: 2,
             ..Limits::default()
@@ -676,7 +622,7 @@ fn first_cue(parser: &mut Extractor, units: u64) -> Cue {
         let mut work = WorkBudget::new(units);
         match parser.step(&mut work, &AtomicBool::new(false)).unwrap() {
             Status::Yield => assert!(work.spent() != 0),
-            Status::Event(Event::Cue(cue)) => return cue,
+            Status::Cue(cue) => return cue,
             other => panic!("expected cue, got {other:?}"),
         }
     }
@@ -702,7 +648,7 @@ fn validated_utf8_packet_view_aliases_original_charged_storage() {
 fn utf16_output_retains_source_and_new_immutable_utf8_charge() {
     let pool = Budget::new(8192).unwrap();
     let baseline = pool.used();
-    let input = input_for(&pool, named("srt-utf16be-bom"));
+    let input = input_for(&pool, named("tx3g-utf16be-bom"));
     let source_charge = input.payload.retained_storage_bytes();
     let mut parser = Extractor::new(&pool, Limits::default(), input.generation);
     parser.provide(input).unwrap();
@@ -723,7 +669,7 @@ fn utf16_output_retains_source_and_new_immutable_utf8_charge() {
 #[test]
 fn output_pressure_yields_then_resumes_identical_utf16_cue() {
     let pool = Budget::new(8192).unwrap();
-    let case = named("srt-utf16be-bom");
+    let case = named("tx3g-utf16be-bom");
     let input = input_for(&pool, case);
     let original = input.clone();
     let mut parser = Extractor::new(&pool, Limits::default(), input.generation);
@@ -743,14 +689,14 @@ fn output_pressure_yields_then_resumes_identical_utf16_cue() {
     }
     assert!(blocked);
     drop(held);
-    let event = Event::Cue(first_cue(&mut parser, 1));
+    let event = first_cue(&mut parser, 1);
     check_event(&event, &case.events[0], &original);
 }
 
 #[test]
 fn cancellation_during_utf16_work_resumes_without_skipping_scalar() {
     let pool = Budget::new(8192).unwrap();
-    let case = named("srt-utf16le-bom");
+    let case = named("tx3g-utf16be-bom");
     let input = input_for(&pool, case);
     let original = input.clone();
     let mut parser = Extractor::new(&pool, Limits::default(), input.generation);
@@ -768,7 +714,7 @@ fn cancellation_during_utf16_work_resumes_without_skipping_scalar() {
         Error::Cancelled
     );
     assert_eq!(cancelled.spent(), 0);
-    let event = Event::Cue(first_cue(&mut parser, 1));
+    let event = first_cue(&mut parser, 1);
     check_event(&event, &case.events[0], &original);
 }
 
@@ -797,7 +743,7 @@ fn long_utf8_validation_yields_and_charges_every_source_byte() {
                 yielded += 1;
                 assert_eq!(work.spent(), 1);
             }
-            Status::Event(Event::Cue(cue)) => {
+            Status::Cue(cue) => {
                 assert_eq!(cue.decoded_utf8.unwrap().as_ref(), original.as_ref());
                 emitted = true;
                 break;
@@ -847,27 +793,4 @@ fn addition_limit_returns_all_source_facts_without_reclassification() {
         }
     );
     same_input(&rejection.input, &original);
-}
-
-#[test]
-fn unknown_declared_charset_is_not_guessed_or_lossily_decoded() {
-    let pool = Budget::new(8192).unwrap();
-    let mut input = input_for(&pool, named("srt-basic"));
-    input.encoding = Encoding::Opaque;
-    input.charset_label = Some(Bytes::copy_from_slice(&pool, b"unknown-author-charset").unwrap());
-    let mut parser = Extractor::new(&pool, Limits::default(), input.generation);
-    parser.provide(input).unwrap();
-    let mut unsupported = false;
-    for _ in 0..10000 {
-        match parser.step(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
-            Ok(Status::Yield) => {}
-            Err(Error::Unsupported(reason)) => {
-                assert_eq!(reason, "declared charset conversion");
-                unsupported = true;
-                break;
-            }
-            other => panic!("unexpected charset outcome {other:?}"),
-        }
-    }
-    assert!(unsupported);
 }

@@ -1171,9 +1171,7 @@ fn tx3g_real_reader_handoff_retains_source_sample_and_exact_clock_after_teardown
         result.source.mp4().unwrap().source.payload.as_ref(),
         raw.as_ref()
     );
-    let text::Event::Cue(cue) = result.event else {
-        panic!()
-    };
+    let cue = result.cue;
     assert_eq!(cue.input.payload.as_ref(), raw.as_ref());
     assert_eq!(
         cue.input.timing.raw_clock().unwrap().pts_ticks,
@@ -1229,9 +1227,7 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
             break o;
         }
     };
-    let text::Event::Cue(cue) = result.event else {
-        panic!()
-    };
+    let cue = result.cue;
     assert_eq!(cue.input.payload.as_ref(), expected);
     assert_eq!(cue.decoded_utf8.as_ref().unwrap().as_ref(), expected);
     assert_eq!(cue.start, pts);
@@ -1239,26 +1235,14 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
     assert!(result.source.matroska().is_some());
 }
 #[test]
-fn original_srt_webvtt_and_authored_ass_documents_keep_exact_source_bytes() {
+fn authored_ass_documents_keep_exact_source_bytes() {
     use text_bridge::*;
     use triergon_subtitles::text;
-    for (format, encoding, bytes) in [
-        (
-            text::Format::SubRip,
-            text::Encoding::Utf8,
-            b"1\n00:00:00,000 --> 00:00:01,000\nsource \xe2\x82\xac\n".as_slice(),
-        ),
-        (
-            text::Format::WebVtt,
-            text::Encoding::Utf8,
-            b"WEBVTT\n\n00:00.000 --> 00:01.000\nsource\n".as_slice(),
-        ),
-        (
-            text::Format::OpaqueAss,
-            text::Encoding::Opaque,
-            b"0,0,Default,,0,0,0,,{\\i1}raw\\Nbytes".as_slice(),
-        ),
-    ] {
+    for (format, encoding, bytes) in [(
+        text::Format::OpaqueAss,
+        text::Encoding::Opaque,
+        b"0,0,Default,,0,0,0,,{\\i1}raw\\Nbytes".as_slice(),
+    )] {
         let b = pool();
         let payload = Bytes::copy_from_slice(&b, bytes).unwrap();
         let input = text::Input {
@@ -1283,13 +1267,11 @@ fn original_srt_webvtt_and_authored_ass_documents_keep_exact_source_bytes() {
         for _ in 0..100_000 {
             match bridge.step(&mut WorkBudget::new(1), &off()).unwrap() {
                 TextStep::Event(o) => {
-                    if let text::Event::Cue(c) = o.event {
-                        assert_eq!(c.input.payload.as_ref(), bytes);
-                        if format == text::Format::OpaqueAss {
-                            assert!(c.decoded_utf8.is_none());
-                        }
-                        cues += 1;
+                    assert_eq!(o.cue.input.payload.as_ref(), bytes);
+                    if format == text::Format::OpaqueAss {
+                        assert!(o.cue.decoded_utf8.is_none());
                     }
+                    cues += 1;
                 }
                 TextStep::Finished => break,
                 _ => {}

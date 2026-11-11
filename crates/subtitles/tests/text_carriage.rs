@@ -1,9 +1,10 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, Time, WorkBudget};
+use triergon_subtitles::compat::document::Syntax;
 use triergon_subtitles::reference_trace::carriage::{
-    CallerClock, Discovery, FormatFacts, Limits, Operation, Packet, Progress, ProgressKind,
-    Session, SideData, Snapshot, Status, Stream,
+    CallerClock, Discovery, DocumentInput, FormatFacts, Limits, Operation, Packet, Progress,
+    ProgressKind, Session, SideData, Snapshot, Source, Status, Stream,
 };
 use triergon_subtitles::text::{Addition, Encoding, Format, Input, RawClock, Timing};
 
@@ -38,13 +39,19 @@ struct ExpectedPacket {
     stream_time_base: [i32; 2],
     side: &'static [ExpectedSide],
 }
+/// What a case reads: a sample of a packet format or a whole document.
+#[derive(Clone, Copy)]
+enum Kind {
+    Sample(Format),
+    Document(Syntax),
+}
 enum ExpectedOperation {
     Sample(CallerClock),
     Document(Discovery, &'static [u8]),
 }
 struct Case {
     id: &'static str,
-    format: Format,
+    kind: Kind,
     encoding: Encoding,
     payload: &'static [u8],
     codec_id: Option<&'static [u8]>,
@@ -70,11 +77,25 @@ fn time(value: Option<(i128, u128)>) -> Option<Time> {
 fn bytes(pool: &Budget, value: Option<&[u8]>) -> Option<Bytes> {
     value.map(|value| Bytes::copy_from_slice(pool, value).unwrap())
 }
-fn input(pool: &Budget, case: &Case) -> Input {
-    Input {
-        format: case.format,
+fn input(pool: &Budget, case: &Case) -> Source {
+    let payload = Bytes::copy_from_slice(pool, case.payload).unwrap();
+    let format = match case.kind {
+        Kind::Sample(format) => format,
+        Kind::Document(syntax) => {
+            return Source::Document(DocumentInput {
+                syntax,
+                payload,
+                source_id: SourceId(91),
+                generation: 3,
+                sequence: 11,
+                configuration_epoch: 17,
+            });
+        }
+    };
+    Source::Sample(Input {
+        format,
         encoding: case.encoding,
-        payload: Bytes::copy_from_slice(pool, case.payload).unwrap(),
+        payload,
         codec_id: bytes(pool, case.codec_id),
         codec_private: bytes(pool, case.codec_private),
         charset_label: bytes(pool, case.charset_label),
@@ -94,7 +115,7 @@ fn input(pool: &Budget, case: &Case) -> Input {
             source: SourceId(91),
             offset: 301,
         }),
-    }
+    })
 }
 fn operation(pool: &Budget, case: &Case) -> Operation {
     match case.operation {
@@ -115,7 +136,21 @@ fn same_bytes(actual: Option<&Bytes>, expected: Option<&Bytes>) {
         _ => panic!("absent/present-empty source fact changed"),
     }
 }
-fn source(actual: &Input, expected: &Input) {
+fn source(actual: &Source, expected: &Source) {
+    match (actual, expected) {
+        (Source::Sample(actual), Source::Sample(expected)) => sample(actual, expected),
+        (Source::Document(actual), Source::Document(expected)) => {
+            assert_eq!(actual.syntax, expected.syntax);
+            same_bytes(Some(&actual.payload), Some(&expected.payload));
+            assert_eq!(actual.source_id, expected.source_id);
+            assert_eq!(actual.generation, expected.generation);
+            assert_eq!(actual.sequence, expected.sequence);
+            assert_eq!(actual.configuration_epoch, expected.configuration_epoch);
+        }
+        _ => panic!("source kind changed"),
+    }
+}
+fn sample(actual: &Input, expected: &Input) {
     assert_eq!(actual.format, expected.format);
     assert_eq!(actual.encoding, expected.encoding);
     same_bytes(Some(&actual.payload), Some(&expected.payload));
@@ -181,7 +216,7 @@ fn packet(actual: &Packet, expected: &ExpectedPacket) {
     assert_eq!(actual.stream_time_base, expected.stream_time_base);
     side(actual.side_data.as_slice(), expected.side);
 }
-fn snapshot(actual: &Snapshot, original: &Input, case: &Case) {
+fn snapshot(actual: &Snapshot, original: &Source, case: &Case) {
     source(&actual.input, original);
     assert_eq!(actual.format, case.native_format);
     assert_eq!(actual.error_code, case.native_error);
@@ -327,7 +362,7 @@ fn bounded_payload_rejection_preserves_the_offered_owner() {
     let case = sample_case();
     let original = input(&pool, case);
     let limits = Limits {
-        payload_bytes: original.payload.len() - 1,
+        payload_bytes: case.payload.len() - 1,
         ..Limits::default()
     };
     let mut offered = Some(original.clone());
