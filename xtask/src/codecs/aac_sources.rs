@@ -1,4 +1,4 @@
-//! Author the pinned audio-only sources for fixed AAC-LC decoder comparisons.
+//! Author the pinned audio-only sources for configured AAC-LC comparisons.
 
 use std::fs;
 use std::path::Path;
@@ -22,6 +22,18 @@ const LAYOUTS: &[(u8, u8, &str)] = &[
 
 const RATES: [u32; 12] = [
     7_350, 8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000, 44_100, 64_000, 88_200, 96_000,
+];
+
+const PROGRAMS: &[(&str, u32, u8, &str)] = &[
+    ("mono", 48_000, 1, "mono"),
+    ("stereo", 44_100, 2, "stereo"),
+    ("three-front", 48_000, 3, "3.0"),
+    ("back-centre", 48_000, 4, "4.0"),
+    ("back-pair", 48_000, 5, "5.0"),
+    ("back-pair-lfe", 48_000, 6, "5.1"),
+    ("back-three-lfe", 48_000, 7, "6.1(back)"),
+    ("surround", 48_000, 8, "7.1"),
+    ("wide-front", 96_000, 8, "7.1(wide)"),
 ];
 
 pub(super) fn run(root: &Path, out: &Path) -> Result<(), String> {
@@ -55,8 +67,11 @@ pub(super) fn run(root: &Path, out: &Path) -> Result<(), String> {
     let rates = RATES
         .into_iter()
         .map(|rate| (format!("aac-rate-{rate}"), rate, 2, 2, "stereo"));
+    let programs = PROGRAMS.iter().map(|&(name, rate, channels, layout)| {
+        (format!("aac-program-{name}"), rate, 0, channels, layout)
+    });
     let mut vectors = Vec::new();
-    for (id, rate, configuration, channels, layout) in layouts.chain(rates) {
+    for (id, rate, configuration, channels, layout) in layouts.chain(rates).chain(programs) {
         let signal = (0..u32::from(channels))
             .map(|channel| {
                 let base = 79 + u32::from(configuration) * 7 + channel * 53;
@@ -69,7 +84,7 @@ pub(super) fn run(root: &Path, out: &Path) -> Result<(), String> {
             .join("|");
         let name = format!("{id}.mov");
         let path = inputs.join(&name);
-        let arguments = [
+        let mut arguments = vec![
             ffmpeg.display().to_string(),
             "-v".into(),
             "error".into(),
@@ -89,8 +104,11 @@ pub(super) fn run(root: &Path, out: &Path) -> Result<(), String> {
             "+bitexact".into(),
             "-b:a".into(),
             (32_000 * u32::from(channels)).to_string(),
-            path.display().to_string(),
         ];
+        if configuration == 0 {
+            arguments.extend(["-aac_pce".into(), "1".into()]);
+        }
+        arguments.push(path.display().to_string());
         process::check_output(&arguments)?;
         vectors.push(Value::object([
             ("name", Value::str(name)),

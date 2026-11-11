@@ -370,7 +370,8 @@ pipeline ([harness/capture](../harness/capture/README.md)).
 workloads](../harness/features/aac-access-units/contract.json) from the pinned
 QuickTime and authored audio-only packets. It compares the ordered speakers and
 every decoded PCM plane. The authored clips cover every supported fixed layout
-and indexed rate. `cargo xtask codecs aac-sources --out DIR` records the source
+and indexed rate, and program configurations from mono to eight channels.
+`cargo xtask codecs aac-sources --out DIR` records the source
 clips from independently varying channel tones using the pinned encoder. The
 committed sources fix the encoded input bytes across architectures.
 The paired codec timing and memory commands require passing parity bound to

@@ -36,14 +36,20 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 from a checked AudioSpecificConfig. Its `decode` consumes one complete raw data block
 of at most 64 KiB and produces 1024 samples per channel. The supported fixed configurations are 1–7,
 11, 12 and 14. Their audible elements follow Table 1.19, including the distinct
-7.1 Front, Back and Top layouts. Raw packets that use a PCE for their layout,
-carry SBR, or require 960-sample blocks are outside this decoder's scope.
+7.1 Front, Back and Top layouts. Raw packets that carry SBR or require 960-sample
+blocks are outside this decoder's scope.
 [ISO/IEC 14496-3:2009/Amd.4, Table 1.19](https://standards.iteh.ai/catalog/standards/iso/c0071f4c-5db7-4cf4-a32e-6b75c874d46d/iso-iec-14496-3-2009-amd-4-2013)
+
+`RawLcDecoder::with_program_config_in` takes the byte-aligned Program Configuration
+Element from an AudioSpecificConfig with channel configuration zero. It supports
+up to eight channels and matches coded elements by type and tag. The
+AudioSpecificConfig program remains in effect when a packet contains its own PCE.
+[ISO/IEC 14496-3:2001/Cor.2:2004, 4.5.1](https://standards.iteh.ai/catalog/standards/iso/09c0e8dc-4b21-438e-a1f1-665e44bfb859/iso-iec-14496-3-2001-cor-2-2004)
 
 `RawLcDecoder::with_layout_in` accepts
 `compat::layout::Policy::ConventionalSurround` for the default FFmpeg speaker
 mapping. This uses a back pair in configurations 5, 6, 11 and 14 and interprets
-configuration 7 as 7.1 Back. The fixed decoder synthesizes directly into the
+configuration 7 as 7.1 Back. The raw decoder synthesizes directly into the
 caller's reserved PCM planes and reuses them on the next access unit.
 
 ## Supported
@@ -57,7 +63,7 @@ caller's reserved PCM planes and reuses them on the next access unit.
 | SBR | Implicit signalling; output at twice the core rate from the first SBR frame; all grid classes, coupled and balanced envelopes, up to 6 patches, limiter, sinusoids |
 | PS | Implicit signalling (mono stream becomes stereo); 20- and 34-band hybrid, IID/ICC/IPD/OPD, switching between 20 and 34 bands |
 | Rates | Sampling-frequency indices 0–12 |
-| Layouts | ADTS configurations 1–7 and PCE layouts up to 48 channels; raw fixed configurations 1–7, 11, 12 and 14 |
+| Layouts | ADTS configurations 1–7 and PCE layouts up to 48 channels; raw fixed configurations 1–7, 11, 12 and 14, and out-of-band PCE layouts up to eight channels |
 
 ## Behaviour and limits
 

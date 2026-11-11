@@ -235,6 +235,45 @@ fn raw_lc_refuses_sbr_and_bytes_after_its_single_block() {
 }
 
 #[test]
+fn raw_program_matches_tags_and_keeps_the_container_layout() {
+    let mut program = Bw::new();
+    front_program(&mut program, &[(false, 2), (false, 9)]);
+    let program = program.bytes();
+    let budget = Budget::new(4 << 20).unwrap();
+    assert!(RawLcDecoder::with_program_config_in(3, &program, &budget).is_err());
+    let mut decoder = RawLcDecoder::with_program_config_in(4, &program, &budget).unwrap();
+    let packet = |tags: &[u32]| {
+        let mut bits = Bw::new();
+        bits.put(5, 3); // An in-band PCE cannot replace the container program.
+        front_program(&mut bits, &[(false, 0)]);
+        for &tag in tags {
+            bits.put(0, 3); // SCE
+            bits.put(tag, 4);
+            if tag == 9 {
+                noise_ics(&mut bits);
+            } else {
+                silent_ics(&mut bits);
+            }
+        }
+        bits.put(7, 3);
+        bits.bytes()
+    };
+    let mut frame = AudioFrame::default();
+    for tags in [&[2][..], &[2, 2], &[2, 3]] {
+        assert!(decoder.decode(&packet(tags), &mut frame).is_err());
+        assert_eq!(frame.samples_per_channel, 0);
+    }
+    decoder.decode(&packet(&[9, 2]), &mut frame).unwrap();
+    assert_eq!(frame.samples_per_channel, 1024);
+    assert_eq!(
+        frame.layout.speakers(),
+        &[Speaker::FrontLeft, Speaker::FrontRight]
+    );
+    assert!(frame.planes[0].iter().all(|&sample| sample == 0.0));
+    assert!(frame.planes[1].iter().any(|&sample| sample != 0.0));
+}
+
+#[test]
 fn raw_output_capacity_is_charged_before_overlap_advances() {
     let budget = Budget::new(4 << 20).unwrap();
     let mut tested = RawLcDecoder::new_in(4, 1, &budget).unwrap();
@@ -471,22 +510,28 @@ fn noise_ics(w: &mut Bw) {
     w.put(0, 3); // pulse, tns, gain control
 }
 
+fn front_program(w: &mut Bw, elements: &[(bool, u32)]) {
+    w.put(0, 4); // element_instance_tag
+    w.put(1, 2); // object_type: LC
+    w.put(4, 4); // sampling_frequency_index
+    w.put(elements.len() as u32, 4);
+    w.put(0, 4 + 4 + 2 + 3 + 4); // side, back, LFE, data and coupling elements
+    w.put(0, 3); // no mixdowns
+    for &(pair, tag) in elements {
+        w.put(u32::from(pair), 1);
+        w.put(tag, 4);
+    }
+    w.align();
+    w.put(0, 8); // comment_field_bytes
+}
+
 /// A raw data block: optionally a PCE of one front element, then that element (an SCE or a
 /// CPE) of noise, optionally an SBR fill element after it, then END.
 fn noise_block(pce: bool, cpe: bool, sbr: bool) -> Vec<u8> {
     let mut w = Bw::new();
     if pce {
         w.put(5, 3); // ID_PCE
-        w.put(0, 4); // element_instance_tag
-        w.put(1, 2); // object_type: LC
-        w.put(4, 4); // sampling_frequency_index
-        w.put(1, 4); // front elements
-        w.put(0, 4 + 4 + 2 + 3 + 4); // side, back, LFE, data and coupling elements
-        w.put(0, 3); // no mixdowns
-        w.put(cpe as u32, 1);
-        w.put(0, 4); // its tag
-        w.align();
-        w.put(0, 8); // comment_field_bytes
+        front_program(&mut w, &[(cpe, 0)]);
     }
     if cpe {
         w.put(1, 3);

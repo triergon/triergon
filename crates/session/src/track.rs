@@ -4,8 +4,8 @@ use triergon_codec::{AudioDecoder, AudioFrame, Budget, DecodeFailure, DownmixLev
 use triergon_core::container::{PacketInfo, TrackInfo};
 use triergon_core::{BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    AacAscFacts, AacAscParser, AacConfigLimits, AacSource, BuildStep, aac_fixed_channel_count,
-    indexed_aac_frequency,
+    AacAscFacts, AacAscParser, AacAudioSpecificConfig, AacConfigLimits, AacSource, BuildStep,
+    aac_fixed_channel_count, indexed_aac_frequency,
 };
 
 use crate::compat::aac::Policy;
@@ -67,14 +67,39 @@ impl TrackDecoder {
         Self::aac_access_units_with_layout_in(configuration, Policy::Specification, budget)
     }
 
-    /// Decode configured AAC-LC with an explicit speaker mapping.
+    /// Decode configured AAC-LC with a speaker mapping for fixed layouts.
+    /// An explicit program layout uses the element tags in AudioSpecificConfig.
     pub fn aac_access_units_with_layout_in(
         configuration: &[u8],
         layout: Policy,
         budget: &Budget,
     ) -> Result<Self, DecodeFailure> {
-        let decoder = parse_aac_access_unit_config(configuration, budget)?
-            .decoder_with_layout_in(layout, budget)?;
+        let parsed = parse_aac_access_unit_config(configuration, budget)?;
+        let decoder: Box<dyn AudioDecoder> = if let Some(program) = parsed.program_config() {
+            validate_raw_aac_lc(parsed.facts())?;
+            let bits = program.facts().source_bits;
+            if !bits.start_bit.is_multiple_of(8) || !bits.bit_count.is_multiple_of(8) {
+                return Err(DecodeFailure(
+                    "unaligned raw AAC program configuration".into(),
+                ));
+            }
+            let start = bits.start_bit / 8;
+            let end = start + bits.bit_count / 8;
+            let source = parsed
+                .source_bytes()
+                .as_ref()
+                .get(start..end)
+                .ok_or_else(|| DecodeFailure("raw AAC program extent".into()))?;
+            let decoder = triergon_codec_aac::RawLcDecoder::with_program_config_in(
+                parsed.facts().core_frequency.index,
+                source,
+                budget,
+            )
+            .map_err(DecodeFailure::from_error)?;
+            Box::new(decoder)
+        } else {
+            AacAccessUnitConfig::from_asc(parsed.facts())?.decoder_with_layout_in(layout, budget)?
+        };
         Ok(Self {
             codec: AudioCodec::Aac,
             delay: decoder.delay(),
@@ -125,17 +150,8 @@ impl AacAccessUnitConfig {
     /// Select indexed rates, 1024 core samples and fixed layouts up to eight channels
     /// from parsed AudioSpecificConfig facts.
     pub fn from_asc(facts: AacAscFacts) -> Result<Self, DecodeFailure> {
-        if facts.outer_object_type.code != 2
-            || facts.core_object_type.code != 2
-            || facts.core_frequency.explicit_hz.is_some()
-            || indexed_aac_frequency(facts.core_frequency.index) != Some(facts.core_frequency.hz)
-            || aac_fixed_channel_count(facts.channel_configuration).is_none()
-            || facts.ga.frame_length_flag
-            || facts.ga.core_coder_delay.is_some()
-            || facts.ga.extension_flag3 == Some(true)
-            || facts.sbr.is_present()
-            || facts.ps.is_present()
-        {
+        validate_raw_aac_lc(facts)?;
+        if aac_fixed_channel_count(facts.channel_configuration).is_none() {
             return Err(DecodeFailure("unsupported raw AAC-LC configuration".into()));
         }
         Ok(Self {
@@ -173,10 +189,26 @@ impl AacAccessUnitConfig {
     }
 }
 
+fn validate_raw_aac_lc(facts: AacAscFacts) -> Result<(), DecodeFailure> {
+    if facts.outer_object_type.code != 2
+        || facts.core_object_type.code != 2
+        || facts.core_frequency.explicit_hz.is_some()
+        || indexed_aac_frequency(facts.core_frequency.index) != Some(facts.core_frequency.hz)
+        || facts.ga.frame_length_flag
+        || facts.ga.core_coder_delay.is_some()
+        || facts.ga.extension_flag3 == Some(true)
+        || facts.sbr.is_present()
+        || facts.ps.is_present()
+    {
+        return Err(DecodeFailure("unsupported raw AAC-LC configuration".into()));
+    }
+    Ok(())
+}
+
 fn parse_aac_access_unit_config(
     configuration: &[u8],
     budget: &Budget,
-) -> Result<AacAccessUnitConfig, DecodeFailure> {
+) -> Result<AacAudioSpecificConfig, DecodeFailure> {
     let limits = AacConfigLimits {
         maximum_record_bytes: 4096,
         maximum_pce_elements: 64,
@@ -206,5 +238,5 @@ fn parse_aac_access_unit_config(
     else {
         return Err(DecodeFailure("missing AAC AudioSpecificConfig".into()));
     };
-    AacAccessUnitConfig::from_asc(parsed.facts())
+    Ok(parsed)
 }

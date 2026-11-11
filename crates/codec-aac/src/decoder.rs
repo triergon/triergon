@@ -317,6 +317,55 @@ impl Core {
         Ok(())
     }
 
+    /// Set up the out-of-band program of a raw AAC-LC stream.
+    pub(crate) fn with_program(
+        budget: &Budget,
+        frequency_index: u8,
+        program: &Pce,
+    ) -> Result<Self> {
+        if frequency_index > 12 {
+            return Err(DecodeError::Unsupported(Feature::SampleRateIndex(
+                frequency_index,
+            )));
+        }
+        if program.object_type != AOT_LC - 1 || program.sf_index != frequency_index {
+            return Err(DecodeError::InvalidData("raw AAC program profile or rate"));
+        }
+        let channels = program
+            .front
+            .iter()
+            .chain(&program.side)
+            .chain(&program.back)
+            .map(|element| 1 + usize::from(element.is_cpe))
+            .sum::<usize>()
+            + program.lfe.len();
+        if channels == 0 {
+            return Err(DecodeError::InvalidData("empty raw AAC program"));
+        }
+        if channels > 8 {
+            return Err(DecodeError::Unsupported(Feature::TooManyChannels));
+        }
+        let (slots, unordered) = pce_slots(program, false);
+        for (index, slot) in slots.iter().enumerate() {
+            if slots[..index]
+                .iter()
+                .any(|prior| prior.kind == slot.kind && prior.tag == slot.tag)
+            {
+                return Err(DecodeError::InvalidData(
+                    "duplicate raw AAC program element",
+                ));
+            }
+        }
+        let mut core = Self::new(budget);
+        core.elements = core.build_elements(AOT_LC, &slots, false, &[])?;
+        core.sf_index = usize::from(frequency_index);
+        core.slots = slots;
+        core.unordered = unordered;
+        core.configured = true;
+        core.rebuild_layout();
+        Ok(core)
+    }
+
     /// The state of every element `slots` declare (once per element identity, a kind and
     /// a tag) that `existing` lacks, with SBR when `sbr`, built before a configuration
     /// applies so that a refused charge applies nothing.
@@ -492,7 +541,8 @@ impl Core {
             sf_index: self.sf_index,
         };
         let mut occ = [0usize; 4];
-        let mut raw_slot = 0;
+        let fixed_raw = RAW && self.channel_config != 0;
+        let mut raw_elements = 0;
         let mut last_elem: Option<usize> = None;
         let mut layout_changed = false;
         loop {
@@ -504,15 +554,19 @@ impl Core {
                 ID_SCE | ID_LFE | ID_CPE => {
                     let tag = br.read(4) as u8;
                     let o = occ[id as usize];
-                    let mut ei = if RAW {
-                        // Fixed configurations list the audible elements in wire
-                        // order. Each fixed slot has its own element state.
-                        let index = raw_slot;
-                        raw_slot += 1;
+                    let mut ei = if fixed_raw {
+                        // Fixed configurations list the audible elements in wire order.
+                        let index = raw_elements;
+                        raw_elements += 1;
                         self.elements
                             .get(index)
                             .filter(|element| element.kind == id)
                             .map(|_| index)
+                    } else if RAW {
+                        raw_elements += 1;
+                        self.elements.iter().position(|element| {
+                            element.kind == id && element.tag == tag && !element.decoded
+                        })
                     } else {
                         occ[id as usize] += 1;
                         self.element_index(id, tag, o)
@@ -571,8 +625,9 @@ impl Core {
                 }
                 ID_PCE => {
                     let p = parse_pce(br, block_start)?;
-                    if self.channel_config == 0 && self.pce.as_ref() != Some(&p) {
-                        let (slots, unordered) = pce_slots(&p);
+                    // The out-of-band program stays in effect for raw access units.
+                    if !RAW && self.channel_config == 0 && self.pce.as_ref() != Some(&p) {
+                        let (slots, unordered) = pce_slots(&p, true);
                         self.switch_layout(slots, unordered, out, blocks)?;
                         self.pce = Some(p);
                         layout_changed = true;
@@ -648,9 +703,9 @@ impl Core {
         if RAW && (br.overrun() || br.left() != 0) {
             return Err(DecodeError::InvalidData("AAC access unit extent"));
         }
-        if RAW && raw_slot != self.slots.len() {
+        if RAW && raw_elements != self.slots.len() {
             return Err(DecodeError::InvalidData(
-                "incomplete fixed AAC channel layout",
+                "incomplete raw AAC channel layout",
             ));
         }
         if self.slots.is_empty() {
@@ -1093,7 +1148,7 @@ fn fixed_config_slots(cfg: u8, layout: FixedLayout) -> Vec<Slot> {
 /// Speaker assignment for a PCE, reproducing FFmpeg 9's observable mapping (probed with
 /// `harness/codecs/aac/tools/probe_layout.py`). Returns the slots and whether the output keeps
 /// PCE order (FFmpeg "unknown" layouts) instead of native order.
-pub(crate) fn pce_slots(p: &Pce) -> (Vec<Slot>, bool) {
+fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
     use Speaker::{
         BackCenter, BackLeft, BackRight, BottomFrontCenter, BottomFrontLeft, BottomFrontRight,
         FrontCenter, FrontLeft, FrontLeftOfCenter, FrontRight, FrontRightOfCenter, LowFrequency,
@@ -1116,9 +1171,10 @@ pub(crate) fn pce_slots(p: &Pce) -> (Vec<Slot>, bool) {
         .chain(&p.side)
         .chain(&p.back)
         .all(|e| e.height == 0);
-    // Element pattern of channel_configuration 5/6 (front SCE+CPE, back CPE, <=1 LFE):
-    // FFmpeg uses the configuration's 5.0/5.1 (side) layout.
-    let cfg56 = no_heights
+    // ADTS uses the conventional side pair for the 5.0/5.1 pattern. An explicit
+    // program in AudioSpecificConfig keeps its declared back pair.
+    let cfg56 = adts
+        && no_heights
         && kinds(&front) == [false, true]
         && side.is_empty()
         && kinds(&back) == [true]

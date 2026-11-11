@@ -9,6 +9,7 @@
   "contract": [
     "extract the original AudioSpecificConfig and every AAC packet from the three pinned QuickTime clips, in decode order and without edit-list trimming",
     "decode the authored audio-only clips with the conventional surround policy and compare their exact ordered speaker IDs across all ten fixed configurations and all thirteen indexed sample rates",
+    "decode the authored one- through eight-channel program configurations from the original AudioSpecificConfig, matching every coded element by type and tag and comparing exact ordered speaker IDs",
     "for the authored configuration-7 case set the four channel-configuration bits to 7 in the source configuration 12 and keep every coded packet; the two configurations use the same order of syntactic element types",
     "preload the same bounded input with zero padding on both sides, then time decoder setup, packet decode, planar float output fold, flush and teardown",
     "compare every sample in every 1024-sample PCM plane using the AAC numeric rules, with exact block count, rate and ordered speakers",
