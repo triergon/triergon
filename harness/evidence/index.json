@@ -19348,6 +19348,16 @@
    "sha256": "18028d8fa7452fd3d43d0d7d254560578d7f7a38d7a553d9fb42b7246a9df927",
    "bytes": 112317324,
    "source_revision": "cc09ffa8f270f0bbbe2a5de0db4dbf3ffb45be03"
+  },
+  {
+   "name": "armv7-kernel-rss-linux-armv7",
+   "path": "armv7-kernel-rss-linux-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 rows of docs/status.md measured under the kernel RSS bound through its 32-bit entry point, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1 at afb9049c: 30 timing pairs and 30 kernel-bound memory pairs of mp4-forward, ts-program, matroska-audio-clocks and raw-annex-b graded by cargo xtask grade; 30 kernel-bound memory pairs of hls-segments, matroska-startup-seek, the six Matroska feature groups, the external HDR vector, mpegts-pes, isobmff-bench and framing; the kernel proofs with their positive and invalidation checks, the build identities, the scripts, the CPU, kernel and user-space package list.",
+   "key": "evidence/armv7-kernel-rss-linux-armv7/4567e8ba906099070b64ac43868bdd9695d350049f25645078e35c0f334ce8b1.tar.gz",
+   "sha256": "4567e8ba906099070b64ac43868bdd9695d350049f25645078e35c0f334ce8b1",
+   "bytes": 4609695693,
+   "source_revision": "afb9049c681916c97311fc9f495e27ceaa69f4df"
   }
  ]
 }
