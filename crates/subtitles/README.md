@@ -97,14 +97,15 @@ duration is kept in 32 bits; WebVTT blocks end at FFmpeg's line-break runs, a cu
 `-->` may be on a later line, a cue that does not read ends the document. Cues are
 sorted by start time, one that ends before it starts lasts until the next, and one
 whose start, duration and text repeat the cue before it is dropped. Time fields that
-overflow read as FFmpeg reads them on 32-bit ARMv7 (SubRip `%d` saturates to 32 bits,
-WebVTT `%u` to 32 unsigned bits); FFmpeg for AArch64 reads them with a 64-bit `long`. A
+overflow read as FFmpeg reads them on 32-bit ARMv7: a SubRip field saturates to the
+32-bit signed range, and a WebVTT field's digits stop at 2³² − 1 and read as a 32-bit
+signed number. FFmpeg for AArch64 reads some of them otherwise (a SubRip hour of 2³¹ as
+−2³¹, a WebVTT field of 2³² as 0); the `subtitle-text-host` cases pin both targets. A
 UTF-16 SubRip document is converted as FFmpeg converts it, the first byte of some
 characters after a line break included. A document in another charset is FFmpeg's
 `sub_charenc` case: each cue's text converts on its own with `charset::CharsetJob`
 and the receiver repertoire, so a cue the charset refuses has no text and the
-others keep theirs (the strict SubRip reader this crate had before refused the
-whole document).
+others keep theirs.
 
 **Comparison-only projections.** The non-default `reference-trace` feature adds
 `reference_trace`: the text `carriage` session that reproduces FFmpeg's demuxer

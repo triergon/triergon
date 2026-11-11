@@ -6,7 +6,8 @@
 //! the last text line before the next timing line is that cue's number, and
 //! is dropped, when it reads as one ([`timestamp::cue_number`]): the whole
 //! line if it is the cue's only line, its start otherwise. A cue with no text
-//! is no packet. The duration is the end minus the start as a 32-bit `int`.
+//! is no packet. The duration is the end minus the start, wrapped to the
+//! 32-bit signed range.
 
 use super::lines::{Line, Span};
 use super::timestamp;
@@ -51,7 +52,7 @@ impl Parser {
             self.close(true, entries)?;
             self.cue = Some(Open {
                 start_ms,
-                // The demuxer keeps the difference in an `int`.
+                // The duration wraps to the 32-bit signed range.
                 duration_ms: i64::from(end_ms.wrapping_sub(start_ms) as i32),
                 text_start: self.text.len(),
                 last_line: None,

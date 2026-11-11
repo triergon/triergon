@@ -1,8 +1,9 @@
 //! SubRip times and cue numbers, read as the `srt` demuxer reads them.
 //!
-//! A number is read as C's `sscanf` reads `%d`: leading white space, an
-//! optional sign, then decimal digits, saturated to the range of a 32-bit
-//! `int` as on 32-bit targets. A field has no range of its own: minutes and
+//! A number is leading white space, an optional sign, then decimal digits.
+//! Its value saturates to the 32-bit signed range, so a field beyond it reads
+//! as 2³¹ − 1 or −2³¹, as observed on 32-bit ARMv7. A field has no range of
+//! its own: minutes and
 //! seconds above 59 count as they are, and the fraction is a count of
 //! milliseconds whatever its width (`1,5` is 1.005 seconds).
 
@@ -30,7 +31,7 @@ impl Scan<'_> {
         Some(())
     }
 
-    /// `%d`, as its sign and the magnitude of its digits.
+    /// A number, as its sign and the magnitude of its digits.
     fn signed(&mut self) -> Option<(bool, i64)> {
         self.space();
         let negative = self.peek() == Some(b'-');
@@ -48,14 +49,14 @@ impl Scan<'_> {
         (self.at > start).then_some((negative, magnitude))
     }
 
-    /// `%d` as an `int`.
+    /// A number, saturated to the 32-bit signed range.
     fn integer(&mut self) -> Option<i64> {
         let (negative, magnitude) = self.signed()?;
         let value = if negative { -magnitude } else { magnitude };
         Some(value.clamp(i32::MIN.into(), i32::MAX.into()))
     }
 
-    /// `%d:%d:%d`, one byte of `separators`, `%d`; in milliseconds.
+    /// `H:M:S`, one byte of `separators` and the fraction; in milliseconds.
     fn clock(&mut self, separators: &[u8]) -> Option<i64> {
         let hours = self.integer()?;
         self.one_of(b":")?;

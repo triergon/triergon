@@ -11,11 +11,12 @@
 //! it contains `-->`; the timing then starts on the next line, otherwise on
 //! the first. The timing is a start time, then anything up to the first
 //! `-->` after it, in the same line or a later one, then an end time. A time
-//! is `H:M:S.F` or `M:S.F`, and each field reads as C's `%u` conversion does
-//! with glibc on 32-bit targets: leading white space (which may span lines),
-//! an optional sign and decimal digits. The value, negated modulo 2³² after a
-//! minus and 2³² − 1 when the digits exceed that, counts as a 32-bit signed
-//! number. A field has no range of its own, and the fraction is a count of
+//! is `H:M:S.F` or `M:S.F`. Each field is leading white space (which may span
+//! lines), an optional sign and decimal digits. The digits count up to
+//! 2³² − 1 and stop there, a minus negates the count modulo 2³², and the
+//! result reads as a 32-bit signed number: `4294967295` and `-1` read as −1,
+//! `2147483648` as −2³¹. This is what is observed on 32-bit ARMv7. A field has
+//! no range of its own, and the fraction is a count of
 //! milliseconds whatever its width (`1.5` is 1.005 seconds). Whatever
 //! follows a time's last digit is ignored.
 //!
@@ -77,7 +78,8 @@ impl Scan<'_> {
         Some(())
     }
 
-    /// `%u` with a 32-bit `unsigned long`, as an `int`.
+    /// A field: its digits as a count that stops at 2³² − 1, negated modulo
+    /// 2³² after a minus, read as a 32-bit signed number.
     fn field(&mut self) -> Option<i64> {
         self.skip(is_space);
         let negative = self.peek() == Some(b'-');
