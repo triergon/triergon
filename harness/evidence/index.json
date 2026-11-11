@@ -19389,6 +19389,15 @@
    "source_revision": "b96eb9ec65abbe4548b4bc00a74e8504a6d0001d"
   },
   {
+   "name": "mp4-range-seek-checkpoints",
+   "path": "mp4-range-seek-checkpoints",
+   "retention": "retained",
+   "reason": "MP4 range playback and fragment seek restart comparisons",
+   "key": "evidence/mp4-range-seek-checkpoints/cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b.tar.gz",
+   "sha256": "cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b",
+   "bytes": 137198328
+  },
+  {
    "name": "aac-mov-host",
    "path": "aac-mov-host",
    "retention": "retained",
