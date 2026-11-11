@@ -22,7 +22,7 @@ const MAX_CHECKPOINTS: usize = 256;
 struct Checkpoint<'a> {
     ordinal: u64,
     timestamp: i64,
-    previous_sync: u64,
+    previous_sync: Option<u64>,
     slot: Slot<'a>,
 }
 
@@ -30,7 +30,7 @@ struct Checkpoint<'a> {
 struct Track<'a> {
     points: BudgetVec<Checkpoint<'a>>,
     previous: Option<i64>,
-    previous_sync: u64,
+    previous_sync: Option<u64>,
     entries: u64,
 }
 
@@ -57,7 +57,7 @@ impl<'a> Checkpoints<'a> {
                 .try_push(Track {
                     points: BudgetVec::new(budget),
                     previous: None,
-                    previous_sync: 0,
+                    previous_sync: None,
                     entries: 0,
                 })
                 .map_err(|e| e.error)?;
@@ -85,10 +85,18 @@ impl<'a> Checkpoints<'a> {
         } else {
             0
         };
-        // A fragment run beginning at a key needs no distance from a
-        // preceding run. Let the full index handle other append boundaries.
+        // A fragment's first sample and the first sample of each following
+        // fragment have zero index distance even without a sync flag.
+        // Other non-sync appends still require the full index.
+        if !key && (track.entries == 0 || slot.starts_fragment_run) {
+            let fragment_start = row.source.fragment_flags.is_some()
+                && row.source.ordinal == track.entries + 1
+                && (track.entries == 0 || slot.append_run.is_some_and(|(_, run)| run == 0));
+            if !fragment_start {
+                return None;
+            }
+        }
         if track.previous.is_some_and(|before| timestamp <= before)
-            || (!key && (track.entries == 0 || slot.starts_fragment_run))
             || flags & !admitted != 0
             || row.source.range.start > i64::MAX as u64
             || row.source.range.end.checked_sub(row.source.range.start)? > 0x1fff_ffff
@@ -96,7 +104,7 @@ impl<'a> Checkpoints<'a> {
             return None;
         }
         if key {
-            track.previous_sync = track.entries;
+            track.previous_sync = Some(track.entries);
         }
         // Short regular tracks can use their existing checkpoint capacity
         // for earlier restarts without growing the index.
@@ -249,7 +257,7 @@ struct TrackSeek<'a> {
     next: u64,
     best: Option<Checkpoint<'a>>,
     cursor: Slot<'a>,
-    previous_sync: u64,
+    previous_sync: Option<u64>,
     fallback: bool,
     search: Search,
 }
@@ -276,10 +284,14 @@ impl<'a> TrackSeek<'a> {
     fn finish_forward(&mut self, points: &[Checkpoint<'a>]) {
         if self.best.is_some() {
             self.search = Search::Ready;
-        } else {
+        } else if let Some(previous_sync) = self.previous_sync {
             // The target falls within a long non-key interval. The recorded
             // preceding sync may be in an earlier interval; restart there.
-            self.restart_at(points, self.previous_sync);
+            self.restart_at(points, previous_sync);
+        } else {
+            self.best = Some(points[0].clone());
+            self.fallback = true;
+            self.search = Search::Ready;
         }
     }
 
@@ -288,7 +300,7 @@ impl<'a> TrackSeek<'a> {
         let point = &points[at - 1];
         self.cursor = point.slot.clone();
         self.next = point.ordinal;
-        self.previous_sync = ordinal;
+        self.previous_sync = Some(ordinal);
         self.best = None;
         self.search = Search::PreviousSync;
     }
@@ -328,7 +340,7 @@ impl<'a> TrackSeek<'a> {
                 .ok_or(Error::Invalid("checked seek clock missing"))?;
             let key = head.demux.flags & 1 != 0;
             let previous_sync =
-                self.search == Search::PreviousSync && self.next == self.previous_sync;
+                self.search == Search::PreviousSync && self.previous_sync == Some(self.next);
             if self.search == Search::Forward && timestamp > self.target {
                 self.finish_forward(points);
                 continue;
@@ -340,7 +352,7 @@ impl<'a> TrackSeek<'a> {
                 self.best = Some(Checkpoint {
                     ordinal: self.next,
                     timestamp,
-                    previous_sync: self.next,
+                    previous_sync: Some(self.next),
                     slot: self.cursor.clone(),
                 });
                 if previous_sync || timestamp == self.target {
@@ -546,6 +558,9 @@ impl<'a> RangeSeekJob<'a> {
             .as_mut()
             .ok_or(Error::Invalid("missing checked seek head"))?;
         if self.landing.is_none() {
+            if head.demux.flags & 1 == 0 {
+                return Err(Error::Unsupported("native seek no observed key fallback"));
+            }
             let mut occurrence = head.clone();
             occurrence.scheduling_clock = SchedulingClock::SingleTrack;
             let discarded = occurrence.demux.flags & 4 != 0;
