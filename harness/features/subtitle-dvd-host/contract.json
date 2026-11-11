@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "id": "subtitle-dvd-host",
+  "operation": "subtitle-decode",
+  "candidate": "subtitle-worker",
+  "worker_operation": "sub-",
+  "reference": "ffmpeg-subtitles-native",
+  "pinned_per_target": true,
+  "contract": [
+    "the DVD subpicture cases whose FFmpeg result depends on the target, decoded and folded as subtitle-dvd decodes and folds them: cases the reference flags because they reach a C library result that differs between 32-bit ARM and AArch64 for the same arguments (harness/reference_subtitles_host.h)",
+    "each case is pinned per target from that target's own reference run, with the reference's flag; a case passes when the candidate, the reference and the target's pin agree",
+    "the decoder follows FFmpeg built with GCC for armv7-unknown-linux-gnueabihf; where FFmpeg for aarch64-unknown-linux-gnu gives another result, the case is open there as a deliberate divergence",
+    "preparation outside the timed operation: open the input, select the subpicture stream and its configuration, and copy its packets in demux order",
+    "one timed operation: create and open the decoder with the stream's configuration, packet time base and options, decode every prepared packet with one call each, drain, fold every output subtitle and free it, free the decoder"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
+  ],
+  "pending_module_requirements": [
+    "a deliberate divergence: FFmpeg built for aarch64-unknown-linux-gnu reads some numbers of a DVD option or configuration with 64 bits where FFmpeg built for 32-bit ARM reads them with 32, so a palette number beyond 32 bits gives another colour there; the decoder follows 32-bit ARM"
+  ],
+  "open_cases": [
+    {
+      "id": "vobsub-palette-option",
+      "requirement": "a deliberate divergence: FFmpeg built for aarch64-unknown-linux-gnu reads some numbers of a DVD option or configuration with 64 bits where FFmpeg built for 32-bit ARM reads them with 32, so a palette number beyond 32 bits gives another colour there; the decoder follows 32-bit ARM",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

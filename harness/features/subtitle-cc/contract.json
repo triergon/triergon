@@ -13,7 +13,8 @@
     "exact equality of the fold with the reference on every case; deliberate differences only as listed compatibility exceptions"
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
   ],
   "iterations": 50,
   "minimum_pairs": 30,

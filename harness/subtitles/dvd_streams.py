@@ -1334,7 +1334,13 @@ def fold(reference, path, arguments, root):
     if run.returncode != 0:
         return {"error": run.stderr.strip()}
     result = json.loads(run.stdout.splitlines()[-1])
-    return {k: result[k] for k in ("packets", "bytes", "digest")}
+    return {k: result[k] for k in ("packets", "bytes", "digest", "host_dependent") if k in result}
+
+
+def host_target():
+    """The target triple the reference was built for: the host's."""
+    run = subprocess.run(["rustc", "-vV"], capture_output=True, text=True, check=True)
+    return next(line.split(": ", 1)[1] for line in run.stdout.splitlines() if line.startswith("host: "))
 
 
 def main():
@@ -1357,7 +1363,13 @@ def main():
             shutil.copyfile(os.path.join(fate, name[len("fate/"):]), target)
         rows.append((cid, file, ["dvd", *arguments], companions, "fetched-not-redistributed",
                      "rsync://fate-suite.ffmpeg.org/fate-suite/" + source))
-    manifest = {"schema": 1, "cases": []}
+    # A case the reference flags host-dependent goes to subtitle-dvd-host,
+    # pinned for this target beside the pins other targets recorded.
+    features = os.path.join(root, "harness", "features")
+    host_path = os.path.join(features, "subtitle-dvd-host", "corpus.json")
+    with open(host_path) as f:
+        pinned = {case["id"]: case["expected_by_target"] for case in json.load(f)["cases"]}
+    manifest, host = {"schema": 1, "cases": []}, {"schema": 1, "cases": []}
     for cid, file, arguments, companions, rights, source in rows:
         path = os.path.join(corpus, file)
         entry = {"id": cid, "profile": cid, "file": file, "sha256": sha256(path), "rights": rights,
@@ -1365,13 +1377,19 @@ def main():
         if companions:
             entry["companions"] = [{"file": c, "sha256": sha256(os.path.join(corpus, c))} for c in companions]
         if os.path.exists(reference):
-            entry["expected"] = fold(reference, path, arguments, root)
+            expected = fold(reference, path, arguments, root)
+            if expected.get("host_dependent"):
+                by_target = {**pinned.get(cid, {}), host_target(): expected}
+                entry["expected_by_target"] = dict(sorted(by_target.items()))
+                host["cases"].append(entry)
+                continue
+            entry["expected"] = expected
         manifest["cases"].append(entry)
-    target = os.path.join(root, "harness", "features", "subtitle-dvd", "corpus.json")
-    with open(target, "w") as f:
-        json.dump(manifest, f, indent=2)
-        f.write("\n")
-    print("%d cases" % len(manifest["cases"]))
+    for target, document in [(os.path.join(features, "subtitle-dvd", "corpus.json"), manifest), (host_path, host)]:
+        with open(target, "w") as f:
+            json.dump(document, f, indent=2)
+            f.write("\n")
+    print("%d cases, %d pinned per target" % (len(manifest["cases"]), len(host["cases"])))
 
 
 if __name__ == "__main__":

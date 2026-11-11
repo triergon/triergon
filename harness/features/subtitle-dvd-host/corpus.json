@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "vobsub-palette-option",
+      "profile": "vobsub-palette-option",
+      "file": "dvd/basic.idx",
+      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd",
+        "opt:palette=112233,445566,778899,aabbcc,0xddeeff,AbCdEf, 102030 ,1122334455"
+      ],
+      "companions": [
+        {
+          "file": "dvd/basic.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 12,
+          "bytes": 56142,
+          "digest": 16769323122748600814,
+          "host_dependent": true
+        },
+        "armv7-unknown-linux-gnueabihf": {
+          "packets": 12,
+          "bytes": 56142,
+          "digest": 1703029331289754392,
+          "host_dependent": true
+        }
+      }
+    }
+  ]
+}
