@@ -333,7 +333,7 @@ pub fn run(args: &[String]) -> Result<()> {
         _ => return Err("expected the opus-roll seek policy".into()),
     };
     let pool = Budget::new(2 * usize::try_from(MAX_INPUT)?)?;
-    let raw = Bytes::copy_from_slice(&pool, &invocation.input(MAX_INPUT)?)?;
+    let raw = Bytes::try_from_vec(&pool, invocation.input(MAX_INPUT)?).map_err(|e| e.error())?;
     measure(&invocation, OPERATION, Some(&pool), || {
         session(&pool, &raw, seek)
     })
