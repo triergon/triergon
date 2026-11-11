@@ -1,7 +1,7 @@
 //! Atomic typed packet-batch publication; source leaf storage is already bounded.
 use super::{
     configuration::{Configuration, StateChangeJob, StateCopyJob},
-    lace::{Frames, LaceJob},
+    lace::LaceJob,
     mapping::TrackExtensionsJob,
     side_data::{BlockGroupSource, GroupJob, GroupLocation},
     syntax::check,
@@ -288,9 +288,9 @@ impl Staged {
 /// a frame is restored, so RestoreJob deliberately remains a separate field.
 /// This union needs no new allocation and preserves the original pool minima.
 #[derive(Debug)]
-#[expect(
+#[allow(
     clippy::large_enum_variant,
-    reason = "one exclusive inline workspace preserves allocation-free common paths and original pool minima; packet/lace fixed resource ceilings are tested"
+    reason = "variant sizes vary by target and one inline workspace preserves the packet budget"
 )]
 enum BatchWork {
     Idle,
@@ -403,20 +403,20 @@ impl PacketBatchJob {
         let BatchWork::Lace(job) = &self.job else {
             return Err(Error::Invalid("missing frame plan"));
         };
-        job.frames().map(Frames::len).required("missing frame plan")
+        job.frame_count().required("missing frame plan")
     }
-    fn frame_range(&self, index: usize) -> Result<Range<usize>> {
+    fn frame_range(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Range<usize>>> {
         if (self.flags >> 1) & 3 == 0 {
-            return (index == 0)
-                .then(|| self.payload.clone())
-                .required("missing frame range");
+            return Ok(Some(self.payload.clone()));
         }
-        let BatchWork::Lace(job) = &self.job else {
+        let BatchWork::Lace(job) = &mut self.job else {
             return Err(Error::Invalid("missing frame range"));
         };
-        job.frames()
-            .and_then(|frames| frames.get(index))
-            .required("missing frame range")
+        job.frame_range(self.frame, work, cancel)
     }
     pub(crate) fn step(
         &mut self,
@@ -633,13 +633,15 @@ impl PacketBatchJob {
                         }
                         continue;
                     }
+                    let Some(range) = self.frame_range(work, cancel)? else {
+                        return Ok(ParseStep::Yield);
+                    };
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
                     let track = &self.live_configuration()?.tracks()[self.track];
                     let laced = frames != 1;
                     let plain = scan_track_is_plain(track);
-                    let range = self.frame_range(self.frame)?;
                     if !laced && plain {
                         // Exactly RestorePlan::identity's immutable source view.
                         // The same one-unit StartFrame admission and subsequent

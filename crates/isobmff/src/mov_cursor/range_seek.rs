@@ -132,14 +132,22 @@ impl<'a> PacketCursor<'a> {
     /// Collect optional seek restarts as the complete range is checked.
     /// The cursor must be exhausted and rewound before using the restarts.
     pub fn enable_range_seek_checkpoints(&mut self) {
-        if matches!(self.phase, Phase::Media)
-            && self.complete_source
-            && !self.front_source
-            && self.limits.max_occurrences <= i32::MAX as u64
+        if matches!(self.phase, Phase::Media) && self.complete_source && !self.front_source {
+            if self.projection.is_all() {
+                self.initialize_range_seek_checkpoints();
+            } else {
+                // Allocate checkpoint slots after validating and projecting the tracks.
+                self.recording_seek_checkpoints = true;
+            }
+        }
+    }
+
+    pub(super) fn initialize_range_seek_checkpoints(&mut self) {
+        self.recording_seek_checkpoints = false;
+        if self.limits.max_occurrences <= i32::MAX as u64
             && self.slots.as_slice().iter().all(|slot| {
                 slot.resume_remaining == 0
-                    && (slot.track.fragments.is_empty()
-                        || (slot.track.table.sample_count() == 0 && slot.track.edits.is_some()))
+                    && (slot.track.fragments.is_empty() || slot.track.table.sample_count() == 0)
             })
         {
             self.seek_checkpoints = Checkpoints::new(self.slots.budget(), self.slots.as_slice())
@@ -184,7 +192,7 @@ impl<'a> PacketCursor<'a> {
             || index.total > limits.index.max_entries
             || index.total > packets.max_occurrences
             || self.validated > packets.max_source_samples
-            || self.slots.len() > packets.max_tracks
+            || self.source_tracks > packets.max_tracks
             || self.media.len() > packets.max_media_extents
             || self.limits.edit.max_occurrences > packets.edit.max_occurrences
             || self.limits.edit.max_scanned_samples > packets.edit.max_scanned_samples
@@ -212,6 +220,7 @@ impl<'a> PacketCursor<'a> {
             slots,
             media: self.media,
             packet_limits: self.limits,
+            source_tracks: self.source_tracks,
             validated: self.validated,
             reference,
             timestamp,
@@ -353,6 +362,7 @@ pub struct RangeSeekJob<'a> {
     slots: BudgetVec<Slot<'a>>,
     media: &'a [Range<u64>],
     packet_limits: super::PacketLimits,
+    source_tracks: usize,
     validated: u64,
     reference: usize,
     timestamp: i64,
@@ -483,8 +493,8 @@ impl<'a> RangeSeekJob<'a> {
                     self.at += 1;
                     continue;
                 }
-                let reference_base = self.slots.as_slice()[0].clock.demux_base;
-                let target_base = points[0].slot.clock.demux_base;
+                let reference_base = self.slots.as_slice()[0].clock()?.demux_base;
+                let target_base = points[0].slot.clock()?.demux_base;
                 if self.opus_track == Some(at) {
                     let pts = landing
                         .selected
@@ -561,7 +571,7 @@ impl<'a> RangeSeekJob<'a> {
             self.at += 1;
         }
         head.scheduling_clock = if self.index.tracks.len() > 1 {
-            SchedulingClock::from_demux_clock(head.demux.dts_field, slot.clock.demux_base)?
+            SchedulingClock::from_demux_clock(head.demux.dts_field, head.media_clock.demux_base)?
         } else {
             SchedulingClock::SingleTrack
         };
@@ -582,6 +592,7 @@ impl<'a> RangeSeekJob<'a> {
         let mut slots = self.slots;
         slots.as_mut_slice()[..=self.reference].rotate_left(1);
         let mut cursor = PacketCursor::from_slots(slots, self.media, self.packet_limits);
+        cursor.source_tracks = self.source_tracks;
         cursor.complete_source = true;
         cursor.phase = Phase::Fill;
         cursor.validated = self.validated;

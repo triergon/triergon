@@ -56,6 +56,21 @@ Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
 When the movie declares its duration, the range player checks source ranges and
 packet projections before merging the tracks for delivery.
+QuickTime range playback reads AAC configuration from version 1 and version 2
+sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
+fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
+also runs with the optional format and marker atoms replaced by free boxes.
+`avc-aac-quicktime-reordered.mov` adds 44.1 kHz AAC and AVC with B pictures.
+`avc-aac-quicktime-fragmented.mov` exercises open and seek with empty
+initialization sample tables and a version 1 sound description. It remuxes the
+synthetic `fragmented-avc-aac.mp4` fixture under the same MIT or Apache-2.0 license.
+
+`Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
+Data tracks such as RTP hints and timecode still have their sample extents checked.
+Supply any edit plans in source track order, with `None` for each data track.
+The `avc-aac-rtp-hints.mp4` test fixture contains a synthetic AVC test pattern,
+AAC sine audio and two RTP hint tracks, with the first hint track between the
+video and audio tracks.
 
 ## Supported
 

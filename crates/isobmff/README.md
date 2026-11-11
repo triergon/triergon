@@ -48,6 +48,8 @@ Complete indexed sources can check all packet projections by track before
 rewinding for merged playback.
 Short regular tracks can keep extra seek restart points in the existing
 checkpoint allocation.
+Complete fragment-only tracks can also retain a restart for backward seek
+when their projected decode times increase and each run begins at a sync sample.
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -208,7 +210,7 @@ What the reader does not do:
 - **A fragment without `tfdt`** has `None` times, and a seek cannot land on it.
 - **Times beyond `i64`** fail the read with `Error::Overflow`.
 - **Encrypted entries** report their outer code (`encv`, `enca`) as `CodecId::Other`.
-- **A QuickTime `mp4a` entry** whose version 1 or `wave` layout cannot be walked
+- **A QuickTime `mp4a` entry** whose sound description or `wave` layout cannot be walked
   stays `CodecId::Other`, as does any object type other than AAC or DTS with a core.
 
 `examples/isobmff_consumer_worker.rs` drives the FFmpeg-compatible operations for
@@ -223,10 +225,11 @@ model establishes EOF. The source trace keeps the original fields and
 strict validation.
 
 `AacConfigurationJob` reads AudioSpecificConfig from one `mp4a` sample
-description, including the supported QuickTime `wave` layout. It returns
-the source offset and shared bytes under `ConfigurationLimits` and a
-`WorkBudget`. The descriptor identifies MPEG-4 Audio. Callers validate
-the bytes and determine the audio object type separately.
+description, including QuickTime version 1 and version 2 sound descriptions
+with `wave` extensions. For version 2, it checks the declared extension offset
+and reads the descriptor inside `wave`. It returns the source offset and shared
+bytes under `ConfigurationLimits` and a `WorkBudget`. The descriptor identifies
+MPEG-4 Audio. Callers validate the bytes and determine the audio object type separately.
 `ObjectTypeScan` reads any `mp4a` or `mp4s` description's stated object
 type and decoder-specific information the same way.
 
