@@ -1,6 +1,7 @@
 //! Decode preloaded AAC access units and fold every native PCM plane.
 
-use std::io::Write;
+use std::fs::File;
+use std::io::{Read, Write};
 use triergon::Budget;
 use triergon_codec::{AudioFrame, SampleFormat};
 use triergon_session::TrackDecoder;
@@ -10,6 +11,27 @@ use crate::Output;
 const PADDING: usize = 64;
 const SAMPLES: usize = 1024;
 const MAX_PACKET: usize = 64 << 10;
+const MAX_INPUT: u64 = 64 << 20;
+pub const OPERATION: &str = "audio-aac-access-units";
+
+pub fn load(path: &str) -> Result<Vec<u8>, String> {
+    let mut file = File::open(path).map_err(|error| error.to_string())?;
+    let metadata = file.metadata().map_err(|error| error.to_string())?;
+    if !metadata.is_file() || !(16..=MAX_INPUT).contains(&metadata.len()) {
+        return Err("AAC input file bounds".into());
+    }
+    let len = metadata.len() as usize;
+    let mut data = Vec::new();
+    data.try_reserve_exact(len)
+        .map_err(|error| error.to_string())?;
+    data.resize(len, 0);
+    file.read_exact(&mut data)
+        .map_err(|error| error.to_string())?;
+    if file.read(&mut [0]).map_err(|error| error.to_string())? != 0 {
+        return Err("AAC input changed while reading".into());
+    }
+    Ok(data)
+}
 
 fn read_u32(data: &mut &[u8]) -> Result<u32, String> {
     let (word, rest) = data.split_first_chunk::<4>().ok_or("truncated AAC input")?;
@@ -61,6 +83,21 @@ pub fn decode(mut data: &[u8], out: &mut Output) -> Result<(), String> {
             || frame.sample_format != SampleFormat::Float
         {
             return Err("AAC output shape".into());
+        }
+        if out.raw.is_some() {
+            let layout = frame.layout.speakers();
+            if layout.len() != channels {
+                return Err("AAC output speaker count".into());
+            }
+            let mut speakers = [0; 8];
+            for (id, speaker) in speakers.iter_mut().zip(layout) {
+                *id = *speaker as u8;
+            }
+            match out.aac_speakers {
+                None => out.aac_speakers = Some((speakers, channels)),
+                Some(previous) if previous == (speakers, channels) => {}
+                Some(_) => return Err("AAC speaker order changed".into()),
+            }
         }
         for plane in &frame.planes {
             if plane.len() != SAMPLES {

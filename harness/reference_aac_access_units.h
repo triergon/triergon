@@ -1,7 +1,7 @@
 /* Configured AAC-LC decoding through the public libavcodec API. */
 #include <libavutil/intreadwrite.h>
 
-enum { AAC_PADDING = 64, AAC_SAMPLES = 1024 };
+enum { AAC_PADDING = 64, AAC_SAMPLES = 1024, AAC_MAX_INPUT = 64 << 20 };
 _Static_assert(AAC_PADDING >= AV_INPUT_BUFFER_PADDING_SIZE, "AAC packet padding");
 
 static void keep_aac_input(void *opaque, uint8_t *data) {
@@ -31,6 +31,7 @@ static void aac_access_units(const uint8_t *data, size_t size, struct out *out) 
     packet->buf = av_buffer_create((uint8_t *)data, size, keep_aac_input, NULL,
                                    AV_BUFFER_FLAG_READONLY);
     if (!decoder->extradata || !packet->buf) die("AAC input storage", AVERROR(ENOMEM));
+    data = packet->buf->data;
     memcpy(decoder->extradata, data + 16, config);
     decoder->extradata_size = (int)config;
     decoder->thread_count = 1;
@@ -55,6 +56,16 @@ static void aac_access_units(const uint8_t *data, size_t size, struct out *out) 
             (uint32_t)frame->ch_layout.nb_channels != channels ||
             (uint32_t)frame->sample_rate != rate)
             die("AAC output shape", AVERROR_INVALIDDATA);
+        if (out->raw) {
+            for (uint32_t channel = 0; channel < channels; channel++) {
+                enum AVChannel speaker = av_channel_layout_channel_from_index(&frame->ch_layout, channel);
+                if (speaker < 0 || speaker > UINT8_MAX ||
+                    (out->aac_channels && out->aac_speakers[channel] != speaker))
+                    die("AAC output speaker order", AVERROR_INVALIDDATA);
+                out->aac_speakers[channel] = (uint8_t)speaker;
+            }
+            out->aac_channels = channels;
+        }
         const size_t plane = AAC_SAMPLES * sizeof(float);
         for (uint32_t channel = 0; channel < channels; channel++) {
             const uint8_t *samples = frame->extended_data[channel];

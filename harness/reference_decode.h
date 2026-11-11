@@ -24,6 +24,7 @@
  * is inside the timed interval; file loading is outside, as in the other workers.
  */
 #define _POSIX_C_SOURCE 200809L
+#include <errno.h>
 #include <libavcodec/avcodec.h>
 #include <libavfilter/avfilter.h>
 #include <libavfilter/buffersink.h>
@@ -100,6 +101,8 @@ struct out {
     uint64_t frames, bytes;
     struct fold digest;
     FILE *raw;
+    uint8_t aac_speakers[8];
+    unsigned aac_channels;
 };
 
 #include "reference_aac_access_units.h"
@@ -383,15 +386,25 @@ int main(int argc, char **argv) {
     if (!kind) return 2;
     *kind++ = 0;
     int video = strncmp(op, "video-", 6) == 0;
-    const char *name = strchr(op, '-') + 1;
+    const char *separator = strchr(op, '-');
+    if (!separator || !separator[1]) return 2;
+    const char *name = separator + 1;
     if (!strcmp(name, "dts")) name = "dca";
+    const int configured_aac = !strcmp(op, "audio-aac-access-units");
     FILE *in = fopen(argv[2], "rb");
     if (!in) { perror("input"); return 1; }
-    fseek(in, 0, SEEK_END);
+    if (fseek(in, 0, SEEK_END)) die("input seek", AVERROR(errno));
     long size = ftell(in);
-    fseek(in, 0, SEEK_SET);
+    if (size < 0) die("input size", AVERROR(errno));
+    if ((uintmax_t)size > SIZE_MAX - AV_INPUT_BUFFER_PADDING_SIZE ||
+        (configured_aac && (size < 16 || size > AAC_MAX_INPUT)))
+        die("input file bounds", AVERROR_INVALIDDATA);
+    if (fseek(in, 0, SEEK_SET)) die("input seek", AVERROR(errno));
     uint8_t *data = av_malloc((size_t)size + AV_INPUT_BUFFER_PADDING_SIZE);
+    if (!data) die("input allocation", AVERROR(ENOMEM));
     if (fread(data, 1, (size_t)size, in) != (size_t)size) { perror("read"); return 1; }
+    if (configured_aac && (fgetc(in) != EOF || ferror(in)))
+        die("AAC input changed while reading", AVERROR(EIO));
     memset(data + size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
     fclose(in);
     /* Video only: the probe decodes a few frames before the measured window, which warms
@@ -418,10 +431,18 @@ int main(int argc, char **argv) {
         fprintf(stderr, "{\"digest\":%llu}\n", (unsigned long long)fold_finish(o.digest));
     } else if (!strcmp(kind, "raw") && argc > 3) {
         o.raw = fopen(argv[3], "wb");
+        if (!o.raw) die("raw output", AVERROR(errno));
         pass(name, par, data, (size_t)size, video, &o);
-        fclose(o.raw);
-        printf("{\"packets\":%llu,\"bytes\":%llu,\"digest\":%llu}\n", (unsigned long long)o.frames,
+        if (fclose(o.raw)) die("raw output", AVERROR(errno));
+        printf("{\"packets\":%llu,\"bytes\":%llu,\"digest\":%llu", (unsigned long long)o.frames,
                (unsigned long long)o.bytes, (unsigned long long)fold_finish(o.digest));
+        if (o.aac_channels) {
+            printf(",\"speakers\":[");
+            for (unsigned i = 0; i < o.aac_channels; i++)
+                printf("%s%u", i ? "," : "", (unsigned)o.aac_speakers[i]);
+            printf("]");
+        }
+        puts("}");
     } else {
         return 2;
     }

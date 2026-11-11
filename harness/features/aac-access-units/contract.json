@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "aac-access-units",
+  "gate": "on-demand",
+  "operation": "audio-aac-access-units",
+  "candidate": "codec-worker",
+  "reference": "ffmpeg-decode-native",
+  "runner": "cargo xtask codecs aac-access-units",
+  "contract": [
+    "extract the original AudioSpecificConfig and every AAC packet from the three pinned QuickTime clips, in decode order and without edit-list trimming",
+    "preload the same bounded input with zero padding on both sides, then time decoder setup, packet decode, planar float output fold, flush and teardown",
+    "compare every sample in every 1024-sample PCM plane using the AAC numeric rules, with exact block count, rate and ordered speakers",
+    "for fixed configurations 5 and 6, allow the back and side labels of the single surround pair to differ while preserving the same plane positions",
+    "require matching parity and worker identities for the timing and memory comparisons"
+  ],
+  "required_targets": ["aarch64-unknown-linux-gnu"],
+  "iterations": 4,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

@@ -114,13 +114,21 @@ fn iterations(workload: &Value) -> Result<u32, String> {
 }
 
 pub fn run(options: &Options) -> Result<(), String> {
-    let workloads = crate::checks::read_json(&options.workloads)
+    let manifest = crate::checks::read_json(&options.workloads)
         .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
-    let workloads = workloads
+    let workloads = manifest
         .get("workloads")
         .and_then(Value::as_array)
         .ok_or("workloads file without workloads")?
         .to_vec();
+    let parity = super::aac_access_units::measurement_parity(
+        &options.repository,
+        &options.candidate,
+        &options.reference,
+        &options.workloads,
+        &options.root,
+        &manifest,
+    )?;
     let timing_lock = timing::lock()?;
     let claims_path = &options.ledger;
     let mut claims = if claims_path.exists() {
@@ -243,6 +251,9 @@ pub fn run(options: &Options) -> Result<(), String> {
             ),
             ("cpus".to_owned(), gate_build::cpus()),
         ];
+        if let Some(parity) = &parity {
+            result.push(("parity_sha256".to_owned(), Value::str(parity)));
+        }
         let (mut ratio, mut delivery, mut digest_equal) = (None, None, None);
         if let Ok(interval) = &graded.interval {
             let equal = digests_equal(&graded.record);

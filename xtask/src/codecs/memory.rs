@@ -111,13 +111,21 @@ fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
 }
 
 pub fn run(options: &Options) -> Result<(), String> {
-    let workloads = crate::checks::read_json(&options.workloads)
+    let manifest = crate::checks::read_json(&options.workloads)
         .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
-    let workloads = workloads
+    let workloads = manifest
         .get("workloads")
         .and_then(Value::as_array)
         .ok_or("workloads file without workloads")?
         .to_vec();
+    let parity = super::aac_access_units::measurement_parity(
+        &options.repository,
+        &options.candidate,
+        &options.reference,
+        &options.workloads,
+        &options.root,
+        &manifest,
+    )?;
     fs::create_dir_all(&options.out).map_err(|e| format!("{}: {e}", options.out.display()))?;
     let refusals =
         gate_build::pair_refusals(&options.repository, &options.candidate, &options.reference);
@@ -128,7 +136,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         println!("no gate result: memory gates are measured on native AArch64 Linux with glibc");
     }
     let only: Option<Vec<&str>> = options.only.as_deref().map(|o| o.split(',').collect());
-    let identity = Value::object([
+    let mut identity = Value::object([
         (
             "candidate_sha256",
             Value::str(file_sha(&options.candidate)?),
@@ -147,6 +155,11 @@ pub fn run(options: &Options) -> Result<(), String> {
         ("seed", Value::int(options.seed)),
         ("utc", Value::str(python::utc_now())),
     ]);
+    if let Some(parity) = parity
+        && let Value::Object(fields) = &mut identity
+    {
+        fields.push(("parity_sha256".into(), Value::str(parity)));
+    }
     write(&options.out.join("identity.json"), &identity)?;
     let mut summary = Vec::new();
     for w in &workloads {

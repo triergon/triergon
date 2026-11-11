@@ -32,10 +32,12 @@ original packets and AudioSpecificConfig with the pinned `ffprobe`. Each input
 starts with four little-endian 32-bit words for the sample rate, channel count,
 packet count and configuration length. The configuration precedes the packets,
 each with a little-endian 32-bit length and 64 zero padding bytes. Both workers
-decode the same preloaded data and require 1024 samples per plane per packet.
-The `raw` mode writes little-endian floats in frame and plane order, and the
-command compares every sample with the AAC accuracy bounds. Use its
-`workloads.json` with `cargo xtask codecs time` and `cargo xtask codecs memory`.
+cap the preloaded input at 64 MiB and require 1024 samples per plane per packet.
+The `raw` mode writes little-endian floats in frame and plane order and reports
+the ordered speaker IDs. The command compares every sample with the AAC
+accuracy bounds and checks the speaker order. Pass its `workloads.json` to
+`cargo xtask codecs time` and `cargo xtask codecs memory` with the same input
+directory and workers. Both commands require the matching `parity.json`.
 
 ## Outputs
 
