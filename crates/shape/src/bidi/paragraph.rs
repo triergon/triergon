@@ -62,9 +62,31 @@ pub(super) fn resolve(
     charge(work, classes.len())?;
     storage.types.clear();
     storage.types.try_extend_from_slice(classes)?;
-    storage.depths.clear();
-    storage.depths.try_resize(classes.len(), 0)?;
-    levels[end..].fill(Level(0));
+    if brackets.is_none() && is_plain(classes) {
+        // One sequence of everything but a final separator, at level 0.
+        let text = classes.len() - usize::from(classes[classes.len() - 1] == BidiClass::B);
+        levels.fill(Level(level));
+        if let Some(separator) = levels.get_mut(text) {
+            *separator = Level(0);
+        }
+        sequence::resolve_plain(
+            &mut storage.sequences,
+            &mut storage.types.as_mut_slice()[..text],
+            level,
+            &mut levels[..text],
+            work,
+        )?;
+        reset_separators(classes, Level(level), levels);
+        return Ok(Level(level).direction());
+    }
+    if storage.depths.len() < classes.len() {
+        storage.depths.try_resize(classes.len(), 0)?;
+    }
+    storage.depths.truncate(classes.len());
+    if end < classes.len() {
+        storage.depths.as_mut_slice()[end..].fill(0);
+        levels[end..].fill(Level(0));
+    }
     explicit::levels(
         classes,
         end,
@@ -111,6 +133,17 @@ pub(super) fn resolve(
     }
     reset_separators(classes, Level(level), levels);
     Ok(Level(level).direction())
+}
+
+/// Whether `classes` hold no explicit formatting characters, isolates or
+/// paragraph separators but perhaps a final one.
+fn is_plain(classes: &[BidiClass]) -> bool {
+    let Some((last, text)) = classes.split_last() else {
+        return true;
+    };
+    let plain =
+        |c: &BidiClass| *c == BidiClass::Bn || !c.is_removed_by_x9() && !c.is_isolate_control();
+    text.iter().all(|c| plain(c) && *c != BidiClass::B) && plain(last)
 }
 
 /// The paragraph's part of rule L1: segment and paragraph separators, and the

@@ -139,6 +139,7 @@ fn brackets(w: &mut Writer, ucd: &Loaded, records: &[source::Record<'_>]) -> Res
             first.map(|first| (r.code_point, first))
         })
         .collect();
+    let mut values = source::filled(0u16);
     let mut items = Vec::new();
     for f in source::fields(ucd.text("BidiBrackets.txt")) {
         let cp = source::code_point(f[0])?;
@@ -150,15 +151,23 @@ fn brackets(w: &mut Writer, ucd: &Loaded, records: &[source::Record<'_>]) -> Res
         };
         let identity = decomposed.get(&opening).copied().unwrap_or(opening);
         let flag = if opens { 0x8000_0000_u32 } else { 0 };
-        items.push(format!("({}, 0x{:08X})", hex(cp), identity | flag));
+        items.push(format!("0x{:08X}", identity | flag));
+        let index = u16::try_from(items.len()).map_err(|_| "too many brackets")?;
+        source::set(&mut values, cp..=cp, &index);
     }
+    w.trie(
+        "Bidi_Paired_Bracket (BidiBrackets.txt), as one more than an index into\n\
+         [`BRACKETS`], 0 for characters that are not brackets.",
+        "BRACKET",
+        &pack(&values, 0),
+    );
     w.array(
-        "Paired brackets (BidiBrackets.txt) in code point order: each bracket and its\n\
-         pair's identity, with the top bit set for opening brackets.",
+        "The brackets of [`BRACKET`]: each one's pair identity, with the top bit set\n\
+         for opening brackets.",
         "BRACKETS",
-        "(u32, u32)",
+        "u32",
         &items,
-        8,
+        4,
     );
     Ok(())
 }

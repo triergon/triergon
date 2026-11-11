@@ -151,11 +151,13 @@ does.
 
 ## What it does not cover
 
-- One paragraph whose text holds a paragraph separator with an isolate opened
-  before it and closed after it: FriBidi resolves the text between the separator
-  and the isolate's PDI apart from the isolate, and the crate does not, which
-  shows in simple shaping of such a line. Text resolved paragraph by paragraph,
-  as libass's complex shaping and `shape-bidi` resolve it, never holds one.
+- Two corners of FriBidi's bidi results. One paragraph whose text holds a
+  paragraph separator with an isolate opened before it and closed after it:
+  FriBidi resolves the text between the separator and the isolate's PDI apart
+  from the isolate, and the crate does not, which shows in simple shaping of such
+  a line; text resolved paragraph by paragraph, as libass's complex shaping and
+  `shape-bidi` resolve it, never holds one. And a mark right after the PDI of an
+  isolate that overflows level 125, after an Arabic letter and a number.
 - Vertical directions (libass shapes `@` fonts horizontally with `vert`).
 - Apple Advanced Typography (`morx`, `kerx`, `trak` with `STAT`) and Apple `kern`
   version 1; in an OpenType `kern` table, subtables of formats 1, 2 and 3, which

@@ -25,7 +25,7 @@
 //! BidiCharacterTest.txt, this is UAX #9's N0.
 
 use super::charge;
-use super::class::{BidiClass, Bracket, Level};
+use super::class::{BidiClass, Bracket, Level, fill};
 use super::explicit::{MAX_ISOLATE_DEPTH, NONE};
 use super::sequence::Paragraph;
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
@@ -51,6 +51,9 @@ struct Depth {
     level: u8,
     /// Where its stack starts in [`Storage::slots`], [`NONE`] until it is used.
     start: u32,
+    /// The paragraph it was last used in, so that a new paragraph starts it
+    /// afresh without clearing every depth.
+    paragraph: u32,
 }
 
 impl Depth {
@@ -58,6 +61,7 @@ impl Depth {
         open: 0,
         level: u8::MAX,
         start: NONE,
+        paragraph: 0,
     };
 }
 
@@ -68,6 +72,8 @@ pub(super) struct Storage {
     /// position.
     slots: BudgetVec<(char, u32)>,
     depths: BudgetVec<Depth>,
+    /// The number of the current paragraph, from 1.
+    paragraph: u32,
     /// The bracket pairs: the positions of each opening and closing bracket.
     pairs: BudgetVec<(u32, u32)>,
 }
@@ -77,8 +83,40 @@ impl Storage {
         Self {
             slots: BudgetVec::new(budget),
             depths: BudgetVec::new(budget),
+            paragraph: 0,
             pairs: BudgetVec::new(budget),
         }
+    }
+
+    /// Starts a paragraph: every depth's stack empty, and the deep stacks'
+    /// room given back.
+    fn start_paragraph(&mut self) -> Result<()> {
+        self.paragraph = self.paragraph.wrapping_add(1);
+        if self.paragraph == 0 {
+            self.depths.clear();
+            self.paragraph = 1;
+        }
+        let depths = usize::from(MAX_ISOLATE_DEPTH) + 1;
+        if self.depths.len() < depths {
+            self.depths.try_resize(depths, Depth::UNUSED)?;
+        }
+        if self.slots.len() < SHARED_SLOTS {
+            self.slots.try_resize(SHARED_SLOTS, ('\0', 0))?;
+        }
+        self.slots.truncate(SHARED_SLOTS);
+        Ok(())
+    }
+
+    /// The stack of `depth` in this paragraph.
+    fn depth(&mut self, depth: usize) -> &mut Depth {
+        let state = &mut self.depths[depth];
+        if state.paragraph != self.paragraph {
+            *state = Depth {
+                paragraph: self.paragraph,
+                ..Depth::UNUSED
+            };
+        }
+        state
     }
 
     /// Where the stack of `depth` starts, giving deep stacks room of their own.
@@ -137,7 +175,8 @@ pub(super) fn resolve_brackets(
                 if sequence_of[at] == NONE {
                     continue;
                 }
-                let joined = paragraph.classes[at] == BidiClass::Nsm || absorbed[at];
+                let joined =
+                    paragraph.classes[at] == BidiClass::Nsm || absorbed.get(at) == Some(&true);
                 if !joined || sequence_of[at] != sequence_of[bracket] {
                     break;
                 }
@@ -164,34 +203,35 @@ fn pair(
 ) -> Result<()> {
     charge(work, types.len())?;
     storage.pairs.clear();
-    storage.slots.clear();
-    storage.slots.try_resize(SHARED_SLOTS, ('\0', 0))?;
-    storage.depths.clear();
-    storage
-        .depths
-        .try_resize(usize::from(MAX_ISOLATE_DEPTH) + 1, Depth::UNUSED)?;
-    // One past the deepest depth seen since a shallower character.
+    storage.start_paragraph()?;
+    // One past the deepest depth seen since a shallower character, and the
+    // depth and level of the last character.
     let mut deepest = 0;
+    let mut last = None;
     for (at, &class) in types.iter().enumerate() {
         if sequence_of[at] == NONE {
             continue;
         }
         let depth = usize::from(depths[at]);
-        for state in &mut storage.depths[depth + 1..deepest.max(depth + 1)] {
-            state.level = u8::MAX;
-        }
-        deepest = depth + 1;
-        let state = &mut storage.depths[depth];
-        if state.level != levels[at].0 {
-            if state.level != u8::MAX {
-                state.open = 0;
+        if last != Some((depth, levels[at].0)) {
+            last = Some((depth, levels[at].0));
+            for deeper in depth + 1..deepest.max(depth + 1) {
+                storage.depth(deeper).level = u8::MAX;
             }
-            state.level = levels[at].0;
+            deepest = depth + 1;
+            let state = storage.depth(depth);
+            if state.level != levels[at].0 {
+                if state.level != u8::MAX {
+                    state.open = 0;
+                }
+                state.level = levels[at].0;
+            }
         }
-        let Some(bracket) = brackets[at].filter(|_| class == BidiClass::On && !absorbed[at]) else {
+        let joined = absorbed.get(at) == Some(&true);
+        let Some(bracket) = brackets[at].filter(|_| class == BidiClass::On && !joined) else {
             continue;
         };
-        let open = usize::from(state.open);
+        let open = usize::from(storage.depth(depth).open);
         let start = storage.start(depth)?;
         if bracket.opens() {
             if open == MAX_OPEN_BRACKETS {
@@ -309,7 +349,7 @@ pub(super) fn resolve(
             Some(_) => BidiClass::L,
             None => embedding,
         };
-        types[at..end].fill(class);
+        fill(&mut types[at..end], class);
         at = end;
     }
     Ok(())

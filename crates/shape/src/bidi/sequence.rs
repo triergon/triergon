@@ -114,20 +114,21 @@ pub(super) fn resolve(
 ) -> Result<()> {
     sequences(storage, paragraph, types, levels, work)?;
     storage.absorbed.clear();
-    if paragraph.brackets.is_some() {
-        storage.absorbed.try_resize(types.len(), false)?;
-    }
     for s in 0..storage.sequences.len() {
         let sequence = storage.sequences[s];
         let positions = sequence_positions(&storage.order, sequence);
-        load(&mut storage.types, types, positions)?;
         let runs = paragraph.brackets.map(|brackets| weak::Runs {
             brackets,
             positions,
-            absorbed: storage.absorbed.as_mut_slice(),
+            absorbed: &mut storage.absorbed,
         });
-        weak::resolve(storage.types.as_mut_slice(), sequence.sos, runs, work)?;
-        store(&storage.types, types, positions);
+        if let Some(range) = contiguous(positions) {
+            weak::resolve(&mut types[range], sequence.sos, runs, work)?;
+        } else {
+            load(&mut storage.types, types, positions)?;
+            weak::resolve(storage.types.as_mut_slice(), sequence.sos, runs, work)?;
+            store(&storage.types, types, positions);
+        }
     }
     if let Some(brackets) = paragraph.brackets {
         neutral::resolve_brackets(
@@ -144,30 +145,106 @@ pub(super) fn resolve(
     for s in 0..storage.sequences.len() {
         let sequence = storage.sequences[s];
         let positions = sequence_positions(&storage.order, sequence);
-        load(&mut storage.types, types, positions)?;
-        neutral::resolve(
-            storage.types.as_mut_slice(),
-            sequence.level,
-            (sequence.sos, sequence.eos),
-            (sequence.break_at != NONE).then_some(sequence.break_at as usize),
-            work,
-        )?;
-        store(&storage.types, types, positions);
+        let ends = (sequence.sos, sequence.eos);
+        let stop = (sequence.break_at != NONE).then_some(sequence.break_at as usize);
+        if let Some(range) = contiguous(positions) {
+            neutral::resolve(&mut types[range.clone()], sequence.level, ends, stop, work)?;
+            for (&class, level) in types[range.clone()].iter().zip(&mut levels[range]) {
+                raise(level, class);
+            }
+        } else {
+            load(&mut storage.types, types, positions)?;
+            neutral::resolve(
+                storage.types.as_mut_slice(),
+                sequence.level,
+                ends,
+                stop,
+                work,
+            )?;
+            for (&at, &class) in positions.iter().zip(storage.types.iter()) {
+                types[at as usize] = class;
+                raise(&mut levels[at as usize], class);
+            }
+        }
     }
-    charge(work, types.len())?;
-    // The embedding and override characters after a paragraph separator take
-    // the direction of their class.
-    for (&class, level) in types.iter().zip(levels.iter_mut()) {
-        level.0 += match (level.0 & 1 == 1, class) {
-            (false, BidiClass::R | BidiClass::Rle | BidiClass::Rlo)
-            | (
-                true,
-                BidiClass::L | BidiClass::Lre | BidiClass::Lro | BidiClass::En | BidiClass::An,
-            ) => 1,
-            (false, BidiClass::En | BidiClass::An) => 2,
-            _ => 0,
-        };
+    Ok(())
+}
+
+/// Resolves a paragraph without explicit formatting characters, isolates or
+/// bracket pairs, but perhaps BN and a final paragraph separator: one isolating
+/// run sequence, at the paragraph level, of every character before the
+/// separator that X9 keeps. A BN takes the level of the character before it.
+pub(super) fn resolve_plain(
+    storage: &mut Storage,
+    types: &mut [BidiClass],
+    level: u8,
+    levels: &mut [Level],
+    work: &mut WorkBudget,
+) -> Result<()> {
+    let ends = BidiClass::of_level(level);
+    if !types.contains(&BidiClass::Bn) {
+        weak::resolve(types, ends, None, work)?;
+        neutral::resolve(types, level, (ends, ends), None, work)?;
+        for (&class, level) in types.iter().zip(levels) {
+            raise(level, class);
+        }
+        return Ok(());
     }
+    storage.order.clear();
+    for (at, &class) in types.iter().enumerate() {
+        if class != BidiClass::Bn {
+            storage.order.try_push(at as u32).map_err(|e| e.error)?;
+        }
+    }
+    load(&mut storage.types, types, &storage.order)?;
+    weak::resolve(storage.types.as_mut_slice(), ends, None, work)?;
+    neutral::resolve(
+        storage.types.as_mut_slice(),
+        level,
+        (ends, ends),
+        None,
+        work,
+    )?;
+    for (&at, &class) in storage.order.iter().zip(storage.types.iter()) {
+        raise(&mut levels[at as usize], class);
+    }
+    let mut before = Level(level);
+    for (&class, level) in types.iter().zip(levels) {
+        if class == BidiClass::Bn {
+            *level = before;
+        }
+        before = *level;
+    }
+    Ok(())
+}
+
+/// Rules I1 and I2 for one character. The embedding and override characters
+/// after a paragraph separator take the direction of their class.
+fn raise(level: &mut Level, class: BidiClass) {
+    level.0 += match (level.0 & 1 == 1, class) {
+        (false, BidiClass::R | BidiClass::Rle | BidiClass::Rlo)
+        | (true, BidiClass::L | BidiClass::Lre | BidiClass::Lro | BidiClass::En | BidiClass::An) => {
+            1
+        }
+        (false, BidiClass::En | BidiClass::An) => 2,
+        _ => 0,
+    };
+}
+
+/// The range of characters `positions` cover when they are consecutive, so
+/// that the rules can work on them in place.
+fn contiguous(positions: &[u32]) -> Option<std::ops::Range<usize>> {
+    let (&first, &last) = (positions.first()?, positions.last()?);
+    let range = first as usize..last as usize + 1;
+    (range.len() == positions.len()).then_some(range)
+}
+
+/// `vector` at `len` elements, filled with `value` only where it grows.
+fn sized<T: Copy>(vector: &mut BudgetVec<T>, len: usize, value: T) -> Result<()> {
+    if vector.len() < len {
+        vector.try_resize(len, value)?;
+    }
+    vector.truncate(len);
     Ok(())
 }
 
@@ -204,14 +281,14 @@ fn sequences(
     charge(work, 2 * types.len())?;
     let sequences = &mut storage.sequences;
     sequences.clear();
-    storage.sequence_of.clear();
-    storage.sequence_of.try_resize(types.len(), NONE)?;
+    sized(&mut storage.sequence_of, types.len(), NONE)?;
     let direction = BidiClass::of_level;
     // The open sequence of each depth, and one past the deepest open depth.
     let mut open = [NONE; MAX_ISOLATE_DEPTH as usize + 1];
     let mut deepest = 0;
     for (at, &class) in types.iter().enumerate() {
         if class == BidiClass::Bn && at < paragraph.explicit_end {
+            storage.sequence_of[at] = NONE;
             continue;
         }
         let depth = usize::from(paragraph.depths[at]);
@@ -276,8 +353,7 @@ fn sequences(
         start += s.len;
         s.len = 0;
     }
-    storage.order.clear();
-    storage.order.try_resize(start as usize, 0)?;
+    sized(&mut storage.order, start as usize, 0)?;
     for (at, &s) in storage.sequence_of.iter().enumerate() {
         if s == NONE {
             continue;

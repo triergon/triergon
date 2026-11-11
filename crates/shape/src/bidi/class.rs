@@ -141,6 +141,15 @@ impl BidiClass {
     }
 }
 
+/// Sets every class of `types` to `class`: one directly, more as a block.
+#[inline]
+pub(super) fn fill(types: &mut [BidiClass], class: BidiClass) {
+    match types {
+        [one] => *one = class,
+        _ => types.fill(class),
+    }
+}
+
 /// A character's paired-bracket property (BidiBrackets.txt): which brackets pair
 /// with it and whether it opens.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

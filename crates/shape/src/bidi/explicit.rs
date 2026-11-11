@@ -12,7 +12,8 @@ pub(super) const NONE: u32 = u32::MAX;
 const MAX_DEPTH: u8 = 125;
 
 /// Rule BD9: for every isolate initiator its matching PDI, and for every PDI
-/// that matches one its initiator; [`NONE`] for every other character.
+/// that matches one its initiator; [`NONE`] for every other character, and
+/// nothing at all for text without isolate initiators.
 pub(super) fn match_isolates(
     classes: &[BidiClass],
     partner: &mut BudgetVec<u32>,
@@ -20,6 +21,10 @@ pub(super) fn match_isolates(
 ) -> Result<()> {
     charge(work, classes.len())?;
     partner.clear();
+    // Only isolate initiators are looked up.
+    if !classes.iter().any(|c| c.is_isolate_initiator()) {
+        return Ok(());
+    }
     partner.try_resize(classes.len(), NONE)?;
     // The open initiators are chained through their own entries, which hold
     // the initiator opened before them until their PDI is found.

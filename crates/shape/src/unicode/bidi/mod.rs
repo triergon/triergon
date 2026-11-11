@@ -14,11 +14,10 @@ pub(crate) fn bidi_class(cp: u32) -> BidiClass {
 }
 
 /// The paired bracket `cp` is, if any.
+#[inline]
 pub(crate) fn bracket(cp: u32) -> Option<Bracket> {
-    let at = tables::BRACKETS
-        .binary_search_by_key(&cp, |&(c, _)| c)
-        .ok()?;
-    let value = tables::BRACKETS[at].1;
+    let index = usize::from(tables::BRACKET.get(cp)).checked_sub(1)?;
+    let value = tables::BRACKETS[index];
     let pair = char::from_u32(value & 0x7FFF_FFFF)?;
     Some(Bracket::new(pair, value & 0x8000_0000 != 0))
 }
