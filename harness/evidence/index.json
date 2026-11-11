@@ -19425,6 +19425,16 @@
    "source_revision": "98ad5b82da81ba113b3bab206459efc7ede2ed8a"
   },
   {
+   "name": "aac-program-range-reviewed",
+   "path": "aac-program-range-reviewed",
+   "retention": "retained",
+   "reason": "Range parity and paired native bounds with the AAC program parser charged to the input budget",
+   "key": "evidence/aac-program-range-reviewed/1beefed497c83dcff49a8638ddbcda6f7968af67806753d727afd10ad16dad26.tar.gz",
+   "sha256": "1beefed497c83dcff49a8638ddbcda6f7968af67806753d727afd10ad16dad26",
+   "bytes": 64212278,
+   "source_revision": "a961b3b38b083180e11a5d57bcf6ab73a15b72dc"
+  },
+  {
    "name": "mp4-range-seek-checkpoints",
    "path": "mp4-range-seek-checkpoints",
    "retention": "retained",
