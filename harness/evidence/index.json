@@ -19358,6 +19358,15 @@
    "sha256": "883ce5128410aefb3ec9affe3579a798ee8d1c5d082c1d129a462d67728e7af9",
    "bytes": 122757292,
    "source_revision": "513149a970caad5b30c61becba1bc2bda1c5e193"
+  },
+  {
+   "name": "mp4-range-quicktime-and-projection",
+   "path": "mp4-range-quicktime-and-projection",
+   "retention": "retained",
+   "reason": "MP4 range playback comparisons in docs/status.md",
+   "key": "evidence/mp4-range-quicktime-and-projection/b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2.tar.gz",
+   "sha256": "b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2",
+   "bytes": 63889181
   }
  ]
 }
