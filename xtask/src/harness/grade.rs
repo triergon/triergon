@@ -1361,7 +1361,7 @@ mod tests {
             ("subtitle-cc", 205),
             ("subtitle-teletext", 70),
             ("subtitle-pgs-capsules", 229),
-            ("subtitle-text", 344),
+            ("subtitle-text", 350),
         ] {
             let (manifest, manifest_sha) = super::super::manifest::read(
                 root,

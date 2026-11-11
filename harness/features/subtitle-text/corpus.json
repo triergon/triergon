@@ -3411,6 +3411,22 @@
       }
     },
     {
+      "id": "charset-iso-8859-1-c1-controls",
+      "profile": "charset-iso-8859-1-c1-controls",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/iso-8859-1-c1-controls.cap",
+      "sha256": "f7c4a58c93acdae3999bb1c8831864a15d85875d63dbfd9aec9697b2a3e1d899",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 276,
+        "digest": 11557859050126654104
+      }
+    },
+    {
       "id": "charset-label-big-5",
       "profile": "charset-label-big-5",
       "group": "charset",
@@ -3667,6 +3683,22 @@
       }
     },
     {
+      "id": "charset-latin1-c1-controls",
+      "profile": "charset-latin1-c1-controls",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/latin1-c1-controls.cap",
+      "sha256": "a869de49689b7417b4df554519f1aa26ae6a7aece503847ad63f23d09fdfef4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 276,
+        "digest": 11557859050126654104
+      }
+    },
+    {
       "id": "charset-shift_jis-ascii",
       "profile": "charset-shift_jis-ascii",
       "group": "charset",
@@ -3760,6 +3792,70 @@
         "packets": 1,
         "bytes": 28,
         "digest": 4349476275663553281
+      }
+    },
+    {
+      "id": "charset-windows-1251-text",
+      "profile": "charset-windows-1251-text",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/windows-1251-text.cap",
+      "sha256": "81212bb2c978c88f40eef8c269edb7294bd939b577b898c12244dc1d5c68102d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 304,
+        "digest": 2885039401792661522
+      }
+    },
+    {
+      "id": "charset-windows-1251-undefined",
+      "profile": "charset-windows-1251-undefined",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/windows-1251-undefined.cap",
+      "sha256": "d6b45180c42c09c6100f312ed0d4bf668dcc4df60094bfe46139a73067d4f4c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-windows-1252-text",
+      "profile": "charset-windows-1252-text",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/windows-1252-text.cap",
+      "sha256": "e21976b73b183e13b0ab675a1778b6b90225b82d843bc1d1e6c361ae0e4b604a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 283,
+        "digest": 4559709250147832810
+      }
+    },
+    {
+      "id": "charset-windows-1252-undefined",
+      "profile": "charset-windows-1252-undefined",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/windows-1252-undefined.cap",
+      "sha256": "e6ac09d432147e7442bfea05b9c0ab26ae9ecb1e05a04df1f0ffd715420a5d6c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
       }
     },
     {
