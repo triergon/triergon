@@ -222,12 +222,12 @@ cannot match are skipped without reading the font.
 Bidi resolution and line reordering run under `bidi::Limits`: each paragraph a
 `Resolver` resolves and each line `reorder_line` reorders may spend
 `work_per_char` units per character, and at least `minimum_work`, charged for
-every character a rule looks at. Resolving looks at each character in about
-twenty passes, and N0 again for each bracket pair that encloses it (at most 63
+every character a rule looks at. Resolving looks at each character in about a
+dozen passes, and N0 again for each bracket pair that encloses it (at most 63
 per isolate depth, at every depth); line reordering looks at each character once
 per level it reverses at (at most 126). The default, 4096 units per character
-and 65536 in all, is 259 times the most a paragraph of the bidi corpora needs
-(15.8 per character, a six-character random paragraph with bracket pairs);
+and 65536 in all, is 347 times the most a paragraph of the bidi corpora needs
+(11.8 per character, a six-character random paragraph with bracket pairs);
 running out is `Error::Policy`.
 Paragraphs are limited to 2³² characters.
 

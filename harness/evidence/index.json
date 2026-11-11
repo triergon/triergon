@@ -17044,6 +17044,19 @@
    }
   },
   {
+   "name": "shape-bidi-reference-e44bfacb",
+   "path": "shape-bidi-reference-e44bfacb",
+   "retention": "retained",
+   "reason": "Bidi from UAX #9 paragraph and table row: the bidi resolver at e44bfacb on a c7g.4xlarge, natively on AArch64 and in the ARMv7 user space; the shape and ASS gates, crate tests, table check and BidiTest.txt and BidiCharacterTest.txt on both targets; generated texts through both shape workers' bidi and simple dumps, seeds 3 to 22; cargo xtask ass equivalence against 8a3f711f with its records; instruction counts of every shape-bidi, shape-simple and ass-render case against 8a3f711f; the scripts that ran them and a bundle of the measured commits.",
+   "key": "evidence/shape-bidi-reference-e44bfacb/dbf448c1ada891ab4122396818350e39df1171ff58e7cd77de0c354abb22c943.tar.gz",
+   "sha256": "dbf448c1ada891ab4122396818350e39df1171ff58e7cd77de0c354abb22c943",
+   "bytes": 69115565,
+   "source_revisions": {
+    "candidate": "e44bfacb38a19598eca07ea96a9aa83a05a9b1f2",
+    "base": "8a3f711f8d014411ea64d5b8967367ac3aedbac1"
+   }
+  },
+  {
    "name": "ass-collision-far-margins-02e3a75a",
    "path": "ass-collision-far-margins-02e3a75a",
    "retention": "retained",

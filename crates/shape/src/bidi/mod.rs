@@ -43,14 +43,14 @@ use triergon_core::{Budget, Error, Result, WorkBudget};
 /// `minimum_work` in all.
 ///
 /// The work is the characters each step looks at. Resolving a paragraph looks
-/// at each character in about twenty passes, and N0 again for each bracket pair
-/// that encloses it (up to 63 per isolate depth, at every depth) and for each
-/// opening bracket still unpaired when a closing one is looked up; reordering a
-/// line looks at each character once for each level it reverses at (up to
-/// 126). The default, 4096 units per character and 65536 in all, as for
-/// shaping, is 259 times the most a paragraph of the bidi corpora needs (15.8
-/// per character). Text that nests brackets in deep isolates needs thousands of
-/// units per character.
+/// at each character in about a dozen passes, and N0 again for each bracket
+/// pair that encloses it (up to 63 per isolate depth, at every depth) and for
+/// each opening bracket still unpaired when a closing one is looked up;
+/// reordering a line looks at each character once for each level it reverses
+/// at (up to 126). The default, 4096 units per character and 65536 in all, as
+/// for shaping, is 347 times the most a paragraph of the bidi corpora needs
+/// (11.8 per character). Text that nests brackets in deep isolates needs
+/// thousands of units per character.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// Work units for each character.
