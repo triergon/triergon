@@ -3819,6 +3819,30 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
 }
 
 #[test]
+fn range_player_keeps_seek_checkpoints_for_unedited_fragments() {
+    let raw = include_bytes!("fixtures/mp4/avc-aac-quicktime-fragmented.mov");
+    let (opened, _) = open(raw, 97, 4096).unwrap();
+    assert!(opened.movie.tracks().iter().all(|track| {
+        track.edits().is_none()
+            && track.table().sample_count() == 0
+            && !track.fragments().is_empty()
+    }));
+    let cancel = off();
+    let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    assert!((0..1000).any(|_| job.poll(&mut WorkBudget::new(64), &cancel).unwrap()));
+    let mut player = job
+        .finish(
+            opened.input,
+            opened.source,
+            1 << 20,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+    assert!(player.discard_seek_checkpoints());
+}
+
+#[test]
 fn range_player_keeps_the_active_seek_after_refusing_opus_recovery() {
     let seed = include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/avc-opus-edit.mp4");
     let mut ended = seed.to_vec();

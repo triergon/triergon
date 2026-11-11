@@ -138,8 +138,7 @@ impl<'a> PacketCursor<'a> {
             && self.limits.max_occurrences <= i32::MAX as u64
             && self.slots.as_slice().iter().all(|slot| {
                 slot.resume_remaining == 0
-                    && (slot.track.fragments.is_empty()
-                        || (slot.track.table.sample_count() == 0 && slot.track.edits.is_some()))
+                    && (slot.track.fragments.is_empty() || slot.track.table.sample_count() == 0)
             })
         {
             self.seek_checkpoints = Checkpoints::new(self.slots.budget(), self.slots.as_slice())

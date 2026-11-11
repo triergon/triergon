@@ -19358,6 +19358,44 @@
    "sha256": "883ce5128410aefb3ec9affe3579a798ee8d1c5d082c1d129a462d67728e7af9",
    "bytes": 122757292,
    "source_revision": "513149a970caad5b30c61becba1bc2bda1c5e193"
+  },
+  {
+   "name": "mp4-range-quicktime-and-projection",
+   "path": "mp4-range-quicktime-and-projection",
+   "retention": "retained",
+   "reason": "MP4 range playback comparisons in docs/status.md",
+   "key": "evidence/mp4-range-quicktime-and-projection/b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2.tar.gz",
+   "sha256": "b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2",
+   "bytes": 63889181
+  },
+  {
+   "name": "mp4-range-quicktime",
+   "path": "mp4-range-quicktime",
+   "retention": "retained",
+   "reason": "QuickTime AAC range playback after reusing the preloaded input",
+   "key": "evidence/mp4-range-quicktime/018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1.tar.gz",
+   "sha256": "018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1",
+   "bytes": 45670319,
+   "source_revision": "5fd3f0244849f11685fdf42a75c4c71847001bf9"
+  },
+  {
+   "name": "mp4-range-fragmented-quicktime",
+   "path": "mp4-range-fragmented-quicktime",
+   "retention": "retained",
+   "reason": "MP4 range comparisons including fragmented QuickTime AAC",
+   "key": "evidence/mp4-range-fragmented-quicktime/2b2030d312f1af3a9716b2178afc5c04b7176822329f03240e4f41fca2f18478.tar.gz",
+   "sha256": "2b2030d312f1af3a9716b2178afc5c04b7176822329f03240e4f41fca2f18478",
+   "bytes": 72018313,
+   "source_revision": "b96eb9ec65abbe4548b4bc00a74e8504a6d0001d"
+  },
+  {
+   "name": "mp4-range-seek-checkpoints",
+   "path": "mp4-range-seek-checkpoints",
+   "retention": "retained",
+   "reason": "MP4 range playback and fragment seek restart comparisons",
+   "key": "evidence/mp4-range-seek-checkpoints/cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b.tar.gz",
+   "sha256": "cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b",
+   "bytes": 137198328
   }
  ]
 }
