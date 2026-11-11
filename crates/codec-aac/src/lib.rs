@@ -39,6 +39,26 @@ pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{AudioDecoder, Budget, DecodeFailure, DownmixLevels};
 
+/// Optional policies for configured AAC.
+pub mod compat {
+    /// Channel mappings for fixed AAC-LC access units.
+    ///
+    /// `ConventionalSurround` reproduces the default AAC decoder of FFmpeg 9.0.2
+    /// when it receives an AudioSpecificConfig and the original packets.
+    pub mod layout {
+        /// How to interpret the fixed channel configuration of a raw access unit.
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+        pub enum Policy {
+            /// Speaker assignments in ISO/IEC 14496-3 Table 1.19.
+            #[default]
+            Specification,
+            /// Use the back pair in configurations 5, 6, 11 and 14. Interpret
+            /// configuration 7 as the conventional 7.1 back layout.
+            ConventionalSurround,
+        }
+    }
+}
+
 /// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
@@ -147,11 +167,31 @@ impl RawLcDecoder {
         channel_configuration: u8,
         budget: &Budget,
     ) -> Result<Self, DecodeError> {
+        Self::with_layout_in(
+            frequency_index,
+            channel_configuration,
+            compat::layout::Policy::Specification,
+            budget,
+        )
+    }
+
+    /// Set up the configured decoder with an explicit speaker mapping.
+    pub fn with_layout_in(
+        frequency_index: u8,
+        channel_configuration: u8,
+        layout: compat::layout::Policy,
+        budget: &Budget,
+    ) -> Result<Self, DecodeError> {
         if !matches!(channel_configuration, 1..=7 | 11 | 12 | 14) {
             return Err(DecodeError::InvalidData("raw AAC channel configuration"));
         }
         let mut core = decoder::Core::new(budget);
-        core.configure(2, frequency_index, channel_configuration, true)?;
+        core.configure(
+            2,
+            frequency_index,
+            channel_configuration,
+            decoder::FixedLayout::Raw(layout),
+        )?;
         Ok(Self { core })
     }
 
@@ -216,7 +256,12 @@ fn decode_adts(
     if au.len() < h.frame_length {
         return Err(DecodeError::Truncated);
     }
-    core.configure(h.profile + 1, h.sf_index, h.channel_config, false)?;
+    core.configure(
+        h.profile + 1,
+        h.sf_index,
+        h.channel_config,
+        decoder::FixedLayout::Adts,
+    )?;
     let mut header_bytes = 7;
     if !h.protection_absent {
         // raw_data_block_position[1..N] (16 bits each) and crc_check (16 bits).

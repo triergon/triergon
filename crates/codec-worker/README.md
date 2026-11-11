@@ -17,7 +17,7 @@ codec-worker packets FORMAT FILE
 ```
 
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
-`audio-aac`, `audio-aac-access-units`, `audio-dts`, `audio-flac`, `audio-mp3`,
+`audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`, `audio-dts`, `audio-flac`, `audio-mp3`,
 `audio-vorbis` or `audio-opus`. The `simd` feature enables the HEVC decoder's nightly-only
 SIMD kernels; output is identical.
 
@@ -38,6 +38,8 @@ the ordered speaker IDs. The command compares every sample with the AAC
 accuracy bounds and checks the speaker order. Pass its `workloads.json` to
 `cargo xtask codecs time` and `cargo xtask codecs memory` with the same input
 directory and workers. Both commands require the matching `parity.json`.
+`audio-aac-access-units` uses the specification mapping.
+`audio-aac-access-units-compat` uses the conventional surround mapping.
 
 ## Outputs
 

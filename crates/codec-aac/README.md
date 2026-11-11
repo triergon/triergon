@@ -40,6 +40,12 @@ of at most 64 KiB and produces 1024 samples per channel. The supported fixed con
 carry SBR, or require 960-sample blocks are outside this decoder's scope.
 [ISO/IEC 14496-3:2009/Amd.4, Table 1.19](https://standards.iteh.ai/catalog/standards/iso/c0071f4c-5db7-4cf4-a32e-6b75c874d46d/iso-iec-14496-3-2009-amd-4-2013)
 
+`RawLcDecoder::with_layout_in` accepts
+`compat::layout::Policy::ConventionalSurround` for the default FFmpeg speaker
+mapping. This uses a back pair in configurations 5, 6, 11 and 14 and interprets
+configuration 7 as 7.1 Back. The fixed decoder synthesizes directly into the
+caller's reserved PCM planes and reuses them on the next access unit.
+
 ## Supported
 
 | Area | Coverage |
@@ -82,7 +88,7 @@ carry SBR, or require 960-sample blocks are outside this decoder's scope.
   accepted.
 - `ChannelLayout::speakers()` names each plane's position, in the
   [channel order](../codec/README.md#channel-order) of triergon-codec: plane `i` is
-  FFmpeg output channel `i`. Configurations 5, 6 and 7 map to 5.0(side), 5.1(side) and 7.1.
+  FFmpeg output channel `i`. For ADTS, configurations 5, 6 and 7 map to 5.0(side), 5.1(side) and 7.1.
   PCE layouts that FFmpeg reports as unnamed keep PCE element order.
 - Dynamic range control data is parsed and not applied, as FFmpeg does by default.
 - FFmpeg-compatible behaviour: the PNS noise generator (LCG, seed `0x1f2e3d4c`); two SCEs

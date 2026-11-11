@@ -362,10 +362,14 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
     avio_context_free(&io);
 }
 
+static int configured_aac_operation(const char *name, int video) {
+    return !video && (!strcmp(name, "aac-access-units") || !strcmp(name, "aac-access-units-compat"));
+}
+
 static void pass(const char *name, const AVCodecParameters *par, const uint8_t *data, size_t size, int video,
                  struct out *o) {
     const char *demuxer;
-    if (!video && !strcmp(name, "aac-access-units"))
+    if (configured_aac_operation(name, video))
         aac_access_units(data, size, o);
     else if (!video && file_lane(name, &demuxer))
         demux_pass(demuxer, data, size, o);
@@ -390,7 +394,7 @@ int main(int argc, char **argv) {
     if (!separator || !separator[1]) return 2;
     const char *name = separator + 1;
     if (!strcmp(name, "dts")) name = "dca";
-    const int configured_aac = !video && !strcmp(name, "aac-access-units");
+    const int configured_aac = configured_aac_operation(name, video);
     FILE *in = fopen(argv[2], "rb");
     if (!in) { perror("input"); return 1; }
     if (fseek(in, 0, SEEK_END)) die("input seek", AVERROR(errno));

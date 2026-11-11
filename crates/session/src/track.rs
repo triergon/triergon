@@ -8,6 +8,7 @@ use triergon_framing::{
     indexed_aac_frequency,
 };
 
+use crate::compat::aac::Policy;
 use crate::{AudioCodec, Discard, audio_codec, audio_configuration, audio_decoder_in};
 
 /// The decoder of one container audio track. It chooses the decoder from the track's
@@ -63,7 +64,17 @@ impl TrackDecoder {
         configuration: &[u8],
         budget: &Budget,
     ) -> Result<Self, DecodeFailure> {
-        let decoder = parse_aac_access_unit_config(configuration, budget)?.decoder_in(budget)?;
+        Self::aac_access_units_with_layout_in(configuration, Policy::Specification, budget)
+    }
+
+    /// Decode configured AAC-LC with an explicit speaker mapping.
+    pub fn aac_access_units_with_layout_in(
+        configuration: &[u8],
+        layout: Policy,
+        budget: &Budget,
+    ) -> Result<Self, DecodeFailure> {
+        let decoder = parse_aac_access_unit_config(configuration, budget)?
+            .decoder_with_layout_in(layout, budget)?;
         Ok(Self {
             codec: AudioCodec::Aac,
             delay: decoder.delay(),
@@ -142,9 +153,19 @@ impl AacAccessUnitConfig {
 
     /// Build a decoder for one raw AAC-LC access unit per packet.
     pub fn decoder_in(self, budget: &Budget) -> Result<Box<dyn AudioDecoder>, DecodeFailure> {
-        let decoder = triergon_codec_aac::RawLcDecoder::new_in(
+        self.decoder_with_layout_in(Policy::Specification, budget)
+    }
+
+    /// Build the configured decoder with an explicit speaker mapping.
+    pub fn decoder_with_layout_in(
+        self,
+        layout: Policy,
+        budget: &Budget,
+    ) -> Result<Box<dyn AudioDecoder>, DecodeFailure> {
+        let decoder = triergon_codec_aac::RawLcDecoder::with_layout_in(
             self.frequency_index,
             self.channel_configuration,
+            layout,
             budget,
         )
         .map_err(DecodeFailure::from_error)?;

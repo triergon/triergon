@@ -367,8 +367,12 @@ and compares the packets of the audio container readers with its `ffprobe`
 (`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
 pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask codecs aac-access-units` prepares the [configured AAC
-workloads](../harness/features/aac-access-units/contract.json) from the original
-QuickTime packets and compares the ordered speakers and every decoded PCM plane.
+workloads](../harness/features/aac-access-units/contract.json) from the pinned
+QuickTime and authored audio-only packets. It compares the ordered speakers and
+every decoded PCM plane. The authored clips cover every supported fixed layout
+and indexed rate. `cargo xtask codecs aac-sources --out DIR` records the source
+clips from independently varying channel tones using the pinned encoder. The
+committed sources fix the encoded input bytes across architectures.
 The paired codec timing and memory commands require passing parity bound to
 the workload manifest, both workers, the pinned probe and the numeric rules.
 The measured work includes decoder construction, decoding every

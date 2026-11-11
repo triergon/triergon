@@ -9,6 +9,7 @@ use json::Value;
 use super::correctness::{Rules, channel_stats};
 
 const OPERATION: &str = "audio-aac-access-units";
+const COMPAT_OPERATION: &str = "audio-aac-access-units-compat";
 const FEATURE: &str = "harness/features/aac-access-units";
 const PARITY_FILE: &str = "parity.json";
 const FFPROBE: &str = "install/bin/ffprobe";
@@ -143,10 +144,12 @@ pub(super) fn measurement_parity(
         .get("workloads")
         .and_then(Value::as_array)
         .unwrap_or_default();
-    if !cases
-        .iter()
-        .any(|case| case.get("operation").and_then(Value::as_str) == Some(OPERATION))
-    {
+    if !cases.iter().any(|case| {
+        matches!(
+            case.get("operation").and_then(Value::as_str),
+            Some(OPERATION | COMPAT_OPERATION)
+        )
+    }) {
         return Ok(None);
     }
     if *manifest != checks::read_json(&root.join(FEATURE).join("corpus.json"))? {
@@ -306,7 +309,7 @@ fn compare_pcm(
 fn compare_speakers(
     candidate: &Value,
     reference: &Value,
-    configuration: u8,
+    specification_configuration: Option<u8>,
     channels: u32,
 ) -> Result<(bool, bool), String> {
     fn ids(row: &Value, channels: u32) -> Result<Vec<u8>, String> {
@@ -326,27 +329,56 @@ fn compare_speakers(
     let theirs = ids(reference, channels)?;
     // AVChannel IDs, in plane order: FL, FR, FC, optional LFE, and one surround pair.
     let surround_pair_labels = matches!(
-        (configuration, ours.as_slice(), theirs.as_slice()),
-        (5, [0, 1, 2, 9, 10], [0, 1, 2, 4, 5]) | (6, [0, 1, 2, 3, 9, 10], [0, 1, 2, 3, 4, 5])
+        (
+            specification_configuration,
+            ours.as_slice(),
+            theirs.as_slice()
+        ),
+        (Some(5), [0, 1, 2, 9, 10], [0, 1, 2, 4, 5])
+            | (Some(6), [0, 1, 2, 3, 9, 10], [0, 1, 2, 3, 4, 5])
     );
     Ok((ours == theirs || surround_pair_labels, surround_pair_labels))
 }
 
-pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
-    let manifest = checks::read_json(&root.join("harness/codecs/aac/mov-manifest.json"))?;
-    let vectors = manifest
+fn vectors(manifest: &Value) -> Result<&[Value], String> {
+    manifest
         .get("vectors")
         .and_then(Value::as_array)
         .filter(|vectors| !vectors.is_empty())
-        .ok_or("missing AAC vectors")?;
+        .ok_or_else(|| "missing AAC vectors".to_owned())
+}
+
+pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
+    let quicktime = checks::read_json(&root.join("harness/codecs/aac/mov-manifest.json"))?;
+    let feature = root.join(FEATURE);
+    let authored = checks::read_json(&feature.join("sources.json"))?;
+    let sources = vectors(&quicktime)?
+        .iter()
+        .map(|source| (source, OPERATION))
+        .chain(
+            vectors(&authored)?
+                .iter()
+                .map(|source| (source, COMPAT_OPERATION)),
+        );
     fs::create_dir(out).map_err(|error| format!("{}: {error}", out.display()))?;
     let mut workloads = Vec::new();
     let mut results = Vec::new();
     let rules = Rules::load(root)?;
     let comparison = Comparison::load(root, None)?;
     let mut accepted = true;
-    for vector in vectors {
-        let source_path = root.join(string(vector, "path")?);
+    for (vector, operation) in sources {
+        let name = string(vector, "name")?;
+        let id = name
+            .strip_suffix(".mov")
+            .filter(|id| {
+                !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+            })
+            .ok_or("invalid AAC source name")?;
+        let source_path = if operation == OPERATION {
+            root.join(string(vector, "path")?)
+        } else {
+            feature.join("inputs").join(name)
+        };
         let source = read(&source_path)?;
         let source_sha = string(vector, "sha256")?;
         if sha256::hex(&source) != source_sha {
@@ -355,11 +387,6 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
                 source_path.display()
             ));
         }
-        let name = string(vector, "name")?;
-        let id = name
-            .strip_suffix(".mov")
-            .filter(|id| !id.contains('/'))
-            .ok_or("invalid AAC source name")?;
         let probe = command(
             &comparison.ffprobe,
             &[
@@ -379,8 +406,22 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
                 &source_path.to_string_lossy(),
             ],
         )?;
-        let (input, rate, channels, count) = access_units(&source, &probe)?;
-        let configuration = input[HEADER_BYTES + 1] >> 3 & 15;
+        let (mut input, rate, channels, count) = access_units(&source, &probe)?;
+        let configuration_byte = &mut input[HEADER_BYTES + 1];
+        let configuration = *configuration_byte >> 3 & 15;
+        if operation == COMPAT_OPERATION {
+            let expected = number(vector, "configuration")?;
+            if rate != number(vector, "sample_rate")? || channels != number(vector, "channels")? {
+                return Err(format!("{id}: authored AAC source shape differs"));
+            }
+            if expected == 7 && configuration == 12 {
+                // Both configurations have the same syntactic elements in wire order.
+                // The fixture supplies the configuration-7 interpretation of those packets.
+                *configuration_byte = *configuration_byte & !0x78 | (7 << 3);
+            } else if expected != u32::from(configuration) {
+                return Err(format!("{id}: authored AAC configuration differs"));
+            }
+        }
         let input_sha = sha256::hex(&input);
         let filename = format!("{id}.aac-access-units");
         let input_path = out.join(&filename);
@@ -390,7 +431,7 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
             ("path", Value::str(filename)),
             ("sha256", Value::str(&input_sha)),
             ("bytes", Value::int(input.len() as u64)),
-            ("operation", Value::str(OPERATION)),
+            ("operation", Value::str(operation)),
             ("iterations", Value::int(comparison.iterations)),
             ("packets", Value::int(count)),
             ("sample_rate", Value::int(rate)),
@@ -403,7 +444,7 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
             let row = command(
                 worker,
                 &[
-                    &format!("{OPERATION}-raw"),
+                    &format!("{operation}-raw"),
                     &input_path.to_string_lossy(),
                     &pcm.to_string_lossy(),
                 ],
@@ -420,8 +461,12 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
         if file_sha(&input_path)? != input_sha {
             return Err(format!("{id}: AAC input changed during parity"));
         }
-        let (layout, surround_pair_labels) =
-            compare_speakers(&candidate_row, &reference_row, configuration, channels)?;
+        let (layout, surround_pair_labels) = compare_speakers(
+            &candidate_row,
+            &reference_row,
+            (operation == OPERATION).then_some(configuration),
+            channels,
+        )?;
         let (pcm, planes) = compare_pcm(
             &candidate_pcm,
             &reference_pcm,
@@ -486,15 +531,21 @@ mod tests {
         };
         let side = speakers(&[0, 1, 2, 3, 9, 10]);
         let back = speakers(&[0, 1, 2, 3, 4, 5]);
-        assert_eq!(compare_speakers(&side, &side, 6, 6).unwrap(), (true, false));
-        assert_eq!(compare_speakers(&side, &back, 6, 6).unwrap(), (true, true));
         assert_eq!(
-            compare_speakers(&side, &back, 0, 6).unwrap(),
+            compare_speakers(&side, &side, Some(6), 6).unwrap(),
+            (true, false)
+        );
+        assert_eq!(
+            compare_speakers(&side, &back, Some(6), 6).unwrap(),
+            (true, true)
+        );
+        assert_eq!(
+            compare_speakers(&side, &back, None, 6).unwrap(),
             (false, false)
         );
         let reversed = speakers(&[0, 1, 2, 3, 5, 4]);
         assert_eq!(
-            compare_speakers(&side, &reversed, 6, 6).unwrap(),
+            compare_speakers(&side, &reversed, Some(6), 6).unwrap(),
             (false, false)
         );
     }

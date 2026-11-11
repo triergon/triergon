@@ -1,6 +1,7 @@
 //! raw_data_block() decoding: element parsing, channel mapping, per-channel state and
 //! output assembly.
 
+use crate::compat::layout::Policy;
 use crate::error::{DecodeError, Feature, Result};
 use crate::fft::Dct4;
 use crate::filterbank::Filterbank;
@@ -25,6 +26,12 @@ const EXT_SBR_DATA_CRC: u32 = 14;
 /// Samples per channel of one raw data block with SBR.
 const SBR_FRAME_LEN: usize = 2048;
 const PNS_INITIAL_STATE: u32 = 0x1f2e3d4c;
+
+#[derive(Clone, Copy)]
+pub(crate) enum FixedLayout {
+    Adts,
+    Raw(Policy),
+}
 
 /// Persistent per-channel state.
 #[derive(Debug)]
@@ -265,7 +272,7 @@ impl Core {
         aot: u8,
         sf_index: u8,
         channel_config: u8,
-        raw: bool,
+        layout: FixedLayout,
     ) -> Result<()> {
         match aot {
             AOT_MAIN | AOT_LC | AOT_LTP => {}
@@ -290,7 +297,7 @@ impl Core {
         let slots = if channel_config == 0 {
             Vec::new()
         } else {
-            fixed_config_slots(channel_config, raw)
+            fixed_config_slots(channel_config, layout)
         };
         let elements = self.build_elements(aot, &slots, false, &[])?;
         self.aot = aot;
@@ -524,7 +531,7 @@ impl Core {
                         // FFmpeg switches a channel_configuration 1 stream to stereo when a
                         // CPE appears (probed).
                         self.switch_layout(
-                            fixed_config_slots(2, false),
+                            fixed_config_slots(2, FixedLayout::Adts),
                             self.unordered,
                             out,
                             blocks,
@@ -1000,9 +1007,8 @@ pub(crate) fn process_channel(
     st.prev_seq = info.window_sequence;
 }
 
-/// Fixed layouts from ISO/IEC 14496-3:2009/Amd.4, Table 1.19. The ADTS
-/// compatibility path keeps its established interpretation of configuration 7.
-fn fixed_config_slots(cfg: u8, raw_access_units: bool) -> Vec<Slot> {
+/// Assign speakers to the fixed elements of ISO/IEC 14496-3:2009/Amd.4, Table 1.19.
+fn fixed_config_slots(cfg: u8, layout: FixedLayout) -> Vec<Slot> {
     use Speaker::{
         BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontLeftOfCenter, FrontRight,
         FrontRightOfCenter, LowFrequency, SideLeft, SideRight, TopFrontLeft, TopFrontRight,
@@ -1022,6 +1028,10 @@ fn fixed_config_slots(cfg: u8, raw_access_units: bool) -> Vec<Slot> {
         tag: 0,
         speakers: [Some(LowFrequency), None],
     };
+    let surround_pair = || match layout {
+        FixedLayout::Raw(Policy::ConventionalSurround) => cpe(BackLeft, BackRight),
+        _ => cpe(SideLeft, SideRight),
+    };
     let mut v = match cfg {
         1 => vec![sce(FrontCenter)],
         2 => vec![cpe(FrontLeft, FrontRight)],
@@ -1034,15 +1044,15 @@ fn fixed_config_slots(cfg: u8, raw_access_units: bool) -> Vec<Slot> {
         5 => vec![
             sce(FrontCenter),
             cpe(FrontLeft, FrontRight),
-            cpe(SideLeft, SideRight),
+            surround_pair(),
         ],
         6 => vec![
             sce(FrontCenter),
             cpe(FrontLeft, FrontRight),
-            cpe(SideLeft, SideRight),
+            surround_pair(),
             lfe,
         ],
-        7 if raw_access_units => vec![
+        7 if matches!(layout, FixedLayout::Raw(Policy::Specification)) => vec![
             sce(FrontCenter),
             cpe(FrontLeftOfCenter, FrontRightOfCenter),
             cpe(FrontLeft, FrontRight),
@@ -1052,14 +1062,14 @@ fn fixed_config_slots(cfg: u8, raw_access_units: bool) -> Vec<Slot> {
         11 => vec![
             sce(FrontCenter),
             cpe(FrontLeft, FrontRight),
-            cpe(SideLeft, SideRight),
+            surround_pair(),
             sce(BackCenter),
             lfe,
         ],
         14 => vec![
             sce(FrontCenter),
             cpe(FrontLeft, FrontRight),
-            cpe(SideLeft, SideRight),
+            surround_pair(),
             lfe,
             cpe(TopFrontLeft, TopFrontRight),
         ],

@@ -48,6 +48,12 @@ and `AudioDecoder` (re-exported from triergon-codec) yourself; the tests use
 scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
 SIMD kernels.
 
+Use `TrackDecoder::aac_access_units_in` to decode raw AAC-LC from a checked
+AudioSpecificConfig. `TrackDecoder::aac_access_units_with_layout_in` accepts
+`compat::aac::Policy::ConventionalSurround` for the conventional speaker mapping.
+With parsed configuration facts, `AacAccessUnitConfig::decoder_with_layout_in`
+builds the same decoder for an audio session.
+
 ## Supported
 
 | Stream | Input | Output |

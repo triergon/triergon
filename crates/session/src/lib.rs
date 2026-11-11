@@ -4,6 +4,14 @@
 // Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
 
 pub mod audio;
+#[cfg(feature = "codecs")]
+pub mod compat {
+    //! Optional decoder policies.
+    /// Channel mappings for configured AAC.
+    pub mod aac {
+        pub use triergon_codec_aac::compat::layout::Policy;
+    }
+}
 mod discard;
 pub mod mix;
 pub mod queue;
