@@ -7,12 +7,12 @@ use crate::{
 };
 use std::sync::{Arc, atomic::AtomicBool};
 use triergon_core::{
-    Budget, BudgetVec, Error, InputCursor, InputToken, Reservation, Result, Rounding, SourceId,
-    Time, TimeBase, WorkBudget,
+    Budget, BudgetVec, Charged, Error, InputCursor, InputToken, Reservation, Result, Rounding,
+    SourceId, Time, TimeBase, WorkBudget,
 };
 use triergon_framing::{
-    Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration, BuildStep, OPUS_RATE,
-    aac_fixed_channel_count, indexed_aac_frequency,
+    AacAscParser, AacConfigLimits, AacSource, Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser,
+    Ac3Configuration, BuildStep, OPUS_RATE, aac_fixed_channel_count, indexed_aac_frequency,
 };
 
 pub(crate) mod fragment_aac;
@@ -397,6 +397,7 @@ pub struct EncodedEditJob<'a> {
     opus_first_tick: i128,
     opus_durations: BudgetVec<OpusDurationRun>,
     preserve_aac_media_durations: bool,
+    aac_program: Option<Box<Charged<AacAscParser>>>,
     dts_scale: Option<u32>,
     dolby_config: Option<Ac3ConfigParser>,
     descriptions: u32,
@@ -510,6 +511,32 @@ impl<'a> EncodedEditJob<'a> {
         job.preserve_aac_media_durations = true;
         let stream = job.context.stream;
         let kind = match stream.kind() {
+            EncodedEntryKind::Aac => {
+                let config = &stream.demux().extradata;
+                if config.as_ref().get(1).is_some_and(|byte| byte & 0x78 == 0) {
+                    let parser = AacAscParser::new(
+                        input.budget(),
+                        AacSource {
+                            source: input.source(),
+                            generation: input.token().generation(),
+                            offset: 0,
+                        },
+                        config.clone(),
+                        AacConfigLimits {
+                            maximum_record_bytes: 4096,
+                            maximum_pce_elements: 64,
+                            maximum_comment_bytes: 255,
+                        },
+                    )?;
+                    let parser = Charged::try_new(
+                        input.budget(),
+                        size_of::<Charged<AacAscParser>>(),
+                        || parser,
+                    )?;
+                    job.aac_program = Some(Box::new(parser));
+                }
+                return Ok(job);
+            }
             EncodedEntryKind::Ac3 => Ac3ConfigKind::Dac3,
             EncodedEntryKind::Eac3 => Ac3ConfigKind::Dec3,
             _ => return Ok(job),
@@ -656,6 +683,7 @@ impl<'a> EncodedEditJob<'a> {
             opus_first_tick: 0,
             opus_durations: BudgetVec::new(input.budget()),
             preserve_aac_media_durations: false,
+            aac_program: None,
             dts_scale,
             dolby_config: None,
             descriptions,
@@ -770,6 +798,23 @@ impl<'a> EncodedEditJob<'a> {
             }
             self.empty_recovery = None;
         }
+        if let Some(parser) = &mut self.aac_program {
+            let config = match parser.step(work, cancel)? {
+                BuildStep::Ready(config) => config,
+                BuildStep::Yield => return Ok(CursorStatus::Yield),
+                BuildStep::Complete => return Err(Error::Invalid("missing AAC program")),
+            };
+            let facts = config.facts();
+            if config.syntax_issues() != 0
+                || config.program_config().is_none()
+                || !(1..=8).contains(&facts.core_channels)
+                || facts.sbr.is_present()
+                || facts.ps.is_present()
+            {
+                return Err(Error::Unsupported("encoded AAC program clock"));
+            }
+            self.aac_program = None;
+        }
         if !self.initialized {
             if !work.try_charge(1) {
                 return Ok(CursorStatus::Yield);
@@ -801,15 +846,17 @@ impl<'a> EncodedEditJob<'a> {
                     self.opus_preroll_boundary = i128::from(self.entry.media_time) - second;
                 }
                 EncodedEntryKind::Aac => {
-                    // Indexed AAC-LC with 1024 core samples and a fixed channel layout.
+                    // Indexed AAC-LC with 1024 core samples. Range playback
+                    // also accepts the out-of-band program validated above.
                     let b = self.context.stream.demux().extradata.as_ref();
                     let a = *b.first().ok_or(Error::Truncated)?;
                     let c = *b.get(1).ok_or(Error::Truncated)?;
                     let index = ((a & 7) << 1) | (c >> 7);
                     let channel_configuration = (c >> 3) & 15;
+                    let program = self.preserve_aac_media_durations && channel_configuration == 0;
                     if a >> 3 != 2
                         || c & 7 != 0
-                        || aac_fixed_channel_count(channel_configuration).is_none()
+                        || (!program && aac_fixed_channel_count(channel_configuration).is_none())
                         || (!self.preserve_aac_media_durations && channel_configuration > 7)
                         || indexed_aac_frequency(index).map(u64::from)
                             != Some(self.context.media_base.denominator())
