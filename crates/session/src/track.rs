@@ -98,7 +98,9 @@ impl TrackDecoder {
             .map_err(DecodeFailure::from_error)?;
             Box::new(decoder)
         } else {
-            AacAccessUnitConfig::from_asc(parsed.facts())?.decoder_with_layout_in(layout, budget)?
+            let fixed = AacAccessUnitConfig::from_asc(parsed.facts())?;
+            drop(parsed);
+            fixed.decoder_with_layout_in(layout, budget)?
         };
         Ok(Self {
             codec: AudioCodec::Aac,
@@ -239,4 +241,23 @@ fn parse_aac_access_unit_config(
         return Err(DecodeFailure("missing AAC AudioSpecificConfig".into()));
     };
     Ok(parsed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fixed_aac_releases_configuration_before_allocating_decoder_state() {
+        let wide = Budget::new(4 << 20).unwrap();
+        let config = AacAccessUnitConfig {
+            frequency_index: 4,
+            channel_configuration: 2,
+        };
+        let decoder = config.decoder_in(&wide).unwrap();
+        let storage = wide.used();
+        drop(decoder);
+        let exact = Budget::new(storage).unwrap();
+        TrackDecoder::aac_access_units_in(&[0x12, 0x10], &exact).unwrap();
+    }
 }

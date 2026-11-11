@@ -42,8 +42,11 @@ blocks are outside this decoder's scope.
 
 `RawLcDecoder::with_program_config_in` takes the byte-aligned Program Configuration
 Element from an AudioSpecificConfig with channel configuration zero. It supports
-up to eight channels and matches coded elements by type and tag. The
-AudioSpecificConfig program remains in effect when a packet contains its own PCE.
+up to eight channels with distinct speaker positions and matches coded
+elements by type and tag. The AudioSpecificConfig program remains in effect
+when a packet contains its own PCE.
+Height information is applied when its extension is complete and its CRC-8 is valid.
+An ambiguous mapping returns `Feature::RawProgramLayout`.
 [ISO/IEC 14496-3:2001/Cor.2:2004, 4.5.1](https://standards.iteh.ai/catalog/standards/iso/09c0e8dc-4b21-438e-a1f1-665e44bfb859/iso-iec-14496-3-2001-cor-2-2004)
 
 `RawLcDecoder::with_layout_in` accepts
@@ -63,7 +66,7 @@ caller's reserved PCM planes and reuses them on the next access unit.
 | SBR | Implicit signalling; output at twice the core rate from the first SBR frame; all grid classes, coupled and balanced envelopes, up to 6 patches, limiter, sinusoids |
 | PS | Implicit signalling (mono stream becomes stereo); 20- and 34-band hybrid, IID/ICC/IPD/OPD, switching between 20 and 34 bands |
 | Rates | Sampling-frequency indices 0–12 |
-| Layouts | ADTS configurations 1–7 and PCE layouts up to 48 channels; raw fixed configurations 1–7, 11, 12 and 14, and out-of-band PCE layouts up to eight channels |
+| Layouts | ADTS configurations 1–7 and PCE layouts up to 48 channels; raw fixed configurations 1–7, 11, 12 and 14, and out-of-band PCE layouts with up to eight distinct speaker positions |
 
 ## Behaviour and limits
 

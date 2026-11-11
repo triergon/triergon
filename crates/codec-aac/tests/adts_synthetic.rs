@@ -237,7 +237,7 @@ fn raw_lc_refuses_sbr_and_bytes_after_its_single_block() {
 #[test]
 fn raw_program_matches_tags_and_keeps_the_container_layout() {
     let mut program = Bw::new();
-    front_program(&mut program, &[(false, 2), (false, 9)]);
+    program_config(&mut program, [&[(false, 2), (false, 9)], &[], &[]], &[]);
     let program = program.bytes();
     let budget = Budget::new(4 << 20).unwrap();
     assert!(RawLcDecoder::with_program_config_in(3, &program, &budget).is_err());
@@ -245,7 +245,7 @@ fn raw_program_matches_tags_and_keeps_the_container_layout() {
     let packet = |tags: &[u32]| {
         let mut bits = Bw::new();
         bits.put(5, 3); // An in-band PCE cannot replace the container program.
-        front_program(&mut bits, &[(false, 0)]);
+        program_config(&mut bits, [&[(false, 0)], &[], &[]], &[]);
         for &tag in tags {
             bits.put(0, 3); // SCE
             bits.put(tag, 4);
@@ -271,6 +271,86 @@ fn raw_program_matches_tags_and_keeps_the_container_layout() {
     );
     assert!(frame.planes[0].iter().all(|&sample| sample == 0.0));
     assert!(frame.planes[1].iter().any(|&sample| sample != 0.0));
+}
+
+#[test]
+fn raw_program_places_a_rear_pair_of_single_elements() {
+    use Speaker::{BackLeft, BackRight, FrontLeft, FrontRight, SideLeft, SideRight};
+    let mut program = Bw::new();
+    program_config(
+        &mut program,
+        [&[(true, 0)], &[], &[(true, 1), (false, 2), (false, 3)]],
+        &[],
+    );
+    let mut packet = Bw::new();
+    for (kind, tag, noise) in [(1, 0, false), (1, 1, true), (0, 2, true), (0, 3, false)] {
+        packet.put(kind, 3);
+        packet.put(tag, 4);
+        if kind == 1 {
+            packet.put(0, 1);
+            silent_ics(&mut packet);
+        }
+        if noise {
+            noise_ics(&mut packet);
+        } else {
+            silent_ics(&mut packet);
+        }
+    }
+    packet.put(7, 3);
+    let budget = Budget::new(4 << 20).unwrap();
+    let mut decoder = RawLcDecoder::with_program_config_in(4, &program.bytes(), &budget).unwrap();
+    let mut frame = AudioFrame::default();
+    decoder.decode(&packet.bytes(), &mut frame).unwrap();
+    assert_eq!(
+        frame.layout.speakers(),
+        &[
+            FrontLeft, FrontRight, BackLeft, BackRight, SideLeft, SideRight
+        ]
+    );
+    let audible: Vec<_> = frame
+        .planes
+        .iter()
+        .map(|plane| plane.iter().any(|&sample| sample != 0.0))
+        .collect();
+    assert_eq!(audible, [false, false, true, false, false, true]);
+}
+
+#[test]
+fn raw_program_uses_only_crc_valid_height_information() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let packet = block(false);
+    for (comment, expected) in [
+        (&[0xac, 0x40, 0xf4][..], Speaker::TopFrontCenter),
+        (&[0xac, 0x40, 0xf5][..], Speaker::FrontCenter),
+        (&[0xac, 0x40][..], Speaker::FrontCenter),
+    ] {
+        let mut program = Bw::new();
+        program_config(&mut program, [&[(false, 0)], &[], &[]], comment);
+        let mut decoder =
+            RawLcDecoder::with_program_config_in(4, &program.bytes(), &budget).unwrap();
+        let mut frame = AudioFrame::default();
+        decoder.decode(&packet, &mut frame).unwrap();
+        assert_eq!(frame.layout.speakers(), &[expected]);
+    }
+}
+
+#[test]
+fn raw_program_refuses_ambiguous_speaker_positions() {
+    let mut program = Bw::new();
+    program_config(
+        &mut program,
+        [
+            &[(false, 0)],
+            &[(true, 0)],
+            &[(true, 1), (false, 1), (false, 2)],
+        ],
+        &[],
+    );
+    let budget = Budget::new(4 << 20).unwrap();
+    assert!(matches!(
+        RawLcDecoder::with_program_config_in(4, &program.bytes(), &budget),
+        Err(DecodeError::Unsupported(Feature::RawProgramLayout))
+    ));
 }
 
 #[test]
@@ -510,19 +590,24 @@ fn noise_ics(w: &mut Bw) {
     w.put(0, 3); // pulse, tns, gain control
 }
 
-fn front_program(w: &mut Bw, elements: &[(bool, u32)]) {
+fn program_config(w: &mut Bw, groups: [&[(bool, u32)]; 3], comment: &[u8]) {
     w.put(0, 4); // element_instance_tag
     w.put(1, 2); // object_type: LC
     w.put(4, 4); // sampling_frequency_index
-    w.put(elements.len() as u32, 4);
-    w.put(0, 4 + 4 + 2 + 3 + 4); // side, back, LFE, data and coupling elements
+    for group in groups {
+        w.put(group.len() as u32, 4);
+    }
+    w.put(0, 2 + 3 + 4); // LFE, data and coupling elements
     w.put(0, 3); // no mixdowns
-    for &(pair, tag) in elements {
+    for &(pair, tag) in groups.into_iter().flatten() {
         w.put(u32::from(pair), 1);
         w.put(tag, 4);
     }
     w.align();
-    w.put(0, 8); // comment_field_bytes
+    w.put(comment.len() as u32, 8);
+    for &byte in comment {
+        w.put(u32::from(byte), 8);
+    }
 }
 
 /// A raw data block: optionally a PCE of one front element, then that element (an SCE or a
@@ -531,7 +616,7 @@ fn noise_block(pce: bool, cpe: bool, sbr: bool) -> Vec<u8> {
     let mut w = Bw::new();
     if pce {
         w.put(5, 3); // ID_PCE
-        front_program(&mut w, &[(cpe, 0)]);
+        program_config(&mut w, [&[(cpe, 0)], &[], &[]], &[]);
     }
     if cpe {
         w.put(1, 3);

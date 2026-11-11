@@ -1,8 +1,9 @@
 //! program_config_element() (ISO/IEC 14496-3 4.4.1.1, Table 4.2) including the height
-//! extension carried in its comment field (ISO/IEC 14496-3:2009/Amd.4, 4.5.1.2.2).
+//! extension carried in its comment field (ISO/IEC 14496-3:2009/Amd.4, 4.5.1.3).
 
 use crate::error::{DecodeError, Result};
 use triergon_bitstream::CachedBitReader;
+use triergon_bitstream::crc::crc8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) struct PceElement {
@@ -80,41 +81,39 @@ pub(crate) fn parse_pce(br: &mut CachedBitReader<'_>, align_base: usize) -> Resu
     if br.left() < (comment_bytes * 8) as isize {
         return Err(DecodeError::InvalidData("PCE comment field"));
     }
-    let comment_start = br.position();
-    // height extension (sync 0xAC) followed by one 2-bit height per front/side/back element
-    if comment_bytes > 0 {
-        let mut hb = *br;
-        if hb.read(8) == 0xAC {
-            let mut ok = true;
-            for e in p
-                .front
-                .iter_mut()
-                .chain(p.side.iter_mut())
-                .chain(p.back.iter_mut())
-            {
-                e.height = hb.read(2) as u8;
-                if e.height == 3 {
-                    ok = false;
-                }
-            }
-            if hb.position() > comment_start + comment_bytes * 8 {
-                ok = false;
-            }
-            if !ok {
-                for e in p
-                    .front
-                    .iter_mut()
-                    .chain(p.side.iter_mut())
-                    .chain(p.back.iter_mut())
-                {
-                    e.height = 0;
-                }
-            }
-        }
-    }
+    apply_heights(&mut p, *br, comment_bytes);
     br.skip(comment_bytes * 8);
     if br.overrun() {
         return Err(DecodeError::InvalidData("PCE overrun"));
     }
     Ok(p)
+}
+
+fn apply_heights(program: &mut Pce, mut comment: CachedBitReader<'_>, bytes: usize) {
+    let count = program.front.len() + program.side.len() + program.back.len();
+    let covered = 1 + (count * 2).div_ceil(8);
+    if bytes <= covered || comment.peek(8) != 0xac {
+        return;
+    }
+    // The sync byte, height fields and alignment bits are protected by CRC-8.
+    let mut checksum = comment;
+    let mut crc = 0xff;
+    for _ in 0..covered {
+        crc = crc8(crc, &[checksum.read(8) as u8]);
+    }
+    if crc != checksum.read(8) as u8 {
+        return;
+    }
+    comment.skip(8);
+    let elements = program
+        .front
+        .iter_mut()
+        .chain(&mut program.side)
+        .chain(&mut program.back);
+    let mut check = comment;
+    if (0..count).all(|_| check.read(2) != 3) {
+        for element in elements {
+            element.height = comment.read(2) as u8;
+        }
+    }
 }
