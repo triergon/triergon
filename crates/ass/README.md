@@ -457,8 +457,10 @@ panics.
   had a median of 0.813 and a highest upper bound of 1.066
   (`cache-keys-ass-720p`), with peak heap ≤0.841 and total RSS ≤0.943. On
   ARMv7, over all 80 cases, the highest upper bound was 0.943, peak heap
-  ≤0.928 and total RSS ≤0.961. [docs/status.md](../../docs/status.md) names
-  the evidence.
+  ≤0.928 and total RSS ≤0.961, the renderer's virtual peak over libass's
+  resident peak. Measured again at `afb9049c` under the kernel RSS bound,
+  ARMv7 peak heap is ≤0.929 and total RSS ≤0.929 over all 80 cases.
+  [docs/status.md](../../docs/status.md) names the evidence.
 - `cargo xtask ass equivalence --base REV` renders the `ass-render`
   fixtures at their frames and every 40 ms, mutations of them with varied
   settings and style overrides, and scripts generated from a seed, with the

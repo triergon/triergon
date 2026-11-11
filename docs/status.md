@@ -287,6 +287,7 @@ against libass for AArch64 where it runs out of memory.
 | ARMv7: rasterising | `a7b6635e20cc2dc9d4592a874ba0eecab24f2870` | `d328061b906a28f523eddd7aeaa778b62d13b7c7750c68347659a457497465d7` |
 | ASS parsing, Linux AArch64 | `21642833a1c1f4d8e587a5c5bc903910f215428e` | `c039ca3e2cb63255140973528ddd22cc7e96b32e5254d22ea4f954011822a35d` |
 | ARMv7: ASS parsing | `21642833a1c1f4d8e587a5c5bc903910f215428e` | `c039ca3e2cb63255140973528ddd22cc7e96b32e5254d22ea4f954011822a35d` |
+| ARMv7: ASS rendering kernel-bound memory, the Thumb-2 playback experiment, the AArch64 proof of the kernel bound's 32-bit entry | `afb9049c681916c97311fc9f495e27ceaa69f4df` | `d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a` |
 | ASS rendering runtime and memory, Linux AArch64 and ARMv7 | `5b3e03f0e9410853152043d033b4f4d757e98a40` | `632964773b8ca4cbd5b2b3c09a2b6ddeafdaeeaff56588ea345bae8550012bb7` |
 | Earlier: ASS rendering memory against the instrumented libass build, Linux AArch64 | `e6de7e70827bb930a8ef9e5cb4d30b1e4e7d0727` | `799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3` |
 | ASS rendering comparison and generated scripts, Linux AArch64 and ARMv7 | `01ccb49792cf1d4d05b74addf35dc616763b88e0` | `c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be` |
@@ -323,7 +324,8 @@ Memory is measured under the kernel RSS bound, through its 32-bit entry point, w
 the table says "kernel-bound": total RSS there is the candidate's proven resident peak
 over the reference's observed peak. The capture row uses the standard bounds: its total
 RSS is the candidate's virtual peak over the reference's observed resident peak, a
-ceiling that already lies below the reference.
+ceiling that already lies below the reference; the ASS rendering row was measured that way
+at `5b3e03f0` too (total RSS ≤0.961), and is now kernel-bound.
 
 | Area | Verified against the reference | Runtime | Memory |
 |---|---|---|---|
@@ -344,7 +346,7 @@ ceiling that already lies below the reference.
 | ASS parsing | `ass-parse-scripts` 48/48, `ass-parse-chunks` 4/4 and `ass-parse-events` 21/21 pass; `ass-parse-host` 13/15 (2 open) | not measured | not measured |
 | Fonts | `font-outlines` 53/53, `font-hinting-none` 159/159 and `font-hinting-default` 9/53 (the same open cases as on AArch64) | not measured | not measured |
 | Shaping | `shape-libass` 195/201 and `shape-text` 200/201 (the same open cases as on AArch64), `shape-bidi` 24/24, `shape-simple` 6/6, `shape-unicode` 1/1 | not measured | not measured |
-| ASS rendering | `ass-render` 76/76 and `ass-render-host` 4/4 pass; the crate's tests pass | 0.9427 (80/80 pass) | heap ≤0.928, total RSS ≤0.961 (80/80 lower) |
+| ASS rendering | `ass-render` 76/76 and `ass-render-host` 4/4 pass; the crate's tests pass | 0.9427 (80/80 pass) | kernel-bound at `afb9049c`: heap ≤0.929, total RSS ≤0.929 (80/80 lower) |
 
 The subtitle, closed-caption and teletext features have not been run on ARMv7: their parity,
 runtime and memory there are not verified; nor are the runtime and memory of fonts and shaping.
@@ -406,7 +408,10 @@ Built for `thumbv7neon-unknown-linux-gnueabihf` (Thumb-2 on the same hardware; n
 gate target, so not a gate result), the same playback worker is 2,076,108 bytes against
 2,698,568, and over 30 alternating pairs of 50 iterations its median ratio to FFmpeg is
 3.7% below the gate build's on MP4 forward (worst `progressive-ten-sequential-batches`
-1.0348) and 2.1% below it on TS program (worst 0.8785). THUMB-RSS
+1.0348) and 2.1% below it on TS program (worst 0.8785). Its kernel-bound resident peak is about 14% lower (a median
+2,557,952 bytes against 2,971,648 on MP4 forward); over 10 observations per case, its
+median total RSS ratio stays above the reference in all 39 MP4 forward cases (1.038 to
+1.120) and falls below it in 31 of the 35 TS program cases (up to 1.017).
 
 The playback rows (MP4 forward, TS program, Matroska audio clocks, raw Annex B) were timed
 and measured at `afb9049c` and graded together by `cargo xtask grade`; the other memory
