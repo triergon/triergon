@@ -19369,6 +19369,16 @@
    "bytes": 63889181
   },
   {
+   "name": "mp4-range-quicktime",
+   "path": "mp4-range-quicktime",
+   "retention": "retained",
+   "reason": "QuickTime AAC range playback after reusing the preloaded input",
+   "key": "evidence/mp4-range-quicktime/018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1.tar.gz",
+   "sha256": "018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1",
+   "bytes": 45670319,
+   "source_revision": "5fd3f0244849f11685fdf42a75c4c71847001bf9"
+  },
+  {
    "name": "aac-mov-host",
    "path": "aac-mov-host",
    "retention": "retained",

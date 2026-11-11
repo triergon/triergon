@@ -8,7 +8,7 @@ use triergon_core::{
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_isobmff::{
-    ConfigurationLimits,
+    AacConfigurationJob, AacConfigurationStep, ConfigurationLimits,
     compat::mov::{
         edits::{
             EncodedEditContext as EditContext, EncodedEditJob as EditJob,
@@ -191,7 +191,26 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
             _ => None,
         };
         let edits = track.edits().filter(|_| track.fragments().is_empty());
-        let config = if edits.is_some() || codec.is_some() {
+        let config = if codec == Some("aac") && !track.fragments().is_empty() {
+            // A fragment's description lives in the initialization table even
+            // when that table contains no samples.
+            let entry = &descriptions[0];
+            if entry.data_reference_index != 1 {
+                return Err("encoded external data reference".into());
+            }
+            let mut config = AacConfigurationJob::new(entry, ConfigurationLimits::default())?;
+            loop {
+                match config.poll(&mut work(), &cancel)? {
+                    AacConfigurationStep::Yield => {}
+                    AacConfigurationStep::Ready(config) => {
+                        result.configuration(entry.format, config.bytes.as_ref());
+                        break;
+                    }
+                    AacConfigurationStep::End => return Err("missing AAC configuration".into()),
+                }
+            }
+            None
+        } else if edits.is_some() || codec.is_some() {
             let mut config = ConfigurationJob::new_range_playback(
                 header,
                 table,
@@ -333,7 +352,7 @@ pub fn run(args: &[String]) -> Result<()> {
         _ => return Err("expected the opus-roll seek policy".into()),
     };
     let pool = Budget::new(2 * usize::try_from(MAX_INPUT)?)?;
-    let raw = Bytes::copy_from_slice(&pool, &invocation.input(MAX_INPUT)?)?;
+    let raw = Bytes::try_from_vec(&pool, invocation.input(MAX_INPUT)?).map_err(|e| e.error())?;
     measure(&invocation, OPERATION, Some(&pool), || {
         session(&pool, &raw, seek)
     })
