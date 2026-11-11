@@ -1,16 +1,14 @@
 //! `cargo xtask shape ucd`: the Unicode property tables of triergon-shape.
 //!
-//! HarfBuzz and FriBidi each compile their own snapshot of the Unicode Character
-//! Database, and the two differ: HarfBuzz 14.6.0 carries Unicode 18.0.0, while the
-//! tables in the FriBidi 1.0.17 release were generated (by FriBidi 1.0.12) from
-//! Unicode 14.0.0; the newer data files in its `gen.tab/unidata` are not used by its
-//! build. Each table here is derived from the release its reference compiled, with
-//! the rules of that reference's own generator, from hash-pinned files on
-//! unicode.org cached under `.research/ucd/<version>/`.
+//! The shaping tables follow HarfBuzz 14.6.0, which carries Unicode 18.0.0, with
+//! the rules of HarfBuzz's own generators. The bidi tables are Unicode 14.0.0's,
+//! the data that libass's FriBidi 1.0.17 resolves text with. Every table is
+//! derived from hash-pinned files on unicode.org cached under
+//! `.research/ucd/<version>/`.
 
+mod bidi;
 mod cmap;
 mod emit;
-mod fribidi;
 mod harfbuzz;
 mod language;
 mod pack;
@@ -126,10 +124,14 @@ const USE_IGNORABLES: Release = Release {
     }],
 };
 
-/// FriBidi 1.0.17: the `lib/*.tab.i` tables of its release, from Unicode 14.0.0.
-const FRIBIDI: Release = Release {
+/// The bidi tables, from Unicode 14.0.0.
+const BIDI: Release = Release {
     version: "14.0.0",
     files: &[
+        File {
+            path: "extracted/DerivedBidiClass.txt",
+            sha256: "e5fe51acc74e3e83b4fb4c7b25f3c34491d6eb8095c9955d0712dafbca7b3c2b",
+        },
         File {
             path: "UnicodeData.txt",
             sha256: "36018e68657fdcb3485f636630ffe8c8532e01c977703d2803f5b89d6c5feafb",
@@ -166,7 +168,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
 
 fn run(root: &Path, check: bool, net: &dyn Transport) -> Result<String, String> {
     let harfbuzz = Loaded::fetch(root, &HARFBUZZ, net)?;
-    let fribidi = Loaded::fetch(root, &FRIBIDI, net)?;
+    let bidi = Loaded::fetch(root, &BIDI, net)?;
     let shapers = Loaded::fetch(root, &SYLLABIC, net)?;
     let ignorables = Loaded::fetch(root, &USE_IGNORABLES, net)?;
     let tree = syllabic::TreeFiles::load(root)?;
@@ -174,7 +176,7 @@ fn run(root: &Path, check: bool, net: &dyn Transport) -> Result<String, String> 
     let remaps = cmap::load(root)?;
     let outputs = [
         ("unicode/tables.rs", harfbuzz::generate(&harfbuzz)?),
-        ("unicode/fribidi/tables.rs", fribidi::generate(&fribidi)?),
+        ("unicode/bidi/tables.rs", bidi::generate(&bidi)?),
         (
             "unicode/syllabic_tables.rs",
             syllabic::generate(&shapers, &ignorables, &tree)?,

@@ -31,9 +31,10 @@ benchmarks assume it.
   that comparison before adding one. Tooling follows the same rule.
 - **Specifications first.** Implement from the standard. FFmpeg is consulted as a
   black box: its inputs and outputs, never its source. Do not translate FFmpeg or any
-  other implementation. Tables the specification declares normative but does not
-  print may be recovered from reference output, provided the recovery is scripted and
-  reproducible (see `crates/codec-dca`).
+  other implementation. The reference implementations Unicode publishes with its
+  standards count as specification. Tables the specification declares normative but
+  does not print may be recovered from reference output, provided the recovery is
+  scripted and reproducible (see `crates/codec-dca`).
 - **Lints are policy.** Clippy (`all` and `pedantic`) and rustdoc run with
   `-D warnings`. The workspace `[lints]` table states the pedantic lints the code does
   not follow and why; each library's `lib.rs` enables the documentation, visibility,

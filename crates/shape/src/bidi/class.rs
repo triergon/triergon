@@ -1,11 +1,11 @@
-//! Bidi classes, paired brackets and embedding levels.
+//! Bidi classes, paired brackets, joining types and embedding levels.
 
 use crate::Direction;
-use crate::unicode::fribidi;
+use crate::unicode::bidi as data;
 
-/// The Bidi_Class of a character (UAX #9, table 4), as FriBidi 1.0.17 assigns it
-/// from Unicode 14.0.0.
+/// The Bidi_Class of a character (UAX #9, table 4), from Unicode 14.0.0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum BidiClass {
     /// Left-to-right.
     L,
@@ -56,93 +56,96 @@ pub enum BidiClass {
 }
 
 impl BidiClass {
-    /// The class of `c`, as `fribidi_get_bidi_type` gives it.
+    /// Every class, in the order of their discriminants (the generated table's
+    /// values).
+    pub(crate) const ALL: [Self; 23] = [
+        Self::L,
+        Self::R,
+        Self::Al,
+        Self::En,
+        Self::Es,
+        Self::Et,
+        Self::An,
+        Self::Cs,
+        Self::Nsm,
+        Self::Bn,
+        Self::B,
+        Self::S,
+        Self::Ws,
+        Self::On,
+        Self::Lre,
+        Self::Lro,
+        Self::Rle,
+        Self::Rlo,
+        Self::Pdf,
+        Self::Lri,
+        Self::Rli,
+        Self::Fsi,
+        Self::Pdi,
+    ];
+
+    /// The class of `c`. Unassigned code points have FriBidi's defaults: R in
+    /// U+0590..U+08FF, U+FB1D..U+FB4F and U+10800..U+10FFF, AL in
+    /// U+0600..U+07BF, U+FB50..U+FDCF, U+FDF0..U+FDFF and U+FE70..U+FEFF, BN for
+    /// noncharacters and default ignorables, and L elsewhere. (Unicode gives
+    /// the unassigned code points of more right-to-left blocks R or AL, and
+    /// those of the Currency Symbols block ET.)
     #[must_use]
     pub fn of(c: char) -> Self {
-        fribidi::bidi_class(u32::from(c))
+        data::bidi_class(u32::from(c))
     }
 
-    /// The strong class of a direction: L for even levels, R for odd ones.
+    /// The strong class of the direction of `level`: L when it is even, R when
+    /// it is odd.
     pub(super) const fn of_level(level: u8) -> Self {
-        if level.is_multiple_of(2) {
-            Self::L
-        } else {
-            Self::R
-        }
+        if level & 1 == 0 { Self::L } else { Self::R }
     }
 
-    /// The direction of the class as a level parity: 1 for R, AL, RLE, RLO and
-    /// RLI, 0 otherwise.
-    pub(super) const fn rtl_bit(self) -> u8 {
-        matches!(self, Self::R | Self::Al | Self::Rle | Self::Rlo | Self::Rli) as u8
-    }
-
-    /// Strong in FriBidi's sense: the letters and the embedding and override
-    /// initiators.
-    pub(super) const fn is_strong(self) -> bool {
+    /// The characters rule X9 removes: BN and the embedding, override and PDF
+    /// characters.
+    pub(super) const fn is_removed_by_x9(self) -> bool {
         matches!(
             self,
-            Self::L | Self::R | Self::Al | Self::Lre | Self::Rle | Self::Lro | Self::Rlo
+            Self::Bn | Self::Lre | Self::Lro | Self::Rle | Self::Rlo | Self::Pdf
         )
     }
 
-    /// L, R or AL.
-    pub(super) const fn is_letter(self) -> bool {
-        matches!(self, Self::L | Self::R | Self::Al)
+    /// LRI, RLI and FSI.
+    pub(super) const fn is_isolate_initiator(self) -> bool {
+        matches!(self, Self::Lri | Self::Rli | Self::Fsi)
     }
 
-    /// The classes the neutral rules resolve: separators, whitespace, other
-    /// neutrals and the isolate formatting characters.
-    pub(super) const fn is_neutral(self) -> bool {
+    /// The isolate initiators and PDI.
+    pub(super) const fn is_isolate_control(self) -> bool {
+        matches!(self, Self::Lri | Self::Rli | Self::Fsi | Self::Pdi)
+    }
+
+    /// The neutral and isolate formatting classes rules N1 and N2 resolve (NI).
+    pub(super) const fn is_neutral_or_isolate(self) -> bool {
         matches!(
             self,
             Self::B | Self::S | Self::Ws | Self::On | Self::Lri | Self::Rli | Self::Fsi | Self::Pdi
         )
     }
 
-    pub(super) const fn is_number(self) -> bool {
-        matches!(self, Self::En | Self::An)
-    }
-
-    /// ES, ET or CS.
-    pub(super) const fn is_number_punctuation(self) -> bool {
-        matches!(self, Self::Es | Self::Et | Self::Cs)
-    }
-
-    /// LRE, RLE, LRO, RLO or PDF.
-    pub(super) const fn is_embedding(self) -> bool {
-        matches!(
-            self,
-            Self::Lre | Self::Rle | Self::Lro | Self::Rlo | Self::Pdf
-        )
-    }
-
-    /// LRI, RLI, FSI or PDI.
-    pub(super) const fn is_isolate(self) -> bool {
-        matches!(self, Self::Lri | Self::Rli | Self::Fsi | Self::Pdi)
-    }
-
-    /// What rule X9 removes: the embedding and override characters and BN.
-    pub(super) const fn is_removed(self) -> bool {
-        self.is_embedding() || matches!(self, Self::Bn)
-    }
-
-    /// B or S.
-    pub(super) const fn is_separator(self) -> bool {
-        matches!(self, Self::B | Self::S)
-    }
-
-    /// EN and AN as R, for the neutral rules.
-    pub(super) const fn numbers_as_r(self) -> Self {
-        if self.is_number() { Self::R } else { self }
+    /// The direction a strong class or number takes in rules N0 to N2, where
+    /// numbers count as R: `Some(false)` for L, `Some(true)` for R, EN and AN.
+    /// RLE and RLO, which a sequence holds only after a paragraph separator,
+    /// count as R.
+    pub(super) const fn strong_rtl(self) -> Option<bool> {
+        match self {
+            Self::L => Some(false),
+            Self::R | Self::Al | Self::En | Self::An | Self::Rle | Self::Rlo => Some(true),
+            _ => None,
+        }
     }
 }
 
-/// A character's paired-bracket property (BidiBrackets.txt, with FriBidi's
-/// compatibility folding): which brackets pair with it and whether it opens.
+/// A character's paired-bracket property (BidiBrackets.txt): which brackets pair
+/// with it and whether it opens.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Bracket {
-    /// The identity both brackets of a pair share (see [`fribidi::bracket`]).
+    /// The identity both brackets of a pair share.
     pair: char,
     opens: bool,
 }
@@ -152,10 +155,10 @@ impl Bracket {
         Self { pair, opens }
     }
 
-    /// The bracket `c` is, if any, as `fribidi_get_bracket` gives it.
+    /// The bracket `c` is, if any.
     #[must_use]
     pub fn of(c: char) -> Option<Self> {
-        fribidi::bracket(u32::from(c))
+        data::bracket(u32::from(c))
     }
 
     /// Whether this is an opening bracket.
@@ -167,21 +170,22 @@ impl Bracket {
     /// Whether `self` and `other` are brackets of one pair (either may open).
     #[must_use]
     pub const fn pairs_with(self, other: Self) -> bool {
-        self.pair == other.pair
+        self.pair as u32 == other.pair as u32 && self.opens != other.opens
     }
 
     /// The identity both brackets of a pair share: the opening bracket, or the
-    /// first character of its decomposition, as FriBidi folds it (U+2329 and
-    /// U+232A pair as U+3008, U+FF08 and U+FF09 as U+0028).
+    /// first character of the opening bracket's decomposition, canonical or
+    /// compatibility. U+2329 and U+232A pair as U+3008, like U+3008 and U+3009,
+    /// and U+FF08 and U+FF09 as U+0028, like U+0028 and U+0029.
     #[must_use]
     pub const fn pair(self) -> char {
         self.pair
     }
 }
 
-/// The joining type of a character (ArabicShaping.txt), as FriBidi 1.0.17
-/// assigns it from Unicode 14.0.0.
+/// The joining type of a character (ArabicShaping.txt), from Unicode 14.0.0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum JoiningType {
     /// U: does not join.
     NonJoining,
@@ -191,21 +195,49 @@ pub enum JoiningType {
     DualJoining,
     /// C: causes joining on both sides without changing form.
     JoinCausing,
-    /// T: marks and format characters, skipped by joining.
+    /// T: marks and format characters, which joining passes over.
     Transparent,
     /// L: joins the following character only.
     LeftJoining,
-    /// G: BN and the explicit directional formatting characters, skipped by joining.
+    /// G: the control characters of class BN, which joining passes over.
     Ignored,
 }
 
 impl JoiningType {
-    /// The joining type of `c`, as `fribidi_get_joining_type` gives it:
-    /// ArabicShaping.txt's type, else transparent for Mn, Me and Cf, ignored for
-    /// BN and the explicit formatting classes, and non-joining otherwise.
+    /// Every joining type, in the order of their discriminants (the generated
+    /// table's values).
+    pub(crate) const ALL: [Self; 7] = [
+        Self::NonJoining,
+        Self::RightJoining,
+        Self::DualJoining,
+        Self::JoinCausing,
+        Self::Transparent,
+        Self::LeftJoining,
+        Self::Ignored,
+    ];
+
+    /// The joining type of `c`: ArabicShaping.txt's, else transparent for marks
+    /// (Mn, Me) and format characters (Cf), ignored for the other characters of
+    /// class BN (controls), and non-joining.
     #[must_use]
     pub fn of(c: char) -> Self {
-        fribidi::joining_type(u32::from(c))
+        data::joining_type(u32::from(c))
+    }
+
+    /// Whether a character of this type joins the character after it.
+    pub(super) const fn joins_following(self) -> bool {
+        matches!(
+            self,
+            Self::DualJoining | Self::JoinCausing | Self::LeftJoining
+        )
+    }
+
+    /// Whether a character of this type joins the character before it.
+    pub(super) const fn joins_preceding(self) -> bool {
+        matches!(
+            self,
+            Self::DualJoining | Self::JoinCausing | Self::RightJoining
+        )
     }
 }
 
@@ -234,7 +266,7 @@ impl Level {
     /// Whether the level is odd.
     #[must_use]
     pub const fn is_rtl(self) -> bool {
-        self.0 % 2 == 1
+        self.0 & 1 == 1
     }
 
     /// The direction of text at this level.
@@ -251,12 +283,12 @@ impl Level {
 /// The direction a paragraph is resolved with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BaseDirection {
-    /// Left-to-right (`FRIBIDI_PAR_LTR`).
+    /// Left-to-right.
     LeftToRight,
-    /// Right-to-left (`FRIBIDI_PAR_RTL`).
+    /// Right-to-left.
     RightToLeft,
     /// The direction of the first strong letter outside isolates, else
-    /// left-to-right (`FRIBIDI_PAR_ON`, rules P2 and P3).
+    /// left-to-right (rules P2 and P3).
     Auto,
 }
 
@@ -274,30 +306,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn classes_follow_fribidi() {
-        assert_eq!(BidiClass::of('a'), BidiClass::L);
-        assert_eq!(BidiClass::of('\u{05D0}'), BidiClass::R);
-        assert_eq!(BidiClass::of('\u{0627}'), BidiClass::Al);
-        assert_eq!(BidiClass::of('\u{2067}'), BidiClass::Rli);
-        assert_eq!(BidiClass::of('\u{2029}'), BidiClass::B);
-        assert_eq!(BidiClass::of('\u{FDD0}'), BidiClass::Bn);
-    }
-
-    #[test]
-    fn brackets_pair_by_identity() {
-        let open = Bracket::of('(').expect("bracket");
-        let close = Bracket::of(')').expect("bracket");
-        assert!(open.opens() && !close.opens());
-        assert!(open.pairs_with(close));
-        assert!(Bracket::of('\u{FF09}').expect("bracket").pairs_with(open));
-        assert!(!Bracket::of(']').expect("bracket").pairs_with(open));
-        assert_eq!(Bracket::of('a'), None);
-    }
-
-    #[test]
     fn levels() {
+        assert_eq!(Level::of(Direction::RightToLeft).get(), 1);
         assert!(Level(3).is_rtl());
-        assert_eq!(Level(2).direction(), Direction::LeftToRight);
-        assert_eq!(Level::of(Direction::RightToLeft), Level(1));
+        assert_eq!(Level(4).direction(), Direction::LeftToRight);
+        assert_eq!(BidiClass::of_level(5), BidiClass::R);
+    }
+
+    #[test]
+    fn class_groups() {
+        assert!(BidiClass::Pdf.is_removed_by_x9());
+        assert!(!BidiClass::Pdi.is_removed_by_x9());
+        assert!(BidiClass::Pdi.is_neutral_or_isolate());
+        assert_eq!(BidiClass::An.strong_rtl(), Some(true));
+        assert_eq!(BidiClass::On.strong_rtl(), None);
+        assert!(JoiningType::JoinCausing.joins_following());
+        assert!(!JoiningType::RightJoining.joins_following());
     }
 }

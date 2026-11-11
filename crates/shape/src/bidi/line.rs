@@ -1,5 +1,4 @@
-//! Rules L1 (for the end of a line) and L2, as `fribidi_reorder_line` with no
-//! flags applies them.
+//! Rules L1 (for the end of a line) and L2.
 
 use super::class::{BidiClass, Level};
 use super::{Limits, charge};
@@ -11,12 +10,14 @@ use triergon_core::{Error, Result};
 /// resolved levels, and `items` holds one value per character (character
 /// indices, for a visual-to-logical map).
 ///
-/// First the whitespace, BN and embedding characters at the end of the line are
-/// set to the paragraph level of `direction` (FriBidi leaves isolate formatting
-/// characters there as they are). Then `items` is reordered as L2 reverses
-/// characters: from the highest level to the lowest odd one, every maximal
-/// stretch at that level or above. `levels` keeps logical order. Combining marks
-/// are not moved (L3 is not applied).
+/// First the whitespace, BN and embedding, override and PDF characters at the
+/// end of the line take the paragraph level of `direction`. Unlike UAX #9's
+/// L1, and as FriBidi applies it, an isolate formatting character ends that
+/// stretch and keeps its level, like the characters before it. Then `items` is
+/// reordered as L2
+/// reverses characters: from the highest level to the lowest odd one, every
+/// maximal stretch at that level or above. `levels` keeps logical order.
+/// Combining marks are not moved (L3 is not applied).
 ///
 /// # Errors
 ///
@@ -32,7 +33,7 @@ pub fn reorder_line<T>(
 }
 
 /// [`reorder_line`] within `limits`: each level's pass over the line is
-/// charged, at most one per level from the highest to the lowest odd one.
+/// charged, one per level from the highest to the lowest odd one.
 ///
 /// # Errors
 ///
@@ -47,29 +48,37 @@ pub fn reorder_line_with_limits<T>(
     if classes.len() != levels.len() || items.len() != levels.len() {
         return Err(Error::Invalid("bidi line lengths differ"));
     }
-    let mut work = limits.budget(levels.len());
-    charge(&mut work, levels.len())?;
-    for (class, level) in classes.iter().zip(levels.iter_mut()).rev() {
-        if !(class.is_removed() || *class == BidiClass::Ws) {
+    let paragraph = Level::of(direction);
+    for (&class, level) in classes.iter().zip(levels.iter_mut()).rev() {
+        if class != BidiClass::Ws && !class.is_removed_by_x9() {
             break;
         }
-        *level = Level::of(direction);
+        *level = paragraph;
     }
-
-    let (Some(&lowest), Some(&highest)) = (levels.iter().min(), levels.iter().max()) else {
+    let Some(highest) = levels.iter().map(|l| l.0).max() else {
         return Ok(());
     };
-    for level in ((lowest.get() | 1)..=highest.get()).rev() {
+    let lowest_odd = levels
+        .iter()
+        .map(|l| l.0)
+        .filter(|l| l & 1 == 1)
+        .min()
+        .unwrap_or(highest + 1);
+    let mut work = limits.work(levels.len());
+    for level in (lowest_odd..=highest).rev() {
         charge(&mut work, levels.len())?;
-        let mut start = 0;
-        while let Some(offset) = levels[start..].iter().position(|l| l.get() >= level) {
-            let from = start + offset;
-            let len = levels[from..]
+        let mut at = 0;
+        while at < levels.len() {
+            if levels[at].0 < level {
+                at += 1;
+                continue;
+            }
+            let end = levels[at..]
                 .iter()
-                .position(|l| l.get() < level)
-                .unwrap_or(levels.len() - from);
-            items[from..from + len].reverse();
-            start = from + len;
+                .position(|l| l.0 < level)
+                .map_or(levels.len(), |n| at + n);
+            items[at..end].reverse();
+            at = end;
         }
     }
     Ok(())
@@ -78,66 +87,33 @@ pub fn reorder_line_with_limits<T>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use BidiClass::*;
-
-    fn reorder(
-        classes: &[BidiClass],
-        direction: Direction,
-        levels: &[u8],
-    ) -> (Vec<u8>, Vec<usize>) {
-        let mut levels: Vec<Level> = levels.iter().map(|&l| Level(l)).collect();
-        let mut map: Vec<usize> = (0..levels.len()).collect();
-        reorder_line(classes, direction, &mut levels, &mut map).expect("reorder");
-        (levels.iter().map(|l| l.0).collect(), map)
-    }
 
     #[test]
     fn reverses_from_the_highest_level() {
-        let (_, map) = reorder(&[L, R, R, L, L], Direction::LeftToRight, &[0, 1, 1, 2, 2]);
-        assert_eq!(map, [0, 3, 4, 2, 1]);
-        let (_, map) = reorder(&[L; 4], Direction::LeftToRight, &[2, 2, 2, 2]);
-        assert_eq!(map, [0, 1, 2, 3]);
+        let classes = [BidiClass::L, BidiClass::R, BidiClass::En, BidiClass::Ws];
+        let mut levels = [0, 1, 2, 1].map(Level);
+        let mut items = [0, 1, 2, 3];
+        reorder_line(&classes, Direction::LeftToRight, &mut levels, &mut items).unwrap();
+        assert_eq!(levels.map(|l| l.0), [0, 1, 2, 0]);
+        assert_eq!(items, [0, 2, 1, 3]);
     }
 
     #[test]
-    fn trailing_whitespace_takes_the_paragraph_level() {
-        let (levels, map) = reorder(&[R, Ws, Bn, Rli], Direction::LeftToRight, &[1, 1, 1, 1]);
-        assert_eq!(levels, [1, 1, 1, 1], "an isolate initiator stops the reset");
-        assert_eq!(map, [3, 2, 1, 0]);
-        let (levels, map) = reorder(&[R, Ws, Bn, Pdf], Direction::LeftToRight, &[1, 1, 1, 1]);
-        assert_eq!(levels, [1, 0, 0, 0]);
-        assert_eq!(map, [0, 1, 2, 3]);
-    }
-
-    #[test]
-    fn deep_levels_need_work() {
-        let classes = [L; 4];
-        let mut levels = [Level(125), Level(0), Level(125), Level(0)];
-        let mut map = [0, 1, 2, 3];
+    fn limits_bound_the_passes() {
+        let classes = [BidiClass::R; 4];
+        let mut levels = [2, 3, 4, 5].map(Level);
+        let mut items = [0; 4];
         let tight = Limits {
             work_per_char: 1,
             minimum_work: 0,
         };
-        assert_eq!(
-            reorder_line_with_limits(
-                tight,
-                &classes,
-                Direction::LeftToRight,
-                &mut levels,
-                &mut map
-            ),
-            Err(Error::Policy("bidi work"))
+        let result = reorder_line_with_limits(
+            tight,
+            &classes,
+            Direction::LeftToRight,
+            &mut levels,
+            &mut items,
         );
-        assert_eq!(
-            reorder_line(&classes, Direction::LeftToRight, &mut levels, &mut map),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn lengths_must_agree() {
-        let mut levels = [Level(0)];
-        let mut map = [0_usize; 2];
-        assert!(reorder_line(&[L], Direction::LeftToRight, &mut levels, &mut map).is_err());
+        assert_eq!(result, Err(Error::Policy("bidi work")));
     }
 }

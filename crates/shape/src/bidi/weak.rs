@@ -1,217 +1,181 @@
-//! Rules W1–W7 on the runs of a paragraph, in FriBidi's two passes: W1 and W2,
-//! then W3 to W7.
+//! Rules W1 to W7 on the classes of one isolating run sequence.
 //!
 //! FriBidi's choices, reproduced here:
-//! - The last strong class W2 and W7 look back to is kept per isolate depth and
-//!   updated from the class each run sees before it, already resolved by the
-//!   current pass (an EN that W7 made L counts as strong L).
-//! - W1 gives an NSM the class of the run before it in its sequence by merging
-//!   it into that run when the two are adjacent at the same level, and sos at a
-//!   level change; an NSM whose predecessor at the same level is not adjacent
-//!   keeps its class. An NSM right after an isolate formatting character
-//!   becomes ON first. When the classes on both sides of the NSM agree, the run
-//!   after it joins the merged run too.
-//! - W4 changes a separator only when it is a run of one character, between a
-//!   number the previous run left behind (after W7 a European number still
-//!   counts) and a number after it, and gives it the class of the run before.
+//! - Marks that W1 makes ON after a neutral (other than an isolate initiator
+//!   or PDI) join the neutral's run, and so does the neutral run after them:
+//!   a bracket there loses its bracket property, and where the run before the
+//!   marks is a bracket that N0 resolves, the marks and the run after them
+//!   take its direction.
+//! - The embedding and override characters, which are only in a sequence
+//!   after a paragraph separator, are strong classes that are neither L nor
+//!   AL for W2 and W7.
+//! - Marks after a PDI join its run, which looking forward W4 and W5 pass
+//!   over when the PDI closes an overflowed isolate (in a sequence, the only
+//!   PDIs after a character that is not an isolate initiator).
 
-use super::class::BidiClass;
-use super::runs::{MAX_ISOLATE_DEPTH, Run, contexts, sequence_after, sequence_before, truncate};
-use triergon_core::{BudgetVec, Result, WorkBudget};
+use super::charge;
+use super::class::{BidiClass, Bracket};
+use triergon_core::{Result, WorkBudget};
 
-/// The last strong class seen before a run, per isolate depth.
-type LastStrong = [BidiClass; MAX_ISOLATE_DEPTH as usize + 1];
+/// The bracket property of a sequence's characters, for W1 to record which
+/// brackets lose it: `brackets` for the paragraph, `positions` of the
+/// sequence's characters in it, and `absorbed`, set for each character that
+/// joins the run of the neutral before the marks before it.
+pub(super) struct Runs<'a> {
+    pub brackets: &'a [Option<Bracket>],
+    pub positions: &'a [u32],
+    pub absorbed: &'a mut [bool],
+}
 
+/// Rules W1 to W7, each over the whole sequence before the next. `sos` is the
+/// sequence's start-of-sequence class; `runs` is given when brackets pair.
 pub(super) fn resolve(
-    runs: &mut BudgetVec<Run>,
-    base_level: u8,
+    types: &mut [BidiClass],
+    sos: BidiClass,
+    mut runs: Option<Runs<'_>>,
     work: &mut WorkBudget,
 ) -> Result<()> {
-    let mut last_strong: LastStrong =
-        [BidiClass::of_level(base_level); MAX_ISOLATE_DEPTH as usize + 1];
-    let kept = marks_and_european_numbers(runs.as_mut_slice(), &mut last_strong, work)?;
-    truncate(runs, kept);
-    last_strong[0] = BidiClass::of_level(base_level);
-    separators_and_terminators(runs.as_mut_slice(), &mut last_strong, work)
-}
-
-/// W1 and W2, merging runs as W1 resolves marks. Returns how many runs remain
-/// at the start of `runs`.
-fn marks_and_european_numbers(
-    runs: &mut [Run],
-    last_strong: &mut LastStrong,
-    work: &mut WorkBudget,
-) -> Result<usize> {
-    // `runs[..kept]` are resolved, `runs[next..]` are not; between them lie
-    // runs already merged away.
-    let (mut kept, mut next) = (0, 0);
-    while let Some(&run) = runs.get(next) {
-        let mut run = run;
-        let rest = next + 1;
-        next = rest;
-        let before = sequence_before(&runs[..kept], run.isolate, work)?;
-        let after = sequence_after(runs, rest, run.isolate, work)?;
-        let before_class = run.context(before.map(|i| &runs[i]));
-        let after_class = run.context(after.map(|i| &runs[i]));
-        if before_class.is_strong() {
-            last_strong[usize::from(run.isolate)] = before_class;
-        }
-
-        if run.class == BidiClass::Nsm {
-            let adjacent = kept.checked_sub(1);
-            if adjacent.is_some_and(|i| runs[i].class.is_isolate()) {
-                run.class = BidiClass::On;
-            }
-            let merges = match before {
-                Some(i) if runs[i].level == run.level => Some(i) == adjacent,
-                _ => {
-                    run.class = before_class;
-                    false
-                }
-            };
-            if merges {
-                runs[kept - 1].len += run.len;
-            } else {
-                runs[kept] = run;
-                kept += 1;
-            }
-            if before_class == after_class && after == Some(rest) && runs[rest].level == run.level {
-                runs[kept - 1].len += runs[rest].len;
-                next = rest + 1;
-            }
+    use BidiClass::{
+        Al, An, Cs, En, Es, Et, Fsi, L, Lre, Lri, Lro, Nsm, On, Pdi, R, Rle, Rli, Rlo,
+    };
+    charge(work, 6 * types.len())?;
+    // W1: a mark takes the class of the character before it, ON after an
+    // isolate initiator or PDI, and sos at the start.
+    let mut before = sos;
+    let mut at = 0;
+    while at < types.len() {
+        if types[at] != Nsm {
+            before = types[at];
+            at += 1;
             continue;
         }
-
-        if run.class == BidiClass::En && last_strong[usize::from(run.isolate)] == BidiClass::Al {
-            run.class = BidiClass::An;
-            if after_class == BidiClass::Nsm
-                && let Some(i) = after
-            {
-                runs[i].class = BidiClass::An;
-            }
+        let end = types[at..]
+            .iter()
+            .position(|&c| c != Nsm)
+            .map_or(types.len(), |n| at + n);
+        let class = match before {
+            Pdi => Pdi,
+            Lri | Rli | Fsi => On,
+            _ => before,
+        };
+        types[at..end].fill(class);
+        if let Some(runs) = runs.as_mut().filter(|_| before == On) {
+            absorb(types, end, runs);
         }
-        runs[kept] = run;
-        kept += 1;
+        before = class;
+        at = end;
     }
-    Ok(kept)
-}
-
-/// W3–W7.
-fn separators_and_terminators(
-    runs: &mut [Run],
-    last_strong: &mut LastStrong,
-    work: &mut WorkBudget,
-) -> Result<()> {
-    // Whether W4 may apply, and the class W4 and W5 see before a run.
-    let mut w4 = true;
-    let mut before_number = BidiClass::On;
-    for at in 0..runs.len() {
-        let run = runs[at];
-        let (before_class, after_class) = contexts(runs, at, work)?;
-        let last = &mut last_strong[usize::from(run.isolate)];
-        if before_class.is_strong() {
-            *last = before_class;
+    // W2 and W3: a European number after an Arabic letter (the last strong
+    // class before it, or sos) is an Arabic number; Arabic letters become R.
+    let mut strong = sos;
+    for class in types.iter_mut() {
+        match *class {
+            L | R | Lre | Lro | Rle | Rlo => strong = *class,
+            Al => {
+                strong = Al;
+                *class = R;
+            }
+            En if strong == Al => *class = An,
+            _ => {}
         }
-
-        let mut class = run.class;
-        if class == BidiClass::Al {
-            runs[at].class = BidiClass::R;
-            w4 = true;
-            before_number = BidiClass::On;
+    }
+    // W4: one separator between two numbers of a type it separates takes
+    // their type.
+    for at in 1..types.len().saturating_sub(1) {
+        let previous = types[at - 1];
+        let Some(next) = following(types, at + 1) else {
+            continue;
+        };
+        types[at] = match (types[at], previous, next) {
+            (Es | Cs, En, En) => En,
+            (Cs, An, An) => An,
+            (class, _, _) => class,
+        };
+    }
+    // W5: terminators next to a European number become European numbers.
+    let mut at = 0;
+    while at < types.len() {
+        if types[at] != Et {
+            at += 1;
             continue;
         }
-        if w4
-            && run.len == 1
-            && matches!(class, BidiClass::Es | BidiClass::Cs)
-            && before_number.is_number()
-            && before_number == after_class
-            && (before_number == BidiClass::En || class == BidiClass::Cs)
-        {
-            class = before_class;
+        let end = types[at..]
+            .iter()
+            .position(|&c| c != Et)
+            .map_or(types.len(), |n| at + n);
+        let touches = (at > 0 && types[at - 1] == En) || following(types, end) == Some(En);
+        if touches {
+            types[at..end].fill(En);
         }
-        w4 = true;
-        if class == BidiClass::Et
-            && (before_number == BidiClass::En || after_class == BidiClass::En)
-        {
-            class = BidiClass::En;
-            w4 = false;
+        at = end;
+    }
+    // W6: the remaining separators and terminators are neutral.
+    for class in types.iter_mut() {
+        if matches!(*class, Es | Et | Cs) {
+            *class = On;
         }
-
-        // The class the next run sees before it: this run's at the same level.
-        let after_level = runs.get(at + 1).map(|n| n.level);
-        if class == BidiClass::En && *last == BidiClass::L {
-            runs[at].class = BidiClass::L;
-            before_number = if after_level == Some(run.level) {
-                BidiClass::En
-            } else {
-                BidiClass::On
-            };
-        } else {
-            // W6.
-            let class = if class.is_number_punctuation() {
-                BidiClass::On
-            } else {
-                class
-            };
-            runs[at].class = class;
-            before_number = match after_level {
-                Some(level) if level == run.level => class,
-                Some(level) => BidiClass::of_level(level.max(run.level)),
-                None => BidiClass::of_level(run.level),
-            };
+    }
+    // W7: a European number after L (the last strong class before it, or sos)
+    // is L.
+    let mut strong = sos;
+    for class in types.iter_mut() {
+        match *class {
+            L | R | Lre | Lro | Rle | Rlo => strong = *class,
+            En if strong == L => *class = L,
+            _ => {}
         }
     }
     Ok(())
+}
+
+/// The first class from `at` on that is not PDI.
+fn following(types: &[BidiClass], at: usize) -> Option<BidiClass> {
+    types
+        .get(at..)?
+        .iter()
+        .copied()
+        .find(|&c| c != BidiClass::Pdi)
+}
+
+/// The neutral run at `at`, after marks that joined a neutral run, joins that
+/// run too: a bracket alone, or the neutrals up to the next bracket.
+fn absorb(types: &[BidiClass], at: usize, runs: &mut Runs<'_>) {
+    let bracket = |at: usize| runs.brackets[runs.positions[at] as usize].is_some();
+    if types.get(at) != Some(&BidiClass::On) {
+        return;
+    }
+    let end = if bracket(at) {
+        at + 1
+    } else {
+        (at..types.len())
+            .find(|&n| types[n] != BidiClass::On || bracket(n))
+            .unwrap_or(types.len())
+    };
+    for &position in &runs.positions[at..end] {
+        runs.absorbed[position as usize] = true;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use BidiClass::*;
-    use triergon_core::Budget;
 
-    fn resolved(classes: &[(BidiClass, u32)], level: u8) -> Vec<(BidiClass, u32)> {
-        let budget = Budget::new(1 << 20).expect("budget");
-        let mut runs = BudgetVec::new(&budget);
-        for &(class, len) in classes {
-            let run = Run {
-                len,
-                class,
-                level,
-                isolate: 0,
-                bracket: None,
-            };
-            runs.try_push(run).map_err(|e| e.error).expect("push");
-        }
-        resolve(&mut runs, level, &mut WorkBudget::new(1000)).expect("work");
-        runs.as_slice().iter().map(|r| (r.class, r.len)).collect()
+    fn weak(types: &[BidiClass], sos: BidiClass) -> Vec<BidiClass> {
+        let mut types = types.to_vec();
+        let mut work = WorkBudget::new(1000);
+        resolve(&mut types, sos, None, &mut work).unwrap();
+        types
     }
 
     #[test]
-    fn marks_take_the_class_before() {
-        assert_eq!(resolved(&[(R, 1), (Nsm, 2)], 0), [(R, 3)]);
-        assert_eq!(resolved(&[(Nsm, 1), (L, 1)], 1), [(R, 1), (L, 1)]);
-        // Both sides agree: the run after joins as well.
-        assert_eq!(resolved(&[(R, 1), (Nsm, 1), (R, 1)], 0), [(R, 3)]);
-    }
-
-    #[test]
-    fn numbers() {
-        // W2 and W3: EN after AL is AN.
-        assert_eq!(resolved(&[(Al, 1), (En, 1)], 0), [(R, 1), (An, 1)]);
-        // W4: one separator between European numbers; W7 then makes them L.
-        assert_eq!(
-            resolved(&[(En, 1), (Es, 1), (En, 1)], 0),
-            [(L, 1), (L, 1), (L, 1)]
-        );
-        // Two separators are not changed.
-        assert_eq!(
-            resolved(&[(En, 1), (Cs, 2), (En, 1)], 1),
-            [(En, 1), (On, 2), (En, 1)]
-        );
-        // W5: terminators next to European numbers.
-        assert_eq!(resolved(&[(Et, 2), (En, 1)], 1), [(En, 2), (En, 1)]);
-        // W6.
-        assert_eq!(resolved(&[(R, 1), (Et, 1)], 1), [(R, 1), (On, 1)]);
+    fn marks_and_numbers() {
+        assert_eq!(weak(&[Nsm, Al, Nsm], R), [R, R, R]);
+        assert_eq!(weak(&[Lri, Nsm], L), [Lri, On]);
+        assert_eq!(weak(&[Al, En, Cs, En], L), [R, An, An, An]);
+        assert_eq!(weak(&[En, Es, En, Cs, Cs, En], R), [En, En, En, On, On, En]);
+        assert_eq!(weak(&[Et, Et, En, Et], R), [En, En, En, En]);
+        assert_eq!(weak(&[L, Et, En, R, En], R), [L, L, L, R, En]);
+        assert_eq!(weak(&[An, Cs, En], R), [An, On, En]);
     }
 }

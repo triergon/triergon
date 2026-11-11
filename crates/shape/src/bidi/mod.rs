@@ -1,32 +1,31 @@
-//! The Unicode bidirectional algorithm (UAX #9) as FriBidi 1.0.17 computes it
-//! for libass, and libass's simple shaping.
+//! The Unicode bidirectional algorithm (UAX #9, revision 44, for Unicode
+//! 14.0.0) as libass resolves text with it, and libass's simple shaping.
 //!
-//! The steps follow libass's `ass_shaper_shape` and `ass_shaper_reorder`:
+//! The rules follow the Unicode Consortium's C reference implementation of the
+//! algorithm for that version, which pass BidiTest.txt and
+//! BidiCharacterTest.txt. libass resolves text with FriBidi 1.0.17, and where
+//! FriBidi's results differ from UAX #9's on text outside those tests, the
+//! results here are FriBidi's: each such deviation is named in the module of
+//! the rule it changes.
+//!
+//! The steps are libass's:
 //!
 //! 1. [`BidiClass::of`] every character, and [`Bracket::of`] each when bracket
-//!    pairs take part (libass's bidi-brackets feature).
-//! 2. [`Resolver::resolve`] each paragraph, or each piece libass resolves on its
-//!    own; [`paragraphs`] splits text after every paragraph separator.
+//!    pairs take part.
+//! 2. [`Resolver::resolve`] each paragraph, or each piece of text resolved on
+//!    its own; [`paragraphs`] splits text after every paragraph separator.
 //! 3. [`reorder_line`] each line with its paragraph's resolved direction.
 //!
-//! [`shape_simple`] is the joining, Arabic presentation forms and mirroring of
-//! libass's simple shaping level, between steps 2 and 3. It reads FriBidi's
-//! [`JoiningType::of`] and [`mirror`] of each character.
-//!
-//! Results equal FriBidi's, including where it reads UAX #9 its own way; each
-//! module lists those choices. In short: rules X9 to I2 work on runs of
-//! characters as FriBidi forms them; the characters X9 removes return with the
-//! level of the character before them; the explicit levels stop at 125 with
-//! FriBidi's overflow counting; brackets pair within 63 open brackets per
-//! isolate depth; processing stops at a paragraph separator inside the text.
+//! [`shape_simple`] is the cursive joining, Arabic presentation forms and
+//! mirroring of libass's simple shaping, between steps 2 and 3.
 
 mod arabic;
 mod class;
 mod explicit;
-mod levels;
 mod line;
 mod neutral;
-mod runs;
+mod paragraph;
+mod sequence;
 mod weak;
 
 use std::ops::Range;
@@ -36,28 +35,27 @@ pub use class::{BaseDirection, BidiClass, Bracket, JoiningType, Level};
 pub use line::{reorder_line, reorder_line_with_limits};
 
 use crate::Direction;
-use crate::unicode::fribidi;
-use runs::Run;
-use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+use crate::unicode::bidi as data;
+use triergon_core::{Budget, Error, Result, WorkBudget};
 
 /// Limits of resolving one paragraph or reordering one line: its work is
 /// bounded by `work_per_char` units for each character, and at least
 /// `minimum_work` in all.
 ///
-/// The work is the runs each rule looks at: once per pass for most rules, and
-/// again for each run whose context lies past runs of deeper isolates (at most
-/// once per enclosing isolate depth, up to 125), for each bracket pair that
-/// encloses a run (up to 63 per isolate depth) and for each level line
-/// reordering reverses at (up to 126). The default, 4096 units per character
-/// and 65536 in all, as for shaping, is 19 times the most any text of the bidi
-/// and shaping corpora needs (216 units per character, for a seeded random
-/// paragraph of every class); it stops only text that nests brackets and
-/// isolates to multiply the work.
+/// The work is the characters each step looks at. Resolving a paragraph looks
+/// at each character in about twenty passes, and N0 again for each bracket pair
+/// that encloses it (up to 63 per isolate depth, at every depth) and for each
+/// opening bracket still unpaired when a closing one is looked up; reordering a
+/// line looks at each character once for each level it reverses at (up to
+/// 126). The default, 4096 units per character and 65536 in all, as for
+/// shaping, is 259 times the most a paragraph of the bidi corpora needs (15.8
+/// per character). Text that nests brackets in deep isolates needs thousands of
+/// units per character.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Work units per character.
+    /// Work units for each character.
     pub work_per_char: u64,
-    /// The work units of a paragraph or line of any length.
+    /// Work units for any text, however short.
     pub minimum_work: u64,
 }
 
@@ -71,11 +69,12 @@ impl Default for Limits {
 }
 
 impl Limits {
-    fn budget(self, chars: usize) -> WorkBudget {
+    /// The work allowed for `chars` characters.
+    fn work(self, chars: usize) -> WorkBudget {
         let chars = u64::try_from(chars).unwrap_or(u64::MAX);
         WorkBudget::new(
-            chars
-                .saturating_mul(self.work_per_char)
+            self.work_per_char
+                .saturating_mul(chars)
                 .max(self.minimum_work),
         )
     }
@@ -83,14 +82,18 @@ impl Limits {
 
 /// Charges `units` before the work is done; running out is `Error::Policy`.
 fn charge(work: &mut WorkBudget, units: usize) -> Result<()> {
-    crate::work::charge_for(work, units, "bidi work")
+    let units = u64::try_from(units).unwrap_or(u64::MAX);
+    if work.try_charge(units) {
+        Ok(())
+    } else {
+        Err(Error::Policy("bidi work"))
+    }
 }
 
-/// The Bidi_Mirroring_Glyph of `c`, if it has one, as `fribidi_get_mirror_char`
-/// gives it.
+/// The Bidi_Mirroring_Glyph of `c`, if it has one (BidiMirroring.txt).
 #[must_use]
 pub fn mirror(c: char) -> Option<char> {
-    fribidi::mirror(u32::from(c)).and_then(char::from_u32)
+    data::mirror(u32::from(c)).and_then(char::from_u32)
 }
 
 /// The paragraphs of a text: ranges that end after each paragraph separator
@@ -113,10 +116,7 @@ pub fn paragraphs(classes: &[BidiClass]) -> impl Iterator<Item = Range<usize>> +
 /// storage, charged to its budget, from one paragraph to the next.
 #[derive(Debug)]
 pub struct Resolver {
-    runs: BudgetVec<Run>,
-    fsi_rtl: BudgetVec<bool>,
-    open_isolates: BudgetVec<Option<u32>>,
-    brackets: neutral::Brackets,
+    storage: paragraph::Storage,
     limits: Limits,
     /// The work of the last paragraph.
     work: WorkBudget,
@@ -134,10 +134,7 @@ impl Resolver {
     #[must_use]
     pub fn with_limits(budget: &Budget, limits: Limits) -> Self {
         Self {
-            runs: BudgetVec::new(budget),
-            fsi_rtl: BudgetVec::new(budget),
-            open_isolates: BudgetVec::new(budget),
-            brackets: neutral::Brackets::new(budget),
+            storage: paragraph::Storage::new(budget),
             limits,
             work: WorkBudget::new(0),
         }
@@ -149,14 +146,23 @@ impl Resolver {
         self.work.spent()
     }
 
-    /// Resolves the embedding level of every character of one paragraph, as
-    /// `fribidi_get_par_embedding_levels_ex` does, and returns the paragraph's
-    /// direction (left-to-right for [`BaseDirection::Auto`] without a strong
-    /// letter).
+    /// Resolves the embedding level of every character of one paragraph and
+    /// returns the paragraph's direction (left-to-right for
+    /// [`BaseDirection::Auto`] without a strong letter).
     ///
     /// `brackets`, one per character, makes paired brackets take part (rule
     /// N0); only brackets of class ON pair. The levels are those before line
-    /// reordering: [`reorder_line`] completes L1 for each line.
+    /// reordering: [`reorder_line`] completes rule L1 for each line.
+    ///
+    /// As in FriBidi, the explicit rules stop at the first paragraph separator:
+    /// it and the characters after it keep their classes, formatting characters
+    /// included, at explicit level 0 and isolate depth 0, and the implicit rules
+    /// resolve them as if the paragraph's level were 0 there. Isolates still
+    /// match, and [`BaseDirection::Auto`] still finds the first strong letter,
+    /// past it. Where an isolate opened before the separator is closed after
+    /// it, FriBidi resolves the text between apart from the isolate and this
+    /// resolver does not. [`paragraphs`] splits text into the pieces to resolve
+    /// one by one.
     ///
     /// # Errors
     ///
@@ -171,46 +177,20 @@ impl Resolver {
         levels: &mut [Level],
     ) -> Result<Direction> {
         if levels.len() != classes.len() || brackets.is_some_and(|b| b.len() != classes.len()) {
-            return Err(Error::Invalid("bidi paragraph lengths differ"));
+            return Err(Error::Invalid("bidi input lengths differ"));
         }
         if u32::try_from(classes.len()).is_err() {
             return Err(Error::Policy("bidi paragraph length"));
         }
-        let direction = match base {
-            BaseDirection::LeftToRight => Direction::LeftToRight,
-            BaseDirection::RightToLeft => Direction::RightToLeft,
-            BaseDirection::Auto => {
-                explicit::first_strong(classes).unwrap_or(Direction::LeftToRight)
-            }
-        };
-        let base_level = Level::of(direction).0;
-        let work = &mut self.work;
-        *work = self.limits.budget(classes.len());
-
-        // The passes over every character: P2, X5c, X1–X9 and the levels.
-        charge(work, 4 * classes.len())?;
-        explicit::first_strong_isolates(classes, &mut self.fsi_rtl, &mut self.open_isolates)?;
-        explicit::runs(
+        self.work = self.limits.work(classes.len());
+        paragraph::resolve(
+            &mut self.storage,
             classes,
             brackets,
-            base_level,
-            self.fsi_rtl.as_slice(),
-            &mut self.runs,
-        )?;
-        weak::resolve(&mut self.runs, base_level, work)?;
-        charge(work, self.runs.len())?;
-        runs::compact(&mut self.runs, Run::continues_neutrally_with);
-        if self.runs.as_slice().iter().any(|r| r.bracket.is_some()) {
-            self.brackets.resolve(self.runs.as_mut_slice(), work)?;
-            for run in self.runs.as_mut_slice() {
-                run.bracket = None;
-            }
-            charge(work, self.runs.len())?;
-            runs::compact(&mut self.runs, Run::continues_neutrally_with);
-        }
-        neutral::resolve(self.runs.as_mut_slice(), work)?;
-        levels::write(self.runs.as_slice(), classes, base_level, levels);
-        Ok(direction)
+            base,
+            levels,
+            &mut self.work,
+        )
     }
 }
 

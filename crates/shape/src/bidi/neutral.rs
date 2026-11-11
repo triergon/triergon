@@ -1,193 +1,316 @@
-//! Rules N0–N2.
+//! Rules BD16 and N0 for the paired brackets of a paragraph, and N1 and N2 on
+//! the classes of one isolating run sequence.
 //!
-//! FriBidi's choices for paired brackets (BD16 and N0), reproduced here:
-//! - Brackets pair per isolate depth: each depth keeps a stack of at most 63
-//!   opening brackets, cleared when the level changes at the same depth but
-//!   kept across separate isolates of one depth. An opening bracket that finds
-//!   its stack full ends the pairing of the paragraph. A bracket is paired only
-//!   while its run is ON, so an overridden bracket does not take part.
-//! - The stacks of the first 16 depths share storage as FriBidi lays them out
-//!   (see [`stack_start`]): from its 17th bracket on, a depth's stack overwrites
-//!   the stacks of the depths after it.
-//! - N0 looks inside a pair at every run between the brackets, at any depth.
-//!   N0b takes the first strong class (numbers as R) whose level, raised as I1
-//!   and I2 would raise it, is the pair's embedding level. N0c takes the first
-//!   strong class at the pair's isolate depth and gives the brackets the
-//!   direction of the strong class last seen before the opening bracket at that
-//!   depth, or the embedding direction; that class is looked up as resolved
-//!   when the pair is reached, earlier pairs included.
-//! - Marks after a bracket follow it because W1 merged them into its run.
+//! The bracket pairs are FriBidi's. UAX #9 pairs brackets within an isolating
+//! run sequence; FriBidi pairs them per isolate depth over the whole paragraph,
+//! which differs from it in these ways:
+//! - Each depth keeps a stack of at most 63 opening brackets, emptied when the
+//!   level changes between characters of that depth with no shallower one
+//!   between them, but kept across separate isolates of one depth, whatever
+//!   their levels, so that brackets in two isolates can pair. An opening
+//!   bracket that finds its stack full ends the pairing of the whole paragraph,
+//!   and the pairs found before it stay.
+//! - The stacks of the first 16 depths start 16 slots apart in one array yet
+//!   each holds 63 brackets: from its 17th bracket on, a depth's stack
+//!   overwrites the stacks of the depths after it, so that a closing bracket
+//!   there may pair with an opening bracket of a shallower depth.
+//! - N0b looks at every strong class between the brackets, at any depth, and
+//!   takes the embedding direction where one of them, raised as I1 and I2 would
+//!   raise it, reaches the level of the opening bracket. N0c looks for a strong
+//!   class at the opening bracket's depth, and takes for the prior context the
+//!   last strong class before the opening bracket at that depth, or the
+//!   embedding direction where there is none.
+//!
+//! Where brackets pair within one isolating run sequence, as in every case of
+//! BidiCharacterTest.txt, this is UAX #9's N0.
 
 use super::charge;
-use super::class::BidiClass;
-use super::runs::{MAX_ISOLATE_DEPTH, Run, contexts};
-use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+use super::class::{BidiClass, Bracket, Level};
+use super::explicit::{MAX_ISOLATE_DEPTH, NONE};
+use super::sequence::Paragraph;
+use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
-/// The opening brackets one isolate depth keeps unpaired.
-const MAX_OPEN: usize = 63;
+/// The opening brackets a depth keeps unpaired at most.
+const MAX_OPEN_BRACKETS: usize = 63;
 
-const DEPTHS: usize = MAX_ISOLATE_DEPTH as usize + 1;
-
-/// The depths whose stacks start [`SHARED_ROW`] slots apart.
+/// The depths whose stacks share one array, and the slots between the starts
+/// of their stacks.
 const SHARED_DEPTHS: usize = 16;
 const SHARED_ROW: usize = 16;
-const SHARED_END: usize = (SHARED_DEPTHS - 1) * SHARED_ROW + MAX_OPEN;
 
-/// Where the stack of opening brackets of an isolate depth starts. FriBidi
-/// keeps the stacks of the first 16 depths in rows of 16 slots of one array yet
-/// lets each hold 63 brackets, so they overlap; deeper stacks have room of their
-/// own.
-const fn stack_start(depth: usize) -> usize {
-    if depth < SHARED_DEPTHS {
-        depth * SHARED_ROW
-    } else {
-        SHARED_END + (depth - SHARED_DEPTHS) * MAX_OPEN
-    }
+/// The slots of the shared array: the last shared stack runs to its full size.
+const SHARED_SLOTS: usize = SHARED_ROW * (SHARED_DEPTHS - 1) + MAX_OPEN_BRACKETS;
+
+/// The bracket stack of one isolate depth.
+#[derive(Clone, Copy, Debug)]
+struct Depth {
+    /// How many opening brackets it holds.
+    open: u8,
+    /// The level of the last character seen at this depth, `u8::MAX` where a
+    /// shallower character came after it.
+    level: u8,
+    /// Where its stack starts in [`Storage::slots`], [`NONE`] until it is used.
+    start: u32,
+}
+
+impl Depth {
+    const UNUSED: Self = Self {
+        open: 0,
+        level: u8::MAX,
+        start: NONE,
+    };
 }
 
 /// Storage for pairing brackets, kept between paragraphs.
 #[derive(Debug)]
-pub(super) struct Brackets {
-    /// The stacks of every isolate depth: indices of unpaired opening runs.
-    open: BudgetVec<u32>,
-    /// Paired runs: opening and closing.
+pub(super) struct Storage {
+    /// The opening brackets of the stacks: each one's pair identity and
+    /// position.
+    slots: BudgetVec<(char, u32)>,
+    depths: BudgetVec<Depth>,
+    /// The bracket pairs: the positions of each opening and closing bracket.
     pairs: BudgetVec<(u32, u32)>,
 }
 
-impl Brackets {
+impl Storage {
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
-            open: BudgetVec::new(budget),
+            slots: BudgetVec::new(budget),
+            depths: BudgetVec::new(budget),
             pairs: BudgetVec::new(budget),
         }
     }
 
-    /// N0 for every bracket pair of `runs`.
-    pub(super) fn resolve(&mut self, runs: &mut [Run], work: &mut WorkBudget) -> Result<()> {
-        self.pair(runs, work)?;
-        let pairs = self.pairs.as_mut_slice();
-        // Pairs of one opening bracket, which the shared rows allow, in the order found.
-        charge(work, pairs.len())?;
-        pairs.sort_unstable();
-        resolve_pairs(runs, pairs, work)
-    }
-
-    /// BD16. Each run, and each open bracket a closing one is compared with,
-    /// is charged to `work`.
-    fn pair(&mut self, runs: &[Run], work: &mut WorkBudget) -> Result<()> {
-        charge(work, runs.len())?;
-        self.pairs.clear();
-        let depths = runs
-            .iter()
-            .map(|r| usize::from(r.isolate))
-            .max()
-            .unwrap_or(0)
-            + 1;
-        self.open.clear();
-        self.open
-            .try_resize(stack_start(depths - 1) + MAX_OPEN, 0)?;
-        let open = self.open.as_mut_slice();
-        let mut open_len = [0_usize; DEPTHS];
-        let mut last: Option<(u8, u8)> = None;
-        for (at, run) in runs.iter().enumerate() {
-            let depth = usize::from(run.isolate);
-            if last.is_none_or(|(level, isolate)| level != run.level && isolate == run.isolate) {
-                open_len[depth] = 0;
-            }
-            last = Some((run.level, run.isolate));
-            let Some(bracket) = run.bracket.filter(|_| run.class == BidiClass::On) else {
-                continue;
+    /// Where the stack of `depth` starts, giving deep stacks room of their own.
+    fn start(&mut self, depth: usize) -> Result<usize> {
+        if self.depths[depth].start == NONE {
+            let start = if depth < SHARED_DEPTHS {
+                depth * SHARED_ROW
+            } else {
+                let start = self.slots.len();
+                self.slots
+                    .try_resize(start + MAX_OPEN_BRACKETS, ('\0', 0))?;
+                start
             };
-            let at = u32::try_from(at).map_err(|_| Error::Overflow)?;
-            let stack = &mut open[stack_start(depth)..][..MAX_OPEN];
-            let len = &mut open_len[depth];
-            if bracket.opens() {
-                if *len == MAX_OPEN {
+            self.depths[depth].start = start as u32;
+        }
+        Ok(self.depths[depth].start as usize)
+    }
+}
+
+/// BD16 and N0 over a paragraph whose weak types are resolved: `levels` are
+/// the explicit levels, `sequence_of` the isolating run sequence of each
+/// character and `absorbed` the characters W1 joined to a run before marks.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn resolve_brackets(
+    storage: &mut Storage,
+    types: &mut [BidiClass],
+    levels: &[Level],
+    sequence_of: &[u32],
+    absorbed: &[bool],
+    paragraph: &Paragraph<'_>,
+    brackets: &[Option<Bracket>],
+    work: &mut WorkBudget,
+) -> Result<()> {
+    pair(
+        storage,
+        types,
+        levels,
+        sequence_of,
+        paragraph.depths,
+        absorbed,
+        brackets,
+        work,
+    )?;
+    for p in 0..storage.pairs.len() {
+        let (open, close) = storage.pairs[p];
+        let (open, close) = (open as usize, close as usize);
+        let Some(rtl) = pair_direction(types, levels, paragraph.depths, open, close, work)? else {
+            continue;
+        };
+        let class = if rtl { BidiClass::R } else { BidiClass::L };
+        for (bracket, end) in [(open, close), (close, types.len())] {
+            types[bracket] = class;
+            // Marks after a bracket in its sequence follow it, and so do the
+            // characters W1 joined to its run.
+            for at in bracket + 1..end {
+                if sequence_of[at] == NONE {
+                    continue;
+                }
+                let joined = paragraph.classes[at] == BidiClass::Nsm || absorbed[at];
+                if !joined || sequence_of[at] != sequence_of[bracket] {
                     break;
                 }
-                stack[*len] = at;
-                *len += 1;
-            } else if let Some(found) = {
-                charge(work, *len)?;
-                stack[..*len].iter().rposition(|&o| {
-                    runs.get(o as usize)
-                        .and_then(|r| r.bracket)
-                        .is_some_and(|b| b.pairs_with(bracket))
-                })
-            } {
-                self.pairs
-                    .try_push((stack[found], at))
-                    .map_err(|e| e.error)?;
-                *len = found;
+                types[at] = class;
             }
-        }
-        Ok(())
-    }
-}
-
-/// The level I1 and I2 would give a strong class: up by one where the class's
-/// direction differs from the level's.
-fn raised(level: u8, class: BidiClass) -> u8 {
-    level + ((level % 2) ^ class.rtl_bit())
-}
-
-/// N0b and N0c for pairs in order of their opening brackets. The runs inside
-/// each pair are charged to `work` as they are looked at, as are the runs swept
-/// before them.
-fn resolve_pairs(runs: &mut [Run], pairs: &[(u32, u32)], work: &mut WorkBudget) -> Result<()> {
-    // The level of the strong class last passed per isolate depth, swept forward
-    // once as pairs are reached.
-    let mut preceding: [Option<u8>; DEPTHS] = [None; DEPTHS];
-    let mut swept = 0;
-    for &(open, close) in pairs {
-        let (open, close) = (open as usize, close as usize);
-        let embedding = runs[open].level;
-        let isolate = runs[open].isolate;
-        let strong = |run: &Run| {
-            let class = run.class.numbers_as_r();
-            class.is_strong().then(|| raised(run.level, class))
-        };
-
-        let inside = &runs[open..close];
-        charge(work, inside.len())?;
-        let direction = if inside.iter().any(|run| strong(run) == Some(embedding)) {
-            Some(embedding)
-        } else {
-            charge(work, inside.len() + open.saturating_sub(swept))?;
-            for run in &runs[swept.min(open)..open] {
-                if let Some(level) = strong(run) {
-                    preceding[usize::from(run.isolate)] = Some(level);
-                }
-            }
-            swept = swept.max(open);
-            inside
-                .iter()
-                .any(|run| run.isolate == isolate && strong(run).is_some())
-                .then(|| preceding[usize::from(isolate)].unwrap_or(embedding))
-        };
-        if let Some(level) = direction {
-            let class = BidiClass::of_level(level);
-            runs[open].class = class;
-            runs[close].class = class;
         }
     }
     Ok(())
 }
 
-/// N1 and N2: a neutral takes the class on both sides where they agree
-/// (numbers as R), else the embedding direction.
-pub(super) fn resolve(runs: &mut [Run], work: &mut WorkBudget) -> Result<()> {
-    for at in 0..runs.len() {
-        charge(work, 1)?;
-        if runs[at].class.is_neutral() {
-            let (before, after) = contexts(runs, at, work)?;
-            let (before, after) = (before.numbers_as_r(), after.numbers_as_r());
-            runs[at].class = if before == after {
-                before
-            } else {
-                BidiClass::of_level(runs[at].level)
-            };
+/// BD16 as FriBidi pairs brackets: the pairs, in order of their opening
+/// brackets, into `storage.pairs`. Only brackets of class ON that W1 did not
+/// join to another run pair.
+#[allow(clippy::too_many_arguments)]
+fn pair(
+    storage: &mut Storage,
+    types: &[BidiClass],
+    levels: &[Level],
+    sequence_of: &[u32],
+    depths: &[u8],
+    absorbed: &[bool],
+    brackets: &[Option<Bracket>],
+    work: &mut WorkBudget,
+) -> Result<()> {
+    charge(work, types.len())?;
+    storage.pairs.clear();
+    storage.slots.clear();
+    storage.slots.try_resize(SHARED_SLOTS, ('\0', 0))?;
+    storage.depths.clear();
+    storage
+        .depths
+        .try_resize(usize::from(MAX_ISOLATE_DEPTH) + 1, Depth::UNUSED)?;
+    // One past the deepest depth seen since a shallower character.
+    let mut deepest = 0;
+    for (at, &class) in types.iter().enumerate() {
+        if sequence_of[at] == NONE {
+            continue;
         }
+        let depth = usize::from(depths[at]);
+        for state in &mut storage.depths[depth + 1..deepest.max(depth + 1)] {
+            state.level = u8::MAX;
+        }
+        deepest = depth + 1;
+        let state = &mut storage.depths[depth];
+        if state.level != levels[at].0 {
+            if state.level != u8::MAX {
+                state.open = 0;
+            }
+            state.level = levels[at].0;
+        }
+        let Some(bracket) = brackets[at].filter(|_| class == BidiClass::On && !absorbed[at]) else {
+            continue;
+        };
+        let open = usize::from(state.open);
+        let start = storage.start(depth)?;
+        if bracket.opens() {
+            if open == MAX_OPEN_BRACKETS {
+                break;
+            }
+            storage.slots[start + open] = (bracket.pair(), at as u32);
+            storage.depths[depth].open += 1;
+            continue;
+        }
+        charge(work, open)?;
+        let stack = &storage.slots[start..start + open];
+        if let Some(found) = stack.iter().rposition(|&(pair, _)| pair == bracket.pair()) {
+            let opening = stack[found].1;
+            storage.depths[depth].open = found as u8;
+            storage
+                .pairs
+                .try_push((opening, at as u32))
+                .map_err(|e| e.error)?;
+        }
+    }
+    storage.pairs.as_mut_slice().sort_unstable();
+    Ok(())
+}
+
+/// N0b and N0c for the pair at `open` and `close`: the direction its brackets
+/// take (right-to-left when true), if one is found between them.
+fn pair_direction(
+    types: &[BidiClass],
+    levels: &[Level],
+    depths: &[u8],
+    open: usize,
+    close: usize,
+    work: &mut WorkBudget,
+) -> Result<Option<bool>> {
+    let level = levels[open].0;
+    let embedding = level & 1 == 1;
+    let depth = depths[open];
+    charge(work, close - open)?;
+    let mut strong_at_depth = false;
+    for at in open + 1..close {
+        let Some(rtl) = types[at].strong_rtl() else {
+            continue;
+        };
+        let own = levels[at].0;
+        if own + u8::from((own & 1 == 1) != rtl) == level {
+            return Ok(Some(embedding));
+        }
+        strong_at_depth |= depths[at] == depth;
+    }
+    if !strong_at_depth {
+        return Ok(None);
+    }
+    // N0c: the brackets take the opposite direction where the context before
+    // them has it, else the embedding direction.
+    let mut before = None;
+    let mut looked = 0;
+    for at in (0..open).rev() {
+        looked += 1;
+        if depths[at] != depth || types[at] == BidiClass::Bn {
+            continue;
+        }
+        if let Some(rtl) = types[at].strong_rtl() {
+            before = Some(rtl);
+            break;
+        }
+    }
+    charge(work, looked)?;
+    let opposite = before == Some(!embedding);
+    Ok(Some(if opposite { !embedding } else { embedding }))
+}
+
+/// The class a neutral stretch compares on one side of it in N1: L, or R for
+/// R, AL and the numbers. The embedding and override characters, which are
+/// only in a sequence after a paragraph separator, compare as themselves, as
+/// in FriBidi: the stretch takes their direction only between two of a kind.
+fn context(class: BidiClass) -> Option<BidiClass> {
+    match class {
+        BidiClass::R | BidiClass::Al | BidiClass::En | BidiClass::An => Some(BidiClass::R),
+        BidiClass::L | BidiClass::Lre | BidiClass::Lro | BidiClass::Rle | BidiClass::Rlo => {
+            Some(class)
+        }
+        _ => None,
+    }
+}
+
+/// N1 and N2 on one sequence: a stretch of neutrals takes the direction of the
+/// classes on both sides where they agree (numbers counting as R), else the
+/// embedding direction of `level`. A stretch does not reach across `stop`.
+pub(super) fn resolve(
+    types: &mut [BidiClass],
+    level: u8,
+    (sos, eos): (BidiClass, BidiClass),
+    stop: Option<usize>,
+    work: &mut WorkBudget,
+) -> Result<()> {
+    charge(work, types.len())?;
+    let embedding = BidiClass::of_level(level);
+    let mut at = 0;
+    while at < types.len() {
+        if !types[at].is_neutral_or_isolate() {
+            at += 1;
+            continue;
+        }
+        let mut end = types[at..]
+            .iter()
+            .position(|c| !c.is_neutral_or_isolate())
+            .map_or(types.len(), |n| at + n);
+        if let Some(stop) = stop.filter(|&stop| at < stop && stop < end) {
+            end = stop;
+        }
+        let before = context(if at == 0 { sos } else { types[at - 1] });
+        let after = context(types.get(end).copied().unwrap_or(eos));
+        let class = match before.filter(|_| before == after) {
+            Some(class) if class.strong_rtl() == Some(true) => BidiClass::R,
+            Some(_) => BidiClass::L,
+            None => embedding,
+        };
+        types[at..end].fill(class);
+        at = end;
     }
     Ok(())
 }
@@ -195,79 +318,34 @@ pub(super) fn resolve(runs: &mut [Run], work: &mut WorkBudget) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bidi::class::Bracket;
     use BidiClass::*;
-    use triergon_core::{Budget, WorkBudget};
 
-    fn run(class: BidiClass, level: u8, bracket: Option<char>) -> Run {
-        Run {
-            len: 1,
-            class,
-            level,
-            isolate: 0,
-            bracket: bracket.and_then(Bracket::of),
-        }
-    }
-
-    fn brackets(runs: &mut [Run]) {
-        let budget = Budget::new(1 << 20).expect("budget");
+    #[test]
+    fn neutrals_take_their_context() {
         let mut work = WorkBudget::new(1000);
-        Brackets::new(&budget)
-            .resolve(runs, &mut work)
-            .expect("brackets");
+        let mut types = [L, Ws, On, L, Ws, R, Ws, En, On];
+        resolve(&mut types, 0, (L, R), None, &mut work).unwrap();
+        assert_eq!(types, [L, L, L, L, L, R, R, En, R]);
     }
 
     #[test]
-    fn brackets_take_the_embedding_direction() {
-        // a ( b ) in a left-to-right paragraph.
-        let mut runs = [
-            run(R, 0, None),
-            run(On, 0, Some('(')),
-            run(L, 0, None),
-            run(On, 0, Some(')')),
-        ];
-        brackets(&mut runs);
-        assert_eq!((runs[1].class, runs[3].class), (L, L));
-    }
-
-    #[test]
-    fn brackets_take_the_preceding_opposite_direction() {
-        // R ( R ) at level 0: N0c1.
-        let mut runs = [
-            run(R, 0, None),
-            run(On, 0, Some('(')),
-            run(R, 0, None),
-            run(On, 0, Some(')')),
-        ];
-        brackets(&mut runs);
-        assert_eq!((runs[1].class, runs[3].class), (R, R));
-        // L ( R ) at level 0: N0c2.
-        runs[0].class = L;
-        runs[1].class = On;
-        runs[3].class = On;
-        brackets(&mut runs);
-        assert_eq!((runs[1].class, runs[3].class), (L, L));
-    }
-
-    #[test]
-    fn unmatched_and_overridden_brackets_stay() {
-        let mut runs = [
-            run(On, 0, Some('(')),
-            run(R, 0, None),
-            run(On, 0, Some(']')),
-            run(L, 0, Some(')')),
-        ];
-        brackets(&mut runs);
-        assert_eq!(runs.map(|r| r.class), [On, R, On, L]);
-    }
-
-    #[test]
-    fn neutrals_between_agreeing_sides() {
-        let mut runs = [run(R, 0, None), run(On, 0, None), run(An, 0, None)];
-        resolve(&mut runs, &mut WorkBudget::new(100)).expect("work");
-        assert_eq!(runs[1].class, R);
-        let mut runs = [run(R, 0, None), run(Ws, 0, None), run(L, 0, None)];
-        resolve(&mut runs, &mut WorkBudget::new(100)).expect("work");
-        assert_eq!(runs[1].class, L);
+    fn pairs_resolve_by_their_contents_and_context() {
+        let mut work = WorkBudget::new(1000);
+        let levels = [Level(0); 4];
+        let depths = [0; 4];
+        let direction = |types: &[BidiClass], open, close, work: &mut WorkBudget| {
+            pair_direction(types, &levels, &depths, open, close, work)
+        };
+        // N0b: a strong class of the embedding direction inside.
+        assert_eq!(direction(&[On, L, On], 0, 2, &mut work), Ok(Some(false)));
+        // N0c1: only the opposite direction inside, and before.
+        assert_eq!(direction(&[R, On, R, On], 1, 3, &mut work), Ok(Some(true)));
+        // N0c2: the opposite direction inside, the embedding one before.
+        assert_eq!(
+            direction(&[L, On, An, On], 1, 3, &mut work),
+            Ok(Some(false))
+        );
+        // Nothing strong inside.
+        assert_eq!(direction(&[On, On], 0, 1, &mut work), Ok(None));
     }
 }

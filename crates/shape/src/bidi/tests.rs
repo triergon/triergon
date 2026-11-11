@@ -187,6 +187,111 @@ fn fribidi_choices() {
     );
 }
 
+/// `text` with each `(code point, count)` repeated.
+fn repeated(parts: &[(u32, usize)]) -> Vec<u32> {
+    parts
+        .iter()
+        .flat_map(|&(c, n)| std::iter::repeat_n(c, n))
+        .collect()
+}
+
+/// The levels after resolving `text` as one paragraph and reordering it as one
+/// line, with brackets taking part.
+fn levels_of(text: &[u32], base: BaseDirection) -> Vec<u8> {
+    run(text, base, true, &[]).1
+}
+
+/// FriBidi's levels where explicit embeddings and isolates reach level 125, as
+/// its comparison shows them.
+#[test]
+fn deepest_levels() {
+    const LRE: u32 = 0x202A;
+    const LRO: u32 = 0x202D;
+    const PDF: u32 = 0x202C;
+    const RLI: u32 = 0x2067;
+    const LRI: u32 = 0x2066;
+    const FSI: u32 = 0x2068;
+    const PDI: u32 = 0x2069;
+    // An isolate that fits is raised past a full stack; its PDI empties it.
+    let text = repeated(&[(LRE, 63), (RLI, 1), (0x21, 1), (PDI, 1), (0x21, 1)]);
+    assert_eq!(levels_of(&text, Ltr)[63..], [124, 125, 0, 0]);
+    // A PDF pops an embedding inside an overflowed isolate.
+    let text = repeated(&[
+        (LRE, 62),
+        (LRI, 1),
+        (0x21, 1),
+        (PDF, 1),
+        (0x21, 1),
+        (PDI, 1),
+        (0x21, 1),
+    ]);
+    assert_eq!(levels_of(&text, Ltr)[62..], [124, 124, 124, 122, 122, 122]);
+    // The raised isolate counts as an overflowed embedding for the PDFs.
+    let text = repeated(&[(LRO, 63), (RLI, 1), (PDF, 3), (0x661, 1)]);
+    assert_eq!(levels_of(&text, Ltr)[63..], [124, 124, 124, 124, 122]);
+    // Looking forward, W5 passes over the PDI of an overflowed isolate.
+    let text = repeated(&[(FSI, 64), (0x5D0, 1), (0x24, 1), (PDI, 1), (0x31, 1)]);
+    assert_eq!(levels_of(&text, Ltr)[62..], [124, 124, 125, 126, 125, 126]);
+    // The PDI of a valid isolate returns to its initiator's depth past an
+    // overflowed one, so that the two link.
+    let text = repeated(&[(LRE, 61), (0x627, 1), (LRI, 2), (PDI, 2), (0x31, 1)]);
+    assert_eq!(levels_of(&text, Ltr)[61..], [123, 123, 124, 124, 123, 124]);
+}
+
+/// FriBidi's bracket pairs, as its comparison shows them.
+#[test]
+fn bracket_pairs() {
+    // Brackets in two isolates of one depth pair.
+    let text = [0x2067, 0x61, 0x28, 0x61, 0x2069, 0x2067, 0x29, 0x2069];
+    assert_eq!(levels_of(&text, Ltr), [0, 2, 2, 2, 0, 0, 2, 0]);
+    // A full stack keeps the pairs found before it...
+    let mut text = vec![0x5D0, 0x28, 0x5D0, 0x29];
+    text.extend(repeated(&[(0x28, 64), (0x61, 1)]));
+    assert_eq!(levels_of(&text, Ltr)[..4], [1, 1, 1, 1]);
+    // ...and ends the pairing of the paragraph, at every depth.
+    let mut text = repeated(&[(0x2066, 1), (0x28, 64), (0x2069, 1)]);
+    text.extend([0x5D0, 0x28, 0x5D0, 0x29, 0x61]);
+    assert_eq!(levels_of(&text, Ltr)[66..], [1, 1, 1, 0, 0]);
+    // A bracket after a mark after a neutral joins the neutral's run and
+    // loses its bracket property.
+    let text = [0x5B, 0x7C0, 0xFF08, 0x300, 0x5D, 0x31];
+    assert_eq!(levels_of(&text, Ltr), [0, 1, 1, 1, 1, 2]);
+    let text = [0x7C0, 0x2069, 0x20D0, 0xFE59, 0x2070, 0x29];
+    assert_eq!(levels_of(&text, Ltr), [1, 1, 1, 1, 2, 0]);
+}
+
+/// FriBidi's simple shaping, as its comparison shows it.
+#[test]
+fn simple_shaping_choices() {
+    let shape = |text: &[u32], base| {
+        let mut text: Vec<char> = text.iter().filter_map(|&c| char::from_u32(c)).collect();
+        let classes: Vec<BidiClass> = text.iter().map(|&c| BidiClass::of(c)).collect();
+        let budget = Budget::new(1 << 20).expect("budget");
+        let mut levels = vec![Level::default(); text.len()];
+        Resolver::new(&budget)
+            .resolve(&classes, None, base, &mut levels)
+            .expect("resolve");
+        shape_simple(&mut text, &classes, &levels).expect("shape");
+        text.into_iter().map(u32::from).collect::<Vec<_>>()
+    };
+    // At an even level a right-joining letter joins the letter after it.
+    assert_eq!(shape(&[0x202D, 0x76B, 0x62B], Rtl)[2], 0xFE9B);
+    // A mark between LAM and ALEF stops the ligature, not the joining.
+    assert_eq!(shape(&[0x644, 0x670, 0x625], Rtl), [0xFEDF, 0x670, 0xFE88]);
+    // A mark at another level ends the joining.
+    assert_eq!(
+        shape(&[0x0A, 0x684, 0x202A, 0x670, 0x635], Ltr),
+        [0x0A, 0xFB72, 0x202A, 0x670, 0xFEB9]
+    );
+    // After a paragraph separator the implicit rules go on at level 0.
+    assert_eq!(
+        shape(&[0x5D0, 0x2029, 0x627, 0x28, 0x628], Rtl),
+        [0x5D0, 0x2029, 0xFE8D, 0x29, 0xFE8F]
+    );
+    assert_eq!(shape(&[0x2029, 0x7B, 0x5D0], Rtl)[1], 0x7B);
+    assert_eq!(shape(&[0x2066, 0x2029, 0x7B, 0x5D0], Rtl)[2], 0x7D);
+}
+
 #[test]
 fn shared_bracket_stacks() {
     // Seventeen opening brackets outside the isolates: the last overwrites the
@@ -353,13 +458,21 @@ fn work_beyond_the_limits_is_a_policy_error() {
     let mut levels = vec![Level::default(); text.len()];
     let mut resolve =
         |resolver: &mut Resolver, brackets| resolver.resolve(&classes, brackets, Auto, &mut levels);
+    let chars = text.len() as u64;
     // Without brackets the isolates alone cost little.
     let mut resolver = Resolver::new(&budget);
     assert!(resolve(&mut resolver, None).is_ok());
-    assert!(resolver.work_spent() < 64 * text.len() as u64);
-    // With them, the default limits stop the paragraph.
+    assert!(resolver.work_spent() < 64 * chars);
+    // With them, N0 looks inside every pair at every depth: thousands of units
+    // per character, within the default limits but not within half of them.
+    assert!(resolve(&mut resolver, Some(&brackets)).is_ok());
+    assert!(resolver.work_spent() > 2048 * chars);
+    let half = Limits {
+        work_per_char: 2048,
+        ..Limits::default()
+    };
     assert_eq!(
-        resolve(&mut resolver, Some(&brackets)),
+        resolve(&mut Resolver::with_limits(&budget, half), Some(&brackets)),
         Err(Error::Policy("bidi work"))
     );
     let tight = Limits {
