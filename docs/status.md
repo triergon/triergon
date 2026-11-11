@@ -250,31 +250,33 @@ and libass for AArch64 and for ARMv7 record the same pins for every `ass-render`
 merge sort with its first run rounded up instead renders that case's 1080p frames otherwise.
 
 The bidi resolver written from UAX #9 was measured at
-`e44bfacb38a19598eca07ea96a9aa83a05a9b1f2` on both targets, against main at
+`81a17b4edf5e24611eab70ac1ddf9b3cf4c37603` on AArch64, against main at
 `8a3f711f8d014411ea64d5b8967367ac3aedbac1`:
 
 - Comparison: `cargo xtask shape compare` and `cargo xtask ass compare --all` give the
-  shaping and ASS results above, and the crates' tests and `cargo xtask shape ucd --check`
-  pass.
-- Conformance: Unicode 14.0.0's `BidiTest.txt` (770,241 cases) and
-  `BidiCharacterTest.txt` (91,707) pass.
-- Generated texts, through both shape workers on AArch64: 3,000,000 simple shaping lines
-  of Arabic letters of every joining type, marks, joiners and formatting characters are
-  identical. Of 6,000,000 resolutions of deep-nesting lines of every class, with bracket
-  pairs, line starts and each base direction, 87 differ, all where embeddings and isolates
-  reach levels 123 to 125, most a mark right after a PDI there; of 1,500,000 such lines
-  through simple shaping, where a line may hold a paragraph separator, 176 differ, where an
-  isolate opened before a separator closes after it.
-- Equivalence with main (`cargo xtask ass equivalence --random 5182`): every frame alike on
-  AArch64 (5,674 cases, 229,509 frames). On ARMv7, on 4 threads, 119 cases differ, each first
-  at a frame one side refuses for storage at the end of the 32-bit address space, the kind
-  that differs between runs of one build. The peak storage is lower in 4,651 of the 5,674
-  cases on AArch64 and in 4,577 of the 5,555 alike on ARMv7, and higher in 952 and 906, by
-  at most 10,585 and 13,040 bytes (0.04%).
+  shaping and ASS results above, and the crates' tests, `cargo xtask shape ucd --check` and
+  rustdoc with `-D warnings` pass.
+- Conformance (`cargo xtask shape conformance`): Unicode 14.0.0's `BidiTest.txt` (770,241
+  cases) and `BidiCharacterTest.txt` (91,707) pass.
+- Generated texts against FriBidi, through both shape workers' dumps, 20 seeds of 50,000
+  lines: 3,000,000 simple shaping lines of Arabic letters of every joining type, marks,
+  joiners and formatting characters, 6,000,000 resolutions of deep-nesting lines of every
+  class, with bracket pairs, line starts and each base direction, and 1,500,000 such lines
+  through simple shaping, where a line may hold a paragraph separator, are all identical, as
+  they are through main's shape worker.
+- Equivalence with main (`cargo xtask ass equivalence --random 5182`): every frame alike
+  (5,674 cases, 229,509 frames). The peak storage is lower in 4,622 cases and higher in 981,
+  by at most 24,808 bytes (0.08%).
 - Instruction counts: no `shape-bidi`, `shape-simple` or `ass-render` case runs more than
-  main's, within the spread of repeated runs; the sums are 9.7% lower for `shape-bidi`,
-  24.3% for `shape-simple` and 0.14% for `ass-render` on AArch64, and 4.9%, 18.3% and
-  0.11% on ARMv7.
+  main's; the sums are 10.1% lower for `shape-bidi`, 24.6% for `shape-simple` and 0.14% for
+  `ass-render`.
+
+On ARMv7 the resolver was last measured at `e44bfacb38a19598eca07ea96a9aa83a05a9b1f2`, before
+the rules that make it match FriBidi on every generated text: the shaping and ASS results
+above and both conformance files pass; against main, on 4 threads, 119 equivalence cases
+differ, each first at a frame one side refuses for storage at the end of the 32-bit address
+space, the kind that differs between runs of one build, and the instruction count sums are
+4.9% lower for `shape-bidi`, 18.3% for `shape-simple` and 0.11% for `ass-render`.
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
@@ -373,7 +375,8 @@ The bidi resolver written from UAX #9 was measured at
 | ARMv7: ASS rendering kernel-bound memory, the Thumb-2 playback experiment, the AArch64 proof of the kernel bound's 32-bit entry | `afb9049c681916c97311fc9f495e27ceaa69f4df` | `d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a` |
 | ASS rendering runtime and memory, Linux AArch64 and ARMv7 | `5b3e03f0e9410853152043d033b4f4d757e98a40` | `632964773b8ca4cbd5b2b3c09a2b6ddeafdaeeaff56588ea345bae8550012bb7` |
 | Earlier: ASS rendering memory against the instrumented libass build, Linux AArch64 | `e6de7e70827bb930a8ef9e5cb4d30b1e4e7d0727` | `799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3` |
-| Bidi from UAX #9: comparison, conformance, generated texts, equivalence and instruction counts, Linux AArch64 and ARMv7 | `e44bfacb38a19598eca07ea96a9aa83a05a9b1f2` | `dbf448c1ada891ab4122396818350e39df1171ff58e7cd77de0c354abb22c943` |
+| Bidi from UAX #9: comparison, conformance, generated texts, equivalence and instruction counts, Linux AArch64 | `81a17b4edf5e24611eab70ac1ddf9b3cf4c37603` | `63104dd7b693a2c559906ca279a2350b4a273083c03fabe4fe097d49e56b961f` |
+| Earlier: bidi from UAX #9, Linux AArch64 and ARMv7 | `e44bfacb38a19598eca07ea96a9aa83a05a9b1f2` | `dbf448c1ada891ab4122396818350e39df1171ff58e7cd77de0c354abb22c943` |
 | ASS collision order on boxes 2^31 rows apart (`collision-far-margins.ass`), Linux AArch64 and ARMv7 | `02e3a75a86bd5c22900d972c02055e23a37103ab` | `736748aa549fec74078fa33d31dba3e0a123290e652278c3359d37a0a9737db2` |
 | ASS collision order: comparison, generated scripts and equivalence, Linux AArch64 and ARMv7 | `1d2ae4a0287972ac3402bd2e717e5b7fdaa086ff` | `e4e97db001bf538840edc2cbfb8db80c126aeb97df3edeb68cf7185b2fe4bd04` |
 | ASS rendering comparison and generated scripts, Linux AArch64 and ARMv7 | `01ccb49792cf1d4d05b74addf35dc616763b88e0` | `c510f31add480041fa7197ddbca26fe143926cf84106890b061b3b99897749be` |

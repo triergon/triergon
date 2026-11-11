@@ -17057,6 +17057,19 @@
    }
   },
   {
+   "name": "shape-bidi-reference-81a17b4e",
+   "path": "shape-bidi-reference-81a17b4e",
+   "retention": "retained",
+   "reason": "Bidi from UAX #9 paragraph and table row: the bidi resolver at 81a17b4e on a c7g.4xlarge, Linux AArch64; the shape and ASS gates, crate tests, table check, rustdoc and cargo xtask shape conformance; generated texts through this commit's, main's and e44bfacb's shape workers against FriBidi, seeds 3 to 22; cargo xtask ass equivalence against 8a3f711f with its records; instruction counts of every shape-bidi, shape-simple and ass-render case against 8a3f711f; the probes of the rules the commit adds, the bracket rules derived again from probes with the brief, cases and report, the lines each bracket rule is needed for, the scripts that ran them and a bundle of the measured commit.",
+   "key": "evidence/shape-bidi-reference-81a17b4e/63104dd7b693a2c559906ca279a2350b4a273083c03fabe4fe097d49e56b961f.tar.gz",
+   "sha256": "63104dd7b693a2c559906ca279a2350b4a273083c03fabe4fe097d49e56b961f",
+   "bytes": 46858249,
+   "source_revisions": {
+    "candidate": "81a17b4edf5e24611eab70ac1ddf9b3cf4c37603",
+    "base": "8a3f711f8d014411ea64d5b8967367ac3aedbac1"
+   }
+  },
+  {
    "name": "ass-collision-far-margins-02e3a75a",
    "path": "ass-collision-far-margins-02e3a75a",
    "retention": "retained",
