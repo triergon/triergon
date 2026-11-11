@@ -45,7 +45,7 @@ in an existing shared input window. The view retains the window's budget charge.
 Random access can reuse bytes already supplied in the same generation. Samples
 split across windows use a bounded packet buffer.
 Complete indexed sources can check all packet projections by track before
-rewinding for merged playback.
+rewinding for merged playback. Rewinding reuses the existing edit cursors.
 Short regular tracks can keep extra seek restart points in the existing
 checkpoint allocation.
 Complete fragment-only tracks can also retain a restart for backward seek

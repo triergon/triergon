@@ -1295,10 +1295,13 @@ impl<'a> PacketCursor<'a> {
                                 movie_base,
                                 self.limits.edit,
                             )?;
-                            // Only a regular track with source edits needs
-                            // this cursor. Keep its storage out of other slots
-                            // and their seek restarts.
-                            Some(BudgetVec::try_filled(&budget, cursor, 1)?)
+                            // The checked replay keeps its edit cursor allocation.
+                            if let Some(mut storage) = slot.edited.take() {
+                                storage.as_mut_slice()[0] = cursor;
+                                Some(storage)
+                            } else {
+                                Some(BudgetVec::try_filled(&budget, cursor, 1)?)
+                            }
                         }
                     } else {
                         None
