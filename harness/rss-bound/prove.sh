@@ -3,21 +3,39 @@
 # registration and write the proof that `cargo xtask build-workers` and
 # `cargo xtask report --memory` accept with TRIERGON_RSS_KERNEL_PROOF.
 #
-#   usage: harness/rss-bound/prove.sh REVIEW OUT
+#   usage: harness/rss-bound/prove.sh REVIEW OUT [USERSPACE]
 #
 # Run from the repository root as the measurement user, with passwordless sudo
 # for insmod, rmmod, chown and reading debugfs, after `cargo xtask build-workers`
 # has built the observer and probe. REVIEW is the source review of this module
-# source for this kernel release. The module stays loaded and owned by the
-# measurement user on success; unload it with `sudo rmmod triergon_rss_bound`
-# before any timing run.
+# source for this kernel release; give it, and OUT, relative to the repository
+# root. The module stays loaded and owned by the measurement user on success;
+# unload it with `sudo rmmod triergon_rss_bound` before any timing run.
+#
+# The module is built and loaded where the kernel's headers and module tools
+# are. For a 32-bit user space on a 64-bit kernel, run this on the host from the
+# repository inside that user space and name its root as USERSPACE: the check is
+# then built and run, and the architecture and page size recorded, inside it
+# under `setarch linux32`, through the module's 32-bit ioctl entry point.
 set -eu
 review=$1
 out=$2
+userspace=${3:-}
 build=target/rss-bound
 module=$build/triergon_rss_bound.ko
 sha() { sha256sum "$1" | cut -d' ' -f1; }
 release=$(uname -r)
+
+# Run a command in the measurement user space, as the measurement user or as root.
+if [ -n "$userspace" ]; then
+    inside=${PWD#"$(cd "$userspace" && pwd)"}
+    [ "$inside" != "$PWD" ] || { echo "the repository is not inside $userspace" >&2; exit 1; }
+    measure() { sudo -n chroot "$userspace" setarch linux32 sudo -n -u "#$(id -u)" sh -c "cd '$inside' && $*"; }
+    measure_root() { sudo -n chroot "$userspace" setarch linux32 sh -c "cd '$inside' && $*"; }
+else
+    measure() { sh -c "$*"; }
+    measure_root() { sudo -n sh -c "$*"; }
+fi
 
 grep -q "\"module_source_sha256\": \"$(sha harness/rss-bound/triergon_rss_bound.c)\"" "$review" ||
     { echo "review does not cover this module source" >&2; exit 1; }
@@ -37,14 +55,14 @@ mkdir -p "$build" "$out"
 cp harness/rss-bound/triergon_rss_bound.c harness/rss-bound/Makefile "$build/"
 cp harness/rss-bound-api.h "$build/rss_bound.h"
 make -s -C "/lib/modules/$release/build" M="$PWD/$build" modules
-cc -O2 -Wall -Wextra -Werror -I "$build" harness/rss-bound/check.c -o "$build/kernel-check"
+measure "cc -O2 -Wall -Wextra -Werror -I $build harness/rss-bound/check.c -o $build/kernel-check"
 
 # Negative attestation: a control write while armed must invalidate the session.
 sudo -n /sbin/insmod "$module"
 sudo -n cat /sys/kernel/debug/kprobes/enabled > "$out/negative-armed.stdout"
 [ "$(cat "$out/negative-armed.stdout")" = 1 ]
 status=0
-sudo -n "$build/kernel-check" invalidate > "$out/negative-invalidate.stdout" || status=$?
+measure_root "$build/kernel-check invalidate" > "$out/negative-invalidate.stdout" || status=$?
 [ "$status" = 1 ]
 grep -q '"missed":0,"errors":8,' "$out/negative-invalidate.stdout"
 sudo -n /sbin/rmmod triergon_rss_bound
@@ -54,7 +72,7 @@ sudo -n /sbin/insmod "$module"
 sudo -n chown "$(id -u):$(id -g)" /dev/triergon_rss_bound
 sudo -n cat /sys/kernel/debug/kprobes/enabled > "$out/fresh-armed.stdout"
 [ "$(cat "$out/fresh-armed.stdout")" = 1 ]
-"$build/kernel-check" > "$out/positive.stdout"
+measure "$build/kernel-check" > "$out/positive.stdout"
 
 pin() { printf '"%s": {"path": "%s", "sha256": "%s"}' "$1" "$2" "$(sha "$2")"; }
 note=/sys/module/triergon_rss_bound/notes/.note.gnu.build-id
@@ -62,7 +80,7 @@ note=/sys/module/triergon_rss_bound/notes/.note.gnu.build-id
     printf '{\n  "schema": "linux-rss-kernel-bound-proof-v1",\n'
     printf '  "status": "reviewed-conditional-upper-bound",\n  "abi": 1,\n'
     printf '  "kernel_release": "%s",\n  "architecture": "%s",\n  "page_size": %s,\n' \
-        "$release" "$(uname -m)" "$(getconf PAGESIZE)"
+        "$release" "$(measure "uname -m")" "$(measure "getconf PAGESIZE")"
     printf '  "files": {\n'
     printf '    %s,\n' "$(pin module_source harness/rss-bound/triergon_rss_bound.c)"
     printf '    %s,\n' "$(pin module_api harness/rss-bound-api.h)"

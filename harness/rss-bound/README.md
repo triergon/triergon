@@ -36,7 +36,12 @@ collection. It pins:
 
 A proof is valid only on the boot that produced it and is never reused.
 
-`prove.sh REVIEW OUT` builds the module against the running kernel's headers, then:
+The result holds only 64-bit fields, so a 32-bit process on a 64-bit kernel reads the
+same layout through the module's 32-bit ioctl entry point. For such a user space,
+`prove.sh` takes its root as a third argument and runs on the host (see
+[32-bit ARMv7](../../docs/quality.md#32-bit-armv7)).
+
+`prove.sh REVIEW OUT [USERSPACE]` builds the module against the running kernel's headers, then:
 
 1. loads it and attests that a control-file write while armed invalidates the session
    (eight errors, none missed);
