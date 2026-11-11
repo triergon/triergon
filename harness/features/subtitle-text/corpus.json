@@ -5107,6 +5107,54 @@
       }
     },
     {
+      "id": "srt-repeat-dropped",
+      "profile": "srt-repeat-dropped",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-repeat-dropped.srt",
+      "sha256": "7936449f4604fb44a6ad8a7d3e8fffd912625a6378ee027fb56b5ec71f17dd15",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 12200062637886634775
+      }
+    },
+    {
+      "id": "srt-repeat-apart-kept",
+      "profile": "srt-repeat-apart-kept",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-repeat-apart-kept.srt",
+      "sha256": "d0bb3a2fa17efa7ca1685ab52ed3a2be4eb8657e9f7942b2392002968b75d0b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 3,
+        "digest": 11391954540265373598
+      }
+    },
+    {
+      "id": "srt-repeat-after-completion",
+      "profile": "srt-repeat-after-completion",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-repeat-after-completion.srt",
+      "sha256": "cc1bbe367adcd24338d9a0b91920f4358e4e51a050726ae3a3473401a476c93e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 3,
+        "digest": 10009754445828030342
+      }
+    },
+    {
       "id": "srt-utf16-line-start-cut",
       "profile": "srt-utf16-line-start-cut",
       "group": "srt",
@@ -5600,6 +5648,22 @@
         "packets": 1,
         "bytes": 1,
         "digest": 17080421276621312266
+      }
+    },
+    {
+      "id": "vtt-repeat-dropped",
+      "profile": "vtt-repeat-dropped",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-repeat-dropped.vtt",
+      "sha256": "ace474461fa11a5d0e60f4fbb54b8c6a7c9d4dedd65f1229229294bd001e59c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 6718903878212944200
       }
     }
   ]

@@ -112,6 +112,9 @@ DOCUMENTS = {
     "srt-negative-duration-until-next": f"1\n00:00:05,000 --> 00:00:04,000\nA\n\n2\n00:00:07,000 --> 00:00:08,000\nB\n\n3\n00:00:06,000 --> 00:00:06,500\nC\n\n",
     "srt-negative-duration-last": "1\n00:00:10,000 --> 00:00:04,000\nA\n\n2\n00:00:05,000 --> 00:00:06,000\nB\n\n",
     "srt-zero-duration-kept": f"1\n00:00:05,000 --> 00:00:05,000\nA\n\n2\n{T2}\nB\n\n",
+    "srt-repeat-dropped": f"1\n{T1}\nA\n\n2\n00:00:05,000 --> 00:00:06,000\nB\n\n3\n{T1}\nA\n\n",
+    "srt-repeat-apart-kept": f"1\n{T1}\nA\n\n2\n{T1}\nB\n\n3\n{T1}\nA\n\n",
+    "srt-repeat-after-completion": "1\n00:00:05,000 --> 00:00:04,000\nA\n\n2\n00:00:05,000 --> 00:00:04,000\nA\n\n3\n00:00:07,000 --> 00:00:08,000\nC\n\n",
     "srt-utf16-line-start-cut": utf16be(f"1\n{T1}\n\u00c5x\n\u00c6y\n\n"),
     "srt-utf16-crlf-no-cut": utf16be(f"1\r\n{T1}\r\n\u00c5x\r\n\u00c6y\r\n\r\n"),
     "srt-utf16-cr-cut": utf16le(f"1\r{T1}\r\u6c34x\r\u00c6y\r\r"),
@@ -143,6 +146,7 @@ DOCUMENTS = {
     "vtt-nul-after-block-ends-document": f"WEBVTT\n\n{V1}\nA\n\n\x00\n\n{V2}\nB\n\n",
     "vtt-negative-duration-until-next": "WEBVTT\n\n00:05.000 --> 00:04.000\nA\n\n00:10.000 --> 00:11.000\nB\n\n",
     "vtt-long-duration": "WEBVTT\n\n00:00.000 --> 999:00:00.000\nA\n\n",
+    "vtt-repeat-dropped": f"WEBVTT\n\na\n{V1} align:start\nA\n\nb\n{V2}\nB\n\nc\n{V1}\nA\n\n",
 }
 def capsule(codec, label, ops):
     out = bytearray(b"TRSTXT01")

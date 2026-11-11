@@ -649,7 +649,8 @@ fn utf16_output_retains_source_and_new_immutable_utf8_charge() {
     let pool = Budget::new(8192).unwrap();
     let baseline = pool.used();
     let input = input_for(&pool, named("tx3g-utf16be-bom"));
-    let source_charge = input.payload.retained_storage_bytes();
+    // The payload, codec identifier and sample description.
+    let source_charge = pool.used() - baseline;
     let mut parser = Extractor::new(&pool, Limits::default(), input.generation);
     parser.provide(input).unwrap();
     let cue = first_cue(&mut parser, 7);

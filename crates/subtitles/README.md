@@ -95,7 +95,10 @@ recognised by position, cue text runs to the next timing line with its empty lin
 left out, time fields have no range and the fraction counts milliseconds, the
 duration is kept in 32 bits; WebVTT blocks end at FFmpeg's line-break runs, a cue's
 `-->` may be on a later line, a cue that does not read ends the document. Cues are
-sorted by start time, and one that ends before it starts lasts until the next. A
+sorted by start time, one that ends before it starts lasts until the next, and one
+whose start, duration and text repeat the cue before it is dropped. Time fields that
+overflow read as FFmpeg reads them on 32-bit ARMv7 (SubRip `%d` saturates to 32 bits,
+WebVTT `%u` to 32 unsigned bits); FFmpeg for AArch64 reads them with a 64-bit `long`. A
 UTF-16 SubRip document is converted as FFmpeg converts it, the first byte of some
 characters after a line break included. A document in another charset is FFmpeg's
 `sub_charenc` case: each cue's text converts on its own with `charset::CharsetJob`

@@ -122,6 +122,60 @@ fn webvtt_blocks_follow_the_demuxer() {
 }
 
 #[test]
+fn a_cue_that_repeats_the_one_before_is_dropped() {
+    let long = "x".repeat(300);
+    let source = format!(
+        "1\n00:00:01,000 --> 00:00:02,000\n{long}\n\n\
+         2\n00:00:05,000 --> 00:00:06,000\nB\n\n\
+         3\n00:00:01,000 --> 00:00:02,000\n{long}\n\n\
+         4\n00:00:07,000 --> 00:00:06,000\nC\n\n\
+         5\n00:00:07,000 --> 00:00:06,000\nC\n\n\
+         6\n00:00:10,000 --> 00:00:11,000\nA\n\n\
+         7\n00:00:10,000 --> 00:00:11,000\nB\n\n\
+         8\n00:00:10,000 --> 00:00:11,000\nA\n\n"
+    );
+    let expected = vec![
+        // The third cue, sorted next to the first, repeats it.
+        cue(1000, 1000, &long),
+        cue(5000, 1000, "B"),
+        // Durations are completed first: these two no longer repeat.
+        cue(7000, 0, "C"),
+        cue(7000, 3000, "C"),
+        // Only the cue just before counts.
+        cue(10_000, 1000, "A"),
+        cue(10_000, 1000, "B"),
+        cue(10_000, 1000, "A"),
+    ];
+    for quantum in [1, 7, 4096] {
+        assert_eq!(
+            read(source.as_bytes(), document::Syntax::SubRip, quantum),
+            expected
+        );
+    }
+    let source = concat!(
+        "WEBVTT\n\n",
+        "a\n00:01.000 --> 00:02.000 align:start\nA\n\n",
+        "b\n00:03.000 --> 00:04.000\nB\n\n",
+        "c\n00:01.000 --> 00:02.000\nA\n\n",
+    );
+    // Identifier and settings do not count.
+    let expected = vec![
+        (
+            1000,
+            1000,
+            b"A".to_vec(),
+            Some(b"a".to_vec()),
+            Some(b"align:start".to_vec()),
+        ),
+        (3000, 1000, b"B".to_vec(), Some(b"b".to_vec()), None),
+    ];
+    assert_eq!(
+        read(source.as_bytes(), document::Syntax::WebVtt, 1),
+        expected
+    );
+}
+
+#[test]
 fn reader_limits_cancellation_and_zero_work() {
     let pool = Budget::new(1 << 20).unwrap();
     let source =

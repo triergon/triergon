@@ -5,8 +5,10 @@
 //! the demuxer returns its packets: by start time, ties in document order.
 //! Each cue carries the demuxer's millisecond start and duration, its packet
 //! bytes and, for WebVTT, the identifier and settings side data. A cue that
-//! ends before it starts lasts until the next cue starts, if there is one.
-//! The rules for each syntax are in [`subrip`] and [`webvtt`].
+//! ends before it starts lasts until the next cue starts, if there is one,
+//! and a cue whose start, duration and text equal those of the cue before it
+//! is dropped, whatever its identifier and settings. The rules for each
+//! syntax are in [`subrip`] and [`webvtt`].
 
 mod blocks;
 mod lines;
@@ -89,6 +91,15 @@ struct Entry {
     settings: Option<Range<usize>>,
 }
 
+impl Entry {
+    /// Whether `next` has this cue's start, duration and text length, so
+    /// that it repeats this cue if the text is the same too.
+    fn may_repeat(&self, next: &Self) -> bool {
+        (self.start_ms, self.duration_ms, self.text.len())
+            == (next.start_ms, next.duration_ms, next.text.len())
+    }
+}
+
 /// The cues read so far, bounded by the limits.
 #[derive(Debug)]
 struct Entries {
@@ -122,8 +133,12 @@ enum Phase {
     Sort {
         paid: u64,
     },
-    /// Publishing the next cue.
-    Publish(usize),
+    /// Publishing the cue at `next`, or dropping it as a repeat of the one
+    /// before, once `paid` covers its cost.
+    Publish {
+        next: usize,
+        paid: u64,
+    },
     Finished,
 }
 
@@ -179,8 +194,8 @@ impl Reader {
     }
 
     /// Advances by at most `work` units: one per document byte read or
-    /// converted, one per cue compared while sorting and one per cue
-    /// published.
+    /// converted, one per cue compared while sorting, one per cue published
+    /// or dropped and one per text byte compared with the cue before.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -242,17 +257,30 @@ impl Reader {
                             entry.duration_ms = next - entry.start_ms;
                         }
                     }
-                    self.phase = Phase::Publish(0);
+                    self.phase = Phase::Publish { next: 0, paid: 0 };
                 }
-                Phase::Publish(next) => {
-                    let Some(entry) = self.entries.entries.as_slice().get(*next) else {
+                Phase::Publish { next, paid } => {
+                    let entries = self.entries.entries.as_slice();
+                    let Some(entry) = entries.get(*next) else {
                         self.phase = Phase::Finished;
                         continue;
                     };
-                    if !work.try_charge(1) {
+                    let text = self.text.as_ref().ok_or(Error::Invalid("cue text"))?;
+                    let before = next.checked_sub(1).map(|before| &entries[before]);
+                    let repeat = before.filter(|before| before.may_repeat(entry));
+                    let cost = 1 + repeat.map_or(0, |_| entry.text.len() as u64);
+                    *paid += work.take(cost - *paid);
+                    if *paid < cost {
                         return Ok(Status::Yield);
                     }
-                    let text = self.text.as_ref().ok_or(Error::Invalid("cue text"))?;
+                    *paid = 0;
+                    *next += 1;
+                    let bytes = text.as_ref();
+                    if repeat.is_some_and(|before| {
+                        bytes[before.text.clone()] == bytes[entry.text.clone()]
+                    }) {
+                        continue;
+                    }
                     let slice = |range: &Range<usize>| text.slice(range.clone());
                     let cue = Cue {
                         start_ms: entry.start_ms,
@@ -261,7 +289,6 @@ impl Reader {
                         identifier: entry.identifier.as_ref().map(slice).transpose()?,
                         settings: entry.settings.as_ref().map(slice).transpose()?,
                     };
-                    *next += 1;
                     return Ok(Status::Cue(cue));
                 }
                 Phase::Finished => return Ok(Status::Finished),

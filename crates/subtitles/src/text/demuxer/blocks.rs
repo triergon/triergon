@@ -1,20 +1,29 @@
 //! The blocks of a WebVTT document as the `webvtt` demuxer cuts it.
 //!
-//! CR and LF are line-break characters. Those at the start of a block are
-//! skipped, and those at its end are not part of it. A run of them between
-//! two other bytes ends the block once it holds two line ends: an LF is one,
-//! and so is either character after a CR, the CR being the last line-break
-//! character of the block so far, wherever it was. A NUL or the end of the
-//! document ends a block too, and a block with nothing in it ends the
-//! document.
+//! CR and LF are the line-break bytes. Line breaks before a block are
+//! skipped: a block starts at the next other byte. It ends before a run of
+//! line-break bytes that ends blocks, at a NUL byte, or at the end of the
+//! document; the bytes that end it are not part of it.
+//!
+//! A run, a maximal sequence of line-break bytes, leaves the block open when
+//! it is LF, LF CR or CR, and also when it is CR CR, CR LF or CR LF CR and
+//! the previous run in the same block ended with LF or there was none. Any
+//! other run ends the block: LF LF always does, CR CR only after a run that
+//! ended with CR, and so does every run of four or more bytes.
+//!
+//! A NUL byte ends the block it is in, and the next block starts after it.
+//! The cut ends with an empty block, at the end of the document or at a NUL
+//! byte where a block would start, so such a NUL byte ends the document. A
+//! UTF-8 byte-order mark gets no special treatment here.
 
 use super::lines::Span;
 use triergon_core::WorkBudget;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Block {
+    /// The bytes of one block, as a range of the document.
     Text(Span),
-    /// The document ended; every later call returns this again.
+    /// Returned after the last block, the empty one, and every later call.
     End,
 }
 
@@ -22,63 +31,106 @@ pub(super) enum Block {
 pub(super) struct Blocks {
     /// Next byte to scan.
     cursor: usize,
-    /// The block being scanned, from its first byte to the end of its last.
-    block: Option<Span>,
-    /// Line ends in the run of line-break characters since the last byte.
-    line_ends: u8,
-    /// The last line-break character of the block was a CR.
+    /// Start of the block being cut; `None` between blocks.
+    start: Option<usize>,
+    /// Whether the last run of line-break bytes in the block ended with CR.
     after_cr: bool,
     ended: bool,
+}
+
+const CR: u8 = b'\r';
+const LF: u8 = b'\n';
+
+fn is_break(byte: u8) -> bool {
+    byte == CR || byte == LF
+}
+
+/// The run of line-break bytes starting at `source[at]`, as its length if
+/// the run leaves the block open, or `None` when it ends the block.
+fn open_run(source: &[u8], at: usize, after_cr: bool) -> Option<usize> {
+    // Every run that leaves a block open is at most three bytes long.
+    let window = &source[at..source.len().min(at + 4)];
+    let length = window.iter().take_while(|&&byte| is_break(byte)).count();
+    match &window[..length] {
+        b"\n" | b"\n\r" | b"\r" => Some(length),
+        b"\r\r" | b"\r\n" | b"\r\n\r" if !after_cr => Some(length),
+        _ => None,
+    }
 }
 
 impl Blocks {
     pub(super) fn new() -> Self {
         Self {
             cursor: 0,
-            block: None,
-            line_ends: 0,
+            start: None,
             after_cr: false,
             ended: false,
         }
     }
 
-    /// The next block, or `None` when `work` runs out first. Each byte
-    /// scanned costs one unit.
+    /// The next block, or `None` when `work` runs out first. Each byte scanned
+    /// costs one unit.
     pub(super) fn next(&mut self, source: &[u8], work: &mut WorkBudget) -> Option<Block> {
-        if self.ended {
-            return Some(Block::End);
-        }
-        while self.cursor < source.len() {
-            if !work.try_charge(1) {
+        loop {
+            if self.ended {
+                return Some(Block::End);
+            }
+            let Some(start) = self.start else {
+                // Between blocks: skip line breaks.
+                let byte = source.get(self.cursor).copied().unwrap_or(0);
+                if byte == 0 {
+                    self.ended = true;
+                    return Some(Block::Text(Span {
+                        start: self.cursor,
+                        end: self.cursor,
+                    }));
+                }
+                if is_break(byte) {
+                    if !work.try_charge(1) {
+                        return None;
+                    }
+                    self.cursor += 1;
+                } else {
+                    self.start = Some(self.cursor);
+                    self.after_cr = false;
+                }
+                continue;
+            };
+            let rest = &source[self.cursor..];
+            if rest.is_empty() {
+                self.start = None;
+                return Some(Block::Text(Span {
+                    start,
+                    end: source.len(),
+                }));
+            }
+            let budget = usize::try_from(work.remaining()).unwrap_or(usize::MAX);
+            let window = &rest[..rest.len().min(budget)];
+            if window.is_empty() {
                 return None;
             }
-            let at = self.cursor;
-            self.cursor += 1;
-            match source[at] {
-                0 => return Some(self.take()),
-                byte @ (b'\r' | b'\n') if self.block.is_some() => {
-                    self.line_ends += u8::from(byte == b'\n' || self.after_cr);
-                    self.after_cr = byte == b'\r';
-                    if self.line_ends == 2 {
-                        return Some(self.take());
-                    }
-                }
-                b'\r' | b'\n' => {}
-                _ => {
-                    self.line_ends = 0;
-                    let block = self.block.get_or_insert(Span { start: at, end: at });
-                    block.end = at + 1;
-                }
+            let Some(offset) = window.iter().position(|&byte| byte == 0 || is_break(byte)) else {
+                work.take(window.len() as u64);
+                self.cursor += window.len();
+                continue;
+            };
+            work.take(offset as u64);
+            let at = self.cursor + offset;
+            if source[at] == 0 {
+                work.take(1);
+                self.cursor = at + 1;
+                self.start = None;
+                return Some(Block::Text(Span { start, end: at }));
             }
+            let Some(length) = open_run(source, at, self.after_cr) else {
+                // The run is skipped, and paid for, before the next block.
+                self.cursor = at;
+                self.start = None;
+                return Some(Block::Text(Span { start, end: at }));
+            };
+            work.take(length as u64);
+            self.cursor = at + length;
+            self.after_cr = source[self.cursor - 1] == CR;
         }
-        Some(self.take())
-    }
-
-    fn take(&mut self) -> Block {
-        self.line_ends = 0;
-        self.after_cr = false;
-        let block = self.block.take();
-        self.ended = block.is_none();
-        block.map_or(Block::End, Block::Text)
     }
 }

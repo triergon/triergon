@@ -1,4 +1,4 @@
-//! Times and cue numbers, read as the demuxers read them.
+//! SubRip times and cue numbers, read as the `srt` demuxer reads them.
 //!
 //! A number is read as C's `sscanf` reads `%d`: leading white space, an
 //! optional sign, then decimal digits, saturated to the range of a 32-bit
@@ -88,22 +88,6 @@ pub(super) fn subrip(line: &[u8]) -> Option<(i64, i64)> {
     scan.at += 3;
     let end = scan.clock(b",.")?;
     Some((start, end))
-}
-
-/// A WebVTT time from `at`, `H:M:S.F` or else `M:S.F`, in milliseconds, and
-/// where it ends.
-pub(super) fn webvtt(text: &[u8], at: usize) -> Option<(i64, usize)> {
-    let mut scan = Scan { bytes: text, at };
-    if let Some(time) = scan.clock(b".") {
-        return Some((time, scan.at));
-    }
-    scan.at = at;
-    let minutes = scan.integer()?;
-    scan.one_of(b":")?;
-    let seconds = scan.integer()?;
-    scan.one_of(b".")?;
-    let fraction = scan.integer()?;
-    Some((milliseconds(0, minutes, seconds, fraction), scan.at))
 }
 
 /// Whether a SubRip line reads as a cue number, one that is not negative:

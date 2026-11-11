@@ -333,6 +333,9 @@
     "srt-negative-duration-until-next",
     "srt-negative-duration-last",
     "srt-zero-duration-kept",
+    "srt-repeat-dropped",
+    "srt-repeat-apart-kept",
+    "srt-repeat-after-completion",
     "srt-utf16-line-start-cut",
     "srt-utf16-crlf-no-cut",
     "srt-utf16-cr-cut",
@@ -363,7 +366,8 @@
     "vtt-nul-starts-identifier",
     "vtt-nul-after-block-ends-document",
     "vtt-negative-duration-until-next",
-    "vtt-long-duration"
+    "vtt-long-duration",
+    "vtt-repeat-dropped"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"
