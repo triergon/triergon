@@ -532,6 +532,10 @@ struct ProfileReference {
     packages: &'static [&'static str],
     /// Compiler options before the source file.
     options: &'static [&'static str],
+    /// C library functions linked with `--wrap`: the source defines each
+    /// `__wrap_` entry point, and every call of the function in the source and
+    /// the pinned archives goes through it.
+    wrapped: &'static [&'static str],
     /// Whether the build answers `identity -` (the container builds do; the
     /// decode, capture and font builds record their configuration in the profile's
     /// `build.json` instead).
@@ -584,6 +588,7 @@ const REFERENCE: ProfileReference = ProfileReference {
     libraries: "",
     packages: &[],
     options: RELEASE_OPTIONS,
+    wrapped: &[],
     identity: false,
     prepared: None,
     generated: None,
@@ -635,6 +640,21 @@ const PROFILE_REFERENCES: [ProfileReference; 13] = [
         libraries: "subtitles_reference",
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
+        // The calls whose result can differ between the targets, so that the
+        // worker flags the folds that reach such a result
+        // (`harness/reference_subtitles_host.h`).
+        wrapped: &[
+            "strtol",
+            "strtoul",
+            "__isoc23_strtol",
+            "__isoc23_strtoul",
+            "__isoc99_sscanf",
+            "lrint",
+            "lrintf",
+            "lround",
+            "llrint",
+            "llrintf",
+        ],
         identity: true,
         ..REFERENCE
     },
@@ -897,6 +917,12 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         if let Some(define) = reference.define {
             command.push(define.into());
         }
+        command.extend(
+            reference
+                .wrapped
+                .iter()
+                .map(|name| format!("-Wl,--wrap={name}")),
+        );
         if let Some(generate) = reference.generated {
             // A system directory, as the pinned tree's own is: libass's code is
             // compiled with its own warnings.

@@ -47,7 +47,13 @@ resource limit becomes an explicit, reviewed rule for that case.
   needs) for the playback startup and seek reference, and `subtitles` (the PGS, DVB,
   DVD, closed-caption and teletext decoders, the latter through a hash-checked
   libzvbi 0.2.46, with the video decoders caption extraction needs) for the subtitle
-  decode comparison. Decoders and
+  decode comparison. The `subtitles` worker is linked with `--wrap` for the C
+  library calls whose result can differ between its targets for the same
+  arguments: `strtol`, `strtoul` and `sscanf`'s integer conversions, which read
+  through `long`, and the rounding functions with results C leaves unspecified
+  out of range. Its `sub-fold` flags a run that reached such a difference
+  (`harness/reference_subtitles_host.h`), and a flagged case fails any feature
+  not pinned per target. Decoders and
   capture are measured against the FFmpeg 9.0.2 release tarball: `decode` (the default
   configuration) for the codec comparison, whose `ffmpeg` and `ffprobe` also decode
   capture output independently, and `capture` (gating) and `capture-small` for the

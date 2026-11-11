@@ -19,7 +19,10 @@
  * decode every prepared packet in order with one call each; then drain with empty
  * packets until no subtitle comes out (at most 64); fold every output subtitle
  * (all rectangles, palettes, pixels, text and ASS) and free it; free the decoder.
- * The same protocol as crates/subtitle-worker. */
+ * The same protocol as crates/subtitle-worker. sub-fold adds "host_dependent":true
+ * when the run reached a C library call whose result differs between the
+ * reference's targets (reference_subtitles_host.h). */
+#include "reference_subtitles_host.h"
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/dict.h>
@@ -350,9 +353,11 @@ static int sub_main(int argc, char **argv) {
         fprintf(stderr, "reference: %s (%d)\n", error, rc);
         return 1;
     }
+    const int flagged = fold_only && atomic_load(&sub_host_dependent);
     if (!trace)
         printf("{\"schema\":1,\"operation\":\"" SUB_OPERATION "\",\"iterations\":%lu,\"packets\":%" PRIu64
-               ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 ",\"eof\":true}\n",
-               iterations, total.events, total.bytes, total.digest, elapsed);
+               ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 "%s,\"eof\":true}\n",
+               iterations, total.events, total.bytes, total.digest, elapsed,
+               flagged ? ",\"host_dependent\":true" : "");
     return 0;
 }
