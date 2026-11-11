@@ -185,33 +185,47 @@ impl Fixed {
     }
 }
 
-/// glibc's `msort_with_tmp` with `cmp_rect_y0`: the first half and then the
-/// second sorted, then merged through `tmp`, a box of the first half first
-/// while it compares at most equal.
-fn merge_sort(boxes: &mut [Rect], tmp: &mut [Rect]) {
-    let n = boxes.len();
-    if n <= 1 {
+/// Sorts `boxes` by [`Rect::cmp_y0`] with a stable top-down merge sort that
+/// sorts the first `len / 2` boxes and the rest, then merges them, taking
+/// the first half's box while it compares at most equal. `scratch` holds at
+/// least `len / 2` boxes.
+///
+/// `cmp_y0` is a total preorder only while no two tops lie 2³¹ or more
+/// apart: beyond that its wrapping difference can rank `a` before `b`, `b`
+/// before `c` and `c` before `a`. Every stable sort agrees on a total
+/// preorder, but on such boxes the order depends on which pairs a sort
+/// compares, so it must be this one, with this split: on
+/// `collision-far-margins.ass` it places the events as libass does on glibc,
+/// and the length halved and rounded up does not. The standard library's
+/// sorts compare other pairs, may panic on a comparison that is not a total
+/// order, and take storage outside the budget.
+fn merge_sort(boxes: &mut [Rect], scratch: &mut [Rect]) {
+    let len = boxes.len();
+    if len < 2 {
         return;
     }
-    let n1 = n / 2;
-    merge_sort(&mut boxes[..n1], tmp);
-    merge_sort(&mut boxes[n1..], tmp);
-    let (mut i, mut j, mut k) = (0, n1, 0);
-    while i < n1 && j < n {
-        if boxes[i].cmp_y0(&boxes[j]) <= 0 {
-            tmp[k] = boxes[i];
+    let mid = len / 2;
+    let (first, second) = boxes.split_at_mut(mid);
+    merge_sort(first, scratch);
+    merge_sort(second, scratch);
+    // The first run moves aside; the merged run then fills `boxes` from the
+    // front, where it never passes the second run's next unread box.
+    let first = &mut scratch[..mid];
+    first.copy_from_slice(&boxes[..mid]);
+    let (mut i, mut j, mut k) = (0, mid, 0);
+    while i < mid && j < len {
+        if first[i].cmp_y0(&boxes[j]) <= 0 {
+            boxes[k] = first[i];
             i += 1;
         } else {
-            tmp[k] = boxes[j];
+            boxes[k] = boxes[j];
             j += 1;
         }
         k += 1;
     }
-    // What is left of the first half follows; the second half's rest is
-    // already in place.
-    let rest = n1 - i;
-    tmp[k..k + rest].copy_from_slice(&boxes[i..n1]);
-    boxes[..k + rest].copy_from_slice(&tmp[..k + rest]);
+    // What is left of the first run fills the gap up to the second's rest,
+    // which is already in place.
+    boxes[k..j].copy_from_slice(&first[i..]);
 }
 
 /// `shift_event`.
@@ -332,5 +346,31 @@ mod tests {
         let mut boxes = tops([30, 10, 20]);
         merge_sort(&mut boxes, &mut [Rect::default(); 3]);
         assert_eq!(boxes.map(|r| r.y0), [10, 20, 30]);
+    }
+
+    #[test]
+    fn tops_closer_than_2_31_sort_by_value_keeping_placement_order() {
+        // Tops spread over just under 2³¹, with many equal, told apart by
+        // their placement in `x0`.
+        let mut state: u32 = 1;
+        let mut next = || {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            state
+        };
+        for len in 0..80 {
+            let base = i32::MIN.wrapping_add((next() % 1024) as i32);
+            let spread = [4, 1 << 20, i32::MAX as u32][len % 3];
+            let mut boxes: Vec<Rect> = (0..len)
+                .map(|x0| Rect {
+                    y0: base.wrapping_add((next() % spread) as i32),
+                    x0: x0 as i32,
+                    ..Rect::default()
+                })
+                .collect();
+            let mut expected = boxes.clone();
+            expected.sort_by_key(|r| r.y0);
+            merge_sort(&mut boxes, &mut vec![Rect::default(); len / 2]);
+            assert_eq!(boxes, expected, "{len} boxes");
+        }
     }
 }

@@ -191,6 +191,17 @@ impl AacAudioSpecificConfig {
     }
 }
 
+/// Channel count for the fixed MPEG-4 AAC configurations of up to eight channels
+/// (ISO/IEC 14496-3:2009/Amd.4, Table 1.19).
+pub const fn aac_fixed_channel_count(configuration: u8) -> Option<u8> {
+    match configuration {
+        1..=6 => Some(configuration),
+        11 => Some(7),
+        7 | 12 | 14 => Some(8),
+        _ => None,
+    }
+}
+
 pub fn indexed_aac_frequency(index: u8) -> Option<u32> {
     const RATES: [u32; 13] = [
         96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350,
@@ -446,7 +457,7 @@ impl AacAscParser {
                 }
                 Phase::Channel => {
                     self.channel = self.bits.read(raw.as_ref(), 4)? as u8;
-                    if self.channel > 7 {
+                    if self.channel != 0 && aac_fixed_channel_count(self.channel).is_none() {
                         return Err(Error::Unsupported("AAC channel configuration"));
                     }
                     self.phase =
@@ -700,9 +711,10 @@ impl AacAscParser {
                                 .facts
                                 .channel_count
                         }
-                        1..=6 => u16::from(self.channel),
-                        7 => 8,
-                        _ => return Err(Error::Unsupported("AAC channel configuration")),
+                        channel => u16::from(
+                            aac_fixed_channel_count(channel)
+                                .ok_or(Error::Unsupported("AAC channel configuration"))?,
+                        ),
                     };
                     let facts = AacAscFacts {
                         outer_object_type: self

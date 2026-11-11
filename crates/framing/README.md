@@ -85,7 +85,7 @@ assert_eq!(decoder_input, [
 | Other config inputs | `AnnexBConfigParser`, `DeclaredConfigParser`, `Configuration::declared_record` | Annex-B extradata framing; caller-declared array/NAL layouts; opaque record retention |
 | AV1 | `Av1ObuReader`, `Av1ConfigParser`, `Av1TemporalUnitJob` | Low-overhead or single-OBU framing with exact LEB128; av1C v1 fields and config OBUs; container sample to decoder temporal unit |
 | VP9 | `Vp9ConfigParser` | vpcC v1 fields (profile, level, bit depth, chroma, range, CICP) |
-| AAC | `AacAscParser`, `AacAscScopeParser`, `aac_decoder_configuration_view` | AudioSpecificConfig for AAC-LC (2), SBR (5), PS (29): frequency, channels 1–7, GASpecificConfig, PCE, `0x2b7`/`0x548` sync extensions |
+| AAC | `AacAscParser`, `AacAscScopeParser`, `aac_decoder_configuration_view` | AudioSpecificConfig for AAC-LC (2), SBR (5), PS (29): frequency, fixed channel configurations 1–7, 11, 12 and 14, GASpecificConfig, PCE, `0x2b7`/`0x548` sync extensions |
 | ADTS | `inspect_aac_adts_header`, `AacAdtsParser`, `AacAdtsWriter`, `AacAdtsStreamReader`, `AacAdtsCarrierReader` | 56-bit header facts; single-block AAC-LC frames; ADTS wrapping of raw access units (`AacAdtsParameters::from_asc`); aligned ADTS streams |
 | AC-3 / E-AC-3 | `probe_ac3_header`, `Ac3FrameReader`, `Ac3ConfigParser`, `Eac3BsiParser` | Header facts (bsid 0–8, 11–16), aligned syncframe reader, dac3/dec3 records, complete E-AC-3 BSI |
 | DTS core | `probe_dts_core_header`, `DtsCoreFrameReader`, `DtsHeaderInspector` | Normal core header (all fields, optional HCRC), FSIZE+1 frame acquisition |
@@ -148,7 +148,8 @@ payload for passthrough packets.
   a size field for a size-less final OBU.
 - VP9: only vpcC version 1. No frame header or superframe parsing.
 - AAC: other object types, unsupported extension modes and frequency indices
-  13/14 are refused. ADTS CRC is carried but not verified; multi-block and
+  13/14 are refused. ADTS wrapping refuses configurations above 7 because the
+  header carries three channel-configuration bits. ADTS CRC is carried but not verified; multi-block and
   protected frames are not parsed. The writer obeys the 8191-byte frame limit.
 - AC-3/E-AC-3: input must be aligned big-endian syncframes. There is no resync
   search, no word-swapped or IEC 61937 input, and no CRC or audio-block check.

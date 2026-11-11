@@ -1,11 +1,11 @@
 # triergon-codec-aac
 
-MPEG-4 AAC decoder for ADTS access units: AAC Main, LC and LTP, HE-AAC (SBR) and
-HE-AAC v2 (Parametric Stereo). It is a codec-layer crate that depends on
+MPEG-4 AAC decoder for ADTS frames and raw AAC-LC access units. The ADTS decoder
+supports Main, LC and LTP, HE-AAC (SBR) and HE-AAC v2 (Parametric Stereo). It depends on
 [triergon-bitstream](../bitstream/README.md) and
 [triergon-codec](../codec/README.md), whose `AudioDecoder` trait it implements and
-whose `AudioFrame`, `ChannelLayout` and `Speaker` it re-exports. It does not split streams, resample or downmix: the caller hands it one ADTS
-frame at a time and receives planar `f32` in FFmpeg's native channel order.
+whose `AudioFrame`, `ChannelLayout` and `Speaker` it re-exports. The caller supplies
+complete access units and receives planar `f32` in the order described by `ChannelLayout`.
 
 ## Usage
 
@@ -32,22 +32,36 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 
 `examples/decode_aac.rs IN.aac OUT.f32` writes interleaved f32le and prints a JSON summary.
 
+`RawLcDecoder::new_in` accepts the indexed core rate and fixed channel configuration
+from a checked AudioSpecificConfig. Its `decode` consumes one complete raw data block
+of at most 64 KiB and produces 1024 samples per channel. The supported fixed configurations are 1–7,
+11, 12 and 14. Their audible elements follow Table 1.19, including the distinct
+7.1 Front, Back and Top layouts. Raw packets that use a PCE for their layout,
+carry SBR, or require 960-sample blocks are outside this decoder's scope.
+[ISO/IEC 14496-3:2009/Amd.4, Table 1.19](https://standards.iteh.ai/catalog/standards/iso/c0071f4c-5db7-4cf4-a32e-6b75c874d46d/iso-iec-14496-3-2009-amd-4-2013)
+
+`RawLcDecoder::with_layout_in` accepts
+`compat::layout::Policy::ConventionalSurround` for the default FFmpeg speaker
+mapping. This uses a back pair in configurations 5, 6, 11 and 14 and interprets
+configuration 7 as 7.1 Back. The fixed decoder synthesizes directly into the
+caller's reserved PCM planes and reuses them on the next access unit.
+
 ## Supported
 
 | Area | Coverage |
 |---|---|
-| Transport | ADTS, CRC-protected or not, 1–4 raw data blocks per frame (CRC parsed, not checked) |
+| Transport | ADTS, CRC-protected or not, 1–4 raw data blocks per frame (CRC parsed, not checked); single raw AAC-LC blocks |
 | Object types | Main (with prediction), LC, LTP |
 | Elements | SCE, CPE (common window, M/S), LFE, CCE (dependent and independent coupling), DSE, FIL, PCE incl. height extension |
 | Tools | Huffman section/scalefactor/spectral coding, pulse data, TNS, intensity stereo, PNS, sine/KBD windows, all window sequences |
 | SBR | Implicit signalling; output at twice the core rate from the first SBR frame; all grid classes, coupled and balanced envelopes, up to 6 patches, limiter, sinusoids |
 | PS | Implicit signalling (mono stream becomes stereo); 20- and 34-band hybrid, IID/ICC/IPD/OPD, switching between 20 and 34 bands |
 | Rates | Sampling-frequency indices 0–12 |
-| Layouts | Channel configurations 1–7 and PCE layouts, up to 48 channels |
+| Layouts | ADTS configurations 1–7 and PCE layouts up to 48 channels; raw fixed configurations 1–7, 11, 12 and 14 |
 
 ## Behaviour and limits
 
-- `decode` takes exactly one ADTS frame including its header. It clears and refills
+- `Decoder::decode` takes exactly one ADTS frame including its header. It clears and refills
   `out`, reusing capacity, because rate and layout can change between frames (implicit
   SBR/PS, a new PCE). A frame yields 1024 samples per raw data block, 2048 with SBR.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
@@ -74,7 +88,7 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
   accepted.
 - `ChannelLayout::speakers()` names each plane's position, in the
   [channel order](../codec/README.md#channel-order) of triergon-codec: plane `i` is
-  FFmpeg output channel `i`. Configurations 5, 6 and 7 map to 5.0(side), 5.1(side) and 7.1.
+  FFmpeg output channel `i`. For ADTS, configurations 5, 6 and 7 map to 5.0(side), 5.1(side) and 7.1.
   PCE layouts that FFmpeg reports as unnamed keep PCE element order.
 - Dynamic range control data is parsed and not applied, as FFmpeg does by default.
 - FFmpeg-compatible behaviour: the PNS noise generator (LCG, seed `0x1f2e3d4c`); two SCEs
@@ -102,7 +116,7 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and
   max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`).
 - SBR/PS vectors are also checked against the conformance `.s16` references (≤ 1 LSB).
-- `cargo test -p triergon-codec-aac` runs synthetic ADTS tests; `tests/fate_vectors.rs`
+- `cargo test -p triergon-codec-aac` runs synthetic ADTS and raw AAC-LC tests. `tests/fate_vectors.rs`
   runs the FATE vectors when `.research/fate-samples/aac/` is present (set
   `AAC_REF_DIR` for the float comparison) and skips otherwise.
 - Comparison and probe tools: [harness/codecs/aac/tools](../../harness/codecs/aac/tools).
