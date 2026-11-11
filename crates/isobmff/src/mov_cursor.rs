@@ -150,7 +150,7 @@ struct Slot<'a> {
     edited: Option<EditCursor<'a>>,
     encoded_edit: Option<&'a crate::EncodedEditPlan>,
     head: Option<PacketOccurrence>,
-    clock: MediaClock,
+    clock: Option<MediaClock>,
     shift: i64,
     append_run: Option<(usize, usize)>,
     discard_boundary: Option<i128>,
@@ -162,8 +162,11 @@ struct Slot<'a> {
     ended: bool,
 }
 impl<'a> Slot<'a> {
-    fn new(track: DemuxTrack<'a>) -> Result<Self> {
+    fn new(track: DemuxTrack<'a>, project_clock: bool) -> Result<Self> {
         let source = SourceTrack::new(track.track_id, Some(track.table), track.fragments)?;
+        let clock = project_clock
+            .then(|| MediaClock::from_source(track.media_base))
+            .transpose()?;
         Ok(Self {
             resume_remaining: 0,
             track,
@@ -171,7 +174,7 @@ impl<'a> Slot<'a> {
             edited: None,
             encoded_edit: None,
             head: None,
-            clock: MediaClock::from_source(track.media_base)?,
+            clock,
             shift: 0,
             append_run: None,
             discard_boundary: None,
@@ -182,6 +185,11 @@ impl<'a> Slot<'a> {
             starts_fragment_run: false,
             ended: false,
         })
+    }
+
+    fn clock(&self) -> Result<MediaClock> {
+        self.clock
+            .ok_or(Error::Invalid("missing projected media clock"))
     }
 
     fn source(&self) -> Result<SourceTrack<'a>> {
@@ -247,6 +255,7 @@ impl<'a> Slot<'a> {
         global_schedule: bool,
         front_source: bool,
     ) -> Result<CursorStatus> {
+        let clock = self.clock()?;
         let mut occurrence = if let Some(plan) = self.encoded_edit {
             let sample = match self.cursor.poll(work)? {
                 SampleStep::Yield => return Ok(CursorStatus::Yield),
@@ -267,7 +276,7 @@ impl<'a> Slot<'a> {
                 demux,
                 edit: Some(edit),
                 clock_origin: ClockOrigin::SourceClock,
-                media_clock: self.clock,
+                media_clock: clock,
                 scheduling_clock: SchedulingClock::SingleTrack,
             }
         } else if let Some(cursor) = &mut self.edited {
@@ -284,7 +293,7 @@ impl<'a> Slot<'a> {
                             duration_basis: occurrence.duration_basis,
                         }),
                         clock_origin: ClockOrigin::SourceClock,
-                        media_clock: self.clock,
+                        media_clock: clock,
                         scheduling_clock: SchedulingClock::SingleTrack,
                     }
                 }
@@ -367,14 +376,14 @@ impl<'a> Slot<'a> {
                 demux,
                 edit,
                 clock_origin,
-                media_clock: self.clock,
+                media_clock: clock,
                 scheduling_clock: SchedulingClock::SingleTrack,
             }
         };
         occurrence.scheduling_clock = if front_source {
             SchedulingClock::NonseekableSourcePosition(occurrence.demux.source_range.start)
         } else if global_schedule {
-            SchedulingClock::from_demux_clock(occurrence.demux.dts_field, self.clock.demux_base)?
+            SchedulingClock::from_demux_clock(occurrence.demux.dts_field, clock.demux_base)?
         } else {
             SchedulingClock::SingleTrack
         };
@@ -451,6 +460,7 @@ impl TrackProjection {
 #[derive(Debug)]
 pub struct PacketCursor<'a> {
     slots: BudgetVec<Slot<'a>>,
+    source_tracks: usize,
     media: &'a [Range<u64>],
     limits: PacketLimits,
     phase: Phase,
@@ -517,6 +527,16 @@ impl<'a> PacketCursor<'a> {
         limits: PacketLimits,
         _profile: DemuxProfile,
     ) -> Result<Self> {
+        Self::build(budget, tracks, media, limits, TrackProjection::default())
+    }
+
+    fn build(
+        budget: &Budget,
+        tracks: &[DemuxTrack<'a>],
+        media: &'a [Range<u64>],
+        limits: PacketLimits,
+        projection: TrackProjection,
+    ) -> Result<Self> {
         let max_tracks = limits.max_tracks.min(64);
         if tracks.len() > max_tracks {
             return Err(Error::Limit {
@@ -547,12 +567,14 @@ impl<'a> PacketCursor<'a> {
         count(regular_samples, limits.max_source_samples)?;
         let mut slots = BudgetVec::new(budget);
         slots.try_reserve_exact(tracks.len())?;
-        for track in tracks {
+        for (index, track) in tracks.iter().enumerate() {
             slots
-                .try_push(Slot::new(*track)?)
+                .try_push(Slot::new(*track, projection.includes(index))?)
                 .map_err(|error| error.error)?;
         }
-        Ok(Self::from_slots(slots, media, limits))
+        let mut cursor = Self::from_slots(slots, media, limits);
+        cursor.projection = projection;
+        Ok(cursor)
     }
 
     fn from_slots(
@@ -561,6 +583,7 @@ impl<'a> PacketCursor<'a> {
         limits: PacketLimits,
     ) -> Self {
         Self {
+            source_tracks: slots.len(),
             slots,
             media,
             limits,
@@ -677,7 +700,7 @@ impl<'a> PacketCursor<'a> {
         Ok(crate::FrontTrack::from_index(
             slot.track.track_id,
             slot.track.media_base,
-            slot.clock,
+            slot.clock()?,
             slot.previous_clock,
             slot.fragment_cto_minimum,
             slot.track.table.sample_count(),
@@ -704,7 +727,16 @@ impl<'a> PacketCursor<'a> {
             limits,
             DemuxProfile::NoParseNoFillin,
         )?;
-        for (slot, plan) in cursor.slots.as_mut_slice().iter_mut().zip(plans) {
+        cursor.bind_encoded_edits(budget, plans)?;
+        Ok(cursor)
+    }
+
+    fn bind_encoded_edits(
+        &mut self,
+        budget: &Budget,
+        plans: &'a [Option<crate::EncodedEditPlan>],
+    ) -> Result<()> {
+        for (slot, plan) in self.slots.as_mut_slice().iter_mut().zip(plans) {
             if let Some(plan) = plan {
                 if !plan.source_table().bytes().belongs_to(budget) {
                     return Err(Error::ForeignPool);
@@ -720,7 +752,7 @@ impl<'a> PacketCursor<'a> {
                 slot.encoded_edit = Some(plan);
             }
         }
-        Ok(cursor)
+        Ok(())
     }
     pub fn ready_encoded_skip(&self) -> Result<Option<[u8; 10]>> {
         let item = self.ready.as_ref().ok_or(Error::Invalid(
@@ -741,32 +773,27 @@ impl<'a> PacketCursor<'a> {
         self.validated
     }
 
-    /// Choose the track ordinals to project, in the order supplied at construction.
-    /// All declared sample extents are checked before the selected tracks enter
-    /// the edit and packet projection. Call before polling or enabling seek checkpoints.
-    pub fn project_tracks(&mut self, include: impl FnMut(usize) -> bool) -> Result<()> {
-        self.set_projection(TrackProjection::new(self.slots.len(), include)?)
-    }
-
-    pub(crate) fn set_projection(&mut self, projection: TrackProjection) -> Result<()> {
-        if !self.complete_source
-            || self.front_source
-            || !matches!(self.phase, Phase::Media)
-            || self.at != 0
-            || self.failed.is_some()
-            || self.recording_seek_checkpoints
-            || self
-                .slots
-                .as_slice()
-                .iter()
-                .any(|slot| slot.resume_remaining != 0)
-        {
-            return Err(Error::Invalid(
-                "track projection requires a fresh complete cursor",
-            ));
+    /// Validate every source extent and project only selected track ordinals.
+    /// Demux clocks and edits are required only for the selected tracks.
+    /// Supply any edit plans in source order.
+    pub fn new_projected(
+        budget: &Budget,
+        tracks: &[DemuxTrack<'a>],
+        media: &'a [Range<u64>],
+        limits: PacketLimits,
+        plans: Option<&'a [Option<crate::EncodedEditPlan>]>,
+        include: impl FnMut(usize) -> bool,
+    ) -> Result<Self> {
+        if plans.is_some_and(|plans| plans.len() != tracks.len()) {
+            return Err(Error::Invalid("encoded edit track coverage"));
         }
-        self.projection = projection;
-        Ok(())
+        let projection = TrackProjection::new(tracks.len(), include)?;
+        let mut cursor = Self::build(budget, tracks, media, limits, projection)?;
+        cursor.complete_source = true;
+        if let Some(plans) = plans {
+            cursor.bind_encoded_edits(budget, plans)?;
+        }
+        Ok(cursor)
     }
 
     /// Check source ranges and packet projections before playback without
@@ -929,7 +956,7 @@ impl<'a> PacketCursor<'a> {
         let mut slots = BudgetVec::new(self.slots.budget());
         slots.try_reserve_exact(checked_slots.len())?;
         for checked in checked_slots {
-            let mut slot = Slot::new(checked.track)?;
+            let mut slot = Slot::new(checked.track, true)?;
             slot.encoded_edit = checked.encoded_edit;
             slot.shift = checked.shift;
             slot.fragment_cto_minimum = checked.fragment_cto_minimum;
@@ -937,6 +964,7 @@ impl<'a> PacketCursor<'a> {
             slots.try_push(slot).map_err(|error| error.error)?;
         }
         let mut replay = Self::from_slots(slots, self.media, self.limits);
+        replay.source_tracks = self.source_tracks;
         replay.complete_source = true;
         replay.phase = Phase::Initialize;
         replay.validated = self.validated;
