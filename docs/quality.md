@@ -359,7 +359,8 @@ Pass `--corpus FEATURE=DIR` for each prefix feature whose files are outside its
 recorded directory or whose manifest omits the directory. Relative directories are
 resolved from the repository root. Prefix comparisons verify the reference worker's
 build hash and the manifest hashes of the primary input, ordered entities and
-companion files before running a case.
+companion files before running a case. DVD palette paths resolve inside the
+selected corpus and keep their manifest spelling in recorded traces.
 `cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent

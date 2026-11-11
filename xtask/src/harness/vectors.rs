@@ -13,7 +13,9 @@ use super::comparison::{reference_record, reference_summary};
 use super::gate_build;
 use super::parity::{self, Run};
 use super::provenance::source_identity_error;
-use super::report::{PrefixFeature, case_arguments, expected_for, host_target};
+use super::report::{
+    PrefixFeature, case_arguments, expected_for, host_target, resolved_case_arguments,
+};
 use super::timing::{Operation, Work, benchmark};
 use crate::checks::read_json;
 use crate::corpus::write_json;
@@ -702,10 +704,13 @@ fn prefix_traces(
                 timeout: feature.timeout,
             };
             let expected = expected_for(case, &target).unwrap_or(&Value::Null);
+            let declared = case_arguments(case);
+            let arguments = resolved_case_arguments(&feature.corpus, case, declared.clone())?;
+            super::worker::record_argument_aliases(&arguments, &declared);
             let result = parity::feed_parity(
                 &run,
                 &feature.prefix,
-                &case_arguments(case),
+                &arguments,
                 expected,
                 &feature.work_fields,
                 feature.per_target,

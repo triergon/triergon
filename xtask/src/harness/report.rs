@@ -460,6 +460,47 @@ pub fn case_arguments(case: &Value) -> Vec<std::ffi::OsString> {
         .collect()
 }
 
+/// Rebase DVD palette options onto the same corpus used to check companion pins.
+pub(super) fn resolved_case_arguments(
+    corpus: &Path,
+    case: &Value,
+    mut arguments: Vec<std::ffi::OsString>,
+) -> Result<Vec<std::ffi::OsString>, String> {
+    const OPTION: &str = "opt:ifo_palette=";
+    for argument in &mut arguments {
+        let Some(declared) = argument.to_str().and_then(|text| text.strip_prefix(OPTION)) else {
+            continue;
+        };
+        let relative = Path::new(declared)
+            .strip_prefix(".research/subtitle-corpus")
+            .map_err(|_| "IFO palette input is outside the subtitle corpus")?;
+        if relative.as_os_str().is_empty()
+            || relative
+                .components()
+                .any(|part| !matches!(part, std::path::Component::Normal(_)))
+        {
+            return Err("IFO palette input escapes corpus".into());
+        }
+        let path = corpus.join(relative);
+        let pinned = case
+            .get("companions")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+            .iter()
+            .any(|pin| s(pin, "file").map(Path::new) == Some(relative));
+        if !pinned && path.try_exists().map_err(|error| error.to_string())? {
+            return Err(format!(
+                "IFO palette input has no pin: {}",
+                relative.display()
+            ));
+        }
+        let mut resolved = std::ffi::OsString::from(OPTION);
+        resolved.push(&path);
+        *argument = resolved;
+    }
+    Ok(arguments)
+}
+
 /// The directory a corpus manifest records for its cases' files, relative to the
 /// repository root.
 pub fn recorded_corpus(root: &Path, manifest: &Value) -> Option<PathBuf> {
@@ -817,7 +858,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         {
             Value::object([("status", Value::str(status))])
         } else if let Some(prefix) = &worker_operation {
-            let arguments = case_arguments(case);
+            let arguments = resolved_case_arguments(&corpus, case, case_arguments(case))?;
             row.push(("input_sha256", Value::str(sha)));
             if let Some(entities) = case.get("entities") {
                 row.push(("input_entities", entities.clone()));
@@ -937,7 +978,11 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 if digest(&input)? != sha {
                     return Ok(Some("input-hash-mismatch"));
                 }
-                additional_input_failure(&corpus, case, worker_operation.as_deref())
+                let failure = additional_input_failure(&corpus, case, worker_operation.as_deref())?;
+                if failure.is_none() && worker_operation.is_some() {
+                    resolved_case_arguments(&corpus, case, case_arguments(case))?;
+                }
+                Ok(failure)
             };
             if options.benchmark {
                 let timing = measure_pinned(check_inputs, || {
@@ -1341,6 +1386,41 @@ mod prefix_tests {
                 .unwrap()
                 .contains("no registered prefix feature unused")
         );
+    }
+
+    #[test]
+    fn dvd_palette_options_use_the_selected_corpus_and_keep_absence() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let manifest = read_json(&root.join("harness/features/subtitle-dvd/corpus.json")).unwrap();
+        let cases = manifest.get("cases").and_then(Value::as_array).unwrap();
+        let case = |id| cases.iter().find(|case| s(case, "id") == Some(id)).unwrap();
+        let scratch = crate::walk::scratch("dvd-ifo");
+        let corpus = scratch.join("relocated");
+        std::fs::create_dir_all(corpus.join("dvd")).unwrap();
+        let resolve = |id| {
+            let case = case(id);
+            super::resolved_case_arguments(&corpus, case, super::case_arguments(case))
+        };
+        let palette = corpus.join("dvd/VTS_01_0.IFO");
+        std::fs::write(&palette, b"palette").unwrap();
+        let arguments = resolve("vobsub-ifo-palette-vts").unwrap();
+        assert_eq!(
+            arguments[1],
+            format!("opt:ifo_palette={}", palette.display()).as_str()
+        );
+
+        let missing = corpus.join("dvd/VTS_99_0.IFO");
+        let arguments = resolve("vobsub-ifo-palette-missing").unwrap();
+        assert_eq!(
+            arguments[1],
+            format!("opt:ifo_palette={}", missing.display()).as_str()
+        );
+        std::fs::write(&missing, b"unexpected palette").unwrap();
+        assert_eq!(
+            resolve("vobsub-ifo-palette-missing").unwrap_err(),
+            "IFO palette input has no pin: dvd/VTS_99_0.IFO"
+        );
+        std::fs::remove_dir_all(scratch).unwrap();
     }
 
     #[test]
