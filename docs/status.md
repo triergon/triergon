@@ -93,17 +93,20 @@ pairs of 50 operations and 30 memory pairs under the kernel RSS proof.
 All five progressive functional inputs pass their ten outcomes. Each HLS
 video unit passes through `contiguous_feed` inside the measured operation.
 
-The Matroska audio clock and raw Annex B results use the gate build
-at `b3579f729494a37a4dbebe03c475f7b38484046e` on a c8g.2xlarge pinned to CPU 1,
+The Matroska audio clock row uses the gate build at
+`b81e3b378d2b2102a7c46545ec89b9b6c345dfa1` on a c8g.large pinned to CPU 1.
+The report uses 60 timing pairs of 50 operations and 30 memory pairs per case.
+All ten cases pass runtime, peak heap and total RSS.
+
+The raw Annex B results and the earlier Matroska audio clock comparison use the gate
+build at `b3579f729494a37a4dbebe03c475f7b38484046e` on a c8g.2xlarge pinned to CPU 1,
 with 30 timing pairs and 30 memory pairs under the kernel RSS proof.
 
-Four Matroska audio clock cases exceed the runtime ceiling.
-`laced-fractional-cadence` reaches 1.4510, `laced-unknown-duration` 1.4089,
-`two-laced-before-first-known-pts` 1.3968 and `damaged-lace-before-valid-anchor`
-1.3878.
-
-Matroska audio clock peak heap reaches 1.822 on `no-absolute-anchor` and 1.321 on
-`dolby-bad-first`. Total RSS ranges from 1.038 to 1.043 across all ten cases.
+In the earlier audio clock comparison, `laced-fractional-cadence` reached 1.4510,
+`laced-unknown-duration` 1.4089, `two-laced-before-first-known-pts` 1.3968 and
+`damaged-lace-before-valid-anchor` 1.3878. Peak heap reached 1.822 on
+`no-absolute-anchor` and 1.321 on `dolby-bad-first`. Total RSS ranged from 1.038 to
+1.043 across all ten cases.
 
 The subtitle rows use gate builds on a c8g.xlarge pinned to CPU 1, with 30 timing pairs
 of 50 operations and 30 memory pairs under the kernel RSS proof; every row is a graded
@@ -248,7 +251,7 @@ against libass for AArch64 where it runs out of memory.
 | MP4 forward and range playback, earlier comparison | `8bbf6eab798f3d58f62dce14915fb30acd14488e` | `a3e74e11216d7769b7b167ac57cb17c043e6d92b4feb39a8422879c27493eebe` |
 | MP4 forward and range, encoded edits | `2a1b26347fee56f5506db63efbc8e3e3c66ad388` | `fe95646449aa52a4a121aeecb3346308b270923aee9b0751b2125501abf36004` |
 | Matroska audio clocks | `b81e3b378d2b2102a7c46545ec89b9b6c345dfa1` | `a86113187261d0a8b1f568b4d8c0149113520274130ca2aa659fa73af330f040` |
-| Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
+| Earlier Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
 | Subtitles: PGS, closed captions, teletext | `956c42961f4a27d88f96d5800d59ff1eeb088018` | `61b52a272e82eeee913c9c4b4d6331caea3283a99ebad4a897aba65dab3c891d` |
 | Subtitles: PGS memory | `03f3efd3a0fde0d558c68f5408c521d632802fb7` | `6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d` |
 | Subtitles: DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
