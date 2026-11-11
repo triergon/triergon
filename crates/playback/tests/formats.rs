@@ -3595,6 +3595,19 @@ fn encoded_range_open(
 
 const RTP_HINTS: &[u8] = include_bytes!("fixtures/mp4/avc-aac-rtp-hints.mp4");
 
+fn rtp_hints_with_wide_clock() -> Vec<u8> {
+    let mut bytes = RTP_HINTS.to_vec();
+    let (at, _) = bytes
+        .windows(4)
+        .enumerate()
+        .filter(|(_, word)| *word == b"mdhd")
+        .nth(1)
+        .unwrap();
+    assert_eq!(bytes[at + 4], 0); // version 0
+    bytes[at + 16..at + 20].copy_from_slice(&(1_u32 << 31).to_be_bytes());
+    bytes
+}
+
 #[test]
 fn range_media_projection_keeps_packets_and_both_seek_paths() {
     let (opened, plans) = encoded_range_open(RTP_HINTS);
@@ -3671,8 +3684,26 @@ fn range_media_projection_keeps_packets_and_both_seek_paths() {
         );
         std::iter::from_fn(|| next_range_output(player)).collect::<Vec<_>>()
     };
+    let require_source_track_limit = |player: &Mp4RangePlayer<'_, ByteSource>| {
+        let mut limits = triergon_isobmff::compat::mov::seek::SeekLimits::default();
+        limits.index.packets.max_tracks = 2;
+        assert!(matches!(
+            player.prepare_seek(Mp4NativeSeekRequest {
+                video: 1,
+                timestamp: 26_880,
+                limits,
+            }),
+            Err(C::Limit {
+                requested: 4,
+                maximum: 2,
+            })
+        ));
+    };
+    require_source_track_limit(&player);
     let with_checkpoints = seek(&mut player);
+    require_source_track_limit(&player);
     assert!(player.discard_seek_checkpoints());
+    require_source_track_limit(&player);
     let without_checkpoints = seek(&mut player);
     let with_checkpoints = mp4_packets(&with_checkpoints);
     let without_checkpoints = mp4_packets(&without_checkpoints);
@@ -3688,6 +3719,43 @@ fn range_media_projection_keeps_packets_and_both_seek_paths() {
         assert_eq!(left.encoded_skip_samples, right.encoded_skip_samples);
         assert_eq!(left.source.payload.as_ref(), right.source.payload.as_ref());
     }
+}
+
+#[test]
+fn range_projection_does_not_admit_a_demux_clock_for_data_tracks() {
+    let raw = rtp_hints_with_wide_clock();
+    let (opened, plans) = encoded_range_open(&raw);
+    assert_eq!(opened.movie.tracks()[1].header().handler, *b"hint");
+    assert_eq!(opened.movie.tracks()[1].header().timescale, 1_u32 << 31);
+    let mut range =
+        Mp4RangeOpen::for_media(&opened.movie, Some(&plans), PlanLimits::default()).unwrap();
+    assert!((0..100_000).any(|_| range.poll(&mut WorkBudget::new(3), &off()).unwrap()));
+    let mut player = range
+        .finish(
+            opened.input,
+            opened.source,
+            1 << 20,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+    assert!(player.discard_seek_checkpoints());
+    let mut seek = player
+        .prepare_seek(Mp4NativeSeekRequest {
+            video: 1,
+            timestamp: 26_880,
+            limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+        })
+        .unwrap();
+    assert!((0..100_000).any(|_| seek.poll(&mut WorkBudget::new(3), &off()).unwrap()));
+    let mut command = seek.finish().unwrap();
+    assert_eq!(command.landing().selected.occurrence.track_id, 1);
+    assert_eq!(command.landing().selected.timestamp, 25_600);
+    assert!(
+        player
+            .apply_seek(&mut command, &mut WorkBudget::new(1), &off())
+            .unwrap()
+    );
 }
 
 #[test]
@@ -3707,7 +3775,7 @@ fn range_media_projection_checks_excluded_sample_extents() {
             BoxStep::End => panic!("hint track has no chunk offsets"),
         }
     };
-    let mut invalid = RTP_HINTS.to_vec();
+    let mut invalid = rtp_hints_with_wide_clock();
     invalid[offset..offset + 4].copy_from_slice(&u32::MAX.to_be_bytes());
     let (opened, plans) = encoded_range_open(&invalid);
     let mut projected =

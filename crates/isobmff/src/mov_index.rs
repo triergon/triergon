@@ -883,11 +883,13 @@ impl<'a> GlobalSeekJob<'a> {
             if tracks[..i].iter().any(|t| t.track_id == track.track_id) {
                 return Err(Error::Invalid("duplicate native seek track"));
             }
-            let track_base = MediaClock::from_source(track.media_base)?.demux_base;
-            if matches!(mode, GlobalSeekMode::SameBase) && track_base != base {
-                return Err(Error::Unsupported(
-                    "native global seek unequal timebase rescale",
-                ));
+            if projection.includes(i) {
+                let track_base = MediaClock::from_source(track.media_base)?.demux_base;
+                if matches!(mode, GlobalSeekMode::SameBase) && track_base != base {
+                    return Err(Error::Unsupported(
+                        "native global seek unequal timebase rescale",
+                    ));
+                }
             }
             owned.try_push(*track).map_err(|e| e.error)?;
             anchors
@@ -1106,7 +1108,16 @@ impl<'a> GlobalSeekPlan<'a> {
         self.anchors.as_slice()
     }
     pub fn cursor(&self) -> Result<PacketCursor<'a>> {
-        let mut cursor = if let Some(plans) = self.encoded_edits {
+        let cursor = if !self.projection.is_all() {
+            PacketCursor::new_projected(
+                &self.pool,
+                self.tracks.as_slice(),
+                self.media,
+                self.limits.index.packets,
+                self.encoded_edits,
+                |index| self.projection.includes(index),
+            )?
+        } else if let Some(plans) = self.encoded_edits {
             PacketCursor::new_encoded_regular(
                 &self.pool,
                 self.tracks.as_slice(),
@@ -1124,9 +1135,6 @@ impl<'a> GlobalSeekPlan<'a> {
                 self.profile,
             )?
         };
-        if !self.projection.is_all() {
-            cursor.set_projection(self.projection)?;
-        }
         cursor.with_resume_points(self.anchors.as_slice(), self.limits.index.packets)
     }
 }

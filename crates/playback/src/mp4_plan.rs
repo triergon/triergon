@@ -550,9 +550,21 @@ impl<'a> Mp4IndexJob<'a> {
                 timing_policy,
             )?)
         };
-        let mut native = if view == Mp4View::PinnedMov9NoParseNoFillin {
+        let native = if view == Mp4View::PinnedMov9NoParseNoFillin {
             let native_limits = limits.native_packet_limits();
-            Some(if let Some(plans) = encoded_edits {
+            let media_tracks_only = range_duration
+                .as_ref()
+                .is_some_and(|range| range.media_tracks_only);
+            Some(if media_tracks_only {
+                PacketCursor::new_projected(
+                    b,
+                    native.as_slice(),
+                    movie.media(),
+                    native_limits,
+                    encoded_edits,
+                    |index| include_media_track(movie, index),
+                )?
+            } else if let Some(plans) = encoded_edits {
                 PacketCursor::new_encoded_regular(
                     b,
                     native.as_slice(),
@@ -599,15 +611,6 @@ impl<'a> Mp4IndexJob<'a> {
         } else {
             None
         };
-        if range_duration
-            .as_ref()
-            .is_some_and(|range| range.media_tracks_only)
-        {
-            native
-                .as_mut()
-                .ok_or(Error::Invalid("missing range playback cursor"))?
-                .project_tracks(|ordinal| include_media_track(movie, ordinal))?;
-        }
         let encoded_edits = if let Some(plans) = encoded_edits {
             let mut retained = BudgetVec::new(b);
             retained.try_reserve_exact(plans.len())?;
