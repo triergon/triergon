@@ -417,7 +417,8 @@ The playback rows (MP4 forward, TS program, Matroska audio clocks, raw Annex B) 
 and measured at `afb9049c` and graded together by `cargo xtask grade`; the other memory
 results are kernel-bound collections at `afb9049c` beside the runtime of their earlier
 revisions. `afb9049c` differs from `365affd2` only in the kernel bound's 32-bit entry
-point and its documentation.
+point and its documentation. The ISO BMFF, MP4 range and Matroska lace changes merged
+after it are not measured on ARMv7.
 
 The [measured revisions](#measured-revisions) table names the revision and raw samples
 behind each ARMv7 row.
