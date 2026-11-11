@@ -61,6 +61,9 @@ sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
 fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
 also runs with the optional format and marker atoms replaced by free boxes.
 `avc-aac-quicktime-reordered.mov` adds 44.1 kHz AAC and AVC with B pictures.
+`avc-aac-quicktime-fragmented.mov` exercises open and seek with empty
+initialization sample tables and a version 1 sound description. It remuxes the
+synthetic `fragmented-avc-aac.mp4` fixture under the same MIT or Apache-2.0 license.
 
 ## Supported
 
