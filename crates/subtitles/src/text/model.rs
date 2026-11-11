@@ -18,11 +18,6 @@ pub enum Encoding {
     Utf16Le,
     Tx3gInBand,
     Opaque,
-    /// Explicit source encodings; never selected from a language or guess.
-    Ascii,
-    Latin1,
-    Windows1251,
-    Windows1252,
     /// Explicit version-pinned multibyte decoding; labels remain caller-owned.
     Multibyte(super::charset::multibyte::MultibyteCharset),
 }

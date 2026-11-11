@@ -22,9 +22,8 @@ by `compat::document`, as FFmpeg's demuxers read them.
 
 `Encoding::Utf8` rejects overlong forms, surrogates and values above U+10FFFF.
 `Utf16Bom` requires a BOM; `Utf16Be`/`Utf16Le` treat a leading FEFF as content.
-`Utf8Packet` and `MatroskaWebVtt` require UTF-8. `Ascii`, `Latin1`,
-`Windows1251`, `Windows1252` and `Multibyte(_)` are the encodings of
-`charset::CharsetJob`.
+`Utf8Packet` and `MatroskaWebVtt` require UTF-8. `Multibyte(_)` decodes an
+explicit multibyte profile.
 
 `charset::CharsetJob` converts a whole byte stream with an explicit `Charset`.
 It validates and counts the input first, then writes into exactly sized storage.

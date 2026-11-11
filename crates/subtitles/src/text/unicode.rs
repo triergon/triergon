@@ -144,22 +144,6 @@ impl Cursor {
             let byte_at = self.at;
             self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
             match self.encoding {
-                Encoding::Ascii
-                | Encoding::Latin1
-                | Encoding::Windows1251
-                | Encoding::Windows1252 => {
-                    let charset = match self.encoding {
-                        Encoding::Ascii => super::charset::Charset::Ascii,
-                        Encoding::Latin1 => super::charset::Charset::Latin1,
-                        Encoding::Windows1251 => super::charset::Charset::Windows1251,
-                        Encoding::Windows1252 => super::charset::Charset::Windows1252,
-                        _ => unreachable!(),
-                    };
-                    self.scalar_start = byte_at;
-                    return self
-                        .scalar(u32::from(charset.scalar(byte)?))
-                        .map(Poll::Ready);
-                }
                 Encoding::Utf8 => {
                     if self.continuation != 0 {
                         if byte & 0xc0 != 0x80 {
@@ -257,14 +241,7 @@ impl Probe {
         cancel: &AtomicBool,
     ) -> Result<Poll<(Encoding, Range<usize>)>> {
         match self.requested {
-            Encoding::Utf8
-            | Encoding::Utf16Be
-            | Encoding::Utf16Le
-            | Encoding::Ascii
-            | Encoding::Latin1
-            | Encoding::Windows1251
-            | Encoding::Windows1252
-            | Encoding::Multibyte(_) => {
+            Encoding::Utf8 | Encoding::Utf16Be | Encoding::Utf16Le | Encoding::Multibyte(_) => {
                 return Ok(Poll::Ready((self.requested, self.range.clone())));
             }
             Encoding::Opaque => return Err(Error::Unsupported("declared charset conversion")),
