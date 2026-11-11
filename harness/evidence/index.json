@@ -19612,11 +19612,38 @@
   {
    "name": "mp4-fragment-subtitles-current-main-workers",
    "path": "mp4-fragment-subtitles-current-main-workers",
-   "retention": "90 days",
+   "retention": "retained",
    "reason": "Compare MP4 range workers after the caption changes",
-   "key": "qualification/mp4-fragment-subtitles-current-main-workers/5baf97ff731c7af0956f82da9a3085acc2dccb81fb19bd65e40f929cdc5e5875.tar.gz",
+   "key": "evidence/mp4-fragment-subtitles-current-main-workers/5baf97ff731c7af0956f82da9a3085acc2dccb81fb19bd65e40f929cdc5e5875.tar.gz",
    "sha256": "5baf97ff731c7af0956f82da9a3085acc2dccb81fb19bd65e40f929cdc5e5875",
    "bytes": 25576885
+  },
+  {
+   "name": "mp4-range-edit-rewind-1e304436-aarch64",
+   "path": "mp4-range-edit-rewind-1e304436-aarch64",
+   "retention": "90 days",
+   "reason": "",
+   "key": "qualification/mp4-range-edit-rewind-1e304436-aarch64/e63e70df25ddeb9f25499fdbeb8a62e7f70ed7658c72c67e6b867541b66406ab.tar.gz",
+   "sha256": "e63e70df25ddeb9f25499fdbeb8a62e7f70ed7658c72c67e6b867541b66406ab",
+   "bytes": 346993021
+  },
+  {
+   "name": "mp4-range-subtitle-fuzz-766961a4",
+   "path": "mp4-range-subtitle-fuzz-766961a4",
+   "retention": "retained",
+   "reason": "MP4 range fuzz comparisons across the cursor allocation changes",
+   "key": "evidence/mp4-range-subtitle-fuzz-766961a4/148654908af0dd8b7ca32d19e0d3986888745fc84c93574a8511aed23d3fbdc9.tar.zst",
+   "sha256": "148654908af0dd8b7ca32d19e0d3986888745fc84c93574a8511aed23d3fbdc9",
+   "bytes": 15542961
+  },
+  {
+   "name": "mp4-range-edited-cursors-766961a4-aarch64",
+   "path": "mp4-range-edited-cursors-766961a4-aarch64",
+   "retention": "retained",
+   "reason": "MP4 range playback with fragmented subtitles and budgeted edit cursors",
+   "key": "evidence/mp4-range-edited-cursors-766961a4-aarch64/7b6e9c9b7f078554882d60869a07068fcec65ce1e4271f69db3f15e9de147bcf.tar.zst",
+   "sha256": "7b6e9c9b7f078554882d60869a07068fcec65ce1e4271f69db3f15e9de147bcf",
+   "bytes": 30959392
   }
  ]
 }
