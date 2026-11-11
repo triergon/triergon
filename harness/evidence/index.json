@@ -19367,6 +19367,16 @@
    "key": "evidence/mp4-range-quicktime-and-projection/b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2.tar.gz",
    "sha256": "b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2",
    "bytes": 63889181
+  },
+  {
+   "name": "mp4-range-quicktime",
+   "path": "mp4-range-quicktime",
+   "retention": "retained",
+   "reason": "QuickTime AAC range playback after reusing the preloaded input",
+   "key": "evidence/mp4-range-quicktime/018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1.tar.gz",
+   "sha256": "018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1",
+   "bytes": 45670319,
+   "source_revision": "5fd3f0244849f11685fdf42a75c4c71847001bf9"
   }
  ]
 }
