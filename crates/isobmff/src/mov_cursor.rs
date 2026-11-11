@@ -396,6 +396,53 @@ enum Phase {
     End,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct TrackProjection(u64);
+
+impl TrackProjection {
+    pub(crate) fn new(count: usize, mut include: impl FnMut(usize) -> bool) -> Result<Self> {
+        if count > 64 {
+            return Err(Error::Limit {
+                requested: count,
+                maximum: 64,
+            });
+        }
+        let mut excluded = 0;
+        for index in 0..count {
+            if !include(index) {
+                excluded |= 1 << index;
+            }
+        }
+        Ok(Self(excluded))
+    }
+
+    pub(crate) fn is_all(self) -> bool {
+        self.0 == 0
+    }
+
+    pub(crate) fn includes(self, index: usize) -> bool {
+        self.0 & (1 << index) == 0
+    }
+
+    pub(crate) fn len(self, count: usize) -> usize {
+        count - self.0.count_ones() as usize
+    }
+
+    pub(crate) fn retain<T>(self, entries: &mut BudgetVec<T>) {
+        if self.is_all() {
+            return;
+        }
+        let mut kept = 0;
+        for index in 0..entries.len() {
+            if self.includes(index) {
+                entries.as_mut_slice().swap(kept, index);
+                kept += 1;
+            }
+        }
+        entries.truncate(kept);
+    }
+}
+
 /// One charged slot/head per track (including the existing edit cursor's bounded
 /// lookahead), plus one pending validation sample and one ready occurrence.
 /// Polling is cancellable/work-bounded, with sticky failures.
@@ -423,6 +470,7 @@ pub struct PacketCursor<'a> {
     terminal: Option<crate::TerminalMdat>,
     forward_regular: Option<crate::ForwardRegularMdat>,
     check_projections: bool,
+    projection: TrackProjection,
     recording_seek_checkpoints: bool,
     seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
 }
@@ -533,6 +581,7 @@ impl<'a> PacketCursor<'a> {
             terminal: None,
             forward_regular: None,
             check_projections: false,
+            projection: TrackProjection::default(),
             recording_seek_checkpoints: false,
             seek_checkpoints: None,
         }
@@ -692,6 +741,34 @@ impl<'a> PacketCursor<'a> {
         self.validated
     }
 
+    /// Choose the track ordinals to project, in the order supplied at construction.
+    /// All declared sample extents are checked before the selected tracks enter
+    /// the edit and packet projection. Call before polling or enabling seek checkpoints.
+    pub fn project_tracks(&mut self, include: impl FnMut(usize) -> bool) -> Result<()> {
+        self.set_projection(TrackProjection::new(self.slots.len(), include)?)
+    }
+
+    pub(crate) fn set_projection(&mut self, projection: TrackProjection) -> Result<()> {
+        if !self.complete_source
+            || self.front_source
+            || !matches!(self.phase, Phase::Media)
+            || self.at != 0
+            || self.failed.is_some()
+            || self.recording_seek_checkpoints
+            || self
+                .slots
+                .as_slice()
+                .iter()
+                .any(|slot| slot.resume_remaining != 0)
+        {
+            return Err(Error::Invalid(
+                "track projection requires a fresh complete cursor",
+            ));
+        }
+        self.projection = projection;
+        Ok(())
+    }
+
     /// Check source ranges and packet projections before playback without
     /// merging the track heads. Poll to End, then rewind for packet delivery.
     /// Use a complete indexed source from its beginning.
@@ -737,7 +814,8 @@ impl<'a> PacketCursor<'a> {
     }
 
     fn set_resume_points(&mut self, starts: &[ResumePoint], limits: PacketLimits) -> Result<u64> {
-        if starts.len() != self.slots.len() {
+        let projection = self.projection;
+        if starts.len() != projection.len(self.slots.len()) {
             return Err(Error::Invalid("native resume track coverage"));
         }
         if self.recording_seek_checkpoints && starts.iter().any(|start| start.occurrence != 0) {
@@ -756,7 +834,11 @@ impl<'a> PacketCursor<'a> {
                 .slots
                 .as_mut_slice()
                 .iter_mut()
-                .find(|s| s.track.track_id == start.track_id)
+                .enumerate()
+                .find_map(|(index, slot)| {
+                    (projection.includes(index) && slot.track.track_id == start.track_id)
+                        .then_some(slot)
+                })
                 .ok_or(Error::Invalid("unknown native resume track"))?;
             slot.resume_remaining = start.occurrence;
         }
@@ -1028,6 +1110,14 @@ impl<'a> PacketCursor<'a> {
                 }
                 Phase::Clock => {
                     if self.at == self.slots.len() {
+                        let projection = std::mem::take(&mut self.projection);
+                        if !projection.is_all() {
+                            // The clock pass charged one unit for visiting each slot.
+                            projection.retain(&mut self.slots);
+                            if self.recording_seek_checkpoints {
+                                self.initialize_range_seek_checkpoints();
+                            }
+                        }
                         self.at = 0;
                         self.phase = Phase::Initialize;
                         continue;
@@ -1036,11 +1126,12 @@ impl<'a> PacketCursor<'a> {
                         return Ok(CursorStatus::Yield);
                     }
                     let slot = &mut self.slots.as_mut_slice()[self.at];
-                    if let Some(runs) = slot
-                        .track
-                        .table
-                        .composition_runs()
-                        .filter(|runs| self.row < runs.count.saturating_sub(2))
+                    if self.projection.includes(self.at)
+                        && let Some(runs) = slot
+                            .track
+                            .table
+                            .composition_runs()
+                            .filter(|runs| self.row < runs.count.saturating_sub(2))
                     {
                         // Explicit reference demux rule, regardless of the
                         // source ctts version. Source runs are never changed.

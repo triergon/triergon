@@ -8,7 +8,7 @@ use crate::{
     input::Source,
     mp4_native_replay::NativeMp4Replay,
     mp4_open::{MetadataReadScope, Movie},
-    mp4_plan::{Mp4View, PreparedMp4},
+    mp4_plan::{Mp4View, PreparedMp4, include_media_track},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Time, WorkBudget};
@@ -199,6 +199,7 @@ impl<'a> Mp4NativeSeekJob<'a> {
             movie,
             plan.encoded_edits.as_ref().map(BudgetVec::as_slice),
             request,
+            false,
         )?;
         Ok(Self {
             plan,
@@ -223,6 +224,7 @@ pub(super) fn native_global_seek<'a>(
     movie: &'a Movie,
     edits: Option<&'a [Option<EncodedEditPlan>]>,
     request: Mp4NativeSeekRequest,
+    media_tracks_only: bool,
 ) -> Result<GlobalSeekJob<'a>> {
     let tracks = movie.tracks();
     let maximum = request.limits.index.packets.max_tracks.min(64);
@@ -246,7 +248,17 @@ pub(super) fn native_global_seek<'a>(
             })
             .map_err(|error| error.error)?;
     }
-    Ok(if let Some(plans) = edits {
+    Ok(if media_tracks_only {
+        GlobalSeekJob::new_projected(
+            movie.pool(),
+            native.as_slice(),
+            movie.media(),
+            (request.video, request.timestamp),
+            request.limits,
+            edits,
+            |ordinal| include_media_track(movie, ordinal),
+        )?
+    } else if let Some(plans) = edits {
         GlobalSeekJob::new_encoded_regular_rescaled(
             movie.pool(),
             native.as_slice(),

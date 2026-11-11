@@ -13,6 +13,7 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
+use triergon_core::container::MediaKind;
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Reservation, Rounding, Time, TimeBase, WorkBudget,
 };
@@ -320,6 +321,11 @@ pub(crate) const BACKWARD_LAYOUT_REFUSAL: Error = Error::Unsupported(BACKWARD_LA
 struct RangeDuration {
     micros: i64,
     scan: bool,
+    media_tracks_only: bool,
+}
+
+pub(crate) fn include_media_track(movie: &Movie, ordinal: usize) -> bool {
+    iso::media_kind(&movie.tracks()[ordinal].header().handler) != MediaKind::Data
 }
 
 impl<'a> Mp4IndexJob<'a> {
@@ -375,6 +381,7 @@ impl<'a> Mp4IndexJob<'a> {
         movie: &'a Movie,
         plans: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         limits: PlanLimits,
+        media_tracks_only: bool,
     ) -> Result<Self> {
         if movie.native_recovery()
             || movie.read_scope() != crate::mp4_open::MetadataReadScope::CompleteEntity
@@ -401,6 +408,7 @@ impl<'a> Mp4IndexJob<'a> {
             Some(RangeDuration {
                 micros,
                 scan: micros == 0,
+                media_tracks_only,
             }),
         )
     }
@@ -542,7 +550,7 @@ impl<'a> Mp4IndexJob<'a> {
                 timing_policy,
             )?)
         };
-        let native = if view == Mp4View::PinnedMov9NoParseNoFillin {
+        let mut native = if view == Mp4View::PinnedMov9NoParseNoFillin {
             let native_limits = limits.native_packet_limits();
             Some(if let Some(plans) = encoded_edits {
                 PacketCursor::new_encoded_regular(
@@ -591,6 +599,15 @@ impl<'a> Mp4IndexJob<'a> {
         } else {
             None
         };
+        if range_duration
+            .as_ref()
+            .is_some_and(|range| range.media_tracks_only)
+        {
+            native
+                .as_mut()
+                .ok_or(Error::Invalid("missing range playback cursor"))?
+                .project_tracks(|ordinal| include_media_track(movie, ordinal))?;
+        }
         let encoded_edits = if let Some(plans) = encoded_edits {
             let mut retained = BudgetVec::new(b);
             retained.try_reserve_exact(plans.len())?;
