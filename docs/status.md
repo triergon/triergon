@@ -35,7 +35,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8780 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤0.984 (317/317 lower) | FATE coverage |
 | Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 229/229 cases (`subtitle-dvb`: TS and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8593 (229/229 pass) | heap ≤0.991, total RSS ≤0.811 (229/229 lower) | FATE coverage |
 | Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 229 cases: `subtitle-dvd` 224/224 on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), and `subtitle-dvd-host`'s 5, pinned per target, 5/5 on ARMv7 and 1/5 on AArch64 | 0.8595 (225/225 pass) | heap ≤0.959, total RSS ≤0.869 (225/225 lower) | FATE coverage; on AArch64, `subtitle-dvd-host`'s 4 open cases, target-dependent by design: FFmpeg there reads numbers of a VobSub configuration and of the `palette` option beyond 32 bits with 64, and the decoder follows FFmpeg on 32-bit ARM |
-| Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 201/205 cases (`subtitle-cc`), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); the other 4 are the open `hevc-eos-ts` cases | 0.9806 (201/201 pass) | heap ≤0.123, total RSS ≤0.966 (201/201 lower) | FATE coverage; HEVC picture output at a new sequence (open case `hevc-eos-ts`: no DPB output model, so `no_output_of_prior_pics` after an end of sequence is not applied) |
+| Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 201/205 cases (`subtitle-cc`), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); the other 4 are the open `hevc-eos-ts` cases | 0.5724 (201/201 pass) | heap ≤0.123, total RSS ≤0.967 (201/201 lower) | FATE coverage; HEVC picture output at a new sequence (open case `hevc-eos-ts`: no DPB output model, so `no_output_of_prior_pics` after an end of sequence is not applied) |
 | Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 70/70 cases (`subtitle-teletext`), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.4388 (70/70 pass) | heap ≤0.622, total RSS ≤0.662 (70/70 lower) | FATE coverage |
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 39/39 (`mp4-forward`), 566 packets, TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 0.9911 (39/39 pass), TS program 1.1621 (35/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤0.5590, total RSS ≤0.9975 (39/39 lower); TS program heap ≤0.1008, total RSS ≤0.9090 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower) | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0551 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths; AAC charges in-band reconfiguration when it appears, and a refused access unit leaves the decoder unchanged unless an earlier raw data block or Main-prediction element of it was decoded |
@@ -108,14 +108,14 @@ pairs of 50 operations and 30 memory pairs under the kernel RSS proof, graded by
 grade` against `ffmpeg-subtitles-plain-native`. Its workers are byte-identical to those of
 `8513398b85d27aa093b8212c202b25c32da859bf`, which the ARMv7 rows measure: the commit between
 changes only the memory runner, which since drops both workers' cached pages before every
-run. On a c6g.4xlarge (Graviton2), natively on AArch64 at `8513398b`, eight caption cases
-time above the ceiling: `mpeg2-a53-limit-m2v` 1.4481, `mpeg2-a53-limit-ts` 1.4479,
-`mpeg2-a53-limit-m2v-first` 1.4445, `mpeg2-a53-limit-ts-first` 1.4418,
-`mpeg2-a53-limit-ts-second` 1.4080, `mpeg2-a53-limit-m2v-second` 1.4041,
-`mpeg2-a53-limit-ts-realtime` 1.3904 and `mpeg2-a53-limit-m2v-realtime` 1.3887, where the
-c8g.xlarge gives them 0.937 to 0.985. On them the candidate executes 1.64 times the
-reference's instructions on AArch64 and 0.93 times on ARMv7, most of it in the caption
-receiver's loop over each construct of large `cc_data`; this is open. The earlier rows were
+run. The closed caption row uses the gate build at `9d048c58fb30c64777f7230eb67c7037a1e1bcf1`
+on a c8g.xlarge in the same way, where the caption receiver reads `cc_data` as three-byte
+constructs and resolves the field once per packet; on all 205 cases its workers' traces and
+folds are byte-identical to those of `d37da04f`. On the eight `mpeg2-a53-limit` cases, which
+carry large `cc_data`, it executes 0.66 to 0.68 times the reference's instructions on
+AArch64, where `d37da04f` executed 1.58 to 1.64 times, and times at 0.5525 to 0.5724 on the
+c8g.xlarge. On a c6g.4xlarge (Graviton2), natively on AArch64, the same eight cases time at
+0.6272 to 0.6485 in 30 pairs, where `8513398b` gave them 1.3887 to 1.4481. The earlier rows were
 measured at `956c42961f4a27d88f96d5800d59ff1eeb088018` (PGS, closed captions and teletext),
 `03f3efd3a0fde0d558c68f5408c521d632802fb7` (PGS memory),
 `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` (DVD) and
@@ -334,6 +334,7 @@ merge sort with its first run rounded up instead renders that case's 1080p frame
 | Earlier Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
 | Subtitles, Linux AArch64 | `f263491102d307997d40d40826a6193d8468e87e` | `9ed7263aabbc4f44910c5135fcf077419ea5b426e3a09a888e83f10153680c32` |
 | ARMv7: subtitles | `8513398b85d27aa093b8212c202b25c32da859bf` | `9ed7263aabbc4f44910c5135fcf077419ea5b426e3a09a888e83f10153680c32` |
+| Closed captions, Linux AArch64 and ARMv7 | `9d048c58fb30c64777f7230eb67c7037a1e1bcf1` | `2b78cc89c624e9296967d4f3ec8aa0e5713631d1d3228c63c8b96eb1c4e6cfd1` |
 | Earlier: subtitles, PGS, closed captions, teletext | `956c42961f4a27d88f96d5800d59ff1eeb088018` | `61b52a272e82eeee913c9c4b4d6331caea3283a99ebad4a897aba65dab3c891d` |
 | Earlier: subtitles, PGS memory | `03f3efd3a0fde0d558c68f5408c521d632802fb7` | `6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d` |
 | Earlier: subtitles, DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
@@ -398,8 +399,8 @@ NEON), with every FFmpeg reference built from the same pins in the same user spa
 (Graviton2, Neoverse N1 r3p1), kernel `7.0.0-1014-aws`, pinned to CPU 1, 30 pairs.
 Memory is measured under the kernel RSS bound, through its 32-bit entry point, wherever
 the table says "kernel-bound": total RSS there is the candidate's proven resident peak
-over the reference's observed peak. The capture, text subtitle and bitmap subtitle,
-caption and teletext rows use the standard bounds: their total RSS is the candidate's virtual peak over the reference's observed
+over the reference's observed peak. The capture, text subtitle and bitmap subtitle and
+teletext rows use the standard bounds: their total RSS is the candidate's virtual peak over the reference's observed
 resident peak, a ceiling that lies below the reference for capture but not for the
 subtitle rows; the ASS rendering row was measured that way
 at `5b3e03f0` too (total RSS ≤0.961), and is now kernel-bound.
@@ -428,7 +429,7 @@ at `5b3e03f0` too (total RSS ≤0.961), and is now kernel-bound.
 | Subtitles, PGS | 317/317 (`subtitle-pgs`) | 0.9630 (317/317 pass) | heap ≤0.968 (317/317 lower); total RSS not accepted (below): ceiling 1.084 to 1.588, observed peak lower in 7,818 of 9,510 pairs |
 | Subtitles, DVB | 229/229 (`subtitle-dvb`) | 0.7361 (229/229 pass) | heap ≤0.992 (229/229 lower); total RSS not accepted: ceiling 1.127 to 1.446, observed peak lower in 6,781 of 6,870 pairs |
 | Subtitles, DVD | 224/224 (`subtitle-dvd`) and 5/5 (`subtitle-dvd-host`, gated on this target) | 1.1142 (229/229 pass) | heap ≤0.966 (229/229 lower); total RSS not accepted: ceiling 0.942 to 1.533 (3/229 lower), observed peak lower in 6,512 of 6,870 pairs |
-| Closed captions | 201/205 (`subtitle-cc`; the 4 open `hevc-eos-ts` cases, as on AArch64) | 0.7880 (201/201 pass) | heap ≤0.127 (201/201 lower); total RSS not accepted: ceiling 0.890 to 1.530 (24/201 lower), observed peak lower in 5,851 of 6,030 pairs |
+| Closed captions | 201/205 (`subtitle-cc`; the 4 open `hevc-eos-ts` cases, as on AArch64) | 0.8127 (201/201 pass) | kernel-bound at `9d048c58`: heap ≤0.127 (201/201 lower); total RSS ≤1.128, 197/201 lower (below) |
 | Teletext | 70/70 (`subtitle-teletext`) | 0.5302 (70/70 pass) | heap ≤0.626 (70/70 lower); total RSS not accepted: ceiling 1.212 to 1.317, observed peak lower in 2,098 of 2,100 pairs |
 
 The text subtitle row was measured on a c6g.2xlarge, the same Neoverse N1 core, at
@@ -437,7 +438,19 @@ The text subtitle row was measured on a c6g.2xlarge, the same Neoverse N1 core, 
 The subtitle, caption and teletext rows are timed and measured against
 `ffmpeg-subtitles-plain-native`, the subtitles reference built without the wrappers that
 flag target-dependent results, so no flagging code runs in the reference's timed span or
-memory window. Their total RSS is not accepted on this target: under the standard bound,
+memory window. The closed caption row uses the gate build at
+`9d048c58fb30c64777f7230eb67c7037a1e1bcf1` on one c6g.4xlarge, from the same user space and
+package list, with memory under the kernel bound; its workers' traces and folds are
+byte-identical to those of `d37da04f` on all 205 cases. On the eight `mpeg2-a53-limit`
+cases it executes 0.45 times the reference's instructions, where `d37da04f` executed 0.92
+to 0.93 times, and times at 0.3227 to 0.3472. The four `mpeg2-a53-limit-ts` cases have a
+total RSS bound of 1.1222 to 1.1276, and their observed peaks are above the reference's in
+120 of their 120 pairs: the candidate starts the operation with about 365 more resident
+pages for the transport stream than for the same video as an elementary stream (about 1,265
+against 900), while the reference starts with about 60 more; during the operation the
+candidate grows by the same 22 to 23 pages for both. This is open.
+
+The other subtitle rows' total RSS is not accepted on this target: under the standard bound,
 the candidate's VmPeak against the reference's observed resident peak, every feature has
 cases above the reference. The observed resident peaks are lower than the reference's in
 most pairs, and the cause of the rest is open; these rows have not been measured under the

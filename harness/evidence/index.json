@@ -19562,6 +19562,16 @@
    "sha256": "9ed7263aabbc4f44910c5135fcf077419ea5b426e3a09a888e83f10153680c32",
    "bytes": 84259003,
    "source_revision": "f263491102d307997d40d40826a6193d8468e87e"
+  },
+  {
+   "name": "subtitles-cc-loop-9d048c58",
+   "path": "subtitles-cc-loop-9d048c58",
+   "retention": "retained",
+   "reason": "Closed caption status rows on Linux AArch64 (c8g.xlarge) and 32-bit ARMv7 (c6g.4xlarge in the armv7-userland user space with 13 packages added for libzvbi's build, A32 gate build) at 9d048c58, where the caption receiver reads cc_data constructs as three-byte arrays and resolves the field once per packet: subtitle-cc parity, 30 timing pairs and 30 memory pairs under the kernel RSS bound (through its 32-bit entry point on ARMv7) per case on CPU 1 against ffmpeg-subtitles-plain-native, the kernel proofs and review, the graded reports, the measured workers, environment and package lists. Also, on each target and natively on the c6g.4xlarge (Graviton2), the instructions of one timed operation per case for main (d37da04f), the branch and the reference, a byte comparison of both workers' sub-trace and sub-fold output on all 205 cases, and 30 Graviton2 timing pairs of the eight mpeg2-a53-limit cases; the scripts and a bundle of the measured source. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitles-cc-loop-9d048c58/2b78cc89c624e9296967d4f3ec8aa0e5713631d1d3228c63c8b96eb1c4e6cfd1.tar.zst",
+   "sha256": "2b78cc89c624e9296967d4f3ec8aa0e5713631d1d3228c63c8b96eb1c4e6cfd1",
+   "bytes": 37396079,
+   "source_revision": "9d048c58fb30c64777f7230eb67c7037a1e1bcf1"
   }
  ]
 }
