@@ -2,6 +2,7 @@
 //! Original Samples and clock/config/edit provenance travel with every entry.
 //! Compact streaming metadata passes; no per-sample array or payload cache.
 //! Regression guards were observed failing before implementation activation.
+use crate::mov_cursor::TrackProjection;
 use crate::{
     BuildStatus, ClockOrigin, CursorStatus, DemuxProfile, DemuxTrack, MediaClock,
     OpusRecoveryLanding, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
@@ -721,6 +722,7 @@ pub struct GlobalSeekJob<'a> {
     limits: SeekLimits,
     profile: DemuxProfile,
     encoded_edits: Option<EncodedEdits<'a>>,
+    projection: TrackProjection,
     reference_index: usize,
     reference_base: TimeBase,
     reference: Option<SeekLanding>,
@@ -741,6 +743,7 @@ pub struct GlobalSeekPlan<'a> {
     limits: SeekLimits,
     profile: DemuxProfile,
     encoded_edits: Option<EncodedEdits<'a>>,
+    projection: TrackProjection,
     reference: SeekLanding,
     anchors: BudgetVec<ResumePoint>,
 }
@@ -748,6 +751,10 @@ enum GlobalSeekMode<'a> {
     SameBase,
     Rescaled,
     Encoded(EncodedEdits<'a>),
+    Projected {
+        plans: Option<EncodedEdits<'a>>,
+        projection: TrackProjection,
+    },
 }
 impl<'a> GlobalSeekJob<'a> {
     pub fn new_complete_source(
@@ -812,6 +819,31 @@ impl<'a> GlobalSeekJob<'a> {
         )
     }
 
+    /// Plan a rescaled seek for the same track ordinals selected for playback.
+    /// Edit plans are indexed by the complete source track order.
+    pub fn new_projected(
+        pool: &Budget,
+        tracks: &[DemuxTrack<'a>],
+        media: &'a [Range<u64>],
+        reference: (u32, i64),
+        limits: SeekLimits,
+        plans: Option<EncodedEdits<'a>>,
+        include: impl FnMut(usize) -> bool,
+    ) -> Result<Self> {
+        Self::build(
+            pool,
+            tracks,
+            media,
+            reference,
+            limits,
+            DemuxProfile::NoParseNoFillin,
+            GlobalSeekMode::Projected {
+                plans,
+                projection: TrackProjection::new(tracks.len(), include)?,
+            },
+        )
+    }
+
     fn build(
         pool: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -822,13 +854,14 @@ impl<'a> GlobalSeekJob<'a> {
         mode: GlobalSeekMode<'a>,
     ) -> Result<Self> {
         let (track_id, timestamp) = request;
-        let encoded_edits = match mode {
-            GlobalSeekMode::Encoded(plans) if plans.len() == tracks.len() => Some(plans),
-            GlobalSeekMode::Encoded(_) => {
-                return Err(Error::Invalid("encoded edit track coverage"));
-            }
-            _ => None,
+        let (encoded_edits, projection) = match mode {
+            GlobalSeekMode::Encoded(plans) => (Some(plans), TrackProjection::default()),
+            GlobalSeekMode::Projected { plans, projection } => (plans, projection),
+            _ => (None, TrackProjection::default()),
         };
+        if encoded_edits.is_some_and(|plans| plans.len() != tracks.len()) {
+            return Err(Error::Invalid("encoded edit track coverage"));
+        }
         let maximum = limits.index.packets.max_tracks.min(64);
         if tracks.len() > maximum {
             return Err(Error::Limit {
@@ -839,6 +872,7 @@ impl<'a> GlobalSeekJob<'a> {
         let reference_index = tracks
             .iter()
             .position(|t| t.track_id == track_id)
+            .filter(|&at| projection.includes(at))
             .ok_or(Error::Invalid("native seek reference track absent"))?;
         let base = MediaClock::from_source(tracks[reference_index].media_base)?.demux_base;
         let mut owned = BudgetVec::new(pool);
@@ -849,11 +883,13 @@ impl<'a> GlobalSeekJob<'a> {
             if tracks[..i].iter().any(|t| t.track_id == track.track_id) {
                 return Err(Error::Invalid("duplicate native seek track"));
             }
-            let track_base = MediaClock::from_source(track.media_base)?.demux_base;
-            if matches!(mode, GlobalSeekMode::SameBase) && track_base != base {
-                return Err(Error::Unsupported(
-                    "native global seek unequal timebase rescale",
-                ));
+            if projection.includes(i) {
+                let track_base = MediaClock::from_source(track.media_base)?.demux_base;
+                if matches!(mode, GlobalSeekMode::SameBase) && track_base != base {
+                    return Err(Error::Unsupported(
+                        "native global seek unequal timebase rescale",
+                    ));
+                }
             }
             owned.try_push(*track).map_err(|e| e.error)?;
             anchors
@@ -870,6 +906,7 @@ impl<'a> GlobalSeekJob<'a> {
             limits,
             profile,
             encoded_edits,
+            projection,
             reference_index,
             reference_base: base,
             reference: None,
@@ -911,7 +948,7 @@ impl<'a> GlobalSeekJob<'a> {
             .as_slice()
             .iter()
             .position(|track| track.track_id == track_id)
-            .filter(|&at| at != self.reference_index)
+            .filter(|&at| at != self.reference_index && self.projection.includes(at))
             .ok_or(Error::Invalid("missing secondary Opus track"))?;
         self.opus_edit(at)?.opus_roll_scope()?;
         self.opus_track = Some(at);
@@ -1008,7 +1045,7 @@ impl<'a> GlobalSeekJob<'a> {
                 self.ready = true;
                 return Ok(BuildStatus::Ready);
             }
-            if self.at == self.reference_index {
+            if self.at == self.reference_index || !self.projection.includes(self.at) {
                 self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
                 continue;
             }
@@ -1040,13 +1077,14 @@ impl<'a> GlobalSeekJob<'a> {
             self.child = Some(SeekJob::build(self.track_context(self.at), timestamp)?);
         }
     }
-    pub fn finish(self) -> Result<GlobalSeekPlan<'a>> {
+    pub fn finish(mut self) -> Result<GlobalSeekPlan<'a>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
         if !self.ready {
             return Err(Error::Invalid("native global seek plan not ready"));
         }
+        self.projection.retain(&mut self.anchors);
         Ok(GlobalSeekPlan {
             pool: self.pool,
             tracks: self.tracks,
@@ -1054,6 +1092,7 @@ impl<'a> GlobalSeekJob<'a> {
             limits: self.limits,
             profile: self.profile,
             encoded_edits: self.encoded_edits,
+            projection: self.projection,
             reference: self
                 .reference
                 .ok_or(Error::Invalid("native reference selection absent"))?,
@@ -1069,8 +1108,17 @@ impl<'a> GlobalSeekPlan<'a> {
         self.anchors.as_slice()
     }
     pub fn cursor(&self) -> Result<PacketCursor<'a>> {
-        if let Some(plans) = self.encoded_edits {
-            return PacketCursor::new_encoded_regular(
+        let cursor = if !self.projection.is_all() {
+            PacketCursor::new_projected(
+                &self.pool,
+                self.tracks.as_slice(),
+                self.media,
+                self.limits.index.packets,
+                self.encoded_edits,
+                |index| self.projection.includes(index),
+            )?
+        } else if let Some(plans) = self.encoded_edits {
+            PacketCursor::new_encoded_regular(
                 &self.pool,
                 self.tracks.as_slice(),
                 self.media,
@@ -1078,15 +1126,15 @@ impl<'a> GlobalSeekPlan<'a> {
                 plans,
                 crate::EncodedEditProfile,
             )?
-            .with_resume_points(self.anchors.as_slice(), self.limits.index.packets);
-        }
-        PacketCursor::new_complete_source_at(
-            &self.pool,
-            self.tracks.as_slice(),
-            self.media,
-            self.limits.index.packets,
-            self.profile,
-            self.anchors.as_slice(),
-        )
+        } else {
+            PacketCursor::new_complete_source(
+                &self.pool,
+                self.tracks.as_slice(),
+                self.media,
+                self.limits.index.packets,
+                self.profile,
+            )?
+        };
+        cursor.with_resume_points(self.anchors.as_slice(), self.limits.index.packets)
     }
 }

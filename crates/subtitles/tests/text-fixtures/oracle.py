@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent source-fact oracle over the original 72 authored inputs.
+"""Independent source-fact oracle over the 40 authored packet inputs.
 
 This code never imports author.py, Rust or a native media library. It checks the
 declared extraction profile, not CSS/ASS rendering or a complete WebVTT UA.
@@ -7,7 +7,6 @@ declared extraction profile, not CSS/ASS rendering or a complete WebVTT UA.
 import argparse
 import hashlib
 import json
-import re
 import struct
 from fractions import Fraction
 from pathlib import Path
@@ -24,58 +23,6 @@ def ratio(value):
     return None if value is None else [value.numerator, value.denominator]
 
 
-def time_value(value, comma):
-    separator = "," if comma else r"\."
-    hours = r"([0-9]{2,}):" if comma else r"(?:([0-9]{2,}):)?"
-    match = re.fullmatch(hours + r"([0-9]{2}):([0-9]{2})" + separator + r"([0-9]{3})", value)
-    if not match:
-        raise SourceError("Invalid")
-    hour, minute, second, millis = match.groups()
-    if int(minute) > 59 or int(second) > 59:
-        raise SourceError("Invalid")
-    return Fraction(((int(hour or "0") * 60 + int(minute)) * 60 + int(second)) * 1000 + int(millis), 1000)
-
-
-def source_lines(raw, encoding):
-    prefix = 0
-    if encoding == "Utf8":
-        codec = "utf-8"
-        if raw.startswith(b"\xef\xbb\xbf"):
-            prefix = 3
-    elif encoding == "Utf16Bom":
-        if raw.startswith(b"\xfe\xff"):
-            codec = "utf-16-be"
-        elif raw.startswith(b"\xff\xfe"):
-            codec = "utf-16-le"
-        else:
-            raise SourceError("Invalid")
-        prefix = 2
-    elif encoding in ("Utf16Be", "Utf16Le"):
-        codec = "utf-16-be" if encoding == "Utf16Be" else "utf-16-le"
-    else:
-        raise SourceError("Invalid")
-    value = raw[prefix:].decode(codec, errors="strict")
-    lines = []
-    offset = prefix
-    for match in re.finditer(r"[^\r\n]*(?:\r\n|\r|\n|$)", value):
-        line = match.group()
-        if not line:
-            continue
-        if line.endswith("\r\n"):
-            content = line[:-2]
-        elif line.endswith(("\r", "\n")):
-            content = line[:-1]
-        else:
-            content = line
-        end = offset + len(content.encode(codec))
-        if end - offset > 65536:
-            raise SourceError("Limit")
-        after = offset + len(line.encode(codec))
-        lines.append(dict(start=offset, end=end, after=after, value=content))
-        offset = after
-    return lines, codec
-
-
 def field(owner, start, end):
     return dict(owner=owner, range=[start, end])
 
@@ -85,70 +32,6 @@ def cue(raw_range, text_range, decoded, encoding, start, duration):
     return dict(kind="Cue", raw=raw_range, text=text_range, decoded=decoded,
                 encoding=encoding, start=ratio(start), end=ratio(end), duration=ratio(duration),
                 identifier=None, settings=None, comments=None, modifiers=[])
-
-
-def document(raw, item, output):
-    if item["format"] == "WebVtt" and item["encoding"] != "Utf8":
-        raise SourceError("Invalid")
-    lines, codec = source_lines(raw, item["encoding"])
-    effective = dict(**{"utf-8": "Utf8", "utf-16-be": "Utf16Be", "utf-16-le": "Utf16Le"})[codec]
-    at = 0
-    if item["format"] == "WebVtt":
-        if not lines or not re.fullmatch(r"WEBVTT(?:[ \t].*)?", lines[0]["value"]):
-            raise SourceError("Invalid")
-        output.append(dict(kind="Header", raw=[0, lines[0]["end"]]))
-        at = 1
-    while at < len(lines):
-        if not lines[at]["value"]:
-            at += 1
-            continue
-        first = lines[at]
-        begin = first["start"]
-        identifier = None
-        if item["format"] == "WebVtt" and (
-            first["value"] in ("STYLE", "REGION") or
-            re.match(r"NOTE(?:[ \t]|$)", first["value"])
-        ):
-            kind = "Style" if first["value"] == "STYLE" else "Region" if first["value"] == "REGION" else "Note"
-            while at < len(lines) and lines[at]["value"]:
-                at += 1
-            output.append(dict(kind=kind, raw=[begin, lines[at - 1]["end"]]))
-            continue
-        if item["format"] == "SubRip":
-            if not re.fullmatch(r"[0-9]+", first["value"]):
-                raise SourceError("Invalid")
-            identifier = field("Payload", first["start"], first["end"])
-            at += 1
-        elif "-->" not in first["value"]:
-            identifier = field("Payload", first["start"], first["end"])
-            at += 1
-        if at >= len(lines):
-            raise SourceError("Invalid")
-        timing = lines[at]
-        match = re.fullmatch(r"([^ \t]+)[ \t]+-->[ \t]+([^ \t]+)(?:[ \t]+(.*))?", timing["value"])
-        if not match:
-            raise SourceError("Invalid")
-        start = time_value(match.group(1), item["format"] == "SubRip")
-        end = time_value(match.group(2), item["format"] == "SubRip")
-        if end <= start:
-            raise SourceError("Invalid")
-        settings = None
-        if match.group(3) is not None:
-            if item["format"] == "SubRip":
-                raise SourceError("Invalid")
-            a = timing["start"] + len(timing["value"][:match.start(3)].encode(codec))
-            settings = field("Payload", a, timing["end"])
-        at += 1
-        text_start = timing["after"]
-        text_end = text_start
-        while at < len(lines) and lines[at]["value"]:
-            text_end = lines[at]["end"]
-            at += 1
-        event = cue([begin, text_end], [text_start, text_end],
-                    raw[text_start:text_end].decode(codec).encode(), effective,
-                    start, end - start)
-        event.update(identifier=identifier, settings=settings)
-        output.append(event)
 
 
 def packet_timing(item):
@@ -170,9 +53,6 @@ def operation(item):
     try:
         if len(raw) > (item["input_limit"] if item["input_limit"] is not None else 4 * 1024 * 1024):
             raise SourceError("Limit")
-        if item["format"] in ("SubRip", "WebVtt"):
-            document(raw, item, output)
-            return output, None
         start, duration = packet_timing(item)
         if item["format"] == "OpaqueAss":
             output.append(cue([0, len(raw)], [0, len(raw)], None, "Opaque", start, duration))

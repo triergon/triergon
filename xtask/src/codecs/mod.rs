@@ -2,6 +2,8 @@
 //! comparison, paired timing and memory, and output identities of the codec crates
 //! against the pinned FFmpeg decoders.
 
+mod aac_access_units;
+mod aac_sources;
 pub mod correctness;
 pub mod equivalence;
 pub mod fuzz;
@@ -14,8 +16,12 @@ use std::path::{Path, PathBuf};
 
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
+  aac-access-units --out DIR [--record]
+                 prepare the configured AAC-LC workloads and compare every native PCM plane
+  aac-sources --out DIR
+                 author the fixed-layout and indexed-rate AAC-LC sources
   manifest --out M.json LANE=DIR[,DIR...]...
-                 hash every vector of each lane (h264, hevc, ac3, eac3, aac, dts, flac,
+                 hash every vector of each lane (h264, hevc, ac3, eac3, aac, aac-mov, dts, flac,
                  mp3, mp2, mp1, vorbis, opus; reader-ogg, reader-flac, reader-mp3,
                  reader-aac, reader-ac3, reader-eac3)
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
@@ -119,6 +125,14 @@ pub fn default_jobs() -> usize {
 pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
     let (command, rest) = args.split_first().ok_or(USAGE)?;
     match command.as_str() {
+        "aac-access-units" => {
+            let a = Args::parse(rest, &["out"], &["record"])?;
+            aac_access_units::run(root, &a.path("out")?, a.get("record").is_some())?;
+        }
+        "aac-sources" => {
+            let a = Args::parse(rest, &["out"], &[])?;
+            aac_sources::run(root, &a.path("out")?)?;
+        }
         "manifest" => {
             let a = Args::parse(rest, &["out"], &[])?;
             if a.positional.is_empty() {

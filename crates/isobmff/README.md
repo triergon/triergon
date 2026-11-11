@@ -48,6 +48,8 @@ Complete indexed sources can check all packet projections by track before
 rewinding for merged playback.
 Short regular tracks can keep extra seek restart points in the existing
 checkpoint allocation.
+Complete fragment-only tracks can also retain a restart for backward seek
+when their projected decode times increase and each run begins at a sync sample.
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -208,7 +210,7 @@ What the reader does not do:
 - **A fragment without `tfdt`** has `None` times, and a seek cannot land on it.
 - **Times beyond `i64`** fail the read with `Error::Overflow`.
 - **Encrypted entries** report their outer code (`encv`, `enca`) as `CodecId::Other`.
-- **A QuickTime `mp4a` entry** whose version 1 or `wave` layout cannot be walked
+- **A QuickTime `mp4a` entry** whose sound description or `wave` layout cannot be walked
   stays `CodecId::Other`, as does any object type other than AAC or DTS with a core.
 
 `examples/isobmff_consumer_worker.rs` drives the FFmpeg-compatible operations for
@@ -223,12 +225,17 @@ model establishes EOF. The source trace keeps the original fields and
 strict validation.
 
 `AacConfigurationJob` reads AudioSpecificConfig from one `mp4a` sample
-description, including the supported QuickTime `wave` layout. It returns
-the source offset and shared bytes under `ConfigurationLimits` and a
-`WorkBudget`. The descriptor identifies MPEG-4 Audio. Callers validate
-the bytes and determine the audio object type separately.
+description, including QuickTime version 1 and version 2 sound descriptions
+with `wave` extensions. For version 2, it checks the declared extension offset
+and reads the descriptor inside `wave`. It returns the source offset and shared
+bytes under `ConfigurationLimits` and a `WorkBudget`. The descriptor identifies
+MPEG-4 Audio. Callers validate the bytes and determine the audio object type separately.
 `ObjectTypeScan` reads any `mp4a` or `mp4s` description's stated object
 type and decoder-specific information the same way.
+
+Range playback accepts edit lists for indexed AAC-LC with 1024 core samples and
+an explicit Program Configuration Element of up to eight channels. The edit plan
+keeps the sample durations in `stts` and uses the coded frame length for trims.
 
 `BoxReader::with_media_data_policy` can preserve a terminal `mdat`'s
 declared extent when the source length is known and the media ends early.
@@ -305,6 +312,8 @@ rejects boxes extending past the source.
   presence before reading its samples.
   Range playback preserves AAC sample durations from `stts`, including
   durations longer than one coded frame. Trim counts use the coded frame length.
+  The regular range view also establishes a 1024-sample clock for indexed AAC-LC
+  configurations 11, 12 and 14 when the media timescale matches the core rate.
   The compatible view of a complete fragmented file supports one open-ended
   rate-one initialization edit. Packet clocks and backward seek queries share
   the edit's offset. AAC leading trim uses the configured audio sample rate.

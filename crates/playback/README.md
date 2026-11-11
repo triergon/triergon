@@ -56,6 +56,42 @@ Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
 When the movie declares its duration, the range player checks source ranges and
 packet projections before merging the tracks for delivery.
+QuickTime range playback reads AAC configuration from version 1 and version 2
+sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
+fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
+also runs with the optional format and marker atoms replaced by free boxes.
+`avc-aac-quicktime-reordered.mov` adds 44.1 kHz AAC and AVC with B pictures.
+`avc-aac-quicktime-fragmented.mov` exercises open and seek with empty
+initialization sample tables and a version 1 sound description. It remuxes the
+synthetic `fragmented-avc-aac.mp4` fixture under the same MIT or Apache-2.0 license.
+`avc-aac-quicktime-7-1.mov` uses the same synthetic video pattern and distinct
+tones at 251, 379, 503, 71, 641, 769, 911 and 1031 Hz for the eight speakers.
+FFmpeg 9.0.2 encoded the fixture as 44.1 kHz AAC-LC with channel configuration
+12. The fixture is distributed under the repository's dual licence. The
+[range corpus](../../harness/features/mp4-range/corpus.json) records its SHA-256.
+
+`avc-aac-program.mov` uses an authored AVC pattern and seven independent tones
+in a 48 kHz AAC-LC program with a leading edit. The range corpus compares its
+original configuration and every selected packet on open and backward seek.
+The fixture uses the repository's dual licence. To regenerate it with FFmpeg
+9.0.2 and libx264:
+
+```sh
+signal='0.13*sin(2*PI*107*t)|0.13*sin(2*PI*211*t)|0.13*sin(2*PI*307*t)|0.13*sin(2*PI*53*t)|0.13*sin(2*PI*409*t)|0.13*sin(2*PI*509*t)|0.13*sin(2*PI*601*t)'
+ffmpeg -nostdin -f lavfi -i 'testsrc2=s=96x64:r=25' \
+  -f lavfi -i "aevalsrc=${signal}:s=48000:c=6.1(back)" -t 2.4 \
+  -c:v libx264 -threads:v 1 -g 25 -keyint_min 25 -sc_threshold 0 -bf 0 -pix_fmt yuv420p \
+  -c:a aac -aac_pce 1 -threads:a 1 -b:a 224k -flags:a +bitexact -fflags +bitexact \
+  -video_track_timescale 16000 -movie_timescale 48000 -use_editlist 1 -movflags +faststart \
+  avc-aac-program.mov
+```
+
+`Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
+Data tracks such as RTP hints and timecode still have their sample extents checked.
+Supply any edit plans in source track order, with `None` for each data track.
+The `avc-aac-rtp-hints.mp4` test fixture contains a synthetic AVC test pattern,
+AAC sine audio and two RTP hint tracks, with the first hint track between the
+video and audio tracks.
 
 ## Supported
 

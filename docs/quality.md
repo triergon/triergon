@@ -342,8 +342,9 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, the six bitmap, caption and teletext `subtitle-*` features with `subtitle-worker` and the
-`subtitles` reference, the three font features with `font-worker` and FreeType, the six
+and `formats` references, the six bitmap, caption and teletext `subtitle-*` features with
+`subtitle-worker` and the `subtitles` reference, `subtitle-text` with `subtitle-worker`
+and the `formats` reference, the three font features with `font-worker` and FreeType, the six
 shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
 features with `raster-worker` and libass, and the four ASS parsing features,
 `ass-render` and `ass-render-host` with `ass-worker` and libass.
@@ -376,6 +377,12 @@ identity every collection is checked against. `cargo xtask trace-identities` rec
 digest of every candidate trace, so a change can show its traces are byte-identical
 (`--compare` an earlier record): the Matroska cases for `media-worker`, every case of
 each feature that runs the `--candidate` worker through a prefix otherwise.
+Pass `--corpus FEATURE=DIR` for each prefix feature whose files are outside its
+recorded directory or whose manifest omits the directory. Relative directories are
+resolved from the repository root. Prefix comparisons verify the reference worker's
+build hash and the manifest hashes of the primary input, ordered entities and
+companion files before running a case. DVD palette paths resolve inside the
+selected corpus and keep their manifest spelling in recorded traces.
 `cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent
@@ -387,6 +394,19 @@ of and records the identities of the codec crates against the pinned FFmpeg deco
 and compares the packets of the audio container readers with its `ffprobe`
 (`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
 pipeline ([harness/capture](../harness/capture/README.md)).
+`cargo xtask codecs aac-access-units` prepares the [configured AAC
+workloads](../harness/features/aac-access-units/contract.json) from the pinned
+QuickTime and authored audio-only packets. It compares the ordered speakers and
+every decoded PCM plane. The authored clips cover every supported fixed layout
+and indexed rate, and program configurations from mono to eight channels.
+`cargo xtask codecs aac-sources --out DIR` records the source
+clips from independently varying channel tones using the pinned encoder. The
+committed sources fix the encoded input bytes across architectures.
+The paired codec timing and memory commands require passing parity bound to
+the workload manifest, both workers, the pinned probe and the numeric rules.
+The measured work includes decoder construction, decoding every
+packet, folding every PCM plane, flushing and teardown. File loading and
+container parsing take place before that work.
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest, with a timeout per
 input (`--timeout-seconds`, 3 by default, or the contract's `timeout_seconds`). With `--contract` it builds that manifest from a prefix feature's cases: the
@@ -549,11 +569,27 @@ time`. It has a user `ubuntu` (uid 1000, passwordless `sudo`); its home director
 part of the image.
 A user space built the same way later can pick up newer packages; compare its
 `dpkg-query -W` list before treating its results as comparable. Inside, install rustup
-as on any host, and run every command under `setarch linux32`. Memory uses the standard
-bounds: the kernel RSS proof module has no 32-bit ioctl entry point. Record the CPU,
-kernel and user-space package list with the results. The `subtitles` reference builds
-libzvbi from its source archive, which needs `apt-get install autoconf automake libtool
-autopoint gettext` in the user space first.
+as on any host, and run every command under `setarch linux32`. Record the CPU, kernel
+and user-space package list with the results. The `subtitles` reference builds libzvbi
+from its source archive, which needs `apt-get install autoconf automake libtool autopoint
+gettext` in the user space first.
+
+The kernel RSS bound works for a 32-bit process through the module's 32-bit ioctl
+entry point. The module belongs to the host's kernel, so build and load it on the host,
+which needs the kernel's headers, and bind debugfs into the user space before entering
+it. Run `prove.sh` on the host from the repository inside the user space, naming the
+user space's root; it builds and runs the check, and records the architecture and page
+size, inside it:
+
+```sh
+sudo mount --bind /sys/kernel/debug /srv/armhf/sys/kernel/debug
+cd /srv/armhf/home/ubuntu/triergon
+harness/rss-bound/prove.sh .research/rss-bound/RSS-REVIEW.json .research/rss-bound /srv/armhf
+```
+
+Then build the workers with `TRIERGON_RSS_KERNEL_PROOF` and collect memory with
+`TRIERGON_RSS_KERNEL_BOUND=1` inside the user space, as the
+[kernel proof workflow](../harness/rss-bound/README.md) describes.
 
 ## Robustness
 

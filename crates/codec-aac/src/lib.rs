@@ -39,6 +39,26 @@ pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{AudioDecoder, Budget, DecodeFailure, DownmixLevels};
 
+/// Optional policies for configured AAC.
+pub mod compat {
+    /// Channel mappings for fixed AAC-LC access units.
+    ///
+    /// `ConventionalSurround` reproduces the default AAC decoder of FFmpeg 9.0.2
+    /// when it receives an AudioSpecificConfig and the original packets.
+    pub mod layout {
+        /// How to interpret the fixed channel configuration of a raw access unit.
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+        pub enum Policy {
+            /// Speaker assignments in ISO/IEC 14496-3 Table 1.19.
+            #[default]
+            Specification,
+            /// Use the back pair in configurations 5, 6, 11 and 14. Interpret
+            /// configuration 7 as the conventional 7.1 back layout.
+            ConventionalSurround,
+        }
+    }
+}
+
 /// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
@@ -93,66 +113,7 @@ impl Decoder {
     /// this frame's output (1024 or, with SBR, 2048 samples per raw_data_block). On error
     /// `out` is left empty; the decoder stays usable for the next frame.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        for p in &mut out.planes {
-            p.clear();
-        }
-        out.samples_per_channel = 0;
-        // A refused access unit leaves the decoder as if it had not arrived: what it may
-        // have advanced before the refusal is restored with it.
-        let (random, skip_samples) = (self.core.random, self.core.skip_samples);
-        let r = self.decode_inner(au, out);
-        if r.is_err() {
-            self.core.random = random;
-            self.core.skip_samples = skip_samples;
-            for p in &mut out.planes {
-                p.clear();
-            }
-            out.samples_per_channel = 0;
-        }
-        r
-    }
-
-    fn decode_inner(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        let h = AdtsHeader::parse(au)?;
-        if au.len() < h.frame_length {
-            return Err(DecodeError::Truncated);
-        }
-        let core = &mut self.core;
-        core.configure_adts(&h)?;
-        let mut hdr = 7;
-        if !h.protection_absent {
-            // raw_data_block_position[1..N] (16 bit each) + crc_check (16)
-            hdr += 2 * (h.raw_data_blocks as usize - 1) + 2;
-        }
-        if h.frame_length < hdr {
-            return Err(DecodeError::InvalidData("ADTS frame length"));
-        }
-        let payload = &au[hdr..h.frame_length];
-        #[cfg(feature = "inspect")]
-        core.sbr_fil_ranges.clear();
-        let mut br = CachedBitReader::new(payload);
-        core.reserve_output(out, h.raw_data_blocks as usize)?;
-        for block in 0..h.raw_data_blocks {
-            let start = br.position();
-            core.decode_block(&mut br, start, out, (h.raw_data_blocks - block) as usize)?;
-            core.emit_planes(out)?;
-            if !h.protection_absent && h.raw_data_blocks > 1 {
-                br.skip(16); // adts_raw_data_block_error_check
-            }
-        }
-        if core.skip_samples > 0 {
-            let n = out.planes.first().map_or(0, |p| p.len());
-            let k = core.skip_samples.min(n);
-            for p in &mut out.planes {
-                p.drain(..k);
-            }
-            core.skip_samples -= k;
-        }
-        core.frames_out += 1;
-        out.sample_rate = core.output_rate();
-        out.layout = core.layout;
-        out.samples_per_channel = out.planes.first().map_or(0, |p| p.len());
-        Ok(())
+        decode_with::<false>(&mut self.core, out, |core, out| decode_adts(core, au, out))
     }
 
     /// Reset overlap, prediction, PNS and SBR/PS signal history after a discontinuity.
@@ -186,6 +147,189 @@ impl Decoder {
             0
         }
     }
+}
+
+/// Decoder for one raw AAC-LC access unit per packet.
+/// Supply the indexed core rate and layout from a checked AudioSpecificConfig
+/// with 1024 core samples and no core dependency.
+#[derive(Debug)]
+pub struct RawLcDecoder {
+    core: decoder::Core,
+}
+
+impl RawLcDecoder {
+    /// Maximum raw block size, including ancillary and fill data.
+    pub const MAX_ACCESS_UNIT_BYTES: usize = 64 << 10;
+
+    /// Set up the fixed layout and charge its decoder state to `budget`.
+    pub fn new_in(
+        frequency_index: u8,
+        channel_configuration: u8,
+        budget: &Budget,
+    ) -> Result<Self, DecodeError> {
+        Self::with_layout_in(
+            frequency_index,
+            channel_configuration,
+            compat::layout::Policy::Specification,
+            budget,
+        )
+    }
+
+    /// Set up the configured decoder with an explicit speaker mapping.
+    pub fn with_layout_in(
+        frequency_index: u8,
+        channel_configuration: u8,
+        layout: compat::layout::Policy,
+        budget: &Budget,
+    ) -> Result<Self, DecodeError> {
+        if !matches!(channel_configuration, 1..=7 | 11 | 12 | 14) {
+            return Err(DecodeError::InvalidData("raw AAC channel configuration"));
+        }
+        let mut core = decoder::Core::new(budget);
+        core.configure(
+            2,
+            frequency_index,
+            channel_configuration,
+            decoder::FixedLayout::Raw(layout),
+        )?;
+        Ok(Self { core })
+    }
+
+    /// Set up an explicit program layout from the byte-aligned PCE in an
+    /// AudioSpecificConfig with channel configuration zero. Pass the complete
+    /// `program_config_element()` field through its comment, starting at its tag.
+    pub fn with_program_config_in(
+        frequency_index: u8,
+        program_config: &[u8],
+        budget: &Budget,
+    ) -> Result<Self, DecodeError> {
+        let mut reader = CachedBitReader::new(program_config);
+        let program = pce::parse_pce(&mut reader, 0)?;
+        if reader.left() != 0 {
+            return Err(DecodeError::InvalidData("raw AAC program extent"));
+        }
+        let core = decoder::Core::with_program(budget, frequency_index, &program)?;
+        Ok(Self { core })
+    }
+
+    /// Decode one complete raw data block from the container sample.
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        decode_with::<true>(&mut self.core, out, |core, out| {
+            if au.len() > Self::MAX_ACCESS_UNIT_BYTES {
+                return Err(DecodeError::ResourceLimit("raw AAC access unit"));
+            }
+            decode_blocks::<true>(core, au, 1, false, out)
+        })
+    }
+}
+
+impl AudioDecoder for RawLcDecoder {
+    fn decode(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+        RawLcDecoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+        Ok(None)
+    }
+
+    fn reset(&mut self) {
+        self.core.reset_history();
+    }
+}
+
+fn decode_with<const RAW: bool>(
+    core: &mut decoder::Core,
+    out: &mut AudioFrame,
+    decode: impl FnOnce(&mut decoder::Core, &mut AudioFrame) -> Result<(), DecodeError>,
+) -> Result<(), DecodeError> {
+    if RAW {
+        // The raw decoder overwrites the entire reserved frame on success.
+        out.samples_per_channel = 0;
+    } else {
+        out.clear();
+    }
+    // Restore delay and random state on a refused access unit.
+    let (random, skip_samples) = (core.random, core.skip_samples);
+    let coupling_elements = core.cce.len();
+    let result = decode(core, out);
+    if result.is_err() {
+        core.random = random;
+        core.skip_samples = skip_samples;
+        if RAW {
+            core.cce.truncate(coupling_elements);
+        }
+        out.clear();
+    }
+    result
+}
+
+fn decode_adts(
+    core: &mut decoder::Core,
+    au: &[u8],
+    out: &mut AudioFrame,
+) -> Result<(), DecodeError> {
+    let h = AdtsHeader::parse(au)?;
+    if au.len() < h.frame_length {
+        return Err(DecodeError::Truncated);
+    }
+    core.configure(
+        h.profile + 1,
+        h.sf_index,
+        h.channel_config,
+        decoder::FixedLayout::Adts,
+    )?;
+    let mut header_bytes = 7;
+    if !h.protection_absent {
+        // raw_data_block_position[1..N] (16 bits each) and crc_check (16 bits).
+        header_bytes += 2 * (usize::from(h.raw_data_blocks) - 1) + 2;
+    }
+    if h.frame_length < header_bytes {
+        return Err(DecodeError::InvalidData("ADTS frame length"));
+    }
+    decode_blocks::<false>(
+        core,
+        &au[header_bytes..h.frame_length],
+        h.raw_data_blocks,
+        !h.protection_absent && h.raw_data_blocks > 1,
+        out,
+    )
+}
+
+fn decode_blocks<const RAW: bool>(
+    core: &mut decoder::Core,
+    payload: &[u8],
+    blocks: u8,
+    per_block_crc: bool,
+    out: &mut AudioFrame,
+) -> Result<(), DecodeError> {
+    #[cfg(feature = "inspect")]
+    core.sbr_fil_ranges.clear();
+    let mut br = CachedBitReader::new(payload);
+    core.reserve_output::<RAW>(out, usize::from(blocks))?;
+    for block in 0..blocks {
+        let start = br.position();
+        core.decode_block::<RAW>(&mut br, start, out, usize::from(blocks - block))?;
+        if !RAW {
+            core.emit_planes(out)?;
+        }
+        if per_block_crc {
+            br.skip(16);
+        }
+    }
+    if core.skip_samples > 0 {
+        let samples = out.planes.first().map_or(0, |p| p.len());
+        let skip = core.skip_samples.min(samples);
+        for plane in &mut out.planes {
+            plane.drain(..skip);
+        }
+        core.skip_samples -= skip;
+    }
+    core.frames_out += 1;
+    out.sample_rate = core.output_rate();
+    out.layout = core.layout;
+    out.samples_per_channel = out.planes.first().map_or(0, |p| p.len());
+    Ok(())
 }
 
 impl AudioDecoder for Decoder {

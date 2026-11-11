@@ -342,6 +342,180 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (93, 25_808, 16_784_415_058_963_717_857),
         ),
     ]);
+    let surround_file = "avc-aac-quicktime-surround.mov";
+    let minimal_wave_file = "avc-aac-quicktime-minimal-wave.mov";
+    let surround_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(surround_file);
+    let surround =
+        fs::read(&surround_seed).map_err(|e| format!("{}: {e}", surround_seed.display()))?;
+    if sha256::hex(&surround) != "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5"
+    {
+        return Err("QuickTime surround AAC range seed changed".into());
+    }
+    let mut minimal_wave = surround.clone();
+    // Replace the optional wave format and marker atoms with free boxes of equal size.
+    minimal_wave[1989..1993].copy_from_slice(b"free");
+    minimal_wave[2001..2005].copy_from_slice(b"free");
+    write(&output.join(surround_file), &surround)?;
+    write(&output.join(minimal_wave_file), &minimal_wave)?;
+    let open = (289, 174_560, 8_952_730_278_029_084_733);
+    let seek = (145, 85_958, 4_047_899_442_073_086_333);
+    cases.extend([
+        mp4_range_case("quicktime-aac-open", surround_file, &surround, [], open),
+        mp4_range_case(
+            "quicktime-aac-seek",
+            surround_file,
+            &surround,
+            ["26880"],
+            seek,
+        ),
+        mp4_range_case(
+            "quicktime-aac-minimal-wave-open",
+            minimal_wave_file,
+            &minimal_wave,
+            [],
+            open,
+        ),
+        mp4_range_case(
+            "quicktime-aac-minimal-wave-seek",
+            minimal_wave_file,
+            &minimal_wave,
+            ["26880"],
+            seek,
+        ),
+    ]);
+    let reordered_file = "avc-aac-quicktime-reordered.mov";
+    let reordered_seed = surround_seed.with_file_name(reordered_file);
+    let reordered =
+        fs::read(&reordered_seed).map_err(|e| format!("{}: {e}", reordered_seed.display()))?;
+    if sha256::hex(&reordered) != "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b"
+    {
+        return Err("Reordered QuickTime AAC range seed changed".into());
+    }
+    write(&output.join(reordered_file), &reordered)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-reordered-open",
+            reordered_file,
+            &reordered,
+            [],
+            (274, 61_802, 11_057_392_877_255_542_627),
+        ),
+        mp4_range_case(
+            "quicktime-aac-reordered-seek",
+            reordered_file,
+            &reordered,
+            ["26880"],
+            (141, 30_781, 3_570_639_560_812_143_604),
+        ),
+    ]);
+    let fragmented_file = "avc-aac-quicktime-fragmented.mov";
+    let fragmented_seed = surround_seed.with_file_name(fragmented_file);
+    let fragmented =
+        fs::read(&fragmented_seed).map_err(|e| format!("{}: {e}", fragmented_seed.display()))?;
+    if sha256::hex(&fragmented)
+        != "be592508645005099c312154a45504c5bb5be002d9616cc94af399394e493b83"
+    {
+        return Err("Fragmented QuickTime AAC range seed changed".into());
+    }
+    write(&output.join(fragmented_file), &fragmented)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-fragmented-open",
+            fragmented_file,
+            &fragmented,
+            [],
+            (93, 39_981, 1_939_830_974_683_508_522),
+        ),
+        mp4_range_case(
+            "quicktime-aac-fragmented-seek",
+            fragmented_file,
+            &fragmented,
+            ["4096"],
+            (73, 30_733, 1_084_237_239_961_408_002),
+        ),
+    ]);
+    let eight_channel_file = "avc-aac-quicktime-7-1.mov";
+    let eight_channel_seed = surround_seed.with_file_name(eight_channel_file);
+    let eight_channel = fs::read(&eight_channel_seed)
+        .map_err(|e| format!("{}: {e}", eight_channel_seed.display()))?;
+    if sha256::hex(&eight_channel)
+        != "005afe6563563ff5af1eee044f68759a188fe75079cf9e74745d43d5b2231c3c"
+    {
+        return Err("QuickTime 7.1 AAC range seed changed".into());
+    }
+    write(&output.join(eight_channel_file), &eight_channel)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-7-1-open",
+            eight_channel_file,
+            &eight_channel,
+            [],
+            (274, 92_570, 4_686_448_036_394_174_807),
+        ),
+        mp4_range_case(
+            "quicktime-aac-7-1-seek",
+            eight_channel_file,
+            &eight_channel,
+            ["26880"],
+            (141, 47_093, 5_018_453_331_173_239_581),
+        ),
+    ]);
+    let hinted_file = "avc-aac-rtp-hints.mp4";
+    let hinted_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(hinted_file);
+    let hinted = fs::read(&hinted_seed).map_err(|e| format!("{}: {e}", hinted_seed.display()))?;
+    if sha256::hex(&hinted) != "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273" {
+        return Err("RTP hint MP4 range seed changed".into());
+    }
+    write(&output.join(hinted_file), &hinted)?;
+    cases.extend([
+        mp4_range_case(
+            "rtp-hints-open",
+            hinted_file,
+            &hinted,
+            [],
+            (289, 72_260, 16_322_489_954_875_018_336),
+        ),
+        mp4_range_case(
+            "rtp-hints-seek",
+            hinted_file,
+            &hinted,
+            ["26880"],
+            (145, 35_398, 5_283_456_504_139_288_625),
+        ),
+    ]);
+    let program_file = "avc-aac-program.mov";
+    let program_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(program_file);
+    let program =
+        fs::read(&program_seed).map_err(|error| format!("{}: {error}", program_seed.display()))?;
+    if sha256::hex(&program) != "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9" {
+        return Err("AAC program range seed changed".into());
+    }
+    write(&output.join(program_file), &program)?;
+    cases.extend([
+        mp4_range_case(
+            "aac-program-open",
+            program_file,
+            &program,
+            [],
+            (174, 91_514, 9_360_453_060_203_789_492),
+        ),
+        mp4_range_case(
+            "aac-program-seek",
+            program_file,
+            &program,
+            ["24000"],
+            (102, 54_337, 7_863_734_754_543_817_612),
+        ),
+    ]);
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",

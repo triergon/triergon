@@ -17044,6 +17044,32 @@
    }
   },
   {
+   "name": "ass-collision-far-margins-02e3a75a",
+   "path": "ass-collision-far-margins-02e3a75a",
+   "retention": "retained",
+   "reason": "ASS collision order paragraph and table row: collision-far-margins.ass at 02e3a75a on an r6g.2xlarge, natively on AArch64 and in the ARMv7 user space; the ASS gates and crate tests on both targets; the ass-render pins as each target's libass records them; frame dumps of the case, clipped and unclipped, from libass, the renderer and the renderer with its merge sort's first run rounded up; the variants' patches and a bundle of the measured commit.",
+   "key": "evidence/ass-collision-far-margins-02e3a75a/736748aa549fec74078fa33d31dba3e0a123290e652278c3359d37a0a9737db2.tar.gz",
+   "sha256": "736748aa549fec74078fa33d31dba3e0a123290e652278c3359d37a0a9737db2",
+   "bytes": 6483969,
+   "source_revisions": {
+    "candidate": "02e3a75a86bd5c22900d972c02055e23a37103ab",
+    "base": "731cdf1cd6b9822f744d3fe13428b9f8428bc145"
+   }
+  },
+  {
+   "name": "ass-collision-order-1d2ae4a0",
+   "path": "ass-collision-order-1d2ae4a0",
+   "retention": "retained",
+   "reason": "ASS collision order paragraph and table row: the collision boxes' top-down merge sort at 1d2ae4a0 on an r6g.2xlarge, natively on AArch64 and in the ARMv7 user space; the ASS gates and crate tests on both targets; the 5,722 generated scripts and fixture mutations rendered frame by frame through the renderer and libass; cargo xtask ass equivalence against 365affd2 with both sides' records, on ARMv7 also each side on one thread in its own process and each build's 4-thread records against its one-thread records; instruction counts of every ass-render and ass-render-host case against 365affd2; the scripts that ran them and a bundle of the measured commit.",
+   "key": "evidence/ass-collision-order-1d2ae4a0/e4e97db001bf538840edc2cbfb8db80c126aeb97df3edeb68cf7185b2fe4bd04.tar.gz",
+   "sha256": "e4e97db001bf538840edc2cbfb8db80c126aeb97df3edeb68cf7185b2fe4bd04",
+   "bytes": 15727298,
+   "source_revisions": {
+    "candidate": "1d2ae4a0287972ac3402bd2e717e5b7fdaa086ff",
+    "base": "365affd25711acfb0be0fbb087e932632e5edf5a"
+   }
+  },
+  {
    "name": "ass-render-parity-01ccb497",
    "path": "ass-render-parity-01ccb497",
    "retention": "retained",
@@ -19348,6 +19374,184 @@
    "sha256": "18028d8fa7452fd3d43d0d7d254560578d7f7a38d7a553d9fb42b7246a9df927",
    "bytes": 112317324,
    "source_revision": "cc09ffa8f270f0bbbe2a5de0db4dbf3ffb45be03"
+  },
+  {
+   "name": "matroska-lace-ranges",
+   "path": "matroska-lace-ranges",
+   "retention": "retained",
+   "reason": "Matroska, startup and seek, and audio clock comparisons in docs/status.md",
+   "key": "evidence/matroska-lace-ranges/883ce5128410aefb3ec9affe3579a798ee8d1c5d082c1d129a462d67728e7af9.tar.gz",
+   "sha256": "883ce5128410aefb3ec9affe3579a798ee8d1c5d082c1d129a462d67728e7af9",
+   "bytes": 122757292,
+   "source_revision": "513149a970caad5b30c61becba1bc2bda1c5e193"
+  },
+  {
+   "name": "mp4-range-quicktime-and-projection",
+   "path": "mp4-range-quicktime-and-projection",
+   "retention": "retained",
+   "reason": "MP4 range playback comparisons in docs/status.md",
+   "key": "evidence/mp4-range-quicktime-and-projection/b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2.tar.gz",
+   "sha256": "b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2",
+   "bytes": 63889181
+  },
+  {
+   "name": "mp4-range-quicktime",
+   "path": "mp4-range-quicktime",
+   "retention": "retained",
+   "reason": "QuickTime AAC range playback after reusing the preloaded input",
+   "key": "evidence/mp4-range-quicktime/018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1.tar.gz",
+   "sha256": "018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1",
+   "bytes": 45670319,
+   "source_revision": "5fd3f0244849f11685fdf42a75c4c71847001bf9"
+  },
+  {
+   "name": "mp4-range-fragmented-quicktime",
+   "path": "mp4-range-fragmented-quicktime",
+   "retention": "retained",
+   "reason": "MP4 range comparisons including fragmented QuickTime AAC",
+   "key": "evidence/mp4-range-fragmented-quicktime/2b2030d312f1af3a9716b2178afc5c04b7176822329f03240e4f41fca2f18478.tar.gz",
+   "sha256": "2b2030d312f1af3a9716b2178afc5c04b7176822329f03240e4f41fca2f18478",
+   "bytes": 72018313,
+   "source_revision": "b96eb9ec65abbe4548b4bc00a74e8504a6d0001d"
+  },
+  {
+   "name": "aac-program-range",
+   "path": "aac-program-range",
+   "retention": "retained",
+   "reason": "AAC program range open and seek parity, paired runtime, peak heap and total resident peak",
+   "key": "evidence/aac-program-range/6b41bc92f4c55f6a868dc01181d152a75fe9cbb4868eebb72a6da437b4cf5579.tar.gz",
+   "sha256": "6b41bc92f4c55f6a868dc01181d152a75fe9cbb4868eebb72a6da437b4cf5579",
+   "bytes": 46410219,
+   "source_revision": "98ad5b82da81ba113b3bab206459efc7ede2ed8a"
+  },
+  {
+   "name": "aac-program-range-reviewed",
+   "path": "aac-program-range-reviewed",
+   "retention": "retained",
+   "reason": "Range parity and paired native bounds with the AAC program parser charged to the input budget",
+   "key": "evidence/aac-program-range-reviewed/1beefed497c83dcff49a8638ddbcda6f7968af67806753d727afd10ad16dad26.tar.gz",
+   "sha256": "1beefed497c83dcff49a8638ddbcda6f7968af67806753d727afd10ad16dad26",
+   "bytes": 64212278,
+   "source_revision": "a961b3b38b083180e11a5d57bcf6ab73a15b72dc"
+  },
+  {
+   "name": "mp4-range-seek-checkpoints",
+   "path": "mp4-range-seek-checkpoints",
+   "retention": "retained",
+   "reason": "MP4 range playback and fragment seek restart comparisons",
+   "key": "evidence/mp4-range-seek-checkpoints/cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b.tar.gz",
+   "sha256": "cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b",
+   "bytes": 137198328
+  },
+  {
+   "name": "subtitle-text-gate-b9898139",
+   "path": "subtitle-text-gate-b9898139",
+   "retention": "retained",
+   "reason": "Text subtitle rows of docs/status.md, Linux AArch64 on a c8g.xlarge and the armv7-userland user space on a c6g.2xlarge: timing and memory (30 pairs, CPU 1) of all 354 subtitle-text cases at b9898139 against the pinned FFmpeg 9.0 reference, graded, with the kernel RSS proof on AArch64 and standard bounds on ARMv7; same-code of the subtitle worker against main at 365affd2; the instruction count of every subtitle-text case and of the bitmap subtitle features against main; the subtitle crate's and worker's tests on both targets; and a git bundle of the branch. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitle-text-gate-b9898139/35aa64c6d273f3f6956811a143c299b9ed01ca1c9c9810e9f2eb0a9d42c75aca.tar.zst",
+   "sha256": "35aa64c6d273f3f6956811a143c299b9ed01ca1c9c9810e9f2eb0a9d42c75aca",
+   "bytes": 9692934,
+   "source_revision": "b9898139893705884c3cff03f1994cbb2157594a"
+  },
+  {
+   "name": "subtitle-text-gate-6126b759",
+   "path": "subtitle-text-gate-6126b759",
+   "retention": "retained",
+   "reason": "Text subtitle rows of docs/status.md, Linux AArch64 on a c8g.xlarge and the armv7-userland user space on a c6g.2xlarge: timing and memory (30 pairs, CPU 1) of the 354 subtitle-text cases and the 23 subtitle-text-host cases at 6126b759 against the pinned FFmpeg 9.0 reference, graded, with the kernel RSS proof on AArch64 and standard bounds on ARMv7; each target's recording of the subtitle-text-host pins; the checks, the subtitle crate's and worker's tests on both targets and both features' parity; same-code of the subtitle worker against b9898139 and of the branch tip after merging main against 6126b759; and a git bundle of the branch. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitle-text-gate-6126b759/aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676.tar.zst",
+   "sha256": "aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676",
+   "bytes": 16191723,
+   "source_revision": "6126b759b9b983afe488c3c362c6e37c2d1425a2"
+  },
+  {
+   "name": "aac-mov-host",
+   "path": "aac-mov-host",
+   "retention": "retained",
+   "reason": "AAC in MOV PCM and ADTS regression comparisons",
+   "key": "evidence/aac-mov-host/100613a296e2f18f9631c60992057cb0debc108f1926c41a33b8c3f6f06f4556.tar.gz",
+   "sha256": "100613a296e2f18f9631c60992057cb0debc108f1926c41a33b8c3f6f06f4556",
+   "bytes": 101185082,
+   "source_revision": "63f5e8e5626ed5dac0bbeb9c0e742e0eec6146e6"
+  },
+  {
+   "name": "aac-mov-fragment-host",
+   "path": "aac-mov-fragment-host",
+   "retention": "retained",
+   "reason": "QuickTime AAC host packet and PCM comparisons",
+   "key": "evidence/aac-mov-fragment-host/0bc8fb8726cff0d2ba18d7c138ba83375baf13265bb148086522047bf816aea2.tar.gz",
+   "sha256": "0bc8fb8726cff0d2ba18d7c138ba83375baf13265bb148086522047bf816aea2",
+   "bytes": 30928202,
+   "source_revision": "9559dae0b89dfd2df2b08b9a97267bc75711be65"
+  },
+  {
+   "name": "aac-access-units",
+   "path": "aac-access-units",
+   "retention": "retained",
+   "reason": "Configured AAC speaker and sample parity, paired runtime, and peak memory",
+   "key": "evidence/aac-access-units/b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0.tar.gz",
+   "sha256": "b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0",
+   "bytes": 69596368,
+   "source_revision": "907ac3dce61c98bd05f52bfa3ff92497efdd141d"
+  },
+  {
+   "name": "aac-layouts-and-rates",
+   "path": "aac-layouts-and-rates",
+   "retention": "retained",
+   "reason": "Fixed AAC channel and rate parity, paired runtime and peak memory",
+   "key": "evidence/aac-layouts-and-rates/5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949.tar.gz",
+   "sha256": "5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949",
+   "bytes": 129922253,
+   "source_revision": "3d422610316d79665c80b48ab8a27a8a57880efe"
+  },
+  {
+   "name": "aac-program-configurations",
+   "path": "aac-program-configurations",
+   "retention": "retained",
+   "reason": "Configured raw AAC-LC speaker and PCM parity, paired runtime, peak heap and total resident peak",
+   "key": "evidence/aac-program-configurations/86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf.tar.gz",
+   "sha256": "86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf",
+   "bytes": 163382979,
+   "source_revision": "0a51b7c3746c882b3ca5127ad047162130c01ea6"
+  },
+  {
+   "name": "aac-program-configurations-reviewed",
+   "path": "aac-program-configurations-reviewed",
+   "retention": "retained",
+   "reason": "Configured AAC-LC parity and native comparisons with height validation and grouped rear pairs",
+   "key": "evidence/aac-program-configurations-reviewed/7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e.tar.gz",
+   "sha256": "7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e",
+   "bytes": 181869637,
+   "source_revision": "7b479ad67690a7c2bc03c15f4ff8545c05bc965a"
+  },
+  {
+   "name": "aac-program-speaker-mapping",
+   "path": "aac-program-speaker-mapping",
+   "retention": "retained",
+   "reason": "Configured AAC-LC parity, runtime, peak heap and total resident peak with distinct speaker positions",
+   "key": "evidence/aac-program-speaker-mapping/68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf.tar.gz",
+   "sha256": "68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf",
+   "bytes": 181930058,
+   "source_revision": "fde36dd91d85ca700538421062ceacd45075c5b8"
+  },
+  {
+   "name": "armv7-kernel-rss-linux-armv7",
+   "path": "armv7-kernel-rss-linux-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 rows of docs/status.md measured under the kernel RSS bound through its 32-bit entry point, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1 at afb9049c: 30 timing pairs and 30 kernel-bound memory pairs of mp4-forward, ts-program, matroska-audio-clocks and raw-annex-b graded by cargo xtask grade; 30 kernel-bound memory pairs of hls-segments, matroska-startup-seek, the six Matroska feature groups, the external HDR vector, mpegts-pes, isobmff-bench and framing; the kernel proofs with their positive and invalidation checks, the build identities, the scripts, the CPU, kernel and user-space package list.",
+   "key": "evidence/armv7-kernel-rss-linux-armv7/4567e8ba906099070b64ac43868bdd9695d350049f25645078e35c0f334ce8b1.tar.gz",
+   "sha256": "4567e8ba906099070b64ac43868bdd9695d350049f25645078e35c0f334ce8b1",
+   "bytes": 4609695693,
+   "source_revision": "afb9049c681916c97311fc9f495e27ceaa69f4df"
+  },
+  {
+   "name": "armv7-ass-thumb-linux-armv7",
+   "path": "armv7-ass-thumb-linux-armv7",
+   "retention": "retained",
+   "reason": "ASS rendering ARMv7 memory row of docs/status.md under the kernel RSS bound through its 32-bit entry point, and the native AArch64 proof of the same module source, on a c6g.4xlarge at afb9049c: 30 kernel-bound memory pairs of ass-render and ass-render-host against libass-player-native in the armv7-userland user space pinned to CPU 1; the AArch64 proof with its positive and invalidation checks and 30 kernel-bound memory pairs of mp4-forward; the thumbv7neon-unknown-linux-gnueabihf playback-worker experiment against the gate build and FFmpeg (timing pairs and kernel-bound RSS observations, with both binaries); the kernel proofs, build identities, scripts, CPU, kernel and user-space package list.",
+   "key": "evidence/armv7-ass-thumb-linux-armv7/d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a.tar.gz",
+   "sha256": "d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a",
+   "bytes": 424394382,
+   "source_revision": "afb9049c681916c97311fc9f495e27ceaa69f4df"
   },
   {
    "name": "subtitles-armv7-arm64-f2634911",

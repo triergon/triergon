@@ -69,7 +69,7 @@ commands:
                  [--baseline-worker W]
                  qualify the mandatory external metadata vector through the same gates
   fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
-  trace-identities --output F [--compare F] [--candidate W]
+  trace-identities --output F [--compare F] [--candidate W] [--corpus FEATURE=DIR]...
                  record the digest of every candidate trace over all recorded cases: the
                  Matroska cases for media-worker, every case of each feature that runs W
                  through a worker operation prefix otherwise
@@ -122,7 +122,8 @@ commands:
                  under REPORTS/<contract>, against the quick-check tolerances
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
-  codecs         manifest|grade|summarize|time|equivalence   codec crates against the
+  codecs         aac-access-units|manifest|grade|summarize|time|equivalence
+                 codec crates against the
                  pinned FFmpeg decoders (see `cargo xtask codecs --help`)
   capture        compare|qualify|summarize|equivalence   capture pipeline against the
                  FFmpeg capture reference (see `cargo xtask capture --help`)
@@ -480,14 +481,27 @@ fn fate_run(root: &Path, args: &[String]) -> ExitCode {
 fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
     let (mut output, mut compare, mut candidate) =
         (None, None, root.join("target/release/media-worker"));
+    let mut corpora = std::collections::BTreeMap::new();
     let mut rest = args.iter();
     let parsed = (|| -> Task {
         while let Some(flag) = rest.next() {
-            let value = PathBuf::from(rest.next().ok_or_else(|| format!("{flag} needs a value"))?);
+            let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
             match flag.as_str() {
-                "--output" => output = Some(value),
-                "--compare" => compare = Some(value),
-                "--candidate" => candidate = value,
+                "--output" => output = Some(PathBuf::from(value)),
+                "--compare" => compare = Some(PathBuf::from(value)),
+                "--candidate" => candidate = PathBuf::from(value),
+                "--corpus" => {
+                    let (feature, directory) = value
+                        .split_once('=')
+                        .filter(|(feature, directory)| !feature.is_empty() && !directory.is_empty())
+                        .ok_or("--corpus needs FEATURE=DIR")?;
+                    if corpora
+                        .insert(feature.to_owned(), root.join(directory))
+                        .is_some()
+                    {
+                        return Err(format!("corpus specified twice for {feature}"));
+                    }
+                }
                 _ => return Err(USAGE.to_owned()),
             }
         }
@@ -495,7 +509,7 @@ fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
     })();
     exit(parsed.and_then(|()| {
         let output = output.ok_or("--output is required")?;
-        harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref())
+        harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref(), &corpora)
     }))
 }
 

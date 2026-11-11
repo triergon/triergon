@@ -64,7 +64,7 @@ impl CceState {
     }
 }
 
-pub(crate) fn parse_cce(
+pub(crate) fn parse_cce<const RAW: bool>(
     core: &mut Core,
     br: &mut CachedBitReader<'_>,
     cfg: &CoreCfg,
@@ -76,7 +76,10 @@ pub(crate) fn parse_cce(
             if core.cce.len() >= 16 {
                 return Err(DecodeError::ResourceLimit("coupling channel elements"));
             }
-            let c = CceState::new(&core.budget, tag)?;
+            let mut c = CceState::new(&core.budget, tag)?;
+            if RAW {
+                c.targets.try_reserve_exact(8)?;
+            }
             core.cce.push(Charged::boxed(&core.budget, c)?);
             core.cce.len() - 1
         }
