@@ -1712,193 +1712,161 @@
     {
       "id": "srt-basic",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-basic.srt"
     },
     {
       "id": "srt-crlf-multiline",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-crlf-multiline.srt"
     },
     {
       "id": "srt-unicode-no-normalization",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-unicode-no-normalization.srt"
     },
     {
       "id": "srt-overlap-order",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-overlap-order.srt"
     },
     {
       "id": "srt-wide-hours-profile",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-wide-hours-profile.srt"
     },
     {
       "id": "srt-utf8-bom",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-utf8-bom.srt"
     },
     {
       "id": "srt-utf16be-bom",
       "format": "SubRip",
-      "encoding": "Utf16Bom",
       "input": "input/srt-utf16be-bom.srt"
     },
     {
       "id": "srt-utf16le-bom",
       "format": "SubRip",
-      "encoding": "Utf16Bom",
       "input": "input/srt-utf16le-bom.srt"
     },
     {
       "id": "srt-explicit-utf16be",
       "format": "SubRip",
-      "encoding": "Utf16Be",
       "input": "input/srt-explicit-utf16be.srt"
     },
     {
       "id": "srt-end-before-start",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-end-before-start.srt"
     },
     {
       "id": "srt-sequence-missing",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-sequence-missing.srt"
     },
     {
       "id": "srt-fraction-width",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-fraction-width.srt"
     },
     {
       "id": "srt-overlong-utf8",
       "format": "SubRip",
-      "encoding": "Utf8",
       "input": "input/srt-overlong-utf8.srt"
     },
     {
       "id": "srt-lone-surrogate",
       "format": "SubRip",
-      "encoding": "Utf16Bom",
       "input": "input/srt-lone-surrogate.srt"
     },
     {
       "id": "vtt-short-timestamps",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-short-timestamps.vtt"
     },
     {
       "id": "vtt-id-settings",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-id-settings.vtt"
     },
     {
       "id": "vtt-crlf-multiline",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-crlf-multiline.vtt"
     },
     {
       "id": "vtt-cr-lines",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-cr-lines.vtt"
     },
     {
       "id": "vtt-utf8-bom",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-utf8-bom.vtt"
     },
     {
       "id": "vtt-payload-markup-exact",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-payload-markup-exact.vtt"
     },
     {
       "id": "vtt-metadata-order",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-metadata-order.vtt"
     },
     {
       "id": "vtt-note-between-cues",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-note-between-cues.vtt"
     },
     {
       "id": "vtt-tab-separators",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-tab-separators.vtt"
     },
     {
       "id": "vtt-wide-hours",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-wide-hours.vtt"
     },
     {
       "id": "vtt-overlap-order",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-overlap-order.vtt"
     },
     {
       "id": "vtt-header-annotation",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-header-annotation.vtt"
     },
     {
       "id": "vtt-empty-document",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-empty-document.vtt"
     },
     {
       "id": "vtt-bad-signature",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-bad-signature.vtt"
     },
     {
       "id": "vtt-utf16-refused",
       "format": "WebVtt",
-      "encoding": "Utf16Be",
       "input": "input/vtt-utf16-refused.vtt"
     },
     {
       "id": "vtt-zero-interval-strict",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-zero-interval-strict.vtt"
     },
     {
       "id": "vtt-surrogate-utf8",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-surrogate-utf8.vtt"
     },
     {
       "id": "vtt-missing-fraction",
       "format": "WebVtt",
-      "encoding": "Utf8",
       "input": "input/vtt-missing-fraction.vtt"
     }
   ],

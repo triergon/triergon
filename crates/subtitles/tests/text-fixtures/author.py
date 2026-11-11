@@ -110,14 +110,13 @@ def stamp(ms, comma=False):
     return f"{hours:02}:{minutes:02}:{seconds:02}{',' if comma else '.'}{millis:03}"
 
 
-def document_input(name, fmt, payload, encoding):
+def document_input(name, fmt, payload):
     suffix = {"SubRip": "srt", "WebVtt": "vtt"}[fmt]
-    DOCUMENTS.append(dict(id=name, format=fmt, encoding=encoding,
-                          input=put(f"input/{name}.{suffix}", payload)))
+    DOCUMENTS.append(dict(id=name, format=fmt, input=put(f"input/{name}.{suffix}", payload)))
 
 
 def document_case(name, fmt, document, **extra):
-    document_input(name, fmt, bytes(document.data), document.encoding)
+    document_input(name, fmt, bytes(document.data))
 
 
 def author_srt():
@@ -147,14 +146,14 @@ def author_srt():
         document = Document(encoding, byte_order, bom)
         document.srt(1, 12, 1012, value)
         document_case(name, "SubRip", document)
-    for name, payload, encoding in [
-        ("srt-end-before-start", b"1\n00:00:02,000 --> 00:00:01,000\nx\n\n", "Utf8"),
-        ("srt-sequence-missing", b"00:00:01,000 --> 00:00:02,000\nx\n\n", "Utf8"),
-        ("srt-fraction-width", b"1\n00:00:01,00 --> 00:00:02,000\nx\n\n", "Utf8"),
-        ("srt-overlong-utf8", b"1\n00:00:01,000 --> 00:00:02,000\n\xc0\xaf\n\n", "Utf8"),
-        ("srt-lone-surrogate", b"\xfe\xff" + "1\n00:00:01,000 --> 00:00:02,000\n".encode("utf-16-be") + b"\xd8\x00\x00\n\x00\n", "Utf16Bom"),
+    for name, payload in [
+        ("srt-end-before-start", b"1\n00:00:02,000 --> 00:00:01,000\nx\n\n"),
+        ("srt-sequence-missing", b"00:00:01,000 --> 00:00:02,000\nx\n\n"),
+        ("srt-fraction-width", b"1\n00:00:01,00 --> 00:00:02,000\nx\n\n"),
+        ("srt-overlong-utf8", b"1\n00:00:01,000 --> 00:00:02,000\n\xc0\xaf\n\n"),
+        ("srt-lone-surrogate", b"\xfe\xff" + "1\n00:00:01,000 --> 00:00:02,000\n".encode("utf-16-be") + b"\xd8\x00\x00\n\x00\n"),
     ]:
-        document_input(name, "SubRip", payload, encoding)
+        document_input(name, "SubRip", payload)
 
 
 def author_vtt():
@@ -215,14 +214,14 @@ def author_vtt():
     document = Document()
     document.header()
     document_case("vtt-empty-document", "WebVtt", document)
-    for name, payload, encoding in [
-        ("vtt-bad-signature", b"WEBVTTX\n\n", "Utf8"),
-        ("vtt-utf16-refused", "WEBVTT\n\n".encode("utf-16-be"), "Utf16Be"),
-        ("vtt-zero-interval-strict", b"WEBVTT\n\n00:01.000 --> 00:01.000\nx\n\n", "Utf8"),
-        ("vtt-surrogate-utf8", b"WEBVTT\n\n00:01.000 --> 00:02.000\n\xed\xa0\x80\n\n", "Utf8"),
-        ("vtt-missing-fraction", b"WEBVTT\n\n00:01 --> 00:02\nx\n\n", "Utf8"),
+    for name, payload in [
+        ("vtt-bad-signature", b"WEBVTTX\n\n"),
+        ("vtt-utf16-refused", "WEBVTT\n\n".encode("utf-16-be")),
+        ("vtt-zero-interval-strict", b"WEBVTT\n\n00:01.000 --> 00:01.000\nx\n\n"),
+        ("vtt-surrogate-utf8", b"WEBVTT\n\n00:01.000 --> 00:02.000\n\xed\xa0\x80\n\n"),
+        ("vtt-missing-fraction", b"WEBVTT\n\n00:01 --> 00:02\nx\n\n"),
     ]:
-        document_input(name, "WebVtt", payload, encoding)
+        document_input(name, "WebVtt", payload)
 
 
 def box(kind, body):

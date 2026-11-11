@@ -39,10 +39,11 @@ struct ExpectedPacket {
     stream_time_base: [i32; 2],
     side: &'static [ExpectedSide],
 }
-/// What a case reads: a sample of a packet format or a whole document.
+/// What a case reads: a sample of a packet format in an encoding, or a whole
+/// document.
 #[derive(Clone, Copy)]
 enum Kind {
-    Sample(Format),
+    Sample(Format, Encoding),
     Document(Syntax),
 }
 enum ExpectedOperation {
@@ -52,7 +53,6 @@ enum ExpectedOperation {
 struct Case {
     id: &'static str,
     kind: Kind,
-    encoding: Encoding,
     payload: &'static [u8],
     codec_id: Option<&'static [u8]>,
     codec_private: Option<&'static [u8]>,
@@ -79,8 +79,8 @@ fn bytes(pool: &Budget, value: Option<&[u8]>) -> Option<Bytes> {
 }
 fn input(pool: &Budget, case: &Case) -> Source {
     let payload = Bytes::copy_from_slice(pool, case.payload).unwrap();
-    let format = match case.kind {
-        Kind::Sample(format) => format,
+    let (format, encoding) = match case.kind {
+        Kind::Sample(format, encoding) => (format, encoding),
         Kind::Document(syntax) => {
             return Source::Document(DocumentInput {
                 syntax,
@@ -94,7 +94,7 @@ fn input(pool: &Budget, case: &Case) -> Source {
     };
     Source::Sample(Input {
         format,
-        encoding: case.encoding,
+        encoding,
         payload,
         codec_id: bytes(pool, case.codec_id),
         codec_private: bytes(pool, case.codec_private),

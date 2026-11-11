@@ -96,7 +96,7 @@ pub mod document {
     //! and duration in milliseconds, its text bytes and the WebVTT identifier
     //! and settings. The demuxers tolerate what the specifications refuse: cues
     //! without numbers, unchecked field ranges, cues out of order, which they
-    //! sort. The strict readers of [`text`](crate::text) are separate.
+    //! sort.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::text::demuxer::{Cue, Limits, Reader, Status, Syntax};
