@@ -13,6 +13,7 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
+use triergon_core::container::MediaKind;
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Reservation, Rounding, Time, TimeBase, WorkBudget,
 };
@@ -320,6 +321,11 @@ pub(crate) const BACKWARD_LAYOUT_REFUSAL: Error = Error::Unsupported(BACKWARD_LA
 struct RangeDuration {
     micros: i64,
     scan: bool,
+    media_tracks_only: bool,
+}
+
+pub(crate) fn include_media_track(movie: &Movie, ordinal: usize) -> bool {
+    iso::media_kind(&movie.tracks()[ordinal].header().handler) != MediaKind::Data
 }
 
 impl<'a> Mp4IndexJob<'a> {
@@ -375,6 +381,7 @@ impl<'a> Mp4IndexJob<'a> {
         movie: &'a Movie,
         plans: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         limits: PlanLimits,
+        media_tracks_only: bool,
     ) -> Result<Self> {
         if movie.native_recovery()
             || movie.read_scope() != crate::mp4_open::MetadataReadScope::CompleteEntity
@@ -401,6 +408,7 @@ impl<'a> Mp4IndexJob<'a> {
             Some(RangeDuration {
                 micros,
                 scan: micros == 0,
+                media_tracks_only,
             }),
         )
     }
@@ -544,7 +552,19 @@ impl<'a> Mp4IndexJob<'a> {
         };
         let native = if view == Mp4View::PinnedMov9NoParseNoFillin {
             let native_limits = limits.native_packet_limits();
-            Some(if let Some(plans) = encoded_edits {
+            let media_tracks_only = range_duration
+                .as_ref()
+                .is_some_and(|range| range.media_tracks_only);
+            Some(if media_tracks_only {
+                PacketCursor::new_projected(
+                    b,
+                    native.as_slice(),
+                    movie.media(),
+                    native_limits,
+                    encoded_edits,
+                    |index| include_media_track(movie, index),
+                )?
+            } else if let Some(plans) = encoded_edits {
                 PacketCursor::new_encoded_regular(
                     b,
                     native.as_slice(),

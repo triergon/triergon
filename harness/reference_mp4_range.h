@@ -34,10 +34,15 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
     int video = -1;
     int audio = -1;
     result = AVERROR_INVALIDDATA;
-    if (format->nb_streams < 1 || format->nb_streams > 2)
+    if (format->nb_streams < 1 || format->nb_streams > 64)
         goto done;
     for (unsigned i = 0; i < format->nb_streams; ++i) {
-        const AVCodecParameters *codec = format->streams[i]->codecpar;
+        AVStream *stream = format->streams[i];
+        const AVCodecParameters *codec = stream->codecpar;
+        if (codec->codec_type == AVMEDIA_TYPE_DATA) {
+            stream->discard = AVDISCARD_ALL;
+            continue;
+        }
         const uint32_t tag = codec->codec_tag;
         const int video_codec =
             (codec->codec_id == AV_CODEC_ID_H264 && tag == MKTAG('a', 'v', 'c', '1')) ||
