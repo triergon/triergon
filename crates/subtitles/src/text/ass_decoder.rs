@@ -7,8 +7,9 @@
 //! refuses the open. Each packet then gives at most one subtitle:
 //!
 //! - an empty packet gives none;
-//! - with a label the packet is converted to UTF-8, and a refused conversion
-//!   gives none;
+//! - with a label the packet is converted to UTF-8, and a conversion the
+//!   charset refuses gives none; one that exceeds a limit or the pool is an
+//!   error, and the next packet decodes anew;
 //! - the text is the packet up to its first NUL;
 //! - text that is not UTF-8, or that holds U+FFFE, gives none.
 
@@ -129,9 +130,13 @@ impl Decoder {
                     self.converter = None;
                 }
                 Err(error @ (Error::Cancelled | Error::Backpressure { .. })) => return Err(error),
-                Err(_) => {
+                Err(error) => {
                     self.converter = None;
-                    return Ok(Status::Decoded(None));
+                    return match error {
+                        // The charset refuses the packet.
+                        Error::Invalid(_) | Error::Truncated => Ok(Status::Decoded(None)),
+                        error => Err(error),
+                    };
                 }
             }
         }

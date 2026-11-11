@@ -301,6 +301,45 @@ fn ass_charset_labels_open_and_convert_as_the_receiver_does() {
     assert!(decode(&mut decoder, b"\xa4\x00", &pool).is_none());
 }
 
+#[test]
+fn an_ass_conversion_beyond_its_limits_is_an_error_not_a_refusal() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let label = Bytes::copy_from_slice(&pool, b"windows-1252").unwrap();
+    let limits = ass::Limits {
+        max_decoded_bytes: 4,
+        ..ass::Limits::default()
+    };
+    let mut decoder =
+        ass::Decoder::new(&pool, None, Some(&label), ass::Options::default(), limits).unwrap();
+    let cancel = AtomicBool::new(false);
+    // Three bytes of two UTF-8 bytes each are six decoded bytes.
+    let packet = Bytes::copy_from_slice(&pool, b"\xe9\xe9\xe9").unwrap();
+    decoder.provide(&packet, ass::Clock::default()).unwrap();
+    let error = loop {
+        match decoder.poll(&mut WorkBudget::new(1), &cancel) {
+            Ok(ass::Status::Pending) => {}
+            Ok(status) => panic!("{status:?}"),
+            Err(error) => break error,
+        }
+    };
+    assert!(
+        matches!(
+            error,
+            Error::Limit {
+                requested: 6,
+                maximum: 4
+            }
+        ),
+        "{error:?}"
+    );
+    // A byte windows-1252 leaves undefined is still a refusal.
+    assert!(decode(&mut decoder, b"\x81", &pool).is_none());
+    assert_eq!(
+        decode(&mut decoder, b"\xe9", &pool).unwrap().ass.as_ref(),
+        "\u{e9}".as_bytes()
+    );
+}
+
 /// Each cue of a SubRip document converted from `label` as FFmpeg's
 /// `sub_charenc` decoder option converts it, `None` where the conversion is
 /// refused: `compat::document` reads the cues, `CharsetJob` converts each
