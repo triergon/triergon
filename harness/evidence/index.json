@@ -19608,6 +19608,15 @@
    "key": "evidence/mp4-fragment-subtitles-b42e33df-aarch64/5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5.tar.gz",
    "sha256": "5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5",
    "bytes": 50007294
+  },
+  {
+   "name": "mp4-fragment-subtitles-current-main-workers",
+   "path": "mp4-fragment-subtitles-current-main-workers",
+   "retention": "90 days",
+   "reason": "Compare MP4 range workers after the caption changes",
+   "key": "qualification/mp4-fragment-subtitles-current-main-workers/5baf97ff731c7af0956f82da9a3085acc2dccb81fb19bd65e40f929cdc5e5875.tar.gz",
+   "sha256": "5baf97ff731c7af0956f82da9a3085acc2dccb81fb19bd65e40f929cdc5e5875",
+   "bytes": 25576885
   }
  ]
 }
