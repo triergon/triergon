@@ -179,6 +179,7 @@ fn run_case(index: usize) {
         }
         // Native byte behavior never changes the independent source oracle.
         assert!(std::str::from_utf8(case.unicode).is_ok());
+        drop(payload);
         drop(result);
         drop(session);
         drop(original);
