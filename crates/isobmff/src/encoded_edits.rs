@@ -7,8 +7,8 @@ use crate::{
 };
 use std::sync::{Arc, atomic::AtomicBool};
 use triergon_core::{
-    Budget, BudgetVec, Error, InputCursor, InputToken, Reservation, Result, Rounding, SourceId,
-    Time, TimeBase, WorkBudget,
+    Budget, BudgetVec, Charged, Error, InputCursor, InputToken, Reservation, Result, Rounding,
+    SourceId, Time, TimeBase, WorkBudget,
 };
 use triergon_framing::{
     AacAscParser, AacConfigLimits, AacSource, Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser,
@@ -397,7 +397,7 @@ pub struct EncodedEditJob<'a> {
     opus_first_tick: i128,
     opus_durations: BudgetVec<OpusDurationRun>,
     preserve_aac_media_durations: bool,
-    aac_program: Option<Box<AacAscParser>>,
+    aac_program: Option<Box<Charged<AacAscParser>>>,
     dts_scale: Option<u32>,
     dolby_config: Option<Ac3ConfigParser>,
     descriptions: u32,
@@ -514,7 +514,7 @@ impl<'a> EncodedEditJob<'a> {
             EncodedEntryKind::Aac => {
                 let config = &stream.demux().extradata;
                 if config.as_ref().get(1).is_some_and(|byte| byte & 0x78 == 0) {
-                    job.aac_program = Some(Box::new(AacAscParser::new(
+                    let parser = AacAscParser::new(
                         input.budget(),
                         AacSource {
                             source: input.source(),
@@ -527,7 +527,13 @@ impl<'a> EncodedEditJob<'a> {
                             maximum_pce_elements: 64,
                             maximum_comment_bytes: 255,
                         },
-                    )?));
+                    )?;
+                    let parser = Charged::try_new(
+                        input.budget(),
+                        size_of::<Charged<AacAscParser>>(),
+                        || parser,
+                    )?;
+                    job.aac_program = Some(Box::new(parser));
                 }
                 return Ok(job);
             }

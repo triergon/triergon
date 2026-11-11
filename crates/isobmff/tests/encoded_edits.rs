@@ -283,7 +283,40 @@ fn range_playback_keeps_quicktime_visual_decode_order_and_signed_clocks() {
 fn range_playback_uses_the_coded_frame_clock_for_aac_programs() {
     let raw = include_bytes!("fixtures/range-encoded-edits/aac-program-edit.mov");
     let source = Source::new(raw, b"soun");
-    let plan = range_plan(&source, *b"qt  ").unwrap();
+    let mut input = source.input();
+    let configs = [range_config(
+        &source,
+        *b"qt  ",
+        &mut input,
+        ConfigurationLimits::default(),
+    )
+    .unwrap()];
+    let context = || EncodedEditContext {
+        table: &source.table,
+        edits: &source.edits,
+        stream: &configs[0],
+        media_base: source.header.time_base().unwrap(),
+        movie_base: source.movie_base,
+    };
+    let pressure = source.pool.reserve(source.pool.available()).unwrap();
+    assert!(matches!(
+        EncodedEditJob::new_range_playback(
+            context(),
+            &configs,
+            &input,
+            EncodedEditLimits::default()
+        ),
+        Err(Error::Backpressure { .. })
+    ));
+    drop(pressure);
+    let mut job = EncodedEditJob::new_range_playback(
+        context(),
+        &configs,
+        &input,
+        EncodedEditLimits::default(),
+    )
+    .unwrap();
+    let plan = complete(&mut job, &mut input, 1).unwrap();
     let packets = rows(&source, plan);
     let ranges = [36, 173, 395, 531, 712, 854, 974, 1156, 1332, 1468];
     assert_eq!(packets.len(), ranges.len() - 1);
