@@ -109,6 +109,7 @@ impl Decoder {
                 maximum: self.maximum,
             });
         }
+        self.output.try_reserve(encoded.len())?;
         self.output.try_extend_from_slice(encoded)
     }
 }

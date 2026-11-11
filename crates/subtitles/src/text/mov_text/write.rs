@@ -83,6 +83,20 @@ impl Writer {
         self.pending.clear();
         Ok(true)
     }
+    /// Appends `bytes` to the output, once [`drain`](Self::drain) has moved
+    /// what is pending; the output never grows beyond `maximum` bytes.
+    pub(super) fn push(&mut self, bytes: &[u8], maximum: usize) -> Result<()> {
+        if self.data.len().saturating_add(bytes.len()) > maximum {
+            return Err(Error::Limit {
+                requested: maximum.saturating_add(1),
+                maximum,
+            });
+        }
+        // Amortised growth: an exact reservation per run would copy the
+        // output again for every run.
+        self.data.try_reserve(bytes.len())?;
+        self.data.try_extend_from_slice(bytes)
+    }
     pub(super) fn freeze(
         &mut self,
         funding: &mut Funding,

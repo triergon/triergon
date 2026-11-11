@@ -320,35 +320,20 @@ impl PacketJob {
                     funding.commit();
                 }
                 Phase::Validate => {
-                    if self.at == self.text_end {
-                        self.advance = true;
-                        self.phase = Phase::Prefix;
-                        continue;
-                    }
-                    if self.bytes()[self.at] == 0 {
-                        if !funding.pay(self.text_end - self.at, caller)? {
-                            return Ok(false);
-                        }
-                        self.visible_end = self.at;
-                        self.advance = true;
-                        self.phase = Phase::Prefix;
-                        funding.commit();
-                        continue;
-                    }
-                    let n = utf8_width(self.bytes()[self.at]);
-                    if !funding.pay(n, caller)? {
+                    // The visible text runs to the first NUL; it must be UTF-8
+                    // without U+FFFE.
+                    if !funding.pay((self.text_end - self.at).max(1), caller)? {
                         return Ok(false);
                     }
-                    let valid = self
-                        .bytes()
-                        .get(self.at..self.at + n)
-                        .filter(|_| self.at + n <= self.text_end)
-                        .and_then(|b| std::str::from_utf8(b).ok())
-                        .and_then(|s| s.chars().next())
-                        .is_some_and(|ch| ch != '\u{fffe}');
                     funding.commit();
+                    let text = &self.bytes()[self.at..self.text_end];
+                    let visible = text.iter().position(|&b| b == 0).unwrap_or(text.len());
+                    let valid = std::str::from_utf8(&text[..visible])
+                        .is_ok_and(|text| !text.contains('\u{fffe}'));
                     if valid {
-                        self.at += n;
+                        self.visible_end = self.at + visible;
+                        self.advance = true;
+                        self.phase = Phase::Prefix;
                     } else {
                         self.refuse(true);
                     }
@@ -383,7 +368,12 @@ impl PacketJob {
                         self.phase = Phase::Freeze;
                         continue;
                     }
-                    if !self.render_transition(config, funding, caller)? {
+                    let boundary = self.next_boundary();
+                    if self.stage == 0 && boundary > self.character {
+                        if !self.render_run(boundary, limits, funding, caller)? {
+                            return Ok(false);
+                        }
+                    } else if !self.render_transition(config, funding, caller)? {
                         return Ok(false);
                     }
                 }
@@ -395,6 +385,53 @@ impl PacketJob {
                 }
             }
         }
+    }
+    /// The first character from the current one at which a style or the
+    /// highlight starts or ends.
+    fn next_boundary(&self) -> usize {
+        let style = self
+            .styles
+            .as_slice()
+            .get(self.selected)
+            .map(|s| [s.start, s.end]);
+        let highlight = self.highlight.map(|(start, end)| [start, end]);
+        style
+            .into_iter()
+            .chain(highlight)
+            .flatten()
+            .map(usize::from)
+            .filter(|&at| at >= self.character)
+            .min()
+            .unwrap_or(usize::MAX)
+    }
+    /// Writes the characters before `boundary`, where no tag changes: one
+    /// unit for each emission stage and output byte of every character.
+    fn render_run(
+        &mut self,
+        boundary: usize,
+        limits: Limits,
+        funding: &mut Funding,
+        caller: &mut WorkBudget,
+    ) -> Result<bool> {
+        let input = self.input.payload.clone();
+        let bytes = input.as_ref();
+        while self.character < boundary && self.text_at < self.visible_end {
+            let b = bytes[self.text_at];
+            let n = utf8_width(b);
+            let output: &[u8] = match b {
+                b'\n' => b"\\N",
+                b'\r' => b"",
+                _ => &bytes[self.text_at..self.text_at + n],
+            };
+            if !funding.pay(7 + output.len(), caller)? {
+                return Ok(false);
+            }
+            self.writer.push(output, limits.maximum_ass_bytes)?;
+            funding.commit();
+            self.text_at += n;
+            self.character += 1;
+        }
+        Ok(true)
     }
     fn at_start(&self) -> Option<Style> {
         self.styles

@@ -75,6 +75,7 @@ impl Parser {
                 maximum: self.maximum,
             });
         }
+        self.text.try_reserve(length - separator)?;
         if !first {
             self.text.try_extend_from_slice(b"\n")?;
         }
