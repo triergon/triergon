@@ -321,8 +321,9 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, the five `subtitle-*` features with `subtitle-worker` and the
-`subtitles` reference, the three font features with `font-worker` and FreeType, the six
+and `formats` references, the five bitmap and caption `subtitle-*` features with
+`subtitle-worker` and the `subtitles` reference, `subtitle-text` with `subtitle-worker`
+and the `formats` reference, the three font features with `font-worker` and FreeType, the six
 shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
 features with `raster-worker` and libass, and the four ASS parsing features,
 `ass-render` and `ass-render-host` with `ass-worker` and libass.

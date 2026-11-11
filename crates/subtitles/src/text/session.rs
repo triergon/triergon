@@ -1,7 +1,6 @@
 //! Resumable per-input operation; repeated loops perform actual parsing.
 use super::{
-    Encoding, Event, Format, Input, Limits, Metadata, MetadataKind,
-    document::{Document, Item},
+    Cue, Encoding, Format, Input, Limits,
     emit::{Emitter, Fields, Plan, TextSpan, Times},
     sample,
     unicode::{Cursor, Poll, Probe, cancelled},
@@ -15,11 +14,9 @@ enum Phase {
     Length,
     Probe,
     Validate,
-    Document,
     Boxes,
     Addition,
     Emit,
-    Metadata,
     Done,
 }
 
@@ -30,7 +27,7 @@ enum Phase {
 )]
 pub(crate) enum Action {
     Yield,
-    Event { event: Event, last: bool },
+    Cue(Cue),
     Complete,
 }
 
@@ -45,12 +42,10 @@ pub(crate) struct Session {
     decoded_len: usize,
     probe: Option<Probe>,
     validator: Option<Cursor>,
-    document: Option<Document>,
     tx3g: Option<sample::Tx3g>,
     addition: Option<sample::Addition>,
     fields: Fields,
     emitter: Option<Emitter>,
-    metadata: Option<(MetadataKind, Range<usize>)>,
 }
 
 impl Session {
@@ -63,12 +58,10 @@ impl Session {
             decoded_len: 0,
             probe: None,
             validator: None,
-            document: None,
             tx3g: (input.format == Format::Tx3g).then(|| sample::Tx3g::new(pool, iso_tx3g)),
             addition: None,
             fields: Fields::default(),
             emitter: None,
-            metadata: None,
         }
     }
 
@@ -97,17 +90,6 @@ impl Session {
 
     fn after_validation(&mut self, input: &Input, pool: &Budget) -> Result<()> {
         match input.format {
-            Format::SubRip | Format::WebVtt => {
-                let mut range = self.decode_range.clone();
-                if self.encoding == Encoding::Utf8
-                    && range.start == 0
-                    && input.payload.as_ref().starts_with(&[0xef, 0xbb, 0xbf])
-                {
-                    range.start = 3;
-                }
-                self.document = Some(Document::new(range, self.encoding, input.format));
-                self.phase = Phase::Document;
-            }
             Format::Tx3g => self.phase = Phase::Boxes,
             Format::MatroskaWebVtt => {
                 if let Some(addition) = input.addition.as_ref().filter(|addition| addition.id == 1)
@@ -145,29 +127,11 @@ impl Session {
                             self.sample_plan(input, pool)?;
                         }
                         Format::Tx3g => self.phase = Phase::Length,
-                        Format::WebVtt | Format::Utf8Packet | Format::MatroskaWebVtt => {
+                        Format::Utf8Packet | Format::MatroskaWebVtt => {
                             if input.encoding != Encoding::Utf8 {
                                 return Err(Error::Invalid("text format requires UTF-8"));
                             }
                             self.probe = Some(Probe::new(self.text_range.clone(), Encoding::Utf8));
-                            self.phase = Phase::Probe;
-                        }
-                        Format::SubRip => {
-                            if !matches!(
-                                input.encoding,
-                                Encoding::Utf8
-                                    | Encoding::Utf16Bom
-                                    | Encoding::Utf16Be
-                                    | Encoding::Utf16Le
-                                    | Encoding::Ascii
-                                    | Encoding::Latin1
-                                    | Encoding::Windows1251
-                                    | Encoding::Windows1252
-                                    | Encoding::Multibyte(_)
-                            ) {
-                                return Err(Error::Unsupported("declared charset conversion"));
-                            }
-                            self.probe = Some(Probe::new(self.text_range.clone(), input.encoding));
                             self.phase = Phase::Probe;
                         }
                     }
@@ -221,25 +185,6 @@ impl Session {
                         }
                     }
                 }
-                Phase::Document => {
-                    match self
-                        .document
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing text document"))?
-                        .poll(input.payload.as_ref(), pool, limits, work, cancel)?
-                    {
-                        Poll::Yield => return Ok(Action::Yield),
-                        Poll::End => self.phase = Phase::Done,
-                        Poll::Ready(Item::Metadata(kind, range)) => {
-                            self.metadata = Some((kind, range));
-                            self.phase = Phase::Metadata;
-                        }
-                        Poll::Ready(Item::Cue(plan)) => {
-                            self.emitter = Some(Emitter::new(plan, pool));
-                            self.phase = Phase::Emit;
-                        }
-                    }
-                }
                 Phase::Boxes => {
                     match self
                         .tx3g
@@ -273,24 +218,6 @@ impl Session {
                         }
                     }
                 }
-                Phase::Metadata => {
-                    if !work.try_charge(1) {
-                        return Ok(Action::Yield);
-                    }
-                    let (kind, raw_range) = self
-                        .metadata
-                        .take()
-                        .ok_or(Error::Invalid("missing text metadata"))?;
-                    self.phase = Phase::Document;
-                    return Ok(Action::Event {
-                        event: Event::Metadata(Metadata {
-                            input: input.clone(),
-                            kind,
-                            raw_range,
-                        }),
-                        last: false,
-                    });
-                }
                 Phase::Emit => {
                     match self
                         .emitter
@@ -302,12 +229,8 @@ impl Session {
                         Poll::End => return Err(Error::Invalid("cue emitter ended")),
                         Poll::Ready(cue) => {
                             self.emitter = None;
-                            let last = self.document.is_none();
-                            self.phase = if last { Phase::Done } else { Phase::Document };
-                            return Ok(Action::Event {
-                                event: Event::Cue(cue),
-                                last,
-                            });
+                            self.phase = Phase::Done;
+                            return Ok(Action::Cue(cue));
                         }
                     }
                 }

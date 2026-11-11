@@ -88,6 +88,36 @@ pub mod charset {
     };
 }
 
+pub mod document {
+    //! FFmpeg's `srt` and `webvtt` demuxers.
+    //!
+    //! [`Reader`] reads one SubRip or WebVTT document ([`Syntax`]) into the
+    //! [`Cue`]s the demuxer returns as packets, in its order: each cue's start
+    //! and duration in milliseconds, its text bytes and the WebVTT identifier
+    //! and settings. The demuxers tolerate what the specifications refuse: cues
+    //! without numbers, unchecked field ranges, cues out of order, which they
+    //! sort.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+    pub use crate::text::demuxer::{Cue, Limits, Reader, Status, Syntax};
+}
+
+pub mod ass {
+    //! FFmpeg's `ass` decoder.
+    //!
+    //! [`Decoder`] opens with the codec configuration and an optional charset
+    //! label, refused when the receiver's repertoire lacks it, and decodes each
+    //! ASS packet to the [`Subtitle`] the decode call returns for it, if any:
+    //! none for an empty packet, a refused conversion or text that is not
+    //! UTF-8. The text is the packet up to its first NUL.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch, with
+    //! Linux/glibc `iconv`.
+    pub use crate::text::Limits;
+    pub use crate::text::ass_decoder::{Decoder, Options, Status};
+    pub use crate::text::decoded::{Clock, Subtitle};
+}
+
 pub mod mov_text {
     //! mov_text to ASS conversion.
     //!

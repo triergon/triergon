@@ -1,5 +1,6 @@
+use crate::compat::document::Syntax;
 use crate::text::Input;
-use triergon_core::{BudgetVec, Bytes};
+use triergon_core::{BudgetVec, Bytes, SourceId};
 
 /// Explicit native caller setup, separate from the original exact source Time.
 /// Ratios remain unreduced. Unknown and caller-known zero remain distinct here.
@@ -86,9 +87,32 @@ pub struct Packet {
     pub side_data: BudgetVec<SideData>,
 }
 
+/// A whole SubRip or WebVTT document for the document operation: its bytes,
+/// the syntax its caller declares and its source facts.
+#[derive(Clone, Debug)]
+pub struct DocumentInput {
+    pub syntax: Syntax,
+    pub payload: Bytes,
+    pub source_id: SourceId,
+    pub generation: u64,
+    pub sequence: u64,
+    pub configuration_epoch: u64,
+}
+
+/// What an operation reads: one demuxed sample or one whole document.
+#[derive(Clone, Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "The input moves through the session inline, as Input did, without a new allocation."
+)]
+pub enum Source {
+    Sample(Input),
+    Document(DocumentInput),
+}
+
 #[derive(Debug)]
 pub struct Snapshot {
-    pub input: Input,
+    pub input: Source,
     pub operation: Operation,
     pub format: Option<FormatFacts>,
     pub stream: Option<Stream>,

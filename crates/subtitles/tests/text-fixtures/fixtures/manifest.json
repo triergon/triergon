@@ -3,1481 +3,6 @@
   "provenance": "Original lane-authored components and expected source facts; no decoder output used",
   "cases": [
     {
-      "id": "srt-basic",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-basic.srt",
-      "events": [
-        {
-          "kind": "Cue",
-          "raw": [
-            0,
-            51
-          ],
-          "text": [
-            32,
-            51
-          ],
-          "decoded": "expected/srt-basic.0.utf8",
-          "start": [
-            1001,
-            1000
-          ],
-          "end": [
-            2509,
-            1000
-          ],
-          "duration": [
-            377,
-            250
-          ],
-          "encoding": "Utf8",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              0,
-              1
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "srt-crlf-multiline",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-crlf-multiline.srt",
-      "events": [
-        {
-          "kind": "Cue",
-          "raw": [
-            0,
-            65
-          ],
-          "text": [
-            35,
-            65
-          ],
-          "decoded": "expected/srt-crlf-multiline.0.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            3,
-            1
-          ],
-          "duration": [
-            3,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              0,
-              2
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "srt-unicode-no-normalization",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-unicode-no-normalization.srt",
-      "events": [
-        {
-          "kind": "Cue",
-          "raw": [
-            0,
-            61
-          ],
-          "text": [
-            32,
-            61
-          ],
-          "decoded": "expected/srt-unicode-no-normalization.0.utf8",
-          "start": [
-            3,
-            1000
-          ],
-          "end": [
-            999,
-            1000
-          ],
-          "duration": [
-            249,
-            250
-          ],
-          "encoding": "Utf8",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              0,
-              1
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "srt-overlap-order",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-overlap-order.srt",
-      "events": [
-        {
-          "kind": "Cue",
-          "raw": [
-            0,
-            50
-          ],
-          "text": [
-            32,
-            50
-          ],
-          "decoded": "expected/srt-overlap-order.0.utf8",
-          "start": [
-            5,
-            1
-          ],
-          "end": [
-            9,
-            1
-          ],
-          "duration": [
-            4,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              0,
-              1
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            52,
-            112
-          ],
-          "text": [
-            84,
-            112
-          ],
-          "decoded": "expected/srt-overlap-order.1.utf8",
-          "start": [
-            5,
-            1
-          ],
-          "end": [
-            6,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              52,
-              53
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "srt-wide-hours-profile",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-wide-hours-profile.srt",
-      "events": [
-        {
-          "kind": "Cue",
-          "raw": [
-            0,
-            47
-          ],
-          "text": [
-            34,
-            47
-          ],
-          "decoded": "expected/srt-wide-hours-profile.0.utf8",
-          "start": [
-            360000001,
-            1000
-          ],
-          "end": [
-            180000501,
-            500
-          ],
-          "duration": [
-            1001,
-            1000
-          ],
-          "encoding": "Utf8",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              0,
-              1
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "declared SubRip profile: two or more hour digits"
-    },
-    {
-      "id": "srt-utf8-bom",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-utf8-bom.srt",
-      "events": [
-        {
-          "kind": "Cue",
-          "raw": [
-            3,
-            59
-          ],
-          "text": [
-            35,
-            59
-          ],
-          "decoded": "expected/srt-utf8-bom.0.utf8",
-          "start": [
-            3,
-            250
-          ],
-          "end": [
-            253,
-            250
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              3,
-              4
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "srt-utf16be-bom",
-      "format": "SubRip",
-      "encoding": "Utf16Bom",
-      "input": "input/srt-utf16be-bom.srt",
-      "events": [
-        {
-          "kind": "Cue",
-          "raw": [
-            2,
-            80
-          ],
-          "text": [
-            66,
-            80
-          ],
-          "decoded": "expected/srt-utf16be-bom.0.utf8",
-          "start": [
-            3,
-            250
-          ],
-          "end": [
-            253,
-            250
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf16Be",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              2,
-              4
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "srt-utf16le-bom",
-      "format": "SubRip",
-      "encoding": "Utf16Bom",
-      "input": "input/srt-utf16le-bom.srt",
-      "events": [
-        {
-          "kind": "Cue",
-          "raw": [
-            2,
-            102
-          ],
-          "text": [
-            66,
-            102
-          ],
-          "decoded": "expected/srt-utf16le-bom.0.utf8",
-          "start": [
-            3,
-            250
-          ],
-          "end": [
-            253,
-            250
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf16Le",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              2,
-              4
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "srt-explicit-utf16be",
-      "format": "SubRip",
-      "encoding": "Utf16Be",
-      "input": "input/srt-explicit-utf16be.srt",
-      "events": [
-        {
-          "kind": "Cue",
-          "raw": [
-            0,
-            102
-          ],
-          "text": [
-            64,
-            102
-          ],
-          "decoded": "expected/srt-explicit-utf16be.0.utf8",
-          "start": [
-            3,
-            250
-          ],
-          "end": [
-            253,
-            250
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf16Be",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              0,
-              2
-            ]
-          },
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "srt-end-before-start",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-end-before-start.srt",
-      "events": null,
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "malformed within declared strict SubRip ingestion profile"
-    },
-    {
-      "id": "srt-sequence-missing",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-sequence-missing.srt",
-      "events": null,
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "malformed within declared strict SubRip ingestion profile"
-    },
-    {
-      "id": "srt-fraction-width",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-fraction-width.srt",
-      "events": null,
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "malformed within declared strict SubRip ingestion profile"
-    },
-    {
-      "id": "srt-overlong-utf8",
-      "format": "SubRip",
-      "encoding": "Utf8",
-      "input": "input/srt-overlong-utf8.srt",
-      "events": null,
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "malformed within declared strict SubRip ingestion profile"
-    },
-    {
-      "id": "srt-lone-surrogate",
-      "format": "SubRip",
-      "encoding": "Utf16Bom",
-      "input": "input/srt-lone-surrogate.srt",
-      "events": null,
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "malformed within declared strict SubRip ingestion profile"
-    },
-    {
-      "id": "vtt-short-timestamps",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-short-timestamps.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            8,
-            47
-          ],
-          "text": [
-            32,
-            47
-          ],
-          "decoded": "expected/vtt-short-timestamps.1.utf8",
-          "start": [
-            5,
-            4
-          ],
-          "end": [
-            11,
-            4
-          ],
-          "duration": [
-            3,
-            2
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-id-settings",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-id-settings.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            8,
-            117
-          ],
-          "text": [
-            97,
-            117
-          ],
-          "decoded": "expected/vtt-id-settings.1.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            1,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": {
-            "owner": "Payload",
-            "range": [
-              8,
-              13
-            ]
-          },
-          "settings": {
-            "owner": "Payload",
-            "range": [
-              44,
-              96
-            ]
-          },
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-crlf-multiline",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-crlf-multiline.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            10,
-            45
-          ],
-          "text": [
-            41,
-            45
-          ],
-          "decoded": "expected/vtt-crlf-multiline.1.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            1,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-cr-lines",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-cr-lines.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            8,
-            48
-          ],
-          "text": [
-            38,
-            48
-          ],
-          "decoded": "expected/vtt-cr-lines.1.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            1,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-utf8-bom",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-utf8-bom.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            9
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            11,
-            58
-          ],
-          "text": [
-            41,
-            58
-          ],
-          "decoded": "expected/vtt-utf8-bom.1.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            1,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-payload-markup-exact",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-payload-markup-exact.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            8,
-            91
-          ],
-          "text": [
-            38,
-            91
-          ],
-          "decoded": "expected/vtt-payload-markup-exact.1.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            1,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-metadata-order",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-metadata-order.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Note",
-          "raw": [
-            8,
-            47
-          ]
-        },
-        {
-          "kind": "Style",
-          "raw": [
-            49,
-            77
-          ]
-        },
-        {
-          "kind": "Region",
-          "raw": [
-            79,
-            109
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            111,
-            161
-          ],
-          "text": [
-            151,
-            161
-          ],
-          "decoded": "expected/vtt-metadata-order.4.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            1,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": {
-            "owner": "Payload",
-            "range": [
-              141,
-              150
-            ]
-          },
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-note-between-cues",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-note-between-cues.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            8,
-            44
-          ],
-          "text": [
-            38,
-            44
-          ],
-          "decoded": "expected/vtt-note-between-cues.1.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            1,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        },
-        {
-          "kind": "Note",
-          "raw": [
-            46,
-            63
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            65,
-            100
-          ],
-          "text": [
-            95,
-            100
-          ],
-          "decoded": "expected/vtt-note-between-cues.3.utf8",
-          "start": [
-            1,
-            1
-          ],
-          "end": [
-            2,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-tab-separators",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-tab-separators.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            8,
-            64
-          ],
-          "text": [
-            38,
-            64
-          ],
-          "decoded": "expected/vtt-tab-separators.1.utf8",
-          "start": [
-            1,
-            1000
-          ],
-          "end": [
-            999,
-            1000
-          ],
-          "duration": [
-            499,
-            500
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-wide-hours",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-wide-hours.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            8,
-            53
-          ],
-          "text": [
-            40,
-            53
-          ],
-          "decoded": "expected/vtt-wide-hours.1.utf8",
-          "start": [
-            360000001,
-            1000
-          ],
-          "end": [
-            180000501,
-            500
-          ],
-          "duration": [
-            1001,
-            1000
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-overlap-order",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-overlap-order.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            8,
-            51
-          ],
-          "text": [
-            38,
-            51
-          ],
-          "decoded": "expected/vtt-overlap-order.1.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            3,
-            1
-          ],
-          "duration": [
-            3,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            53,
-            97
-          ],
-          "text": [
-            83,
-            97
-          ],
-          "decoded": "expected/vtt-overlap-order.2.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            2,
-            1
-          ],
-          "duration": [
-            2,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-header-annotation",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-header-annotation.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            30
-          ]
-        },
-        {
-          "kind": "Cue",
-          "raw": [
-            32,
-            79
-          ],
-          "text": [
-            62,
-            79
-          ],
-          "decoded": "expected/vtt-header-annotation.1.utf8",
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            1,
-            1
-          ],
-          "duration": [
-            1,
-            1
-          ],
-          "encoding": "Utf8",
-          "identifier": null,
-          "settings": null,
-          "comments": null,
-          "modifiers": []
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-empty-document",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-empty-document.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        }
-      ],
-      "error": null,
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "authored source profile; no native or renderer claim"
-    },
-    {
-      "id": "vtt-bad-signature",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-bad-signature.vtt",
-      "events": [],
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "strict ingestion error; not a claim about user-agent recovery"
-    },
-    {
-      "id": "vtt-utf16-refused",
-      "format": "WebVtt",
-      "encoding": "Utf16Be",
-      "input": "input/vtt-utf16-refused.vtt",
-      "events": [],
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "strict ingestion error; not a claim about user-agent recovery"
-    },
-    {
-      "id": "vtt-zero-interval-strict",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-zero-interval-strict.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        }
-      ],
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "strict ingestion error; not a claim about user-agent recovery"
-    },
-    {
-      "id": "vtt-surrogate-utf8",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-surrogate-utf8.vtt",
-      "events": [],
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "strict ingestion error; not a claim about user-agent recovery"
-    },
-    {
-      "id": "vtt-missing-fraction",
-      "format": "WebVtt",
-      "encoding": "Utf8",
-      "input": "input/vtt-missing-fraction.vtt",
-      "events": [
-        {
-          "kind": "Header",
-          "raw": [
-            0,
-            6
-          ]
-        }
-      ],
-      "error": "Invalid",
-      "codec_id": null,
-      "codec_private": null,
-      "charset_label": null,
-      "addition": null,
-      "clock": null,
-      "start": null,
-      "duration": null,
-      "input_limit": null,
-      "classification": "strict ingestion error; not a claim about user-agent recovery"
-    },
-    {
       "id": "tx3g-basic",
       "format": "Tx3g",
       "encoding": "Tx3gInBand",
@@ -3183,6 +1708,168 @@
       "classification": "opaque carriage does not assert declared encoding is truthful or source conforming"
     }
   ],
+  "documents": [
+    {
+      "id": "srt-basic",
+      "format": "SubRip",
+      "input": "input/srt-basic.srt"
+    },
+    {
+      "id": "srt-crlf-multiline",
+      "format": "SubRip",
+      "input": "input/srt-crlf-multiline.srt"
+    },
+    {
+      "id": "srt-unicode-no-normalization",
+      "format": "SubRip",
+      "input": "input/srt-unicode-no-normalization.srt"
+    },
+    {
+      "id": "srt-overlap-order",
+      "format": "SubRip",
+      "input": "input/srt-overlap-order.srt"
+    },
+    {
+      "id": "srt-wide-hours-profile",
+      "format": "SubRip",
+      "input": "input/srt-wide-hours-profile.srt"
+    },
+    {
+      "id": "srt-utf8-bom",
+      "format": "SubRip",
+      "input": "input/srt-utf8-bom.srt"
+    },
+    {
+      "id": "srt-utf16be-bom",
+      "format": "SubRip",
+      "input": "input/srt-utf16be-bom.srt"
+    },
+    {
+      "id": "srt-utf16le-bom",
+      "format": "SubRip",
+      "input": "input/srt-utf16le-bom.srt"
+    },
+    {
+      "id": "srt-explicit-utf16be",
+      "format": "SubRip",
+      "input": "input/srt-explicit-utf16be.srt"
+    },
+    {
+      "id": "srt-end-before-start",
+      "format": "SubRip",
+      "input": "input/srt-end-before-start.srt"
+    },
+    {
+      "id": "srt-sequence-missing",
+      "format": "SubRip",
+      "input": "input/srt-sequence-missing.srt"
+    },
+    {
+      "id": "srt-fraction-width",
+      "format": "SubRip",
+      "input": "input/srt-fraction-width.srt"
+    },
+    {
+      "id": "srt-overlong-utf8",
+      "format": "SubRip",
+      "input": "input/srt-overlong-utf8.srt"
+    },
+    {
+      "id": "srt-lone-surrogate",
+      "format": "SubRip",
+      "input": "input/srt-lone-surrogate.srt"
+    },
+    {
+      "id": "vtt-short-timestamps",
+      "format": "WebVtt",
+      "input": "input/vtt-short-timestamps.vtt"
+    },
+    {
+      "id": "vtt-id-settings",
+      "format": "WebVtt",
+      "input": "input/vtt-id-settings.vtt"
+    },
+    {
+      "id": "vtt-crlf-multiline",
+      "format": "WebVtt",
+      "input": "input/vtt-crlf-multiline.vtt"
+    },
+    {
+      "id": "vtt-cr-lines",
+      "format": "WebVtt",
+      "input": "input/vtt-cr-lines.vtt"
+    },
+    {
+      "id": "vtt-utf8-bom",
+      "format": "WebVtt",
+      "input": "input/vtt-utf8-bom.vtt"
+    },
+    {
+      "id": "vtt-payload-markup-exact",
+      "format": "WebVtt",
+      "input": "input/vtt-payload-markup-exact.vtt"
+    },
+    {
+      "id": "vtt-metadata-order",
+      "format": "WebVtt",
+      "input": "input/vtt-metadata-order.vtt"
+    },
+    {
+      "id": "vtt-note-between-cues",
+      "format": "WebVtt",
+      "input": "input/vtt-note-between-cues.vtt"
+    },
+    {
+      "id": "vtt-tab-separators",
+      "format": "WebVtt",
+      "input": "input/vtt-tab-separators.vtt"
+    },
+    {
+      "id": "vtt-wide-hours",
+      "format": "WebVtt",
+      "input": "input/vtt-wide-hours.vtt"
+    },
+    {
+      "id": "vtt-overlap-order",
+      "format": "WebVtt",
+      "input": "input/vtt-overlap-order.vtt"
+    },
+    {
+      "id": "vtt-header-annotation",
+      "format": "WebVtt",
+      "input": "input/vtt-header-annotation.vtt"
+    },
+    {
+      "id": "vtt-empty-document",
+      "format": "WebVtt",
+      "input": "input/vtt-empty-document.vtt"
+    },
+    {
+      "id": "vtt-bad-signature",
+      "format": "WebVtt",
+      "input": "input/vtt-bad-signature.vtt"
+    },
+    {
+      "id": "vtt-utf16-refused",
+      "format": "WebVtt",
+      "input": "input/vtt-utf16-refused.vtt"
+    },
+    {
+      "id": "vtt-zero-interval-strict",
+      "format": "WebVtt",
+      "input": "input/vtt-zero-interval-strict.vtt"
+    },
+    {
+      "id": "vtt-surrogate-utf8",
+      "format": "WebVtt",
+      "input": "input/vtt-surrogate-utf8.vtt"
+    },
+    {
+      "id": "vtt-missing-fraction",
+      "format": "WebVtt",
+      "input": "input/vtt-missing-fraction.vtt"
+    }
+  ],
   "files": [
     {
       "path": "fixtures/addition/mkv-vtt-present-empty-fields.bin",
@@ -3206,8 +1893,8 @@
     },
     {
       "path": "fixtures/cases.rs",
-      "bytes": 49195,
-      "sha256": "0aaabeac9fa915e238ae24baaa7671f021a8f0934cd8d943c94d37b1a799f41b"
+      "bytes": 24463,
+      "sha256": "265a554395a84f6f22e195cfbb980215d0cb7762312175ab9da15a2cfe4b9a49"
     },
     {
       "path": "fixtures/config/ass-invalid-utf8-unvalidated.charset_label",
@@ -3355,56 +2042,6 @@
       "sha256": "41cf6794ba4200b839c53531555f0f3998df4cbb01a4d5cb0b94e3ca5e23947d"
     },
     {
-      "path": "fixtures/expected/srt-basic.0.utf8",
-      "bytes": 19,
-      "sha256": "c857f559bb0db7033769a59be2e31a21783b134b611ed0ad71068152e1432506"
-    },
-    {
-      "path": "fixtures/expected/srt-crlf-multiline.0.utf8",
-      "bytes": 30,
-      "sha256": "f88a15f2713f2b992ef7dc86fe6c1078a112faf0cac1d27d4dd6082ef5477b98"
-    },
-    {
-      "path": "fixtures/expected/srt-explicit-utf16be.0.utf8",
-      "bytes": 19,
-      "sha256": "117dbc722f689e1101c1a3939ea808b726125c1d2080928040c224f88fddf30b"
-    },
-    {
-      "path": "fixtures/expected/srt-overlap-order.0.utf8",
-      "bytes": 18,
-      "sha256": "2bdefcd1caf9fca05f352748a4064b9f0f912d5fdcc627f1158327fc195ba952"
-    },
-    {
-      "path": "fixtures/expected/srt-overlap-order.1.utf8",
-      "bytes": 28,
-      "sha256": "ef78dc95f5a3ffc7c32d7a07d8ea4ad4e96b8851ebdb52662ff92d1d38ef4cca"
-    },
-    {
-      "path": "fixtures/expected/srt-unicode-no-normalization.0.utf8",
-      "bytes": 29,
-      "sha256": "6ecb8e226138cbd18f8e583920eb67f0ba62fbf0f72c42876025bc056ab47822"
-    },
-    {
-      "path": "fixtures/expected/srt-utf16be-bom.0.utf8",
-      "bytes": 10,
-      "sha256": "aa9e05ed5a8ccb17f6e7b477d19980e477a70e3b4a40fdbc54c85f6a2128ccc0"
-    },
-    {
-      "path": "fixtures/expected/srt-utf16le-bom.0.utf8",
-      "bytes": 20,
-      "sha256": "15be107f23e704023e118b7e87aca47159e939728b071e30bde90eb4eff825ad"
-    },
-    {
-      "path": "fixtures/expected/srt-utf8-bom.0.utf8",
-      "bytes": 24,
-      "sha256": "4c7bd884f66c926e289239b1885751d1706a8f0b9f09d2dae321d838f8dd6f52"
-    },
-    {
-      "path": "fixtures/expected/srt-wide-hours-profile.0.utf8",
-      "bytes": 13,
-      "sha256": "279a589b264fb0d1353a51dcf443004df9cfc317d1c1a2591bb3f17731942e72"
-    },
-    {
       "path": "fixtures/expected/tx3g-basic.0.utf8",
       "bytes": 8,
       "sha256": "746e50ede463b5d919060f6fd0b65652dacf5dcf542987676120737a6bcff231"
@@ -3488,76 +2125,6 @@
       "path": "fixtures/expected/utf8-packet-unknown-time.0.utf8",
       "bytes": 7,
       "sha256": "b23a6a8439c0dde5515893e7c90c1e3233b8616e634470f20dc4928bcf3609bc"
-    },
-    {
-      "path": "fixtures/expected/vtt-cr-lines.1.utf8",
-      "bytes": 10,
-      "sha256": "4dadef1d603d745c0f4d45325a2b468cd4c041e704c492dca48a20ee89eec0db"
-    },
-    {
-      "path": "fixtures/expected/vtt-crlf-multiline.1.utf8",
-      "bytes": 4,
-      "sha256": "18745f36a05e29072709042d6062ce54f1b08ff36c27ba80c39f81fb010c8ce2"
-    },
-    {
-      "path": "fixtures/expected/vtt-header-annotation.1.utf8",
-      "bytes": 17,
-      "sha256": "7f9004fa1c45ab477c94c70ae3e33ff765a763aa9c451c445a297f5b69f4dcfe"
-    },
-    {
-      "path": "fixtures/expected/vtt-id-settings.1.utf8",
-      "bytes": 20,
-      "sha256": "e2697850eb0ab0822eeae4b8545460157146205cd98af3220f79e11696a4049d"
-    },
-    {
-      "path": "fixtures/expected/vtt-metadata-order.4.utf8",
-      "bytes": 10,
-      "sha256": "8f6f980370b156e1ce76f30412048e9219b08762053cf6c45acf1f64c301adef"
-    },
-    {
-      "path": "fixtures/expected/vtt-note-between-cues.1.utf8",
-      "bytes": 6,
-      "sha256": "6db7d803e74f1ffa7d8f5adc0bf95b3e15bf4c8373fffadf546227cc6c6742cb"
-    },
-    {
-      "path": "fixtures/expected/vtt-note-between-cues.3.utf8",
-      "bytes": 5,
-      "sha256": "f39592393ef0859cb196a52693d2cea00fb2df784b3c04ae54aa7cadb8e562f8"
-    },
-    {
-      "path": "fixtures/expected/vtt-overlap-order.1.utf8",
-      "bytes": 13,
-      "sha256": "ce7a529131b3f336621fa3f1a3c1bd0dc7528da9ae412fe9d89fb66e4ffb723a"
-    },
-    {
-      "path": "fixtures/expected/vtt-overlap-order.2.utf8",
-      "bytes": 14,
-      "sha256": "bc1f72a720dec46cd2ac5b138c986b87f63b44725a83d1187cb77746da1aa5e2"
-    },
-    {
-      "path": "fixtures/expected/vtt-payload-markup-exact.1.utf8",
-      "bytes": 53,
-      "sha256": "4d6e1d0dbe9a53b28c172babcc23e5425bb1d2c0a27e81e58420e818ba729fab"
-    },
-    {
-      "path": "fixtures/expected/vtt-short-timestamps.1.utf8",
-      "bytes": 15,
-      "sha256": "4b5e1b521cc80b131df199b857b214d0c2d624688709d20e57838e885572697e"
-    },
-    {
-      "path": "fixtures/expected/vtt-tab-separators.1.utf8",
-      "bytes": 26,
-      "sha256": "9797bfdc4bbf5dff4787084f3774b7bfa55f4a00983bb34af8c4019733959c93"
-    },
-    {
-      "path": "fixtures/expected/vtt-utf8-bom.1.utf8",
-      "bytes": 17,
-      "sha256": "a81f15b525a2ccece8fd55eb8f5ced29993d16a78d7a0a4f68d7c9236fefab6b"
-    },
-    {
-      "path": "fixtures/expected/vtt-wide-hours.1.utf8",
-      "bytes": 13,
-      "sha256": "279a589b264fb0d1353a51dcf443004df9cfc317d1c1a2591bb3f17731942e72"
     },
     {
       "path": "fixtures/input/ass-empty-not-clear.ass-packet",
@@ -3921,8 +2488,8 @@
     },
     {
       "path": "fixtures/test_names.rs",
-      "bytes": 3037,
-      "sha256": "f2792a158f4814799162abf96020aa17c8dccb11185d6cc07348c5007fa1aeba"
+      "bytes": 1792,
+      "sha256": "d10fc034b7993e43367d61c402d5e5cee3c49ff02c76bb2337208a3b4cd1f0f1"
     }
   ]
 }

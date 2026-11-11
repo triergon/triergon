@@ -31,7 +31,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.1185 (3/3 pass) | heap ≤0.015079, total RSS ≤0.723530 (3/3 lower) | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.0336 (71/71 pass) | heap ≤0.020733, total RSS ≤0.808122 (71/71 lower) | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
-| Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | `subtitle-text`: 275 cases (82 captured mov_text cases, the samples of the 79 tx3g tests, 74 charset cases, 8 ASS packets, 32 SubRip and WebVTT documents) folded by `subtitle-capsule-worker` against the reference's recorded folds, 24 of them with differences the corpus names; not gated | not measured | not measured | timing and memory; gating `subtitle-text` |
+| Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets, and mov_text and tx3g to ASS | 354/354 cases (`subtitle-text`: 82 captured mov_text cases, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); `subtitle-text-host` pins per target the 23 SubRip and WebVTT documents whose time fields leave the 32-bit range: 23/23 pass on ARMv7, 0/23 on AArch64 (open) | 0.8573 (354/354 pass; worst `tx3g-known_box_trailing_bytes_and_short_bodies_are_errors`, median of the cases 0.383) | heap ≤0.336, total RSS ≤0.911 (354/354 lower) | on AArch64, `subtitle-text-host`'s 23 cases, a deliberate divergence: FFmpeg for AArch64 reads a SubRip time field beyond the 32-bit range as its value, held to the 64-bit signed range, modulo 2^32, and a WebVTT field whose digits exceed 2^32 − 1 as those digits, held to 2^64 − 1, modulo 2^32, where on 32-bit ARM both saturate; the reader follows 32-bit ARM, so these cases are not timed or measured on AArch64; on ARMv7, total RSS is not accepted: it is the declared ceiling under standard bounds, not kernel-bound, and is above the reference ([32-bit ARMv7](#32-bit-armv7)); FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska) | 0.8564 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤0.959 (317/317 lower) | FATE coverage |
 | Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 229/229 cases (`subtitle-dvb`: TS and Matroska) | 0.8568 (229/229 pass) | heap ≤0.991, total RSS ≤0.813 (229/229 lower) | FATE coverage |
 | Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 223/223 cases (`subtitle-dvd`) | 0.8592 (223/223 pass) | heap ≤0.959, total RSS ≤0.853 (223/223 lower) | FATE coverage |
@@ -106,7 +106,9 @@ The subtitle rows use gate builds on a c8g.xlarge pinned to CPU 1, with 30 timin
 of 50 operations and 30 memory pairs under the kernel RSS proof; every row is a graded
 report. DVB is from `0d70bebfc0799f65df14f170ed97e68c5a35daa7`, DVD from
 `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc`, PGS, closed captions and teletext from
-`956c42961f4a27d88f96d5800d59ff1eeb088018`. Between these builds, the subtitle worker's
+`956c42961f4a27d88f96d5800d59ff1eeb088018`, and text from
+`6126b759b9b983afe488c3c362c6e37c2d1425a2`, whose timing pairs are of 2,000 operations.
+Between the bitmap builds, the subtitle worker's
 functions differ only in the DVB and DVD receivers, apart from constant addresses. PGS memory is
 from `03f3efd3`, which keeps planes resident by writing the last display's buffer again
 (30 memory pairs under the kernel RSS proof); its runtime is from `956c4296`, and against main
@@ -318,6 +320,7 @@ merge sort with its first run rounded up instead renders that case's 1080p frame
 | Subtitles: PGS memory | `03f3efd3a0fde0d558c68f5408c521d632802fb7` | `6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d` |
 | Subtitles: DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
 | Subtitles: DVB | `0d70bebfc0799f65df14f170ed97e68c5a35daa7` | `06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077` |
+| Subtitles: text, Linux AArch64 and ARMv7 | `6126b759b9b983afe488c3c362c6e37c2d1425a2` | `aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676` |
 | MPEG-TS | `5634f47d33ca2a9ba671c82e805398ce4eafd83e` | `1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2` |
 | MPEG-TS finite fault recovery, host | `f3f439b803e079208c9ab422270a77feb6281207` | `69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f` |
 | MPEG-TS source boundaries, macOS AArch64 | `f939fb92a6e1309fdafcd84b0bc037130ed35ee3` | `8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656` |
@@ -377,9 +380,10 @@ NEON), with every FFmpeg reference built from the same pins in the same user spa
 (Graviton2, Neoverse N1 r3p1), kernel `7.0.0-1014-aws`, pinned to CPU 1, 30 pairs.
 Memory is measured under the kernel RSS bound, through its 32-bit entry point, wherever
 the table says "kernel-bound": total RSS there is the candidate's proven resident peak
-over the reference's observed peak. The capture row uses the standard bounds: its total
-RSS is the candidate's virtual peak over the reference's observed resident peak, a
-ceiling that already lies below the reference; the ASS rendering row was measured that way
+over the reference's observed peak. The capture and text subtitle rows use the standard
+bounds: their total RSS is the candidate's virtual peak over the reference's observed
+resident peak, a ceiling that lies below the reference for capture but not for text
+subtitles; the ASS rendering row was measured that way
 at `5b3e03f0` too (total RSS ≤0.961), and is now kernel-bound.
 
 | Area | Verified against the reference | Runtime | Memory |
@@ -402,9 +406,12 @@ at `5b3e03f0` too (total RSS ≤0.961), and is now kernel-bound.
 | Fonts | `font-outlines` 53/53, `font-hinting-none` 159/159 and `font-hinting-default` 9/53 (the same open cases as on AArch64) | not measured | not measured |
 | Shaping | `shape-libass` 195/201 and `shape-text` 200/201 (the same open cases as on AArch64), `shape-bidi` 24/24, `shape-simple` 6/6, `shape-unicode` 1/1 | not measured | not measured |
 | ASS rendering | `ass-render` 78/78 and `ass-render-host` 4/4 pass; the crate's tests pass | 0.9427 (80/80 pass; the 2 `ass-render` cases added since are not timed) | kernel-bound at `afb9049c`: heap ≤0.929, total RSS ≤0.929 (80/80 lower; the 2 `ass-render` cases added since are not measured) |
+| Subtitles, text | `subtitle-text` 354/354 and `subtitle-text-host` 23/23 pass; the subtitle crate's and worker's tests pass | `subtitle-text` 0.8547 (354/354 pass), `subtitle-text-host` 0.0744 (23/23 pass) | heap ≤0.336 (377/377 lower); total RSS not accepted: ceiling ≤2.224, observed peaks ≤1.160, the highest peak above the reference's in 310 of 377 cases |
 
-The subtitle, closed-caption and teletext features have not been run on ARMv7: their parity,
-runtime and memory there are not verified; nor are the runtime and memory of fonts and shaping.
+The text subtitle row was measured on a c6g.2xlarge, the same Neoverse N1 core, at
+`6126b759`. The bitmap subtitle, closed-caption and teletext features have not been run on
+ARMv7: their parity, runtime and memory there are not verified; nor are the runtime and
+memory of fonts and shaping.
 
 Above the ceiling on ARMv7: codecs `h264-high-1080p` 1.5371, `h264-main-1920x800`
 1.3155, `dts-core-es-6.1` 1.7268, `dts-core-7.1-master` 1.7785, `ac3-5.1-448` 1.3602,

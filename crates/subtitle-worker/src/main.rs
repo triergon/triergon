@@ -21,6 +21,9 @@
 //! the header line and one line per event instead.
 //! `sub-input` prints the prepared packets as the reference's `sub-input` does:
 //! a header line with the time base and configuration, then one line per packet.
+//!
+//! The `subtitle-text-` modes ([`text`]) are the text subtitle operations of
+//! the formats build of the reference worker (`harness/reference_subtitle_text.h`).
 #![forbid(unsafe_code)]
 
 mod cc;
@@ -30,6 +33,13 @@ mod dvd;
 mod pgs;
 mod sink;
 mod teletext;
+mod text;
+// The repository's JSON reader, for tests that read a corpus; the parts they
+// do not call are unused here.
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../../../xtask/src/json.rs"]
+mod json;
 
 use container::Result;
 use sink::Sink;
@@ -176,7 +186,11 @@ fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
 
 fn main() -> ExitCode {
     let words: Vec<String> = std::env::args().skip(1).collect();
-    match run(&words) {
+    let result = match words.first() {
+        Some(mode) if mode.starts_with(text::PREFIX) => text::run(&words),
+        _ => run(&words),
+    };
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("subtitle-worker: {error}");

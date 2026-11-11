@@ -19444,6 +19444,26 @@
    "bytes": 137198328
   },
   {
+   "name": "subtitle-text-gate-b9898139",
+   "path": "subtitle-text-gate-b9898139",
+   "retention": "retained",
+   "reason": "Text subtitle rows of docs/status.md, Linux AArch64 on a c8g.xlarge and the armv7-userland user space on a c6g.2xlarge: timing and memory (30 pairs, CPU 1) of all 354 subtitle-text cases at b9898139 against the pinned FFmpeg 9.0 reference, graded, with the kernel RSS proof on AArch64 and standard bounds on ARMv7; same-code of the subtitle worker against main at 365affd2; the instruction count of every subtitle-text case and of the bitmap subtitle features against main; the subtitle crate's and worker's tests on both targets; and a git bundle of the branch. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitle-text-gate-b9898139/35aa64c6d273f3f6956811a143c299b9ed01ca1c9c9810e9f2eb0a9d42c75aca.tar.zst",
+   "sha256": "35aa64c6d273f3f6956811a143c299b9ed01ca1c9c9810e9f2eb0a9d42c75aca",
+   "bytes": 9692934,
+   "source_revision": "b9898139893705884c3cff03f1994cbb2157594a"
+  },
+  {
+   "name": "subtitle-text-gate-6126b759",
+   "path": "subtitle-text-gate-6126b759",
+   "retention": "retained",
+   "reason": "Text subtitle rows of docs/status.md, Linux AArch64 on a c8g.xlarge and the armv7-userland user space on a c6g.2xlarge: timing and memory (30 pairs, CPU 1) of the 354 subtitle-text cases and the 23 subtitle-text-host cases at 6126b759 against the pinned FFmpeg 9.0 reference, graded, with the kernel RSS proof on AArch64 and standard bounds on ARMv7; each target's recording of the subtitle-text-host pins; the checks, the subtitle crate's and worker's tests on both targets and both features' parity; same-code of the subtitle worker against b9898139 and of the branch tip after merging main against 6126b759; and a git bundle of the branch. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitle-text-gate-6126b759/aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676.tar.zst",
+   "sha256": "aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676",
+   "bytes": 16191723,
+   "source_revision": "6126b759b9b983afe488c3c362c6e37c2d1425a2"
+  },
+  {
    "name": "aac-mov-host",
    "path": "aac-mov-host",
    "retention": "retained",

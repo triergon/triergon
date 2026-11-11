@@ -20,7 +20,7 @@ use triergon::{
 };
 use triergon_mpegts::PacketFormat;
 
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub use triergon_harness_runner::Result;
 
 /// One demuxed packet, copied out of the reader.
 #[derive(Clone, Debug)]

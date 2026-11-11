@@ -6,7 +6,7 @@ use super::charset::{
     Charset, CharsetJob, CharsetStatus, ConvertedText, multibyte::MultibyteCharset as M,
 };
 use super::unicode::cancelled;
-use super::{Cue, Encoding, Event, Extractor, Format, Input, Limits, Status};
+use super::{Cue, Encoding, Extractor, Format, Input, Limits, Status};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, Result, WorkBudget};
 
@@ -35,6 +35,18 @@ pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
     ] {
         if label.eq_ignore_ascii_case(name.as_bytes()) {
             return Ok(Charset::Multibyte(profile));
+        }
+    }
+    // The single-byte labels: Latin-1 keeps 0x80 to 0x9F as the C1 controls,
+    // and the Windows code pages refuse the bytes their tables leave undefined.
+    for (name, charset) in [
+        ("latin1", Charset::Latin1),
+        ("iso-8859-1", Charset::Latin1),
+        ("windows-1251", Charset::Windows1251),
+        ("windows-1252", Charset::Windows1252),
+    ] {
+        if label.eq_ignore_ascii_case(name.as_bytes()) {
+            return Ok(charset);
         }
     }
     Err(Error::Unsupported("captured receiver charset label"))
@@ -159,7 +171,7 @@ impl AssPacketJob {
         }
         if self.source.is_none() {
             match self.extractor.step(work, cancel)? {
-                Status::Event(Event::Cue(cue)) => self.source = Some(cue),
+                Status::Cue(cue) => self.source = Some(cue),
                 Status::Yield | Status::NeedOutput => return Ok(PacketStatus::Pending),
                 _ => return Err(Error::Invalid("receiver expected opaque cue")),
             }
