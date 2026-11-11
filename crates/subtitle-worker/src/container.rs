@@ -309,15 +309,39 @@ fn matroska_clock(mut track: Track, scale: u64) -> Result<Track> {
 /// `value` in `base` units as microseconds, rounded to nearest with ties away
 /// from zero, as the reference's packet-time rescale does.
 pub fn microseconds(value: i64, base: TimeBase) -> Option<i64> {
-    let num = i128::from(value) * i128::from(base.numerator()) * 1_000_000;
+    i64::try_from(rounded(value, base, 1_000_000)).ok()
+}
+
+/// `value` ticks of `base` times `scale`, over the base's denominator, rounded
+/// to nearest with ties away from zero, exactly. It divides in 64 bits when the
+/// product and its rounding fit there, and in 128 bits otherwise: without a
+/// divide instruction, as on 32-bit ARM, a 128-bit division is a loop of 128
+/// steps and a 64-bit one a short library call.
+pub fn rounded(value: i64, base: TimeBase, scale: i64) -> i128 {
+    let narrow = || {
+        let num = value
+            .checked_mul(i64::try_from(base.numerator()).ok()?)?
+            .checked_mul(scale)?;
+        let den = i64::try_from(base.denominator()).ok()?;
+        let half = den / 2;
+        Some(if num >= 0 {
+            num.checked_add(half)? / den
+        } else {
+            num.checked_sub(half)? / den
+        })
+    };
+    narrow().map_or_else(|| wide_rounded(value, base, scale), i128::from)
+}
+
+fn wide_rounded(value: i64, base: TimeBase, scale: i64) -> i128 {
+    let num = i128::from(value) * i128::from(base.numerator()) * i128::from(scale);
     let den = i128::from(base.denominator());
     let half = den / 2;
-    let q = if num >= 0 {
+    if num >= 0 {
         (num + half) / den
     } else {
         (num - half) / den
-    };
-    i64::try_from(q).ok()
+    }
 }
 
 /// The `sub-input` lines for `track`, byte for byte as the reference prints them.
@@ -343,4 +367,55 @@ pub fn write_input(out: &mut impl std::io::Write, track: &Track) -> std::io::Res
         )?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TimeBase, rounded, wide_rounded};
+
+    #[test]
+    fn rounding_in_64_bits_gives_the_128_bit_result() {
+        let values = [
+            0,
+            1,
+            -1,
+            44,
+            -45,
+            90_000,
+            -90_001,
+            i64::from(i32::MAX),
+            i64::from(i32::MIN),
+            1 << 40,
+            -(1 << 40),
+            9_223_372_036_854,
+            -9_223_372_036_855,
+            i64::MAX / 1000,
+            i64::MIN / 1000,
+            i64::MAX,
+            i64::MIN,
+        ];
+        let bases = [
+            (1, 90_000),
+            (1, 1000),
+            (1, 1_000_000_000),
+            (1001, 30_000),
+            (1, 2),
+            (3, 7),
+            (1, u64::MAX),
+            (u64::from(u32::MAX), 1),
+            (1 << 40, 3),
+        ];
+        for (num, den) in bases {
+            let base = TimeBase::new(num, den).unwrap();
+            for value in values {
+                for scale in [1, 1000, 1_000_000] {
+                    assert_eq!(
+                        rounded(value, base, scale),
+                        wide_rounded(value, base, scale),
+                        "{value} * {num}/{den} * {scale}"
+                    );
+                }
+            }
+        }
+    }
 }

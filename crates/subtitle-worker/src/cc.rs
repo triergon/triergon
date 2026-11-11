@@ -320,15 +320,7 @@ impl Prepared for Captions {
 /// `value` in `base` units as milliseconds, rounded to nearest with ties away
 /// from zero and kept to 32 bits, as the reference's display time is.
 fn milliseconds(value: i64, base: TimeBase) -> u32 {
-    let num = i128::from(value) * i128::from(base.numerator()) * 1000;
-    let den = i128::from(base.denominator());
-    let half = den / 2;
-    let ms = if num >= 0 {
-        (num + half) / den
-    } else {
-        (num - half) / den
-    };
-    ms as u32
+    container::rounded(value, base, 1000) as u32
 }
 
 fn emit(sink: &mut Sink<'_>, packet: usize, subtitle: &Subtitle) -> Result<()> {
