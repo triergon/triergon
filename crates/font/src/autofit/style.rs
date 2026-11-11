@@ -58,6 +58,11 @@ pub(crate) struct BlueString {
     pub(crate) properties: u8,
 }
 
+/// `AF_BLUE_STRINGSET_MAX_LEN`: the blue zones of one style.
+pub(crate) const MAX_BLUES: usize = 8;
+/// `AF_BLUE_STRING_MAX_LEN`: the clusters of one blue string.
+pub(crate) const MAX_CLUSTERS: usize = 51;
+
 /// The bits of a glyph's entry in [`Coverage`] that hold its style.
 pub(crate) const STYLE_MASK: u16 = 0x1FFF;
 /// A glyph no style covers yet (`AF_STYLE_UNASSIGNED`).

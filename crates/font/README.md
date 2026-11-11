@@ -275,9 +275,16 @@ them when the scale is undefined. A `SizedFont` then gives:
   runs between the hinted phantom points (the scaled advance in a fixed-pitch
   face and for digits of one width), the vertical advance is scaled by the
   style's vertical scale, and the box is fitted outwards to pixels. Glyphs of
-  the CJK and Indic styles have their advances (the scaled advance, rounded,
-  which those writing systems leave unhinted) and, without points, their empty
-  outlines, but outlines with points are `Unsupported`. The style of every glyph and each style's metrics are
+  the CJK style (CJK characters and every glyph no script covers) go through the
+  CJK writing system: stem widths and digits measured as the latin ones, a top
+  and a bottom blue zone measured on its ideographs, then in both dimensions
+  segments, stems and serifs (stems nested in wider stroke ends), edges
+  snapped to the zones, stems centred on the pixel grid, stems less than a
+  pixel after the previous one interpolated instead, and strong and weak
+  points interpolated. Their advance stays the scaled one, rounded, and their
+  outline is not moved by it. Glyphs of the Indic styles have that advance
+  and, without points, their empty outlines, but outlines with points are
+  `Unsupported`. The style of every glyph and each style's metrics are
   computed on the first load that needs them and kept with the face, charged
   to its budget, as is the storage one load hints in, which the next reuses
   and which stays charged at the largest glyph's size.
@@ -360,8 +367,8 @@ opens it and fails each glyph.
 At a size, the default load of an instructed TrueType glyph is `Unsupported`,
 hence its glyph extents and contour points, which libass's HarfBuzz callbacks
 report: it needs the TrueType interpreter, which this crate does not run. So is
-the default-load outline, with points, of an auto-hinted glyph of a CJK or Indic style, whose
-writing systems the auto-hinter here does not run, and HarfBuzz's coverage of
+the default-load outline, with points, of an auto-hinted glyph of an Indic style,
+whose writing system the auto-hinter here does not run, and HarfBuzz's coverage of
 glyphs through OpenType features, which FreeType's auto-hinter has only with
 HarfBuzz built in. The auto-hinter runs only the normal render mode, without
 the light mode's stem darkening.
@@ -401,7 +408,7 @@ tables charged to the `Budget` it was created with: the supported cmap records, 
 Private DICT per CFF FDArray entry, variation region scalars and kern subtable
 records. A face FreeType auto-hints also keeps, once a default load needs
 them, the auto-hinter's style of each glyph, its reverse charmap of accented
-characters and each latin style's metrics, charged to that budget, as is the
+characters and each latin or CJK style's metrics, charged to that budget, as is the
 scratch storage of an auto-hinted load. An `Outline` charges its points and
 contour ends to its own budget and keeps its capacity across glyphs; a
 `SizedFont` is a small copyable view that allocates nothing.
