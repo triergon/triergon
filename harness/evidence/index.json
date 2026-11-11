@@ -19572,6 +19572,42 @@
    "sha256": "2b78cc89c624e9296967d4f3ec8aa0e5713631d1d3228c63c8b96eb1c4e6cfd1",
    "bytes": 37396079,
    "source_revision": "9d048c58fb30c64777f7230eb67c7037a1e1bcf1"
+  },
+  {
+   "name": "mp4-fragment-subtitles-5c1b2d66-aarch64",
+   "path": "mp4-fragment-subtitles-5c1b2d66-aarch64",
+   "retention": "90 days",
+   "reason": "MP4 range measurement with full index replay",
+   "key": "qualification/mp4-fragment-subtitles-5c1b2d66-aarch64/5b17946f7a0ce79d3df8995c24a497216c5858bf5a49e4c2777682b178da5e6d.tar.gz",
+   "sha256": "5b17946f7a0ce79d3df8995c24a497216c5858bf5a49e4c2777682b178da5e6d",
+   "bytes": 49974009
+  },
+  {
+   "name": "mp4-fragment-subtitles-04960913-aarch64",
+   "path": "mp4-fragment-subtitles-04960913-aarch64",
+   "retention": "90 days",
+   "reason": "MP4 range measurement with checked fragment restarts",
+   "key": "qualification/mp4-fragment-subtitles-04960913-aarch64/c90b2366570234f13a7c56944c792f17b67dc15127257176042c1d9cd870d3b8.tar.gz",
+   "sha256": "c90b2366570234f13a7c56944c792f17b67dc15127257176042c1d9cd870d3b8",
+   "bytes": 50018046
+  },
+  {
+   "name": "mp4-fragment-subtitles-3e055282-aarch64",
+   "path": "mp4-fragment-subtitles-3e055282-aarch64",
+   "retention": "90 days",
+   "reason": "MP4 range measurement with additional fragment restarts",
+   "key": "qualification/mp4-fragment-subtitles-3e055282-aarch64/140090c0103d00c21253fa0873b06b3ab4fb8ca79df3c2b26a61c4922c52f35d.tar.gz",
+   "sha256": "140090c0103d00c21253fa0873b06b3ab4fb8ca79df3c2b26a61c4922c52f35d",
+   "bytes": 49998585
+  },
+  {
+   "name": "mp4-fragment-subtitles-b42e33df-aarch64",
+   "path": "mp4-fragment-subtitles-b42e33df-aarch64",
+   "retention": "retained",
+   "reason": "MP4 range playback with fragmented timed text and DVD subpictures",
+   "key": "evidence/mp4-fragment-subtitles-b42e33df-aarch64/5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5.tar.gz",
+   "sha256": "5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5",
+   "bytes": 50007294
   }
  ]
 }
