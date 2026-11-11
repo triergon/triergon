@@ -24,7 +24,7 @@ mod memory;
 mod render;
 mod screen;
 
-use crate::cc::cc_data::{CcType, triplets};
+use crate::cc::cc_data::{constructs, is_field_pair};
 use crate::cc::line21::odd_parity;
 use crate::cc::text::Text;
 use memory::{Effect, Memory};
@@ -282,28 +282,28 @@ impl Decoder {
     fn receive(&mut self, packet: &[u8], clock: Clock, out: &mut Subtitle) -> Result<bool> {
         out.clear(clock.pts);
         let now = clock.pts.unwrap_or(i64::MIN);
-        for triplet in triplets(packet) {
-            let field = triplet.flags & 1;
-            let field = *self.field.get_or_insert(field);
-            if !triplet.valid()
-                || !matches!(triplet.kind(), CcType::Field1 | CcType::Field2)
-                || triplet.flags & 1 != field
-            {
-                continue;
+        let constructs = constructs(packet);
+        // Without a field set by the options, the first construct received
+        // selects it, whatever the construct carries.
+        if let Some(&[flags, ..]) = constructs.first() {
+            let field = *self.field.get_or_insert(flags & 1);
+            for &[flags, hi, lo] in constructs {
+                if !is_field_pair(flags, field) {
+                    continue;
+                }
+                // A second byte failing parity drops the pair; a first byte
+                // failing it becomes the solid block.
+                if !odd_parity(lo) {
+                    continue;
+                }
+                let hi = if odd_parity(hi) { hi & 0x7f } else { 0x7f };
+                // Padding is a null pair under a standard flag byte; under
+                // another flag byte a null pair counts as a code.
+                if matches!(flags, 0xfa | 0xfc | 0xfd) && hi == 0 && lo & 0x7f == 0 {
+                    continue;
+                }
+                self.pair(hi, lo & 0x7f, now, out)?;
             }
-            // A second byte failing parity drops the pair; a first byte failing
-            // it becomes the solid block.
-            let [hi, lo] = triplet.data;
-            if !odd_parity(lo) {
-                continue;
-            }
-            let hi = if odd_parity(hi) { hi & 0x7f } else { 0x7f };
-            // Padding is a null pair under a standard flag byte; under another
-            // flag byte a null pair counts as a code.
-            if matches!(triplet.flags, 0xfa | 0xfc | 0xfd) && hi == 0 && lo & 0x7f == 0 {
-                continue;
-            }
-            self.pair(hi, lo & 0x7f, now, out)?;
         }
         // The interval runs from the subtitle's time, which an erase or end of
         // caption in this packet has moved back to its snapshot's start.
