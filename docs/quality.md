@@ -496,7 +496,8 @@ may override that count for diagnostic comparisons.
   executable from the same, empty, page-cache state. Without it, a freshly written copy
   can stay cached in larger blocks, and the kernel then makes more of the executable
   resident on some runs than on others: 320 kB more of a subtitle worker's own mapping,
-  and so of the resident peak, on a c8g.xlarge. A failed eviction fails the run.
+  and so of the resident peak, on a c8g.xlarge. A failed eviction fails the run. Memory
+  results collected before this eviction may include that effect, on either side.
 - Before a timing pass, `cargo xtask count CANDIDATE REFERENCE ARGUMENT...` runs both
   workers on one workload under Linux `perf stat`, five runs each, and prints the least
   user-mode instructions, cycles and branch misses. It fails when instructions rise more

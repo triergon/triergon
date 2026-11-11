@@ -31,11 +31,11 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.0336 (71/71 pass) | heap ≤0.020733, total RSS ≤0.808122 (71/71 lower) | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | `subtitle-text`: 275 cases (82 captured mov_text cases, the samples of the 79 tx3g tests, 74 charset cases, 8 ASS packets, 32 SubRip and WebVTT documents) folded by `subtitle-capsule-worker` against the reference's recorded folds, 24 of them with differences the corpus names; not gated | not measured | not measured | timing and memory; gating `subtitle-text` |
-| Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska) | 0.8564 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤0.959 (317/317 lower) | FATE coverage |
-| Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 229/229 cases (`subtitle-dvb`: TS and Matroska) | 0.8568 (229/229 pass) | heap ≤0.991, total RSS ≤0.813 (229/229 lower) | FATE coverage |
-| Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 223/223 cases (`subtitle-dvd`) | 0.8592 (223/223 pass) | heap ≤0.959, total RSS ≤0.853 (223/223 lower) | FATE coverage |
-| Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 197/197 cases (`subtitle-cc`) | 0.9751 (197/197 pass) | heap ≤0.123, total RSS ≤0.956 (197/197 lower) | FATE coverage; HEVC picture output at a new sequence (open case `hevc-eos-ts`: no DPB output model, so `no_output_of_prior_pics` after an end of sequence is not applied) |
-| Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 70/70 cases (`subtitle-teletext`) | 0.4257 (70/70 pass) | heap ≤0.622, total RSS ≤0.676 (70/70 lower) | FATE coverage |
+| Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8780 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤0.984 (317/317 lower) | FATE coverage |
+| Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 229/229 cases (`subtitle-dvb`: TS and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8593 (229/229 pass) | heap ≤0.991, total RSS ≤0.811 (229/229 lower) | FATE coverage |
+| Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 229 cases: `subtitle-dvd` 224/224 on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), and `subtitle-dvd-host`'s 5, pinned per target, 5/5 on ARMv7 and 1/5 on AArch64 | 0.8595 (225/225 pass) | heap ≤0.959, total RSS ≤0.869 (225/225 lower) | FATE coverage; on AArch64, `subtitle-dvd-host`'s 4 open cases, target-dependent by design: FFmpeg there reads numbers of a VobSub configuration and of the `palette` option beyond 32 bits with 64, and the decoder follows FFmpeg on 32-bit ARM |
+| Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 201/205 cases (`subtitle-cc`), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); the other 4 are the open `hevc-eos-ts` cases | 0.9806 (201/201 pass) | heap ≤0.123, total RSS ≤0.966 (201/201 lower) | FATE coverage; HEVC picture output at a new sequence (open case `hevc-eos-ts`: no DPB output model, so `no_output_of_prior_pics` after an end of sequence is not applied) |
+| Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 70/70 cases (`subtitle-teletext`), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.4388 (70/70 pass) | heap ≤0.622, total RSS ≤0.662 (70/70 lower) | FATE coverage |
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 39/39 (`mp4-forward`), 566 packets, TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 0.9911 (39/39 pass), TS program 1.1621 (35/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤0.5590, total RSS ≤0.9975 (39/39 lower); TS program heap ≤0.1008, total RSS ≤0.9090 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower) | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0551 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths; AAC charges in-band reconfiguration when it appears, and a refused access unit leaves the decoder unchanged unless an earlier raw data block or Main-prediction element of it was decoded |
 | Audio codecs in files | FLAC (RFC 9639, 4 to 32 bits, 1 to 8 channels); Opus (RFC 6716 and 8251: SILK, CELT, hybrid, families 0, 1 and 255); Vorbis I; MPEG-1, 2 and 2.5 audio Layer I, II and III | 315/321 pass through the container readers (FATE Vorbis, Opus and MP3 conformance, the IETF FLAC testbench, generated streams): FLAC bit-exact, the others within the [numeric rules](../harness/codecs/numeric-rules.json) | 1.0834 (10/10 pass) | heap ≤0.904, total RSS ≤0.966 (10/10) | FLAC `01 - changing samplerate`, `02 - increasing number of channels`, `03 - decreasing number of channels` and MP3 `he_mode` change format mid-stream, which the CLI converts; FLAC `flac_3ch_odd_mask`, whose layout FFmpeg refuses on its stereo output; MP3 `he_free` (free format: FFmpeg finds no two consecutive frames, and the decoder refuses free-format frames), refused by both; runtime toward the target for Opus music (1.0301) and 5.1 (1.0834), Vorbis 5.1 (0.9356) and stereo (0.8423) and Opus speech (0.8719); Opus families 2 and 3 |
@@ -108,18 +108,34 @@ In the earlier audio clock comparison, `laced-fractional-cadence` reached 1.4510
 `no-absolute-anchor` and 1.321 on `dolby-bad-first`. Total RSS ranged from 1.038 to
 1.043 across all ten cases.
 
-The subtitle rows use gate builds on a c8g.xlarge pinned to CPU 1, with 30 timing pairs
-of 50 operations and 30 memory pairs under the kernel RSS proof; every row is a graded
-report. DVB is from `0d70bebfc0799f65df14f170ed97e68c5a35daa7`, DVD from
-`531e2d04ba7386513ff7afe7b44f53b2a93ca9dc`, PGS, closed captions and teletext from
-`956c42961f4a27d88f96d5800d59ff1eeb088018`. Between these builds, the subtitle worker's
-functions differ only in the DVB and DVD receivers, apart from constant addresses. PGS memory is
-from `03f3efd3`, which keeps planes resident by writing the last display's buffer again
-(30 memory pairs under the kernel RSS proof); its runtime is from `956c4296`, and against main
-the instruction counts of `03f3efd3` are a median +0.20% per case, −1.51% in total, over the
-subtitle-pgs cases and +0.26%, +0.15% in total, over the capsule cases. `long-movie-mkv` total RSS
-went from 1.010 to 0.958: the receiver had mapped and unmapped its first planes before glibc's
-dynamic mmap threshold adapted, and the kernel bound counts pages faulted in again.
+The subtitle rows on Linux AArch64 use the gate build at
+`f263491102d307997d40d40826a6193d8468e87e` on a c8g.xlarge pinned to CPU 1, with 30 timing
+pairs of 50 operations and 30 memory pairs under the kernel RSS proof, graded by `cargo xtask
+grade` against `ffmpeg-subtitles-plain-native`. Its workers are byte-identical to those of
+`8513398b85d27aa093b8212c202b25c32da859bf`, which the ARMv7 rows measure: the commit between
+changes only the memory runner, which since drops both workers' cached pages before every
+run. On a c6g.4xlarge (Graviton2), natively on AArch64 at `8513398b`, eight caption cases
+time above the ceiling: `mpeg2-a53-limit-m2v` 1.4481, `mpeg2-a53-limit-ts` 1.4479,
+`mpeg2-a53-limit-m2v-first` 1.4445, `mpeg2-a53-limit-ts-first` 1.4418,
+`mpeg2-a53-limit-ts-second` 1.4080, `mpeg2-a53-limit-m2v-second` 1.4041,
+`mpeg2-a53-limit-ts-realtime` 1.3904 and `mpeg2-a53-limit-m2v-realtime` 1.3887, where the
+c8g.xlarge gives them 0.937 to 0.985. On them the candidate executes 1.64 times the
+reference's instructions on AArch64 and 0.93 times on ARMv7, most of it in the caption
+receiver's loop over each construct of large `cc_data`; this is open. The earlier rows were
+measured at `956c42961f4a27d88f96d5800d59ff1eeb088018` (PGS, closed captions and teletext),
+`03f3efd3a0fde0d558c68f5408c521d632802fb7` (PGS memory),
+`531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` (DVD) and
+`0d70bebfc0799f65df14f170ed97e68c5a35daa7` (DVB).
+
+The ARMv7 subtitle rows use the gate build at `8513398b85d27aa093b8212c202b25c32da859bf` in
+the ARMv7 user space on two c6g.4xlarge hosts that built byte-identical workers from the same
+source and package list. Each feature's 30 timing pairs and 30 memory pairs come from one
+host, pinned to CPU 1 with nothing else running (PGS, DVD-host and teletext from one; DVB,
+DVD and closed captions from the other), each graded by `cargo xtask grade`. The user space
+adds the 13 packages libzvbi's build needs to `armv7-userland` (autoconf, automake,
+autopoint, libtool, gettext and what they depend on); both package lists are in the raw
+samples, with each case's instruction counts, the caption and page-fault profiles, and the
+probes the DVD rules were derived from.
 
 Codec and decode-session memory await gate-build measurement with repository runners.
 
@@ -261,10 +277,12 @@ against libass for AArch64 where it runs out of memory.
 | MP4 forward and range, encoded edits | `2a1b26347fee56f5506db63efbc8e3e3c66ad388` | `fe95646449aa52a4a121aeecb3346308b270923aee9b0751b2125501abf36004` |
 | Matroska audio clocks | `b81e3b378d2b2102a7c46545ec89b9b6c345dfa1` | `a86113187261d0a8b1f568b4d8c0149113520274130ca2aa659fa73af330f040` |
 | Earlier Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
-| Subtitles: PGS, closed captions, teletext | `956c42961f4a27d88f96d5800d59ff1eeb088018` | `61b52a272e82eeee913c9c4b4d6331caea3283a99ebad4a897aba65dab3c891d` |
-| Subtitles: PGS memory | `03f3efd3a0fde0d558c68f5408c521d632802fb7` | `6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d` |
-| Subtitles: DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
-| Subtitles: DVB | `0d70bebfc0799f65df14f170ed97e68c5a35daa7` | `06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077` |
+| Subtitles, Linux AArch64 | `f263491102d307997d40d40826a6193d8468e87e` | `9ed7263aabbc4f44910c5135fcf077419ea5b426e3a09a888e83f10153680c32` |
+| ARMv7: subtitles | `8513398b85d27aa093b8212c202b25c32da859bf` | `9ed7263aabbc4f44910c5135fcf077419ea5b426e3a09a888e83f10153680c32` |
+| Earlier: subtitles, PGS, closed captions, teletext | `956c42961f4a27d88f96d5800d59ff1eeb088018` | `61b52a272e82eeee913c9c4b4d6331caea3283a99ebad4a897aba65dab3c891d` |
+| Earlier: subtitles, PGS memory | `03f3efd3a0fde0d558c68f5408c521d632802fb7` | `6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d` |
+| Earlier: subtitles, DVD | `531e2d04ba7386513ff7afe7b44f53b2a93ca9dc` | `01ef0a02aad45d7b754c0e409e12949437e8f7f0270e252e82a3f7ebff0e6391` |
+| Earlier: subtitles, DVB | `0d70bebfc0799f65df14f170ed97e68c5a35daa7` | `06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077` |
 | MPEG-TS | `5634f47d33ca2a9ba671c82e805398ce4eafd83e` | `1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2` |
 | MPEG-TS finite fault recovery, host | `f3f439b803e079208c9ab422270a77feb6281207` | `69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f` |
 | MPEG-TS source boundaries, macOS AArch64 | `f939fb92a6e1309fdafcd84b0bc037130ed35ee3` | `8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656` |
@@ -343,19 +361,38 @@ peaks are given beside it.
 | Fonts | `font-outlines` 53/53, `font-hinting-none` 159/159 and `font-hinting-default` 9/53 (the same open cases as on AArch64) | not measured | not measured |
 | Shaping | `shape-libass` 195/201 and `shape-text` 200/201 (the same open cases as on AArch64), `shape-bidi` 24/24, `shape-simple` 6/6, `shape-unicode` 1/1 | not measured | not measured |
 | ASS rendering | `ass-render` 76/76 and `ass-render-host` 4/4 pass; the crate's tests pass | 0.9427 (80/80 pass) | heap ≤0.928, total RSS ≤0.961 (80/80 lower) |
+| Subtitles, PGS | 317/317 (`subtitle-pgs`) | 0.9630 (317/317 pass) | heap ≤0.968 (317/317 lower); total RSS not accepted (below): ceiling 1.084 to 1.588, observed peak lower in 7,818 of 9,510 pairs |
+| Subtitles, DVB | 229/229 (`subtitle-dvb`) | 0.7361 (229/229 pass) | heap ≤0.992 (229/229 lower); total RSS not accepted: ceiling 1.127 to 1.446, observed peak lower in 6,781 of 6,870 pairs |
+| Subtitles, DVD | 224/224 (`subtitle-dvd`) and 5/5 (`subtitle-dvd-host`, gated on this target) | 1.1142 (229/229 pass) | heap ≤0.966 (229/229 lower); total RSS not accepted: ceiling 0.942 to 1.533 (3/229 lower), observed peak lower in 6,512 of 6,870 pairs |
+| Closed captions | 201/205 (`subtitle-cc`; the 4 open `hevc-eos-ts` cases, as on AArch64) | 0.7880 (201/201 pass) | heap ≤0.127 (201/201 lower); total RSS not accepted: ceiling 0.890 to 1.530 (24/201 lower), observed peak lower in 5,851 of 6,030 pairs |
+| Teletext | 70/70 (`subtitle-teletext`) | 0.5302 (70/70 pass) | heap ≤0.626 (70/70 lower); total RSS not accepted: ceiling 1.212 to 1.317, observed peak lower in 2,098 of 2,100 pairs |
 
-The subtitle, closed-caption and teletext features have not been run on ARMv7: their parity,
-runtime and memory there are not verified; nor are the runtime and memory of fonts and shaping.
-The DVD decoder reads the numbers FFmpeg reads through C's `long` as FFmpeg built for ARMv7
-does, with 32 bits: a colour list's (the `palette` option and a configuration's `palette:`
-line), a `size:` line's, which beyond `int`'s range refuse the size, and a `.idx` `delay:`
-line's (a `-` after spaces negating the whole delay, then up to four `%d` fields, each
-saturating at `int`'s range, missing fields zero). FFmpeg built for AArch64 keeps 64 or the low
-32 bits of such numbers instead. `subtitle-dvd-host` pins the cases that reach them per target
-and holds them open on AArch64 (`vobsub-palette-option`, `vobsub-idx-size-beyond-32-bits`,
-`vobsub-idx-size-negative-beyond-32-bits`, `vobsub-idx-delay-beyond-32-bits`), with
-`vobsub-idx-size-int-min`, which both refuse. A decoder that refuses to open is a result both
-workers fold and compare.
+The runtime and memory of fonts and shaping are not verified on ARMv7.
+
+The subtitle, caption and teletext rows are timed and measured against
+`ffmpeg-subtitles-plain-native`, the subtitles reference built without the wrappers that
+flag target-dependent results, so no flagging code runs in the reference's timed span or
+memory window. Their total RSS is not accepted on this target: under the standard bound,
+the candidate's VmPeak against the reference's observed resident peak, every feature has
+cases above the reference. The observed resident peaks are lower than the reference's in
+most pairs, and the cause of the rest is open; a kernel-bound measurement in the 32-bit
+user space is needed to tell the candidate's code pages from its data. These collections
+predate the memory runner's page-cache eviction ([quality](quality.md#measuring-performance)):
+in every case each worker's resident set at the start of the operation varies by more than
+32 pages between pairs (the candidate's from about 423 to 659 pages, the reference's from
+about 570 to 712), so the counts of pairs with a lower observed peak carry that spread.
+
+The DVD decoder reads the numbers of a VobSub configuration and of the `palette` option as
+FFmpeg built for ARMv7 does, with a 32-bit `long`: a colour list's (the `palette` option and
+a `palette:` line), a `size:` line's, which beyond `int`'s range refuse the size, and a
+`.idx` `delay:` line's (a `-` after spaces negating the whole delay, then up to four `%d`
+fields, each saturating at `int`'s range, missing fields zero). FFmpeg built for AArch64
+keeps 64 bits, or the low 32, of such numbers instead. `subtitle-dvd-host` pins the cases
+that reach them per target and holds four of them open on AArch64, each target-dependent
+by design: `vobsub-palette-option`, which `subtitle-dvd` held before and which passed there,
+and the cases `vobsub-idx-size-beyond-32-bits`, `vobsub-idx-size-negative-beyond-32-bits`
+and `vobsub-idx-delay-beyond-32-bits`; its fifth, `vobsub-idx-size-int-min`, both targets
+refuse. A decoder that refuses to open is a result both workers fold and compare.
 
 Above the ceiling on ARMv7: codecs `h264-high-1080p` 1.5371, `h264-main-1920x800`
 1.3155, `dts-core-es-6.1` 1.7268, `dts-core-7.1-master` 1.7785, `ac3-5.1-448` 1.3602,
