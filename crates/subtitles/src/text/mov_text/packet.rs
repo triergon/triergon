@@ -354,6 +354,11 @@ impl PacketJob {
                         })?;
                     }
                     self.color = config.style.color;
+                    // The prefix and the text, as most events are; tags and
+                    // line breaks grow it further.
+                    self.writer.reserve(
+                        64 + (self.visible_end - self.text_at).min(limits.maximum_ass_bytes),
+                    )?;
                     self.phase = Phase::Render;
                     funding.commit();
                 }
@@ -413,8 +418,7 @@ impl PacketJob {
         funding: &mut Funding,
         caller: &mut WorkBudget,
     ) -> Result<bool> {
-        let input = self.input.payload.clone();
-        let bytes = input.as_ref();
+        let bytes = self.input.payload.as_ref();
         while self.character < boundary && self.text_at < self.visible_end {
             let b = bytes[self.text_at];
             let n = utf8_width(b);
