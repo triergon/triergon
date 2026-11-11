@@ -237,7 +237,7 @@ fn raw_lc_refuses_sbr_and_bytes_after_its_single_block() {
 #[test]
 fn raw_program_matches_tags_and_keeps_the_container_layout() {
     let mut program = Bw::new();
-    program_config(&mut program, &[(false, 2), (false, 9)], &[], &[]);
+    program_config(&mut program, [&[(false, 2), (false, 9)], &[], &[]], &[]);
     let program = program.bytes();
     let budget = Budget::new(4 << 20).unwrap();
     assert!(RawLcDecoder::with_program_config_in(3, &program, &budget).is_err());
@@ -245,7 +245,7 @@ fn raw_program_matches_tags_and_keeps_the_container_layout() {
     let packet = |tags: &[u32]| {
         let mut bits = Bw::new();
         bits.put(5, 3); // An in-band PCE cannot replace the container program.
-        program_config(&mut bits, &[(false, 0)], &[], &[]);
+        program_config(&mut bits, [&[(false, 0)], &[], &[]], &[]);
         for &tag in tags {
             bits.put(0, 3); // SCE
             bits.put(tag, 4);
@@ -279,8 +279,7 @@ fn raw_program_places_a_rear_pair_of_single_elements() {
     let mut program = Bw::new();
     program_config(
         &mut program,
-        &[(true, 0)],
-        &[(true, 1), (false, 2), (false, 3)],
+        [&[(true, 0)], &[], &[(true, 1), (false, 2), (false, 3)]],
         &[],
     );
     let mut packet = Bw::new();
@@ -326,13 +325,32 @@ fn raw_program_uses_only_crc_valid_height_information() {
         (&[0xac, 0x40][..], Speaker::FrontCenter),
     ] {
         let mut program = Bw::new();
-        program_config(&mut program, &[(false, 0)], &[], comment);
+        program_config(&mut program, [&[(false, 0)], &[], &[]], comment);
         let mut decoder =
             RawLcDecoder::with_program_config_in(4, &program.bytes(), &budget).unwrap();
         let mut frame = AudioFrame::default();
         decoder.decode(&packet, &mut frame).unwrap();
         assert_eq!(frame.layout.speakers(), &[expected]);
     }
+}
+
+#[test]
+fn raw_program_refuses_ambiguous_speaker_positions() {
+    let mut program = Bw::new();
+    program_config(
+        &mut program,
+        [
+            &[(false, 0)],
+            &[(true, 0)],
+            &[(true, 1), (false, 1), (false, 2)],
+        ],
+        &[],
+    );
+    let budget = Budget::new(4 << 20).unwrap();
+    assert!(matches!(
+        RawLcDecoder::with_program_config_in(4, &program.bytes(), &budget),
+        Err(DecodeError::Unsupported(Feature::RawProgramLayout))
+    ));
 }
 
 #[test]
@@ -572,16 +590,16 @@ fn noise_ics(w: &mut Bw) {
     w.put(0, 3); // pulse, tns, gain control
 }
 
-fn program_config(w: &mut Bw, front: &[(bool, u32)], back: &[(bool, u32)], comment: &[u8]) {
+fn program_config(w: &mut Bw, groups: [&[(bool, u32)]; 3], comment: &[u8]) {
     w.put(0, 4); // element_instance_tag
     w.put(1, 2); // object_type: LC
     w.put(4, 4); // sampling_frequency_index
-    w.put(front.len() as u32, 4);
-    w.put(0, 4); // side
-    w.put(back.len() as u32, 4);
+    for group in groups {
+        w.put(group.len() as u32, 4);
+    }
     w.put(0, 2 + 3 + 4); // LFE, data and coupling elements
     w.put(0, 3); // no mixdowns
-    for &(pair, tag) in front.iter().chain(back) {
+    for &(pair, tag) in groups.into_iter().flatten() {
         w.put(u32::from(pair), 1);
         w.put(tag, 4);
     }
@@ -598,7 +616,7 @@ fn noise_block(pce: bool, cpe: bool, sbr: bool) -> Vec<u8> {
     let mut w = Bw::new();
     if pce {
         w.put(5, 3); // ID_PCE
-        program_config(&mut w, &[(cpe, 0)], &[], &[]);
+        program_config(&mut w, [&[(cpe, 0)], &[], &[]], &[]);
     }
     if cpe {
         w.put(1, 3);

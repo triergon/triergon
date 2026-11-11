@@ -346,6 +346,9 @@ impl Core {
             return Err(DecodeError::Unsupported(Feature::TooManyChannels));
         }
         let (slots, unordered) = pce_slots(program, false);
+        if unordered {
+            return Err(DecodeError::Unsupported(Feature::RawProgramLayout));
+        }
         for (index, slot) in slots.iter().enumerate() {
             if slots[..index]
                 .iter()
@@ -357,12 +360,14 @@ impl Core {
             }
         }
         let mut core = Self::new(budget);
-        core.elements = core.build_elements(AOT_LC, &slots, false, &[])?;
         core.sf_index = usize::from(frequency_index);
         core.slots = slots;
-        core.unordered = unordered;
-        core.configured = true;
         core.rebuild_layout();
+        if core.layout.mask() == 0 {
+            return Err(DecodeError::Unsupported(Feature::RawProgramLayout));
+        }
+        core.elements = core.build_elements(AOT_LC, &core.slots, false, &[])?;
+        core.configured = true;
         Ok(core)
     }
 
