@@ -593,8 +593,16 @@ fn the_size_line_sets_the_canvas() {
     // The largest square the reference accepts, and one past it.
     assert_eq!(canvas(b"size: 16255x16255"), Ok(Some([16255, 16255])));
     assert!(canvas(b"size: 16256x16256").is_err());
-    // A number keeps its low 32 bits, as the reference stores it in an `int`.
-    assert_eq!(canvas(b"size: 4294968016x480"), Ok(Some([720, 480])));
+    // A number is converted with a 32-bit `long`, as on 32-bit ARMv7: beyond
+    // it, `LONG_MAX` or `LONG_MIN`, a size the reference refuses.
+    for beyond in [
+        &b"size: 4294968016x480"[..],
+        b"size: 2147483648x480",
+        b"size: 720x-4294966816",
+        b"size: 99999999999999999999x480",
+    ] {
+        assert!(canvas(beyond).is_err(), "{beyond:?}");
+    }
 }
 
 #[test]

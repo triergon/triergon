@@ -149,7 +149,7 @@ bytes are errors; nothing is replaced with U+FFFD.
 | --- | --- | --- |
 | DVB (EN 300 743) | DDS, PCS, RCS, CDS and method-0 (pixel) ODS; 2/4/8-bit interlaced RLE with map tables; default CLUTs; page/region/CLUT/object state per epoch | FFmpeg's subtitles: indexed planes and ARGB palettes, with its display window, region order, automatic palette and `compute_edt`, `compute_clut`, `dvb_substream` |
 | PGS (Blu-ray) | PCS, PDS, ODS, END in packet or SUP framing; fragmented objects; palette updates; object cache; forced flags | Every packet FFmpeg decodes, malformed ones included: indexed planes and ARGB palettes, with its refusals and `forced_subs_only` |
-| DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette (a list's numbers read with a 32-bit `unsigned long`, as FFmpeg for 32-bit ARMv7 reads them), the canvas of the configuration's `size:` line, and `forced_subs_only` |
+| DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette (a list's numbers read with a 32-bit `unsigned long`, as FFmpeg for 32-bit ARMv7 reads them), the canvas of the configuration's `size:` line (its numbers read with a 32-bit `long` likewise), and `forced_subs_only` |
 
 ### Closed captions and teletext
 

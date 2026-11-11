@@ -27,7 +27,9 @@ impl Settings {
     /// line). A line beginning `palette:` replaces the palette and one
     /// beginning `size:` the canvas; other lines are ignored. Both values are
     /// scanned from the rest of the text, so they can continue on the next
-    /// line. A `size:` line without two numbers is ignored.
+    /// line. A `size:` line without two numbers is ignored; its numbers are
+    /// converted with a 32-bit `long`, as on 32-bit ARMv7, so one beyond
+    /// `int`'s range saturates and the size is refused.
     ///
     /// # Errors
     ///
@@ -199,9 +201,9 @@ fn scan_size(text: &[u8]) -> Option<[i32; 2]> {
     Some([width, height])
 }
 
-/// One `%d` from `start`: a decimal number converted as `strtol` does (out of
-/// range is `LONG_MAX` or `LONG_MIN`) and stored in an `int`, which keeps its
-/// low 32 bits; with the index after it.
+/// One `%d` from `start`: a decimal number converted as `strtol` does with a
+/// 32-bit `long`, as on 32-bit ARMv7 (out of range is `LONG_MAX` or
+/// `LONG_MIN`, which an `int` holds unchanged); with the index after it.
 fn scan_int(text: &[u8], start: usize) -> Option<(i32, usize)> {
     let mut at = start;
     while text.get(at).copied().is_some_and(is_space) {
@@ -212,24 +214,22 @@ fn scan_int(text: &[u8], start: usize) -> Option<(i32, usize)> {
         at += 1;
     }
     let digits = at;
-    let (mut magnitude, mut overflow) = (0_u64, false);
+    let mut magnitude = 0_u32;
     while let Some(&byte @ b'0'..=b'9') = text.get(at) {
-        let (scaled, carry) = magnitude.overflowing_mul(10);
-        let (sum, wrapped) = scaled.overflowing_add(u64::from(byte - b'0'));
-        overflow |= carry | wrapped;
-        magnitude = sum;
+        magnitude = magnitude
+            .saturating_mul(10)
+            .saturating_add(u32::from(byte - b'0'));
         at += 1;
     }
     if at == digits {
         return None;
     }
-    let value = match (overflow, negative) {
-        (false, false) => i64::try_from(magnitude).unwrap_or(i64::MAX),
-        (false, true) => 0_i64.checked_sub_unsigned(magnitude).unwrap_or(i64::MIN),
-        (true, false) => i64::MAX,
-        (true, true) => i64::MIN,
+    let value = if negative {
+        0_i32.saturating_sub_unsigned(magnitude)
+    } else {
+        i32::try_from(magnitude).unwrap_or(i32::MAX)
     };
-    Some((value as i32, at))
+    Some((value, at))
 }
 
 /// A size the reference opens a decoder with: both dimensions positive, and
