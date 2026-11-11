@@ -280,6 +280,26 @@ fn range_playback_keeps_quicktime_visual_decode_order_and_signed_clocks() {
 }
 
 #[test]
+fn range_playback_uses_the_coded_frame_clock_for_aac_programs() {
+    let raw = include_bytes!("fixtures/range-encoded-edits/aac-program-edit.mov");
+    let source = Source::new(raw, b"soun");
+    let plan = range_plan(&source, *b"qt  ").unwrap();
+    let packets = rows(&source, plan);
+    let ranges = [36, 173, 395, 531, 712, 854, 974, 1156, 1332, 1468];
+    assert_eq!(packets.len(), ranges.len() - 1);
+    for (index, ((packet, skip), range)) in packets.into_iter().zip(ranges.windows(2)).enumerate() {
+        let stamp = (index as i64 - 1) * 1024;
+        assert_eq!(packet.source.range, range[0]..range[1]);
+        assert_eq!(
+            (packet.demux.pts, packet.demux.dts),
+            (Some(stamp), Some(stamp))
+        );
+        assert_eq!(packet.demux.duration, 1024);
+        assert_eq!(skip, (index == 0).then_some([0, 4, 0, 0, 0, 0, 0, 0, 0, 0]));
+    }
+}
+
+#[test]
 fn range_playback_preserves_long_aac_sample_durations_and_coded_trim() {
     let original = Source::new(ORIGINAL, b"soun");
     let stts = child(original.table.raw(), b"stts").unwrap();
