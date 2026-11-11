@@ -19426,6 +19426,16 @@
    "sha256": "b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0",
    "bytes": 69596368,
    "source_revision": "907ac3dce61c98bd05f52bfa3ff92497efdd141d"
+  },
+  {
+   "name": "aac-layouts-and-rates",
+   "path": "aac-layouts-and-rates",
+   "retention": "retained",
+   "reason": "Fixed AAC channel and rate parity, paired runtime and peak memory",
+   "key": "evidence/aac-layouts-and-rates/5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949.tar.gz",
+   "sha256": "5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949",
+   "bytes": 129922253,
+   "source_revision": "3d422610316d79665c80b48ab8a27a8a57880efe"
   }
  ]
 }
