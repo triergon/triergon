@@ -15,7 +15,8 @@
  * into one packet carrying the frame's timestamp, in output order.
  *
  * The operation, inside the timed interval and memory window: allocate and open
- * the subtitle decoder with the stream's extradata, packet time base and options;
+ * the subtitle decoder with the stream's extradata, packet time base and options
+ * (a decoder that refuses to open ends the operation with that result);
  * decode every prepared packet in order with one call each; then drain with empty
  * packets until no subtitle comes out (at most 64); fold every output subtitle
  * (all rectangles, palettes, pixels, text and ASS) and free it; free the decoder.
@@ -267,7 +268,16 @@ static int sub_operation(const SubInput *in, SubWork *work, int trace) {
     if ((rc = avcodec_parameters_to_context(context, in->par)) < 0) goto done;
     context->pkt_timebase = in->time_base;
     if ((rc = av_dict_copy(&options, in->options, 0)) < 0) goto done;
-    if ((rc = avcodec_open2(context, decoder, &options)) < 0) goto done;
+    if (avcodec_open2(context, decoder, &options) < 0) {
+        /* A decoder that refuses to open is a result of its own: the one word
+         * UINT64_MAX, which no header length can be, traced in place of the
+         * header line. */
+        sub_mix(&work->digest, UINT64_MAX);
+        if (trace)
+            printf("{\"schema\":1,\"operation\":\"" SUB_OPERATION "\",\"packets\":%zu,\"refused\":\"open\"}\n",
+                   in->count);
+        goto done;
+    }
     if (av_dict_count(options)) { rc = AVERROR_OPTION_NOT_FOUND; goto done; }
     const char *header = context->subtitle_header_size ? (const char *)context->subtitle_header : NULL;
     sub_fold_text(work, header);

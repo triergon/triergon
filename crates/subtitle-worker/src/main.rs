@@ -15,7 +15,9 @@
 //! Preparation (reading the file, demuxing, extracting caption data, creating the
 //! decoder's pool) is outside the timed interval and memory window. The operation
 //! creates the decoder, decodes every prepared packet in order, drains it, folds
-//! every output subtitle into the canonical [`sink`] form and drops everything.
+//! every output subtitle into the canonical [`sink`] form and drops everything. A
+//! decoder that refuses to open, as the reference's does with the same input,
+//! ends the operation with that result ([`Sink::refused_open`]).
 //! `sub-fold`, `sub-bench` and `sub-memory` print one JSON line with the event
 //! count, folded bytes and digest (`triergon-harness-runner`); `sub-trace` prints
 //! the header line and one line per event instead.

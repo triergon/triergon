@@ -47,7 +47,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   needs) for the playback startup and seek reference, and `subtitles` (the PGS, DVB,
   DVD, closed-caption and teletext decoders, the latter through a hash-checked
   libzvbi 0.2.46, with the video decoders caption extraction needs) for the subtitle
-  decode comparison. The `subtitles` worker is linked with `--wrap` for the C
+  decode comparison. A decoder that refuses to open with the stream's
+  configuration and options is a result both subtitle workers fold alike, as no
+  subtitles and the one word 2^64 − 1, and trace as a `"refused":"open"` line in
+  place of the header. The `subtitles` worker is linked with `--wrap` for the C
   library calls whose result can differ between its targets for the same
   arguments: `strtol`, `strtoul` and `sscanf`'s integer conversions, which read
   through `long`, and the rounding functions with results C leaves unspecified
