@@ -19562,6 +19562,16 @@
    "sha256": "176e926c723851e4a2c41bf2ddee547d4485a93e5ae28a8fd1480ed41143258b",
    "bytes": 99000725,
    "source_revision": "d100a1225d9fadcef101d89acffec307694e9ce9"
+  },
+  {
+   "name": "matroska-legacy-aac-main-baseline",
+   "path": "matroska-legacy-aac-main-baseline",
+   "retention": "retained",
+   "reason": "Matroska legacy AAC-LC packet parity, paired runtime, peak heap and total resident peak on current reader sources",
+   "key": "evidence/matroska-legacy-aac-main-baseline/927caece428d577611be77b2da58cc5e57fff6025e903e2a814b679fec825547.tar.gz",
+   "sha256": "927caece428d577611be77b2da58cc5e57fff6025e903e2a814b679fec825547",
+   "bytes": 44395856,
+   "source_revision": "46efc86fdc121a0f5bfcc9129f00599c24e291dc"
   }
  ]
 }

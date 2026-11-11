@@ -20,7 +20,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four host FATE demux comparisons | 1.1423 (116/116 pass) | heap ≤0.6263, total RSS ≤0.9831 (116/116 lower) | full EBML/Matroska scope |
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1488 (44/44 pass) | heap ≤0.4038, total RSS ≤0.9202 (44/44 lower) | FATE mapping |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10/10 packet folds (`matroska-audio-clocks`) | 1.1408 (10/10 pass) | heap ≤0.8103, total RSS ≤0.9875 (10/10 lower) | audio seek and FATE coverage |
-| Matroska legacy AAC-LC | MPEG-2 and MPEG-4 legacy AAC-LC tags, derived initialization, ADTS feed and packet clocks | 4/4 packet folds and 32 framed packets, including a Xiph lace and declared or omitted duration (`matroska-legacy-aac`) | 1.1688 (4/4 pass) | heap ≤0.5228 (4/4 lower), total RSS ≤1.0553 (0/4 lower) | total RSS and FATE coverage |
+| Matroska legacy AAC-LC | MPEG-2 and MPEG-4 legacy AAC-LC tags, derived initialization, ADTS feed and packet clocks | 4/4 packet folds and 32 framed packets, including a Xiph lace and declared or omitted duration (`matroska-legacy-aac`) | 1.1755 (4/4 pass) | heap ≤0.5228 (4/4 lower), total RSS ≤1.0551 (0/4 lower) | total RSS and FATE coverage |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 and Dolby Vision sample entry identification | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 0.8854 (972/972 pass) | heap ≤0.4132, total RSS ≤0.7260 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
 | MP4 range playback | Regular AVC/AAC and AVC/Opus startup and backward seek, fragmented AVC/AAC with open-ended edits, dedicated HEVC and AV1 sample entries, source-declared Opus seek preroll, QuickTime AAC with fixed and program configurations, including regular version-2 descriptions and fragmented version-1 descriptions, and media playback in the presence of RTP hint tracks | 41 complete open and backward-seek comparisons (`mp4-range`), including 276 packets from the AAC program clip, out of 5,445 packets on AArch64 Linux | 1.1133 (41/41 pass) | heap ≤0.7121, total RSS ≤0.9847 (41/41 lower) | additional range playback profiles and FATE coverage |
 | AAC in MOV | Raw AAC-LC access units with 1024 samples per plane and all thirteen indexed rates. Supports fixed configurations 1–7, 11, 12 and 14 and out-of-band programs assigning up to eight distinct speaker positions. | The [configured decoder comparison](../harness/features/aac-access-units/contract.json) covers 34 clips, 3,544 access units and 15,575,040 PCM samples. Two fixed-layout QuickTime clips compare the surround pair in the same plane positions with side or back labels. Every other clip compares exact speaker order. | 0.8262 (34/34 pass) | heap ≤0.8066, total RSS ≤0.4586 (34/34 lower) | 960-sample frames and SBR in raw access units |
@@ -58,7 +58,7 @@ The Matroska reader, startup and seek, and audio-clock rows use the
 [gate build](quality.md#measuring-performance)
 at `513149a970caad5b30c61becba1bc2bda1c5e193` on a c8g.large pinned to CPU 1,
 with 30 timing pairs of 50 operations and 30 separate memory pairs per case.
-The legacy AAC row uses the gate build at `d100a1225d9fadcef101d89acffec307694e9ce9`
+The legacy AAC row uses the gate build at `46efc86fdc121a0f5bfcc9129f00599c24e291dc`
 under the same measurement settings. All four cases pass parity, runtime and
 peak heap. Total peak RSS exceeds the reference on all four.
 Codec and decode-session runtime at
@@ -257,7 +257,8 @@ merge sort with its first run rounded up instead renders that case's 1080p frame
 | Matroska / WebM | `513149a970caad5b30c61becba1bc2bda1c5e193` | `883ce5128410aefb3ec9affe3579a798ee8d1c5d082c1d129a462d67728e7af9` |
 | Matroska startup and seek | `513149a970caad5b30c61becba1bc2bda1c5e193` | `883ce5128410aefb3ec9affe3579a798ee8d1c5d082c1d129a462d67728e7af9` |
 | Matroska startup and seek, preceding comparison | `0e28298d038bea072629b3bad6389dcc806b4861` | `a20dcbbe804bfd21ee631cc42f61466d2400d5115abb8ea97dd243ef733ba74f` |
-| Matroska legacy AAC-LC | `d100a1225d9fadcef101d89acffec307694e9ce9` | `176e926c723851e4a2c41bf2ddee547d4485a93e5ae28a8fd1480ed41143258b` |
+| Matroska legacy AAC-LC | `46efc86fdc121a0f5bfcc9129f00599c24e291dc` | `927caece428d577611be77b2da58cc5e57fff6025e903e2a814b679fec825547` |
+| Matroska legacy AAC-LC, preceding comparison | `d100a1225d9fadcef101d89acffec307694e9ce9` | `176e926c723851e4a2c41bf2ddee547d4485a93e5ae28a8fd1480ed41143258b` |
 | ISO BMFF / MP4 | `f958c0b9624a8b7c7bd91b7d2a0c30299ae1dbed` | `fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c` |
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
 | ISO BMFF open and index runtime and memory | `f99d893196908d562c897bccb20c6a972cd25d11` | `806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b` |
