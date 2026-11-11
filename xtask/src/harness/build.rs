@@ -606,7 +606,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 13] = [
+const PROFILE_REFERENCES: [ProfileReference; 14] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -655,6 +655,21 @@ const PROFILE_REFERENCES: [ProfileReference; 13] = [
             "llrint",
             "llrintf",
         ],
+        identity: true,
+        // Its wrappers run inside the timed operation, so it is never timed or
+        // measured; `ffmpeg-subtitles-plain-native` is.
+        instrumented: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-subtitles",
+        binary: "ffmpeg-subtitles-plain-worker",
+        define: Some("-DTRIERGON_SUBTITLE_PLAIN_REFERENCE=1"),
+        record: "ffmpeg-subtitles-plain-native",
+        kind: "the subtitles reference without its flagging wrappers; the timing and memory reference of the subtitle decode features",
+        libraries: "subtitles_plain_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
         identity: true,
         ..REFERENCE
     },
@@ -1379,6 +1394,11 @@ mod tests {
         let error =
             |reference, measurement| measurement_reference_error(&contract(reference, measurement));
         assert_eq!(error("libass-ass-native", "libass-player-native"), None);
+        assert_eq!(
+            error("ffmpeg-subtitles-native", "ffmpeg-subtitles-plain-native"),
+            None
+        );
+        assert!(error("ffmpeg-subtitles-plain-native", "ffmpeg-subtitles-native").is_some());
         assert!(error("libass-ass-native", "libass-ass-native").is_some());
         assert!(error("libass-native", "libass-player-native").is_some());
         assert!(error("libass-ass-native", "freetype-native").is_some());

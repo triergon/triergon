@@ -53,7 +53,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   through `long`, and the rounding functions with results C leaves unspecified
   out of range. Its `sub-fold` flags a run that reached such a difference
   (`harness/reference_subtitles_host.h`), and a flagged case fails any feature
-  not pinned per target. Decoders and
+  not pinned per target. Because the wrappers run inside the operation, that
+  build is never timed or measured: the subtitle features name the same build
+  without them, `ffmpeg-subtitles-plain-native`, as their
+  `measurement_reference`. Decoders and
   capture are measured against the FFmpeg 9.0.2 release tarball: `decode` (the default
   configuration) for the codec comparison, whose `ffmpeg` and `ffprobe` also decode
   capture output independently, and `capture` (gating) and `capture-small` for the

@@ -5,6 +5,7 @@
   "candidate": "subtitle-worker",
   "worker_operation": "sub-",
   "reference": "ffmpeg-subtitles-native",
+  "measurement_reference": "ffmpeg-subtitles-plain-native",
   "contract": [
     "PGS (HDMV presentation graphics) from SUP, Matroska, MPEG-TS and M2TS, malformed packets included; reference: FFmpeg pgssub",
     "preparation outside the timed operation: open the input, select the PGS stream and copy its packets in demux order (one per PG unit in SUP, one per block or PES otherwise)",

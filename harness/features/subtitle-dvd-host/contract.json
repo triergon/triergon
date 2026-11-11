@@ -5,6 +5,7 @@
   "candidate": "subtitle-worker",
   "worker_operation": "sub-",
   "reference": "ffmpeg-subtitles-native",
+  "measurement_reference": "ffmpeg-subtitles-plain-native",
   "pinned_per_target": true,
   "contract": [
     "the DVD subpicture cases whose FFmpeg result depends on the target, decoded and folded as subtitle-dvd decodes and folds them: cases the reference flags because they reach a C library result that differs between 32-bit ARM and AArch64 for the same arguments (harness/reference_subtitles_host.h)",

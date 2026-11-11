@@ -5,6 +5,7 @@
   "candidate": "subtitle-worker",
   "worker_operation": "sub-",
   "reference": "ffmpeg-subtitles-native",
+  "measurement_reference": "ffmpeg-subtitles-plain-native",
   "contract": [
     "DVB teletext subtitle pages (EN 300 472, EN 300 706) from MPEG-TS in the text and ASS formats, with page selection and the txt_ options; reference: FFmpeg libzvbi_teletextdec with libzvbi 0.2.46",
     "preparation outside the timed operation: open the input, select the teletext stream and its descriptor configuration, and copy its PES payloads in demux order",
