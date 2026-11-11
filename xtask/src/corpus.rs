@@ -342,6 +342,101 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (93, 25_808, 16_784_415_058_963_717_857),
         ),
     ]);
+    let surround_file = "avc-aac-quicktime-surround.mov";
+    let minimal_wave_file = "avc-aac-quicktime-minimal-wave.mov";
+    let surround_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(surround_file);
+    let surround =
+        fs::read(&surround_seed).map_err(|e| format!("{}: {e}", surround_seed.display()))?;
+    if sha256::hex(&surround) != "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5"
+    {
+        return Err("QuickTime surround AAC range seed changed".into());
+    }
+    let mut minimal_wave = surround.clone();
+    // Replace the optional wave format and marker atoms with free boxes of equal size.
+    minimal_wave[1989..1993].copy_from_slice(b"free");
+    minimal_wave[2001..2005].copy_from_slice(b"free");
+    write(&output.join(surround_file), &surround)?;
+    write(&output.join(minimal_wave_file), &minimal_wave)?;
+    let open = (289, 174_560, 8_952_730_278_029_084_733);
+    let seek = (145, 85_958, 4_047_899_442_073_086_333);
+    cases.extend([
+        mp4_range_case("quicktime-aac-open", surround_file, &surround, [], open),
+        mp4_range_case(
+            "quicktime-aac-seek",
+            surround_file,
+            &surround,
+            ["26880"],
+            seek,
+        ),
+        mp4_range_case(
+            "quicktime-aac-minimal-wave-open",
+            minimal_wave_file,
+            &minimal_wave,
+            [],
+            open,
+        ),
+        mp4_range_case(
+            "quicktime-aac-minimal-wave-seek",
+            minimal_wave_file,
+            &minimal_wave,
+            ["26880"],
+            seek,
+        ),
+    ]);
+    let reordered_file = "avc-aac-quicktime-reordered.mov";
+    let reordered_seed = surround_seed.with_file_name(reordered_file);
+    let reordered =
+        fs::read(&reordered_seed).map_err(|e| format!("{}: {e}", reordered_seed.display()))?;
+    if sha256::hex(&reordered) != "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b"
+    {
+        return Err("Reordered QuickTime AAC range seed changed".into());
+    }
+    write(&output.join(reordered_file), &reordered)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-reordered-open",
+            reordered_file,
+            &reordered,
+            [],
+            (274, 61_802, 11_057_392_877_255_542_627),
+        ),
+        mp4_range_case(
+            "quicktime-aac-reordered-seek",
+            reordered_file,
+            &reordered,
+            ["26880"],
+            (141, 30_781, 3_570_639_560_812_143_604),
+        ),
+    ]);
+    let fragmented_file = "avc-aac-quicktime-fragmented.mov";
+    let fragmented_seed = surround_seed.with_file_name(fragmented_file);
+    let fragmented =
+        fs::read(&fragmented_seed).map_err(|e| format!("{}: {e}", fragmented_seed.display()))?;
+    if sha256::hex(&fragmented)
+        != "be592508645005099c312154a45504c5bb5be002d9616cc94af399394e493b83"
+    {
+        return Err("Fragmented QuickTime AAC range seed changed".into());
+    }
+    write(&output.join(fragmented_file), &fragmented)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-fragmented-open",
+            fragmented_file,
+            &fragmented,
+            [],
+            (93, 39_981, 1_939_830_974_683_508_522),
+        ),
+        mp4_range_case(
+            "quicktime-aac-fragmented-seek",
+            fragmented_file,
+            &fragmented,
+            ["4096"],
+            (73, 30_733, 1_084_237_239_961_408_002),
+        ),
+    ]);
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",

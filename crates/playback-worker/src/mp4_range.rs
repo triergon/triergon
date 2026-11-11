@@ -8,7 +8,7 @@ use triergon_core::{
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_isobmff::{
-    ConfigurationLimits,
+    AacConfigurationJob, AacConfigurationStep, ConfigurationLimits,
     compat::mov::{
         edits::{
             EncodedEditContext as EditContext, EncodedEditJob as EditJob,
@@ -155,6 +155,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
     while !matches!(open.advance(&mut work(), &cancel)?, OpenProgress::Ready) {}
     let mut opened = open.finish()?;
     let movie = &opened.movie;
+    let major_brand = movie.major_brand();
     let movie_base = movie.header().time_base()?;
     let mut plans = BudgetVec::new(pool);
     plans.try_reserve_exact(movie.tracks().len())?;
@@ -186,16 +187,36 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
             b"dvh1" | b"dvhe" => Some("hevc"),
             b"dav1" => Some("av1"),
             b"Opus" => Some("opus"),
+            b"mp4a" if major_brand == Some(*b"qt  ") => Some("aac"),
             _ => None,
         };
         let edits = track.edits().filter(|_| track.fragments().is_empty());
-        let config = if edits.is_some() || codec.is_some() {
+        let config = if codec == Some("aac") && !track.fragments().is_empty() {
+            // A fragment's description lives in the initialization table even
+            // when that table contains no samples.
+            let entry = &descriptions[0];
+            if entry.data_reference_index != 1 {
+                return Err("encoded external data reference".into());
+            }
+            let mut config = AacConfigurationJob::new(entry, ConfigurationLimits::default())?;
+            loop {
+                match config.poll(&mut work(), &cancel)? {
+                    AacConfigurationStep::Yield => {}
+                    AacConfigurationStep::Ready(config) => {
+                        result.configuration(entry.format, config.bytes.as_ref());
+                        break;
+                    }
+                    AacConfigurationStep::End => return Err("missing AAC configuration".into()),
+                }
+            }
+            None
+        } else if edits.is_some() || codec.is_some() {
             let mut config = ConfigurationJob::new_range_playback(
                 header,
                 table,
                 &opened.input,
                 DescriptionSelection {
-                    major_brand: movie.major_brand(),
+                    major_brand,
                     description: descriptions[0].index,
                     limits: ConfigurationLimits::default(),
                 },
@@ -331,7 +352,7 @@ pub fn run(args: &[String]) -> Result<()> {
         _ => return Err("expected the opus-roll seek policy".into()),
     };
     let pool = Budget::new(2 * usize::try_from(MAX_INPUT)?)?;
-    let raw = Bytes::copy_from_slice(&pool, &invocation.input(MAX_INPUT)?)?;
+    let raw = Bytes::try_from_vec(&pool, invocation.input(MAX_INPUT)?).map_err(|e| e.error())?;
     measure(&invocation, OPERATION, Some(&pool), || {
         session(&pool, &raw, seek)
     })
