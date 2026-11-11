@@ -1059,7 +1059,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         ("rustc", Value::str(rustc)),
         (
             "platform",
-            Value::str(crate::harness::report::host_target()),
+            Value::str(crate::harness::report::gate_target()),
         ),
         ("machine", Value::str(crate::harness::linux::machine())),
         (

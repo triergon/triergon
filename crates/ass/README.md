@@ -444,7 +444,7 @@ panics.
 - `ass-render-host` renders, as `ass-render` does, the fixtures whose libass
   result differs by target (`border-x-overflow.ass`, and `collision-far-tops.ass`,
   colliding events whose boxes end up 2³¹ or more rows apart), each pinned for
-  `aarch64-unknown-linux-gnu` and `armv7-unknown-linux-gnueabihf` from that
+  `aarch64-unknown-linux-gnu` and `thumbv7neon-unknown-linux-gnueabihf` from that
   target's reference. All four cases pass on ARMv7; on AArch64 all four are
   open as a deliberate divergence.
 - Runtime and memory of both features are taken against `libass-player-native`

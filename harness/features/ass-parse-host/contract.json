@@ -21,7 +21,7 @@
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
-    "armv7-unknown-linux-gnueabihf"
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "pending_module_requirements": [
     "a deliberate divergence: libass built with GCC accepts a coordinate landing exactly on INT_MIN through abs(INT_MIN) overflow, and the crate rejects it",
@@ -40,7 +40,7 @@
       "requirement": "a deliberate divergence: libass built with GCC accepts a coordinate landing exactly on INT_MIN through abs(INT_MIN) overflow, and the crate rejects it",
       "targets": [
         "aarch64-unknown-linux-gnu",
-        "armv7-unknown-linux-gnueabihf"
+        "thumbv7neon-unknown-linux-gnueabihf"
       ]
     },
     {
@@ -48,7 +48,7 @@
       "requirement": "a deliberate divergence: libass built with GCC accepts a coordinate landing exactly on INT_MIN through abs(INT_MIN) overflow, and the crate rejects it",
       "targets": [
         "aarch64-unknown-linux-gnu",
-        "armv7-unknown-linux-gnueabihf"
+        "thumbv7neon-unknown-linux-gnueabihf"
       ]
     },
     {

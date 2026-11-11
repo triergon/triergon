@@ -38,6 +38,7 @@ def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / '.research/core-time-check')
     parser.add_argument('--profiles', nargs='+', choices=('debug', 'release'), default=['debug', 'release'])
+    parser.add_argument('--target', help='the Rust target to build the probe for; the host when omitted')
     args = parser.parse_args()
     destination = args.output.resolve()
     out = destination / 'runs' / str(time.time_ns())
@@ -82,8 +83,11 @@ def main():
         command = ['cargo', '+nightly', 'build', '-p', 'triergon-core', '--example', 'time-oracle', '--locked']
         if profile == 'release':
             command.append('--release')
+        if args.target:
+            command.extend(['--target', args.target])
         subprocess.run(command, cwd=ROOT, env=env, check=True)
-        probe = ROOT / ('target/' + profile + '/examples/time-oracle')
+        built = ROOT / 'target' / args.target if args.target else ROOT / 'target'
+        probe = built / profile / 'examples/time-oracle'
         executable = sha(probe)
         shutil.copyfile(probe, out / (profile + '-time-oracle'))
         if sha(out / (profile + '-time-oracle')) != executable:

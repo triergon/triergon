@@ -479,8 +479,12 @@ fn fate_run(root: &Path, args: &[String]) -> ExitCode {
 }
 
 fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
-    let (mut output, mut compare, mut candidate) =
-        (None, None, root.join("target/release/media-worker"));
+    let (mut output, mut compare, mut candidate) = (
+        None,
+        None,
+        root.join(harness::gate_build::release_dir())
+            .join("media-worker"),
+    );
     let mut rest = args.iter();
     let parsed = (|| -> Task {
         while let Some(flag) = rest.next() {
@@ -844,6 +848,15 @@ fn cargo(root: &Path, toolchain: Option<&str>, args: &[&str]) -> Task {
         .current_dir(root))
 }
 
+/// `cargo ARGS` compiled for the worker target, for the steps that build or test
+/// what the workers run.
+fn cargo_for_workers(root: &Path, toolchain: Option<&str>, args: &[&str]) -> Task {
+    let target = harness::gate_build::target_args();
+    let mut args = args.to_vec();
+    args.extend(target.iter().map(String::as_str));
+    cargo(root, toolchain, &args)
+}
+
 /// Run with the pinned FFmpeg reference first on `PATH`, as the harness expects.
 fn run(command: &mut Command) -> Task {
     let reference = root().join(".research/reference/install/bin");
@@ -893,15 +906,17 @@ fn prepare_check() -> Task {
 /// The opt-in nightly `std::simd` path of the HEVC decoder must decode exactly as
 /// the scalar default does (the conformance tests compare both with FFmpeg digests).
 fn check_simd(root: &Path) -> Task {
-    run(Command::new("rustup").args([
-        "toolchain",
-        "install",
-        NIGHTLY,
-        "--profile",
-        "minimal",
-        "--component",
-        "clippy",
-    ]))?;
+    run(Command::new("rustup")
+        .args([
+            "toolchain",
+            "install",
+            NIGHTLY,
+            "--profile",
+            "minimal",
+            "--component",
+            "clippy",
+        ])
+        .args(harness::gate_build::target_args()))?;
     let toolchain = format!("+{NIGHTLY}");
     let features = "triergon-codec-hevc/simd,codec-worker/simd";
     cargo(
@@ -922,7 +937,7 @@ fn check_simd(root: &Path) -> Task {
             "warnings",
         ],
     )?;
-    cargo(
+    cargo_for_workers(
         root,
         Some(&toolchain),
         &[
@@ -1064,9 +1079,9 @@ fn smoke_campaigns<'a>(
 
 fn check(root: &Path) -> Task {
     cargo(root, None, &["fmt", "--all", "--check"])?;
-    cargo(root, None, &["test", "--workspace", "--locked"])?;
+    cargo_for_workers(root, None, &["test", "--workspace", "--locked"])?;
     for package in REFERENCE_TRACE_CRATES {
-        cargo(
+        cargo_for_workers(
             root,
             None,
             &[
@@ -1104,7 +1119,7 @@ fn check(root: &Path) -> Task {
         .current_dir(root))?;
     // Workspace feature unification can change the prepared worker binaries.
     // Keep this build separate from the workers checked against their identities.
-    cargo(
+    cargo_for_workers(
         root,
         None,
         &[
@@ -1160,9 +1175,12 @@ fn check(root: &Path) -> Task {
     check_design(root)?;
     check_links(root)?;
     check_revisions(root)?;
-    run(Command::new("python3")
-        .arg("tools/test-core-time.py")
-        .current_dir(root))
+    let mut core_time = Command::new("python3");
+    core_time.arg("tools/test-core-time.py");
+    if let [_, target] = harness::gate_build::target_args().as_slice() {
+        core_time.args(["--target", target]);
+    }
+    run(core_time.current_dir(root))
 }
 
 #[cfg(test)]
