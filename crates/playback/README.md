@@ -56,6 +56,12 @@ Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
 When the movie declares its duration, the range player checks source ranges and
 packet projections before merging the tracks for delivery.
+`Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
+Data tracks such as RTP hints and timecode still have their sample extents checked.
+Supply any edit plans in source track order, with `None` for each data track.
+The `avc-aac-rtp-hints.mp4` test fixture contains a synthetic AVC test pattern,
+AAC sine audio and two RTP hint tracks, with the first hint track between the
+video and audio tracks.
 
 ## Supported
 

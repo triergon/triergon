@@ -388,6 +388,34 @@
         "bytes": 25808,
         "digest": 16784415058963717857
       }
+    },
+    {
+      "id": "rtp-hints-open",
+      "profile": "rtp-hints-open",
+      "file": "avc-aac-rtp-hints.mp4",
+      "sha256": "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 289,
+        "bytes": 72260,
+        "digest": 16322489954875018336
+      }
+    },
+    {
+      "id": "rtp-hints-seek",
+      "profile": "rtp-hints-seek",
+      "file": "avc-aac-rtp-hints.mp4",
+      "sha256": "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "26880"
+      ],
+      "expected": {
+        "packets": 145,
+        "bytes": 35398,
+        "digest": 5283456504139288625
+      }
     }
   ]
 }
