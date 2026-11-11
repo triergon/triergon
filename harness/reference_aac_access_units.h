@@ -9,6 +9,18 @@ static void keep_aac_input(void *opaque, uint8_t *data) {
     (void)data;
 }
 
+/* A complete plane is a multiple of 64 bytes, so each lane reads whole words. */
+static void fold_aac_plane(struct fold *digest, const uint8_t *samples) {
+    const size_t bytes = AAC_SAMPLES * sizeof(float);
+    digest->total += bytes;
+    for (size_t offset = 0; offset < bytes; offset += 64) {
+        for (size_t lane = 0; lane < 8; lane++) {
+            const uint64_t word = AV_RL64(samples + offset + lane * 8);
+            digest->lane[lane] = (digest->lane[lane] ^ word) * FOLD_K;
+        }
+    }
+}
+
 static void aac_access_units(const uint8_t *data, size_t size, struct out *out) {
     static const uint8_t padding[AAC_PADDING] = {0};
     if (size < 16 || AV_HAVE_BIGENDIAN)
@@ -69,7 +81,7 @@ static void aac_access_units(const uint8_t *data, size_t size, struct out *out) 
         const size_t plane = AAC_SAMPLES * sizeof(float);
         for (uint32_t channel = 0; channel < channels; channel++) {
             const uint8_t *samples = frame->extended_data[channel];
-            fold(&out->digest, samples, plane);
+            fold_aac_plane(&out->digest, samples);
             if (out->raw && fwrite(samples, 1, plane, out->raw) != plane)
                 die("AAC PCM output", AVERROR(EIO));
         }

@@ -228,6 +228,13 @@ pub fn run(options: &Options) -> Result<(), String> {
             ));
         };
         let graded = graded?;
+        let parity_matches = parity.as_ref().is_none_or(|parity| {
+            parity.matches(
+                graded.record.get("worker_hashes"),
+                &graded.record,
+                Some(&input_sha),
+            )
+        });
         let state = graded.status().to_owned();
         // The seed of the attempt the session kept.
         let seed = graded
@@ -252,12 +259,13 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("cpus".to_owned(), gate_build::cpus()),
         ];
         if let Some(parity) = &parity {
-            result.push(("parity_sha256".to_owned(), Value::str(parity)));
+            result.push(("parity_sha256".to_owned(), Value::str(&parity.sha256)));
+            result.push(("parity_matches".to_owned(), Value::Bool(parity_matches)));
         }
         let (mut ratio, mut delivery, mut digest_equal) = (None, None, None);
         if let Ok(interval) = &graded.interval {
             let equal = digests_equal(&graded.record);
-            let gate_build = refusals.is_empty();
+            let gate_build = refusals.is_empty() && parity_matches;
             let passes = gate_build && interval.upper_95 <= gate.ceiling;
             result.extend([
                 ("digest_equal".to_owned(), Value::Bool(equal)),

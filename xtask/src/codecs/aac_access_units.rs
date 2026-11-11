@@ -114,6 +114,22 @@ impl Comparison {
     }
 }
 
+pub(super) struct MeasurementParity {
+    pub sha256: String,
+    workers: Value,
+}
+
+impl MeasurementParity {
+    pub fn matches(
+        &self,
+        workers: Option<&Value>,
+        measured: &Value,
+        input: Option<&Value>,
+    ) -> bool {
+        workers == Some(&self.workers) && input.is_some() && measured.get("input_sha256") == input
+    }
+}
+
 /// Require matching PCM parity before either performance collector admits these workloads.
 pub(super) fn measurement_parity(
     root: &Path,
@@ -122,7 +138,7 @@ pub(super) fn measurement_parity(
     workload_path: &Path,
     inputs: &Path,
     manifest: &Value,
-) -> Result<Option<String>, String> {
+) -> Result<Option<MeasurementParity>, String> {
     let cases = manifest
         .get("workloads")
         .and_then(Value::as_array)
@@ -138,7 +154,9 @@ pub(super) fn measurement_parity(
     }
     let comparison = Comparison::load(root, Some((candidate, reference)))?;
     let parity_path = inputs.join(PARITY_FILE);
-    let parity = checks::read_json(&parity_path)?;
+    let bytes = read(&parity_path)?;
+    let parity = json::parse(std::str::from_utf8(&bytes).map_err(|error| error.to_string())?)
+        .map_err(|error| format!("{}: {error}", parity_path.display()))?;
     if parity.get("comparison") != Some(&comparison.binding)
         || string(&parity, "workloads_sha256")? != file_sha(workload_path)?
     {
@@ -157,7 +175,19 @@ pub(super) fn measurement_parity(
     {
         return Err("AAC measurement requires passing parity for every workload".into());
     }
-    Ok(Some(file_sha(&parity_path)?))
+    Ok(Some(MeasurementParity {
+        sha256: sha256::hex(&bytes),
+        workers: Value::object([
+            (
+                "candidate",
+                Value::str(string(&comparison.binding, "candidate_sha256")?),
+            ),
+            (
+                "reference",
+                Value::str(string(&comparison.binding, "reference_sha256")?),
+            ),
+        ]),
+    }))
 }
 
 fn command(program: &Path, args: &[&str]) -> Result<Value, String> {
@@ -387,6 +417,9 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
         };
         let (candidate_row, candidate_pcm) = raw(&comparison.candidate, "candidate")?;
         let (reference_row, reference_pcm) = raw(&comparison.reference, "reference")?;
+        if file_sha(&input_path)? != input_sha {
+            return Err(format!("{id}: AAC input changed during parity"));
+        }
         let (layout, surround_pair_labels) =
             compare_speakers(&candidate_row, &reference_row, configuration, channels)?;
         let (pcm, planes) = compare_pcm(
@@ -413,6 +446,11 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
         ("schema", Value::str("triergon.codecs.workloads.v1")),
         ("workloads", Value::Array(workloads)),
     ]);
+    if Comparison::load(root, Some((&comparison.candidate, &comparison.reference)))?.binding
+        != comparison.binding
+    {
+        return Err("AAC comparison tools or rules changed during parity".into());
+    }
     let pinned = root.join(FEATURE).join("corpus.json");
     if !record && checks::read_json(&pinned)? != workloads {
         return Err("AAC access-unit workload differs from its pins".into());
@@ -459,5 +497,26 @@ mod tests {
             compare_speakers(&side, &reversed, 6, 6).unwrap(),
             (false, false)
         );
+    }
+
+    #[test]
+    fn parity_only_accepts_the_measured_worker_and_input_hashes() {
+        let workers = Value::object([
+            ("candidate", Value::str("candidate")),
+            ("reference", Value::str("reference")),
+        ]);
+        let parity = MeasurementParity {
+            sha256: "parity".to_owned(),
+            workers: workers.clone(),
+        };
+        let expected = Value::str("expected-input");
+        let measurement = Value::object([("input_sha256", expected.clone())]);
+        assert!(parity.matches(Some(&workers), &measurement, Some(&expected)));
+        assert!(!parity.matches(None, &measurement, Some(&expected)));
+        assert!(!parity.matches(
+            Some(&workers),
+            &measurement,
+            Some(&Value::str("other-input"))
+        ));
     }
 }

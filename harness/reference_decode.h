@@ -390,7 +390,7 @@ int main(int argc, char **argv) {
     if (!separator || !separator[1]) return 2;
     const char *name = separator + 1;
     if (!strcmp(name, "dts")) name = "dca";
-    const int configured_aac = !strcmp(op, "audio-aac-access-units");
+    const int configured_aac = !video && !strcmp(name, "aac-access-units");
     FILE *in = fopen(argv[2], "rb");
     if (!in) { perror("input"); return 1; }
     if (fseek(in, 0, SEEK_END)) die("input seek", AVERROR(errno));

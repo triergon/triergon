@@ -155,10 +155,10 @@ pub fn run(options: &Options) -> Result<(), String> {
         ("seed", Value::int(options.seed)),
         ("utc", Value::str(python::utc_now())),
     ]);
-    if let Some(parity) = parity
+    if let Some(parity) = &parity
         && let Value::Object(fields) = &mut identity
     {
-        fields.push(("parity_sha256".into(), Value::str(parity)));
+        fields.push(("parity_sha256".into(), Value::str(&parity.sha256)));
     }
     write(&options.out.join("identity.json"), &identity)?;
     let mut summary = Vec::new();
@@ -215,11 +215,23 @@ pub fn run(options: &Options) -> Result<(), String> {
                     ]),
                 }
             };
+        let parity_matches = parity.as_ref().is_none_or(|parity| {
+            parity.matches(
+                measured
+                    .get("certificate")
+                    .and_then(|certificate| certificate.get("worker_hashes")),
+                &measured,
+                w.get("sha256"),
+            )
+        });
+        if parity.is_some() {
+            record.push(("parity_matches".into(), Value::Bool(parity_matches)));
+        }
         let verdict = verdict(
             &measured,
             options.pairs,
             gate_platform(),
-            refusals.is_empty(),
+            refusals.is_empty() && parity_matches,
         );
         let bound = |key: &str| measured.get(key).cloned().unwrap_or(Value::Null);
         let mut line = vec![("id".to_owned(), Value::str(id))];
