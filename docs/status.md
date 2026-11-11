@@ -252,6 +252,8 @@ against libass for AArch64 where it runs out of memory.
 | MP4 forward and range playback | `a41648dd4de2933d526415cce86a9ebbd1d4444b` | `32aa6f481afc5f6074dd14a683a110bc044b781b9c40b72c84876af9b812f977` |
 | MP4 range playback with data tracks | `90944404d8236a6da47d414f67a0652f2fc232c2` | `b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2` |
 | MP4 range playback with QuickTime AAC | `5fd3f0244849f11685fdf42a75c4c71847001bf9` | `018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1` |
+| MP4 range playback with fragmented QuickTime AAC, preceding seek path | `b96eb9ec65abbe4548b4bc00a74e8504a6d0001d` | `2b2030d312f1af3a9716b2178afc5c04b7176822329f03240e4f41fca2f18478` |
+| MP4 range playback with projected tracks, preceding fragment seek path | `5ab026d75783575aaf2ebf0120b0338dac85369a` | `2b2030d312f1af3a9716b2178afc5c04b7176822329f03240e4f41fca2f18478` |
 | MP4 range playback with QuickTime AAC, earlier preload | `4c59b8121079719a3c988835c1cef6e65eae1719` | `b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2` |
 | AAC in MOV PCM | `63f5e8e5626ed5dac0bbeb9c0e742e0eec6146e6` | `100613a296e2f18f9631c60992057cb0debc108f1926c41a33b8c3f6f06f4556` |
 | AAC in MOV and fragmented QuickTime host comparisons | `9559dae0b89dfd2df2b08b9a97267bc75711be65` | `0bc8fb8726cff0d2ba18d7c138ba83375baf13265bb148086522047bf816aea2` |
