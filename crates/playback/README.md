@@ -64,6 +64,11 @@ also runs with the optional format and marker atoms replaced by free boxes.
 `avc-aac-quicktime-fragmented.mov` exercises open and seek with empty
 initialization sample tables and a version 1 sound description. It remuxes the
 synthetic `fragmented-avc-aac.mp4` fixture under the same MIT or Apache-2.0 license.
+`avc-aac-quicktime-7-1.mov` uses the same synthetic video pattern and distinct
+tones at 251, 379, 503, 71, 641, 769, 911 and 1031 Hz for the eight speakers.
+FFmpeg 9.0.2 encoded the fixture as 44.1 kHz AAC-LC with channel configuration
+12. The fixture is distributed under the repository's dual licence. The
+[range corpus](../../harness/features/mp4-range/corpus.json) records its SHA-256.
 
 `Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
 Data tracks such as RTP hints and timecode still have their sample extents checked.

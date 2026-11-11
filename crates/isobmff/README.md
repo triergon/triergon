@@ -308,6 +308,8 @@ rejects boxes extending past the source.
   presence before reading its samples.
   Range playback preserves AAC sample durations from `stts`, including
   durations longer than one coded frame. Trim counts use the coded frame length.
+  The regular range view also establishes a 1024-sample clock for indexed AAC-LC
+  configurations 11, 12 and 14 when the media timescale matches the core rate.
   The compatible view of a complete fragmented file supports one open-ended
   rate-one initialization edit. Packet clocks and backward seek queries share
   the edit's offset. AAC leading trim uses the configured audio sample rate.

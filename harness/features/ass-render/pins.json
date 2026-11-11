@@ -163,6 +163,16 @@
       "bytes": 5508816,
       "digest": 9218362220370028582
     },
+    "collision-far-margins-ass-1080p": {
+      "packets": 18,
+      "bytes": 228192,
+      "digest": 2433410785177038486
+    },
+    "collision-far-margins-ass-720p": {
+      "packets": 18,
+      "bytes": 152646,
+      "digest": 10369443860810198380
+    },
     "collision-ass-1080p": {
       "packets": 318,
       "bytes": 8009084,

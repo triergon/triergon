@@ -17,7 +17,8 @@ codec-worker packets FORMAT FILE
 ```
 
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
-`audio-aac`, `audio-dts`, `audio-flac`, `audio-mp3`, `audio-vorbis`, `audio-opus`. The `simd` feature enables the HEVC decoder's nightly-only
+`audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`, `audio-dts`, `audio-flac`, `audio-mp3`,
+`audio-vorbis` or `audio-opus`. The `simd` feature enables the HEVC decoder's nightly-only
 SIMD kernels; output is identical.
 
 Video is split into Annex B access units and audio into frames (AC-3/E-AC-3 by
@@ -26,10 +27,25 @@ reference worker's parser does, so both decode the same units. This is measureme
 framing; playback frames access units through `triergon-framing`. Decode errors are
 printed to stderr and decoding continues.
 
+For configured AAC, `cargo xtask codecs aac-access-units --out DIR` extracts the
+original packets and AudioSpecificConfig with the pinned `ffprobe`. Each input
+starts with four little-endian 32-bit words for the sample rate, channel count,
+packet count and configuration length. The configuration precedes the packets,
+each with a little-endian 32-bit length and 64 zero padding bytes. Both workers
+cap the preloaded input at 64 MiB and require 1024 samples per plane per packet.
+The `raw` mode writes little-endian floats in frame and plane order and reports
+the ordered speaker IDs. The command compares every sample with the AAC
+accuracy bounds and checks the speaker order. Pass its `workloads.json` to
+`cargo xtask codecs time` and `cargo xtask codecs memory` with the same input
+directory and workers. Both commands require the matching `parity.json`.
+`audio-aac-access-units` uses the specification mapping.
+`audio-aac-access-units-compat` uses the conventional surround mapping.
+
 ## Outputs
 
-The converted output is 1920×1080 RGBA per picture or interleaved stereo s16le per
-audio frame. `packets` counts pictures or audio frames.
+The output is 1920×1080 RGBA per picture, interleaved stereo s16le per mixed
+audio frame, or all native PCM planes per configured AAC frame. `packets` counts
+pictures or audio frames.
 
 | Mode | stdout |
 |---|---|

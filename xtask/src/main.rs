@@ -122,7 +122,8 @@ commands:
                  under REPORTS/<contract>, against the quick-check tolerances
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
-  codecs         manifest|grade|summarize|time|equivalence   codec crates against the
+  codecs         aac-access-units|manifest|grade|summarize|time|equivalence
+                 codec crates against the
                  pinned FFmpeg decoders (see `cargo xtask codecs --help`)
   capture        compare|qualify|summarize|equivalence   capture pipeline against the
                  FFmpeg capture reference (see `cargo xtask capture --help`)

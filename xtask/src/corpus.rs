@@ -437,6 +437,32 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (73, 30_733, 1_084_237_239_961_408_002),
         ),
     ]);
+    let eight_channel_file = "avc-aac-quicktime-7-1.mov";
+    let eight_channel_seed = surround_seed.with_file_name(eight_channel_file);
+    let eight_channel = fs::read(&eight_channel_seed)
+        .map_err(|e| format!("{}: {e}", eight_channel_seed.display()))?;
+    if sha256::hex(&eight_channel)
+        != "005afe6563563ff5af1eee044f68759a188fe75079cf9e74745d43d5b2231c3c"
+    {
+        return Err("QuickTime 7.1 AAC range seed changed".into());
+    }
+    write(&output.join(eight_channel_file), &eight_channel)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-7-1-open",
+            eight_channel_file,
+            &eight_channel,
+            [],
+            (274, 92_570, 4_686_448_036_394_174_807),
+        ),
+        mp4_range_case(
+            "quicktime-aac-7-1-seek",
+            eight_channel_file,
+            &eight_channel,
+            ["26880"],
+            (141, 47_093, 5_018_453_331_173_239_581),
+        ),
+    ]);
     let hinted_file = "avc-aac-rtp-hints.mp4";
     let hinted_seed = paths
         .root

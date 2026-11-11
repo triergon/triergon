@@ -2,8 +2,8 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    AacAscParser, AacAudioSpecificConfig, AacConfigLimits, AacExtensionSignal, AacPceElement,
-    AacPceElementKind, AacSource, BuildStep,
+    AacAdtsParameters, AacAscParser, AacAudioSpecificConfig, AacConfigLimits, AacExtensionSignal,
+    AacPceElement, AacPceElementKind, AacSource, BuildStep,
 };
 
 fn limits() -> AacConfigLimits {
@@ -121,6 +121,23 @@ fn parse(b: &Bits) -> Result<AacAudioSpecificConfig, Error> {
         b.len,
         limits(),
     )
+}
+
+#[test]
+fn extended_fixed_asc_layouts_cannot_be_wrapped_in_adts() {
+    for (configuration, channels) in [(11, 7), (12, 8), (14, 8)] {
+        let mut bits = base(configuration);
+        bits.put(0, 3);
+        let asc = parse(&bits).unwrap();
+        assert_eq!(asc.facts().channel_configuration, configuration);
+        assert_eq!(asc.facts().core_channels, channels);
+        assert!(matches!(
+            AacAdtsParameters::from_asc(asc.facts()),
+            Err(Error::Unsupported(
+                "ASC channel configuration does not fit ADTS"
+            ))
+        ));
+    }
 }
 
 #[test]
@@ -394,7 +411,7 @@ fn unselected_objects_channels_frequencies_and_extensions_are_explicit() {
         b.put(0, 3);
         assert!(matches!(parse(&b), Err(Error::Unsupported(_))));
     }
-    for channel in 8..16 {
+    for channel in [8, 9, 10, 13, 15] {
         let mut b = base(channel);
         b.put(0, 3);
         assert!(matches!(parse(&b), Err(Error::Unsupported(_))));

@@ -44,6 +44,29 @@ impl InterleavedDigest {
         }
     }
 
+    /// Append float samples in their little-endian byte representation.
+    pub fn update_f32(&mut self, samples: &[f32]) {
+        if !self.pending.is_empty() {
+            for sample in samples {
+                self.update(&sample.to_le_bytes());
+            }
+            return;
+        }
+        let (blocks, tail) = samples.as_chunks::<16>();
+        self.total += blocks.len() as u64 * 64;
+        for block in blocks {
+            for (accumulator, &[lo, hi]) in
+                self.accumulators.iter_mut().zip(block.as_chunks::<2>().0)
+            {
+                let word = u64::from(lo.to_bits()) | (u64::from(hi.to_bits()) << 32);
+                *accumulator = (*accumulator ^ word).wrapping_mul(K);
+            }
+        }
+        for sample in tail {
+            self.update(&sample.to_le_bytes());
+        }
+    }
+
     /// The digest of everything appended so far.
     pub fn finish(&self) -> u64 {
         let mut accumulators = self.accumulators;
@@ -90,6 +113,21 @@ mod tests {
         }
         let bytes: Vec<&[u8]> = data.chunks(1).collect();
         assert_eq!(digest(&bytes), GOLDEN[3]);
+    }
+
+    #[test]
+    fn float_planes_match_the_byte_digest() {
+        let samples: Vec<_> = (0..49).map(|i| (i as f32 - 19.0) * 0.125).collect();
+        let bytes: Vec<_> = samples
+            .iter()
+            .flat_map(|sample| sample.to_le_bytes())
+            .collect();
+        for prefix in [b"".as_slice(), b"prefix".as_slice()] {
+            let mut floats = InterleavedDigest::default();
+            floats.update(prefix);
+            floats.update_f32(&samples);
+            assert_eq!(floats.finish(), digest(&[prefix, &bytes]));
+        }
     }
 
     const GOLDEN: [u64; 4] = [
