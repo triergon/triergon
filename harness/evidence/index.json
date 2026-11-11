@@ -19462,6 +19462,26 @@
    "sha256": "5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949",
    "bytes": 129922253,
    "source_revision": "3d422610316d79665c80b48ab8a27a8a57880efe"
+  },
+  {
+   "name": "armv7-kernel-rss-linux-armv7",
+   "path": "armv7-kernel-rss-linux-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 rows of docs/status.md measured under the kernel RSS bound through its 32-bit entry point, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1 at afb9049c: 30 timing pairs and 30 kernel-bound memory pairs of mp4-forward, ts-program, matroska-audio-clocks and raw-annex-b graded by cargo xtask grade; 30 kernel-bound memory pairs of hls-segments, matroska-startup-seek, the six Matroska feature groups, the external HDR vector, mpegts-pes, isobmff-bench and framing; the kernel proofs with their positive and invalidation checks, the build identities, the scripts, the CPU, kernel and user-space package list.",
+   "key": "evidence/armv7-kernel-rss-linux-armv7/4567e8ba906099070b64ac43868bdd9695d350049f25645078e35c0f334ce8b1.tar.gz",
+   "sha256": "4567e8ba906099070b64ac43868bdd9695d350049f25645078e35c0f334ce8b1",
+   "bytes": 4609695693,
+   "source_revision": "afb9049c681916c97311fc9f495e27ceaa69f4df"
+  },
+  {
+   "name": "armv7-ass-thumb-linux-armv7",
+   "path": "armv7-ass-thumb-linux-armv7",
+   "retention": "retained",
+   "reason": "ASS rendering ARMv7 memory row of docs/status.md under the kernel RSS bound through its 32-bit entry point, and the native AArch64 proof of the same module source, on a c6g.4xlarge at afb9049c: 30 kernel-bound memory pairs of ass-render and ass-render-host against libass-player-native in the armv7-userland user space pinned to CPU 1; the AArch64 proof with its positive and invalidation checks and 30 kernel-bound memory pairs of mp4-forward; the thumbv7neon-unknown-linux-gnueabihf playback-worker experiment against the gate build and FFmpeg (timing pairs and kernel-bound RSS observations, with both binaries); the kernel proofs, build identities, scripts, CPU, kernel and user-space package list.",
+   "key": "evidence/armv7-ass-thumb-linux-armv7/d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a.tar.gz",
+   "sha256": "d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a",
+   "bytes": 424394382,
+   "source_revision": "afb9049c681916c97311fc9f495e27ceaa69f4df"
   }
  ]
 }

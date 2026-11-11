@@ -168,9 +168,11 @@ static int bound_release(struct inode *inode, struct file *file)
     mutex_unlock(&session_lock);
     return 0;
 }
+/* The result holds only __u64 fields, so a 32-bit process on a 64-bit kernel
+ * passes the same layout and command number; only its pointer needs widening. */
 static const struct file_operations bound_ops = {
     .owner = THIS_MODULE, .open = bound_open, .release = bound_release,
-    .unlocked_ioctl = bound_ioctl
+    .unlocked_ioctl = bound_ioctl, .compat_ioctl = compat_ptr_ioctl
 };
 static struct miscdevice bound_device = {
     .minor = MISC_DYNAMIC_MINOR, .name = "triergon_rss_bound",
@@ -217,4 +219,4 @@ module_init(bound_init);
 module_exit(bound_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Isolated triergon RSS positive-delta bound experiment");
-MODULE_VERSION("2");
+MODULE_VERSION("3");
