@@ -11,6 +11,7 @@
     "for AVC/AAC with RTP hint tracks, compare all selected audio and video packets at startup and after backward seek. The range player checks source extents for all tracks and excludes data tracks from edit projection, packet delivery and seek alignment",
     "compare the original sample-entry tag and decoder configuration bytes for dvh1, dvhe, dav1, Opus and QuickTime AAC",
     "compare six-channel QuickTime AAC in version-2 sound descriptions with a wave container, including a variant without optional frma and mp4a marker atoms and a 44.1 kHz variant with reordered AVC pictures",
+    "compare fragmented QuickTime AVC/AAC with empty initialization sample tables and a version-1 sound description",
     "compare the reference container output when the MOV demuxer exposes dav1 without assigning an AV1 codec ID",
     "seek cases read one packet, seek backward using the video clock, then read the complete suffix",
     "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
@@ -55,6 +56,8 @@
     "quicktime-aac-minimal-wave-seek",
     "quicktime-aac-reordered-open",
     "quicktime-aac-reordered-seek",
+    "quicktime-aac-fragmented-open",
+    "quicktime-aac-fragmented-seek",
     "rtp-hints-open",
     "rtp-hints-seek"
   ],

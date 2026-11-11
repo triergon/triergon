@@ -411,6 +411,32 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (141, 30_781, 3_570_639_560_812_143_604),
         ),
     ]);
+    let fragmented_file = "avc-aac-quicktime-fragmented.mov";
+    let fragmented_seed = surround_seed.with_file_name(fragmented_file);
+    let fragmented =
+        fs::read(&fragmented_seed).map_err(|e| format!("{}: {e}", fragmented_seed.display()))?;
+    if sha256::hex(&fragmented)
+        != "be592508645005099c312154a45504c5bb5be002d9616cc94af399394e493b83"
+    {
+        return Err("Fragmented QuickTime AAC range seed changed".into());
+    }
+    write(&output.join(fragmented_file), &fragmented)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-fragmented-open",
+            fragmented_file,
+            &fragmented,
+            [],
+            (93, 39_981, 1_939_830_974_683_508_522),
+        ),
+        mp4_range_case(
+            "quicktime-aac-fragmented-seek",
+            fragmented_file,
+            &fragmented,
+            ["4096"],
+            (73, 30_733, 1_084_237_239_961_408_002),
+        ),
+    ]);
     let hinted_file = "avc-aac-rtp-hints.mp4";
     let hinted_seed = paths
         .root
