@@ -61,6 +61,11 @@ sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
 fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
 also runs with the optional format and marker atoms replaced by free boxes.
 `avc-aac-quicktime-reordered.mov` adds 44.1 kHz AAC and AVC with B pictures.
+`avc-aac-quicktime-7-1.mov` uses the same synthetic video pattern and distinct
+tones at 251, 379, 503, 71, 641, 769, 911 and 1031 Hz for the eight speakers.
+FFmpeg 9.0.2 encoded the fixture as 44.1 kHz AAC-LC with channel configuration
+12. The fixture is distributed under the repository's dual licence. The
+[range corpus](../../harness/features/mp4-range/corpus.json) records its SHA-256.
 
 ## Supported
 

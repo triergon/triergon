@@ -323,6 +323,11 @@ impl AacAdtsParameters {
                 "ASC cannot be represented by selected indexed ADTS core",
             ));
         }
+        if f.channel_configuration > 7 {
+            return Err(Error::Unsupported(
+                "ASC channel configuration does not fit ADTS",
+            ));
+        }
         if f.ga.frame_length_flag || f.ga.core_coder_delay.is_some() {
             return Err(Error::Unsupported(
                 "ASC frame/core-dependency fields not advertised by ADTS header",

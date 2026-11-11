@@ -15,7 +15,7 @@ pub use audio::{AudioSession, PcmBlock};
 pub use discard::Discard;
 pub use queue::{FeedError, QueueLimits};
 #[cfg(feature = "codecs")]
-pub use track::TrackDecoder;
+pub use track::{AacAccessUnitConfig, TrackDecoder};
 pub use triergon_codec::{AudioCodec, AudioDecoder, DecodeFailure, VideoCodec, VideoDecoder};
 pub use video::{Published, VideoSession};
 

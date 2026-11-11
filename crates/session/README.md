@@ -53,12 +53,15 @@ SIMD kernels.
 | Stream | Input | Output |
 |---|---|---|
 | Video | H.264, HEVC Annex B access units with optional PTS | 1920×1080 RGBA, letterboxed, 8- and 10-bit 4:2:0 sources |
-| Audio | AC-3, E-AC-3, AAC (ADTS), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
+| Audio | AC-3, E-AC-3, AAC (ADTS or configured raw LC), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
-configuration (`audio_configuration`: Matroska CodecPrivate, ISO BMFF `dfLa`/`dOps`,
-Ogg headers), and its `decode(packet, frame)` drops what the container marks for
+configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). An AAC
+track with AudioSpecificConfig uses its raw access units and fixed channel layout.
+An AAC track with empty configuration uses ADTS. Callers with parsed ASC facts
+can construct an `AacAccessUnitConfig` and build the same decoder for an `AudioSession`.
+`TrackDecoder::decode(packet, frame)` drops what the container marks for
 discarding: the packet's `Trim`, samples before time zero (Matroska CodecDelay, Ogg
 pre-skip) and the decoder's start delay (`AudioDecoder::delay`, the Opus pre-skip), a
 start trim carrying into the next packet when it is longer than one. `Discard::of(packet)`

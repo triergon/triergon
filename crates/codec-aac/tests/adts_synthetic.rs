@@ -1,6 +1,8 @@
 //! Self-contained ADTS tests with synthetic (self-authored) bitstreams.
 use triergon_codec::Budget;
-use triergon_codec_aac::{AudioFrame, DecodeError, Decoder, Feature, Limits, Speaker};
+use triergon_codec_aac::{
+    AudioFrame, DecodeError, Decoder, Feature, Limits, RawLcDecoder, Speaker,
+};
 
 struct Bw {
     bits: Vec<u8>,
@@ -98,6 +100,119 @@ fn block(cpe: bool) -> Vec<u8> {
     let mut w = Bw::new();
     silent_block(&mut w, cpe);
     w.bytes()
+}
+
+#[test]
+fn raw_fixed_layouts_follow_the_speaker_configuration() {
+    use Speaker::{
+        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontLeftOfCenter, FrontRight,
+        FrontRightOfCenter, LowFrequency, SideLeft, SideRight, TopFrontLeft, TopFrontRight,
+    };
+    let cases: &[(u8, &[u32], &[Speaker])] = &[
+        (
+            7,
+            &[0, 1, 1, 1, 3],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                FrontLeftOfCenter,
+                FrontRightOfCenter,
+                SideLeft,
+                SideRight,
+            ],
+        ),
+        (
+            11,
+            &[0, 1, 1, 0, 3],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                BackCenter,
+                SideLeft,
+                SideRight,
+            ],
+        ),
+        (
+            12,
+            &[0, 1, 1, 1, 3],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                BackLeft,
+                BackRight,
+                SideLeft,
+                SideRight,
+            ],
+        ),
+        (
+            14,
+            &[0, 1, 1, 3, 1],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                SideLeft,
+                SideRight,
+                TopFrontLeft,
+                TopFrontRight,
+            ],
+        ),
+    ];
+    let budget = Budget::new(4 << 20).unwrap();
+    for &(config, elements, speakers) in cases {
+        let mut bits = Bw::new();
+        for (tag, &kind) in elements.iter().enumerate() {
+            bits.put(kind, 3);
+            bits.put(tag as u32, 4);
+            if kind == 1 {
+                bits.put(0, 1); // common_window
+                silent_ics(&mut bits);
+            }
+            silent_ics(&mut bits);
+        }
+        bits.put(7, 3); // END
+        let mut decoder = RawLcDecoder::new_in(4, config, &budget).unwrap();
+        let mut frame = AudioFrame::default();
+        decoder.decode(&bits.bytes(), &mut frame).unwrap();
+        assert_eq!(frame.layout.speakers(), speakers);
+        assert_eq!(
+            (frame.sample_rate, frame.samples_per_channel),
+            (44_100, 1024)
+        );
+    }
+}
+
+#[test]
+fn raw_lc_refuses_sbr_and_bytes_after_its_single_block() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let mut decoder = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let mut frame = AudioFrame::default();
+    let mut packet = block(false);
+    packet.push(0);
+    assert_eq!(
+        decoder.decode(&packet, &mut frame),
+        Err(DecodeError::InvalidData("AAC access unit extent"))
+    );
+    let mut bits = Bw::new();
+    bits.put(6, 3); // FIL
+    bits.put(1, 4); // one byte
+    bits.put(13, 4); // EXT_SBR_DATA
+    bits.put(0, 4);
+    bits.put(7, 3); // END
+    assert_eq!(
+        decoder.decode(&bits.bytes(), &mut frame),
+        Err(DecodeError::Unsupported(Feature::RawSbr))
+    );
+    assert_eq!(frame.samples_per_channel, 0);
+    decoder.decode(&block(false), &mut frame).unwrap();
+    assert_eq!(frame.samples_per_channel, 1024);
 }
 
 #[test]

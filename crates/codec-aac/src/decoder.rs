@@ -1,7 +1,6 @@
 //! raw_data_block() decoding: element parsing, channel mapping, per-channel state and
 //! output assembly.
 
-use crate::adts::AdtsHeader;
 use crate::error::{DecodeError, Feature, Result};
 use crate::fft::Dct4;
 use crate::filterbank::Filterbank;
@@ -260,40 +259,43 @@ impl Core {
         if self.sbr_active { SBR_FRAME_LEN } else { 1024 }
     }
 
-    /// (Re)configure from an ADTS header. Returns true when the configuration changed.
-    pub(crate) fn configure_adts(&mut self, h: &AdtsHeader) -> Result<bool> {
-        let aot = h.profile + 1;
+    /// Select the audio object type, indexed rate and channel configuration.
+    pub(crate) fn configure(
+        &mut self,
+        aot: u8,
+        sf_index: u8,
+        channel_config: u8,
+        raw: bool,
+    ) -> Result<()> {
         match aot {
             AOT_MAIN | AOT_LC | AOT_LTP => {}
             3 => return Err(DecodeError::Unsupported(Feature::SsrGainControl)),
             _ => return Err(DecodeError::Unsupported(Feature::ObjectType(aot))),
         }
-        if h.sf_index > 12 {
-            return Err(DecodeError::Unsupported(Feature::SampleRateIndex(
-                h.sf_index,
-            )));
+        if sf_index > 12 {
+            return Err(DecodeError::Unsupported(Feature::SampleRateIndex(sf_index)));
         }
-        let changed = !self.configured
-            || aot != self.aot
-            || h.sf_index as usize != self.sf_index
-            || h.channel_config != self.channel_config;
-        if !changed {
-            return Ok(false);
+        if self.configured
+            && aot == self.aot
+            && usize::from(sf_index) == self.sf_index
+            && channel_config == self.channel_config
+        {
+            return Ok(());
         }
         // The new configuration starts from nothing. Until its element state is charged
         // the decoder is unconfigured, so a refusal here is retried by the next header.
         self.elements.clear();
         self.cce.clear();
         self.configured = false;
-        let slots = if h.channel_config != 0 {
-            fixed_config_slots(h.channel_config)
-        } else {
+        let slots = if channel_config == 0 {
             Vec::new()
+        } else {
+            fixed_config_slots(channel_config, raw)
         };
         let elements = self.build_elements(aot, &slots, false, &[])?;
         self.aot = aot;
-        self.sf_index = h.sf_index as usize;
-        self.channel_config = h.channel_config;
+        self.sf_index = usize::from(sf_index);
+        self.channel_config = channel_config;
         self.sbr_active = false;
         self.ps_active = false;
         self.frames_out = 0;
@@ -301,11 +303,11 @@ impl Core {
         self.configured = true;
         self.unordered = false;
         self.slots = slots;
-        if h.channel_config != 0 {
+        if channel_config != 0 {
             self.pce = None;
         }
         self.rebuild_layout();
-        Ok(true)
+        Ok(())
     }
 
     /// The state of every element `slots` declare (once per element identity, a kind and
@@ -464,7 +466,7 @@ impl Core {
     /// Decode one raw_data_block(); appends `frame_len()` samples per plane to `planes`.
     /// Decode one raw_data_block() of the `blocks` (this one included) the access unit has
     /// left; `out` gets room for an in-band reconfiguration before it applies.
-    pub(crate) fn decode_block(
+    pub(crate) fn decode_block<const RAW: bool>(
         &mut self,
         br: &mut CachedBitReader<'_>,
         block_start: usize,
@@ -483,6 +485,7 @@ impl Core {
             sf_index: self.sf_index,
         };
         let mut occ = [0usize; 4];
+        let mut raw_slot = 0;
         let mut last_elem: Option<usize> = None;
         let mut layout_changed = false;
         loop {
@@ -494,9 +497,20 @@ impl Core {
                 ID_SCE | ID_LFE | ID_CPE => {
                     let tag = br.read(4) as u8;
                     let o = occ[id as usize];
-                    occ[id as usize] += 1;
-                    let mut ei = self.element_index(id, tag, o);
-                    if ei.is_none() && self.channel_config == 2 && id == ID_SCE && o < 2 {
+                    let mut ei = if RAW {
+                        // Fixed configurations list the audible elements in wire
+                        // order. Each fixed slot has its own element state.
+                        let index = raw_slot;
+                        raw_slot += 1;
+                        self.elements
+                            .get(index)
+                            .filter(|element| element.kind == id)
+                            .map(|_| index)
+                    } else {
+                        occ[id as usize] += 1;
+                        self.element_index(id, tag, o)
+                    };
+                    if ei.is_none() && self.channel_config == 2 && id == ID_SCE && o < 2 && !RAW {
                         // FFmpeg maps SCEs of a channel_configuration 2 stream to FL then FR
                         // (probed); the CPE slot's channel o carries them.
                         if let Some(i) = self.element_index(ID_CPE, 0, 0) {
@@ -506,10 +520,15 @@ impl Core {
                             continue;
                         }
                     }
-                    if ei.is_none() && self.channel_config == 1 && id == ID_CPE && o == 0 {
+                    if ei.is_none() && self.channel_config == 1 && id == ID_CPE && o == 0 && !RAW {
                         // FFmpeg switches a channel_configuration 1 stream to stereo when a
                         // CPE appears (probed).
-                        self.switch_layout(fixed_config_slots(2), self.unordered, out, blocks)?;
+                        self.switch_layout(
+                            fixed_config_slots(2, false),
+                            self.unordered,
+                            out,
+                            blocks,
+                        )?;
                         self.channel_config = 2;
                         layout_changed = true;
                         ei = self.element_index(id, tag, o);
@@ -567,7 +586,10 @@ impl Core {
                             return Err(DecodeError::InvalidData("fill element overrun"));
                         }
                         let ext = br.read(4);
-                        if ext == 0 && count * 8 - 4 >= 13 + 7 * 8 {
+                        if RAW && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
+                            return Err(DecodeError::Unsupported(Feature::RawSbr));
+                        }
+                        if !RAW && ext == 0 && count * 8 - 4 >= 13 + 7 * 8 {
                             // EXT_FILL carrying an encoder signature. FFmpeg skips the first
                             // 1024 output samples when it reads "libfaac <major>.<minor>" here
                             // (faac encoder delay compensation); replicated for output parity.
@@ -616,6 +638,14 @@ impl Core {
         // byte_alignment after END
         let rel = br.position() - block_start;
         br.skip((8 - (rel & 7)) & 7);
+        if RAW && (br.overrun() || br.left() != 0) {
+            return Err(DecodeError::InvalidData("AAC access unit extent"));
+        }
+        if RAW && raw_slot != self.slots.len() {
+            return Err(DecodeError::InvalidData(
+                "incomplete fixed AAC channel layout",
+            ));
+        }
         if self.slots.is_empty() {
             return Err(DecodeError::InvalidData(
                 "no channel configuration (missing PCE)",
@@ -952,12 +982,12 @@ pub(crate) fn process_channel(
     st.prev_seq = info.window_sequence;
 }
 
-/// Element layout of channel_configuration 1..7 (ISO/IEC 14496-3 Table 1.19) with the
-/// speaker positions FFmpeg assigns.
-pub(crate) fn fixed_config_slots(cfg: u8) -> Vec<Slot> {
+/// Fixed layouts from ISO/IEC 14496-3:2009/Amd.4, Table 1.19. The ADTS
+/// compatibility path keeps its established interpretation of configuration 7.
+fn fixed_config_slots(cfg: u8, raw_access_units: bool) -> Vec<Slot> {
     use Speaker::{
-        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency,
-        SideLeft, SideRight,
+        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontLeftOfCenter, FrontRight,
+        FrontRightOfCenter, LowFrequency, SideLeft, SideRight, TopFrontLeft, TopFrontRight,
     };
     let sce = |s| Slot {
         kind: ID_SCE,
@@ -974,6 +1004,11 @@ pub(crate) fn fixed_config_slots(cfg: u8) -> Vec<Slot> {
         tag: 0,
         speakers: [Some(LowFrequency), None],
     };
+    let surround = if raw_access_units {
+        cpe(BackLeft, BackRight)
+    } else {
+        cpe(SideLeft, SideRight)
+    };
     let mut v = match cfg {
         1 => vec![sce(FrontCenter)],
         2 => vec![cpe(FrontLeft, FrontRight)],
@@ -983,17 +1018,29 @@ pub(crate) fn fixed_config_slots(cfg: u8) -> Vec<Slot> {
             cpe(FrontLeft, FrontRight),
             sce(BackCenter),
         ],
-        // FFmpeg 9 maps configurations 5/6 to 5.0/5.1 (side) and 7 to 7.1 (probed)
-        5 => vec![
+        // ADTS keeps its established side pair for configurations 5 and 6.
+        5 => vec![sce(FrontCenter), cpe(FrontLeft, FrontRight), surround],
+        6 => vec![sce(FrontCenter), cpe(FrontLeft, FrontRight), surround, lfe],
+        7 if raw_access_units => vec![
+            sce(FrontCenter),
+            cpe(FrontLeftOfCenter, FrontRightOfCenter),
+            cpe(FrontLeft, FrontRight),
+            cpe(SideLeft, SideRight),
+            lfe,
+        ],
+        11 => vec![
             sce(FrontCenter),
             cpe(FrontLeft, FrontRight),
             cpe(SideLeft, SideRight),
+            sce(BackCenter),
+            lfe,
         ],
-        6 => vec![
+        14 => vec![
             sce(FrontCenter),
             cpe(FrontLeft, FrontRight),
             cpe(SideLeft, SideRight),
             lfe,
+            cpe(TopFrontLeft, TopFrontRight),
         ],
         _ => vec![
             sce(FrontCenter),

@@ -166,7 +166,8 @@ mod aac_config;
 pub use aac_config::{
     AacAscFacts, AacAscParser, AacAudioSpecificConfig, AacBitRange, AacConfigLimits,
     AacExtensionSignal, AacFrequency, AacGaSpecific, AacObjectType, AacPceElement,
-    AacPceElementKind, AacPceFacts, AacProgramConfig, AacSource, indexed_aac_frequency,
+    AacPceElementKind, AacPceFacts, AacProgramConfig, AacSource, aac_fixed_channel_count,
+    indexed_aac_frequency,
 };
 
 mod aac_adts;

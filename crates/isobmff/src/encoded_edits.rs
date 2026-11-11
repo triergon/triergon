@@ -12,6 +12,7 @@ use triergon_core::{
 };
 use triergon_framing::{
     Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration, BuildStep, OPUS_RATE,
+    aac_fixed_channel_count, indexed_aac_frequency,
 };
 
 pub(crate) mod fragment_aac;
@@ -800,21 +801,17 @@ impl<'a> EncodedEditJob<'a> {
                     self.opus_preroll_boundary = i128::from(self.entry.media_time) - second;
                 }
                 EncodedEntryKind::Aac => {
-                    // Narrow LC/standard-rate/channel-config profile. Body
-                    // tools, PCE, SBR signalling and decoder validity stay opaque.
+                    // Indexed AAC-LC with 1024 core samples and a fixed channel layout.
                     let b = self.context.stream.demux().extradata.as_ref();
                     let a = *b.first().ok_or(Error::Truncated)?;
                     let c = *b.get(1).ok_or(Error::Truncated)?;
-                    let index = usize::from(((a & 7) << 1) | (c >> 7));
-                    const RATES: [u32; 13] = [
-                        96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000,
-                        11025, 8000, 7350,
-                    ];
+                    let index = ((a & 7) << 1) | (c >> 7);
+                    let channel_configuration = (c >> 3) & 15;
                     if a >> 3 != 2
                         || c & 7 != 0
-                        || ((c >> 3) & 15) == 0
-                        || ((c >> 3) & 15) > 7
-                        || RATES.get(index).map(|x| u64::from(*x))
+                        || aac_fixed_channel_count(channel_configuration).is_none()
+                        || (!self.preserve_aac_media_durations && channel_configuration > 7)
+                        || indexed_aac_frequency(index).map(u64::from)
                             != Some(self.context.media_base.denominator())
                         || self.context.media_base.numerator() != 1
                     {

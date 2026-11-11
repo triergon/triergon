@@ -42,6 +42,7 @@ fn audio_suffixes(lane: &str) -> Option<&'static [&'static str]> {
         "ac3" => Some(&[".ac3"]),
         "eac3" => Some(&[".eac3"]),
         "aac" => Some(&[".adts"]),
+        "aac-mov" => Some(&[".mov", ".mp4", ".m4a"]),
         "dts" => Some(&[".core.dts"]),
         "flac" => Some(&[".flac"]),
         "mp3" => Some(&[".bit", ".mp3"]),
@@ -60,6 +61,7 @@ fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
         "ac3" => Some("ac3"),
         "eac3" => Some("eac3"),
         "aac" => Some("aac"),
+        "aac-mov" => Some("mov"),
         "dts" => Some("dts"),
         "flac" => Some("flac"),
         "mp3" | "mp2" | "mp1" => Some("mp3"),
@@ -74,6 +76,7 @@ fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
 /// defaults are fixed point with 16-bit output.
 fn reference_decoder(lane: &str) -> Option<&'static str> {
     Some(match lane {
+        "aac-mov" => "aac",
         "flac" => "flac",
         "mp3" => "mp3float",
         "mp2" => "mp2float",
@@ -92,7 +95,7 @@ fn example(lane: &str) -> Option<&'static str> {
         "aac" => "codec-aac-decode",
         "dts" => "codec-dca-decode",
         // File-format lanes decode through a container reader, as a player does.
-        "flac" | "mp3" | "mp2" | "mp1" | "vorbis" | "opus" => "audio-decode",
+        "aac-mov" | "flac" | "mp3" | "mp2" | "mp1" | "vorbis" | "opus" => "audio-decode",
         _ => return None,
     })
 }
@@ -585,10 +588,17 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
     if let Some(decoder) = reference_decoder(lane) {
         reference_argv.extend(["-c:a".to_owned(), decoder.to_owned()]);
     }
+    if lane == "aac-mov" {
+        // Compare the complete decoder packets from the neutral MOV view.
+        reference_argv
+            .extend(["-flags2", "+skip_manual", "-ignore_editlist", "1"].map(String::from));
+    }
+    reference_argv.extend(["-i", path].map(String::from));
+    if lane == "aac-mov" {
+        reference_argv.extend(["-map", "0:a:0"].map(String::from));
+    }
     reference_argv.extend(
         [
-            "-i",
-            path,
             "-f",
             "f32le",
             "-c:a",
@@ -693,7 +703,12 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
     };
     let exact = same(ours_channels, reference_channels)
         && same(ours_rate, reference_rate)
-        && candidate.len() == reference.len();
+        && candidate.len() == reference.len()
+        && (lane != "aac-mov"
+            || (ours_run.code == 0
+                && reference_run.code == 0
+                && info.get("errors").and_then(python::int) == Some(0)
+                && info.get("layout") == stream.as_ref().and_then(|s| s.get("channel_layout"))));
     let stats = if exact {
         let channels = reference_channels.ok_or_else(|| {
             Stop::Fatal("'<=' not supported between instances of 'NoneType' and 'int'".into())
@@ -922,16 +937,18 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                     Err(Stop::Fatal(message)) => return Err(message),
                 },
             ));
-            let output_dir = tmp.0.join("o");
-            fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
-            row.push((
-                "output".into(),
-                match output_path(a, &lane, &path, &output_dir) {
-                    Ok(value) => value,
-                    Err(Stop::Timeout(argv)) => timeout_row(argv),
-                    Err(Stop::Fatal(message)) => return Err(message),
-                },
-            ));
+            if lane != "aac-mov" {
+                let output_dir = tmp.0.join("o");
+                fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
+                row.push((
+                    "output".into(),
+                    match output_path(a, &lane, &path, &output_dir) {
+                        Ok(value) => value,
+                        Err(Stop::Timeout(argv)) => timeout_row(argv),
+                        Err(Stop::Fatal(message)) => return Err(message),
+                    },
+                ));
+            }
         }
         let row = Value::Object(row);
         writeln!(out, "{}", json::to_python(&row, None))
