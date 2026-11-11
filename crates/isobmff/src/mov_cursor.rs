@@ -142,12 +142,12 @@ pub(crate) struct PreviousClock {
     pub(crate) duration: u32,
     pub(crate) source_known: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Slot<'a> {
     resume_remaining: u64,
     track: DemuxTrack<'a>,
     cursor: TrackSampleCursor<'a>,
-    edited: Option<EditCursor<'a>>,
+    edited: Option<BudgetVec<EditCursor<'a>>>,
     encoded_edit: Option<&'a crate::EncodedEditPlan>,
     head: Option<PacketOccurrence>,
     clock: Option<MediaClock>,
@@ -190,6 +190,42 @@ impl<'a> Slot<'a> {
     fn clock(&self) -> Result<MediaClock> {
         self.clock
             .ok_or(Error::Invalid("missing projected media clock"))
+    }
+
+    fn try_clone(&self) -> Result<Self> {
+        self.try_clone_with_edit_storage(None)
+    }
+
+    fn try_clone_with_edit_storage(
+        &self,
+        storage: Option<BudgetVec<EditCursor<'a>>>,
+    ) -> Result<Self> {
+        let edited = match (&self.edited, storage) {
+            (None, _) => None,
+            (Some(source), Some(mut storage)) => {
+                storage.as_mut_slice()[0].clone_from(&source.as_slice()[0]);
+                Some(storage)
+            }
+            (Some(source), None) => Some(source.try_clone()?),
+        };
+        Ok(Self {
+            resume_remaining: self.resume_remaining,
+            track: self.track,
+            cursor: self.cursor.clone(),
+            edited,
+            encoded_edit: self.encoded_edit,
+            head: self.head.clone(),
+            clock: self.clock,
+            shift: self.shift,
+            append_run: self.append_run,
+            discard_boundary: self.discard_boundary,
+            fragment_cto_minimum: self.fragment_cto_minimum,
+            fragment_edit: self.fragment_edit,
+            previous_clock: self.previous_clock,
+            saw_fragment: self.saw_fragment,
+            starts_fragment_run: self.starts_fragment_run,
+            ended: self.ended,
+        })
     }
 
     fn fragment_edit_offset(&self) -> i64 {
@@ -287,7 +323,8 @@ impl<'a> Slot<'a> {
                 media_clock: clock,
                 scheduling_clock: SchedulingClock::SingleTrack,
             }
-        } else if let Some(cursor) = &mut self.edited {
+        } else if let Some(edited) = &mut self.edited {
+            let cursor = &mut edited.as_mut_slice()[0];
             match cursor.poll(work)? {
                 CursorStatus::Ready => {
                     let occurrence = cursor.take_occurrence()?;
@@ -1231,6 +1268,7 @@ impl<'a> PacketCursor<'a> {
                     if !work.try_charge(1) {
                         return Ok(CursorStatus::Yield);
                     }
+                    let budget = self.slots.budget().clone();
                     let slot = &mut self.slots.as_mut_slice()[self.at];
                     if slot.saw_fragment && slot.track.table.sample_count() != 0 {
                         return Err(Error::Unsupported(
@@ -1250,13 +1288,17 @@ impl<'a> PacketCursor<'a> {
                                 Some(FragmentEdit::new(edits, movie_base, slot.track.media_base)?);
                             None
                         } else {
-                            Some(EditCursor::new(
+                            let cursor = EditCursor::new(
                                 slot.track.table,
                                 edits,
                                 slot.track.media_base,
                                 movie_base,
                                 self.limits.edit,
-                            )?)
+                            )?;
+                            // Only a regular track with source edits needs
+                            // this cursor. Keep its storage out of other slots
+                            // and their seek restarts.
+                            Some(BudgetVec::try_filled(&budget, cursor, 1)?)
                         }
                     } else {
                         None

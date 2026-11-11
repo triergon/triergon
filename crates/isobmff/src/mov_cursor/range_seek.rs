@@ -19,12 +19,23 @@ const MAX_SHORT_CHECKPOINTS_PER_TRACK: usize = 4;
 const MAX_FRAGMENT_CHECKPOINTS_PER_TRACK: usize = 8;
 const MAX_CHECKPOINTS: usize = 256;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Checkpoint<'a> {
     ordinal: u64,
     timestamp: i64,
     previous_sync: Option<u64>,
     slot: Slot<'a>,
+}
+
+impl Checkpoint<'_> {
+    fn try_clone(&self) -> Result<Self> {
+        Ok(Self {
+            ordinal: self.ordinal,
+            timestamp: self.timestamp,
+            previous_sync: self.previous_sync,
+            slot: self.slot.try_clone()?,
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -109,8 +120,9 @@ impl<'a> Checkpoints<'a> {
         }
         // Short regular tracks can use their existing checkpoint capacity
         // for earlier restarts without growing the index.
+        let short_interval = track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL);
         let spare = self.use_spare_capacity
-            && track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL)
+            && short_interval
             && track.points.len() < track.points.capacity().min(MAX_SHORT_CHECKPOINTS_PER_TRACK);
         // Keep nearby restarts for short fragment sequences and denser tracks
         // such as audio. Limit the extra points so long sources still have room
@@ -118,11 +130,11 @@ impl<'a> Checkpoints<'a> {
         let periodic = track.entries.is_multiple_of(CHECKPOINT_INTERVAL);
         let fragment_restart = !periodic
             && slot.saw_fragment
+            && (short_interval
+                || (slot.starts_fragment_run && slot.append_run.is_some_and(|(_, run)| run == 0)))
             && self.stored < MAX_CHECKPOINTS / 2
             && track.points.len() < MAX_FRAGMENT_CHECKPOINTS_PER_TRACK
-            && (track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL)
-                || (slot.starts_fragment_run && slot.append_run.is_some_and(|(_, run)| run == 0)))
-            && track.points.try_reserve_exact(1).is_ok();
+            && track.points.try_reserve(1).is_ok();
         if periodic || spare || fragment_restart {
             if self.stored == MAX_CHECKPOINTS {
                 return None;
@@ -136,7 +148,7 @@ impl<'a> Checkpoints<'a> {
                     ordinal: track.entries,
                     timestamp,
                     previous_sync: track.previous_sync,
-                    slot: slot.clone(),
+                    slot: slot.try_clone().ok()?,
                 })
                 .ok()?;
             self.stored += 1;
@@ -275,14 +287,14 @@ struct TrackSeek<'a> {
 }
 
 impl<'a> TrackSeek<'a> {
-    fn new(points: &[Checkpoint<'a>], target: i64) -> Self {
+    fn new(points: &[Checkpoint<'a>], target: i64) -> Result<Self> {
         let at = points.partition_point(|point| point.timestamp <= target);
         let point = &points[at.saturating_sub(1)];
-        Self {
+        Ok(Self {
             target,
             next: point.ordinal,
-            best: (at == 0).then(|| point.clone()),
-            cursor: point.slot.clone(),
+            best: (at == 0).then(|| point.try_clone()).transpose()?,
+            cursor: point.slot.try_clone()?,
             previous_sync: point.previous_sync,
             fallback: at == 0,
             search: if at == 0 {
@@ -290,31 +302,35 @@ impl<'a> TrackSeek<'a> {
             } else {
                 Search::Forward
             },
-        }
+        })
     }
 
-    fn finish_forward(&mut self, points: &[Checkpoint<'a>]) {
+    fn finish_forward(&mut self, points: &[Checkpoint<'a>]) -> Result<()> {
         if self.best.is_some() {
             self.search = Search::Ready;
         } else if let Some(previous_sync) = self.previous_sync {
             // The target falls within a long non-key interval. The recorded
             // preceding sync may be in an earlier interval; restart there.
-            self.restart_at(points, previous_sync);
+            self.restart_at(points, previous_sync)?;
         } else {
-            self.best = Some(points[0].clone());
+            self.best = Some(points[0].try_clone()?);
             self.fallback = true;
             self.search = Search::Ready;
         }
+        Ok(())
     }
 
-    fn restart_at(&mut self, points: &[Checkpoint<'a>], ordinal: u64) {
+    fn restart_at(&mut self, points: &[Checkpoint<'a>], ordinal: u64) -> Result<()> {
         let at = points.partition_point(|point| point.ordinal <= ordinal);
         let point = &points[at - 1];
-        self.cursor = point.slot.clone();
+        self.cursor = point
+            .slot
+            .try_clone_with_edit_storage(self.cursor.edited.take())?;
         self.next = point.ordinal;
         self.previous_sync = Some(ordinal);
         self.best = None;
         self.search = Search::PreviousSync;
+        Ok(())
     }
 
     fn poll(
@@ -331,7 +347,7 @@ impl<'a> TrackSeek<'a> {
                 match self.cursor.fill(work, true, false, false)? {
                     CursorStatus::Yield => return Ok(false),
                     CursorStatus::End if self.search == Search::Forward => {
-                        self.finish_forward(points);
+                        self.finish_forward(points)?;
                         continue;
                     }
                     CursorStatus::End => return Err(Error::Invalid("checked seek lost sync")),
@@ -354,18 +370,19 @@ impl<'a> TrackSeek<'a> {
             let previous_sync =
                 self.search == Search::PreviousSync && self.previous_sync == Some(self.next);
             if self.search == Search::Forward && timestamp > self.target {
-                self.finish_forward(points);
+                self.finish_forward(points)?;
                 continue;
             }
             if previous_sync && !key {
                 return Err(Error::Invalid("checked seek lost sync"));
             }
             if previous_sync || (self.search == Search::Forward && key) {
+                let storage = self.best.take().and_then(|point| point.slot.edited);
                 self.best = Some(Checkpoint {
                     ordinal: self.next,
                     timestamp,
                     previous_sync: Some(self.next),
-                    slot: self.cursor.clone(),
+                    slot: self.cursor.try_clone_with_edit_storage(storage)?,
                 });
                 if previous_sync || timestamp == self.target {
                     self.search = Search::Ready;
@@ -466,7 +483,7 @@ impl<'a> RangeSeekJob<'a> {
                 self.scan
                     .as_mut()
                     .expect("Opus recovery follows the audio search")
-                    .restart_at(points, edit.opus_occurrence(landing.first_sample)?);
+                    .restart_at(points, edit.opus_occurrence(landing.first_sample)?)?;
                 self.landing
                     .as_mut()
                     .expect("Opus recovery follows the reference seek")
@@ -552,7 +569,7 @@ impl<'a> RangeSeekJob<'a> {
             // A query below the signed index range still lands at its first
             // key. Every checkpoint has a defined DTS above the null value.
             let target = target.saturating_sub(points[0].slot.fragment_seek_offset());
-            self.scan = Some(TrackSeek::new(points, target));
+            self.scan = Some(TrackSeek::new(points, target)?);
         }
     }
 
