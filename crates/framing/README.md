@@ -138,6 +138,10 @@ payload for passthrough packets.
 - avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and
   unknown versions. The `compat::nal` receiver parsers accept them for the packet
   session only.
+- With complete AVC sequence and picture parameter-set arrays, the AVC receiver
+  can frame a sample whose required profile extension has zero to three bytes.
+  It preserves that suffix as trailing bytes and reports `Truncated` as the
+  strict source refusal.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
   profiles. It adds no timestamps. `append_payload` can consume an interior NAL
   slice while the reader is waiting for input.

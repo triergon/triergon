@@ -395,6 +395,67 @@ fn source_avc_width_three_refusal_and_observed_bytes_remain_distinct() {
     );
     assert_eq!(out.configuration_bytes().as_ref(), raw);
 }
+
+#[test]
+fn avc_receiver_preserves_short_profile_extension_and_frames_complete_parameter_sets() {
+    let pool = Budget::new(100_000).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut base = avcc(4);
+    base[1] = 100;
+    base[9] = 100;
+    let extension = [0xfd, 0xf8, 0xf8, 0];
+    let idr = [0, 0, 0, 3, 0x65, 0xb8, 128];
+    let mut complete = base.clone();
+    complete.extend_from_slice(&extension);
+    let mut strict =
+        AvcConfigParser::new(&pool, source(), bytes(&pool, &complete), alimits()).unwrap();
+    let BuildStep::Ready(complete) = strict.step(&mut WorkBudget::new(4096), &cancel).unwrap()
+    else {
+        panic!("complete AVC record must publish");
+    };
+    let mut complete_session =
+        NalPacketSession::new(&pool, NalPacketConfiguration::Avc(complete), limits()).unwrap();
+    let expected = output(&mut complete_session.packet(packet(&pool, &idr), None).unwrap());
+
+    for length in 0..extension.len() {
+        let suffix = &extension[..length];
+        let mut raw = base.clone();
+        raw.extend_from_slice(suffix);
+        let raw_bytes = bytes(&pool, &raw);
+        let mut strict =
+            AvcConfigParser::new(&pool, source(), raw_bytes.clone(), alimits()).unwrap();
+        assert!(matches!(
+            strict.step(&mut WorkBudget::new(4096), &cancel),
+            Err(Error::Truncated)
+        ));
+        let mut receiver =
+            ReceiverAvcConfigParser::new(&pool, source(), raw_bytes, alimits()).unwrap();
+        let config = (0..128)
+            .find_map(
+                |_| match receiver.step(&mut WorkBudget::new(1), &cancel).unwrap() {
+                    BuildStep::Ready(value) => Some(value),
+                    BuildStep::Yield => None,
+                    BuildStep::Complete => panic!("AVC receiver finished without a record"),
+                },
+            )
+            .expect("AVC receiver must publish with bounded work");
+        assert_eq!(config.source_bytes().as_ref(), raw);
+        assert_eq!(config.fields().raw_extension(), None);
+        assert_eq!(config.trailing_bytes(), suffix);
+        assert_eq!(config.strict_source_refusal(), Some(Error::Truncated));
+        let mut session =
+            NalPacketSession::new(&pool, NalPacketConfiguration::ReceiverAvc(config), limits())
+                .unwrap();
+        let framed = output(&mut session.packet(packet(&pool, &idr), None).unwrap());
+        assert_eq!(framed.bytes().as_ref(), expected.bytes().as_ref());
+        assert_eq!(framed.configuration_bytes().as_ref(), raw);
+        assert_eq!(
+            framed.configuration_source_refusal(),
+            Some(Error::Truncated)
+        );
+    }
+}
+
 #[test]
 fn source_hevc_width_three_refusal_and_observed_header_bits_remain_distinct() {
     let p = Budget::new(100000).unwrap();

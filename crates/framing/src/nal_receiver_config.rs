@@ -1,7 +1,7 @@
 //! The packet receiver's configuration acceptance ([`crate::compat::nal`]).
-//! The ordinary ISO source parsers stay strict. In particular a three-byte
-//! declaration remains a source refusal; its unchanged wire bytes can still drive
-//! this separately typed receiver.
+//! Carries strict source refusals alongside receiver-accepted wire bytes.
+use crate::avc_config::profile_extension_required;
+use crate::nal_packet::NalConfigurationRefusal;
 use crate::{
     AvcConfigArray, AvcConfigFields, AvcConfigLimits, AvcConfigNal, AvcConfigParser,
     AvcConfigSource, AvcConfiguration, BuildStep, HvcConfigArray, HvcConfigFields, HvcConfigLimits,
@@ -43,10 +43,28 @@ impl ReceiverAvcUpdateRejection {
 
 pub struct ReceiverAvcConfiguration {
     inner: AvcConfiguration,
+    refusal: NalConfigurationRefusal,
 }
 impl ReceiverAvcConfiguration {
+    fn from_record(inner: AvcConfiguration) -> Self {
+        let fields = inner.fields();
+        let refusal = if fields.length_size_minus_one() == 2 {
+            NalConfigurationRefusal::AvcWidthThree
+        } else if profile_extension_required(fields.profile_indication())
+            && fields.raw_extension().is_none()
+        {
+            NalConfigurationRefusal::AvcExtensionTruncated
+        } else {
+            NalConfigurationRefusal::None
+        };
+        Self { inner, refusal }
+    }
+
     pub(crate) fn record(&self) -> &AvcConfiguration {
         &self.inner
+    }
+    pub(crate) const fn refusal(&self) -> NalConfigurationRefusal {
+        self.refusal
     }
     pub fn arrays(
         &self,
@@ -87,8 +105,7 @@ impl ReceiverAvcConfiguration {
         self.inner.nals()
     }
     pub fn strict_source_refusal(&self) -> Option<Error> {
-        (self.fields().length_size_minus_one() == 2)
-            .then_some(Error::Invalid("AVC three-byte sample length"))
+        self.refusal.error()
     }
 }
 
@@ -158,7 +175,7 @@ impl ReceiverAvcConfigParser {
         raw: Bytes,
         limits: AvcConfigLimits,
     ) -> Result<Self> {
-        let inner = AvcConfigParser::new_observed_width(pool, source, raw.clone(), limits)?;
+        let inner = AvcConfigParser::new_receiver(pool, source, raw.clone(), limits)?;
         Ok(Self {
             inner,
             raw,
@@ -194,7 +211,9 @@ impl ReceiverAvcConfigParser {
     ) -> Result<BuildStep<ReceiverAvcConfiguration>> {
         let result = self.inner.step(work, cancel);
         match result {
-            Ok(BuildStep::Ready(inner)) => Ok(BuildStep::Ready(ReceiverAvcConfiguration { inner })),
+            Ok(BuildStep::Ready(inner)) => Ok(BuildStep::Ready(
+                ReceiverAvcConfiguration::from_record(inner),
+            )),
             Ok(BuildStep::Yield) => Ok(BuildStep::Yield),
             Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
             Err(error) => {
