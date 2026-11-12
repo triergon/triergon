@@ -18,6 +18,7 @@ use crate::metadata::{
     ATTACHMENTS, CHAPTERS, CLUSTER, CUES, INFO, SEEK_HEAD, SEGMENT, TAGS, TRACKS,
     is_segment_metadata,
 };
+use typed_bridge::CompactElementEvent;
 const EBML: u64 = 0x1a45dfa3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,48 +102,6 @@ enum BodyTransfer {
     Copy,
     Borrow,
     Ready,
-}
-
-// One parser and one set of work/error/byte rules. Only the leaf delivery
-// representation is selected at compile time; the public event API is intact.
-trait EnvelopeDelivery {
-    type Event;
-    const RETAIN_LEAF: bool;
-    fn start(header: ElementHeader) -> Self::Event;
-    fn end(id: u64, offset: u64, generation: u64) -> Self::Event;
-    fn skipped(header: ElementHeader) -> Self::Event;
-    fn leaf(body: &mut BodyState, bytes: Bytes) -> Self::Event;
-    fn retained_leaf(body: &mut BodyState) -> Result<Self::Event> {
-        let bytes = body
-            .direct
-            .take()
-            .ok_or(Error::Invalid("missing compact leaf owner"))?;
-        Ok(Self::leaf(body, bytes))
-    }
-}
-struct PublicDelivery;
-impl EnvelopeDelivery for PublicDelivery {
-    type Event = ElementEvent;
-    const RETAIN_LEAF: bool = false;
-    fn start(header: ElementHeader) -> Self::Event {
-        ElementEvent::Start(header)
-    }
-    fn end(id: u64, offset: u64, generation: u64) -> Self::Event {
-        ElementEvent::End {
-            id,
-            offset,
-            generation,
-        }
-    }
-    fn skipped(header: ElementHeader) -> Self::Event {
-        ElementEvent::Skipped(header)
-    }
-    fn leaf(body: &mut BodyState, bytes: Bytes) -> Self::Event {
-        ElementEvent::Leaf {
-            header: body.header,
-            data: SharedBytes::from_core(bytes),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -342,8 +301,12 @@ impl ElementReader {
         self.expected_cluster = false;
         Ok(request)
     }
-    fn ended<D: EnvelopeDelivery>(&self, master: Master) -> D::Event {
-        D::end(master.id, self.position(), self.generation())
+    fn ended(&self, master: Master) -> CompactElementEvent {
+        CompactElementEvent::End {
+            id: master.id,
+            offset: self.position(),
+            generation: self.generation(),
+        }
     }
     fn check_parent(&self, header: ElementHeader, end: Option<u64>) -> Result<()> {
         if end.is_some_and(|end| header.data > end) {
@@ -356,7 +319,7 @@ impl ElementReader {
         }
         Ok(())
     }
-    fn begin<D: EnvelopeDelivery>(&mut self, header: ElementHeader) -> Result<Option<D::Event>> {
+    fn begin(&mut self, header: ElementHeader) -> Result<Option<CompactElementEvent>> {
         if self.expected_cluster {
             if header.id != CLUSTER {
                 return Err(Error::Invalid("range no longer starts at Cluster"));
@@ -375,7 +338,11 @@ impl ElementReader {
             }
             self.cluster = None;
             self.pending_header = Some(header);
-            return Ok(Some(D::end(cluster.id, header.start, self.generation())));
+            return Ok(Some(CompactElementEvent::End {
+                id: cluster.id,
+                offset: header.start,
+                generation: self.generation(),
+            }));
         }
         self.check_parent(header, self.cluster.and_then(|m| m.end))?;
         if !self.seen_ebml {
@@ -390,7 +357,7 @@ impl ElementReader {
                 start: header.start,
                 end: header.end()?,
             });
-            return Ok(Some(D::start(header)));
+            return Ok(Some(CompactElementEvent::Start(header)));
         } else if !self.seen_segment && !matches!(header.id, 0xec | 0xbf) {
             return Err(Error::Invalid("element before Segment"));
         } else if header.id == SEGMENT || header.id == EBML {
@@ -405,7 +372,7 @@ impl ElementReader {
                 start: header.start,
                 end: header.end()?,
             });
-            return Ok(Some(D::start(header)));
+            return Ok(Some(CompactElementEvent::Start(header)));
         }
         let size = header
             .size
@@ -448,33 +415,67 @@ impl ElementReader {
         Ok(None)
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep> {
-        self.step_mode::<PublicDelivery>(work, cancel, Admit::Never)
+        self.step_public(work, cancel, Admit::Never)
     }
-    fn step_mode<D: EnvelopeDelivery>(
+    fn step_public(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         admit: Admit,
-    ) -> Result<ParseStep<D::Event>> {
+    ) -> Result<ParseStep> {
         // Empty read checks sticky transport/cancellation without consuming bytes
         // or depending on an OS read. Even a completed/pending event observes it.
         self.input.read_into(&mut [], work, cancel)?;
-        self.step_after_input_health::<D>(work, cancel, admit)
+        match self.step_after_input_health(work, cancel, admit)? {
+            ParseStep::Event(event) => Ok(ParseStep::Event(self.public_event(event)?)),
+            other => crate::matroska::typed::pending(other),
+        }
+    }
+    /// Converts a compact event to the public one; a collected leaf hands over
+    /// its frozen bytes and the parser moves on.
+    fn public_event(&mut self, event: CompactElementEvent) -> Result<ElementEvent> {
+        Ok(match event {
+            CompactElementEvent::Start(header) => ElementEvent::Start(header),
+            CompactElementEvent::Skipped(header) => ElementEvent::Skipped(header),
+            CompactElementEvent::End {
+                id,
+                offset,
+                generation,
+            } => ElementEvent::End {
+                id,
+                offset,
+                generation,
+            },
+            CompactElementEvent::Leaf(header) => {
+                let Phase::Body(body) = &mut self.phase else {
+                    return Err(Error::Invalid("missing compact leaf owner"));
+                };
+                let bytes = body
+                    .direct
+                    .take()
+                    .ok_or(Error::Invalid("missing compact leaf owner"))?;
+                self.phase = Phase::Between;
+                ElementEvent::Leaf {
+                    header,
+                    data: SharedBytes::from_core(bytes),
+                }
+            }
+        })
     }
 
     // The typed controller checks source health once on entry and propagates
     // every subsequent input error. The envelope still checks its own latch
     // and cancellation at each bounded operation.
-    fn step_after_input_health<D: EnvelopeDelivery>(
+    fn step_after_input_health(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         admit: Admit,
-    ) -> Result<ParseStep<D::Event>> {
+    ) -> Result<ParseStep<CompactElementEvent>> {
         if self.failed {
             return Err(Error::Invalid("reader requires explicit reset after error"));
         }
-        let result = self.advance::<D>(work, cancel, admit);
+        let result = self.advance(work, cancel, admit);
         match result {
             Err(Error::Backpressure {
                 requested,
@@ -513,16 +514,13 @@ impl ElementReader {
         Ok(())
     }
     #[inline]
-    fn accept_header<D: EnvelopeDelivery>(
-        &mut self,
-        header: ElementHeader,
-    ) -> Result<Option<D::Event>> {
+    fn accept_header(&mut self, header: ElementHeader) -> Result<Option<CompactElementEvent>> {
         self.elements_left = self
             .elements_left
             .checked_sub(1)
             .ok_or(Error::Policy("element count"))?;
         self.phase = Phase::Between;
-        self.begin::<D>(header)
+        self.begin(header)
     }
 
     #[inline]
@@ -562,12 +560,14 @@ impl ElementReader {
         }))
     }
 
-    fn advance<D: EnvelopeDelivery>(
+    /// Advances to the next envelope event. A collected leaf keeps its frozen
+    /// bytes in the body until the consumer takes them.
+    fn advance(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         admit: Admit,
-    ) -> Result<ParseStep<D::Event>> {
+    ) -> Result<ParseStep<CompactElementEvent>> {
         let pause_for_admission = !matches!(admit, Admit::Never);
         'advance: loop {
             // Cancellation also runs between every bounded inner operation.
@@ -576,16 +576,16 @@ impl ElementReader {
                 Phase::Done => return Ok(ParseStep::Finished),
                 Phase::Eof => {
                     if let Some(master) = self.cluster.take() {
-                        return Ok(ParseStep::Event(self.ended::<D>(master)));
+                        return Ok(ParseStep::Event(self.ended(master)));
                     }
                     if let Some(master) = self.segment.take() {
-                        return Ok(ParseStep::Event(self.ended::<D>(master)));
+                        return Ok(ParseStep::Event(self.ended(master)));
                     }
                     self.phase = Phase::Done;
                 }
                 Phase::Between => {
                     if let Some(header) = self.pending_header.take() {
-                        if let Some(event) = self.begin::<D>(header)? {
+                        if let Some(event) = self.begin(header)? {
                             return Ok(ParseStep::Event(event));
                         }
                         continue;
@@ -594,16 +594,16 @@ impl ElementReader {
                         && master.end == Some(self.position())
                     {
                         self.cluster = None;
-                        return Ok(ParseStep::Event(self.ended::<D>(master)));
+                        return Ok(ParseStep::Event(self.ended(master)));
                     }
                     if let Some(master) = self.segment
                         && master.end == Some(self.position())
                     {
                         self.segment = None;
-                        return Ok(ParseStep::Event(self.ended::<D>(master)));
+                        return Ok(ParseStep::Event(self.ended(master)));
                     }
                     if let Some(header) = self.take_buffered_header(work, cancel)? {
-                        if let Some(event) = self.accept_header::<D>(header)? {
+                        if let Some(event) = self.accept_header(header)? {
                             return Ok(ParseStep::Event(event));
                         }
                     } else {
@@ -713,17 +713,16 @@ impl ElementReader {
                             generation: self.input.generation(),
                         };
                     };
-                    if let Some(event) = self.accept_header::<D>(header)? {
+                    if let Some(event) = self.accept_header(header)? {
                         return Ok(ParseStep::Event(event));
                     }
                 }
                 Phase::Body(body) => {
                     if body.transfer == BodyTransfer::Ready {
-                        let event = D::retained_leaf(body)?;
-                        if !D::RETAIN_LEAF {
-                            self.phase = Phase::Between;
+                        if body.direct.is_none() {
+                            return Err(Error::Invalid("missing compact leaf owner"));
                         }
-                        return Ok(ParseStep::Event(event));
+                        return Ok(ParseStep::Event(CompactElementEvent::Leaf(body.header)));
                     }
                     if pause_for_admission && !body.typed_admitted && !body.allocated {
                         let ordinary_block = matches!(admit, Admit::OrdinaryBlocks)
@@ -852,16 +851,18 @@ impl ElementReader {
                                     }
                                 }
                             };
-                            D::leaf(body, bytes)
+                            body.direct = Some(bytes);
+                            body.transfer = BodyTransfer::Ready;
+                            CompactElementEvent::Leaf(body.header)
                         } else {
-                            D::skipped(header)
+                            CompactElementEvent::Skipped(header)
                         };
                         // Only a collected Cluster block ends this envelope
                         // scan phase. A skipped Block ID cannot refill it.
                         if body.collect && matches!(header.id, 0xa0 | 0xa3) {
                             self.scan_left = self.limits.scan_bytes;
                         }
-                        if body.collect && D::RETAIN_LEAF {
+                        if body.collect {
                             // Keep only the exhausted body's already-owned frozen
                             // Bytes; discard the empty builder at that boundary.
                             body.buffer = None;

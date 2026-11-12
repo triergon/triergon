@@ -38,9 +38,7 @@ pub use blocking::BlockingReader;
 use resolving::{Opening, ResolvePurpose, Resolver};
 use seeking::{ReplayPrefix, ScanContext, ScanSimple, ScanState, SeekMode, SubtitleRecovery};
 mod projection;
-use projection::{
-    LegacyEvent, LegacyProjection, PacketProjection, ScanEvent, ScanProjection, TypedProjection,
-};
+use projection::{LegacyEvent, LegacyProjection, PacketProjection, TypedProjection};
 
 use crate::metadata::{CLUSTER, CUES, INFO, SEEK_HEAD, SEGMENT, TRACKS, is_segment_metadata};
 fn document(id: u64) -> bool {
@@ -502,7 +500,7 @@ impl Reader {
             } else if self.opening.is_some() {
                 D::progress(self.step_opening(work, cancel))
             } else if self.pending_seek.is_some() {
-                D::seeking(self, work, cancel)
+                D::progress(self.step_seeking(work, cancel))
             } else {
                 let result = self.step_demux_after_health_check::<D>(work, cancel, None, false);
                 if self.state_coverage_contiguous && matches!(result, Ok(ParseStep::Event(_))) {

@@ -152,6 +152,8 @@ pub struct Refusal {
 /// # Errors
 ///
 /// When the operation fails, retains charged storage, or stdout fails.
+// Each operation inlines into its own copy of the timed loop, not into its caller.
+#[inline(never)]
 pub fn measure(
     invocation: &Invocation<'_>,
     name: &str,
@@ -159,23 +161,19 @@ pub fn measure(
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
     let retained = held.map(Budget::used);
-    let memory = invocation.mode == Mode::Memory;
     let mut out = io::stdout().lock();
-    if memory {
-        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
-        out.flush()?;
-    }
+    mark(&mut out, invocation, b"TRIERGON_BEGIN_V1\n")?;
     let start = (invocation.mode == Mode::Bench).then(Instant::now);
-    let (mut packets, mut bytes, mut digest) = (0, 0, 0);
-    let (mut runs, mut refusal) = (0, None);
+    let mut sum = Totals::default();
+    let mut runs = 0;
     while runs < invocation.iterations {
         let totals = operation()?;
         runs += 1;
-        packets += totals.packets;
-        bytes += totals.bytes;
-        fold(&mut digest, totals.digest);
+        sum.packets += totals.packets;
+        sum.bytes += totals.bytes;
+        fold(&mut sum.digest, totals.digest);
         if totals.refusal.is_some() {
-            refusal = totals.refusal;
+            sum.refusal = totals.refusal;
             break;
         }
         if held.map(Budget::used) != retained {
@@ -183,10 +181,32 @@ pub fn measure(
         }
     }
     let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
-    if memory {
-        out.write_all(b"TRIERGON_END_V1\n")?;
+    mark(&mut out, invocation, b"TRIERGON_END_V1\n")?;
+    print_result(&mut out, name, runs, &sum, elapsed)
+}
+
+/// Writes a memory-mode boundary marker; other modes have none.
+fn mark(out: &mut impl Write, invocation: &Invocation<'_>, marker: &[u8]) -> Result<()> {
+    if invocation.mode == Mode::Memory {
+        out.write_all(marker)?;
         out.flush()?;
     }
+    Ok(())
+}
+
+fn print_result(
+    out: &mut impl Write,
+    name: &str,
+    runs: u64,
+    sum: &Totals,
+    elapsed: u128,
+) -> Result<()> {
+    let Totals {
+        packets,
+        bytes,
+        digest,
+        refusal,
+    } = sum;
     let mut line = format!(
         "{{\"schema\":1,\"operation\":\"{name}\",\"iterations\":{runs},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest},\"elapsed_ns\":{elapsed},\"eof\":{}",
         refusal.is_none()
