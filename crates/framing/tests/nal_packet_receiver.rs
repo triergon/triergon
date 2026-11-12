@@ -428,32 +428,62 @@ fn avc_receiver_preserves_short_profile_extension_and_frames_complete_parameter_
             strict.step(&mut WorkBudget::new(4096), &cancel),
             Err(Error::Truncated)
         ));
-        let mut receiver =
-            ReceiverAvcConfigParser::new(&pool, source(), raw_bytes, alimits()).unwrap();
-        let config = (0..128)
-            .find_map(
-                |_| match receiver.step(&mut WorkBudget::new(1), &cancel).unwrap() {
-                    BuildStep::Ready(value) => Some(value),
-                    BuildStep::Yield => None,
-                    BuildStep::Complete => panic!("AVC receiver finished without a record"),
-                },
-            )
-            .expect("AVC receiver must publish with bounded work");
-        assert_eq!(config.source_bytes().as_ref(), raw);
-        assert_eq!(config.fields().raw_extension(), None);
-        assert_eq!(config.trailing_bytes(), suffix);
-        assert_eq!(config.strict_source_refusal(), Some(Error::Truncated));
-        let mut session =
-            NalPacketSession::new(&pool, NalPacketConfiguration::ReceiverAvc(config), limits())
-                .unwrap();
-        let framed = output(&mut session.packet(packet(&pool, &idr), None).unwrap());
-        assert_eq!(framed.bytes().as_ref(), expected.bytes().as_ref());
-        assert_eq!(framed.configuration_bytes().as_ref(), raw);
-        assert_eq!(
-            framed.configuration_source_refusal(),
-            Some(Error::Truncated)
-        );
+        for budget in [1, 4096] {
+            let mut receiver =
+                ReceiverAvcConfigParser::new(&pool, source(), raw_bytes.clone(), alimits())
+                    .unwrap();
+            let config = (0..128)
+                .find_map(|_| {
+                    match receiver
+                        .step(&mut WorkBudget::new(budget), &cancel)
+                        .unwrap()
+                    {
+                        BuildStep::Ready(value) => Some(value),
+                        BuildStep::Yield => None,
+                        BuildStep::Complete => panic!("AVC receiver finished without a record"),
+                    }
+                })
+                .expect("AVC receiver must publish with bounded work");
+            assert_eq!(config.source_bytes().as_ref(), raw);
+            assert_eq!(config.fields().raw_extension(), None);
+            assert_eq!(config.trailing_bytes(), suffix);
+            assert_eq!(config.strict_source_refusal(), Some(Error::Truncated));
+            assert_eq!(
+                receiver.strict_source_refusal(),
+                config.strict_source_refusal()
+            );
+            let mut session =
+                NalPacketSession::new(&pool, NalPacketConfiguration::ReceiverAvc(config), limits())
+                    .unwrap();
+            let framed = output(&mut session.packet(packet(&pool, &idr), None).unwrap());
+            assert_eq!(framed.bytes().as_ref(), expected.bytes().as_ref());
+            assert_eq!(framed.configuration_bytes().as_ref(), raw);
+            assert_eq!(
+                framed.configuration_source_refusal(),
+                Some(Error::Truncated)
+            );
+        }
     }
+}
+
+#[test]
+fn avc_receiver_refuses_missing_parameter_set_in_complete_extension() {
+    let pool = Budget::new(100_000).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut raw = avcc(4);
+    raw[1] = 100;
+    raw.extend_from_slice(&[0xfd, 0xf8, 0xf8, 1]);
+    let raw = bytes(&pool, &raw);
+    let mut strict = AvcConfigParser::new(&pool, source(), raw.clone(), alimits()).unwrap();
+    let mut receiver = ReceiverAvcConfigParser::new(&pool, source(), raw, alimits()).unwrap();
+    assert!(matches!(
+        strict.step(&mut WorkBudget::new(4096), &cancel),
+        Err(Error::Truncated)
+    ));
+    assert!(matches!(
+        receiver.step(&mut WorkBudget::new(4096), &cancel),
+        Err(Error::Truncated)
+    ));
 }
 
 #[test]

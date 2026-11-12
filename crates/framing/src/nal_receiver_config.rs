@@ -165,6 +165,7 @@ pub struct ReceiverAvcConfigParser {
     raw: Bytes,
     source: AvcConfigSource,
     failure: Option<Error>,
+    refusal: NalConfigurationRefusal,
     update_role: bool,
     rejection_taken: bool,
 }
@@ -176,11 +177,17 @@ impl ReceiverAvcConfigParser {
         limits: AvcConfigLimits,
     ) -> Result<Self> {
         let inner = AvcConfigParser::new_receiver(pool, source, raw.clone(), limits)?;
+        let refusal = if raw.len() >= 6 && raw[0] == 1 && raw[4] & 3 == 2 {
+            NalConfigurationRefusal::AvcWidthThree
+        } else {
+            NalConfigurationRefusal::None
+        };
         Ok(Self {
             inner,
             raw,
             source,
             failure: None,
+            refusal,
             update_role: false,
             rejection_taken: false,
         })
@@ -200,9 +207,10 @@ impl ReceiverAvcConfigParser {
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// The strict refusal established so far, including extension truncation
+    /// once the receiver publishes a record.
     pub fn strict_source_refusal(&self) -> Option<Error> {
-        (self.raw.len() >= 6 && self.raw[0] == 1 && self.raw[4] & 3 == 2)
-            .then_some(Error::Invalid("AVC three-byte sample length"))
+        self.refusal.error()
     }
     pub fn step(
         &mut self,
@@ -211,9 +219,11 @@ impl ReceiverAvcConfigParser {
     ) -> Result<BuildStep<ReceiverAvcConfiguration>> {
         let result = self.inner.step(work, cancel);
         match result {
-            Ok(BuildStep::Ready(inner)) => Ok(BuildStep::Ready(
-                ReceiverAvcConfiguration::from_record(inner),
-            )),
+            Ok(BuildStep::Ready(inner)) => {
+                let config = ReceiverAvcConfiguration::from_record(inner);
+                self.refusal = config.refusal();
+                Ok(BuildStep::Ready(config))
+            }
             Ok(BuildStep::Yield) => Ok(BuildStep::Yield),
             Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
             Err(error) => {
