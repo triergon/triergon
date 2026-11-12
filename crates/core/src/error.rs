@@ -2,7 +2,7 @@ use std::{fmt, io};
 
 /// The one error type of every format, playback and core operation. Variants
 /// keep their typed detail; nothing converts it away.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     Invalid(&'static str),
     /// Live capacity request above the budget policy.
@@ -77,6 +77,50 @@ impl fmt::Display for Error {
     }
 }
 
+// The derived format, written out: a derived `fmt` is compiled into every
+// crate that formats an error, this one once.
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Invalid(reason) => f.debug_tuple("Invalid").field(reason).finish(),
+            Self::Limit { requested, maximum } => f
+                .debug_struct("Limit")
+                .field("requested", requested)
+                .field("maximum", maximum)
+                .finish(),
+            Self::Policy(limit) => f.debug_tuple("Policy").field(limit).finish(),
+            Self::Backpressure {
+                requested,
+                available,
+            } => f
+                .debug_struct("Backpressure")
+                .field("requested", requested)
+                .field("available", available)
+                .finish(),
+            Self::Allocation => f.write_str("Allocation"),
+            Self::Overflow => f.write_str("Overflow"),
+            Self::Truncated => f.write_str("Truncated"),
+            Self::Transport => f.write_str("Transport"),
+            Self::Cancelled => f.write_str("Cancelled"),
+            Self::StaleGeneration { expected, received } => f
+                .debug_struct("StaleGeneration")
+                .field("expected", expected)
+                .field("received", received)
+                .finish(),
+            Self::StaleRequest { expected, received } => f
+                .debug_struct("StaleRequest")
+                .field("expected", expected)
+                .field("received", received)
+                .finish(),
+            Self::ForeignPool => f.write_str("ForeignPool"),
+            Self::SourceMismatch => f.write_str("SourceMismatch"),
+            Self::Unsupported(feature) => f.debug_tuple("Unsupported").field(feature).finish(),
+            Self::Io(kind) => f.debug_tuple("Io").field(kind).finish(),
+            Self::Closed => f.write_str("Closed"),
+        }
+    }
+}
+
 impl std::error::Error for Error {}
 
 impl From<io::Error> for Error {
@@ -84,6 +128,99 @@ impl From<io::Error> for Error {
         match value.kind() {
             io::ErrorKind::UnexpectedEof => Self::Truncated,
             kind => Self::Io(kind),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Error;
+    use std::io::ErrorKind;
+
+    /// The variants as `#[derive(Debug)]` formats them.
+    #[derive(Debug)]
+    #[expect(dead_code, reason = "read only through the derived Debug")]
+    enum Derived {
+        Invalid(&'static str),
+        Limit { requested: usize, maximum: usize },
+        Policy(&'static str),
+        Backpressure { requested: usize, available: usize },
+        Allocation,
+        Overflow,
+        Truncated,
+        Transport,
+        Cancelled,
+        StaleGeneration { expected: u64, received: u64 },
+        StaleRequest { expected: u64, received: u64 },
+        ForeignPool,
+        SourceMismatch,
+        Unsupported(&'static str),
+        Io(ErrorKind),
+        Closed,
+    }
+
+    #[test]
+    fn debug_is_the_derived_format() {
+        let pairs = [
+            (Error::Invalid("a \"b\""), Derived::Invalid("a \"b\"")),
+            (
+                Error::Limit {
+                    requested: 1,
+                    maximum: 2,
+                },
+                Derived::Limit {
+                    requested: 1,
+                    maximum: 2,
+                },
+            ),
+            (Error::Policy("depth"), Derived::Policy("depth")),
+            (
+                Error::Backpressure {
+                    requested: 3,
+                    available: 4,
+                },
+                Derived::Backpressure {
+                    requested: 3,
+                    available: 4,
+                },
+            ),
+            (Error::Allocation, Derived::Allocation),
+            (Error::Overflow, Derived::Overflow),
+            (Error::Truncated, Derived::Truncated),
+            (Error::Transport, Derived::Transport),
+            (Error::Cancelled, Derived::Cancelled),
+            (
+                Error::StaleGeneration {
+                    expected: 5,
+                    received: 6,
+                },
+                Derived::StaleGeneration {
+                    expected: 5,
+                    received: 6,
+                },
+            ),
+            (
+                Error::StaleRequest {
+                    expected: 7,
+                    received: u64::MAX,
+                },
+                Derived::StaleRequest {
+                    expected: 7,
+                    received: u64::MAX,
+                },
+            ),
+            (Error::ForeignPool, Derived::ForeignPool),
+            (Error::SourceMismatch, Derived::SourceMismatch),
+            (Error::Unsupported("x"), Derived::Unsupported("x")),
+            (
+                Error::Io(ErrorKind::UnexpectedEof),
+                Derived::Io(ErrorKind::UnexpectedEof),
+            ),
+            (Error::Closed, Derived::Closed),
+        ];
+        for (error, derived) in pairs {
+            assert_eq!(format!("{error:?}"), format!("{derived:?}"));
+            assert_eq!(format!("{error:#?}"), format!("{derived:#?}"));
         }
     }
 }
