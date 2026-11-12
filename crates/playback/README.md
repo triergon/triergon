@@ -164,9 +164,12 @@ Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
 Range playback derives the duration from packet end times when the movie
 header's duration is unknown or exceeds the presentation clock.
-Complete fragmented files with an open-ended rate-one initialization edit
-apply the same edit clocks on startup and seek. The first AAC packet carries
-leading trim in `Mp4Packet::encoded_skip_samples`.
+Complete fragmented files support an open-ended rate-one media edit. A
+leading empty subtitle edit delays the subtitle packet clocks. When video
+seeks before the first sync packet of a secondary fragment track, range
+playback replays that track from its first packet. An AAC track with a
+single initialization edit carries leading trim in the first packet's
+`Mp4Packet::encoded_skip_samples`.
 `Mp4RangePlayer::prepare_seek_with_opus_recovery` includes the regular
 Opus track's declared preroll. Decode from the reported first sample and
 present PCM from the video landing through the track's edited end. A refused
