@@ -143,7 +143,13 @@
     "avc-same-update-continuation",
     "avc-inband-update-continuation",
     "avc-configured-annexb",
-    "hevc-configured-annexb"
+    "hevc-configured-annexb",
+    "avc-profile-extension-0-bytes",
+    "avc-profile-extension-1-bytes",
+    "avc-profile-extension-2-bytes",
+    "avc-profile-extension-3-bytes",
+    "avc-profile-extension-4-bytes",
+    "avc-profile-extension-update"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"
