@@ -23,10 +23,11 @@ fn word(raw: &[u8], at: usize) -> u16 {
     u16::from_be_bytes([byte(raw, at), byte(raw, at + 1)])
 }
 
-/// Whether the receiver accepts a canvas size (it validates it as an image size).
+/// Whether the receiver takes a PCS's video size as its canvas: both sides at
+/// least one and `(width + 128) × (height + 128)` below 2²⁸ (65,535 × 1 and
+/// 63,422 × 4,096 are taken, 0 × 0, 63,423 × 4,096 and 65,535 × 65,535 are not).
 fn valid_canvas(width: u16, height: u16) -> bool {
-    let (w, h) = (u64::from(width), u64::from(height));
-    w > 0 && h > 0 && (w + 128) * (h + 128) < u64::from(i32::MAX.unsigned_abs()) / 8
+    width != 0 && height != 0 && (u64::from(width) + 128) * (u64::from(height) + 128) < 1 << 28
 }
 
 /// A packet's PTS in microseconds, as the receiver rescales it: `None` when
@@ -76,8 +77,8 @@ pub(super) struct Object {
 enum Update<'a> {
     /// The receiver rejects the fragment.
     Keep,
-    /// A first fragment whose data length the receiver fails to allocate:
-    /// the object takes its size without data, and the packet is refused.
+    /// A first fragment whose length leaves no room for its size fields: the
+    /// object it starts has that size and no data, and the packet is refused.
     Unallocated(Object),
     /// An accepted first fragment: the object it starts.
     Replace(Object),
@@ -85,9 +86,10 @@ enum Update<'a> {
     Append(&'a [u8]),
 }
 
-/// Room for `additional` more RLE bytes of an object that declared `declared`.
-/// The declared length is a claim the reference allocates whole; the
-/// receiver stores only the bytes that arrive and limits those.
+/// Room for `additional` more RLE bytes of an object that declared
+/// `declared`. Storage grows with the bytes that arrive, never past the
+/// declared length, so a declared length is a claim, not an allocation; the
+/// bytes held stay within `limits.max_encoded`.
 fn stored(
     encoded: &mut BudgetVec<u8>,
     additional: usize,
@@ -131,9 +133,24 @@ impl Object {
         }
     }
 
-    /// A first fragment (after its id, version and flags): the object it
-    /// starts, when it has data and a size inside the canvas and declares at
-    /// least that data.
+    /// A first fragment: the object data length (24 bits, counting the four
+    /// bytes of the width and height that follow it), the width, the height,
+    /// then RLE bytes. Observed on a 16 × 4 canvas, in this order:
+    ///
+    /// - a fragment without an RLE byte after its size fields is rejected,
+    ///   whatever the length declares; its fields are never read past the
+    ///   segment end;
+    /// - a width or height of zero or beyond the canvas (17 × 1, 1 × 5) is
+    ///   rejected; 16 × 4 and 1 × 4 are accepted;
+    /// - a declared length below 4 (no room for the size fields) refuses the
+    ///   packet, and the object takes the new size without data;
+    /// - more RLE bytes than the length declares reject the fragment (a length
+    ///   of 8 with 6 bytes, or of 4 with any);
+    /// - otherwise the fragment replaces the object with its bytes, however
+    ///   many more the length declares, up to 2²⁴ − 5.
+    ///
+    /// The ODS syntax (BD-ROM presentation graphics) has the length count the
+    /// size fields; the rejections and the refusal are the reference's.
     fn start<'a>(
         id: u16,
         fragment: &'a [u8],
@@ -144,44 +161,30 @@ impl Object {
         let [l0, l1, l2, w0, w1, h0, h1, data @ ..] = fragment else {
             return Ok(Update::Keep);
         };
-        let declared = usize::from(*l0) << 16 | usize::from(*l1) << 8 | usize::from(*l2);
         let (width, height) = (
             u16::from_be_bytes([*w0, *w1]),
             u16::from_be_bytes([*h0, *h1]),
         );
-        let [canvas_width, canvas_height] = canvas;
-        if data.is_empty()
-            || width == 0
-            || height == 0
-            || width > canvas_width
-            || height > canvas_height
-        {
+        if data.is_empty() || width == 0 || height == 0 || width > canvas[0] || height > canvas[1] {
             return Ok(Update::Keep);
         }
-        // The receiver cannot allocate a negative data length, and frees
-        // the object's previous data trying.
-        let Some(length) = declared.checked_sub(4) else {
-            return Ok(Update::Unallocated(Self {
-                width,
-                height,
-                ..Self::empty(id, budget)
-            }));
-        };
-        if data.len() > length {
-            return Ok(Update::Keep);
-        }
-        let fragments = next_fragment(0, limits)?;
-        let mut encoded = BudgetVec::new(budget);
-        stored(&mut encoded, data.len(), length, limits)?;
-        encoded.try_extend_from_slice(data)?;
-        Ok(Update::Replace(Self {
-            id,
+        let mut object = Object {
             width,
             height,
-            declared: length,
-            encoded,
-            fragments,
-        }))
+            ..Self::empty(id, budget)
+        };
+        let length = usize::from(*l0) << 16 | usize::from(*l1) << 8 | usize::from(*l2);
+        let Some(declared) = length.checked_sub(4) else {
+            return Ok(Update::Unallocated(object));
+        };
+        if data.len() > declared {
+            return Ok(Update::Keep);
+        }
+        object.fragments = next_fragment(0, limits)?;
+        stored(&mut object.encoded, data.len(), declared, limits)?;
+        object.encoded.try_extend_from_slice(data)?;
+        object.declared = declared;
+        Ok(Update::Replace(object))
     }
 
     /// A continuation fragment's data, accepted while it fits the length the
@@ -489,6 +492,73 @@ impl ColourMatrix {
 mod tests {
     use super::*;
     use triergon_core::TimeBase;
+
+    fn first(length: u32, width: u16, height: u16, data: &[u8]) -> Vec<u8> {
+        let mut fragment = length.to_be_bytes()[1..].to_vec();
+        fragment.extend(width.to_be_bytes());
+        fragment.extend(height.to_be_bytes());
+        fragment.extend_from_slice(data);
+        fragment
+    }
+
+    /// What a first fragment does to object 1 on a 16 × 4 canvas, as the
+    /// reference showed it (`ods_first` probe): `keep` leaves the object as it
+    /// was, `refuse` refuses the packet, and a replacement shows its declared
+    /// RLE length.
+    fn outcome(fragment: &[u8]) -> String {
+        let budget = Budget::new(1 << 20).unwrap();
+        let update = Object::start(1, fragment, [16, 4], &DisplayLimits::default(), &budget);
+        match update.unwrap() {
+            Update::Keep => "keep".into(),
+            Update::Unallocated(object) => {
+                assert_eq!(object.declared, 0);
+                assert!(!object.has_data());
+                format!("refuse {}x{}", object.width, object.height)
+            }
+            Update::Replace(object) => {
+                assert_eq!(object.fragments, 1);
+                assert!(object.encoded.capacity() <= 16);
+                let data = object.encoded.as_slice();
+                assert_eq!(data, &fragment[7..]);
+                format!("{}x{} {}", object.width, object.height, object.declared)
+            }
+            Update::Append(_) => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn a_first_fragment_is_checked_against_the_canvas_then_its_length() {
+        let rle = [2, 2, 0, 0];
+        for (w, h) in [(0, 1), (1, 0), (0, 0), (17, 1), (1, 5), (17, 5)] {
+            assert_eq!(outcome(&first(8, w, h, &rle)), "keep", "{w}x{h}");
+        }
+        for (w, h) in [(2, 1), (16, 4), (16, 1), (1, 4)] {
+            assert_eq!(outcome(&first(8, w, h, &rle)), format!("{w}x{h} 4"));
+        }
+        for length in 0..4 {
+            assert_eq!(outcome(&first(length, 2, 1, &[])), "keep");
+            assert_eq!(outcome(&first(length, 2, 1, &[2])), "refuse 2x1");
+            assert_eq!(outcome(&first(length, 2, 1, &rle)), "refuse 2x1");
+            assert_eq!(outcome(&first(length, 17, 1, &rle)), "keep");
+            assert_eq!(outcome(&first(length, 0, 1, &rle)), "keep");
+        }
+        let six = [2, 2, 0, 0, 1, 1];
+        for (length, data) in [(4, &[][..]), (4, &rle), (5, &rle), (7, &rle), (8, &six)] {
+            assert_eq!(outcome(&first(length, 2, 1, data)), "keep", "{length}");
+        }
+        for (length, data) in [(8, &rle[..]), (9, &rle), (12, &rle), (8, &rle[..2])] {
+            assert_eq!(
+                outcome(&first(length, 2, 1, data)),
+                format!("2x1 {}", length - 4)
+            );
+        }
+        assert_eq!(outcome(&first(0xff_ffff, 2, 1, &rle)), "2x1 16777211");
+        // Cut inside the size fields, or right after them.
+        let whole = first(8, 2, 1, &rle);
+        for cut in 0..8 {
+            assert_eq!(outcome(&whole[..cut]), "keep", "{cut}");
+        }
+    }
 
     #[test]
     fn microseconds_match_the_exact_rational_rescale() {
