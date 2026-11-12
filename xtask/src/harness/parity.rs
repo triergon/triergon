@@ -603,7 +603,7 @@ mod feed_tests {
     }
 
     #[test]
-    fn all_125_framing_expectations_use_both_digests() {
+    fn all_framing_expectations_use_both_digests() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let contract =
             crate::checks::read_json(&root.join("harness/features/packet-framing/contract.json"))
@@ -613,7 +613,7 @@ mod feed_tests {
                 .unwrap();
         let fields = super::super::comparison::work_fields(&contract).unwrap();
         let rows = manifest.get("cases").and_then(Value::as_array).unwrap();
-        assert_eq!(rows.len(), 125);
+        assert_eq!(rows.len(), 131);
         for row in rows {
             let expected = row.get("expected").unwrap();
             let result = feed_result(
