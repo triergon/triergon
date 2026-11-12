@@ -97,7 +97,6 @@ enum State {
     Admission(Admission),
     Ebml {
         header: ElementHeader,
-        source: SharedBytes,
         job: EbmlJob,
     },
     Tracks {
@@ -114,7 +113,6 @@ enum State {
     },
     Head {
         header: ElementHeader,
-        source: SharedBytes,
         job: SeekHeadJob,
     },
     MergeHead {
@@ -776,7 +774,6 @@ impl Reader {
             0x1a45dfa3 => {
                 self.state = State::Ebml {
                     header,
-                    source: data.clone(),
                     job: EbmlJob::new(data),
                 };
             }
@@ -829,7 +826,6 @@ impl Reader {
             SEEK_HEAD => {
                 self.state = State::Head {
                     header,
-                    source: data.clone(),
                     job: SeekHeadJob::new(
                         data,
                         self.segment_data,
@@ -1201,17 +1197,13 @@ impl Reader {
                         self.state = State::Envelope;
                     }
                 },
-                State::Ebml {
-                    header,
-                    source,
-                    job,
-                } => match job.step(work, cancel)? {
+                State::Ebml { header, job } => match job.step(work, cancel)? {
                     ParseStep::Event(doctype) => {
                         self.webm_vp9_t35 &= doctype == BlockAdditionContainer::WebM;
-                        self.metadata_used = source.len();
+                        self.metadata_used = job.source().len();
                         let event = ElementEvent::Leaf {
                             header: *header,
-                            data: source.clone(),
+                            data: job.source().clone(),
                         };
                         self.state = State::Envelope;
                         return Ok(ParseStep::Event(D::envelope(event)?));
@@ -1262,15 +1254,11 @@ impl Reader {
                     }
                     other => return crate::matroska::typed::pending(other),
                 },
-                State::Head {
-                    header,
-                    source,
-                    job,
-                } => match job.step(work, cancel)? {
+                State::Head { header, job } => match job.step(work, cancel)? {
                     ParseStep::Event(entries) => {
                         self.state = State::MergeHead {
                             header: *header,
-                            source: source.clone(),
+                            source: job.source().clone(),
                             entries,
                             at: 0,
                             reserved: false,
