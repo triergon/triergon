@@ -19692,6 +19692,15 @@
    "key": "evidence/mp4-range-fate-prefix-e35e3584-aarch64/35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063.tar.zst",
    "sha256": "35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063",
    "bytes": 50059794
+  },
+  {
+   "name": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
+   "path": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet framing comparison with short AVC profile extensions",
+   "key": "evidence/packet-framing-avc-profile-extension-cc7e59d2-aarch64/05a700f15536e0b793abad2cf001f33d86561f602b13a282e46f829ca2094320.tar.zst",
+   "sha256": "05a700f15536e0b793abad2cf001f33d86561f602b13a282e46f829ca2094320",
+   "bytes": 74607220
   }
  ]
 }
