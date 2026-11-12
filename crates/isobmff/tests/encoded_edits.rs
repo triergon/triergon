@@ -393,6 +393,14 @@ fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
     assert_eq!(seek.anchors()[1].track_id, secondary.track_id);
     assert_eq!(seek.anchors()[1].occurrence, 0);
 
+    let mut reordered = raw.clone();
+    replace_atom_word(&mut reordered, b"ctts", 24, 1536, 511);
+    let reordered = Source::new(&reordered, b"vide");
+    assert!(matches!(
+        range_plan(&reordered, *b"qt  "),
+        Err(Error::Unsupported("encoded edit initial source/key origin"))
+    ));
+
     replace_atom_word(&mut raw, b"elst", 16, 1024, 1025);
     let cropped = Source::new(&raw, b"vide");
     assert!(matches!(

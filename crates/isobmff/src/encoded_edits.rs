@@ -397,6 +397,7 @@ pub struct EncodedEditJob<'a> {
     opus_first_tick: i128,
     opus_durations: BudgetVec<OpusDurationRun>,
     range_playback: bool,
+    non_sync_prefix: bool,
     sync_after_edit: bool,
     aac_program: Option<Box<Charged<AacAscParser>>>,
     dts_scale: Option<u32>,
@@ -685,6 +686,7 @@ impl<'a> EncodedEditJob<'a> {
             opus_first_tick: 0,
             opus_durations: BudgetVec::new(input.budget()),
             range_playback: false,
+            non_sync_prefix: false,
             sync_after_edit: false,
             aac_program: None,
             dts_scale,
@@ -1059,7 +1061,8 @@ impl<'a> EncodedEditJob<'a> {
                     let allows_non_sync = self.range_playback
                         && self.context.stream.kind().is_video()
                         && c == i128::from(self.entry.media_time);
-                    if d != 0 || (!allows_non_sync && !s.is_container_sync()) {
+                    self.non_sync_prefix = !s.is_container_sync();
+                    if d != 0 || (!allows_non_sync && self.non_sync_prefix) {
                         return Err(Error::Unsupported("encoded edit initial source/key origin"));
                     }
                 }
@@ -1112,9 +1115,13 @@ impl<'a> EncodedEditJob<'a> {
                         self.opus_first_tick = d;
                     }
                 } else {
-                    if c >= i128::from(self.entry.media_time)
-                        && self.anchor.is_none_or(|prior| c < prior)
-                    {
+                    let media_start = i128::from(self.entry.media_time);
+                    // A reordered sync sample at the edit start can replace
+                    // the prefix even when decoded after its first sample.
+                    if self.non_sync_prefix && c <= media_start && s.is_container_sync() {
+                        return Err(Error::Unsupported("encoded edit initial source/key origin"));
+                    }
+                    if c >= media_start && self.anchor.is_none_or(|prior| c < prior) {
                         self.anchor = Some(c);
                     }
                     // The presentation anchor can only extend the scan's end.

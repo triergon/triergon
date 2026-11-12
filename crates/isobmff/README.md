@@ -314,7 +314,8 @@ rejects boxes extending past the source.
   `SampleTable::has_composition_offsets` reports a regular table's `ctts`
   presence before reading its samples.
   A regular video edit starting on the first decoded sample's presentation
-  tick keeps the initial non-sync samples with their original flags. A
+  tick keeps the initial non-sync samples with their original flags when
+  there is no sync sample at or before that tick. A
   backward seek on that track requires a preceding sync sample. Secondary
   tracks can replay their verified prefix when the primary lands earlier.
   A zero-origin edit covering the decode span can retain reordered non-sync
