@@ -16,7 +16,12 @@ Everything else is Python's standard library, byte for byte the same on every
 run (the muxed copies depend on that ffmpeg build; their hashes are recorded in
 the corpus manifest).
 
-usage: dvd_streams.py [OUTPUT_DIR]   (default: .research/subtitle-corpus/dvd)
+usage: dvd_streams.py [--group NAME] [OUTPUT_DIR]   (default: .research/subtitle-corpus/dvd)
+
+`--group index` writes only the `.idx` text variants, which need no ffmpeg,
+and adds their new cases to the manifests without touching any other case;
+run on each target, it records that target's pins of the cases pinned per
+target (`subtitle-dvd-host`).
 """
 
 import hashlib
@@ -1015,6 +1020,71 @@ FIXTURE_SETS = [
 ]
 
 
+def index_variants(out, case):
+    """The `.idx` text variants: header lines, line ends, tracks, timestamps,
+    palettes, and the numbers of `size:` and `delay:` lines, whose values beyond
+    32 bits were observed to differ between FFmpeg's targets."""
+    unit = spu(glyphs(16, 6, 1), 10, 10)
+    sub = b"".join(sectors(0x20, unit, 90000, 0)) + b"".join(sectors(0x21, unit, 90000, 0))
+    T = lambda ms, pos=0: "timestamp: %s, filepos: %09x" % (timestamp(ms), pos)
+    P = "palette: " + ", ".join(DEFAULT_PALETTE)
+    variants = [
+        ("idx-header-lines", ["# c", "size: 720x576", "org: 0, 0", "Palette: 112233", "weird line",
+                              "  palette: 445566", "langidx: 0", "delay: 00:00:01:000", "id: en, index: 0",
+                              P, T(1000), "# trailing comment"], ()),
+        ("idx-crlf", ["size: 720x576\r", "palette: 010203, 040506\r", "", "", "id: en, index: 0\r", T(1000) + "\r"], ()),
+        ("idx-no-header", ["id: en, index: 0", T(1000)], ()),
+        ("idx-delays", ["id: en, index: 0", "delay: 00:00:01:000", T(1000), "delay: -00:00:00:500", T(2000),
+                        "delay: 1:2:3:4", T(3000)], ()),
+        ("idx-timestamp-forms", ["id: en, index: 0", "timestamp: 00:00:01:000, filepos: 0",
+                                 "timestamp: 1:2:3:4, filepos: 0", "timestamp:00:00:05:000,filepos:000000000",
+                                 "timestamp: 00:00:06:000, filepos: 000000800"], ()),
+        ("idx-track-order", ["delay: 00:00:01:000", "id: de, index: 1", T(2000, 0x800), "id: en, index: 0", T(1000)],
+         ("stream=0", "stream=1")),
+        ("idx-empty-track", ["id: en, index: 0", "id: de, index: 1", T(2000, 0x800)], ()),
+        ("idx-repeated-track", ["id: en, index: 0", T(1000), "id: en, index: 0", T(3000)], ()),
+        ("idx-no-index", ["id: en", T(1000)], ()),
+        ("idx-alt", ["id: en, index: 0, alt: English", T(1000)], ()),
+        ("idx-past-end", ["id: en, index: 0", T(1000), T(2000, 0x10000)], ()),
+        ("idx-palette-lines", ["palette: 111111, 222222, 333333, 444444", "palette: 555555, 666666",
+                               "id: en, index: 0", T(1000)], ()),
+        ("idx-palette-malformed", ["palette: zz", "id: en, index: 0", T(1000)], ()),
+        ("idx-palette-empty", ["palette:", "id: en, index: 0", T(1000)], ()),
+        ("idx-custom-colours", [P, "custom colors: ON, tridx: 1010, colors: 111111, 222222, 333333, 444444",
+                                "id: en, index: 0", T(1000)], ()),
+        ("idx-custom-colours-only", ["custom colors: ON, tridx: 0110, colors: 111111, 222222, 333333, 444444",
+                                     "id: en, index: 0", T(1000)], ()),
+    ]
+    for name, lines, streams in variants:
+        file = raw_idx(out, name, lines, sub)
+        for arguments in (streams or ((),)):
+            arguments = (arguments,) if isinstance(arguments, str) else arguments
+            suffix = "-" + arguments[0].replace("=", "") if arguments else ""
+            case("vobsub-" + name + suffix, file, *arguments)
+
+    # size: numbers beyond 32 bits and sizes the decoder refuses to open with
+    for name, size in [("idx-size-zero", "0x480"), ("idx-size-beyond-32-bits", "4294968016x480"),
+                       ("idx-size-negative-beyond-32-bits", "720x-4294966816"),
+                       ("idx-size-int-min", "2147483648x480")]:
+        case("vobsub-" + name, raw_idx(out, name, ["size: " + size, P, "id: en, index: 0", T(1000)], sub))
+
+    # delay: forms, one before each of twelve units
+    stream, units = program_stream([(0x20, data, pts) for data, pts in chain(basic_units())])
+    for name, delays in [
+        ("idx-delay-forms", ["+00:00:01:000", "\t-00:00:01:000", " --00:00:01:500", " - -00:00:00:250",
+                             " 00:00:03", " 0:0:0:-500", " -0:0:0:-500", " 00:00:-01:000", " garbage",
+                             " 0x10:0:0:2", " 00 :00:01:000", " 1:2"]),
+        ("idx-delay-beyond-32-bits", [" 0:0:0:2147483648", " 0:0:0:4294968296", " 0:0:0:99999999999999999999",
+                                      " 4294967296:0:0:0", " 4294967297:0:0:0", " -0:0:0:2147483648",
+                                      " -2147483649:0:0:0", " 0:0:0:-2147483649", " -0:0:0:-2147483649",
+                                      " -4294967297:0:0:0", " 0:4294967296:0:0", " 0:0:4294967296:0"]),
+    ]:
+        lines = ["size: 720x480", P, "id: en, index: 0"]
+        for delay, (_, pts, pos) in zip(delays, units):
+            lines += ["delay:" + delay, T(pts // 90, pos)]
+        case("vobsub-" + name, raw_idx(out, name, lines, stream))
+
+
 def generate(out):
     """Write every input; return the cases as (id, file, arguments, companions)."""
     cases = []
@@ -1190,44 +1260,7 @@ def generate(out):
                           ("foreign-padding", pack_header(0) + padding(SECTOR - 14))]:
         case("vobsub-" + name, idx_file(out, name, {0: [(1000, 0)], 1: [(1055, 0x1000)]}, mid(payload)))
 
-    # index text variants
-    unit = spu(glyphs(16, 6, 1), 10, 10)
-    sub = b"".join(sectors(0x20, unit, 90000, 0)) + b"".join(sectors(0x21, unit, 90000, 0))
-    T = lambda ms, pos=0: "timestamp: %s, filepos: %09x" % (timestamp(ms), pos)
-    P = "palette: " + ", ".join(DEFAULT_PALETTE)
-    variants = [
-        ("idx-header-lines", ["# c", "size: 720x576", "org: 0, 0", "Palette: 112233", "weird line",
-                              "  palette: 445566", "langidx: 0", "delay: 00:00:01:000", "id: en, index: 0",
-                              P, T(1000), "# trailing comment"], ()),
-        ("idx-crlf", ["size: 720x576\r", "palette: 010203, 040506\r", "", "", "id: en, index: 0\r", T(1000) + "\r"], ()),
-        ("idx-no-header", ["id: en, index: 0", T(1000)], ()),
-        ("idx-delays", ["id: en, index: 0", "delay: 00:00:01:000", T(1000), "delay: -00:00:00:500", T(2000),
-                        "delay: 1:2:3:4", T(3000)], ()),
-        ("idx-timestamp-forms", ["id: en, index: 0", "timestamp: 00:00:01:000, filepos: 0",
-                                 "timestamp: 1:2:3:4, filepos: 0", "timestamp:00:00:05:000,filepos:000000000",
-                                 "timestamp: 00:00:06:000, filepos: 000000800"], ()),
-        ("idx-track-order", ["delay: 00:00:01:000", "id: de, index: 1", T(2000, 0x800), "id: en, index: 0", T(1000)],
-         ("stream=0", "stream=1")),
-        ("idx-empty-track", ["id: en, index: 0", "id: de, index: 1", T(2000, 0x800)], ()),
-        ("idx-repeated-track", ["id: en, index: 0", T(1000), "id: en, index: 0", T(3000)], ()),
-        ("idx-no-index", ["id: en", T(1000)], ()),
-        ("idx-alt", ["id: en, index: 0, alt: English", T(1000)], ()),
-        ("idx-past-end", ["id: en, index: 0", T(1000), T(2000, 0x10000)], ()),
-        ("idx-palette-lines", ["palette: 111111, 222222, 333333, 444444", "palette: 555555, 666666",
-                               "id: en, index: 0", T(1000)], ()),
-        ("idx-palette-malformed", ["palette: zz", "id: en, index: 0", T(1000)], ()),
-        ("idx-palette-empty", ["palette:", "id: en, index: 0", T(1000)], ()),
-        ("idx-custom-colours", [P, "custom colors: ON, tridx: 1010, colors: 111111, 222222, 333333, 444444",
-                                "id: en, index: 0", T(1000)], ()),
-        ("idx-custom-colours-only", ["custom colors: ON, tridx: 0110, colors: 111111, 222222, 333333, 444444",
-                                     "id: en, index: 0", T(1000)], ()),
-    ]
-    for name, lines, streams in variants:
-        file = raw_idx(out, name, lines, sub)
-        for arguments in (streams or ((),)):
-            arguments = (arguments,) if isinstance(arguments, str) else arguments
-            suffix = "-" + arguments[0].replace("=", "") if arguments else ""
-            case("vobsub-" + name + suffix, file, *arguments)
+    index_variants(out, case)
 
     # program streams: video, navigation and audio packets, two subpicture streams, the parser
     def vob_sector(*parts):
@@ -1334,22 +1367,102 @@ def fold(reference, path, arguments, root):
     if run.returncode != 0:
         return {"error": run.stderr.strip()}
     result = json.loads(run.stdout.splitlines()[-1])
-    return {k: result[k] for k in ("packets", "bytes", "digest")}
+    return {k: result[k] for k in ("packets", "bytes", "digest", "host_dependent") if k in result}
+
+
+def host_target():
+    """The target triple the reference was built for: the host's."""
+    run = subprocess.run(["rustc", "-vV"], capture_output=True, text=True, check=True)
+    return next(line.split(": ", 1)[1] for line in run.stdout.splitlines() if line.startswith("host: "))
+
+
+GROUPS = {"index": index_variants}
+
+
+def entry(corpus, row):
+    cid, file, arguments, companions, rights, source = row
+    item = {"id": cid, "profile": cid, "file": file, "sha256": sha256(os.path.join(corpus, file)), "rights": rights,
+            "source": source, "arguments": arguments}
+    if companions:
+        item["companions"] = [{"file": c, "sha256": sha256(os.path.join(corpus, c))} for c in companions]
+    return item
+
+
+def write_manifest(path, document):
+    with open(path, "w") as f:
+        json.dump(document, f, indent=2)
+        f.write("\n")
+
+
+def authored_rows(cases):
+    return [(cid, "dvd/" + file, arguments, ["dvd/" + c for c in companions] +
+             (["dvd/" + file[:-4] + ".sub"] if file.endswith(".idx") else []),
+             "authored-synthetic", "harness/subtitles/dvd_streams.py") for cid, file, arguments, companions in cases]
+
+
+def update_group(name, out, corpus, reference, root, manifests):
+    """Write one group's inputs and add its cases to the manifests in place:
+    a case already listed must have the same input bytes; a new one is folded
+    and placed after the group's case before it. A case pinned per target gets
+    this target's pin; one pinned once must fold as its pin here too."""
+    cases = []
+    GROUPS[name](out, lambda cid, file, *arguments, companions=(): cases.append(
+        (cid, file, ["dvd", *arguments], list(companions))))
+    dvd, host = manifests
+    where = {c["id"]: (m, c) for m in (dvd, host) for c in m["cases"]}
+    after = {id(dvd): None, id(host): None}
+    for row in authored_rows(cases):
+        item = entry(corpus, row)
+        expected = fold(reference, os.path.join(corpus, row[1]), row[2], root)
+        if row[0] in where:
+            manifest, listed = where[row[0]]
+            inputs = lambda c: (c["sha256"], c.get("companions"))
+            if inputs(listed) != inputs(item):
+                raise SystemExit("%s: its input changed" % row[0])
+            if manifest is host:
+                listed["expected_by_target"] = dict(sorted({**listed["expected_by_target"],
+                                                            host_target(): expected}.items()))
+            elif listed["expected"] != expected:
+                raise SystemExit("%s: %r here, pinned %r" % (row[0], expected, listed["expected"]))
+        else:
+            manifest = host if expected.get("host_dependent") else dvd
+            if manifest is host:
+                item["expected_by_target"] = {host_target(): expected}
+            else:
+                item["expected"] = expected
+            ids = [c["id"] for c in manifest["cases"]]
+            at = ids.index(after[id(manifest)]) + 1 if after[id(manifest)] in ids else len(ids)
+            manifest["cases"].insert(at, item)
+        after[id(manifest)] = row[0]
+    return len(cases)
 
 
 def main():
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     corpus = os.path.join(root, ".research", "subtitle-corpus")
-    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(corpus, "dvd")
+    arguments = sys.argv[1:]
+    group = None
+    if arguments[:1] == ["--group"]:
+        group, arguments = arguments[1], arguments[2:]
+    out = arguments[0] if arguments else os.path.join(corpus, "dvd")
     os.makedirs(out, exist_ok=True)
-    cases = generate(out)
     reference = os.path.join(root, "target", "harness", "ffmpeg-subtitles-worker")
+    features = os.path.join(root, "harness", "features")
+    dvd_path = os.path.join(features, "subtitle-dvd", "corpus.json")
+    host_path = os.path.join(features, "subtitle-dvd-host", "corpus.json")
+    if group is not None:
+        manifests = []
+        for path in (dvd_path, host_path):
+            with open(path) as f:
+                manifests.append(json.load(f))
+        count = update_group(group, out, corpus, reference, root, manifests)
+        for path, document in zip((dvd_path, host_path), manifests):
+            write_manifest(path, document)
+        print("%s: %d cases" % (group, count))
+        return
+    cases = generate(out)
     fate = os.path.join(root, ".research", "fate-samples")
-    rows = []
-    for cid, file, arguments, companions in cases:
-        rows.append((cid, "dvd/" + file, arguments, ["dvd/" + c for c in companions] +
-                     (["dvd/" + file[:-4] + ".sub"] if file.endswith(".idx") else []),
-                     "authored-synthetic", "harness/subtitles/dvd_streams.py"))
+    rows = authored_rows(cases)
     for cid, file, arguments, companions, source in FATE:
         for name in [file] + companions:
             target = os.path.join(corpus, name)
@@ -1357,21 +1470,25 @@ def main():
             shutil.copyfile(os.path.join(fate, name[len("fate/"):]), target)
         rows.append((cid, file, ["dvd", *arguments], companions, "fetched-not-redistributed",
                      "rsync://fate-suite.ffmpeg.org/fate-suite/" + source))
-    manifest = {"schema": 1, "cases": []}
-    for cid, file, arguments, companions, rights, source in rows:
-        path = os.path.join(corpus, file)
-        entry = {"id": cid, "profile": cid, "file": file, "sha256": sha256(path), "rights": rights,
-                 "source": source, "arguments": arguments}
-        if companions:
-            entry["companions"] = [{"file": c, "sha256": sha256(os.path.join(corpus, c))} for c in companions]
+    # A case the reference flags host-dependent goes to subtitle-dvd-host,
+    # pinned for this target beside the pins other targets recorded.
+    with open(host_path) as f:
+        pinned = {case["id"]: case["expected_by_target"] for case in json.load(f)["cases"]}
+    manifest, host = {"schema": 1, "cases": []}, {"schema": 1, "cases": []}
+    for row in rows:
+        item = entry(corpus, row)
         if os.path.exists(reference):
-            entry["expected"] = fold(reference, path, arguments, root)
-        manifest["cases"].append(entry)
-    target = os.path.join(root, "harness", "features", "subtitle-dvd", "corpus.json")
-    with open(target, "w") as f:
-        json.dump(manifest, f, indent=2)
-        f.write("\n")
-    print("%d cases" % len(manifest["cases"]))
+            expected = fold(reference, os.path.join(corpus, row[1]), row[2], root)
+            if expected.get("host_dependent"):
+                by_target = {**pinned.get(row[0], {}), host_target(): expected}
+                item["expected_by_target"] = dict(sorted(by_target.items()))
+                host["cases"].append(item)
+                continue
+            item["expected"] = expected
+        manifest["cases"].append(item)
+    for path, document in [(dvd_path, manifest), (host_path, host)]:
+        write_manifest(path, document)
+    print("%d cases, %d pinned per target" % (len(manifest["cases"]), len(host["cases"])))
 
 
 if __name__ == "__main__":

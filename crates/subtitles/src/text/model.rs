@@ -4,8 +4,6 @@ use triergon_core::{BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, T
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
-    SubRip,
-    WebVtt,
     Tx3g,
     Utf8Packet,
     MatroskaWebVtt,
@@ -20,11 +18,6 @@ pub enum Encoding {
     Utf16Le,
     Tx3gInBand,
     Opaque,
-    /// Explicit source encodings; never selected from a language or guess.
-    Ascii,
-    Latin1,
-    Windows1251,
-    Windows1252,
     /// Explicit version-pinned multibyte decoding; labels remain caller-owned.
     Multibyte(super::charset::multibyte::MultibyteCharset),
 }
@@ -127,8 +120,6 @@ pub struct Limits {
     pub max_config_bytes: usize,
     pub max_label_bytes: usize,
     pub max_addition_bytes: usize,
-    pub max_line_bytes: usize,
-    pub max_cues: usize,
     pub max_modifiers: usize,
     pub max_decoded_bytes: usize,
 }
@@ -140,8 +131,6 @@ impl Default for Limits {
             max_config_bytes: 1024 * 1024,
             max_label_bytes: 256,
             max_addition_bytes: 1024 * 1024,
-            max_line_bytes: 64 * 1024,
-            max_cues: 4096,
             max_modifiers: 4096,
             max_decoded_bytes: 4 * 1024 * 1024,
         }
@@ -206,34 +195,6 @@ pub struct Cue {
     pub modifiers: BudgetVec<Modifier>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MetadataKind {
-    Header,
-    Note,
-    Style,
-    Region,
-}
-
-#[derive(Debug)]
-pub struct Metadata {
-    pub input: Input,
-    pub kind: MetadataKind,
-    pub raw_range: Range<usize>,
-}
-
-#[derive(Debug)]
-#[cfg_attr(
-    target_pointer_width = "64",
-    expect(
-        clippy::large_enum_variant,
-        reason = "Exclusive output events move existing charged owners inline without publication allocation; guarded at 672 bytes."
-    )
-)]
-pub enum Event {
-    Cue(Cue),
-    Metadata(Metadata),
-}
-
 // Backing allocations stay charged by Bytes/BudgetVec. This guards only the
 // complete inline value, on every target, and requires review if it grows.
-const _: () = assert!(size_of::<Event>() <= 672);
+const _: () = assert!(size_of::<Cue>() <= 672);

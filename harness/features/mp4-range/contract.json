@@ -13,11 +13,14 @@
     "compare six-channel QuickTime AAC in version-2 sound descriptions with a wave container, including a variant without optional frma and mp4a marker atoms and a 44.1 kHz variant with reordered AVC pictures",
     "compare fragmented QuickTime AVC/AAC with empty initialization sample tables and a version-1 sound description",
     "compare 44.1 kHz QuickTime AAC with fixed 7.1 channel configuration 12 on open and backward seek",
+    "compare QuickTime AAC-LC with a 6.1 program configuration and a leading edit on open and backward seek",
     "compare the reference container output when the MOV demuxer exposes dav1 without assigning an AV1 codec ID",
     "seek cases read one packet, seek backward using the video clock, then read the complete suffix",
     "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
     "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame",
     "compare open-ended fragment edits, startup trim with unequal media and sample clocks, and backward seeks on both sides of a sync boundary",
+    "compare fragmented AVC/AAC with timed text and DVD subpictures through EOF, including non-sync text samples at fragment boundaries and a leading empty subpicture edit",
+    "compare the full suffix of the subtitle files after video seeks at the start, during a cue and after it ends",
     "compare Opus leading and trailing edit trim, unequal media and decoder clocks, long leading crops with variable packet durations, and secondary-track alignment at exact and between-sample seek boundaries",
     "opus-roll cases use the audio sample at the actual video presentation landing, including a landing whose PTS and DTS differ, to select the source roll group and decoder start",
     "compare the video landing extent, audio sync and start ordinals, and preroll in 48 kHz samples before comparing the complete suffix",
@@ -62,7 +65,17 @@
     "quicktime-aac-7-1-open",
     "quicktime-aac-7-1-seek",
     "rtp-hints-open",
-    "rtp-hints-seek"
+    "rtp-hints-seek",
+    "aac-program-open",
+    "aac-program-seek",
+    "fragmented-subtitles-open",
+    "fragmented-subtitles-seek-start",
+    "fragmented-subtitles-seek-during-cue",
+    "fragmented-subtitles-seek-after-cue",
+    "fragmented-subtitle-edit-open",
+    "fragmented-subtitle-edit-seek-start",
+    "fragmented-subtitle-edit-seek-during-cue",
+    "fragmented-subtitle-edit-seek-after-cue"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

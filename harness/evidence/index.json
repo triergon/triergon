@@ -17044,6 +17044,45 @@
    }
   },
   {
+   "name": "shape-bidi-reference-e44bfacb",
+   "path": "shape-bidi-reference-e44bfacb",
+   "retention": "retained",
+   "reason": "Bidi from UAX #9 paragraph and table row: the bidi resolver at e44bfacb on a c7g.4xlarge, natively on AArch64 and in the ARMv7 user space; the shape and ASS gates, crate tests, table check and BidiTest.txt and BidiCharacterTest.txt on both targets; generated texts through both shape workers' bidi and simple dumps, seeds 3 to 22; cargo xtask ass equivalence against 8a3f711f with its records; instruction counts of every shape-bidi, shape-simple and ass-render case against 8a3f711f; the scripts that ran them and a bundle of the measured commits.",
+   "key": "evidence/shape-bidi-reference-e44bfacb/dbf448c1ada891ab4122396818350e39df1171ff58e7cd77de0c354abb22c943.tar.gz",
+   "sha256": "dbf448c1ada891ab4122396818350e39df1171ff58e7cd77de0c354abb22c943",
+   "bytes": 69115565,
+   "source_revisions": {
+    "candidate": "e44bfacb38a19598eca07ea96a9aa83a05a9b1f2",
+    "base": "8a3f711f8d014411ea64d5b8967367ac3aedbac1"
+   }
+  },
+  {
+   "name": "shape-bidi-reference-81a17b4e",
+   "path": "shape-bidi-reference-81a17b4e",
+   "retention": "retained",
+   "reason": "Bidi from UAX #9 paragraph and table row: the bidi resolver at 81a17b4e on a c7g.4xlarge, Linux AArch64; the shape and ASS gates, crate tests, table check, rustdoc and cargo xtask shape conformance; generated texts through this commit's, main's and e44bfacb's shape workers against FriBidi, seeds 3 to 22; cargo xtask ass equivalence against 8a3f711f with its records; instruction counts of every shape-bidi, shape-simple and ass-render case against 8a3f711f; the probes of the rules the commit adds, the bracket rules derived again from probes with the brief, cases and report, the lines each bracket rule is needed for, the scripts that ran them and a bundle of the measured commit.",
+   "key": "evidence/shape-bidi-reference-81a17b4e/63104dd7b693a2c559906ca279a2350b4a273083c03fabe4fe097d49e56b961f.tar.gz",
+   "sha256": "63104dd7b693a2c559906ca279a2350b4a273083c03fabe4fe097d49e56b961f",
+   "bytes": 46858249,
+   "source_revisions": {
+    "candidate": "81a17b4edf5e24611eab70ac1ddf9b3cf4c37603",
+    "base": "8a3f711f8d014411ea64d5b8967367ac3aedbac1"
+   }
+  },
+  {
+   "name": "shape-bidi-reference-81a17b4e-armv7",
+   "path": "shape-bidi-reference-81a17b4e-armv7",
+   "retention": "retained",
+   "reason": "Bidi from UAX #9 paragraph and table row, ARMv7: the bidi resolver at 81a17b4e in the ARMv7 user space on a c7g.2xlarge; the shape and ASS gates, cargo xtask shape conformance, seed 3 of the generated texts against FriBidi, instruction counts of every shape-bidi, shape-simple and ass-render case against 8a3f711f, the scripts that ran them and a bundle of the measured commit.",
+   "key": "evidence/shape-bidi-reference-81a17b4e-armv7/18211802f6b7d171f06852a6f38459957ae6049a7c65930f1c96900cc33edb36.tar.gz",
+   "sha256": "18211802f6b7d171f06852a6f38459957ae6049a7c65930f1c96900cc33edb36",
+   "bytes": 12388296,
+   "source_revisions": {
+    "candidate": "81a17b4edf5e24611eab70ac1ddf9b3cf4c37603",
+    "base": "8a3f711f8d014411ea64d5b8967367ac3aedbac1"
+   }
+  },
+  {
    "name": "ass-collision-far-margins-02e3a75a",
    "path": "ass-collision-far-margins-02e3a75a",
    "retention": "retained",
@@ -19415,6 +19454,26 @@
    "source_revision": "b96eb9ec65abbe4548b4bc00a74e8504a6d0001d"
   },
   {
+   "name": "aac-program-range",
+   "path": "aac-program-range",
+   "retention": "retained",
+   "reason": "AAC program range open and seek parity, paired runtime, peak heap and total resident peak",
+   "key": "evidence/aac-program-range/6b41bc92f4c55f6a868dc01181d152a75fe9cbb4868eebb72a6da437b4cf5579.tar.gz",
+   "sha256": "6b41bc92f4c55f6a868dc01181d152a75fe9cbb4868eebb72a6da437b4cf5579",
+   "bytes": 46410219,
+   "source_revision": "98ad5b82da81ba113b3bab206459efc7ede2ed8a"
+  },
+  {
+   "name": "aac-program-range-reviewed",
+   "path": "aac-program-range-reviewed",
+   "retention": "retained",
+   "reason": "Range parity and paired native bounds with the AAC program parser charged to the input budget",
+   "key": "evidence/aac-program-range-reviewed/1beefed497c83dcff49a8638ddbcda6f7968af67806753d727afd10ad16dad26.tar.gz",
+   "sha256": "1beefed497c83dcff49a8638ddbcda6f7968af67806753d727afd10ad16dad26",
+   "bytes": 64212278,
+   "source_revision": "a961b3b38b083180e11a5d57bcf6ab73a15b72dc"
+  },
+  {
    "name": "mp4-range-seek-checkpoints",
    "path": "mp4-range-seek-checkpoints",
    "retention": "retained",
@@ -19422,6 +19481,26 @@
    "key": "evidence/mp4-range-seek-checkpoints/cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b.tar.gz",
    "sha256": "cea6d87e41ab618d2db679b659856276788a37a6f962eb27e5e71a2b8825c48b",
    "bytes": 137198328
+  },
+  {
+   "name": "subtitle-text-gate-b9898139",
+   "path": "subtitle-text-gate-b9898139",
+   "retention": "retained",
+   "reason": "Text subtitle rows of docs/status.md, Linux AArch64 on a c8g.xlarge and the armv7-userland user space on a c6g.2xlarge: timing and memory (30 pairs, CPU 1) of all 354 subtitle-text cases at b9898139 against the pinned FFmpeg 9.0 reference, graded, with the kernel RSS proof on AArch64 and standard bounds on ARMv7; same-code of the subtitle worker against main at 365affd2; the instruction count of every subtitle-text case and of the bitmap subtitle features against main; the subtitle crate's and worker's tests on both targets; and a git bundle of the branch. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitle-text-gate-b9898139/35aa64c6d273f3f6956811a143c299b9ed01ca1c9c9810e9f2eb0a9d42c75aca.tar.zst",
+   "sha256": "35aa64c6d273f3f6956811a143c299b9ed01ca1c9c9810e9f2eb0a9d42c75aca",
+   "bytes": 9692934,
+   "source_revision": "b9898139893705884c3cff03f1994cbb2157594a"
+  },
+  {
+   "name": "subtitle-text-gate-6126b759",
+   "path": "subtitle-text-gate-6126b759",
+   "retention": "retained",
+   "reason": "Text subtitle rows of docs/status.md, Linux AArch64 on a c8g.xlarge and the armv7-userland user space on a c6g.2xlarge: timing and memory (30 pairs, CPU 1) of the 354 subtitle-text cases and the 23 subtitle-text-host cases at 6126b759 against the pinned FFmpeg 9.0 reference, graded, with the kernel RSS proof on AArch64 and standard bounds on ARMv7; each target's recording of the subtitle-text-host pins; the checks, the subtitle crate's and worker's tests on both targets and both features' parity; same-code of the subtitle worker against b9898139 and of the branch tip after merging main against 6126b759; and a git bundle of the branch. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitle-text-gate-6126b759/aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676.tar.zst",
+   "sha256": "aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676",
+   "bytes": 16191723,
+   "source_revision": "6126b759b9b983afe488c3c362c6e37c2d1425a2"
   },
   {
    "name": "aac-mov-host",
@@ -19464,6 +19543,36 @@
    "source_revision": "3d422610316d79665c80b48ab8a27a8a57880efe"
   },
   {
+   "name": "aac-program-configurations",
+   "path": "aac-program-configurations",
+   "retention": "retained",
+   "reason": "Configured raw AAC-LC speaker and PCM parity, paired runtime, peak heap and total resident peak",
+   "key": "evidence/aac-program-configurations/86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf.tar.gz",
+   "sha256": "86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf",
+   "bytes": 163382979,
+   "source_revision": "0a51b7c3746c882b3ca5127ad047162130c01ea6"
+  },
+  {
+   "name": "aac-program-configurations-reviewed",
+   "path": "aac-program-configurations-reviewed",
+   "retention": "retained",
+   "reason": "Configured AAC-LC parity and native comparisons with height validation and grouped rear pairs",
+   "key": "evidence/aac-program-configurations-reviewed/7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e.tar.gz",
+   "sha256": "7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e",
+   "bytes": 181869637,
+   "source_revision": "7b479ad67690a7c2bc03c15f4ff8545c05bc965a"
+  },
+  {
+   "name": "aac-program-speaker-mapping",
+   "path": "aac-program-speaker-mapping",
+   "retention": "retained",
+   "reason": "Configured AAC-LC parity, runtime, peak heap and total resident peak with distinct speaker positions",
+   "key": "evidence/aac-program-speaker-mapping/68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf.tar.gz",
+   "sha256": "68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf",
+   "bytes": 181930058,
+   "source_revision": "fde36dd91d85ca700538421062ceacd45075c5b8"
+  },
+  {
    "name": "armv7-kernel-rss-linux-armv7",
    "path": "armv7-kernel-rss-linux-armv7",
    "retention": "retained",
@@ -19482,6 +19591,98 @@
    "sha256": "d6df03ff861f3259d837bfb93273a440f30a8240ab52c95891d2065e594c242a",
    "bytes": 424394382,
    "source_revision": "afb9049c681916c97311fc9f495e27ceaa69f4df"
+  },
+  {
+   "name": "subtitles-armv7-arm64-f2634911",
+   "path": "subtitles-armv7-arm64-f2634911",
+   "retention": "retained",
+   "reason": "Subtitle, caption and teletext status rows on 32-bit ARMv7 (8513398b, two c6g.4xlarge hosts in the armv7-userland user space with 13 packages added for libzvbi's build) and Linux AArch64 (f2634911, c8g.xlarge, kernel-bound memory with page-cache eviction; its workers are byte-identical to 8513398b's): parity of the six features on both targets, 30 timing pairs and 30 memory pairs per case on CPU 1 against ffmpeg-subtitles-plain-native, the graded reports, the measured workers, environment and package lists. Also the c8g gate at 8513398b before the page-cache eviction, the page-cache before/after measurements, a Graviton2 AArch64 timing diagnostic, instruction counts, the caption profiles, the clean-room probe tools and results the DVD rules and the reference's flag were derived from, and bundles of both measured sources. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitles-armv7-arm64-f2634911/9ed7263aabbc4f44910c5135fcf077419ea5b426e3a09a888e83f10153680c32.tar.zst",
+   "sha256": "9ed7263aabbc4f44910c5135fcf077419ea5b426e3a09a888e83f10153680c32",
+   "bytes": 84259003,
+   "source_revision": "f263491102d307997d40d40826a6193d8468e87e"
+  },
+  {
+   "name": "subtitles-cc-loop-9d048c58",
+   "path": "subtitles-cc-loop-9d048c58",
+   "retention": "retained",
+   "reason": "Closed caption status rows on Linux AArch64 (c8g.xlarge) and 32-bit ARMv7 (c6g.4xlarge in the armv7-userland user space with 13 packages added for libzvbi's build, A32 gate build) at 9d048c58, where the caption receiver reads cc_data constructs as three-byte arrays and resolves the field once per packet: subtitle-cc parity, 30 timing pairs and 30 memory pairs under the kernel RSS bound (through its 32-bit entry point on ARMv7) per case on CPU 1 against ffmpeg-subtitles-plain-native, the kernel proofs and review, the graded reports, the measured workers, environment and package lists. Also, on each target and natively on the c6g.4xlarge (Graviton2), the instructions of one timed operation per case for main (d37da04f), the branch and the reference, a byte comparison of both workers' sub-trace and sub-fold output on all 205 cases, and 30 Graviton2 timing pairs of the eight mpeg2-a53-limit cases; the scripts and a bundle of the measured source. The collection checkpoints (partial.json), which repeat each report.json, are left out. A zstd-compressed tar of the deterministic pack.",
+   "key": "evidence/subtitles-cc-loop-9d048c58/2b78cc89c624e9296967d4f3ec8aa0e5713631d1d3228c63c8b96eb1c4e6cfd1.tar.zst",
+   "sha256": "2b78cc89c624e9296967d4f3ec8aa0e5713631d1d3228c63c8b96eb1c4e6cfd1",
+   "bytes": 37396079,
+   "source_revision": "9d048c58fb30c64777f7230eb67c7037a1e1bcf1"
+  },
+  {
+   "name": "mp4-fragment-subtitles-5c1b2d66-aarch64",
+   "path": "mp4-fragment-subtitles-5c1b2d66-aarch64",
+   "retention": "90 days",
+   "reason": "MP4 range measurement with full index replay",
+   "key": "qualification/mp4-fragment-subtitles-5c1b2d66-aarch64/5b17946f7a0ce79d3df8995c24a497216c5858bf5a49e4c2777682b178da5e6d.tar.gz",
+   "sha256": "5b17946f7a0ce79d3df8995c24a497216c5858bf5a49e4c2777682b178da5e6d",
+   "bytes": 49974009
+  },
+  {
+   "name": "mp4-fragment-subtitles-04960913-aarch64",
+   "path": "mp4-fragment-subtitles-04960913-aarch64",
+   "retention": "90 days",
+   "reason": "MP4 range measurement with checked fragment restarts",
+   "key": "qualification/mp4-fragment-subtitles-04960913-aarch64/c90b2366570234f13a7c56944c792f17b67dc15127257176042c1d9cd870d3b8.tar.gz",
+   "sha256": "c90b2366570234f13a7c56944c792f17b67dc15127257176042c1d9cd870d3b8",
+   "bytes": 50018046
+  },
+  {
+   "name": "mp4-fragment-subtitles-3e055282-aarch64",
+   "path": "mp4-fragment-subtitles-3e055282-aarch64",
+   "retention": "90 days",
+   "reason": "MP4 range measurement with additional fragment restarts",
+   "key": "qualification/mp4-fragment-subtitles-3e055282-aarch64/140090c0103d00c21253fa0873b06b3ab4fb8ca79df3c2b26a61c4922c52f35d.tar.gz",
+   "sha256": "140090c0103d00c21253fa0873b06b3ab4fb8ca79df3c2b26a61c4922c52f35d",
+   "bytes": 49998585
+  },
+  {
+   "name": "mp4-fragment-subtitles-b42e33df-aarch64",
+   "path": "mp4-fragment-subtitles-b42e33df-aarch64",
+   "retention": "retained",
+   "reason": "MP4 range playback with fragmented timed text and DVD subpictures",
+   "key": "evidence/mp4-fragment-subtitles-b42e33df-aarch64/5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5.tar.gz",
+   "sha256": "5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5",
+   "bytes": 50007294
+  },
+  {
+   "name": "mp4-fragment-subtitles-current-main-workers",
+   "path": "mp4-fragment-subtitles-current-main-workers",
+   "retention": "retained",
+   "reason": "Compare MP4 range workers after the caption changes",
+   "key": "evidence/mp4-fragment-subtitles-current-main-workers/5baf97ff731c7af0956f82da9a3085acc2dccb81fb19bd65e40f929cdc5e5875.tar.gz",
+   "sha256": "5baf97ff731c7af0956f82da9a3085acc2dccb81fb19bd65e40f929cdc5e5875",
+   "bytes": 25576885
+  },
+  {
+   "name": "mp4-range-edit-rewind-1e304436-aarch64",
+   "path": "mp4-range-edit-rewind-1e304436-aarch64",
+   "retention": "90 days",
+   "reason": "",
+   "key": "qualification/mp4-range-edit-rewind-1e304436-aarch64/e63e70df25ddeb9f25499fdbeb8a62e7f70ed7658c72c67e6b867541b66406ab.tar.gz",
+   "sha256": "e63e70df25ddeb9f25499fdbeb8a62e7f70ed7658c72c67e6b867541b66406ab",
+   "bytes": 346993021
+  },
+  {
+   "name": "mp4-range-subtitle-fuzz-766961a4",
+   "path": "mp4-range-subtitle-fuzz-766961a4",
+   "retention": "retained",
+   "reason": "MP4 range fuzz comparisons across the cursor allocation changes",
+   "key": "evidence/mp4-range-subtitle-fuzz-766961a4/148654908af0dd8b7ca32d19e0d3986888745fc84c93574a8511aed23d3fbdc9.tar.zst",
+   "sha256": "148654908af0dd8b7ca32d19e0d3986888745fc84c93574a8511aed23d3fbdc9",
+   "bytes": 15542961
+  },
+  {
+   "name": "mp4-range-edited-cursors-766961a4-aarch64",
+   "path": "mp4-range-edited-cursors-766961a4-aarch64",
+   "retention": "retained",
+   "reason": "MP4 range playback with fragmented subtitles and budgeted edit cursors",
+   "key": "evidence/mp4-range-edited-cursors-766961a4-aarch64/7b6e9c9b7f078554882d60869a07068fcec65ce1e4271f69db3f15e9de147bcf.tar.zst",
+   "sha256": "7b6e9c9b7f078554882d60869a07068fcec65ce1e4271f69db3f15e9de147bcf",
+   "bytes": 30959392
   },
   {
    "name": "armv7-thumb2-linux-armv7",

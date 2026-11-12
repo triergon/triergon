@@ -1,10 +1,11 @@
 mod common;
+use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
     BoxView, EditList, Limits, MovieHeader, Sample, SampleStep, SampleTable, TrackHeader,
     compat::mov::{
         edits::{EditCursor, EditLimits},
-        packets::CursorStatus,
+        packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
     },
 };
 
@@ -239,6 +240,58 @@ fn ready_occurrence_waits_for_the_caller_without_advancing_or_spending_work() {
     );
     assert_eq!(cursor.take_occurrence().unwrap().sequence, 1);
     assert!(cursor.take_occurrence().is_err());
+}
+
+#[test]
+fn rewinding_checked_edits_reuses_the_reserved_cursor() {
+    let probe = &PROBES[1];
+    let (table, edits, media_base, movie_base) = source(probe.input);
+    let pool = Budget::new(65536).unwrap();
+    let media: Vec<_> = common::roots(&pool, probe.input)
+        .unwrap()
+        .iter()
+        .filter(|root| root.header().kind == *b"mdat")
+        .map(|root| root.header().payload_range().unwrap())
+        .collect();
+    let tracks = [DemuxTrack {
+        track_id: 1,
+        table: &table,
+        fragments: &[],
+        media_base,
+        edits: Some((&edits, movie_base)),
+    }];
+    for only_required_storage in [false, true] {
+        let mut cursor = PacketCursor::new_complete_source(
+            &pool,
+            &tracks,
+            &media,
+            PacketLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+        )
+        .unwrap();
+        let cancel = AtomicBool::new(false);
+        let _reserve_for_open = only_required_storage.then(|| {
+            pool.reserve(pool.available() - size_of::<EditCursor<'_>>())
+                .unwrap()
+        });
+        cursor.enable_range_seek_checkpoints();
+        cursor.check_projections_before_replay().unwrap();
+        let mut work = WorkBudget::new(4096);
+        assert_eq!(cursor.poll(&mut work, &cancel), Ok(CursorStatus::End));
+
+        let _reservation = pool.reserve(pool.available()).unwrap();
+        cursor.rewind_at_end().unwrap();
+        for (&ordinal, &dts) in probe.samples.iter().zip(probe.dts) {
+            assert_eq!(cursor.poll(&mut work, &cancel), Ok(CursorStatus::Ready));
+            let packet = cursor.take_occurrence().unwrap();
+            assert_eq!(
+                (packet.source.ordinal, packet.demux.dts),
+                (ordinal, Some(dts))
+            );
+        }
+        assert_eq!(cursor.poll(&mut work, &cancel), Ok(CursorStatus::End));
+        assert_eq!(pool.available(), 0);
+    }
 }
 
 #[test]

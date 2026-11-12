@@ -69,13 +69,7 @@ impl Emitter {
     pub(super) fn new(plan: Plan, pool: &Budget) -> Self {
         let transcode = matches!(
             plan.span.encoding,
-            Encoding::Utf16Be
-                | Encoding::Utf16Le
-                | Encoding::Ascii
-                | Encoding::Latin1
-                | Encoding::Windows1251
-                | Encoding::Windows1252
-                | Encoding::Multibyte(_)
+            Encoding::Utf16Be | Encoding::Utf16Le | Encoding::Multibyte(_)
         );
         let cursor = transcode.then(|| Cursor::new(plan.span.decode.clone(), plan.span.encoding));
         let builder = transcode.then(|| BudgetVec::new(pool));
@@ -122,13 +116,7 @@ impl Emitter {
             }
         } else if matches!(
             encoding,
-            Encoding::Utf16Be
-                | Encoding::Utf16Le
-                | Encoding::Ascii
-                | Encoding::Latin1
-                | Encoding::Windows1251
-                | Encoding::Windows1252
-                | Encoding::Multibyte(_)
+            Encoding::Utf16Be | Encoding::Utf16Le | Encoding::Multibyte(_)
         ) {
             if !self.reserved {
                 if !work.try_charge(1) {

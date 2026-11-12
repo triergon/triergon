@@ -1,6 +1,6 @@
 //! Bounded carriage session.
 use super::document::Document;
-use super::{CallerClock, Limits, Operation, Packet, Snapshot, Status, Stream};
+use super::{CallerClock, Limits, Operation, Packet, Snapshot, Source, Status, Stream};
 use crate::text::{Format, Input};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Result, Time, TimeBase, WorkBudget};
@@ -9,7 +9,7 @@ use triergon_core::{Budget, BudgetVec, Error, Result, Time, TimeBase, WorkBudget
 pub struct Session {
     pool: Budget,
     limits: Limits,
-    pending: Option<Input>,
+    pending: Option<Source>,
     operation: Option<Operation>,
     document: Option<Document>,
     output: Option<Snapshot>,
@@ -56,17 +56,14 @@ fn validate_clock(input: &Input, clock: CallerClock) -> Result<()> {
     Ok(())
 }
 
-fn sample_codec(format: Format) -> Result<(i32, &'static str)> {
+fn sample_codec(format: Format) -> (i32, &'static str) {
     // Pinned public enum values/descriptor names from the observed reference ABI.
     // No decoder registry is consulted and no source codec-tag is rewritten.
     match format {
-        Format::Tx3g => Ok((94213, "mov_text")),
-        Format::Utf8Packet => Ok((94210, "text")),
-        Format::MatroskaWebVtt => Ok((94226, "webvtt")),
-        Format::OpaqueAss => Ok((94230, "ass")),
-        _ => Err(Error::Unsupported(
-            "sample carriage requires an explicit packet format",
-        )),
+        Format::Tx3g => (94213, "mov_text"),
+        Format::Utf8Packet => (94210, "text"),
+        Format::MatroskaWebVtt => (94226, "webvtt"),
+        Format::OpaqueAss => (94230, "ass"),
     }
 }
 
@@ -83,13 +80,43 @@ impl Session {
         }
     }
 
-    pub fn provide(&mut self, offered: &mut Option<Input>, operation: Operation) -> Result<()> {
+    pub fn provide(&mut self, offered: &mut Option<Source>, operation: Operation) -> Result<()> {
         if self.pending.is_some() || self.output.is_some() || self.ended {
             return Err(Error::Invalid("carriage input unavailable"));
         }
-        let input = offered
-            .as_ref()
-            .ok_or(Error::Invalid("empty carriage input"))?;
+        match (
+            offered
+                .as_ref()
+                .ok_or(Error::Invalid("empty carriage input"))?,
+            &operation,
+        ) {
+            (Source::Sample(input), Operation::Sample(clock)) => {
+                self.bound_sample(input)?;
+                validate_clock(input, *clock)?;
+                bound(1, self.limits.packets)?;
+                bound(input.payload.len(), self.limits.total_packet_bytes)?;
+            }
+            (Source::Document(document), Operation::Document { file_name, .. }) => {
+                bound(document.payload.len(), self.limits.payload_bytes)?;
+                bound(file_name.len(), self.limits.label_bytes)?;
+            }
+            (Source::Sample(_), Operation::Document { .. }) => {
+                return Err(Error::Unsupported(
+                    "document carriage requires a text document",
+                ));
+            }
+            (Source::Document(_), Operation::Sample(_)) => {
+                return Err(Error::Unsupported(
+                    "sample carriage requires an explicit packet format",
+                ));
+            }
+        }
+        self.pending = offered.take();
+        self.operation = Some(operation);
+        Ok(())
+    }
+
+    fn bound_sample(&self, input: &Input) -> Result<()> {
         bound(input.payload.len(), self.limits.payload_bytes)?;
         bound(
             input
@@ -112,26 +139,7 @@ impl Session {
         bound(
             input.addition.as_ref().map_or(0, |value| value.bytes.len()),
             self.limits.addition_bytes,
-        )?;
-        match &operation {
-            Operation::Sample(clock) => {
-                sample_codec(input.format)?;
-                validate_clock(input, *clock)?;
-                bound(1, self.limits.packets)?;
-                bound(input.payload.len(), self.limits.total_packet_bytes)?;
-            }
-            Operation::Document { file_name, .. } => {
-                if !matches!(input.format, Format::SubRip | Format::WebVtt) {
-                    return Err(Error::Unsupported(
-                        "document carriage requires a text document",
-                    ));
-                }
-                bound(file_name.len(), self.limits.label_bytes)?;
-            }
-        }
-        self.pending = offered.take();
-        self.operation = Some(operation);
-        Ok(())
+        )
     }
 
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
@@ -141,7 +149,7 @@ impl Session {
         if self.output.is_some() {
             return Ok(Status::NeedOutput);
         }
-        let Some(input) = self.pending.as_ref() else {
+        let Some(source) = self.pending.as_ref() else {
             return Ok(if self.ended {
                 Status::End
             } else {
@@ -152,12 +160,12 @@ impl Session {
             .operation
             .as_ref()
             .ok_or(Error::Invalid("missing carriage operation"))?;
-        let parts = match operation {
-            Operation::Sample(clock) => {
+        let parts = match (source, operation) {
+            (Source::Sample(input), Operation::Sample(clock)) => {
                 if !work.try_charge(1) {
                     return Ok(Status::Yield);
                 }
-                let (codec_id, codec_name) = sample_codec(input.format)?;
+                let (codec_id, codec_name) = sample_codec(input.format);
                 let clock_base = [clock.numerator, clock.denominator];
                 let stream = Stream {
                     index: 0,
@@ -199,10 +207,13 @@ impl Session {
                     error_code: None,
                 }
             }
-            Operation::Document {
-                discovery,
-                file_name,
-            } => {
+            (
+                Source::Document(document_input),
+                Operation::Document {
+                    discovery,
+                    file_name,
+                },
+            ) => {
                 if self.document.is_none() {
                     self.document = Some(Document::new(
                         &self.pool,
@@ -215,7 +226,7 @@ impl Session {
                     .document
                     .as_mut()
                     .ok_or(Error::Invalid("missing document state"))?;
-                if !document.advance(input, work, cancel)? {
+                if !document.advance(&document_input.payload, work, cancel)? {
                     return Ok(Status::Yield);
                 }
                 self.document
@@ -223,6 +234,7 @@ impl Session {
                     .ok_or(Error::Invalid("missing completed document"))?
                     .finish()?
             }
+            _ => return Err(Error::Invalid("carriage operation and input differ")),
         };
         let input = self
             .pending
@@ -250,7 +262,7 @@ impl Session {
     pub fn finish(&mut self) {
         self.ended = true;
     }
-    pub fn recover_pending(&mut self) -> Option<Input> {
+    pub fn recover_pending(&mut self) -> Option<Source> {
         self.document = None;
         self.operation = None;
         self.pending.take()

@@ -264,14 +264,12 @@ impl<'a> IndexCursor<'a> {
                     (
                         Some((previous_fragment, _)),
                         Some(previous),
-                        Some((fragment, current_run, flags)),
+                        Some((fragment, current_run, _)),
                     ) => {
                         fragment > previous_fragment
                             && current_run == 0
                             && previous.source_ordinal.checked_add(1)
                                 == Some(occurrence.source.ordinal)
-                            && previous.flags & 0x400 != 0
-                            && flags & 0x400 != 0
                     }
                     _ => false,
                 };
@@ -297,9 +295,14 @@ impl<'a> IndexCursor<'a> {
                     }
                     _ => false,
                 };
-                if !key
-                    && ((self.next == 0 && !self.recovery_initial_nonkey)
-                        || (run.is_some() && run != self.run && !continued_run && !starts_fragment))
+                let first_fragment_sample =
+                    self.next == 0 && source_run.is_some() && occurrence.source.ordinal == 1;
+                let starts_at_zero = key
+                    || starts_fragment
+                    || first_fragment_sample
+                    || (self.next == 0 && self.recovery_initial_nonkey);
+                if !starts_at_zero
+                    && (self.next == 0 || (run.is_some() && run != self.run && !continued_run))
                 {
                     return Err(Error::Unsupported(
                         "native index no-key append distance carry",
@@ -310,14 +313,13 @@ impl<'a> IndexCursor<'a> {
                 // 0,0,1. Keep the last emitted distance, carry it once at an
                 // accepted append boundary, then increment inside that run.
                 // Flag presence alone does not introduce a per-sample lag.
-                let distance =
-                    if key || starts_fragment || (self.next == 0 && self.recovery_initial_nonkey) {
-                        0
-                    } else if run.is_some() && run != self.run {
-                        self.distance
-                    } else {
-                        self.distance.checked_add(1).ok_or(Error::Overflow)?
-                    };
+                let distance = if starts_at_zero {
+                    0
+                } else if run.is_some() && run != self.run {
+                    self.distance
+                } else {
+                    self.distance.checked_add(1).ok_or(Error::Overflow)?
+                };
                 let raw_flag_bits = u8::from(key)
                     | if occurrence.demux.flags & 4 != 0 {
                         2
@@ -417,6 +419,7 @@ pub struct SeekJob<'a> {
     previous: Option<i64>,
     unordered_minimum: Option<i64>,
     scanned: u64,
+    allow_fragment_prefix: bool,
     ready: bool,
     failed: Option<Error>,
 }
@@ -492,6 +495,7 @@ impl<'a> SeekJob<'a> {
             previous: None,
             unordered_minimum: None,
             scanned: 0,
+            allow_fragment_prefix: false,
             ready: false,
             failed: None,
         })
@@ -525,9 +529,13 @@ impl<'a> SeekJob<'a> {
                         return Err(Error::Unsupported("native seek null index clock"));
                     }
                     if self.scanned == 0 {
-                        // A fragment edit shifts index entries at open. The seek
-                        // query receives the same shift before it searches them.
+                        // A fragment seek subtracts the media start from its
+                        // query. A leading empty edit delays index timestamps.
                         self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
+                        if entry.occurrence.source.fragment_flags.is_some() && entry.flags & 1 == 0
+                        {
+                            self.first = Some(entry.clone());
+                        }
                     }
                     if self.previous.is_some_and(|prior| entry.timestamp <= prior)
                         || self.unordered_minimum.is_some()
@@ -563,7 +571,12 @@ impl<'a> SeekJob<'a> {
                             "native seek overlapping index clock query",
                         ));
                     }
-                    if self.first.is_none() {
+                    if self.best.is_none()
+                        && self
+                            .first
+                            .as_ref()
+                            .is_none_or(|entry| entry.flags & 1 == 0 && !self.allow_fragment_prefix)
+                    {
                         return Err(Error::Unsupported("native seek no observed key fallback"));
                     }
                     self.ready = true;
@@ -1074,7 +1087,11 @@ impl<'a> GlobalSeekJob<'a> {
                     None => timestamp,
                 }
             };
-            self.child = Some(SeekJob::build(self.track_context(self.at), timestamp)?);
+            // Before the first sync on a secondary fragment track, a fresh
+            // range still has its leading non-sync packets available to replay.
+            let mut child = SeekJob::build(self.track_context(self.at), timestamp)?;
+            child.allow_fragment_prefix = true;
+            self.child = Some(child);
         }
     }
     pub fn finish(mut self) -> Result<GlobalSeekPlan<'a>> {

@@ -489,6 +489,83 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (145, 35_398, 5_283_456_504_139_288_625),
         ),
     ]);
+    let program_file = "avc-aac-program.mov";
+    let program_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(program_file);
+    let program =
+        fs::read(&program_seed).map_err(|error| format!("{}: {error}", program_seed.display()))?;
+    if sha256::hex(&program) != "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9" {
+        return Err("AAC program range seed changed".into());
+    }
+    write(&output.join(program_file), &program)?;
+    cases.extend([
+        mp4_range_case(
+            "aac-program-open",
+            program_file,
+            &program,
+            [],
+            (174, 91_514, 9_360_453_060_203_789_492),
+        ),
+        mp4_range_case(
+            "aac-program-seek",
+            program_file,
+            &program,
+            ["24000"],
+            (102, 54_337, 7_863_734_754_543_817_612),
+        ),
+    ]);
+    for (name, hash, folds) in [
+        (
+            "fragmented-subtitles",
+            "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+            [
+                (229, 47_344, 17_268_720_163_590_035_113),
+                (229, 47_344, 17_268_720_163_590_035_113),
+                (172, 35_623, 9_383_543_265_607_670_677),
+                (60, 11_998, 2_935_735_271_173_150_781),
+            ],
+        ),
+        (
+            "fragmented-subtitle-edit",
+            "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+            [
+                (228, 47_342, 4_913_362_454_912_207_988),
+                (228, 47_342, 4_913_362_454_912_207_988),
+                (173, 35_629, 17_500_664_033_615_905_035),
+                (61, 12_004, 15_718_313_594_074_699_357),
+            ],
+        ),
+    ] {
+        let file = format!("{name}.mp4");
+        let source = paths
+            .root
+            .join("crates/playback/tests/fixtures/mp4")
+            .join(&file);
+        let bytes = fs::read(&source).map_err(|error| format!("{}: {error}", source.display()))?;
+        if sha256::hex(&bytes) != hash {
+            return Err(format!("Fragmented subtitle range seed changed: {file}"));
+        }
+        write(&output.join(&file), &bytes)?;
+        for ((operation, target), expected) in [
+            ("open", None),
+            ("seek-start", Some("0")),
+            ("seek-during-cue", Some("24576")),
+            ("seek-after-cue", Some("60000")),
+        ]
+        .into_iter()
+        .zip(folds)
+        {
+            cases.push(mp4_range_case(
+                &format!("{name}-{operation}"),
+                &file,
+                &bytes,
+                target,
+                expected,
+            ));
+        }
+    }
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",

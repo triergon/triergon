@@ -224,29 +224,6 @@
       }
     },
     {
-      "id": "vobsub-palette-option",
-      "profile": "vobsub-palette-option",
-      "file": "dvd/basic.idx",
-      "sha256": "04a85b44cdc986ee47ee3f05ddfe079b9022c474400827a2ed2a6d9bb578ef9d",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvd_streams.py",
-      "arguments": [
-        "dvd",
-        "opt:palette=112233,445566,778899,aabbcc,0xddeeff,AbCdEf, 102030 ,1122334455"
-      ],
-      "companions": [
-        {
-          "file": "dvd/basic.sub",
-          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
-        }
-      ],
-      "expected": {
-        "packets": 12,
-        "bytes": 56142,
-        "digest": 16769323122748600814
-      }
-    },
-    {
       "id": "vobsub-palette-option-short",
       "profile": "vobsub-palette-option-short",
       "file": "dvd/basic.idx",
@@ -4270,6 +4247,50 @@
         "packets": 1,
         "bytes": 112,
         "digest": 4419488657075856610
+      }
+    },
+    {
+      "id": "vobsub-idx-size-zero",
+      "profile": "vobsub-idx-size-zero",
+      "file": "dvd/idx-size-zero.idx",
+      "sha256": "06290d0d2c4991e9276c0ada567a790f55fe5aaa6f46f7175d300e36a656bdf3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-size-zero.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 18446744073709551615
+      }
+    },
+    {
+      "id": "vobsub-idx-delay-forms",
+      "profile": "vobsub-idx-delay-forms",
+      "file": "dvd/idx-delay-forms.idx",
+      "sha256": "37a31311fdbaf60b70e323f47f7227defa919f312f43bd39953a7d5a504dcd45",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-delay-forms.sub",
+          "sha256": "d2917def4c0a5720b80ce1525f697aadc546ebaa6ea0abd19e547a299fa5531d"
+        }
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 56142,
+        "digest": 1205403688077255163
       }
     },
     {

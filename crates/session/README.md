@@ -49,10 +49,12 @@ scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-onl
 SIMD kernels.
 
 Use `TrackDecoder::aac_access_units_in` to decode raw AAC-LC from a checked
-AudioSpecificConfig. `TrackDecoder::aac_access_units_with_layout_in` accepts
-`compat::aac::Policy::ConventionalSurround` for the conventional speaker mapping.
-With parsed configuration facts, `AacAccessUnitConfig::decoder_with_layout_in`
-builds the same decoder for an audio session.
+AudioSpecificConfig with a fixed layout or a Program Configuration Element.
+`TrackDecoder::aac_access_units_with_layout_in` accepts
+`compat::aac::Policy::ConventionalSurround` for fixed layouts. Call
+`TrackDecoder::into_decoder` to use the configured decoder in an audio session.
+With parsed facts for a fixed layout, `AacAccessUnitConfig::decoder_with_layout_in`
+also builds a decoder for an audio session.
 
 ## Supported
 
@@ -66,7 +68,7 @@ builds the same decoder for an audio session.
 configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). The
 generic AAC track decoder takes ADTS. For raw packets, call
 `TrackDecoder::aac_access_units_in` with the AudioSpecificConfig of the packet's
-sample description. Callers with parsed ASC facts can construct an
+sample description. Callers with parsed facts for a fixed layout can construct an
 `AacAccessUnitConfig` and build the same decoder for an `AudioSession`.
 `TrackDecoder::decode(packet, frame)` drops what the container marks for
 discarding: the packet's `Trim`, samples before time zero (Matroska CodecDelay, Ogg

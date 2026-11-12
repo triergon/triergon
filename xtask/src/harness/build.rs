@@ -535,6 +535,10 @@ struct ProfileReference {
     packages: &'static [&'static str],
     /// Compiler options before the source file.
     options: &'static [&'static str],
+    /// C library functions linked with `--wrap`: the source defines each
+    /// `__wrap_` entry point, and every call of the function in the source and
+    /// the pinned archives goes through it.
+    wrapped: &'static [&'static str],
     /// Whether the build answers `identity -` (the container builds do; the
     /// decode, capture and font builds record their configuration in the profile's
     /// `build.json` instead).
@@ -587,6 +591,7 @@ const REFERENCE: ProfileReference = ProfileReference {
     libraries: "",
     packages: &[],
     options: RELEASE_OPTIONS,
+    wrapped: &[],
     identity: false,
     prepared: None,
     generated: None,
@@ -604,7 +609,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 13] = [
+const PROFILE_REFERENCES: [ProfileReference; 14] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -636,6 +641,36 @@ const PROFILE_REFERENCES: [ProfileReference; 13] = [
         record: "ffmpeg-subtitles-native",
         kind: "pinned FFmpeg subtitle decoders with libzvbi and the video decoders closed captions need; subtitle decode operations",
         libraries: "subtitles_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        // The calls whose result can differ between the targets, so that the
+        // worker flags the folds that reach such a result
+        // (`harness/reference_subtitles_host.h`).
+        wrapped: &[
+            "strtol",
+            "strtoul",
+            "__isoc23_strtol",
+            "__isoc23_strtoul",
+            "__isoc99_sscanf",
+            "lrint",
+            "lrintf",
+            "lround",
+            "llrint",
+            "llrintf",
+        ],
+        identity: true,
+        // Its wrappers run inside the timed operation, so it is never timed or
+        // measured; `ffmpeg-subtitles-plain-native` is.
+        instrumented: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-subtitles",
+        binary: "ffmpeg-subtitles-plain-worker",
+        define: Some("-DTRIERGON_SUBTITLE_PLAIN_REFERENCE=1"),
+        record: "ffmpeg-subtitles-plain-native",
+        kind: "the subtitles reference without its flagging wrappers; the timing and memory reference of the subtitle decode features",
+        libraries: "subtitles_plain_reference",
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
         identity: true,
@@ -901,6 +936,12 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         if let Some(define) = reference.define {
             command.push(define.into());
         }
+        command.extend(
+            reference
+                .wrapped
+                .iter()
+                .map(|name| format!("-Wl,--wrap={name}")),
+        );
         if let Some(generate) = reference.generated {
             // A system directory, as the pinned tree's own is: libass's code is
             // compiled with its own warnings.
@@ -1357,6 +1398,11 @@ mod tests {
         let error =
             |reference, measurement| measurement_reference_error(&contract(reference, measurement));
         assert_eq!(error("libass-ass-native", "libass-player-native"), None);
+        assert_eq!(
+            error("ffmpeg-subtitles-native", "ffmpeg-subtitles-plain-native"),
+            None
+        );
+        assert!(error("ffmpeg-subtitles-plain-native", "ffmpeg-subtitles-native").is_some());
         assert!(error("libass-ass-native", "libass-ass-native").is_some());
         assert!(error("libass-native", "libass-player-native").is_some());
         assert!(error("libass-ass-native", "freetype-native").is_some());

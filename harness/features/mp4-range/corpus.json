@@ -556,6 +556,150 @@
         "bytes": 35398,
         "digest": 5283456504139288625
       }
+    },
+    {
+      "id": "aac-program-open",
+      "profile": "aac-program-open",
+      "file": "avc-aac-program.mov",
+      "sha256": "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 174,
+        "bytes": 91514,
+        "digest": 9360453060203789492
+      }
+    },
+    {
+      "id": "aac-program-seek",
+      "profile": "aac-program-seek",
+      "file": "avc-aac-program.mov",
+      "sha256": "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "24000"
+      ],
+      "expected": {
+        "packets": 102,
+        "bytes": 54337,
+        "digest": 7863734754543817612
+      }
+    },
+    {
+      "id": "fragmented-subtitles-open",
+      "profile": "fragmented-subtitles-open",
+      "file": "fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 229,
+        "bytes": 47344,
+        "digest": 17268720163590035113
+      }
+    },
+    {
+      "id": "fragmented-subtitles-seek-start",
+      "profile": "fragmented-subtitles-seek-start",
+      "file": "fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "0"
+      ],
+      "expected": {
+        "packets": 229,
+        "bytes": 47344,
+        "digest": 17268720163590035113
+      }
+    },
+    {
+      "id": "fragmented-subtitles-seek-during-cue",
+      "profile": "fragmented-subtitles-seek-during-cue",
+      "file": "fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "24576"
+      ],
+      "expected": {
+        "packets": 172,
+        "bytes": 35623,
+        "digest": 9383543265607670677
+      }
+    },
+    {
+      "id": "fragmented-subtitles-seek-after-cue",
+      "profile": "fragmented-subtitles-seek-after-cue",
+      "file": "fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "60000"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 11998,
+        "digest": 2935735271173150781
+      }
+    },
+    {
+      "id": "fragmented-subtitle-edit-open",
+      "profile": "fragmented-subtitle-edit-open",
+      "file": "fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 228,
+        "bytes": 47342,
+        "digest": 4913362454912207988
+      }
+    },
+    {
+      "id": "fragmented-subtitle-edit-seek-start",
+      "profile": "fragmented-subtitle-edit-seek-start",
+      "file": "fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "0"
+      ],
+      "expected": {
+        "packets": 228,
+        "bytes": 47342,
+        "digest": 4913362454912207988
+      }
+    },
+    {
+      "id": "fragmented-subtitle-edit-seek-during-cue",
+      "profile": "fragmented-subtitle-edit-seek-during-cue",
+      "file": "fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "24576"
+      ],
+      "expected": {
+        "packets": 173,
+        "bytes": 35629,
+        "digest": 17500664033615905035
+      }
+    },
+    {
+      "id": "fragmented-subtitle-edit-seek-after-cue",
+      "profile": "fragmented-subtitle-edit-seek-after-cue",
+      "file": "fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "60000"
+      ],
+      "expected": {
+        "packets": 61,
+        "bytes": 12004,
+        "digest": 15718313594074699357
+      }
     }
   ]
 }

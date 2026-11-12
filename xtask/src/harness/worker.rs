@@ -182,12 +182,38 @@ pub fn run_in(
 
 /// Candidate invocations recorded for trace identities: the worker whose calls
 /// are recorded, and each call's arguments, exit code and stdout digest.
-static RECORDER: std::sync::Mutex<Option<(PathBuf, Vec<Value>)>> = std::sync::Mutex::new(None);
+struct Recorder {
+    worker: PathBuf,
+    calls: Vec<Value>,
+    argument_aliases: Vec<(OsString, OsString)>,
+}
+
+static RECORDER: std::sync::Mutex<Option<Recorder>> = std::sync::Mutex::new(None);
 
 /// Record every later invocation of `worker` until [`stop_recording`].
 pub fn record_calls(worker: &Path) {
     if let Ok(mut slot) = RECORDER.lock() {
-        *slot = Some((worker.to_path_buf(), Vec::new()));
+        *slot = Some(Recorder {
+            worker: worker.to_path_buf(),
+            calls: Vec::new(),
+            argument_aliases: Vec::new(),
+        });
+    }
+}
+
+/// Record the declared spelling of a resolved corpus argument for this case.
+pub(super) fn record_argument_aliases(actual: &[OsString], declared: &[OsString]) {
+    if let Ok(mut slot) = RECORDER.lock()
+        && let Some(recorder) = slot.as_mut()
+    {
+        recorder.argument_aliases.clear();
+        recorder.argument_aliases.extend(
+            actual
+                .iter()
+                .zip(declared)
+                .filter(|(actual, declared)| actual != declared)
+                .map(|(actual, declared)| (actual.clone(), declared.clone())),
+        );
     }
 }
 
@@ -196,15 +222,15 @@ pub fn stop_recording() -> Vec<Value> {
         .lock()
         .ok()
         .and_then(|mut slot| slot.take())
-        .map(|(_, calls)| calls)
+        .map(|recorder| recorder.calls)
         .unwrap_or_default()
 }
 
 /// A recorded candidate run: no timeout, and only status, exit code and output.
 fn recorded(argv: &[OsString]) -> Option<Value> {
     let mut slot = RECORDER.lock().ok()?;
-    let (worker, calls) = slot.as_mut()?;
-    if fs::canonicalize(&argv[0]).ok().as_deref() != Some(worker.as_path()) {
+    let recorder = slot.as_mut()?;
+    if fs::canonicalize(&argv[0]).ok().as_deref() != Some(recorder.worker.as_path()) {
         return None;
     }
     let finished = match run(argv, &[], Duration::from_secs(u64::MAX / 4)) {
@@ -219,10 +245,16 @@ fn recorded(argv: &[OsString]) -> Option<Value> {
                 |n| n.to_string_lossy().into_owned(),
             )
         } else {
-            a.to_string_lossy().into_owned()
+            recorder
+                .argument_aliases
+                .iter()
+                .find(|(actual, _)| actual == a)
+                .map_or(a, |(_, declared)| declared)
+                .to_string_lossy()
+                .into_owned()
         }
     });
-    calls.push(Value::object([
+    recorder.calls.push(Value::object([
         ("argv", Value::strings(shown)),
         ("exit", Value::int(finished.code)),
         (

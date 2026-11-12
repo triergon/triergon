@@ -14,6 +14,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 FILES = {}
 CASES = []
+# SubRip and WebVTT documents: inputs of the subtitle-text comparison and of the
+# carriage view, authored here; no reader of this crate has their expected values.
+DOCUMENTS = []
 
 
 def put(path, data):
@@ -40,8 +43,7 @@ def cue(raw, text, value, start=None, end=None, encoding="Utf8", **extra):
 
 
 def case(name, fmt, payload, events=None, error=None, encoding="Utf8", **extra):
-    suffix = {"SubRip": "srt", "WebVtt": "vtt", "Tx3g": "tx3g",
-              "Utf8Packet": "txt", "MatroskaWebVtt": "block",
+    suffix = {"Tx3g": "tx3g", "Utf8Packet": "txt", "MatroskaWebVtt": "block",
               "OpaqueAss": "ass-packet"}[fmt]
     item = dict(id=name, format=fmt, encoding=encoding,
                 input=put(f"input/{name}.{suffix}", payload), events=events,
@@ -69,62 +71,36 @@ class Document:
     def __init__(self, encoding="Utf8", byte_order="be", bom=False, eol="\n"):
         self.encoding = encoding
         self.codec = "utf-8" if encoding == "Utf8" else f"utf-16-{byte_order}"
-        self.effective = "Utf8" if encoding == "Utf8" else "Utf16" + byte_order.title()
         self.data = bytearray()
-        self.events = []
         self.eol = eol
         if bom:
             self.data.extend(b"\xef\xbb\xbf" if encoding == "Utf8" else
                              b"\xfe\xff" if byte_order == "be" else b"\xff\xfe")
 
     def add(self, value):
-        begin = len(self.data)
         self.data.extend(value.encode(self.codec))
-        return [begin, len(self.data)]
 
     def srt(self, number, first, last, text, lex_first=None, lex_last=None):
-        begin = len(self.data)
-        identifier = self.add(str(number))
-        self.add(self.eol)
+        self.add(str(number) + self.eol)
         self.add((lex_first or stamp(first, comma=True)) + " --> " +
                  (lex_last or stamp(last, comma=True)) + self.eol)
-        span = self.add(text)
-        self.events.append(cue([begin, span[1]], span, text, first, last,
-                               self.effective,
-                               identifier=dict(owner="Payload", range=identifier)))
-        self.add(self.eol + self.eol)
+        self.add(text + self.eol + self.eol)
 
     def header(self, comment=""):
-        self.add("WEBVTT" + comment)
-        self.events.append(dict(kind="Header", raw=[0, len(self.data)]))
-        self.add(self.eol + self.eol)
+        self.add("WEBVTT" + comment + self.eol + self.eol)
 
     def metadata(self, kind, body):
-        span = self.add(body)
-        self.events.append(dict(kind=kind, raw=span))
-        self.add(self.eol + self.eol)
+        self.add(body + self.eol + self.eol)
 
     def vtt(self, first, last, text, identifier=None, settings=None,
             lex_first=None, lex_last=None, separator=" "):
-        begin = len(self.data)
-        identifier_span = None
         if identifier is not None:
-            identifier_span = self.add(identifier)
-            self.add(self.eol)
+            self.add(identifier + self.eol)
         self.add((lex_first or stamp(first)) + separator + "-->" + separator +
                  (lex_last or stamp(last)))
-        settings_span = None
         if settings is not None:
-            self.add(" ")
-            settings_span = self.add(settings)
-        self.add(self.eol)
-        span = self.add(text)
-        self.events.append(cue([begin, span[1]], span, text, first, last,
-                               identifier=None if identifier_span is None else
-                               dict(owner="Payload", range=identifier_span),
-                               settings=None if settings_span is None else
-                               dict(owner="Payload", range=settings_span)))
-        self.add(self.eol + self.eol)
+            self.add(" " + settings)
+        self.add(self.eol + text + self.eol + self.eol)
 
 
 def stamp(ms, comma=False):
@@ -134,9 +110,13 @@ def stamp(ms, comma=False):
     return f"{hours:02}:{minutes:02}:{seconds:02}{',' if comma else '.'}{millis:03}"
 
 
+def document_input(name, fmt, payload):
+    suffix = {"SubRip": "srt", "WebVtt": "vtt"}[fmt]
+    DOCUMENTS.append(dict(id=name, format=fmt, input=put(f"input/{name}.{suffix}", payload)))
+
+
 def document_case(name, fmt, document, **extra):
-    return case(name, fmt, bytes(document.data), document.events,
-                encoding=document.encoding, **extra)
+    document_input(name, fmt, bytes(document.data))
 
 
 def author_srt():
@@ -166,15 +146,14 @@ def author_srt():
         document = Document(encoding, byte_order, bom)
         document.srt(1, 12, 1012, value)
         document_case(name, "SubRip", document)
-    for name, payload, error, encoding in [
-        ("srt-end-before-start", b"1\n00:00:02,000 --> 00:00:01,000\nx\n\n", "Invalid", "Utf8"),
-        ("srt-sequence-missing", b"00:00:01,000 --> 00:00:02,000\nx\n\n", "Invalid", "Utf8"),
-        ("srt-fraction-width", b"1\n00:00:01,00 --> 00:00:02,000\nx\n\n", "Invalid", "Utf8"),
-        ("srt-overlong-utf8", b"1\n00:00:01,000 --> 00:00:02,000\n\xc0\xaf\n\n", "Invalid", "Utf8"),
-        ("srt-lone-surrogate", b"\xfe\xff" + "1\n00:00:01,000 --> 00:00:02,000\n".encode("utf-16-be") + b"\xd8\x00\x00\n\x00\n", "Invalid", "Utf16Bom"),
+    for name, payload in [
+        ("srt-end-before-start", b"1\n00:00:02,000 --> 00:00:01,000\nx\n\n"),
+        ("srt-sequence-missing", b"00:00:01,000 --> 00:00:02,000\nx\n\n"),
+        ("srt-fraction-width", b"1\n00:00:01,00 --> 00:00:02,000\nx\n\n"),
+        ("srt-overlong-utf8", b"1\n00:00:01,000 --> 00:00:02,000\n\xc0\xaf\n\n"),
+        ("srt-lone-surrogate", b"\xfe\xff" + "1\n00:00:01,000 --> 00:00:02,000\n".encode("utf-16-be") + b"\xd8\x00\x00\n\x00\n"),
     ]:
-        case(name, "SubRip", payload, error=error, encoding=encoding,
-             classification="malformed within declared strict SubRip ingestion profile")
+        document_input(name, "SubRip", payload)
 
 
 def author_vtt():
@@ -235,17 +214,14 @@ def author_vtt():
     document = Document()
     document.header()
     document_case("vtt-empty-document", "WebVtt", document)
-    for name, payload, error, encoding in [
-        ("vtt-bad-signature", b"WEBVTTX\n\n", "Invalid", "Utf8"),
-        ("vtt-utf16-refused", "WEBVTT\n\n".encode("utf-16-be"), "Invalid", "Utf16Be"),
-        ("vtt-zero-interval-strict", b"WEBVTT\n\n00:01.000 --> 00:01.000\nx\n\n", "Invalid", "Utf8"),
-        ("vtt-surrogate-utf8", b"WEBVTT\n\n00:01.000 --> 00:02.000\n\xed\xa0\x80\n\n", "Invalid", "Utf8"),
-        ("vtt-missing-fraction", b"WEBVTT\n\n00:01 --> 00:02\nx\n\n", "Invalid", "Utf8"),
+    for name, payload in [
+        ("vtt-bad-signature", b"WEBVTTX\n\n"),
+        ("vtt-utf16-refused", "WEBVTT\n\n".encode("utf-16-be")),
+        ("vtt-zero-interval-strict", b"WEBVTT\n\n00:01.000 --> 00:01.000\nx\n\n"),
+        ("vtt-surrogate-utf8", b"WEBVTT\n\n00:01.000 --> 00:02.000\n\xed\xa0\x80\n\n"),
+        ("vtt-missing-fraction", b"WEBVTT\n\n00:01 --> 00:02\nx\n\n"),
     ]:
-        prefix = [dict(kind="Header", raw=[0, 6])] if name in (
-            "vtt-zero-interval-strict", "vtt-missing-fraction") else []
-        case(name, "WebVtt", payload, events=prefix, error=error, encoding=encoding,
-             classification="strict ingestion error; not a claim about user-agent recovery")
+        document_input(name, "WebVtt", payload)
 
 
 def box(kind, body):
@@ -398,7 +374,7 @@ def rust_cases():
         if item["events"]:
             lines.append("        events: &[")
         for event in item["events"] or []:
-            lines.append("            ExpectedEvent { kind: ExpectedKind::" + event["kind"] + ",")
+            lines.append("            ExpectedEvent {")
             for field in ("raw", "text"):
                 pair = event.get(field, [0, 0])
                 lines.append(f"                {field}: ({pair[0]}, {pair[1]}),")
@@ -437,7 +413,7 @@ def main():
     author_vtt()
     author_tx3g()
     author_packets()
-    assert len(CASES) == 72, len(CASES)
+    assert (len(CASES), len(DOCUMENTS)) == (40, 32), (len(CASES), len(DOCUMENTS))
     # Rust include paths in fixtures/cases.rs are relative to that file.
     rust_cases()
     for path in list(FILES):
@@ -446,6 +422,7 @@ def main():
     manifest = dict(schema="m05-original-text-source-fixtures-v1",
                     provenance="Original lane-authored components and expected source facts; no decoder output used",
                     cases=CASES,
+                    documents=DOCUMENTS,
                     files=[dict(path=path, bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
                            for path, data in sorted(FILES.items())])
     FILES["fixtures/manifest.json"] = (json.dumps(manifest, ensure_ascii=True, indent=2) + "\n").encode()
@@ -456,7 +433,7 @@ def main():
             target.write_bytes(data)
         elif not target.exists() or target.read_bytes() != data:
             raise SystemExit(f"authored bytes differ: {path}")
-    print(json.dumps(dict(cases=len(CASES), files=len(FILES),
+    print(json.dumps(dict(cases=len(CASES), documents=len(DOCUMENTS), files=len(FILES),
                           operation="write" if args.write else "reconstruct-check",
                           native_or_rust_executed=False)))
 

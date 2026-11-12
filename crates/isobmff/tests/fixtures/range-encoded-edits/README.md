@@ -21,6 +21,18 @@ movie timescale of 48,000, so the edit duration converts exactly to media ticks.
 [ETSI TS 102 366, Annex F](https://www.etsi.org/deliver/etsi_ts/102300_102399/102366/01.04.01_60/ts_102366v010401p.pdf).
 [QuickTime language code values](https://developer.apple.com/documentation/quicktime-file-format/language_code_values).
 
+`aac-program-edit.mov` uses two generated tones and the repository licence.
+Its channel configuration is zero, with a stereo Program Configuration Element
+in AudioSpecificConfig. The edit skips 1,024 samples at the start. The test checks
+all nine packet records and the trim against the packet view. Its SHA-256 is
+`0042a7fcaa5815e7541c61ce569a66e3cfeb547861123e5554ca6ea453c16e73`.
+
+```sh
+ffmpeg -nostdin -f lavfi -i 'aevalsrc=0.13*sin(2*PI*440*t)|0.13*sin(2*PI*523*t):s=48000:c=stereo' \
+  -frames:a 8 -c:a aac -aac_pce 1 -b:a 64k -threads:a 1 -flags:a +bitexact -fflags +bitexact \
+  -use_editlist 1 -movie_timescale 48000 aac-program-edit.mov
+```
+
 `avc-opus-edit.mp4` is an authored sine and test pattern, with the same licence
 as the repository. The Matroska intermediate gives the MP4 sample table unequal
 first and last audio durations. The edit trims 336 samples, while `dOps` records

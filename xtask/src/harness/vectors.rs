@@ -3,16 +3,19 @@
 //! the pinned source tree. Samples stay in the ignored cache; running them is
 //! local testing, not permission to redistribute them.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::acceptance::acceptance;
-use super::comparison::{reference_named, reference_record, reference_summary};
+use super::comparison::{reference_record, reference_summary};
 use super::gate_build;
 use super::parity::{self, Run};
 use super::provenance::source_identity_error;
-use super::report::{PrefixFeature, case_arguments, expected_for, gate_target};
+use super::report::{
+    PrefixFeature, case_arguments, expected_for, gate_target, resolved_case_arguments,
+};
 use super::timing::{Operation, Work, benchmark};
 use crate::checks::read_json;
 use crate::corpus::write_json;
@@ -443,6 +446,7 @@ pub fn trace_identities(
     candidate: &Path,
     output: &Path,
     compare: Option<&Path>,
+    corpora: &BTreeMap<String, PathBuf>,
 ) -> R<i32> {
     let candidate =
         fs::canonicalize(candidate).map_err(|e| format!("{}: {e}", candidate.display()))?;
@@ -450,7 +454,7 @@ pub fn trace_identities(
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let features = PrefixFeature::registered(root, &name)?;
+    let features = PrefixFeature::registered(root, &name, corpora)?;
     let identity = read_json(&root.join("target/harness/identity.json"))?;
     let native = root.join("target/harness/ffmpeg-worker");
     let scratch = std::env::temp_dir().join(format!("triergon-traces-{}", std::process::id()));
@@ -684,14 +688,10 @@ fn prefix_traces(
 ) -> R<()> {
     let target = gate_target();
     for feature in features {
-        let reference = reference_named(identity, &feature.reference)?;
-        let reference = root.join(s(&reference, "path").unwrap_or_default());
+        let reference = feature.reference_worker(root, identity)?;
         for case in &feature.cases {
             let id = s(case, "id").unwrap_or_default();
-            let path = feature.input(case)?;
-            if Some(sha(&path)?.as_str()) != s(case, "sha256") {
-                return Err(format!("input changed: {}", path.display()));
-            }
+            let path = feature.verified_input(case)?;
             let run = Run {
                 root,
                 candidate,
@@ -701,10 +701,13 @@ fn prefix_traces(
                 timeout: feature.timeout,
             };
             let expected = expected_for(case, &target).unwrap_or(&Value::Null);
+            let declared = case_arguments(case);
+            let arguments = resolved_case_arguments(&feature.corpus, case, declared.clone())?;
+            super::worker::record_argument_aliases(&arguments, &declared);
             let result = parity::feed_parity(
                 &run,
                 &feature.prefix,
-                &case_arguments(case),
+                &arguments,
                 expected,
                 &feature.work_fields,
                 feature.per_target,
@@ -722,6 +725,77 @@ fn prefix_traces(
 mod tests {
     use super::*;
     use std::cell::RefCell;
+
+    #[test]
+    fn prefix_traces_require_the_reference_and_secondary_input_pins() {
+        let root = crate::walk::scratch("prefix-traces");
+        let corpus = root.join("relocated");
+        fs::create_dir(&corpus).unwrap();
+        fs::write(root.join("reference"), b"reference").unwrap();
+        fs::write(corpus.join("first"), b"first").unwrap();
+        let input = crate::sha256::hex(b"first");
+        let secondary = crate::sha256::hex(b"original");
+        let identity = |pin: &str| {
+            crate::json::parse(&format!(
+                r#"{{"comparison_references":{{"reference":{{"path":"reference","sha256":"{pin}"}}}}}}"#,
+            ))
+            .unwrap()
+        };
+        for (prefix, inputs, mismatch) in [
+            (
+                "ts-",
+                format!(
+                    r#""arguments":["188","1","next"],"entities":[{{"file":"first","sha256":"{input}"}},{{"file":"next","sha256":"{secondary}"}}]"#,
+                ),
+                "entity-hash-mismatch",
+            ),
+            (
+                "sub-",
+                format!(r#""companions":[{{"file":"next","sha256":"{secondary}"}}]"#),
+                "companion-hash-mismatch",
+            ),
+        ] {
+            let case = crate::json::parse(&format!(
+                r#"{{"id":"case","file":"first","sha256":"{input}",{inputs}}}"#,
+            ))
+            .unwrap();
+            let features = [PrefixFeature {
+                id: "feature".into(),
+                prefix: prefix.into(),
+                candidate: "candidate".into(),
+                reference: "reference".into(),
+                contract: root.join("contract.json"),
+                manifest: root.join("corpus.json"),
+                cases: vec![case],
+                corpus: corpus.clone(),
+                work_fields: vec![],
+                timeout: super::super::worker::DEFAULT_TIMEOUT,
+                per_target: false,
+            }];
+            let run = |identity: &Value| {
+                prefix_traces(
+                    &root,
+                    &root.join("candidate"),
+                    &features,
+                    identity,
+                    &root.join("raw"),
+                    &mut Vec::new(),
+                )
+                .unwrap_err()
+            };
+            fs::write(corpus.join("next"), b"changed").unwrap();
+            assert_eq!(
+                run(&identity(&"0".repeat(64))),
+                "reference changed since build identity; rebuild"
+            );
+            assert_eq!(
+                run(&identity(&crate::sha256::hex(b"reference"))),
+                format!("feature/case: {mismatch}")
+            );
+        }
+        assert!(!root.join("raw").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     struct Fake {
         parity: Option<&'static str>,
