@@ -4272,6 +4272,94 @@
       }
     },
     {
+      "id": "vobsub-idx-size-largest",
+      "profile": "vobsub-idx-size-largest",
+      "file": "dvd/idx-size-largest.idx",
+      "sha256": "79bb3317893b4933d1da36607d57cd2844f729f3e4debfd7d030fb81433c1b96",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-size-largest.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 112,
+        "digest": 3709003682102700352
+      }
+    },
+    {
+      "id": "vobsub-idx-size-past-largest",
+      "profile": "vobsub-idx-size-past-largest",
+      "file": "dvd/idx-size-past-largest.idx",
+      "sha256": "6836812b65abdfdee623c3fee7ebbc0ad9b5907382b073ca751c491dcecb1d88",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-size-past-largest.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 18446744073709551615
+      }
+    },
+    {
+      "id": "vobsub-idx-size-widest",
+      "profile": "vobsub-idx-size-widest",
+      "file": "dvd/idx-size-widest.idx",
+      "sha256": "999a654949f95bf4d23c84beb32b515bf2e9a73aba4841e6fbfbfe0e2552d9a4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-size-widest.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 112,
+        "digest": 3709003682102700352
+      }
+    },
+    {
+      "id": "vobsub-idx-size-past-widest",
+      "profile": "vobsub-idx-size-past-widest",
+      "file": "dvd/idx-size-past-widest.idx",
+      "sha256": "6a2d3232d14913f46cbfb1245b93d364cb256e46b7b168db006855486c347677",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvd_streams.py",
+      "arguments": [
+        "dvd"
+      ],
+      "companions": [
+        {
+          "file": "dvd/idx-size-past-widest.sub",
+          "sha256": "34e3b94203b15d12d8fc0ce566f7afb9c22557b1daf9735d2a07dd40a47b4672"
+        }
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 18446744073709551615
+      }
+    },
+    {
       "id": "vobsub-idx-delay-forms",
       "profile": "vobsub-idx-delay-forms",
       "file": "dvd/idx-delay-forms.idx",
