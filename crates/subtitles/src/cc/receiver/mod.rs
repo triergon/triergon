@@ -4,17 +4,52 @@
 //! field's byte pairs, runs them through a two-screen caption memory and reports
 //! each caption it finishes as one ASS event line.
 //!
-//! **Buffered mode** (the default) reports a caption once its display ends:
-//! erase displayed memory, end of caption and a roll-up carriage return each
-//! take a snapshot of the displayed screen. In paint-on, roll-up and text modes
-//! a snapshot is reported at once, timed from the previous snapshot to now. In
-//! pop-on mode the receiver reports the snapshot before it instead, so a caption
-//! shown by one end of caption is reported by the next. The empty packet that
-//! drains the receiver reports the snapshot still waiting.
+//! **Repeated control codes.** CEA-608 sends each control code twice, and a
+//! receiver acts on the first and ignores the identical repeat (47 CFR
+//! 15.119(h)(2)(i)(4)). The receiver ignores a control code (first byte `0x10`
+//! to `0x1F`) equal to the pair before it however often it repeats, also
+//! across packets: a special character sent five times in a row is written
+//! once. Any other pair ends the repetition: characters (including a first
+//! byte failing parity, written as a block), an XDS pair, or another control
+//! code, of either data channel or without a meaning. Pairs dropped before
+//! decoding (padding, a second byte failing parity) do not.
 //!
-//! **Real-time mode** reports the screen as it changes, with an unknown end:
-//! every erase and end of caption, and at most once per latency interval the
-//! screen as written by paint-on, roll-up and text characters.
+//! **Snapshots.** Erase displayed memory, end of caption and, without
+//! `real_time`, carriage return capture the displayed screen (an end of
+//! caption after showing the other screen) and are reported. Each report
+//! starts at the time of the snapshot before it, 0 before the first; the
+//! commands that select a mode report nothing themselves.
+//!
+//! Without `real_time` a report lasts until its snapshot: an end of caption
+//! at 4198 ms after one at 2066 ms reports a caption starting at 2066 ms
+//! lasting 2132 ms. In pop-on mode it holds the caption captured at the
+//! snapshot before (an end of caption clears the displayed screen once it is
+//! captured), so a caption is reported when the next end of caption, erase or
+//! carriage return removes it; in the other modes it holds the screen just
+//! captured, before a carriage return scrolls it. An empty capture is not
+//! reported, but its time still starts the next report. The pop-on capture
+//! still waiting is reported by [`Decoder::drain`], starting at the latest
+//! snapshot and lasting as long as the interval before it, or, after a
+//! switch to another mode, by the next pop-on snapshot, as late as it comes:
+//! a caption shown at 1000 ms, a roll-up carriage return at 2000 ms and an
+//! end of caption at 3000 ms report the roll-up row (1000 ms, 1000 ms long),
+//! then the first caption again (2000 ms, 1000 ms long).
+//!
+//! With `real_time` a report holds the displayed screen as it is, empty after
+//! an erase, and has no end (`u32::MAX`); the latency clock moves to its
+//! start. Characters written to the displayed screen (paint-on, roll-up and
+//! text modes, not pop-on) since the last report are reported at the end of
+//! their packet when its time, moved back to the start of a report in the
+//! same packet, is at least `real_time_latency_msec` after the latency clock;
+//! the clock then moves to that time. A packet of unknown time never reports
+//! characters, and nothing is drained.
+//!
+//! Several reports in one packet are lines of one subtitle with the start and
+//! duration of the last line; a duration of 0 becomes the packet's duration.
+//! A report starting at an unknown time has no `pts`. A duration takes an
+//! unknown time as `i64::MIN` microseconds, wraps the difference and rounds it
+//! to milliseconds kept to 32 bits: an erase at an unknown time after an end
+//! of caption at 967 633 µs lasts 2 783 137 840 ms.
 //!
 //! **Work.** A packet is decoded in one call that needs
 //! [`Decoder::packet_work`] units available and spends one per construct and
@@ -23,6 +58,8 @@
 mod memory;
 mod render;
 mod screen;
+#[cfg(test)]
+mod tests;
 
 use crate::cc::cc_data::{constructs, is_field_pair};
 use crate::cc::line21::odd_parity;
@@ -202,12 +239,16 @@ pub struct Decoder {
     field: Option<u8>,
     memory: Memory,
     snapshots: Snapshots,
-    /// The last control code, ignored when sent again (codes are sent twice).
+    /// The control code of the last pair, ignored while it repeats; zero
+    /// after any other pair.
     last_control: [u8; 2],
     /// Characters were written to the displayed screen since the last
-    /// real-time report.
+    /// report.
     touched: bool,
+    /// The start of the last real-time report, microseconds: written
+    /// characters are next reported a latency after it.
     last_real_time: i64,
+    /// The `ReadOrder` of the next event line.
     read_order: u32,
 }
 
@@ -353,48 +394,58 @@ impl Decoder {
         Ok(true)
     }
 
+    /// Decodes one pair of the selected field, parity removed, received at
+    /// `now` (microseconds, `i64::MIN` when unknown).
     fn pair(&mut self, hi: u8, lo: u8, now: i64, out: &mut Subtitle) -> Result<()> {
-        if hi < 0x20 {
-            if [hi, lo] == self.last_control {
-                return Ok(());
-            }
-            self.last_control = [hi, lo];
-        } else {
-            self.last_control = [0; 2];
-        }
-        let real_time = self.options.real_time;
-        match self
-            .memory
-            .apply(hi, lo, real_time, self.snapshots.current())?
-        {
-            Effect::None => return Ok(()),
-            Effect::Touched => {
-                self.touched = true;
-                return Ok(());
-            }
-            // A reported snapshot shows what was written so far.
-            Effect::Snapshot => self.touched = false,
-        }
-        let pop_on = !real_time && self.memory.is_pop_on();
-        if pop_on {
-            self.snapshots.current ^= 1;
-        }
-        let snapshots = &mut self.snapshots;
-        snapshots.times = [snapshots.times[1], now];
-        let text = &snapshots.text[snapshots.current];
-        if text.is_empty() && !real_time {
+        let control = matches!(hi, 0x10..=0x1f);
+        if control && self.last_control == [hi, lo] {
             return Ok(());
         }
-        let [start, end] = snapshots.times;
-        out.pts = known(start);
-        out.end_ms = if real_time {
-            // The next real-time report of written characters waits from here.
+        // No control code has a first byte of 0, so this ends the repetition.
+        self.last_control = if control { [hi, lo] } else { [0; 2] };
+        let taken = self.snapshots.current;
+        let effect = self.memory.apply(
+            hi,
+            lo,
+            self.options.real_time,
+            &mut self.snapshots.text[taken],
+        )?;
+        match effect {
+            Effect::None => {}
+            Effect::Touched => self.touched = true,
+            Effect::Snapshot => self.report(now, out)?,
+        }
+        Ok(())
+    }
+
+    /// Reports the snapshot just taken at `now`. Its event starts at the
+    /// snapshot before it.
+    fn report(&mut self, now: i64, out: &mut Subtitle) -> Result<()> {
+        let start = self.snapshots.times[1];
+        self.snapshots.times = [start, now];
+        self.touched = false;
+        let taken = self.snapshots.current;
+        let reported = if self.options.real_time {
             self.last_real_time = start;
-            u32::MAX
+            out.end_ms = u32::MAX;
+            taken
         } else {
-            milliseconds(end.wrapping_sub(start))
+            // A pop-on caption is reported when it leaves the screen, so the
+            // capture before this one is reported and this one waits.
+            let shown = if self.memory.is_pop_on() {
+                self.snapshots.current = 1 - taken;
+                1 - taken
+            } else {
+                taken
+            };
+            if self.snapshots.text[shown].is_empty() {
+                return Ok(());
+            }
+            out.end_ms = milliseconds(now.wrapping_sub(start));
+            shown
         };
-        out.push(self.read_order, text.as_bytes())?;
+        out.push(self.read_order, self.snapshots.text[reported].as_bytes())?;
+        out.pts = known(start);
         self.read_order = self.read_order.wrapping_add(1);
         Ok(())
     }
