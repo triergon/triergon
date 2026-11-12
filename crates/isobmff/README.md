@@ -313,6 +313,13 @@ rejects boxes extending past the source.
   or shifts packets; the FFmpeg-compatible view does.
   `SampleTable::has_composition_offsets` reports a regular table's `ctts`
   presence before reading its samples.
+  A regular video edit starting on the first decoded sample's presentation
+  tick keeps the initial non-sync samples with their original flags when
+  there is no sync sample at or before that tick. A
+  backward seek on that track requires a preceding sync sample. Secondary
+  tracks can replay their verified prefix when the primary lands earlier.
+  A zero-origin edit covering the decode span can retain reordered non-sync
+  packets past its presentation end and marks them for discard.
   Range playback preserves AAC sample durations from `stts`, including
   durations longer than one coded frame. Trim counts use the coded frame length.
   The regular range view also establishes a 1024-sample clock for indexed AAC-LC

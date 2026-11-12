@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "directory": ".research/mp4-range-fixtures",
   "cases": [
     {
       "id": "regular-open",
@@ -699,6 +700,36 @@
         "packets": 61,
         "bytes": 12004,
         "digest": 15718313594074699357
+      }
+    },
+    {
+      "id": "fate-non-sync-prefix-open",
+      "profile": "fate-non-sync-prefix-open",
+      "file": "mov/mp4-init-nonkeyframe.mp4",
+      "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/mov/mp4-init-nonkeyframe.mp4",
+      "arguments": [],
+      "expected": {
+        "packets": 293,
+        "bytes": 1158487,
+        "digest": 4548821196215711946
+      }
+    },
+    {
+      "id": "fate-non-sync-prefix-seek",
+      "profile": "fate-non-sync-prefix-seek",
+      "file": "mov/mp4-init-nonkeyframe.mp4",
+      "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/mov/mp4-init-nonkeyframe.mp4",
+      "arguments": [
+        "91091"
+      ],
+      "expected": {
+        "packets": 72,
+        "bytes": 317984,
+        "digest": 3463143097373344921
       }
     }
   ]

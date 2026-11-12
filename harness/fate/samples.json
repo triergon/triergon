@@ -56,6 +56,11 @@
       "path": "pgs/fate-pgs_sub.mkv",
       "sha256": "c928ea53e2acdf1cbaa3b0934510b65ca2f5381e2293c1067c20ff47eefa3918",
       "source": "fate-suite sub/pgs_sub.sup, muxed by ffmpeg 9.0.2"
+    },
+    {
+      "path": "fate/mov/mp4-init-nonkeyframe.mp4",
+      "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
+      "source": "https://fate-suite.ffmpeg.org/mov/mp4-init-nonkeyframe.mp4"
     }
   ]
 }

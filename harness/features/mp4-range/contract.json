@@ -2,9 +2,11 @@
   "schema": 1,
   "id": "mp4-range",
   "operation": "mp4-range-playback",
+  "gate": "required",
   "candidate": "playback-worker",
   "worker_operation": "mp4-range-",
   "reference": "ffmpeg-formats-native",
+  "fetch_fate_cases": true,
   "contract": [
     "open a preloaded regular or complete fragmented MP4 file through 32 KiB random-access input",
     "read AVC with AAC or Opus, regular dedicated HEVC/AAC entries or a regular dedicated AV1 entry through EOF in demux order",
@@ -17,6 +19,7 @@
     "compare the reference container output when the MOV demuxer exposes dav1 without assigning an AV1 codec ID",
     "seek cases read one packet, seek backward using the video clock, then read the complete suffix",
     "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
+    "compare startup and backward seek at the first sync sample in a regular AVC/AAC file with an initial non-sync sequence and reordered packets outside its presentation edit",
     "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame",
     "compare open-ended fragment edits, startup trim with unequal media and sample clocks, and backward seeks on both sides of a sync boundary",
     "compare fragmented AVC/AAC with timed text and DVD subpictures through EOF, including non-sync text samples at fragment boundaries and a leading empty subpicture edit",
@@ -75,7 +78,9 @@
     "fragmented-subtitle-edit-open",
     "fragmented-subtitle-edit-seek-start",
     "fragmented-subtitle-edit-seek-during-cue",
-    "fragmented-subtitle-edit-seek-after-cue"
+    "fragmented-subtitle-edit-seek-after-cue",
+    "fate-non-sync-prefix-open",
+    "fate-non-sync-prefix-seek"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"
