@@ -17070,6 +17070,19 @@
    }
   },
   {
+   "name": "shape-bidi-reference-81a17b4e-armv7",
+   "path": "shape-bidi-reference-81a17b4e-armv7",
+   "retention": "retained",
+   "reason": "Bidi from UAX #9 paragraph and table row, ARMv7: the bidi resolver at 81a17b4e in the ARMv7 user space on a c7g.2xlarge; the shape and ASS gates, cargo xtask shape conformance, seed 3 of the generated texts against FriBidi, instruction counts of every shape-bidi, shape-simple and ass-render case against 8a3f711f, the scripts that ran them and a bundle of the measured commit.",
+   "key": "evidence/shape-bidi-reference-81a17b4e-armv7/18211802f6b7d171f06852a6f38459957ae6049a7c65930f1c96900cc33edb36.tar.gz",
+   "sha256": "18211802f6b7d171f06852a6f38459957ae6049a7c65930f1c96900cc33edb36",
+   "bytes": 12388296,
+   "source_revisions": {
+    "candidate": "81a17b4edf5e24611eab70ac1ddf9b3cf4c37603",
+    "base": "8a3f711f8d014411ea64d5b8967367ac3aedbac1"
+   }
+  },
+  {
    "name": "ass-collision-far-margins-02e3a75a",
    "path": "ass-collision-far-margins-02e3a75a",
    "retention": "retained",

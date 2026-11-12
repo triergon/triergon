@@ -271,12 +271,12 @@ The bidi resolver written from UAX #9 was measured at
   main's; the sums are 10.1% lower for `shape-bidi`, 24.6% for `shape-simple` and 0.14% for
   `ass-render`.
 
-On ARMv7 the resolver was last measured at `e44bfacb38a19598eca07ea96a9aa83a05a9b1f2`, before
-the rules that make it match FriBidi on every generated text: the shaping and ASS results
-above and both conformance files pass; against main, on 4 threads, 119 equivalence cases
-differ, each first at a frame one side refuses for storage at the end of the 32-bit address
-space, the kind that differs between runs of one build, and the instruction count sums are
-4.9% lower for `shape-bidi`, 18.3% for `shape-simple` and 0.11% for `ass-render`.
+On ARMv7, in the armhf user space, at the same commit: `cargo xtask shape compare` and
+`cargo xtask ass compare --all` give the shaping and ASS results above, both conformance files
+pass, and one seed of the generated texts (50,000 lines through each set and base direction) is
+identical to FriBidi. No `shape-bidi`, `shape-simple` or `ass-render` case runs more instructions
+than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` and 0.12% for
+`ass-render`.
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
@@ -376,6 +376,7 @@ space, the kind that differs between runs of one build, and the instruction coun
 | ASS rendering runtime and memory, Linux AArch64 and ARMv7 | `5b3e03f0e9410853152043d033b4f4d757e98a40` | `632964773b8ca4cbd5b2b3c09a2b6ddeafdaeeaff56588ea345bae8550012bb7` |
 | Earlier: ASS rendering memory against the instrumented libass build, Linux AArch64 | `e6de7e70827bb930a8ef9e5cb4d30b1e4e7d0727` | `799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3` |
 | Bidi from UAX #9: comparison, conformance, generated texts, equivalence and instruction counts, Linux AArch64 | `81a17b4edf5e24611eab70ac1ddf9b3cf4c37603` | `63104dd7b693a2c559906ca279a2350b4a273083c03fabe4fe097d49e56b961f` |
+| ARMv7: bidi from UAX #9, comparison, conformance, one seed of generated texts and instruction counts | `81a17b4edf5e24611eab70ac1ddf9b3cf4c37603` | `18211802f6b7d171f06852a6f38459957ae6049a7c65930f1c96900cc33edb36` |
 | Earlier: bidi from UAX #9, Linux AArch64 and ARMv7 | `e44bfacb38a19598eca07ea96a9aa83a05a9b1f2` | `dbf448c1ada891ab4122396818350e39df1171ff58e7cd77de0c354abb22c943` |
 | ASS collision order on boxes 2^31 rows apart (`collision-far-margins.ass`), Linux AArch64 and ARMv7 | `02e3a75a86bd5c22900d972c02055e23a37103ab` | `736748aa549fec74078fa33d31dba3e0a123290e652278c3359d37a0a9737db2` |
 | ASS collision order: comparison, generated scripts and equivalence, Linux AArch64 and ARMv7 | `1d2ae4a0287972ac3402bd2e717e5b7fdaa086ff` | `e4e97db001bf538840edc2cbfb8db80c126aeb97df3edeb68cf7185b2fe4bd04` |
