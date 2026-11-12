@@ -281,11 +281,9 @@ fn range_playback_keeps_quicktime_visual_decode_order_and_signed_clocks() {
 
 #[test]
 fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
-    let mut raw = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov").to_vec();
-    let table = raw.windows(4).position(|bytes| bytes == b"stss").unwrap();
-    let first_entry = table + 12;
-    assert_eq!(raw[first_entry..first_entry + 4], 1u32.to_be_bytes());
-    raw[first_entry..first_entry + 4].copy_from_slice(&2u32.to_be_bytes());
+    let seed = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov");
+    let mut raw = seed.to_vec();
+    replace_atom_word(&mut raw, b"stss", 12, 1, 2);
 
     let source = Source::new(&raw, b"vide");
     let plan = range_plan(&source, *b"qt  ").unwrap();
@@ -325,6 +323,115 @@ fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
     let landing = &seek.landing().selected.occurrence;
     assert_eq!(landing.source.ordinal, 2);
     assert_eq!(landing.demux.flags, 1);
+
+    let mut cursor = PacketCursor::new_encoded_regular(
+        &source.pool,
+        &tracks,
+        &source.media,
+        PacketLimits::default(),
+        &plans,
+        EncodedEditProfile,
+    )
+    .unwrap();
+    cursor.enable_range_seek_checkpoints();
+    let mut work = WorkBudget::new(4096);
+    for _ in 0..packets.len() {
+        assert_eq!(
+            cursor.poll(&mut work, &cancel).unwrap(),
+            CursorStatus::Ready
+        );
+        cursor.take_occurrence().unwrap();
+    }
+    assert_eq!(cursor.poll(&mut work, &cancel).unwrap(), CursorStatus::End);
+    cursor.rewind_at_end().unwrap();
+
+    let mut before_sync = cursor
+        .prepare_checked_range_seek(tracks[0].track_id, -513, SeekLimits::default())
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        before_sync.poll(&mut work, &cancel),
+        Err(Error::Unsupported("native seek no observed key fallback"))
+    ));
+    let mut at_sync = cursor
+        .prepare_checked_range_seek(tracks[0].track_id, -512, SeekLimits::default())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        at_sync.poll(&mut work, &cancel).unwrap(),
+        BuildStatus::Ready
+    );
+    let (_, checked_landing) = at_sync.finish().unwrap();
+    let checked = &checked_landing.selected.occurrence;
+    assert_eq!(checked.source.ordinal, landing.source.ordinal);
+    assert_eq!(checked.source.range, landing.source.range);
+    assert_eq!(checked.demux.dts, landing.demux.dts);
+    assert_eq!(checked.demux.flags, landing.demux.flags);
+
+    let primary = Source::in_pool(seed, b"vide", source.pool.clone());
+    let mut secondary = source.track();
+    secondary.track_id = primary.header.track_id + 1;
+    let tracks = [primary.track(), secondary];
+    let plans = [
+        Some(range_plan(&primary, *b"qt  ").unwrap()),
+        plans[0].clone(),
+    ];
+    let mut seek = GlobalSeekJob::new_encoded_regular_rescaled(
+        &source.pool,
+        &tracks,
+        &source.media,
+        (tracks[0].track_id, -1024),
+        SeekLimits::default(),
+        &plans,
+    )
+    .unwrap();
+    assert_eq!(
+        seek.poll(&mut WorkBudget::new(4096), &cancel).unwrap(),
+        BuildStatus::Ready
+    );
+    let seek = seek.finish().unwrap();
+    assert_eq!(seek.anchors()[1].track_id, secondary.track_id);
+    assert_eq!(seek.anchors()[1].occurrence, 0);
+
+    replace_atom_word(&mut raw, b"elst", 16, 1024, 1025);
+    let cropped = Source::new(&raw, b"vide");
+    assert!(matches!(
+        range_plan(&cropped, *b"qt  "),
+        Err(Error::Unsupported("encoded edit initial source/key origin"))
+    ));
+}
+
+#[test]
+fn range_playback_keeps_only_established_reordered_video_tails() {
+    let mut raw = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov").to_vec();
+    replace_atom_word(&mut raw, b"mvhd", 16, 1000, 12800);
+    replace_atom_word(&mut raw, b"elst", 12, 240, 3072);
+    replace_atom_word(&mut raw, b"elst", 16, 1024, 0);
+    replace_atom_word(&mut raw, b"ctts", 16, 1024, 0);
+    let source = Source::new(&raw, b"vide");
+    let packets = rows(&source, range_plan(&source, *b"qt  ").unwrap());
+    assert_eq!(packets.len(), 6);
+    assert!(
+        packets[4..]
+            .iter()
+            .all(|(packet, _)| packet.demux.flags == 4)
+    );
+
+    replace_atom_word(&mut raw, b"stss", 16, 4, 5);
+    let tail_sync = Source::new(&raw, b"vide");
+    assert!(matches!(
+        range_plan(&tail_sync, *b"qt  "),
+        Err(Error::Unsupported(
+            "encoded video tail selection not established"
+        ))
+    ));
+}
+
+fn replace_atom_word(raw: &mut [u8], kind: &[u8; 4], offset: usize, from: u32, to: u32) {
+    let start = raw.windows(4).position(|bytes| bytes == kind).unwrap() + offset;
+    let word = &mut raw[start..start + 4];
+    assert_eq!(word, from.to_be_bytes());
+    word.copy_from_slice(&to.to_be_bytes());
 }
 
 #[test]

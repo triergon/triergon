@@ -419,7 +419,7 @@ pub struct SeekJob<'a> {
     previous: Option<i64>,
     unordered_minimum: Option<i64>,
     scanned: u64,
-    allow_fragment_prefix: bool,
+    allow_initial_prefix: bool,
     ready: bool,
     failed: Option<Error>,
 }
@@ -495,7 +495,7 @@ impl<'a> SeekJob<'a> {
             previous: None,
             unordered_minimum: None,
             scanned: 0,
-            allow_fragment_prefix: false,
+            allow_initial_prefix: false,
             ready: false,
             failed: None,
         })
@@ -532,8 +532,8 @@ impl<'a> SeekJob<'a> {
                         // A fragment seek subtracts the media start from its
                         // query. A leading empty edit delays index timestamps.
                         self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
-                        // Keep the initial non-sync row so a later key is
-                        // only selected when it precedes the requested tick.
+                        // A secondary track can replay its non-sync prefix.
+                        // The primary needs a preceding key.
                         if entry.flags & 1 == 0
                             && (entry.occurrence.source.fragment_flags.is_some()
                                 || self.context.encoded_edits.is_some())
@@ -576,11 +576,10 @@ impl<'a> SeekJob<'a> {
                         ));
                     }
                     if self.best.is_none()
-                        && self.first.as_ref().is_none_or(|entry| {
-                            entry.flags & 1 == 0
-                                && (!self.allow_fragment_prefix
-                                    || entry.occurrence.source.fragment_flags.is_none())
-                        })
+                        && self
+                            .first
+                            .as_ref()
+                            .is_none_or(|entry| entry.flags & 1 == 0 && !self.allow_initial_prefix)
                     {
                         return Err(Error::Unsupported("native seek no observed key fallback"));
                     }
@@ -1092,10 +1091,10 @@ impl<'a> GlobalSeekJob<'a> {
                     None => timestamp,
                 }
             };
-            // Before the first sync on a secondary fragment track, a fresh
-            // range still has its leading non-sync packets available to replay.
+            // If a secondary track has no preceding sync sample, replay
+            // its verified non-sync prefix from the beginning.
             let mut child = SeekJob::build(self.track_context(self.at), timestamp)?;
-            child.allow_fragment_prefix = true;
+            child.allow_initial_prefix = true;
             self.child = Some(child);
         }
     }

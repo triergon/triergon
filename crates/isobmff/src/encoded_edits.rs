@@ -397,6 +397,7 @@ pub struct EncodedEditJob<'a> {
     opus_first_tick: i128,
     opus_durations: BudgetVec<OpusDurationRun>,
     range_playback: bool,
+    sync_after_edit: bool,
     aac_program: Option<Box<Charged<AacAscParser>>>,
     dts_scale: Option<u32>,
     dolby_config: Option<Ac3ConfigParser>,
@@ -500,7 +501,7 @@ impl<'a> EncodedEditJob<'a> {
     /// and DTS. DTS also supports a leading empty edit before the media edit.
     /// AAC uses the sample durations in `stts` and the coded frame length for trim.
     /// Opus uses the edit list for priming and keeps each source duration.
-    /// Regular video may start before its first container sync sample.
+    /// A regular video edit can begin on the presentation tick of a non-sync sample at decode origin.
     pub fn new_range_playback(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -684,6 +685,7 @@ impl<'a> EncodedEditJob<'a> {
             opus_first_tick: 0,
             opus_durations: BudgetVec::new(input.budget()),
             range_playback: false,
+            sync_after_edit: false,
             aac_program: None,
             dts_scale,
             dolby_config: None,
@@ -969,12 +971,13 @@ impl<'a> EncodedEditJob<'a> {
                         .checked_sub(i128::from(self.entry.media_time))
                         .ok_or(Error::Overflow)?;
                     self.end = anchor.checked_add(duration).ok_or(Error::Overflow)?;
-                    // A zero-origin edit that covers the whole decode span
-                    // keeps reordered packets past the presentation end for
-                    // decoding. Projection marks them as discard.
-                    let covers_decode_span =
-                        self.range_playback && anchor == 0 && self.end == self.source_end;
-                    if !covers_decode_span && self.maximum_cts.is_some_and(|x| x >= self.end) {
+                    // Reordered non-sync packets beyond a zero-origin edit
+                    // can still be needed to decode the complete edit.
+                    let keeps_reordered_tail = self.range_playback
+                        && anchor == 0
+                        && self.end == self.source_end
+                        && !self.sync_after_edit;
+                    if !keeps_reordered_tail && self.maximum_cts.is_some_and(|x| x >= self.end) {
                         return Err(Error::Unsupported(
                             "encoded video tail selection not established",
                         ));
@@ -1053,8 +1056,9 @@ impl<'a> EncodedEditJob<'a> {
                     .cts_ticks
                     .ok_or(Error::Unsupported("encoded edit source CTS unknown"))?;
                 if self.count == 0 {
-                    let allows_non_sync =
-                        self.range_playback && self.context.stream.kind().is_video();
+                    let allows_non_sync = self.range_playback
+                        && self.context.stream.kind().is_video()
+                        && c == i128::from(self.entry.media_time);
                     if d != 0 || (!allows_non_sync && !s.is_container_sync()) {
                         return Err(Error::Unsupported("encoded edit initial source/key origin"));
                     }
@@ -1107,10 +1111,18 @@ impl<'a> EncodedEditJob<'a> {
                         self.opus_first = s.ordinal;
                         self.opus_first_tick = d;
                     }
-                } else if c >= i128::from(self.entry.media_time) {
-                    self.anchor = Some(self.anchor.map_or(c, |prior| prior.min(c)));
+                } else {
+                    if c >= i128::from(self.entry.media_time)
+                        && self.anchor.is_none_or(|prior| c < prior)
+                    {
+                        self.anchor = Some(c);
+                    }
+                    // The presentation anchor can only extend the scan's end.
+                    if c >= self.end {
+                        self.maximum_cts = Some(self.maximum_cts.map_or(c, |prior| prior.max(c)));
+                        self.sync_after_edit |= s.is_container_sync();
+                    }
                 }
-                self.maximum_cts = Some(self.maximum_cts.map_or(c, |prior| prior.max(c)));
                 self.source_end = d
                     .checked_add(i128::from(s.duration_ticks))
                     .ok_or(Error::Overflow)?;

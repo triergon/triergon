@@ -219,14 +219,7 @@ fn pinned_in(
     for &source in sources {
         match source.fetch(net, agent, limit) {
             Ok(data) if matches(&data) => {
-                if let Some(dir) = cache {
-                    let stored = fs::create_dir_all(dir)
-                        .map_err(|e| format!("{}: {e}", dir.display()))
-                        .and_then(|()| publish(&dir.join(sha256), &data));
-                    if let Err(error) = stored {
-                        eprintln!("download cache not updated: {error}");
-                    }
-                }
+                store_download(cache, sha256, &data);
                 return Ok(data);
             }
             Ok(data) if data.len() > limit => {
@@ -240,6 +233,17 @@ fn pinned_in(
         "no source served the pinned download {sha256}: {}",
         failures.join("; ")
     ))
+}
+
+fn store_download(cache: Option<&Path>, sha256: &str, data: &[u8]) {
+    if let Some(dir) = cache {
+        let stored = fs::create_dir_all(dir)
+            .map_err(|e| format!("{}: {e}", dir.display()))
+            .and_then(|()| publish(&dir.join(sha256), data));
+        if let Err(error) = stored {
+            eprintln!("download cache not updated: {error}");
+        }
+    }
 }
 
 /// A verified cache entry, marked as used by this run so a pruned cache keeps it.
@@ -407,14 +411,21 @@ fn today() -> String {
 pub const VECTOR_LIMIT: usize = 8 * 1024 * 1024;
 const VECTOR_CONTRACT: &str = "harness/features/matroska-segment-metadata/contract.json";
 
-/// Fetch every required vector named by the metadata contract into
-/// `.research/fate-samples/`, verifying cached copies; returns their paths.
-pub fn required_vectors(
+/// Fetch and verify the external vectors needed by the workspace check.
+pub fn vectors(root: &Path, net: &dyn Transport, limit: usize) -> Result<Vec<String>, String> {
+    let cache = download_cache();
+    let mut verified = required_vectors(root, net, cache.as_deref(), limit)?;
+    verified.extend(fate_corpus_vectors(root, net, cache.as_deref(), limit)?);
+    Ok(verified)
+}
+
+fn required_vectors(
     root: &Path,
     net: &dyn Transport,
+    cache: Option<&Path>,
     limit: usize,
 ) -> Result<Vec<String>, String> {
-    let cache = root.join(".research/fate-samples");
+    let directory = root.join(".research/fate-samples");
     let contract = crate::checks::read_json(&root.join(VECTOR_CONTRACT))?;
     let mut verified = Vec::new();
     for vector in contract
@@ -430,16 +441,17 @@ pub fn required_vectors(
             .get("sha256")
             .and_then(Value::as_str)
             .ok_or("required vector without a hash")?;
-        fetch_vector(&cache, relative, expected, net, limit)?;
+        fetch_vector(&directory, relative, expected, net, cache, limit)?;
         verified.push(relative.to_owned());
     }
     Ok(verified)
 }
 
 /// Fetch the FATE cases of registered corpora that request them.
-pub fn fate_corpus_vectors(
+fn fate_corpus_vectors(
     root: &Path,
     net: &dyn Transport,
+    cache: Option<&Path>,
     limit: usize,
 ) -> Result<Vec<String>, String> {
     let mut verified = Vec::new();
@@ -488,7 +500,7 @@ pub fn fate_corpus_vectors(
         }
         let directory = root.join(directory);
         for (relative, expected) in pins {
-            fetch_vector(&directory, relative, expected, net, limit)?;
+            fetch_vector(&directory, relative, expected, net, cache, limit)?;
             verified.push(relative.to_owned());
         }
     }
@@ -508,10 +520,14 @@ fn fetch_vector(
     relative: &str,
     expected: &str,
     net: &dyn Transport,
+    cache: Option<&Path>,
     limit: usize,
 ) -> Result<(), String> {
     if !relative_path(relative) {
         return Err("invalid required vector path".into());
+    }
+    if expected.len() != 64 || !expected.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("invalid required vector hash".into());
     }
     let path = directory.join(relative);
     if path.exists() {
@@ -522,17 +538,25 @@ fn fetch_vector(
         if sha256::hex(&data) != expected {
             return Err(format!("cached required vector changed: {relative}"));
         }
+        store_download(cache, expected, &data);
         return Ok(());
     }
-    let data = download_vector(relative, net, limit)?;
-    if data.len() > limit {
-        return Err("required vector exceeds download bound".into());
-    }
-    if sha256::hex(&data) != expected {
-        return Err(format!(
-            "required vector download hash mismatch: {relative}"
-        ));
-    }
+    let matches = |bytes: &[u8]| bytes.len() <= limit && sha256::hex(bytes) == expected;
+    let data = if let Some(data) = cache.and_then(|dir| cached(dir, expected, limit, matches)) {
+        data
+    } else {
+        let data = download_vector(relative, net, limit)?;
+        if data.len() > limit {
+            return Err("required vector exceeds download bound".into());
+        }
+        if !matches(&data) {
+            return Err(format!(
+                "required vector download hash mismatch: {relative}"
+            ));
+        }
+        store_download(cache, expected, &data);
+        data
+    };
     let parent = path.parent().expect("vector inside the cache");
     fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
     publish(&path, &data)
@@ -606,6 +630,48 @@ mod tests {
     const VECTOR: &str = ".research/fate-samples/mkv/required.mkv";
 
     #[test]
+    fn fetched_cases_share_a_pinned_input_and_reuse_the_download_cache() {
+        let root = crate::walk::scratch("fate-corpus");
+        let feature = root.join("harness/features/range");
+        let cache = root.join("downloads");
+        let relative = "mov/prefix.mp4";
+        let bytes = b"pinned vector";
+        let hash = sha256::hex(bytes);
+        fs::create_dir_all(&feature).unwrap();
+        fs::write(
+            feature.join("contract.json"),
+            r#"{"id":"range","fetch_fate_cases":true}"#,
+        )
+        .unwrap();
+        let case = format!(
+            r#"{{"file":"{relative}","source":"fate-suite/{relative}","sha256":"{hash}"}}"#
+        );
+        fs::write(
+            feature.join("corpus.json"),
+            format!(r#"{{"directory":".research/range","cases":[{case},{case}]}}"#),
+        )
+        .unwrap();
+
+        let net = Fake {
+            https: Some(bytes.to_vec()),
+            ..Fake::default()
+        };
+        let input = root.join(".research/range").join(relative);
+        let run = |transport| fate_corpus_vectors(&root, transport, Some(&cache), VECTOR_LIMIT);
+        assert_eq!(run(&net).unwrap(), [relative]);
+        assert_eq!(net.calls.borrow().len(), 1);
+        assert_eq!(fs::read(&input).unwrap(), bytes);
+        assert_eq!(fs::read(cache.join(hash)).unwrap(), bytes);
+        fs::remove_file(&input).unwrap();
+
+        let offline = Fake::default();
+        assert_eq!(run(&offline).unwrap(), [relative]);
+        assert!(offline.calls.borrow().is_empty());
+        assert_eq!(fs::read(&input).unwrap(), bytes);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn cached_original_is_verified_without_network() {
         let root = crate::walk::scratch("vectors");
         contract(&root, "mkv/required.mkv", b"original vector");
@@ -613,7 +679,7 @@ mod tests {
         fs::write(root.join(VECTOR), b"original vector").unwrap();
         let net = Fake::default();
         assert_eq!(
-            required_vectors(&root, &net, VECTOR_LIMIT).unwrap(),
+            required_vectors(&root, &net, None, VECTOR_LIMIT).unwrap(),
             ["mkv/required.mkv"]
         );
         assert!(net.calls.borrow().is_empty());
@@ -626,7 +692,7 @@ mod tests {
         contract(&root, "mkv/required.mkv", b"original vector");
         fs::create_dir_all(root.join(".research/fate-samples/mkv")).unwrap();
         fs::write(root.join(VECTOR), b"changed").unwrap();
-        let error = required_vectors(&root, &Fake::default(), VECTOR_LIMIT).unwrap_err();
+        let error = required_vectors(&root, &Fake::default(), None, VECTOR_LIMIT).unwrap_err();
         assert!(error.contains("cached required vector changed"), "{error}");
         assert_eq!(fs::read(root.join(VECTOR)).unwrap(), b"changed");
         fs::remove_dir_all(root).unwrap();
@@ -646,7 +712,7 @@ mod tests {
         ] {
             let root = crate::walk::scratch("vectors");
             contract(&root, "mkv/required.mkv", b"original vector");
-            let error = required_vectors(&root, &net, VECTOR_LIMIT).unwrap_err();
+            let error = required_vectors(&root, &net, None, VECTOR_LIMIT).unwrap_err();
             assert!(error.contains("download hash mismatch"), "{error}");
             assert!(!root.join(VECTOR).exists());
             fs::remove_dir_all(root).unwrap();
@@ -662,7 +728,7 @@ mod tests {
             ..Fake::default()
         };
         assert_eq!(
-            required_vectors(&root, &net, VECTOR_LIMIT).unwrap(),
+            required_vectors(&root, &net, None, VECTOR_LIMIT).unwrap(),
             ["mkv/required.mkv"]
         );
         assert_eq!(
@@ -673,7 +739,7 @@ mod tests {
             ]
         );
         assert_eq!(fs::read(root.join(VECTOR)).unwrap(), b"original vector");
-        let error = required_vectors(&root, &Fake::default(), VECTOR_LIMIT);
+        let error = required_vectors(&root, &Fake::default(), None, VECTOR_LIMIT);
         assert!(error.is_ok(), "the published copy is verified from cache");
         fs::remove_dir_all(root).unwrap();
     }
@@ -687,11 +753,11 @@ mod tests {
             ..Fake::default()
         };
         assert!(
-            required_vectors(&root, &net, 1024)
+            required_vectors(&root, &net, None, 1024)
                 .unwrap_err()
                 .contains("exceeds download bound")
         );
-        let error = required_vectors(&root, &Fake::default(), 1024).unwrap_err();
+        let error = required_vectors(&root, &Fake::default(), None, 1024).unwrap_err();
         assert!(error.contains("could not fetch required vector"), "{error}");
         assert!(!root.join(VECTOR).exists());
         fs::remove_dir_all(root).unwrap();
@@ -734,7 +800,7 @@ mod tests {
             let root = crate::walk::scratch("vectors");
             contract(&root, file, b"x");
             assert_eq!(
-                required_vectors(&root, &Fake::default(), VECTOR_LIMIT).unwrap_err(),
+                required_vectors(&root, &Fake::default(), None, VECTOR_LIMIT).unwrap_err(),
                 "invalid required vector path"
             );
             fs::remove_dir_all(root).unwrap();

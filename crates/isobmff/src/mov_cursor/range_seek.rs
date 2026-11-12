@@ -97,14 +97,15 @@ impl<'a> Checkpoints<'a> {
         } else {
             0
         };
-        // A fragment's first sample and the first sample of each following
-        // fragment have zero index distance even without a sync flag.
-        // Other non-sync appends still require the full index.
+        // A verified regular edit can start with a non-sync sample.
+        // Fragments also permit non-sync starts at their boundaries.
         if !key && (track.entries == 0 || slot.starts_fragment_run) {
+            let regular_prefix =
+                track.entries == 0 && row.source.ordinal == 1 && slot.encoded_edit.is_some();
             let fragment_start = row.source.fragment_flags.is_some()
                 && row.source.ordinal == track.entries + 1
                 && (track.entries == 0 || slot.append_run.is_some_and(|(_, run)| run == 0));
-            if !fragment_start {
+            if !regular_prefix && !fragment_start {
                 return None;
             }
         }

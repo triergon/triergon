@@ -2,6 +2,7 @@
   "schema": 1,
   "id": "mp4-range",
   "operation": "mp4-range-playback",
+  "gate": "required",
   "candidate": "playback-worker",
   "worker_operation": "mp4-range-",
   "reference": "ffmpeg-formats-native",
