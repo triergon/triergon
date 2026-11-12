@@ -442,6 +442,15 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
+- Gate results assume the workspace release profile, `lto = "fat"` and
+  `codegen-units = 1`, and a program that depends on these crates matches them only
+  with the same two settings in its own release profile. On ARMv7, building the
+  playback worker without fat LTO, Cargo's default, adds 12.6% user-mode instructions
+  on MP4 forward and 25.0% on TS program, and TS program takes 1.228 times as long;
+  Cargo's default of 16 codegen units adds up to another 2.5%. `panic = "abort"` saves
+  a further 2 to 3% and is safe: no library code catches or relies on unwinding. A
+  program that wraps calls into these crates in `catch_unwind` loses that protection
+  under abort.
 - `report`, `external-vector`, `codecs time` and `capture qualify` time through one
   paired runner. It holds the host-wide benchmark lock, runs and checks one warm-up of
   each worker, observes every pair from the snapshot that closed the one before, proves

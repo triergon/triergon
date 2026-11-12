@@ -458,17 +458,18 @@ panics.
   its span, which the renderer reads before its own, and libass's side copies
   the script inside its span.
 - Measured at `5b3e03f0` on a c6g.2xlarge, before the later default glyph load
-  with CFF hinting and the harness's memory and worker change; the current code
-  has not been timed. At that revision every passing case was within the
+  with CFF hinting and the harness's memory and worker change, which are not
+  timed on AArch64. At that revision every passing case was within the
   runtime ceiling of [docs/quality.md](../../docs/quality.md) and lower than
   libass in peak heap and total RSS. On Linux AArch64 the `ass-render` ratios
   had a median of 0.813 and a highest upper bound of 1.066
   (`cache-keys-ass-720p`), with peak heap ≤0.841 and total RSS ≤0.943. On
   ARMv7, over all 80 cases, the highest upper bound was 0.943, peak heap
   ≤0.928 and total RSS ≤0.961, the renderer's virtual peak over libass's
-  resident peak. Measured again at `afb9049c` under the kernel RSS bound,
-  ARMv7 peak heap is ≤0.929 and total RSS ≤0.929 over the 80 cases of that
-  revision.
+  resident peak. Measured again at `22ed8232` for
+  `thumbv7neon-unknown-linux-gnueabihf` under the kernel RSS bound, over all
+  82 cases on ARMv7 the highest upper bound is 0.780, peak heap ≤0.928 and
+  total RSS ≤0.911.
   [docs/status.md](../../docs/status.md) names the evidence.
 - `cargo xtask ass equivalence --base REV` renders the `ass-render`
   fixtures at their frames and every 40 ms, mutations of them with varied

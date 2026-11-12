@@ -88,6 +88,18 @@ while let Some(packet) = reader.next_typed_packet(&cancel)? {
 Each crate README shows its entry points, and the `examples/` directories contain
 small programs.
 
+The published results assume this release profile in the program that uses the crates:
+
+```toml
+[profile.release]
+lto = "fat"
+codegen-units = 1
+```
+
+Cargo's default profile runs measurably slower, up to a quarter more instructions on
+32-bit ARM; `panic = "abort"` is safe to add and saves a little more. See
+[measuring performance](docs/quality.md#measuring-performance).
+
 ## Documentation
 
 - [Architecture](docs/architecture.md): layers, input and resource model, container contract
