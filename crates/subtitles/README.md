@@ -127,6 +127,10 @@ resolves all defined sample modifiers into style runs, highlight, karaoke,
 hyperlink, blink, wrap, scroll and disparity intents; see
 [TX3G-SEMANTICS.md](src/text/TX3G-SEMANTICS.md). `compat::mov_text::Decoder`
 converts a sample to the ASS event and header FFmpeg's mov_text decoder emits.
+Where a style record or the highlight starts or ends it writes FFmpeg's override
+tags in FFmpeg's order and digits, also at a NUL that ends the visible text but
+not at the end of the text; a font name it would write that is not UTF-8, or
+holds U+FFFE, refuses the sample as such text does.
 
 **Charsets.** Selected explicitly with `text::Encoding` or a label resolver;
 there is no detection from content, language or file name.
