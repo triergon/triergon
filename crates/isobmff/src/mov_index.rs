@@ -113,14 +113,14 @@ pub struct IndexCursor<'a> {
     carry: Option<RunCarry>,
     ready: Option<IndexEntry>,
     failed: Option<Error>,
-    recovery_initial_nonkey: bool,
+    allow_initial_nonkey: bool,
     dependency_table: bool,
 }
 impl<'a> IndexCursor<'a> {
     fn from_cursor(
         cursor: PacketCursor<'a>,
         max_entries: u64,
-        recovery_initial_nonkey: bool,
+        allow_initial_nonkey: bool,
         dependency_table: bool,
     ) -> Self {
         Self {
@@ -132,7 +132,7 @@ impl<'a> IndexCursor<'a> {
             carry: None,
             ready: None,
             failed: None,
-            recovery_initial_nonkey,
+            allow_initial_nonkey,
             dependency_table,
         }
     }
@@ -197,12 +197,12 @@ impl<'a> IndexCursor<'a> {
         Ok(Self::from_cursor(
             cursor,
             limits.max_entries,
-            false,
+            plans[0].is_some(),
             plans.iter().flatten().any(|p| p.has_dependency_view()),
         ))
     }
     pub(crate) fn allow_recovery_initial_nonkey(&mut self) {
-        self.recovery_initial_nonkey = true;
+        self.allow_initial_nonkey = true;
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
@@ -300,7 +300,7 @@ impl<'a> IndexCursor<'a> {
                 let starts_at_zero = key
                     || starts_fragment
                     || first_fragment_sample
-                    || (self.next == 0 && self.recovery_initial_nonkey);
+                    || (self.next == 0 && self.allow_initial_nonkey);
                 if !starts_at_zero
                     && (self.next == 0 || (run.is_some() && run != self.run && !continued_run))
                 {
@@ -532,7 +532,11 @@ impl<'a> SeekJob<'a> {
                         // A fragment seek subtracts the media start from its
                         // query. A leading empty edit delays index timestamps.
                         self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
-                        if entry.occurrence.source.fragment_flags.is_some() && entry.flags & 1 == 0
+                        // Keep the initial non-sync row so a later key is
+                        // only selected when it precedes the requested tick.
+                        if entry.flags & 1 == 0
+                            && (entry.occurrence.source.fragment_flags.is_some()
+                                || self.context.encoded_edits.is_some())
                         {
                             self.first = Some(entry.clone());
                         }
@@ -572,10 +576,11 @@ impl<'a> SeekJob<'a> {
                         ));
                     }
                     if self.best.is_none()
-                        && self
-                            .first
-                            .as_ref()
-                            .is_none_or(|entry| entry.flags & 1 == 0 && !self.allow_fragment_prefix)
+                        && self.first.as_ref().is_none_or(|entry| {
+                            entry.flags & 1 == 0
+                                && (!self.allow_fragment_prefix
+                                    || entry.occurrence.source.fragment_flags.is_none())
+                        })
                     {
                         return Err(Error::Unsupported("native seek no observed key fallback"));
                     }

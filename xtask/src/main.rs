@@ -238,6 +238,14 @@ fn main() -> ExitCode {
         },
         Some("fetch-vectors") => {
             fetch::required_vectors(&root, &fetch::Network, fetch::VECTOR_LIMIT)
+                .and_then(|mut verified| {
+                    verified.extend(fetch::fate_corpus_vectors(
+                        &root,
+                        &fetch::Network,
+                        fetch::VECTOR_LIMIT,
+                    )?);
+                    Ok(verified)
+                })
                 .map(|verified| println!("Verified required vectors: {}", verified.join(", ")))
         }
         Some("-h" | "--help" | "help") => {

@@ -280,6 +280,54 @@ fn range_playback_keeps_quicktime_visual_decode_order_and_signed_clocks() {
 }
 
 #[test]
+fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
+    let mut raw = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov").to_vec();
+    let table = raw.windows(4).position(|bytes| bytes == b"stss").unwrap();
+    let first_entry = table + 12;
+    assert_eq!(raw[first_entry..first_entry + 4], 1u32.to_be_bytes());
+    raw[first_entry..first_entry + 4].copy_from_slice(&2u32.to_be_bytes());
+
+    let source = Source::new(&raw, b"vide");
+    let plan = range_plan(&source, *b"qt  ").unwrap();
+    let packets = rows(&source, plan.clone());
+    assert_eq!(packets.len(), 6);
+    let (first, skip) = &packets[0];
+    assert_eq!(first.source.ordinal, 1);
+    assert_eq!(first.demux.flags, 0);
+    assert_eq!((first.demux.pts, first.demux.dts), (Some(0), Some(-1024)));
+    assert_eq!(*skip, None);
+    assert_eq!(packets[1].0.demux.flags, 1);
+
+    let tracks = [source.track()];
+    let plans = [Some(plan)];
+    let seek = |timestamp| {
+        GlobalSeekJob::new_encoded_regular_rescaled(
+            &source.pool,
+            &tracks,
+            &source.media,
+            (tracks[0].track_id, timestamp),
+            SeekLimits::default(),
+            &plans,
+        )
+        .unwrap()
+    };
+    let cancel = AtomicBool::new(false);
+    assert!(matches!(
+        seek(-513).poll(&mut WorkBudget::new(4096), &cancel),
+        Err(Error::Unsupported("native seek no observed key fallback"))
+    ));
+    let mut at_sync = seek(-512);
+    assert_eq!(
+        at_sync.poll(&mut WorkBudget::new(4096), &cancel).unwrap(),
+        BuildStatus::Ready
+    );
+    let seek = at_sync.finish().unwrap();
+    let landing = &seek.landing().selected.occurrence;
+    assert_eq!(landing.source.ordinal, 2);
+    assert_eq!(landing.demux.flags, 1);
+}
+
+#[test]
 fn range_playback_uses_the_coded_frame_clock_for_aac_programs() {
     let raw = include_bytes!("fixtures/range-encoded-edits/aac-program-edit.mov");
     let source = Source::new(raw, b"soun");

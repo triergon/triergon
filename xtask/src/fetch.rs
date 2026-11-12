@@ -2,6 +2,7 @@
 //! SHA-256: specification texts, required external test vectors and the FFmpeg
 //! reference source. Transfers shell out to `curl` and `rsync`.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -429,39 +430,112 @@ pub fn required_vectors(
             .get("sha256")
             .and_then(Value::as_str)
             .ok_or("required vector without a hash")?;
-        let parts = Path::new(relative).components();
-        if relative.contains('\\')
-            || parts.clone().any(|c| !matches!(c, Component::Normal(_)))
-            || relative.is_empty()
-        {
-            return Err("invalid required vector path".into());
-        }
-        let path = cache.join(relative);
-        if path.exists() {
-            let data = read_bounded(&path, limit)?;
-            if data.len() > limit {
-                return Err("cached required vector exceeds download bound".into());
-            }
-            if sha256::hex(&data) != expected {
-                return Err(format!("cached required vector changed: {relative}"));
-            }
-        } else {
-            let parent = path.parent().expect("vector inside the cache");
-            fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
-            let data = download_vector(relative, net, limit)?;
-            if data.len() > limit {
-                return Err("required vector exceeds download bound".into());
-            }
-            if sha256::hex(&data) != expected {
-                return Err(format!(
-                    "required vector download hash mismatch: {relative}"
-                ));
-            }
-            publish(&path, &data)?;
-        }
+        fetch_vector(&cache, relative, expected, net, limit)?;
         verified.push(relative.to_owned());
     }
     Ok(verified)
+}
+
+/// Fetch the FATE cases of registered corpora that request them.
+pub fn fate_corpus_vectors(
+    root: &Path,
+    net: &dyn Transport,
+    limit: usize,
+) -> Result<Vec<String>, String> {
+    let mut verified = Vec::new();
+    for contract in crate::harness::features::discover(root)? {
+        if contract.document.get("fetch_fate_cases") != Some(&Value::Bool(true)) {
+            continue;
+        }
+        let manifest = crate::checks::read_json(&contract.manifest())?;
+        let directory = manifest
+            .get("directory")
+            .and_then(Value::as_str)
+            .filter(|path| path.starts_with(".research/") && relative_path(path))
+            .ok_or_else(|| format!("{}: invalid fetched corpus directory", contract.id))?;
+        let mut pins = BTreeMap::new();
+        for case in manifest
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+        {
+            let Some(relative) = case
+                .get("source")
+                .and_then(Value::as_str)
+                .and_then(|source| source.strip_prefix("fate-suite/"))
+            else {
+                continue;
+            };
+            if case.get("file").and_then(Value::as_str) != Some(relative) {
+                return Err(format!(
+                    "{}: FATE source and input paths differ",
+                    contract.id
+                ));
+            }
+            let expected = case
+                .get("sha256")
+                .and_then(Value::as_str)
+                .ok_or("required vector without a hash")?;
+            if pins
+                .insert(relative, expected)
+                .is_some_and(|sha| sha != expected)
+            {
+                return Err(format!(
+                    "{}: conflicting FATE hashes for {relative}",
+                    contract.id
+                ));
+            }
+        }
+        let directory = root.join(directory);
+        for (relative, expected) in pins {
+            fetch_vector(&directory, relative, expected, net, limit)?;
+            verified.push(relative.to_owned());
+        }
+    }
+    Ok(verified)
+}
+
+fn relative_path(path: &str) -> bool {
+    !path.is_empty()
+        && !path.contains('\\')
+        && Path::new(path)
+            .components()
+            .all(|part| matches!(part, Component::Normal(_)))
+}
+
+fn fetch_vector(
+    directory: &Path,
+    relative: &str,
+    expected: &str,
+    net: &dyn Transport,
+    limit: usize,
+) -> Result<(), String> {
+    if !relative_path(relative) {
+        return Err("invalid required vector path".into());
+    }
+    let path = directory.join(relative);
+    if path.exists() {
+        let data = read_bounded(&path, limit)?;
+        if data.len() > limit {
+            return Err("cached required vector exceeds download bound".into());
+        }
+        if sha256::hex(&data) != expected {
+            return Err(format!("cached required vector changed: {relative}"));
+        }
+        return Ok(());
+    }
+    let data = download_vector(relative, net, limit)?;
+    if data.len() > limit {
+        return Err("required vector exceeds download bound".into());
+    }
+    if sha256::hex(&data) != expected {
+        return Err(format!(
+            "required vector download hash mismatch: {relative}"
+        ));
+    }
+    let parent = path.parent().expect("vector inside the cache");
+    fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+    publish(&path, &data)
 }
 
 /// HTTPS first; FFmpeg also serves the FATE suite over rsync. The caller checks
