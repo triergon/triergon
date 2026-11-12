@@ -39,6 +39,36 @@ pub fn read(
     selection: Selection<'_>,
     ordinal: usize,
 ) -> Result<(Track, Option<CodecId<'static>>)> {
+    let mut packets = Vec::new();
+    let stream = for_each_packet(file, format, selection, ordinal, &mut |_, packet| {
+        packets.push(packet);
+        Ok(())
+    })?;
+    let track = Track {
+        configuration: stream.configuration,
+        time_base: TimeBase::new(1, 90_000)?,
+        packets,
+    };
+    Ok((track, stream.codec))
+}
+
+/// A selected stream: the codec the demuxer opens for it and its
+/// configuration.
+pub struct Stream {
+    pub codec: Option<CodecId<'static>>,
+    pub configuration: Vec<u8>,
+}
+
+/// Hands each packet of the stream [`read`] selects to `packet_sink` as it is cut,
+/// with the stream, and returns the stream. Only the packet being cut stays
+/// resident.
+pub fn for_each_packet(
+    file: &Path,
+    format: PacketFormat,
+    selection: Selection<'_>,
+    ordinal: usize,
+    packet_sink: &mut dyn FnMut(&Stream, Packet) -> Result<()>,
+) -> Result<Stream> {
     let pool = Budget::new(1 << 30)?;
     let mut file = File::open(file)?;
     let length = file.length();
@@ -101,13 +131,13 @@ pub fn read(
         }
         if let Some(selected) = selected.as_mut() {
             selected.cutter.push(&packet)?;
-            selected.drain()?;
+            selected.drain(packet_sink)?;
         }
     }
     let mut selected = selected.ok_or("no such stream")?;
     selected.cutter.finish()?;
-    selected.drain()?;
-    Ok((selected.track, selected.codec))
+    selected.drain(packet_sink)?;
+    Ok(selected.stream)
 }
 
 /// Counts the streams the PMTs introduce until the selected one.
@@ -141,15 +171,14 @@ impl Finder<'_> {
     }
 }
 
-/// The selected stream: its cutter, clock and the packets read so far.
+/// The selected stream, its cutter and clock.
 struct Selected {
     program: u16,
-    codec: Option<CodecId<'static>>,
+    stream: Stream,
     cutter: PesCutter,
     clock: DemuxClock,
     /// DVB subtitles only: the data-field parser.
     dvb: Option<PesParser>,
-    track: Track,
 }
 
 impl Selected {
@@ -157,29 +186,27 @@ impl Selected {
         let codec = stream::codec(es);
         Ok(Self {
             program,
-            codec,
+            stream: Stream {
+                codec,
+                configuration: stream::configuration(es).collect(),
+            },
             cutter: PesCutter::new(es.pid, pool.clone(), ParseLimits::default())?,
             clock: DemuxClock::new(program)?,
             dvb: (codec == Some(CodecId::DvbSubtitle)).then(|| PesParser::new(pool)),
-            track: Track {
-                configuration: stream::configuration(es).collect(),
-                time_base: TimeBase::new(1, 90_000)?,
-                packets: Vec::new(),
-            },
         })
     }
 
-    /// Moves the PES packets the cutter completed into the track.
-    fn drain(&mut self) -> Result<()> {
+    /// Hands the PES packets the cutter completed to `sink`.
+    fn drain(&mut self, sink: &mut dyn FnMut(&Stream, Packet) -> Result<()>) -> Result<()> {
         while let Some(pes) = self.cutter.pop() {
             let packet = self.packet(&pes)?;
-            self.track.packets.push(packet);
+            sink(&self.stream, packet)?;
         }
         Ok(())
     }
 
     fn packet(&mut self, pes: &CutPes) -> Result<Packet> {
-        let (pts, dts) = if self.codec == Some(CodecId::DvbTeletext) {
+        let (pts, dts) = if self.stream.codec == Some(CodecId::DvbTeletext) {
             (pes.pcr_bounded_pts(), None)
         } else {
             (pes.pts_raw33, pes.dts_raw33)

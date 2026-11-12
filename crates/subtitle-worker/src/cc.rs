@@ -8,7 +8,7 @@
 //! caption data becomes one packet, in FFmpeg's output order and with its
 //! times, from a [`CaptionExtractor`] fed packet by packet.
 
-use crate::container::{self, Packet, Result, Track};
+use crate::container::{self, Packet, Result, Selection, Track, ts};
 use crate::sink::{EventHead, RectHead, RectKind, Sink};
 use crate::{Args, At, Prepared};
 use std::fs::File;
@@ -86,79 +86,115 @@ fn scc_track(bytes: &[u8]) -> Result<Track> {
     })
 }
 
-/// The caption packets of the `ordinal`th video stream.
+/// The caption packets of the `ordinal`th video stream. A raw elementary
+/// stream and a transport stream are fed to the extractor as they are read,
+/// so preparation never holds the whole video stream.
 fn video_track(file: &Path, ordinal: usize) -> Result<Track> {
     let head = container::head(file)?;
     if head.starts_with(&[0, 0, 1, 0xb3]) {
-        // The extractor takes any run of elementary stream bytes; reading the
-        // file in chunks keeps preparation from touching the whole file.
-        return extract(VideoCoding::Mpeg2Raw, (1, 1), |push| {
-            let mut input = File::open(file)?;
-            let mut chunk = vec![0; 32 * 1024];
-            loop {
-                let got = input.read(&mut chunk)?;
-                if got == 0 {
-                    return Ok(());
-                }
-                push(VideoPacket {
-                    data: &chunk[..got],
-                    pts: None,
-                    dts: None,
-                    duration: None,
-                })?;
+        let mut extraction = Extraction::new(VideoCoding::Mpeg2Raw, (1, 1))?;
+        let mut input = File::open(file)?;
+        let mut chunk = vec![0; 32 * 1024];
+        loop {
+            let got = input.read(&mut chunk)?;
+            if got == 0 {
+                return extraction.finish();
             }
-        });
+            extraction.push(VideoPacket {
+                data: &chunk[..got],
+                pts: None,
+                dts: None,
+                duration: None,
+            })?;
+        }
+    }
+    if let Some(format) = PacketFormat::detect(&head) {
+        let mut extraction = None;
+        let stream =
+            ts::for_each_packet(file, format, Selection::Video, ordinal, &mut |stream, p| {
+                let extraction = match &mut extraction {
+                    Some(extraction) => extraction,
+                    None => extraction.insert(Extraction::new(
+                        coding(stream.codec, &stream.configuration)?,
+                        (1, 90_000),
+                    )?),
+                };
+                extraction.push(VideoPacket {
+                    data: &p.data,
+                    pts: p.pts,
+                    dts: p.dts,
+                    duration: p.duration,
+                })
+            })?;
+        return match extraction {
+            Some(extraction) => extraction,
+            None => Extraction::new(coding(stream.codec, &stream.configuration)?, (1, 90_000))?,
+        }
+        .finish();
     }
     let (mut track, codec) = container::read_file_video_track(file, ordinal)?;
-    let mp4 = !head.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]) && PacketFormat::detect(&head).is_none();
-    if mp4 {
+    if !head.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]) {
         let shift = mp4_edit_shift(&std::fs::read(file)?, ordinal).unwrap_or(0);
         for packet in &mut track.packets {
             packet.pts = packet.pts.map(|pts| pts.saturating_sub(shift));
         }
     }
-    let coding = match codec {
-        Some(CodecId::Mpeg2Video) => VideoCoding::Mpeg2Pes,
-        Some(CodecId::H264) => VideoCoding::Nal(
-            Codec::H264,
-            length_framing(Codec::H264, &track.configuration),
-        ),
-        Some(CodecId::Hevc) => VideoCoding::Nal(
-            Codec::Hevc,
-            length_framing(Codec::Hevc, &track.configuration),
-        ),
-        _ => return Err("cc: captions are read from MPEG-2, H.264 or HEVC video".into()),
-    };
     let time_base = (
         u32::try_from(track.time_base.numerator())?,
         u32::try_from(track.time_base.denominator())?,
     );
-    extract(coding, time_base, |push| {
-        track.packets.iter().try_for_each(|p| {
-            push(VideoPacket {
-                data: &p.data,
-                pts: p.pts,
-                dts: p.dts,
-                duration: p.duration,
-            })
-        })
+    let mut extraction = Extraction::new(coding(codec, &track.configuration)?, time_base)?;
+    for p in &track.packets {
+        extraction.push(VideoPacket {
+            data: &p.data,
+            pts: p.pts,
+            dts: p.dts,
+            duration: p.duration,
+        })?;
+    }
+    extraction.finish()
+}
+
+/// How the extractor reads a video stream of `codec`.
+fn coding(codec: Option<CodecId<'_>>, configuration: &[u8]) -> Result<VideoCoding> {
+    Ok(match codec {
+        Some(CodecId::Mpeg2Video) => VideoCoding::Mpeg2Pes,
+        Some(CodecId::H264) => {
+            VideoCoding::Nal(Codec::H264, length_framing(Codec::H264, configuration))
+        }
+        Some(CodecId::Hevc) => {
+            VideoCoding::Nal(Codec::Hevc, length_framing(Codec::Hevc, configuration))
+        }
+        _ => return Err("cc: captions are read from MPEG-2, H.264 or HEVC video".into()),
     })
 }
 
-/// The caption frames of the video packets `feed` pushes (decode order) as
-/// packets of a track.
-fn extract(
-    coding: VideoCoding,
-    time_base: (u32, u32),
-    feed: impl FnOnce(&mut dyn FnMut(VideoPacket<'_>) -> Result<()>) -> Result<()>,
-) -> Result<Track> {
-    let pool = Budget::new(1 << 30)?;
-    let mut work = WorkBudget::new(u64::MAX);
-    let mut extractor = CaptionExtractor::new(&pool, coding, time_base);
-    let mut frames = Vec::new();
-    let collect = |extractor: &mut CaptionExtractor, frames: &mut Vec<Packet>| -> Result<()> {
-        while let Some(frame) = extractor.pop()? {
-            frames.push(Packet {
+/// The caption frames of video packets pushed in decode order, collected as
+/// the packets of a track.
+struct Extraction {
+    work: WorkBudget,
+    extractor: CaptionExtractor,
+    frames: Vec<Packet>,
+}
+
+impl Extraction {
+    fn new(coding: VideoCoding, time_base: (u32, u32)) -> Result<Self> {
+        let pool = Budget::new(1 << 30)?;
+        Ok(Self {
+            work: WorkBudget::new(u64::MAX),
+            extractor: CaptionExtractor::new(&pool, coding, time_base),
+            frames: Vec::new(),
+        })
+    }
+
+    fn push(&mut self, packet: VideoPacket<'_>) -> Result<()> {
+        self.extractor.push(packet, &mut self.work)?;
+        self.collect()
+    }
+
+    fn collect(&mut self) -> Result<()> {
+        while let Some(frame) = self.extractor.pop()? {
+            self.frames.push(Packet {
                 pts: frame.pts,
                 dts: frame.pts,
                 duration: frame.duration,
@@ -166,19 +202,18 @@ fn extract(
             });
         }
         Ok(())
-    };
-    feed(&mut |packet| {
-        extractor.push(packet, &mut work)?;
-        collect(&mut extractor, &mut frames)
-    })?;
-    extractor.finish()?;
-    collect(&mut extractor, &mut frames)?;
-    let (num, den) = extractor.time_base();
-    Ok(Track {
-        configuration: Vec::new(),
-        time_base: TimeBase::new(num.into(), den.into())?,
-        packets: frames,
-    })
+    }
+
+    fn finish(mut self) -> Result<Track> {
+        self.extractor.finish()?;
+        self.collect()?;
+        let (num, den) = self.extractor.time_base();
+        Ok(Track {
+            configuration: Vec::new(),
+            time_base: TimeBase::new(num.into(), den.into())?,
+            packets: self.frames,
+        })
+    }
 }
 
 /// How far FFmpeg's MP4 demuxer moves the `ordinal`th video track's times by
