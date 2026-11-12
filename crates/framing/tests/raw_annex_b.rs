@@ -221,6 +221,37 @@ fn hevc_access_unit_wire_matches_the_raw_demuxer_with_and_without_aud() {
     );
 }
 
+/// One base-layer NAL unit of each non-VCL type inserted between the second
+/// and third pictures of `hevc-aud0.hevc`, on the side of the boundary where
+/// the pinned FFmpeg's raw hevc demuxer put it: with the third picture for the
+/// types H.265 7.4.2.4.4 lists and for an end of sequence or bitstream, with
+/// the second for the others.
+#[test]
+fn a_non_vcl_unit_after_a_picture_lands_where_the_raw_demuxer_puts_it() {
+    let input = include_bytes!("../fixtures/raw-annex-b/hevc-aud0.hevc");
+    // The third picture's first slice, from its four-byte start code.
+    const AT: usize = 5432;
+    for kind in 32..64u8 {
+        let mut stream = input[..AT].to_vec();
+        stream.extend([0, 0, 0, 1, kind << 1, 1, 0x80, 0x55]);
+        stream.extend_from_slice(&input[AT..]);
+        let pool = Budget::new(1 << 20).unwrap();
+        let source = Bytes::copy_from_slice(&pool, &stream).unwrap();
+        let limits = RawAnnexBLimits::default();
+        let mut drive = Drive::new(&pool, Codec::Hevc, &source, 4096, true, limits);
+        let ranges: Vec<_> = (0..3)
+            .map(|_| drive.next(4096).unwrap().unwrap().range)
+            .collect();
+        let boundary = if matches!(kind, 32..=37 | 39 | 41..=44 | 48..=55) {
+            5432
+        } else {
+            5440
+        };
+        assert_eq!(ranges[1], 4295..boundary, "type {kind}");
+        assert_eq!(ranges[2].start, boundary, "type {kind}");
+    }
+}
+
 fn hevc_nal(out: &mut Vec<u8>, zeros: usize, kind: u8, layer: u8, body: u8) {
     out.resize(out.len() + zeros, 0);
     out.extend([1, (kind << 1) | (layer >> 5), (layer << 3) | 1, body]);

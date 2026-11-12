@@ -23,11 +23,11 @@ fn word(raw: &[u8], at: usize) -> u16 {
     u16::from_be_bytes([byte(raw, at), byte(raw, at + 1)])
 }
 
-/// Whether the receiver takes a PCS's video size as its canvas: both sides at
-/// least one and `(width + 128) × (height + 128)` below 2²⁸ (65,535 × 1 and
-/// 63,422 × 4,096 are taken, 0 × 0, 63,423 × 4,096 and 65,535 × 65,535 are not).
+/// Whether the receiver takes a PCS's video size as its canvas
+/// ([`crate::canvas::accepts`]): 65,535 × 1 and 63,422 × 4,096 are taken,
+/// 0 × 0, 63,423 × 4,096 and 65,535 × 65,535 are not.
 fn valid_canvas(width: u16, height: u16) -> bool {
-    width != 0 && height != 0 && (u64::from(width) + 128) * (u64::from(height) + 128) < 1 << 28
+    crate::canvas::accepts(width.into(), height.into())
 }
 
 /// A packet's PTS in microseconds, as the receiver rescales it: `None` when

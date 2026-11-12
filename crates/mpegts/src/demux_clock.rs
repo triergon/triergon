@@ -80,11 +80,18 @@ pub struct EncodedTimeView {
     pub origin: ClockOrigin,
 }
 
+/// The window of PERIOD90 ticks the program's timestamps are read in, set by
+/// its first reference timestamp (the first DTS, or the PTS without one).
 fn initial_interval(reference: u64) -> ClockOrigin {
-    // The fixed 90-kHz behavioural profile admits one congruent representative
-    // in an interval of width PERIOD90. Its 60-second lead is contract data.
-    // At this timebase the near-end window is narrower than an eighth period.
-    // No observed peer timestamp is an input to this interval construction.
+    // The window starts 60 s (5,400,000 ticks) before the first reference, or
+    // at 0 when that is earlier, and one period lower when the first reference
+    // lies within the last 60 s before 2^33, which then reads as negative.
+    // Later timestamps never move it. Observed: after a first 10,000,000,
+    // 4,600,000 reads as itself and 4,599,999 as 8,594,534,591; a first
+    // 2^33 - 5,400,000 reads as -5,400,000, then 0 as 0, 2^33 - 10,800,000 as
+    // -10,800,000 and 2^33 - 10,800,001 as itself; a first 2^33 - 5,400,001
+    // reads as itself, then 0 as 2^33; after a first 1,000, 2^33 - 1,000 reads
+    // as itself.
     const LEAD90: i128 = 60 * 90_000;
     let reference90 = i128::from(reference);
     let candidate = reference90 - LEAD90;
