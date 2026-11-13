@@ -622,6 +622,15 @@ impl<'a> Mp4IndexJob<'a> {
                     native_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
+            } else if native_front && !movie.trex().is_empty() {
+                PacketCursor::new_front_fragmented(
+                    b,
+                    native.as_slice(),
+                    movie.media(),
+                    movie.terminal_mdat(),
+                    movie.trex(),
+                    native_limits,
+                )?
             } else if native_front {
                 PacketCursor::new_front_source(
                     b,

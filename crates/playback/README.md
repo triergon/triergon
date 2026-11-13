@@ -164,12 +164,14 @@ Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
 Range playback derives the duration from packet end times when the movie
 header's duration is unknown or exceeds the presentation clock.
-Complete fragmented files support an open-ended rate-one media edit. A
+Fragmented files support an open-ended rate-one media edit. Forward playback
+applies it from the front movie, including tracks first seen in later fragments. A
 leading empty subtitle edit delays the subtitle packet clocks. When video
 seeks before the first sync packet of a secondary fragment track, range
 playback replays that track from its first packet. An AAC track with a
 single initialization edit carries leading trim in the first packet's
-`Mp4Packet::encoded_skip_samples`.
+`Mp4Packet::encoded_skip_samples`. Source sample clocks and byte ranges stay
+literal while the compatibility packet clocks reflect the edit.
 For regular front-metadata input with one finite media extent,
 `compat::mov::forward_encoded_edits` accepts checked encoded edit plans
 and delivers projected packets in source byte order. AAC packets include the

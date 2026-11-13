@@ -12,7 +12,7 @@ enum Phase {
     Audio(AacAscParser),
 }
 
-/// Read the leading decoder trim for the first AAC packet of a complete
+/// Read the leading decoder trim for the first AAC packet of a
 /// fragmented track with an open-ended rate-one edit. The source sample and
 /// fragment decode times stay in the original media timebase.
 #[allow(missing_debug_implementations)] // The AAC parser has no Debug implementation.
@@ -31,10 +31,17 @@ impl FragmentAacTrimJob {
             .tracks()
             .get(at)
             .ok_or(Error::Invalid("fragment edit track absent"))?;
-        if track.header().handler != *b"soun"
-            || track.fragments().is_empty()
-            || track.table().sample_count() != 0
-            || movie.read_scope() != MetadataReadScope::CompleteEntity
+        if track.header().handler != *b"soun" || track.table().sample_count() != 0 {
+            return Ok(None);
+        }
+        if track.fragments().is_empty()
+            && !(matches!(
+                movie.read_scope(),
+                MetadataReadScope::FrontMetadataBeforeMdat(_)
+            ) && movie
+                .trex()
+                .iter()
+                .any(|trex| trex.track_id == track.header().track_id))
         {
             return Ok(None);
         }

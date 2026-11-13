@@ -3167,6 +3167,84 @@ fn forward_encoded_edits_keep_aac_preroll_and_trim_in_source_order() {
 }
 
 #[test]
+fn forward_fragment_edits_keep_source_clocks_and_trim_once() {
+    use triergon_playback::progressive::ProgressiveLimits;
+
+    for raw in [
+        include_bytes!("fixtures/mp4/forward-fragment-aac-edit.mp4").as_slice(),
+        include_bytes!("fixtures/mp4/forward-fragment-aac-late-track.mp4").as_slice(),
+    ] {
+        let (selected, budget, calls) = probe(raw, 37, true);
+        let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+        run_open(&mut open, 17).unwrap();
+        let opened = open.finish().unwrap();
+        let mut index =
+            Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+        assert!((0..100_000).any(|_| index.poll(&mut WorkBudget::new(17), &off()).unwrap()));
+        let engine = Engine::mp4_native_terminal_v1(
+            opened.input,
+            index.finish().unwrap(),
+            1 << 20,
+            ProgressiveLimits::default(),
+        )
+        .unwrap();
+        let mut player = Player::new_direct(
+            engine,
+            opened.source,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+        let out = collect(&mut player, 17).unwrap();
+        let packets = mp4_packets(&out);
+        assert_eq!(packets.len(), 21);
+        assert!(
+            packets.windows(2).all(|rows| {
+                rows[0].source.sample.range.end <= rows[1].source.sample.range.start
+            })
+        );
+        let mut audio_count = 0;
+        for packet in packets {
+            let source = &packet.source.sample;
+            let range = &source.range;
+            assert_eq!(
+                packet.source.payload.as_ref(),
+                &raw[range.start as usize..range.end as usize]
+            );
+            if packet.configuration.track.handler == *b"soun" {
+                let expected = 1024 * audio_count;
+                let occurrence = packet.native.as_ref().unwrap();
+                assert_eq!(source.dts_ticks, Some(i128::from(expected)));
+                assert_eq!(occurrence.demux.dts, Some(expected - 1024));
+                assert_eq!(occurrence.demux.pts, Some(expected - 1024));
+                let mut leading_trim = [0; 10];
+                leading_trim[..4].copy_from_slice(&1024u32.to_le_bytes());
+                assert_eq!(
+                    packet.encoded_skip_samples,
+                    (audio_count == 0).then_some(leading_trim)
+                );
+                audio_count += 1;
+            }
+        }
+        assert_eq!(audio_count, 17);
+        let calls = calls.lock().unwrap();
+        let offsets: Vec<_> = calls
+            .iter()
+            .filter_map(|call| match call {
+                Call::Poll(offset) => Some(*offset),
+                _ => None,
+            })
+            .collect();
+        assert!(offsets.windows(2).all(|rows| rows[0] < rows[1]));
+        drop(calls);
+        drop(out);
+        drop(player);
+        drop(opened.movie);
+        assert_eq!(budget.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[test]
 fn forward_encoded_edit_drains_samples_outside_the_presentation() {
     let mut raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4").to_vec();
     let audio_edit = raw.windows(4).rposition(|kind| kind == b"elst").unwrap();

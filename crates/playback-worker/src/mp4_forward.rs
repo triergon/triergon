@@ -185,7 +185,7 @@ fn operation(pool: &Budget, raw: &Bytes, layout: Layout, work: Work) -> Result<W
             let include_trim = layout == Layout::ProgressiveEdited;
             let mut plans = BudgetVec::new(pool);
             let limits = PlanLimits::default();
-            let mut index = if include_trim {
+            let mut index = if include_trim && movie.trex().is_empty() {
                 plans.try_reserve_exact(movie.tracks().len())?;
                 for track in movie.tracks() {
                     let plan = crate::mp4_range::prepare_edit(

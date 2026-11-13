@@ -631,6 +631,36 @@
         "bytes": 3034,
         "digest": 635478357930127229
       }
+    },
+    {
+      "id": "progressive-fragment-aac-edit",
+      "profile": "progressive-fragment-aac-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-edit.mp4",
+      "sha256": "d8990d764a54e21ff908bd2b7074b993b8e785e750907f270940034ed23f4c37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 7922816248949067195
+      }
+    },
+    {
+      "id": "progressive-fragment-aac-late-track",
+      "profile": "progressive-fragment-aac-late-track",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-late-track.mp4",
+      "sha256": "d898a74c2ddc7edf2c0d4a435e9b2808e14b611339028131d324cc518a27af4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 8711731649149925243
+      }
     }
   ]
 }

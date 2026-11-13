@@ -156,6 +156,7 @@ struct Slot<'a> {
     discard_boundary: Option<i128>,
     fragment_cto_minimum: i64,
     fragment_edit: Option<FragmentEdit>,
+    front_fragment: bool,
     previous_clock: Option<PreviousClock>,
     saw_fragment: bool,
     starts_fragment_run: bool,
@@ -180,6 +181,7 @@ impl<'a> Slot<'a> {
             discard_boundary: None,
             fragment_cto_minimum: 0,
             fragment_edit: None,
+            front_fragment: false,
             previous_clock: None,
             saw_fragment: false,
             starts_fragment_run: false,
@@ -221,6 +223,7 @@ impl<'a> Slot<'a> {
             discard_boundary: self.discard_boundary,
             fragment_cto_minimum: self.fragment_cto_minimum,
             fragment_edit: self.fragment_edit,
+            front_fragment: self.front_fragment,
             previous_clock: self.previous_clock,
             saw_fragment: self.saw_fragment,
             starts_fragment_run: self.starts_fragment_run,
@@ -410,11 +413,7 @@ impl<'a> Slot<'a> {
                     source_known: sample.dts_ticks.is_some(),
                 });
             }
-            let edit = self.fragment_edit.map(|edit| EditIdentity {
-                sequence: sample.ordinal,
-                edit_ordinal: 1 + u32::from(edit.leading_empty),
-                duration_basis: DurationBasis::FragmentDecodeDelta,
-            });
+            let edit = self.fragment_edit.map(|edit| edit.identity(sample.ordinal));
             PacketOccurrence {
                 track_id: self.track.track_id,
                 source: sample,
@@ -555,8 +554,8 @@ fn fragment_media_start_at(edits: &EditList, at: u32) -> Result<i64> {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct FragmentEdit {
-    packet_offset: i64,
+pub(crate) struct FragmentEdit {
+    pub(crate) packet_offset: i64,
     media_start: i64,
     leading_empty: bool,
 }
@@ -585,6 +584,14 @@ impl FragmentEdit {
             media_start,
             leading_empty: at != 0,
         })
+    }
+
+    pub(crate) fn identity(self, sequence: u64) -> EditIdentity {
+        EditIdentity {
+            sequence,
+            edit_ordinal: 1 + u32::from(self.leading_empty),
+            duration_basis: DurationBasis::FragmentDecodeDelta,
+        }
     }
 }
 
@@ -659,6 +666,32 @@ impl<'a> PacketCursor<'a> {
         }
         let mut cursor = Self::from_slots(slots, media, limits);
         cursor.projection = projection;
+        Ok(cursor)
+    }
+
+    /// Project initialization edits for tracks declared by the front movie's
+    /// fragment defaults, including tracks whose first fragment arrives later.
+    pub fn new_front_fragmented(
+        budget: &Budget,
+        tracks: &[DemuxTrack<'a>],
+        media: &'a [Range<u64>],
+        terminal: Option<crate::TerminalMdat>,
+        defaults: &[crate::Trex],
+        limits: PacketLimits,
+    ) -> Result<Self> {
+        let mut cursor = Self::new_front_source(
+            budget,
+            tracks,
+            media,
+            terminal,
+            limits,
+            DemuxProfile::NoParseNoFillin,
+        )?;
+        for slot in cursor.slots.as_mut_slice() {
+            slot.front_fragment = defaults
+                .iter()
+                .any(|entry| entry.track_id == slot.track.track_id);
+        }
         Ok(cursor)
     }
 
@@ -826,7 +859,7 @@ impl<'a> PacketCursor<'a> {
             slot.previous_clock,
             slot.fragment_cto_minimum,
             slot.track.table.sample_count(),
-            slot.edited.is_some(),
+            slot.fragment_edit,
         ))
     }
     /// Explicit encoded edit admission; the default/demux-source constructors
@@ -1320,15 +1353,16 @@ impl<'a> PacketCursor<'a> {
                     slot.edited = if slot.encoded_edit.is_some() {
                         None
                     } else if let Some((edits, movie_base)) = slot.track.edits {
-                        if slot.saw_fragment {
-                            if !self.complete_source || self.front_source {
-                                return Err(Error::Unsupported(
-                                    "fragment edit needs a complete source",
-                                ));
-                            }
+                        if (slot.saw_fragment && self.complete_source)
+                            || (slot.front_fragment && slot.track.table.sample_count() == 0)
+                        {
                             slot.fragment_edit =
                                 Some(FragmentEdit::new(edits, movie_base, slot.track.media_base)?);
                             None
+                        } else if slot.saw_fragment {
+                            return Err(Error::Unsupported(
+                                "fragment edit needs a complete source",
+                            ));
                         } else {
                             let cursor = EditCursor::new(
                                 slot.track.table,

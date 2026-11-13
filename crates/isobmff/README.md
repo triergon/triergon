@@ -327,9 +327,11 @@ rejects boxes extending past the source.
   durations longer than one coded frame. Trim counts use the coded frame length.
   The regular range view also establishes a 1024-sample clock for indexed AAC-LC
   configurations 11, 12 and 14 when the media timescale matches the core rate.
-  The compatible view of a complete fragmented file supports one open-ended
-  rate-one media edit after an optional leading empty edit. The empty edit
+  The compatible view of a fragmented file supports one open-ended rate-one
+  media edit after an optional leading empty edit. The empty edit
   delays packet clocks by its duration, rounded to the track time base.
+  A front movie with fragment defaults establishes the same edit before the
+  track's first fragment, even when that fragment follows other media.
   Backward seek queries subtract the media start. AAC leading trim for
   a single initialization edit uses the configured audio sample rate.
   Regular Opus range playback retains the `dOps` record and exposes its canonical
