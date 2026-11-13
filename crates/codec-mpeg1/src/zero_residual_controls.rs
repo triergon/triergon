@@ -48,7 +48,14 @@ fn code(
         last_intra: None,
         skipped: 0,
     };
-    e.inter_mb(&input, 0, 0, 0, &mut state, Mv::ZERO, 1, true, tight);
+    let inter = Inter {
+        mv: Mv::ZERO,
+        f_code: 1,
+        edge: true,
+        tight,
+        repeated: false,
+    };
+    e.inter_mb(&input, 0, 0, 0, &mut state, inter);
     assert_eq!(state.q, q);
     assert_eq!(state.pmv, Mv::ZERO);
     (e.levels[0], expected, e.writer.bit_len())
